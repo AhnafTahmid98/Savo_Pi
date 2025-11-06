@@ -1,0 +1,9 @@
+indoor:
+  max_linear: 0.2
+  max_angular: 0.5
+demo:
+  max_linear: 0.1
+  max_angular: 0.3
+safe:
+  max_linear: 0.05
+  max_angular: 0.2

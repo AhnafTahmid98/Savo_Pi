@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>savo_bringup</name>
+  <version>0.0.1</version>
+  <description>Launch + config for Robot Savo core stack</description>
+  <maintainer email="todo@example.com">TODO_NAME</maintainer>
+  <license>MIT</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <exec_depend>rclpy</exec_depend>
+</package>

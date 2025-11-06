@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+# ROS 2
+build/
+install/
+log/
+# Editors
+.vscode/
+.idea/
+# OS
+.DS_Store
+Thumbs.db
+# Data
+bags/

@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>savo_locations</name>
+  <version>0.0.1</version>
+  <description>Static map of known campus locations for navigation</description>
+  <maintainer email="todo@example.com">TODO_NAME</maintainer>
+  <license>MIT</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+</package>
