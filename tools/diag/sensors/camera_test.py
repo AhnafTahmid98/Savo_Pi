@@ -1,533 +1,450 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Robot Savo — Camera Tester (Ubuntu 24.04 / Pi 5)
-================================================
-- Ubuntu-first: works without Picamera2; uses libcamera core tools + GStreamer. Picamera2 is optional.
-- Listing: tries in order → cam -l (libcamera-tools), libcamera-hello, libcamera-ctl, gst-device-monitor.
-- Preview:
-    --preview wayland  → waylandsink (letterboxed 1280x720 → 800x480) + queues + sync=false
-    --preview kms      → kmssink (DRM/KMS, no compositor) [optional connector id]
-    --preview window   → autovideosink (X11/Wayland window)
-- Stills:
-    --snap PATH        → libcamera-jpeg (if present) or Picamera2 (if present)
-    --snap-gst PATH    → robust GStreamer capture (multifilesink trick, no num-buffers)
-- Video:
-    --record PATH      → MP4/H.264 via Picamera2 or libcamera-vid or pure GStreamer
-    --bitrate BPS      → set desired bitrate (default 8 Mbps)
-    --encoder {x264, openh264, auto} (default x264)
-- Logging (optional):
-    --log BASE         → writes BASE.txt (human) & BASE.csv (machine) with timestamps + config
+Robot Savo — Camera Diagnostic (Ubuntu 24.04 on Raspberry Pi 5)
+----------------------------------------------------------------
+- List cameras (libcamera 'cam -l' or gst-device-monitor).
+- Live preview to 7" DSI: Wayland, X11, or DRM/KMS (kmssink).
+- Record MP4 (H.264) with valid moov (graceful EOS), GOP control, faststart.
+- Capture a JPEG still using a minimal GStreamer pipeline.
+- Optional CSV logging of config + results.
+- No Picamera2 required; works with libcamera + GStreamer.
 
-Wayland preview env (example):
-    export XDG_RUNTIME_DIR=/run/user/1000
-    export WAYLAND_DISPLAY=wayland-1
-    export GST_PLUGIN_PATH=/usr/local/lib/aarch64-linux-gnu/gstreamer-1.0
-    export LD_LIBRARY_PATH=/usr/local/lib/aarch64-linux-gnu:/usr/local/lib
+
+Wayland env (for DSI preview):
+  export XDG_RUNTIME_DIR=/run/user/1000
+  export WAYLAND_DISPLAY=wayland-1
+  # If you compiled GStreamer/libcamera to /usr/local:
+  export GST_PLUGIN_PATH=/usr/local/lib/aarch64-linux-gnu/gstreamer-1.0
+  export LD_LIBRARY_PATH=/usr/local/lib/aarch64-linux-gnu:/usr/local/lib
+
+  
 """
 
 import argparse
-import csv
-import datetime as dt
-import glob
 import os
-import shlex
-import shutil
-import signal
-import subprocess
 import sys
-import tempfile
+import shutil
+import subprocess
+import signal
 import time
-from typing import Optional, Tuple, Dict, Any
+import tempfile
+import glob
+import csv
+import json
+import shlex
+from datetime import datetime
+from typing import Optional, List, Tuple
 
-# ---------------- Utilities ----------------
+# -------- Utilities --------
 
-def which(cmd: str) -> bool:
-    return shutil.which(cmd) is not None
+def require(bin_name: str, human: str):
+    if shutil.which(bin_name) is None:
+        print(f"ERROR: {human} not found in PATH (binary: {bin_name}).", file=sys.stderr)
+        hint_video_group()
+        sys.exit(1)
 
-def run(cmd, *, capture=False, check=False, env=None) -> Tuple[int, str]:
-    try:
-        if capture:
-            out = subprocess.check_output(cmd, stderr=subprocess.STDOUT, text=True, env=env)
-            return 0, out
-        rc = subprocess.call(cmd, env=env)
-        if check and rc != 0:
-            raise subprocess.CalledProcessError(rc, cmd)
-        return rc, ""
-    except subprocess.CalledProcessError as e:
-        return e.returncode, getattr(e, "output", str(e))
-    except FileNotFoundError:
-        return 127, f"{cmd[0]} not found"
-    except Exception as e:
-        return 1, f"{type(e).__name__}: {e}"
-
-def require(cmd: str, friendly: Optional[str] = None):
-    if not which(cmd):
-        print(f"ERROR: {friendly or cmd} not found in PATH.", file=sys.stderr)
-        sys.exit(127)
+def run(cmd: List[str], capture: bool = False, env: Optional[dict] = None) -> Tuple[int, str]:
+    if capture:
+        try:
+            out = subprocess.check_output(cmd, stderr=subprocess.STDOUT, env=env)
+            return (0, out.decode(errors="replace"))
+        except subprocess.CalledProcessError as e:
+            return (e.returncode, e.output.decode(errors="replace"))
+    else:
+        try:
+            rc = subprocess.call(cmd, env=env)
+            return (rc, "")
+        except FileNotFoundError:
+            return (127, "")
 
 def ensure_dir_for(path: str):
-    d = os.path.dirname(os.path.abspath(path))
-    if d and not os.path.isdir(d):
-        os.makedirs(d, exist_ok=True)
+    d = os.path.dirname(os.path.abspath(path)) or "."
+    os.makedirs(d, exist_ok=True)
 
 def hint_video_group():
-    print("Hint: If access fails, add user to 'video':\n"
-          "  sudo usermod -aG video $USER && newgrp video", file=sys.stderr)
+    print("\nHint: If camera access fails, add user to 'video' group then relogin:", file=sys.stderr)
+    print("  sudo usermod -aG video $USER && newgrp video\n", file=sys.stderr)
 
-def now_iso():
-    return dt.datetime.now().isoformat(timespec="seconds")
+def pick_encoder(enc: str) -> str:
+    enc = (enc or "x264").lower()
+    if enc not in ("x264", "openh264"):
+        print(f"WARNING: Unknown encoder '{enc}', falling back to x264.")
+        enc = "x264"
+    # Presence hints (no hard fail)
+    if shutil.which("gst-inspect-1.0"):
+        rc_x264, _ = run(["gst-inspect-1.0", "x264"], capture=True)
+        rc_oh, _  = run(["gst-inspect-1.0", "openh264"], capture=True)
+        if enc == "x264" and rc_x264 != 0:
+            print("WARNING: 'x264enc' plugin not found; install gstreamer1.0-plugins-ugly (Ubuntu may bundle it elsewhere).", file=sys.stderr)
+        if enc == "openh264" and rc_oh != 0:
+            print("WARNING: 'openh264enc' plugin not found; prefer --encoder x264 or install OpenH264.", file=sys.stderr)
+    return enc
 
-# ---------------- Logging ----------------
+def run_with_optional_timeout(cmd_list: List[str], timeout_int: Optional[float]):
+    """Wrap gst-launch in `timeout --signal=INT N ...` so mp4mux receives EOS."""
+    if timeout_int and shutil.which("timeout"):
+        return subprocess.Popen(["timeout", "--signal=INT", str(timeout_int), *cmd_list])
+    return subprocess.Popen(cmd_list)
 
-def start_logs(log_base: Optional[str], header: Dict[str, Any]) -> Optional[Tuple[str, str]]:
-    if not log_base:
-        return None
-    txt = f"{log_base}.txt"
-    csvp = f"{log_base}.csv"
-    ensure_dir_for(txt)
-    with open(txt, "a", encoding="utf-8") as f:
-        f.write(f"[{now_iso()}] camera_test start\n")
-        for k, v in header.items():
-            f.write(f"  {k}: {v}\n")
-    new_file = not os.path.exists(csvp)
-    with open(csvp, "a", newline="", encoding="utf-8") as f:
-        w = csv.writer(f)
-        if new_file:
-            w.writerow(["timestamp"] + list(header.keys()))
-        w.writerow([now_iso()] + [header[k] for k in header.keys()])
-    return txt, csvp
-
-def append_log(log_paths: Optional[Tuple[str, str]], row: Dict[str, Any]):
-    if not log_paths:
-        return
-    txt, csvp = log_paths
-    with open(txt, "a", encoding="utf-8") as f:
-        f.write(f"[{now_iso()}] " + " ".join(f"{k}={v}" for k, v in row.items()) + "\n")
-    with open(csvp, "a", newline="", encoding="utf-8") as f:
-        w = csv.writer(f)
-        keys = list(row.keys())
-        w.writerow([now_iso()] + [row[k] for k in keys])
-
-# ---------------- Optional Picamera2 ----------------
-
-def have_picamera2() -> bool:
+def size_bytes(path: str) -> Optional[int]:
     try:
-        import picamera2  # noqa: F401
-        return True
+        return os.path.getsize(path)
     except Exception:
-        return False
+        return None
 
-# ---------------- Listing (robust) ----------------
+def write_csv_row(csv_path: str, data: dict):
+    if not csv_path:
+        return
+    ensure_dir_for(csv_path)
+    new_file = not os.path.exists(csv_path)
+    keys = ["ts","mode","width","height","fps","encoder","bitrate","gop",
+            "duration","faststart","path","size_bytes","extra"]
+    with open(csv_path, "a", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=keys)
+        if new_file:
+            w.writeheader()
+        row = {k: data.get(k, "") for k in keys}
+        w.writerow(row)
+
+def print_config(namespace: argparse.Namespace):
+    cfg = vars(namespace).copy()
+    # Hide long/unused fields if any later
+    print("# Config:")
+    print(json.dumps(cfg, indent=2, sort_keys=True))
+
+# -------- Listing --------
 
 def list_devices():
-    """
-    Robust camera lister for Ubuntu/RPi:
-    1) cam -l (libcamera-tools) at common paths
-    2) libcamera-hello --list-cameras (if available)
-    3) libcamera-ctl --list-cameras (if available)
-    4) gst-device-monitor-1.0 Video/Source (fallback, muted warnings)
-    """
-    def try_cmd(cmd, env=None, label=None):
-        rc, out = run(cmd, capture=True, env=env)
-        if rc == 0 and out and out.strip():
-            print(out.strip() if not label else f"{label}\n{out.strip()}")
-            return True
+    # Prefer libcamera 'cam -l' (from libcamera-tools)
+    cam_bin = shutil.which("cam") or "/usr/local/bin/cam"
+    if os.path.exists(cam_bin):
+        rc, out = run([cam_bin, "-l"], capture=True)
         if out:
             print(out.strip())
-        return False
-
-    cam_candidates = [
-        shutil.which("cam"),
-        "/usr/bin/cam",
-        "/usr/local/bin/cam",
-    ]
-    for c in cam_candidates:
-        if c and os.path.exists(c):
-            if try_cmd([c, "-l"]):
-                return
-
-    hello = shutil.which("libcamera-hello")
-    if hello and try_cmd([hello, "--list-cameras"]):
-        return
-
-    ctl = shutil.which("libcamera-ctl")
-    if ctl and try_cmd([ctl, "--list-cameras"]):
-        return
-
+            return
+    # Fallback: gst-device-monitor
     mon = shutil.which("gst-device-monitor-1.0")
     if mon:
         env = os.environ.copy()
         env.setdefault("GST_DEBUG", "0")
-        if try_cmd([mon, "Video/Source"], env=env, label="Detected video sources (GStreamer):"):
+        rc, out = run([mon, "Video/Source"], capture=True, env=env)
+        if out:
+            print("Detected video sources (GStreamer):")
+            print(out.strip())
             return
-
-    print("No camera listers found or returned no devices.")
+    print("No camera listers available.")
     print("Install (if missing):")
     print("  sudo apt install libcamera-tools")
     print("  sudo apt install gstreamer1.0-plugins-base-apps")
 
-# ---------------- Stills ----------------
+# -------- Still capture --------
 
-def snap_picamera2(path: str, w: int, h: int, exposure_us: Optional[int], iso: Optional[int], awb: Optional[str]):
-    from picamera2 import Picamera2
-    cam = Picamera2()
-    cfg = cam.create_still_configuration(main={"size": (w, h)})
-    cam.configure(cfg)
-    controls = {}
-    if exposure_us is not None:
-        controls["ExposureTime"] = int(max(100, exposure_us))
-    if iso is not None:
-        controls["AnalogueGain"] = float(max(1.0, iso/100.0))
-    if awb:
-        controls["AwbMode"] = awb
-    cam.start(); time.sleep(0.5)
-    if controls:
-        cam.set_controls(controls); time.sleep(0.3)
-    cam.capture_file(path)
-    cam.stop()
-    print(f"Saved still: {path}")
-
-def snap_cli(path: str, w: int, h: int, exposure_us: Optional[int], iso: Optional[int], awb: Optional[str], cam_index: Optional[int]):
-    if not which("libcamera-jpeg"):
-        print("libcamera-jpeg not found; use --snap-gst or install libcamera-apps.", file=sys.stderr)
-        sys.exit(127)
-    cmd = ["libcamera-jpeg", "-o", path, "--width", str(w), "--height", str(h), "-n"]
-    if cam_index is not None: cmd += ["--camera", str(cam_index)]
-    if awb: cmd += ["--awb", awb]
-    if iso: cmd += ["--gain", f"{max(1.0, float(iso)/100.0):.2f}"]
-    if exposure_us: cmd += ["--shutter", str(int(max(100, exposure_us)))]
-    print("Running:", " ".join(shlex.quote(x) for x in cmd))
-    rc, out = run(cmd, capture=True)
-    if rc != 0:
-        print(out, file=sys.stderr); hint_video_group(); sys.exit(rc)
-    print(f"Saved still: {path}")
-
-def snap_gst(path: str, w: int, h: int):
-    """Robust still capture via GStreamer without libcamera-apps.
-    Strategy: run libcamerasrc → jpegenc → multifilesink, wait for first frame, then stop.
-    """
+def snap_gst(path: str, w: int, h: int, fps: int, hflip: bool, vflip: bool):
+    """Take a single JPEG using GStreamer; save to `path`."""
     require("gst-launch-1.0", "GStreamer (gst-launch-1.0)")
     ensure_dir_for(path)
-
     tmpdir = tempfile.mkdtemp(prefix="savo_cam_snap_")
     pattern = os.path.join(tmpdir, "frame-%06d.jpg")
+
+    flips = []
+    # Some builds expose a 'videoflip' element; safest is to request transforms via capsfilters
+    # but videoflip is simpler if present. Here we try videoflip; if absent, caps ignores it.
+    if hflip or vflip:
+        mode = "horizontal-flip" if hflip and not vflip else \
+               "vertical-flip" if vflip and not hflip else \
+               "rotate-180"
+        flips = ["!", "videoflip", f"video-direction={mode}"]
 
     pipeline = [
         "gst-launch-1.0", "-e",
         "libcamerasrc", "!",
-        f"video/x-raw,format=I420,width={w},height={h},framerate=30/1", "!",
-        "videoconvert", "!", "jpegenc", "!",
+        f"video/x-raw,format=I420,width={w},height={h},framerate={fps}/1", "!",
+        "videoconvert", *flips, "!",
+        "jpegenc", "!",
         "multifilesink", f"location={pattern}", "post-messages=true"
     ]
     print("Running:", " ".join(shlex.quote(x) for x in pipeline))
-    proc = subprocess.Popen(pipeline, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    rc, _ = run(pipeline, capture=False)
 
-    first_path = None
-    t0 = time.time()
+    # pick last frame
     try:
-        # Wait up to ~2.0s for the first frame to appear
-        while (first_path is None) and (time.time() - t0) < 2.0:
-            files = sorted(glob.glob(os.path.join(tmpdir, "frame-*.jpg")))
-            if files:
-                first_path = files[0]
-                break
-            time.sleep(0.05)
-
-        if first_path is None:
-            try:
-                _, err = proc.communicate(timeout=0.2)
-            except Exception:
-                err = ""
-            proc.terminate()
-            try:
-                proc.wait(timeout=1.0)
-            except Exception:
-                proc.kill()
-            if err:
-                print(err.strip(), file=sys.stderr)
-            print("ERROR: No frame produced. Check camera access and GStreamer.", file=sys.stderr)
-            hint_video_group()
-            sys.exit(1)
-
-        # We have a frame → stop the pipeline cleanly
-        proc.send_signal(signal.SIGINT)
-        try:
-            proc.wait(timeout=1.0)
-        except Exception:
-            proc.kill()
-
-        shutil.move(first_path, path)
-        print(f"Saved still (gst): {path}")
-
+        files = sorted(glob.glob(os.path.join(tmpdir, "frame-*.jpg")))
+        if not files:
+            raise FileNotFoundError("No JPEG frames produced.")
+        last = files[-1]
+        shutil.copy2(last, path)
     finally:
         try:
-            shutil.rmtree(tmpdir, ignore_errors=True)
+            for f in glob.glob(os.path.join(tmpdir, "frame-*.jpg")):
+                os.remove(f)
+            os.rmdir(tmpdir)
         except Exception:
             pass
+    print(f"Saved still (gst): {path}")
 
-# ---------------- Video record ----------------
+# -------- Recording --------
 
-def record_picamera2(path: str, w: int, h: int, fps: int, duration: float, bitrate: int,
-                     exposure_us: Optional[int], iso: Optional[int], awb: Optional[str]):
-    from picamera2 import Picamera2
-    from picamera2.encoders import H264Encoder, Quality
-    cam = Picamera2()
-    cfg = cam.create_video_configuration(
-        main={"size": (w, h)},
-        controls={"FrameDurationLimits": (int(1e6/fps), int(1e6/fps))}
-    )
-    cam.configure(cfg)
-    controls = {}
-    if exposure_us is not None: controls["ExposureTime"] = int(max(100, exposure_us))
-    if iso is not None: controls["AnalogueGain"] = float(max(1.0, iso/100.0))
-    if awb: controls["AwbMode"] = awb
-    enc = H264Encoder(bitrate=max(100_000, int(bitrate)))
-    cam.start_recording(enc, path, quality=Quality.MEDIUM)
-    time.sleep(0.5)
-    if controls: cam.set_controls(controls)
-    print(f"Recording {duration:.1f}s → {path} @ {w}x{h} {fps}fps, {bitrate} bps")
-    time.sleep(max(0.0, duration))
-    cam.stop_recording()
-    print("Done.")
-
-def have_gst_element(name: str) -> bool:
-    rc, _ = run(["gst-inspect-1.0", name], capture=True)
-    return rc == 0
-
-def pick_encoder(pref: str) -> str:
-    if pref == "x264":
-        return "x264"
-    if pref == "openh264":
-        return "openh264" if have_gst_element("openh264enc") else "x264"
-    # auto: prefer openh264 if present; else x264
-    return "openh264" if have_gst_element("openh264enc") else "x264"
-
-def record_cli(path: str, w: int, h: int, fps: int, duration: float, bitrate: int, cam_index: Optional[int]):
-    if not which("libcamera-vid"):
-        print("libcamera-vid not found; falling back to pure GStreamer.", file=sys.stderr)
-        record_gst(path, w, h, fps, bitrate, duration, encoder="auto")
-        return
-    cmd = [
-        "libcamera-vid", "-t", str(int(duration*1000)),
-        "--width", str(w), "--height", str(h),
-        "--framerate", str(int(fps)),
-        "--bitrate", str(int(bitrate)),
-        "-o", path, "-n"
-    ]
-    if cam_index is not None:
-        cmd += ["--camera", str(cam_index)]
-    print("Running:", " ".join(shlex.quote(x) for x in cmd))
-    rc, out = run(cmd, capture=True)
-    if rc != 0:
-        print(out, file=sys.stderr); hint_video_group(); sys.exit(rc)
-    print(f"Saved video: {path}")
-
-def record_gst(path: str, w: int, h: int, fps: int, bitrate: int, duration: float, encoder: str = "x264"):
-    """Pure GStreamer MP4/H.264 (x264enc or openh264enc), graceful EOS for valid MP4."""
+def record_gst(path: str, w: int, h: int, fps: int, bitrate: int,
+               duration: float, encoder: str = "x264", gop: Optional[int] = 60,
+               timeout_int: Optional[float] = None, faststart: bool = True,
+               hflip: bool = False, vflip: bool = False) -> dict:
+    """
+    Record MP4/H.264 with EOS finalization:
+    - External timeout: `timeout --signal=INT <N>` wraps gst-launch
+    - Else internal SIGINT after <duration>
+    Returns a small result dict for logging.
+    """
     require("gst-launch-1.0", "GStreamer (gst-launch-1.0)")
     ensure_dir_for(path)
     enc = pick_encoder(encoder)
 
+    flips = []
+    if hflip or vflip:
+        mode = "horizontal-flip" if hflip and not vflip else \
+               "vertical-flip" if vflip and not hflip else \
+               "rotate-180"
+        flips = ["!", "videoflip", f"video-direction={mode}"]
+
     if enc == "openh264":
         enc_chain = [
-            "videoconvert", "!",
+            "videoconvert", *flips, "!",
             "openh264enc", f"bitrate={int(bitrate/1000)}", "!",
             "h264parse"
         ]
-    else:  # x264
+    else:
         enc_chain = [
-            "videoconvert", "!",
-            "x264enc", f"bitrate={int(bitrate/1000)}",
-            "speed-preset=superfast", "tune=zerolatency", "key-int-max=60", "!",
-            "h264parse"
+            "videoconvert", *flips, "!",
+            "x264enc",
+            f"bitrate={int(bitrate/1000)}",
+            "speed-preset=superfast",
+            "tune=zerolatency",
         ]
+        if gop and gop > 0:
+            enc_chain += [f"key-int-max={gop}"]
+        enc_chain += ["!", "h264parse"]
+
+    mux_opts = ["mp4mux"]
+    if faststart:
+        mux_opts += ["faststart=true"]
 
     pipeline = [
-        "gst-launch-1.0", "-e",                     # -e = send EOS on SIGINT
+        "gst-launch-1.0", "-e",
         "libcamerasrc", "!",
         f"video/x-raw,format=I420,width={w},height={h},framerate={fps}/1", "!",
         *enc_chain, "!",
-        "mp4mux", "faststart=true", "!",            # write moov at head
+        *mux_opts, "!",
         "filesink", f"location={path}"
     ]
     print("Running:", " ".join(shlex.quote(x) for x in pipeline))
 
-    # Start pipeline
-    proc = subprocess.Popen(pipeline)
+    t0 = time.time()
+    proc = run_with_optional_timeout(pipeline, timeout_int=timeout_int)
 
     try:
-        # Run for requested duration
-        t_end = time.time() + max(0.0, duration)
-        while proc.poll() is None and time.time() < t_end:
-            time.sleep(0.1)
-
-        if proc.poll() is None:
-            # Graceful stop: SIGINT → EOS → mp4 finalized
-            proc.send_signal(signal.SIGINT)
-            try:
-                proc.wait(timeout=5.0)
-            except subprocess.TimeoutExpired:
-                # Fallback: TERM then KILL if truly stuck
-                proc.terminate()
+        if not timeout_int:
+            t_end = t0 + max(0.0, duration)
+            while proc.poll() is None and time.time() < t_end:
+                time.sleep(0.1)
+            if proc.poll() is None:
+                proc.send_signal(signal.SIGINT)  # graceful EOS
                 try:
-                    proc.wait(timeout=2.0)
+                    proc.wait(timeout=5.0)
                 except subprocess.TimeoutExpired:
-                    proc.kill()
-                    proc.wait(timeout=2.0)
+                    proc.terminate()
+                    try:
+                        proc.wait(timeout=2.0)
+                    except subprocess.TimeoutExpired:
+                        proc.kill()
+                        proc.wait(timeout=2.0)
+        else:
+            proc.wait()
     except KeyboardInterrupt:
-        # Also finalize on Ctrl+C
         try:
             proc.send_signal(signal.SIGINT)
             proc.wait(timeout=5.0)
         except Exception:
             proc.terminate()
+
+    t1 = time.time()
+    out_size = size_bytes(path)
     print(f"Saved video (gst/{enc}): {path}")
+    return {
+        "path": path,
+        "elapsed": round(t1 - t0, 3),
+        "size_bytes": out_size,
+        "encoder": enc
+    }
 
+# -------- Preview --------
 
-# ---------------- Previews ----------------
-
-def check_wayland_env():
-    missing = [k for k in ("XDG_RUNTIME_DIR", "WAYLAND_DISPLAY", "GST_PLUGIN_PATH", "LD_LIBRARY_PATH")
-               if not os.environ.get(k)]
-    if missing:
-        print("ERROR: Missing env:", ", ".join(missing), file=sys.stderr)
-        print("Export the Wayland environment (see header).", file=sys.stderr)
-        sys.exit(2)
-
-def preview_wayland(src_w: int, src_h: int, fps: int, panel_w: int = 800, panel_h: int = 480):
+def preview_wayland(w: int, h: int, fps: int, latency: str, hflip: bool, vflip: bool):
     require("gst-launch-1.0", "GStreamer (gst-launch-1.0)")
-    check_wayland_env()
-    target_w = panel_w
-    target_h = int(round(panel_w * 9 / 16))  # 450 for 800 wide
-    pad = panel_h - target_h                 # 30 → 15/15
-    cmd = [
-        "gst-launch-1.0", "-v",
-        "libcamerasrc", "!", "queue", "!",
-        f"video/x-raw,format=I420,width={src_w},height={src_h},framerate={fps}/1", "!",
-        "videoscale", "!", f"video/x-raw,width={target_w},height={target_h}", "!",
-        "videobox", f"border-alpha=1", f"top={pad//2}", f"bottom={pad - pad//2}", "left=0", "right=0", "!",
-        "videoscale", "!", f"video/x-raw,width={panel_w},height={panel_h}", "!",
-        "videoconvert", "!", "queue", "!",
-        "waylandsink", f"display={os.environ.get('WAYLAND_DISPLAY','wayland-1')}", "sync=false"
-    ]
-    print("Running (Ctrl+C to quit):", " ".join(shlex.quote(x) for x in cmd))
-    os.execvp(cmd[0], cmd)
+    display = os.environ.get("WAYLAND_DISPLAY", "wayland-1")
+    flips = []
+    if hflip or vflip:
+        mode = "horizontal-flip" if hflip and not vflip else \
+               "vertical-flip" if vflip and not hflip else \
+               "rotate-180"
+        flips = ["!", "videoflip", f"video-direction={mode}"]
 
-def preview_kms(src_w: int, src_h: int, fps: int, conn_id: Optional[int] = None):
-    """DRM/KMS direct-to-panel preview (no compositor)."""
-    require("gst-launch-1.0", "GStreamer (gst-launch-1.0)")
-    sink = ["kmssink"]
-    if conn_id is not None:
-        sink += [f"connector-id={conn_id}"]
-    cmd = [
-        "gst-launch-1.0", "-v",
-        "libcamerasrc", "!", "queue", "!",
-        f"video/x-raw,format=I420,width={src_w},height={src_h},framerate={fps}/1", "!",
-        "videoconvert", "!", "queue", "!",
-    ] + sink
-    print("Running (Ctrl+C to quit):", " ".join(shlex.quote(x) for x in cmd))
-    os.execvp(cmd[0], cmd)
+    if latency == "low":
+        pipeline = [
+            "gst-launch-1.0", "-v",
+            "libcamerasrc", "!", "queue", "max-size-buffers=3", "leaky=downstream", "!",
+            f"video/x-raw,format=I420,width={w},height={h},framerate={fps}/1", "!",
+            "videoscale", "!", "video/x-raw,width=800,height=450", "!",
+            "videobox", "border-alpha=1", "top=15", "bottom=15", "left=0", "right=0", "!",
+            "videoscale", "!", "video/x-raw,width=800,height=480", "!",
+            "videoconvert", *flips, "!", "queue", "max-size-buffers=3", "leaky=downstream", "!",
+            "waylandsink", f"display={display}", "sync=false"
+        ]
+    else:
+        pipeline = [
+            "gst-launch-1.0", "-v",
+            "libcamerasrc", "!",
+            f"video/x-raw,format=I420,width={w},height={h},framerate={fps}/1", "!",
+            "videoscale", "!", "video/x-raw,width=800,height=450", "!",
+            "videobox", "border-alpha=1", "top=15", "bottom=15", "left=0", "right=0", "!",
+            "videoscale", "!", "video/x-raw,width=800,height=480", "!",
+            "videoconvert", *flips, "!",
+            "waylandsink", f"display={display}"
+        ]
+    print("Running (Ctrl+C to quit):", " ".join(shlex.quote(x) for x in pipeline))
+    os.execvp(pipeline[0], pipeline)
 
-def preview_window(src_w: int, src_h: int, fps: int):
-    """Windowed preview (X11/Wayland desktop)."""
+def preview_x11(w: int, h: int, fps: int, hflip: bool, vflip: bool):
     require("gst-launch-1.0", "GStreamer (gst-launch-1.0)")
-    cmd = [
+    flips = []
+    if hflip or vflip:
+        mode = "horizontal-flip" if hflip and not vflip else \
+               "vertical-flip" if vflip and not hflip else \
+               "rotate-180"
+        flips = ["!", "videoflip", f"video-direction={mode}"]
+    pipeline = [
         "gst-launch-1.0", "-v",
-        "libcamerasrc", "!", "queue", "!",
-        f"video/x-raw,format=I420,width={src_w},height={src_h},framerate={fps}/1", "!",
-        "videoconvert", "!", "queue", "!",
+        "libcamerasrc", "!",
+        f"video/x-raw,format=I420,width={w},height={h},framerate={fps}/1", "!",
+        "videoconvert", *flips, "!",
         "autovideosink"
     ]
-    print("Running (Ctrl+C to quit):", " ".join(shlex.quote(x) for x in cmd))
-    os.execvp(cmd[0], cmd)
+    print("Running (Ctrl+C to quit):", " ".join(shlex.quote(x) for x in pipeline))
+    os.execvp(pipeline[0], pipeline)
 
-# ---------------- Main ----------------
+def preview_drm(w: int, h: int, fps: int, hflip: bool, vflip: bool):
+    """Direct DRM/KMS preview via kmssink (console); may need tty & KMS console."""
+    require("gst-launch-1.0", "GStreamer (gst-launch-1.0)")
+    # We keep it simple; connector/plane selection left to defaults.
+    flips = []
+    if hflip or vflip:
+        mode = "horizontal-flip" if hflip and not vflip else \
+               "vertical-flip" if vflip and not hflip else \
+               "rotate-180"
+        flips = ["!", "videoflip", f"video-direction={mode}"]
+    pipeline = [
+        "gst-launch-1.0", "-v",
+        "libcamerasrc", "!",
+        f"video/x-raw,format=I420,width={w},height={h},framerate={fps}/1", "!",
+        "videoconvert", *flips, "!",
+        "kmssink"
+    ]
+    print("Running (Ctrl+C to quit):", " ".join(shlex.quote(x) for x in pipeline))
+    os.execvp(pipeline[0], pipeline)
+
+# -------- Main --------
 
 def main():
-    ap = argparse.ArgumentParser(description="Robot Savo — Camera Tester")
-    g = ap.add_mutually_exclusive_group(required=True)
-    g.add_argument("--list", action="store_true", help="List cameras (cam -l / hello / ctl / gst-device-monitor)")
-    g.add_argument("--snap", metavar="PATH", help="Capture JPEG to PATH (libcamera-jpeg or Picamera2)")
-    g.add_argument("--snap-gst", metavar="PATH", help="Capture JPEG via robust GStreamer pipeline")
-    g.add_argument("--record", metavar="PATH", help="Record MP4/H.264 to PATH")
-    g.add_argument("--preview", choices=["wayland", "kms", "window"], help="Live preview sink")
+    ap = argparse.ArgumentParser(description="Robot Savo Camera Diagnostic")
+    ap.add_argument("--list", action="store_true", help="List detected cameras.")
+    ap.add_argument("--preview", choices=["wayland", "x11", "drm"], help="Live preview mode.")
+    ap.add_argument("--latency", choices=["normal", "low"], default="normal",
+                    help="Wayland preview latency preset; 'low' adds queues + sync=false.")
+    ap.add_argument("--record", type=str, help="Record MP4 path.")
+    ap.add_argument("--encoder", choices=["x264", "openh264"], default="x264",
+                    help="H.264 encoder (x264 recommended).")
+    ap.add_argument("--gop", type=int, default=60, help="GOP size (key-int-max) for x264.")
+    ap.add_argument("--faststart", action="store_true", default=True,
+                    help="Enable mp4 'faststart' (moov at head). Default: on.")
+    ap.add_argument("--no-faststart", dest="faststart", action="store_false",
+                    help="Disable mp4 faststart.")
+    ap.add_argument("--snap-gst", type=str, help="Capture a JPEG to this path via GStreamer.")
+    ap.add_argument("--width", type=int, default=1280, help="Frame width.")
+    ap.add_argument("--height", type=int, default=720, help="Frame height.")
+    ap.add_argument("--fps", type=int, default=30, help="Frames per second.")
+    ap.add_argument("--bitrate", type=int, default=8_000_000, help="Target bitrate (bits/s).")
+    ap.add_argument("--duration", type=float, default=6.0, help="Record duration (seconds).")
+    ap.add_argument("--timeout-int", type=float, default=None,
+                    help="Wrap gst-launch with `timeout --signal=INT N` to force EOS finalization.")
+    ap.add_argument("--log", type=str, default=None, help="Append a CSV log row to this path.")
+    ap.add_argument("--print-config", action="store_true", help="Print config JSON before running.")
+    ap.add_argument("--hflip", action="store_true", help="Horizontal flip (preview/record/snap).")
+    ap.add_argument("--vflip", action="store_true", help="Vertical flip (preview/record/snap).")
 
-    ap.add_argument("--width", type=int, default=1280, help="Frame width (snap/record/src)")
-    ap.add_argument("--height", type=int, default=720, help="Frame height (snap/record/src)")
-    ap.add_argument("--fps", type=int, default=30, help="FPS for record/preview")
-    ap.add_argument("--duration", type=float, default=5.0, help="Record duration (sec)")
-    ap.add_argument("--bitrate", type=int, default=8_000_000, help="Video bitrate (bps)")
-    ap.add_argument("--encoder", choices=["auto", "x264", "openh264"], default="x264",
-                    help="Encoder for --record (default x264; auto prefers openh264 if available)")
-    ap.add_argument("--camera", type=int, default=None, help="Camera index (CLI fallback)")
-    ap.add_argument("--awb", type=str, default=None, help="AWB mode (auto/daylight/cloudy/fluorescent/etc.)")
-    ap.add_argument("--iso", type=int, default=None, help="Approx ISO (Picamera2 via AnalogueGain)")
-    ap.add_argument("--exposure", type=int, default=None, help="Exposure time (microseconds)")
-    ap.add_argument("--kms-conn", type=int, default=None, help="DRM/KMS connector id (for --preview kms)")
-    ap.add_argument("--log", type=str, default=None, help="Base path for logs (writes .txt and .csv)")
     args = ap.parse_args()
 
-    header = {
-        "action": ("list" if args.list else
-                   "snap-gst" if args.snap_gst else
-                   "snap" if args.snap else
-                   "record" if args.record else
-                   f"preview:{args.preview}"),
-        "width": args.width, "height": args.height, "fps": args.fps,
-        "bitrate": args.bitrate, "encoder": args.encoder, "duration": args.duration,
-    }
-    logs = start_logs(args.log, header)
+    # Sanity
+    if args.width <= 0 or args.height <= 0 or args.fps <= 0:
+        print("ERROR: width/height/fps must be positive.", file=sys.stderr)
+        sys.exit(2)
 
-    use_p2 = have_picamera2()
+    if args.print-config:
+        print_config(args)
 
+    # Actions
     if args.list:
         list_devices()
-        append_log(logs, {"result": "listed"})
         return
+
+    did_something = False
 
     if args.snap_gst:
-        snap_gst(args.snap_gst, args.width, args.height)
-        append_log(logs, {"result": "snap_gst_ok", "path": args.snap_gst})
-        return
-
-    if args.snap:
-        ensure_dir_for(args.snap)
-        if which("libcamera-jpeg"):
-            snap_cli(args.snap, args.width, args.height, args.exposure, args.iso, args.awb, args.camera)
-        elif use_p2:
-            snap_picamera2(args.snap, args.width, args.height, args.exposure, args.iso, args.awb)
-        else:
-            print("Neither libcamera-jpeg nor Picamera2 available. Use --snap-gst.", file=sys.stderr)
-            sys.exit(127)
-        append_log(logs, {"result": "snap_ok", "path": args.snap})
-        return
+        snap_gst(args.snap_gst, args.width, args.height, args.fps, args.hflip, args.vflip)
+        write_csv_row(args.log, {
+            "ts": datetime.utcnow().isoformat(),
+            "mode": "snap",
+            "width": args.width, "height": args.height, "fps": args.fps,
+            "encoder": "", "bitrate": "", "gop": "",
+            "duration": "", "faststart": "",
+            "path": args.snap_gst, "size_bytes": size_bytes(args.snap_gst),
+            "extra": ""
+        })
+        did_something = True
 
     if args.record:
-        ensure_dir_for(args.record)
-        if use_p2:
-            record_picamera2(args.record, args.width, args.height, args.fps, args.duration, args.bitrate,
-                             args.exposure, args.iso, args.awb)
-        elif which("libcamera-vid"):
-            record_cli(args.record, args.width, args.height, args.fps, args.duration, args.bitrate, args.camera)
-        else:
-            record_gst(args.record, args.width, args.height, args.fps, args.bitrate, args.duration,
-                       encoder=args.encoder)
-        append_log(logs, {"result": "record_ok", "path": args.record})
-        return
+        res = record_gst(args.record, args.width, args.height, args.fps,
+                         args.bitrate, args.duration, args.encoder, args.gop,
+                         args.timeout_int, args.faststart, args.hflip, args.vflip)
+        write_csv_row(args.log, {
+            "ts": datetime.utcnow().isoformat(),
+            "mode": "record",
+            "width": args.width, "height": args.height, "fps": args.fps,
+            "encoder": res.get("encoder"), "bitrate": args.bitrate, "gop": args.gop,
+            "duration": args.duration, "faststart": args.faststart,
+            "path": args.record, "size_bytes": res.get("size_bytes", ""),
+            "extra": ""
+        })
+        did_something = True
 
     if args.preview:
+        # Execs (replaces process)
         if args.preview == "wayland":
-            preview_wayland(args.width, args.height, args.fps)
-        elif args.preview == "kms":
-            preview_kms(args.width, args.height, args.fps, args.kms_conn)
-        else:
-            preview_window(args.width, args.height, args.fps)
-        append_log(logs, {"result": "preview_exited"})
-        return
+            preview_wayland(args.width, args.height, args.fps, args.latency, args.hflip, args.vflip)
+        elif args.preview == "x11":
+            preview_x11(args.width, args.height, args.fps, args.hflip, args.vflip)
+        elif args.preview == "drm":
+            preview_drm(args.width, args.height, args.fps, args.hflip, args.vflip)
+        did_something = True
+
+    if not did_something:
+        print("Nothing to do. Try one of:")
+        print("  --list")
+        print("  --preview wayland|x11|drm  [--latency low] [--hflip/--vflip]")
+        print("  --record /tmp/cam.mp4 --width 1920 --height 1080 --fps 30 --bitrate 10000000 --duration 6 [--timeout-int 6] [--log /tmp/cam.csv]")
+        print("  --snap-gst /tmp/cam.jpg --width 1280 --height 720")
+        print("Add --print-config to dump the current settings.")
 
 if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print("\nInterrupted.")
+        print("\nInterrupted by user.")
