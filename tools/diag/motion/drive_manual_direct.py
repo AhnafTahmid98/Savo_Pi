@@ -4,24 +4,27 @@
 Robot Savo — Manual Teleop (NO ROS2) for Mecanum (PCA9685 + H-Bridge)
 ----------------------------------------------------------------------
 - Keyboard → direct PCA9685 motor drive (no ROS2).
-- **Arrow keys** + **WASD/QE**.
-- Accel limiting, deadman timeout, per-wheel invert, shutdown-safe.
-- **Calibration helpers** for mecanum layout/polarity:
-    • Keys 1/2/3/4 spin FL/FR/RL/RR forward briefly
-    • F = forward pattern, H = strafe-left pattern, T = CCW turn pattern
-    • On wrong motion: use --inv-* flags OR fix channel mapping (fl/fr/rl/rr)
+- Arrow keys + WASD/QE.
+- Accel limiting, deadman, per-wheel invert, shutdown-safe.
+- **Diagnostics** built in to fix your mapping fast:
+    • 1/2/3/4  → pulse FL/FR/RL/RR **forward**
+    • 5/6/7/8  → pulse FL/FR/RL/RR **reverse**
+    • F/H/T    → demo patterns (Forward / strafe-Left / Turn CCW)
+    • M        → print current wheel duties + targets
 - **Sign toggles** for chassis conventions: --flip-vy, --flip-omega
+- **Robust quit**: Esc or Ctrl+C always stops motors and exits.
 
 Key map (US)
   W/S or ↑/↓  = +vx / −vx   (forward/back)
   A/D or ←/→  = +vy / −vy   (strafe left/right)
   Q/E         = +ω  / −ω    (CCW/CW turn)
-  1/2/3/4     = pulse FL/FR/RL/RR forward (diagnostics)
-  F/H/T       = demo patterns (Forward / strafe-Left / Turn CCW)
+  1..4 / 5..8 = pulse single wheel fwd / rev (FL,FR,RL,RR)
+  F/H/T       = forward / strafe-left / turn-CCW pattern demo
+  M           = print current command + wheel duties
   SPACE       = stop immediately
   Shift       = fast scale    |   Ctrl = slow scale
   R           = reset scale to 1.0
-  Esc / Ctrl+C= quit (Esc alone, not when part of an arrow sequence)
+  Esc / Ctrl+C= quit (safe)
 
 Conventions
   +vx forward, +vy left, +ω CCW (can flip vy/ω with flags).
@@ -55,6 +58,7 @@ import sys
 import termios
 import time
 import tty
+import signal
 from dataclasses import dataclass
 
 try:
@@ -175,16 +179,16 @@ class Keyboard:
         out = []
         ch = self._read1(0.0)
         while ch is not None:
-            if ch == b"\x1b":  # ESC or arrow seq
+            if ch == b"":  # ESC or arrow seq
                 a = self._read1(0.02)
                 if a == b'[':
                     b = self._read1(0.02)
                     if b in (b'A', b'B', b'C', b'D'):
                         out.append({b'A': b'UP', b'B': b'DOWN', b'C': b'RIGHT', b'D': b'LEFT'}[b])
                     else:
-                        out.extend(filter(None, [b"\x1b", a, b]))
+                        out.extend(filter(None, [b"", a, b]))
                 else:
-                    out.append(b"\x1b")
+                    out.append(b"")
                     if a:
                         out.append(a)
             else:
@@ -240,14 +244,23 @@ class DirectTeleop:
 
         self.estop_force = bool(args.estop_force)
 
+        # trap SIGINT/SIGTERM for safe stop even if raw tty eats Ctrl+C
+        signal.signal(signal.SIGINT, self._signal_quit)
+        signal.signal(signal.SIGTERM, self._signal_quit)
+
         print(
-            "[Teleop] READY (no ROS2). Esc to quit.\n"
-            f" rate={self.hz} Hz  deadman={self.deadman}s  max(vx,vy,wz)=({self.lim.vx},{self.lim.vy},{self.lim.wz})\n"
-            f" accel(x,y,z)=({self.lim.ax},{self.lim.ay},{self.lim.az})  scale_low={self.scale_low}  scale_high={self.scale_high}\n"
-            f" geom: r={self.geom.r} m, L={self.geom.L} m  PCA9685@0x{args.pca_addr:02X} bus={args.i2c_bus}\n"
-            f" flips: vy={'-vy' if args.flip_vy else 'vy'}  omega={'-ω' if args.flip_omega else 'ω'}\n"
-            " Keys: WASD/QE or Arrows, 1..4 wheel test, F/H/T demos, Space stop, R reset, Shift fast, Ctrl slow\n"
+            "[Teleop] READY (no ROS2). Esc/Ctrl+C to quit."
+            f" rate={self.hz} Hz  deadman={self.deadman}s  max(vx,vy,wz)=({self.lim.vx},{self.lim.vy},{self.lim.wz})"
+            f" accel(x,y,z)=({self.lim.ax},{self.lim.ay},{self.lim.az})  scale_low={self.scale_low}  scale_high={self.scale_high}"
+            f" geom: r={self.geom.r} m, L={self.geom.L} m  PCA9685@0x{args.pca_addr:02X} bus={args.i2c_bus}"
+            f" flips: vy={'-vy' if args.flip_vy else 'vy'}  omega={'-ω' if args.flip_omega else 'ω'}"
+            " Keys: WASD/QE or Arrows, 1..4/5..8 wheel test fwd/rev, F/H/T demos, M print, Space stop, R reset"
         )
+
+    def _signal_quit(self, *_):
+        print("[Teleop] SIGINT/SIGTERM → safe stop and exit")
+        self.close()
+        os._exit(0)
 
     def close(self):
         try:
@@ -302,31 +315,29 @@ class DirectTeleop:
 
     # ------------------ internals ------------------
     def _handle_key(self, ch) -> bool:
-        if ch == b"\x1b":  # lone ESC
+        if ch in (b"", b""):  # Esc or Ctrl+C
             print("[Teleop] Quit")
             return True
         if ch == b' ':  # Space stop
             self.t_vx = self.t_vy = self.t_wz = 0.0
             return False
-        if ch in (b'r', b'R', b"\x12"):
+        if ch in (b'r', b'R', b""):
             self.scale = 1.0
             return False
 
         # diagnostics: single-wheel and patterns
-        if ch == b'1':
-            self._pulse_wheels([1,0,0,0]); return False
-        if ch == b'2':
-            self._pulse_wheels([0,1,0,0]); return False
-        if ch == b'3':
-            self._pulse_wheels([0,0,1,0]); return False
-        if ch == b'4':
-            self._pulse_wheels([0,0,0,1]); return False
-        if ch in (b'f', b'F'):
-            self._demo(vx=0.4, vy=0.0, wz=0.0); return False
-        if ch in (b'h', b'H'):
-            self._demo(vx=0.0, vy=0.4, wz=0.0); return False
-        if ch in (b't', b'T'):
-            self._demo(vx=0.0, vy=0.0, wz=0.8); return False
+        if ch == b'1': self._pulse_wheels([1,0,0,0]); return False
+        if ch == b'2': self._pulse_wheels([0,1,0,0]); return False
+        if ch == b'3': self._pulse_wheels([0,0,1,0]); return False
+        if ch == b'4': self._pulse_wheels([0,0,0,1]); return False
+        if ch == b'5': self._pulse_wheels([1,0,0,0], duty=-0.5); return False
+        if ch == b'6': self._pulse_wheels([0,1,0,0], duty=-0.5); return False
+        if ch == b'7': self._pulse_wheels([0,0,1,0], duty=-0.5); return False
+        if ch == b'8': self._pulse_wheels([0,0,0,1], duty=-0.5); return False
+        if ch in (b'f', b'F'): self._demo(vx=0.4, vy=0.0, wz=0.0); return False
+        if ch in (b'h', b'H'): self._demo(vx=0.0, vy=0.4, wz=0.0); return False
+        if ch in (b't', b'T'): self._demo(vx=0.0, vy=0.0, wz=0.8); return False
+        if ch in (b'm', b'M'): self._print_status(); return False
 
         # speed scaling
         if isinstance(ch, bytes) and len(ch) == 1:
@@ -362,15 +373,17 @@ class DirectTeleop:
 
     def _apply(self, vx, vy, wz):
         r = self.geom.r; L = self.geom.L; sy = self.sy; so = self.so
+        # compute desired wheel angular velocities
         w_fl = ( vx - sy*vy - L*so*wz ) / r
         w_fr = ( vx + sy*vy + L*so*wz ) / r
         w_rl = ( vx + sy*vy - L*so*wz ) / r
         w_rr = ( vx - sy*vy + L*so*wz ) / r
         ws = [w_fl, w_fr, w_rl, w_rr]
         max_w = max(1e-6, max(abs(w) for w in ws))
-        # duty proportional to requested magnitude, not always full-scale
+        # duty proportional to command magnitude
         mag = max(abs(vx)/max(self.lim.vx,1e-6), abs(vy)/max(self.lim.vy,1e-6), abs(wz)/max(self.lim.wz,1e-6))
         duties = [clamp((w/max_w) * mag, -1.0, 1.0) for w in ws]
+        self._duties = duties  # store for M print
         self.FL.drive(duties[0]); self.FR.drive(duties[1]); self.RL.drive(duties[2]); self.RR.drive(duties[3])
 
     def _pulse_wheels(self, mask, duty=0.5, t=0.5):
@@ -382,10 +395,16 @@ class DirectTeleop:
             m.stop()
 
     def _demo(self, vx, vy, wz, t=0.8):
-        # temporary hold targets to visualize motion
         self._apply(vx, vy, wz)
         time.sleep(t)
         self._apply(0.0, 0.0, 0.0)
+
+    def _print_status(self):
+        try:
+            duties = getattr(self, '_duties', [0,0,0,0])
+            print(f"[cmd] vx={self.c_vx:+.3f} vy={self.c_vy:+.3f} wz={self.c_wz:+.3f}  duties=[FL {duties[0]:+.2f}, FR {duties[1]:+.2f}, RL {duties[2]:+.2f}, RR {duties[3]:+.2f}]")
+        except Exception:
+            pass
 
 # --------------------------- CLI -----------------------------------
 
