@@ -324,7 +324,7 @@ def record_cli(path: str, w: int, h: int, fps: int, duration: float, bitrate: in
     print(f"Saved video: {path}")
 
 def record_gst(path: str, w: int, h: int, fps: int, bitrate: int, duration: float, encoder: str = "x264"):
-    """Pure GStreamer MP4/H.264 (x264enc or openh264enc)."""
+    """Pure GStreamer MP4/H.264 (x264enc or openh264enc), graceful EOS for valid MP4."""
     require("gst-launch-1.0", "GStreamer (gst-launch-1.0)")
     ensure_dir_for(path)
     enc = pick_encoder(encoder)
@@ -344,29 +344,46 @@ def record_gst(path: str, w: int, h: int, fps: int, bitrate: int, duration: floa
         ]
 
     pipeline = [
-        "gst-launch-1.0", "-e",
+        "gst-launch-1.0", "-e",                     # -e = send EOS on SIGINT
         "libcamerasrc", "!",
         f"video/x-raw,format=I420,width={w},height={h},framerate={fps}/1", "!",
         *enc_chain, "!",
-        "mp4mux", "!",
+        "mp4mux", "faststart=true", "!",            # write moov at head
         "filesink", f"location={path}"
     ]
     print("Running:", " ".join(shlex.quote(x) for x in pipeline))
-    t0 = time.time()
+
+    # Start pipeline
     proc = subprocess.Popen(pipeline)
+
     try:
-        while proc.poll() is None and (time.time() - t0) < duration:
-            time.sleep(0.2)
+        # Run for requested duration
+        t_end = time.time() + max(0.0, duration)
+        while proc.poll() is None and time.time() < t_end:
+            time.sleep(0.1)
+
         if proc.poll() is None:
-            proc.terminate()
-            try: proc.wait(timeout=2)
-            except Exception: proc.kill()
+            # Graceful stop: SIGINT → EOS → mp4 finalized
+            proc.send_signal(signal.SIGINT)
+            try:
+                proc.wait(timeout=5.0)
+            except subprocess.TimeoutExpired:
+                # Fallback: TERM then KILL if truly stuck
+                proc.terminate()
+                try:
+                    proc.wait(timeout=2.0)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait(timeout=2.0)
     except KeyboardInterrupt:
-        proc.terminate()
-        try: proc.wait(timeout=2)
-        except Exception: proc.kill()
-        raise
+        # Also finalize on Ctrl+C
+        try:
+            proc.send_signal(signal.SIGINT)
+            proc.wait(timeout=5.0)
+        except Exception:
+            proc.terminate()
     print(f"Saved video (gst/{enc}): {path}")
+
 
 # ---------------- Previews ----------------
 
