@@ -11,10 +11,11 @@ Robot Savo — Camera Tester (Ubuntu 24.04 / Pi 5)
     --preview window   → autovideosink (X11/Wayland window)
 - Stills:
     --snap PATH        → libcamera-jpeg (if present) or Picamera2 (if present)
-    --snap-gst PATH    → one-buffer GStreamer: libcamerasrc → jpegenc → filesink
+    --snap-gst PATH    → robust GStreamer capture (multifilesink trick, no num-buffers)
 - Video:
     --record PATH      → MP4/H.264 via Picamera2 or libcamera-vid or pure GStreamer
     --bitrate BPS      → set desired bitrate (default 8 Mbps)
+    --encoder {x264, openh264, auto} (default x264)
 - Logging (optional):
     --log BASE         → writes BASE.txt (human) & BASE.csv (machine) with timestamps + config
 
@@ -28,11 +29,14 @@ Wayland preview env (example):
 import argparse
 import csv
 import datetime as dt
+import glob
 import os
 import shlex
 import shutil
+import signal
 import subprocess
 import sys
+import tempfile
 import time
 from typing import Optional, Tuple, Dict, Any
 
@@ -133,7 +137,6 @@ def list_devices():
             print(out.strip())
         return False
 
-    # 1) cam -l (explicit common locations)
     cam_candidates = [
         shutil.which("cam"),
         "/usr/bin/cam",
@@ -144,17 +147,14 @@ def list_devices():
             if try_cmd([c, "-l"]):
                 return
 
-    # 2) libcamera-hello --list-cameras
     hello = shutil.which("libcamera-hello")
     if hello and try_cmd([hello, "--list-cameras"]):
         return
 
-    # 3) libcamera-ctl --list-cameras
     ctl = shutil.which("libcamera-ctl")
     if ctl and try_cmd([ctl, "--list-cameras"]):
         return
 
-    # 4) GStreamer device monitor (suppress noisy warnings)
     mon = shutil.which("gst-device-monitor-1.0")
     if mon:
         env = os.environ.copy()
@@ -207,8 +207,6 @@ def snap_gst(path: str, w: int, h: int):
     """Robust still capture via GStreamer without libcamera-apps.
     Strategy: run libcamerasrc → jpegenc → multifilesink, wait for first frame, then stop.
     """
-    import tempfile, glob, shutil as _shutil, time as _time, signal
-
     require("gst-launch-1.0", "GStreamer (gst-launch-1.0)")
     ensure_dir_for(path)
 
@@ -226,18 +224,17 @@ def snap_gst(path: str, w: int, h: int):
     proc = subprocess.Popen(pipeline, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
     first_path = None
-    t0 = _time.time()
+    t0 = time.time()
     try:
         # Wait up to ~2.0s for the first frame to appear
-        while (first_path is None) and (_time.time() - t0) < 2.0:
+        while (first_path is None) and (time.time() - t0) < 2.0:
             files = sorted(glob.glob(os.path.join(tmpdir, "frame-*.jpg")))
             if files:
                 first_path = files[0]
                 break
-            _time.sleep(0.05)
+            time.sleep(0.05)
 
         if first_path is None:
-            # Read a bit of stderr for debug and exit
             try:
                 _, err = proc.communicate(timeout=0.2)
             except Exception:
@@ -260,17 +257,14 @@ def snap_gst(path: str, w: int, h: int):
         except Exception:
             proc.kill()
 
-        # Move the first frame to the requested path
-        _shutil.move(first_path, path)
+        shutil.move(first_path, path)
         print(f"Saved still (gst): {path}")
 
     finally:
-        # Clean temp dir
         try:
-            _shutil.rmtree(tmpdir, ignore_errors=True)
+            shutil.rmtree(tmpdir, ignore_errors=True)
         except Exception:
             pass
-
 
 # ---------------- Video record ----------------
 
@@ -297,10 +291,22 @@ def record_picamera2(path: str, w: int, h: int, fps: int, duration: float, bitra
     cam.stop_recording()
     print("Done.")
 
+def have_gst_element(name: str) -> bool:
+    rc, _ = run(["gst-inspect-1.0", name], capture=True)
+    return rc == 0
+
+def pick_encoder(pref: str) -> str:
+    if pref == "x264":
+        return "x264"
+    if pref == "openh264":
+        return "openh264" if have_gst_element("openh264enc") else "x264"
+    # auto: prefer openh264 if present; else x264
+    return "openh264" if have_gst_element("openh264enc") else "x264"
+
 def record_cli(path: str, w: int, h: int, fps: int, duration: float, bitrate: int, cam_index: Optional[int]):
     if not which("libcamera-vid"):
         print("libcamera-vid not found; falling back to pure GStreamer.", file=sys.stderr)
-        record_gst(path, w, h, fps, bitrate, duration)
+        record_gst(path, w, h, fps, bitrate, duration, encoder="auto")
         return
     cmd = [
         "libcamera-vid", "-t", str(int(duration*1000)),
@@ -317,17 +323,31 @@ def record_cli(path: str, w: int, h: int, fps: int, duration: float, bitrate: in
         print(out, file=sys.stderr); hint_video_group(); sys.exit(rc)
     print(f"Saved video: {path}")
 
-def record_gst(path: str, w: int, h: int, fps: int, bitrate: int, duration: float):
-    """Pure GStreamer MP4/H.264 path (needs x264enc + mp4mux)."""
+def record_gst(path: str, w: int, h: int, fps: int, bitrate: int, duration: float, encoder: str = "x264"):
+    """Pure GStreamer MP4/H.264 (x264enc or openh264enc)."""
     require("gst-launch-1.0", "GStreamer (gst-launch-1.0)")
     ensure_dir_for(path)
+    enc = pick_encoder(encoder)
+
+    if enc == "openh264":
+        enc_chain = [
+            "videoconvert", "!",
+            "openh264enc", f"bitrate={int(bitrate/1000)}", "!",
+            "h264parse"
+        ]
+    else:  # x264
+        enc_chain = [
+            "videoconvert", "!",
+            "x264enc", f"bitrate={int(bitrate/1000)}",
+            "speed-preset=superfast", "tune=zerolatency", "key-int-max=60", "!",
+            "h264parse"
+        ]
+
     pipeline = [
         "gst-launch-1.0", "-e",
         "libcamerasrc", "!",
         f"video/x-raw,format=I420,width={w},height={h},framerate={fps}/1", "!",
-        "videoconvert", "!",
-        "x264enc", f"bitrate={int(bitrate/1000)}", "speed-preset=superfast", "tune=zerolatency", "!",
-        "h264parse", "!",
+        *enc_chain, "!",
         "mp4mux", "!",
         "filesink", f"location={path}"
     ]
@@ -346,7 +366,7 @@ def record_gst(path: str, w: int, h: int, fps: int, bitrate: int, duration: floa
         try: proc.wait(timeout=2)
         except Exception: proc.kill()
         raise
-    print(f"Saved video (gst): {path}")
+    print(f"Saved video (gst/{enc}): {path}")
 
 # ---------------- Previews ----------------
 
@@ -412,7 +432,7 @@ def main():
     g = ap.add_mutually_exclusive_group(required=True)
     g.add_argument("--list", action="store_true", help="List cameras (cam -l / hello / ctl / gst-device-monitor)")
     g.add_argument("--snap", metavar="PATH", help="Capture JPEG to PATH (libcamera-jpeg or Picamera2)")
-    g.add_argument("--snap-gst", metavar="PATH", help="Capture JPEG via one-buffer GStreamer pipeline")
+    g.add_argument("--snap-gst", metavar="PATH", help="Capture JPEG via robust GStreamer pipeline")
     g.add_argument("--record", metavar="PATH", help="Record MP4/H.264 to PATH")
     g.add_argument("--preview", choices=["wayland", "kms", "window"], help="Live preview sink")
 
@@ -421,6 +441,8 @@ def main():
     ap.add_argument("--fps", type=int, default=30, help="FPS for record/preview")
     ap.add_argument("--duration", type=float, default=5.0, help="Record duration (sec)")
     ap.add_argument("--bitrate", type=int, default=8_000_000, help="Video bitrate (bps)")
+    ap.add_argument("--encoder", choices=["auto", "x264", "openh264"], default="x264",
+                    help="Encoder for --record (default x264; auto prefers openh264 if available)")
     ap.add_argument("--camera", type=int, default=None, help="Camera index (CLI fallback)")
     ap.add_argument("--awb", type=str, default=None, help="AWB mode (auto/daylight/cloudy/fluorescent/etc.)")
     ap.add_argument("--iso", type=int, default=None, help="Approx ISO (Picamera2 via AnalogueGain)")
@@ -436,7 +458,7 @@ def main():
                    "record" if args.record else
                    f"preview:{args.preview}"),
         "width": args.width, "height": args.height, "fps": args.fps,
-        "bitrate": args.bitrate, "duration": args.duration,
+        "bitrate": args.bitrate, "encoder": args.encoder, "duration": args.duration,
     }
     logs = start_logs(args.log, header)
 
@@ -472,7 +494,8 @@ def main():
         elif which("libcamera-vid"):
             record_cli(args.record, args.width, args.height, args.fps, args.duration, args.bitrate, args.camera)
         else:
-            record_gst(args.record, args.width, args.height, args.fps, args.bitrate, args.duration)
+            record_gst(args.record, args.width, args.height, args.fps, args.bitrate, args.duration,
+                       encoder=args.encoder)
         append_log(logs, {"result": "record_ok", "path": args.record})
         return
 
