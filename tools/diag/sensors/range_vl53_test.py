@@ -19,7 +19,7 @@ import signal
 from collections import deque
 from typing import Dict, Optional, List
 
-# Robust import (module casing varies by build)
+# --- Robust import (handles both module name casings) ------------------------
 try:
     from VL53L1X import VL53L1X
 except ImportError:
@@ -32,7 +32,7 @@ except ImportError:
 
 I2C_ADDRESS = 0x29
 
-# SIGINT / Ctrl+C
+# --- Ctrl+C handling ---------------------------------------------------------
 _stop = False
 def _sigint_handler(signum, frame):
     global _stop
@@ -41,7 +41,7 @@ def _sigint_handler(signum, frame):
         print("\n^C  Stopping cleanly (closing sensors & files)...", flush=True)
 signal.signal(signal.SIGINT, _sigint_handler)
 
-# Utilities
+# --- Utilities ---------------------------------------------------------------
 def _mode_name(mode: str) -> str:
     m = mode.strip().lower()
     if m in ("short", "s"): return "short"
@@ -91,9 +91,10 @@ def read_distance_mm(sensor: VL53L1X) -> Optional[int]:
     except Exception:
         return None
 
+# --- Main --------------------------------------------------------------------
 def main():
     global _stop
-    ap = argparse.ArgumentParser(description="VL53L1X range test on dual I²C buses (no buzzer)")
+    ap = argparse.ArgumentParser(description="VL53L1X range test on dual I²C buses (output in cm)")
     ap.add_argument("--buses", type=str, default="1,0", help="Comma-separated I²C buses, e.g. '1' or '1,0'.")
     ap.add_argument("--rate", type=float, default=20.0, help="Sample rate in Hz (default: 20.0)")
     ap.add_argument("--samples", type=int, default=0, help="Number of samples (0 = run until Ctrl+C)")
@@ -101,7 +102,7 @@ def main():
     ap.add_argument("--timing", type=int, default=50, help="Timing budget in ms (default: 50)")
     ap.add_argument("--inter", type=int, default=0, help="Inter-measurement in ms (0 = auto)")
     ap.add_argument("--median", type=int, default=3, help="Rolling median window (odd int ≥1). 1 = no filter. (default: 3)")
-    ap.add_argument("--threshold", type=int, default=280, help="Near-field alert threshold in mm (default: 280)")
+    ap.add_argument("--threshold", type=float, default=28.0, help="Near-field alert threshold in cm (default: 28.0)")
     ap.add_argument("--csv", action="store_true", help="Write CSV to --out")
     ap.add_argument("--out", type=str, default="vl53l1x_log.csv", help="CSV filename")
     args = ap.parse_args()
@@ -122,9 +123,8 @@ def main():
 
     print(f"[VL53L1X] Addr=0x{I2C_ADDRESS:02X}  Buses={buses}  Mode={_mode_name(args.mode).upper()}  "
           f"Timing={args.timing}ms  Inter={args.inter if args.inter>0 else 'auto'}ms  "
-          f"Rate={args.rate:.2f} Hz  Median={args.median}  Threshold={args.threshold}mm")
+          f"Rate={args.rate:.2f} Hz  Median={args.median}  Threshold={args.threshold:.1f} cm")
 
-    # init sensors
     for bus in buses:
         if _stop: break
         try:
@@ -136,24 +136,21 @@ def main():
         except Exception as e:
             print(f"  - FAIL: i2c-{bus} init error: {e}", file=sys.stderr)
 
-    if _stop:
-        pass
-    elif not sensors:
-        print("ERROR: No sensors initialized. Check wiring and i2cdetect shows 0x29.", file=sys.stderr)
+    if not sensors:
+        print("ERROR: No sensors initialized. Check wiring and i2cdetect output.", file=sys.stderr)
         return 1
 
-    # CSV
     csv_writer = None
     csv_file = None
     try:
         if args.csv:
             csv_file = open(args.out, "w", newline="")
             csv_writer = csv.writer(csv_file)
-            header = ["t_sec"] + [f"bus{bus}_mm" for bus in buses] + [f"bus{bus}_f_mm" for bus in buses]
+            header = ["t_sec"] + [f"bus{bus}_cm" for bus in buses] + [f"bus{bus}_f_cm" for bus in buses]
             csv_writer.writerow(header)
             print(f"[CSV] Logging to {args.out}")
 
-        cols = " | ".join([f"bus{bus}(mm)" for bus in buses] + [f"bus{bus}_f(mm)" for bus in buses])
+        cols = " | ".join([f"bus{bus}(cm)" for bus in buses] + [f"bus{bus}_f(cm)" for bus in buses])
         print("\n t(s)  | " + cols + " | alert")
         print("-" * (12 + len(cols) + 8))
 
@@ -163,29 +160,30 @@ def main():
             loop_start = time.perf_counter()
             t = loop_start - t0
 
-            raw_vals, filt_vals = [], []
+            raw_vals_cm, filt_vals_cm = [], []
             for bus in buses:
-                d = read_distance_mm(sensors[bus])
-                raw_vals.append(d if d is not None else -1)
-                if d is not None:
-                    hist[bus].append(d)
+                d_mm = read_distance_mm(sensors[bus])
+                d_cm = round(d_mm / 10.0, 1) if d_mm is not None else -1
+                raw_vals_cm.append(d_cm)
+                if d_cm > 0:
+                    hist[bus].append(d_cm)
                 fv = _median(list(hist[bus])) if (args.median > 1 and len(hist[bus]) > 0) else (hist[bus][-1] if len(hist[bus]) else -1)
-                filt_vals.append(fv)
+                filt_vals_cm.append(fv)
 
-            alert = any((v >= 0 and v < args.threshold) for v in filt_vals)
+            alert = any((v >= 0 and v < args.threshold) for v in filt_vals_cm)
 
-            def fmt(v):  return f"{v:>6d}" if v >= 0 else "  --- "
-            line = " | ".join([fmt(v) for v in raw_vals] + [fmt(v) for v in filt_vals])
+            def fmt(v):  return f"{v:>6.1f}" if v >= 0 else "  --- "
+            line = " | ".join([fmt(v) for v in raw_vals_cm] + [fmt(v) for v in filt_vals_cm])
             print(f"{t:6.2f} | {line} | {'!' if alert else '-'}")
 
             if csv_writer:
-                csv_writer.writerow([f"{t:.3f}"] + raw_vals + filt_vals)
+                csv_writer.writerow([f"{t:.3f}"] + raw_vals_cm + filt_vals_cm)
 
             count += 1
             if args.samples > 0 and count >= args.samples:
                 break
 
-            sleep_s = (period - (time.perf_counter() - loop_start))
+            sleep_s = period - (time.perf_counter() - loop_start)
             if sleep_s > 0:
                 time.sleep(sleep_s)
     except KeyboardInterrupt:
