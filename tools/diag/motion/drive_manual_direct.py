@@ -6,9 +6,10 @@ Robot Savo — Manual Teleop (NO ROS2) for Mecanum (PCA9685 + H-Bridge)
 - Keyboard → direct PCA9685 motor drive (no ROS2).
 - Arrow keys + WASD/QE.
 - Accel limiting, deadman, per-wheel invert, shutdown-safe.
-- **Diagnostics** built in to fix your mapping fast:
-    • 1/2/3/4  → pulse FL/FR/RL/RR **forward**
-    • 5/6/7/8  → pulse FL/FR/RL/RR **reverse**
+- I²C robust: retries/backoff for EAGAIN bus-busy.
+- **Diagnostics**:
+    • 1/2/3/4  → pulse FL/FR/RL/RR forward
+    • 5/6/7/8  → pulse FL/FR/RL/RR reverse
     • F/H/T    → demo patterns (Forward / strafe-Left / Turn CCW)
     • M        → print current wheel duties + targets
 - **Sign toggles** for chassis conventions: --flip-vy, --flip-omega
@@ -45,10 +46,8 @@ Usage example
       --rl-pwm 6 --rl-in1 7 --rl-in2 8 \
       --rr-pwm 9 --rr-in1 10 --rr-in2 11 \
       --hz 60 --max-vx 0.6 --max-vy 0.6 --max-omega 1.8 \
-      --wheel-radius 0.0325 --L 0.115
-
-Dependencies
-  sudo apt install -y python3-smbus  # or: pip3 install smbus2
+      --wheel-radius 0.0325 --L 0.115 \
+      --i2c-retries 20 --i2c-delay 0.006
 """
 
 import argparse
@@ -73,21 +72,36 @@ PRESCALE = 0xFE
 LED0_ON_L = 0x06
 
 class PCA9685:
-    def __init__(self, bus: int = 1, addr: int = 0x40, freq_hz: float = 1000.0):
+    def __init__(self, bus: int = 1, addr: int = 0x40, freq_hz: float = 1000.0,
+                 retries: int = 8, retry_delay: float = 0.004):
         self.addr = addr
+        self.retries = int(max(1, retries))
+        self.retry_delay = float(max(0.0, retry_delay))
         self.bus = SMBus(int(bus))
         self._write8(MODE1, 0x00)  # normal mode
         time.sleep(0.005)
         self.set_pwm_freq(freq_hz)
 
+    def _xfer(self, fn, *args):
+        last = None
+        for _ in range(self.retries):
+            try:
+                return fn(*args)
+            except (BlockingIOError, OSError) as e:
+                last = e
+                time.sleep(self.retry_delay)
+        if last:
+            raise last
+        raise RuntimeError("I2C transfer failed")
+
     def _write8(self, reg, val):
         reg = int(reg) & 0xFF
         val = int(val) & 0xFF
-        self.bus.write_byte_data(self.addr, reg, val)
+        return self._xfer(self.bus.write_byte_data, self.addr, reg, val)
 
     def _read8(self, reg):
         reg = int(reg) & 0xFF
-        return self.bus.read_byte_data(self.addr, reg)
+        return self._xfer(self.bus.read_byte_data, self.addr, reg)
 
     def set_pwm_freq(self, freq_hz: float):
         prescale_val = 25_000_000.0 / (4096.0 * float(freq_hz)) - 1.0
@@ -161,7 +175,7 @@ class HBridge:
 
 # ---------------------- Keyboard + helpers --------------------------
 class Keyboard:
-    """Non‑blocking keyboard reader that parses arrow keys robustly.
+    """Non-blocking keyboard reader that parses arrow keys robustly.
     Returns tokens: bytes OR b'UP'/b'DOWN'/b'LEFT'/b'RIGHT'.
     """
     def __init__(self):
@@ -179,16 +193,16 @@ class Keyboard:
         out = []
         ch = self._read1(0.0)
         while ch is not None:
-            if ch == b"":  # ESC or arrow seq
+            if ch == b"\x1b":  # ESC or arrow seq
                 a = self._read1(0.02)
                 if a == b'[':
                     b = self._read1(0.02)
                     if b in (b'A', b'B', b'C', b'D'):
                         out.append({b'A': b'UP', b'B': b'DOWN', b'C': b'RIGHT', b'D': b'LEFT'}[b])
                     else:
-                        out.extend(filter(None, [b"", a, b]))
+                        out.extend(filter(None, [b"\x1b", a, b]))
                 else:
-                    out.append(b"")
+                    out.append(b"\x1b")
                     if a:
                         out.append(a)
             else:
@@ -199,10 +213,8 @@ class Keyboard:
     def restore(self):
         termios.tcsetattr(self.fd, termios.TCSADRAIN, self.old)
 
-
 def clamp(x, lo, hi):
     return max(lo, min(hi, x))
-
 
 def step(curr, target, max_step):
     return min(curr + max_step, target) if target > curr else max(curr - max_step, target)
@@ -225,7 +237,8 @@ class DirectTeleop:
         self.scale_low = float(args.scale_low)
         self.scale_high = float(args.scale_high)
         self.scale = 1.0
-        self.lim = Limits(args.max_vx, args.max_vy, args.max_omega, args.accel_x, args.accel_y, args.accel_z)
+        self.lim = Limits(args.max_vx, args.max_vy, args.max_omega,
+                          args.accel_x, args.accel_y, args.accel_z)
         self.geom = MecanumGeom(args.wheel_radius, args.L)
         self.sy = -1.0 if args.flip_vy else +1.0
         self.so = -1.0 if args.flip_omega else +1.0
@@ -236,7 +249,8 @@ class DirectTeleop:
         self.c_vx = self.c_vy = self.c_wz = 0.0
         self._last = time.monotonic()
 
-        self.pca = PCA9685(bus=args.i2c_bus, addr=args.pca_addr, freq_hz=args.pwm_freq)
+        self.pca = PCA9685(bus=args.i2c_bus, addr=args.pca_addr, freq_hz=args.pwm_freq,
+                           retries=args.i2c_retries, retry_delay=args.i2c_delay)
         self.FL = HBridge(self.pca, MotorCH(args.fl_pwm, args.fl_in1, args.fl_in2), invert=args.inv_fl)
         self.FR = HBridge(self.pca, MotorCH(args.fr_pwm, args.fr_in1, args.fr_in2), invert=args.inv_fr)
         self.RL = HBridge(self.pca, MotorCH(args.rl_pwm, args.rl_in1, args.rl_in2), invert=args.inv_rl)
@@ -249,16 +263,16 @@ class DirectTeleop:
         signal.signal(signal.SIGTERM, self._signal_quit)
 
         print(
-            "[Teleop] READY (no ROS2). Esc/Ctrl+C to quit."
-            f" rate={self.hz} Hz  deadman={self.deadman}s  max(vx,vy,wz)=({self.lim.vx},{self.lim.vy},{self.lim.wz})"
-            f" accel(x,y,z)=({self.lim.ax},{self.lim.ay},{self.lim.az})  scale_low={self.scale_low}  scale_high={self.scale_high}"
-            f" geom: r={self.geom.r} m, L={self.geom.L} m  PCA9685@0x{args.pca_addr:02X} bus={args.i2c_bus}"
-            f" flips: vy={'-vy' if args.flip_vy else 'vy'}  omega={'-ω' if args.flip_omega else 'ω'}"
-            " Keys: WASD/QE or Arrows, 1..4/5..8 wheel test fwd/rev, F/H/T demos, M print, Space stop, R reset"
+            "[Teleop] READY (no ROS2). Esc/Ctrl+C to quit.\n"
+            f" rate={self.hz} Hz  deadman={self.deadman}s  max(vx,vy,wz)=({self.lim.vx},{self.lim.vy},{self.lim.wz})\n"
+            f" accel(x,y,z)=({self.lim.ax},{self.lim.ay},{self.lim.az})  scale_low={self.scale_low}  scale_high={self.scale_high}\n"
+            f" geom: r={self.geom.r} m, L={self.geom.L} m  PCA9685@0x{args.pca_addr:02X} bus={args.i2c_bus}\n"
+            f" flips: vy={'-vy' if args.flip_vy else 'vy'}  omega={'-ω' if args.flip_omega else 'ω'}\n"
+            " Keys: WASD/QE or Arrows, 1..4/5..8 wheel test fwd/rev, F/H/T demos, M print, Space stop, R reset\n"
         )
 
     def _signal_quit(self, *_):
-        print("[Teleop] SIGINT/SIGTERM → safe stop and exit")
+        print("\n[Teleop] SIGINT/SIGTERM → safe stop and exit")
         self.close()
         os._exit(0)
 
@@ -268,7 +282,8 @@ class DirectTeleop:
                 self.kb.restore()
         except Exception:
             pass
-        for m in (getattr(self, 'FL', None), getattr(self, 'FR', None), getattr(self, 'RL', None), getattr(self, 'RR', None)):
+        for m in (getattr(self, 'FL', None), getattr(self, 'FR', None),
+                  getattr(self, 'RL', None), getattr(self, 'RR', None)):
             try:
                 if m:
                     m.stop()
@@ -315,13 +330,13 @@ class DirectTeleop:
 
     # ------------------ internals ------------------
     def _handle_key(self, ch) -> bool:
-        if ch in (b"", b""):  # Esc or Ctrl+C
+        if ch in (b"\x1b", b"\x03"):  # Esc or Ctrl+C
             print("[Teleop] Quit")
             return True
-        if ch == b' ':  # Space stop
+        if ch == b' ':
             self.t_vx = self.t_vy = self.t_wz = 0.0
             return False
-        if ch in (b'r', b'R', b""):
+        if ch in (b'r', b'R', b"\x12"):
             self.scale = 1.0
             return False
 
@@ -381,7 +396,9 @@ class DirectTeleop:
         ws = [w_fl, w_fr, w_rl, w_rr]
         max_w = max(1e-6, max(abs(w) for w in ws))
         # duty proportional to command magnitude
-        mag = max(abs(vx)/max(self.lim.vx,1e-6), abs(vy)/max(self.lim.vy,1e-6), abs(wz)/max(self.lim.wz,1e-6))
+        mag = max(abs(vx)/max(self.lim.vx,1e-6),
+                  abs(vy)/max(self.lim.vy,1e-6),
+                  abs(wz)/max(self.lim.wz,1e-6))
         duties = [clamp((w/max_w) * mag, -1.0, 1.0) for w in ws]
         self._duties = duties  # store for M print
         self.FL.drive(duties[0]); self.FR.drive(duties[1]); self.RL.drive(duties[2]); self.RR.drive(duties[3])
@@ -402,7 +419,8 @@ class DirectTeleop:
     def _print_status(self):
         try:
             duties = getattr(self, '_duties', [0,0,0,0])
-            print(f"[cmd] vx={self.c_vx:+.3f} vy={self.c_vy:+.3f} wz={self.c_wz:+.3f}  duties=[FL {duties[0]:+.2f}, FR {duties[1]:+.2f}, RL {duties[2]:+.2f}, RR {duties[3]:+.2f}]")
+            print(f"[cmd] vx={self.c_vx:+.3f} vy={self.c_vy:+.3f} wz={self.c_wz:+.3f}  "
+                  f"duties=[FL {duties[0]:+.2f}, FR {duties[1]:+.2f}, RL {duties[2]:+.2f}, RR {duties[3]:+.2f}]")
         except Exception:
             pass
 
@@ -427,7 +445,9 @@ def build_argparser():
     # I2C / PCA9685
     p.add_argument('--i2c-bus', type=int, default=1)
     p.add_argument('--pca-addr', type=lambda x: int(x, 0), default=0x40)
-    p.add_argument('--pwm-freq', type=float, default=1000.0, help='PWM carrier frequency (Hz). 1 kHz safe for many H‑bridges')
+    p.add_argument('--pwm-freq', type=float, default=1000.0, help='PWM carrier frequency (Hz). 1 kHz safe for many H-bridges')
+    p.add_argument('--i2c-retries', type=int, default=8, help='I²C retry count for EAGAIN bus-busy conditions')
+    p.add_argument('--i2c-delay', type=float, default=0.004, help='Delay between I²C retries (seconds)')
     # Channel mapping
     p.add_argument('--fl-pwm', type=int, required=True)
     p.add_argument('--fl-in1', type=int, required=True)
@@ -450,9 +470,8 @@ def build_argparser():
     p.add_argument('--flip-vy', action='store_true', help='Flip strafe axis sign (vy ←→ −vy)')
     p.add_argument('--flip-omega', action='store_true', help='Flip yaw sign (ω ←→ −ω)')
     # Safety (software)
-    p.add_argument('--estop-force', action='store_true', help='Force software e‑stop (zero all outputs)')
+    p.add_argument('--estop-force', action='store_true', help='Force software e-stop (zero all outputs)')
     return p
-
 
 def main(argv=None):
     args = build_argparser().parse_args(argv)
@@ -463,7 +482,6 @@ def main(argv=None):
         pass
     finally:
         t.close()
-
 
 if __name__ == '__main__':
     main()
