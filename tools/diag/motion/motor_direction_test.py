@@ -23,11 +23,12 @@ Encoders (LOCKED for Robot Savo)
   Gray-code quadrature with illegal transition counting.
 
 Examples
-  # Manual prompts
-  python3 tools/diag/motion/motor_direction_test.py
+  # Manual prompts (safest)
+  python3 tools/diag/motion/motor_direction_test.py --chip N --no-pullup
 
   # Auto (PCA9685 + GPIO dir), edit channels/pins to match wiring
   python3 tools/diag/motion/motor_direction_test.py \
+    --chip N --no-pullup \
     --driver pwmgpio --pwm-addr 0x40 --pwm-freq 1000 \
     --m1-pwm 0 --m1-in1 5  --m1-in2 6  \
     --m2-pwm 1 --m2-in1 13 --m2-in2 19 \
@@ -42,7 +43,7 @@ import argparse
 from dataclasses import dataclass
 from typing import Tuple, List, Optional
 
-# ------------------------ Encoder (lgpio, Gray decode) ------------------------
+# ======================== Encoders via lgpio (alerts only) ====================
 try:
     import lgpio
 except Exception as e:
@@ -67,18 +68,8 @@ class Quad:
     count: int = 0
     last_state: int = 0
     illegal: int = 0
-    pullup: bool = True
 
-    def setup(self):
-        for pin in (self.a, self.b):
-            lgpio.gpio_claim_input(self.chip, pin)
-        if self.pullup:
-            # Optional internal pull-ups (ignored if driver doesn't support)
-            try:
-                lgpio.gpio_set_flags(self.chip, self.a, lgpio.BIAS_PULL_UP)
-                lgpio.gpio_set_flags(self.chip, self.b, lgpio.BIAS_PULL_UP)
-            except Exception:
-                pass
+    def init_state(self):
         a = lgpio.gpio_read(self.chip, self.a)
         b = lgpio.gpio_read(self.chip, self.b)
         self.last_state = (a << 1) | b
@@ -102,6 +93,7 @@ class Encoders:
     alerts: List[int]
 
 def encoders_open(chip_idx: Optional[int] = None, pullup: bool = True) -> Encoders:
+    # open a gpiochip
     chip = None
     if chip_idx is not None:
         chip = lgpio.gpiochip_open(chip_idx)
@@ -115,15 +107,25 @@ def encoders_open(chip_idx: Optional[int] = None, pullup: bool = True) -> Encode
     if chip is None:
         raise RuntimeError("No gpiochip available")
 
-    qL, qR = Quad(chip, L_A, L_B, pullup=pullup), Quad(chip, R_A, R_B, pullup=pullup)
-    qL.setup(); qR.setup()
+    # Optional internal bias (skip if you have external 10k pull-ups and use --no-pullup)
+    if pullup:
+        for pin in (L_A, L_B, R_A, R_B):
+            try:
+                lgpio.gpio_set_flags(chip, pin, lgpio.BIAS_PULL_UP)
+            except Exception:
+                pass
 
+    # Claim alerts directly (do NOT claim as input as well)
     alerts = [
         lgpio.gpio_claim_alert(chip, L_A, lgpio.BOTH_EDGES),
         lgpio.gpio_claim_alert(chip, L_B, lgpio.BOTH_EDGES),
         lgpio.gpio_claim_alert(chip, R_A, lgpio.BOTH_EDGES),
         lgpio.gpio_claim_alert(chip, R_B, lgpio.BOTH_EDGES),
     ]
+
+    qL, qR = Quad(chip, L_A, L_B), Quad(chip, R_A, R_B)
+    qL.init_state(); qR.init_state()
+
     lgpio.callback(chip, L_A, lgpio.BOTH_EDGES, qL.cb)
     lgpio.callback(chip, L_B, lgpio.BOTH_EDGES, qL.cb)
     lgpio.callback(chip, R_A, lgpio.BOTH_EDGES, qR.cb)
@@ -136,7 +138,7 @@ def encoders_close(E: Encoders):
     except Exception:
         pass
 
-# ------------------------ Drivers ------------------------
+# ================== Vendor-neutral PWM+GPIO PCA9685 driver ====================
 class BaseDriver:
     def enable(self): pass
     def disable(self): pass
@@ -214,7 +216,8 @@ class PwmGpioPca9685Driver(BaseDriver):
     def __init__(self,
                  addr: int, freq: int,
                  m_pwm: List[int], m_in1: List[int], m_in2: List[int],
-                 duty_limit: float = 1.0):
+                 duty_limit: float = 1.0,
+                 i2c_bus: int = 1):
         try:
             from smbus2 import SMBus  # noqa
         except Exception as e:
@@ -222,7 +225,7 @@ class PwmGpioPca9685Driver(BaseDriver):
 
         # I²C
         from smbus2 import SMBus
-        self.bus = SMBus(1)
+        self.bus = SMBus(i2c_bus)
         self.pca = self._PCA9685(self.bus, addr)
         self.pca.set_freq(freq)
 
@@ -276,7 +279,7 @@ class PwmGpioPca9685Driver(BaseDriver):
         for idx in group:
             self._set_motor(idx, val)
 
-# ------------------------ Test Logic ------------------------
+# ================================ Test Logic ==================================
 def measure(E: Encoders, seconds: float) -> Tuple[int, int, int, int]:
     L0, R0  = E.L.count, E.R.count
     iL0, iR0 = E.L.illegal, E.R.illegal
@@ -298,7 +301,7 @@ def suggest(forwL: int, forwR: int) -> str:
     if invR:          return "Suggestion: set --invert-right"
     return "Suggestion: no inversion needed (forward is positive on both sides)"
 
-# ------------------------ Main ------------------------
+# ================================== Main ======================================
 def main():
     ap = argparse.ArgumentParser(description="Motor direction test (manual or PWM+GPIO auto)")
     # Mode & timings
