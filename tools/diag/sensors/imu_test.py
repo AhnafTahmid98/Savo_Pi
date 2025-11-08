@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-tools/diag/sensors/imu_test.py
+imu_test.py
 IMU (BNO055) diagnostic streamer + health checker for Robot Savo
 Author: Savo Copilot
 
@@ -58,11 +58,15 @@ OPERATION_MODE_NDOF      = 0x0C
 # Units: metric + deg + dps + °C
 UNIT_SEL_METRIC_DEG_DPS_C = 0b00000000
 
-# Scales (with above units)
-ACC_SCALE = 1.0              # m/s² per LSB
-GYR_SCALE = 1.0              # dps per LSB
-EUL_SCALE = 1.0 / 16.0       # deg per LSB
-MAG_SCALE = 1.0 / 16.0       # µT per LSB
+# --- Correct scales (datasheet with above units) ---
+# Accel: 1 LSB = 0.01 m/s² → scale = 1/100
+# Gyro : 1 LSB = 1/16 dps  → scale = 1/16
+# Euler: 1 LSB = 1/16 deg  → already deg scale
+# Mag  : 1 LSB = 1/16 µT   → already µT scale
+ACC_SCALE = 1.0/100.0      # m/s² per LSB
+GYR_SCALE = 1.0/16.0       # dps per LSB
+EUL_SCALE = 1.0/16.0       # deg per LSB
+MAG_SCALE = 1.0/16.0       # µT per LSB
 
 G = 9.80665
 
@@ -98,7 +102,8 @@ class BNO055:
         lsb = self.bus.read_byte_data(self.addr, reg_lsb)
         msb = self.bus.read_byte_data(self.addr, reg_lsb + 1)
         v = (msb << 8) | lsb
-        if v & 0x8000: v -= 0x10000
+        if v & 0x8000:
+            v -= 0x10000
         return v
 
     def read_vec3(self, reg_lsb: int, scale: float) -> Tuple[float, float, float]:
@@ -146,7 +151,8 @@ class BNO055:
         return ((v>>6)&3, (v>>4)&3, (v>>2)&3, v&3)
     def temperature_c(self) -> float:
         t = self.read8(BNO055_TEMP_ADDR)
-        if t > 127: t -= 256
+        if t > 127:
+            t -= 256
         return float(t)
     def read_euler_deg(self) -> Tuple[float,float,float]:
         h = self.read16s(BNO055_EULER_H_LSB) * EUL_SCALE
@@ -158,28 +164,30 @@ class BNO055:
     def read_mag(self):   return self.read_vec3(BNO055_MAG_DATA_X_LSB, MAG_SCALE)
 
 # ---------------- helpers ----------------
-def mag3(x,y,z): return math.sqrt(x*x + y*y + z*z)
+def mag3(x,y,z):
+    return math.sqrt(x*x + y*y + z*z)
 
 def auto_detect_lidar() -> bool:
     """Heuristic: returns True if LiDAR likely running."""
-    # 1) ros2 topic list shows /scan ?
     if shutil.which("ros2"):
         try:
             out = subprocess.check_output(["ros2","topic","list"], timeout=1.5).decode()
-            if "/scan" in out: return True
+            if "/scan" in out:
+                return True
         except Exception:
             pass
-    # 2) process names
     try:
         out = subprocess.check_output(["ps","-A"], timeout=1.0).decode().lower()
         for key in ("rplidar","ydlidar","slamtec"):
-            if key in out: return True
+            if key in out:
+                return True
     except Exception:
         pass
     return False
 
 def compute_rms(vals: List[float]) -> float:
-    if not vals: return float("nan")
+    if not vals:
+        return float("nan")
     return math.sqrt(sum(v*v for v in vals) / len(vals))
 
 def grade_health(reasons: List[str]) -> str:
@@ -192,17 +200,17 @@ def main():
     ap.add_argument("--addr", type=lambda s: int(s,0), default=BNO055_ADDRESS_A)
     ap.add_argument("--rate", type=float, default=25.0)
     ap.add_argument("--samples", type=int, default=200)
-    ap.add_argument("--imu-only", action="store_true", help="IMU mode (no mag/fusion)")
+    ap.add_argument("--imu_only", action="store_true", help="IMU mode (no mag/fusion)")
     ap.add_argument("--stats", action="store_true", help="Summary statistics")
     ap.add_argument("--health", action="store_true", help="Health grade A/B/C with notes")
     ap.add_argument("--csv", action="store_true", help="CSV output instead of table")
     ap.add_argument("--out", type=str, default="", help="Save CSV/table to file path")
     ap.add_argument("--tag", type=str, default="", help="Freeform test tag, e.g., LIDAR_ON, MOVING")
-    ap.add_argument("--auto-lidar", action="store_true", help="Heuristically tag if LiDAR is ON")
-    ap.add_argument("--detect-motion", action="store_true", help="Per-sample MOVING detection + vibe score")
+    ap.add_argument("--auto_lidar", action="store_true", help="Heuristically tag if LiDAR is ON")
+    ap.add_argument("--detect_motion", action="store_true", help="Per-sample MOVING detection + vibe score")
     # Motion thresholds (tuned for desk testing)
-    ap.add_argument("--gyro-rms-th", type=float, default=2.0, help="dps threshold for MOVING")
-    ap.add_argument("--acc-std-th", type=float, default=0.15, help="m/s² threshold for MOVING")
+    ap.add_argument("--gyro_rms_th", type=float, default=2.0, help="dps threshold for MOVING")
+    ap.add_argument("--acc_std_th", type=float, default=0.15, help="m/s² threshold for MOVING")
     ap.add_argument("--window", type=int, default=20, help="window (samples) for motion/vibe calc")
     args = ap.parse_args()
 
@@ -211,15 +219,18 @@ def main():
     if args.out:
         out = open(args.out, "w", buffering=1)
 
-    def _print(s):
+    def _print(s: str):
         print(s)
-        if out: print(s, file=out)
+        if out:
+            print(s, file=out)
 
     # Connect sensor
     bno = BNO055(bus=args.bus, addr=args.addr)
     chip = bno.chip_id()
     if chip != BNO055_ID:
         _print(f"ERROR: CHIP_ID=0x{chip:02X}, expected 0xA0 at addr {hex(args.addr)} on bus {args.bus}")
+        if out:
+            out.close()
         sys.exit(2)
 
     bno.reset()
@@ -242,13 +253,14 @@ def main():
 
     # Headers
     if args.csv:
-        cols = ["t_s","sys_stat","sys_err","c_sys","c_gyr","c_acc","c_mag",
-                "yaw_deg","roll_deg","pitch_deg","ax","ay","az","gx","gy","gz","mag_uT","temp_C",
-                "moving","vibe_score"]
+        cols = [
+            "t_s","sys_stat","sys_err","c_sys","c_gyr","c_acc","c_mag",
+            "yaw_deg","roll_deg","pitch_deg","ax","ay","az","gx","gy","gz","mag_uT","temp_C",
+            "moving","vibe_score"
+        ]
         _print(",".join(cols))
     else:
-        _print("\n t(s) | stat err calib |   yaw     roll    pitch |"
-               "    ax     ay     az  |   gx     gy     gz  |  |B|(uT) | T(°C) | M | Vibe")
+        _print("\n t(s) | stat err calib |   yaw     roll    pitch |    ax     ay     az  |   gx     gy     gz  |  |B|(uT) | T(°C) | M | Vibe")
         _print("-"*118)
 
     # Buffers for stats + motion windows
@@ -277,8 +289,10 @@ def main():
         if args.imu_only:
             yaw = roll = pitch = None
         else:
-            try:    yaw, roll, pitch = bno.read_euler_deg()
-            except: yaw, roll, pitch = None, None, None
+            try:
+                yaw, roll, pitch = bno.read_euler_deg()
+            except Exception:
+                yaw = roll = pitch = None
 
         ax, ay, az = bno.read_accel()
         gx, gy, gz = bno.read_gyro()
@@ -288,7 +302,7 @@ def main():
             try:
                 mx, my, mz = bno.read_mag()
                 b_mag = mag3(mx,my,mz)
-            except:
+            except Exception:
                 b_mag = None
         temp_c = bno.temperature_c()
         t = t_loop - t0
@@ -297,21 +311,29 @@ def main():
         if args.detect_motion:
             for buf,val in ((win_ax,ax),(win_ay,ay),(win_az,az),(win_gx,gx),(win_gy,gy),(win_gz,gz)):
                 buf.append(val)
-                if len(buf) > args.window: buf.pop(0)
+                if len(buf) > args.window:
+                    buf.pop(0)
 
             if len(win_ax) >= max(5, args.window//2):
-                # accel std (|g| stability proxy) and gyro RMS
-                ax_std = (sum((v - sum(win_ax)/len(win_ax))**2 for v in win_ax)/max(1,len(win_ax)-1))**0.5
-                ay_std = (sum((v - sum(win_ay)/len(win_ay))**2 for v in win_ay)/max(1,len(win_ay)-1))**0.5
-                az_std = (sum((v - sum(win_az)/len(win_az))**2 for v in win_az)/max(1,len(win_az)-1))**0.5
+                # accel std and gyro RMS
+                def _std(ws: List[float]) -> float:
+                    n=len(ws)
+                    if n<2:
+                        return 0.0
+                    m=sum(ws)/n
+                    return math.sqrt(sum((v-m)**2 for v in ws)/max(1,n-1))
+
+                ax_std = _std(win_ax)
+                ay_std = _std(win_ay)
+                az_std = _std(win_az)
                 acc_std = (ax_std+ay_std+az_std)/3.0
 
-                gyro_rms = math.sqrt(
-                    (compute_rms(win_gx)**2 + compute_rms(win_gy)**2 + compute_rms(win_gz)**2) / 3.0
-                )
+                def _rms(ws: List[float]) -> float:
+                    return math.sqrt(sum(v*v for v in ws)/len(ws)) if ws else 0.0
+                gyro_rms = math.sqrt((_rms(win_gx)**2 + _rms(win_gy)**2 + _rms(win_gz)**2)/3.0)
 
                 moving = int(gyro_rms > args.gyro_rms_th or acc_std > args.acc_std_th)
-                vibe_score = gyro_rms + abs(acc_std)  # simple composite
+                vibe_score = gyro_rms + abs(acc_std)
             else:
                 moving = 0
                 vibe_score = 0.0
@@ -352,16 +374,18 @@ def main():
 
         # pacing
         dt = time.monotonic() - t_loop
-        slp = (1.0/args.rate) - dt
-        if slp > 0: time.sleep(slp)
+        slp = period - dt
+        if slp > 0:
+            time.sleep(slp)
 
     # ------- Summary -------
     if args.stats or args.health:
         _print("\n--- Summary ---")
 
     if args.stats:
-        def stats(xs):
-            n = len(xs); mean = sum(xs)/n
+        def stats(xs: List[float]):
+            n = len(xs)
+            mean = sum(xs)/n
             var = sum((x-mean)**2 for x in xs)/max(1,n-1)
             return mean, math.sqrt(var), min(xs), max(xs)
 
@@ -376,6 +400,8 @@ def main():
         _print(f"Accel Z  (m/s^2): mean={az_m:.3f}  std={az_s:.3f}  min={az_min:.3f}  max={az_max:.3f}")
         _print(f"|g| norm (m/s^2): mean={gnorm_m:.3f}  std={gnorm_s:.3f}  (target ≈ 9.81 at rest)")
         _print(f"Gyro Z  (dps)   : mean={gz_m:.3f}  std={gz_s:.3f}  (bias near 0 if at rest)")
+
+    exit_code = 0  # default: success
 
     if args.health:
         reasons: List[str] = []
@@ -408,8 +434,10 @@ def main():
             elif abs(gz_mean) > 0.8:
                 reasons.append(f"MINOR: Gyro Z bias {gz_mean:.2f} dps elevated")
 
-        if c_gyr < 2: reasons.append(f"MINOR: Gyro calib low ({c_gyr}/3)")
-        if c_acc < 2: reasons.append(f"MINOR: Accel calib low ({c_acc}/3)")
+        if c_gyr < 2:
+            reasons.append(f"MINOR: Gyro calib low ({c_gyr}/3)")
+        if c_acc < 2:
+            reasons.append(f"MINOR: Accel calib low ({c_acc}/3)")
         if not args.imu_only and c_mag < 2:
             reasons.append(f"MINOR: Mag calib low ({c_mag}/3)")
 
@@ -417,9 +445,18 @@ def main():
         _print(f"Health grade: {grade}")
         if reasons:
             _print("Notes:")
-            for r in reasons: _print(f" - {r}")
+            for r in reasons:
+                _print(f" - {r}")
 
-    if out: out.close()
+        if any(r.startswith("MAJOR:") for r in reasons):
+            exit_code = 1
+
+    if out:
+        out.close()
+
+    # Exit with pass/fail when --health was requested
+    if args.health:
+        sys.exit(exit_code)
 
 if __name__ == "__main__":
     try:
