@@ -204,21 +204,73 @@ def snap_cli(path: str, w: int, h: int, exposure_us: Optional[int], iso: Optiona
     print(f"Saved still: {path}")
 
 def snap_gst(path: str, w: int, h: int):
-    """One-buffer GStreamer capture → JPEG (no libcamera-apps needed)."""
+    """Robust still capture via GStreamer without libcamera-apps.
+    Strategy: run libcamerasrc → jpegenc → multifilesink, wait for first frame, then stop.
+    """
+    import tempfile, glob, shutil as _shutil, time as _time, signal
+
     require("gst-launch-1.0", "GStreamer (gst-launch-1.0)")
     ensure_dir_for(path)
+
+    tmpdir = tempfile.mkdtemp(prefix="savo_cam_snap_")
+    pattern = os.path.join(tmpdir, "frame-%06d.jpg")
+
     pipeline = [
         "gst-launch-1.0", "-e",
-        "libcamerasrc", "num-buffers=1", "!",
+        "libcamerasrc", "!",
         f"video/x-raw,format=I420,width={w},height={h},framerate=30/1", "!",
         "videoconvert", "!", "jpegenc", "!",
-        "filesink", f"location={path}"
+        "multifilesink", f"location={pattern}", "post-messages=true"
     ]
     print("Running:", " ".join(shlex.quote(x) for x in pipeline))
-    rc, out = run(pipeline, capture=True)
-    if rc != 0:
-        print(out, file=sys.stderr); hint_video_group(); sys.exit(rc)
-    print(f"Saved still (gst): {path}")
+    proc = subprocess.Popen(pipeline, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+    first_path = None
+    t0 = _time.time()
+    try:
+        # Wait up to ~2.0s for the first frame to appear
+        while (first_path is None) and (_time.time() - t0) < 2.0:
+            files = sorted(glob.glob(os.path.join(tmpdir, "frame-*.jpg")))
+            if files:
+                first_path = files[0]
+                break
+            _time.sleep(0.05)
+
+        if first_path is None:
+            # Read a bit of stderr for debug and exit
+            try:
+                _, err = proc.communicate(timeout=0.2)
+            except Exception:
+                err = ""
+            proc.terminate()
+            try:
+                proc.wait(timeout=1.0)
+            except Exception:
+                proc.kill()
+            if err:
+                print(err.strip(), file=sys.stderr)
+            print("ERROR: No frame produced. Check camera access and GStreamer.", file=sys.stderr)
+            hint_video_group()
+            sys.exit(1)
+
+        # We have a frame → stop the pipeline cleanly
+        proc.send_signal(signal.SIGINT)
+        try:
+            proc.wait(timeout=1.0)
+        except Exception:
+            proc.kill()
+
+        # Move the first frame to the requested path
+        _shutil.move(first_path, path)
+        print(f"Saved still (gst): {path}")
+
+    finally:
+        # Clean temp dir
+        try:
+            _shutil.rmtree(tmpdir, ignore_errors=True)
+        except Exception:
+            pass
+
 
 # ---------------- Video record ----------------
 
