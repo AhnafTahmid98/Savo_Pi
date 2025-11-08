@@ -33,7 +33,7 @@ import glob
 import csv
 import json
 import shlex
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List, Tuple
 
 # -------- Utilities --------
@@ -400,7 +400,7 @@ def main():
     if args.snap_gst:
         snap_gst(args.snap_gst, args.width, args.height, args.fps, args.hflip, args.vflip)
         write_csv_row(args.log, {
-            "ts": datetime.utcnow().isoformat(),
+            "ts": datetime.now(timezone.utc).isoformat(),
             "mode": "snap",
             "width": args.width, "height": args.height, "fps": args.fps,
             "encoder": "", "bitrate": "", "gop": "",
@@ -415,7 +415,7 @@ def main():
                          args.bitrate, args.duration, args.encoder, args.gop,
                          args.timeout_int, args.faststart, args.hflip, args.vflip)
         write_csv_row(args.log, {
-            "ts": datetime.utcnow().isoformat(),
+            "ts": datetime.now(timezone.utc).isoformat(),
             "mode": "record",
             "width": args.width, "height": args.height, "fps": args.fps,
             "encoder": res.get("encoder"), "bitrate": args.bitrate, "gop": args.gop,
