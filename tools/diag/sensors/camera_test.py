@@ -79,7 +79,7 @@ def write_info_log(outdir: str, label: str, extra: str = "") -> None:
     ensure_dir(outdir)
     fname = os.path.join(outdir, ts_name(f"{label}_info", "txt"))
     with open(fname, "w") as f:
-        f.write(f"time: {datetime.now().isoformat()}
+        f.write("time: " + datetime.now().isoformat() + "\n"
 ")
         if extra:
             f.write(extra + "
@@ -135,8 +135,7 @@ def build_libcamera_common(args) -> str:
 
 
 def parse_metadata_json_to_csv(meta_json_path: str, csv_path: str) -> None:
-    """Convert libcamera metadata JSON (array or per-line JSON) to CSV per second."""
-    # libcamera-vid writes one JSON object per frame; aggregate ~1Hz
+    """Convert libcamera metadata JSON (one JSON object per frame) into ~1 Hz CSV."""
     import csv
 
     try:
@@ -150,11 +149,11 @@ def parse_metadata_json_to_csv(meta_json_path: str, csv_path: str) -> None:
         print("[WARN] Empty metadata JSON; no CSV produced")
         return
 
-    # Aggregate by whole second timestamps
+    # Aggregate by whole seconds from Timestamp (microseconds)
     buckets: Dict[int, Dict[str, float]] = {}
     for rec in lines:
-        ts = rec.get("Timestamp", 0)  # microseconds
-        sec = int(float(ts) / 1_000_000)
+        ts_us = rec.get("Timestamp", 0)
+        sec = int(float(ts_us) / 1_000_000)
         ag = rec.get("AnalogueGain") or rec.get("AgcAnalogueGain") or 0.0
         sh = rec.get("ExposureTime") or rec.get("ShutterSpeed") or 0
         ct = rec.get("ColourTemperature", 0)
@@ -168,20 +167,22 @@ def parse_metadata_json_to_csv(meta_json_path: str, csv_path: str) -> None:
         b["lux"] += float(lux)
         b["fd"] += int(fd)
 
-    rows = []
     t0 = min(buckets.keys())
+    rows = []
     for sec in sorted(buckets.keys()):
         b = buckets[sec]
         n = max(1, b["count"])
-        rows.append({
+        gain_avg = b["gain"] / n
+        row = {
             "t": f"{sec - t0:.3f}",
-            "exposure_us": int(b["exp"]/n),
-            "gain": f"{b["gain"]/n:.3f}",
-            "iso_like": int(100 * (b["gain"]/n)),
-            "ct_k": int(b["ct"]/n),
-            "lux": f"{b["lux"]/n:.2f}",
-            "frame_duration_us": int(b["fd"]/n),
-        })
+            "exposure_us": int(b["exp"] / n),
+            "gain": f"{gain_avg:.3f}",
+            "iso_like": int(100 * gain_avg),
+            "ct_k": int(b["ct"] / n),
+            "lux": f"{(b["lux"] / n):.2f}",
+            "frame_duration_us": int(b["fd"] / n),
+        }
+        rows.append(row)
 
     with open(csv_path, "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=[
@@ -193,7 +194,7 @@ def parse_metadata_json_to_csv(meta_json_path: str, csv_path: str) -> None:
     print(f"[Meta] CSV written → {csv_path}")
 
 
-def do_video(args) -> int:
+def do_video(args) -> int:(args) -> int:
     ensure_dir(args.outdir)
     mp4 = os.path.join(args.outdir, ts_name("cam_video", "mp4"))
     meta_json = os.path.join(args.outdir, ts_name("cam_video_meta", "json"))
@@ -238,7 +239,6 @@ def do_still(args) -> int:
         try:
             with open(meta_json, "r") as f:
                 rec = json.load(f)
-            # Write CSV
             import csv
             csv_path = os.path.join(args.outdir, ts_name("cam_still_meta", "csv"))
             with open(csv_path, "w", newline="") as cf:
@@ -247,13 +247,14 @@ def do_still(args) -> int:
                 ])
                 wcsv.writeheader()
                 ag = rec.get("AnalogueGain") or rec.get("AgcAnalogueGain") or 0.0
+                lux = rec.get("Lux", 0.0)
                 row = {
                     "t": "0.000",
                     "exposure_us": rec.get("ExposureTime") or rec.get("ShutterSpeed") or 0,
                     "gain": f"{float(ag):.3f}",
                     "iso_like": int(100 * float(ag)),
                     "ct_k": rec.get("ColourTemperature", 0),
-                    "lux": f"{float(rec.get("Lux", 0.0)):.2f}",
+                    "lux": f"{float(lux):.2f}",
                     "frame_duration_us": rec.get("FrameDuration", 0),
                 }
                 wcsv.writerow(row)
