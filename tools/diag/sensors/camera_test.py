@@ -387,7 +387,7 @@ def main():
         print("ERROR: width/height/fps must be positive.", file=sys.stderr)
         sys.exit(2)
 
-    if args.print-config:
+    if args.print_config:
         print_config(args)
 
     # Actions
