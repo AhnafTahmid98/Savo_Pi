@@ -79,7 +79,8 @@ def write_info_log(outdir: str, label: str, extra: str = "") -> None:
     ensure_dir(outdir)
     fname = os.path.join(outdir, ts_name(f"{label}_info", "txt"))
     with open(fname, "w") as f:
-        f.write("time: " + datetime.now().isoformat() + "\n"
+        f.write("time: " + datetime.now().isoformat() + "
+"
 ")
         if extra:
             f.write(extra + "
@@ -288,9 +289,11 @@ def main() -> None:
     if args.mode == "preview":
         # Ensure Weston is active for wayland sink
         if args.sink == "wayland" and not os.environ.get("WAYLAND_DISPLAY"):
-            print("[WARN] WAYLAND_DISPLAY not set. Start Weston: 
-  weston --backend=drm-backend.so --tty=1 --idle-time=0 &",
-                  file=sys.stderr)
+            warn_msg = (
+                "[WARN] WAYLAND_DISPLAY not set. Start Weston:\n"
+                "  weston --backend=drm-backend.so --tty=1 --idle-time=0 &"
+            )
+            print(warn_msg, file=sys.stderr)
         sys.exit(do_preview(args))
 
     elif args.mode == "video":
