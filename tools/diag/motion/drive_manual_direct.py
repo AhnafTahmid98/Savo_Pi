@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Robot Savo — Manual Teleop  for Mecanum (PCA9685 + H-Bridge)
+Robot Savo — Manual Teleop (NO ROS2) for Mecanum (PCA9685 + H-Bridge)
 ----------------------------------------------------------------------
 - Reads keyboard directly (raw TTY) and drives motors via PCA9685 @ 0x40.
-- **Arrow keys supported** in addition to WASD/QE.
+- **Arrow keys supported** (robust ESC-sequence parsing) + WASD/QE.
 - No ROS 2 required; ideal for bring‑up/offline testing on blocks.
 - Smooth accel limiting, deadman timeout, software e‑stop, clear kinematics.
+- **Per‑wheel invert flags** to fix wiring polarity without changing cables.
+- **Shutdown-safe**: ignores I²C errors during exit so quitting never crashes.
 
 Key map (US)
   W/S or ↑/↓  = +vx / −vx   (forward/back)
@@ -15,7 +17,7 @@ Key map (US)
   SPACE       = stop immediately
   Shift       = fast scale    |   Ctrl = slow scale
   R           = reset scale to 1.0
-  Esc / Ctrl+C= quit
+  Esc / Ctrl+C= quit (Esc alone, not when part of an arrow sequence)
 
 Conventions
   +vx forward, +vy left, +ω CCW.
@@ -37,13 +39,14 @@ Safety
   - For a hardware e‑stop input, we can add GPIO (lgpio) on request.
 
 Usage example
-  sudo -E python3 tools/scripts/drive_manual_direct.py \
+  sudo -E python3 tools/diag/motion/drive_manual_direct.py \
       --fl-pwm 0 --fl-in1 1 --fl-in2 2 \
       --fr-pwm 3 --fr-in1 4 --fr-in2 5 \
       --rl-pwm 6 --rl-in1 7 --rl-in2 8 \
       --rr-pwm 9 --rr-in1 10 --rr-in2 11 \
       --hz 60 --max-vx 0.6 --max-vy 0.6 --max-omega 1.8 \
-      --wheel-radius 0.0325 --L 0.115
+      --wheel-radius 0.0325 --L 0.115 \
+      --inv-fr --inv-rr   # example: flip FR & RR if forward spins backwards
 
 Dependencies
   sudo apt install -y python3-smbus  # or: pip3 install smbus2
@@ -72,15 +75,19 @@ LED0_ON_L = 0x06
 class PCA9685:
     def __init__(self, bus: int = 1, addr: int = 0x40, freq_hz: float = 1000.0):
         self.addr = addr
-        self.bus = SMBus(bus)
+        self.bus = SMBus(int(bus))
         self._write8(MODE1, 0x00)  # normal mode
         time.sleep(0.005)
         self.set_pwm_freq(freq_hz)
 
     def _write8(self, reg, val):
-        self.bus.write_byte_data(self.addr, reg, val & 0xFF)
+        # defensive: ensure plain ints
+        reg = int(reg) & 0xFF
+        val = int(val) & 0xFF
+        self.bus.write_byte_data(self.addr, reg, val)
 
     def _read8(self, reg):
+        reg = int(reg) & 0xFF
         return self.bus.read_byte_data(self.addr, reg)
 
     def set_pwm_freq(self, freq_hz: float):
@@ -94,14 +101,14 @@ class PCA9685:
         self._write8(MODE1, old | 0xA1)  # auto‑inc, allcall
 
     def set_pwm(self, channel: int, on: int, off: int):
-        base = LED0_ON_L + 4 * channel
+        base = LED0_ON_L + 4 * int(channel)
         self._write8(base + 0, on & 0xFF)
         self._write8(base + 1, (on >> 8) & 0x0F)
         self._write8(base + 2, off & 0xFF)
         self._write8(base + 3, (off >> 8) & 0x0F)
 
     def set_duty(self, channel: int, duty: float):
-        duty = max(0.0, min(1.0, duty))
+        duty = max(0.0, min(1.0, float(duty)))
         off = int(round(duty * 4095))
         self.set_pwm(channel, 0, off)
 
@@ -113,66 +120,85 @@ class MotorCH:
     in2: int
 
 class HBridge:
-    def __init__(self, pca: PCA9685, ch: MotorCH):
+    def __init__(self, pca: PCA9685, ch: MotorCH, invert: bool = False):
         self.pca = pca
         self.ch = ch
+        self.invert = bool(invert)
         self.stop()
 
     def _gpio_set(self, channel: int, level: int):
         # emulate digital via PWM full‑on/full‑off
-        if level:
-            self.pca.set_pwm(channel, 4096, 0)  # ON
-        else:
-            self.pca.set_pwm(channel, 0, 0)     # OFF
+        try:
+            if level:
+                self.pca.set_pwm(int(channel), 4096, 0)  # ON
+            else:
+                self.pca.set_pwm(int(channel), 0, 0)     # OFF
+        except Exception:
+            # ignore on shutdown
+            pass
 
     def drive(self, duty_signed: float):
-        d = max(-1.0, min(1.0, duty_signed))
+        d = max(-1.0, min(1.0, float(duty_signed)))
+        if self.invert:
+            d = -d
         if abs(d) < 1e-3:
             self.stop()
             return
-        if d > 0:
-            self._gpio_set(self.ch.in1, 1); self._gpio_set(self.ch.in2, 0)
-            self.pca.set_duty(self.ch.pwm, d)
-        else:
-            self._gpio_set(self.ch.in1, 0); self._gpio_set(self.ch.in2, 1)
-            self.pca.set_duty(self.ch.pwm, -d)
+        try:
+            if d > 0:
+                self._gpio_set(self.ch.in1, 1); self._gpio_set(self.ch.in2, 0)
+                self.pca.set_duty(self.ch.pwm, d)
+            else:
+                self._gpio_set(self.ch.in1, 0); self._gpio_set(self.ch.in2, 1)
+                self.pca.set_duty(self.ch.pwm, -d)
+        except Exception:
+            pass
 
     def stop(self):
-        self._gpio_set(self.ch.in1, 0)
-        self._gpio_set(self.ch.in2, 0)
-        self.pca.set_duty(self.ch.pwm, 0.0)
+        try:
+            self._gpio_set(self.ch.in1, 0)
+            self._gpio_set(self.ch.in2, 0)
+            self.pca.set_duty(self.ch.pwm, 0.0)
+        except Exception:
+            pass
 
 # ---------------------- Keyboard + helpers --------------------------
 class Keyboard:
-    """Non‑blocking keyboard reader that also parses ANSI arrow keys.
-    Returns list of tokens: one‑byte bytes OR b'UP'/b'DOWN'/b'LEFT'/b'RIGHT'.
+    """Non‑blocking keyboard reader that **robustly parses arrow keys**.
+    Returns tokens: one‑byte bytes OR b'UP'/b'DOWN'/b'LEFT'/b'RIGHT'.
     """
     def __init__(self):
         self.fd = sys.stdin.fileno()
         self.old = termios.tcgetattr(self.fd)
         tty.setraw(self.fd)
 
-    def _read1(self):
-        r, _, _ = select.select([sys.stdin], [], [], 0)
+    def _read1(self, timeout: float = 0.0):
+        r, _, _ = select.select([sys.stdin], [], [], timeout)
         if not r:
             return None
         return os.read(self.fd, 1)
 
     def read(self):
         out = []
-        ch = self._read1()
+        ch = self._read1(0.0)
         while ch is not None:
-            if ch == b"":  # ESC
-                a = self._read1(); b = self._read1()
-                if a == b'[' and b in (b'A', b'B', b'C', b'D'):
-                    out.append({b'A': b'UP', b'B': b'DOWN', b'C': b'RIGHT', b'D': b'LEFT'}[b])
+            if ch == b"":  # possible ESC[ arrow sequence
+                a = self._read1(0.02)  # small wait to disambiguate
+                if a == b'[':
+                    b = self._read1(0.02)
+                    if b in (b'A', b'B', b'C', b'D'):
+                        out.append({b'A': b'UP', b'B': b'DOWN', b'C': b'RIGHT', b'D': b'LEFT'}[b])
+                    else:
+                        # not an arrow; push back best‑effort
+                        out.extend(filter(None, [b"", a, b]))
                 else:
+                    # lone ESC (quit)
                     out.append(b"")
-                    if a: out.append(a)
-                    if b: out.append(b)
+                    if a:
+                        out.append(a)
             else:
                 out.append(ch)
-            ch = self._read1()
+            ch = self._read1(0.0)
         return out
 
     def restore(self):
@@ -214,10 +240,10 @@ class DirectTeleop:
         self._last = time.monotonic()
 
         self.pca = PCA9685(bus=args.i2c_bus, addr=args.pca_addr, freq_hz=args.pwm_freq)
-        self.FL = HBridge(self.pca, MotorCH(args.fl_pwm, args.fl_in1, args.fl_in2))
-        self.FR = HBridge(self.pca, MotorCH(args.fr_pwm, args.fr_in1, args.fr_in2))
-        self.RL = HBridge(self.pca, MotorCH(args.rl_pwm, args.rl_in1, args.rl_in2))
-        self.RR = HBridge(self.pca, MotorCH(args.rr_pwm, args.rr_in1, args.rr_in2))
+        self.FL = HBridge(self.pca, MotorCH(args.fl_pwm, args.fl_in1, args.fl_in2), invert=args.inv_fl)
+        self.FR = HBridge(self.pca, MotorCH(args.fr_pwm, args.fr_in1, args.fr_in2), invert=args.inv_fr)
+        self.RL = HBridge(self.pca, MotorCH(args.rl_pwm, args.rl_in1, args.rl_in2), invert=args.inv_rl)
+        self.RR = HBridge(self.pca, MotorCH(args.rr_pwm, args.rr_in1, args.rr_in2), invert=args.inv_rr)
 
         self.estop_force = bool(args.estop_force)
 
@@ -230,12 +256,24 @@ class DirectTeleop:
         )
 
     def close(self):
+        # restore TTY first so errors show cleanly
         try:
-            self.FL.stop(); self.FR.stop(); self.RL.stop(); self.RR.stop()
-            if self.kb: self.kb.restore()
-        finally:
-            try: self.pca.bus.close()
-            except Exception: pass
+            if self.kb:
+                self.kb.restore()
+        except Exception:
+            pass
+        # stop motors; ignore I2C errors on shutdown
+        for m in (getattr(self, 'FL', None), getattr(self, 'FR', None), getattr(self, 'RL', None), getattr(self, 'RR', None)):
+            try:
+                if m:
+                    m.stop()
+            except Exception:
+                pass
+        try:
+            if hasattr(self.pca, 'bus') and self.pca.bus:
+                self.pca.bus.close()
+        except Exception:
+            pass
 
     def loop(self):
         try:
@@ -274,9 +312,9 @@ class DirectTeleop:
             self.close()
 
     # ------------------ internals ------------------
-    def _handle_key(self, ch: bytes) -> bool:
+    def _handle_key(self, ch) -> bool:
         # return True to quit
-        if ch in (b"", b""):  # Esc or Ctrl+C
+        if ch == b"":  # **lone** ESC (arrow sequences are parsed separately)
             print("[Teleop] Quit")
             return True
         if ch == b' ':  # Space → stop
@@ -287,8 +325,11 @@ class DirectTeleop:
             return False
 
         # speed scaling heuristics
-        slow = isinstance(ch, bytes) and (1 <= ch[0] <= 26)   # control chars → slow
-        fast = isinstance(ch, bytes) and ch.isalpha() and ch.isupper()  # uppercase → fast
+        if isinstance(ch, bytes) and len(ch) == 1:
+            slow = 1 <= ch[0] <= 26   # control chars → slow
+            fast = ch.isalpha() and ch.isupper()  # uppercase → fast
+        else:
+            slow = False; fast = False
         if slow:
             self.scale = clamp(self.scale_low, 0.05, 1.0)
         elif fast:
@@ -296,7 +337,7 @@ class DirectTeleop:
         else:
             self.scale = 1.0
 
-        # Movement keys (WASD/QE + Arrows)
+        # Movement keys (WASD/QE + Arrows tokens)
         if ch in (b'w', b'W', b'UP'):
             self.t_vx = +self.lim.vx
         elif ch in (b's', b'S', b'DOWN'):
@@ -362,6 +403,11 @@ def build_argparser():
     p.add_argument('--rr-pwm', type=int, required=True)
     p.add_argument('--rr-in1', type=int, required=True)
     p.add_argument('--rr-in2', type=int, required=True)
+    # Polarity fixes
+    p.add_argument('--inv-fl', action='store_true', help='Invert FL direction')
+    p.add_argument('--inv-fr', action='store_true', help='Invert FR direction')
+    p.add_argument('--inv-rl', action='store_true', help='Invert RL direction')
+    p.add_argument('--inv-rr', action='store_true', help='Invert RR direction')
     # Safety (software)
     p.add_argument('--estop-force', action='store_true', help='Force software e‑stop (zero all outputs)')
     return p
