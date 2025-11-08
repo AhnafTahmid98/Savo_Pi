@@ -1,369 +1,490 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-imu_watch.py — Live BNO055 watcher for Robot Savo
+tools/diag/sensors/imu_test.py
+IMU (BNO055) diagnostic streamer + health checker for Robot Savo
 Author: Savo Copilot
 
-Features
-- IMU-only (acc+gyro; magnetometer ignored) or NDOF (uses mag)
-- Proper unit config: m/s^2, dps, °, °C
-- Live console stream with compact columns
-- Graceful KeyboardInterrupt
-- Optional summary stats (mean/std) at the end
-- Robust formatting, no weird f-string spec issues
+FEATURES
+---------------------------------------------------------------
+- IMU-only (acc+gyro) or NDOF (fusion with magnetometer).
+- Live stream at a fixed sample rate (e.g. 25 Hz).
+- Motion-aware health grading (grades when stationary).
+- Stats summary (mean/std) over the streamed window.
+- CSV logging for offline analysis.
+- Clear PASS/CAUTION/FAIL reasons.
 
-Usage examples
-  # Baseline, still, LiDAR OFF
-  python3 tools/diag/sensors/imu_watch.py --imu-only --rate 25 --samples 40
 
-  # With LiDAR ON (new shell), compare visually
-  python3 tools/diag/sensors/imu_watch.py --imu-only --rate 25 --samples 40
-
-  # Optional NDOF characterization (expect mag|B| to jump indoors)
-  python3 tools/diag/sensors/imu_watch.py --ndof --rate 25 --samples 40
-
-Notes
-- BNO055 scaling (per datasheet/common practice):
-    Euler: 1 LSB = 1/16 degree
-    Accel: 1 LSB = 1/100 m/s^2
-    Gyro : 1 LSB = 1/16 dps
-    Mag  : 1 LSB = 1/16 µT
 """
 
 import argparse
+import csv
 import math
+import signal
+import sys
 import time
 from collections import deque
 
+# -------- Dependencies check --------
 try:
-    import smbus2
-except Exception as e:
-    raise SystemExit("smbus2 is required: sudo apt install python3-smbus || pip install smbus2") from e
+    from smbus2 import SMBus
+except Exception:
+    print(
+        "ERROR: smbus2 missing. Install with:\n"
+        "  sudo apt-get install -y python3-smbus\n"
+        "  pip3 install smbus2"
+    )
+    sys.exit(1)
 
+# ===============================================================
+# BNO055 REGISTER MAP (Page 0 unless noted)
+# ===============================================================
+BNO055_ADDRESS_A      = 0x28
 
-# -------------------------------
-# BNO055 register map / constants
-# -------------------------------
-BNO055_ADDRESS_A    = 0x28  # default: ADR pin low
-BNO055_ADDRESS_B    = 0x29  # ADR pin high
+REG_PAGE_ID           = 0x07
+REG_CHIP_ID           = 0x00  # expects 0xA0
 
-# Page
-BNO055_PAGE_ID      = 0x07
-
-# ID
-BNO055_CHIP_ID      = 0x00  # Expect 0xA0
-
-# Operation / Power
-BNO055_OPR_MODE     = 0x3D
-BNO055_PWR_MODE     = 0x3E
-BNO055_SYS_TRIGGER  = 0x3F
-
-# Status
-BNO055_SYS_STAT     = 0x39
-BNO055_SYS_ERR      = 0x3A
-BNO055_CALIB_STAT   = 0x35
-BNO055_ST_RESULT    = 0x36
-
-# Unit selection
-BNO055_UNIT_SEL     = 0x3B
-# UNIT_SEL bits:
-# 7..6 = (unused)
-# 5    = Temperature: 0=C, 1=F
-# 4    = Euler:       0=deg, 1=rad
-# 3    = Gyro:        0=dps, 1=rps
-# 2    = Accel:       0=m/s^2, 1=mg
-# 1..0 = (reserved)
-UNIT_SEL_VALUE = 0b00000000  # C / deg / dps / m/s^2
+# Unit selection (set to m/s², dps, degrees, °C)
+# bit0=ACC (0 m/s², 1 mg)
+# bit1=GYR (0 dps, 1 rps)
+# bit2=EUL (0 deg, 1 rad)
+# bit4=TEMP(0 °C,  1 °F)
+REG_UNIT_SEL          = 0x3B
 
 # Modes
-OPR_MODE_CONFIG         = 0x00
-OPR_MODE_ACCONLY        = 0x01
-OPR_MODE_MAGONLY        = 0x02
-OPR_MODE_GYRONLY        = 0x03
-OPR_MODE_AMG            = 0x07
-OPR_MODE_IMU            = 0x08
-OPR_MODE_COMPASS        = 0x09
-OPR_MODE_M4G            = 0x0A
-OPR_MODE_NDOF_FMC_OFF   = 0x0B
-OPR_MODE_NDOF           = 0x0C
+REG_OPR_MODE          = 0x3D
+REG_PWR_MODE          = 0x3E
+MODE_CONFIG           = 0x00
+MODE_IMU              = 0x08   # IMU Plus (ACC + GYR)
+MODE_NDOF             = 0x0C   # Fusion (ACC + GYR + MAG)
 
-# Data registers (little endian)
-ACC_DATA_X_LSB   = 0x08
-MAG_DATA_X_LSB   = 0x0E
-GYR_DATA_X_LSB   = 0x14
-EUL_HEADING_LSB  = 0x1A  # heading (yaw)
-EUL_ROLL_LSB     = 0x1C
-EUL_PITCH_LSB    = 0x1E
-TEMP             = 0x34
+REG_SYS_TRIGGER       = 0x3F
+REG_SYS_STATUS        = 0x39
+REG_SYS_ERR           = 0x3A
+REG_TEMP              = 0x34
+REG_CALIB_STAT        = 0x35
+REG_ST_RESULT         = 0x36
 
-# Scale factors
-ACC_SCALE  = 1.0 / 100.0   # m/s^2
-GYR_SCALE  = 1.0 / 16.0    # dps
-EUL_SCALE  = 1.0 / 16.0    # deg
-MAG_SCALE  = 1.0 / 16.0    # uT
+# Sensor data blocks (little-endian)
+REG_ACC_DATA          = 0x08  # 6 bytes
+REG_MAG_DATA          = 0x0E  # 6 bytes
+REG_GYR_DATA          = 0x14  # 6 bytes
+REG_EUL_DATA          = 0x1A  # 6 bytes (yaw/roll/pitch) in 1/16 deg units
+REG_LIA_DATA          = 0x28  # 6 bytes (linear accel) in 1/100 m/s² units
+REG_GRV_DATA          = 0x2E  # 6 bytes (gravity)
+
+UNIT_SEL_DEFAULT      = 0x00  # m/s², dps, degrees, °C
+
+# ===============================================================
+# DIAG/GRADING THRESHOLDS
+# ===============================================================
+# Stationary detection gates (within a sliding 1s window)
+GYRO_GATE_DPS_RMS     = 0.5
+ACC_GATE_STD          = 0.05
+STATIONARY_WINDOW_S   = 1.0
+
+# Health thresholds
+GYRO_BIAS_PASS        = 0.30
+GYRO_BIAS_CAUTION     = 0.60
+GYRO_STD_PASS         = 0.15
+GYRO_STD_CAUTION      = 0.30
+
+ACC_MEAN_MIN_PASS     = 9.60
+ACC_MEAN_MAX_PASS     = 9.95
+ACC_MEAN_MIN_CAUT     = 9.40
+ACC_MEAN_MAX_CAUT     = 10.10
+ACC_STD_PASS          = 0.05
+ACC_STD_CAUTION       = 0.10
+
+TILT_CAUTION_DEG      = 4.0
+
+DEFAULT_I2C_BUS       = 1
+DEFAULT_ADDR          = BNO055_ADDRESS_A
 
 
-# -------------------------------
-# I2C helpers
-# -------------------------------
-class BNO055:
-    def __init__(self, bus=1, address=BNO055_ADDRESS_A):
-        self.bus_no = bus
-        self.address = address
-        self.bus = smbus2.SMBus(bus)
+# ===============================================================
+# Utility helpers
+# ===============================================================
+class GracefulExit(Exception):
+    pass
 
-    def _write8(self, reg, val):
-        self.bus.write_byte_data(self.address, reg, val & 0xFF)
 
-    def _read8(self, reg):
-        return self.bus.read_byte_data(self.address, reg)
+def _install_sigint_handler():
+    def handler(sig, frame):
+        raise GracefulExit()
+    signal.signal(signal.SIGINT, handler)
 
-    def _readS16(self, reg):
-        # little-endian signed 16-bit
-        data = self.bus.read_i2c_block_data(self.address, reg, 2)
-        val = data[0] | (data[1] << 8)
-        if val >= 32768:
-            val -= 65536
-        return val
 
-    def _read_vector3(self, base_reg, scale):
-        x = self._readS16(base_reg + 0) * scale
-        y = self._readS16(base_reg + 2) * scale
-        z = self._readS16(base_reg + 4) * scale
-        return (x, y, z)
+def norm3(x, y, z):
+    return math.sqrt((x or 0.0) ** 2 + (y or 0.0) ** 2 + (z or 0.0) ** 2)
 
-    # High-level helpers
-    def set_page(self, page=0):
-        self._write8(BNO055_PAGE_ID, page & 0xFF)
 
-    def read_chip_id(self):
-        return self._read8(BNO055_CHIP_ID)
+def mean_std(seq):
+    n = len(seq)
+    if n == 0:
+        return 0.0, 0.0
+    m = sum(seq) / n
+    v = sum((x - m) ** 2 for x in seq) / n
+    return m, math.sqrt(v)
 
-    def set_units(self):
-        self.set_page(0)
-        self._write8(BNO055_UNIT_SEL, UNIT_SEL_VALUE)
 
-    def set_mode(self, mode):
-        self.set_page(0)
-        self._write8(BNO055_OPR_MODE, OPR_MODE_CONFIG)
-        time.sleep(0.02)
-        self._write8(BNO055_OPR_MODE, mode & 0xFF)
-        # Per datasheet: allow mode change settling
+# ===============================================================
+# Low-level I²C helpers
+# ===============================================================
+def rd8(bus, addr, reg):
+    return bus.read_byte_data(addr, reg)
+
+
+def wr8(bus, addr, reg, val):
+    bus.write_byte_data(addr, reg, val & 0xFF)
+
+
+def rdlen(bus, addr, reg, n):
+    return bus.read_i2c_block_data(addr, reg, n)
+
+
+def rds16_le(buf, i):
+    """Little-endian signed 16-bit"""
+    v = buf[i] | (buf[i + 1] << 8)
+    return v - 65536 if v > 32767 else v
+
+
+# ===============================================================
+# BNO055 setup & status
+# ===============================================================
+def select_page0(bus, addr):
+    wr8(bus, addr, REG_PAGE_ID, 0x00)
+    time.sleep(0.002)
+
+
+def set_mode(bus, addr, mode):
+    # Must go through CONFIG first per datasheet timing
+    wr8(bus, addr, REG_OPR_MODE, MODE_CONFIG)
+    time.sleep(0.02)
+    wr8(bus, addr, REG_OPR_MODE, mode)
+    time.sleep(0.02)
+
+
+def set_units(bus, addr):
+    # m/s², dps, degrees, °C
+    wr8(bus, addr, REG_UNIT_SEL, UNIT_SEL_DEFAULT)
+    time.sleep(0.002)
+
+
+def pwr_normal(bus, addr):
+    wr8(bus, addr, REG_PWR_MODE, 0x00)
+    time.sleep(0.002)
+
+
+def init_bno(bus, addr):
+    select_page0(bus, addr)
+    chip = rd8(bus, addr, REG_CHIP_ID)
+    if chip != 0xA0:
+        print(f"ERROR: CHIP_ID=0x{chip:02X}, expected 0xA0")
+        sys.exit(2)
+    pwr_normal(bus, addr)
+    set_units(bus, addr)
+
+
+def get_status(bus, addr):
+    st = rd8(bus, addr, REG_SYS_STATUS)
+    er = rd8(bus, addr, REG_SYS_ERR)
+    cal = rd8(bus, addr, REG_CALIB_STAT)
+    # calib bits: [7:6 sys][5:4 gyro][3:2 accel][1:0 mag]
+    cal_sys = (cal >> 6) & 0x03
+    cal_gy  = (cal >> 4) & 0x03
+    cal_ac  = (cal >> 2) & 0x03
+    cal_mg  = (cal >> 0) & 0x03
+
+    st_res = rd8(bus, addr, REG_ST_RESULT)
+    acc_ok = bool(st_res & 0x01)
+    mag_ok = bool(st_res & 0x02)
+    gyr_ok = bool(st_res & 0x04)
+    mcu_ok = bool(st_res & 0x08)
+    return st, er, (cal_sys, cal_gy, cal_ac, cal_mg), (acc_ok, mag_ok, gyr_ok, mcu_ok)
+
+
+# ===============================================================
+# Sensor reads 
+# ===============================================================
+def read_euler_deg(bus, addr):
+    buf = rdlen(bus, addr, REG_EUL_DATA, 6)
+    yaw   = rds16_le(buf, 0) / 16.0
+    roll  = rds16_le(buf, 2) / 16.0
+    pitch = rds16_le(buf, 4) / 16.0
+    return yaw, roll, pitch
+
+
+def read_gyro_dps(bus, addr):
+    buf = rdlen(bus, addr, REG_GYR_DATA, 6)
+    gx = rds16_le(buf, 0) / 16.0
+    gy = rds16_le(buf, 2) / 16.0
+    gz = rds16_le(buf, 4) / 16.0
+    return gx, gy, gz
+
+
+def read_accel_ms2(bus, addr):
+    """
+    Prefer linear acceleration (gravity-compensated). If all zeros (not valid),
+    fall back to raw accelerometer (includes gravity).
+    """
+    lia = rdlen(bus, addr, REG_LIA_DATA, 6)
+    ax, ay, az = (rds16_le(lia, 0) / 100.0, rds16_le(lia, 2) / 100.0, rds16_le(lia, 4) / 100.0)
+    if ax == 0.0 and ay == 0.0 and az == 0.0:
+        acc = rdlen(bus, addr, REG_ACC_DATA, 6)
+        ax, ay, az = (rds16_le(acc, 0) / 100.0, rds16_le(acc, 2) / 100.0, rds16_le(acc, 4) / 100.0)
+    return ax, ay, az
+
+
+def read_mag_uT(bus, addr):
+    buf = rdlen(bus, addr, REG_MAG_DATA, 6)
+    mx = rds16_le(buf, 0) / 16.0
+    my = rds16_le(buf, 2) / 16.0
+    mz = rds16_le(buf, 4) / 16.0
+    return mx, my, mz
+
+
+# ===============================================================
+# Grading helpers
+# ===============================================================
+def grade_value(name, value, pass_max=None, pass_min=None, caution_max=None, caution_min=None):
+    """
+    Generic grader: returns (grade, note).
+    Grade ∈ {'PASS','CAUTION','FAIL'}.
+    """
+    if pass_min is not None and pass_max is not None:
+        if pass_min <= value <= pass_max:
+            return "PASS", ""
+        if caution_min is not None and caution_max is not None and caution_min <= value <= caution_max:
+            return "CAUTION", f"{name} marginal ({value:.3f})"
+        return "FAIL", f"{name} out of range ({value:.3f})"
+
+    if pass_max is not None:
+        if value <= pass_max:
+            return "PASS", ""
+        if caution_max is not None and value <= caution_max:
+            return "CAUTION", f"{name} marginal ({value:.3f})"
+        return "FAIL", f"{name} high ({value:.3f})"
+
+    if pass_min is not None:
+        if value >= pass_min:
+            return "PASS", ""
+        if caution_min is not None and value >= caution_min:
+            return "CAUTION", f"{name} marginal ({value:.3f})"
+        return "FAIL", f"{name} low ({value:.3f})"
+
+    return "PASS", ""
+
+
+def combine_grades(*grades):
+    s = set(grades)
+    if "FAIL" in s:
+        return "FAIL"
+    if "CAUTION" in s:
+        return "CAUTION"
+    return "PASS"
+
+
+def stationary_buffers(rate_hz):
+    maxlen = max(2, int(STATIONARY_WINDOW_S * rate_hz))
+    return deque(maxlen=maxlen), deque(maxlen=maxlen)
+
+
+def stationary_update(gbuf, abuf, gz, accnorm):
+    gbuf.append(abs(gz or 0.0))
+    abuf.append(accnorm or 0.0)
+    if len(gbuf) < gbuf.maxlen:
+        return False, 0.0, 0.0
+    _, gstd = mean_std(list(gbuf))
+    _, astd = mean_std(list(abuf))
+    return (gstd <= GYRO_GATE_DPS_RMS and astd <= ACC_GATE_STD), gstd, astd
+
+
+# ===============================================================
+# Main
+# ===============================================================
+def main():
+    parser = argparse.ArgumentParser(description="BNO055 (smbus2) diagnostic streamer + health (Robot Savo)")
+    m = parser.add_mutually_exclusive_group()
+    m.add_argument("--imu-only", action="store_true", help="IMU mode (ACC+GYR) — ignores magnetometer")
+    m.add_argument("--ndof", action="store_true", help="Fusion mode (ACC+GYR+MAG), uses magnetometer")
+
+    parser.add_argument("--rate", type=float, default=25.0, help="Sample rate in Hz (default: 25)")
+    parser.add_argument("--samples", type=int, default=40, help="Number of lines to stream (default: 40)")
+    parser.add_argument("--stats", action="store_true", help="Print mean/std stats over streamed samples")
+    parser.add_argument("--health", action="store_true", help="Print motion-aware health summary")
+    parser.add_argument("--csv", type=str, default=None, help="Save streamed samples to CSV path")
+
+    parser.add_argument("--i2c-bus", type=int, default=DEFAULT_I2C_BUS, help="I²C bus number (default: 1)")
+    parser.add_argument("--addr", type=lambda x: int(x, 0), default=DEFAULT_ADDR, help="I²C address (default: 0x28)")
+
+    args = parser.parse_args()
+
+    # Default to IMU-only unless explicitly asked for NDOF
+    use_ndof = True if args.ndof else False
+
+    _install_sigint_handler()
+
+    with SMBus(args.i2c_bus) as bus:
+        # Init sequence
+        select_page0(bus, args.addr)
+        init_bno(bus, args.addr)
+        set_mode(bus, args.addr, MODE_NDOF if use_ndof else MODE_IMU)
         time.sleep(0.05)
 
-    def sys_status(self):
-        return self._read8(BNO055_SYS_STAT)
+        chip = rd8(bus, args.addr, REG_CHIP_ID)
+        st, er, cal, st_ok = get_status(bus, args.addr)
+        acc_ok, mag_ok, gyr_ok, mcu_ok = st_ok
 
-    def sys_err(self):
-        return self._read8(BNO055_SYS_ERR)
+        print(f"[{time.strftime('%H:%M:%S')}] BNO055 on i2c-{args.i2c_bus} addr 0x{args.addr:02X}")
+        print(f"CHIP_ID=0x{chip:02X}  SELFTEST: ACC={acc_ok} MAG={mag_ok} GYR={gyr_ok} MCU={mcu_ok}")
+        print(f"SYS_STATUS={st}  SYS_ERR={er}  CALIB(sys,gyro,acc,mag)={cal}")
+        print(f"Mode: {'NDOF (fusion uses mag)' if use_ndof else 'IMU (acc+gyro only)'}  "
+              f"Rate: {args.rate:.1f} Hz  Samples: {args.samples}")
 
-    def calib_tuple(self):
-        val = self._read8(BNO055_CALIB_STAT)
-        sys = (val >> 6) & 0x03
-        gyr = (val >> 4) & 0x03
-        acc = (val >> 2) & 0x03
-        mag = (val >> 0) & 0x03
-        return sys, gyr, acc, mag
+        # Header
+        print("\n t(s) | stat err calib |   yaw     roll    pitch |    ax     ay     az  |  gz(dps) | mag|B|(uT) | T(°C)")
+        print("-" * 98)
 
-    def self_test(self):
-        # ST_RESULT: bit=1 means "pass"
-        v = self._read8(BNO055_ST_RESULT)
-        acc = bool(v & 0x01)
-        mag = bool(v & 0x02)
-        gyr = bool(v & 0x04)
-        mcu = bool(v & 0x08)
-        return acc, mag, gyr, mcu
+        # Optional CSV
+        csvw = None
+        if args.csv:
+            f = open(args.csv, "w", newline="")
+            csvw = csv.writer(f)
+            csvw.writerow([
+                "t_s", "sys_status", "sys_err", "cal_sys", "cal_gyro", "cal_acc", "cal_mag",
+                "yaw_deg", "roll_deg", "pitch_deg", "ax_ms2", "ay_ms2", "az_ms2",
+                "gz_dps", "mag_uT", "temp_C"
+            ])
 
-    def read_temp_c(self):
-        t = self._read8(TEMP)
-        # datasheet: signed byte; many boards expose 2's complement here
-        if t >= 128:
-            t -= 256
-        return t
+        # Streaming state
+        gyro_buf, acc_buf = stationary_buffers(args.rate)
+        gz_series = []
+        acc_series = []
 
-    def read_euler(self):
-        # heading (yaw), roll, pitch in degrees
-        h = self._readS16(EUL_HEADING_LSB) * EUL_SCALE
-        r = self._readS16(EUL_ROLL_LSB)    * EUL_SCALE
-        p = self._readS16(EUL_PITCH_LSB)   * EUL_SCALE
-        return h, r, p
+        t0 = time.time()
+        period = 1.0 / max(1e-3, args.rate)
 
-    def read_accel(self):
-        return self._read_vector3(ACC_DATA_X_LSB, ACC_SCALE)  # m/s^2
+        try:
+            for _ in range(args.samples):
+                t = time.time() - t0
 
-    def read_gyro(self):
-        return self._read_vector3(GYR_DATA_X_LSB, GYR_SCALE)  # dps
+                yaw, roll, pitch = read_euler_deg(bus, args.addr)
+                ax, ay, az = read_accel_ms2(bus, args.addr)
+                gx, gy, gz = read_gyro_dps(bus, args.addr)
 
-    def read_mag(self):
-        return self._read_vector3(MAG_DATA_X_LSB, MAG_SCALE)  # uT
+                if use_ndof:
+                    mx, my, mz = read_mag_uT(bus, args.addr)
+                    mag_norm = norm3(mx, my, mz)
+                else:
+                    mag_norm = 0.0
 
+                temp_c = rd8(bus, args.addr, REG_TEMP)
+                st, er, cal, _ = get_status(bus, args.addr)
 
-# -------------------------------
-# Formatting helpers
-# -------------------------------
-def calib_str(sys, gyr, acc, mag):
-    # 4 digits: sys,gyr,acc,mag (each 0..3)
-    return f"{sys}{gyr}{acc}{mag}"
+                acc_norm = norm3(ax, ay, az)
+                is_stat, gstd, astd = stationary_update(gyro_buf, acc_buf, gz, acc_norm)
 
-def fmt_bool(b):
-    return "True" if b else "False"
+                print(f"{t:5.2f} | {st:4d} {er:3d}  {cal[0]}{cal[1]}{cal[2]}{cal[3]}  |"
+                      f" {yaw:7.2f}  {roll:7.2f}  {pitch:7.2f} |"
+                      f" {ax:6.2f} {ay:6.2f} {az:6.2f} | {gz:7.2f} | {mag_norm:8.2f} | {int(temp_c):2d}")
 
+                gz_series.append(gz)
+                acc_series.append(acc_norm)
 
-# -------------------------------
-# Main stream routine
-# -------------------------------
-def run(args):
-    bno = BNO055(bus=args.bus, address=args.addr)
+                if csvw:
+                    csvw.writerow([
+                        f"{t:.3f}", st, er, cal[0], cal[1], cal[2], cal[3],
+                        f"{yaw:.3f}", f"{roll:.3f}", f"{pitch:.3f}",
+                        f"{ax:.4f}", f"{ay:.4f}", f"{az:.4f}",
+                        f"{gz:.4f}", f"{mag_norm:.4f}", int(temp_c)
+                    ])
 
-    # Sanity: chip ID
-    chip = bno.read_chip_id()
-    if chip != 0xA0:
-        print(f"[!] Unexpected CHIP_ID=0x{chip:02X} (expected 0xA0). Check wiring/address.")
-        # continue anyway (some clones need time), but warn
+                # Timing control
+                dt = period - ((time.time() - t0) - t)
+                if dt > 0:
+                    time.sleep(dt)
 
-    # Units
-    bno.set_units()
+        except GracefulExit:
+            print("\n[CTRL-C] Stopping...")
 
-    # Mode selection
-    mode = OPR_MODE_IMU if args.imu_only else OPR_MODE_NDOF
-    bno.set_mode(mode)
+        finally:
+            if csvw:
+                f.close()
 
-    # Quick meta
-    acc_ok, mag_ok, gyr_ok, mcu_ok = bno.self_test()
-    sys_stat = bno.sys_status()
-    sys_err  = bno.sys_err()
-    sys,gyr,acc,mag = bno.calib_tuple()
+        # -------- Stats summary (over streamed samples) --------
+        if args.stats:
+            gz_mean, gz_std = mean_std(gz_series)
+            acc_m, acc_s = mean_std(acc_series)
+            print("\nStats (over streamed samples)")
+            print("----------------------------------")
+            print(f"gz(dps)  mean={gz_mean:.3f}  std={gz_std:.3f}")
+            print(f"|acc|    mean={acc_m:.3f} m/s²  std={acc_s:.3f} m/s²")
 
-    print(f"[{time.strftime('%H:%M:%S')}] BNO055 on i2c-{args.bus} addr 0x{args.addr:02X}")
-    print(f"CHIP_ID=0x{chip:02X}  SELFTEST: ACC={fmt_bool(acc_ok)} MAG={fmt_bool(mag_ok)} "
-          f"GYR={fmt_bool(gyr_ok)} MCU={fmt_bool(mcu_ok)}")
-    print(f"SYS_STATUS={sys_stat}  SYS_ERR={sys_err}  CALIB(sys,gyro,acc,mag)=({sys},{gyr},{acc},{mag})")
-    mstr = "IMU (acc+gyro only)" if args.imu_only else "NDOF (fusion uses mag)"
-    print(f"Mode: {mstr}  Rate: {args.rate} Hz  Samples: {args.samples if args.samples>0 else '∞'}")
-    print()
+            g1, _ = grade_value("GYRO mean|gz|", abs(gz_mean),
+                                pass_max=GYRO_BIAS_PASS, caution_max=GYRO_BIAS_CAUTION)
+            g2, _ = grade_value("GYRO std", gz_std,
+                                pass_max=GYRO_STD_PASS, caution_max=GYRO_STD_CAUTION)
+            g3, _ = grade_value("|ACC| mean", acc_m,
+                                pass_min=ACC_MEAN_MIN_PASS, pass_max=ACC_MEAN_MAX_PASS,
+                                caution_min=ACC_MEAN_MIN_CAUT, caution_max=ACC_MEAN_MAX_CAUT)
+            g4, _ = grade_value("|ACC| std", acc_s,
+                                pass_max=ACC_STD_PASS, caution_max=ACC_STD_CAUTION)
+            overall = combine_grades(g1, g2, g3, g4)
+            print(f"GYRO: {g1} | ACCEL: {combine_grades(g3, g4)}")
+            print(f"Overall (stats-only): {overall}")
 
-    # Header
-    if not args.no_header:
-        print(" t(s) | stat err calib |   yaw     roll    pitch |    ax     ay     az  |  gz(dps) | mag|B|(uT) | T(°C)")
-        print("-"*98)
+        # -------- Motion-aware health summary --------
+        if args.health:
+            print("\nIMU Health Summary")
+            print("---------------------------------------------------------------")
+            print("Check         Value                                Status   Note")
+            print("---------------------------------------------------------------")
 
-    # Streaming loop
-    period = 1.0 / float(args.rate)
-    start  = time.time()
-    n_done = 0
+            chip = rd8(bus, args.addr, REG_CHIP_ID)
+            print(f"Chip ID       0x{chip:02X}                               {'PASS' if chip == 0xA0 else 'FAIL'}    Should be 0xA0")
 
-    # Stats (if requested)
-    gz_vals   = deque()
-    acc_norms = deque()
+            st, er, cal, st_ok = get_status(bus, args.addr)
+            acc_ok, mag_ok, gyr_ok, mcu_ok = st_ok
+            all_ok = acc_ok and mag_ok and gyr_ok and mcu_ok
+            print(f"Self-test     ACC={acc_ok} MAG={mag_ok} GYR={gyr_ok} MCU={mcu_ok}    "
+                  f"{'PASS' if all_ok else 'FAIL'}    All True expected")
+            # Note: SYS_STATUS typically 5 in NDOF, 6 in IMU; SYS_ERR should be 0 ideally.
+            print(f"System        status={st} err={er}                      {'WARN' if er != 0 else 'PASS'}    5=NDOF, 6=IMU; err=0 ideal")
 
-    try:
-        while True:
-            now = time.time()
-            t = now - start
+            gz_mean, gz_std = mean_std(gz_series)
+            acc_m, acc_s = mean_std(acc_series)
 
-            sys_stat = bno.sys_status()
-            sys_err  = bno.sys_err()
-            sys,gyr,acc,mag = bno.calib_tuple()
+            g_bias, _ = grade_value("Gyro bias", abs(gz_mean),
+                                    pass_max=GYRO_BIAS_PASS, caution_max=GYRO_BIAS_CAUTION)
+            g_gstd, _ = grade_value("Gyro std", gz_std,
+                                    pass_max=GYRO_STD_PASS, caution_max=GYRO_STD_CAUTION)
+            g_am, _ = grade_value("Accel |g|", acc_m,
+                                  pass_min=ACC_MEAN_MIN_PASS, pass_max=ACC_MEAN_MAX_PASS,
+                                  caution_min=ACC_MEAN_MIN_CAUT, caution_max=ACC_MEAN_MAX_CAUT)
+            g_as, _ = grade_value("Accel |g| std", acc_s,
+                                  pass_max=ACC_STD_PASS, caution_max=ACC_STD_CAUTION)
 
-            # Reads
-            yaw, roll, pitch = bno.read_euler()
-            ax, ay, az       = bno.read_accel()
-            gx, gy, gz       = bno.read_gyro()
-            mx, my, mz       = (0.0, 0.0, 0.0)
-            if not args.imu_only:
-                mx, my, mz = bno.read_mag()
+            # Snapshot of current orientation (for "is robot level?" hint)
+            yaw, roll, pitch = read_euler_deg(bus, args.addr)
+            print(f"Accel |g|     {acc_m:4.2f} ±{acc_s:.2f} m/s²                {g_am:<6}  Target ~9.8")
+            print(f"Gyro bias     {abs(gz_mean):.2f} dps                         {g_bias:<6}  < 0.3 dps")
 
-            # Derived
-            acc_abs = math.sqrt(ax*ax + ay*ay + az*az)
-            mag_abs = math.sqrt(mx*mx + my*my + mz*mz)
+            if use_ndof:
+                mx, my, mz = read_mag_uT(bus, args.addr)
+                print(f"Mag |B|       {norm3(mx, my, mz):.1f} µT                       WARN    Indoors can vary (25–65 µT ideal)")
+            else:
+                print(f"Mag |B|       0.0 µT                       PASS    IMU-only (ignored)")
 
-            # Accumulate stats
-            if args.stats:
-                gz_vals.append(gz)
-                acc_norms.append(acc_abs)
+            print(f"Roll |mean|   {abs(roll):.1f}°                            "
+                  f"{'WARN' if abs(roll) > TILT_CAUTION_DEG else 'PASS'}    Level robot for baseline")
+            print(f"Pitch |mean|  {abs(pitch):.1f}°                            "
+                  f"{'WARN' if abs(pitch) > TILT_CAUTION_DEG else 'PASS'}    Level robot for baseline")
 
-            # Print line
-            print(f"{t:5.2f} | {sys_stat:4d} {sys_err:3d} {calib_str(sys,gyr,acc,mag):>5} |"
-                  f" {yaw:7.2f} {roll:7.2f} {pitch:7.2f} |"
-                  f" {ax:6.2f} {ay:6.2f} {az:6.2f} |"
-                  f" {gz:7.2f} | {mag_abs:9.2f} | {bno.read_temp_c():3d}")
-
-            n_done += 1
-            if args.samples > 0 and n_done >= args.samples:
-                break
-
-            # Sleep to rate (simple pacing)
-            # Adjust for loop time so we stay close to 'rate'
-            elapsed = time.time() - now
-            to_sleep = period - elapsed
-            if to_sleep > 0:
-                time.sleep(to_sleep)
-    except KeyboardInterrupt:
-        pass
-
-    # Summary stats
-    if args.stats and len(gz_vals) >= 2 and len(acc_norms) >= 2:
-        def mean_std(vals):
-            m = sum(vals) / len(vals)
-            v = sum((x - m)**2 for x in vals) / (len(vals) - 1)
-            return m, math.sqrt(v)
-
-        gz_mean, gz_std = mean_std(gz_vals)
-        acc_m, acc_s    = mean_std(acc_norms)
-
-        print("\nStats (over streamed samples)")
-        print("-"*34)
-        print(f"gz(dps)  mean={gz_mean:.3f}  std={gz_std:.3f}")
-        print(f"|acc|    mean={acc_m:.3f} m/s²  std={acc_s:.3f} m/s²")
-        # Quick green/yellow/red hints matching our acceptance gates
-        hints = []
-        if abs(gz_mean) <= 0.30 and gz_std <= 0.30:
-            hints.append("GYRO: PASS")
-        elif abs(gz_mean) <= 0.40:
-            hints.append("GYRO: WARN")
-        else:
-            hints.append("GYRO: FAIL")
-
-        if 9.70 <= acc_m <= 9.85 and acc_s <= 0.18:
-            hints.append("ACCEL: PASS")
-        elif 9.60 <= acc_m <= 9.95 and acc_s <= 0.25:
-            hints.append("ACCEL: WARN")
-        else:
-            hints.append("ACCEL: FAIL")
-
-        print(" | ".join(hints))
-
-
-# -------------------------------
-# CLI
-# -------------------------------
-def parse_args():
-    p = argparse.ArgumentParser(description="Live BNO055 IMU watcher (Robot Savo)")
-    gmode = p.add_mutually_exclusive_group()
-    gmode.add_argument("--imu-only", action="store_true",
-                       help="IMU mode (acc+gyro; magnetometer ignored)")
-    gmode.add_argument("--ndof", action="store_true",
-                       help="NDOF fusion (uses magnetometer; not recommended indoors)")
-    p.add_argument("--bus", type=int, default=1, help="I2C bus (default 1)")
-    p.add_argument("--addr", type=lambda x: int(x, 0), default=BNO055_ADDRESS_A,
-                   help="I2C address (e.g., 0x28 or 0x29; default 0x28)")
-    p.add_argument("--rate", type=float, default=25.0, help="Sampling rate in Hz (default 25)")
-    p.add_argument("--samples", type=int, default=0,
-                   help="Number of samples to print; 0 = unlimited (default 0)")
-    p.add_argument("--stats", action="store_true",
-                   help="Print summary stats (mean/std) at the end")
-    p.add_argument("--no-header", action="store_true", help="Do not print the header line")
-    args = p.parse_args()
-
-    # Default to IMU-only unless --ndof explicitly given
-    if not args.imu_only and not args.ndof:
-        args.imu_only = True
-    return args
-
-
-def main():
-    args = parse_args()
-    run(args)
+            overall = combine_grades(g_bias, g_gstd, g_am, g_as)
+            print("---------------------------------------------------------------")
+            print(f"Overall: {overall}")
+            print(f"[{time.strftime('%H:%M:%S')}] Done.")
 
 
 if __name__ == "__main__":
