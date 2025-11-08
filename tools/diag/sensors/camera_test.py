@@ -1,46 +1,28 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Robot Savo — Camera Tester (expert, Ubuntu 24.04 / Pi 5)
-========================================================
-- Zero-guessing camera bring-up for IMX219 + DSI 7".
-- Previews:
-    --preview wayland   → waylandsink (your letterboxed 800x480)
-    --preview kms       → kmssink (DRM/KMS to the DSI panel)
-    --preview window    → autovideosink (X11/Wayland window if available)
+Robot Savo — Camera Tester (Ubuntu 24.04 / Pi 5)
+================================================
+- Ubuntu-first: works without Picamera2; uses libcamera core tools + GStreamer. Picamera2 is optional.
+- Listing: tries in order → cam -l (libcamera-tools), libcamera-hello, libcamera-ctl, gst-device-monitor.
+- Preview:
+    --preview wayland  → waylandsink (letterboxed 1280x720 → 800x480) + queues + sync=false
+    --preview kms      → kmssink (DRM/KMS, no compositor) [optional connector id]
+    --preview window   → autovideosink (X11/Wayland window)
 - Stills:
-    --snap PATH         → Picamera2 or libcamera-jpeg
-    --snap-gst PATH     → One-buffer GStreamer: libcamerasrc num-buffers=1 → jpegenc
+    --snap PATH        → libcamera-jpeg (if present) or Picamera2 (if present)
+    --snap-gst PATH    → one-buffer GStreamer: libcamerasrc → jpegenc → filesink
 - Video:
-    --record PATH       → MP4/H.264 with --bitrate, width/height/fps (Picamera2/libcamera-vid/GStreamer)
-- Logging:
-    --log BASEPATH      → Writes BASEPATH.txt (human) + BASEPATH.csv (machine) with timestamps + config
+    --record PATH      → MP4/H.264 via Picamera2 or libcamera-vid or pure GStreamer
+    --bitrate BPS      → set desired bitrate (default 8 Mbps)
+- Logging (optional):
+    --log BASE         → writes BASE.txt (human) & BASE.csv (machine) with timestamps + config
 
-Environment (for Wayland preview)
----------------------------------
-export XDG_RUNTIME_DIR=/run/user/1000
-export WAYLAND_DISPLAY=wayland-1
-export GST_PLUGIN_PATH=/usr/local/lib/aarch64-linux-gnu/gstreamer-1.0
-export LD_LIBRARY_PATH=/usr/local/lib/aarch64-linux-gnu:/usr/local/lib
-
-Examples
---------
-# List cameras
-python3 camera_test.py --list
-
-# Still via libcamera-jpeg (no Picamera2 needed)
-python3 camera_test.py --snap /tmp/cam.jpg --width 1280 --height 720
-
-# Still via one-buffer GStreamer
-python3 camera_test.py --snap-gst /tmp/cam_gst.jpg --width 1280 --height 720
-
-# Record 8s MP4 at 1920x1080/30, 10 Mbit/s, with logs
-python3 camera_test.py --record /tmp/cam.mp4 --width 1920 --height 1080 --fps 30 --bitrate 10000000 --duration 8 --log /tmp/cam_record
-
-# Live preview
-python3 camera_test.py --preview wayland
-python3 camera_test.py --preview kms
-python3 camera_test.py --preview window
+Wayland preview env (example):
+    export XDG_RUNTIME_DIR=/run/user/1000
+    export WAYLAND_DISPLAY=wayland-1
+    export GST_PLUGIN_PATH=/usr/local/lib/aarch64-linux-gnu/gstreamer-1.0
+    export LD_LIBRARY_PATH=/usr/local/lib/aarch64-linux-gnu:/usr/local/lib
 """
 
 import argparse
@@ -100,12 +82,10 @@ def start_logs(log_base: Optional[str], header: Dict[str, Any]) -> Optional[Tupl
     txt = f"{log_base}.txt"
     csvp = f"{log_base}.csv"
     ensure_dir_for(txt)
-    # human text
     with open(txt, "a", encoding="utf-8") as f:
         f.write(f"[{now_iso()}] camera_test start\n")
         for k, v in header.items():
             f.write(f"  {k}: {v}\n")
-    # csv header (append if not exists)
     new_file = not os.path.exists(csvp)
     with open(csvp, "a", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
@@ -122,11 +102,10 @@ def append_log(log_paths: Optional[Tuple[str, str]], row: Dict[str, Any]):
         f.write(f"[{now_iso()}] " + " ".join(f"{k}={v}" for k, v in row.items()) + "\n")
     with open(csvp, "a", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
-        # keep column order stable
         keys = list(row.keys())
         w.writerow([now_iso()] + [row[k] for k in keys])
 
-# ---------------- Picamera2 detection ----------------
+# ---------------- Optional Picamera2 ----------------
 
 def have_picamera2() -> bool:
     try:
@@ -135,32 +114,58 @@ def have_picamera2() -> bool:
     except Exception:
         return False
 
-# ---------------- List cameras ----------------
+# ---------------- Listing (robust) ----------------
 
-def list_picamera2():
-    from picamera2 import Picamera2
-    cams = Picamera2.global_camera_info()
-    if not cams:
-        print("No cameras detected (Picamera2).")
-        hint_video_group()
-        return
-    print("Detected cameras (Picamera2):")
-    for i, ci in enumerate(cams):
-        model = ci.get("Model", "Unknown")
-        sensor = ci.get("Sensor", "Unknown")
-        location = ci.get("Location", "Unknown")
-        print(f"  [{i}] {model} | sensor={sensor} | location={location}")
-
-def list_cli():
-    require("libcamera-hello", "libcamera-apps")
-    rc, out = run(["libcamera-hello", "--list-cameras"], capture=True)
-    if rc == 0 and out.strip():
-        print(out.strip())
-    else:
-        print("No cameras detected (libcamera-hello).")
+def list_devices():
+    """
+    Robust camera lister for Ubuntu/RPi:
+    1) cam -l (libcamera-tools) at common paths
+    2) libcamera-hello --list-cameras (if available)
+    3) libcamera-ctl --list-cameras (if available)
+    4) gst-device-monitor-1.0 Video/Source (fallback, muted warnings)
+    """
+    def try_cmd(cmd, env=None, label=None):
+        rc, out = run(cmd, capture=True, env=env)
+        if rc == 0 and out and out.strip():
+            print(out.strip() if not label else f"{label}\n{out.strip()}")
+            return True
         if out:
             print(out.strip())
-        hint_video_group()
+        return False
+
+    # 1) cam -l (explicit common locations)
+    cam_candidates = [
+        shutil.which("cam"),
+        "/usr/bin/cam",
+        "/usr/local/bin/cam",
+    ]
+    for c in cam_candidates:
+        if c and os.path.exists(c):
+            if try_cmd([c, "-l"]):
+                return
+
+    # 2) libcamera-hello --list-cameras
+    hello = shutil.which("libcamera-hello")
+    if hello and try_cmd([hello, "--list-cameras"]):
+        return
+
+    # 3) libcamera-ctl --list-cameras
+    ctl = shutil.which("libcamera-ctl")
+    if ctl and try_cmd([ctl, "--list-cameras"]):
+        return
+
+    # 4) GStreamer device monitor (suppress noisy warnings)
+    mon = shutil.which("gst-device-monitor-1.0")
+    if mon:
+        env = os.environ.copy()
+        env.setdefault("GST_DEBUG", "0")
+        if try_cmd([mon, "Video/Source"], env=env, label="Detected video sources (GStreamer):"):
+            return
+
+    print("No camera listers found or returned no devices.")
+    print("Install (if missing):")
+    print("  sudo apt install libcamera-tools")
+    print("  sudo apt install gstreamer1.0-plugins-base-apps")
 
 # ---------------- Stills ----------------
 
@@ -184,7 +189,9 @@ def snap_picamera2(path: str, w: int, h: int, exposure_us: Optional[int], iso: O
     print(f"Saved still: {path}")
 
 def snap_cli(path: str, w: int, h: int, exposure_us: Optional[int], iso: Optional[int], awb: Optional[str], cam_index: Optional[int]):
-    require("libcamera-jpeg", "libcamera-apps")
+    if not which("libcamera-jpeg"):
+        print("libcamera-jpeg not found; use --snap-gst or install libcamera-apps.", file=sys.stderr)
+        sys.exit(127)
     cmd = ["libcamera-jpeg", "-o", path, "--width", str(w), "--height", str(h), "-n"]
     if cam_index is not None: cmd += ["--camera", str(cam_index)]
     if awb: cmd += ["--awb", awb]
@@ -197,7 +204,7 @@ def snap_cli(path: str, w: int, h: int, exposure_us: Optional[int], iso: Optiona
     print(f"Saved still: {path}")
 
 def snap_gst(path: str, w: int, h: int):
-    """One-buffer GStreamer capture → JPEG."""
+    """One-buffer GStreamer capture → JPEG (no libcamera-apps needed)."""
     require("gst-launch-1.0", "GStreamer (gst-launch-1.0)")
     ensure_dir_for(path)
     pipeline = [
@@ -239,7 +246,10 @@ def record_picamera2(path: str, w: int, h: int, fps: int, duration: float, bitra
     print("Done.")
 
 def record_cli(path: str, w: int, h: int, fps: int, duration: float, bitrate: int, cam_index: Optional[int]):
-    require("libcamera-vid", "libcamera-apps")
+    if not which("libcamera-vid"):
+        print("libcamera-vid not found; falling back to pure GStreamer.", file=sys.stderr)
+        record_gst(path, w, h, fps, bitrate, duration)
+        return
     cmd = [
         "libcamera-vid", "-t", str(int(duration*1000)),
         "--width", str(w), "--height", str(h),
@@ -256,10 +266,9 @@ def record_cli(path: str, w: int, h: int, fps: int, duration: float, bitrate: in
     print(f"Saved video: {path}")
 
 def record_gst(path: str, w: int, h: int, fps: int, bitrate: int, duration: float):
-    """Pure GStreamer MP4/H.264 path."""
+    """Pure GStreamer MP4/H.264 path (needs x264enc + mp4mux)."""
     require("gst-launch-1.0", "GStreamer (gst-launch-1.0)")
     ensure_dir_for(path)
-    # Needs x264enc (gstreamer1.0-plugins-ugly) and mp4mux (gstreamer1.0-plugins-good)
     pipeline = [
         "gst-launch-1.0", "-e",
         "libcamerasrc", "!",
@@ -301,35 +310,32 @@ def preview_wayland(src_w: int, src_h: int, fps: int, panel_w: int = 800, panel_
     require("gst-launch-1.0", "GStreamer (gst-launch-1.0)")
     check_wayland_env()
     target_w = panel_w
-    target_h = int(round(panel_w * 9 / 16))  # 450
+    target_h = int(round(panel_w * 9 / 16))  # 450 for 800 wide
     pad = panel_h - target_h                 # 30 → 15/15
     cmd = [
         "gst-launch-1.0", "-v",
-        "libcamerasrc", "!",
+        "libcamerasrc", "!", "queue", "!",
         f"video/x-raw,format=I420,width={src_w},height={src_h},framerate={fps}/1", "!",
         "videoscale", "!", f"video/x-raw,width={target_w},height={target_h}", "!",
         "videobox", f"border-alpha=1", f"top={pad//2}", f"bottom={pad - pad//2}", "left=0", "right=0", "!",
         "videoscale", "!", f"video/x-raw,width={panel_w},height={panel_h}", "!",
-        "videoconvert", "!",
-        f"waylandsink", f"display={os.environ.get('WAYLAND_DISPLAY','wayland-1')}"
+        "videoconvert", "!", "queue", "!",
+        "waylandsink", f"display={os.environ.get('WAYLAND_DISPLAY','wayland-1')}", "sync=false"
     ]
     print("Running (Ctrl+C to quit):", " ".join(shlex.quote(x) for x in cmd))
     os.execvp(cmd[0], cmd)
 
 def preview_kms(src_w: int, src_h: int, fps: int, conn_id: Optional[int] = None):
-    """
-    DRM/KMS direct-to-panel preview (no compositor).
-    Optionally pass connector id with --kms-conn.
-    """
+    """DRM/KMS direct-to-panel preview (no compositor)."""
     require("gst-launch-1.0", "GStreamer (gst-launch-1.0)")
     sink = ["kmssink"]
     if conn_id is not None:
         sink += [f"connector-id={conn_id}"]
     cmd = [
         "gst-launch-1.0", "-v",
-        "libcamerasrc", "!",
+        "libcamerasrc", "!", "queue", "!",
         f"video/x-raw,format=I420,width={src_w},height={src_h},framerate={fps}/1", "!",
-        "videoconvert", "!",
+        "videoconvert", "!", "queue", "!",
     ] + sink
     print("Running (Ctrl+C to quit):", " ".join(shlex.quote(x) for x in cmd))
     os.execvp(cmd[0], cmd)
@@ -339,9 +345,9 @@ def preview_window(src_w: int, src_h: int, fps: int):
     require("gst-launch-1.0", "GStreamer (gst-launch-1.0)")
     cmd = [
         "gst-launch-1.0", "-v",
-        "libcamerasrc", "!",
+        "libcamerasrc", "!", "queue", "!",
         f"video/x-raw,format=I420,width={src_w},height={src_h},framerate={fps}/1", "!",
-        "videoconvert", "!",
+        "videoconvert", "!", "queue", "!",
         "autovideosink"
     ]
     print("Running (Ctrl+C to quit):", " ".join(shlex.quote(x) for x in cmd))
@@ -352,8 +358,8 @@ def preview_window(src_w: int, src_h: int, fps: int):
 def main():
     ap = argparse.ArgumentParser(description="Robot Savo — Camera Tester")
     g = ap.add_mutually_exclusive_group(required=True)
-    g.add_argument("--list", action="store_true", help="List cameras")
-    g.add_argument("--snap", metavar="PATH", help="Capture JPEG to PATH (Picamera2 or libcamera-jpeg)")
+    g.add_argument("--list", action="store_true", help="List cameras (cam -l / hello / ctl / gst-device-monitor)")
+    g.add_argument("--snap", metavar="PATH", help="Capture JPEG to PATH (libcamera-jpeg or Picamera2)")
     g.add_argument("--snap-gst", metavar="PATH", help="Capture JPEG via one-buffer GStreamer pipeline")
     g.add_argument("--record", metavar="PATH", help="Record MP4/H.264 to PATH")
     g.add_argument("--preview", choices=["wayland", "kms", "window"], help="Live preview sink")
@@ -371,7 +377,6 @@ def main():
     ap.add_argument("--log", type=str, default=None, help="Base path for logs (writes .txt and .csv)")
     args = ap.parse_args()
 
-    # Begin logging
     header = {
         "action": ("list" if args.list else
                    "snap-gst" if args.snap_gst else
@@ -386,7 +391,7 @@ def main():
     use_p2 = have_picamera2()
 
     if args.list:
-        (list_picamera2 if use_p2 else list_cli)()
+        list_devices()
         append_log(logs, {"result": "listed"})
         return
 
@@ -397,16 +402,18 @@ def main():
 
     if args.snap:
         ensure_dir_for(args.snap)
-        if use_p2:
+        if which("libcamera-jpeg"):
+            snap_cli(args.snap, args.width, args.height, args.exposure, args.iso, args.awb, args.camera)
+        elif use_p2:
             snap_picamera2(args.snap, args.width, args.height, args.exposure, args.iso, args.awb)
         else:
-            snap_cli(args.snap, args.width, args.height, args.exposure, args.iso, args.awb, args.camera)
+            print("Neither libcamera-jpeg nor Picamera2 available. Use --snap-gst.", file=sys.stderr)
+            sys.exit(127)
         append_log(logs, {"result": "snap_ok", "path": args.snap})
         return
 
     if args.record:
         ensure_dir_for(args.record)
-        # Prefer libcamera-vid on headless systems; Picamera2 if available; else GStreamer
         if use_p2:
             record_picamera2(args.record, args.width, args.height, args.fps, args.duration, args.bitrate,
                              args.exposure, args.iso, args.awb)
@@ -424,7 +431,6 @@ def main():
             preview_kms(args.width, args.height, args.fps, args.kms_conn)
         else:
             preview_window(args.width, args.height, args.fps)
-        # execvp replaces process; if it returns, it's an error
         append_log(logs, {"result": "preview_exited"})
         return
 
