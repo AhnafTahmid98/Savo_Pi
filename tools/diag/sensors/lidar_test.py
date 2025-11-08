@@ -17,12 +17,12 @@ Author: Robot Savo
 
 """
 
+import os, sys
+sys.path.insert(0, os.path.expanduser('~/Savo_Pi/.pylibs'))
+
 import argparse
 import csv
 import math
-import os
-import signal
-import sys
 import time
 from dataclasses import dataclass
 from typing import Iterable, List, Optional, Tuple
@@ -31,8 +31,8 @@ from typing import Iterable, List, Optional, Tuple
 try:
     from rplidar import RPLidar, RPLidarException  # type: ignore
 except Exception:
-    print("ERROR: 'rplidar' library not found. Install it (project-local is fine):", file=sys.stderr)
-    print("  python3 -m pip install --target ~/Savo_Pi/.pylibs rplidar", file=sys.stderr)
+    print("ERROR: 'rplidar' library not found. Install it (project-local is fine):")
+    print("  python3 -m pip install --target ~/Savo_Pi/.pylibs rplidar")
     sys.exit(1)
 
 # -------------------------- Helpers --------------------------
@@ -106,22 +106,15 @@ def run(args):
     csv_mode  = args.csv_mode
 
     if angle_min > angle_max:
-        print("ERROR: --angle-min must be <= --angle-max", file=sys.stderr)
+        print("ERROR: --angle-min must be <= --angle-max")
         sys.exit(2)
     if r_min_m >= r_max_m:
-        print("ERROR: --range-min must be < --range-max", file=sys.stderr)
+        print("ERROR: --range-min must be < --range-max")
         sys.exit(2)
 
     # CSV setup (lazy open to avoid partial files on early failure)
     csv_file = None
     csv_writer = None
-
-    # Graceful stop flag
-    stop_flag = {"stop": False}
-    def _sig_handler(sig, frame):
-        stop_flag["stop"] = True
-    signal.signal(signal.SIGINT, _sig_handler)
-    signal.signal(signal.SIGTERM, _sig_handler)
 
     lidar: Optional[RPLidar] = None
     scan_count = 0
@@ -130,8 +123,9 @@ def run(args):
     ret = 0
 
     try:
+        # Short timeout so Ctrl+C breaks read quickly
         print(f"[LiDAR] Connecting: port='{port}' baud={baudrate} ...")
-        lidar = RPLidar(port=port, baudrate=baudrate, timeout=3)
+        lidar = RPLidar(port=port, baudrate=baudrate, timeout=0.2)
 
         info = lidar.get_info()
         model = info.get('model', 'unknown')
@@ -145,10 +139,9 @@ def run(args):
         err_code = health[1] if len(health) > 1 else 0
         print(f"[LiDAR] Health: status={status}  error_code={err_code}")
         if status.lower() != 'good':
-            print("ERROR: LiDAR health is not GOOD. Power-cycle the sensor and recheck.", file=sys.stderr)
+            print("ERROR: LiDAR health is not GOOD. Power-cycle the sensor and recheck.")
             try:
-                lidar.stop()
-                lidar.stop_motor()
+                lidar.stop(); lidar.stop_motor()
             except Exception:
                 pass
             sys.exit(3)
@@ -162,7 +155,7 @@ def run(args):
             print("[LiDAR] Starting motor (default speed) ...")
             lidar.start_motor()
 
-        time.sleep(0.5)  # stabilize rotor
+        time.sleep(0.4)  # stabilize rotor
 
         # Prepare CSV if requested
         if csv_path:
@@ -185,77 +178,80 @@ def run(args):
         last_print = 0.0
 
         # Enforce *full-rotation* scans (min_len high; large buffer)
-        for scan in lidar.iter_scans(max_buf_meas=8192, min_len=args.min_len):
-            if stop_flag["stop"]:
-                break
+        try:
+            for scan in lidar.iter_scans(max_buf_meas=8192, min_len=args.min_len):
+                t_scan = now_s()
+                scan_count += 1
 
-            t_scan = now_s()
-            scan_count += 1
+                # Sector/range gating
+                if (angle_min != -180.0) or (angle_max != 180.0) or (r_min_m > 0.0) or (r_max_m < 40.0):
+                    filtered = gate_by_angle_and_range(scan, angle_min, angle_max, r_min_m, r_max_m)
+                else:
+                    filtered = [(q, ang, d_mm/1000.0) for (q, ang, d_mm) in scan]
 
-            # Sector/range gating
-            if (angle_min != -180.0) or (angle_max != 180.0) or (r_min_m > 0.0) or (r_max_m < 40.0):
-                filtered = gate_by_angle_and_range(scan, angle_min, angle_max, r_min_m, r_max_m)
-            else:
-                filtered = [(q, ang, d_mm/1000.0) for (q, ang, d_mm) in scan]
+                # Compute period from consecutive scan timestamps (realistic Hz)
+                period = (t_scan - prev_scan_ts) if prev_scan_ts is not None else None
+                prev_scan_ts = t_scan
 
-            # Compute period from consecutive scan timestamps (realistic Hz)
-            period = (t_scan - prev_scan_ts) if prev_scan_ts is not None else None
-            prev_scan_ts = t_scan
+                # Min distance/angle in filtered set
+                min_pair = min(filtered, key=lambda x: x[2]) if filtered else None
 
-            # Min distance/angle in filtered set
-            min_pair = min(filtered, key=lambda x: x[2]) if filtered else None
-
-            stats = compute_scan_stats(
-                scan_id=scan_count, t_scan=t_scan,
-                n_points=len(filtered), period_s=period,
-                min_pair=min_pair
-            )
-
-            # Obstacle alert check
-            obstacle_hit = bool(obst_th is not None and
-                                stats.min_dist_m is not None and
-                                stats.min_dist_m <= obst_th)
-
-            # Console line (rate-limited to ~10 Hz)
-            if (t_scan - last_print) >= 0.1:
-                last_print = t_scan
-                md_txt = (
-                    f"{stats.min_dist_m:.3f} m @ {stats.min_angle_deg:.1f}°"
-                    if stats.min_dist_m is not None else "—"
+                stats = compute_scan_stats(
+                    scan_id=scan_count, t_scan=t_scan,
+                    n_points=len(filtered), period_s=period,
+                    min_pair=min_pair
                 )
-                hz_txt = f"{stats.hz_estimate:4.2f} Hz" if math.isfinite(stats.hz_estimate) else " n/a "
-                pps_txt = f"{int(round(stats.pts_per_sec))}/s" if math.isfinite(stats.pts_per_sec) else "n/a"
-                alert = "  **OBSTACLE**" if obstacle_hit else ""
-                print(f"[scan {stats.scan_id:05d}] {hz_txt}  pts/scan={stats.n_points:4d}  pts/s={pps_txt}  min={md_txt}{alert}")
 
-            # CSV logging
-            if csv_writer:
-                if csv_mode == 'scans':
-                    csv_writer.writerow([
-                        f"{stats.t:.6f}", stats.scan_id, stats.n_points,
-                        f"{stats.hz_estimate:.4f}" if math.isfinite(stats.hz_estimate) else "",
-                        f"{stats.pts_per_sec:.1f}" if math.isfinite(stats.pts_per_sec) else "",
-                        f"{stats.min_dist_m:.4f}" if stats.min_dist_m is not None else "",
-                        f"{stats.min_angle_deg:.2f}" if stats.min_angle_deg is not None else "",
-                    ])
-                else:  # points
-                    for q, ang, d_m in filtered:
-                        csv_writer.writerow([f"{t_scan:.6f}", stats.scan_id, q, f"{ang:.2f}", f"{d_m:.4f}"])
+                # Obstacle alert check
+                obstacle_hit = bool(
+                    obst_th is not None and
+                    stats.min_dist_m is not None and
+                    stats.min_dist_m <= obst_th
+                )
 
-            # Stop conditions
-            if duration is not None and (now_s() - t_start) >= duration:
-                print("[LiDAR] Duration reached; stopping.")
-                break
-            if max_scans is not None and scan_count >= max_scans:
-                print("[LiDAR] Max scans reached; stopping.")
-                break
+                # Console line (rate-limited to ~10 Hz)
+                if (t_scan - last_print) >= 0.1:
+                    last_print = t_scan
+                    md_txt = (
+                        f"{stats.min_dist_m:.3f} m @ {stats.min_angle_deg:.1f}°"
+                        if stats.min_dist_m is not None else "—"
+                    )
+                    hz_txt = f"{stats.hz_estimate:4.2f} Hz" if math.isfinite(stats.hz_estimate) else " n/a "
+                    pps_txt = f"{int(round(stats.pts_per_sec))}/s" if math.isfinite(stats.pts_per_sec) else "n/a"
+                    alert = "  **OBSTACLE**" if obstacle_hit else ""
+                    print(f"[scan {stats.scan_id:05d}] {hz_txt}  pts/scan={stats.n_points:4d}  pts/s={pps_txt}  min={md_txt}{alert}")
+
+                # CSV logging
+                if csv_writer:
+                    if csv_mode == 'scans':
+                        csv_writer.writerow([
+                            f"{stats.t:.6f}", stats.scan_id, stats.n_points,
+                            f"{stats.hz_estimate:.4f}" if math.isfinite(stats.hz_estimate) else "",
+                            f"{stats.pts_per_sec:.1f}" if math.isfinite(stats.pts_per_sec) else "",
+                            f"{stats.min_dist_m:.4f}" if stats.min_dist_m is not None else "",
+                            f"{stats.min_angle_deg:.2f}" if stats.min_angle_deg is not None else "",
+                        ])
+                    else:  # points
+                        for q, ang, d_m in filtered:
+                            csv_writer.writerow([f"{t_scan:.6f}", stats.scan_id, q, f"{ang:.2f}", f"{d_m:.4f}"])
+
+                # Stop conditions
+                if duration is not None and (now_s() - t_start) >= duration:
+                    print("[LiDAR] Duration reached; stopping.")
+                    break
+                if max_scans is not None and scan_count >= max_scans:
+                    print("[LiDAR] Max scans reached; stopping.")
+                    break
+
+        except KeyboardInterrupt:
+            print("\n[LiDAR] Ctrl+C received — stopping.")
 
     except RPLidarException as e:
-        print(f"RPLidarException: {e}", file=sys.stderr)
-        print("Tip: Check power, USB cable, port path, and that no other process uses the port.", file=sys.stderr)
+        print(f"RPLidarException: {e}")
+        print("Tip: Check power, USB cable, port path, and that no other process uses the port.")
         ret = 4
     except Exception as e:
-        print(f"ERROR: {e}", file=sys.stderr)
+        print(f"ERROR: {e}")
         ret = 5
     finally:
         # Flush CSV
@@ -274,13 +270,13 @@ def run(args):
                 lidar.disconnect()
                 print("[LiDAR] Stopped motor and disconnected.")
         except Exception as e:
-            print(f"[LiDAR] Cleanup warning: {e}", file=sys.stderr)
+            print(f"[LiDAR] Cleanup warning: {e}")
     sys.exit(ret)
 
 # -------------------------- CLI --------------------------
 def main():
     parser = argparse.ArgumentParser(
-        description="Robot Savo — RPLIDAR A1 Diagnostic (expert edition, no buzzer)"
+        description="Robot Savo — RPLIDAR A1 Diagnostic (expert edition, Ctrl+C safe, no buzzer)"
     )
     parser.add_argument("--port", type=str,
                         default="/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_*-if00-port0",
@@ -304,7 +300,7 @@ def main():
                         help="CSV format: per-scan stats or raw per-point rows (default: scans).")
 
     parser.add_argument("--min-len", type=int, default=200,
-                        help="Minimum points per scan (full rotation). Increase to 300+ if needed.")
+                        help="Minimum points per scan (full rotation). If you see no output, try 80–120.")
 
     args = parser.parse_args()
 
@@ -318,4 +314,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
