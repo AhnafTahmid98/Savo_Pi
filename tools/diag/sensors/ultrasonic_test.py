@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 ultrasonic_test.py
-HC-SR04-class ultrasonic tester for Robot Savo 
+HC-SR04-class ultrasonic tester for Robot Savo (Pi 5, Ubuntu 24.04)
 
 Features:
 - Precise echo pulse timing with perf_counter_ns()
@@ -18,22 +18,21 @@ Author: Savo Copilot
 
 import argparse
 import csv
-import math
 import sys
 import time
 from statistics import median, mean, pstdev
 from typing import Optional, List, Tuple
 
-# -------------------- Defaults (locked for Robot Savo) --------------------
-DEF_TRIG = 22
-DEF_ECHO = 27
+# -------------------- Defaults (Freenove mapping) --------------------
+DEF_TRIG = 27          # Freenove: TRIG on BCM27
+DEF_ECHO = 22          # Freenove: ECHO on BCM22
 DEF_BUZZ = None        # set to 17 to beep on near hits
 DEF_RATE = 10.0        # readings per second
 DEF_BURST = 5          # samples per reading (median-of-N)
 DEF_SAMPLES = 50       # number of readings (0 = run forever)
 DEF_TEMP = 20.0        # ambient °C for speed-of-sound
 DEF_THRESH = 0.28      # meters (near-field safety threshold)
-DEF_TIMEOUT = 30e-3    # seconds per edge wait (30 ms)
+DEF_TIMEOUT = 0.03     # seconds per edge wait
 DEF_SETTLE = 0.05      # seconds settle before first ping
 DEF_TRIG_PULSE = 10e-6 # seconds (10 μs HIGH)
 
@@ -58,16 +57,15 @@ class LgpioBackend(GpioBackend):
         import lgpio  # type: ignore
         self._lgpio = lgpio
         self._h = lgpio.gpiochip_open(chip_index)
-        self._outputs = set()
-        self._inputs = set()
+        self._outs = set(); self._ins = set()
 
     def setup_output(self, pin: int):
         self._lgpio.gpio_claim_output(self._h, pin, 0)
-        self._outputs.add(pin)
+        self._outs.add(pin)
 
     def setup_input(self, pin: int):
         self._lgpio.gpio_claim_input(self._h, pin)
-        self._inputs.add(pin)
+        self._ins.add(pin)
 
     def write(self, pin: int, level: int):
         self._lgpio.gpio_write(self._h, pin, 1 if level else 0)
@@ -77,7 +75,7 @@ class LgpioBackend(GpioBackend):
 
     def close(self):
         try:
-            for p in list(self._outputs):
+            for p in list(self._outs):
                 self._lgpio.gpio_write(self._h, p, 0)
         except Exception:
             pass
@@ -92,45 +90,35 @@ class GpiodBackend(GpioBackend):
         import gpiod  # type: ignore
         self._gpiod = gpiod
         self._chip = gpiod.Chip(chip_name)
-        self._lines_out = {}
-        self._lines_in = {}
+        self._outs = {}; self._ins = {}
 
     def setup_output(self, pin: int):
         line = self._chip.get_line(pin)
-        line.request(consumer="ultra_test_out", type=self._gpiod.LINE_REQ_DIR_OUT, default_vals=[0])
-        self._lines_out[pin] = line
+        line.request(consumer="ultra_out", type=self._gpiod.LINE_REQ_DIR_OUT, default_vals=[0])
+        self._outs[pin] = line
 
     def setup_input(self, pin: int):
         line = self._chip.get_line(pin)
-        line.request(consumer="ultra_test_in", type=self._gpiod.LINE_REQ_DIR_IN)
-        self._lines_in[pin] = line
+        line.request(consumer="ultra_in", type=self._gpiod.LINE_REQ_DIR_IN)
+        self._ins[pin] = line
 
     def write(self, pin: int, level: int):
-        self._lines_out[pin].set_value(1 if level else 0)
+        self._outs[pin].set_value(1 if level else 0)
 
     def read(self, pin: int) -> int:
-        return 1 if self._lines_in[pin].get_value() else 0
+        return 1 if self._ins[pin].get_value() else 0
 
     def close(self):
-        # Drive outputs low, then release
-        for pin, line in list(self._lines_out.items()):
-            try:
-                line.set_value(0)
-            except Exception:
-                pass
-            try:
-                line.release()
-            except Exception:
-                pass
-        for pin, line in list(self._lines_in.items()):
-            try:
-                line.release()
-            except Exception:
-                pass
-        try:
-            self._chip.close()
-        except Exception:
-            pass
+        for pin, line in list(self._outs.items()):
+            try: line.set_value(0)
+            except Exception: pass
+            try: line.release()
+            except Exception: pass
+        for pin, line in list(self._ins.items()):
+            try: line.release()
+            except Exception: pass
+        try: self._chip.close()
+        except Exception: pass
 
 def pick_backend(prefer: Optional[str] = None) -> GpioBackend:
     """
@@ -146,22 +134,16 @@ def pick_backend(prefer: Optional[str] = None) -> GpioBackend:
         if importlib.util.find_spec("gpiod"):
             return GpiodBackend()
         raise RuntimeError("Requested backend 'gpiod' not available.")
-
-    # Auto preference: lgpio -> gpiod
-    try:
-        return LgpioBackend()
-    except Exception:
-        pass
-    try:
-        return GpiodBackend()
-    except Exception:
-        pass
+    # Auto: try lgpio → gpiod
+    try: return LgpioBackend()
+    except Exception: pass
+    try: return GpiodBackend()
+    except Exception: pass
     raise RuntimeError("No usable GPIO backend found (install python3-lgpio or python3-libgpiod).")
 
 # -------------------- Timing helpers --------------------
 def busy_wait_level(gpio: GpioBackend, pin: int, level: int, timeout_s: float) -> bool:
-    t0 = now_ns()
-    limit = int(timeout_s * 1e9)
+    t0 = now_ns(); limit = int(timeout_s * 1e9)
     while (now_ns() - t0) < limit:
         if gpio.read(pin) == level:
             return True
@@ -172,37 +154,26 @@ def pulse_width_s(gpio: GpioBackend, trig: int, echo: int, trig_pulse_s: float, 
     Emit a TRIG pulse and measure echo HIGH width in seconds.
     Returns None on timeout or invalid width.
     """
-    # Ensure TRIG low
     gpio.write(trig, 0)
     time.sleep(2e-6)
-
-    # 10 µs HIGH pulse with busy-wait timing
+    # 10 µs HIGH pulse (busy-wait for precision)
     gpio.write(trig, 1)
-    tstart = now_ns()
-    while (now_ns() - tstart) < int(trig_pulse_s * 1e9):
+    t0 = now_ns()
+    while (now_ns() - t0) < int(trig_pulse_s * 1e9):
         pass
     gpio.write(trig, 0)
 
-    # Rising edge (start)
     if not busy_wait_level(gpio, echo, 1, timeout_s):
         return None
     t_rise = now_ns()
-
-    # Falling edge (end)
     if not busy_wait_level(gpio, echo, 0, timeout_s):
         return None
     t_fall = now_ns()
-
     width = (t_fall - t_rise) / 1e9
-    if width <= 0:
-        return None
-    return width
+    return width if width > 0 else None
 
 def measure_distance_m(gpio: GpioBackend, trig: int, echo: int, temp_c: float,
                        trig_pulse_s: float, timeout_s: float) -> Optional[Tuple[float, float]]:
-    """
-    Returns (distance_m, pulse_width_s) or None on failure.
-    """
     w = pulse_width_s(gpio, trig, echo, trig_pulse_s, timeout_s)
     if w is None:
         return None
@@ -213,29 +184,17 @@ def measure_distance_m(gpio: GpioBackend, trig: int, echo: int, temp_c: float,
 def median_burst(gpio: GpioBackend, trig: int, echo: int, temp_c: float,
                  burst: int, trig_pulse_s: float, timeout_s: float,
                  inter_sample_delay_s: float = 0.01) -> Optional[Tuple[float, float, List[float], List[float]]]:
-    """
-    Take N samples; return (median_d, median_w, list_d, list_w).
-    Returns None if all samples fail.
-    """
-    ds: List[float] = []
-    ws: List[float] = []
+    ds: List[float] = []; ws: List[float] = []
     for _ in range(burst):
         r = measure_distance_m(gpio, trig, echo, temp_c, trig_pulse_s, timeout_s)
         if r is not None:
-            d, w = r
-            ds.append(d); ws.append(w)
+            d, w = r; ds.append(d); ws.append(w)
         time.sleep(inter_sample_delay_s)
     if not ds:
         return None
     return (median(ds), median(ws), ds, ws)
 
 def grade_health(distances: List[float], thresh_m: float) -> Tuple[str, str]:
-    """
-    Heuristic grading for diagnostics:
-      PASS    jitter <= 0.01 m and plausible mean in 0.02..4.0 m
-      CAUTION jitter <= 0.03 m and plausible mean
-      FAIL    else (timeouts/implausible/high noise)
-    """
     if not distances:
         return ("FAIL", "No valid readings.")
     dmin, dmax = min(distances), max(distances)
@@ -243,12 +202,9 @@ def grade_health(distances: List[float], thresh_m: float) -> Tuple[str, str]:
     djit = pstdev(distances) if len(distances) > 1 else 0.0
     valid = (0.02 <= dmean <= 4.0)
     near_hits = sum(1 for d in distances if d <= thresh_m)
-    if valid and djit <= 0.01:
-        grade = "PASS"
-    elif valid and djit <= 0.03:
-        grade = "CAUTION"
-    else:
-        grade = "FAIL"
+    if valid and djit <= 0.01: grade = "PASS"
+    elif valid and djit <= 0.03: grade = "CAUTION"
+    else: grade = "FAIL"
     msg = (f"range=[{dmin:.3f},{dmax:.3f}] m, mean={dmean:.3f} m, jitter={djit:.3f} m, "
            f"near({thresh_m:.2f} m) hits={near_hits}/{len(distances)}")
     return grade, msg
@@ -256,8 +212,8 @@ def grade_health(distances: List[float], thresh_m: float) -> Tuple[str, str]:
 # -------------------- Main --------------------
 def main():
     ap = argparse.ArgumentParser(description="Robot Savo ultrasonic tester (lgpio/libgpiod auto)")
-    ap.add_argument("--trig", type=int, default=DEF_TRIG, help="TRIG BCM GPIO (default 22)")
-    ap.add_argument("--echo", type=int, default=DEF_ECHO, help="ECHO BCM GPIO (default 27)")
+    ap.add_argument("--trig", type=int, default=DEF_TRIG, help="TRIG BCM GPIO (default 27)")
+    ap.add_argument("--echo", type=int, default=DEF_ECHO, help="ECHO BCM GPIO (default 22)")
     ap.add_argument("--buzzer", type=int, default=DEF_BUZZ, help="Optional buzzer BCM GPIO (e.g., 17)")
     ap.add_argument("--rate", type=float, default=DEF_RATE, help="Readings per second")
     ap.add_argument("--burst", type=int, default=DEF_BURST, help="Samples per reading (median-of-N)")
@@ -272,15 +228,11 @@ def main():
     ap.add_argument("--quiet", action="store_true", help="Reduce per-reading prints")
     args = ap.parse_args()
 
-    # Backend select
+    # Select backend
     try:
-        if args.backend == "auto":
-            gpio = pick_backend(None)
-        else:
-            gpio = pick_backend(args.backend)
+        gpio = pick_backend(None if args.backend == "auto" else args.backend)
     except Exception as e:
-        print(f"ERROR: {e}", file=sys.stderr)
-        sys.exit(2)
+        print(f"ERROR: {e}", file=sys.stderr); sys.exit(2)
 
     # Claim lines
     try:
@@ -297,15 +249,13 @@ def main():
     buz = None
     if args.buzzer is not None:
         try:
-            gpio.setup_output(args.buzzer)
-            buz = args.buzzer
+            gpio.setup_output(args.buzzer); buz = args.buzzer
         except Exception as e:
             print(f"WARNING: buzzer setup failed ({e}). Continuing without buzzer.", file=sys.stderr)
             buz = None
 
-    # CSV init
-    writer = None
-    fcsv = None
+    # CSV
+    writer = None; fcsv = None
     if args.csv:
         try:
             fcsv = open(args.csv, "w", newline="")
@@ -320,21 +270,18 @@ def main():
           + (f"  BUZZER={buz}" if buz is not None else "")
           + f"  rate={args.rate:.2f} Hz  burst={args.burst}  temp={args.temp:.1f}°C  thresh={args.thresh:.2f} m")
     print(f"Speed of sound: {speed_of_sound_mps(args.temp):.2f} m/s")
-    print("Note: Sensor is powered from Freenove board @5V; GPIO levels are board-buffered to 3.3V.\n")
+    print("Note: Sensor is powered from Freenove HAT @5V; GPIO levels are board-buffered to 3.3V.\n")
 
     time.sleep(DEF_SETTLE)
     period = 1.0 / max(1e-3, args.rate)
 
     all_dist: List[float] = []
     n = 0
-
     try:
         while True:
-            loop_t0 = time.perf_counter()
-            r = median_burst(
-                gpio, args.trig, args.echo, args.temp,
-                args.burst, DEF_TRIG_PULSE, args.timeout
-            )
+            t0 = time.perf_counter()
+            r = median_burst(gpio, args.trig, args.echo, args.temp,
+                             args.burst, DEF_TRIG_PULSE, args.timeout)
             ts_iso = time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime())
 
             if r is None:
@@ -361,7 +308,6 @@ def main():
                         "[" + ",".join(f"{x:.6e}" for x in ws) + "]"
                     ])
 
-                # Optional near-field buzzer
                 if buz is not None and d_med <= args.thresh:
                     for _ in range(2):
                         gpio.write(buz, 1); time.sleep(0.04)
@@ -373,7 +319,7 @@ def main():
                 break
 
             # rate control
-            dt = time.perf_counter() - loop_t0
+            dt = time.perf_counter() - t0
             sleep_left = period - dt
             if sleep_left > 0:
                 time.sleep(sleep_left)
