@@ -1,304 +1,249 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Robot Savo — Quadrature Encoders Test (no odom)
------------------------------------------------
-- Uses libgpiod edge events (interrupt-like) with software debouncing.
-- Robust quadrature state machine (valid/invalid transition tracking).
-- Per-wheel count and linear speed (m/s) — NO pose/odom here.
-- Tunable CPR, decoding (1x/2x/4x), wheel geometry for speed calc.
-- Optional CSV logging.
-- Clean shutdown and summary.
+Robot Savo — Encoders Test (no odom)
+- Pure quadrature counting with direction (polling-based, debounced by time).
+- Works with libgpiod v2 (new API) and v1 (legacy API).
+- Prints counts, per-interval deltas, simple velocities, and illegal transitions.
+- No odometry math here (you’ll test that later).
 
-Author: Robot Savo
+Pins (locked from memory):
+  Left  : A=21, B=20
+  Right : A=12, B=26
+
+Examples:
+  python3 tools/diag/motion/encoders_test.py --duration 12
+  # If forward shows negative, flip sign without rewiring:
+  python3 tools/diag/motion/encoders_test.py --invert-left
+  python3 tools/diag/motion/encoders_test.py --invert-right
+  # CSV
+  python3 tools/diag/motion/encoders_test.py --duration 15 --csv encoders.csv
 """
 
 import argparse
-import csv
-import math
-import os
-import sys
 import time
-from dataclasses import dataclass
-from typing import Optional, Tuple
+import math
+import sys
+import csv
 
 try:
-    import gpiod  # python3-libgpiod
+    import gpiod
 except Exception as e:
-    print("ERROR: python3-libgpiod is required. Install with: sudo apt install -y python3-libgpiod", file=sys.stderr)
+    print("ERROR: python3-libgpiod is required. Install:\n  sudo apt install -y python3-libgpiod", file=sys.stderr)
     raise
 
-# ----------------------------- Quadrature Helpers -----------------------------
+# ---------------------------- Quadrature utils ----------------------------
 
-# Valid next-state table for 2-bit quadrature (Gray code): 00 -> 01 -> 11 -> 10 -> 00 (forward)
-# We map (prev<<2 | curr) -> step {-1, 0, +1}. 0 means no change or illegal (tracked separately).
-_QSTEP = {
-    0b0001: +1,  # 00 -> 01
-    0b0011:  0,  # 00 -> 11 (illegal, but we count it elsewhere)
-    0b0010: -1,  # 00 -> 10
-    0b0100: -1,  # 01 -> 00
-    0b0111: +1,  # 01 -> 11
-    0b0110:  0,  # 01 -> 10 (illegal)
-    0b1110: +1,  # 11 -> 10
-    0b1100: -1,  # 11 -> 00
-    0b1101:  0,  # 11 -> 01 (illegal)
-    0b1011: -1,  # 10 -> 11
-    0b1000: +1,  # 10 -> 00
-    0b1001:  0,  # 10 -> 01 (illegal)
-}
+# Valid Gray-code sequence for quadrature: 00→01→11→10→00 (and reverse)
+STATE_ORDER = [0b00, 0b01, 0b11, 0b10]
+STATE_INDEX = {s: i for i, s in enumerate(STATE_ORDER)}
 
-def qstate(a_val: int, b_val: int) -> int:
-    """Pack A,B (0/1) into a 2-bit state."""
-    return ((a_val & 1) << 1) | (b_val & 1)
+def step_from(prev_state: int, curr_state: int) -> int:
+    """Return +1, -1 or 0 for valid neighbor transitions; 0 on same; raise on illegal."""
+    if curr_state == prev_state:
+        return 0
+    if curr_state not in STATE_INDEX or prev_state not in STATE_INDEX:
+        raise ValueError("Invalid state")
+    di = STATE_INDEX[curr_state] - STATE_INDEX[prev_state]
+    if di == 1 or di == -3:
+        return +1   # forward
+    if di == -1 or di == 3:
+        return -1   # reverse
+    raise RuntimeError("Illegal quadrature jump: {} -> {}".format(bin(prev_state), bin(curr_state)))
 
-# --------------------------------- Data Classes --------------------------------
+# ----------------------- GPIO abstraction (v2 and v1) ----------------------
 
-@dataclass
-class WheelConfig:
-    a_pin: int
-    b_pin: int
-    invert: bool = False  # invert direction if needed (A/B swapped or wiring)
-    name: str = "L"
+def libgpiod_is_v2() -> bool:
+    # v2 exposes request_lines(); v1 doesn't
+    return hasattr(gpiod, "request_lines")
 
-@dataclass
-class MechConfig:
-    wheel_diam: float = 0.065  # m
-    cpr: int = 20              # cycles per revolution of encoder (A channel)
-    decoding: int = 4          # 1, 2, or 4 (edges per cycle)
-    gear: float = 1.0          # gear ratio wheel:encoder (1.0 if on wheel shaft)
+class LinesV2:
+    def __init__(self, chipname: str, offsets: list[int]):
+        settings = {}
+        for off in offsets:
+            settings[off] = gpiod.LineSettings(
+                direction=gpiod.LineDirection.INPUT,
+                edge_detection=gpiod.LineEdge.NONE,
+                bias=gpiod.LineBias.DISABLED  # you said you have 10k external pull-ups
+            )
+        self.req = gpiod.request_lines(
+            f"/dev/{chipname}" if not chipname.startswith("/dev/") else chipname,
+            consumer="encoders_test",
+            config=settings
+        )
+        self.offsets = offsets
 
-    @property
-    def edges_per_rev(self) -> float:
-        return float(self.cpr) * float(self.decoding) * float(self.gear)
+    def get_values(self) -> list[int]:
+        vals = self.req.get_values()  # dict {offset: value}
+        return [int(vals[o]) for o in self.offsets]
 
-    @property
-    def wheel_circ(self) -> float:
-        return math.pi * self.wheel_diam
+class LinesV1:
+    def __init__(self, chipname: str, offsets: list[int]):
+        self.chip = gpiod.Chip(chipname)
+        self.lines = self.chip.get_lines(offsets)
+        self.lines.request(consumer="encoders_test", type=gpiod.LINE_REQ_DIR_IN)
+        self.offsets = offsets
 
-# -------------------------------- Encoder Class --------------------------------
+    def get_values(self) -> list[int]:
+        return list(map(int, self.lines.get_values()))
 
-class QuadEncoder:
-    def __init__(self, chip: gpiod.Chip, cfg: WheelConfig, debounce_us: int):
-        self.cfg = cfg
-        self.debounce_us = max(0, int(debounce_us))
+class GPIOBank:
+    """Group two lines (A,B) for one wheel; supports v2/v1 uniformly."""
+    def __init__(self, chipname: str, a: int, b: int, use_v2: bool):
+        Impl = LinesV2 if use_v2 else LinesV1
+        self.impl = Impl(chipname, [a, b])
+
+    def read_ab(self) -> tuple[int, int]:
+        a, b = self.impl.get_values()
+        return a, b
+
+# ------------------------------ Core counter ------------------------------
+
+class QuadCounter:
+    def __init__(self, name: str, gpio: GPIOBank, invert: bool, debounce_us: int):
+        self.name = name
+        self.gpio = gpio
+        self.invert = invert
+        self.debounce_s = max(0.0, debounce_us / 1_000_000.0)
+        a, b = self.gpio.read_ab()
+        self.prev_state = (a << 1) | b
+        self.last_change_t = time.monotonic()
         self.count = 0
         self.illegal = 0
-        self.last_state: Optional[int] = None
-        self.last_ts_us = 0
 
-        # Request lines with edge events; bias to pull-up (if supported)
-        # We use BOTH edges on both lines and always sample both A,B to compute state transitions.
-        req = gpiod.line_request()
-        req.consumer = f"enc_{cfg.name}"
-        req.request_type = gpiod.line_request.EVENT_BOTH_EDGES
-        req.flags = gpiod.line_request.FLAG_BIAS_PULL_UP  # safe even if no internal pull
-        self.a_line = chip.get_line(cfg.a_pin)
-        self.b_line = chip.get_line(cfg.b_pin)
-        self.a_line.request(req)
-        self.b_line.request(req)
+    def sample(self) -> int:
+        """Poll and update count; returns delta (since last sample call) in steps."""
+        a, b = self.gpio.read_ab()
+        state = (a << 1) | b
+        now = time.monotonic()
+        d = 0
+        if state != self.prev_state:
+            # Simple time-based debounce: ignore changes faster than debounce_s
+            if (now - self.last_change_t) >= self.debounce_s:
+                try:
+                    step = step_from(self.prev_state, state)
+                    if self.invert:
+                        step = -step
+                    self.count += step
+                    d = step
+                except RuntimeError:
+                    self.illegal += 1
+                self.prev_state = state
+                self.last_change_t = now
+            # else: ignore as bounce
+        return d
 
-        # Initialize last state
-        a = self.a_line.get_value()
-        b = self.b_line.get_value()
-        self.last_state = qstate(a, b)
-        self.last_ts_us = _monotonic_us()
+# ------------------------------ CLI / main --------------------------------
 
-    def close(self):
-        try:
-            self.a_line.release()
-        except Exception:
-            pass
-        try:
-            self.b_line.release()
-        except Exception:
-            pass
-
-    def poll_once(self) -> None:
-        """Poll without blocking: drain any queued events for A and B, apply debounced transitions."""
-        # Drain both lines’ events, but always compute transitions from sampled A/B pair.
-        # We simply check if any edge occurred; if so, we sample current A,B and update state machine.
-        got_edge = False
-        for ln in (self.a_line, self.b_line):
-            while True:
-                ev = ln.event_read_multiple()
-                if not ev:
-                    break
-                got_edge = True
-
-        if not got_edge:
-            return
-
-        now_us = _monotonic_us()
-        if self.debounce_us and (now_us - self.last_ts_us) < self.debounce_us:
-            # Debounce window: ignore all transitions too soon after the previous accepted one.
-            return
-
-        a = self.a_line.get_value()
-        b = self.b_line.get_value()
-        curr = qstate(a, b)
-        prev = self.last_state
-        if prev is None:
-            self.last_state = curr
-            self.last_ts_us = now_us
-            return
-
-        step = _QSTEP.get(((prev << 2) | curr), 0)
-        if step == 0 and curr != prev:
-            # Illegal transition
-            self.illegal += 1
-        else:
-            # Valid quantized step (+1/-1)
-            if self.cfg.invert:
-                step = -step
-            self.count += step
-
-        self.last_state = curr
-        self.last_ts_us = now_us
-
-# ------------------------------ Utility Functions ------------------------------
-
-def _monotonic_us() -> int:
-    return int(time.monotonic_ns() // 1000)
-
-def _open_chip(name_hint: Optional[str]) -> gpiod.Chip:
-    # Try exact chip if provided, else pick the last available gpiochip (usual on Pi5 is gpiochip4)
-    if name_hint:
-        try:
-            return gpiod.Chip(name_hint)
-        except Exception:
-            print(f"[Warn] Could not open '{name_hint}', falling back to auto.", file=sys.stderr)
-    chips = gpiod.chip_iter()
-    last = None
-    for c in chips:
-        last = c
-    if last is None:
-        raise RuntimeError("No gpiochip found")
-    # Re-open by label to own a handle (iterator yields temporary objects)
-    return gpiod.Chip(last.label())
-
-def _fmt(v: float, width: int = 6, prec: int = 3) -> str:
-    return f"{v:{width}.{prec}f}"
-
-# ------------------------------------ Main -------------------------------------
+def parse_args():
+    p = argparse.ArgumentParser(description="Robot Savo encoders test (no odom).")
+    p.add_argument("--left-a", type=int, default=21, help="Left A GPIO (BCM)")
+    p.add_argument("--left-b", type=int, default=20, help="Left B GPIO (BCM)")
+    p.add_argument("--right-a", type=int, default=12, help="Right A GPIO (BCM)")
+    p.add_argument("--right-b", type=int, default=26, help="Right B GPIO (BCM)")
+    p.add_argument("--chip", default="gpiochip4", help="GPIO chip (pinctrl-rp1 is usually gpiochip4)")
+    p.add_argument("--duration", type=float, default=12.0, help="Run time (s)")
+    p.add_argument("--rate", type=float, default=20.0, help="Print rate (Hz)")
+    p.add_argument("--debounce-us", type=int, default=300, help="Time debounce for A/B transitions (µs)")
+    p.add_argument("--invert-left", action="store_true", help="Invert left direction")
+    p.add_argument("--invert-right", action="store_true", help="Invert right direction")
+    p.add_argument("--wheel-dia", type=float, default=0.065, help="Wheel diameter (m) for velocity estimate")
+    p.add_argument("--cpr", type=int, default=20, help="Counts per revolution of encoder")
+    p.add_argument("--decoding", type=int, default=4, choices=[1,2,4], help="1/2/4x decoding for edges/rev calc")
+    p.add_argument("--gear", type=float, default=1.0, help="Gear ratio (motor:wheel), only affects velocity scaling")
+    p.add_argument("--csv", type=str, default="", help="CSV output path")
+    return p.parse_args()
 
 def main():
-    ap = argparse.ArgumentParser(description="Robot Savo — Encoders Test (no odom)")
-    # GPIO / chip
-    ap.add_argument("--chip", default="gpiochip4", help="gpiochip name (default: gpiochip4; auto-fallsback if missing)")
-    ap.add_argument("--left-a", type=int, default=21, help="Left encoder A GPIO (BCM)")
-    ap.add_argument("--left-b", type=int, default=20, help="Left encoder B GPIO (BCM)")
-    ap.add_argument("--right-a", type=int, default=12, help="Right encoder A GPIO (BCM)")
-    ap.add_argument("--right-b", type=int, default=26, help="Right encoder B GPIO (BCM)")
-    ap.add_argument("--invert-left", action="store_true", help="Invert left direction")
-    ap.add_argument("--invert-right", action="store_true", help="Invert right direction")
-    ap.add_argument("--debounce-us", type=int, default=300, help="Debounce window in microseconds (per accepted step)")
+    args = parse_args()
 
-    # Mechanics (for speed only; no odom is computed)
-    ap.add_argument("--wheel-diam", type=float, default=0.065, help="Wheel diameter (m)")
-    ap.add_argument("--cpr", type=int, default=20, help="Encoder CPR (cycles per revolution on A)")
-    ap.add_argument("--decoding", type=int, default=4, choices=[1,2,4], help="Decoding factor (1/2/4)")
-    ap.add_argument("--gear", type=float, default=1.0, help="Gear ratio wheel:encoder (1.0 if direct)")
+    v2 = libgpiod_is_v2()
+    # Probe version string if available
+    ver = getattr(gpiod, "version_string", lambda: "unknown")()
+    print(f"[Encoders] libgpiod={'v2' if v2 else 'v1'} ({ver})  Chip={args.chip}  Pins L({args.left_a},{args.left_b}) R({args.right_a},{args.right_b})")
 
-    # Run/print/log
-    ap.add_argument("--duration", type=float, default=10.0, help="Duration seconds (<=0 for infinite)")
-    ap.add_argument("--print-hz", type=float, default=5.0, help="Terminal print rate (Hz)")
-    ap.add_argument("--csv", default="", help="Optional CSV path to log samples")
-
-    args = ap.parse_args()
-
-    # Open gpiochip
-    chip = _open_chip(args.chip)
-    try:
-        chip_label = chip.label()
-    except Exception:
-        chip_label = args.chip
-    print(f"[Encoders] Using {chip_label}  Pins L({args.left_a},{args.left_b}) R({args.right_a},{args.right_b})")
-    mech = MechConfig(args.wheel_diam, args.cpr, args.decoding, args.gear)
-    print(f"[Mech] wheel_dia={mech.wheel_diam:.3f} m  CPR={mech.cpr}  decoding={mech.decoding}  gear={mech.gear}  edges/rev={mech.edges_per_rev:.1f}")
+    edges_per_rev = args.cpr * args.decoding
+    print(f"[Mech] wheel_dia={args.wheel-dia:.3f} m  CPR={args.cpr}  decoding={args.decoding}  gear={args.gear}  edges/rev={edges_per_rev:.1f}")
     print(f"[Debounce] {args.debounce_us} µs  [Invert] left={args.invert_left} right={args.invert_right}")
 
-    # Encoders
-    encL = QuadEncoder(chip, WheelConfig(args.left_a, args.left_b, args.invert_left, "L"), args.debounce_us)
-    encR = QuadEncoder(chip, WheelConfig(args.right_a, args.right_b, args.invert_right, "R"), args.debounce_us)
+    # Build GPIO readers
+    try:
+        left_bank  = GPIOBank(args.chip, args.left_a,  args.left_b,  v2)
+        right_bank = GPIOBank(args.chip, args.right_a, args.right_b, v2)
+    except Exception as e:
+        print(f"ERROR: could not open {args.chip} or request lines: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    left  = QuadCounter("L", left_bank,  args.invert_left,  args.debounce_us)
+    right = QuadCounter("R", right_bank, args.invert_right, args.debounce_us)
 
     # CSV
-    csv_writer = None
-    csv_fp = None
+    writer = None
     if args.csv:
-        os.makedirs(os.path.dirname(args.csv) or ".", exist_ok=True)
-        csv_fp = open(args.csv, "w", newline="")
-        csv_writer = csv.writer(csv_fp)
-        csv_writer.writerow(["t_s", "L_cnt", "R_cnt", "L_dcnt", "R_dcnt", "dt_s", "L_v_mps", "R_v_mps", "L_illegal", "R_illegal"])
+        f = open(args.csv, "w", newline="")
+        writer = csv.writer(f)
+        writer.writerow(["t_s", "L_cnt", "R_cnt", "L_d", "R_d", "L_illeg", "R_illeg", "L_v_mps", "R_v_mps"])
 
     # Print header
-    print(" t(s) |   L_cnt    R_cnt | L_dcnt R_dcnt | dt(s) |  L_v(m/s)  R_v(m/s) | L_illeg R_illeg")
-    print("-----------------------------------------------------------------------------------------")
+    print(" t(s) |   L_cnt    R_cnt |  L_d  R_d |  L_v   R_v (m/s) | L_illeg R_illeg")
+    print("--------------------------------------------------------------------------")
 
-    start_t = time.monotonic()
-    last_t = start_t
-    last_L = encL.count
-    last_R = encR.count
-    print_period = 1.0 / max(1e-3, args.print_hz)
-    next_print = start_t
+    period = 1.0 / max(1e-3, args.rate)
+    t0 = time.monotonic()
+    t_last = t0
+    last_L = left.count
+    last_R = right.count
 
     try:
         while True:
-            # Poll both encoders; non-blocking
-            encL.poll_once()
-            encR.poll_once()
-
             now = time.monotonic()
-            if args.duration > 0 and (now - start_t) >= args.duration:
+            t = now - t0
+            if t >= args.duration:
                 break
 
-            if now >= next_print:
-                dt = now - last_t
-                if dt <= 0:
-                    dt = 1e-6
+            # Poll fast internally to not miss quick transitions; limit to ~1 kHz
+            # but keep CPU reasonable by sleeping small slices until next print tick.
+            next_print = t_last + period
+            while now < next_print:
+                # sample both wheels
+                left.sample()
+                right.sample()
+                time.sleep(0.0005)  # 0.5 ms inner poll
+                now = time.monotonic()
 
-                L_cnt = encL.count
-                R_cnt = encR.count
-                dL = L_cnt - last_L
-                dR = R_cnt - last_R
+            dt = now - t_last
+            t_last = now
 
-                # Convert count delta -> linear speed (m/s)
-                # revs = dcounts / edges_per_rev ; distance = revs * wheel_circ ; v = distance / dt
-                def speed(dcounts: int) -> float:
-                    return (float(dcounts) / mech.edges_per_rev) * mech.wheel_circ / dt
+            # deltas since last print
+            dL = left.count - last_L
+            dR = right.count - last_R
+            last_L = left.count
+            last_R = right.count
 
-                L_v = speed(dL)
-                R_v = speed(dR)
+            # velocity estimate (m/s) using counts/sec → rev/sec → m/s
+            # counts per wheel revolution = edges_per_rev * gear
+            # Note: if encoder is on motor shaft with gearbox, set gear accordingly.
+            counts_per_wrev = max(1, int(edges_per_rev * args.gear))
+            L_v = (dL / max(1e-6, dt)) / counts_per_wrev * (math.pi * args.wheel_dia)
+            R_v = (dR / max(1e-6, dt)) / counts_per_wrev * (math.pi * args.wheel_dia)
 
-                t_rel = now - start_t
-                print(f"{_fmt(t_rel,5,1)} | {L_cnt:7d} {R_cnt:7d} | {dL:6d} {dR:6d} | {_fmt(dt,4,3)} | {_fmt(L_v,8,3)}  {_fmt(R_v,8,3)} | {encL.illegal:7d} {encR.illegal:7d}")
+            print(f"{t:5.1f} | {left.count:7d} {right.count:7d} | {dL:4d} {dR:4d} | {L_v: .3f} {R_v: .3f} | {left.illegal:7d} {right.illegal:7d}")
 
-                if csv_writer:
-                    csv_writer.writerow([f"{t_rel:.3f}", L_cnt, R_cnt, dL, dR, f"{dt:.6f}", f"{L_v:.6f}", f"{R_v:.6f}", encL.illegal, encR.illegal])
-
-                # roll
-                last_t = now
-                last_L = L_cnt
-                last_R = R_cnt
-                next_print = now + print_period
-
-            # Small sleep to reduce CPU, but keep latency low
-            time.sleep(0.001)
+            if writer:
+                writer.writerow([f"{t:.3f}", left.count, right.count, dL, dR, left.illegal, right.illegal, f"{L_v:.6f}", f"{R_v:.6f}"])
 
     except KeyboardInterrupt:
         pass
     finally:
-        encL.close()
-        encR.close()
-        if csv_fp:
-            csv_fp.close()
+        if writer:
+            f.close()
 
     # Summary
-    end_t = time.monotonic()
-    dur = end_t - start_t
+    t_total = time.monotonic() - t0
     print("\n=== Summary ===")
-    print(f"Duration: {dur:.2f} s")
-    print(f"L total: {encL.count}   R total: {encR.count}   L_illegal={encL.illegal}  R_illegal={encR.illegal}")
-    print("Done.")
+    print(f"Duration: {t_total:.2f} s")
+    print(f"L total: {left.count}   R total: {right.count}   L_illegal={left.illegal}  R_illegal={right.illegal}")
+    print("Tip: positive/negative counts indicate forward/reverse; flip with --invert-left/--invert-right if needed.")
 
 if __name__ == "__main__":
     main()
