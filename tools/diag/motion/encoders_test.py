@@ -5,7 +5,6 @@ Robot Savo — Encoders Test (lgpio, counts + direction + m/s + omega, CSV)
 Raspberry Pi 5 • Ubuntu 24.04 • lgpio-based polling quadrature counter
 
 Features
-- BCM pins (defaults: L_A=21, L_B=20, R_A=12, R_B=26) — locked to your wiring.
 - Auto-detects a usable gpiochip unless --chip is provided.
 - Gray-code state machine (legal transitions only), counts illegal jumps.
 - Debounce: tries lgpio hardware debounce if available, else software time-debounce.
