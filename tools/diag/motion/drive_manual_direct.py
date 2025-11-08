@@ -3,40 +3,37 @@
 """
 Robot Savo — Manual Teleop (NO ROS2) for Mecanum (PCA9685 + H-Bridge)
 ----------------------------------------------------------------------
-- Reads keyboard directly (raw TTY) and drives motors via PCA9685 @ 0x40.
-- **Arrow keys supported** (robust ESC-sequence parsing) + WASD/QE.
-- No ROS 2 required; ideal for bring‑up/offline testing on blocks.
-- Smooth accel limiting, deadman timeout, software e‑stop, clear kinematics.
-- **Per‑wheel invert flags** to fix wiring polarity without changing cables.
-- **Shutdown-safe**: ignores I²C errors during exit so quitting never crashes.
+- Keyboard → direct PCA9685 motor drive (no ROS2).
+- **Arrow keys** + **WASD/QE**.
+- Accel limiting, deadman timeout, per-wheel invert, shutdown-safe.
+- **Calibration helpers** for mecanum layout/polarity:
+    • Keys 1/2/3/4 spin FL/FR/RL/RR forward briefly
+    • F = forward pattern, H = strafe-left pattern, T = CCW turn pattern
+    • On wrong motion: use --inv-* flags OR fix channel mapping (fl/fr/rl/rr)
+- **Sign toggles** for chassis conventions: --flip-vy, --flip-omega
 
 Key map (US)
   W/S or ↑/↓  = +vx / −vx   (forward/back)
   A/D or ←/→  = +vy / −vy   (strafe left/right)
   Q/E         = +ω  / −ω    (CCW/CW turn)
+  1/2/3/4     = pulse FL/FR/RL/RR forward (diagnostics)
+  F/H/T       = demo patterns (Forward / strafe-Left / Turn CCW)
   SPACE       = stop immediately
   Shift       = fast scale    |   Ctrl = slow scale
   R           = reset scale to 1.0
   Esc / Ctrl+C= quit (Esc alone, not when part of an arrow sequence)
 
 Conventions
-  +vx forward, +vy left, +ω CCW.
+  +vx forward, +vy left, +ω CCW (can flip vy/ω with flags).
   Wheel order: FL, FR, RL, RR.
 
 Kinematics (inverse, mecanum)
   r = wheel radius;  L = (Lx + Ly)/2 (half of track + wheelbase)
-  ω_FL = ( vx − vy − L*ωz ) / r
-  ω_FR = ( vx + vy + L*ωz ) / r
-  ω_RL = ( vx + vy − L*ωz ) / r
-  ω_RR = ( vx − vy + L*ωz ) / r
-
-Hardware assumptions
-  - PCA9685 @ 0x40 driving H‑bridge inputs (IN1/IN2) and a PWM per wheel.
-  - Provide per‑wheel channels via CLI (e.g., --fl-pwm 0 --fl-in1 1 --fl-in2 2 ...).
-
-Safety
-  - Software e‑stop: --estop-force zeroes all outputs.
-  - For a hardware e‑stop input, we can add GPIO (lgpio) on request.
+  ω_FL = ( vx − s_y*vy − L*s_o*ωz ) / r
+  ω_FR = ( vx + s_y*vy + L*s_o*ωz ) / r
+  ω_RL = ( vx + s_y*vy − L*s_o*ωz ) / r
+  ω_RR = ( vx − s_y*vy + L*s_o*ωz ) / r
+Where s_y ∈ {+1,-1} from --flip-vy, s_o ∈ {+1,-1} from --flip-omega.
 
 Usage example
   sudo -E python3 tools/diag/motion/drive_manual_direct.py \
@@ -45,8 +42,7 @@ Usage example
       --rl-pwm 6 --rl-in1 7 --rl-in2 8 \
       --rr-pwm 9 --rr-in1 10 --rr-in2 11 \
       --hz 60 --max-vx 0.6 --max-vy 0.6 --max-omega 1.8 \
-      --wheel-radius 0.0325 --L 0.115 \
-      --inv-fr --inv-rr   # example: flip FR & RR if forward spins backwards
+      --wheel-radius 0.0325 --L 0.115
 
 Dependencies
   sudo apt install -y python3-smbus  # or: pip3 install smbus2
@@ -81,7 +77,6 @@ class PCA9685:
         self.set_pwm_freq(freq_hz)
 
     def _write8(self, reg, val):
-        # defensive: ensure plain ints
         reg = int(reg) & 0xFF
         val = int(val) & 0xFF
         self.bus.write_byte_data(self.addr, reg, val)
@@ -98,7 +93,7 @@ class PCA9685:
         self._write8(PRESCALE, prescale)
         self._write8(MODE1, old)
         time.sleep(0.005)
-        self._write8(MODE1, old | 0xA1)  # auto‑inc, allcall
+        self._write8(MODE1, old | 0xA1)  # auto-inc, allcall
 
     def set_pwm(self, channel: int, on: int, off: int):
         base = LED0_ON_L + 4 * int(channel)
@@ -127,14 +122,12 @@ class HBridge:
         self.stop()
 
     def _gpio_set(self, channel: int, level: int):
-        # emulate digital via PWM full‑on/full‑off
         try:
             if level:
                 self.pca.set_pwm(int(channel), 4096, 0)  # ON
             else:
                 self.pca.set_pwm(int(channel), 0, 0)     # OFF
         except Exception:
-            # ignore on shutdown
             pass
 
     def drive(self, duty_signed: float):
@@ -164,8 +157,8 @@ class HBridge:
 
 # ---------------------- Keyboard + helpers --------------------------
 class Keyboard:
-    """Non‑blocking keyboard reader that **robustly parses arrow keys**.
-    Returns tokens: one‑byte bytes OR b'UP'/b'DOWN'/b'LEFT'/b'RIGHT'.
+    """Non‑blocking keyboard reader that parses arrow keys robustly.
+    Returns tokens: bytes OR b'UP'/b'DOWN'/b'LEFT'/b'RIGHT'.
     """
     def __init__(self):
         self.fd = sys.stdin.fileno()
@@ -182,18 +175,16 @@ class Keyboard:
         out = []
         ch = self._read1(0.0)
         while ch is not None:
-            if ch == b"":  # possible ESC[ arrow sequence
-                a = self._read1(0.02)  # small wait to disambiguate
+            if ch == b"\x1b":  # ESC or arrow seq
+                a = self._read1(0.02)
                 if a == b'[':
                     b = self._read1(0.02)
                     if b in (b'A', b'B', b'C', b'D'):
                         out.append({b'A': b'UP', b'B': b'DOWN', b'C': b'RIGHT', b'D': b'LEFT'}[b])
                     else:
-                        # not an arrow; push back best‑effort
-                        out.extend(filter(None, [b"", a, b]))
+                        out.extend(filter(None, [b"\x1b", a, b]))
                 else:
-                    # lone ESC (quit)
-                    out.append(b"")
+                    out.append(b"\x1b")
                     if a:
                         out.append(a)
             else:
@@ -232,6 +223,8 @@ class DirectTeleop:
         self.scale = 1.0
         self.lim = Limits(args.max_vx, args.max_vy, args.max_omega, args.accel_x, args.accel_y, args.accel_z)
         self.geom = MecanumGeom(args.wheel_radius, args.L)
+        self.sy = -1.0 if args.flip_vy else +1.0
+        self.so = -1.0 if args.flip_omega else +1.0
 
         self.kb = Keyboard()
         self.last_input = 0.0
@@ -248,21 +241,20 @@ class DirectTeleop:
         self.estop_force = bool(args.estop_force)
 
         print(
-            "[Teleop] READY (no ROS2). Esc to quit."
-            f" rate={self.hz} Hz  deadman={self.deadman}s  max(vx,vy,wz)=({self.lim.vx},{self.lim.vy},{self.lim.wz})"
-            f" accel(x,y,z)=({self.lim.ax},{self.lim.ay},{self.lim.az})  scale_low={self.scale_low}  scale_high={self.scale_high}"
-            f" geom: r={self.geom.r} m, L={self.geom.L} m  PCA9685@0x{args.pca_addr:02X} bus={args.i2c_bus}"
-            " Keys: WASD/QE or Arrows, Space=stop, R=reset, Shift=fast, Ctrl=slow"
+            "[Teleop] READY (no ROS2). Esc to quit.\n"
+            f" rate={self.hz} Hz  deadman={self.deadman}s  max(vx,vy,wz)=({self.lim.vx},{self.lim.vy},{self.lim.wz})\n"
+            f" accel(x,y,z)=({self.lim.ax},{self.lim.ay},{self.lim.az})  scale_low={self.scale_low}  scale_high={self.scale_high}\n"
+            f" geom: r={self.geom.r} m, L={self.geom.L} m  PCA9685@0x{args.pca_addr:02X} bus={args.i2c_bus}\n"
+            f" flips: vy={'-vy' if args.flip_vy else 'vy'}  omega={'-ω' if args.flip_omega else 'ω'}\n"
+            " Keys: WASD/QE or Arrows, 1..4 wheel test, F/H/T demos, Space stop, R reset, Shift fast, Ctrl slow\n"
         )
 
     def close(self):
-        # restore TTY first so errors show cleanly
         try:
             if self.kb:
                 self.kb.restore()
         except Exception:
             pass
-        # stop motors; ignore I2C errors on shutdown
         for m in (getattr(self, 'FL', None), getattr(self, 'FR', None), getattr(self, 'RL', None), getattr(self, 'RR', None)):
             try:
                 if m:
@@ -285,11 +277,9 @@ class DirectTeleop:
                         return
                     self.last_input = t0
 
-                # deadman → zero targets
                 if (t0 - self.last_input) > self.deadman:
                     self.t_vx = self.t_vy = self.t_wz = 0.0
 
-                # accel limit toward scaled targets
                 scale = self.scale
                 vx_t = clamp(self.t_vx * scale, -self.lim.vx, self.lim.vx)
                 vy_t = clamp(self.t_vy * scale, -self.lim.vy, self.lim.vy)
@@ -305,7 +295,6 @@ class DirectTeleop:
 
                 self._apply(self.c_vx, self.c_vy, self.c_wz)
 
-                # loop pacing
                 dt_done = time.monotonic() - t0
                 time.sleep(max(0.0, period - dt_done))
         finally:
@@ -313,21 +302,36 @@ class DirectTeleop:
 
     # ------------------ internals ------------------
     def _handle_key(self, ch) -> bool:
-        # return True to quit
-        if ch == b"":  # **lone** ESC (arrow sequences are parsed separately)
+        if ch == b"\x1b":  # lone ESC
             print("[Teleop] Quit")
             return True
-        if ch == b' ':  # Space → stop
+        if ch == b' ':  # Space stop
             self.t_vx = self.t_vy = self.t_wz = 0.0
             return False
-        if ch in (b'r', b'R', b""):  # reset scale (r/R or Ctrl+R)
+        if ch in (b'r', b'R', b"\x12"):
             self.scale = 1.0
             return False
 
-        # speed scaling heuristics
+        # diagnostics: single-wheel and patterns
+        if ch == b'1':
+            self._pulse_wheels([1,0,0,0]); return False
+        if ch == b'2':
+            self._pulse_wheels([0,1,0,0]); return False
+        if ch == b'3':
+            self._pulse_wheels([0,0,1,0]); return False
+        if ch == b'4':
+            self._pulse_wheels([0,0,0,1]); return False
+        if ch in (b'f', b'F'):
+            self._demo(vx=0.4, vy=0.0, wz=0.0); return False
+        if ch in (b'h', b'H'):
+            self._demo(vx=0.0, vy=0.4, wz=0.0); return False
+        if ch in (b't', b'T'):
+            self._demo(vx=0.0, vy=0.0, wz=0.8); return False
+
+        # speed scaling
         if isinstance(ch, bytes) and len(ch) == 1:
-            slow = 1 <= ch[0] <= 26   # control chars → slow
-            fast = ch.isalpha() and ch.isupper()  # uppercase → fast
+            slow = 1 <= ch[0] <= 26
+            fast = ch.isalpha() and ch.isupper()
         else:
             slow = False; fast = False
         if slow:
@@ -337,7 +341,7 @@ class DirectTeleop:
         else:
             self.scale = 1.0
 
-        # Movement keys (WASD/QE + Arrows tokens)
+        # movement
         if ch in (b'w', b'W', b'UP'):
             self.t_vx = +self.lim.vx
         elif ch in (b's', b'S', b'DOWN'):
@@ -357,16 +361,31 @@ class DirectTeleop:
         return False
 
     def _apply(self, vx, vy, wz):
-        # inverse kinematics → wheel angular rates
-        r = self.geom.r; L = self.geom.L
-        w_fl = ( vx - vy - L*wz ) / r
-        w_fr = ( vx + vy + L*wz ) / r
-        w_rl = ( vx + vy - L*wz ) / r
-        w_rr = ( vx - vy + L*wz ) / r
+        r = self.geom.r; L = self.geom.L; sy = self.sy; so = self.so
+        w_fl = ( vx - sy*vy - L*so*wz ) / r
+        w_fr = ( vx + sy*vy + L*so*wz ) / r
+        w_rl = ( vx + sy*vy - L*so*wz ) / r
+        w_rr = ( vx - sy*vy + L*so*wz ) / r
         ws = [w_fl, w_fr, w_rl, w_rr]
         max_w = max(1e-6, max(abs(w) for w in ws))
-        duties = [clamp(w/max_w, -1.0, 1.0) for w in ws]
+        # duty proportional to requested magnitude, not always full-scale
+        mag = max(abs(vx)/max(self.lim.vx,1e-6), abs(vy)/max(self.lim.vy,1e-6), abs(wz)/max(self.lim.wz,1e-6))
+        duties = [clamp((w/max_w) * mag, -1.0, 1.0) for w in ws]
         self.FL.drive(duties[0]); self.FR.drive(duties[1]); self.RL.drive(duties[2]); self.RR.drive(duties[3])
+
+    def _pulse_wheels(self, mask, duty=0.5, t=0.5):
+        motors = [self.FL, self.FR, self.RL, self.RR]
+        for i, m in enumerate(motors):
+            m.drive(duty if mask[i] else 0.0)
+        time.sleep(t)
+        for m in motors:
+            m.stop()
+
+    def _demo(self, vx, vy, wz, t=0.8):
+        # temporary hold targets to visualize motion
+        self._apply(vx, vy, wz)
+        time.sleep(t)
+        self._apply(0.0, 0.0, 0.0)
 
 # --------------------------- CLI -----------------------------------
 
@@ -408,6 +427,9 @@ def build_argparser():
     p.add_argument('--inv-fr', action='store_true', help='Invert FR direction')
     p.add_argument('--inv-rl', action='store_true', help='Invert RL direction')
     p.add_argument('--inv-rr', action='store_true', help='Invert RR direction')
+    # Convention flips
+    p.add_argument('--flip-vy', action='store_true', help='Flip strafe axis sign (vy ←→ −vy)')
+    p.add_argument('--flip-omega', action='store_true', help='Flip yaw sign (ω ←→ −ω)')
     # Safety (software)
     p.add_argument('--estop-force', action='store_true', help='Force software e‑stop (zero all outputs)')
     return p
