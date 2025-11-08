@@ -1,28 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Robot Savo — RPLIDAR A1 Diagnostic (expert edition)
----------------------------------------------------
+Robot Savo — RPLIDAR A1 Diagnostic (expert edition, debounced alerts)
+----------------------------------------------------------------------
 - Robust init: stop → reset → flush → start_motor → start_scan → drain.
-- SCAN mode (per-rotation stats via iter_scans) with *correct* scan Hz calc.
+- SCAN mode (iter_scans) with correct scan-hz computation.
 - RAW mode (iter_measurments) for flaky links; auto-fallback on header/desync.
-- Sector & range gates, near-field obstacle alert, CSV logging (scans/points).
-- Stable defaults for CP2102 bridges: /dev/ttyUSB0, timeout=2.0s.
-- Safe cleanup (idempotent); controlled retries.
+- Sector & range gates, near-field obstacle alert with debounce + hysteresis.
+- CSV logging (scans/points). Stable defaults for CP2102 bridges.
 
-Usage
------
-# General sanity (defaults)
-python3 tools/diag/sensors/lidar_test.py --duration 8
-
-# Forward sector gate + obstacle alert at 0.28 m
-python3 tools/diag/sensors/lidar_test.py --angle-min -60 --angle-max 60 --obst 0.28 --duration 10
-
-# Force RAW (robust) with explicit port/timeout
-python3 tools/diag/sensors/lidar_test.py --port /dev/ttyUSB0 --timeout 2.0 --raw --duration 8
-
-# Log per-scan summary
-python3 tools/diag/sensors/lidar_test.py --csv scans.csv --csv-mode scans --duration 12
+Author: Robot Savo
 """
 
 import os
@@ -35,7 +22,7 @@ import argparse
 from dataclasses import dataclass
 from typing import Iterable, List, Optional, Tuple
 
-# Project-local pip target (no system-wide install required):
+# Local pip target (no system-wide install required):
 #   python3 -m pip install --target ~/Savo_Pi/.pylibs rplidar
 sys.path.insert(0, os.path.expanduser('~/Savo_Pi/.pylibs'))
 
@@ -158,14 +145,54 @@ def print_scan_line(s: ScanStats, obstacle: bool) -> None:
     pps_txt = f"{int(min(pps, 50000)):5d}/s" if math.isfinite(pps) else "  n/a "
     print(f"[scan {s.scan_id:05d}] {hz_txt}  pts/scan={s.n_points:4d}  pts/s={pps_txt}  min={md}{'  **OBSTACLE**' if obstacle else ''}")
 
+# ---------------- alert utils ----------------
+class AlertState:
+    def __init__(self, obst: Optional[float], debounce: int, hyst: float, alert_only: bool):
+        self.obst = obst
+        self.debounce = max(1, debounce)
+        self.hyst = max(0.0, hyst)
+        self.alert_only = alert_only
+        self.hit_cnt = 0
+        self.on = False
+
+    def update(self, d_min: Optional[float], ang_min: Optional[float]) -> Tuple[bool, bool, str]:
+        """
+        Returns (alert_changed, alert_is_on, message) where message is "ALERT"/"CLEAR"/"".
+        """
+        if self.obst is None or d_min is None:
+            # no threshold or no measurement
+            if self.on:
+                # if we're on but we lost data, don't force-clear; maintain state
+                return False, self.on, ""
+            return False, False, ""
+
+        msg = ""
+        if not self.on:
+            # waiting to trigger
+            self.hit_cnt = self.hit_cnt + 1 if d_min <= self.obst else 0
+            if self.hit_cnt >= self.debounce:
+                self.on = True
+                msg = f"[ALERT] obstacle ≤ {self.obst:.3f} m  d={d_min:.3f} m  @ {ang_min:.1f}°  (debounced {self.debounce})"
+                return True, True, msg
+        else:
+            # active; require clear above obst+hyst
+            if d_min > self.obst + self.hyst:
+                self.on = False
+                self.hit_cnt = 0
+                msg = f"[CLEAR] obstacle > {self.obst + self.hyst:.3f} m  d={d_min:.3f} m"
+                return True, False, msg
+
+        return False, self.on, ""
+
 # ---------------- run modes ----------------
 def run_scan(lidar: "RPLidar", args) -> None:
     a_min, a_max = args.angle_min, args.angle_max
     r_min, r_max = args.range_min, args.range_max
-    obst = args.obst
     t_start = now()
     scan_id = 0
     last_scan_wall: Optional[float] = None
+
+    alert = AlertState(args.obst, args.debounce, args.hyst, args.alert_only)
 
     writer, csvf = None, None
     if args.csv:
@@ -204,12 +231,17 @@ def run_scan(lidar: "RPLidar", args) -> None:
             else:
                 d_min, ang_min = None, None
 
-            obstacle = bool(obst is not None and d_min is not None and d_min <= obst)
-
-            # print
-            s = ScanStats(t=t_now, scan_id=scan_id, n_points=n, scan_hz=scan_hz,
-                          pts_per_sec=pts_per_sec, min_dist_m=d_min, min_angle_deg=ang_min)
-            print_scan_line(s, obstacle)
+            # alert update
+            changed, on, msg = alert.update(d_min, ang_min)
+            if args.alert_only:
+                if changed and msg:
+                    print(msg)
+            else:
+                s = ScanStats(t=t_now, scan_id=scan_id, n_points=n, scan_hz=scan_hz,
+                              pts_per_sec=pts_per_sec, min_dist_m=d_min, min_angle_deg=ang_min)
+                print_scan_line(s, obstacle=(args.obst is not None and d_min is not None and d_min <= args.obst))
+                if changed and msg:
+                    print(msg)
 
             # csv
             if writer:
@@ -227,6 +259,8 @@ def run_scan(lidar: "RPLidar", args) -> None:
 
             # stopping conditions
             if args.duration is not None and (t_now - t_start) >= args.duration:
+                if args.alert_only and alert.on:
+                    print("[INFO] Duration ended while ALERT active (SCAN).")
                 print("[LiDAR] Duration reached; stopping.")
                 break
             if args.max_scans is not None and scan_id >= args.max_scans:
@@ -242,13 +276,14 @@ def run_scan(lidar: "RPLidar", args) -> None:
 def run_raw(lidar: "RPLidar", args) -> None:
     a_min, a_max = args.angle_min, args.angle_max
     r_min, r_max = args.range_min, args.range_max
-    obst = args.obst
     t_start = now()
     t0 = now()
     last = 0.0
     n = 0
     min_d = None
     min_ang = None
+
+    alert = AlertState(args.obst, args.debounce, args.hyst, args.alert_only)
 
     print("[LiDAR] RAW mode: streaming measurements (robust).")
     for _, q, ang, d_mm in lidar.iter_measurments(max_buf_meas=4096):
@@ -259,15 +294,24 @@ def run_raw(lidar: "RPLidar", args) -> None:
                 if (min_d is None) or (d < min_d):
                     min_d, min_ang = d, ang
 
+        # alert update (per measurement window)
+        changed, on, msg = alert.update(min_d, min_ang)
+        if args.alert_only:
+            if changed and msg:
+                print(msg)
+
         t = now()
         if (t - last) >= 0.5:
-            rate = int(n / max(1e-6, (t - t0)))
-            md = f"{min_d:.3f} m @ {min_ang:.1f}°" if min_d is not None else "—"
-            alert = "  **OBSTACLE**" if (obst is not None and min_d is not None and min_d <= obst) else ""
-            print(f"[RAW] {rate} meas/s   min={md}{alert}")
+            if not args.alert_only:
+                rate = int(n / max(1e-6, (t - t0)))
+                md = f"{min_d:.3f} m @ {min_ang:.1f}°" if min_d is not None else "—"
+                suffix = "  **OBSTACLE**" if (args.obst is not None and min_d is not None and min_d <= args.obst) else ""
+                print(f"[RAW] {rate} meas/s   min={md}{suffix}")
             last = t
 
         if args.duration is not None and (t - t_start) >= args.duration:
+            if args.alert_only and alert.on:
+                print("[INFO] Duration ended while ALERT active (RAW).")
             print("[LiDAR] Duration reached; stopping.")
             break
 
@@ -295,6 +339,15 @@ def main():
 
     ap.add_argument("--raw", action="store_true", help="Force RAW mode.")
     ap.add_argument("--attempts", type=int, default=3, help="Reconnect attempts on errors.")
+
+    # alert printing controls
+    ap.add_argument("--alert-only", action="store_true",
+                    help="Only print debounced ALERT/CLEAR lines. Normal lines suppressed.")
+    ap.add_argument("--debounce", type=int, default=3,
+                    help="Consecutive frames under threshold before ALERT (default: 3).")
+    ap.add_argument("--hyst", type=float, default=0.03,
+                    help="Hysteresis (m): CLEAR only when d > obst + hyst (default: 0.03).")
+
     args = ap.parse_args()
 
     for attempt in range(1, args.attempts + 1):
