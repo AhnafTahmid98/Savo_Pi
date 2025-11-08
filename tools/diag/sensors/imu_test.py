@@ -3,7 +3,7 @@
 """
 imu_test.py
 IMU (BNO055) diagnostic streamer + health checker for Robot Savo
-Author: Savo Copilot
+Author: Robot Savo
 
 FEATURES
 ---------------------------------------------------------------

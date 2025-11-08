@@ -9,7 +9,7 @@ Robot Savo — Ultrasonic Tester (gpiozero)
 - Pin factory selectable: lgpio (default) or pigpio (higher timing accuracy).
 - Optional buzzer on BCM17 for near-field alert.
 
-Author: Savo Copilot
+Author: Robot Savo
 
 """
 

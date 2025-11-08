@@ -7,7 +7,7 @@ Robot Savo — VL53L1X Range Tester (dual I²C buses, pro features)
   different I²C controllers (i2c-1 and i2c-0) on Raspberry Pi.
 - Clean SIGINT (Ctrl+C), CSV logging, rolling median filter, threshold flag,
  
-Author: Savo Copilot
+Author: Robot Savo
 
 """
 
