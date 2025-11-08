@@ -294,7 +294,7 @@ def main():
         t = t_loop - t0
 
         # Motion/vibration window update
-        if args.detect-motion:
+        if args.detect_motion:
             for buf,val in ((win_ax,ax),(win_ay,ay),(win_az,az),(win_gx,gx),(win_gy,gy),(win_gz,gz)):
                 buf.append(val)
                 if len(buf) > args.window: buf.pop(0)
