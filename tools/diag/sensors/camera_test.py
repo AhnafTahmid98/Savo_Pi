@@ -207,7 +207,7 @@ def snap_gst(path: str, w: int, h: int):
         "videoconvert", "!", "jpegenc", "!",
         "filesink", f"location={path}"
     ]
-    print("Running:", " ".join(shlex.quote(x) for x in pipeline)))
+    print("Running:", " ".join(shlex.quote(x) for x in pipeline))
     rc, out = run(pipeline, capture=True)
     if rc != 0:
         print(out, file=sys.stderr); hint_video_group(); sys.exit(rc)
