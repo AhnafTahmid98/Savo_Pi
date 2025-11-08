@@ -3,50 +3,44 @@
 """
 Robot Savo — Camera Diagnostic (Ubuntu 24.04 + Weston/Wayland, Expert Edition)
 -----------------------------------------------------------------------------
-Designed for **Ubuntu 24.04 on Raspberry Pi 5** using **libcamera** with:
-- **Wayland/Weston** full‑screen preview on the 7" DSI (waylandsink)
-- **libcamera-vid/libcamera-still** for video/still with AE/AWB/exposure/gain controls
-- **Per‑second metadata → CSV** from libcamera JSON metadata
-- Clean exit and timestamped outputs in ./log
 
-Install once
+Designed for Ubuntu 24.04 on Raspberry Pi 5 using libcamera with:
+- Wayland/Weston full-screen preview on the 7" DSI (waylandsink)  [preview mode]
+- libcamera-vid / libcamera-still for controlled video/still capture [video/still]
+- Per-second metadata -> CSV (video) and 1-row CSV (still) parsed from libcamera JSON
+- Timestamped outputs to ./log and clean shutdown
+
+Install once:
   sudo apt update
   sudo apt install -y libcamera-tools libcamera-apps gstreamer1.0-libcamera \
       gstreamer1.0-tools gstreamer1.0-plugins-base gstreamer1.0-plugins-good weston jq
 
-Start Weston (if not already running on the DSI tty)
+Start Weston on the DSI (if not already):
   weston --backend=drm-backend.so --tty=1 --idle-time=0 &
 
-Examples
+Examples:
   # Full-screen live preview on DSI via Wayland
   python3 tools/diag/sensors/camera_test.py --mode preview --res 1280x720 --fps 30 --sink wayland
 
-  # 10 s 1080p30 with fixed shutter (1/100s) and gain 2.0, with CSV metadata
+  # 10 s 1080p30 with fixed shutter (1/100s) + gain 2.0, with CSV metadata
   python3 tools/diag/sensors/camera_test.py --mode video --res 1920x1080 --fps 30 \
     --duration 10 --exposure-us 10000 --gain 2.0 --awb daylight --metering matrix --csv
 
-  # Single full-res still with custom AWB
+  # Single full-res still with custom AWB (+ CSV)
   python3 tools/diag/sensors/camera_test.py --mode still --res 3280x2464 --awb cloudy --csv
-
-Notes
-- Preview uses GStreamer (libcamerasrc → waylandsink) for robust Weston output.
-- Video/Still use libcamera-apps for reliable control + metadata JSON.
-- If preview fails under Wayland, confirm Weston is running and WAYLAND_DISPLAY exists.
 """
-
 import argparse
 import json
 import os
 import shlex
 import subprocess
 import sys
-import tempfile
 import time
 from datetime import datetime
 from typing import Dict, Tuple
 
-# ---------------------------- helpers ----------------------------
 
+# ---------------------------- helpers ----------------------------
 def parse_res(s: str) -> Tuple[int, int]:
     try:
         w, h = s.lower().split("x")
@@ -65,6 +59,7 @@ def ts_name(prefix: str, ext: str) -> str:
 
 def run(cmd: str) -> int:
     print(f"[RUN] {cmd}")
+    # shell out; we want gst/libcamera CLI to do the heavy lifting
     return subprocess.call(cmd, shell=True)
 
 
@@ -72,31 +67,26 @@ def capture_cam_list() -> str:
     try:
         return subprocess.check_output(["cam", "-l"], text=True)
     except Exception as e:
-        return f"cam -l failed: {e}"
+        return "cam -l failed: " + str(e)
 
 
 def write_info_log(outdir: str, label: str, extra: str = "") -> None:
     ensure_dir(outdir)
     fname = os.path.join(outdir, ts_name(f"{label}_info", "txt"))
     with open(fname, "w") as f:
-        # Write a single line with a properly escaped newline
-        f.write("time: " + datetime.now().isoformat() + "
-")
+        f.write("time: " + datetime.now().isoformat() + "\n")
         if extra:
-            f.write(extra + "
-")
-        f.write("
-# cam -l
-")
+            f.write(str(extra) + "\n")
+        f.write("\n# cam -l\n")
         f.write(capture_cam_list())
     print(f"[INFO] Wrote {fname}")
 
-# ---------------------------- pipelines ----------------------------
 
+# ---------------------------- preview (GStreamer) ----------------------------
 AWB_CHOICES = [
     "auto", "incandescent", "tungsten", "fluorescent", "indoor", "daylight", "cloudy",
 ]
-METERING_CHOICES = ["centre", "center", "spot", "matrix"]
+METERING_CHOICES = ["centre", "center", "spot", "matrix"]  # accept both spellings
 
 
 def do_preview(args) -> int:
@@ -114,8 +104,7 @@ def do_preview(args) -> int:
     return run(f"gst-launch-1.0 -v {pipeline}")
 
 
-# libcamera CLI mappers
-
+# ---------------------------- libcamera control ----------------------------
 def map_metering(m: str) -> str:
     m = m.lower()
     return {"center": "centre", "centre": "centre", "spot": "spot", "matrix": "matrix"}.get(m, "centre")
@@ -174,16 +163,15 @@ def parse_metadata_json_to_csv(meta_json_path: str, csv_path: str) -> None:
         b = buckets[sec]
         n = max(1, b["count"])
         gain_avg = b["gain"] / n
-        row = {
+        rows.append({
             "t": f"{sec - t0:.3f}",
             "exposure_us": int(b["exp"] / n),
             "gain": f"{gain_avg:.3f}",
             "iso_like": int(100 * gain_avg),
             "ct_k": int(b["ct"] / n),
-            "lux": f"{(b["lux"] / n):.2f}",
+            "lux": f"{(b['lux'] / n):.2f}",
             "frame_duration_us": int(b["fd"] / n),
-        }
-        rows.append(row)
+        })
 
     with open(csv_path, "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=[
@@ -195,18 +183,20 @@ def parse_metadata_json_to_csv(meta_json_path: str, csv_path: str) -> None:
     print(f"[Meta] CSV written → {csv_path}")
 
 
-def do_video(args) -> int:(args) -> int:
+# ---------------------------- actions ----------------------------
+def do_video(args) -> int:
     ensure_dir(args.outdir)
     mp4 = os.path.join(args.outdir, ts_name("cam_video", "mp4"))
     meta_json = os.path.join(args.outdir, ts_name("cam_video_meta", "json"))
     common = build_libcamera_common(args)
     timeout_ms = max(0, int(args.duration * 1000)) if args.duration > 0 else 0
+    bitrate_bps = int(args.bitrate) * 1000  # args.bitrate is in kbps
 
     cmd = (
         f"libcamera-vid -o {shlex.quote(mp4)} {common} --codec h264 --profile high "
-        f"--bitrate {args.bitrate*1000} --inline --flush "+
-        (f"--timeout {timeout_ms} " if timeout_ms else "")+
-        ("--metadata " + shlex.quote(meta_json) + " " if args.csv else "")
+        f"--bitrate {bitrate_bps} --inline --flush "
+        + (f"--timeout {timeout_ms} " if timeout_ms else "")
+        + (f"--metadata {shlex.quote(meta_json)} " if args.csv else "")
     ).strip()
 
     write_info_log(args.outdir, "video", extra=f"cmd={cmd}")
@@ -224,12 +214,12 @@ def do_still(args) -> int:
     ensure_dir(args.outdir)
     jpg = os.path.join(args.outdir, ts_name("cam_still", "jpg"))
     meta_json = os.path.join(args.outdir, ts_name("cam_still_meta", "json"))
-    w, h = args.res
     common = build_libcamera_common(args)
 
+    # --immediate: capture without preview; autofocus-mode manual (IMX219 is fixed-focus)
     cmd = (
-        f"libcamera-still -o {shlex.quote(jpg)} {common} --immediate --autofocus-mode manual "
-        f"--metadata {shlex.quote(meta_json)}"
+        f"libcamera-still -o {shlex.quote(jpg)} {common} --immediate "
+        f"--autofocus-mode manual --metadata {shlex.quote(meta_json)}"
     )
 
     write_info_log(args.outdir, "still", extra=f"cmd={cmd}")
@@ -266,45 +256,36 @@ def do_still(args) -> int:
     print(f"[Still] Saved → {jpg}")
     return ret
 
-# ---------------------------- main ----------------------------
 
+# ---------------------------- main ----------------------------
 def main() -> None:
     p = argparse.ArgumentParser(description="Robot Savo Camera Diagnostic (Ubuntu + Weston, Expert)")
     p.add_argument("--mode", choices=["preview", "video", "still"], default="preview")
     p.add_argument("--res", type=parse_res, default="1280x720", help="WxH (default 1280x720)")
     p.add_argument("--fps", type=int, default=30, help="Frames per second (default 30)")
     p.add_argument("--duration", type=float, default=5.0, help="Seconds for video; 0 = until Ctrl+C")
-    p.add_argument("--bitrate", type=int, default=6000, help="Video bitrate (kbps) for H.264")
+    p.add_argument("--bitrate", type=int, default=6000, help="Video bitrate (kbps), default 6000")
     p.add_argument("--sink", choices=["wayland", "drm", "auto"], default="wayland",
                    help="Preview sink: wayland=Weston full-screen, drm=raw KMS, auto=desktop window")
     p.add_argument("--awb", choices=AWB_CHOICES, default="auto", help="AWB mode")
     p.add_argument("--metering", choices=METERING_CHOICES, default="centre", help="AE metering mode")
-    p.add_argument("--exposure-us", type=int, default=None, help="Lock exposure time (µs); sets --shutter")
+    p.add_argument("--exposure-us", type=int, default=None, help="Lock exposure time (µs); maps to --shutter")
     p.add_argument("--gain", type=float, default=None, help="Lock analogue gain (e.g., 2.0 ≈ ISO200)")
-    p.add_argument("--csv", action="store_true", help="Write per-second metadata CSV (video) or one-row CSV (still)")
+    p.add_argument("--csv", action="store_true",
+                   help="Write per-second metadata CSV (video) or one-row CSV (still)")
     p.add_argument("--outdir", default="log", help="Output directory for files and logs")
 
     args = p.parse_args()
 
     if args.mode == "preview":
-        # Ensure Weston is active for wayland sink
         if args.sink == "wayland" and not os.environ.get("WAYLAND_DISPLAY"):
-            warn_msg = (
-                "[WARN] WAYLAND_DISPLAY not set. Start Weston:
-"
-                "  weston --backend=drm-backend.so --tty=1 --idle-time=0 &"
-            )
-            print(warn_msg, file=sys.stderr)
+            msg = "[WARN] WAYLAND_DISPLAY not set. Start Weston:\n  weston --backend=drm-backend.so --tty=1 --idle-time=0 &"
+            print(msg, file=sys.stderr)
         sys.exit(do_preview(args))
-
     elif args.mode == "video":
-        # If duration=0, user can Ctrl+C to stop; libcamera-vid will run until killed
-        ret = do_video(args)
-        sys.exit(ret)
-
-    else:  # still
-        ret = do_still(args)
-        sys.exit(ret)
+        sys.exit(do_video(args))
+    else:
+        sys.exit(do_still(args))
 
 
 if __name__ == "__main__":
