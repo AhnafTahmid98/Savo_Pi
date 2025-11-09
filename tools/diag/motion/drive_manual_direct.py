@@ -12,7 +12,10 @@ Robot Savo — Manual Teleop (NO ROS2) for Mecanum (PCA9685 + H-Bridge)
     • 5/6/7/8  → pulse FL/FR/RL/RR reverse
     • F/H/T    → demo patterns (Forward / strafe-Left / Turn CCW)
     • M        → print current wheel duties + targets
+    • G        → gentle forward test (small duty, quick check)
 - **Sign toggles** for chassis conventions: --flip-vy, --flip-omega
+- **IN-pin compatibility**: --in-active-low (for inverted driver logic),
+  and per-wheel --swap-in12-* (if IN1/IN2 wires are crossed on that wheel).
 - **Robust quit**: Esc or Ctrl+C always stops motors and exits.
 
 Key map (US)
@@ -21,6 +24,7 @@ Key map (US)
   Q/E         = +ω  / −ω    (CCW/CW turn)
   1..4 / 5..8 = pulse single wheel fwd / rev (FL,FR,RL,RR)
   F/H/T       = forward / strafe-left / turn-CCW pattern demo
+  G           = gentle forward test (short pulse)
   M           = print current command + wheel duties
   SPACE       = stop immediately
   Shift       = fast scale    |   Ctrl = slow scale
@@ -37,9 +41,8 @@ Kinematics (inverse, mecanum)
   ω_FR = ( vx + s_y*vy + L*s_o*ωz ) / r
   ω_RL = ( vx + s_y*vy − L*s_o*ωz ) / r
   ω_RR = ( vx − s_y*vy + L*s_o*ωz ) / r
-Where s_y ∈ {+1,-1} from --flip-vy, s_o ∈ {+1,-1} from --flip-omega.
 
-Usage example
+Usage (example)
   python3 tools/diag/motion/drive_manual_direct.py \
       --fl-pwm 8  --fl-in1 9  --fl-in2 10 \
       --fr-pwm 11 --fr-in1 12 --fr-in2 13 \
@@ -50,14 +53,7 @@ Usage example
       --i2c-retries 20 --i2c-delay 0.006
 """
 
-import argparse
-import os
-import select
-import sys
-import termios
-import time
-import tty
-import signal
+import argparse, os, select, sys, termios, time, tty, signal
 from dataclasses import dataclass
 
 try:
@@ -90,8 +86,7 @@ class PCA9685:
             except (BlockingIOError, OSError) as e:
                 last = e
                 time.sleep(self.retry_delay)
-        if last:
-            raise last
+        if last: raise last
         raise RuntimeError("I2C transfer failed")
 
     def _write8(self, reg, val):
@@ -133,18 +128,23 @@ class MotorCH:
     in2: int
 
 class HBridge:
-    def __init__(self, pca: PCA9685, ch: MotorCH, invert: bool = False):
+    def __init__(self, pca: PCA9685, ch: MotorCH, invert: bool = False,
+                 in_active_low: bool = False, swap_in12: bool = False):
         self.pca = pca
         self.ch = ch
         self.invert = bool(invert)
+        self.in_active_low = bool(in_active_low)
+        self.swap_in12 = bool(swap_in12)
         self.stop()
 
+    def _logic_level(self, level: int):
+        # level=1 means "assert" the input; handle inverted boards
+        return 0 if (level and self.in_active_low) else (4096 if level else 0), 0
+
     def _gpio_set(self, channel: int, level: int):
+        on, off = self._logic_level(1 if level else 0)
         try:
-            if level:
-                self.pca.set_pwm(int(channel), 4096, 0)  # ON
-            else:
-                self.pca.set_pwm(int(channel), 0, 0)     # OFF
+            self.pca.set_pwm(int(channel), on, off)
         except Exception:
             pass
 
@@ -155,20 +155,24 @@ class HBridge:
         if abs(d) < 1e-3:
             self.stop()
             return
+        # choose which IN is "forward"
+        inA, inB = (self.ch.in1, self.ch.in2) if not self.swap_in12 else (self.ch.in2, self.ch.in1)
         try:
             if d > 0:
-                self._gpio_set(self.ch.in1, 1); self._gpio_set(self.ch.in2, 0)
+                # Forward
+                self._gpio_set(inA, 1); self._gpio_set(inB, 0)
                 self.pca.set_duty(self.ch.pwm, d)
             else:
-                self._gpio_set(self.ch.in1, 0); self._gpio_set(self.ch.in2, 1)
+                # Reverse
+                self._gpio_set(inA, 0); self._gpio_set(inB, 1)
                 self.pca.set_duty(self.ch.pwm, -d)
         except Exception:
             pass
 
     def stop(self):
         try:
-            self._gpio_set(self.ch.in1, 0)
-            self._gpio_set(self.ch.in2, 0)
+            inA, inB = (self.ch.in1, self.ch.in2) if not self.swap_in12 else (self.ch.in2, self.ch.in1)
+            self._gpio_set(inA, 0); self._gpio_set(inB, 0)
             self.pca.set_duty(self.ch.pwm, 0.0)
         except Exception:
             pass
@@ -185,8 +189,7 @@ class Keyboard:
 
     def _read1(self, timeout: float = 0.0):
         r, _, _ = select.select([sys.stdin], [], [], timeout)
-        if not r:
-            return None
+        if not r: return None
         return os.read(self.fd, 1)
 
     def read(self):
@@ -203,8 +206,7 @@ class Keyboard:
                         out.extend(filter(None, [b"\x1b", a, b]))
                 else:
                     out.append(b"\x1b")
-                    if a:
-                        out.append(a)
+                    if a: out.append(a)
             else:
                 out.append(ch)
             ch = self._read1(0.0)
@@ -213,8 +215,7 @@ class Keyboard:
     def restore(self):
         termios.tcsetattr(self.fd, termios.TCSADRAIN, self.old)
 
-def clamp(x, lo, hi):
-    return max(lo, min(hi, x))
+def clamp(x, lo, hi): return max(lo, min(hi, x))
 
 def step(curr, target, max_step):
     return min(curr + max_step, target) if target > curr else max(curr - max_step, target)
@@ -244,17 +245,22 @@ class DirectTeleop:
         self.so = -1.0 if args.flip_omega else +1.0
 
         self.kb = Keyboard()
-        self.last_input = 0.0
+        self.last_input = time.monotonic()
         self.t_vx = self.t_vy = self.t_wz = 0.0
         self.c_vx = self.c_vy = self.c_wz = 0.0
         self._last = time.monotonic()
 
         self.pca = PCA9685(bus=args.i2c_bus, addr=args.pca_addr, freq_hz=args.pwm_freq,
                            retries=args.i2c_retries, retry_delay=args.i2c_delay)
-        self.FL = HBridge(self.pca, MotorCH(args.fl_pwm, args.fl_in1, args.fl_in2), invert=args.inv_fl)
-        self.FR = HBridge(self.pca, MotorCH(args.fr_pwm, args.fr_in1, args.fr_in2), invert=args.inv_fr)
-        self.RL = HBridge(self.pca, MotorCH(args.rl_pwm, args.rl_in1, args.rl_in2), invert=args.inv_rl)
-        self.RR = HBridge(self.pca, MotorCH(args.rr_pwm, args.rr_in1, args.rr_in2), invert=args.inv_rr)
+        # Motors with new compatibility flags
+        self.FL = HBridge(self.pca, MotorCH(args.fl_pwm, args.fl_in1, args.fl_in2),
+                          invert=args.inv_fl, in_active_low=args.in_active_low, swap_in12=args.swap_in12_fl)
+        self.FR = HBridge(self.pca, MotorCH(args.fr_pwm, args.fr_in1, args.fr_in2),
+                          invert=args.inv_fr, in_active_low=args.in_active_low, swap_in12=args.swap_in12_fr)
+        self.RL = HBridge(self.pca, MotorCH(args.rl_pwm, args.rl_in1, args.rl_in2),
+                          invert=args.inv_rl, in_active_low=args.in_active_low, swap_in12=args.swap_in12_rl)
+        self.RR = HBridge(self.pca, MotorCH(args.rr_pwm, args.rr_in1, args.rr_in2),
+                          invert=args.inv_rr, in_active_low=args.in_active_low, swap_in12=args.swap_in12_rr)
 
         self.estop_force = bool(args.estop_force)
 
@@ -268,7 +274,8 @@ class DirectTeleop:
             f" accel(x,y,z)=({self.lim.ax},{self.lim.ay},{self.lim.az})  scale_low={self.scale_low}  scale_high={self.scale_high}\n"
             f" geom: r={self.geom.r} m, L={self.geom.L} m  PCA9685@0x{args.pca_addr:02X} bus={args.i2c_bus}\n"
             f" flips: vy={'-vy' if args.flip_vy else 'vy'}  omega={'-ω' if args.flip_omega else 'ω'}\n"
-            " Keys: WASD/QE or Arrows, 1..4/5..8 wheel test fwd/rev, F/H/T demos, M print, Space stop, R reset\n"
+            f" IN logic: {'ACTIVE-LOW' if args.in_active_low else 'ACTIVE-HIGH'}  swap(FL/FR/RL/RR)={args.swap_in12_fl}/{args.swap_in12_fr}/{args.swap_in12_rl}/{args.swap_in12_rr}\n"
+            " Keys: WASD/QE or Arrows, 1..4/5..8 wheel test fwd/rev, F/H/T demos, G gentle fwd, M print, Space stop, R reset\n"
         )
 
     def _signal_quit(self, *_):
@@ -278,20 +285,17 @@ class DirectTeleop:
 
     def close(self):
         try:
-            if self.kb:
-                self.kb.restore()
+            if self.kb: self.kb.restore()
         except Exception:
             pass
         for m in (getattr(self, 'FL', None), getattr(self, 'FR', None),
                   getattr(self, 'RL', None), getattr(self, 'RR', None)):
             try:
-                if m:
-                    m.stop()
+                if m: m.stop()
             except Exception:
                 pass
         try:
-            if hasattr(self.pca, 'bus') and self.pca.bus:
-                self.pca.bus.close()
+            if hasattr(self.pca, 'bus') and self.pca.bus: self.pca.bus.close()
         except Exception:
             pass
 
@@ -300,12 +304,16 @@ class DirectTeleop:
             period = 1.0 / self.hz
             while True:
                 t0 = time.monotonic()
+                got_key = False
                 for ch in self.kb.read():
+                    got_key = True
                     if self._handle_key(ch):
                         return
                     self.last_input = t0
 
-                if (t0 - self.last_input) > self.deadman:
+                if not got_key and (t0 - self.last_input) > self.deadman:
+                    if (self.t_vx, self.t_vy, self.t_wz) != (0.0, 0.0, 0.0):
+                        print("[Deadman] No input → stopping")
                     self.t_vx = self.t_vy = self.t_wz = 0.0
 
                 scale = self.scale
@@ -329,34 +337,40 @@ class DirectTeleop:
             self.close()
 
     # ------------------ internals ------------------
+    def _announce(self, text):  # concise, readable cues
+        print(text)
+
     def _handle_key(self, ch) -> bool:
         if ch in (b"\x1b", b"\x03"):  # Esc or Ctrl+C
             print("[Teleop] Quit")
             return True
         if ch == b' ':
             self.t_vx = self.t_vy = self.t_wz = 0.0
+            self._announce("[Cmd] STOP")
             return False
         if ch in (b'r', b'R', b"\x12"):
             self.scale = 1.0
+            self._announce("[Scale] reset → 1.0")
             return False
 
-        # diagnostics: single-wheel and patterns
-        if ch == b'1': self._pulse_wheels([1,0,0,0]); return False
-        if ch == b'2': self._pulse_wheels([0,1,0,0]); return False
-        if ch == b'3': self._pulse_wheels([0,0,1,0]); return False
-        if ch == b'4': self._pulse_wheels([0,0,0,1]); return False
-        if ch == b'5': self._pulse_wheels([1,0,0,0], duty=-0.5); return False
-        if ch == b'6': self._pulse_wheels([0,1,0,0], duty=-0.5); return False
-        if ch == b'7': self._pulse_wheels([0,0,1,0], duty=-0.5); return False
-        if ch == b'8': self._pulse_wheels([0,0,0,1], duty=-0.5); return False
-        if ch in (b'f', b'F'): self._demo(vx=0.4, vy=0.0, wz=0.0); return False
-        if ch in (b'h', b'H'): self._demo(vx=0.0, vy=0.4, wz=0.0); return False
-        if ch in (b't', b'T'): self._demo(vx=0.0, vy=0.0, wz=0.8); return False
+        # diagnostics
+        if ch == b'1': self._pulse_wheels([1,0,0,0]); self._announce("[Diag] FL forward pulse"); return False
+        if ch == b'2': self._pulse_wheels([0,1,0,0]); self._announce("[Diag] FR forward pulse"); return False
+        if ch == b'3': self._pulse_wheels([0,0,1,0]); self._announce("[Diag] RL forward pulse"); return False
+        if ch == b'4': self._pulse_wheels([0,0,0,1]); self._announce("[Diag] RR forward pulse"); return False
+        if ch == b'5': self._pulse_wheels([1,0,0,0], duty=-0.5); self._announce("[Diag] FL reverse pulse"); return False
+        if ch == b'6': self._pulse_wheels([0,1,0,0], duty=-0.5); self._announce("[Diag] FR reverse pulse"); return False
+        if ch == b'7': self._pulse_wheels([0,0,1,0], duty=-0.5); self._announce("[Diag] RL reverse pulse"); return False
+        if ch == b'8': self._pulse_wheels([0,0,0,1], duty=-0.5); self._announce("[Diag] RR reverse pulse"); return False
+        if ch in (b'f', b'F'): self._demo(vx=0.4, vy=0.0, wz=0.0); self._announce("[Demo] Forward"); return False
+        if ch in (b'h', b'H'): self._demo(vx=0.0, vy=0.4, wz=0.0); self._announce("[Demo] Strafe Left"); return False
+        if ch in (b't', b'T'): self._demo(vx=0.0, vy=0.0, wz=0.8); self._announce("[Demo] Turn CCW"); return False
+        if ch in (b'g', b'G'): self._gentle_forward(); return False
         if ch in (b'm', b'M'): self._print_status(); return False
 
-        # speed scaling
+        # speed scaling (Shift=fast, Ctrl=slow)
         if isinstance(ch, bytes) and len(ch) == 1:
-            slow = 1 <= ch[0] <= 26   # Ctrl chars
+            slow = 1 <= ch[0] <= 26   # Ctrl chars map 1..26
             fast = ch.isalpha() and ch.isupper()
         else:
             slow = False; fast = False
@@ -367,35 +381,39 @@ class DirectTeleop:
         else:
             self.scale = 1.0
 
-        # movement
+        # movement intent (announce on change)
+        prev = (self.t_vx, self.t_vy, self.t_wz)
         if ch in (b'w', b'W', b'UP'):
-            self.t_vx = +self.lim.vx
+            self.t_vx = +self.lim.vx; self.t_vy = 0.0
+            self._announce("[Cmd] FORWARD")
         elif ch in (b's', b'S', b'DOWN'):
-            self.t_vx = -self.lim.vx
+            self.t_vx = -self.lim.vx; self.t_vy = 0.0
+            self._announce("[Cmd] BACK")
         elif ch in (b'a', b'A', b'LEFT'):
-            self.t_vy = +self.lim.vy
+            self.t_vy = +self.lim.vy; self.t_vx = 0.0
+            self._announce("[Cmd] LEFT")
         elif ch in (b'd', b'D', b'RIGHT'):
-            self.t_vy = -self.lim.vy
+            self.t_vy = -self.lim.vy; self.t_vx = 0.0
+            self._announce("[Cmd] RIGHT")
         elif ch in (b'q', b'Q'):
-            self.t_wz = +self.lim.wz
+            self.t_wz = +self.lim.wz; self._announce("[Cmd] TURN CCW")
         elif ch in (b'e', b'E'):
-            self.t_wz = -self.lim.wz
+            self.t_wz = -self.lim.wz; self._announce("[Cmd] TURN CW")
         elif ch in (b'x', b'X'):
-            self.t_vx = 0.0; self.t_vy = 0.0
+            self.t_vx = 0.0; self.t_vy = 0.0; self._announce("[Cmd] HALT XY")
         elif ch in (b'z', b'Z'):
-            self.t_wz = 0.0
+            self.t_wz = 0.0; self._announce("[Cmd] HALT YAW")
         return False
 
     def _apply(self, vx, vy, wz):
         r = self.geom.r; L = self.geom.L; sy = self.sy; so = self.so
-        # compute desired wheel angular velocities
+        # wheel angular velocities
         w_fl = ( vx - sy*vy - L*so*wz ) / r
         w_fr = ( vx + sy*vy + L*so*wz ) / r
         w_rl = ( vx + sy*vy - L*so*wz ) / r
         w_rr = ( vx - sy*vy + L*so*wz ) / r
         ws = [w_fl, w_fr, w_rl, w_rr]
         max_w = max(1e-6, max(abs(w) for w in ws))
-        # duty proportional to command magnitude (preserve sign across wheels)
         mag = max(abs(vx)/max(self.lim.vx,1e-6),
                   abs(vy)/max(self.lim.vy,1e-6),
                   abs(wz)/max(self.lim.wz,1e-6))
@@ -408,13 +426,18 @@ class DirectTeleop:
         for i, m in enumerate(motors):
             m.drive(duty if mask[i] else 0.0)
         time.sleep(t)
-        for m in motors:
-            m.stop()
+        for m in motors: m.stop()
 
     def _demo(self, vx, vy, wz, t=0.8):
         self._apply(vx, vy, wz)
         time.sleep(t)
         self._apply(0.0, 0.0, 0.0)
+
+    def _gentle_forward(self, duty=0.25, t=0.7):
+        self._announce("[Test] Gentle forward pulse")
+        self.FL.drive(duty); self.FR.drive(duty); self.RL.drive(duty); self.RR.drive(duty)
+        time.sleep(t)
+        self.FL.stop(); self.FR.stop(); self.RL.stop(); self.RR.stop()
 
     def _print_status(self):
         try:
@@ -425,7 +448,6 @@ class DirectTeleop:
             pass
 
 # --------------------------- CLI -----------------------------------
-
 def build_argparser():
     p = argparse.ArgumentParser(description='Robot Savo — Manual Teleop (no ROS2, PCA9685)')
     # Geometry
@@ -449,23 +471,21 @@ def build_argparser():
     p.add_argument('--i2c-retries', type=int, default=8, help='I²C retry count for EAGAIN bus-busy conditions')
     p.add_argument('--i2c-delay', type=float, default=0.004, help='Delay between I²C retries (seconds)')
     # Channel mapping
-    p.add_argument('--fl-pwm', type=int, required=True)
-    p.add_argument('--fl-in1', type=int, required=True)
-    p.add_argument('--fl-in2', type=int, required=True)
-    p.add_argument('--fr-pwm', type=int, required=True)
-    p.add_argument('--fr-in1', type=int, required=True)
-    p.add_argument('--fr-in2', type=int, required=True)
-    p.add_argument('--rl-pwm', type=int, required=True)
-    p.add_argument('--rl-in1', type=int, required=True)
-    p.add_argument('--rl-in2', type=int, required=True)
-    p.add_argument('--rr-pwm', type=int, required=True)
-    p.add_argument('--rr-in1', type=int, required=True)
-    p.add_argument('--rr-in2', type=int, required=True)
+    p.add_argument('--fl-pwm', type=int, required=True); p.add_argument('--fl-in1', type=int, required=True); p.add_argument('--fl-in2', type=int, required=True)
+    p.add_argument('--fr-pwm', type=int, required=True); p.add_argument('--fr-in1', type=int, required=True); p.add_argument('--fr-in2', type=int, required=True)
+    p.add_argument('--rl-pwm', type=int, required=True); p.add_argument('--rl-in1', type=int, required=True); p.add_argument('--rl-in2', type=int, required=True)
+    p.add_argument('--rr-pwm', type=int, required=True); p.add_argument('--rr-in1', type=int, required=True); p.add_argument('--rr-in2', type=int, required=True)
     # Polarity fixes
     p.add_argument('--inv-fl', action='store_true', help='Invert FL direction')
     p.add_argument('--inv-fr', action='store_true', help='Invert FR direction')
     p.add_argument('--inv-rl', action='store_true', help='Invert RL direction')
     p.add_argument('--inv-rr', action='store_true', help='Invert RR direction')
+    # IN logic compatibility
+    p.add_argument('--in-active-low', action='store_true', help='IN pins are active-LOW on your driver board')
+    p.add_argument('--swap-in12-fl', action='store_true', help='Swap IN1/IN2 wiring for FL')
+    p.add_argument('--swap-in12-fr', action='store_true', help='Swap IN1/IN2 wiring for FR')
+    p.add_argument('--swap-in12-rl', action='store_true', help='Swap IN1/IN2 wiring for RL')
+    p.add_argument('--swap-in12-rr', action='store_true', help='Swap IN1/IN2 wiring for RR')
     # Convention flips
     p.add_argument('--flip-vy', action='store_true', help='Flip strafe axis sign (vy ←→ −vy)')
     p.add_argument('--flip-omega', action='store_true', help='Flip yaw sign (ω ←→ −ω)')
