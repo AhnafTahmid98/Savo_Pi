@@ -446,8 +446,7 @@ class DirectTeleop:
     def _print_status(self):
         duties = getattr(self, '_duties', [0,0,0,0])
         print(f"[cmd] vx={self.c_vx:+.3f} vy={self.c_vy:+.3f} wz={self.c_wz:+.3f}  "
-              f"duties=[FL {d
-uties[0]:+.2f}, FR {duties[1]:+.2f}, RL {duties[2]:+.2f}, RR {duties[3]:+.2f}]")
+              f"duties=[FL {duties[0]:+.2f}, FR {duties[1]:+.2f}, RL {duties[2]:+.2f}, RR {duties[3]:+.2f}]")
 
 # --------------------------- CLI -----------------------------------
 def build_argparser():
