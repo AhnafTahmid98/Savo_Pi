@@ -16,10 +16,10 @@ Keys
 ----
 W / ↑ : Forward
 S / ↓ : Backward
-A / ← : Move left
-D / → : Move right
-Q     : Turn left  (CCW)
-E     : Turn right (CW)
+A / ← : Move left   (strafe)
+D / → : Move right  (strafe)
+Q     : Turn left   (CCW)
+E     : Turn right  (CW)
 SPACE : Stop now
 M     : Print per-wheel duties
 1..4  : Pulse M1..M4 forward
@@ -28,8 +28,10 @@ Esc or Ctrl+C : Quit (safe stop)
 
 Notes
 -----
-• NO servo code. This script NEVER writes to any servo channels and DOES NOT
+• NO servo code. This script NEVER writes any servo logic and DOES NOT
   change PCA9685 frequency unless you pass --set-freq.
+• A hard safety check REFUSES to run if any motor channel is in 12–15
+  (FNK0043 servo header).
 • If any wheel is electrically inverted, fix with --wheel-signs (CSV of -1/1).
 """
 
@@ -180,12 +182,12 @@ class Limits:
 
 class Teleop:
     # pattern vectors per Freenove table (M1,M2,M3,M4)
-    V_F  = (+1, +1, +1, +1)
-    V_B  = (-1, -1, -1, -1)
-    V_L  = (-1, +1, +1, -1)
-    V_R  = (+1, -1, -1, +1)
-    V_TL = (-1, -1, +1, +1)  # turn left (CCW): left side back, right side fwd
-    V_TR = (+1, +1, -1, -1)  # turn right (CW)
+    V_F  = (+1, +1, +1, +1)   # forward
+    V_B  = (-1, -1, -1, -1)   # backward
+    V_L  = (-1, +1, +1, -1)   # strafe left
+    V_R  = (+1, -1, -1, +1)   # strafe right
+    V_TL = (-1, -1, +1, +1)   # turn left (CCW)
+    V_TR = (+1, +1, -1, -1)   # turn right (CW)
 
     def __init__(self, a):
         self.lim = Limits(a.max_vx, a.max_vy, a.max_omega, a.accel_x, a.accel_y, a.accel_z)
@@ -197,6 +199,19 @@ class Teleop:
         self.ws = [int(x) for x in a.wheel_signs.split(',')]
         if len(self.ws) != 4 or any(s not in (-1, 1) for s in self.ws):
             raise ValueError("--wheel-signs must be CSV of four values in {-1,1}")
+
+        # HARD guard: refuse to run if any motor channel is in 12–15 (servo header)
+        servo_forbidden = set(range(12, 16))
+        mot_ch = [
+            a.fl_pwm, a.fl_in1, a.fl_in2,
+            a.fr_pwm, a.fr_in1, a.fr_in2,
+            a.rl_pwm, a.rl_in1, a.rl_in2,
+            a.rr_pwm, a.rr_in1, a.rr_in2,
+        ]
+        bad = sorted(set(mot_ch) & servo_forbidden)
+        if bad:
+            raise SystemExit(f"ERROR: Motor channels overlap FNK0043 servo header (12–15): {bad}. "
+                             f"Remap motors to 0–11 or move servos to a second PCA @ 0x41.")
 
         self.pca = PCA9685(bus=a.i2c_bus, addr=a.pca_addr, freq_hz=a.pwm_freq, set_freq=a.set_freq)
 
@@ -217,7 +232,7 @@ class Teleop:
         self.c_vx = self.c_vy = self.c_wz = 0.0
         self._last = time.monotonic()
         self._duties = [0.0, 0.0, 0.0, 0.0]
-        print("[Teleop] READY. W/S forward/back, A/D left/right, Q/E turn. Esc=quit")
+        print("[Teleop] READY. W/S forward/back, A/D left/right (strafe), Q/E turn. Esc=quit")
 
     def close(self):
         try: self.kb.restore()
@@ -228,21 +243,14 @@ class Teleop:
         try: self.pca.close()
         except Exception: pass
 
-    def _apply_pattern(self, vec, mag):
-        # apply vector (tuple of +/-1) with magnitude 0..1
-        d = [self.ws[i] * clamp(vec[i] * mag, -1.0, 1.0) for i in range(4)]
-        for i, m in enumerate(self.M):
-            m.drive(d[i])
-        self._duties = d
-
     def _mix_and_apply(self, vx, vy, wz):
-        # magnitudes 0..1
+        # magnitudes 0..1 from limits
         sx = abs(vx) / max(self.lim.vx, 1e-6)
         sy = abs(vy) / max(self.lim.vy, 1e-6)
         so = abs(wz) / max(self.lim.wz, 1e-6)
         k  = self.scale
 
-        # start at zero, then add each pattern contribution
+        # accumulate pattern contributions
         acc = [0.0, 0.0, 0.0, 0.0]
         def add(vec, s):
             for i in range(4):
@@ -273,7 +281,7 @@ class Teleop:
         # stop
         if ch == b' ':
             self.t_vx = self.t_vy = self.t_wz = 0.0
-            self._apply_pattern((0,0,0,0), 0.0)
+            for m in self.M: m.stop()
             print("[Cmd] Stop")
             return False
         if ch in (b'm', b'M'):
@@ -315,7 +323,7 @@ class Teleop:
 
         return False
 
-    def _pulse(self, mask, duty, t=0.5):
+    def _pulse(self, mask, duty, t=0.45):
         for i, m in enumerate(self.M):
             m.drive(self.ws[i] * (duty if mask[i] else 0.0))
         time.sleep(t)
@@ -338,7 +346,7 @@ class Teleop:
                 # accel limiting
                 dt = max(1e-3, t0 - getattr(self, "_tlast", t0))
                 self._tlast = t0
-                def filt(c, t, amax): 
+                def filt(c, t, amax):
                     return min(c + amax, t) if t > c else max(c - amax, t)
                 self.c_vx = filt(self.c_vx, self.t_vx, self.lim.ax*dt)
                 self.c_vy = filt(self.c_vy, self.t_vy, self.lim.ay*dt)
