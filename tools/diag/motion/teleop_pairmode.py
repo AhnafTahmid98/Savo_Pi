@@ -1,193 +1,201 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Robot Savo — Pair-Mode Teleop (Left/Right sides on PCA9685)
-Keys:
-  W/S : both sides forward / reverse
-  Q/E : turn CCW / CW (left rev, right fwd) / (left fwd, right rev)
-  SPACE: stop
-  1/2 : Left side pulse fwd/rev
-  3/4 : Right side pulse fwd/rev
-Notes:
-- Map EACH SIDE to ONE triplet (PWM, IN1, IN2). Works even if your HAT only has 3 DC triplets.
-- No servos touched. Channels 12..15 FULL-OFF by default.
+Robot Savo — Freenove Mecanum Teleop (11 patterns, DC motors only)
+- Uses Freenove motor driver via car.Car().motor.set_motor_model(FL, FR, RL, RR)
+- NO servo control. Smooth ramping, deadman, slow/fast scales.
+
+Keys (M1=FL, M2=FR, M3=RL, M4=RR):
+  W / ↑ : (+,+,+,+)  Forward
+  S / ↓ : (-,-,-,-)  Backward
+  Q     : (-,-,+,+)  Turn left (CCW)
+  E     : (+,+,-,-)  Turn right (CW)
+  A / ← : (-,+,+,-)  Strafe left
+  D / → : (+,-,-,+)  Strafe right
+  Y     : (0,+,+,0)  Left and forward
+  H     : (0,-,-,0)  Right and backward
+  U     : (+,0,0,+)  Right and forward
+  J     : (-,0,0,-)  Left and backward
+  SPACE/0: stop,  M: print duties,  Esc/Ctrl+C: quit
+  Shift: fast scale  Ctrl: slow scale
 """
 
-import sys, os, time, select, termios, tty, argparse, signal
-from smbus2 import SMBus
+import sys, os, time, select, termios, tty, signal, argparse
+from dataclasses import dataclass
 
-MODE1, MODE2, PRESCALE, LED0_ON_L = 0x00, 0x01, 0xFE, 0x06
-RESTART, SLEEP, AI, OUTDRV, ALLCALL = 0x80, 0x10, 0x20, 0x04, 0x01
+# --- Freenove stack (uses your existing modules) ---
+from car import Car   # <- gives car.motor.set_motor_model(FL, FR, RL, RR)
 
-class PCA9685:
-    def __init__(self, bus=1, addr=0x40, freq_hz=200.0, set_freq=True):
-        self.addr = int(addr); self.bus = SMBus(int(bus))
-        self._w8(MODE2, OUTDRV); self._w8(MODE1, AI); time.sleep(0.003)
-        if set_freq: self.set_pwm_freq(freq_hz)
-        m1 = self._r8(MODE1); self._w8(MODE1, (m1 | RESTART | AI) & ~ALLCALL)
+def clamp(x, lo, hi): return max(lo, min(hi, x))
 
-    def close(self):
-        try: self.bus.close()
-        except: pass
+@dataclass
+class Params:
+    hz: float
+    deadman: float
+    scale_low: float
+    scale_high: float
+    mag: float
+    ramp: float
 
-    def _w8(self, reg, val): self.bus.write_byte_data(self.addr, reg & 0xFF, val & 0xFF)
-    def _r8(self, reg):      return self.bus.read_byte_data(self.addr, reg & 0xFF)
-
-    def set_pwm_freq(self, f_hz: float):
-        f = float(max(40.0, min(1500.0, f_hz)))
-        prescale = int(max(3, min(255, round(25_000_000.0/(4096.0*f) - 1.0))))
-        old = self._r8(MODE1); self._w8(MODE1, (old & ~RESTART) | SLEEP)
-        self._w8(PRESCALE, prescale); self._w8(MODE1, old & ~SLEEP)
-        time.sleep(0.003); self._w8(MODE1, (old | RESTART | AI) & ~ALLCALL)
-
-    def _raw(self, ch: int, on: int, off: int):
-        base = LED0_ON_L + 4*int(ch)
-        self._w8(base+0, on & 0xFF); self._w8(base+1, (on>>8) & 0x0F)
-        self._w8(base+2, off & 0xFF); self._w8(base+3, (off>>8) & 0x0F)
-
-    def full_off(self, ch: int):
-        base = LED0_ON_L + 4*int(ch)
-        self._w8(base+0, 0x00); self._w8(base+1, 0x00)
-        self._w8(base+2, 0x00); self._w8(base+3, 0x10)
-
-    def full_on(self, ch: int):
-        base = LED0_ON_L + 4*int(ch)
-        self._w8(base+0, 0x00); self._w8(base+1, 0x10)
-        self._w8(base+2, 0x00); self._w8(base+3, 0x00)
-
-    def set_duty(self, ch: int, duty: float):
-        d = max(0.0, min(1.0, float(duty)))
-        if d <= 0.0: self.full_off(ch); return
-        if d >= 1.0: self.full_on(ch); return
-        off = int(round(d * 4095)); self._raw(ch, 0, off)
-
-class Side:
-    def __init__(self, pca: PCA9685, pwm: int, in1: int, in2: int, invert=False, swap_in12=False, active_low=False):
-        self.pca = pca; self.pwm=pwm
-        self.in1=in1; self.in2=in2
-        self.invert=bool(invert); self.swap=bool(swap_in12); self.active_low=bool(active_low)
-        self.stop()
-
-    def _digital(self, ch, level):
-        lvl = (level ^ 1) if self.active_low else level
-        if lvl: self.pca.full_on(ch)
-        else:   self.pca.full_off(ch)
-
-    def drive(self, signed: float):
-        d = max(-1.0, min(1.0, float(signed)))
-        if self.invert: d = -d
-        a,b = (self.in1,self.in2) if not self.swap else (self.in2,self.in1)
-        if abs(d) < 1e-3:
-            self._digital(a,0); self._digital(b,0); self.pca.set_duty(self.pwm,0.0); return
-        if d > 0:
-            self._digital(a,1); self._digital(b,0); self.pca.set_duty(self.pwm,d)
-        else:
-            self._digital(a,0); self._digital(b,1); self.pca.set_duty(self.pwm,-d)
-
-    def stop(self):
-        a,b = (self.in1,self.in2) if not self.swap else (self.in2,self.in1)
-        self._digital(a,0); self._digital(b,0); self.pca.set_duty(self.pwm,0.0)
-
-class Kb:
+class Keyboard:
     def __init__(self):
         self.fd = sys.stdin.fileno()
         self.old = termios.tcgetattr(self.fd)
         tty.setraw(self.fd)
     def read_all(self, t=0.0):
-        out=[]; r,_,_ = select.select([sys.stdin],[],[],t)
+        out=[]; r,_,_=select.select([sys.stdin],[],[],t)
         while r:
-            b=os.read(self.fd,1); 
+            b=os.read(self.fd,1)
             if not b: break
-            out.append(b)
+            # arrow decode
+            if b == b'\x1b':
+                a=os.read(self.fd,1) if select.select([sys.stdin],[],[],0.01)[0] else b''
+                if a in (b'[',b'O'):
+                    c=os.read(self.fd,1) if select.select([sys.stdin],[],[],0.02)[0] else b''
+                    arrows={b'A':b'UP', b'B':b'DOWN', b'C':b'RIGHT', b'D':b'LEFT'}
+                    out.append(arrows.get(c,b'\x1b'))
+                else:
+                    out.append(b)
+            else:
+                out.append(b)
             r,_,_=select.select([sys.stdin],[],[],0.0)
         return out
     def restore(self):
         termios.tcsetattr(self.fd, termios.TCSADRAIN, self.old)
 
-def main():
-    ap = argparse.ArgumentParser("Teleop Pair-Mode (Left/Right)")
-    ap.add_argument('--i2c-bus', type=int, default=1)
-    ap.add_argument('--pca-addr', type=lambda x:int(x,0), default=0x40)
-    ap.add_argument('--pwm-freq', type=float, default=200.0)
-    ap.add_argument('--set-freq', action='store_true')
-    ap.add_argument('--reserve', type=str, default='12,13,14,15')
-    # LEFT triplet
-    ap.add_argument('--left-pwm', type=int, required=True)
-    ap.add_argument('--left-in1', type=int, required=True)
-    ap.add_argument('--left-in2', type=int, required=True)
-    ap.add_argument('--inv-left', action='store_true')
-    ap.add_argument('--swap-in12-left', action='store_true')
-    # RIGHT triplet
-    ap.add_argument('--right-pwm', type=int, required=True)
-    ap.add_argument('--right-in1', type=int, required=True)
-    ap.add_argument('--right-in2', type=int, required=True)
-    ap.add_argument('--inv-right', action='store_true')
-    ap.add_argument('--swap-in12-right', action='store_true')
-    # control
-    ap.add_argument('--hz', type=float, default=30.0)
-    ap.add_argument('--deadman', type=float, default=1.5)
-    ap.add_argument('--scale-low', type=float, default=0.25)
-    ap.add_argument('--scale-high', type=float, default=1.0)
-    a = ap.parse_args()
+class Teleop:
+    # 11-pattern table
+    V_F  = (+1,+1,+1,+1)
+    V_B  = (-1,-1,-1,-1)
+    V_TL = (-1,-1,+1,+1)
+    V_TR = (+1,+1,-1,-1)
+    V_SL = (-1,+1,+1,-1)
+    V_SR = (+1,-1,-1,+1)
+    V_LF = ( 0,+1,+1, 0)
+    V_RB = ( 0,-1,-1, 0)
+    V_RF = (+1, 0, 0,+1)
+    V_LB = (-1, 0, 0,-1)
 
-    p = PCA9685(bus=a.i2c_bus, addr=a.pca_addr, freq_hz=a.pwm_freq, set_freq=a.set_freq)
-    try:
-        # reserve servos
+    def __init__(self, p: Params):
+        self.p = p
+        self.kb = Keyboard()
+        self.car = Car()     # Freenove driver initializes HAT/ADC/etc.
+        self.last_input = time.monotonic()
+        self.vec = (0,0,0,0)
+        self.tgt = [0.0,0.0,0.0,0.0]
+        self.cur = [0.0,0.0,0.0,0.0]
+        print("[Teleop] READY — Freenove mecanum via set_motor_model().")
+
+    def _apply_motor(self, d):
+        # Freenove expects (FL, FR, RL, RR) as integers (duty-like).
+        # We scale [-1..+1] by 1000 then by mag.
+        scale = 1000
+        FL = int(round(d[0]*scale)); FR = int(round(d[1]*scale))
+        RL = int(round(d[2]*scale)); RR = int(round(d[3]*scale))
+        self.car.motor.set_motor_model(FL, FR, RL, RR)
+
+    def _set_vec(self, vec, mag):
+        self.vec = vec
+        m = clamp(mag, 0.0, 1.0)
+        self.tgt = [clamp(v*m, -1.0, 1.0) for v in vec]
+
+    def _slew(self, cur, tgt, rate, dt):
+        if cur < tgt: return min(cur+rate*dt, tgt)
+        if cur > tgt: return max(cur-rate*dt, tgt)
+        return cur
+
+    def _update_outputs(self, dt):
+        rate = max(0.05, min(1.0, self.p.ramp))   # per-second duty change (0..1)
+        for i in range(4):
+            self.cur[i] = self._slew(self.cur[i], self.tgt[i], rate, dt)
+        self._apply_motor(self.cur)
+
+    def _stop(self):
+        self._set_vec((0,0,0,0), 0.0)
+        self._apply_motor([0,0,0,0])
+
+    def _handle_key(self, b):
+        # modifiers → scale
+        scale = 1.0
+        if b.isalpha() and b.isupper(): scale = self.p.scale_high   # Shift
+        if 1 <= b[0] <= 26:             scale = self.p.scale_low    # Ctrl
+
+        mag = self.p.mag * scale
+
+        # commands
+        if b in (b' ', b'0'):
+            print("[STOP]"); self._stop(); return False
+        if b in (b'\x1b', b'\x03'):
+            print("[QUIT]"); raise KeyboardInterrupt
+        if b in (b'm', b'M'):
+            print("[duty] FL={:+.2f} FR={:+.2f} RL={:+.2f} RR={:+.2f}".format(*self.cur))
+            return False
+
+        # arrows
+        if b == b'UP':    b = b'w'
+        if b == b'DOWN':  b = b's'
+        if b == b'LEFT':  b = b'a'
+        if b == b'RIGHT': b = b'd'
+
+        # mapping
+        if   b in (b'w', b'W'): self._set_vec(self.V_F,  mag); print("[W] Forward")
+        elif b in (b's', b'S'): self._set_vec(self.V_B,  mag); print("[S] Backward")
+        elif b in (b'a', b'A'): self._set_vec(self.V_SL, mag); print("[A] Strafe Left")
+        elif b in (b'd', b'D'): self._set_vec(self.V_SR, mag); print("[D] Strafe Right")
+        elif b in (b'q', b'Q'): self._set_vec(self.V_TL, mag); print("[Q] Turn CCW")
+        elif b in (b'e', b'E'): self._set_vec(self.V_TR, mag); print("[E] Turn CW")
+        elif b in (b'y', b'Y'): self._set_vec(self.V_LF, mag); print("[Y] Left+Forward")
+        elif b in (b'h', b'H'): self._set_vec(self.V_RB, mag); print("[H] Right+Backward")
+        elif b in (b'u', b'U'): self._set_vec(self.V_RF, mag); print("[U] Right+Forward")
+        elif b in (b'j', b'J'): self._set_vec(self.V_LB, mag); print("[J] Left+Backward")
+        else: return False
+        return True
+
+    def loop(self):
+        period = 1.0 / self.p.hz
         try:
-            rs = [int(x) for x in a.reserve.split(',') if x.strip()!='']
-            for ch in rs: p.full_off(ch)
-            if rs: print(f"[Reserve] FULL-OFF: {rs}")
-        except: pass
+            while True:
+                t0 = time.monotonic()
+                got = False
+                for b in self.kb.read_all(0.0):
+                    got = True
+                    self._handle_key(b)
+                    self.last_input = t0
+                # deadman
+                if not got and (t0 - self.last_input) > self.p.deadman:
+                    if any(abs(x) > 1e-3 for x in self.cur):
+                        print("[Deadman] stop")
+                    self._stop()
+                # ramp update
+                self._update_outputs(period)
+                # pace
+                elapsed = time.monotonic() - t0
+                if elapsed < period: time.sleep(period - elapsed)
+        finally:
+            try: self.kb.restore()
+            except: pass
+            self._stop()
+            try: self.car.close()
+            except: pass
 
-        L = Side(p, a.left_pwm,  a.left_in1,  a.left_in2,  invert=a.inv_left,  swap_in12=a.swap_in12_left)
-        R = Side(p, a.right_pwm, a.right_in1, a.right_in2, invert=a.inv_right, swap_in12=a.swap_in12_right)
+def build_ap():
+    p = argparse.ArgumentParser("Freenove mecanum teleop (11 patterns, ramped)")
+    p.add_argument('--hz', type=float, default=30.0)
+    p.add_argument('--deadman', type=float, default=0.6)
+    p.add_argument('--scale-low', type=float, default=0.35)
+    p.add_argument('--scale-high', type=float, default=1.25)
+    p.add_argument('--mag', type=float, default=0.65, help="Base magnitude 0..1")
+    p.add_argument('--ramp', type=float, default=0.8, help="Duty slew rate per second (0..1)")
+    return p
 
-        def stop_all():
-            L.stop(); R.stop()
+def main(argv=None):
+    a = build_ap().parse_args(argv)
+    t = Teleop(Params(a.hz, a.deadman, a.scale_low, a.scale_high, a.mag, a.ramp))
+    signal.signal(signal.SIGINT, lambda *_: (_ for _ in ()).throw(KeyboardInterrupt()))
+    try:
+        t.loop()
+    except KeyboardInterrupt:
+        pass
 
-        def pulse(side, duty, t=0.35):
-            side.drive(duty); time.sleep(t); side.stop()
-
-        kb = Kb()
-        signal.signal(signal.SIGINT, lambda *_: (print("\n[Quit]"), kb.restore(), stop_all(), sys.exit(0)))
-        print("[Ready] Pair-mode: W/S/Q/E, Space=stop, 1/2=Left fwd/rev, 3/4=Right fwd/rev")
-
-        last = time.monotonic(); scale=1.0; mag=0.8
-        while True:
-            now = time.monotonic()
-            if (now - last) > a.deadman:
-                stop_all()
-            for b in kb.read_all(0.02):
-                last = now
-                # modifiers
-                if b.isalpha() and b.isupper(): scale = a.scale_high
-                elif 1 <= b[0] <= 26:           scale = a.scale_low
-                else:                            scale = 1.0
-                # actions
-                if b in (b' ',):
-                    print("[Cmd] STOP"); stop_all()
-                elif b in (b'w', b'W'):
-                    L.drive(+mag*scale); R.drive(+mag*scale); print("[W] forward")
-                elif b in (b's', b'S'):
-                    L.drive(-mag*scale); R.drive(-mag*scale); print("[S] backward")
-                elif b in (b'q', b'Q'):
-                    L.drive(-mag*scale); R.drive(+mag*scale); print("[Q] turn CCW")
-                elif b in (b'e', b'E'):
-                    L.drive(+mag*scale); R.drive(-mag*scale); print("[E] turn CW")
-                elif b == b'1':
-                    print("[Pulse] LEFT +"); pulse(L, +0.35)
-                elif b == b'2':
-                    print("[Pulse] LEFT -"); pulse(L, -0.35)
-                elif b == b'3':
-                    print("[Pulse] RIGHT +"); pulse(R, +0.35)
-                elif b == b'4':
-                    print("[Pulse] RIGHT -"); pulse(R, -0.35)
-                elif b in (b'\x1b', b'\x03'):
-                    print("[Quit]"); kb.restore(); stop_all(); return
-            time.sleep(max(0.0, 1.0/a.hz))
-    finally:
-        try: p.close()
-        except: pass
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
