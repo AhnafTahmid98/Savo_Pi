@@ -3,46 +3,27 @@
 """
 Robot Savo — Manual Teleop (NO ROS2) for DC Motors via PCA9685 + H-Bridge
 ---------------------------------------------------------------------------
-- MOTOR-ONLY (servos are not used). Optionally hard-OFF reserved channels.
-- Keyboard control: WASD/QE + Arrows. Deadman timer for safety.
-- Correct PCA9685 FULL-ON/FULL-OFF handling on H-bridge IN pins.
-- Clears ALLCALL and sets OUTDRV to avoid broadcast twitching.
-- Per-wheel invert, IN1/IN2 swap, and active-LOW compatibility.
-- Safe defaults: low speeds, low pulse duty, short pulses.
+MOTOR-ONLY (no servo control). Designed to be safe on FNK0043 (shared PCA9685).
 
-Key map
-  W/S or ↑/↓  = +vx / −vx   (forward/back)
-  A/D or ←/→  = +vy / −vy   (strafe left/right)   # set --max-vy 0.0 for paired boards
-  Q/E         = +ω  / −ω    (CCW/CW turn)
-  G           = gentle forward pulse (very mild)
-  1..4 / 5..8 = pulse FL/FR/RL/RR forward / reverse
-  M           = print current command + wheel duties
-  SPACE       = stop immediately
-  Shift       = fast scale    |   Ctrl = slow scale
-  R           = reset scale to 1.0
-  Esc / Ctrl+C= quit (safe)
+Fixes / Features
+- W/S forward/back fixed: new --flip-vx (DEFAULT ON) makes W = forward on FNK0043.
+- Arrow keys robust: supports CSI (ESC [ A) and SS3 (ESC O A).
+- Clears ALLCALL, sets OUTDRV; reserves channels (FULL-OFF) so servos don't twitch.
+- H-bridge control with proper FULL-ON/FULL-OFF on IN pins and PWM on ENA/ENB.
+- Per-wheel invert + IN1/IN2 swap + active-LOW compatibility.
+- Safe defaults (slow speeds, deadman, gentle pulses).
 
-Usage example (true 4-wheel board)
-  python3 tools/diag/motion/drive_manual_direct.py \
-    --pca-addr 0x40 --i2c-bus 1 \
-    --fl-pwm 0  --fl-in1 1  --fl-in2 2 \
-    --fr-pwm 3  --fr-in1 4  --fr-in2 5 \
-    --rl-pwm 6  --rl-in1 7  --rl-in2 8 \
-    --rr-pwm 9  --rr-in1 10 --rr-in2 11 \
-    --max-vx 0.15 --max-vy 0.15 --max-omega 0.6 \
-    --reserve 12,13,14,15
-
-Usage example (paired left/right board like FNK0043; no strafe)
-  # Map both LEFT wheels to the same left triple (L_PWM,L_IN1,L_IN2)
-  # Map both RIGHT wheels to the same right triple (R_PWM,R_IN1,R_IN2)
-  python3 tools/diag/motion/drive_manual_direct.py \
-    --pca-addr 0x40 --i2c-bus 1 \
-    --fl-pwm L_PWM --fl-in1 L_IN1 --fl-in2 L_IN2 \
-    --rl-pwm L_PWM --rl-in1 L_IN1 --rl-in2 L_IN2 \
-    --fr-pwm R_PWM --fr-in1 R_IN1 --fr-in2 R_IN2 \
-    --rr-pwm R_PWM --rr-in1 R_IN1 --rr-in2 R_IN2 \
-    --max-vx 0.12 --max-vy 0.0  --max-omega 0.5 \
-    --reserve 12,13,14,15
+Keys
+  W/S or ↑/↓  = Forward / Back
+  Q/E         = Turn CCW / CW
+  A/D or ←/→  = Strafe L/R  (set --max-vy 0.0 on paired boards like FNK0043)
+  G           = Gentle forward pulse
+  1..4 / 5..8 = Pulse FL/FR/RL/RR forward / reverse
+  M           = Print current command + wheel duties
+  SPACE       = Stop immediately
+  Shift       = fast scale,  Ctrl = slow scale
+  R           = Reset scale to 1.0
+  Esc / Ctrl+C= Quit (safe)
 """
 
 import argparse
@@ -86,20 +67,18 @@ class PCA9685:
     def __init__(self, bus: int = 1, addr: int = 0x40, freq_hz: float = 800.0):
         self.addr = int(addr)
         self.bus = SMBus(int(bus))
-        # set OUTDRV + AI, clear ALLCALL
+        # OUTDRV + AI; clear ALLCALL
         self._write8(MODE2, OUTDRV)
-        self._write8(MODE1, AI)  # clears ALLCALL bit implicitly
+        self._write8(MODE1, AI)  # (clears ALLCALL)
         time.sleep(0.003)
         self.set_pwm_freq(freq_hz)
-        # ensure ALLCALL is cleared
+        # ensure ALLCALL cleared
         m1 = self._read8(MODE1)
         self._write8(MODE1, (m1 | RESTART | AI) & ~ALLCALL)
 
     def close(self):
-        try:
-            self.bus.close()
-        except Exception:
-            pass
+        try: self.bus.close()
+        except Exception: pass
 
     def _write8(self, reg, val):
         self.bus.write_byte_data(self.addr, reg & 0xFF, val & 0xFF)
@@ -210,7 +189,7 @@ class HBridge:
 
 # ---------------------- Keyboard + helpers --------------------------
 class Keyboard:
-    """Non-blocking keyboard reader that parses arrow keys robustly."""
+    """Non-blocking keyboard reader that parses arrow keys robustly (CSI & SS3)."""
     def __init__(self):
         self.fd = sys.stdin.fileno()
         self.old = termios.tcgetattr(self.fd)
@@ -226,12 +205,13 @@ class Keyboard:
         out = []
         ch = self._read1(0.0)
         while ch is not None:
-            if ch == b"\x1b":
+            if ch == b"\x1b":  # ESC
                 a = self._read1(0.02)
-                if a == b'[':
-                    b = self._read1(0.02)
-                    if b in (b'A', b'B', b'C', b'D'):
-                        out.append({b'A': b'UP', b'B': b'DOWN', b'C': b'RIGHT', b'D': b'LEFT'}[b])
+                if a in (b'[', b'O'):  # CSI or SS3
+                    b = self._read1(0.04)
+                    arrows = {b'A': b'UP', b'B': b'DOWN', b'C': b'RIGHT', b'D': b'LEFT'}
+                    if b in arrows:
+                        out.append(arrows[b])
                     else:
                         out.extend(filter(None, [b"\x1b", a, b]))
                 else:
@@ -273,6 +253,9 @@ class DirectTeleop:
         self.lim = Limits(args.max_vx, args.max_vy, args.max_omega,
                           args.accel_x, args.accel_y, args.accel_z)
         self.geom = MecanumGeom(args.wheel_radius, args.L)
+
+        # Axis sign flips (W/S fix here: flip-vx default True)
+        self.sx = -1.0 if args.flip_vx else +1.0
         self.sy = -1.0 if args.flip_vy else +1.0
         self.so = -1.0 if args.flip_omega else +1.0
 
@@ -313,7 +296,7 @@ class DirectTeleop:
             f" rate={self.hz} Hz  deadman={self.deadman}s  max(vx,vy,wz)=({self.lim.vx},{self.lim.vy},{self.lim.wz})\n"
             f" accel(x,y,z)=({self.lim.ax},{self.lim.ay},{self.lim.az})  scale_low={self.scale_low}  scale_high={self.scale_high}\n"
             f" geom: r={self.geom.r} m, L={self.geom.L} m  PCA9685@0x{args.pca_addr:02X} bus={args.i2c_bus}\n"
-            f" flips: vy={'-vy' if args.flip_vy else 'vy'}  omega={'-ω' if args.flip_omega else 'ω'}\n"
+            f" flips: vx={'-vx' if args.flip_vx else 'vx'}  vy={'-vy' if args.flip_vy else 'vy'}  omega={'-ω' if args.flip_omega else 'ω'}\n"
             f" IN logic: {'ACTIVE-LOW' if args.in_active_low else 'ACTIVE-HIGH'}  swap(FL/FR/RL/RR)={args.swap_in12_fl}/{args.swap_in12_fr}/{args.swap_in12_rl}/{args.swap_in12_rr}\n"
             " Keys: WASD/QE or Arrows, G gentle forward, 1..8 wheel pulses, M print, Space stop, R reset\n"
         )
@@ -397,7 +380,7 @@ class DirectTeleop:
         elif fast: self.scale = clamp(self.scale_high, 1.0, 3.0)
         else: self.scale = 1.0
 
-        # Movement + cues
+        # Movement + cues (logical commands; sign flip applied later in _apply)
         if ch in (b'w', b'W', b'UP'):
             self.t_vx = +self.lim.vx; self._announce("[Cmd] FORWARD")
         elif ch in (b's', b'S', b'DOWN'):
@@ -426,12 +409,17 @@ class DirectTeleop:
         return False
 
     def _apply(self, vx, vy, wz):
-        r = self.geom.r; L = self.geom.L; sy = self.sy; so = self.so
+        # Apply axis flips here (so W=forward with --flip-vx default ON)
+        vx *= self.sx
+        vy *= self.sy
+        wz *= self.so
+
+        r = self.geom.r; L = self.geom.L
         # inverse kinematics (mecanum)
-        w_fl = ( vx - sy*vy - L*so*wz ) / r
-        w_fr = ( vx + sy*vy + L*so*wz ) / r
-        w_rl = ( vx + sy*vy - L*so*wz ) / r
-        w_rr = ( vx - sy*vy + L*so*wz ) / r
+        w_fl = ( vx - vy - L*wz ) / r
+        w_fr = ( vx + vy + L*wz ) / r
+        w_rl = ( vx + vy - L*wz ) / r
+        w_rr = ( vx - vy + L*wz ) / r
         ws = [w_fl, w_fr, w_rl, w_rr]
         max_w = max(1e-6, max(abs(w) for w in ws))
         mag = max(abs(vx)/max(self.lim.vx,1e-6),
@@ -493,8 +481,10 @@ def build_argparser():
     p.add_argument('--in-active-low', action='store_true', help='IN pins are active-LOW on your driver board')
     p.add_argument('--swap-in12-fl', action='store_true'); p.add_argument('--swap-in12-fr', action='store_true')
     p.add_argument('--swap-in12-rl', action='store_true'); p.add_argument('--swap-in12-rr', action='store_true')
-    # Convention flips
-    p.add_argument('--flip-vy', action='store_true'); p.add_argument('--flip-omega', action='store_true')
+    # Convention flips (W/S fixed here: flip-vx default True for FNK0043)
+    p.add_argument('--flip-vx', action='store_true', default=True, help='Flip forward axis sign (W/S). DEFAULT: True')
+    p.add_argument('--flip-vy', action='store_true', default=False, help='Flip strafe axis sign')
+    p.add_argument('--flip-omega', action='store_true', default=False, help='Flip yaw sign')
     # Safety (software)
     p.add_argument('--estop-force', action='store_true', help='Force software e-stop (zero all outputs)')
     return p
