@@ -169,7 +169,7 @@ class Keyboard:
                     if b in arrows: out.append(arrows[b])
                     else: out.extend(filter(None, [b'\x1b', a, b]))
                 else:
-                    out.append(b'\x1b'); 
+                    out.append(b'\x1b')
                     if a: out.append(a)
             else:
                 out.append(ch)
@@ -251,6 +251,29 @@ class Teleop:
         signal.signal(signal.SIGTERM, self._sig_exit)
 
         print("[Teleop] READY — (W/S/A/D/Q/E + Y/H/U/J; Space/0 stop; M print; 1..8 pulses)")
+
+    # ----- signal + cleanup -----
+    def _sig_exit(self, *_):
+        print("\n[Teleop] Signal → safe stop & exit")
+        try:
+            self.close()
+        finally:
+            os._exit(0)
+
+    def close(self):
+        # stop motors, restore keyboard, close I²C
+        try:
+            self.FL.stop(); self.FR.stop(); self.RL.stop(); self.RR.stop()
+        except Exception:
+            pass
+        try:
+            self.kb.restore()
+        except Exception:
+            pass
+        try:
+            self.pca.close()
+        except Exception:
+            pass
 
     # ----- wiring report + collision checks -----
     def _wiring_report(self):
