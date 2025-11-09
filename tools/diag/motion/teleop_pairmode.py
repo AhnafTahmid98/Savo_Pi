@@ -142,7 +142,7 @@ class App:
     def __init__(self, a):
         self.a=a
         self.pca = PCA9685(a.i2c_bus, a.pca_addr, a.pwm_freq, set_freq=a.set_freq, verbose=a.verbose)
-        # reserve
+        # reserve (e.g., servo channels)
         if a.reserve:
             r=[int(x) for x in a.reserve.split(',') if x.strip()!='']; [self.pca.full_off(ch) for ch in r]
             if a.verbose: print(f"[Reserve] FULL-OFF: {r}")
@@ -174,14 +174,16 @@ class App:
         print("[DEMO] done"); self.stop()
 
     def run_pulse(self):
-        tests=[("FL", (1,0,0,0)),("BL",(0,1,0,0)),("FR",(0,0,1,0)),("BR",(0,0,0,1))]
+        tests=[("FL",(1,0,0,0)),("BL",(0,1,0,0)),("FR",(0,0,1,0)),("BR",(0,0,0,1))]
         for name,mask in tests:
             print(f"[PULSE] {name} FWD"); self.mot.set_motor_model(*(m*self.a.mag for m in mask)); time.sleep(0.4); self.stop(); time.sleep(0.15)
             print(f"[PULSE] {name} REV"); self.mot.set_motor_model(*(-m*self.a.mag for m in mask)); time.sleep(0.4); self.stop(); time.sleep(0.25)
         print("[PULSE] done"); self.stop()
 
     def run_teleop(self):
-        kb=Keyboard(); deadman=self.a.deadman; idle=self.a.idle_exit if self.a.idle_exit>0 else None
+        kb=Keyboard()
+        deadman=self.a.deadman
+        idle=self.a.idle_exit if self.a.idle_exit>0 else None
         start=time.monotonic(); last=time.monotonic(); pattern=P.STOP; scale=1.0
         print("[Teleop] W/S/A/D  Q/E  (Space=stop, ESC quits)")
         try:
@@ -192,17 +194,20 @@ class App:
                 got=False
                 for ch in kb.read():
                     got=True; last=now
-                    if ch in (b'\x1b', b'\x03'): print("[Teleop] quit"); return
-                    if ch in (b' ', b'0'): pattern=P.STOP; print("[Cmd] STOP"); continue
-                    slow = (isinstance(ch,bytes) and len(ch)==1 and 1<=ch[0]<=26)
+                    if ch in (b'\x1b', b'\x03'):
+                        print("[Teleop] quit"); return
+                    if ch in (b' ', b'0'):
+                        pattern=P.STOP; print("[Cmd] STOP"); continue
+                    # speed scaling: ctrl/lowcase vs UPPERCASE
+                    slow = (isinstance(ch,bytes) and len(ch)==1 and 1<=ch[0]<=26)  # control keys
                     fast = (isinstance(ch,bytes) and ch.isalpha() and ch.isupper())
                     scale = self.a.scale_low if slow else (self.a.scale_high if fast else 1.0)
-                    if ch in (b'w',b'W',b'UP'): pattern=P.F;  print("[Move] FWD")
-                    elif ch in (b's',b'S',b'DOWN'): pattern=P.B; print("[Move] BWD")
-                    elif ch in (b'a',b'A',b'LEFT'): pattern=P.SL; print("[Move] STRAFE L")
+                    if ch in (b'w',b'W',b'UP'):      pattern=P.F;  print("[Move] FWD")
+                    elif ch in (b's',b'S',b'DOWN'):  pattern=P.B;  print("[Move] BWD")
+                    elif ch in (b'a',b'A',b'LEFT'):  pattern=P.SL; print("[Move] STRAFE L")
                     elif ch in (b'd',b'D',b'RIGHT'): pattern=P.SR; print("[Move] STRAFE R")
-                    elif ch in (b'q',b'Q'): pattern=P.TL; print("[Turn] CCW")
-                    elif ch in (b'e',b'E'): pattern=P.TR; print("[Turn] CW")
+                    elif ch in (b'q',b'Q'):          pattern=P.TL; print("[Turn] CCW")
+                    elif ch in (b'e',b'E'):          pattern=P.TR; print("[Turn] CW")
                 if not got:
                     if (now-last)>deadman and pattern!=P.STOP:
                         pattern=P.STOP; print("[Deadman] stop")
@@ -225,6 +230,9 @@ def build_ap():
     p.add_argument('--mag', type=float, default=0.6)
     p.add_argument('--max', type=float, default=1.0)
     p.add_argument('--step', type=float, default=1.0, help="demo step seconds")
+    p.add_argument('--deadman', type=float, default=2.0, help="Auto STOP if no key for SEC")
+    p.add_argument('--scale-low', type=float, default=0.35, help="Speed scale when holding control keys")
+    p.add_argument('--scale-high', type=float, default=1.25, help="Speed scale when using UPPERCASE letters")
     p.add_argument('--i2c-bus', type=int, default=1)
     p.add_argument('--pca-addr', type=lambda x:int(x,0), default=0x40)
     p.add_argument('--pwm-freq', type=float, default=200.0)
@@ -246,12 +254,15 @@ def build_ap():
 
 def main(argv=None):
     a = build_ap().parse_args(argv)
+    # expose scales on the object (used in teleop)
+    setattr(a, 'scale_low', getattr(a, 'scale_low', 0.35))
+    setattr(a, 'scale_high', getattr(a, 'scale_high', 1.25))
     app = App(a)
     signal.signal(signal.SIGINT, lambda *_: (_ for _ in ()).throw(KeyboardInterrupt()))
     try:
-        if a.mode=='demo':  app.run_demo()
+        if a.mode=='demo':    app.run_demo()
         elif a.mode=='pulse': app.run_pulse()
-        else: app.run_teleop()
+        else:                 app.run_teleop()
     except KeyboardInterrupt:
         print("\n[Main] Ctrl+C")
     finally:
