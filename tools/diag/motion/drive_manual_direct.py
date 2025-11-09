@@ -324,7 +324,31 @@ class Teleop:
         self.FL.drive(new_d[0]); self.FR.drive(new_d[1]); self.RL.drive(new_d[2]); self.RR.drive(new_d[3])
         self._duties = new_d
 
-
+    def _self_test(self):
+        seq = [
+            ("FL fwd", [1,0,0,0], +0.30),
+            ("FR fwd", [0,1,0,0], +0.30),
+            ("RL fwd", [0,0,1,0], +0.30),
+            ("RR fwd", [0,0,0,1], +0.30),
+            ("FL rev", [1,0,0,0], -0.30),
+            ("FR rev", [0,1,0,0], -0.30),
+            ("RL rev", [0,0,1,0], -0.30),
+            ("RR rev", [0,0,0,1], -0.30),
+        ]
+        print("\n[Test] Solo wheels...")
+        for name, mask, d in seq:
+            print(f"  {name} @ {abs(d):0.2f}")
+            self._pulse(mask, d, 0.6)
+            time.sleep(0.2)
+        print("[Test] All four ramp 0.15 → 0.60")
+        for k in range(15, 61, 5):
+            mag = k/100.0
+            self._apply_vec((1,1,1,1), mag)
+            print(f"  All fwd @ {mag:0.2f}")
+            time.sleep(0.5)
+        self._apply_vec((0,0,0,0), 0.0)
+        print("[Test] Done.\n")
+    
     def _set_pattern(self, vec, mag):
         self.vec, self.mag = vec, clamp(mag, 0.0, 1.0)
 
@@ -332,30 +356,39 @@ class Teleop:
         # quit
         if ch in (b"\x1b", b"\x03"):
             print("[Teleop] Quit"); return True
+
         # stop
         if ch in (b' ', b'0'):
             self._set_pattern((0,0,0,0), 0.0); print("[Cmd] STOP"); return False
+
         # print duties
         if ch in (b'm', b'M'):
             d = self._duties
             print(f"[duty] M1 {d[0]:+0.2f}  M2 {d[1]:+0.2f}  M3 {d[2]:+0.2f}  M4 {d[3]:+0.2f}")
             return False
 
-        # speed scaling
+        # self-test (solo + ramp)
+        if ch in (b't', b'T'):
+            print("[Test] Starting self-test...")
+            self._self_test()
+            return False
+
+        # speed scaling (Ctrl = slow, Shift = fast)
         slow = (isinstance(ch, bytes) and len(ch)==1 and 1 <= ch[0] <= 26)   # Ctrl
         fast = (isinstance(ch, bytes) and ch.isalpha() and ch.isupper())     # Shift
         self.scale = self.scale_low if slow else (self.scale_high if fast else 1.0)
 
-        base_mag = 1.0
-        mag = clamp(base_mag * self.scale, 0.0, 1.0)
+        # base magnitude from linear limit (kept at 1.0; scale handles user speed)
+        mag = clamp(1.0 * self.scale, 0.0, 1.0)
 
+        # axis flips helper
         def maybe_flip(vec, axis):
             if axis == 'x' and self.flip_vx: vec = tuple(-v for v in vec)
             if axis == 'y' and self.flip_vy: vec = tuple(-v for v in vec)
             if axis == 'o' and self.flip_wz: vec = tuple(-v for v in vec)
             return vec
 
-        # basics
+        # basics: W/S/A/D + Q/E + arrows
         if ch in (b'w', b'W', b'UP'):
             self._set_pattern(maybe_flip(self.V_F, 'x'), mag); print("[Move] Forward")
         elif ch in (b's', b'S', b'DOWN'):
@@ -369,7 +402,7 @@ class Teleop:
         elif ch in (b'e', b'E'):
             self._set_pattern(maybe_flip(self.V_TR, 'o'), mag); print("[Turn] CW")
 
-        # two-wheel combos
+        # two-wheel Freenove combos (explicit wheel patterns; do not flip)
         elif ch in (b'y', b'Y'):
             self._set_pattern(self.V_LF, mag); print("[Move] Left+Forward")
         elif ch in (b'h', b'H'):
