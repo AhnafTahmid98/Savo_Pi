@@ -40,11 +40,11 @@ Kinematics (inverse, mecanum)
 Where s_y ∈ {+1,-1} from --flip-vy, s_o ∈ {+1,-1} from --flip-omega.
 
 Usage example
-  sudo -E python3 tools/diag/motion/drive_manual_direct.py \
-      --fl-pwm 0 --fl-in1 1 --fl-in2 2 \
-      --fr-pwm 3 --fr-in1 4 --fr-in2 5 \
-      --rl-pwm 6 --rl-in1 7 --rl-in2 8 \
-      --rr-pwm 9 --rr-in1 10 --rr-in2 11 \
+  python3 tools/diag/motion/drive_manual_direct.py \
+      --fl-pwm 8  --fl-in1 9  --fl-in2 10 \
+      --fr-pwm 11 --fr-in1 12 --fr-in2 13 \
+      --rl-pwm 2  --rl-in1 3  --rl-in2 4  \
+      --rr-pwm 5  --rr-in1 6  --rr-in2 7  \
       --hz 60 --max-vx 0.6 --max-vy 0.6 --max-omega 1.8 \
       --wheel-radius 0.0325 --L 0.115 \
       --i2c-retries 20 --i2c-delay 0.006
@@ -356,7 +356,7 @@ class DirectTeleop:
 
         # speed scaling
         if isinstance(ch, bytes) and len(ch) == 1:
-            slow = 1 <= ch[0] <= 26
+            slow = 1 <= ch[0] <= 26   # Ctrl chars
             fast = ch.isalpha() and ch.isupper()
         else:
             slow = False; fast = False
@@ -395,7 +395,7 @@ class DirectTeleop:
         w_rr = ( vx - sy*vy + L*so*wz ) / r
         ws = [w_fl, w_fr, w_rl, w_rr]
         max_w = max(1e-6, max(abs(w) for w in ws))
-        # duty proportional to command magnitude
+        # duty proportional to command magnitude (preserve sign across wheels)
         mag = max(abs(vx)/max(self.lim.vx,1e-6),
                   abs(vy)/max(self.lim.vy,1e-6),
                   abs(wz)/max(self.lim.wz,1e-6))
