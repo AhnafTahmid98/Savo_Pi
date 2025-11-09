@@ -113,15 +113,32 @@ class HBridge:
         self.swap = bool(swap_in12)
         self.name = name
         self.verbose = bool(verbose)
+        # cache: last known levels per PCA channel and last duty set
+        self._ch_level = {}    # {channel: 0/1}
+        self._last_duty = None # float in [0..1]
         self.stop()
 
     def _digital(self, channel: int, level: int):
         lvl = (level ^ 1) if self.in_active_low else level
+        # only write if changed
+        if self._ch_level.get(channel) == lvl:
+            return
+        self._ch_level[channel] = lvl
         if lvl: self.pca.full_on(channel)
         else:   self.pca.full_off(channel)
         if self.verbose:
             state = "HIGH" if lvl else "LOW"
             print(f"[{self.name}] CH{channel}: {state} (in_active_low={self.in_active_low})")
+
+    def _set_pwm_duty(self, duty: float):
+        # only write if changed meaningfully (>1% or crossing zero)
+        eps = 0.01
+        prev = self._last_duty
+        if prev is None or abs(duty - prev) > eps or (duty == 0.0) != (prev == 0.0):
+            self.pca.set_duty(self.ch.pwm, duty)
+            self._last_duty = duty
+            if self.verbose:
+                print(f"[{self.name}] PWM CH{self.ch.pwm} duty={duty:0.2f}")
 
     def drive(self, signed: float):
         d = max(-1.0, min(1.0, float(signed)))
@@ -129,22 +146,22 @@ class HBridge:
         if self.invert: d = -d
         a, b = (self.ch.in1, self.ch.in2) if not self.swap else (self.ch.in2, self.ch.in1)
         if abs(d) < 1e-3:
-            self._digital(a, 0); self._digital(b, 0); self.pca.set_duty(self.ch.pwm, 0.0)
+            self._digital(a, 0); self._digital(b, 0); self._set_pwm_duty(0.0)
             if self.verbose:
-                print(f"[{self.name}] STOP  pwm=CH{self.ch.pwm} duty=0.00 (invert={self.invert} swap={self.swap})")
+                print(f"[{self.name}] STOP (invert={self.invert} swap={self.swap})")
             return
         if d > 0:
-            self._digital(a, 1); self._digital(b, 0); self.pca.set_duty(self.ch.pwm, d)
+            self._digital(a, 1); self._digital(b, 0); self._set_pwm_duty(d)
+            if self.verbose:
+                print(f"[{self.name}] FWD  inA=CH{a} inB=CH{b}  duty={d:0.2f}  (invert={self.invert} swap={self.swap}, raw={raw:+0.2f})")
         else:
-            self._digital(a, 0); self._digital(b, 1); self.pca.set_duty(self.ch.pwm, -d)
-        if self.verbose:
-            mode = "FWD" if d > 0 else "REV"
-            duty = abs(d)
-            print(f"[{self.name}] {mode} pwm=CH{self.ch.pwm} duty={duty:0.2f}  inA=CH{a} inB=CH{b}  (invert={self.invert} swap={self.swap}, raw={raw:+0.2f})")
+            self._digital(a, 0); self._digital(b, 1); self._set_pwm_duty(-d)
+            if self.verbose:
+                print(f"[{self.name}] REV  inA=CH{a} inB=CH{b}  duty={-d:0.2f} (invert={self.invert} swap={self.swap}, raw={raw:+0.2f})")
 
     def stop(self):
         a, b = (self.ch.in1, self.ch.in2) if not self.swap else (self.ch.in2, self.ch.in1)
-        self._digital(a, 0); self._digital(b, 0); self.pca.set_duty(self.ch.pwm, 0.0)
+        self._digital(a, 0); self._digital(b, 0); self._set_pwm_duty(0.0)
 
 # ----------- Keyboard ----------
 class Keyboard:
@@ -295,11 +312,18 @@ class Teleop:
 
     # ---- core helpers ----
     def _apply_vec(self, vec, mag):
-        d = [clamp(v*mag, -1.0, 1.0) for v in vec]
+        # compute desired duties
+        new_d = [clamp(v*mag, -1.0, 1.0) for v in vec]
+        # only act/print if something changed
+        eps = 1e-3
+        changed = any(abs(new_d[i] - self._duties[i]) > eps for i in range(4))
+        if not changed:
+            return
         if self.verbose:
-            print(f"[CMD] vec={vec} mag={mag:0.2f} -> duty FL={d[0]:+0.2f} FR={d[1]:+0.2f} RL={d[2]:+0.2f} RR={d[3]:+0.2f}")
-        self.FL.drive(d[0]); self.FR.drive(d[1]); self.RL.drive(d[2]); self.RR.drive(d[3])
-        self._duties = d
+            print(f"[CMD] vec={vec} mag={mag:0.2f} -> duty FL={new_d[0]:+0.2f} FR={new_d[1]:+0.2f} RL={new_d[2]:+0.2f} RR={new_d[3]:+0.2f}")
+        self.FL.drive(new_d[0]); self.FR.drive(new_d[1]); self.RL.drive(new_d[2]); self.RR.drive(new_d[3])
+        self._duties = new_d
+
 
     def _set_pattern(self, vec, mag):
         self.vec, self.mag = vec, clamp(mag, 0.0, 1.0)
@@ -376,6 +400,7 @@ class Teleop:
         for i, m in enumerate(ms): m.drive(duty if mask[i] else 0.0)
         time.sleep(t)
         for m in ms: m.stop()
+
 
     def loop(self):
         period = 1.0 / self.hz
