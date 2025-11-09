@@ -1,65 +1,43 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Robot Savo — Teleop (PAIR MODE, PCA9685 direct)
------------------------------------------------
-Use this when your board ties front+rear wheels together on each side
-(i.e., one PWM+IN1+IN2 triad drives both left wheels, another drives both right).
+Robot Savo — Minimal Mecanum Teleop (our own, DC motors only)
+-------------------------------------------------------------
+- Drives FOUR wheels simultaneously using raw PCA9685.
+- API mirrors Freenove's set_motor_model(FL, BL, FR, BR) so we can swap later.
+- W/S/A/D/Q/E + diagonals (U,J,Y,H). Space/0 = stop. ESC/Ctrl+C = quit.
+- Deadman + optional idle-exit. Verbose wiring echo.
 
-Controls
-  W / ↑ : both sides forward
-  S / ↓ : both sides reverse
-  Q     : turn left (CCW)   -> left reverse, right forward
-  E     : turn right (CW)   -> left forward, right reverse
-  SPACE/0: stop
-  M     : print current duties
-  1/2   : pulse LEFT forward/reverse
-  3/4   : pulse RIGHT forward/reverse
-  Esc / Ctrl+C : quit
+Wheel order (important):
+  set_motor_model(FL, BL, FR, BR)   # same argument order Freenove uses
 
-Quality-of-life
-  --duration N   : auto-quit after N seconds (0=never)
-  --idle-exit N  : auto-quit if no keys for N seconds (0=never)
-  --quiet        : suppress per-tick prints (still prints key events)
-  Deadman: stops motors after --deadman seconds with no key press
-
-Example (common Freenove-style wiring)
-  python3 tools/diag/motion/teleop_pairmode_pca.py \
-    --i2c-bus 1 --pca-addr 0x40 --pwm-freq 200 \
-    --left-pwm 0  --left-in1 1  --left-in2 2 \
-    --right-pwm 3 --right-in1 4 --right-in2 5 \
-    --reserve 12,13,14,15 --idle-exit 10
+Each wheel needs 3 PCA9685 channels: PWM, IN1, IN2.
 """
-
 import argparse, os, select, sys, termios, time, tty, signal
 from dataclasses import dataclass
 
-# ---------------- I2C ----------------
+# ---------- I2C ----------
 try:
     from smbus2 import SMBus
 except Exception:
     print("ERROR: smbus2 missing. Install: sudo apt install -y python3-smbus || pip3 install smbus2", file=sys.stderr)
     raise
 
-# ------------- PCA9685 mini driver -------------
+# ---------- PCA9685 (minimal) ----------
 MODE1, MODE2, PRESCALE, LED0_ON_L = 0x00, 0x01, 0xFE, 0x06
 RESTART, SLEEP, AI, OUTDRV, ALLCALL = 0x80, 0x10, 0x20, 0x04, 0x01
 
 class PCA9685:
-    def __init__(self, bus=1, addr=0x40, freq_hz=200.0, set_freq=False):
-        self.addr = int(addr)
-        self.bus = SMBus(int(bus))
-        self._w8(MODE2, OUTDRV)
-        self._w8(MODE1, AI)
-        time.sleep(0.003)
-        if set_freq:
-            self.set_pwm_freq(freq_hz)
+    def __init__(self, bus=1, addr=0x40, freq_hz=200.0, set_freq=True, verbose=False):
+        self.addr = int(addr); self.bus = SMBus(int(bus)); self.verbose=verbose
+        self._w8(MODE2, OUTDRV); self._w8(MODE1, AI); time.sleep(0.003)
+        if set_freq: self.set_pwm_freq(freq_hz)
         m1 = self._r8(MODE1)
         self._w8(MODE1, (m1 | RESTART | AI) & ~ALLCALL)
 
     def close(self):
         try: self.bus.close()
-        except Exception: pass
+        except: pass
 
     def _w8(self, reg, val): self.bus.write_byte_data(self.addr, reg & 0xFF, val & 0xFF)
     def _r8(self, reg):      return self.bus.read_byte_data(self.addr, reg & 0xFF)
@@ -70,16 +48,14 @@ class PCA9685:
         old = self._r8(MODE1)
         self._w8(MODE1, (old & ~RESTART) | SLEEP)
         self._w8(PRESCALE, prescale)
-        self._w8(MODE1, old & ~SLEEP)
-        time.sleep(0.003)
+        self._w8(MODE1, old & ~SLEEP); time.sleep(0.003)
         self._w8(MODE1, (old | RESTART | AI) & ~ALLCALL)
+        if self.verbose: print(f"[PCA] freq={f:.1f} Hz (prescale={prescale})")
 
     def _raw(self, ch: int, on: int, off: int):
         base = LED0_ON_L + 4*int(ch)
-        self._w8(base+0, on & 0xFF)
-        self._w8(base+1, (on >> 8) & 0x0F)
-        self._w8(base+2, off & 0xFF)
-        self._w8(base+3, (off >> 8) & 0x0F)
+        self._w8(base+0, on & 0xFF);    self._w8(base+1, (on >> 8) & 0x0F)
+        self._w8(base+2, off & 0xFF);   self._w8(base+3, (off >> 8) & 0x0F)
 
     def full_off(self, ch: int):
         base = LED0_ON_L + 4*int(ch)
@@ -94,53 +70,79 @@ class PCA9685:
     def set_duty(self, ch: int, duty: float):
         duty = max(0.0, min(1.0, float(duty)))
         off = int(round(duty * 4095))
-        if off <= 0:      self.full_off(ch)
-        elif off >= 4095: self.full_on(ch)
-        else:             self._raw(ch, 0, off)
+        if off <= 0:         self.full_off(ch)
+        elif off >= 4095:    self.full_on(ch)
+        else:                self._raw(ch, 0, off)
 
-# ------------- H-bridge pair (one side) -------------
+# ---------- H-bridge ----------
 @dataclass
 class Triplet:
-    pwm: int
-    in1: int
-    in2: int
+    pwm: int; in1: int; in2: int
+    invert: bool=False
+    in_active_low: bool=False
+    swap_in12: bool=False
 
-class SideDrive:
-    def __init__(self, pca: PCA9685, ch: Triplet, invert=False, in_active_low=False, swap_in12=False, name="SIDE"):
-        self.pca, self.ch = pca, ch
-        self.invert = bool(invert)
-        self.in_active_low = bool(in_active_low)
-        self.swap = bool(swap_in12)
-        self.name = name
+class Wheel:
+    def __init__(self, pca: PCA9685, t: Triplet, name: str, verbose=False):
+        self.p = pca; self.t = t; self.name=name; self.verbose=verbose
         self.stop()
 
-    def _digital(self, ch: int, level: int):
-        lvl = (level ^ 1) if self.in_active_low else level
-        if lvl: self.pca.full_on(ch)
-        else:   self.pca.full_off(ch)
+    def _digital(self, ch: int, lvl: int):
+        if self.t.in_active_low: lvl ^= 1
+        if lvl: self.p.full_on(ch)
+        else:   self.p.full_off(ch)
+        if self.verbose:
+            s = "HIGH" if lvl else "LOW"
+            print(f"[{self.name}] CH{ch}: {s} (in_active_low={self.t.in_active_low})")
 
-    def drive(self, signed: float, verbose=False):
+    def drive(self, signed: float, duty_max: float):
         d = max(-1.0, min(1.0, float(signed)))
-        if self.invert: d = -d
-        a, b = (self.ch.in1, self.ch.in2) if not self.swap else (self.ch.in2, self.ch.in1)
-
-        if abs(d) < 1e-3:
-            self._digital(a, 0); self._digital(b, 0); self.pca.set_duty(self.ch.pwm, 0.0)
-            if verbose: print(f"[{self.name}] STOP (pwm=CH{self.ch.pwm})")
+        if self.t.invert: d = -d
+        a,b = (self.t.in1, self.t.in2) if not self.t.swap_in12 else (self.t.in2, self.t.in1)
+        if abs(d) < 1e-6:
+            self._digital(a,0); self._digital(b,0); self.p.set_duty(self.t.pwm, 0.0)
+            if self.verbose: print(f"[{self.name}] STOP pwm=CH{self.t.pwm} duty=0.00")
             return
-
         if d > 0:
-            self._digital(a, 1); self._digital(b, 0); self.pca.set_duty(self.ch.pwm, d)
-            if verbose: print(f"[{self.name}] FWD  inA=CH{a} inB=CH{b} duty={d:.2f}")
+            self._digital(a,1); self._digital(b,0); self.p.set_duty(self.t.pwm, abs(d)*duty_max)
+            if self.verbose: print(f"[{self.name}] FWD  duty={abs(d)*duty_max:.2f}")
         else:
-            self._digital(a, 0); self._digital(b, 1); self.pca.set_duty(self.ch.pwm, -d)
-            if verbose: print(f"[{self.name}] REV  inA=CH{a} inB=CH{b} duty={-d:.2f}")
+            self._digital(a,0); self._digital(b,1); self.p.set_duty(self.t.pwm, abs(d)*duty_max)
+            if self.verbose: print(f"[{self.name}] REV  duty={abs(d)*duty_max:.2f}")
 
     def stop(self):
-        a, b = (self.ch.in1, self.ch.in2) if not self.swap else (self.ch.in2, self.ch.in1)
-        self._digital(a, 0); self._digital(b, 0); self.pca.set_duty(self.ch.pwm, 0.0)
+        a,b = (self.t.in1, self.t.in2) if not self.t.swap_in12 else (self.t.in2, self.t.in1)
+        self._digital(a,0); self._digital(b,0); self.p.set_duty(self.t.pwm, 0.0)
 
-# ---------------- Keyboard raw ----------------
+# ---------- Our motor adapter (drop-in for Freenove style) ----------
+class Motor4:
+    """
+    set_motor_model(FL, BL, FR, BR)  # signed ints or floats in [-max, +max]
+    """
+    def __init__(self, pca: PCA9685, FL: Triplet, BL: Triplet, FR: Triplet, BR: Triplet, max_duty=1.0, verbose=False):
+        self.FL = Wheel(pca, FL, "FL", verbose)
+        self.BL = Wheel(pca, BL, "BL", verbose)
+        self.FR = Wheel(pca, FR, "FR", verbose)
+        self.BR = Wheel(pca, BR, "BR", verbose)
+        self.max = float(max(0.05, min(1.0, max_duty)))
+
+    def set_motor_model(self, FL, BL, FR, BR):
+        # accept int in 0..4095 or normalized -1..+1
+        def to_norm(v):
+            v = float(v)
+            if abs(v) > 1.01:  # assume raw 0..4095
+                return max(-1.0, min(1.0, v/4095.0))
+            return max(-1.0, min(1.0, v))
+        fL, bL, fR, bR = map(to_norm, (FL, BL, FR, BR))
+        self.FL.drive(fL, self.max)
+        self.BL.drive(bL, self.max)
+        self.FR.drive(fR, self.max)
+        self.BR.drive(bR, self.max)
+
+    def stop(self):
+        for w in (self.FL, self.BL, self.FR, self.BR): w.stop()
+
+# ---------- Keyboard ----------
 class Keyboard:
     def __init__(self):
         self.fd = sys.stdin.fileno()
@@ -152,234 +154,194 @@ class Keyboard:
         return os.read(self.fd, 1) if r else None
 
     def read(self):
-        out = []
-        ch = self._read1(0.0)
+        out=[]
+        ch=self._read1(0.0)
         while ch is not None:
-            if ch == b'\x1b':  # escape sequences
+            if ch == b'\x1b':
                 a = self._read1(0.02)
                 if a in (b'[', b'O'):
                     b = self._read1(0.04)
                     arrows = {b'A': b'UP', b'B': b'DOWN', b'C': b'RIGHT', b'D': b'LEFT'}
                     if b in arrows: out.append(arrows[b])
-                    else: out.extend(filter(None, [b'\x1b', a, b]))
                 else:
                     out.append(b'\x1b')
                     if a: out.append(a)
             else:
                 out.append(ch)
-            ch = self._read1(0.0)
+            ch=self._read1(0.0)
         return out
 
     def restore(self):
         termios.tcsetattr(self.fd, termios.TCSADRAIN, self.old)
 
-# ---------------- Teleop pair-mode ----------------
+# ---------- Teleop ----------
 def clamp(x, lo, hi): return max(lo, min(hi, x))
 
-class TeleopPair:
-    def __init__(self, a):
-        self.hz = float(a.hz)
-        self.deadman = float(a.deadman)
-        self.scale_low = float(a.scale_low)
-        self.scale_high = float(a.scale_high)
-        self.mag = float(a.mag)
-        self.ramp = float(a.ramp)
+@dataclass
+class Patterns:
+    # vectors for mecanum (signs for each wheel in set_motor_model order: FL, BL, FR, BR)
+    F  = (+1, +1, +1, +1)
+    B  = (-1, -1, -1, -1)
+    TL = (-1, -1, +1, +1)  # CCW
+    TR = (+1, +1, -1, -1)  # CW
+    SL = (-1, -1, +1, +1)  # strafe left (same as CCW if you wire differently; flip keys if needed)
+    SR = (+1, +1, -1, -1)  # strafe right
+    # diagonals (two-wheel combos)
+    LF = ( 0, +1, +1,  0)
+    RB = ( 0, -1, -1,  0)
+    RF = (+1,  0,  0, +1)
+    LB = (-1,  0,  0, -1)
+    STOP = (0,0,0,0)
 
-        self.duration   = float(a.duration)
-        self.idle_exit  = float(a.idle_exit)
-        self.verbose    = bool(a.verbose)
-        self.quiet      = bool(a.quiet or (not self.verbose))
+class Teleop:
+    def __init__(self, args):
+        self.args = args
+        self.pca = PCA9685(args.i2c_bus, args.pca_addr, args.pwm_freq, set_freq=args.set_freq, verbose=args.verbose)
+        # reserve channels
+        if args.reserve:
+            chans=[int(x) for x in args.reserve.split(',') if x.strip()!='']
+            for ch in chans: self.pca.full_off(ch)
+            if args.verbose: print(f"[Reserve] FULL-OFF: {chans}")
 
-        self.pca = PCA9685(bus=a.i2c_bus, addr=a.pca_addr, freq_hz=a.pwm_freq, set_freq=a.set_freq)
+        def T(pwm, in1, in2, invert, swap, ial):
+            return Triplet(pwm=pwm, in1=in1, in2=in2, invert=invert, swap_in12=swap, in_active_low=ial)
+        ial = args.in_active_low
 
-        # Reserve channels (e.g., servo outputs)
-        if a.reserve:
-            try:
-                rs = [int(x) for x in str(a.reserve).split(',') if x.strip()!='']
-                for ch in rs: self.pca.full_off(ch)
-                if rs: print(f"[Reserve] FULL-OFF: {rs}")
-            except Exception:
-                pass
+        self.motor = Motor4(
+            self.pca,
+            FL=T(args.fl_pwm,args.fl_in1,args.fl_in2,args.inv_fl,args.swap_in12_fl,ial),
+            BL=T(args.bl_pwm,args.bl_in1,args.bl_in2,args.inv_bl,args.swap_in12_bl,ial),
+            FR=T(args.fr_pwm,args.fr_in1,args.fr_in2,args.inv_fr,args.swap_in12_fr,ial),
+            BR=T(args.br_pwm,args.br_in1,args.br_in2,args.inv_br,args.swap_in12_br,ial),
+            max_duty=clamp(args.max, 0.05, 1.0),
+            verbose=args.verbose
+        )
 
-        self.left  = SideDrive(self.pca, Triplet(a.left_pwm,  a.left_in1,  a.left_in2),
-                               invert=a.inv_left, in_active_low=a.in_active_low, swap_in12=a.swap_in12_left, name="LEFT")
-        self.right = SideDrive(self.pca, Triplet(a.right_pwm, a.right_in1, a.right_in2),
-                               invert=a.inv_right, in_active_low=a.in_active_low, swap_in12=a.swap_in12_right, name="RIGHT")
-
-        if self.verbose:
-            print("\n[WIRING] side   PWM  IN1  IN2   invert swap in_active_low")
-            print(f"[WIRING] LEFT   {a.left_pwm:<4} {a.left_in1:<4} {a.left_in2:<4} {bool(a.inv_left):<6} {bool(a.swap_in12_left):<4} {bool(a.in_active_low)}")
-            print(f"[WIRING] RIGHT  {a.right_pwm:<4} {a.right_in1:<4} {a.right_in2:<4} {bool(a.inv_right):<6} {bool(a.swap_in12_right):<4} {bool(a.in_active_low)}\n")
+        # echo wiring
+        print("\n[WIRING]  Wheel   PWM  IN1  IN2   invert swap in_active_low")
+        print(f"[WIRING]  FL     {args.fl_pwm:2}  {args.fl_in1:2}  {args.fl_in2:2}   {bool(args.inv_fl)!s:5}  {bool(args.swap_in12_fl)!s:5} {bool(ial)!s:5}")
+        print(f"[WIRING]  BL     {args.bl_pwm:2}  {args.bl_in1:2}  {args.bl_in2:2}   {bool(args.inv_bl)!s:5}  {bool(args.swap_in12_bl)!s:5} {bool(ial)!s:5}")
+        print(f"[WIRING]  FR     {args.fr_pwm:2}  {args.fr_in1:2}  {args.fr_in2:2}   {bool(args.inv_fr)!s:5}  {bool(args.swap_in12_fr)!s:5} {bool(ial)!s:5}")
+        print(f"[WIRING]  BR     {args.br_pwm:2}  {args.br_in1:2}  {args.br_in2:2}   {bool(args.inv_br)!s:5}  {bool(args.swap_in12_br)!s:5} {bool(ial)!s:5}\n")
 
         self.kb = Keyboard()
-        self._targetL = 0.0
-        self._targetR = 0.0
-        self._curL = 0.0
-        self._curR = 0.0
+        self.deadman = float(args.deadman)
+        self.idle_exit = float(args.idle_exit) if args.idle_exit>0 else None
+        self.scale_low, self.scale_high = float(args.scale_low), float(args.scale_high)
+        self.scale = 1.0
+        self.mag = clamp(args.mag, 0.05, 1.0)
         self.last_in = time.monotonic()
-        self.start_time = self.last_in
+        self.pattern = Patterns.STOP
 
-        signal.signal(signal.SIGINT,  self._sig_exit)
+        signal.signal(signal.SIGINT, self._sig_exit)
         signal.signal(signal.SIGTERM, self._sig_exit)
 
-        print("[Teleop] READY — Pair mode (W/S forward/back, Q/E yaw, Space stop, 1..4 pulses, Esc quits)")
+        print("[Teleop] READY: W/S/A/D  Q/E  U/J/Y/H  (Space=stop, M=print duties, ESC/Ctrl+C=quit)")
 
     def _sig_exit(self, *_):
-        print("\n[Teleop] Signal → safe stop & exit")
+        print("\n[Teleop] Signal → safe stop")
         self.close(); os._exit(0)
 
-    def close(self):
-        try: self.kb.restore()
-        except Exception: pass
-        try: self.left.stop()
-        except Exception: pass
-        try: self.right.stop()
-        except Exception: pass
-        try: self.pca.close()
-        except Exception: pass
-
-    def _set_targets(self, L: float, R: float, note=""):
-        self._targetL = clamp(L, -1.0, 1.0)
-        self._targetR = clamp(R, -1.0, 1.0)
-        if not self.quiet and note:
-            print(f"[CMD] {note} -> L={self._targetL:+.2f} R={self._targetR:+.2f}")
-
-    def _pulse(self, which: str, duty: float, sec=0.30):
-        if which == "L":
-            self.left.drive(duty, verbose=self.verbose)
-            time.sleep(sec)
-            self.left.stop()
-        elif which == "R":
-            self.right.drive(duty, verbose=self.verbose)
-            time.sleep(sec)
-            self.right.stop()
+    def _apply(self):
+        v = self.pattern
+        m = self.scale * self.mag
+        # call using Freenove order (FL, BL, FR, BR)
+        self.motor.set_motor_model(v[0]*m, v[1]*m, v[2]*m, v[3]*m)
 
     def _handle_key(self, ch):
-        # quit
-        if ch in (b"\x1b", b"\x03"):
+        if ch in (b'\x1b', b'\x03'):   # ESC or Ctrl+C
             print("[Teleop] Quit"); return True
-
-        # stop
         if ch in (b' ', b'0'):
-            self._set_targets(0.0, 0.0, "STOP"); return False
-
-        # print duties
+            self.pattern = Patterns.STOP; print("[Cmd] STOP"); return False
         if ch in (b'm', b'M'):
-            print(f"[duty] L {self._curL:+.2f}  R {self._curR:+.2f}")
+            print(f"[mag] base={self.mag:.2f} scale={self.scale:.2f} -> eff={self.mag*self.scale:.2f}")
             return False
 
-        # speed scaling via shift/ctrl
         slow = (isinstance(ch, bytes) and len(ch)==1 and 1 <= ch[0] <= 26)   # Ctrl
         fast = (isinstance(ch, bytes) and ch.isalpha() and ch.isupper())     # Shift
-        scale = self.scale_low if slow else (self.scale_high if fast else 1.0)
-        mag = clamp(self.mag * scale, 0.0, 1.0)
+        self.scale = self.scale_low if slow else (self.scale_high if fast else 1.0)
 
-        # pulses for probing
-        if ch == b'1': self._pulse("L", +0.20); return False
-        if ch == b'2': self._pulse("L", -0.20); return False
-        if ch == b'3': self._pulse("R", +0.20); return False
-        if ch == b'4': self._pulse("R", -0.20); return False
-
-        # arrows / WASD + Q/E
-        if ch in (b'w', b'W', b'UP'):
-            self._set_targets(+mag, +mag, "FWD")
-        elif ch in (b's', b'S', b'DOWN'):
-            self._set_targets(-mag, -mag, "REV")
-        elif ch in (b'q', b'Q'):
-            self._set_targets(-mag, +mag, "YAW CCW")
-        elif ch in (b'e', b'E'):
-            self._set_targets(+mag, -mag, "YAW CW")
-        elif ch in (b'a', b'A', b'LEFT'):
-            # optional: treat A as gentle CCW
-            self._set_targets(-0.5*mag, +0.5*mag, "YAW CCW (A)")
-        elif ch in (b'd', b'D', b'RIGHT'):
-            # optional: treat D as gentle CW
-            self._set_targets(+0.5*mag, -0.5*mag, "YAW CW (D)")
-
+        if ch in (b'w', b'W', b'UP'):     self.pattern = Patterns.F;  print("[Move] Forward")
+        elif ch in (b's', b'S', b'DOWN'): self.pattern = Patterns.B;  print("[Move] Backward")
+        elif ch in (b'a', b'A', b'LEFT'): self.pattern = Patterns.SL; print("[Move] Left (strafe)")
+        elif ch in (b'd', b'D', b'RIGHT'):self.pattern = Patterns.SR; print("[Move] Right (strafe)")
+        elif ch in (b'q', b'Q'):          self.pattern = Patterns.TL; print("[Turn] CCW")
+        elif ch in (b'e', b'E'):          self.pattern = Patterns.TR; print("[Turn] CW")
+        elif ch in (b'u', b'U'):          self.pattern = Patterns.RF; print("[Diag] Right+Forward (2-wheel)")
+        elif ch in (b'j', b'J'):          self.pattern = Patterns.LB; print("[Diag] Left+Backward (2-wheel)")
+        elif ch in (b'y', b'Y'):          self.pattern = Patterns.LF; print("[Diag] Left+Forward (2-wheel)")
+        elif ch in (b'h', b'H'):          self.pattern = Patterns.RB; print("[Diag] Right+Backward (2-wheel)")
         return False
 
-    def loop(self):
-        period = 1.0 / self.hz
+    def loop(self, hz=30.0, duration=None):
+        period = 1.0/max(1.0, float(hz))
+        t0 = time.monotonic()
         try:
             while True:
-                t0 = time.monotonic()
-
-                # time-based exits
-                if self.duration > 0 and (t0 - self.start_time) >= self.duration:
-                    print("[Teleop] Duration reached → exit"); return
-                if self.idle_exit > 0 and (t0 - self.last_in) >= self.idle_exit:
-                    print("[Teleop] Idle timeout → exit"); return
-
-                # read all pending keys
+                now = time.monotonic()
                 got = False
                 for ch in self.kb.read():
                     got = True
                     if self._handle_key(ch): return
-                    self.last_in = t0
+                    self.last_in = now
 
-                # deadman: stop motors if no key for a while (but keep running)
-                if not got and (t0 - self.last_in) > self.deadman:
-                    self._targetL = 0.0
-                    self._targetR = 0.0
+                if not got:
+                    if (now - self.last_in) > self.deadman and self.pattern != Patterns.STOP:
+                        print("[Deadman] stop"); self.pattern = Patterns.STOP
+                    if self.idle_exit and (now - self.last_in) > self.idle_exit:
+                        print("[Idle] exit"); return
 
-                # ramp towards targets for smoothness
-                alpha = clamp(self.ramp, 0.0, 1.0)
-                self._curL = (1.0 - alpha)*self._curL + alpha*self._targetL
-                self._curR = (1.0 - alpha)*self._curR + alpha*self._targetR
+                self._apply()
 
-                self.left.drive(self._curL,  verbose=(self.verbose and not self.quiet))
-                self.right.drive(self._curR, verbose=(self.verbose and not self.quiet))
-
-                time.sleep(max(0.0, period - (time.monotonic() - t0)))
+                if duration and (now - t0) > duration: return
+                time.sleep(max(0.0, period - (time.monotonic() - now)))
         finally:
             self.close()
 
-# ---------------- CLI ----------------
+    def close(self):
+        try: self.motor.stop()
+        except: pass
+        try: self.kb.restore()
+        except: pass
+        try: self.pca.close()
+        except: pass
+
+# ---------- CLI ----------
 def build_ap():
-    p = argparse.ArgumentParser(description="Robot Savo — Teleop Pair-Mode (PCA9685)")
+    p = argparse.ArgumentParser(description="Robot Savo — Mecanum Teleop (our own, DC only)")
     p.add_argument('--i2c-bus', type=int, default=1)
     p.add_argument('--pca-addr', type=lambda x:int(x,0), default=0x40)
     p.add_argument('--pwm-freq', type=float, default=200.0)
-    p.add_argument('--set-freq', action='store_true', help="Apply prescale (default: don't change)")
+    p.add_argument('--set-freq', action='store_true', help="Write prescale (default: yes)", default=True)
     p.add_argument('--reserve', type=str, default='12,13,14,15')
-
-    # pair channels
-    p.add_argument('--left-pwm',  type=int, required=True)
-    p.add_argument('--left-in1',  type=int, required=True)
-    p.add_argument('--left-in2',  type=int, required=True)
-    p.add_argument('--right-pwm', type=int, required=True)
-    p.add_argument('--right-in1', type=int, required=True)
-    p.add_argument('--right-in2', type=int, required=True)
-
-    # polarity/logic helpers
-    p.add_argument('--inv-left',  action='store_true')
-    p.add_argument('--inv-right', action='store_true')
-    p.add_argument('--in-active-low', action='store_true', help='IN pins are active-low')
-    p.add_argument('--swap-in12-left',  action='store_true', help='Swap IN1/IN2 on LEFT side')
-    p.add_argument('--swap-in12-right', action='store_true', help='Swap IN1/IN2 on RIGHT side')
-
-    # motion & loop
+    p.add_argument('--mag', type=float, default=0.6, help="base magnitude (0..1)")
+    p.add_argument('--max', type=float, default=1.0, help="max duty (0..1)")
     p.add_argument('--hz', type=float, default=30.0)
-    p.add_argument('--deadman', type=float, default=0.25)
-    p.add_argument('--mag', type=float, default=0.55, help='Base magnitude for commands (0..1)')
-    p.add_argument('--ramp', type=float, default=0.7, help='Smoothing (0..1) per tick')
-    p.add_argument('--scale-low', type=float, default=0.25, help='Ctrl scaling')
-    p.add_argument('--scale-high', type=float, default=1.5, help='Shift scaling')
-
-    # exits / verbosity
-    p.add_argument('--duration', type=float, default=0.0, help='Quit after N seconds (0=never)')
-    p.add_argument('--idle-exit', type=float, default=0.0, help='Quit after N seconds without keys (0=never)')
-    p.add_argument('--quiet', action='store_true', help='Reduce prints even when --verbose')
+    p.add_argument('--deadman', type=float, default=0.5)
+    p.add_argument('--idle-exit', type=float, default=0.0, help="exit after idle seconds (0=never)")
+    p.add_argument('--scale-low', type=float, default=0.35)
+    p.add_argument('--scale-high', type=float, default=1.5)
+    p.add_argument('--in-active-low', action='store_true')
     p.add_argument('--verbose', action='store_true')
+
+    # channel mapping (PCA ch)
+    p.add_argument('--fl-pwm', type=int, required=True); p.add_argument('--fl-in1', type=int, required=True); p.add_argument('--fl-in2', type=int, required=True)
+    p.add_argument('--bl-pwm', type=int, required=True); p.add_argument('--bl-in1', type=int, required=True); p.add_argument('--bl-in2', type=int, required=True)
+    p.add_argument('--fr-pwm', type=int, required=True); p.add_argument('--fr-in1', type=int, required=True); p.add_argument('--fr-in2', type=int, required=True)
+    p.add_argument('--br-pwm', type=int, required=True); p.add_argument('--br-in1', type=int, required=True); p.add_argument('--br-in2', type=int, required=True)
+
+    # polarity helpers
+    p.add_argument('--inv-fl', action='store_true'); p.add_argument('--inv-bl', action='store_true')
+    p.add_argument('--inv-fr', action='store_true'); p.add_argument('--inv-br', action='store_true')
+    p.add_argument('--swap-in12-fl', action='store_true'); p.add_argument('--swap-in12-bl', action='store_true')
+    p.add_argument('--swap-in12-fr', action='store_true'); p.add_argument('--swap-in12-br', action='store_true')
     return p
 
 def main(argv=None):
     args = build_ap().parse_args(argv)
-    t = TeleopPair(args)
+    t = Teleop(args)
     try:
-        t.loop()
-    except KeyboardInterrupt:
-        pass
+        t.loop(hz=args.hz)
     finally:
         t.close()
 
