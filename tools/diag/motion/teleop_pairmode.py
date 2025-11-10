@@ -11,6 +11,7 @@ Adds:
 - --debug-pins to print exact pins/levels/duty on transitions.
 - Robust exits: ESC/Ctrl+C/x/X, --max-runtime, --idle-exit, --headless,
   and auto-headless if no TTY (SSH without -t / VSCode tasks).
+- Headless drive pattern: --headless-pattern {F,B,SL,SR,TL,TR,STOP} with --headless-mag.
 
 Safety:
 - Motor channels must be 0..7. Servo 8..15 default OFF (reserved).
@@ -189,6 +190,17 @@ class Keyboard:
 # ---------------------- helpers ----------------------
 def clamp(x, lo, hi): return max(lo, min(hi, x))
 
+# pattern mapping
+PATTERNS = {
+    'F':  (+1,+1,+1,+1),
+    'B':  (-1,-1,-1,-1),
+    'SL': (-1,+1,+1,-1),
+    'SR': (+1,-1,-1,+1),
+    'TL': (-1,-1,+1,+1),
+    'TR': (+1,+1,-1,-1),
+    'STOP': (0,0,0,0),
+}
+
 # ---------------------- teleop core ----------------------
 class DirectTeleop:
     def __init__(self, args):
@@ -247,6 +259,11 @@ class DirectTeleop:
             self.idle_exit = 5.0
             print("[Teleop] Headless with no timers → idle-exit set to 5.0s")
 
+        # Prepare headless pattern
+        self._hp_signs = PATTERNS.get(args.headless_pattern, PATTERNS['STOP'])
+        self._hp_mag = float(args.headless_mag)
+        self._headless_applied = False
+
         # Signals
         def _sig(_s,_f): self._running=False
         signal.signal(signal.SIGINT, _sig)
@@ -258,7 +275,8 @@ class DirectTeleop:
             f" PCA=0x{args.pca_addr:02X} bus={args.i2c_bus} pwm={args.pwm_freq}Hz  paired_mode={args.paired_mode}\n"
             f" RevModes: FL={args.fl_rev_mode or args.rev_mode} FR={args.fr_rev_mode or args.rev_mode} "
             f"RL={args.rl_rev_mode or args.rev_mode} RR={args.rr_rev_mode or args.rev_mode}\n"
-            f" DebugPins={args.debug_pins}  Settle={args.settle_ms:.1f} ms  Headless={self._headless}\n"
+            f" DebugPins={args.debug_pins}  Settle={args.settle_ms:.1f} ms  Headless={self._headless} "
+            f"HeadlessPattern={args.headless_pattern} mag={self._hp_mag:.2f}\n"
         )
 
     # ---------------- soft safety check ----------------
@@ -304,7 +322,6 @@ class DirectTeleop:
                 if self.max_runtime > 0 and (now - self.start_time) >= self.max_runtime:
                     print("[Time] Max runtime reached → exiting"); break
 
-                # Read keys (if interactive)
                 got = False
                 if self._kb:
                     for ch in self._kb.read():
@@ -314,8 +331,14 @@ class DirectTeleop:
                         self.last_input = now
                 if not self._running: break
 
-                # Deadman
-                if not got and (now - self.last_input) > self.deadman:
+                # Headless pattern: apply once and keep it running
+                if self._headless and not self._headless_applied:
+                    self.apply_pattern(self._hp_signs, self._hp_mag, "[Headless] Apply pattern")
+                    self._headless_applied = True
+                    self.last_input = now  # keep timers happy
+
+                # Deadman: skip in headless (no keyboard to refresh)
+                if (not self._headless) and (not got) and (now - self.last_input) > self.deadman:
                     if any(abs(x) > 1e-6 for x in self.duties):
                         print("[Deadman] STOP")
                     self.apply_pattern((0,0,0,0), 0.0)
@@ -345,14 +368,7 @@ class DirectTeleop:
         fast = (isinstance(ch,bytes) and ch.isalpha() and ch.isupper())
         self.scale = clamp(self.scale_low if slow else (self.scale_high if fast else 1.0), 0.05, 3.0)
 
-        # patterns
-        F  = (+1,+1,+1,+1)
-        B  = (-1,-1,-1,-1)
-        SL = (-1,+1,+1,-1)
-        SR = (+1,-1,-1,+1)
-        TL = (-1,-1,+1,+1)
-        TR = (+1,+1,-1,-1)
-
+        F, B, SL, SR, TL, TR = PATTERNS['F'], PATTERNS['B'], PATTERNS['SL'], PATTERNS['SR'], PATTERNS['TL'], PATTERNS['TR']
         if ch in (b'w', b'W', b'UP'):      self.apply_pattern(F,  announce='[Cmd] F (forward)')
         elif ch in (b's', b'S', b'DOWN'):   self.apply_pattern(B,  announce='[Cmd] B (back)')
         elif ch in (b'a', b'A', b'LEFT'):   self.apply_pattern(SL, announce='[Cmd] SL (strafe L)')
@@ -443,6 +459,8 @@ def build_argparser():
 
     # Headless / exits
     p.add_argument('--headless', action='store_true', help='Run without keyboard; use with --max-runtime or --idle-exit')
+    p.add_argument('--headless-pattern', choices=['F','B','SL','SR','TL','TR','STOP'], default='STOP')
+    p.add_argument('--headless-mag', type=float, default=0.20)
 
     # Direction inversion flags
     p.add_argument('--invert-fl', action='store_true')
