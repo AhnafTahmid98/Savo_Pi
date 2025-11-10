@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Robot Savo — Mecanum Teleop/Tests (DIAGNOSTIC VERSION)
-- Modes:
-  diagnostic : runs comprehensive forward/backward tests with prompts
-  teleop     : W/S/A/D/Q/E, ESC quits (default)
-  demo       : plays FWD, BWD, STRAFE L/R, TURN CCW/CW then exits
-  pulse      : pulses each wheel FWD/REV to verify mapping then exits
+Robot Savo — Mecanum Teleop/Tests (FIXED VERSION with Speed Control)
+- Default: ALL wheels inverted (fixes reverse issue)
+- Better speed control with lower defaults
+- Diagnostic mode to help troubleshoot
 """
 import argparse, os, select, sys, termios, time, tty, signal
 from dataclasses import dataclass
@@ -158,27 +156,30 @@ class App:
             if a.verbose: print(f"[Reserve] FULL-OFF: {r}")
         ial=a.in_active_low
         def T(pwm,in1,in2,inv,sw): return Triplet(pwm,in1,in2,inv,ial,sw)
+        
+        # AUTO-INVERT ALL WHEELS by default (fixes reverse issue)
+        auto_invert = not a.no_auto_invert  # Default: auto-invert enabled
+        
         self.mot = Motor4(
             self.pca,
-            FL=T(a.fl_pwm,a.fl_in1,a.fl_in2,a.inv_fl,a.swap_in12_fl),
-            BL=T(a.bl_pwm,a.bl_in1,a.bl_in2,a.inv_bl,a.swap_in12_bl),
-            FR=T(a.fr_pwm,a.fr_in1,a.fr_in2,a.inv_fr,a.swap_in12_fr),
-            BR=T(a.br_pwm,a.br_in1,a.br_in2,a.inv_br,a.swap_in12_br),
+            FL=T(a.fl_pwm,a.fl_in1,a.fl_in2, a.inv_fl or auto_invert, a.swap_in12_fl),
+            BL=T(a.bl_pwm,a.bl_in1,a.bl_in2, a.inv_bl or auto_invert, a.swap_in12_bl),
+            FR=T(a.fr_pwm,a.fr_in1,a.fr_in2, a.inv_fr or auto_invert, a.swap_in12_fr),
+            BR=T(a.br_pwm,a.br_in1,a.br_in2, a.inv_br or auto_invert, a.swap_in12_br),
             max_duty=max(0.05, min(1.0, a.max)),
             verbose=a.verbose
         )
-        print("\n=== ROBOT SAVO DIAGNOSTIC ===")
+        
+        print("\n" + "="*60)
+        print("ROBOT SAVO - FIXED VERSION (Auto-Invert Enabled)")
+        print("="*60)
         print("[WIRING] Wheel  PWM IN1 IN2  invert swap in_active_low")
-        print(f"[WIRING] FL     {a.fl_pwm:2}  {a.fl_in1:2} {a.fl_in2:2}  {bool(a.inv_fl)!s:5} {bool(a.swap_in12_fl)!s:4} {bool(ial)!s}")
-        print(f"[WIRING] BL     {a.bl_pwm:2}  {a.bl_in1:2} {a.bl_in2:2}  {bool(a.inv_bl)!s:5} {bool(a.swap_in12_bl)!s:4} {bool(ial)!s}")
-        print(f"[WIRING] FR     {a.fr_pwm:2}  {a.fr_in1:2} {a.fr_in2:2}  {bool(a.inv_fr)!s:5} {bool(a.swap_in12_fr)!s:4} {bool(ial)!s}")
-        print(f"[WIRING] BR     {a.br_pwm:2}  {a.br_in1:2} {a.br_in2:2}  {bool(a.inv_br)!s:5} {bool(a.swap_in12_br)!s:4} {bool(ial)!s}")
-        print(f"\n[PATTERNS] Forward: {P.F}")
-        print(f"[PATTERNS] Backward: {P.B}")
-        print(f"[PATTERNS] Strafe Left: {P.SL}")
-        print(f"[PATTERNS] Strafe Right: {P.SR}")
-        print(f"[PATTERNS] Turn CCW: {P.TL}")
-        print(f"[PATTERNS] Turn CW: {P.TR}")
+        print(f"[WIRING] FL     {a.fl_pwm:2}  {a.fl_in1:2} {a.fl_in2:2}  {bool(a.inv_fl or auto_invert)!s:5} {bool(a.swap_in12_fl)!s:4} {bool(ial)!s}")
+        print(f"[WIRING] BL     {a.bl_pwm:2}  {a.bl_in1:2} {a.bl_in2:2}  {bool(a.inv_bl or auto_invert)!s:5} {bool(a.swap_in12_bl)!s:4} {bool(ial)!s}")
+        print(f"[WIRING] FR     {a.fr_pwm:2}  {a.fr_in1:2} {a.fr_in2:2}  {bool(a.inv_fr or auto_invert)!s:5} {bool(a.swap_in12_fr)!s:4} {bool(ial)!s}")
+        print(f"[WIRING] BR     {a.br_pwm:2}  {a.br_in1:2} {a.br_in2:2}  {bool(a.inv_br or auto_invert)!s:5} {bool(a.swap_in12_br)!s:4} {bool(ial)!s}")
+        print(f"\n[SPEED] Base: {a.mag:.1f}  Max: {a.max:.1f}  Low: {a.scale_low:.1f}  High: {a.scale_high:.1f}")
+        print(f"[AUTO-INVERT] {auto_invert} (use --no-auto-invert to disable)")
 
     def setv(self, vec, mag): 
         self.mot.set_motor_model(vec[0]*mag, vec[1]*mag, vec[2]*mag, vec[3]*mag)
@@ -187,147 +188,127 @@ class App:
     def run_diagnostic(self):
         """Run a comprehensive diagnostic"""
         print("\n=== RUNNING COMPREHENSIVE DIAGNOSTIC ===")
-        print("This will test ALL movement patterns.")
-        print("Observe the robot behavior and note any incorrect movements.")
+        print("Testing ALL movement patterns with auto-inversion...")
         
-        # Test 1: Forward
-        print("\n" + "="*50)
-        print("[TEST 1] FORWARD - All wheels should move FORWARD")
-        print("Expected: FL=FWD, BL=FWD, FR=FWD, BR=FWD")
-        input("Press Enter to test FORWARD...")
-        self.setv(P.F, self.a.mag)
-        time.sleep(3.0)
-        self.stop()
-        time.sleep(0.5)
+        test_sequence = [
+            ("FORWARD", P.F, "All wheels FORWARD"),
+            ("BACKWARD", P.B, "All wheels BACKWARD"), 
+            ("STRAFE LEFT", P.SL, "Move LEFT"),
+            ("STRAFE RIGHT", P.SR, "Move RIGHT"),
+            ("TURN CCW", P.TL, "Rotate COUNTER-CLOCKWISE"),
+            ("TURN CW", P.TR, "Rotate CLOCKWISE")
+        ]
         
-        # Test 2: Backward  
-        print("\n" + "="*50)
-        print("[TEST 2] BACKWARD - All wheels should move BACKWARD")
-        print("Expected: FL=REV, BL=REV, FR=REV, BR=REV")
-        input("Press Enter to test BACKWARD...")
-        self.setv(P.B, self.a.mag)
-        time.sleep(3.0)
-        self.stop()
-        time.sleep(0.5)
-        
-        # Test 3: Strafe Left
-        print("\n" + "="*50)
-        print("[TEST 3] STRAFE LEFT - Robot should move LEFT")
-        print("Expected: FL=REV, BL=FWD, FR=FWD, BR=REV")
-        input("Press Enter to test STRAFE LEFT...")
-        self.setv(P.SL, self.a.mag)
-        time.sleep(3.0)
-        self.stop()
-        time.sleep(0.5)
-        
-        # Test 4: Strafe Right
-        print("\n" + "="*50)
-        print("[TEST 4] STRAFE RIGHT - Robot should move RIGHT")
-        print("Expected: FL=FWD, BL=REV, FR=REV, BR=FWD")
-        input("Press Enter to test STRAFE RIGHT...")
-        self.setv(P.SR, self.a.mag)
-        time.sleep(3.0)
-        self.stop()
-        time.sleep(0.5)
-        
-        # Test 5: Turn CCW
-        print("\n" + "="*50)
-        print("[TEST 5] TURN CCW - Robot should rotate COUNTER-CLOCKWISE")
-        print("Expected: FL=REV, BL=REV, FR=FWD, BR=FWD")
-        input("Press Enter to test TURN CCW...")
-        self.setv(P.TL, self.a.mag)
-        time.sleep(3.0)
-        self.stop()
-        time.sleep(0.5)
-        
-        # Test 6: Turn CW
-        print("\n" + "="*50)
-        print("[TEST 6] TURN CW - Robot should rotate CLOCKWISE")
-        print("Expected: FL=FWD, BL=FWD, FR=REV, BR=REV")
-        input("Press Enter to test TURN CW...")
-        self.setv(P.TR, self.a.mag)
-        time.sleep(3.0)
-        self.stop()
+        for name, pattern, description in test_sequence:
+            print(f"\n{'='*50}")
+            print(f"[TEST] {name} - {description}")
+            input("Press Enter to test...")
+            
+            # Ramp up speed gently
+            for speed in [0.1, 0.2, 0.3, self.a.mag]:
+                self.setv(pattern, speed)
+                time.sleep(0.3)
+            
+            time.sleep(1.5)
+            self.stop()
+            time.sleep(0.5)
         
         print("\n" + "="*50)
-        print("=== DIAGNOSTIC COMPLETE ===")
-        print("\nTROUBLESHOOTING GUIDE:")
-        print("1. If ALL wheels reversed in Forward/Backward:")
-        print("   Use: --inv-fl --inv-bl --inv-fr --inv-br")
-        print("2. If individual wheels are wrong:")
-        print("   Invert only the problematic wheels")
-        print("3. If strafing/turning is wrong:")
-        print("   Check wheel positions and inversion flags")
-        print("\nQuick fix for all reverse:")
-        print("python3 tools/diag/motion/teleop_pairmode.py --inv-fl --inv-bl --inv-fr --inv-br [your other args]")
+        print("DIAGNOSTIC COMPLETE")
+        if self.a.no_auto_invert:
+            print("Auto-invert is DISABLED - if movements are reversed, remove --no-auto-invert")
+        else:
+            print("Auto-invert is ENABLED - if movements are still reversed, check wiring")
 
     def run_demo(self):
+        print("\n[DEMO] Running movement sequence...")
         seq=[
-            ("Forward", P.F),
-            ("Backward", P.B), 
-            ("Strafe Left", P.SL),
-            ("Strafe Right", P.SR),
-            ("Turn CCW", P.TL),
-            ("Turn CW", P.TR)
+            ("Forward", P.F, 2.0),
+            ("Backward", P.B, 2.0), 
+            ("Strafe Left", P.SL, 2.0),
+            ("Strafe Right", P.SR, 2.0),
+            ("Turn CCW", P.TL, 2.0),
+            ("Turn CW", P.TR, 2.0)
         ]
-        for name,vec in seq:
-            print(f"[DEMO] {name}"); 
-            self.setv(vec, self.a.mag); 
-            time.sleep(self.a.step)
-            self.setv(P.STOP,0); 
-            time.sleep(0.25)
-        print("[DEMO] done"); self.stop()
+        for name, vec, duration in seq:
+            print(f"[DEMO] {name}")
+            self.setv(vec, self.a.mag)
+            time.sleep(duration)
+            self.stop()
+            time.sleep(0.5)
+        print("[DEMO] done")
 
     def run_pulse(self):
+        print("\n[PULSE] Testing individual wheels...")
         tests=[("FL",(1,0,0,0)),("BL",(0,1,0,0)),("FR",(0,0,1,0)),("BR",(0,0,0,1))]
         for name,mask in tests:
-            print(f"[PULSE] {name} FWD"); 
-            self.mot.set_motor_model(*(m*self.a.mag for m in mask)); 
-            time.sleep(0.4); 
-            self.stop(); 
-            time.sleep(0.15)
-            print(f"[PULSE] {name} REV"); 
-            self.mot.set_motor_model(*(-m*self.a.mag for m in mask)); 
-            time.sleep(0.4); 
-            self.stop(); 
-            time.sleep(0.25)
-        print("[PULSE] done"); self.stop()
+            print(f"[PULSE] {name} FWD (low speed)")
+            self.mot.set_motor_model(*(m*0.2 for m in mask))  # Low speed for testing
+            time.sleep(0.8)
+            self.stop()
+            time.sleep(0.2)
+            
+            print(f"[PULSE] {name} REV (low speed)")
+            self.mot.set_motor_model(*(-m*0.2 for m in mask))  # Low speed for testing
+            time.sleep(0.8)
+            self.stop()
+            time.sleep(0.4)
+        print("[PULSE] done")
 
     def run_teleop(self):
         kb=Keyboard()
         deadman=self.a.deadman
-        idle=self.a.idle_exit if self.a.idle_exit>0 else None
         start=time.monotonic(); last=time.monotonic(); pattern=P.STOP; scale=1.0
-        print("[Teleop] W/S/A/D  Q/E  (Space=stop, ESC quits)")
+        
+        print("\n[TELEOP] Keyboard Control Active")
+        print("Movement: W/S/A/D/Q/E")
+        print("Speed: Normal=WASD, Slow=Ctrl+WASD, Fast=SHIFT+WASD") 
+        print("Stop: SPACE, Quit: ESC")
+        print(f"Base Speed: {self.a.mag:.1f}")
+        
         try:
             while True:
                 now=time.monotonic()
                 if self.a.duration>0 and (now-start)>=self.a.duration:
-                    print("[Teleop] duration timeout"); return
+                    print("[Teleop] duration timeout")
+                    break
+                    
                 got=False
                 for ch in kb.read():
                     got=True; last=now
                     if ch in (b'\x1b', b'\x03'):
-                        print("[Teleop] quit"); return
+                        print("[Teleop] quit")
+                        return
                     if ch in (b' ', b'0'):
-                        pattern=P.STOP; print("[Cmd] STOP"); continue
-                    # speed scaling: ctrl/lowcase vs UPPERCASE
+                        pattern=P.STOP; print("[Cmd] STOP")
+                        continue
+                    
+                    # Speed control
                     slow = (isinstance(ch,bytes) and len(ch)==1 and 1<=ch[0]<=26)  # control keys
                     fast = (isinstance(ch,bytes) and ch.isalpha() and ch.isupper())
                     scale = self.a.scale_low if slow else (self.a.scale_high if fast else 1.0)
-                    if ch in (b'w',b'W',b'UP'):      pattern=P.F;  print("[Move] FWD")
-                    elif ch in (b's',b'S',b'DOWN'):  pattern=P.B;  print("[Move] BWD")
-                    elif ch in (b'a',b'A',b'LEFT'):  pattern=P.SL; print("[Move] STRAFE L")
-                    elif ch in (b'd',b'D',b'RIGHT'): pattern=P.SR; print("[Move] STRAFE R")
-                    elif ch in (b'q',b'Q'):          pattern=P.TL; print("[Turn] CCW")
-                    elif ch in (b'e',b'E'):          pattern=P.TR; print("[Turn] CW")
-                if not got:
-                    if (now-last)>deadman and pattern!=P.STOP:
-                        pattern=P.STOP; print("[Deadman] stop")
-                    if idle and (now-last)>idle:
-                        print("[Idle] exit"); return
+                    current_speed = self.a.mag * scale
+                    
+                    if ch in (b'w',b'W',b'UP'):      
+                        pattern=P.F;  print(f"[Move] FWD speed={current_speed:.1f}")
+                    elif ch in (b's',b'S',b'DOWN'):  
+                        pattern=P.B;  print(f"[Move] BWD speed={current_speed:.1f}")
+                    elif ch in (b'a',b'A',b'LEFT'):  
+                        pattern=P.SL; print(f"[Move] STRAFE L speed={current_speed:.1f}")
+                    elif ch in (b'd',b'D',b'RIGHT'): 
+                        pattern=P.SR; print(f"[Move] STRAFE R speed={current_speed:.1f}")
+                    elif ch in (b'q',b'Q'):          
+                        pattern=P.TL; print(f"[Turn] CCW speed={current_speed:.1f}")
+                    elif ch in (b'e',b'E'):          
+                        pattern=P.TR; print(f"[Turn] CW speed={current_speed:.1f}")
+                
+                # Deadman switch
+                if not got and (now-last)>deadman and pattern!=P.STOP:
+                    pattern=P.STOP; print("[Deadman] stop")
+                
                 self.setv(pattern, self.a.mag*scale)
                 time.sleep(max(0.0, 1.0/max(1.0,self.a.hz)))
+                
         finally:
             try: kb.restore()
             except: pass
@@ -335,23 +316,24 @@ class App:
 
 # ---- CLI ----
 def build_ap():
-    p=argparse.ArgumentParser(description="Robot Savo — Mecanum Teleop/Tests (DIAGNOSTIC VERSION)")
+    p=argparse.ArgumentParser(description="Robot Savo — Mecanum Teleop/Tests (FIXED with Auto-Invert)")
     p.add_argument('--mode', choices=['diagnostic','teleop','demo','pulse'], default='diagnostic')
     p.add_argument('--duration', type=float, default=0.0, help="Auto-exit after SEC (teleop)")
     p.add_argument('--idle-exit', type=float, default=0.0, help="Exit if idle for SEC (teleop)")
     p.add_argument('--hz', type=float, default=30.0)
-    p.add_argument('--mag', type=float, default=0.6)
-    p.add_argument('--max', type=float, default=1.0)
-    p.add_argument('--step', type=float, default=1.0, help="demo step seconds")
-    p.add_argument('--deadman', type=float, default=2.0, help="Auto STOP if no key for SEC")
-    p.add_argument('--scale-low', type=float, default=0.35, help="Speed scale when holding control keys")
-    p.add_argument('--scale-high', type=float, default=1.25, help="Speed scale when using UPPERCASE letters")
+    p.add_argument('--mag', type=float, default=0.3, help="Base speed (0.0-1.0)")  # LOWER DEFAULT
+    p.add_argument('--max', type=float, default=0.6, help="Max duty cycle (0.0-1.0)")  # LOWER DEFAULT
+    p.add_argument('--step', type=float, default=2.0, help="demo step seconds")
+    p.add_argument('--deadman', type=float, default=1.5, help="Auto STOP if no key for SEC")
+    p.add_argument('--scale-low', type=float, default=0.3, help="Slow speed scale")  # LOWER
+    p.add_argument('--scale-high', type=float, default=1.5, help="Fast speed scale")
     p.add_argument('--i2c-bus', type=int, default=1)
     p.add_argument('--pca-addr', type=lambda x:int(x,0), default=0x40)
     p.add_argument('--pwm-freq', type=float, default=200.0)
     p.add_argument('--set-freq', action='store_true', default=True)
     p.add_argument('--reserve', type=str, default='12,13,14,15')
     p.add_argument('--in-active-low', action='store_true')
+    p.add_argument('--no-auto-invert', action='store_true', help="Disable auto-inversion (use if wheels spin correctly)")
     p.add_argument('--verbose', action='store_true')
     # wheel channels (PCA)
     p.add_argument('--fl-pwm', type=int, required=True); p.add_argument('--fl-in1', type=int, required=True); p.add_argument('--fl-in2', type=int, required=True)
@@ -368,8 +350,8 @@ def build_ap():
 def main(argv=None):
     a = build_ap().parse_args(argv)
     # expose scales on the object (used in teleop)
-    setattr(a, 'scale_low', getattr(a, 'scale_low', 0.35))
-    setattr(a, 'scale_high', getattr(a, 'scale_high', 1.25))
+    setattr(a, 'scale_low', getattr(a, 'scale_low', 0.3))
+    setattr(a, 'scale_high', getattr(a, 'scale_high', 1.5))
     app = App(a)
     signal.signal(signal.SIGINT, lambda *_: (_ for _ in ()).throw(KeyboardInterrupt()))
     try:
