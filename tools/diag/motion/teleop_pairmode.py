@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Robot Savo — Mecanum Teleop/Tests (finite modes included)
+Robot Savo — Mecanum Teleop/Tests (DIAGNOSTIC VERSION)
 - Modes:
-  teleop : W/S/A/D/Q/E, ESC quits (default)
-  demo   : plays FWD, BWD, STRAFE L/R, TURN CCW/CW then exits
-  pulse  : pulses each wheel FWD/REV to verify mapping then exits
+  diagnostic : runs comprehensive forward/backward tests with prompts
+  teleop     : W/S/A/D/Q/E, ESC quits (default)
+  demo       : plays FWD, BWD, STRAFE L/R, TURN CCW/CW then exits
+  pulse      : pulses each wheel FWD/REV to verify mapping then exits
 """
 import argparse, os, select, sys, termios, time, tty, signal
 from dataclasses import dataclass
@@ -129,12 +130,21 @@ class Keyboard:
     def restore(self):
         termios.tcsetattr(self.fd, termios.TCSADRAIN, self.old)
 
-# ---- patterns ----
+# ---- CORRECTED patterns for mecanum wheels ----
 @dataclass
 class P:
-    F=(+1,+1,+1,+1); B=(-1,-1,-1,-1)
-    SL=(-1,-1,+1,+1); SR=(+1,+1,-1,-1)
-    TL=(-1,-1,+1,+1); TR=(+1,+1,-1,-1)
+    # Forward: all wheels forward
+    F=(+1,+1,+1,+1)
+    # Backward: all wheels backward  
+    B=(-1,-1,-1,-1)
+    # Strafe Left: left wheels backward, right wheels forward
+    SL=(-1,+1,+1,-1)
+    # Strafe Right: left wheels forward, right wheels backward
+    SR=(+1,-1,-1,+1)
+    # Turn CCW: left wheels backward, right wheels forward
+    TL=(-1,-1,+1,+1)
+    # Turn CW: left wheels forward, right wheels backward
+    TR=(+1,+1,-1,-1)
     STOP=(0,0,0,0)
 
 # ---- main controller ----
@@ -157,27 +167,130 @@ class App:
             max_duty=max(0.05, min(1.0, a.max)),
             verbose=a.verbose
         )
-        print("\n[WIRING] Wheel  PWM IN1 IN2  invert swap in_active_low")
+        print("\n=== ROBOT SAVO DIAGNOSTIC ===")
+        print("[WIRING] Wheel  PWM IN1 IN2  invert swap in_active_low")
         print(f"[WIRING] FL     {a.fl_pwm:2}  {a.fl_in1:2} {a.fl_in2:2}  {bool(a.inv_fl)!s:5} {bool(a.swap_in12_fl)!s:4} {bool(ial)!s}")
         print(f"[WIRING] BL     {a.bl_pwm:2}  {a.bl_in1:2} {a.bl_in2:2}  {bool(a.inv_bl)!s:5} {bool(a.swap_in12_bl)!s:4} {bool(ial)!s}")
         print(f"[WIRING] FR     {a.fr_pwm:2}  {a.fr_in1:2} {a.fr_in2:2}  {bool(a.inv_fr)!s:5} {bool(a.swap_in12_fr)!s:4} {bool(ial)!s}")
-        print(f"[WIRING] BR     {a.br_pwm:2}  {a.br_in1:2} {a.br_in2:2}  {bool(a.inv_br)!s:5} {bool(a.swap_in12_br)!s:4} {bool(ial)!s}\n")
+        print(f"[WIRING] BR     {a.br_pwm:2}  {a.br_in1:2} {a.br_in2:2}  {bool(a.inv_br)!s:5} {bool(a.swap_in12_br)!s:4} {bool(ial)!s}")
+        print(f"\n[PATTERNS] Forward: {P.F}")
+        print(f"[PATTERNS] Backward: {P.B}")
+        print(f"[PATTERNS] Strafe Left: {P.SL}")
+        print(f"[PATTERNS] Strafe Right: {P.SR}")
+        print(f"[PATTERNS] Turn CCW: {P.TL}")
+        print(f"[PATTERNS] Turn CW: {P.TR}")
 
-    def setv(self, vec, mag): self.mot.set_motor_model(vec[0]*mag, vec[1]*mag, vec[2]*mag, vec[3]*mag)
+    def setv(self, vec, mag): 
+        self.mot.set_motor_model(vec[0]*mag, vec[1]*mag, vec[2]*mag, vec[3]*mag)
     def stop(self): self.mot.stop()
 
+    def run_diagnostic(self):
+        """Run a comprehensive diagnostic"""
+        print("\n=== RUNNING COMPREHENSIVE DIAGNOSTIC ===")
+        print("This will test ALL movement patterns.")
+        print("Observe the robot behavior and note any incorrect movements.")
+        
+        # Test 1: Forward
+        print("\n" + "="*50)
+        print("[TEST 1] FORWARD - All wheels should move FORWARD")
+        print("Expected: FL=FWD, BL=FWD, FR=FWD, BR=FWD")
+        input("Press Enter to test FORWARD...")
+        self.setv(P.F, self.a.mag)
+        time.sleep(3.0)
+        self.stop()
+        time.sleep(0.5)
+        
+        # Test 2: Backward  
+        print("\n" + "="*50)
+        print("[TEST 2] BACKWARD - All wheels should move BACKWARD")
+        print("Expected: FL=REV, BL=REV, FR=REV, BR=REV")
+        input("Press Enter to test BACKWARD...")
+        self.setv(P.B, self.a.mag)
+        time.sleep(3.0)
+        self.stop()
+        time.sleep(0.5)
+        
+        # Test 3: Strafe Left
+        print("\n" + "="*50)
+        print("[TEST 3] STRAFE LEFT - Robot should move LEFT")
+        print("Expected: FL=REV, BL=FWD, FR=FWD, BR=REV")
+        input("Press Enter to test STRAFE LEFT...")
+        self.setv(P.SL, self.a.mag)
+        time.sleep(3.0)
+        self.stop()
+        time.sleep(0.5)
+        
+        # Test 4: Strafe Right
+        print("\n" + "="*50)
+        print("[TEST 4] STRAFE RIGHT - Robot should move RIGHT")
+        print("Expected: FL=FWD, BL=REV, FR=REV, BR=FWD")
+        input("Press Enter to test STRAFE RIGHT...")
+        self.setv(P.SR, self.a.mag)
+        time.sleep(3.0)
+        self.stop()
+        time.sleep(0.5)
+        
+        # Test 5: Turn CCW
+        print("\n" + "="*50)
+        print("[TEST 5] TURN CCW - Robot should rotate COUNTER-CLOCKWISE")
+        print("Expected: FL=REV, BL=REV, FR=FWD, BR=FWD")
+        input("Press Enter to test TURN CCW...")
+        self.setv(P.TL, self.a.mag)
+        time.sleep(3.0)
+        self.stop()
+        time.sleep(0.5)
+        
+        # Test 6: Turn CW
+        print("\n" + "="*50)
+        print("[TEST 6] TURN CW - Robot should rotate CLOCKWISE")
+        print("Expected: FL=FWD, BL=FWD, FR=REV, BR=REV")
+        input("Press Enter to test TURN CW...")
+        self.setv(P.TR, self.a.mag)
+        time.sleep(3.0)
+        self.stop()
+        
+        print("\n" + "="*50)
+        print("=== DIAGNOSTIC COMPLETE ===")
+        print("\nTROUBLESHOOTING GUIDE:")
+        print("1. If ALL wheels reversed in Forward/Backward:")
+        print("   Use: --inv-fl --inv-bl --inv-fr --inv-br")
+        print("2. If individual wheels are wrong:")
+        print("   Invert only the problematic wheels")
+        print("3. If strafing/turning is wrong:")
+        print("   Check wheel positions and inversion flags")
+        print("\nQuick fix for all reverse:")
+        print("python3 tools/diag/motion/teleop_pairmode.py --inv-fl --inv-bl --inv-fr --inv-br [your other args]")
+
     def run_demo(self):
-        seq=[("Forward",P.F),("Backward",P.B),("Strafe Left",P.SL),("Strafe Right",P.SR),("Turn CCW",P.TL),("Turn CW",P.TR)]
+        seq=[
+            ("Forward", P.F),
+            ("Backward", P.B), 
+            ("Strafe Left", P.SL),
+            ("Strafe Right", P.SR),
+            ("Turn CCW", P.TL),
+            ("Turn CW", P.TR)
+        ]
         for name,vec in seq:
-            print(f"[DEMO] {name}"); self.setv(vec, self.a.mag); time.sleep(self.a.step)
-            self.setv(P.STOP,0); time.sleep(0.25)
+            print(f"[DEMO] {name}"); 
+            self.setv(vec, self.a.mag); 
+            time.sleep(self.a.step)
+            self.setv(P.STOP,0); 
+            time.sleep(0.25)
         print("[DEMO] done"); self.stop()
 
     def run_pulse(self):
         tests=[("FL",(1,0,0,0)),("BL",(0,1,0,0)),("FR",(0,0,1,0)),("BR",(0,0,0,1))]
         for name,mask in tests:
-            print(f"[PULSE] {name} FWD"); self.mot.set_motor_model(*(m*self.a.mag for m in mask)); time.sleep(0.4); self.stop(); time.sleep(0.15)
-            print(f"[PULSE] {name} REV"); self.mot.set_motor_model(*(-m*self.a.mag for m in mask)); time.sleep(0.4); self.stop(); time.sleep(0.25)
+            print(f"[PULSE] {name} FWD"); 
+            self.mot.set_motor_model(*(m*self.a.mag for m in mask)); 
+            time.sleep(0.4); 
+            self.stop(); 
+            time.sleep(0.15)
+            print(f"[PULSE] {name} REV"); 
+            self.mot.set_motor_model(*(-m*self.a.mag for m in mask)); 
+            time.sleep(0.4); 
+            self.stop(); 
+            time.sleep(0.25)
         print("[PULSE] done"); self.stop()
 
     def run_teleop(self):
@@ -222,8 +335,8 @@ class App:
 
 # ---- CLI ----
 def build_ap():
-    p=argparse.ArgumentParser(description="Robot Savo — Mecanum Teleop/Tests (finite modes)")
-    p.add_argument('--mode', choices=['teleop','demo','pulse'], default='teleop')
+    p=argparse.ArgumentParser(description="Robot Savo — Mecanum Teleop/Tests (DIAGNOSTIC VERSION)")
+    p.add_argument('--mode', choices=['diagnostic','teleop','demo','pulse'], default='diagnostic')
     p.add_argument('--duration', type=float, default=0.0, help="Auto-exit after SEC (teleop)")
     p.add_argument('--idle-exit', type=float, default=0.0, help="Exit if idle for SEC (teleop)")
     p.add_argument('--hz', type=float, default=30.0)
@@ -260,12 +373,15 @@ def main(argv=None):
     app = App(a)
     signal.signal(signal.SIGINT, lambda *_: (_ for _ in ()).throw(KeyboardInterrupt()))
     try:
-        if a.mode=='demo':    app.run_demo()
-        elif a.mode=='pulse': app.run_pulse()
-        else:                 app.run_teleop()
+        if a.mode == 'diagnostic':
+            app.run_diagnostic()
+        elif a.mode=='demo':    app.run_demo()
+        elif a.mode=='pulse':   app.run_pulse()
+        else:                   app.run_teleop()
     except KeyboardInterrupt:
         print("\n[Main] Ctrl+C")
     finally:
         app.stop()
 
-if __name__=='__main__': main()
+if __name__=='__main__': 
+    main()
