@@ -17,6 +17,7 @@ Keys:
   5..8 = pulse FL/FR/RL/RR reverse
   M = print current command + wheel duties
   R = reset speed scale
+  F = toggle forward-axis flip at runtime
   ESC / Ctrl+C = quit
 
 Tip: Keep robot on blocks when testing. Start slow.
@@ -185,7 +186,7 @@ class DirectTeleop:
                           args.accel_x, args.accel_y, args.accel_z)
         self.geom = MecanumGeom(args.wheel_radius, args.L)
 
-        # flips (defaults for FNK0043: W=Forward)
+        # flips (defaults now: W=Forward → no flip)
         self.sx = -1.0 if args.flip_vx else +1.0
         self.sy = -1.0 if args.flip_vy else +1.0
         self.so = -1.0 if args.flip_omega else +1.0
@@ -238,7 +239,7 @@ class DirectTeleop:
             f" max(vx,vy,wz)=({self.lim.vx},{self.lim.vy},{self.lim.wz})  accel=({self.lim.ax},{self.lim.ay},{self.lim.az})\n"
             f" geom: r={self.geom.r}m L={self.geom.L}m  PCA=0x{args.pca_addr:02X} bus={args.i2c_bus} freq={args.pwm_freq}Hz\n"
             f" flips: vx={'-vx' if args.flip_vx else 'vx'} vy={'-vy' if args.flip_vy else 'vy'} ω={'-ω' if args.flip_omega else 'ω'}\n"
-            " Keys: WASD/QE, Space stop, G gentle, 1..8 pulses, M print, R reset scale\n"
+            " Keys: WASD/QE, Space stop, G gentle, 1..8 pulses, M print, R reset scale, F flip forward\n"
         )
 
     # ---------------- safety checks ----------------
@@ -257,7 +258,7 @@ class DirectTeleop:
                     raise ValueError(f"[ERROR] {name} {label}={ch} out of motor-safe range 0..7 (8..15 are servos).")
                 if ch in reserved:
                     raise ValueError(f"[ERROR] {name} {label}={ch} is reserved ({sorted(reserved)}).")
-        # 2) PWM must be unique per SIDE only (left uses 0, right uses 6 typically); never reused as IN
+        # 2) PWM must not be reused as any IN
         pwms = [args.fl_pwm, args.fr_pwm, args.rl_pwm, args.rr_pwm]
         ins  = [args.fl_in1, args.fl_in2, args.fr_in1, args.fr_in2, args.rl_in1, args.rl_in2, args.rr_in1, args.rr_in2]
         bad = sorted(set(pwms) & set(ins))
@@ -355,6 +356,12 @@ class DirectTeleop:
 
         if ch in (b'm', b'M'):
             self._print_status(); return False
+
+        # runtime toggle: flip forward axis
+        if ch in (b'f', b'F'):
+            self.sx *= -1.0
+            print(f"[Flip] forward axis is now {'flipped' if self.sx<0 else 'normal'}")
+            return False
 
         # scale via CTRL (slow) or UPPERCASE (fast)
         slow = (isinstance(ch,bytes) and len(ch)==1 and 1 <= ch[0] <= 26)
@@ -481,10 +488,21 @@ def build_argparser():
     p.add_argument('--swap-in12-fl', action='store_true'); p.add_argument('--swap-in12-fr', action='store_true')
     p.add_argument('--swap-in12-rl', action='store_true'); p.add_argument('--swap-in12-rr', action='store_true')
 
-    # motion flips (defaults chosen for FNK0043: “W=forward”)
-    p.add_argument('--flip-vx', action='store_true', default=True)
-    p.add_argument('--flip-vy', action='store_true', default=False)
-    p.add_argument('--flip-omega', action='store_true', default=False)
+    # motion flips (defaults chosen so W=forward)
+    g = p.add_mutually_exclusive_group()
+    g.add_argument('--flip-vx', dest='flip_vx', action='store_true', help='Flip forward axis sign')
+    g.add_argument('--no-flip-vx', dest='flip_vx', action='store_false', help='Do NOT flip forward axis sign')
+    p.set_defaults(flip_vx=False)
+
+    g2 = p.add_mutually_exclusive_group()
+    g2.add_argument('--flip-vy', dest='flip_vy', action='store_true')
+    g2.add_argument('--no-flip-vy', dest='flip_vy', action='store_false')
+    p.set_defaults(flip_vy=False)
+
+    g3 = p.add_mutually_exclusive_group()
+    g3.add_argument('--flip-omega', dest='flip_omega', action='store_true')
+    g3.add_argument('--no-flip-omega', dest='flip_omega', action='store_false')
+    p.set_defaults(flip_omega=False)
 
     # hard e-stop freeze
     p.add_argument('--estop-force', action='store_true')
