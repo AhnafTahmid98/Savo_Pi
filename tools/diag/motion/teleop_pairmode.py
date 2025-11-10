@@ -9,6 +9,8 @@ Adds:
 - Quench + small settle delay when changing direction (fixes stale highs).
 - Per-wheel reverse logic mode: std (IN1=0,IN2=1) or swap (IN1=1,IN2=0).
 - --debug-pins to print exact pins/levels/duty on transitions.
+- Robust exits: ESC/Ctrl+C/x/X, --max-runtime, --idle-exit, --headless,
+  and auto-headless if no TTY (SSH without -t / VSCode tasks).
 
 Safety:
 - Motor channels must be 0..7. Servo 8..15 default OFF (reserved).
@@ -108,7 +110,6 @@ class HBridgeDir:
         (self.pca.full_on if level else self.pca.full_off)(ch)
 
     def _quench_all(self, why=""):
-        # Turn off both triplets hard
         for t in (self.cfg.fwd, self.cfg.rev):
             self._digital(t.in1, 0)
             self._digital(t.in2, 0)
@@ -142,7 +143,6 @@ class HBridgeDir:
         else:
             t = self.cfg.rev
             if self.rev_mode == 'swap':
-                # alternate reverse polarity for odd boards
                 self._apply(self.cfg.name, t, 1, 0, abs(d), "REV.swap")
             else:
                 self._apply(self.cfg.name, t, 0, 1, abs(d), "REV.std")
@@ -156,6 +156,8 @@ class HBridgeDir:
 # ---------------------- keyboard ----------------------
 class Keyboard:
     def __init__(self):
+        if not sys.stdin.isatty():
+            raise RuntimeError("stdin is not a TTY")
         self.fd = sys.stdin.fileno()
         self.old = termios.tcgetattr(self.fd)
         tty.setraw(self.fd)
@@ -174,14 +176,15 @@ class Keyboard:
                     arrows={b'A':b'UP',b'B':b'DOWN',b'C':b'RIGHT',b'D':b'LEFT'}
                     if b in arrows: out.append(arrows[b])
                 else:
-                    out.append(b'\x1b'); 
+                    out.append(b'\x1b')
                     if a: out.append(a)
             else:
                 out.append(ch)
             ch=self._read1(0.0)
         return out
 
-    def restore(self): termios.tcsetattr(self.fd, termios.TCSADRAIN, self.old)
+    def restore(self):
+        termios.tcsetattr(self.fd, termios.TCSADRAIN, self.old)
 
 # ---------------------- helpers ----------------------
 def clamp(x, lo, hi): return max(lo, min(hi, x))
@@ -198,7 +201,10 @@ class DirectTeleop:
         self.scale_high = float(args.scale_high)
         self.scale = 1.0
         self._running = True
+        self._headless = bool(args.headless)
+        self._kb = None
 
+        # PCA + reserve channels (servos 8..15 OFF by default)
         self.pca = PCA9685(bus=args.i2c_bus, addr=args.pca_addr, freq_hz=args.pwm_freq, set_freq=args.set_freq)
         try:
             reserved = [int(x) for x in str(args.reserve).split(',') if x.strip()!='']
@@ -207,7 +213,7 @@ class DirectTeleop:
         except Exception as e:
             print(f"[Teleop] Warning: reserve failed: {e}")
 
-        # Builder for motors with per-wheel rev mode + debug + settle
+        # Motors
         mk = lambda name, fwd_pwm,fwd_in1,fwd_in2, rev_pwm,rev_in1,rev_in2, inv: HBridgeDir(
             self.pca,
             MotorDirConfig(DirTriplet(fwd_pwm,fwd_in1,fwd_in2), DirTriplet(rev_pwm,rev_in1,rev_in2), name=name),
@@ -217,7 +223,6 @@ class DirectTeleop:
             settle_s=args.settle_ms/1000.0,
             debug=args.debug_pins
         )
-
         self.FL = mk("FL", args.fl_fwd_pwm,args.fl_fwd_in1,args.fl_fwd_in2, args.fl_rev_pwm,args.fl_rev_in1,args.fl_rev_in2, args.invert_fl)
         self.FR = mk("FR", args.fr_fwd_pwm,args.fr_fwd_in1,args.fr_fwd_in2, args.fr_rev_pwm,args.fr_rev_in1,args.fr_rev_in2, args.invert_fr)
         self.RL = mk("RL", args.rl_fwd_pwm,args.rl_fwd_in1,args.rl_fwd_in2, args.rl_rev_pwm,args.rl_rev_in1,args.rl_rev_in2, args.invert_rl)
@@ -229,16 +234,31 @@ class DirectTeleop:
         self.last_input = time.monotonic()
         self.start_time = self.last_input
 
+        # Keyboard init (fallback to headless if no TTY)
+        if not self._headless:
+            try:
+                self._kb = Keyboard()
+            except Exception as e:
+                print(f"[Teleop] No TTY for keyboard ({e}) → headless mode")
+                self._headless = True
+
+        # Safety: prevent infinite run in headless without timers
+        if self._headless and self.max_runtime <= 0 and self.idle_exit <= 0:
+            self.idle_exit = 5.0
+            print("[Teleop] Headless with no timers → idle-exit set to 5.0s")
+
+        # Signals
         def _sig(_s,_f): self._running=False
-        signal.signal(signal.SIGINT, _sig); signal.signal(signal.SIGTERM, _sig)
+        signal.signal(signal.SIGINT, _sig)
+        signal.signal(signal.SIGTERM, _sig)
 
         print(
-            "[Teleop] READY (dir-triplet mode). Esc/Ctrl+C to quit.\n"
+            "[Teleop] READY (dir-triplet mode). Esc/Ctrl+C/x/X to quit.\n"
             f" rate={self.hz}Hz deadman={self.deadman}s idle-exit={self.idle_exit}s max-runtime={self.max_runtime}s\n"
             f" PCA=0x{args.pca_addr:02X} bus={args.i2c_bus} pwm={args.pwm_freq}Hz  paired_mode={args.paired_mode}\n"
             f" RevModes: FL={args.fl_rev_mode or args.rev_mode} FR={args.fr_rev_mode or args.rev_mode} "
             f"RL={args.rl_rev_mode or args.rev_mode} RR={args.rr_rev_mode or args.rev_mode}\n"
-            f" DebugPins={args.debug_pins}  Settle={args.settle_ms:.1f} ms\n"
+            f" DebugPins={args.debug_pins}  Settle={args.settle_ms:.1f} ms  Headless={self._headless}\n"
         )
 
     # ---------------- soft safety check ----------------
@@ -270,33 +290,37 @@ class DirectTeleop:
             for m in (self.FL, self.FR, self.RL, self.RR):
                 try: m.stop()
                 except: pass
-            if hasattr(self, 'kb'): self.kb.restore()
+            if self._kb: self._kb.restore()
             self.pca.close()
         except Exception as e:
             print(f"[Teleop] Close warning: {e}")
 
     def loop(self):
-        self.kb = Keyboard()
         period = 1.0 / max(1.0, self.hz)
         try:
             while self._running:
                 now = time.monotonic()
+                # Hard cap
                 if self.max_runtime > 0 and (now - self.start_time) >= self.max_runtime:
                     print("[Time] Max runtime reached → exiting"); break
 
+                # Read keys (if interactive)
                 got = False
-                for ch in self.kb.read():
-                    got = True
-                    if self._handle_key(ch):
-                        self._running = False; break
-                    self.last_input = now
+                if self._kb:
+                    for ch in self._kb.read():
+                        got = True
+                        if self._handle_key(ch):
+                            self._running = False; break
+                        self.last_input = now
                 if not self._running: break
 
+                # Deadman
                 if not got and (now - self.last_input) > self.deadman:
                     if any(abs(x) > 1e-6 for x in self.duties):
                         print("[Deadman] STOP")
                     self.apply_pattern((0,0,0,0), 0.0)
 
+                # Idle auto-exit
                 if self.idle_exit > 0 and (now - self.last_input) > self.idle_exit:
                     print("[Idle] No input → exiting"); break
 
@@ -309,7 +333,9 @@ class DirectTeleop:
 
     # ---------------- input handling ----------------
     def _handle_key(self, ch) -> bool:
-        if ch in (b"\x1b", b"\x03"): print("[Teleop] Quit"); return True
+        # Quit keys: ESC, Ctrl+C, x/X
+        if ch in (b"\x1b", b"\x03", b'x', b'X'):
+            print("[Teleop] Quit"); return True
         if ch == b' ': self.apply_pattern((0,0,0,0), 0.0, "[Cmd] STOP"); return False
         if ch in (b'r', b'R', b"\x12"): self.scale=1.0; print("[Scale] reset → 1.0"); return False
         if ch in (b'g', b'G'): self._gentle_forward(); return False
@@ -319,6 +345,7 @@ class DirectTeleop:
         fast = (isinstance(ch,bytes) and ch.isalpha() and ch.isupper())
         self.scale = clamp(self.scale_low if slow else (self.scale_high if fast else 1.0), 0.05, 3.0)
 
+        # patterns
         F  = (+1,+1,+1,+1)
         B  = (-1,-1,-1,-1)
         SL = (-1,+1,+1,-1)
@@ -396,8 +423,8 @@ def build_argparser():
     # timing / exit / scaling
     p.add_argument('--hz', type=float, default=30.0)
     p.add_argument('--deadman', type=float, default=0.40)
-    p.add_argument('--idle-exit', type=float, default=0.0)
-    p.add_argument('--max-runtime', type=float, default=0.0)
+    p.add_argument('--idle-exit', type=float, default=0.0, help='Auto-exit after SEC idle (0=never)')
+    p.add_argument('--max-runtime', type=float, default=0.0, help='Hard exit after SEC (0=never)')
     p.add_argument('--scale-low', type=float, default=0.25)
     p.add_argument('--scale-high', type=float, default=1.35)
 
@@ -413,6 +440,9 @@ def build_argparser():
     # Debug / settling
     p.add_argument('--debug-pins', action='store_true', help='Print pin levels/duty on transitions')
     p.add_argument('--settle-ms', type=float, default=3.0, help='Delay after quench on dir flip')
+
+    # Headless / exits
+    p.add_argument('--headless', action='store_true', help='Run without keyboard; use with --max-runtime or --idle-exit')
 
     # Direction inversion flags
     p.add_argument('--invert-fl', action='store_true')
