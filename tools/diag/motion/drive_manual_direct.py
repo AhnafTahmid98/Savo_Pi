@@ -2,25 +2,25 @@
 # -*- coding: utf-8 -*-
 """
 Robot Savo — Manual Teleop (NO ROS2) for DC Motors via PCA9685 + H-Bridge
+Pattern Mode (explicit wheel signs) with Paired-Board Support
 ---------------------------------------------------------------------------
-MOTOR-ONLY (no servo control). Safe for FNK0043:
-- Motor channels allowed: 0..7
-- Servo rows: 8..15 (reserved/off by default)
+- Directly applies your sign patterns to wheels: (FL, FR, RL, RR)
+- Optional --paired-mode forces FL=RL and FR=RR (for boards that side-pair IN lines)
+- Motor channels must be 0..7; servo channels 8..15 are reserved OFF
 
 Keys:
-  W/S = forward/back
-  A/D = strafe (side-paired boards will not truly strafe; this is blended)
-  Q/E = turn CCW/CW
-  Space = stop
+  W = Forward   (F = + + + +)
+  S = Backward  (B = - - - -)
+  A = Strafe L  (SL = - + + -)   [in paired-mode: mapped to TL]
+  D = Strafe R  (SR = + - - +)   [in paired-mode: mapped to TR]
+  Q = Turn CCW  (TL = - - + +)
+  E = Turn CW   (TR = + + - -)
+  Space = STOP
   G = gentle forward pulse
-  1..4 = pulse FL/FR/RL/RR forward
-  5..8 = pulse FL/FR/RL/RR reverse
-  M = print current command + wheel duties
+  1..4 / 5..8 = single-wheel forward / reverse pulse
+  M = print current duties
   R = reset speed scale
-  F = toggle forward-axis flip at runtime
   ESC / Ctrl+C = quit
-
-Tip: Keep robot on blocks when testing. Start slow.
 """
 
 import argparse, os, select, sys, termios, time, tty, signal
@@ -41,7 +41,6 @@ class PCA9685:
     def __init__(self, bus: int = 1, addr: int = 0x40, freq_hz: float = 800.0, set_freq: bool = True):
         self.addr = int(addr)
         self.bus = SMBus(int(bus))
-        # OUTDRV push-pull, auto-increment, clear ALLCALL
         self._w8(MODE2, OUTDRV)
         self._w8(MODE1, AI)
         time.sleep(0.003)
@@ -74,7 +73,6 @@ class PCA9685:
         self._w8(base+2, off&0xFF);  self._w8(base+3, (off>>8)&0x0F)
 
     def set_duty(self, ch: int, duty: float):
-        """duty in [0..1]"""
         duty = max(0.0, min(1.0, float(duty)))
         off = int(round(duty * 4095))
         if off <= 0:
@@ -159,44 +157,18 @@ class Keyboard:
     def restore(self):
         termios.tcsetattr(self.fd, termios.TCSADRAIN, self.old)
 
-# ---------------------- math helpers ----------------------
+# ---------------------- helpers ----------------------
 def clamp(x, lo, hi): return max(lo, min(hi, x))
-def step(curr, target, max_step): return min(curr + max_step, target) if target > curr else max(curr - max_step, target)
-
-@dataclass
-class Limits:
-    vx: float; vy: float; wz: float
-    ax: float; ay: float; az: float
-
-@dataclass
-class MecanumGeom:
-    r: float
-    L: float
 
 # ---------------------- main teleop ----------------------
 class DirectTeleop:
     def __init__(self, args):
+        self.args = args
         self.hz = float(args.hz)
         self.deadman = float(args.deadman)
-        self.idle_exit = float(args.idle_exit) if args.idle_exit > 0 else None
         self.scale_low = float(args.scale_low)
         self.scale_high = float(args.scale_high)
         self.scale = 1.0
-        self.lim = Limits(args.max_vx, args.max_vy, args.max_omega,
-                          args.accel_x, args.accel_y, args.accel_z)
-        self.geom = MecanumGeom(args.wheel_radius, args.L)
-
-        # flips (defaults now: W=Forward → no flip)
-        self.sx = -1.0 if args.flip_vx else +1.0
-        self.sy = -1.0 if args.flip_vy else +1.0
-        self.so = -1.0 if args.flip_omega else +1.0
-
-        self.kb = Keyboard()
-        self.last_input = time.monotonic()
-        self.t_vx = self.t_vy = self.t_wz = 0.0  # target commands
-        self.c_vx = self.c_vy = self.c_wz = 0.0  # current (ramped)
-        self._last = time.monotonic()
-        self._running = True
 
         # PCA + reserve channels (servos 8..15 OFF by default)
         self.pca = PCA9685(bus=args.i2c_bus, addr=args.pca_addr, freq_hz=args.pwm_freq, set_freq=args.set_freq)
@@ -217,29 +189,25 @@ class DirectTeleop:
         self.RR = HBridge(self.pca, MotorCH(args.rr_pwm, args.rr_in1, args.rr_in2),
                           invert=args.inv_rr, in_active_low=args.in_active_low, swap_in12=args.swap_in12_rr, name="RR")
 
-        # Channel safety
         self._check_channels(args)
 
-        self.estop_force = bool(args.estop_force)
-
-        print("\n[WIRING] Wheel : PWM IN1 IN2 | invert swap active_low")
-        print(f"[WIRING] FL    : {args.fl_pwm:>3} {args.fl_in1:>3} {args.fl_in2:>3} | {bool(args.inv_fl)!s:5} {bool(args.swap_in12_fl)!s:4} {bool(args.in_active_low)!s}")
-        print(f"[WIRING] FR    : {args.fr_pwm:>3} {args.fr_in1:>3} {args.fr_in2:>3} | {bool(args.inv_fr)!s:5} {bool(args.swap_in12_fr)!s:4} {bool(args.in_active_low)!s}")
-        print(f"[WIRING] RL    : {args.rl_pwm:>3} {args.rl_in1:>3} {args.rl_in2:>3} | {bool(args.inv_rl)!s:5} {bool(args.swap_in12_rl)!s:4} {bool(args.in_active_low)!s}")
-        print(f"[WIRING] RR    : {args.rr_pwm:>3} {args.rr_in1:>3} {args.rr_in2:>3} | {bool(args.inv_rr)!s:5} {bool(args.swap_in12_rr)!s:4} {bool(args.in_active_low)!s}\n")
+        # Current duties for wheels (FL, FR, RL, RR)
+        self.duties = [0.0, 0.0, 0.0, 0.0]
 
         # Signals
         def _sig(_s,_f): self._running=False
         signal.signal(signal.SIGINT, _sig)
         signal.signal(signal.SIGTERM, _sig)
 
+        self._running = True
+        self.last_input = time.monotonic()
+
         print(
-            "[Teleop] READY (no ROS2). Esc/Ctrl+C to quit.\n"
-            f" rate={self.hz}Hz  deadman={self.deadman}s  idle_exit={self.idle_exit or 0}s\n"
-            f" max(vx,vy,wz)=({self.lim.vx},{self.lim.vy},{self.lim.wz})  accel=({self.lim.ax},{self.lim.ay},{self.lim.az})\n"
-            f" geom: r={self.geom.r}m L={self.geom.L}m  PCA=0x{args.pca_addr:02X} bus={args.i2c_bus} freq={args.pwm_freq}Hz\n"
-            f" flips: vx={'-vx' if args.flip_vx else 'vx'} vy={'-vy' if args.flip_vy else 'vy'} ω={'-ω' if args.flip_omega else 'ω'}\n"
-            " Keys: WASD/QE, Space stop, G gentle, 1..8 pulses, M print, R reset scale, F flip forward\n"
+            "[Teleop] READY (pattern mode). Esc/Ctrl+C to quit.\n"
+            f" rate={self.hz}Hz  deadman={self.deadman}s  "
+            f"PCA=0x{args.pca_addr:02X} bus={args.i2c_bus} freq={args.pwm_freq}Hz  "
+            f"paired_mode={args.paired_mode}\n"
+            " Keys: W/S/A/D/Q/E, Space stop, G gentle, 1..8 pulses, M print, R reset scale\n"
         )
 
     # ---------------- safety checks ----------------
@@ -251,36 +219,17 @@ class DirectTeleop:
             "RL": MotorCH(args.rl_pwm, args.rl_in1, args.rl_in2),
             "RR": MotorCH(args.rr_pwm, args.rr_in1, args.rr_in2),
         }
-        # 1) enforce motor channels only in 0..7
         for name, chs in motors.items():
             for label, ch in (("PWM",chs.pwm),("IN1",chs.in1),("IN2",chs.in2)):
                 if ch < 0 or ch > 7:
                     raise ValueError(f"[ERROR] {name} {label}={ch} out of motor-safe range 0..7 (8..15 are servos).")
                 if ch in reserved:
                     raise ValueError(f"[ERROR] {name} {label}={ch} is reserved ({sorted(reserved)}).")
-        # 2) PWM must not be reused as any IN
         pwms = [args.fl_pwm, args.fr_pwm, args.rl_pwm, args.rr_pwm]
         ins  = [args.fl_in1, args.fl_in2, args.fr_in1, args.fr_in2, args.rl_in1, args.rl_in2, args.rr_in1, args.rr_in2]
         bad = sorted(set(pwms) & set(ins))
         if bad:
             raise ValueError(f"[ERROR] PWM channels {bad} also used as IN pins — not allowed.")
-        # 3) Warn if IN pins are shared across motors (side-paired boards will do this)
-        per_motor = {
-            "FL": {args.fl_in1, args.fl_in2},
-            "FR": {args.fr_in1, args.fr_in2},
-            "RL": {args.rl_in1, args.rl_in2},
-            "RR": {args.rr_in1, args.rr_in2},
-        }
-        shared = {}
-        names = list(per_motor.keys())
-        for i in range(len(names)):
-            for j in range(i+1, len(names)):
-                a, b = names[i], names[j]
-                overlap = per_motor[a] & per_motor[b]
-                if overlap:
-                    shared.setdefault(tuple(sorted(overlap)), set()).update([a, b])
-        if shared:
-            print(f"[WARN] Some IN pin(s) are shared across motors (side-paired). Mecanum strafe may be blended: {shared}")
 
     # ---------------- main loop ----------------
     def close(self):
@@ -295,43 +244,25 @@ class DirectTeleop:
             print(f"[Teleop] Close warning: {e}")
 
     def loop(self):
+        self.kb = Keyboard()
         period = 1.0 / max(1.0, self.hz)
         try:
             while self._running:
                 now = time.monotonic()
 
-                # input
                 got = False
                 for ch in self.kb.read():
                     got = True
-                    if self._handle_key(ch):  # request quit
+                    if self._handle_key(ch):
                         self._running = False
                         break
                     self.last_input = now
 
-                # deadman + optional idle-exit
-                if not got:
-                    if (now - self.last_input) > self.deadman:
-                        if (self.t_vx, self.t_vy, self.t_wz) != (0.0, 0.0, 0.0):
-                            print("[Deadman] stop")
-                        self.t_vx = self.t_vy = self.t_wz = 0.0
+                if not got and (now - self.last_input) > self.deadman:
+                    self.apply_pattern((0,0,0,0), magnitude=0.0, announce="[Deadman] STOP")
 
-                # scale + limits
-                vx_t = clamp(self.t_vx * self.scale, -self.lim.vx, self.lim.vx)
-                vy_t = clamp(self.t_vy * self.scale, -self.lim.vy, self.lim.vy)
-                wz_t = clamp(self.t_wz * self.scale, -self.lim.wz, self.lim.wz)
-
-                # ramps
-                dt = max(1e-3, now - self._last); self._last = now
-                self.c_vx = step(self.c_vx, vx_t, self.lim.ax * dt)
-                self.c_vy = step(self.c_vy, vy_t, self.lim.ay * dt)
-                self.c_wz = step(self.c_wz, wz_t, self.lim.az * dt)
-
-                if self.estop_force:
-                    self.c_vx = self.c_vy = self.c_wz = 0.0
-
-                # apply
-                self._apply(self.c_vx, self.c_vy, self.c_wz)
+                # drive duties currently set
+                self._apply_duties()
 
                 # pace
                 sleep_t = period - (time.monotonic() - now)
@@ -345,8 +276,7 @@ class DirectTeleop:
             print("[Teleop] Quit"); return True
 
         if ch == b' ':
-            self.t_vx = self.t_vy = self.t_wz = 0.0
-            print("[Cmd] STOP"); return False
+            self.apply_pattern((0,0,0,0), magnitude=0.0, announce="[Cmd] STOP"); return False
 
         if ch in (b'r', b'R', b"\x12"):
             self.scale = 1.0; print("[Scale] reset → 1.0"); return False
@@ -357,26 +287,27 @@ class DirectTeleop:
         if ch in (b'm', b'M'):
             self._print_status(); return False
 
-        # runtime toggle: flip forward axis
-        if ch in (b'f', b'F'):
-            self.sx *= -1.0
-            print(f"[Flip] forward axis is now {'flipped' if self.sx<0 else 'normal'}")
-            return False
-
         # scale via CTRL (slow) or UPPERCASE (fast)
         slow = (isinstance(ch,bytes) and len(ch)==1 and 1 <= ch[0] <= 26)
         fast = (isinstance(ch,bytes) and ch.isalpha() and ch.isupper())
         self.scale = clamp(self.scale_low if slow else (self.scale_high if fast else 1.0), 0.05, 3.0)
 
-        # motion
-        if ch in (b'w', b'W', b'UP'):    self.t_vx = +self.lim.vx; print("[Cmd] FORWARD")
-        elif ch in (b's', b'S', b'DOWN'):self.t_vx = -self.lim.vx; print("[Cmd] BACK")
-        elif ch in (b'a', b'A', b'LEFT'):self.t_vy = +self.lim.vy; print("[Cmd] LEFT (strafe)")
-        elif ch in (b'd', b'D', b'RIGHT'):self.t_vy = -self.lim.vy; print("[Cmd] RIGHT (strafe)")
-        elif ch in (b'q', b'Q'):         self.t_wz = +self.lim.wz; print("[Cmd] TURN CCW")
-        elif ch in (b'e', b'E'):         self.t_wz = -self.lim.wz; print("[Cmd] TURN CW")
-        elif ch in (b'x', b'X'):         self.t_vx = self.t_vy = 0.0; print("[Cmd] HALT XY")
-        elif ch in (b'z', b'Z'):         self.t_wz = 0.0; print("[Cmd] HALT YAW")
+        # patterns (FL, FR, RL, RR)
+        F  = (+1,+1,+1,+1)
+        B  = (-1,-1,-1,-1)
+        SL = (-1,+1,+1,-1)
+        SR = (+1,-1,-1,+1)
+        TL = (-1,-1,+1,+1)
+        TR = (+1,+1,-1,-1)
+        STOP = (0,0,0,0)
+
+        # map keys
+        if ch in (b'w', b'W', b'UP'):      self.apply_pattern(F,  announce='[Cmd] F (forward)')
+        elif ch in (b's', b'S', b'DOWN'):   self.apply_pattern(B,  announce='[Cmd] B (back)')
+        elif ch in (b'a', b'A', b'LEFT'):   self.apply_pattern(SL, announce='[Cmd] SL (strafe L)')
+        elif ch in (b'd', b'D', b'RIGHT'):  self.apply_pattern(SR, announce='[Cmd] SR (strafe R)')
+        elif ch in (b'q', b'Q'):            self.apply_pattern(TL, announce='[Cmd] TL (turn CCW)')
+        elif ch in (b'e', b'E'):            self.apply_pattern(TR, announce='[Cmd] TR (turn CW)')
         elif ch == b'1': self._pulse_wheels([1,0,0,0]);        return False
         elif ch == b'2': self._pulse_wheels([0,1,0,0]);        return False
         elif ch == b'3': self._pulse_wheels([0,0,1,0]);        return False
@@ -388,33 +319,45 @@ class DirectTeleop:
 
         return False
 
-    def _apply(self, vx, vy, wz):
-        # flips
-        vx *= self.sx; vy *= self.sy; wz *= self.so
+    # ---------------- pattern application ----------------
+    def apply_pattern(self, signs, magnitude=1.0, announce=None):
+        """
+        signs: tuple/list of 4 ints in {-1,0,+1} in order (FL, FR, RL, RR)
+        magnitude: scales final duty (0..1), then multiplied by 'scale'
+        """
+        mag = clamp(float(magnitude) * self.scale, 0.0, 1.0)
+        s = list(signs)
 
-        # mecanum mix (geometric form)
-        r = self.geom.r; L = self.geom.L
-        w_fl = ( vx - vy - L*wz ) / r
-        w_fr = ( vx + vy + L*wz ) / r
-        w_rl = ( vx + vy - L*wz ) / r
-        w_rr = ( vx - vy + L*wz ) / r
-        ws = [w_fl, w_fr, w_rl, w_rr]
+        if self.args.paired_mode:
+            # If request conflicts with paired constraint, adapt nicely:
+            # - SL -> TL, SR -> TR, otherwise force RL=FL and RR=FR.
+            if tuple(signs) == (-1,+1,+1,-1):  # SL
+                print("[Paired] SL not possible on paired board → using TL")
+                s = [-1,-1,+1,+1]
+            elif tuple(signs) == (+1,-1,-1,+1):  # SR
+                print("[Paired] SR not possible on paired board → using TR")
+                s = [+1,+1,-1,-1]
+            # Enforce pairing
+            s[2] = s[0]  # RL = FL
+            s[3] = s[1]  # RR = FR
 
-        max_w = max(1e-6, max(abs(w) for w in ws))
-        mag = max(abs(vx)/max(self.lim.vx,1e-6),
-                  abs(vy)/max(self.lim.vy,1e-6),
-                  abs(wz)/max(self.lim.wz,1e-6))
-        duties = [clamp((w/max_w)*mag, -1.0, 1.0) for w in ws]
-        self._duties = duties
+        # store duties (signed)
+        self.duties = [clamp(si * mag, -1.0, 1.0) for si in s]
 
+        if announce:
+            print(f"{announce}  signs={tuple(s)}  mag={mag:.2f}")
+
+    def _apply_duties(self):
+        d = self.duties
         try:
-            self.FL.drive(duties[0])
-            self.FR.drive(duties[1])
-            self.RL.drive(duties[2])
-            self.RR.drive(duties[3])
+            self.FL.drive(d[0])
+            self.FR.drive(d[1])
+            self.RL.drive(d[2])
+            self.RR.drive(d[3])
         except Exception as e:
             print(f"[Teleop] Motor drive error: {e}")
 
+    # ---------------- utility actions ----------------
     def _pulse_wheels(self, mask, duty=0.12, t=0.30):
         try:
             motors = [self.FL, self.FR, self.RL, self.RR]
@@ -435,34 +378,16 @@ class DirectTeleop:
             print(f"[Teleop] Gentle forward error: {e}")
 
     def _print_status(self):
-        d = getattr(self, "_duties", [0,0,0,0])
-        print(f"[cmd] vx={self.c_vx:+.3f} vy={self.c_vy:+.3f} wz={self.c_wz:+.3f}  "
-              f"duties=[FL {d[0]:+.2f}, FR {d[1]:+.2f}, RL {d[2]:+.2f}, RR {d[3]:+.2f}]")
+        d = self.duties
+        print(f"[duties] FL {d[0]:+0.2f}  FR {d[1]:+0.2f}  RL {d[2]:+0.2f}  RR {d[3]:+0.2f}")
 
 # ---------------------- CLI ----------------------
 def build_argparser():
-    p = argparse.ArgumentParser(description='Robot Savo — Manual Teleop (no ROS2, PCA9685 + H-bridge)')
+    p = argparse.ArgumentParser(description='Robot Savo — Manual Teleop (pattern mode, PCA9685 + H-bridge)')
 
-    # geometry
-    p.add_argument('--wheel-radius', type=float, default=0.0325)
-    p.add_argument('--L', type=float, default=0.115)
-
-    # speeds (LOW by default)
-    p.add_argument('--max-vx', type=float, default=0.10)
-    p.add_argument('--max-vy', type=float, default=0.10)
-    p.add_argument('--max-omega', type=float, default=0.45)
-
-    # ramps
-    p.add_argument('--accel-x', type=float, default=0.8)
-    p.add_argument('--accel-y', type=float, default=0.8)
-    p.add_argument('--accel-z', type=float, default=1.2)
-
-    # timing
-    p.add_argument('--hz', type=float, default=20.0)
+    # timing / scaling
+    p.add_argument('--hz', type=float, default=30.0)
     p.add_argument('--deadman', type=float, default=0.40)
-    p.add_argument('--idle-exit', type=float, default=0.0, help="Auto-exit after SEC idle (0=off)")
-
-    # scaling shortcuts
     p.add_argument('--scale-low', type=float, default=0.25)
     p.add_argument('--scale-high', type=float, default=1.35)
 
@@ -472,7 +397,6 @@ def build_argparser():
     p.add_argument('--pwm-freq', type=float, default=800.0)
     p.add_argument('--set-freq', dest='set_freq', action='store_true', default=True)
     p.add_argument('--no-set-freq', dest='set_freq', action='store_false')
-    # reserve all servo pins by default (8..15)
     p.add_argument('--reserve', type=str, default='8,9,10,11,12,13,14,15')
     p.add_argument('--in-active-low', action='store_true')
 
@@ -488,24 +412,9 @@ def build_argparser():
     p.add_argument('--swap-in12-fl', action='store_true'); p.add_argument('--swap-in12-fr', action='store_true')
     p.add_argument('--swap-in12-rl', action='store_true'); p.add_argument('--swap-in12-rr', action='store_true')
 
-    # motion flips (defaults chosen so W=forward)
-    g = p.add_mutually_exclusive_group()
-    g.add_argument('--flip-vx', dest='flip_vx', action='store_true', help='Flip forward axis sign')
-    g.add_argument('--no-flip-vx', dest='flip_vx', action='store_false', help='Do NOT flip forward axis sign')
-    p.set_defaults(flip_vx=False)
+    # paired board behavior
+    p.add_argument('--paired-mode', action='store_true', help='Force side pairing: FL=RL and FR=RR; map SL/SR to TL/TR')
 
-    g2 = p.add_mutually_exclusive_group()
-    g2.add_argument('--flip-vy', dest='flip_vy', action='store_true')
-    g2.add_argument('--no-flip-vy', dest='flip_vy', action='store_false')
-    p.set_defaults(flip_vy=False)
-
-    g3 = p.add_mutually_exclusive_group()
-    g3.add_argument('--flip-omega', dest='flip_omega', action='store_true')
-    g3.add_argument('--no-flip-omega', dest='flip_omega', action='store_false')
-    p.set_defaults(flip_omega=False)
-
-    # hard e-stop freeze
-    p.add_argument('--estop-force', action='store_true')
     return p
 
 def main(argv=None):
