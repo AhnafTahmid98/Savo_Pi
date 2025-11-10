@@ -108,10 +108,11 @@ class HBridgeDir:
     Uses EXACT (pwm, in1, in2) triplets per direction (forward vs reverse).
     This matches boards where reverse requires totally different channels.
     """
-    def __init__(self, pca: PCA9685, cfg: MotorDirConfig, in_active_low=False):
+    def __init__(self, pca: PCA9685, cfg: MotorDirConfig, in_active_low=False, invert_direction=False):
         self.pca = pca
         self.cfg = cfg
         self.in_active_low = bool(in_active_low)
+        self.invert_direction = bool(invert_direction)
         self.stop()
 
     def _digital(self, ch: int, level: int):
@@ -120,6 +121,8 @@ class HBridgeDir:
 
     def drive(self, duty_signed: float):
         d = max(-1.0, min(1.0, float(duty_signed)))
+        if self.invert_direction:
+            d = -d  # Invert the direction
         if abs(d) < 1e-3:
             self.stop(); return
         
@@ -204,25 +207,25 @@ class DirectTeleop:
             fwd=DirTriplet(args.fl_fwd_pwm, args.fl_fwd_in1, args.fl_fwd_in2),
             rev=DirTriplet(args.fl_rev_pwm, args.fl_rev_in1, args.fl_rev_in2),
             name="FL"
-        ), in_active_low=args.in_active_low)
+        ), in_active_low=args.in_active_low, invert_direction=args.invert_fl)
 
         self.FR = HBridgeDir(self.pca, MotorDirConfig(
             fwd=DirTriplet(args.fr_fwd_pwm, args.fr_fwd_in1, args.fr_fwd_in2),
             rev=DirTriplet(args.fr_rev_pwm, args.fr_rev_in1, args.fr_rev_in2),
             name="FR"
-        ), in_active_low=args.in_active_low)
+        ), in_active_low=args.in_active_low, invert_direction=args.invert_fr)
 
         self.RL = HBridgeDir(self.pca, MotorDirConfig(
             fwd=DirTriplet(args.rl_fwd_pwm, args.rl_fwd_in1, args.rl_fwd_in2),
             rev=DirTriplet(args.rl_rev_pwm, args.rl_rev_in1, args.rl_rev_in2),
             name="RL"
-        ), in_active_low=args.in_active_low)
+        ), in_active_low=args.in_active_low, invert_direction=args.invert_rl)
 
         self.RR = HBridgeDir(self.pca, MotorDirConfig(
             fwd=DirTriplet(args.rr_fwd_pwm, args.rr_fwd_in1, args.rr_fwd_in2),
             rev=DirTriplet(args.rr_rev_pwm, args.rr_rev_in1, args.rr_rev_in2),
             name="RR"
-        ), in_active_low=args.in_active_low)
+        ), in_active_low=args.in_active_low, invert_direction=args.invert_rr)
 
         self._soft_check_channels(args)
 
@@ -239,6 +242,7 @@ class DirectTeleop:
             "[Teleop] READY (dir-triplet mode). Esc/Ctrl+C to quit.\n"
             f" rate={self.hz}Hz deadman={self.deadman}s idle-exit={self.idle_exit}s max-runtime={self.max_runtime}s\n"
             f" PCA=0x{args.pca_addr:02X} bus={args.i2c_bus} pwm={args.pwm_freq}Hz  paired_mode={args.paired_mode}\n"
+            f" Inversions: FL={args.invert_fl} FR={args.invert_fr} RL={args.invert_rl} RR={args.invert_rr}\n"
         )
 
     # ---------------- soft safety check ----------------
@@ -417,6 +421,12 @@ def build_argparser():
     p.add_argument('--no-set-freq', dest='set_freq', action='store_false')
     p.add_argument('--reserve', type=str, default='8,9,10,11,12,13,14,15')
     p.add_argument('--in-active-low', action='store_true')
+
+    # ---------- Direction inversion flags ----------
+    p.add_argument('--invert-fl', action='store_true', help='Invert FL motor direction')
+    p.add_argument('--invert-fr', action='store_true', help='Invert FR motor direction')
+    p.add_argument('--invert-rl', action='store_true', help='Invert RL motor direction')
+    p.add_argument('--invert-rr', action='store_true', help='Invert RR motor direction')
 
     # ---------- Direction-specific triplets (0..7) ----------
     # FL
