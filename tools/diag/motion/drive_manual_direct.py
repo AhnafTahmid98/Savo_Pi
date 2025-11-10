@@ -3,7 +3,9 @@
 """
 Robot Savo — Manual Teleop (NO ROS2) for DC Motors via PCA9685 + H-Bridge
 ---------------------------------------------------------------------------
-MOTOR-ONLY (no servo control). Safe for FNK0043 (shared PCA9685).
+MOTOR-ONLY (no servo control). Safe for FNK0043:
+- Motor channels allowed: 0..7
+- Servo rows: 8..15 (reserved/off by default)
 
 Keys:
   W/S = forward/back
@@ -17,7 +19,7 @@ Keys:
   R = reset speed scale
   ESC / Ctrl+C = quit
 
-Tip: Start with very low speed limits and increase slowly.
+Tip: Keep robot on blocks when testing. Start slow.
 """
 
 import argparse, os, select, sys, termios, time, tty, signal
@@ -35,9 +37,10 @@ MODE1, MODE2, PRESCALE, LED0_ON_L = 0x00, 0x01, 0xFE, 0x06
 RESTART, SLEEP, AI, OUTDRV, ALLCALL = 0x80, 0x10, 0x20, 0x04, 0x01
 
 class PCA9685:
-    def __init__(self, bus: int = 1, addr: int = 0x40, freq_hz: float = 200.0, set_freq: bool = True):
+    def __init__(self, bus: int = 1, addr: int = 0x40, freq_hz: float = 800.0, set_freq: bool = True):
         self.addr = int(addr)
         self.bus = SMBus(int(bus))
+        # OUTDRV push-pull, auto-increment, clear ALLCALL
         self._w8(MODE2, OUTDRV)
         self._w8(MODE1, AI)
         time.sleep(0.003)
@@ -47,10 +50,8 @@ class PCA9685:
         self._w8(MODE1, (m1 | RESTART | AI) & ~ALLCALL)
 
     def close(self):
-        try:
-            self.bus.close()
-        except Exception:
-            pass
+        try: self.bus.close()
+        except Exception: pass
 
     def _w8(self, reg, val): self.bus.write_byte_data(self.addr, reg & 0xFF, val & 0xFF)
     def _r8(self, reg):      return self.bus.read_byte_data(self.addr, reg & 0xFF)
@@ -184,7 +185,7 @@ class DirectTeleop:
                           args.accel_x, args.accel_y, args.accel_z)
         self.geom = MecanumGeom(args.wheel_radius, args.L)
 
-        # flips (defaults chosen to feel natural; override with flags if needed)
+        # flips (defaults for FNK0043: W=Forward)
         self.sx = -1.0 if args.flip_vx else +1.0
         self.sy = -1.0 if args.flip_vy else +1.0
         self.so = -1.0 if args.flip_omega else +1.0
@@ -196,7 +197,7 @@ class DirectTeleop:
         self._last = time.monotonic()
         self._running = True
 
-        # PCA + reserve channels (e.g., servos)
+        # PCA + reserve channels (servos 8..15 OFF by default)
         self.pca = PCA9685(bus=args.i2c_bus, addr=args.pca_addr, freq_hz=args.pwm_freq, set_freq=args.set_freq)
         try:
             reserved = [int(x) for x in str(args.reserve).split(',') if x.strip()!='']
@@ -214,6 +215,9 @@ class DirectTeleop:
                           invert=args.inv_rl, in_active_low=args.in_active_low, swap_in12=args.swap_in12_rl, name="RL")
         self.RR = HBridge(self.pca, MotorCH(args.rr_pwm, args.rr_in1, args.rr_in2),
                           invert=args.inv_rr, in_active_low=args.in_active_low, swap_in12=args.swap_in12_rr, name="RR")
+
+        # Channel safety
+        self._check_channels(args)
 
         self.estop_force = bool(args.estop_force)
 
@@ -237,6 +241,47 @@ class DirectTeleop:
             " Keys: WASD/QE, Space stop, G gentle, 1..8 pulses, M print, R reset scale\n"
         )
 
+    # ---------------- safety checks ----------------
+    def _check_channels(self, args):
+        reserved = set(int(x) for x in str(args.reserve).split(',') if x.strip()!='')
+        motors = {
+            "FL": MotorCH(args.fl_pwm, args.fl_in1, args.fl_in2),
+            "FR": MotorCH(args.fr_pwm, args.fr_in1, args.fr_in2),
+            "RL": MotorCH(args.rl_pwm, args.rl_in1, args.rl_in2),
+            "RR": MotorCH(args.rr_pwm, args.rr_in1, args.rr_in2),
+        }
+        # 1) enforce motor channels only in 0..7
+        for name, chs in motors.items():
+            for label, ch in (("PWM",chs.pwm),("IN1",chs.in1),("IN2",chs.in2)):
+                if ch < 0 or ch > 7:
+                    raise ValueError(f"[ERROR] {name} {label}={ch} out of motor-safe range 0..7 (8..15 are servos).")
+                if ch in reserved:
+                    raise ValueError(f"[ERROR] {name} {label}={ch} is reserved ({sorted(reserved)}).")
+        # 2) PWM must be unique per SIDE only (left uses 0, right uses 6 typically); never reused as IN
+        pwms = [args.fl_pwm, args.fr_pwm, args.rl_pwm, args.rr_pwm]
+        ins  = [args.fl_in1, args.fl_in2, args.fr_in1, args.fr_in2, args.rl_in1, args.rl_in2, args.rr_in1, args.rr_in2]
+        bad = sorted(set(pwms) & set(ins))
+        if bad:
+            raise ValueError(f"[ERROR] PWM channels {bad} also used as IN pins — not allowed.")
+        # 3) Warn if IN pins are shared across motors (side-paired boards will do this)
+        per_motor = {
+            "FL": {args.fl_in1, args.fl_in2},
+            "FR": {args.fr_in1, args.fr_in2},
+            "RL": {args.rl_in1, args.rl_in2},
+            "RR": {args.rr_in1, args.rr_in2},
+        }
+        shared = {}
+        names = list(per_motor.keys())
+        for i in range(len(names)):
+            for j in range(i+1, len(names)):
+                a, b = names[i], names[j]
+                overlap = per_motor[a] & per_motor[b]
+                if overlap:
+                    shared.setdefault(tuple(sorted(overlap)), set()).update([a, b])
+        if shared:
+            print(f"[WARN] Some IN pin(s) are shared across motors (side-paired). Mecanum strafe may be blended: {shared}")
+
+    # ---------------- main loop ----------------
     def close(self):
         print("[Teleop] Shutting down safely...")
         try:
@@ -250,7 +295,6 @@ class DirectTeleop:
 
     def loop(self):
         period = 1.0 / max(1.0, self.hz)
-        start = time.monotonic()
         try:
             while self._running:
                 now = time.monotonic()
@@ -270,9 +314,6 @@ class DirectTeleop:
                         if (self.t_vx, self.t_vy, self.t_wz) != (0.0, 0.0, 0.0):
                             print("[Deadman] stop")
                         self.t_vx = self.t_vy = self.t_wz = 0.0
-                    if self.idle_exit and (now - self.last_input) > self.idle_exit:
-                        print("[Idle] exit")
-                        break
 
                 # scale + limits
                 vx_t = clamp(self.t_vx * self.scale, -self.lim.vx, self.lim.vx)
@@ -394,45 +435,57 @@ class DirectTeleop:
 # ---------------------- CLI ----------------------
 def build_argparser():
     p = argparse.ArgumentParser(description='Robot Savo — Manual Teleop (no ROS2, PCA9685 + H-bridge)')
+
     # geometry
     p.add_argument('--wheel-radius', type=float, default=0.0325)
     p.add_argument('--L', type=float, default=0.115)
+
     # speeds (LOW by default)
     p.add_argument('--max-vx', type=float, default=0.10)
     p.add_argument('--max-vy', type=float, default=0.10)
     p.add_argument('--max-omega', type=float, default=0.45)
+
     # ramps
     p.add_argument('--accel-x', type=float, default=0.8)
     p.add_argument('--accel-y', type=float, default=0.8)
     p.add_argument('--accel-z', type=float, default=1.2)
+
     # timing
     p.add_argument('--hz', type=float, default=20.0)
     p.add_argument('--deadman', type=float, default=0.40)
     p.add_argument('--idle-exit', type=float, default=0.0, help="Auto-exit after SEC idle (0=off)")
+
     # scaling shortcuts
     p.add_argument('--scale-low', type=float, default=0.25)
     p.add_argument('--scale-high', type=float, default=1.35)
+
     # I2C/PCA
     p.add_argument('--i2c-bus', type=int, default=1)
     p.add_argument('--pca-addr', type=lambda x:int(x,0), default=0x40)
-    p.add_argument('--pwm-freq', type=float, default=200.0)
-    p.add_argument('--set-freq', action='store_true', default=True)
-    p.add_argument('--reserve', type=str, default='12,13,14,15')
+    p.add_argument('--pwm-freq', type=float, default=800.0)
+    p.add_argument('--set-freq', dest='set_freq', action='store_true', default=True)
+    p.add_argument('--no-set-freq', dest='set_freq', action='store_false')
+    # reserve all servo pins by default (8..15)
+    p.add_argument('--reserve', type=str, default='8,9,10,11,12,13,14,15')
     p.add_argument('--in-active-low', action='store_true')
-    # channels (REQUIRED)
+
+    # channels (REQUIRED; must be 0..7)
     p.add_argument('--fl-pwm', type=int, required=True); p.add_argument('--fl-in1', type=int, required=True); p.add_argument('--fl-in2', type=int, required=True)
     p.add_argument('--fr-pwm', type=int, required=True); p.add_argument('--fr-in1', type=int, required=True); p.add_argument('--fr-in2', type=int, required=True)
     p.add_argument('--rl-pwm', type=int, required=True); p.add_argument('--rl-in1', type=int, required=True); p.add_argument('--rl-in2', type=int, required=True)
     p.add_argument('--rr-pwm', type=int, required=True); p.add_argument('--rr-in1', type=int, required=True); p.add_argument('--rr-in2', type=int, required=True)
+
     # polarity helpers
     p.add_argument('--inv-fl', action='store_true'); p.add_argument('--inv-fr', action='store_true')
     p.add_argument('--inv-rl', action='store_true'); p.add_argument('--inv-rr', action='store_true')
     p.add_argument('--swap-in12-fl', action='store_true'); p.add_argument('--swap-in12-fr', action='store_true')
     p.add_argument('--swap-in12-rl', action='store_true'); p.add_argument('--swap-in12-rr', action='store_true')
-    # motion flips (defaults chosen for “W=forward” normal sense)
-    p.add_argument('--flip-vx', action='store_true', default=False)
+
+    # motion flips (defaults chosen for FNK0043: “W=forward”)
+    p.add_argument('--flip-vx', action='store_true', default=True)
     p.add_argument('--flip-vy', action='store_true', default=False)
     p.add_argument('--flip-omega', action='store_true', default=False)
+
     # hard e-stop freeze
     p.add_argument('--estop-force', action='store_true')
     return p
