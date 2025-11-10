@@ -372,17 +372,15 @@ class DirectTeleop:
 
     # ---------------- patterns to duties ----------------
     def apply_pattern(self, signs, magnitude=1.0, announce=None):
-        """
-        signs: (FL, FR, RL, RR) each ∈ {-1,0,+1}
-        """
         mag = clamp(float(magnitude) * self.scale, 0.0, 1.0)
         s = list(signs)
 
         if self.args.paired_mode:
-            if tuple(signs) == (-1,+1,+1,-1):   # SL → TL
-                print("[Paired] SL not possible → using TL"); s = [-1,-1,+1,+1]
-            elif tuple(signs) == (+1,-1,-1,+1): # SR → TR
-                print("[Paired] SR not possible → using TR"); s = [+1,+1,-1,-1]
+        # CORRECTED: Fix the swapped turn patterns
+            if tuple(signs) == (-1,+1,+1,-1):   # SL → TL (turn left)
+                print("[Paired] SL not possible → using TL"); s = [-1,-1,+1,+1]  # TL pattern
+            elif tuple(signs) == (+1,-1,-1,+1): # SR → TR (turn right)
+                print("[Paired] SR not possible → using TR"); s = [+1,+1,-1,-1]  # TR pattern
             s[2] = s[0]  # RL = FL
             s[3] = s[1]  # RR = FR
 
