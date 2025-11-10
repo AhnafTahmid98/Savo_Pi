@@ -1,26 +1,28 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Robot Savo — Manual Teleop (NO ROS2) for DC Motors via PCA9685 + H-Bridge
-Pattern Mode (explicit wheel signs) with Paired-Board Support
+Robot Savo — Manual Teleop (NO ROS2) via PCA9685 + H-Bridge
+Pattern Mode (explicit wheel signs) with Paired-Board & Idle-Exit
 ---------------------------------------------------------------------------
-- Directly applies your sign patterns to wheels: (FL, FR, RL, RR)
-- Optional --paired-mode forces FL=RL and FR=RR (for boards that side-pair IN lines)
+- Direct wheel patterns (FL, FR, RL, RR)
+- --paired-mode enforces FL=RL and FR=RR (SL/SR → TL/TR)
 - Motor channels must be 0..7; servo channels 8..15 are reserved OFF
 
 Keys:
   W = Forward   (F = + + + +)
   S = Backward  (B = - - - -)
-  A = Strafe L  (SL = - + + -)   [in paired-mode: mapped to TL]
-  D = Strafe R  (SR = + - - +)   [in paired-mode: mapped to TR]
+  A = Strafe L  (SL = - + + -)   [paired: mapped to TL]
+  D = Strafe R  (SR = + - - +)   [paired: mapped to TR]
   Q = Turn CCW  (TL = - - + +)
   E = Turn CW   (TR = + + - -)
   Space = STOP
   G = gentle forward pulse
-  1..4 / 5..8 = single-wheel forward / reverse pulse
-  M = print current duties
+  1..4 / 5..8 = pulse FL/FR/RL/RR forward / reverse
+  M = print duties
   R = reset speed scale
   ESC / Ctrl+C = quit
+
+Run tip: keep the robot on blocks for first tests. Start with small duty.
 """
 
 import argparse, os, select, sys, termios, time, tty, signal
@@ -166,9 +168,11 @@ class DirectTeleop:
         self.args = args
         self.hz = float(args.hz)
         self.deadman = float(args.deadman)
+        self.idle_exit = float(args.idle_exit)
         self.scale_low = float(args.scale_low)
         self.scale_high = float(args.scale_high)
         self.scale = 1.0
+        self._running = True
 
         # PCA + reserve channels (servos 8..15 OFF by default)
         self.pca = PCA9685(bus=args.i2c_bus, addr=args.pca_addr, freq_hz=args.pwm_freq, set_freq=args.set_freq)
@@ -193,18 +197,16 @@ class DirectTeleop:
 
         # Current duties for wheels (FL, FR, RL, RR)
         self.duties = [0.0, 0.0, 0.0, 0.0]
+        self.last_input = time.monotonic()
 
         # Signals
         def _sig(_s,_f): self._running=False
         signal.signal(signal.SIGINT, _sig)
         signal.signal(signal.SIGTERM, _sig)
 
-        self._running = True
-        self.last_input = time.monotonic()
-
         print(
             "[Teleop] READY (pattern mode). Esc/Ctrl+C to quit.\n"
-            f" rate={self.hz}Hz  deadman={self.deadman}s  "
+            f" rate={self.hz}Hz  deadman={self.deadman}s  idle-exit={self.idle_exit}s  "
             f"PCA=0x{args.pca_addr:02X} bus={args.i2c_bus} freq={args.pwm_freq}Hz  "
             f"paired_mode={args.paired_mode}\n"
             " Keys: W/S/A/D/Q/E, Space stop, G gentle, 1..8 pulses, M print, R reset scale\n"
@@ -238,7 +240,7 @@ class DirectTeleop:
             for m in (self.FL, self.FR, self.RL, self.RR):
                 try: m.stop()
                 except: pass
-            self.kb.restore()
+            if hasattr(self, 'kb'): self.kb.restore()
             self.pca.close()
         except Exception as e:
             print(f"[Teleop] Close warning: {e}")
@@ -258,13 +260,20 @@ class DirectTeleop:
                         break
                     self.last_input = now
 
+                # deadman stop if idle but keep program alive
                 if not got and (now - self.last_input) > self.deadman:
                     self.apply_pattern((0,0,0,0), magnitude=0.0, announce="[Deadman] STOP")
 
-                # drive duties currently set
+                # auto-exit after prolonged idle (if enabled)
+                if self.idle_exit > 0 and (now - self.last_input) > self.idle_exit:
+                    print("[Idle] No input → exiting")
+                    self._running = False
+                    continue
+
+                # apply any set duties
                 self._apply_duties()
 
-                # pace
+                # pacing
                 sleep_t = period - (time.monotonic() - now)
                 if sleep_t > 0: time.sleep(sleep_t)
         finally:
@@ -299,9 +308,7 @@ class DirectTeleop:
         SR = (+1,-1,-1,+1)
         TL = (-1,-1,+1,+1)
         TR = (+1,+1,-1,-1)
-        STOP = (0,0,0,0)
 
-        # map keys
         if ch in (b'w', b'W', b'UP'):      self.apply_pattern(F,  announce='[Cmd] F (forward)')
         elif ch in (b's', b'S', b'DOWN'):   self.apply_pattern(B,  announce='[Cmd] B (back)')
         elif ch in (b'a', b'A', b'LEFT'):   self.apply_pattern(SL, announce='[Cmd] SL (strafe L)')
@@ -329,19 +336,16 @@ class DirectTeleop:
         s = list(signs)
 
         if self.args.paired_mode:
-            # If request conflicts with paired constraint, adapt nicely:
-            # - SL -> TL, SR -> TR, otherwise force RL=FL and RR=FR.
-            if tuple(signs) == (-1,+1,+1,-1):  # SL
-                print("[Paired] SL not possible on paired board → using TL")
+            # Map impossible strafes to turns and enforce pairing
+            if tuple(signs) == (-1,+1,+1,-1):   # SL
+                print("[Paired] SL not possible → using TL")
                 s = [-1,-1,+1,+1]
-            elif tuple(signs) == (+1,-1,-1,+1):  # SR
-                print("[Paired] SR not possible on paired board → using TR")
+            elif tuple(signs) == (+1,-1,-1,+1): # SR
+                print("[Paired] SR not possible → using TR")
                 s = [+1,+1,-1,-1]
-            # Enforce pairing
             s[2] = s[0]  # RL = FL
             s[3] = s[1]  # RR = FR
 
-        # store duties (signed)
         self.duties = [clamp(si * mag, -1.0, 1.0) for si in s]
 
         if announce:
@@ -388,6 +392,7 @@ def build_argparser():
     # timing / scaling
     p.add_argument('--hz', type=float, default=30.0)
     p.add_argument('--deadman', type=float, default=0.40)
+    p.add_argument('--idle-exit', type=float, default=0.0, help="Auto-exit after SEC idle (0=never)")
     p.add_argument('--scale-low', type=float, default=0.25)
     p.add_argument('--scale-high', type=float, default=1.35)
 
@@ -413,7 +418,7 @@ def build_argparser():
     p.add_argument('--swap-in12-rl', action='store_true'); p.add_argument('--swap-in12-rr', action='store_true')
 
     # paired board behavior
-    p.add_argument('--paired-mode', action='store_true', help='Force side pairing: FL=RL and FR=RR; map SL/SR to TL/TR')
+    p.add_argument('--paired-mode', action='store_true', help='Force FL=RL and FR=RR; map SL/SR to TL/TR')
 
     return p
 
