@@ -4,17 +4,16 @@
 Robot Savo — Manual Teleop (NO ROS2) via PCA9685 + H-Bridge
 Direction-Specific Wiring (FWD/REV triplets) + Paired-Board Mode
 ---------------------------------------------------------------------------
-WHY THIS VERSION:
-- Your board requires *different* (PWM, IN1, IN2) for reverse vs forward,
-  and those sets differ per side. This driver takes explicit FWD/REV triplets
-  for each wheel (FL, FR, RL, RR) and uses the right triplet per direction.
 
-- Optional --paired-mode forces FL=RL and FR=RR (mecanum strafe maps to turns).
+WHY THIS VERSION
+- Your board requires different (PWM, IN1, IN2) for reverse vs forward,
+  and those sets differ per side. We take explicit FWD/REV triplets.
+- Fix for "reverse goes forward": when switching direction we QUENCH
+  (clear) both triplets first, so no stale pin remains high.
 
 Safety:
 - Motor channels must be 0..7. Servo channels 8..15 are reserved OFF by default.
-- We do soft validation and warnings; we won't block overlapping numbers because
-  your board's wiring dictates the truth. You control exact triplets via CLI.
+- We soft-check & warn about overlaps or reserved use; you control truth via CLI.
 
 Keys:
   W = Forward   (+,+,+,+)
@@ -48,9 +47,15 @@ RESTART, SLEEP, AI, OUTDRV, ALLCALL = 0x80, 0x10, 0x20, 0x04, 0x01
 class PCA9685:
     def __init__(self, bus: int = 1, addr: int = 0x40, freq_hz: float = 800.0, set_freq: bool = True):
         self.addr = int(addr); self.bus = SMBus(int(bus))
-        self._w8(MODE2, OUTDRV); self._w8(MODE1, AI); time.sleep(0.003)
-        if set_freq: self.set_pwm_freq(freq_hz)
-        m1 = self._r8(MODE1); self._w8(MODE1, (m1 | RESTART | AI) & ~ALLCALL)
+        # sane defaults: totem-pole, auto-increment
+        self._w8(MODE2, OUTDRV)
+        self._w8(MODE1, AI)
+        time.sleep(0.003)
+        if set_freq:
+            self.set_pwm_freq(freq_hz)
+        # restart with AI, not ALLCALL
+        m1 = self._r8(MODE1)
+        self._w8(MODE1, (m1 | RESTART | AI) & ~ALLCALL)
 
     def close(self):
         try: self.bus.close()
@@ -106,45 +111,62 @@ class MotorDirConfig:
 class HBridgeDir:
     """
     Uses EXACT (pwm, in1, in2) triplets per direction (forward vs reverse).
-    This matches boards where reverse requires totally different channels.
+    Quenches both triplets on direction change to avoid stale highs.
     """
     def __init__(self, pca: PCA9685, cfg: MotorDirConfig, in_active_low=False, invert_direction=False):
         self.pca = pca
         self.cfg = cfg
         self.in_active_low = bool(in_active_low)
         self.invert_direction = bool(invert_direction)
+        self._last_dir = 0  # -1, 0, +1 (direction sign from previous nonzero command)
         self.stop()
 
     def _digital(self, ch: int, level: int):
-        if self.in_active_low: level ^= 1
+        if self.in_active_low:
+            level ^= 1
         (self.pca.full_on if level else self.pca.full_off)(ch)
+
+    def _quench_all(self):
+        # Turn off both IN pairs and PWM for both triplets
+        for t in (self.cfg.fwd, self.cfg.rev):
+            self._digital(t.in1, 0)
+            self._digital(t.in2, 0)
+            self.pca.set_duty(t.pwm, 0.0)
 
     def drive(self, duty_signed: float):
         d = max(-1.0, min(1.0, float(duty_signed)))
         if self.invert_direction:
-            d = -d  # Invert the direction
+            d = -d
+
         if abs(d) < 1e-3:
-            self.stop(); return
-        
-        if d > 0:
-            # Use forward triplet: set IN1=1, IN2=0, PWM=duty
-            triplet = self.cfg.fwd
-            self._digital(triplet.in1, 1)
-            self._digital(triplet.in2, 0)
-            self.pca.set_duty(triplet.pwm, d)
+            self.stop()
+            return
+
+        # Determine new direction sign
+        new_dir = 1 if d > 0 else -1
+
+        # If direction changed (+ ↔ -), quench everything to clear latched pins
+        if self._last_dir != 0 and new_dir != self._last_dir:
+            self._quench_all()
+
+        if new_dir > 0:
+            # Forward: IN1=1, IN2=0 on the forward triplet, PWM=duty on fwd.PWM
+            t = self.cfg.fwd
+            self._digital(t.in1, 1)
+            self._digital(t.in2, 0)
+            self.pca.set_duty(t.pwm, abs(d))
         else:
-            # Use reverse triplet: set IN1=0, IN2=1, PWM=|duty|
-            triplet = self.cfg.rev
-            self._digital(triplet.in1, 0)
-            self._digital(triplet.in2, 1)
-            self.pca.set_duty(triplet.pwm, -d)
+            # Reverse: IN1=0, IN2=1 on the reverse triplet, PWM=|d| on rev.PWM
+            t = self.cfg.rev
+            self._digital(t.in1, 0)
+            self._digital(t.in2, 1)
+            self.pca.set_duty(t.pwm, abs(d))
+
+        self._last_dir = new_dir
 
     def stop(self):
-        # Turn off all channels in both triplets
-        for triplet in (self.cfg.fwd, self.cfg.rev):
-            self._digital(triplet.in1, 0)
-            self._digital(triplet.in2, 0)
-            self.pca.set_duty(triplet.pwm, 0.0)
+        self._quench_all()
+        self._last_dir = 0
 
 # ---------------------- keyboard ----------------------
 class Keyboard:
@@ -422,13 +444,13 @@ def build_argparser():
     p.add_argument('--reserve', type=str, default='8,9,10,11,12,13,14,15')
     p.add_argument('--in-active-low', action='store_true')
 
-    # ---------- Direction inversion flags ----------
+    # Direction inversion flags
     p.add_argument('--invert-fl', action='store_true', help='Invert FL motor direction')
     p.add_argument('--invert-fr', action='store_true', help='Invert FR motor direction')
     p.add_argument('--invert-rl', action='store_true', help='Invert RL motor direction')
     p.add_argument('--invert-rr', action='store_true', help='Invert RR motor direction')
 
-    # ---------- Direction-specific triplets (0..7) ----------
+    # Direction-specific triplets (0..7)
     # FL
     p.add_argument('--fl-fwd-pwm', type=int, required=True)
     p.add_argument('--fl-fwd-in1', type=int, required=True)
