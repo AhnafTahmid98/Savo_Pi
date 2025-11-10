@@ -2,27 +2,15 @@
 # -*- coding: utf-8 -*-
 """
 Robot Savo — Manual Teleop (NO ROS2) via PCA9685 + H-Bridge
-Pattern Mode (explicit wheel signs) with Paired-Board & Idle-Exit
+Pattern Mode + Paired-Board + Reliable Exit Controls
 ---------------------------------------------------------------------------
-- Direct wheel patterns (FL, FR, RL, RR)
-- --paired-mode enforces FL=RL and FR=RR (SL/SR → TL/TR)
-- Motor channels must be 0..7; servo channels 8..15 are reserved OFF
-
-Keys:
-  W = Forward   (F = + + + +)
-  S = Backward  (B = - - - -)
-  A = Strafe L  (SL = - + + -)   [paired: mapped to TL]
-  D = Strafe R  (SR = + - - +)   [paired: mapped to TR]
-  Q = Turn CCW  (TL = - - + +)
-  E = Turn CW   (TR = + + - -)
-  Space = STOP
-  G = gentle forward pulse
-  1..4 / 5..8 = pulse FL/FR/RL/RR forward / reverse
-  M = print duties
-  R = reset speed scale
-  ESC / Ctrl+C = quit
-
-Run tip: keep the robot on blocks for first tests. Start with small duty.
+- Wheel patterns (FL, FR, RL, RR) per your spec
+- --paired-mode: enforce FL=RL & FR=RR (SL/SR auto-map to TL/TR)
+- Exit controls:
+    * --idle-exit SEC   → quit after no keypress for SEC
+    * --max-runtime SEC → quit after SEC regardless
+    * --once-exit       → after first motion, quit when deadman STOP triggers
+- Motor channels must be 0..7; servos 8..15 are reserved OFF
 """
 
 import argparse, os, select, sys, termios, time, tty, signal
@@ -169,10 +157,13 @@ class DirectTeleop:
         self.hz = float(args.hz)
         self.deadman = float(args.deadman)
         self.idle_exit = float(args.idle_exit)
+        self.max_runtime = float(args.max_runtime)
+        self.once_exit = bool(args.once_exit)
         self.scale_low = float(args.scale_low)
         self.scale_high = float(args.scale_high)
         self.scale = 1.0
         self._running = True
+        self._made_motion = False  # first motion seen?
 
         # PCA + reserve channels (servos 8..15 OFF by default)
         self.pca = PCA9685(bus=args.i2c_bus, addr=args.pca_addr, freq_hz=args.pwm_freq, set_freq=args.set_freq)
@@ -198,6 +189,7 @@ class DirectTeleop:
         # Current duties for wheels (FL, FR, RL, RR)
         self.duties = [0.0, 0.0, 0.0, 0.0]
         self.last_input = time.monotonic()
+        self.start_time = self.last_input
 
         # Signals
         def _sig(_s,_f): self._running=False
@@ -207,6 +199,7 @@ class DirectTeleop:
         print(
             "[Teleop] READY (pattern mode). Esc/Ctrl+C to quit.\n"
             f" rate={self.hz}Hz  deadman={self.deadman}s  idle-exit={self.idle_exit}s  "
+            f"max-runtime={self.max_runtime}s  once-exit={self.once_exit}  "
             f"PCA=0x{args.pca_addr:02X} bus={args.i2c_bus} freq={args.pwm_freq}Hz  "
             f"paired_mode={args.paired_mode}\n"
             " Keys: W/S/A/D/Q/E, Space stop, G gentle, 1..8 pulses, M print, R reset scale\n"
@@ -252,6 +245,11 @@ class DirectTeleop:
             while self._running:
                 now = time.monotonic()
 
+                # hard max runtime
+                if self.max_runtime > 0 and (now - self.start_time) >= self.max_runtime:
+                    print("[Time] Max runtime reached → exiting")
+                    break
+
                 got = False
                 for ch in self.kb.read():
                     got = True
@@ -260,15 +258,25 @@ class DirectTeleop:
                         break
                     self.last_input = now
 
+                if not self._running:
+                    break
+
                 # deadman stop if idle but keep program alive
                 if not got and (now - self.last_input) > self.deadman:
-                    self.apply_pattern((0,0,0,0), magnitude=0.0, announce="[Deadman] STOP")
+                    # only print once per stop
+                    if any(abs(x) > 1e-6 for x in self.duties):
+                        print("[Deadman] STOP")
+                    self.apply_pattern((0,0,0,0), magnitude=0.0)
 
-                # auto-exit after prolonged idle (if enabled)
+                    # once-exit: quit on first deadman STOP after motion
+                    if self.once_exit and self._made_motion:
+                        print("[Once] Deadman stop after first motion → exiting")
+                        break
+
+                # idle-exit (definite exit)
                 if self.idle_exit > 0 and (now - self.last_input) > self.idle_exit:
                     print("[Idle] No input → exiting")
-                    self._running = False
-                    continue
+                    break
 
                 # apply any set duties
                 self._apply_duties()
@@ -309,12 +317,19 @@ class DirectTeleop:
         TL = (-1,-1,+1,+1)
         TR = (+1,+1,-1,-1)
 
-        if ch in (b'w', b'W', b'UP'):      self.apply_pattern(F,  announce='[Cmd] F (forward)')
-        elif ch in (b's', b'S', b'DOWN'):   self.apply_pattern(B,  announce='[Cmd] B (back)')
-        elif ch in (b'a', b'A', b'LEFT'):   self.apply_pattern(SL, announce='[Cmd] SL (strafe L)')
-        elif ch in (b'd', b'D', b'RIGHT'):  self.apply_pattern(SR, announce='[Cmd] SR (strafe R)')
-        elif ch in (b'q', b'Q'):            self.apply_pattern(TL, announce='[Cmd] TL (turn CCW)')
-        elif ch in (b'e', b'E'):            self.apply_pattern(TR, announce='[Cmd] TR (turn CW)')
+        moved = False
+        if ch in (b'w', b'W', b'UP'):
+            self.apply_pattern(F,  announce='[Cmd] F (forward)'); moved = True
+        elif ch in (b's', b'S', b'DOWN'):
+            self.apply_pattern(B,  announce='[Cmd] B (back)');    moved = True
+        elif ch in (b'a', b'A', b'LEFT'):
+            self.apply_pattern(SL, announce='[Cmd] SL (strafe L)'); moved = True
+        elif ch in (b'd', b'D', b'RIGHT'):
+            self.apply_pattern(SR, announce='[Cmd] SR (strafe R)'); moved = True
+        elif ch in (b'q', b'Q'):
+            self.apply_pattern(TL, announce='[Cmd] TL (turn CCW)'); moved = True
+        elif ch in (b'e', b'E'):
+            self.apply_pattern(TR, announce='[Cmd] TR (turn CW)');  moved = True
         elif ch == b'1': self._pulse_wheels([1,0,0,0]);        return False
         elif ch == b'2': self._pulse_wheels([0,1,0,0]);        return False
         elif ch == b'3': self._pulse_wheels([0,0,1,0]);        return False
@@ -324,6 +339,8 @@ class DirectTeleop:
         elif ch == b'7': self._pulse_wheels([0,0,1,0], -0.12); return False
         elif ch == b'8': self._pulse_wheels([0,0,0,1], -0.12); return False
 
+        if moved:
+            self._made_motion = True
         return False
 
     # ---------------- pattern application ----------------
@@ -389,10 +406,12 @@ class DirectTeleop:
 def build_argparser():
     p = argparse.ArgumentParser(description='Robot Savo — Manual Teleop (pattern mode, PCA9685 + H-bridge)')
 
-    # timing / scaling
+    # timing / scaling / exit controls
     p.add_argument('--hz', type=float, default=30.0)
     p.add_argument('--deadman', type=float, default=0.40)
     p.add_argument('--idle-exit', type=float, default=0.0, help="Auto-exit after SEC idle (0=never)")
+    p.add_argument('--max-runtime', type=float, default=0.0, help="Hard exit after SEC (0=never)")
+    p.add_argument('--once-exit', action='store_true', help="Exit after first motion when deadman STOP occurs")
     p.add_argument('--scale-low', type=float, default=0.25)
     p.add_argument('--scale-high', type=float, default=1.35)
 
