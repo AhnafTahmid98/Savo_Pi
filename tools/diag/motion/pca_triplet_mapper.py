@@ -1,30 +1,35 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-PCA9685 Triplet Mapper + Pairing Detector (with sign labels)
-------------------------------------------------------------
+PCA9685 Triplet Mapper + Pairing Detector (signed + CSV + redo)
+---------------------------------------------------------------
 - Systematically tests (PWM, IN1, IN2) for FWD and REV.
-- Prints sign for each pulse: FWD → "+"  |  REV → "−"
-- You can respond: fl, fr, rl, rr, none, multi
-  OR include sign: fl+, fl-, fr+, fr-, rl+, rl-, rr+, rr-
-- Summarizes best triplets per wheel with signs:
-    FL: + (p,i1,i2)    - (p,i1,i2)
-- Infers pairing: INDEPENDENT / SIDE-PAIRED / DIAGONAL-PAIRED / MIXED
+- Prints direction + sign per pulse: FWD → "+"  |  REV → "−"
+- Interactive observation with redo/skip and strength tagging.
+- Logs every pulse to CSV.
+- Summarizes best (+/-) triplets per wheel (FL/FR/RL/RR) and infers pairing.
 
-Safety:
-- Low duty + short pulses; quench between tests.
-- Skips reserved 8..15 by default (servos).
+Controls / Answers:
+  After each pulse, type one of:
+    fl, fr, rl, rr, none, multi
+    or with sign override: fl+, fr-, rl+, rr-
+    optionally add strength:  fl+? (weak), fr-! (strong)
+  Commands:
+    r  -> repeat the same pulse
+    n  -> next (skip/keep current observation)
+    q  -> quit early (safe)
 
 Examples:
   python3 tools/diag/motion/pca_triplet_mapper.py \
     --pca-addr 0x40 --i2c-bus 1 --pwm-freq 800 \
     --reserve 8,9,10,11,12,13,14,15 \
-    --pulse 3.0 --duty 0.22 --pause 0.70 \
+    --pulse 3.0 --duty 0.35 --pause 0.70 \
     --pwm-cands 0,1,2,6,7 \
-    --in-cands 0,1,3,4,5,6,7
+    --in-cands 0,1,3,4,5,6,7 \
+    --csv /tmp/pca_map.csv
 """
 
-import argparse, sys, time, itertools
+import argparse, sys, time, itertools, csv, datetime
 from dataclasses import dataclass
 from typing import Dict, List, Tuple, Optional
 
@@ -91,26 +96,40 @@ def parse_list(arg: Optional[str], default: List[int]) -> List[int]:
         out.append(int(tok))
     return out
 
-def ask_moved(prompt: str) -> Tuple[str, Optional[int]]:
+def parse_answer(s: str) -> Tuple[str, Optional[int], str]:
     """
-    Returns (wheel, sign_override)
-     - wheel: 'fl','fr','rl','rr','none','multi'
-     - sign_override: +1, -1, or None (if no explicit +/- provided)
-    Accepts entries like: fl, fr, rl, rr, none, multi, or fl+, fr-, rl+, rr-
+    Parse user answer string.
+    Returns: (wheel, sign_override, strength)
+      - wheel in {'fl','fr','rl','rr','none','multi','r','n','q'}
+      - sign_override in {+1, -1, None}
+      - strength in {'normal','weak','strong'}
+    Syntax:
+      wheel        -> fl, fr, rl, rr, none, multi
+      wheel+/-     -> fl+, fr-, rl+, rr-
+      strength     -> add '?' for weak, '!' for strong (e.g., fl+?, rr-!, fr!)
+      commands     -> r (repeat), n (next), q (quit)
     """
-    valid = {'fl','fr','rl','rr','none','multi',
-             'fl+','fl-','fr+','fr-','rl+','rl-','rr+','rr-'}
-    while True:
-        s = input(prompt).strip().lower()
-        if s in valid:
-            if s.endswith('+'): return (s[:-1], +1)
-            if s.endswith('-'): return (s[:-1], -1)
-            return (s, None)
-        print("Please type: fl, fr, rl, rr, none, multi OR add sign: fl+, fr-, rl+, rr-")
+    s = s.strip().lower()
+    if s in ('r','n','q'):
+        return (s, None, 'normal')
+    strength = 'normal'
+    if s.endswith('!'):
+        strength = 'strong'
+        s = s[:-1]
+    elif s.endswith('?'):
+        strength = 'weak'
+        s = s[:-1]
+    sign = None
+    if s.endswith('+'): sign, s = +1, s[:-1]
+    elif s.endswith('-'): sign, s = -1, s[:-1]
+    valid = {'fl','fr','rl','rr','none','multi'}
+    if s not in valid:
+        return ('invalid', None, 'normal')
+    return (s, sign, strength)
 
 # ---------- main ----------
 def main():
-    ap = argparse.ArgumentParser("PCA9685 Triplet Mapper + Pairing Detector (signed)")
+    ap = argparse.ArgumentParser("PCA9685 Triplet Mapper + Pairing Detector (signed + CSV + redo)")
     ap.add_argument("--i2c-bus", type=int, default=1)
     ap.add_argument("--pca-addr", type=lambda x:int(x,0), default=0x40)
     ap.add_argument("--pwm-freq", type=float, default=800.0)
@@ -122,16 +141,31 @@ def main():
     ap.add_argument("--pwm-cands", type=str, default="0,1,2,3,4,5,6,7")
     ap.add_argument("--in-cands",  type=str, default="0,1,2,3,4,5,6,7")
 
-    # pulse profile
+    # pulse profile (alias: --secs for --pulse)
     ap.add_argument("--duty", type=float, default=0.18)
     ap.add_argument("--pulse", type=float, default=0.50)
+    ap.add_argument("--secs", type=float, default=None, help="Alias for --pulse")
     ap.add_argument("--pause", type=float, default=0.30)
 
     # limit scans
     ap.add_argument("--max-tests", type=int, default=0, help="Stop after N triplets (0 = no limit)")
+
+    # CSV
+    ap.add_argument("--csv", type=str, default="pca_triplet_map.csv")
+
     args = ap.parse_args()
+    if args.secs is not None:
+        args.pulse = float(args.secs)
 
     p = PCA(args.i2c_bus, args.pca_addr, args.pwm_freq, args.set_freq)
+    csv_file = open(args.csv, "w", newline="")
+    csvw = csv.writer(csv_file)
+    csvw.writerow([
+        "timestamp","phase","intended_sign","+1/-1",
+        "pwm","in1","in2","duty","pulse",
+        "answer_wheel","answer_sign","+1/-1","strength"
+    ])
+
     try:
         reserve_channels(p, args.reserve)
         reserved = set(int(x) for x in args.reserve.split(',') if x.strip()!='')
@@ -139,11 +173,13 @@ def main():
         in_cands  = [c for c in parse_list(args.in_cands,  list(range(8))) if c not in reserved]
 
         print("\nRobot on blocks. I’ll try (PWM,IN1,IN2) combos.")
-        print("I label sign by pulse type: FWD → '+', REV → '−'.")
-        print("You can override with: fl+, fr-, rl+, rr- (if observed sign differs).")
-        print("If multiple moved, answer 'multi'; if nothing, answer 'none'.\n")
+        print("Labels: FWD (+)  |  REV (−)")
+        print("Answer examples:")
+        print("  fl+    (FL moved forward/positive)   fr-?  (FR moved reverse and weak)")
+        print("  none   (no motion)                    multi (more than one moved)")
+        print("Commands: r=repeat, n=next, q=quit\n")
 
-        # Best hits per wheel/direction (we store first reliable)
+        # Best hits per wheel/direction (first reliable)
         best = {
             'fl+': None, 'fl-': None,
             'fr+': None, 'fr-': None,
@@ -151,57 +187,104 @@ def main():
             'rr+': None, 'rr-': None,
         }
 
-        # For pairing inference
-        answers = []  # list of (who, sign, triplet, phase)
+        answers = []  # (wheel, sign, (pwm,in1,in2), phase, strength)
         tested = 0
 
-        for pwm, in1, in2 in itertools.product(pwm_cands, in_cands, in_cands):
-            if in1 == in2: continue
-            if pwm in (in1, in2): continue  # avoid overlap within a triplet
-
-            # ---- FWD pulse: label '+' ----
+        def do_pulse(phase, pwm, in1, in2):
+            """phase in {'fwd','rev'}; returns (wheel, sign, strength) or control"""
+            # Set signals
             quench_triplet(p, pwm, in1, in2, args.active_low)
             time.sleep(0.05)
-            digital(p, in1, 1, args.active_low)
-            digital(p, in2, 0, args.active_low)
+            if phase == 'fwd':
+                intended_sign = +1
+                digital(p, in1, 1, args.active_low)
+                digital(p, in2, 0, args.active_low)
+                label = "FWD (+)"
+            else:
+                intended_sign = -1
+                digital(p, in1, 0, args.active_low)
+                digital(p, in2, 1, args.active_low)
+                label = "REV (−)"
+
             p.set_duty(pwm, args.duty)
-            print(f"[TEST] FWD  (+) → triplet=({pwm},{in1},{in2}) duty={args.duty:.2f} for {args.pulse:.2f}s")
+            print(f"[TEST] {label}  triplet=({pwm},{in1},{in2})  duty={args.duty:.2f}  for {args.pulse:.2f}s")
+            t0 = time.time()
             time.sleep(args.pulse)
             quench_triplet(p, pwm, in1, in2, args.active_low)
 
-            who, override = ask_moved("  moved? (fl/fr/rl/rr/none/multi or fl+/fr-/...): ")
-            eff_sign = override if override in (+1,-1) else +1
-            answers.append((who, eff_sign, (pwm,in1,in2), 'fwd'))
-            if who in ('fl','fr','rl','rr') and eff_sign == +1:
-                key = f"{who}+"
-                if best[key] is None:
-                    best[key] = (pwm,in1,in2)
+            # Query until valid or control (r/n/q)
+            while True:
+                s = input("  moved? (fl/fr/rl/rr/none/multi or fl+/fr-/... ; r=repeat, n=next, q=quit): ")
+                wheel, sign_override, strength = parse_answer(s)
+                if wheel == 'invalid':
+                    print("  Please type: fl, fr, rl, rr, none, multi (add +/-, ? weak, ! strong), or r/n/q")
+                    continue
+                if wheel == 'r':
+                    # Repeat the very same pulse
+                    return ('repeat', None, 'normal', intended_sign)
+                if wheel == 'n':
+                    # Mark as none; proceed
+                    wheel, sign_override, strength = 'none', None, 'normal'
+                elif wheel == 'q':
+                    return ('quit', None, 'normal', intended_sign)
 
-            tested += 1
-            if args.max_tests and tested >= args.max_tests: break
-            time.sleep(args.pause)
+                # Effective sign = user override if provided, else intended
+                eff_sign = sign_override if sign_override in (+1,-1) else intended_sign
 
-            # ---- REV pulse: label '−' ----
-            quench_triplet(p, pwm, in1, in2, args.active_low)
-            time.sleep(0.05)
-            digital(p, in1, 0, args.active_low)
-            digital(p, in2, 1, args.active_low)
-            p.set_duty(pwm, args.duty)
-            print(f"[TEST] REV  (−) → triplet=({pwm},{in1},{in2}) duty={args.duty:.2f} for {args.pulse:.2f}s")
-            time.sleep(args.pulse)
-            quench_triplet(p, pwm, in1, in2, args.active_low)
+                # CSV
+                csvw.writerow([
+                    datetime.datetime.now().isoformat(timespec="seconds"),
+                    phase, '+' if intended_sign>0 else '-', intended_sign,
+                    pwm, in1, in2, f"{args.duty:.3f}", f"{args.pulse:.3f}",
+                    wheel, ('+' if (sign_override==+1) else ('-' if (sign_override==-1) else '')),
+                    eff_sign, strength
+                ])
+                csv_file.flush()
 
-            who, override = ask_moved("  moved? (fl/fr/rl/rr/none/multi or fl+/fr-/...): ")
-            eff_sign = override if override in (+1,-1) else -1
-            answers.append((who, eff_sign, (pwm,in1,in2), 'rev'))
-            if who in ('fl','fr','rl','rr') and eff_sign == -1:
-                key = f"{who}-"
-                if best[key] is None:
-                    best[key] = (pwm,in1,in2)
+                # Store best hits
+                if wheel in ('fl','fr','rl','rr') and eff_sign in (+1,-1):
+                    key = f"{wheel}{'+' if eff_sign>0 else '-'}"
+                    if best[key] is None:
+                        best[key] = (pwm, in1, in2)
+                answers.append((wheel, eff_sign, (pwm,in1,in2), phase, strength))
+                return (wheel, eff_sign, strength, intended_sign)
 
-            tested += 1
-            if args.max_tests and tested >= args.max_tests: break
-            time.sleep(args.pause)
+        # Iterate through triplets
+        outer_break = False
+        for pwm in pwm_cands:
+            for in1 in in_cands:
+                for in2 in in_cands:
+                    if in1 == in2: 
+                        continue
+                    if pwm in (in1, in2):
+                        continue  # avoid overlap within a triplet
+
+                    # FWD then REV
+                    while True:
+                        ans = do_pulse('fwd', pwm, in1, in2)
+                        if ans[0] == 'repeat': 
+                            continue
+                        if ans[0] == 'quit': 
+                            outer_break = True
+                        break
+                    if outer_break: break
+
+                    while True:
+                        ans = do_pulse('rev', pwm, in1, in2)
+                        if ans[0] == 'repeat': 
+                            continue
+                        if ans[0] == 'quit': 
+                            outer_break = True
+                        break
+                    if outer_break: break
+
+                    tested += 1
+                    if args.max_tests and tested >= args.max_tests:
+                        outer_break = True
+                        break
+                    time.sleep(args.pause)
+                if outer_break: break
+            if outer_break: break
 
         # ------------ Summary ------------
         def fmt(t): 
@@ -218,8 +301,7 @@ def main():
         diag_pairs = {('fl','rr'), ('rr','fl'), ('fr','rl'), ('rl','fr')}
         side_votes = 0
         diag_votes = 0
-
-        seen = [w for (w,_,_,_) in answers if w in ('fl','fr','rl','rr')]
+        seen = [w for (w,_,_,_,_) in answers if w in ('fl','fr','rl','rr')]
         for a, b in zip(seen, seen[1:]):
             if (a,b) in side_pairs: side_votes += 1
             if (a,b) in diag_pairs: diag_votes += 1
@@ -237,14 +319,18 @@ def main():
         # Handy CLI lines to copy into your paired teleop later:
         print("\n=== COPY-PASTE (if correct) ===")
         def line(w):
-            p = best[w+'+']; r = best[w+'-']
-            if p and r:
-                print(f" --{w}-fwd-pwm {p[0]} --{w}-fwd-in1 {p[1]} --{w}-fwd-in2 {p[2]}  "
-                      f"--{w}-rev-pwm {r[0]} --{w}-rev-in1 {r[1]} --{w}-rev-in2 {r[2]}")
+            p_trip = best[w+'+']; r_trip = best[w+'-']
+            if p_trip and r_trip:
+                print(f" --{w}-fwd-pwm {p_trip[0]} --{w}-fwd-in1 {p_trip[1]} --{w}-fwd-in2 {p_trip[2]}  "
+                      f"--{w}-rev-pwm {r_trip[0]} --{w}-rev-in1 {r_trip[1]} --{w}-rev-in2 {r_trip[2]}")
         for w in ('fl','fr','rl','rr'):
             line(w)
 
+        print(f"\n[CSV] Saved: {args.csv}")
+
     finally:
+        try: csv_file.close()
+        except Exception: pass
         try: p.bus.close()
         except Exception: pass
 
