@@ -385,4 +385,4 @@ def main():
         print_suggestions(suggest_from_scores(score))
 
 if __name__ == "__main__":
-    main()
+    main() 
