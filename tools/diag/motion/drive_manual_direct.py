@@ -2,28 +2,44 @@
 # -*- coding: utf-8 -*-
 """
 Robot Savo — Manual Teleop (NO ROS2) via PCA9685 + H-Bridge
-Direction-Specific Wiring (FWD/REV triplets) + Paired-Board Mode
-+ Compact flags + optional CSV load
+Direction-Specific Wiring (FWD/REV triplets) + Paired-Board Mode + Safe Quench
 ---------------------------------------------------------------------------
-- Use compact flags:  --fl-fwd 0,2,7  --fl-rev 1,2,3  (pwm,in1,in2)
-- OR keep legacy flags: --fl-fwd-pwm 0 --fl-fwd-in1 2 --fl-fwd-in2 7 ...
-- OR load from a CSV row: --from-csv path --csv-row N
-- Paired mode forces FL=RL and FR=RR; strafes remapped to turns.
+WHY THIS VERSION
+- Your board requires *different* (PWM, IN1, IN2) for reverse vs forward,
+  and those sets can differ per side. This driver takes explicit FWD/REV
+  triplets for each wheel (FL, FR, RL, RR) and uses the right triplet per dir.
+- **Fix:** when changing direction we *quench* (drive low) **both** triplets
+  first, wait --settle-ms, then energize the new triplet. This prevents the
+  previous IN lines from staying latched high (root cause of "reverse goes fwd").
+- Optional --paired-mode forces FL=RL and FR=RR (mecanum strafe maps to turns).
 
-Keys:
-  W/S = forward/back,  A/D = strafe L/R (→ turn if paired),  Q/E = turn CCW/CW
-  Space=STOP,  G=gently test forward pulse,  M=print duties,  R=reset scale
-  1..4 pulses FL/FR/RL/RR forward, 5..8 reverse.  Esc/Ctrl+C quit.
+Safety
+- Motor channels must be 0..7. Servo channels 8..15 are reserved OFF by default.
+- Soft validation warns on overlaps (incl. cross-triplet overlaps).
+
+Keys
+  W = Forward   (+,+,+,+)
+  S = Backward  (-,-,-,-)
+  A = Strafe L  (-,+,+,-)  [paired → TL]
+  D = Strafe R  (+,-,-,+)  [paired → TR]
+  Q = Turn CCW  (-,-,+,+)
+  E = Turn CW   (+,+,-,-)
+  Space = STOP
+  G = gentle forward pulse
+  1..4 / 5..8 = pulse FL/FR/RL/RR forward / reverse
+  M = print current duties
+  R = reset speed scale
+  ESC / Ctrl+C = quit
 """
 
-import argparse, os, select, sys, termios, time, tty, signal, csv
+import argparse, os, select, sys, termios, time, tty, signal
 from dataclasses import dataclass
 
 # ---------------------- I2C ----------------------
 try:
     from smbus2 import SMBus
 except Exception:
-    print("ERROR: smbus2 missing. Install: sudo apt install -y python3-smbus  OR  pip3 install smbus2", file=sys.stderr)
+    print("ERROR: smbus2 missing. Install: sudo apt install -y python3-smbus OR pip3 install smbus2", file=sys.stderr)
     raise
 
 # ---------------------- PCA9685 low-level ----------------------
@@ -31,18 +47,22 @@ MODE1, MODE2, PRESCALE, LED0_ON_L = 0x00, 0x01, 0xFE, 0x06
 RESTART, SLEEP, AI, OUTDRV, ALLCALL = 0x80, 0x10, 0x20, 0x04, 0x01
 
 class PCA9685:
-    def __init__(self, bus: int = 1, addr: int = 0x40, freq_hz: float = 800.0, set_freq: bool = True, verbose=False):
-        self.addr = int(addr); self.bus = SMBus(int(bus)); self.verbose = verbose
+    def __init__(self, bus: int = 1, addr: int = 0x40, freq_hz: float = 800.0, set_freq: bool = True):
+        self.addr = int(addr); self.bus = SMBus(int(bus))
         self._w8(MODE2, OUTDRV); self._w8(MODE1, AI); time.sleep(0.003)
-        if set_freq: self.set_pwm_freq(freq_hz)
+        if set_freq:
+            self.set_pwm_freq(freq_hz)
         m1 = self._r8(MODE1); self._w8(MODE1, (m1 | RESTART | AI) & ~ALLCALL)
 
     def close(self):
         try: self.bus.close()
         except Exception: pass
 
-    def _w8(self, reg, val): self.bus.write_byte_data(self.addr, reg & 0xFF, val & 0xFF)
-    def _r8(self, reg):      return self.bus.read_byte_data(self.addr, reg & 0xFF)
+    def _w8(self, reg, val):
+        self.bus.write_byte_data(self.addr, reg & 0xFF, val & 0xFF)
+
+    def _r8(self, reg):
+        return self.bus.read_byte_data(self.addr, reg & 0xFF)
 
     def set_pwm_freq(self, f_hz: float):
         f = float(max(40.0, min(1500.0, f_hz)))
@@ -53,7 +73,7 @@ class PCA9685:
         self._w8(MODE1, old & ~SLEEP)
         time.sleep(0.003)
         self._w8(MODE1, (old | RESTART | AI) & ~ALLCALL)
-        if self.verbose: print(f"[PCA] freq={f:.1f}Hz prescale={prescale}")
+        print(f"[PCA] freq={f:.1f}Hz prescale={prescale}")
 
     def _raw(self, ch, on, off):
         base = LED0_ON_L + 4*int(ch)
@@ -63,9 +83,12 @@ class PCA9685:
     def set_duty(self, ch: int, duty: float):
         duty = max(0.0, min(1.0, float(duty)))
         off = int(round(duty * 4095))
-        if off <= 0: self.full_off(ch)
-        elif off >= 4095: self.full_on(ch)
-        else: self._raw(ch, 0, off)
+        if off <= 0:
+            self.full_off(ch)
+        elif off >= 4095:
+            self.full_on(ch)
+        else:
+            self._raw(ch, 0, off)
 
     def full_off(self, ch: int):
         base = LED0_ON_L + 4*int(ch)
@@ -91,50 +114,61 @@ class MotorDirConfig:
 class HBridgeDir:
     """
     Uses EXACT (pwm, in1, in2) triplets per direction (forward vs reverse).
-    Quenches both triplets on direction change to avoid stale highs.
+    **Safe quench**: when switching direction, idle *both* triplets and wait.
     """
-    def __init__(self, pca: PCA9685, cfg: MotorDirConfig, in_active_low=False, verbose=False):
+    def __init__(self, pca: PCA9685, cfg: MotorDirConfig, in_active_low=False, settle_ms: float = 12.0):
         self.pca = pca
         self.cfg = cfg
         self.in_active_low = bool(in_active_low)
-        self.verbose = verbose
-        self._last_dir = 0  # -1, 0, +1
+        self.settle_ms = float(settle_ms)
+        self._last_sign = 0  # -1, 0, +1
         self.stop()
 
+    # --- low level ---
     def _digital(self, ch: int, level: int):
-        if self.in_active_low: level ^= 1
+        if self.in_active_low:
+            level ^= 1
         (self.pca.full_on if level else self.pca.full_off)(ch)
 
-    def _quench_all(self):
-        # Turn off both IN pairs and both PWM channels
-        for t in (self.cfg.fwd, self.cfg.rev):
-            self._digital(t.in1, 0)
-            self._digital(t.in2, 0)
-            self.pca.set_duty(t.pwm, 0.0)
+    def _idle_triplet(self, dcfg: DirTriplet):
+        # Order matters for overlap cases: drop PWM first, then INs.
+        try:
+            self.pca.set_duty(dcfg.pwm, 0.0)
+        except Exception:
+            pass
+        self._digital(dcfg.in1, 0)
+        self._digital(dcfg.in2, 0)
 
+    def _quench_both(self):
+        self._idle_triplet(self.cfg.fwd)
+        self._idle_triplet(self.cfg.rev)
+
+    def _apply_dir(self, dcfg: DirTriplet, duty: float, forward_logic: bool):
+        # Direction: A=1,B=0 for forward; A=0,B=1 for reverse *logic* on the chosen triplet
+        if forward_logic:
+            self._digital(dcfg.in1, 1); self._digital(dcfg.in2, 0)
+        else:
+            self._digital(dcfg.in1, 0); self._digital(dcfg.in2, 1)
+        self.pca.set_duty(dcfg.pwm, duty)
+
+    # --- public ---
     def drive(self, duty_signed: float):
         d = max(-1.0, min(1.0, float(duty_signed)))
-        if abs(d) < 1e-3:
-            self.stop(); return
-        new_dir = 1 if d > 0 else -1
-        if self._last_dir != 0 and new_dir != self._last_dir:
-            # clear latched pins before swapping triplets
-            self._quench_all(); time.sleep(0.002)
-
-        if new_dir > 0:
-            t = self.cfg.fwd
-            if self.verbose: print(f"[{self.cfg.name}] FWD -> pwm={t.pwm} in1={t.in1} in2={t.in2} duty={abs(d):.2f}")
-            self._digital(t.in1, 1); self._digital(t.in2, 0); self.pca.set_duty(t.pwm, abs(d))
+        sign = 0 if abs(d) < 1e-3 else (1 if d > 0 else -1)
+        if sign == 0:
+            self.stop(); self._last_sign = 0; return
+        # If direction flips (e.g., + → - or - → +), quench both triplets first.
+        if self._last_sign != 0 and sign != self._last_sign:
+            self._quench_both()
+            time.sleep(self.settle_ms / 1000.0)
+        if sign > 0:
+            self._apply_dir(self.cfg.fwd, +d, forward_logic=True)
         else:
-            t = self.cfg.rev
-            if self.verbose: print(f"[{self.cfg.name}] REV -> pwm={t.pwm} in1={t.in1} in2={t.in2} duty={abs(d):.2f}")
-            self._digital(t.in1, 0); self._digital(t.in2, 1); self.pca.set_duty(t.pwm, abs(d))
-
-        self._last_dir = new_dir
+            self._apply_dir(self.cfg.rev, -d, forward_logic=False)
+        self._last_sign = sign
 
     def stop(self):
-        self._quench_all()
-        self._last_dir = 0
+        self._quench_both()
 
 # ---------------------- keyboard ----------------------
 class Keyboard:
@@ -157,7 +191,7 @@ class Keyboard:
                     arrows={b'A':b'UP',b'B':b'DOWN',b'C':b'RIGHT',b'D':b'LEFT'}
                     if b in arrows: out.append(arrows[b])
                 else:
-                    out.append(b'\x1b'); 
+                    out.append(b'\x1b');
                     if a: out.append(a)
             else:
                 out.append(ch)
@@ -168,54 +202,10 @@ class Keyboard:
         termios.tcsetattr(self.fd, termios.TCSADRAIN, self.old)
 
 # ---------------------- helpers ----------------------
-def clamp(x, lo, hi): return max(lo, min(hi, x))
-
-def parse_triplet_arg(s: str):
-    # "pwm,in1,in2" -> DirTriplet
-    parts = [p.strip() for p in str(s).split(",")]
-    if len(parts) != 3: raise ValueError(f"Triplet must be 3 ints: got '{s}'")
-    return DirTriplet(*(int(x) for x in parts))
-
-def read_triplets_from_csv(path: str, row_index: int):
-    """
-    CSV formats accepted (any one row):
-      fl_fwd,fl_rev,fr_fwd,fr_rev,rl_fwd,rl_rev,rr_fwd,rr_rev
-    where each cell is 'pwm,in1,in2'
-    OR columns named like fl_fwd_pwm, fl_fwd_in1, fl_fwd_in2, ...
-    """
-    with open(path, newline="") as f:
-        rows = list(csv.DictReader(f))
-    if row_index < 0 or row_index >= len(rows):
-        raise IndexError(f"CSV row {row_index} out of range (0..{len(rows)-1})")
-    r = rows[row_index]
-
-    def get_named(prefix):
-        # try compact
-        if f"{prefix}" in r and r[prefix].strip():
-            return parse_triplet_arg(r[prefix])
-        # try exploded
-        keys = (f"{prefix}_pwm", f"{prefix}_in1", f"{prefix}_in2")
-        if all(k in r and str(r[k]).strip() != "" for k in keys):
-            return DirTriplet(int(r[keys[0]]), int(r[keys[1]]), int(r[keys[2]]))
-        return None
-
-    data = {}
-    for w in ("fl","fr","rl","rr"):
-        data[w] = {}
-        data[w]['+'] = get_named(f"{w}_fwd")
-        data[w]['-'] = get_named(f"{w}_rev")
-        if data[w]['+'] is None or data[w]['-'] is None:
-            raise ValueError(f"CSV row missing {w}_fwd or {w}_rev")
-    return data
+def clamp(x, lo, hi):
+    return max(lo, min(hi, x))
 
 # ---------------------- teleop core ----------------------
-@dataclass
-class TeleTrip:
-    fl_fwd: DirTriplet; fl_rev: DirTriplet
-    fr_fwd: DirTriplet; fr_rev: DirTriplet
-    rl_fwd: DirTriplet; rl_rev: DirTriplet
-    rr_fwd: DirTriplet; rr_rev: DirTriplet
-
 class DirectTeleop:
     def __init__(self, args):
         self.args = args
@@ -229,7 +219,7 @@ class DirectTeleop:
         self._running = True
 
         # PCA + reserve channels (servos 8..15 OFF by default)
-        self.pca = PCA9685(bus=args.i2c_bus, addr=args.pca_addr, freq_hz=args.pwm_freq, set_freq=args.set_freq, verbose=args.verbose)
+        self.pca = PCA9685(bus=args.i2c_bus, addr=args.pca_addr, freq_hz=args.pwm_freq, set_freq=args.set_freq)
         try:
             reserved = [int(x) for x in str(args.reserve).split(',') if x.strip()!='']
             for ch in reserved: self.pca.full_off(ch)
@@ -237,17 +227,29 @@ class DirectTeleop:
         except Exception as e:
             print(f"[Teleop] Warning: reserve failed: {e}")
 
-        # resolve triplets (CSV > compact > legacy exploded)
-        trips = self._resolve_triplets(args)
+        # Build direction-specific configs from CLI
+        self.FL = HBridgeDir(self.pca, MotorDirConfig(
+            fwd=DirTriplet(args.fl_fwd_pwm, args.fl_fwd_in1, args.fl_fwd_in2),
+            rev=DirTriplet(args.fl_rev_pwm, args.fl_rev_in1, args.fl_rev_in2),
+            name="FL"
+        ), in_active_low=args.in_active_low, settle_ms=args.settle_ms)
+        self.FR = HBridgeDir(self.pca, MotorDirConfig(
+            fwd=DirTriplet(args.fr_fwd_pwm, args.fr_fwd_in1, args.fr_fwd_in2),
+            rev=DirTriplet(args.fr_rev_pwm, args.fr_rev_in1, args.fr_rev_in2),
+            name="FR"
+        ), in_active_low=args.in_active_low, settle_ms=args.settle_ms)
+        self.RL = HBridgeDir(self.pca, MotorDirConfig(
+            fwd=DirTriplet(args.rl_fwd_pwm, args.rl_fwd_in1, args.rl_fwd_in2),
+            rev=DirTriplet(args.rl_rev_pwm, args.rl_rev_in1, args.rl_rev_in2),
+            name="RL"
+        ), in_active_low=args.in_active_low, settle_ms=args.settle_ms)
+        self.RR = HBridgeDir(self.pca, MotorDirConfig(
+            fwd=DirTriplet(args.rr_fwd_pwm, args.rr_fwd_in1, args.rr_fwd_in2),
+            rev=DirTriplet(args.rr_rev_pwm, args.rr_rev_in1, args.rr_rev_in2),
+            name="RR"
+        ), in_active_low=args.in_active_low, settle_ms=args.settle_ms)
 
-        # Motors
-        self.FL = HBridgeDir(self.pca, MotorDirConfig(trips.fl_fwd, trips.fl_rev, "FL"), in_active_low=args.in_active_low, verbose=args.verbose)
-        self.FR = HBridgeDir(self.pca, MotorDirConfig(trips.fr_fwd, trips.fr_rev, "FR"), in_active_low=args.in_active_low, verbose=args.verbose)
-        self.RL = HBridgeDir(self.pca, MotorDirConfig(trips.rl_fwd, trips.rl_rev, "RL"), in_active_low=args.in_active_low, verbose=args.verbose)
-        self.RR = HBridgeDir(self.pca, MotorDirConfig(trips.rr_fwd, trips.rr_rev, "RR"), in_active_low=args.in_active_low, verbose=args.verbose)
-
-        self._soft_check_channels(args, trips)
-
+        self._soft_check_channels(args)
         self.duties = [0.0, 0.0, 0.0, 0.0]
         self.last_input = time.monotonic()
         self.start_time = self.last_input
@@ -258,60 +260,48 @@ class DirectTeleop:
         signal.signal(signal.SIGTERM, _sig)
 
         print(
-            "[Teleop] READY (dir-triplet mode). Esc/Ctrl+C to quit.\n"
+            "[Teleop] READY (dir-triplet mode, safe-quench). Esc/Ctrl+C to quit.\n"
             f" rate={self.hz}Hz deadman={self.deadman}s idle-exit={self.idle_exit}s max-runtime={self.max_runtime}s\n"
-            f" PCA=0x{args.pca_addr:02X} bus={args.i2c_bus} pwm={args.pwm_freq}Hz  paired_mode={args.paired_mode}\n"
-        )
-
-    def _resolve_triplets(self, a) -> TeleTrip:
-        if a.from_csv:
-            data = read_triplets_from_csv(a.from_csv, a.csv_row)
-            def g(w, s): return data[w][s]
-            return TeleTrip(
-                fl_fwd=g("fl","+"), fl_rev=g("fl","-"),
-                fr_fwd=g("fr","+"), fr_rev=g("fr","-"),
-                rl_fwd=g("rl","+"), rl_rev=g("rl","-"),
-                rr_fwd=g("rr","+"), rr_rev=g("rr","-"),
-            )
-        # compact
-        def pick(compact, pwm,in1,in2):
-            if compact is not None: return parse_triplet_arg(compact)
-            if None not in (pwm,in1,in2): return DirTriplet(pwm,in1,in2)
-            raise ValueError("Missing triplet flags; provide compact or legacy exploded flags.")
-        return TeleTrip(
-            fl_fwd = pick(a.fl_fwd, a.fl_fwd_pwm, a.fl_fwd_in1, a.fl_fwd_in2),
-            fl_rev = pick(a.fl_rev, a.fl_rev_pwm, a.fl_rev_in1, a.fl_rev_in2),
-            fr_fwd = pick(a.fr_fwd, a.fr_fwd_pwm, a.fr_fwd_in1, a.fr_fwd_in2),
-            fr_rev = pick(a.fr_rev, a.fr_rev_pwm, a.fr_rev_in1, a.fr_rev_in2),
-            rl_fwd = pick(a.rl_fwd, a.rl_fwd_pwm, a.rl_fwd_in1, a.rl_fwd_in2),
-            rl_rev = pick(a.rl_rev, a.rl_rev_pwm, a.rl_rev_in1, a.rl_rev_in2),
-            rr_fwd = pick(a.rr_fwd, a.rr_fwd_pwm, a.rr_fwd_in1, a.rr_fwd_in2),
-            rr_rev = pick(a.rr_rev, a.rr_rev_pwm, a.rr_rev_in1, a.rr_rev_in2),
+            f" PCA=0x{args.pca_addr:02X} bus={args.i2c_bus} pwm={args.pwm_freq}Hz paired_mode={args.paired_mode} settle={args.settle_ms}ms in_active_low={args.in_active_low}\n"
         )
 
     # ---------------- soft safety check ----------------
-    def _soft_check_channels(self, args, trips: TeleTrip):
+    def _soft_check_channels(self, args):
         reserved = set(int(x) for x in str(args.reserve).split(',') if x.strip()!='')
 
         def check_triplet(name, t: DirTriplet):
             warn = []
             for label, ch in (("PWM",t.pwm),("IN1",t.in1),("IN2",t.in2)):
-                if ch < 0 or ch > 7:
-                    warn.append(f"{label}={ch} out of motor-safe 0..7")
-                if ch in reserved:
-                    warn.append(f"{label}={ch} in reserved {sorted(reserved)}")
+                if ch < 0 or ch > 7: warn.append(f"{label}={ch} out of motor-safe 0..7")
+                if ch in reserved: warn.append(f"{label}={ch} in reserved {sorted(reserved)}")
             if len({t.pwm, t.in1, t.in2}) < 3:
-                warn.append("PWM/IN overlap inside triplet (verify board’s quirks)")
-            if warn:
-                print(f"[WARN] {name}: " + "; ".join(warn))
+                warn.append("PWM/IN overlap inside triplet (verify wiring)")
+            if warn: print(f"[WARN] {name}: " + "; ".join(warn))
 
-        for nm,t in (
-            ("FL.fwd", trips.fl_fwd), ("FL.rev", trips.fl_rev),
-            ("FR.fwd", trips.fr_fwd), ("FR.rev", trips.fr_rev),
-            ("RL.fwd", trips.rl_fwd), ("RL.rev", trips.rl_rev),
-            ("RR.fwd", trips.rr_fwd), ("RR.rev", trips.rr_rev),
-        ):
-            check_triplet(nm, t)
+        # Per-triplet
+        check_triplet("FL.fwd", DirTriplet(args.fl_fwd_pwm, args.fl_fwd_in1, args.fl_fwd_in2))
+        check_triplet("FL.rev", DirTriplet(args.fl_rev_pwm, args.fl_rev_in1, args.fl_rev_in2))
+        check_triplet("FR.fwd", DirTriplet(args.fr_fwd_pwm, args.fr_fwd_in1, args.fr_fwd_in2))
+        check_triplet("FR.rev", DirTriplet(args.fr_rev_pwm, args.fr_rev_in1, args.fr_rev_in2))
+        check_triplet("RL.fwd", DirTriplet(args.rl_fwd_pwm, args.rl_fwd_in1, args.rl_fwd_in2))
+        check_triplet("RL.rev", DirTriplet(args.rl_rev_pwm, args.rl_rev_in1, args.rl_rev_in2))
+        check_triplet("RR.fwd", DirTriplet(args.rr_fwd_pwm, args.rr_fwd_in1, args.rr_fwd_in2))
+        check_triplet("RR.rev", DirTriplet(args.rr_rev_pwm, args.rr_rev_in1, args.rr_rev_in2))
+
+        # Cross-triplet overlaps for **each motor** (common cause of weirdness)
+        def cross_check(name, f: DirTriplet, r: DirTriplet):
+            xs = []
+            for a_lbl, a in (("f.PWM",f.pwm),("f.IN1",f.in1),("f.IN2",f.in2)):
+                for b_lbl, b in (("r.PWM",r.pwm),("r.IN1",r.in1),("r.IN2",r.in2)):
+                    if a == b:
+                        xs.append(f"{a_lbl}={b_lbl}={a}")
+            if xs:
+                print(f"[WARN] {name} FWD/REV share channels → {', '.join(xs)}. Quench helps, but wiring should avoid this.")
+
+        cross_check("FL", DirTriplet(args.fl_fwd_pwm, args.fl_fwd_in1, args.fl_fwd_in2), DirTriplet(args.fl_rev_pwm, args.fl_rev_in1, args.fl_rev_in2))
+        cross_check("FR", DirTriplet(args.fr_fwd_pwm, args.fr_fwd_in1, args.fr_fwd_in2), DirTriplet(args.fr_rev_pwm, args.fr_rev_in1, args.fr_rev_in2))
+        cross_check("RL", DirTriplet(args.rl_fwd_pwm, args.rl_fwd_in1, args.rl_fwd_in2), DirTriplet(args.rl_rev_pwm, args.rl_rev_in1, args.rl_rev_in2))
+        cross_check("RR", DirTriplet(args.rr_fwd_pwm, args.rr_fwd_in1, args.rr_fwd_in2), DirTriplet(args.rr_rev_pwm, args.rr_rev_in1, args.rr_rev_in2))
 
     # ---------------- lifecycle ----------------
     def close(self):
@@ -345,13 +335,11 @@ class DirectTeleop:
                 if not got and (now - self.last_input) > self.deadman:
                     if any(abs(x) > 1e-6 for x in self.duties):
                         print("[Deadman] STOP")
-                    self.apply_pattern((0,0,0,0), 0.0)
-
-                if self.idle_exit > 0 and (now - self.last_input) > self.idle_exit:
-                    print("[Idle] No input → exiting"); break
+                        self.apply_pattern((0,0,0,0), 0.0)
+                    if self.idle_exit > 0 and (now - self.last_input) > self.idle_exit:
+                        print("[Idle] No input → exiting"); break
 
                 self._apply_duties()
-
                 sleep_t = period - (time.monotonic() - now)
                 if sleep_t > 0: time.sleep(sleep_t)
         finally:
@@ -359,61 +347,82 @@ class DirectTeleop:
 
     # ---------------- input handling ----------------
     def _handle_key(self, ch) -> bool:
-        if ch in (b"\x1b", b"\x03"): print("[Teleop] Quit"); return True
-        if ch == b' ': self.apply_pattern((0,0,0,0), 0.0, "[Cmd] STOP"); return False
-        if ch in (b'r', b'R', b"\x12"): self.scale=1.0; print("[Scale] reset → 1.0"); return False
-        if ch in (b'g', b'G'): self._gentle_forward(); return False
-        if ch in (b'm', b'M'): self._print_status(); return False
+        if ch in (b"\x1b", b"\x03"):
+            print("[Teleop] Quit"); return True
+        if ch == b' ':
+            self.apply_pattern((0,0,0,0), 0.0, "[Cmd] STOP"); return False
+        if ch in (b'r', b'R', b"\x12"):
+            self.scale=1.0; print("[Scale] reset → 1.0"); return False
+        if ch in (b'g', b'G'):
+            self._gentle_forward(); return False
+        if ch in (b'm', b'M'):
+            self._print_status(); return False
 
         slow = (isinstance(ch,bytes) and len(ch)==1 and 1 <= ch[0] <= 26)
         fast = (isinstance(ch,bytes) and ch.isalpha() and ch.isupper())
         self.scale = clamp(self.scale_low if slow else (self.scale_high if fast else 1.0), 0.05, 3.0)
 
         # patterns
-        F  = (+1,+1,+1,+1)
-        B  = (-1,-1,-1,-1)
+        F = (+1,+1,+1,+1)
+        B = (-1,-1,-1,-1)
         SL = (-1,+1,+1,-1)
         SR = (+1,-1,-1,+1)
         TL = (-1,-1,+1,+1)
         TR = (+1,+1,-1,-1)
 
-        if ch in (b'w', b'W', b'UP'):      self.apply_pattern(F,  announce='[Cmd] F (forward)')
-        elif ch in (b's', b'S', b'DOWN'):   self.apply_pattern(B,  announce='[Cmd] B (back)')
-        elif ch in (b'a', b'A', b'LEFT'):   self.apply_pattern(SL, announce='[Cmd] SL (strafe L)')
-        elif ch in (b'd', b'D', b'RIGHT'):  self.apply_pattern(SR, announce='[Cmd] SR (strafe R)')
-        elif ch in (b'q', b'Q'):            self.apply_pattern(TL, announce='[Cmd] TL (turn CCW)')
-        elif ch in (b'e', b'E'):            self.apply_pattern(TR, announce='[Cmd] TR (turn CW)')
-        elif ch == b'1': self._pulse_wheels([1,0,0,0]);        return False
-        elif ch == b'2': self._pulse_wheels([0,1,0,0]);        return False
-        elif ch == b'3': self._pulse_wheels([0,0,1,0]);        return False
-        elif ch == b'4': self._pulse_wheels([0,0,0,1]);        return False
-        elif ch == b'5': self._pulse_wheels([1,0,0,0], -0.12); return False
-        elif ch == b'6': self._pulse_wheels([0,1,0,0], -0.12); return False
-        elif ch == b'7': self._pulse_wheels([0,0,1,0], -0.12); return False
-        elif ch == b'8': self._pulse_wheels([0,0,0,1], -0.12); return False
+        if ch in (b'w', b'W', b'UP'):
+            self.apply_pattern(F, announce='[Cmd] F (forward)')
+        elif ch in (b's', b'S', b'DOWN'):
+            self.apply_pattern(B, announce='[Cmd] B (back)')
+        elif ch in (b'a', b'A', b'LEFT'):
+            self.apply_pattern(SL, announce='[Cmd] SL (strafe L)')
+        elif ch in (b'd', b'D', b'RIGHT'):
+            self.apply_pattern(SR, announce='[Cmd] SR (strafe R)')
+        elif ch in (b'q', b'Q'):
+            self.apply_pattern(TL, announce='[Cmd] TL (turn CCW)')
+        elif ch in (b'e', b'E'):
+            self.apply_pattern(TR, announce='[Cmd] TR (turn CW)')
+        elif ch == b'1':
+            self._pulse_wheels([1,0,0,0]); return False
+        elif ch == b'2':
+            self._pulse_wheels([0,1,0,0]); return False
+        elif ch == b'3':
+            self._pulse_wheels([0,0,1,0]); return False
+        elif ch == b'4':
+            self._pulse_wheels([0,0,0,1]); return False
+        elif ch == b'5':
+            self._pulse_wheels([1,0,0,0], -0.12); return False
+        elif ch == b'6':
+            self._pulse_wheels([0,1,0,0], -0.12); return False
+        elif ch == b'7':
+            self._pulse_wheels([0,0,1,0], -0.12); return False
+        elif ch == b'8':
+            self._pulse_wheels([0,0,0,1], -0.12); return False
         return False
 
     # ---------------- patterns to duties ----------------
     def apply_pattern(self, signs, magnitude=1.0, announce=None):
+        """ signs: (FL, FR, RL, RR) each ∈ {-1,0,+1} """
         mag = clamp(float(magnitude) * self.scale, 0.0, 1.0)
         s = list(signs)
-
         if self.args.paired_mode:
-            # strafe → turn and pair sides
-            if tuple(signs) == (-1,+1,+1,-1):   # SL → TL
+            if tuple(signs) == (-1,+1,+1,-1):  # SL → TL
                 print("[Paired] SL not possible → using TL"); s = [-1,-1,+1,+1]
-            elif tuple(signs) == (+1,-1,-1,+1): # SR → TR
+            elif tuple(signs) == (+1,-1,-1,+1):  # SR → TR
                 print("[Paired] SR not possible → using TR"); s = [+1,+1,-1,-1]
             s[2] = s[0]  # RL = FL
             s[3] = s[1]  # RR = FR
-
         self.duties = [clamp(si * mag, -1.0, 1.0) for si in s]
-        if announce: print(f"{announce}  signs={tuple(s)}  mag={mag:.2f}")
+        if announce:
+            print(f"{announce} signs={tuple(s)} mag={mag:.2f}")
 
     def _apply_duties(self):
         d = self.duties
         try:
-            self.FL.drive(d[0]); self.FR.drive(d[1]); self.RL.drive(d[2]); self.RR.drive(d[3])
+            self.FL.drive(d[0])
+            self.FR.drive(d[1])
+            self.RL.drive(d[2])
+            self.RR.drive(d[3])
         except Exception as e:
             print(f"[Teleop] Motor drive error: {e}")
 
@@ -439,19 +448,19 @@ class DirectTeleop:
 
     def _print_status(self):
         d = self.duties
-        print(f"[duties] FL {d[0]:+0.2f}  FR {d[1]:+0.2f}  RL {d[2]:+0.2f}  RR {d[3]:+0.2f}")
+        print(f"[duties] FL {d[0]:+0.2f} FR {d[1]:+0.2f} RL {d[2]:+0.2f} RR {d[3]:+0.2f}")
 
 # ---------------------- CLI ----------------------
 def build_argparser():
-    p = argparse.ArgumentParser(description='Robot Savo — Manual Teleop (direction-specific wiring)')
-
+    p = argparse.ArgumentParser(description='Robot Savo — Manual Teleop (direction-specific wiring + safe quench)')
     # timing / exit / scaling
     p.add_argument('--hz', type=float, default=30.0)
     p.add_argument('--deadman', type=float, default=0.40)
-    p.add_argument('--idle-exit', type=float, default=0.0)
-    p.add_argument('--max-runtime', type=float, default=0.0)
+    p.add_argument('--idle-exit', type=float, default=0.0, help='Auto-exit after SEC idle (0=never)')
+    p.add_argument('--max-runtime', type=float, default=0.0, help='Hard exit after SEC (0=never)')
     p.add_argument('--scale-low', type=float, default=0.25)
     p.add_argument('--scale-high', type=float, default=1.35)
+    p.add_argument('--settle-ms', type=float, default=12.0, help='Delay after quench before energizing new direction')
 
     # I2C/PCA
     p.add_argument('--i2c-bus', type=int, default=1)
@@ -461,35 +470,44 @@ def build_argparser():
     p.add_argument('--no-set-freq', dest='set_freq', action='store_false')
     p.add_argument('--reserve', type=str, default='8,9,10,11,12,13,14,15')
     p.add_argument('--in-active-low', action='store_true')
-    p.add_argument('--verbose', action='store_true')
 
-    # ========== NEW: compact triplets ==========
-    p.add_argument('--fl-fwd', type=str); p.add_argument('--fl-rev', type=str)
-    p.add_argument('--fr-fwd', type=str); p.add_argument('--fr-rev', type=str)
-    p.add_argument('--rl-fwd', type=str); p.add_argument('--rl-rev', type=str)
-    p.add_argument('--rr-fwd', type=str); p.add_argument('--rr-rev', type=str)
-
-    # Back-compat: legacy exploded flags (optional if compact provided)
+    # ---------- Direction-specific triplets (0..7) ----------
     # FL
-    p.add_argument('--fl-fwd-pwm', type=int); p.add_argument('--fl-fwd-in1', type=int); p.add_argument('--fl-fwd-in2', type=int)
-    p.add_argument('--fl-rev-pwm', type=int); p.add_argument('--fl-rev-in1', type=int); p.add_argument('--fl-rev-in2', type=int)
-    # FR
-    p.add_argument('--fr-fwd-pwm', type=int); p.add_argument('--fr-fwd-in1', type=int); p.add_argument('--fr-fwd-in2', type=int)
-    p.add_argument('--fr-rev-pwm', type=int); p.add_argument('--fr-rev-in1', type=int); p.add_argument('--fr-rev-in2', type=int)
-    # RL
-    p.add_argument('--rl-fwd-pwm', type=int); p.add_argument('--rl-fwd-in1', type=int); p.add_argument('--rl-fwd-in2', type=int)
-    p.add_argument('--rl-rev-pwm', type=int); p.add_argument('--rl-rev-in1', type=int); p.add_argument('--rl-rev-in2', type=int)
-    # RR
-    p.add_argument('--rr-fwd-pwm', type=int); p.add_argument('--rr-fwd-in1', type=int); p.add_argument('--rr-fwd-in2', type=int)
-    p.add_argument('--rr-rev-pwm', type=int); p.add_argument('--rr-rev-in1', type=int); p.add_argument('--rr-rev-in2', type=int)
+    p.add_argument('--fl-fwd-pwm', type=int, required=True)
+    p.add_argument('--fl-fwd-in1', type=int, required=True)
+    p.add_argument('--fl-fwd-in2', type=int, required=True)
+    p.add_argument('--fl-rev-pwm', type=int, required=True)
+    p.add_argument('--fl-rev-in1', type=int, required=True)
+    p.add_argument('--fl-rev-in2', type=int, required=True)
 
-    # Optional: load all triplets from a CSV mapping row
-    p.add_argument('--from-csv', type=str, help='CSV with columns fl_fwd,fl_rev,... (pwm,in1,in2) or exploded fields')
-    p.add_argument('--csv-row', type=int, default=0)
+    # FR
+    p.add_argument('--fr-fwd-pwm', type=int, required=True)
+    p.add_argument('--fr-fwd-in1', type=int, required=True)
+    p.add_argument('--fr-fwd-in2', type=int, required=True)
+    p.add_argument('--fr-rev-pwm', type=int, required=True)
+    p.add_argument('--fr-rev-in1', type=int, required=True)
+    p.add_argument('--fr-rev-in2', type=int, required=True)
+
+    # RL
+    p.add_argument('--rl-fwd-pwm', type=int, required=True)
+    p.add_argument('--rl-fwd-in1', type=int, required=True)
+    p.add_argument('--rl-fwd-in2', type=int, required=True)
+    p.add_argument('--rl-rev-pwm', type=int, required=True)
+    p.add_argument('--rl-rev-in1', type=int, required=True)
+    p.add_argument('--rl-rev-in2', type=int, required=True)
+
+    # RR
+    p.add_argument('--rr-fwd-pwm', type=int, required=True)
+    p.add_argument('--rr-fwd-in1', type=int, required=True)
+    p.add_argument('--rr-fwd-in2', type=int, required=True)
+    p.add_argument('--rr-rev-pwm', type=int, required=True)
+    p.add_argument('--rr-rev-in1', type=int, required=True)
+    p.add_argument('--rr-rev-in2', type=int, required=True)
 
     # Force side pairing
     p.add_argument('--paired-mode', action='store_true', help='Force FL=RL and FR=RR; map SL/SR to TL/TR')
     return p
+
 
 def main(argv=None):
     args = build_argparser().parse_args(argv)
@@ -501,7 +519,7 @@ def main(argv=None):
         print("\n[Main] KeyboardInterrupt")
     finally:
         if t: t.close()
-    print("[Main] Exit complete")
+        print("[Main] Exit complete")
 
 if __name__ == '__main__':
     main()
