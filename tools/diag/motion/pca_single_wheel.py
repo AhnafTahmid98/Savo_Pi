@@ -14,18 +14,18 @@ class PCA:
             old = self.r8(MODE1); self.w8(MODE1, (old & ~RESTART)|SLEEP)
             self.w8(PRESCALE, prescale); self.w8(MODE1, old & ~SLEEP)
             time.sleep(0.003); self.w8(MODE1, (old | RESTART | AI) & ~ALLCALL)
-    def w8(self, r, v): self.bus.write_byte_data(self.addr, r&0xFF, v&0xFF)
-    def r8(self, r):    return self.bus.read_byte_data(self.addr, r&0FF)
+    def w8(self, r, v): self.bus.write_byte_data(self.addr, r & 0xFF, v & 0xFF)
+    def r8(self, r):    return self.bus.read_byte_data(self.addr, r & 0xFF)
     def raw(self, ch, on, off):
         base = LED0_ON_L + 4*int(ch)
         self.w8(base+0, on & 0xFF); self.w8(base+1, (on>>8)&0x0F)
-        self.w8(base+2, off&0xFF);  self.w8(base+3, (off>>8)&0x0F)
+        self.w8(base+2, off & 0xFF); self.w8(base+3, (off>>8)&0x0F)
     def full_on(self, ch):  self.raw(ch, 0, 0); self.w8(LED0_ON_L+4*ch+1, 0x10)
     def full_off(self, ch): self.raw(ch, 0, 0); self.w8(LED0_ON_L+4*ch+3, 0x10)
     def set_duty(self, ch, duty):
         duty = max(0.0, min(1.0, duty)); off = int(round(duty*4095))
-        if off<=0: self.full_off(ch)
-        elif off>=4095: self.full_on(ch)
+        if off <= 0: self.full_off(ch)
+        elif off >= 4095: self.full_on(ch)
         else: self.raw(ch, 0, off)
 
 def digital(pca, ch, level, active_low=False):
@@ -63,7 +63,7 @@ def main():
             for ch in range(16):
                 p.full_off(ch)
 
-        # hold safety LOWs (e.g., other wheel’s IN pins)
+        # hold safety LOWs (e.g., other wheel’s IN pins that share this PWM)
         for ch in force_low:
             digital(p, ch, 0, args.active_low)
 
