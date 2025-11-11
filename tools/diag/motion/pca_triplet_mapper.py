@@ -1,28 +1,27 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-PCA9685 Triplet Mapper + Pairing Detector (Motors on 0..7, Servos 8..15)
-------------------------------------------------------------------------
-- Systematically tests (PWM, IN1, IN2) triplets for FWD and REV.
-- You confirm which wheel(s) moved after each short pulse.
-- Produces suggested triplets per wheel (FL/FR/RL/RR) for FWD+REV.
-- Infers if the board is INDEPENDENT, SIDE-PAIRED (FL=RL, FR=RR),
-  or DIAGONAL-PAIRED (FL=RR, FR=RL).
+PCA9685 Triplet Mapper + Pairing Detector (with sign labels)
+------------------------------------------------------------
+- Systematically tests (PWM, IN1, IN2) for FWD and REV.
+- Prints sign for each pulse: FWD → "+"  |  REV → "−"
+- You can respond: fl, fr, rl, rr, none, multi
+  OR include sign: fl+, fl-, fr+, fr-, rl+, rl-, rr+, rr-
+- Summarizes best triplets per wheel with signs:
+    FL: + (p,i1,i2)    - (p,i1,i2)
+- Infers pairing: INDEPENDENT / SIDE-PAIRED / DIAGONAL-PAIRED / MIXED
 
 Safety:
-- Low duty (default 0.18) and short pulse (0.5 s).
-- Quenches outputs between tests.
-- Skips reserved channels (default reserve: 8..15 for servos).
+- Low duty + short pulses; quench between tests.
+- Skips reserved 8..15 by default (servos).
 
-Usage (example):
+Examples:
   python3 tools/diag/motion/pca_triplet_mapper.py \
     --pca-addr 0x40 --i2c-bus 1 --pwm-freq 800 \
-    --reserve 8,9,10,11,12,13,14,15
-
-Tips:
-- Put robot on blocks.
-- If too many combos, narrow with --pwm-cands and --in-cands, e.g.:
-    --pwm-cands 0,2,6,7 --in-cands 0,1,3,4,5,6,7
+    --reserve 8,9,10,11,12,13,14,15 \
+    --pulse 3.0 --duty 0.22 --pause 0.70 \
+    --pwm-cands 0,1,2,6,7 \
+    --in-cands 0,1,3,4,5,6,7
 """
 
 import argparse, sys, time, itertools
@@ -92,20 +91,26 @@ def parse_list(arg: Optional[str], default: List[int]) -> List[int]:
         out.append(int(tok))
     return out
 
-def ask_moved(prompt: str) -> str:
+def ask_moved(prompt: str) -> Tuple[str, Optional[int]]:
     """
-    Returns one of: 'fl','fr','rl','rr','none','multi'
+    Returns (wheel, sign_override)
+     - wheel: 'fl','fr','rl','rr','none','multi'
+     - sign_override: +1, -1, or None (if no explicit +/- provided)
+    Accepts entries like: fl, fr, rl, rr, none, multi, or fl+, fr-, rl+, rr-
     """
-    mapping = {'fl','fr','rl','rr','none','multi'}
+    valid = {'fl','fr','rl','rr','none','multi',
+             'fl+','fl-','fr+','fr-','rl+','rl-','rr+','rr-'}
     while True:
         s = input(prompt).strip().lower()
-        if s in mapping:
-            return s
-        print("Please type one of: fl, fr, rl, rr, none, multi")
+        if s in valid:
+            if s.endswith('+'): return (s[:-1], +1)
+            if s.endswith('-'): return (s[:-1], -1)
+            return (s, None)
+        print("Please type: fl, fr, rl, rr, none, multi OR add sign: fl+, fr-, rl+, rr-")
 
 # ---------- main ----------
 def main():
-    ap = argparse.ArgumentParser("PCA9685 Triplet Mapper + Pairing Detector")
+    ap = argparse.ArgumentParser("PCA9685 Triplet Mapper + Pairing Detector (signed)")
     ap.add_argument("--i2c-bus", type=int, default=1)
     ap.add_argument("--pca-addr", type=lambda x:int(x,0), default=0x40)
     ap.add_argument("--pwm-freq", type=float, default=800.0)
@@ -134,43 +139,41 @@ def main():
         in_cands  = [c for c in parse_list(args.in_cands,  list(range(8))) if c not in reserved]
 
         print("\nRobot on blocks. I’ll try (PWM,IN1,IN2) combos.")
-        print("After each pulse, type which moved: fl, fr, rl, rr, none, multi")
-        print("Press Ctrl+C to stop early.\n")
+        print("I label sign by pulse type: FWD → '+', REV → '−'.")
+        print("You can override with: fl+, fr-, rl+, rr- (if observed sign differs).")
+        print("If multiple moved, answer 'multi'; if nothing, answer 'none'.\n")
 
-        # Keep best hits per wheel/direction by duty response order (first reliable wins)
+        # Best hits per wheel/direction (we store first reliable)
         best = {
-            'fl_fwd': None, 'fl_rev': None,
-            'fr_fwd': None, 'fr_rev': None,
-            'rl_fwd': None, 'rl_rev': None,
-            'rr_fwd': None, 'rr_rev': None,
+            'fl+': None, 'fl-': None,
+            'fr+': None, 'fr-': None,
+            'rl+': None, 'rl-': None,
+            'rr+': None, 'rr-': None,
         }
 
-        # Record co-movement to infer pairing
-        comove = []  # list of (who, dir, reported)
+        # For pairing inference
+        answers = []  # list of (who, sign, triplet, phase)
         tested = 0
-
-        def stop_all():
-            # We can't know all channels; best-effort quench for tested ones happens per triplet.
-            pass
 
         for pwm, in1, in2 in itertools.product(pwm_cands, in_cands, in_cands):
             if in1 == in2: continue
-            if pwm in (in1, in2): continue  # avoid overlapping within triplet
+            if pwm in (in1, in2): continue  # avoid overlap within a triplet
 
-            # ---- FWD pulse (IN1=1, IN2=0) ----
+            # ---- FWD pulse: label '+' ----
             quench_triplet(p, pwm, in1, in2, args.active_low)
             time.sleep(0.05)
             digital(p, in1, 1, args.active_low)
             digital(p, in2, 0, args.active_low)
             p.set_duty(pwm, args.duty)
-            print(f"[TEST] FWD  triplet=({pwm},{in1},{in2})  duty={args.duty:.2f} for {args.pulse:.2f}s")
+            print(f"[TEST] FWD  (+) → triplet=({pwm},{in1},{in2}) duty={args.duty:.2f} for {args.pulse:.2f}s")
             time.sleep(args.pulse)
             quench_triplet(p, pwm, in1, in2, args.active_low)
 
-            who = ask_moved(" → moved? (fl/fr/rl/rr/none/multi): ")
-            comove.append((who, 'fwd', (pwm,in1,in2)))
-            if who in ('fl','fr','rl','rr'):
-                key = f"{who}_fwd"
+            who, override = ask_moved("  moved? (fl/fr/rl/rr/none/multi or fl+/fr-/...): ")
+            eff_sign = override if override in (+1,-1) else +1
+            answers.append((who, eff_sign, (pwm,in1,in2), 'fwd'))
+            if who in ('fl','fr','rl','rr') and eff_sign == +1:
+                key = f"{who}+"
                 if best[key] is None:
                     best[key] = (pwm,in1,in2)
 
@@ -178,20 +181,21 @@ def main():
             if args.max_tests and tested >= args.max_tests: break
             time.sleep(args.pause)
 
-            # ---- REV pulse (IN1=0, IN2=1) ----
+            # ---- REV pulse: label '−' ----
             quench_triplet(p, pwm, in1, in2, args.active_low)
             time.sleep(0.05)
             digital(p, in1, 0, args.active_low)
             digital(p, in2, 1, args.active_low)
             p.set_duty(pwm, args.duty)
-            print(f"[TEST] REV  triplet=({pwm},{in1},{in2})  duty={args.duty:.2f} for {args.pulse:.2f}s")
+            print(f"[TEST] REV  (−) → triplet=({pwm},{in1},{in2}) duty={args.duty:.2f} for {args.pulse:.2f}s")
             time.sleep(args.pulse)
             quench_triplet(p, pwm, in1, in2, args.active_low)
 
-            who = ask_moved(" → moved? (fl/fr/rl/rr/none/multi): ")
-            comove.append((who, 'rev', (pwm,in1,in2)))
-            if who in ('fl','fr','rl','rr'):
-                key = f"{who}_rev"
+            who, override = ask_moved("  moved? (fl/fr/rl/rr/none/multi or fl+/fr-/...): ")
+            eff_sign = override if override in (+1,-1) else -1
+            answers.append((who, eff_sign, (pwm,in1,in2), 'rev'))
+            if who in ('fl','fr','rl','rr') and eff_sign == -1:
+                key = f"{who}-"
                 if best[key] is None:
                     best[key] = (pwm,in1,in2)
 
@@ -203,26 +207,19 @@ def main():
         def fmt(t): 
             return "None" if t is None else f"({t[0]},{t[1]},{t[2]})"
 
-        print("\n=== SUGGESTED TRIPLETS (first reliable hits) ===")
-        print(f" FL: FWD {fmt(best['fl_fwd'])}   REV {fmt(best['fl_rev'])}")
-        print(f" FR: FWD {fmt(best['fr_fwd'])}   REV {fmt(best['fr_rev'])}")
-        print(f" RL: FWD {fmt(best['rl_fwd'])}   REV {fmt(best['rl_rev'])}")
-        print(f" RR: FWD {fmt(best['rr_fwd'])}   REV {fmt(best['rr_rev'])}")
+        print("\n=== SUGGESTED TRIPLETS (with signs) ===")
+        print(f" FL: + {fmt(best['fl+'])}    - {fmt(best['fl-'])}")
+        print(f" FR: + {fmt(best['fr+'])}    - {fmt(best['fr-'])}")
+        print(f" RL: + {fmt(best['rl+'])}    - {fmt(best['rl-'])}")
+        print(f" RR: + {fmt(best['rr+'])}    - {fmt(best['rr-'])}")
 
-        # Pairing inference: count co-move patterns from *the answers you gave*
-        # We only tally when a single clear wheel moved (no 'multi'/'none').
+        # Pairing inference (coarse, from answer sequence)
         side_pairs = {('fl','rl'), ('rl','fl'), ('fr','rr'), ('rr','fr')}
         diag_pairs = {('fl','rr'), ('rr','fl'), ('fr','rl'), ('rl','fr')}
         side_votes = 0
         diag_votes = 0
 
-        # We can’t see “partner” directly; but if during scanning FL and RL both
-        # appear frequently for many different triplets, that’s a side tie.
-        # A simpler proxy: measure which two wheels showed up most often together
-        # across FWD/REV: we’ll approximate from your answers sequence order.
-        # Here we just count side vs diag hits across all recognized singles.
-        seen = [w for (w,_,_) in comove if w in ('fl','fr','rl','rr')]
-        # Pair adjacent answers into rough co-move categories
+        seen = [w for (w,_,_,_) in answers if w in ('fl','fr','rl','rr')]
         for a, b in zip(seen, seen[1:]):
             if (a,b) in side_pairs: side_votes += 1
             if (a,b) in diag_pairs: diag_votes += 1
@@ -232,29 +229,20 @@ def main():
             print(" Likely SIDE-PAIRED (FL=RL, FR=RR).")
         elif diag_votes >= side_votes + 2:
             print(" Likely DIAGONAL-PAIRED (FL=RR, FR=RL).")
-        elif all(best[k] is not None for k in best.keys()):
+        elif all(best[k] is not None for k in ('fl+','fl-','fr+','fr-','rl+','rl-','rr+','rr-')):
             print(" Likely INDEPENDENT (each wheel separate).")
         else:
             print(" Mixed/Ambiguous. Narrow search or re-test.")
 
         # Handy CLI lines to copy into your paired teleop later:
         print("\n=== COPY-PASTE (if correct) ===")
-        if all(best[k] is not None for k in ('fl_fwd','fl_rev')):
-            t = best['fl_fwd']; r = best['fl_rev']
-            print(f" --fl-fwd-pwm {t[0]} --fl-fwd-in1 {t[1]} --fl-fwd-in2 {t[2]}  "
-                  f"--fl-rev-pwm {r[0]} --fl-rev-in1 {r[1]} --fl-rev-in2 {r[2]}")
-        if all(best[k] is not None for k in ('fr_fwd','fr_rev')):
-            t = best['fr_fwd']; r = best['fr_rev']
-            print(f" --fr-fwd-pwm {t[0]} --fr-fwd-in1 {t[1]} --fr-fwd-in2 {t[2]}  "
-                  f"--fr-rev-pwm {r[0]} --fr-rev-in1 {r[1]} --fr-rev-in2 {r[2]}")
-        if all(best[k] is not None for k in ('rl_fwd','rl_rev')):
-            t = best['rl_fwd']; r = best['rl_rev']
-            print(f" --rl-fwd-pwm {t[0]} --rl-fwd-in1 {t[1]} --rl-fwd-in2 {t[2]}  "
-                  f"--rl-rev-pwm {r[0]} --rl-rev-in1 {r[1]} --rl-rev-in2 {r[2]}")
-        if all(best[k] is not None for k in ('rr_fwd','rr_rev')):
-            t = best['rr_fwd']; r = best['rr_rev']
-            print(f" --rr-fwd-pwm {t[0]} --rr-fwd-in1 {t[1]} --rr-fwd-in2 {t[2]}  "
-                  f"--rr-rev-pwm {r[0]} --rr-rev-in1 {r[1]} --rr-rev-in2 {r[2]}")
+        def line(w):
+            p = best[w+'+']; r = best[w+'-']
+            if p and r:
+                print(f" --{w}-fwd-pwm {p[0]} --{w}-fwd-in1 {p[1]} --{w}-fwd-in2 {p[2]}  "
+                      f"--{w}-rev-pwm {r[0]} --{w}-rev-in1 {r[1]} --{w}-rev-in2 {r[2]}")
+        for w in ('fl','fr','rl','rr'):
+            line(w)
 
     finally:
         try: p.bus.close()
