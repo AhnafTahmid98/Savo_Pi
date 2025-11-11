@@ -171,42 +171,68 @@ def suggest_from_scores(scorebook):
     }
 
 def print_suggestions(sug):
-    print("\n=== SUGGESTED TRIPLETS (with signs) ===")
-    def fmt(t): 
-        return "None" if t is None else f"({t.pwm},{t.in1},{t.in2})"
-    print(f" FL: + {fmt(sug['FL']['+'])}    - {fmt(sug['FL']['-'])}")
-    print(f" FR: + {fmt(sug['FR']['+'])}    - {fmt(sug['FR']['-'])}")
-    print(f" RL: + {fmt(sug['RL']['+'])}    - {fmt(sug['RL']['-'])}")
-    print(f" RR: + {fmt(sug['RR']['+'])}    - {fmt(sug['RR']['-'])}")
+    # Normalize keys (accept FL/FR/RL/RR or fl/fr/rl/rr)
+    S = {}
+    for k, v in sug.items():
+        S[k.upper()] = v
 
-    # Pairing hint
-    flp, rlp = sug["FL"]["+"], sug["RL"]["+"]
-    flm, rlm = sug["FL"]["-"], sug["RL"]["-"]
-    frp, rrp = sug["FR"]["+"], sug["RR"]["+"]
-    frm, rrm = sug["FR"]["-"], sug["RR"]["-"]
-    def same(a,b): 
-        return (a is not None and b is not None and a == b)
+    def get(wheel, sign):
+        w = S.get(wheel.upper(), {})
+        return w.get(sign, None)
+
+    def fmt(t):
+        return "None" if t is None else f"({t.pwm},{t.in1},{t.in2})"
+
+    # Pretty list
+    print("\n=== SUGGESTED TRIPLETS (with signs) ===")
+    for wheel in ("FL","FR","RL","RR"):
+        p = get(wheel, "+")
+        m = get(wheel, "-")
+        print(f" {wheel}: + {fmt(p)}    - {fmt(m)}")
+
+    # Pairing hint (only compare when both present)
+    def same(a, b):
+        return (a is not None and b is not None and
+                a.pwm == b.pwm and a.in1 == b.in1 and a.in2 == b.in2)
+
+    flp, rlp = get("FL","+"), get("RL","+")
+    flm, rlm = get("FL","-"), get("RL","-")
+    frp, rrp = get("FR","+"), get("RR","+")
+    frm, rrm = get("FR","-"), get("RR","-")
+
     res = []
-    if same(flp,rlp): res.append("FL=RL looks paired for Forward")
-    if same(flm,rlm): res.append("FL=RL looks paired for Reverse")
-    if same(frp,rrp): res.append("FR=RR looks paired for Forward")
-    if same(frm,rrm): res.append("FR=RR looks paired for Reverse")
+    if same(flp, rlp): res.append("FL=RL looks paired for Forward")
+    if same(flm, rlm): res.append("FL=RL looks paired for Reverse")
+    if same(frp, rrp): res.append("FR=RR looks paired for Forward")
+    if same(frm, rrm): res.append("FR=RR looks paired for Reverse")
+
     print("\n=== PAIRING RESULT ===")
     print(" OK: " + "; ".join(res) if res else " Mixed/Ambiguous. Narrow search or re-test.")
 
+    # Safe copy-paste block: only print wheels that have suggestions
     print("\n=== COPY-PASTE (if correct) ===")
-    def cp(name):
-        return (f" --{name}-fwd-pwm {getattr(sug[name]['+'],'pwm', 'X')} "
-                f"--{name}-fwd-in1 {getattr(sug[name]['+'],'in1', 'X')} "
-                f"--{name}-fwd-in2 {getattr(sug[name]['+'],'in2', 'X')} "
-                f"--{name}-rev-pwm {getattr(sug[name]['-'],'pwm', 'X')} "
-                f"--{name}-rev-in1 {getattr(sug[name]['-'],'in1', 'X')} "
-                f"--{name}-rev-in2 {getattr(sug[name]['-'],'in2', 'X')}")
-    print(cp("fl"))
-    print(cp("fr"))
-    print(cp("rl"))
-    print(cp("rr"))
+    def cp_line(name_lc):
+        # read from normalized S using UPPER name
+        name_uc = name_lc.upper()
+        p = get(name_uc, "+")
+        m = get(name_uc, "-")
+        parts = []
+        if p is not None:
+            parts.append(f"--{name_lc}-fwd-pwm {p.pwm} --{name_lc}-fwd-in1 {p.in1} --{name_lc}-fwd-in2 {p.in2}")
+        if m is not None:
+            parts.append(f"--{name_lc}-rev-pwm {m.pwm} --{name_lc}-rev-in1 {m.in1} --{name_lc}-rev-in2 {m.in2}")
+        return "  ".join(parts)
+
+    printed_any = False
+    for nm in ("fl","fr","rl","rr"):
+        line = cp_line(nm)
+        if line:
+            printed_any = True
+            print(" " + line)
+    if not printed_any:
+        print(" (no complete wheel suggestions yet)")
     print()
+
 
 # ---------------------- Core test pulse ----------------------
 def pulse_triplet(pca: PCA, trip: Triplet, sign: int, duty: float, secs: float, active_low=False, pause=0.4):
