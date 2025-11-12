@@ -7,6 +7,10 @@ Controls
   W / S : forward / backward
   A / D : strafe left / right
   Q / E : rotate CCW / CW
+  W + A = forward-left
+  W + D = forward-right
+  S + A = backward-left
+  S + D = backward-right
   X or SPACE : stop (zero all)
   Z / C : speed scale down / up
   R : reset velocities & scale
