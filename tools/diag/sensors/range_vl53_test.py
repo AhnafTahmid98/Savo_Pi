@@ -130,19 +130,22 @@ def read_distance_mm(sensor: VL53L1X) -> Optional[int]:
 def main():
     global _stop
     ap = argparse.ArgumentParser(description="VL53L1X range test on dual I²C buses (output in cm)")
-    ap.add_argument("--buses", type=str, default="1,0", help="Comma-separated I²C buses, e.g. '1' or '1,0'. (1=FR, 0=FL)")
+    ap.add_argument("--buses", type=str, default="1,0",
+                    help="Comma-separated I²C buses, e.g. '1' or '1,0'. (1=FR, 0=FL)")
     ap.add_argument("--rate", type=float, default=20.0, help="Sample rate in Hz (default: 20.0)")
     ap.add_argument("--samples", type=int, default=0, help="Number of samples (0 = run until Ctrl+C)")
     ap.add_argument("--mode", type=str, default="short", help="Distance mode: short|medium|long (default: short)")
     ap.add_argument("--timing", type=int, default=50, help="Timing budget in ms (default: 50)")
     ap.add_argument("--inter", type=int, default=0, help="Inter-measurement in ms (0 = auto)")
-    ap.add_argument("--median", type=int, default=3, help="Rolling median window (odd int ≥1). 1 = no filter. (default: 3)")
-    ap.add_argument("--threshold", type=float, default=28.0, help="Near-field alert threshold in cm (default: 28.0)")
+    ap.add_argument("--median", type=int, default=3,
+                    help="Rolling median window (odd int ≥1). 1 = no filter. (default: 3)")
+    ap.add_argument("--threshold", type=float, default=28.0,
+                    help="Near-field alert threshold in cm (default: 28.0)")
     ap.add_argument("--csv", action="store_true", help="Write CSV to --out")
     ap.add_argument("--out", type=str, default="vl53l1x_log.csv", help="CSV filename")
     args = ap.parse_args()
 
-    # Parse bus list
+    # Parse bus list (preserve order user gave)
     try:
         buses = [int(x.strip()) for x in args.buses.split(",") if x.strip()]
     except ValueError:
@@ -170,14 +173,15 @@ def main():
 
     # Init sensors
     for bus in buses:
-        hist[bus] = deque(maxlen=args.median)
         if _stop:
             break
         try:
-            s = setup_sensor(bus, I2C_ADDRESS, args.mode, args.timing, args.inter if args.inter > 0 else None)
+            s = setup_sensor(bus, I2C_ADDRESS, args.mode, args.timing,
+                             args.inter if args.inter > 0 else None)
             time.sleep(0.05)
             _ = read_distance_mm(s)
             sensors[bus] = s
+            hist[bus] = deque(maxlen=args.median)
             print(f"  - OK: {bus_desc(bus)} online")
         except Exception as e:
             print(f"  - FAIL: {bus_desc(bus)} init error: {e}", file=sys.stderr)
@@ -186,7 +190,8 @@ def main():
         print("ERROR: No sensors initialized. Check wiring and i2cdetect output.", file=sys.stderr)
         return 1
 
-    active_buses = sorted(sensors.keys())
+    # Respect user order but drop failed buses
+    active_buses = [bus for bus in buses if bus in sensors]
 
     # CSV setup
     csv_writer = None
@@ -235,7 +240,8 @@ def main():
             def fmt(v: float) -> str:
                 return f"{v:>6.1f}" if v >= 0 else "  --- "
 
-            line = " | ".join([fmt(v) for v in raw_vals_cm] + [fmt(v) for v in filt_vals_cm])
+            line = " | ".join([fmt(v) for v in raw_vals_cm] +
+                              [fmt(v) for v in filt_vals_cm])
             print(f"{t:6.2f} | " + line + f" | {'!' if alert else '-'}")
 
             if csv_writer:
