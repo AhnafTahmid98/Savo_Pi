@@ -16,7 +16,7 @@ Robot Savo — Dual VL53L1X Integrator (Python only, no ROS2)
   where alert = "!" if either filtered distance < threshold (e.g. 28 cm).
 
 Run example:
-  python3 tools/diag/sensors/range_vl53_integrated.py --rate 10 --threshold 0.28
+  python3 tools/diag/sensors/range_vl53_integrated.py --rate 10 --threshold 28
 """
 
 import argparse
@@ -25,9 +25,8 @@ import time
 import signal
 import queue
 from collections import deque
-from typing import Optional, Tuple
+from typing import Optional
 from multiprocessing import Process, Queue
-
 
 I2C_ADDRESS = 0x29
 _stop = False
@@ -89,7 +88,11 @@ def tof_worker(bus: int, role: str, rate_hz: float, median_n: int, out_q: Queue)
     Worker process:
       - Initializes VL53L1X on given bus.
       - Loops at rate_hz, reads distance, applies median filter.
-      - Sends (timestamp, bus, role, raw_cm, filt_cm) to main process.
+      - Sends (kind, ...) messages to main:
+          ("init_ok", bus, role, "")
+          ("init_error", bus, role, err_msg)
+          ("data", bus, role, raw_cm, filt_cm, t_now)
+          ("done", bus, role, "")
     """
     VL53L1X = _import_vl53()
 
@@ -111,9 +114,8 @@ def tof_worker(bus: int, role: str, rate_hz: float, median_n: int, out_q: Queue)
                 pass
 
         try:
-            # 50 ms timing budget, inter_measurement auto
             if hasattr(sensor, "set_timing"):
-                sensor.set_timing(50, 70)
+                sensor.set_timing(50, 70)  # 50 ms budget, ~70 ms inter
         except Exception:
             pass
 
@@ -136,7 +138,6 @@ def tof_worker(bus: int, role: str, rate_hz: float, median_n: int, out_q: Queue)
             if d_cm > 0:
                 hist.append(d_cm)
 
-            # Median filter
             if median_n > 1 and len(hist) > 0:
                 s = sorted(hist)
                 n = len(s)
@@ -164,7 +165,6 @@ def tof_worker(bus: int, role: str, rate_hz: float, median_n: int, out_q: Queue)
                 sensor.stop()
         except Exception:
             pass
-        # Inform main we're done
         out_q.put(("done", bus, role, ""))
 
 
@@ -192,9 +192,7 @@ def main():
         print("ERROR: --median must be odd ≥1", file=sys.stderr)
         return 2
 
-    # Locked mapping
-    #   bus 1 = Front-Right (FR)
-    #   bus 0 = Front-Left  (FL)
+    # Locked mapping: bus 1 = FR, bus 0 = FL
     workers_cfg = [
         (1, "FR"),
         (0, "FL"),
@@ -218,6 +216,7 @@ def main():
     init_ok = set()
     init_fail = False
     start_time = time.perf_counter()
+
     while len(init_ok) < len(workers_cfg) and not init_fail:
         try:
             msg = q.get(timeout=2.0)
@@ -259,7 +258,6 @@ def main():
                 latest[role]["raw"] = raw_cm
                 latest[role]["filt"] = filt_cm
 
-                # Compute alert from both filtered distances
                 vals = [v["filt"] for v in latest.values() if v["filt"] >= 0.0]
                 alert = any(v < args.threshold for v in vals)
 
@@ -274,13 +272,14 @@ def main():
                     f"{fmt(latest['FL']['raw'])} | "
                     f"{fmt(latest['FR']['filt'])} | "
                     f"{fmt(latest['FL']['filt'])} | "
-                    f\"{'!' if alert else '-'}\"
+                    f"{'!' if alert else '-'}"
                 )
                 print(line)
+
             elif kind == "done":
-                # A worker exited; we can keep going or stop if you want.
                 _, bus, role, _ = msg
                 print(f"[INFO] Worker {role}(bus{bus}) exited.", file=sys.stderr)
+
     except KeyboardInterrupt:
         _stop = True
     finally:
