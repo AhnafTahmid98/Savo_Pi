@@ -11,9 +11,13 @@ Robot Savo — Dual VL53L1X Integrator (Python only, no ROS2)
   bus 0 + bus 1 in the same process).
 - Main process integrates both readings and prints:
 
-      t(s) | FR_raw | FL_raw | FR_filt | FL_filt | alert
+      t(s) | FR_raw | FR_filt | FL_raw | FL_filt | Alert
 
-  where alert = "!" if either filtered distance < threshold (e.g. 28 cm).
+  Alert column examples:
+    "-"                  = no obstacle close
+    "FR 5.4cm"           = front-right near
+    "FL 3.2cm"           = front-left near
+    "FR 6.1cm, FL 4.3cm" = both near
 
 Run example:
   python3 tools/diag/sensors/range_vl53_integrated.py --rate 10 --threshold 28
@@ -237,8 +241,9 @@ def main():
         print("ERROR: One or more ToF sensors failed to init.", file=sys.stderr)
         _stop = True
 
-    print("\n t(s)  | FR_raw(cm) | FL_raw(cm) | FR_filt(cm) | FL_filt(cm) | alert")
-    print("-" * 72)
+    # New header with your preferred order
+    print("\n t(s)  | FR_raw(cm) | FR_filt(cm) | FL_raw(cm) | FL_filt(cm) | Alert")
+    print("-" * 78)
 
     latest = {
         "FR": {"raw": -1.0, "filt": -1.0},
@@ -258,21 +263,34 @@ def main():
                 latest[role]["raw"] = raw_cm
                 latest[role]["filt"] = filt_cm
 
-                vals = [v["filt"] for v in latest.values() if v["filt"] >= 0.0]
-                alert = any(v < args.threshold for v in vals)
+                # Build detailed alert string
+                fr_f = latest["FR"]["filt"]
+                fl_f = latest["FL"]["filt"]
+
+                alerts = []
+                if fr_f >= 0.0 and fr_f < args.threshold:
+                    alerts.append(f"FR {fr_f:.1f}cm")
+                if fl_f >= 0.0 and fl_f < args.threshold:
+                    alerts.append(f"FL {fl_f:.1f}cm")
+
+                if alerts:
+                    alert_str = ", ".join(alerts)
+                else:
+                    alert_str = "-"
 
                 t_rel = t_now - start_time
 
                 def fmt(v: float) -> str:
                     return f"{v:>7.1f}" if v >= 0 else "   --- "
 
+                # Note: order is now FR_raw, FR_filt, FL_raw, FL_filt
                 line = (
                     f"{t_rel:6.2f} | "
                     f"{fmt(latest['FR']['raw'])} | "
-                    f"{fmt(latest['FL']['raw'])} | "
                     f"{fmt(latest['FR']['filt'])} | "
+                    f"{fmt(latest['FL']['raw'])} | "
                     f"{fmt(latest['FL']['filt'])} | "
-                    f"{'!' if alert else '-'}"
+                    f"{alert_str}"
                 )
                 print(line)
 
