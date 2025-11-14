@@ -6,10 +6,13 @@ Robot Savo — Pan-Tilt Servo Test (PCA9685)
 Interactive controls (default):
   W / S : tilt up / tilt down
   A / D : pan left / pan right
-  C     : center both servos to 90°
+  C     : center both servos (pan=90°, tilt=55° by default)
   Q or ESC : quit
 
-Angles are clamped between min_angle and max_angle (default 0..180).
+Default angle limits:
+  Pan  : 0 .. 180 degrees
+  Tilt : 45 .. 180 degrees (to match your physical mount)
+  Default tilt center = 55 degrees.
 
 Author: Robot Savo
 """
@@ -188,15 +191,21 @@ def interactive_test(pan_chan: str,
                      tilt_chan: str,
                      min_angle: int,
                      max_angle: int,
-                     step: int) -> None:
+                     step: int,
+                     tilt_center: int = 55) -> None:
     """
     Interactive WASD pan-tilt test.
+
+    tilt_center: default center angle for tilt (e.g. 55 deg for your mount).
     """
     servo = Servo(addr=0x40, debug=True)
 
-    # Start centered
-    pan_angle = 90
-    tilt_angle = 90
+    # Clamp center and initial angles into allowed range
+    tilt_center = max(min_angle, min(max_angle, tilt_center))
+
+    # Start centered: pan=90, tilt=tilt_center
+    pan_angle = max(min_angle, min(max_angle, 90))
+    tilt_angle = tilt_center
     servo.set_servo_angle(pan_chan, pan_angle)
     servo.set_servo_angle(tilt_chan, tilt_angle)
 
@@ -205,11 +214,12 @@ def interactive_test(pan_chan: str,
     print(f"Pan channel : '{pan_chan}' (PCA9685 ch {servo.pwm_channel_map[pan_chan]})")
     print(f"Tilt channel: '{tilt_chan}' (PCA9685 ch {servo.pwm_channel_map[tilt_chan]})")
     print(f"Angle range : {min_angle} .. {max_angle} deg")
+    print(f"Tilt center : {tilt_center} deg")
     print(f"Step size   : {step} deg\n")
     print("Controls:")
     print("  W / S : tilt up / tilt down")
     print("  A / D : pan left / pan right")
-    print("  C     : center both to 90°")
+    print("  C     : center both (pan=90°, tilt=tilt_center)")
     print("  Q or ESC : quit\n")
 
     print(f"[INFO] Starting at pan={pan_angle}°, tilt={tilt_angle}°")
@@ -230,8 +240,8 @@ def interactive_test(pan_chan: str,
                     break
 
                 if ch_up == 'C':
-                    pan_angle = 90
-                    tilt_angle = 90
+                    pan_angle = max(min_angle, min(max_angle, 90))
+                    tilt_angle = tilt_center
                     servo.set_servo_angle(pan_chan, pan_angle)
                     servo.set_servo_angle(tilt_chan, tilt_angle)
                     print(f"[CENTER] pan={pan_angle}°, tilt={tilt_angle}°")
@@ -261,10 +271,10 @@ def interactive_test(pan_chan: str,
         print("\n[INFO] Ctrl+C caught, exiting...")
 
     finally:
-        # Optional: recenter on exit
+        # On exit: recenter to pan=90, tilt=tilt_center
         try:
-            pan_angle = 90
-            tilt_angle = 90
+            pan_angle = max(min_angle, min(max_angle, 90))
+            tilt_angle = tilt_center
             servo.set_servo_angle(pan_chan, pan_angle)
             servo.set_servo_angle(tilt_chan, tilt_angle)
             print(f"[INFO] On exit: recentered to pan={pan_angle}°, tilt={tilt_angle}°")
@@ -281,12 +291,14 @@ def main() -> None:
                     help="Logical pan servo channel (default: '0' -> PCA 8).")
     ap.add_argument("--tilt-chan", default="1",
                     help="Logical tilt servo channel (default: '1' -> PCA 9).")
-    ap.add_argument("--min-angle", type=int, default=0,
-                    help="Minimum angle (default: 0).")
+    ap.add_argument("--min-angle", type=int, default=45,
+                    help="Minimum angle (default: 45 for your tilt).")
     ap.add_argument("--max-angle", type=int, default=180,
                     help="Maximum angle (default: 180).")
     ap.add_argument("--step", type=int, default=5,
                     help="Angle step per key press (default: 5 degrees).")
+    ap.add_argument("--tilt-center", type=int, default=55,
+                    help="Tilt center angle (default: 55 degrees).")
 
     args = ap.parse_args()
 
@@ -296,6 +308,7 @@ def main() -> None:
         min_angle=args.min_angle,
         max_angle=args.max_angle,
         step=args.step,
+        tilt_center=args.tilt_center,
     )
 
 
