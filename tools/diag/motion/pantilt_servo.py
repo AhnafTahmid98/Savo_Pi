@@ -9,8 +9,12 @@ Interactive controls (default):
   C     : center both servos (pan=90°, tilt=55° by default)
   Q or ESC : quit
 
-Author: Robot Savo
+Ranges:
+  Pan  : 0 .. 180 degrees
+  Tilt : 45 .. 180 degrees (defaults, can be changed with CLI)
+  Default tilt center = 55 degrees.
 
+Author: Robot Savo
 """
 
 import sys
@@ -19,13 +23,12 @@ import math
 import argparse
 import termios
 import tty
-from typing import Tuple
 
 import smbus
 
 
 # ---------------------------------------------------------------------------
-# PCA9685 driver (from your servo.py, slightly tidied)
+# PCA9685 driver
 # ---------------------------------------------------------------------------
 class PCA9685:
     # Registers/etc.
@@ -50,16 +53,12 @@ class PCA9685:
         self.write(self.__MODE1, 0x00)
 
     def write(self, reg: int, value: int) -> None:
-        """Writes an 8-bit value to the specified register/address."""
         self.bus.write_byte_data(self.address, reg, value)
 
     def read(self, reg: int) -> int:
-        """Read an unsigned byte from the I2C device."""
-        result = self.bus.read_byte_data(self.address, reg)
-        return result
+        return self.bus.read_byte_data(self.address, reg)
 
     def set_pwm_freq(self, freq: float) -> None:
-        """Sets the PWM frequency."""
         prescaleval = 25000000.0    # 25MHz
         prescaleval /= 4096.0       # 12-bit
         prescaleval /= float(freq)
@@ -68,44 +67,37 @@ class PCA9685:
 
         oldmode = self.read(self.__MODE1)
         newmode = (oldmode & 0x7F) | 0x10        # sleep
-        self.write(self.__MODE1, newmode)        # go to sleep
+        self.write(self.__MODE1, newmode)
         self.write(self.__PRESCALE, int(math.floor(prescale)))
         self.write(self.__MODE1, oldmode)
         time.sleep(0.005)
         self.write(self.__MODE1, oldmode | 0x80)
 
     def set_pwm(self, channel: int, on: int, off: int) -> None:
-        """Sets a single PWM channel."""
         self.write(self.__LED0_ON_L + 4 * channel, on & 0xFF)
         self.write(self.__LED0_ON_H + 4 * channel, on >> 8)
         self.write(self.__LED0_OFF_L + 4 * channel, off & 0xFF)
         self.write(self.__LED0_OFF_H + 4 * channel, off >> 8)
 
     def set_motor_pwm(self, channel: int, duty: int) -> None:
-        """Sets the PWM duty cycle for a motor (0..4095)."""
         self.set_pwm(channel, 0, duty)
 
     def set_servo_pulse(self, channel: int, pulse_us: float) -> None:
-        """
-        Sets the Servo Pulse width in microseconds.
-        Assumes PWM frequency is 50 Hz → period is 20,000 us.
-        """
-        pulse = pulse_us * 4096.0 / 20000.0  # 12-bit within 20ms
+        # 50 Hz → 20 ms period = 20000 us
+        pulse = pulse_us * 4096.0 / 20000.0
         self.set_pwm(channel, 0, int(pulse))
 
     def close(self) -> None:
-        """Close the I2C bus."""
         self.bus.close()
 
 
 # ---------------------------------------------------------------------------
-# Servo helper (from your code, with small safety clamps)
+# Servo helper
 # ---------------------------------------------------------------------------
 class Servo:
     def __init__(self, addr: int = 0x40, debug: bool = True):
         self.pwm_frequency = 50
         self.initial_pulse = 1500
-        # Logical channels mapped to PCA9685 channels 8..15
         self.pwm_channel_map = {
             '0': 8,
             '1': 9,
@@ -119,30 +111,21 @@ class Servo:
         self.pwm_servo = PCA9685(addr, debug=debug)
         self.pwm_servo.set_pwm_freq(self.pwm_frequency)
 
-        # Initialize all defined channels to neutral position
         for channel in self.pwm_channel_map.values():
             self.pwm_servo.set_servo_pulse(channel, self.initial_pulse)
 
     def angle_to_pulse(self, channel: str, angle: int, error: int = 10) -> float:
-        """
-        Convert angle (0..180) to microsecond pulse.
-        This replicates your original formula:
-          - channel '0': 2500 - (angle+error)/0.09
-          - others    :  500 + (angle+error)/0.09
-        """
         angle = int(angle)
         if channel == '0':
             pulse = 2500.0 - float((angle + error) / 0.09)
         else:
             pulse = 500.0 + float((angle + error) / 0.09)
-        # Clamp to a safe typical range ~500..2500 us
         return max(500.0, min(2500.0, pulse))
 
     def set_servo_angle(self, channel: str, angle: int, error: int = 10) -> None:
-        """Set a servo to a given angle (0..180)."""
         if channel not in self.pwm_channel_map:
             raise ValueError(
-                f"Invalid channel: {channel}. Valid channels: {list(self.pwm_channel_map.keys())}"
+                f"Invalid channel: {channel}. Valid: {list(self.pwm_channel_map.keys())}"
             )
         angle = max(0, min(180, int(angle)))
         pulse = self.angle_to_pulse(channel, angle, error)
@@ -154,7 +137,7 @@ class Servo:
 
 
 # ---------------------------------------------------------------------------
-# Keyboard helpers (raw key reading without Enter)
+# Keyboard helpers
 # ---------------------------------------------------------------------------
 class RawKeyReader:
     def __init__(self):
@@ -171,37 +154,40 @@ class RawKeyReader:
             termios.tcsetattr(self.fd, termios.TCSADRAIN, self.old_settings)
 
     def read_key(self) -> str:
-        """
-        Read a single character from stdin (non-blocking echo).
-        Returns the raw character (1-byte). ESC sequences for arrows are longer,
-        but for this script we only use simple keys (WASD, C, Q).
-        """
-        ch = sys.stdin.read(1)
-        return ch
+        return sys.stdin.read(1)
 
 
 # ---------------------------------------------------------------------------
 # Main interactive test
 # ---------------------------------------------------------------------------
-def interactive_test(pan_chan: str,
-                     tilt_chan: str,
-                     min_angle: int,
-                     max_angle: int,
-                     step: int,
-                     tilt_center: int = 55) -> None:
+def interactive_test(
+    pan_chan: str,
+    tilt_chan: str,
+    tilt_min: int,
+    tilt_max: int,
+    step: int,
+    tilt_center: int = 55,
+) -> None:
     """
     Interactive WASD pan-tilt test.
 
-    tilt_center: default center angle for tilt (e.g. 55 deg for your mount).
+    Pan range:  0 .. 180 deg
+    Tilt range: tilt_min .. tilt_max (e.g. 45 .. 180)
     """
+    PAN_MIN = 0
+    PAN_MAX = 180
+
     servo = Servo(addr=0x40, debug=True)
 
     # Clamp center and initial angles into allowed range
-    tilt_center = max(min_angle, min(max_angle, tilt_center))
+    tilt_center = max(tilt_min, min(tilt_max, tilt_center))
 
-    # Start centered: pan=90, tilt=tilt_center
-    pan_angle = max(min_angle, min(max_angle, 90))
+    pan_angle = 90
     tilt_angle = tilt_center
+
+    pan_angle = max(PAN_MIN, min(PAN_MAX, pan_angle))
+    tilt_angle = max(tilt_min, min(tilt_max, tilt_angle))
+
     servo.set_servo_angle(pan_chan, pan_angle)
     servo.set_servo_angle(tilt_chan, tilt_angle)
 
@@ -209,15 +195,15 @@ def interactive_test(pan_chan: str,
     print("---------------------------------")
     print(f"Pan channel : '{pan_chan}' (PCA9685 ch {servo.pwm_channel_map[pan_chan]})")
     print(f"Tilt channel: '{tilt_chan}' (PCA9685 ch {servo.pwm_channel_map[tilt_chan]})")
-    print(f"Angle range : {min_angle} .. {max_angle} deg")
+    print(f"Pan range   : {PAN_MIN} .. {PAN_MAX} deg")
+    print(f"Tilt range  : {tilt_min} .. {tilt_max} deg")
     print(f"Tilt center : {tilt_center} deg")
     print(f"Step size   : {step} deg\n")
     print("Controls:")
     print("  W / S : tilt up / tilt down")
     print("  A / D : pan left / pan right")
-    print("  C     : center both (pan=90°, tilt=tilt_center)")
+    print("  C     : center (pan=90°, tilt=tilt_center)")
     print("  Q or ESC : quit\n")
-
     print(f"[INFO] Starting at pan={pan_angle}°, tilt={tilt_angle}°")
     print("[INFO] Press keys now.\n")
 
@@ -236,30 +222,32 @@ def interactive_test(pan_chan: str,
                     break
 
                 if ch_up == 'C':
-                    pan_angle = max(min_angle, min(max_angle, 90))
+                    pan_angle = 90
                     tilt_angle = tilt_center
+                    pan_angle = max(PAN_MIN, min(PAN_MAX, pan_angle))
+                    tilt_angle = max(tilt_min, min(tilt_max, tilt_angle))
                     servo.set_servo_angle(pan_chan, pan_angle)
                     servo.set_servo_angle(tilt_chan, tilt_angle)
                     print(f"[CENTER] pan={pan_angle}°, tilt={tilt_angle}°")
                     continue
 
-                # Pan
+                # Pan: always 0..180
                 if ch_up == 'A':
-                    pan_angle = max(min_angle, pan_angle - step)
+                    pan_angle = max(PAN_MIN, pan_angle - step)
                     servo.set_servo_angle(pan_chan, pan_angle)
                     print(f"[PAN] Left  → pan={pan_angle}°, tilt={tilt_angle}°")
                 elif ch_up == 'D':
-                    pan_angle = min(max_angle, pan_angle + step)
+                    pan_angle = min(PAN_MAX, pan_angle + step)
                     servo.set_servo_angle(pan_chan, pan_angle)
                     print(f"[PAN] Right → pan={pan_angle}°, tilt={tilt_angle}°")
 
-                # Tilt
+                # Tilt: 45..180 (or CLI overrides)
                 elif ch_up == 'W':
-                    tilt_angle = min(max_angle, tilt_angle + step)
+                    tilt_angle = min(tilt_max, tilt_angle + step)
                     servo.set_servo_angle(tilt_chan, tilt_angle)
                     print(f"[TILT] Up   → pan={pan_angle}°, tilt={tilt_angle}°")
                 elif ch_up == 'S':
-                    tilt_angle = max(min_angle, tilt_angle - step)
+                    tilt_angle = max(tilt_min, tilt_angle - step)
                     servo.set_servo_angle(tilt_chan, tilt_angle)
                     print(f"[TILT] Down → pan={pan_angle}°, tilt={tilt_angle}°")
 
@@ -267,10 +255,11 @@ def interactive_test(pan_chan: str,
         print("\n[INFO] Ctrl+C caught, exiting...")
 
     finally:
-        # On exit: recenter to pan=90, tilt=tilt_center
         try:
-            pan_angle = max(min_angle, min(max_angle, 90))
+            pan_angle = 90
             tilt_angle = tilt_center
+            pan_angle = max(PAN_MIN, min(PAN_MAX, pan_angle))
+            tilt_angle = max(tilt_min, min(tilt_max, tilt_angle))
             servo.set_servo_angle(pan_chan, pan_angle)
             servo.set_servo_angle(tilt_chan, tilt_angle)
             print(f"[INFO] On exit: recentered to pan={pan_angle}°, tilt={tilt_angle}°")
@@ -287,22 +276,22 @@ def main() -> None:
                     help="Logical pan servo channel (default: '0' -> PCA 8).")
     ap.add_argument("--tilt-chan", default="1",
                     help="Logical tilt servo channel (default: '1' -> PCA 9).")
-    ap.add_argument("--min-angle", type=int, default=45,
-                    help="Minimum angle (default: 45 for your tilt).")
-    ap.add_argument("--max-angle", type=int, default=180,
-                    help="Maximum angle (default: 180).")
+    ap.add_argument("--tilt-min", type=int, default=45,
+                    help="Tilt minimum angle (default: 45).")
+    ap.add_argument("--tilt-max", type=int, default=180,
+                    help="Tilt maximum angle (default: 180).")
     ap.add_argument("--step", type=int, default=5,
                     help="Angle step per key press (default: 5 degrees).")
     ap.add_argument("--tilt-center", type=int, default=55,
-                    help="Tilt center angle (default: 55 degrees).")
+                    help="Tilt center angle (default: 55).")
 
     args = ap.parse_args()
 
     interactive_test(
         pan_chan=args.pan_chan,
         tilt_chan=args.tilt_chan,
-        min_angle=args.min_angle,
-        max_angle=args.max_angle,
+        tilt_min=args.tilt_min,
+        tilt_max=args.tilt_max,
         step=args.step,
         tilt_center=args.tilt_center,
     )
