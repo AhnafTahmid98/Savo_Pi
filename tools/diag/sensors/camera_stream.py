@@ -21,22 +21,28 @@ def build_sender_pipeline(host: str,
                           width: int,
                           height: int,
                           fps: int,
-                          bitrate: int) -> str:
+                          bitrate_kbps: int) -> str:
     """
     Build the GStreamer pipeline for sending H.264 video over UDP.
 
-    We use:
-      libcamerasrc → video/x-raw → videoconvert → x264enc (low latency) → H.264 → RTP → UDP
-
-    No local display, no file saving.
+    Pipeline:
+      libcamerasrc
+        -> video/x-raw (size + fps)
+        -> videoconvert
+        -> x264enc (low latency, byte-stream)
+        -> h264parse
+        -> rtph264pay
+        -> udpsink
     """
     pipeline = (
         "libcamerasrc ! "
         f"video/x-raw,width={width},height={height},framerate={fps}/1 ! "
         "videoconvert ! "
+        # x264enc bitrate is in kbit/s
         "x264enc tune=zerolatency speed-preset=superfast "
-        f"bitrate={bitrate} key-int-max=30 ! "
-        "video/x-h264,profile=baseline ! "
+        f"bitrate={bitrate_kbps} key-int-max=30 byte-stream=true ! "
+        # Parse to ensure proper stream format for RTP
+        "h264parse config-interval=-1 ! "
         "rtph264pay config-interval=1 pt=96 ! "
         f"udpsink host={host} port={port} sync=false async=false"
     )
@@ -102,7 +108,7 @@ def main() -> None:
         width=args.width,
         height=args.height,
         fps=args.fps,
-        bitrate=args.bitrate,
+        bitrate_kbps=args.bitrate,
     )
 
     cmd = ["gst-launch-1.0", "-v"] + pipeline.split()
@@ -118,10 +124,10 @@ def main() -> None:
     print("  " + " ".join(cmd))
     print("\n[Camera-Stream] On your LAPTOP, run:")
     print(f"  gst-launch-1.0 -v \\")
-    print(f"    udpsrc port={args.port} caps=\"application/x-rtp, media=video, encoding-name=H264, payload=96\" ! \\")
-    print("    rtph264depay ! avdec_h264 ! videoconvert ! autovideosink\n")
+    print(f"    udpsrc port={args.port} caps=\"application/x-rtp, "
+          "media=video, encoding-name=H264, payload=96, clock-rate=90000\" ! \\")
+    print("    rtph264depay ! h264parse ! avdec_h264 ! videoconvert ! autovideosink\n")
 
-    # FIX: argparse stores --print-only as args.print_only
     if args.print_only:
         print("[Camera-Stream] --print-only set, not starting pipeline.")
         return
