@@ -31,8 +31,8 @@ Usage
   # Include rotation CCW/CW checks
   python3 motor_direction_test.py --driver pca --duty 0.40 --with-rotate
 
-  # If you have external pull-ups (recommended), keep --no-pullup
-  # If you need internal pull-ups, omit --no-pullup
+  # For external pull-ups (recommended), keep --no-pullup
+ 
 """
 
 import sys, time, math, argparse

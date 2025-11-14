@@ -4,6 +4,9 @@ Robot Face (Wayland-first, Pi DSI 800x480)
 - Prefers Wayland; works under Weston
 - Non-blocking blink, clean SIGTERM handling
 - Proper scaling helpers (fixed)
+
+Author: Robot Savo
+
 """
 
 import os, sys, time, math, random, signal

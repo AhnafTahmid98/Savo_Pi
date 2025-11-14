@@ -3,19 +3,7 @@
 """
 Robot Savo — Encoders Test (lgpio, counts + direction + m/s + omega, CSV)
 Raspberry Pi 5 • Ubuntu 24.04 • lgpio-based polling quadrature counter
-
-Features
-- Auto-detects a usable gpiochip unless --chip is provided.
-- Gray-code state machine (legal transitions only), counts illegal jumps.
-- Debounce: tries lgpio hardware debounce if available, else software time-debounce.
-- Direction flags: --invert-left / --invert-right (so “forward” is positive without rewiring).
-- Reports every --interval seconds:
-    • total counts and per-interval deltas
-    • wheel speeds L_v, R_v (m/s)
-    • robot v (m/s) and ω (rad/s) using differential model: v=(vR+vL)/2, ω=(vR−vL)/track
-- Optional CSV logging with the same metrics.
-- Clean Ctrl+C and resource release.
-
+-----------------------------------------------------------
 Author: Robot Savo
 
 """

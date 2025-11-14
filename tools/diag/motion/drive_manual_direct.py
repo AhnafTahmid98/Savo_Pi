@@ -16,25 +16,7 @@ Controls
   R : reset velocities & scale
   ESC : quit
 
-Highlights
-  • Embedded minimal PCA9685 driver (I²C @ 0x40 by default).
-  • Robust CLI: bus/address/frequency, scale & kinematics, per-wheel invert, quench ms.
-  • “Quench” neutral on direction sign flip to protect H-bridge latching.
-  • Optional --poke mode to test each wheel in +/− without keyboard.
-  • Smooth decay, duty clamping, safe shutdown on Ctrl+C.
-
-Examples
-  # default run (WASD only)
-  python3 teleop_mecanum.py
-
-  # gentler power and stronger rotation, with longer quench
-  python3 teleop_mecanum.py --max-duty 2400 --turn-gain 1.2 --quench-ms 22
-
-  # if forward is backwards for your wiring (flip global forward sign)
-  python3 teleop_mecanum.py --forward-sign -1
-
-  # quick wheel poke test instead of teleop
-  python3 teleop_mecanum.py --poke
+Author: Robot Savo
 """
 
 import sys, time, tty, termios, select, math, argparse
