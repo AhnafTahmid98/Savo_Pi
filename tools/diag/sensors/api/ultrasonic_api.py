@@ -1,11 +1,15 @@
-# Robot Savo — Ultrasonic API (HC-SR04 via gpiozero)
-# ---------------------------------------------------
-# Usage (import in control code):
-#   from tools.diag.sensors.api.ultrasonic_api import read_ultrasonic_cm, read_ultrasonic_stats
-#   d_cm = read_ultrasonic_cm()  # returns centimeters or None
-#
-# CLI probe (run directly):
-#   python3 tools/diag/sensors/api/ultrasonic_api.py
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Robot Savo — Ultrasonic API (HC-SR04 via gpiozero)
+---------------------------------------------------
+Import in control code:
+    from tools.diag.sensors.api.ultrasonic_api import read_ultrasonic_cm, read_ultrasonic_stats
+    d_cm = read_ultrasonic_cm()  # centimeters or None
+
+CLI probe (run directly):
+    python3 tools/diag/sensors/api/ultrasonic_api.py
+"""
 
 from typing import Optional, Tuple
 import time
@@ -32,15 +36,20 @@ except Exception:
 # ---------------------------- internal helpers ----------------------------
 
 def _choose_factory(factory: str = "lgpio") -> None:
-    """Select gpiozero pin factory (no-op if gpiozero unavailable)."""
+    """
+    Select gpiozero pin factory.
+    - If 'pigpio' requested but daemon is not running, gracefully fall back to lgpio.
+    """
     if Device is None:
         return
     if factory == "pigpio" and _HAS_PIGPIO and PiGPIOFactory is not None:
-        Device.pin_factory = PiGPIOFactory()
-    else:
-        # default / fallback
-        if LGPIOFactory is not None:
-            Device.pin_factory = LGPIOFactory()
+        try:
+            Device.pin_factory = PiGPIOFactory()   # raises if pigpiod not running
+            return
+        except Exception:
+            pass  # fall through to lgpio
+    if LGPIOFactory is not None:
+        Device.pin_factory = LGPIOFactory()
 
 
 def _make_sensor(trig_pin: int, echo_pin: int, max_m: float, queue_len: int = 1) -> Optional["DistanceSensor"]:
@@ -53,10 +62,10 @@ def _make_sensor(trig_pin: int, echo_pin: int, max_m: float, queue_len: int = 1)
 # ------------------------------- public API --------------------------------
 
 def read_ultrasonic_cm(
-    trig_pin: int = 22,
-    echo_pin: int = 27,
+    trig_pin: int = 27,         # default aligned to your tester
+    echo_pin: int = 22,         # default aligned to your tester
     *,
-    factory: str = "lgpio",
+    factory: str = "lgpio",     # "lgpio" | "pigpio"
     max_distance_m: float = 3.0,
     samples: int = 5,
     per_sample_timeout_s: float = 0.08,
@@ -70,7 +79,7 @@ def read_ultrasonic_cm(
     - If gpiozero/factory unavailable, returns None.
 
     Args:
-      trig_pin, echo_pin: BCM pins (LOCKED default: TRIG=22, ECHO=27)
+      trig_pin, echo_pin: BCM pins (LOCKED default: TRIG=27, ECHO=22)
       factory: "lgpio" (default) or "pigpio"
       max_distance_m: gpiozero scaling (meters)
       samples: how many quick reads to average (≥1)
@@ -114,8 +123,8 @@ def read_ultrasonic_cm(
 
 
 def read_ultrasonic_stats(
-    trig_pin: int = 22,
-    echo_pin: int = 27,
+    trig_pin: int = 27,
+    echo_pin: int = 22,
     *,
     factory: str = "lgpio",
     max_distance_m: float = 3.0,
@@ -166,13 +175,19 @@ def ultrasonic_available() -> bool:
 # -------------------------------- CLI shim ---------------------------------
 
 if __name__ == "__main__":
-    import argparse, sys
+    import argparse, sys, warnings
+    # allow suppressing the common gpiozero warnings in CLI mode
+    try:
+        from gpiozero.exc import DistanceSensorNoEcho, PWMSoftwareFallback  # type: ignore
+    except Exception:
+        DistanceSensorNoEcho = RuntimeWarning  # fallback
+        PWMSoftwareFallback = RuntimeWarning   # fallback
 
     ap = argparse.ArgumentParser(
         description="Robot Savo — Ultrasonic API quick check (prints cm values using the import-safe API)."
     )
-    ap.add_argument("--trig", type=int, default=22, help="BCM TRIG pin (default: 22)")
-    ap.add_argument("--echo", type=int, default=27, help="BCM ECHO pin (default: 27)")
+    ap.add_argument("--trig", type=int, default=27, help="BCM TRIG pin (default: 27)")
+    ap.add_argument("--echo", type=int, default=22, help="BCM ECHO pin (default: 22)")
     ap.add_argument("--factory", choices=["lgpio", "pigpio"], default="lgpio",
                     help="gpiozero pin factory (default: lgpio)")
     ap.add_argument("--samples", type=int, default=5,
@@ -183,7 +198,13 @@ if __name__ == "__main__":
                     help="prints per second (default: 5.0)")
     ap.add_argument("--stats", action="store_true",
                     help="print one mean/std burst and exit")
+    ap.add_argument("--quiet", action="store_true",
+                    help="suppress gpiozero warnings in CLI (no-echo, PWM fallback)")
     args = ap.parse_args()
+
+    if args.quiet:
+        warnings.filterwarnings("ignore", category=DistanceSensorNoEcho)
+        warnings.filterwarnings("ignore", category=PWMSoftwareFallback)
 
     if args.stats:
         ok, mean_cm, std_cm = read_ultrasonic_stats(
