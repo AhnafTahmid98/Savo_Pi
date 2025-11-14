@@ -5,39 +5,15 @@ Robot Savo — RPLIDAR A1 Safety API (Python only, no ROS2)
 ---------------------------------------------------------
 Thin wrapper around rplidar for near-field safety & diagnostics.
 
-Features:
-- Robust connect() with reset + motor start (similar to lidar_test.py).
-- Per-scan API: poll() → LidarReading (min distance, angle, scan_hz, obstacle flag).
-- Front-sector gating via angle_min/angle_max + range_min/range_max.
-- Debounced obstacle detection with hysteresis (same idea as lidar_test.py).
-- Simple CLI test: prints one debug line per scan.
-
-Typical usage in another script (e.g. drive_automode.py):
-
-    from lidar_api import LidarSafetyAPI
-
-    api = LidarSafetyAPI(
-        port="/dev/ttyUSB0",
-        angle_min=-35.0,
-        angle_max=35.0,
-        range_min=0.05,
-        range_max=2.0,
-        obst_threshold=0.28,
-        debounce=3,
-        hyst=0.03,
-        verbose=False,   # or True for prints
-    )
-    api.start()
-
-    try:
-        while True:
-            reading = api.poll()   # blocks until next scan
-            if reading.obstacle:
-                # trigger stop / reverse / safety behavior
-                print("Safety STOP, LiDAR says obstacle!", reading)
-            time.sleep(0.01)
-    finally:
-        api.stop()
+Design:
+- Reuses the robust init pattern from lidar_test.py:
+    stop → reset → drain_input → start_motor → start_scan → drain_input.
+- Uses iter_scans() for clean per-rotation summaries.
+- Sector gating + range window.
+- Debounced obstacle detection with hysteresis.
+- Header/desync recovery similar to lidar_test.py:
+    on "Incorrect descriptor"/"Wrong body size"/"length mismatch"
+    → drain_input + restart scan + rebuild iterator.
 
 Author: Robot Savo
 """
@@ -59,7 +35,6 @@ try:
     from rplidar import RPLidar, RPLidarException
     _IMPORT_ERROR: Optional[BaseException] = None
 except Exception as e:
-    # Degrade gracefully if imported as a module without rplidar installed.
     RPLidar = None  # type: ignore
     class RPLidarException(Exception):
         pass
@@ -97,7 +72,7 @@ def gate(points: Iterable[Tuple[int, float, int]],
          r_min: float, r_max: float) -> List[Tuple[int, float, float]]:
     """
     (quality, angle_deg, dist_mm) → filtered list of (q, angle_deg, dist_m).
-    Same idea as in lidar_test.py but very small & focused.
+    Same as lidar_test.py but kept small.
     """
     out: List[Tuple[int, float, float]] = []
     for q, ang, d_mm in points:
@@ -146,82 +121,19 @@ class AlertState:
         return False
 
 
-# ---------------- connect/init ----------------
-def connect_open(port: str,
-                 baud: int,
-                 timeout: float,
-                 motor_pwm: Optional[int]) -> "RPLidar":
+# ---------------- io helpers (copied from lidar_test.py style) ----------------
+def drain_input(lidar: "RPLidar", sec: float = 0.25) -> None:
     """
-    Open RPLidar on given serial port, reset, flush, and start motor+scan.
-
-    This is a trimmed version of lidar_test.py:connect_open().
+    Aggressively flush stale bytes from the serial buffer
+    for 'sec' seconds. Same pattern as lidar_test.py.
     """
-    if RPLidar is None:
-        raise RPLidarException(
-            f"'rplidar' import failed: {_IMPORT_ERROR!r}\n"
-            "Install with:\n"
-            "  python3 -m pip install --target ~/Savo_Pi/.pylibs rplidar"
-        )
-
-    # Resolve glob if by-id wildcard passed.
-    if "*" in port:
-        matches = glob.glob(port)
-        port = matches[0] if matches else "/dev/ttyUSB0"
-
-    print(f"[LiDAR-API] Connecting: port='{port}' baud={baud} timeout={timeout:.1f}s ...")
-    lidar = RPLidar(port=port, baudrate=baud, timeout=timeout)
-
-    # Clear any stale state.
-    for fn in (lidar.stop, lidar.stop_motor):
+    t0 = now()
+    while now() - t0 < sec:
         try:
-            fn()
+            lidar.clear_input()
         except Exception:
             pass
-
-    # Info & health.
-    info = lidar.get_info()
-    fw = info.get("firmware", (0, 0))
-    print(
-        "[LiDAR-API] Info: "
-        f"model={info.get('model','?')} fw={fw[0]}.{fw[1]} "
-        f"hw={info.get('hardware',0)} serial={info.get('serialnumber','n/a')}"
-    )
-    status, err = lidar.get_health()
-    print(f"[LiDAR-API] Health: status={status} error_code={err}")
-    if str(status).lower() != "good":
-        raise RPLidarException(f"Health not GOOD: {status} (err={err})")
-
-    # Reset & flush a bit.
-    try:
-        lidar.reset()
-        time.sleep(0.25)
-    except Exception:
-        pass
-
-    try:
-        lidar.clear_input()
-    except Exception:
-        pass
-
-    # Motor control.
-    if motor_pwm is not None:
-        pwm = clamp(motor_pwm, 0, 1023)
-        print(f"[LiDAR-API] Starting motor with PWM={pwm} ...")
-        lidar.set_pwm(pwm)
-    else:
-        print("[LiDAR-API] Starting motor (default speed) ...")
-        lidar.start_motor()
-
-    time.sleep(0.5)
-
-    # Kick scan; some forks require this.
-    try:
-        lidar.start_scan()
-    except Exception:
-        pass
-
-    print("[LiDAR-API] Connected, motor running.")
-    return lidar
+        time.sleep(0.02)
 
 
 def safe_cleanup(lidar: Optional["RPLidar"]) -> None:
@@ -232,6 +144,81 @@ def safe_cleanup(lidar: Optional["RPLidar"]) -> None:
             fn()
         except Exception:
             pass
+
+
+# ---------------- connect/init (mirrors lidar_test.py behavior) ----------------
+def connect_open(port: str,
+                 baud: int,
+                 timeout: float,
+                 motor_pwm: Optional[int]) -> "RPLidar":
+    """
+    Open RPLidar on given serial port, reset, drain, start motor + scan, drain.
+    This is intentionally very close to lidar_test.py:connect_open().
+    """
+    if RPLidar is None:
+        raise RPLidarException(
+            f"'rplidar' import failed: {_IMPORT_ERROR!r}\n"
+            "Install with:\n"
+            "  python3 -m pip install --target ~/Savo_Pi/.pylibs rplidar"
+        )
+
+    # resolve glob if by-id wildcard passed
+    if "*" in port:
+        matches = glob.glob(port)
+        port = matches[0] if matches else "/dev/ttyUSB0"
+
+    print(f"[LiDAR-API] Connecting: port='{port}' baud={baud} timeout={timeout:.1f}s ...")
+    lidar = RPLidar(port=port, baudrate=baud, timeout=timeout)
+
+    # clear any stale state
+    for fn in (lidar.stop, lidar.stop_motor):
+        try:
+            fn()
+        except Exception:
+            pass
+
+    # info & health
+    info = lidar.get_info()
+    fw = info.get('firmware', (0, 0))
+    print(
+        "[LiDAR-API] Info: "
+        f"model={info.get('model','?')} fw={fw[0]}.{fw[1]} "
+        f"hw={info.get('hardware',0)} serial={info.get('serialnumber','n/a')}"
+    )
+    status, err = lidar.get_health()
+    print(f"[LiDAR-API] Health: status={status} error_code={err}")
+    if str(status).lower() != "good":
+        raise RPLidarException(f"Health not GOOD: {status} (err={err})")
+
+    # reset & flush
+    try:
+        lidar.reset()
+        time.sleep(0.25)
+    except Exception:
+        pass
+    drain_input(lidar, 0.25)
+
+    # motor
+    if motor_pwm is not None:
+        pwm = clamp(motor_pwm, 0, 1023)
+        print(f"[LiDAR-API] Starting motor with PWM={pwm} ...")
+        lidar.set_pwm(pwm)
+    else:
+        print("[LiDAR-API] Starting motor (default speed) ...")
+        lidar.start_motor()
+
+    time.sleep(0.50)
+    drain_input(lidar, 0.30)
+
+    # explicitly kick scan; some forks require this
+    try:
+        lidar.start_scan()
+    except Exception:
+        pass
+    drain_input(lidar, 0.10)
+
+    print("[LiDAR-API] Connected, motor running.")
+    return lidar
 
 
 # ---------------- main API class ----------------
@@ -318,8 +305,7 @@ class LidarSafetyAPI:
         - Return LidarReading.
 
         On header/desync errors from rplidar, we:
-        - Clear input, restart scan, rebuild iterator (once), and retry.
-        Raises RPLidarException if something goes badly wrong.
+        - drain_input(), restart scan, rebuild iterator (once), and retry.
         """
         if self._iter is None:
             raise RPLidarException("LidarSafetyAPI.poll() called before start().")
@@ -328,17 +314,16 @@ class LidarSafetyAPI:
             raw_scan = next(self._iter)  # may raise RPLidarException
         except RPLidarException as e:
             msg = str(e)
-            # Header/desync patterns like in lidar_test.py:
-            header_keys = ("descriptor", "Wrong body size", "Incorrect descriptor", "length mismatch")
+            header_keys = ("Wrong body size", "descriptor", "Incorrect descriptor", "length mismatch")
             if _retry_header and any(k in msg for k in header_keys):
                 if self.verbose:
-                    print(f"[LiDAR-API] Header/desync in poll(): {msg} → clearing input & rebuilding iterator.")
+                    print(f"[LiDAR-API] Header/desync in poll(): {msg} → draining input & rebuilding iterator.")
                 if self._lidar is None:
                     raise
 
-                # Try to clear and restart scan cleanly.
+                # Mimic lidar_test.py recovery: flush & restart scan.
                 try:
-                    self._lidar.clear_input()
+                    drain_input(self._lidar, 0.30)
                 except Exception:
                     pass
                 try:
@@ -350,7 +335,7 @@ class LidarSafetyAPI:
                     self._lidar.start_scan()
                 except Exception:
                     pass
-                time.sleep(0.2)
+                drain_input(self._lidar, 0.10)
 
                 # Rebuild iterator and reset timing; then retry once.
                 self._iter = self._lidar.iter_scans(max_buf_meas=2048, min_len=self.min_len)
