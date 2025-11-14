@@ -1,10 +1,29 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Robot Savo — VL53L1X Simple Dual-Bus Range Tester
--------------------------------------------------
-- Reads VL53L1X sensors at address 0x29 on any I²C buses you pass (e.g. 1,0).
-- NO FR/FL labels here, only explicit bus numbers so we can't get confused.
+Robot Savo — VL53L1X Range Tester (single I²C bus)
+--------------------------------------------------
+- Reads one VL53L1X sensor at address 0x29 on a chosen I²C bus.
+- Clean SIGINT (Ctrl+C), rolling median filter, threshold flag.
+
+IMPORTANT LIMITATION:
+  The Python 'VL53L1X/vl53l1x' module uses GLOBAL I²C state internally.
+  That means using multiple buses (e.g. 1 and 0) in the SAME PROCESS
+  is unreliable: the last-initialized bus "wins" and both reads come
+  from that bus.
+
+So this tool is intentionally SINGLE-BUS.
+To see both front sensors, run it twice:
+
+  # Front-Right (FR) on bus 1
+  python3 range_vl53_test.py --bus 1 --rate 10
+
+  # Front-Left (FL) on bus 0
+  python3 range_vl53_test.py --bus 0 --rate 10
+
+Physical mapping (LOCKED for Robot Savo front bumper):
+  - i2c-1 (bus 1) -> Front-Right  (FR)
+  - i2c-0 (bus 0) -> Front-Left   (FL)
 """
 
 import argparse
@@ -12,7 +31,7 @@ import sys
 import time
 import signal
 from collections import deque
-from typing import Dict, Optional, List
+from typing import Optional, List
 
 try:
     from VL53L1X import VL53L1X
@@ -21,10 +40,12 @@ except ImportError:
         from vl53l1x import VL53L1X
     except Exception:
         print("ERROR: Python module 'VL53L1X/vl53l1x' not found.", file=sys.stderr)
+        print("Install with: sudo -H python3 -m pip install --break-system-packages --upgrade vl53l1x", file=sys.stderr)
         sys.exit(1)
 
 I2C_ADDRESS = 0x29
 _stop = False
+
 
 def sigint_handler(signum, frame):
     global _stop
@@ -32,7 +53,9 @@ def sigint_handler(signum, frame):
         _stop = True
         print("\n^C  Stopping cleanly...", flush=True)
 
+
 signal.signal(signal.SIGINT, sigint_handler)
+
 
 def median(vals: List[float]) -> float:
     if not vals:
@@ -41,6 +64,16 @@ def median(vals: List[float]) -> float:
     n = len(s)
     mid = n // 2
     return s[mid] if (n % 2) else (s[mid - 1] + s[mid]) / 2.0
+
+
+def role_for_bus(bus: int) -> str:
+    """Human label for this bus."""
+    if bus == 1:
+        return "FR"  # Front-Right
+    if bus == 0:
+        return "FL"  # Front-Left
+    return f"bus{bus}"
+
 
 def setup_sensor(bus: int, mode: str, timing_ms: int, inter_ms: Optional[int]) -> VL53L1X:
     s = VL53L1X(i2c_bus=bus, i2c_address=I2C_ADDRESS)
@@ -71,6 +104,7 @@ def setup_sensor(bus: int, mode: str, timing_ms: int, inter_ms: Optional[int]) -
         s.start()
     return s
 
+
 def read_mm(sensor: VL53L1X) -> Optional[int]:
     try:
         d = sensor.get_distance() if hasattr(sensor, "get_distance") else getattr(sensor, "distance", None)
@@ -84,20 +118,18 @@ def read_mm(sensor: VL53L1X) -> Optional[int]:
     except Exception:
         return None
 
+
 def main():
     global _stop
-    ap = argparse.ArgumentParser(description="Simple dual-bus VL53L1X test (cm)")
-    ap.add_argument("--buses", type=str, default="1,0", help="Comma-separated I²C buses, e.g. '1,0'.")
+    ap = argparse.ArgumentParser(description="Single-bus VL53L1X test (cm)")
+    ap.add_argument("--bus", type=int, default=1,
+                    help="I²C bus number (default: 1). Use 1=FR, 0=FL.")
     ap.add_argument("--rate", type=float, default=10.0, help="Hz (default: 10.0)")
+    ap.add_argument("--mode", type=str, default="short", help="short|medium|long (default: short)")
+    ap.add_argument("--timing", type=int, default=50, help="Timing budget ms (default: 50)")
     ap.add_argument("--median", type=int, default=3, help="Median window (odd ≥1, default: 3)")
-    ap.add_argument("--threshold", type=float, default=28.0, help="Alert threshold in cm")
+    ap.add_argument("--threshold", type=float, default=28.0, help="Alert threshold in cm (default: 28.0)")
     args = ap.parse_args()
-
-    try:
-        buses = [int(x.strip()) for x in args.buses.split(",") if x.strip()]
-    except ValueError:
-        print("ERROR: --buses must be a comma-separated list of integers.", file=sys.stderr)
-        return 2
 
     if args.rate <= 0:
         print("ERROR: --rate must be > 0", file=sys.stderr)
@@ -106,73 +138,65 @@ def main():
         print("ERROR: --median must be odd ≥1", file=sys.stderr)
         return 2
 
+    role = role_for_bus(args.bus)
     period = 1.0 / args.rate
-    sensors: Dict[int, VL53L1X] = {}
-    hist: Dict[int, deque] = {}
 
-    print(f"[VL53L1X SIMPLE] Addr=0x{I2C_ADDRESS:02X}  Buses={buses}  Rate={args.rate:.2f} Hz  Median={args.median}")
+    print(
+        f"[VL53L1X SINGLE] Addr=0x{I2C_ADDRESS:02X}  Bus={args.bus} ({role})  "
+        f"Mode={args.mode.upper()}  Timing={args.timing}ms  "
+        f"Rate={args.rate:.2f} Hz  Median={args.median}  Threshold={args.threshold:.1f} cm"
+    )
 
-    # Init
-    for bus in buses:
-        if _stop:
-            break
-        try:
-            s = setup_sensor(bus, "short", 50, None)
-            time.sleep(0.05)
-            _ = read_mm(s)
-            sensors[bus] = s
-            hist[bus] = deque(maxlen=args.median)
-            print(f"  - OK: bus{bus} online")
-        except Exception as e:
-            print(f"  - FAIL: bus{bus} init error: {e}", file=sys.stderr)
-
-    if not sensors:
-        print("ERROR: No sensors initialized.", file=sys.stderr)
+    try:
+        sensor = setup_sensor(args.bus, args.mode, args.timing, None)
+        print(f"  - OK: {role} (i2c-{args.bus}) online")
+    except Exception as e:
+        print(f"  - FAIL: Could not init VL53L1X on bus {args.bus}: {e}", file=sys.stderr)
         return 1
 
-    active_buses = [b for b in buses if b in sensors]
+    hist = deque(maxlen=args.median)
 
-    # Header
-    cols = " | ".join([f"bus{b}_cm" for b in active_buses] +
-                      [f"bus{b}_f_cm" for b in active_buses])
-    print("\n t(s)  | " + cols + " | alert")
-    print("-" * (12 + len(cols) + 8))
+    print(f"\n t(s)  | {role}[bus{args.bus}](cm) | {role}[bus{args.bus}]_f(cm) | alert")
+    print("-" * 57)
 
     t0 = time.perf_counter()
     while not _stop:
-        t = time.perf_counter() - t0
-        raw_vals, filt_vals = [], []
+        loop_start = time.perf_counter()
+        t = loop_start - t0
 
-        for bus in active_buses:
-            d_mm = read_mm(sensors[bus])
-            d_cm = round(d_mm / 10.0, 1) if d_mm is not None else -1.0
-            raw_vals.append(d_cm)
+        d_mm = read_mm(sensor)
+        d_cm = round(d_mm / 10.0, 1) if d_mm is not None else -1.0
 
-            if d_cm > 0:
-                hist[bus].append(d_cm)
-            fv = median(list(hist[bus])) if (args.median > 1 and hist[bus]) else (hist[bus][-1] if hist[bus] else -1.0)
-            filt_vals.append(fv)
+        if d_cm > 0:
+            hist.append(d_cm)
 
-        alert = any((v >= 0 and v < args.threshold) for v in filt_vals)
+        if args.median > 1 and len(hist) > 0:
+            fv = median(list(hist))
+        else:
+            fv = hist[-1] if hist else -1.0
+
+        alert = (fv >= 0 and fv < args.threshold)
 
         def fmt(v: float) -> str:
             return f"{v:>6.1f}" if v >= 0 else "  --- "
 
-        line = " | ".join([fmt(v) for v in raw_vals] + [fmt(v) for v in filt_vals])
-        print(f"{t:6.2f} | " + line + f" | {'!' if alert else '-'}")
+        print(f"{t:6.2f} | {fmt(d_cm)} | {fmt(fv)} | {'!' if alert else '-'}")
 
-        sleep_s = period - (time.perf_counter() - (t0 + t))
+        sleep_s = period - (time.perf_counter() - loop_start)
         if sleep_s > 0:
             time.sleep(sleep_s)
 
-    # Cleanup
-    for s in sensors.values():
-        try:
-            (s.stop_ranging() if hasattr(s, "stop_ranging") else s.stop())
-        except Exception:
-            pass
+    try:
+        if hasattr(sensor, "stop_ranging"):
+            sensor.stop_ranging()
+        elif hasattr(sensor, "stop"):
+            sensor.stop()
+    except Exception:
+        pass
+
     print("Done.")
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())
