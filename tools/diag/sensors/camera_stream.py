@@ -121,7 +121,8 @@ def main() -> None:
     print(f"    udpsrc port={args.port} caps=\"application/x-rtp, media=video, encoding-name=H264, payload=96\" ! \\")
     print("    rtph264depay ! avdec_h264 ! videoconvert ! autovideosink\n")
 
-    if args.print-only:
+    # FIX: argparse stores --print-only as args.print_only
+    if args.print_only:
         print("[Camera-Stream] --print-only set, not starting pipeline.")
         return
 
