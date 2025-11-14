@@ -9,12 +9,8 @@ Interactive controls (default):
   C     : center both servos (pan=90°, tilt=55° by default)
   Q or ESC : quit
 
-Default angle limits:
-  Pan  : 0 .. 180 degrees
-  Tilt : 45 .. 180 degrees (to match your physical mount)
-  Default tilt center = 55 degrees.
-
 Author: Robot Savo
+
 """
 
 import sys
