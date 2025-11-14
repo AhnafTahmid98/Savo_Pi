@@ -6,6 +6,7 @@ Robot Savo — Camera Live Stream (Pi → Laptop, GStreamer + libcamerasrc)
 - Uses libcamerasrc + x264enc + rtph264pay to stream H.264 over UDP.
 - No files are saved; it's purely a live preview.
 - Avoids libcamera-vid completely (better on Ubuntu 24.04).
+- Matches the working caps style from camera_test.py (format=I420).
 
 Author: Robot Savo
 """
@@ -18,6 +19,7 @@ import shlex
 
 
 def require(bin_name: str, human: str) -> None:
+    """Ensure a required binary exists in PATH."""
     if shutil.which(bin_name) is None:
         print(f"[Camera-Stream] ERROR: {human} not found in PATH (binary: {bin_name}).", file=sys.stderr)
         print("  Install the missing package (e.g. gstreamer1.0-* plugins).", file=sys.stderr)
@@ -34,18 +36,25 @@ def build_gst_pipeline(host: str,
     Build a GStreamer pipeline:
 
       libcamerasrc !
-        video/x-raw,width=WxH,framerate=FPS/1 !
+        video/x-raw,format=I420,width=WxH,framerate=FPS/1 !
         videoconvert !
         x264enc tune=zerolatency bitrate=(kbps) speed-preset=superfast key-int-max=60 !
         rtph264pay config-interval=1 pt=96 !
         udpsink host=HOST port=PORT sync=false async=false
+
+    This produces an RTP H.264 stream suitable for:
+
+      udpsrc caps=application/x-rtp,media=video,encoding-name=H264,payload=96 !
+      rtph264depay ! h264parse ! avdec_h264 ! videoconvert ! autovideosink
     """
-    bitrate = int(bitrate_kbps)  # x264enc bitrate is in kbit/s (not bits/s)
+    # x264enc bitrate is in kbit/s (not bits/s)
+    bitrate = int(bitrate_kbps)
 
     pipeline = [
         "gst-launch-1.0", "-v",
         "libcamerasrc", "!",
-        f"video/x-raw,width={width},height={height},framerate={fps}/1", "!",
+        # IMPORTANT: match camera_test.py – force I420 so negotiation is happy.
+        f"video/x-raw,format=I420,width={width},height={height},framerate={fps}/1", "!",
         "videoconvert", "!",
         "x264enc",
         "tune=zerolatency",
