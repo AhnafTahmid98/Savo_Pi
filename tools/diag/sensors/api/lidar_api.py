@@ -309,7 +309,7 @@ class LidarSafetyAPI:
         self._iter = None
 
     # ----- core reading -----
-    def poll(self) -> LidarReading:
+    def poll(self, _retry_header: bool = True) -> LidarReading:
         """
         Block until one full LiDAR rotation is available, then:
         - Filter to configured sector.
@@ -317,12 +317,49 @@ class LidarSafetyAPI:
         - Update debounced obstacle state.
         - Return LidarReading.
 
+        On header/desync errors from rplidar, we:
+        - Clear input, restart scan, rebuild iterator (once), and retry.
         Raises RPLidarException if something goes badly wrong.
         """
         if self._iter is None:
             raise RPLidarException("LidarSafetyAPI.poll() called before start().")
 
-        raw_scan = next(self._iter)  # may raise RPLidarException
+        try:
+            raw_scan = next(self._iter)  # may raise RPLidarException
+        except RPLidarException as e:
+            msg = str(e)
+            # Header/desync patterns like in lidar_test.py:
+            header_keys = ("descriptor", "Wrong body size", "Incorrect descriptor", "length mismatch")
+            if _retry_header and any(k in msg for k in header_keys):
+                if self.verbose:
+                    print(f"[LiDAR-API] Header/desync in poll(): {msg} → clearing input & rebuilding iterator.")
+                if self._lidar is None:
+                    raise
+
+                # Try to clear and restart scan cleanly.
+                try:
+                    self._lidar.clear_input()
+                except Exception:
+                    pass
+                try:
+                    self._lidar.stop()
+                except Exception:
+                    pass
+                time.sleep(0.1)
+                try:
+                    self._lidar.start_scan()
+                except Exception:
+                    pass
+                time.sleep(0.2)
+
+                # Rebuild iterator and reset timing; then retry once.
+                self._iter = self._lidar.iter_scans(max_buf_meas=2048, min_len=self.min_len)
+                self._last_scan_wall = None
+                return self.poll(_retry_header=False)
+            else:
+                # Some other (or repeated) error; bubble up.
+                raise
+
         t_now = now()
         self._scan_id += 1
 
