@@ -3,55 +3,55 @@
 """
 Robot Savo — Camera Live Stream (Pi → Laptop, no recording)
 -----------------------------------------------------------
-- Uses libcamera via GStreamer to stream H.264 over UDP.
+- Uses libcamera-vid to stream H.264 over UDP.
 - No files are saved; it's purely a live preview.
-- Designed to be simple and robust for testing and for drive_automode.py.
+- Avoids gst-libcamera negotiation issues we saw with libcamerasrc.
 
 Author: Robot Savo
 """
 
 import argparse
+import shutil
 import subprocess
 import sys
-import shutil
 
 
-def build_sender_pipeline(host: str,
-                          port: int,
-                          width: int,
-                          height: int,
-                          fps: int,
-                          bitrate_kbps: int) -> str:
+def build_libcamera_vid_cmd(host: str,
+                            port: int,
+                            width: int,
+                            height: int,
+                            fps: int,
+                            bitrate_kbps: int) -> list[str]:
     """
-    Build the GStreamer pipeline for sending H.264 video over UDP.
+    Build the libcamera-vid command for sending H.264 over UDP.
 
-    Pipeline:
-      libcamerasrc
-        -> video/x-raw (size + fps)
-        -> videoconvert
-        -> x264enc (low latency, byte-stream)
-        -> h264parse
-        -> rtph264pay
-        -> udpsink
+    We use:
+      libcamera-vid -t 0 --inline --width W --height H --framerate FPS
+                    --codec h264 --profile baseline --bitrate (bits/s)
+                    --nopreview
+                    -o udp://HOST:PORT
     """
-    pipeline = (
-        "libcamerasrc ! "
-        f"video/x-raw,width={width},height={height},framerate={fps}/1 ! "
-        "videoconvert ! "
-        # x264enc bitrate is in kbit/s
-        "x264enc tune=zerolatency speed-preset=superfast "
-        f"bitrate={bitrate_kbps} key-int-max=30 byte-stream=true ! "
-        # Parse to ensure proper stream format for RTP
-        "h264parse config-interval=-1 ! "
-        "rtph264pay config-interval=1 pt=96 ! "
-        f"udpsink host={host} port={port} sync=false async=false"
-    )
-    return pipeline
+    bitrate_bits = bitrate_kbps * 1000
+
+    cmd = [
+        "libcamera-vid",
+        "-t", "0",                    # 0 ms == run until Ctrl+C
+        "--inline",                   # include SPS/PPS in stream for late join
+        "--width", str(width),
+        "--height", str(height),
+        "--framerate", str(fps),
+        "--codec", "h264",
+        "--profile", "baseline",
+        "--bitrate", str(bitrate_bits),
+        "--nopreview",               # no local preview window
+        "-o", f"udp://{host}:{port}",
+    ]
+    return cmd
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(
-        description="Robot Savo — Pi camera live stream to laptop (UDP, no recording)"
+        description="Robot Savo — Pi camera live stream to laptop (UDP, libcamera-vid, no recording)"
     )
     ap.add_argument(
         "--host",
@@ -67,14 +67,14 @@ def main() -> None:
     ap.add_argument(
         "--width",
         type=int,
-        default=640,
-        help="Video width (default: 640).",
+        default=1280,
+        help="Video width (default: 1280).",
     )
     ap.add_argument(
         "--height",
         type=int,
-        default=480,
-        help="Video height (default: 480).",
+        default=720,
+        help="Video height (default: 720).",
     )
     ap.add_argument(
         "--fps",
@@ -85,24 +85,24 @@ def main() -> None:
     ap.add_argument(
         "--bitrate",
         type=int,
-        default=1500,
-        help="Approx. video bitrate in kbit/s (default: 1500).",
+        default=4000,
+        help="Approx. video bitrate in kbit/s (default: 4000).",
     )
     ap.add_argument(
         "--print-only",
         action="store_true",
-        help="Only print the gst-launch command and exit (no streaming).",
+        help="Only print the libcamera-vid command and exit (no streaming).",
     )
 
     args = ap.parse_args()
 
-    # Check that gst-launch-1.0 exists on the Pi
-    if shutil.which("gst-launch-1.0") is None:
-        print("[Camera-Stream] ERROR: 'gst-launch-1.0' not found in PATH.", file=sys.stderr)
-        print("  Install GStreamer (gst-launch-1.0) before using this script.", file=sys.stderr)
+    # Check that libcamera-vid exists on the Pi
+    if shutil.which("libcamera-vid") is None:
+        print("[Camera-Stream] ERROR: 'libcamera-vid' not found in PATH.", file=sys.stderr)
+        print("  Install libcamera-apps (libcamera-vid) before using this script.", file=sys.stderr)
         sys.exit(1)
 
-    pipeline = build_sender_pipeline(
+    cmd = build_libcamera_vid_cmd(
         host=args.host,
         port=args.port,
         width=args.width,
@@ -111,35 +111,36 @@ def main() -> None:
         bitrate_kbps=args.bitrate,
     )
 
-    cmd = ["gst-launch-1.0", "-v"] + pipeline.split()
-
-    print("\n[Camera-Stream] Robot Savo — Pi → Laptop Live Stream")
-    print("----------------------------------------------------")
+    print("\n[Camera-Stream] Robot Savo — Pi → Laptop Live Stream (libcamera-vid)")
+    print("---------------------------------------------------------------------")
     print(f"[Camera-Stream] Host       : {args.host}")
     print(f"[Camera-Stream] Port       : {args.port}")
     print(f"[Camera-Stream] Resolution : {args.width}x{args.height}")
     print(f"[Camera-Stream] FPS        : {args.fps}")
     print(f"[Camera-Stream] Bitrate    : {args.bitrate} kbit/s\n")
-    print("[Camera-Stream] Sender pipeline (Pi):")
+    print("[Camera-Stream] Sender command (Pi):")
     print("  " + " ".join(cmd))
-    print("\n[Camera-Stream] On your LAPTOP, run:")
+    print("\n[Camera-Stream] On your LAPTOP, you can use for example:\n")
+    print("  # Option 1: ffplay (simple)")
+    print(f"  ffplay -fflags nobuffer -flags low_delay -framedrop -strict experimental udp://@:{args.port}\n")
+    print("  # Option 2: GStreamer")
     print(f"  gst-launch-1.0 -v \\")
-    print(f"    udpsrc port={args.port} caps=\"application/x-rtp, "
-          "media=video, encoding-name=H264, payload=96, clock-rate=90000\" ! \\")
+    print(f"    udpsrc port={args.port} ! \\")
+    print("    application/x-rtp, payload=96 ! \\")
     print("    rtph264depay ! h264parse ! avdec_h264 ! videoconvert ! autovideosink\n")
 
     if args.print_only:
-        print("[Camera-Stream] --print-only set, not starting pipeline.")
+        print("[Camera-Stream] --print-only set, not starting libcamera-vid.")
         return
 
-    print("[Camera-Stream] Starting GStreamer sender...  (Ctrl+C to stop)\n")
+    print("[Camera-Stream] Starting libcamera-vid sender...  (Ctrl+C to stop)\n")
 
     proc = None
     try:
         proc = subprocess.Popen(cmd)
         proc.wait()
     except KeyboardInterrupt:
-        print("\n[Camera-Stream] Ctrl+C received, terminating pipeline...")
+        print("\n[Camera-Stream] Ctrl+C received, terminating libcamera-vid...")
         if proc is not None:
             try:
                 proc.terminate()
