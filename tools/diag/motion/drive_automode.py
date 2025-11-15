@@ -31,12 +31,10 @@ from typing import Optional
 
 import smbus
 
-# -------------------------------------------------------------------
-# Ensure we can import APIs from tools/diag/sensors/api/*
-# -------------------------------------------------------------------
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-if ROOT not in sys.path:
-    sys.path.insert(0, ROOT)
+# --- make /home/savo/Savo_Pi importable as "tools" root ---
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 from tools.diag.sensors.api.vl53_dual_api import DualToF
 from tools.diag.sensors.api.ultrasonic_api import read_ultrasonic_cm
