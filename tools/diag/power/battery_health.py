@@ -18,10 +18,12 @@ Features
         - V_empty (default 6.40 V) -> 0%
         - V_full  (default 8.40 V) -> 100%
 
-- Kit SoC-based notes similar to UPS:
-    * KIT FULL  : SoC >= --kit-full-soc (default 95 %)
-    * KIT LOW   : SoC <= --kit-low-soc (default 20 %) OR voltage <= --kit-low-v
-    * KIT ERR   : I²C read error
+- Kit SoC-based notes similar to UPS, but printed in human language:
+    * "Kit low – needs charging"
+    * "UPS low"
+    * "Both low – needs charging"
+    * "Good condition"
+    * Error messages: "UPS error", "Kit error", "UPS and kit error"
 
 - Print a compact, timestamped status line each interval.
 - Optional CSV logging for long-term plots.
@@ -30,23 +32,6 @@ Features
 
 This script is *standalone*: it does not require ROS 2. It is meant for
 bench diagnostics and troubleshooting on the live robot.
-
-Examples
-========
-# Basic monitoring (UPS + kit battery), 2 s interval:
-  python3 battery_health.py
-
-# Monitor every 5 s for 10 minutes and log to CSV:
-  python3 battery_health.py --interval 5 --duration 600 --csv battery_log.csv
-
-# Only check robot kit battery on PCB v2, warn below 7.2 V:
-  python3 battery_health.py --no-ups --pcb-version 2 --kit-low-v 7.2
-
-# Enable real shutdown if UPS pack drops below 3.20 V:
-  sudo python3 battery_health.py --allow-shutdown --ups-shutdown-v 3.2
-
-# Override SoC mapping for kit pack (e.g. more conservative empty at 6.6 V):
-  python3 battery_health.py --kit-v-empty 6.6 --kit-v-full 8.4
 """
 
 import argparse
@@ -335,8 +320,6 @@ def parse_args(argv=None):
 def maybe_shutdown(ups_v: float, args) -> None:
     """
     Optionally request system shutdown if UPS voltage is critically low.
-
-    We keep this in a separate function to make behaviour very explicit.
     """
     if ups_v <= args.ups_shutdown_v and args.allow_shutdown:
         print(
@@ -412,8 +395,8 @@ def main(argv=None) -> int:
                     "ups_capacity_pct",
                     "kit_voltage_V",
                     "kit_soc_pct",
-                    "ups_warn",
-                    "kit_warn",
+                    "ups_state",
+                    "kit_state",
                 ]
             )
 
@@ -457,25 +440,28 @@ def main(argv=None) -> int:
 
             ups_read = UpsReading(voltage=None, capacity=None, ok=False)
             kit_read = KitReading(voltage=None, soc=None, ok=False)
-            ups_warn = ""
-            kit_warn = ""
+
+            # Internal state flags
+            ups_state = "ok"
+            kit_state = "ok"
 
             # ----- UPS state -----
             if ups is not None:
                 ups_read = ups.safe_read()
                 if ups_read.ok and ups_read.voltage is not None:
                     if ups_read.voltage <= args.ups_shutdown_v:
-                        ups_warn = "UPS CRITICAL"
+                        ups_state = "critical"
                     elif ups_read.voltage <= args.ups_low_v:
-                        ups_warn = "UPS LOW"
-                elif not ups_read.ok:
-                    ups_warn = "UPS ERR"
+                        ups_state = "low"
+                    else:
+                        ups_state = "ok"
+                else:
+                    ups_state = "error"
 
             # ----- Kit battery state -----
             if kit is not None:
                 kit_read = kit.safe_read()
                 if kit_read.ok and kit_read.voltage is not None:
-                    # Check SoC-based and voltage-based warnings
                     low_by_v = kit_read.voltage <= args.kit_low_v
                     low_by_soc = (
                         kit_read.soc is not None
@@ -485,18 +471,35 @@ def main(argv=None) -> int:
                         kit_read.soc is not None
                         and kit_read.soc >= args.kit_full_soc
                     )
-
                     if full_by_soc:
-                        kit_warn = "KIT FULL"
+                        kit_state = "full"
                     elif low_by_v or low_by_soc:
-                        kit_warn = "KIT LOW"
-                elif not kit_read.ok:
-                    kit_warn = "KIT ERR"
+                        kit_state = "low"
+                    else:
+                        kit_state = "ok"
+                else:
+                    kit_state = "error"
 
-            # Compose notes column
-            notes = ", ".join(filter(None, [ups_warn, kit_warn]))
-            if not notes:
-                notes = "-"
+            # ----- Human-readable Notes -----
+            if ups_state == "error" and kit_state == "error":
+                notes = "UPS and kit error"
+            elif ups_state == "error":
+                notes = "UPS error"
+            elif kit_state == "error":
+                notes = "Kit error"
+            else:
+                # No errors: talk about condition / charging
+                ups_low_flag = ups_state in ("low", "critical")
+                kit_low_flag = kit_state == "low"
+
+                if ups_low_flag and kit_low_flag:
+                    notes = "Both low – needs charging"
+                elif ups_low_flag:
+                    notes = "UPS low"
+                elif kit_low_flag:
+                    notes = "Kit low – needs charging"
+                else:
+                    notes = "Good condition"
 
             ups_v_str = f"{ups_read.voltage:5.2f}" if ups_read.voltage is not None else "  n/a"
             ups_c_str = f"{ups_read.capacity:5.1f}" if ups_read.capacity is not None else "  n/a"
@@ -505,7 +508,7 @@ def main(argv=None) -> int:
 
             print(f"{now}  {ups_v_str}  {ups_c_str}  {kit_v_str}  {kit_soc_str}   {notes}")
 
-            # CSV logging
+            # CSV logging (store internal states too)
             if csv_writer is not None:
                 csv_writer.writerow(
                     [
@@ -514,8 +517,8 @@ def main(argv=None) -> int:
                         ups_read.capacity if ups_read.capacity is not None else "",
                         kit_read.voltage if kit_read.voltage is not None else "",
                         kit_read.soc if kit_read.soc is not None else "",
-                        ups_warn,
-                        kit_warn,
+                        ups_state,
+                        kit_state,
                     ]
                 )
                 csv_file.flush()
