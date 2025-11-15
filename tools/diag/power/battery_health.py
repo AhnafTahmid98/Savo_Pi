@@ -61,8 +61,11 @@ except ImportError:
     try:
         from smbus import SMBus  # type: ignore
     except ImportError as exc:  # pragma: no cover - environment specific
-        print("ERROR: Neither 'smbus2' nor 'smbus' is available. "
-              "Install with: sudo apt install python3-smbus2", file=sys.stderr)
+        print(
+            "ERROR: Neither 'smbus2' nor 'smbus' is available. "
+            "Install with: sudo apt install python3-smbus2",
+            file=sys.stderr,
+        )
         raise
 
 
@@ -185,7 +188,9 @@ class KitBattery:
 
     def _read_adc_channel(self) -> float:
         # ADS7830 channel encoding (same as vendor example)
-        cmd = ADS7830_CMD_BASE | ((((self.channel << 2) | (self.channel >> 1)) & 0x07) << 4)
+        cmd = ADS7830_CMD_BASE | (
+            (((self.channel << 2) | (self.channel >> 1)) & 0x07) << 4
+        )
         self.bus.write_byte(self.address, cmd)
         value = self._read_stable_byte()
         voltage = value / 255.0 * self.adc_voltage_coefficient
@@ -232,7 +237,9 @@ def parse_args(argv=None):
 
     parser.add_argument("--ups-bus", type=int, default=1, help="I²C bus for UPS HAT (0x36)")
     parser.add_argument("--adc-bus", type=int, default=1, help="I²C bus for ADS7830 (0x48)")
-    parser.add_argument("--adc-channel", type=int, default=2, help="ADS7830 channel used for battery sense (0-7)")
+    parser.add_argument(
+        "--adc-channel", type=int, default=2, help="ADS7830 channel used for battery sense (0-7)"
+    )
     parser.add_argument(
         "--pcb-version",
         type=int,
@@ -313,8 +320,10 @@ def maybe_shutdown(ups_v: float, args) -> None:
     We keep this in a separate function to make behaviour very explicit.
     """
     if ups_v <= args.ups_shutdown_v and args.allow_shutdown:
-        print(">>> UPS voltage below shutdown threshold "
-              f"({ups_v:.3f} V <= {args.ups_shutdown_v:.3f} V).")
+        print(
+            ">>> UPS voltage below shutdown threshold "
+            f"({ups_v:.3f} V <= {args.ups_shutdown_v:.3f} V)."
+        )
         print(">>> Requesting system shutdown NOW...")
         import subprocess
 
@@ -328,7 +337,10 @@ def main(argv=None) -> int:
     args = parse_args(argv)
 
     if args.no_ups and args.no_kit:
-        print("Nothing to do: both UPS and robot kit readings are disabled.", file=sys.stderr)
+        print(
+            "Nothing to do: both UPS and robot kit readings are disabled.",
+            file=sys.stderr,
+        )
         return 1
 
     ups = None
@@ -338,7 +350,10 @@ def main(argv=None) -> int:
         try:
             ups = UpsHat(bus_id=args.ups_bus)
         except Exception as exc:
-            print(f"WARNING: Failed to initialise UPS HAT on bus {args.ups_bus}: {exc}", file=sys.stderr)
+            print(
+                f"WARNING: Failed to initialise UPS HAT on bus {args.ups_bus}: {exc}",
+                file=sys.stderr,
+            )
 
     if not args.no_kit:
         try:
@@ -350,10 +365,16 @@ def main(argv=None) -> int:
                 v_full=args.kit_v_full,
             )
         except Exception as exc:
-            print(f"WARNING: Failed to initialise ADS7830 on bus {args.adc_bus}: {exc}", file=sys.stderr)
+            print(
+                f"WARNING: Failed to initialise ADS7830 on bus {args.adc_bus}: {exc}",
+                file=sys.stderr,
+            )
 
     if ups is None and kit is None:
-        print("ERROR: Neither UPS HAT nor robot kit battery monitor could be initialised.", file=sys.stderr)
+        print(
+            "ERROR: Neither UPS HAT nor robot kit battery monitor could be initialised.",
+            file=sys.stderr,
+        )
         return 1
 
     csv_file = None
@@ -379,17 +400,33 @@ def main(argv=None) -> int:
 
     print("-" * 80)
     print("Robot Savo — Battery Health Diagnostic")
-    print(f"UPS HAT    : {'disabled' if args.no_ups or ups is None else f'I2C-{args.ups_bus} @ 0x{UPS_I2C_ADDR:02X}'}")
-    print(
-        f"Kit battery: "
-        f"{'disabled' if args.no_kit or kit is None else f'I2C-{args.adc_bus} @ 0x{ADC_I2C_ADDR:02X}, ch={args.adc_channel}, PCB v{args.pcb_version}, "
-        f"SoC range {args.kit_v_empty:.2f}–{args.kit_v_full:.2f} V -> 0–100%'}"
-    )
-    print(f"Interval   : {args.interval:.2f} s   Duration: {'infinite' if args.duration <= 0 else f'{args.duration:.1f} s'}")
+
+    # UPS status line
+    if args.no_ups or ups is None:
+        ups_line = "disabled"
+    else:
+        ups_line = f"I2C-{args.ups_bus} @ 0x{UPS_I2C_ADDR:02X}"
+    print(f"UPS HAT    : {ups_line}")
+
+    # Kit battery status line (fixed version)
+    if args.no_kit or kit is None:
+        kit_line = "disabled"
+    else:
+        kit_line = (
+            f"I2C-{args.adc_bus} @ 0x{ADC_I2C_ADDR:02X}, "
+            f"ch={args.adc_channel}, PCB v{args.pcb_version}, "
+            f"SoC range {args.kit_v_empty:.2f}–{args.kit_v_full:.2f} V -> 0–100%"
+        )
+    print(f"Kit battery: {kit_line}")
+
+    duration_str = "infinite" if args.duration <= 0 else f"{args.duration:.1f} s"
+    print(f"Interval   : {args.interval:.2f} s   Duration: {duration_str}")
+
     if args.allow_shutdown and not args.no_ups:
         print(f"Shutdown   : ENABLED below {args.ups_shutdown_v:.3f} V (UPS HAT)")
     else:
         print("Shutdown   : disabled (no automatic power-off)")
+
     print("-" * 80)
     print(" time       UPS_V   UPS_%   KIT_V   KIT_%   Notes")
     print("--------------------------------------------------------------------------")
