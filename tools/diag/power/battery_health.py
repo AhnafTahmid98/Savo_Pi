@@ -18,6 +18,11 @@ Features
         - V_empty (default 6.40 V) -> 0%
         - V_full  (default 8.40 V) -> 100%
 
+- Kit SoC-based notes similar to UPS:
+    * KIT FULL  : SoC >= --kit-full-soc (default 95 %)
+    * KIT LOW   : SoC <= --kit-low-soc (default 20 %) OR voltage <= --kit-low-v
+    * KIT ERR   : I²C read error
+
 - Print a compact, timestamped status line each interval.
 - Optional CSV logging for long-term plots.
 - Programmable low-voltage warnings and (optional) automatic shutdown
@@ -298,12 +303,26 @@ def parse_args(argv=None):
         default=3.20,
         help="UPS emergency shutdown threshold (V)",
     )
+
     parser.add_argument(
         "--kit-low-v",
         type=float,
         default=7.20,
         help="Robot kit pack low voltage warning threshold (V)",
     )
+    parser.add_argument(
+        "--kit-low-soc",
+        type=float,
+        default=20.0,
+        help="Kit SoC warning threshold (percent, linear estimate)",
+    )
+    parser.add_argument(
+        "--kit-full-soc",
+        type=float,
+        default=95.0,
+        help="Kit SoC 'full' threshold (percent, linear estimate)",
+    )
+
     parser.add_argument(
         "--allow-shutdown",
         action="store_true",
@@ -408,7 +427,7 @@ def main(argv=None) -> int:
         ups_line = f"I2C-{args.ups_bus} @ 0x{UPS_I2C_ADDR:02X}"
     print(f"UPS HAT    : {ups_line}")
 
-    # Kit battery status line (fixed version)
+    # Kit battery status line
     if args.no_kit or kit is None:
         kit_line = "disabled"
     else:
@@ -441,6 +460,7 @@ def main(argv=None) -> int:
             ups_warn = ""
             kit_warn = ""
 
+            # ----- UPS state -----
             if ups is not None:
                 ups_read = ups.safe_read()
                 if ups_read.ok and ups_read.voltage is not None:
@@ -451,10 +471,24 @@ def main(argv=None) -> int:
                 elif not ups_read.ok:
                     ups_warn = "UPS ERR"
 
+            # ----- Kit battery state -----
             if kit is not None:
                 kit_read = kit.safe_read()
                 if kit_read.ok and kit_read.voltage is not None:
-                    if kit_read.voltage <= args.kit_low_v:
+                    # Check SoC-based and voltage-based warnings
+                    low_by_v = kit_read.voltage <= args.kit_low_v
+                    low_by_soc = (
+                        kit_read.soc is not None
+                        and kit_read.soc <= args.kit_low_soc
+                    )
+                    full_by_soc = (
+                        kit_read.soc is not None
+                        and kit_read.soc >= args.kit_full_soc
+                    )
+
+                    if full_by_soc:
+                        kit_warn = "KIT FULL"
+                    elif low_by_v or low_by_soc:
                         kit_warn = "KIT LOW"
                 elif not kit_read.ok:
                     kit_warn = "KIT ERR"
