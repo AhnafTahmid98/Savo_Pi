@@ -14,6 +14,9 @@ Features
 - Read Robot Kit main battery via ADS7830 ADC @ 0x48:
     * Uses PCB version 1 or 2 scaling (divider ratio) for Freenove-style boards.
     * Default channel 2 for battery sense, but configurable via CLI.
+    * Simple SoC estimate (%) using a linear 2S Li-ion model:
+        - V_empty (default 6.40 V) -> 0%
+        - V_full  (default 8.40 V) -> 100%
 
 - Print a compact, timestamped status line each interval.
 - Optional CSV logging for long-term plots.
@@ -36,6 +39,9 @@ Examples
 
 # Enable real shutdown if UPS pack drops below 3.20 V:
   sudo python3 battery_health.py --allow-shutdown --ups-shutdown-v 3.2
+
+# Override SoC mapping for kit pack (e.g. more conservative empty at 6.6 V):
+  python3 battery_health.py --kit-v-empty 6.6 --kit-v-full 8.4
 """
 
 import argparse
@@ -76,7 +82,8 @@ class UpsReading:
 @dataclass
 class KitReading:
     voltage: Optional[float]  # Pack voltage in volts
-    ok: bool
+    soc: Optional[float] = None  # State of charge in percent
+    ok: bool = False
     error: Optional[str] = None
 
 
@@ -134,6 +141,15 @@ class KitBattery:
     - PCB v2:
         adc_voltage_coefficient = 5.2
         battery_voltage = adc_voltage * 2
+
+    SoC estimation:
+    ----------------
+    A simple *linear* mapping between two points:
+
+      V_empty -> 0%
+      V_full  -> 100%
+
+    Values below V_empty are clamped to 0%, above V_full to 100%.
     """
 
     def __init__(
@@ -142,16 +158,22 @@ class KitBattery:
         address: int = ADC_I2C_ADDR,
         channel: int = 2,
         pcb_version: int = 2,
+        v_empty: float = 6.4,
+        v_full: float = 8.4,
     ) -> None:
         if channel < 0 or channel > 7:
             raise ValueError("ADS7830 channel must be 0..7")
         if pcb_version not in (1, 2):
             raise ValueError("pcb_version must be 1 or 2")
+        if v_full <= v_empty:
+            raise ValueError("v_full must be greater than v_empty for SoC calculation")
 
         self.address = address
         self.channel = channel
         self.pcb_version = pcb_version
         self.adc_voltage_coefficient = 3.3 if pcb_version == 1 else 5.2
+        self.v_empty = float(v_empty)
+        self.v_full = float(v_full)
         self.bus = SMBus(bus_id)
 
     def _read_stable_byte(self) -> int:
@@ -177,12 +199,23 @@ class KitBattery:
             battery_voltage = adc_voltage * 2.0
         return float(f"{battery_voltage:.3f}")
 
+    def estimate_soc(self, voltage: float) -> float:
+        """Simple linear SoC estimate for 2S pack between v_empty and v_full."""
+        if voltage <= self.v_empty:
+            soc = 0.0
+        elif voltage >= self.v_full:
+            soc = 100.0
+        else:
+            soc = (voltage - self.v_empty) / (self.v_full - self.v_empty) * 100.0
+        return float(f"{soc:.1f}")
+
     def safe_read(self) -> KitReading:
         try:
             v = self.read_battery_voltage()
-            return KitReading(voltage=v, ok=True)
+            soc = self.estimate_soc(v)
+            return KitReading(voltage=v, soc=soc, ok=True)
         except OSError as exc:
-            return KitReading(voltage=None, ok=False, error=str(exc))
+            return KitReading(voltage=None, soc=None, ok=False, error=str(exc))
 
     def close(self) -> None:
         try:
@@ -206,6 +239,19 @@ def parse_args(argv=None):
         choices=[1, 2],
         default=2,
         help="Robot kit PCB version (affects ADC scaling)",
+    )
+
+    parser.add_argument(
+        "--kit-v-empty",
+        type=float,
+        default=6.4,
+        help="Kit battery voltage mapped to 0% SoC (2S pack, linear model)",
+    )
+    parser.add_argument(
+        "--kit-v-full",
+        type=float,
+        default=8.4,
+        help="Kit battery voltage mapped to 100% SoC (2S pack, linear model)",
     )
 
     parser.add_argument("--interval", type=float, default=2.0, help="Sampling interval in seconds")
@@ -300,6 +346,8 @@ def main(argv=None) -> int:
                 bus_id=args.adc_bus,
                 channel=args.adc_channel,
                 pcb_version=args.pcb_version,
+                v_empty=args.kit_v_empty,
+                v_full=args.kit_v_full,
             )
         except Exception as exc:
             print(f"WARNING: Failed to initialise ADS7830 on bus {args.adc_bus}: {exc}", file=sys.stderr)
@@ -318,24 +366,33 @@ def main(argv=None) -> int:
         # Write header if file is empty
         if args.csv.stat().st_size == 0:
             csv_writer.writerow(
-                ["timestamp", "ups_voltage_V", "ups_capacity_pct", "kit_voltage_V", "ups_warn", "kit_warn"]
+                [
+                    "timestamp",
+                    "ups_voltage_V",
+                    "ups_capacity_pct",
+                    "kit_voltage_V",
+                    "kit_soc_pct",
+                    "ups_warn",
+                    "kit_warn",
+                ]
             )
 
-    print("-" * 72)
+    print("-" * 80)
     print("Robot Savo — Battery Health Diagnostic")
     print(f"UPS HAT    : {'disabled' if args.no_ups or ups is None else f'I2C-{args.ups_bus} @ 0x{UPS_I2C_ADDR:02X}'}")
     print(
         f"Kit battery: "
-        f"{'disabled' if args.no_kit or kit is None else f'I2C-{args.adc_bus} @ 0x{ADC_I2C_ADDR:02X}, ch={args.adc_channel}, PCB v{args.pcb_version}'}"
+        f"{'disabled' if args.no_kit or kit is None else f'I2C-{args.adc_bus} @ 0x{ADC_I2C_ADDR:02X}, ch={args.adc_channel}, PCB v{args.pcb_version}, "
+        f"SoC range {args.kit_v_empty:.2f}–{args.kit_v_full:.2f} V -> 0–100%'}"
     )
     print(f"Interval   : {args.interval:.2f} s   Duration: {'infinite' if args.duration <= 0 else f'{args.duration:.1f} s'}")
     if args.allow_shutdown and not args.no_ups:
         print(f"Shutdown   : ENABLED below {args.ups_shutdown_v:.3f} V (UPS HAT)")
     else:
         print("Shutdown   : disabled (no automatic power-off)")
-    print("-" * 72)
-    print(" time       UPS_V   UPS_%   KIT_V   Notes")
-    print("------------------------------------------------------------")
+    print("-" * 80)
+    print(" time       UPS_V   UPS_%   KIT_V   KIT_%   Notes")
+    print("--------------------------------------------------------------------------")
 
     start_time = time.time()
     try:
@@ -343,7 +400,7 @@ def main(argv=None) -> int:
             now = datetime.now().strftime("%H:%M:%S")
 
             ups_read = UpsReading(voltage=None, capacity=None, ok=False)
-            kit_read = KitReading(voltage=None, ok=False)
+            kit_read = KitReading(voltage=None, soc=None, ok=False)
             ups_warn = ""
             kit_warn = ""
 
@@ -373,8 +430,9 @@ def main(argv=None) -> int:
             ups_v_str = f"{ups_read.voltage:5.2f}" if ups_read.voltage is not None else "  n/a"
             ups_c_str = f"{ups_read.capacity:5.1f}" if ups_read.capacity is not None else "  n/a"
             kit_v_str = f"{kit_read.voltage:5.2f}" if kit_read.voltage is not None else "  n/a"
+            kit_soc_str = f"{kit_read.soc:5.1f}" if kit_read.soc is not None else "  n/a"
 
-            print(f"{now}  {ups_v_str}  {ups_c_str}  {kit_v_str}   {notes}")
+            print(f"{now}  {ups_v_str}  {ups_c_str}  {kit_v_str}  {kit_soc_str}   {notes}")
 
             # CSV logging
             if csv_writer is not None:
@@ -384,6 +442,7 @@ def main(argv=None) -> int:
                         ups_read.voltage if ups_read.voltage is not None else "",
                         ups_read.capacity if ups_read.capacity is not None else "",
                         kit_read.voltage if kit_read.voltage is not None else "",
+                        kit_read.soc if kit_read.soc is not None else "",
                         ups_warn,
                         kit_warn,
                     ]
