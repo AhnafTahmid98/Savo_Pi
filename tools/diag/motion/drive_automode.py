@@ -10,13 +10,14 @@ Robot Savo — Expert Auto Drive (Non-ROS, Mecanum + Safety)
 - Uses safety APIs from tools/diag/sensors/api/:
     * DualToF (FR/FL) for near-field
     * Ultrasonic for front-center
-    * Optional LiDAR front-sector
+    * LiDAR front-sector (optional, but supported)
 - Reactive behaviour:
     * Prefer FORWARD when front is clear
     * If front blocked:
          - Try STRAFE LEFT / RIGHT
          - If no side open, try ROTATE L/R
          - If everything tight for a while, BACKUP then STOPPED
+    * LiDAR also used to SLOW forward speed as robot approaches obstacles.
 
 Author: Robot Savo
 """
@@ -31,7 +32,9 @@ from typing import Optional
 
 import smbus
 
-# --- make /home/savo/Savo_Pi importable as "tools" root ---
+# -------------------------------------------------------------------
+# Ensure project root (Savo_Pi) is on sys.path so "import tools..." works
+# -------------------------------------------------------------------
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
@@ -401,7 +404,14 @@ def main():
 
     # LiDAR
     ap.add_argument("--no-lidar", action="store_true")
-    ap.add_argument("--lidar-th", type=float, default=0.28)
+    ap.add_argument("--lidar-th", type=float, default=0.28,
+                    help="LiDAR obstacle threshold (m) for front_blocked")
+
+    # LiDAR-based speed reduction
+    ap.add_argument("--lidar-slow-dist", type=float, default=0.80,
+                    help="Distance (m) where we start to slow forward motion")
+    ap.add_argument("--min-speed-scale", type=float, default=0.25,
+                    help="Minimum forward speed fraction near obstacle")
 
     # Camera & face (optional)
     ap.add_argument("--enable-camera", action="store_true")
@@ -490,10 +500,12 @@ def main():
 
             # LiDAR
             lidar_near = False
+            lidar_min_m: Optional[float] = None
             if lidar is not None:
                 try:
                     r = lidar.poll()
                     lidar_near = r.obstacle
+                    lidar_min_m = r.min_dist_m
                 except RPLidarException as e:
                     print(f"[AutoDrive] LiDAR error: {e}", file=sys.stderr)
                 except Exception:
@@ -542,6 +554,17 @@ def main():
                 args.w_rotate,
             )
 
+            # LiDAR-based forward speed reduction
+            if mode == "FORWARD" and lidar_min_m is not None:
+                stop_d = args.lidar_th          # hard safety threshold
+                slow_d = args.lidar_slow_dist   # start slowing distance
+                if lidar_min_m <= stop_d:
+                    vx = 0.0
+                elif lidar_min_m < slow_d:
+                    t = (lidar_min_m - stop_d) / max(1e-3, (slow_d - stop_d))  # 0..1
+                    scale = max(args.min_speed_scale, min(1.0, t))
+                    vx *= scale
+
             nfl, nrl, nfr, nrr = mix_mecanum(
                 vx, vy, wz,
                 forward_sign=args.forward_sign,
@@ -558,6 +581,7 @@ def main():
                 f"FR_f={fr_f:5.1f}cm  FL_f={fl_f:5.1f}cm  "
                 f"US={('%.1f cm' % us_cm) if us_cm is not None else 'None':>8s}  "
                 f"ToF_near={tof_near}  US_near={us_near}  LiDAR_near={lidar_near}  "
+                f"LiDAR_min={('%4.2f m' % lidar_min_m) if lidar_min_m is not None else 'None':>8s}  "
                 f"blocked_cnt={blocked_counter}"
             )
 
