@@ -11,15 +11,15 @@ Robot Savo — Expert Auto Drive (Non-ROS, Mecanum + Safety)
     * DualToF (FR/FL) for near-field
     * Ultrasonic for front-center
     * LiDAR front-sector (optional, but supported)
-- Reactive behaviour:
+- Behaviour:
     * Prefer FORWARD when front is clear
     * If front blocked:
          - Try STRAFE LEFT / RIGHT
          - If no side open, try ROTATE L/R
          - If everything tight for a while, BACKUP then STOPPED
     * LiDAR also used to SLOW forward speed as robot approaches obstacles.
-
-Author: Robot Savo
+    * EMERGENCY STOP layer if anything is VERY close (LiDAR/ToF/US),
+      then a short reverse + small turn to escape.
 """
 
 import sys
@@ -28,14 +28,16 @@ import time
 import math
 import argparse
 import subprocess
-from typing import Optional
+from typing import Optional, Tuple
 
 import smbus
 
 # -------------------------------------------------------------------
-# Ensure project root (Savo_Pi) is on sys.path so "import tools..." works
+# Project root (Savo_Pi)
 # -------------------------------------------------------------------
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+PROJECT_ROOT = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "..")
+)
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
@@ -45,20 +47,20 @@ from tools.diag.sensors.api.lidar_api import LidarSafetyAPI, RPLidarException
 
 
 # ===================================================================
-# PCA9685 (same style as your teleop)
+# PCA9685 driver
 # ===================================================================
 class PCA9685:
     __SUBADR1 = 0x02
     __SUBADR2 = 0x03
     __SUBADR3 = 0x04
-    __MODE1   = 0x00
+    __MODE1 = 0x00
     __PRESCALE = 0xFE
-    __LED0_ON_L  = 0x06
-    __LED0_ON_H  = 0x07
+    __LED0_ON_L = 0x06
+    __LED0_ON_H = 0x07
     __LED0_OFF_L = 0x08
     __LED0_OFF_H = 0x09
-    __ALLLED_ON_L  = 0xFA
-    __ALLLED_ON_H  = 0xFB
+    __ALLLED_ON_L = 0xFA
+    __ALLLED_ON_H = 0xFB
     __ALLLED_OFF_L = 0xFC
     __ALLLED_OFF_H = 0xFD
 
@@ -107,7 +109,7 @@ class PCA9685:
 
 
 # ===================================================================
-# Robot motor wrapper (same mapping as teleop)
+# Robot motor wrapper
 # ===================================================================
 class RobotSavo:
     """
@@ -117,64 +119,103 @@ class RobotSavo:
       FR (front-right) : (6,7)
       RR (rear-right)  : (4,5)
     """
-    def __init__(self, *, i2c_bus: int, addr: int, pwm_freq: float,
-                 inv=(+1, +1, +1, +1), quench_ms: int = 18):
+
+    def __init__(
+        self,
+        *,
+        i2c_bus: int,
+        addr: int,
+        pwm_freq: float,
+        inv: Tuple[int, int, int, int] = (+1, +1, +1, +1),
+        quench_ms: int = 18,
+    ):
         self.pwm = PCA9685(bus=i2c_bus, address=addr, debug=False)
         self.pwm.set_pwm_freq(pwm_freq)
         self.FL_INV, self.RL_INV, self.FR_INV, self.RR_INV = inv
         self.quench_ms = max(0, int(quench_ms))
-        self._last_sign = {'fl': 0, 'rl': 0, 'fr': 0, 'rr': 0}
+        self._last_sign = {"fl": 0, "rl": 0, "fr": 0, "rr": 0}
 
     # low-level wheel writers (positive = IN_hi on 2nd channel of each pair)
-    def _wheel_fl(self, d):
-        if   d > 0:  self.pwm.set_motor_pwm(0, 0);   self.pwm.set_motor_pwm(1, d)
-        elif d < 0:  self.pwm.set_motor_pwm(1, 0);   self.pwm.set_motor_pwm(0, -d)
-        else:        self.pwm.set_motor_pwm(0, 4095); self.pwm.set_motor_pwm(1, 4095)
+    def _wheel_fl(self, d: int) -> None:
+        if d > 0:
+            self.pwm.set_motor_pwm(0, 0)
+            self.pwm.set_motor_pwm(1, d)
+        elif d < 0:
+            self.pwm.set_motor_pwm(1, 0)
+            self.pwm.set_motor_pwm(0, -d)
+        else:
+            self.pwm.set_motor_pwm(0, 4095)
+            self.pwm.set_motor_pwm(1, 4095)
 
-    def _wheel_rl(self, d):
-        if   d > 0:  self.pwm.set_motor_pwm(3, 0);   self.pwm.set_motor_pwm(2, d)
-        elif d < 0:  self.pwm.set_motor_pwm(2, 0);   self.pwm.set_motor_pwm(3, -d)
-        else:        self.pwm.set_motor_pwm(2, 4095); self.pwm.set_motor_pwm(3, 4095)
+    def _wheel_rl(self, d: int) -> None:
+        if d > 0:
+            self.pwm.set_motor_pwm(3, 0)
+            self.pwm.set_motor_pwm(2, d)
+        elif d < 0:
+            self.pwm.set_motor_pwm(2, 0)
+            self.pwm.set_motor_pwm(3, -d)
+        else:
+            self.pwm.set_motor_pwm(2, 4095)
+            self.pwm.set_motor_pwm(3, 4095)
 
-    def _wheel_fr(self, d):
-        if   d > 0:  self.pwm.set_motor_pwm(6, 0);   self.pwm.set_motor_pwm(7, d)
-        elif d < 0:  self.pwm.set_motor_pwm(7, 0);   self.pwm.set_motor_pwm(6, -d)
-        else:        self.pwm.set_motor_pwm(6, 4095); self.pwm.set_motor_pwm(7, 4095)
+    def _wheel_fr(self, d: int) -> None:
+        if d > 0:
+            self.pwm.set_motor_pwm(6, 0)
+            self.pwm.set_motor_pwm(7, d)
+        elif d < 0:
+            self.pwm.set_motor_pwm(7, 0)
+            self.pwm.set_motor_pwm(6, -d)
+        else:
+            self.pwm.set_motor_pwm(6, 4095)
+            self.pwm.set_motor_pwm(7, 4095)
 
-    def _wheel_rr(self, d):
-        if   d > 0:  self.pwm.set_motor_pwm(4, 0);   self.pwm.set_motor_pwm(5, d)
-        elif d < 0:  self.pwm.set_motor_pwm(5, 0);   self.pwm.set_motor_pwm(4, -d)
-        else:        self.pwm.set_motor_pwm(4, 4095); self.pwm.set_motor_pwm(5, 4095)
+    def _wheel_rr(self, d: int) -> None:
+        if d > 0:
+            self.pwm.set_motor_pwm(4, 0)
+            self.pwm.set_motor_pwm(5, d)
+        elif d < 0:
+            self.pwm.set_motor_pwm(5, 0)
+            self.pwm.set_motor_pwm(4, -d)
+        else:
+            self.pwm.set_motor_pwm(4, 4095)
+            self.pwm.set_motor_pwm(5, 4095)
 
     @staticmethod
-    def _clamp4(d1, d2, d3, d4):
-        def c(v): return 4095 if v > 4095 else (-4095 if v < -4095 else int(v))
+    def _clamp4(d1: int, d2: int, d3: int, d4: int) -> Tuple[int, int, int, int]:
+        def c(v: int) -> int:
+            return 4095 if v > 4095 else (-4095 if v < -4095 else int(v))
+
         return c(d1), c(d2), c(d3), c(d4)
 
     def _apply_quench(self, name: str, prev_sign: int, new_val: int, fn) -> int:
         new_sign = 0 if new_val == 0 else (1 if new_val > 0 else -1)
-        if self.quench_ms and prev_sign and new_sign and (prev_sign != new_sign):
+        if (
+            self.quench_ms
+            and prev_sign
+            and new_sign
+            and (prev_sign != new_sign)
+        ):
             fn(0)
             time.sleep(self.quench_ms / 1000.0)
         fn(new_val)
         self._last_sign[name] = new_sign
         return new_sign
 
-    def set_motor_model(self, d_fl, d_rl, d_fr, d_rr):
+    def set_motor_model(self, d_fl: int, d_rl: int, d_fr: int, d_rr: int) -> None:
         d_fl *= self.FL_INV
         d_rl *= self.RL_INV
         d_fr *= self.FR_INV
         d_rr *= self.RR_INV
         d_fl, d_rl, d_fr, d_rr = self._clamp4(d_fl, d_rl, d_fr, d_rr)
-        self._apply_quench('fl', self._last_sign['fl'], d_fl, self._wheel_fl)
-        self._apply_quench('rl', self._last_sign['rl'], d_rl, self._wheel_rl)
-        self._apply_quench('fr', self._last_sign['fr'], d_fr, self._wheel_fr)
-        self._apply_quench('rr', self._last_sign['rr'], d_rr, self._wheel_rr)
+        self._apply_quench("fl", self._last_sign["fl"], d_fl, self._wheel_fl)
+        self._apply_quench("rl", self._last_sign["rl"], d_rl, self._wheel_rl)
+        self._apply_quench("fr", self._last_sign["fr"], d_fr, self._wheel_fr)
+        self._apply_quench("rr", self._last_sign["rr"], d_rr, self._wheel_rr)
 
-    def stop(self):
+    def stop(self) -> None:
         self.set_motor_model(0, 0, 0, 0)
 
-    def close(self):
+    def close(self) -> None:
         try:
             self.stop()
         finally:
@@ -182,9 +223,18 @@ class RobotSavo:
 
 
 # ===================================================================
-# Kinematics helpers (same formulas as teleop)
+# Kinematics helpers
 # ===================================================================
-def mix_mecanum(vx, vy, wz, *, forward_sign, strafe_sign, rotate_sign, turn_gain):
+def mix_mecanum(
+    vx: float,
+    vy: float,
+    wz: float,
+    *,
+    forward_sign: int,
+    strafe_sign: int,
+    rotate_sign: int,
+    turn_gain: float,
+) -> Tuple[float, float, float, float]:
     """
     Return normalized wheel commands (fl, rl, fr, rr) in [-1..1].
       fl =  vx - vy - w
@@ -194,25 +244,34 @@ def mix_mecanum(vx, vy, wz, *, forward_sign, strafe_sign, rotate_sign, turn_gain
     """
     vx *= forward_sign
     vy *= strafe_sign
-    w  = rotate_sign * turn_gain * wz
+    w = rotate_sign * turn_gain * wz
     fl = vx - vy - w
     rl = vx + vy - w
     fr = vx + vy + w
     rr = vx - vy + w
-    m  = max(1.0, abs(fl), abs(rl), abs(fr), abs(rr))
+    m = max(1.0, abs(fl), abs(rl), abs(fr), abs(rr))
     return fl / m, rl / m, fr / m, rr / m
 
 
-def to_duties(nfl, nrl, nfr, nrr, max_duty):
-    return int(nfl * max_duty), int(nrl * max_duty), int(nfr * max_duty), int(nrr * max_duty)
+def to_duties(
+    nfl: float, nrl: float, nfr: float, nrr: float, max_duty: int
+) -> Tuple[int, int, int, int]:
+    return (
+        int(nfl * max_duty),
+        int(nrl * max_duty),
+        int(nfr * max_duty),
+        int(nrr * max_duty),
+    )
 
 
 # ===================================================================
 # Reactive planner helpers
 # ===================================================================
-def safe_cm(v: float) -> float:
-    """Normalize distances: -1.0 means 'no valid reading' -> treat as far away."""
-    return v if v >= 0.0 else 9999.0
+def safe_cm(v: Optional[float]) -> float:
+    """Normalize distances: >=0.0 is valid cm; None / negative => treat as very far."""
+    if v is None or v < 0.0:
+        return 9999.0
+    return v
 
 
 def choose_mode(
@@ -224,7 +283,7 @@ def choose_mode(
     side_th: float,
     mode_prev: str,
     blocked_counter: int,
-) -> (str, int):
+) -> Tuple[str, int]:
     """
     Decide high-level motion mode based on near-field sensors.
 
@@ -241,13 +300,10 @@ def choose_mode(
     fl = safe_cm(fl_cm)
     us = us_cm if us_cm is not None else 9999.0
 
-    front_blocked = (
-        (us < front_th) or
-        (fr < front_th and fl < front_th) or
-        lidar_near
-    )
-    left_blocked  = (fl < side_th)
-    right_blocked = (fr < side_th)
+    # More conservative: if ANY ToF is close, treat as front-blocked
+    front_blocked = (us < front_th) or (min(fr, fl) < front_th) or lidar_near
+    left_blocked = fl < side_th
+    right_blocked = fr < side_th
 
     if front_blocked and left_blocked and right_blocked:
         blocked_counter += 1
@@ -287,42 +343,51 @@ def mode_to_cmd(
     v_side: float,
     v_back: float,
     w_rotate: float,
-) -> (float, float, float):
+) -> Tuple[float, float, float]:
     """
     Convert mode -> (vx, vy, wz) in [-1..1].
     vx: +forward, vy: +left, wz: +CCW
     """
     if mode == "FORWARD":
-        return (v_forward, 0.0, 0.0)
+        return v_forward, 0.0, 0.0
     if mode == "STRAFE_L":
-        return (0.0, +v_side, 0.0)
+        return 0.0, +v_side, 0.0
     if mode == "STRAFE_R":
-        return (0.0, -v_side, 0.0)
+        return 0.0, -v_side, 0.0
     if mode == "BACKUP":
-        return (-v_back, 0.0, 0.0)
+        return -v_back, 0.0, 0.0
     if mode == "ROTATE_L":
-        return (0.0, 0.0, +w_rotate)
+        return 0.0, 0.0, +w_rotate
     if mode == "ROTATE_R":
-        return (0.0, 0.0, -w_rotate)
-    return (0.0, 0.0, 0.0)  # STOPPED / unknown
+        return 0.0, 0.0, -w_rotate
+    return 0.0, 0.0, 0.0  # STOPPED / unknown
 
 
 # ===================================================================
 # Optional: camera + face helpers (default OFF)
 # ===================================================================
 def start_camera_stream(host: str, port: int) -> Optional[subprocess.Popen]:
-    """
-    Optional camera stream to laptop (off by default).
-    Enable with --enable-camera if you want.
-    """
     pipeline = [
         "gst-launch-1.0",
-        "libcamerasrc", "!",
-        "video/x-raw,format=I420,width=1280,height=720,framerate=30/1", "!",
-        "videoconvert", "!",
-        "x264enc", "tune=zerolatency", "speed-preset=ultrafast", "bitrate=2000", "!",
-        "rtph264pay", "config-interval=1", "pt=96", "!",
-        "udpsink", f"host={host}", f"port={port}", "sync=false"
+        "libcamerasrc",
+        "!",
+        "video/x-raw,format=I420,width=1280,height=720,framerate=30/1",
+        "!",
+        "videoconvert",
+        "!",
+        "x264enc",
+        "tune=zerolatency",
+        "speed-preset=ultrafast",
+        "bitrate=2000",
+        "!",
+        "rtph264pay",
+        "config-interval=1",
+        "pt=96",
+        "!",
+        "udpsink",
+        f"host={host}",
+        f"port={port}",
+        "sync=false",
     ]
     try:
         print(f"[AutoDrive] Starting camera stream to {host}:{port} ...")
@@ -332,7 +397,10 @@ def start_camera_stream(host: str, port: int) -> Optional[subprocess.Popen]:
             stderr=subprocess.DEVNULL,
         )
     except Exception as e:
-        print(f"[AutoDrive] WARNING: camera start failed: {e}", file=sys.stderr)
+        print(
+            f"[AutoDrive] WARNING: camera start failed: {e}",
+            file=sys.stderr,
+        )
         return None
 
 
@@ -347,7 +415,10 @@ def start_face(face_cmd: str) -> Optional[subprocess.Popen]:
             stderr=subprocess.DEVNULL,
         )
     except Exception as e:
-        print(f"[AutoDrive] WARNING: face start failed: {e}", file=sys.stderr)
+        print(
+            f"[AutoDrive] WARNING: face start failed: {e}",
+            file=sys.stderr,
+        )
         return None
 
 
@@ -370,13 +441,15 @@ def stop_proc(proc: Optional[subprocess.Popen], name: str) -> None:
 # ===================================================================
 # Main auto-drive loop
 # ===================================================================
-def main():
-    ap = argparse.ArgumentParser(description="Robot Savo — Expert Auto Drive (Non-ROS Mecanum)")
+def main() -> None:
+    ap = argparse.ArgumentParser(
+        description="Robot Savo — Expert Auto Drive (Non-ROS Mecanum)"
+    )
     # Motor / board
     ap.add_argument("--i2c-bus", type=int, default=1)
     ap.add_argument("--addr", type=lambda x: int(x, 0), default=0x40)
     ap.add_argument("--pwm-freq", type=float, default=50.0)
-    ap.add_argument("--max-duty", type=int, default=2500)
+    ap.add_argument("--max-duty", type=int, default=2200)
 
     ap.add_argument("--invert-fl", action="store_true")
     ap.add_argument("--invert-rl", action="store_true")
@@ -391,27 +464,68 @@ def main():
     ap.add_argument("--turn-gain", type=float, default=1.0)
 
     # Motion magnitudes
-    ap.add_argument("--v-forward", type=float, default=0.5)
-    ap.add_argument("--v-side",    type=float, default=0.5)
-    ap.add_argument("--v-back",    type=float, default=0.3)
-    ap.add_argument("--w-rotate",  type=float, default=0.6)
+    ap.add_argument("--v-forward", type=float, default=0.4)
+    ap.add_argument("--v-side", type=float, default=0.4)
+    ap.add_argument("--v-back", type=float, default=0.3)
+    ap.add_argument("--w-rotate", type=float, default=0.5)
 
-    # Safety thresholds
-    ap.add_argument("--front-th", type=float, default=28.0)
-    ap.add_argument("--side-th",  type=float, default=22.0)
-    ap.add_argument("--us-th",    type=float, default=28.0)
-    ap.add_argument("--loop-hz",  type=float, default=20.0)
+    # Safety thresholds (normal planner)
+    ap.add_argument(
+        "--front-th",
+        type=float,
+        default=35.0,
+        help="Front block threshold for ToF/US (cm)",
+    )
+    ap.add_argument(
+        "--side-th",
+        type=float,
+        default=22.0,
+        help="Side block threshold for ToF (cm)",
+    )
+    ap.add_argument(
+        "--us-th",
+        type=float,
+        default=35.0,
+        help="Near-field threshold for ultrasonic (cm)",
+    )
+    ap.add_argument("--loop-hz", type=float, default=20.0)
+
+    # EMERGENCY thresholds (hard stop)
+    ap.add_argument(
+        "--emerg-front-cm",
+        type=float,
+        default=20.0,
+        help="Emergency stop if ToF/US < this (cm)",
+    )
+    ap.add_argument(
+        "--emerg-lidar-m",
+        type=float,
+        default=0.25,
+        help="Emergency stop if LiDAR < this (m)",
+    )
 
     # LiDAR
     ap.add_argument("--no-lidar", action="store_true")
-    ap.add_argument("--lidar-th", type=float, default=0.28,
-                    help="LiDAR obstacle threshold (m) for front_blocked")
+    ap.add_argument(
+        "--lidar-th",
+        type=float,
+        default=0.35,
+        help="LiDAR obstacle threshold (m) for front_blocked",
+    )
 
     # LiDAR-based speed reduction
-    ap.add_argument("--lidar-slow-dist", type=float, default=0.80,
-                    help="Distance (m) where we start to slow forward motion")
-    ap.add_argument("--min-speed-scale", type=float, default=0.25,
-                    help="Minimum forward speed fraction near obstacle")
+    ap.add_argument(
+        "--lidar-slow-dist",
+        type=float,
+        default=0.80,
+        help="Distance (m) where we start to slow forward motion",
+    )
+    ap.add_argument(
+        "--min-speed-scale",
+        type=float,
+        default=0.25,
+        help="Minimum forward speed fraction near obstacle",
+    )
 
     # Camera & face (optional)
     ap.add_argument("--enable-camera", action="store_true")
@@ -446,7 +560,7 @@ def main():
     us_trig, us_echo = 27, 22
     print(f"[AutoDrive] Ultrasonic TRIG={us_trig} ECHO={us_echo}")
 
-    lidar = None
+    lidar: Optional[LidarSafetyAPI] = None
     if not args.no_lidar:
         try:
             print("[AutoDrive] Initializing LiDAR Safety API ...")
@@ -468,11 +582,18 @@ def main():
             lidar.start()
             print("[AutoDrive] LiDAR ready.")
         except Exception as e:
-            print(f"[AutoDrive] WARNING: LiDAR init failed: {e}", file=sys.stderr)
+            print(
+                f"[AutoDrive] WARNING: LiDAR init failed: {e}",
+                file=sys.stderr,
+            )
             lidar = None
 
     # Camera & face (optional)
-    cam_proc = start_camera_stream(args.cam_host, args.cam_port) if args.enable_camera else None
+    cam_proc = (
+        start_camera_stream(args.cam_host, args.cam_port)
+        if args.enable_camera
+        else None
+    )
     face_proc = start_face(args.face_cmd) if args.face_cmd else None
 
     # Reactive loop state
@@ -496,7 +617,7 @@ def main():
                 factory="lgpio",
                 samples=5,
             )
-            us_near = (us_cm is not None and us_cm < args.us_th)
+            us_near = us_cm is not None and us_cm < args.us_th
 
             # LiDAR
             lidar_near = False
@@ -511,7 +632,89 @@ def main():
                 except Exception:
                     pass
 
-            # Decide mode
+            # ------------- EMERGENCY STOP LAYER + ESCAPE -------------
+            emerg = False
+            emerg_reason = ""
+            if us_cm is not None and us_cm < args.emerg_front_cm:
+                emerg = True
+                emerg_reason = f"US {us_cm:.1f}cm"
+            if fr_f >= 0.0 and fr_f < args.emerg_front_cm:
+                emerg = True
+                emerg_reason = (
+                    (emerg_reason + " + ") if emerg_reason else ""
+                ) + f"FR {fr_f:.1f}cm"
+            if fl_f >= 0.0 and fl_f < args.emerg_front_cm:
+                emerg = True
+                emerg_reason = (
+                    (emerg_reason + " + ") if emerg_reason else ""
+                ) + f"FL {fl_f:.1f}cm"
+            if lidar_min_m is not None and lidar_min_m < args.emerg_lidar_m:
+                emerg = True
+                emerg_reason = (
+                    (emerg_reason + " + ") if emerg_reason else ""
+                ) + f"LiDAR {lidar_min_m:.2f}m"
+
+            if emerg:
+                # Hard stop first
+                bot.set_motor_model(0, 0, 0, 0)
+                print(
+                    f"[AutoDrive][EMERG] HARD STOP  reason={emerg_reason}  "
+                    f"FR_f={fr_f:.1f}cm FL_f={fl_f:.1f}cm "
+                    f"US={('%.1f cm' % us_cm) if us_cm is not None else 'None'} "
+                    f"LiDAR_min={('%4.2f m' % lidar_min_m) if lidar_min_m is not None else 'None'}"
+                )
+                time.sleep(0.05)
+
+                # Escape: small reverse + turn away from closer side
+                vx_b, vy_b, wz_b = mode_to_cmd(
+                    "BACKUP",
+                    args.v_forward,
+                    args.v_side,
+                    args.v_back,
+                    args.w_rotate,
+                )
+
+                # Decide turning direction based on which side is closer
+                fr_close = fr_f if fr_f >= 0.0 else 9999.0
+                fl_close = fl_f if fl_f >= 0.0 else 9999.0
+                # small margin to avoid noise
+                if fr_close + 1.0 < fl_close:
+                    # right side closer -> turn CCW while reversing
+                    wz_b = +args.w_rotate * 0.6
+                elif fl_close + 1.0 < fr_close:
+                    # left side closer -> turn CW while reversing
+                    wz_b = -args.w_rotate * 0.6
+                else:
+                    # obstacle centered -> pure straight backup
+                    wz_b = 0.0
+
+                nfl, nrl, nfr, nrr = mix_mecanum(
+                    vx_b,
+                    vy_b,
+                    wz_b,
+                    forward_sign=args.forward_sign,
+                    strafe_sign=args.strafe_sign,
+                    rotate_sign=args.rotate_sign,
+                    turn_gain=args.turn_gain,
+                )
+                dfl, drl, dfr, drr = to_duties(nfl, nrl, nfr, nrr, max_duty)
+
+                escape_dur = 0.4  # seconds
+                t_escape = time.time()
+                while time.time() - t_escape < escape_dur:
+                    bot.set_motor_model(dfl, drl, dfr, drr)
+                    time.sleep(loop_period / 2.0)
+
+                # Final stop after escape
+                bot.set_motor_model(0, 0, 0, 0)
+                mode = "STOPPED"
+                blocked_counter = 0
+
+                time.sleep(loop_period)
+                continue
+            # ------------------------------------------------
+
+            # Decide mode (planner layer)
             prev_mode = mode
             mode, blocked_counter = choose_mode(
                 fr_cm=fr_f,
@@ -534,7 +737,9 @@ def main():
                     args.w_rotate,
                 )
                 nfl, nrl, nfr, nrr = mix_mecanum(
-                    vx_b, vy_b, wz_b,
+                    vx_b,
+                    vy_b,
+                    wz_b,
                     forward_sign=args.forward_sign,
                     strafe_sign=args.strafe_sign,
                     rotate_sign=args.rotate_sign,
@@ -556,17 +761,25 @@ def main():
 
             # LiDAR-based forward speed reduction
             if mode == "FORWARD" and lidar_min_m is not None:
-                stop_d = args.lidar_th          # hard safety threshold
+                stop_d = args.lidar_th          # hard safety threshold for planner
                 slow_d = args.lidar_slow_dist   # start slowing distance
                 if lidar_min_m <= stop_d:
                     vx = 0.0
                 elif lidar_min_m < slow_d:
-                    t = (lidar_min_m - stop_d) / max(1e-3, (slow_d - stop_d))  # 0..1
-                    scale = max(args.min_speed_scale, min(1.0, t))
+                    t_scale = (lidar_min_m - stop_d) / max(
+                        1e-3, (slow_d - stop_d)
+                    )  # 0..1
+                    scale = max(
+                        args.min_speed_scale,
+                        min(1.0, t_scale),
+                    )
                     vx *= scale
 
+            # Mix mecanum and send commands
             nfl, nrl, nfr, nrr = mix_mecanum(
-                vx, vy, wz,
+                vx,
+                vy,
+                wz,
                 forward_sign=args.forward_sign,
                 strafe_sign=args.strafe_sign,
                 rotate_sign=args.rotate_sign,
