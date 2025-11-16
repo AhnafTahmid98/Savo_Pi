@@ -8,21 +8,23 @@ Robot Savo — Expert Auto Drive (Non-ROS, Mecanum + Safety)
     * RobotSavo motor wrapper 
     * Mecanum kinematics helpers (mix_mecanum, to_duties)
 - Uses safety APIs from tools/diag/sensors/api/:
-    * DualToF (FR/FL) for near-field (front-right / front-left)
+    * DualToF (FR/FL) for near-field
     * Ultrasonic for front-center
-    * LiDAR as a 360° safety bubble (global min distance + angle)
+    * LiDAR front-sector (via LidarSafetyAPI)
 - Behaviour:
-    * Prefer FORWARD when front is clear (ToF + US)
+    * Prefer FORWARD when front is clear.
     * If front blocked:
          - Try STRAFE LEFT / RIGHT
          - If no side open, try ROTATE L/R
-         - If everything tight for a while, BACKUP then STOPPED
-    * LiDAR is used to:
-         - SLOW forward speed when a front obstacle is within 0.8 m
-           (based on LiDAR min angle in ±60° front sector)
-         - EMERGENCY STOP if anything (any direction) is extremely close
-           (LiDAR / ToF / US). For front emergencies, perform a small
-           reverse + turn. For side/back-only emergencies, just hard-stop.
+         - If everything tight for a while, BACKUP then STOPPED.
+    * LiDAR used to:
+         - Mark front-blocked when front sector obstacle is detected.
+         - Smoothly SLOW forward speed as robot approaches obstacles.
+    * EMERGENCY STOP if anything VERY close (LiDAR/ToF/US),
+      followed by clear escape motion: reverse + turn away from closer side.
+
+Typical use (defaults match your teleop signs/inverts):
+    python3 drive_automode.py
 """
 
 import sys
@@ -121,6 +123,8 @@ class RobotSavo:
       RL (rear-left)   : (3,2)
       FR (front-right) : (6,7)
       RR (rear-right)  : (4,5)
+
+    Positive duty => "forward" according to your wiring & invert flags.
     """
 
     def __init__(
@@ -281,6 +285,7 @@ def choose_mode(
     fr_cm: float,
     fl_cm: float,
     us_cm: Optional[float],
+    lidar_near: bool,
     front_th: float,
     side_th: float,
     mode_prev: str,
@@ -297,17 +302,13 @@ def choose_mode(
       ROTATE_R   : rotate CW
       BACKUP     : used only internally before STOPPED
       STOPPED    : fully stopped when all blocked for a while
-
-    NOTE:
-      - Only ToF (FR/FL) + Ultrasonic decide 'front_blocked'.
-      - LiDAR is handled separately in the EMERGENCY + speed layers.
     """
     fr = safe_cm(fr_cm)
     fl = safe_cm(fl_cm)
     us = us_cm if us_cm is not None else 9999.0
 
-    # More conservative: if ANY ToF or US is close, treat as front-blocked
-    front_blocked = (us < front_th) or (min(fr, fl) < front_th)
+    # More conservative: if ANY sensor says close, treat as front-blocked
+    front_blocked = (us < front_th) or (min(fr, fl) < front_th) or lidar_near
     left_blocked = fl < side_th
     right_blocked = fr < side_th
 
@@ -507,7 +508,7 @@ def main() -> None:
         "--emerg-lidar-m",
         type=float,
         default=0.25,
-        help="Emergency stop if LiDAR (global) < this (m)",
+        help="Emergency stop if LiDAR < this (m)",
     )
 
     # LiDAR
@@ -516,16 +517,10 @@ def main() -> None:
         "--lidar-th",
         type=float,
         default=0.35,
-        help="LiDAR obstacle threshold (m) for debounced 'obstacle' state",
-    )
-    ap.add_argument(
-        "--lidar-front-ang",
-        type=float,
-        default=60.0,
-        help="Half-angle of front sector (deg) for EMERG/slowdown classification",
+        help="LiDAR obstacle threshold (m) for front_blocked",
     )
 
-    # LiDAR-based speed reduction (FORWARD only, front sector)
+    # LiDAR-based speed reduction
     ap.add_argument(
         "--lidar-slow-dist",
         type=float,
@@ -569,20 +564,21 @@ def main() -> None:
     print("[AutoDrive] Initializing DualToF ...")
     tof = DualToF(rate_hz=args.loop_hz, median=3, threshold_cm=args.front_th)
 
-    us_trig, us_echo = 27, 22
+    us_trig, us_echo = 27, 22  # locked mapping via ultrasonic_api
     print(f"[AutoDrive] Ultrasonic TRIG={us_trig} ECHO={us_echo}")
 
     lidar: Optional[LidarSafetyAPI] = None
     if not args.no_lidar:
         try:
-            print("[AutoDrive] Initializing LiDAR Safety API (360° bubble) ...")
+            print("[AutoDrive] Initializing LiDAR Safety API ...")
+            # Front-sector window; lidar_api internally also computes global/sectors.
             lidar = LidarSafetyAPI(
                 port="/dev/ttyUSB0",
                 baudrate=115200,
                 timeout=2.0,
                 motor_pwm=None,
-                angle_min=-180.0,   # PRIMARY window = 360° (global)
-                angle_max=180.0,
+                angle_min=-35.0,
+                angle_max=35.0,
                 range_min=0.05,
                 range_max=2.0,
                 obst_threshold=args.lidar_th,
@@ -619,10 +615,10 @@ def main() -> None:
         while True:
             t0 = time.time()
 
-            # ToF
+            # ---------- ToF ----------
             fr_raw, fr_f, fl_raw, fl_f, alert_str, tof_near = tof.read()
 
-            # Ultrasonic
+            # ---------- Ultrasonic ----------
             us_cm = read_ultrasonic_cm(
                 trig_pin=us_trig,
                 echo_pin=us_echo,
@@ -631,30 +627,25 @@ def main() -> None:
             )
             us_near = us_cm is not None and us_cm < args.us_th
 
-            # LiDAR (360° bubble)
+            # ---------- LiDAR ----------
             lidar_near = False
             lidar_min_m: Optional[float] = None
-            lidar_ang_deg: Optional[float] = None
+            lidar_min_ang_deg: Optional[float] = None
             if lidar is not None:
                 try:
                     r = lidar.poll()
-                    # In 360° mode, min_dist_m/min_angle_deg are GLOBAL min
                     lidar_near = r.obstacle
                     lidar_min_m = r.min_dist_m
-                    lidar_ang_deg = r.min_angle_deg
-                    # Map angle to [-180, +180] for region classification
-                    if lidar_ang_deg is not None and lidar_ang_deg > 180.0:
-                        lidar_ang_deg = lidar_ang_deg - 360.0
+                    # Angle attribute is optional; getattr keeps us compatible
+                    lidar_min_ang_deg = getattr(r, "min_angle_deg", None)
                 except RPLidarException as e:
                     print(f"[AutoDrive] LiDAR error: {e}", file=sys.stderr)
                 except Exception:
                     pass
 
-            # ------------- EMERGENCY STOP LAYER + ESCAPE -------------
+            # ---------- EMERGENCY STOP LAYER + ESCAPE ----------
             emerg = False
             emerg_reason = ""
-
-            # Front-based emergencies (ToF + US)
             if us_cm is not None and us_cm < args.emerg_front_cm:
                 emerg = True
                 emerg_reason = f"US {us_cm:.1f}cm"
@@ -668,30 +659,11 @@ def main() -> None:
                 emerg_reason = (
                     (emerg_reason + " + ") if emerg_reason else ""
                 ) + f"FL {fl_f:.1f}cm"
-
-            # LiDAR-based emergency (any direction)
-            lidar_emerg = (
-                lidar_min_m is not None and lidar_min_m < args.emerg_lidar_m
-            )
-            if lidar_emerg:
+            if lidar_min_m is not None and lidar_min_m < args.emerg_lidar_m:
                 emerg = True
                 emerg_reason = (
                     (emerg_reason + " + ") if emerg_reason else ""
                 ) + f"LiDAR {lidar_min_m:.2f}m"
-
-            # Classify where the LiDAR min is (front / side / back)
-            lidar_front_hit = False
-            if lidar_emerg and lidar_ang_deg is not None:
-                if abs(lidar_ang_deg) <= args.lidar_front_ang:
-                    lidar_front_hit = True
-
-            # Decide if this is a "front emergency" where backup makes sense
-            front_emerg = (
-                (us_cm is not None and us_cm < args.emerg_front_cm)
-                or (fr_f >= 0.0 and fr_f < args.emerg_front_cm)
-                or (fl_f >= 0.0 and fl_f < args.emerg_front_cm)
-                or lidar_front_hit
-            )
 
             if emerg:
                 # Hard stop first
@@ -701,33 +673,57 @@ def main() -> None:
                     f"FR_f={fr_f:.1f}cm FL_f={fl_f:.1f}cm "
                     f"US={('%.1f cm' % us_cm) if us_cm is not None else 'None'} "
                     f"LiDAR_min={('%4.2f m' % lidar_min_m) if lidar_min_m is not None else 'None'} "
-                    f"LiDAR_ang={('%5.1f°' % lidar_ang_deg) if lidar_ang_deg is not None else ' None '}"
+                    f"LiDAR_ang={('%5.1f deg' % lidar_min_ang_deg) if lidar_min_ang_deg is not None else 'None'}"
                 )
-                time.sleep(0.05)
+                time.sleep(0.1)
+
+                # Decide if this is a FRONT-type emergency
+                front_emerg = False
+
+                # ToF / US criteria (slightly looser than emerg_front_cm)
+                if us_cm is not None and us_cm < (args.emerg_front_cm + 5.0):
+                    front_emerg = True
+                if (
+                    (fr_f >= 0.0 and fr_f < (args.emerg_front_cm + 5.0))
+                    or (fl_f >= 0.0 and fl_f < (args.emerg_front_cm + 5.0))
+                ):
+                    front_emerg = True
+
+                # LiDAR angle-based front check (if angle provided)
+                if (
+                    lidar_min_m is not None
+                    and lidar_min_m < (args.emerg_lidar_m + 0.05)
+                    and lidar_min_ang_deg is not None
+                    and abs(lidar_min_ang_deg) <= 60.0
+                ):
+                    front_emerg = True
 
                 if front_emerg:
-                    # Escape: small reverse + turn away from closer side (front obstacle)
-                    vx_b, vy_b, wz_b = mode_to_cmd(
-                        "BACKUP",
-                        args.v_forward,
-                        args.v_side,
-                        args.v_back,
-                        args.w_rotate,
-                    )
+                    # Stronger, clearly visible escape motion:
+                    # - Reverse a bit faster
+                    # - Turn away from closer side (ToF)
+                    vx_b = -max(0.4, args.v_back)
+                    vy_b = 0.0
 
-                    # Decide turning direction based on which side is closer (front ToFs)
                     fr_close = fr_f if fr_f >= 0.0 else 9999.0
                     fl_close = fl_f if fl_f >= 0.0 else 9999.0
-                    # small margin to avoid noise
+
                     if fr_close + 1.0 < fl_close:
-                        # right side closer -> turn CCW while reversing
-                        wz_b = +args.w_rotate * 0.6
+                        # right side closer -> turn CCW (left) while backing
+                        wz_b = +max(0.6, args.w_rotate)
+                        turn_txt = "CCW (left)"
                     elif fl_close + 1.0 < fr_close:
-                        # left side closer -> turn CW while reversing
-                        wz_b = -args.w_rotate * 0.6
+                        # left side closer -> turn CW (right) while backing
+                        wz_b = -max(0.6, args.w_rotate)
+                        turn_txt = "CW (right)"
                     else:
-                        # obstacle centered -> pure straight backup
                         wz_b = 0.0
+                        turn_txt = "straight back"
+
+                    print(
+                        f"[AutoDrive][EMERG] ESCAPE: vx={vx_b:.2f}, wz={wz_b:.2f}  "
+                        f"({turn_txt}), dur=0.8s"
+                    )
 
                     nfl, nrl, nfr, nrr = mix_mecanum(
                         vx_b,
@@ -740,7 +736,7 @@ def main() -> None:
                     )
                     dfl, drl, dfr, drr = to_duties(nfl, nrl, nfr, nrr, max_duty)
 
-                    escape_dur = 0.4  # seconds
+                    escape_dur = 0.8  # seconds (long enough to be visible)
                     t_escape = time.time()
                     while time.time() - t_escape < escape_dur:
                         bot.set_motor_model(dfl, drl, dfr, drr)
@@ -749,21 +745,27 @@ def main() -> None:
                     # Final stop after escape
                     bot.set_motor_model(0, 0, 0, 0)
                 else:
-                    # Side/back-only emergency -> stay stopped, do not auto-backup
-                    print("[AutoDrive][EMERG] Side/back obstacle -> staying stopped (no escape motion).")
+                    # Side / back-only emergency -> stay stopped (no blind reverse)
+                    print(
+                        "[AutoDrive][EMERG] Obstacle not clearly in front sector -> "
+                        "staying stopped, no escape motion."
+                    )
+                    bot.set_motor_model(0, 0, 0, 0)
 
                 mode = "STOPPED"
                 blocked_counter = 0
+
                 time.sleep(loop_period)
                 continue
-            # ------------------------------------------------
+            # --------------------------------------------------------
 
-            # Decide mode (planner layer) — only ToF + US here
+            # Decide mode (planner layer)
             prev_mode = mode
             mode, blocked_counter = choose_mode(
                 fr_cm=fr_f,
                 fl_cm=fl_f,
                 us_cm=us_cm,
+                lidar_near=lidar_near,
                 front_th=args.front_th,
                 side_th=args.side_th,
                 mode_prev=prev_mode,
@@ -802,26 +804,21 @@ def main() -> None:
                 args.w_rotate,
             )
 
-            # LiDAR-based forward speed reduction (front sector only)
-            if (
-                mode == "FORWARD"
-                and lidar_min_m is not None
-                and lidar_ang_deg is not None
-            ):
-                if abs(lidar_ang_deg) <= args.lidar_front_ang:
-                    stop_d = args.lidar_th          # hard safety threshold for planner
-                    slow_d = args.lidar_slow_dist   # start slowing distance
-                    if lidar_min_m <= stop_d:
-                        vx = 0.0
-                    elif lidar_min_m < slow_d:
-                        t_scale = (lidar_min_m - stop_d) / max(
-                            1e-3, (slow_d - stop_d)
-                        )  # 0..1
-                        scale = max(
-                            args.min_speed_scale,
-                            min(1.0, t_scale),
-                        )
-                        vx *= scale
+            # LiDAR-based forward speed reduction
+            if mode == "FORWARD" and lidar_min_m is not None:
+                stop_d = args.lidar_th          # hard safety threshold for planner
+                slow_d = args.lidar_slow_dist   # start slowing distance
+                if lidar_min_m <= stop_d:
+                    vx = 0.0
+                elif lidar_min_m < slow_d:
+                    t_scale = (lidar_min_m - stop_d) / max(
+                        1e-3, (slow_d - stop_d)
+                    )  # 0..1
+                    scale = max(
+                        args.min_speed_scale,
+                        min(1.0, t_scale),
+                    )
+                    vx *= scale
 
             # Mix mecanum and send commands
             nfl, nrl, nfr, nrr = mix_mecanum(
@@ -841,11 +838,10 @@ def main() -> None:
                 f"[AutoDrive] mode={mode:9s}  "
                 f"FR_f={fr_f:5.1f}cm  FL_f={fl_f:5.1f}cm  "
                 f"US={('%.1f cm' % us_cm) if us_cm is not None else 'None':>8s}  "
-                f"ToF_near={tof_near}  US_near={us_near}  "
-                f"LiDAR_near={lidar_near}  "
+                f"ToF_near={tof_near}  US_near={us_near}  LiDAR_near={lidar_near}  "
                 f"LiDAR_min={('%4.2f m' % lidar_min_m) if lidar_min_m is not None else 'None':>8s}  "
-                f"LiDAR_ang={('%5.1f°' % lidar_ang_deg) if lidar_ang_deg is not None else ' None '}"
-                f"  blocked_cnt={blocked_counter}"
+                f"LiDAR_ang={('%5.1f deg' % lidar_min_ang_deg) if lidar_min_ang_deg is not None else 'None':>10s}  "
+                f"blocked_cnt={blocked_counter}"
             )
 
             # Timing
