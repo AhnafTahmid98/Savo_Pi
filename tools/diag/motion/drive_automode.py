@@ -7,9 +7,9 @@ Robot Savo — Expert Auto Drive (Non-ROS, Mecanum + Safety)
     * PCA9685 class
     * RobotSavo motor wrapper 
     * Mecanum kinematics helpers (mix_mecanum, to_duties)
-- Uses safety APIs from tools/diag/sensors/api/:
+- Uses safety sensors:
     * DualToF (FR/FL) for near-field
-    * Ultrasonic for front-center
+    * Ultrasonic (front-center) via gpiozero DistanceSensor
     * LiDAR front-sector (via LidarSafetyAPI)
 - Behaviour:
     * Prefer FORWARD when front is clear.
@@ -36,6 +36,8 @@ import subprocess
 from typing import Optional, Tuple
 
 import smbus
+from gpiozero import DistanceSensor
+from gpiozero.pins.lgpio import LGPIOFactory
 
 # -------------------------------------------------------------------
 # Project root (Savo_Pi)
@@ -47,7 +49,6 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from tools.diag.sensors.api.vl53_dual_api import DualToF
-from tools.diag.sensors.api.ultrasonic_api import read_ultrasonic_cm
 from tools.diag.sensors.api.lidar_api import LidarSafetyAPI, RPLidarException
 
 
@@ -371,6 +372,71 @@ def mode_to_cmd(
 
 
 # ===================================================================
+# Ultrasonic helper — SINGLE sensor, reused
+# ===================================================================
+class UltrasonicReader:
+    """
+    Front-center ultrasonic helper:
+    - Uses LGPIOFactory + DistanceSensor once.
+    - Provides read_cm() method, safe for use in tight loops.
+    """
+
+    def __init__(self, trig_pin: int, echo_pin: int, max_distance_m: float = 4.0):
+        self.trig_pin = trig_pin
+        self.echo_pin = echo_pin
+        self.max_distance_m = max_distance_m
+        self.sensor: Optional[DistanceSensor] = None
+        self._init_sensor()
+
+    def _init_sensor(self) -> None:
+        try:
+            factory = LGPIOFactory()
+            self.sensor = DistanceSensor(
+                echo=self.echo_pin,
+                trigger=self.trig_pin,
+                max_distance=self.max_distance_m,
+                queue_len=3,
+                pin_factory=factory,
+            )
+            print(
+                f"[AutoDrive] Ultrasonic sensor ready "
+                f"(TRIG={self.trig_pin}, ECHO={self.echo_pin}, max={self.max_distance_m} m)"
+            )
+        except Exception as e:
+            print(
+                f"[AutoDrive] WARNING: ultrasonic init failed: {e}",
+                file=sys.stderr,
+            )
+            self.sensor = None
+
+    def read_cm(self) -> Optional[float]:
+        if self.sensor is None:
+            return None
+        try:
+            d = self.sensor.distance  # 0.0..1.0
+            if d is None:
+                return None
+            dist_cm = d * 100.0
+            if dist_cm <= 0.0 or dist_cm > 400.0:
+                return None
+            return dist_cm
+        except Exception as e:
+            print(
+                f"[AutoDrive] WARNING: ultrasonic read error: {e}",
+                file=sys.stderr,
+            )
+            return None
+
+    def close(self) -> None:
+        if self.sensor is not None:
+            try:
+                self.sensor.close()
+            except Exception:
+                pass
+            self.sensor = None
+
+
+# ===================================================================
 # Optional: camera + face helpers (default OFF)
 # ===================================================================
 def start_camera_stream(host: str, port: int) -> Optional[subprocess.Popen]:
@@ -480,19 +546,19 @@ def main() -> None:
     ap.add_argument(
         "--front-th",
         type=float,
-        default=35.0,
+        default=25.0,
         help="Front block threshold for ToF/US (cm)",
     )
     ap.add_argument(
         "--side-th",
         type=float,
-        default=22.0,
+        default=25.0,
         help="Side block threshold for ToF (cm)",
     )
     ap.add_argument(
         "--us-th",
         type=float,
-        default=35.0,
+        default=25.0,
         help="Near-field threshold for ultrasonic (cm)",
     )
     ap.add_argument("--loop-hz", type=float, default=20.0)
@@ -564,14 +630,14 @@ def main() -> None:
     print("[AutoDrive] Initializing DualToF ...")
     tof = DualToF(rate_hz=args.loop_hz, median=3, threshold_cm=args.front_th)
 
-    us_trig, us_echo = 27, 22  # locked mapping via ultrasonic_api
+    us_trig, us_echo = 27, 22  # locked mapping
     print(f"[AutoDrive] Ultrasonic TRIG={us_trig} ECHO={us_echo}")
+    us_reader = UltrasonicReader(us_trig, us_echo)
 
     lidar: Optional[LidarSafetyAPI] = None
     if not args.no_lidar:
         try:
             print("[AutoDrive] Initializing LiDAR Safety API ...")
-            # Front-sector window; lidar_api internally also computes global/sectors.
             lidar = LidarSafetyAPI(
                 port="/dev/ttyUSB0",
                 baudrate=115200,
@@ -618,13 +684,8 @@ def main() -> None:
             # ---------- ToF ----------
             fr_raw, fr_f, fl_raw, fl_f, alert_str, tof_near = tof.read()
 
-            # ---------- Ultrasonic ----------
-            us_cm = read_ultrasonic_cm(
-                trig_pin=us_trig,
-                echo_pin=us_echo,
-                factory="lgpio",
-                samples=5,
-            )
+            # ---------- Ultrasonic (single shared sensor) ----------
+            us_cm = us_reader.read_cm()
             us_near = us_cm is not None and us_cm < args.us_th
 
             # ---------- LiDAR ----------
@@ -636,7 +697,6 @@ def main() -> None:
                     r = lidar.poll()
                     lidar_near = r.obstacle
                     lidar_min_m = r.min_dist_m
-                    # Angle attribute is optional; getattr keeps us compatible
                     lidar_min_ang_deg = getattr(r, "min_angle_deg", None)
                 except RPLidarException as e:
                     print(f"[AutoDrive] LiDAR error: {e}", file=sys.stderr)
@@ -680,7 +740,6 @@ def main() -> None:
                 # Decide if this is a FRONT-type emergency
                 front_emerg = False
 
-                # ToF / US criteria (slightly looser than emerg_front_cm)
                 if us_cm is not None and us_cm < (args.emerg_front_cm + 5.0):
                     front_emerg = True
                 if (
@@ -688,8 +747,6 @@ def main() -> None:
                     or (fl_f >= 0.0 and fl_f < (args.emerg_front_cm + 5.0))
                 ):
                     front_emerg = True
-
-                # LiDAR angle-based front check (if angle provided)
                 if (
                     lidar_min_m is not None
                     and lidar_min_m < (args.emerg_lidar_m + 0.05)
@@ -699,9 +756,6 @@ def main() -> None:
                     front_emerg = True
 
                 if front_emerg:
-                    # Stronger, clearly visible escape motion:
-                    # - Reverse a bit faster
-                    # - Turn away from closer side (ToF)
                     vx_b = -max(0.4, args.v_back)
                     vy_b = 0.0
 
@@ -709,11 +763,9 @@ def main() -> None:
                     fl_close = fl_f if fl_f >= 0.0 else 9999.0
 
                     if fr_close + 1.0 < fl_close:
-                        # right side closer -> turn CCW (left) while backing
                         wz_b = +max(0.6, args.w_rotate)
                         turn_txt = "CCW (left)"
                     elif fl_close + 1.0 < fr_close:
-                        # left side closer -> turn CW (right) while backing
                         wz_b = -max(0.6, args.w_rotate)
                         turn_txt = "CW (right)"
                     else:
@@ -736,7 +788,7 @@ def main() -> None:
                     )
                     dfl, drl, dfr, drr = to_duties(nfl, nrl, nfr, nrr, max_duty)
 
-                    escape_dur = 0.8  # seconds (long enough to be visible)
+                    escape_dur = 0.8  # seconds
                     t_escape = time.time()
                     while time.time() - t_escape < escape_dur:
                         bot.set_motor_model(dfl, drl, dfr, drr)
@@ -745,7 +797,6 @@ def main() -> None:
                     # Final stop after escape
                     bot.set_motor_model(0, 0, 0, 0)
                 else:
-                    # Side / back-only emergency -> stay stopped (no blind reverse)
                     print(
                         "[AutoDrive][EMERG] Obstacle not clearly in front sector -> "
                         "staying stopped, no escape motion."
@@ -806,14 +857,14 @@ def main() -> None:
 
             # LiDAR-based forward speed reduction
             if mode == "FORWARD" and lidar_min_m is not None:
-                stop_d = args.lidar_th          # hard safety threshold for planner
-                slow_d = args.lidar_slow_dist   # start slowing distance
+                stop_d = args.lidar_th
+                slow_d = args.lidar_slow_dist
                 if lidar_min_m <= stop_d:
                     vx = 0.0
                 elif lidar_min_m < slow_d:
                     t_scale = (lidar_min_m - stop_d) / max(
                         1e-3, (slow_d - stop_d)
-                    )  # 0..1
+                    )
                     scale = max(
                         args.min_speed_scale,
                         min(1.0, t_scale),
@@ -863,6 +914,7 @@ def main() -> None:
                 lidar.stop()
             except Exception:
                 pass
+        us_reader.close()
         stop_proc(cam_proc, "camera")
         stop_proc(face_proc, "face")
         print("[AutoDrive] Done.")
