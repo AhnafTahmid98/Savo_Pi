@@ -6,19 +6,22 @@ Robot Savo — RPLIDAR A1 Safety API (Python only, no ROS2)
 Thin wrapper around rplidar for near-field safety & diagnostics.
 
 Design:
-- Robust init pattern from lidar_test.py:
+- Robust init pattern:
     stop → reset → drain_input → start_motor → start_scan → drain_input.
-- Uses iter_scans() for clean per-rotation summaries.
-- 360° sector summaries:
-    * global_min (any angle)
-    * front  (-35..+35°)
-    * back   (145..215°)
-    * left   (55..125°)
-    * right  (-125..-55°)
-- Debounced obstacle detection (FRONT sector) with hysteresis.
-- Header/desync recovery similar to lidar_test.py:
-    on "Incorrect descriptor"/"Wrong body size"/"length mismatch"
-    → drain_input + restart scan + rebuild iterator.
+- 360° scan, plus derived sectors:
+    * FRONT  : around 0°   (|angle_wrapped| <= 45°)
+    * RIGHT  : -135°..-45°
+    * BACK   : |angle_wrapped| >= 135°
+    * LEFT   :  45°..135°
+- Debounced obstacle detection (using the PRIMARY sector only):
+    * PRIMARY sector is defined by angle_min..angle_max in the API ctor.
+    * For drive_automode.py we still use a FRONT window (≈−35°..+35°).
+- CLI test (this file as a script):
+    python3 tools/diag/sensors/api/lidar_api.py
+    → by default uses FULL 360° as PRIMARY sector (0..360°) and prints:
+        - global min
+        - per-sector mins (front/right/back/left)
+        - ALERT/CLEAR messages when within 'obst' threshold.
 
 Author: Robot Savo
 """
@@ -44,6 +47,7 @@ except Exception as e:
 
     class RPLidarException(Exception):
         pass
+
     _IMPORT_ERROR = e
 
 
@@ -56,73 +60,55 @@ def clamp(v: int, a: int, b: int) -> int:
     return max(a, min(b, v))
 
 
+def wrap_deg(a: float) -> float:
+    """
+    Wrap angle to [-180, 180) degrees.
+    """
+    while a >= 180.0:
+        a -= 360.0
+    while a < -180.0:
+        a += 360.0
+    return a
+
+
 # ---------------- dataclasses ----------------
 @dataclass
 class LidarReading:
     """
     Summary for one LiDAR rotation.
-
-    Legacy fields:
-      - min_dist_m / min_angle_deg: kept for compatibility (front sector).
-      - obstacle: debounced alert for FRONT sector only.
-
-    New fields:
-      - global_min_m / global_min_angle_deg: closest point anywhere in 360°.
-      - front_min_m / front_min_angle_deg: front sector (-35..+35°).
-      - back_min_m / back_min_angle_deg: rear sector (145..215°).
-      - left_min_m / left_min_angle_deg: left side (55..125°).
-      - right_min_m / right_min_angle_deg: right side (-125..-55°).
+    PRIMARY sector = [angle_min, angle_max] from LidarSafetyAPI ctor.
     """
     t_epoch_s: float
     scan_id: int
-    n_points: int
+    n_points: int          # points in PRIMARY sector
     scan_hz: float
     pts_per_sec: float
 
-    # legacy "front" summary (for backwards compatibility)
+    # PRIMARY sector (used for safety thresholds in drive_automode.py)
     min_dist_m: Optional[float]
     min_angle_deg: Optional[float]
     obstacle: bool
 
-    # new 360° summaries
+    # Global 360° minimum
     global_min_m: Optional[float]
     global_min_angle_deg: Optional[float]
 
+    # Sector mins (360°) – for diagnostics / debug
     front_min_m: Optional[float]
     front_min_angle_deg: Optional[float]
-
-    back_min_m: Optional[float]
-    back_min_angle_deg: Optional[float]
-
-    left_min_m: Optional[float]
-    left_min_angle_deg: Optional[float]
-
     right_min_m: Optional[float]
     right_min_angle_deg: Optional[float]
-
-
-# ---------------- filters ----------------
-def gate(points: Iterable[Tuple[int, float, int]],
-         a_min: float, a_max: float,
-         r_min: float, r_max: float) -> List[Tuple[int, float, float]]:
-    """
-    (quality, angle_deg, dist_mm) → filtered list of (q, angle_deg, dist_m).
-    Same as lidar_test.py but kept small.
-    """
-    out: List[Tuple[int, float, float]] = []
-    for q, ang, d_mm in points:
-        if d_mm <= 0:
-            continue
-        d_m = d_mm / 1000.0
-        if a_min <= ang <= a_max and r_min <= d_m <= r_max:
-            out.append((q, ang, d_m))
-    return out
+    back_min_m: Optional[float]
+    back_min_angle_deg: Optional[float]
+    left_min_m: Optional[float]
+    left_min_angle_deg: Optional[float]
 
 
 # ---------------- alert utils ----------------
 class AlertState:
     """
     Debounced obstacle / clear state (scan-based).
+    Uses PRIMARY sector min distance only.
     """
     def __init__(self, obst: Optional[float], debounce: int, hyst: float):
         self.obst = obst
@@ -156,11 +142,11 @@ class AlertState:
         return False
 
 
-# ---------------- io helpers (copied from lidar_test.py style) ----------------
+# ---------------- io helpers ----------------
 def drain_input(lidar: "RPLidar", sec: float = 0.25) -> None:
     """
     Aggressively flush stale bytes from the serial buffer
-    for 'sec' seconds. Same pattern as lidar_test.py.
+    for 'sec' seconds.
     """
     t0 = now()
     while now() - t0 < sec:
@@ -181,14 +167,13 @@ def safe_cleanup(lidar: Optional["RPLidar"]) -> None:
             pass
 
 
-# ---------------- connect/init (mirrors lidar_test.py behavior) ----------------
+# ---------------- connect/init ----------------
 def connect_open(port: str,
                  baud: int,
                  timeout: float,
                  motor_pwm: Optional[int]) -> "RPLidar":
     """
     Open RPLidar on given serial port, reset, drain, start motor + scan, drain.
-    This is intentionally very close to lidar_test.py:connect_open().
     """
     if RPLidar is None:
         raise RPLidarException(
@@ -261,11 +246,14 @@ class LidarSafetyAPI:
     """
     High-level LiDAR safety helper.
 
-    - Call start() once.
-    - Then call poll() repeatedly; each call blocks until one scan is ready.
+    - PRIMARY sector is [angle_min, angle_max] (deg).
+      * For drive_automode.py we pass something like -35..+35 (front).
+      * For CLI default we use 0..360 (full circle).
+    - Call start() once, then poll() in a loop.
     - poll() returns LidarReading with:
-        * front-sector min + debounced obstacle flag (legacy)
-        * 360° sector mins (front/back/left/right + global)
+        * PRIMARY sector min distance + obstacle flag.
+        * global 360° min.
+        * per-sector mins (front/right/back/left) for debug.
     """
 
     def __init__(self,
@@ -273,8 +261,8 @@ class LidarSafetyAPI:
                  baudrate: int = 115200,
                  timeout: float = 2.0,
                  motor_pwm: Optional[int] = None,
-                 angle_min: float = -35.0,
-                 angle_max: float = 35.0,
+                 angle_min: float = 0.0,
+                 angle_max: float = 360.0,
                  range_min: float = 0.05,
                  range_max: float = 2.0,
                  obst_threshold: Optional[float] = 0.28,
@@ -287,10 +275,11 @@ class LidarSafetyAPI:
         self.timeout = timeout
         self.motor_pwm = motor_pwm
 
-        # NOTE: angle_min/angle_max kept for CLI compatibility,
-        # but internal logic now always computes 360° sectors.
+        # PRIMARY sector window
         self.angle_min = angle_min
         self.angle_max = angle_max
+
+        # Distance window
         self.range_min = range_min
         self.range_max = range_max
 
@@ -302,7 +291,6 @@ class LidarSafetyAPI:
         self._scan_id = 0
         self._last_scan_wall: Optional[float] = None
 
-        # ALERT uses FRONT sector (see poll()).
         self._alert = AlertState(obst_threshold, debounce, hyst)
 
     # ----- lifecycle -----
@@ -339,9 +327,10 @@ class LidarSafetyAPI:
     def poll(self, _retry_header: bool = True) -> LidarReading:
         """
         Block until one full LiDAR rotation is available, then:
-        - Build 360° point set within range_min..range_max.
-        - Compute global / front / back / left / right mins.
-        - Update debounced obstacle state for FRONT sector only.
+        - Build 360° point list (within range_min..range_max).
+        - Compute PRIMARY sector min distance for safety logic.
+        - Compute global + sector mins for diagnostics.
+        - Update debounced obstacle state.
         - Return LidarReading.
         """
         if self._iter is None:
@@ -358,7 +347,7 @@ class LidarSafetyAPI:
                 if self._lidar is None:
                     raise
 
-                # Mimic lidar_test.py recovery: flush & restart scan.
+                # Recovery: flush & restart scan.
                 try:
                     drain_input(self._lidar, 0.30)
                 except Exception:
@@ -374,12 +363,11 @@ class LidarSafetyAPI:
                     pass
                 drain_input(self._lidar, 0.10)
 
-                # Rebuild iterator and reset timing; then retry once.
+                # Rebuild iterator; retry once.
                 self._iter = self._lidar.iter_scans(max_buf_meas=2048, min_len=self.min_len)
                 self._last_scan_wall = None
                 return self.poll(_retry_header=False)
             else:
-                # Some other (or repeated) error; bubble up.
                 raise
 
         t_now = now()
@@ -393,77 +381,82 @@ class LidarSafetyAPI:
             scan_hz = 1.0 / period
         self._last_scan_wall = t_now
 
-        # ---------- Build 360° point set within range ----------
-        # pts_all: list[(q, angle_deg, dist_m)]
-        pts_all = gate(
-            raw_scan,
-            -180.0,
-            180.0,
-            self.range_min,
-            self.range_max,
-        )
+        # 360° list within [range_min, range_max]
+        full_pts: List[Tuple[int, float, float]] = []
+        for q, ang_deg, d_mm in raw_scan:
+            if d_mm <= 0:
+                continue
+            d_m = d_mm / 1000.0
+            if self.range_min <= d_m <= self.range_max:
+                full_pts.append((q, ang_deg, d_m))
 
-        n = len(pts_all)
-        pts_per_sec = (n * scan_hz) if math.isfinite(scan_hz) else float("nan")
+        # PRIMARY sector subset (angle_min..angle_max)
+        primary_pts: List[Tuple[int, float, float]] = [
+            (q, ang, d) for (q, ang, d) in full_pts
+            if self.angle_min <= ang <= self.angle_max
+        ]
 
-        # ---------- Global min ----------
-        if pts_all:
-            _, g_ang, g_d = min(pts_all, key=lambda x: x[2])
-            global_min_m = g_d
-            global_min_ang = g_ang
+        n_primary = len(primary_pts)
+        pts_per_sec = (n_primary * scan_hz) if math.isfinite(scan_hz) else float("nan")
+
+        # PRIMARY min
+        if n_primary:
+            _, p_ang_min, p_d_min = min(primary_pts, key=lambda x: x[2])
         else:
-            global_min_m = None
-            global_min_ang = None
+            p_d_min, p_ang_min = None, None
 
-        # ---------- Sector mins ----------
-        # Use original raw_scan for sector gating; gate() converts mm→m internally.
-        front_pts = gate(raw_scan, -35.0,   35.0, self.range_min, self.range_max)
-        back_pts  = gate(raw_scan, 145.0,  215.0, self.range_min, self.range_max)
-        left_pts  = gate(raw_scan,  55.0,  125.0, self.range_min, self.range_max)
-        right_pts = gate(raw_scan, -125.0,  -55.0, self.range_min, self.range_max)
-
-        def sector_min(pts):
-            if not pts:
-                return None, None
-            _, ang, d = min(pts, key=lambda x: x[2])
-            return d, ang
-
-        front_min_m, front_min_ang = sector_min(front_pts)
-        back_min_m,  back_min_ang  = sector_min(back_pts)
-        left_min_m,  left_min_ang  = sector_min(left_pts)
-        right_min_m, right_min_ang = sector_min(right_pts)
-
-        # ---------- Legacy "front" values for compatibility ----------
-        d_min = front_min_m
-        ang_min = front_min_ang
-
-        # Update debounced obstacle state using FRONT sector only
-        state_changed = self._alert.update(d_min)
+        # Debounced safety state uses PRIMARY sector only
+        state_changed = self._alert.update(p_d_min)
         obstacle = self._alert.on
+
+        # Global 360° min
+        if full_pts:
+            _, g_ang_min, g_d_min = min(full_pts, key=lambda x: x[2])
+        else:
+            g_d_min, g_ang_min = None, None
+
+        # Sector mins over 360° (use wrapped angle)
+        front_min = right_min = back_min = left_min = None
+        front_ang = right_ang = back_ang = left_ang = None
+
+        for _, ang, d in full_pts:
+            w = wrap_deg(ang)  # [-180, 180)
+            # FRONT: |w| ≤ 45°
+            if abs(w) <= 45.0:
+                if front_min is None or d < front_min:
+                    front_min, front_ang = d, ang
+            # RIGHT: -135° < w < -45°
+            elif -135.0 < w < -45.0:
+                if right_min is None or d < right_min:
+                    right_min, right_ang = d, ang
+            # LEFT: 45° < w < 135°
+            elif 45.0 < w < 135.0:
+                if left_min is None or d < left_min:
+                    left_min, left_ang = d, ang
+            # BACK: else (|w| ≥ 135°)
+            else:
+                if back_min is None or d < back_min:
+                    back_min, back_ang = d, ang
 
         reading = LidarReading(
             t_epoch_s=t_now,
             scan_id=self._scan_id,
-            n_points=n,
+            n_points=n_primary,
             scan_hz=scan_hz,
             pts_per_sec=pts_per_sec,
-
-            # legacy front summary
-            min_dist_m=d_min,
-            min_angle_deg=ang_min,
+            min_dist_m=p_d_min,
+            min_angle_deg=p_ang_min,
             obstacle=obstacle,
-
-            # new 360° info
-            global_min_m=global_min_m,
-            global_min_angle_deg=global_min_ang,
-            front_min_m=front_min_m,
-            front_min_angle_deg=front_min_ang,
-            back_min_m=back_min_m,
-            back_min_angle_deg=back_min_ang,
-            left_min_m=left_min_m,
-            left_min_angle_deg=left_min_ang,
-            right_min_m=right_min_m,
-            right_min_angle_deg=right_min_ang,
+            global_min_m=g_d_min,
+            global_min_angle_deg=g_ang_min,
+            front_min_m=front_min,
+            front_min_angle_deg=front_ang,
+            right_min_m=right_min,
+            right_min_angle_deg=right_ang,
+            back_min_m=back_min,
+            back_min_angle_deg=back_ang,
+            left_min_m=left_min,
+            left_min_angle_deg=left_ang,
         )
 
         if self.verbose:
@@ -475,7 +468,7 @@ class LidarSafetyAPI:
     def _print_reading(self, r: LidarReading, state_changed: bool) -> None:
         """
         Human-friendly one-line debug print for testing.
-        Shows legacy front min; you can extend this if you want more info.
+        Shows PRIMARY sector + 360° sectors.
         """
         hz_txt = (
             f"{min(r.scan_hz, 50.0):5.2f} Hz"
@@ -485,33 +478,48 @@ class LidarSafetyAPI:
             f"{int(min(r.pts_per_sec, 50000)):5d}/s"
             if math.isfinite(r.pts_per_sec) else "  n/a "
         )
-        if r.min_dist_m is not None and r.min_angle_deg is not None:
-            md = f"{r.min_dist_m:.3f} m @ {r.min_angle_deg:.1f}°"
-        else:
-            md = "—"
 
-        suffix = "  **OBSTACLE**" if r.obstacle else ""
+        def fmt_md(d: Optional[float], a: Optional[float]) -> str:
+            if d is None or a is None:
+                return "   —   "
+            return f"{d:4.3f} m @ {a:6.1f}°"
+
+        prim_txt = fmt_md(r.min_dist_m, r.min_angle_deg)
+        glob_txt = fmt_md(r.global_min_m, r.global_min_angle_deg)
+        f_txt = fmt_md(r.front_min_m, r.front_min_angle_deg)
+        r_txt = fmt_md(r.right_min_m, r.right_min_angle_deg)
+        b_txt = fmt_md(r.back_min_m, r.back_min_angle_deg)
+        l_txt = fmt_md(r.left_min_m, r.left_min_angle_deg)
+
+        obst_txt = " **OBSTACLE**" if r.obstacle else ""
+
         print(
-            f"[LiDAR-API] scan={r.scan_id:05d}  {hz_txt}  "
-            f"pts/scan={r.n_points:4d}  pts/s={pps_txt}  min(front)={md}{suffix}"
+            f"[LiDAR-API] scan={r.scan_id:05d}  {hz_txt}  pts/PRIMARY={r.n_points:4d}  pts/s={pps_txt}\n"
+            f"             PRIMARY[{self.angle_min:.1f}..{self.angle_max:.1f}]  : {prim_txt}{obst_txt}\n"
+            f"             GLOBAL(0..360)             : {glob_txt}\n"
+            f"             FRONT  (±45°)             : {f_txt}\n"
+            f"             RIGHT  (-135°..-45°)      : {r_txt}\n"
+            f"             BACK   (|angle| ≥135°)    : {b_txt}\n"
+            f"             LEFT   (45°..135°)        : {l_txt}"
         )
 
         if state_changed:
             if r.obstacle:
-                print(
-                    f"[LiDAR-API] ALERT: obstacle within threshold "
-                    f"(min_dist={r.min_dist_m:.3f} m)"
-                    if r.min_dist_m is not None else
-                    "[LiDAR-API] ALERT: obstacle (no distance estimate)"
-                )
+                if r.min_dist_m is not None:
+                    print(
+                        f"[LiDAR-API] ALERT: obstacle in PRIMARY sector "
+                        f"(min_dist={r.min_dist_m:.3f} m)"
+                    )
+                else:
+                    print("[LiDAR-API] ALERT: obstacle (no distance estimate)")
             else:
-                print("[LiDAR-API] CLEAR: obstacle region free again.")
+                print("[LiDAR-API] CLEAR: PRIMARY sector free again.")
 
 
 # ---------------- CLI test harness ----------------
 def main() -> None:
     ap = argparse.ArgumentParser(
-        description="Robot Savo — RPLIDAR A1 Safety API quick test"
+        description="Robot Savo — RPLIDAR A1 Safety API quick test (360° + sectors)"
     )
     ap.add_argument("--port", default="/dev/ttyUSB0",
                     help="Serial device (default /dev/ttyUSB0). By-id glob supported.")
@@ -521,12 +529,16 @@ def main() -> None:
     ap.add_argument("--motor-pwm", type=int, default=None,
                     help="Optional motor PWM 0..1023 (else default speed).")
 
-    ap.add_argument("--angle-min", type=float, default=-35.0)
-    ap.add_argument("--angle-max", type=float, default=35.0)
+    # IMPORTANT: defaults are 0..360 → PRIMARY = full circle
+    ap.add_argument("--angle-min", type=float, default=0.0,
+                    help="PRIMARY sector min angle (deg, default 0).")
+    ap.add_argument("--angle-max", type=float, default=360.0,
+                    help="PRIMARY sector max angle (deg, default 360).")
+
     ap.add_argument("--range-min", type=float, default=0.05)
     ap.add_argument("--range-max", type=float, default=2.0)
     ap.add_argument("--obst", type=float, default=0.28,
-                    help="Obstacle threshold (m). Use e.g. 0.28 for Robot Savo bumper.")
+                    help="Obstacle threshold (m) for PRIMARY sector.")
     ap.add_argument("--debounce", type=int, default=3,
                     help="Consecutive scans under threshold before ALERT (default: 3).")
     ap.add_argument("--hyst", type=float, default=0.03,
@@ -563,7 +575,7 @@ def main() -> None:
     t0 = now()
     try:
         while True:
-            r = api.poll()
+            _ = api.poll()
             if args.duration is not None and (now() - t0) >= args.duration:
                 print("[LiDAR-API] Duration reached; stopping.")
                 break
