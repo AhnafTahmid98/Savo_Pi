@@ -564,7 +564,7 @@ def main() -> None:
     print("[AutoDrive] Initializing DualToF ...")
     tof = DualToF(rate_hz=args.loop_hz, median=3, threshold_cm=args.front_th)
 
-    us_trig = 27, us_echo = 22  # locked mapping via ultrasonic_api
+    us_trig = 27; us_echo = 22  # locked mapping via ultrasonic_api
     print(f"[AutoDrive] Ultrasonic TRIG={us_trig} ECHO={us_echo}")
 
     lidar: Optional[LidarSafetyAPI] = None
