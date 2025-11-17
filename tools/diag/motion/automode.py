@@ -589,19 +589,19 @@ def main() -> None:
     ap.add_argument(
         "--front-th",
         type=float,
-        default=25.0,
+        default=35.0,
         help="Front block threshold for ToF/US (cm)",
     )
     ap.add_argument(
         "--side-th",
         type=float,
-        default=25.0,
+        default=35.0,
         help="Side block threshold for ToF (cm)",
     )
     ap.add_argument(
         "--us-th",
         type=float,
-        default=25.0,
+        default=35.0,
         help="Near-field threshold for ultrasonic (cm)",
     )
     ap.add_argument("--loop-hz", type=float, default=20.0)
