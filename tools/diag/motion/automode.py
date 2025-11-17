@@ -999,7 +999,8 @@ def main() -> None:
                 else:
                     block_tags.append("L(?)")
 
-            block_str = ",".join(block_tags) if block_str := ",".join(block_tags) else "none"
+            block_str = ",".join(block_tags) if block_tags else "none"
+
 
             def fmt_lidar_cm(v: Optional[float]) -> str:
                 return f"{v:5.1f}cm" if v is not None else "  N/A "
