@@ -478,8 +478,8 @@ def start_camera_stream(host: str, port: int) -> Optional[subprocess.Popen]:
         "!",
         "x264enc",
         "tune=zerolatency",
-        "speed-preset=ultrafast",
-        "bitrate=2000",
+        "speed-preset=superfast",   # was ultrafast
+        "bitrate=6000",             # was 2000 → more bits = better quality
         "key-int-max=30",
         "!",
         "rtph264pay",
@@ -510,8 +510,6 @@ def start_camera_stream(host: str, port: int) -> Optional[subprocess.Popen]:
             file=sys.stderr,
         )
         return None
-
-
 
 def start_face() -> Optional[subprocess.Popen]:
     """
@@ -612,7 +610,7 @@ def main() -> None:
     ap.add_argument(
         "--side-th-fl",
         type=float,
-        default=35.0,
+        default=40.0,
         help="Side block threshold for FRONT-LEFT ToF (cm)",
     )
     ap.add_argument(
