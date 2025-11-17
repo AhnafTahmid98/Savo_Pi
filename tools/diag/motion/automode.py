@@ -25,40 +25,18 @@ Robot Savo — Expert Auto Drive (Non-ROS, Mecanum + Full 360° Safety)
              * Avoid strafing into close LEFT/RIGHT obstacles.
              * Emergency STOP if ANY direction is too close (global min).
          - Speed reduction in ALL directions:
-             * vx>0  → slow using FRONT (with fallback to primary/global)
-             * vx<0  → slow using BACK (fallback to global)
-             * vy>0  → slow using LEFT (fallback to global)
-             * vy<0  → slow using RIGHT (fallback to global)
-             * wz≠0 → slow using closest obstacle around (global/primary/sectors)
+             * vx>0  → slow using FRONT sector
+             * vx<0  → slow using BACK sector
+             * vy>0  → slow using LEFT sector
+             * vy<0  → slow using RIGHT sector
+             * wz≠0 → slow using global LiDAR min
     * EMERGENCY STOP if anything VERY close (LiDAR/ToF/US),
       followed by clear escape motion for FRONT-type obstacles:
          - reverse + turn away from closer ToF side.
 
-Near-field slow-down (NEW):
-    - Uses ToF + Ultrasonic front distance.
-    - nf-slow-dist: start slowing at this distance.
-    - nf-min-speed-scale: minimum linear speed fraction near obstacle.
-    - NF slow-down is COMBINED with LiDAR slow-down by taking MIN(scale_nf, scale_lidar),
-      NOT multiplying them (so robot still has enough power to move).
-
-Typical use:
+Typical use (defaults match your teleop signs/inverts):
     cd ~/Savo_Pi
-    python3 tools/diag/motion/automode.py \
-      --max-duty 3200 \
-      --loop-hz 30 \
-      --v-forward 0.30 \
-      --v-side 0.25 \
-      --v-back 0.25 \
-      --w-rotate 0.45 \
-      --front-th 30.0 \
-      --us-th 30.0 \
-      --lidar-th 0.45 \
-      --lidar-slow-dist 1.20 \
-      --min-speed-scale 0.20 \
-      --nf-slow-dist 60.0 \
-      --nf-min-speed-scale 0.25 \
-      --emerg-front-cm 25.0 \
-      --emerg-lidar-m 0.45
+    python3 tools/diag/motion/drive_automode.py
 
 Face UI:
     - Starts tools/diag/ui/face.py by default on the DSI.
@@ -348,7 +326,7 @@ def choose_mode(
     else:
         blocked_counter = 0
 
-    if blocked_counter > 40:  # ~2s at 20–30 Hz
+    if blocked_counter > 40:  # ~2s at 20 Hz
         return "STOPPED", blocked_counter
 
     # If front clear → always go forward
@@ -421,38 +399,6 @@ def lidar_slow_scale(
         return 1.0
     t = (dist_m - stop_d) / max(1e-3, (slow_d - stop_d))
     return max(min_scale, min(1.0, t))
-
-
-def nf_slow_scale(
-    dist_cm: float,
-    block_th_cm: float,
-    slow_dist_cm: float,
-    min_scale: float,
-) -> float:
-    """
-    Near-field slow-down scale (for ToF + Ultrasonic front distance):
-      - dist <= block_th_cm   → min_scale
-      - dist >= slow_dist_cm  → 1.0
-      - between               → linear [min_scale..1.0]
-    NF never fully stops the robot; EMERGENCY block handles hard stops.
-    """
-    if dist_cm >= slow_dist_cm:
-        return 1.0
-    if dist_cm <= block_th_cm:
-        return min_scale
-    t = (dist_cm - block_th_cm) / max(1e-3, (slow_dist_cm - block_th_cm))
-    return max(min_scale, min(1.0, t))
-
-
-def pick_dist(*vals: Optional[float]) -> Optional[float]:
-    """
-    Return the first valid positive distance in meters from the list,
-    or None if all are None/<=0.
-    """
-    for v in vals:
-        if v is not None and v > 0.0:
-            return v
-    return None
 
 
 # ===================================================================
@@ -659,20 +605,6 @@ def main() -> None:
     )
     ap.add_argument("--loop-hz", type=float, default=20.0)
 
-    # Near-field slow-down (ToF + US)
-    ap.add_argument(
-        "--nf-slow-dist",
-        type=float,
-        default=60.0,
-        help="Distance (cm) where NF slow-down starts (ToF+US front)",
-    )
-    ap.add_argument(
-        "--nf-min-speed-scale",
-        type=float,
-        default=0.25,
-        help="Minimum linear speed fraction near NF obstacle",
-    )
-
     # EMERGENCY thresholds (hard stop)
     ap.add_argument(
         "--emerg-front-cm",
@@ -707,7 +639,7 @@ def main() -> None:
         "--min-speed-scale",
         type=float,
         default=0.25,
-        help="Minimum speed fraction near LiDAR obstacle (0.25 → 25%)",
+        help="Minimum speed fraction near obstacle (0.25 → 25%)",
     )
 
     # Camera & face (face ON by default)
@@ -810,9 +742,6 @@ def main() -> None:
             lidar_min_m: Optional[float] = None
             lidar_min_ang_deg: Optional[float] = None
 
-            prim_min_m: Optional[float] = None
-            prim_min_ang: Optional[float] = None
-
             front_lidar_cm = right_lidar_cm = back_lidar_cm = left_lidar_cm = None
             front_lidar_m = right_lidar_m = back_lidar_m = left_lidar_m = None
 
@@ -821,6 +750,7 @@ def main() -> None:
                     r = lidar.poll()
                     # PRIMARY sector (front window)
                     lidar_near_primary = r.obstacle
+                    # PRIMARY min
                     prim_min_m = r.min_dist_m
                     prim_min_ang = r.min_angle_deg
 
@@ -867,7 +797,9 @@ def main() -> None:
             left_block_lidar = left_lidar_cm is not None and left_lidar_cm < lidar_th_cm
 
             # ------------------------------------------------------------------
-            # Combine ToF/US + LiDAR for each direction (for planner)
+            # Combine ToF/US + LiDAR for each direction
+            # NOTE: we DO NOT use lidar_near_primary to hard-block front anymore.
+            #       It is used only for slow-down later.
             # ------------------------------------------------------------------
             front_blocked = front_near_nf or front_block_lidar
             left_blocked = left_near_nf or left_block_lidar
@@ -1000,76 +932,32 @@ def main() -> None:
                 args.w_rotate,
             )
 
-            # ---------- Near-field slow-down (ToF + US) ----------
-            nf_front_cm = min(us_cm_safe, fr_cm, fl_cm)
-            nf_scale = nf_slow_scale(
-                nf_front_cm,
-                block_th_cm=args.front_th,
-                slow_dist_cm=args.nf_slow_dist,
-                min_scale=args.nf_min_speed_scale,
-            )
-
-            # ---------- LiDAR slow-down (ALL directions, with fallback) ----------
-            lidar_lin_scale = 1.0  # for vx, vy
-            lidar_rot_scale = 1.0  # for wz
-
+            # ---------- LiDAR-based speed reduction in ALL directions ----------
             if lidar is not None:
                 stop_d = args.lidar_th
                 slow_d = args.lidar_slow_dist
                 min_sc = args.min_speed_scale
 
-                # FORWARD: front sector → primary window → global min
-                if vx > 0.0:
-                    d_forward = pick_dist(front_lidar_m, prim_min_m, lidar_min_m)
-                    if d_forward is not None:
-                        s = lidar_slow_scale(d_forward, stop_d, slow_d, min_sc)
-                        lidar_lin_scale = min(lidar_lin_scale, s)
+                # Forward / backward component
+                if vx > 0.0 and front_lidar_m is not None:
+                    scale_vx = lidar_slow_scale(front_lidar_m, stop_d, slow_d, min_sc)
+                    vx *= scale_vx
+                elif vx < 0.0 and back_lidar_m is not None:
+                    scale_vx = lidar_slow_scale(back_lidar_m, stop_d, slow_d, min_sc)
+                    vx *= scale_vx
 
-                # BACKWARD: back sector → global min
-                elif vx < 0.0:
-                    d_back = pick_dist(back_lidar_m, lidar_min_m)
-                    if d_back is not None:
-                        s = lidar_slow_scale(d_back, stop_d, slow_d, min_sc)
-                        lidar_lin_scale = min(lidar_lin_scale, s)
+                # Left / right component
+                if vy > 0.0 and left_lidar_m is not None:
+                    scale_vy = lidar_slow_scale(left_lidar_m, stop_d, slow_d, min_sc)
+                    vy *= scale_vy
+                elif vy < 0.0 and right_lidar_m is not None:
+                    scale_vy = lidar_slow_scale(right_lidar_m, stop_d, slow_d, min_sc)
+                    vy *= scale_vy
 
-                # LEFT / RIGHT strafing:
-                #   LEFT  (vy>0):  left sector → global
-                #   RIGHT (vy<0):  right sector → global
-                if vy > 0.0:
-                    d_left = pick_dist(left_lidar_m, lidar_min_m)
-                    if d_left is not None:
-                        s = lidar_slow_scale(d_left, stop_d, slow_d, min_sc)
-                        lidar_lin_scale = min(lidar_lin_scale, s)
-                elif vy < 0.0:
-                    d_right = pick_dist(right_lidar_m, lidar_min_m)
-                    if d_right is not None:
-                        s = lidar_slow_scale(d_right, stop_d, slow_d, min_sc)
-                        lidar_lin_scale = min(lidar_lin_scale, s)
-
-                # ROTATION: use closest thing we know (global → primary → sectors)
-                if wz != 0.0:
-                    d_rot = pick_dist(
-                        lidar_min_m,
-                        prim_min_m,
-                        front_lidar_m,
-                        right_lidar_m,
-                        left_lidar_m,
-                        back_lidar_m,
-                    )
-                    if d_rot is not None:
-                        lidar_rot_scale = lidar_slow_scale(d_rot, stop_d, slow_d, min_sc)
-
-            # ---------- Combine NF + LiDAR for linear motion ----------
-            # IMPORTANT: do NOT multiply nf_scale * lidar_lin_scale.
-            # We use the *slowest* of the two (min), so speed doesn't go to a few percent.
-            if lidar_lin_scale == 0.0:
-                lin_scale = 0.0
-            else:
-                lin_scale = min(nf_scale, lidar_lin_scale)
-
-            vx *= lin_scale
-            vy *= lin_scale
-            wz *= lidar_rot_scale
+                # Rotation component (any close obstacle around)
+                if wz != 0.0 and lidar_min_m is not None:
+                    scale_wz = lidar_slow_scale(lidar_min_m, stop_d, slow_d, min_sc)
+                    wz *= scale_wz
 
             # Mix mecanum and send commands
             nfl, nrl, nfr, nrr = mix_mecanum(
@@ -1118,17 +1006,14 @@ def main() -> None:
 
             print(
                 f"[AutoDrive] mode={mode:9s}  "
-                f"vx={vx:+.3f} vy={vy:+.3f} wz={wz:+.3f}  "
                 f"FR_f={fr_f:5.1f}cm  FL_f={fl_f:5.1f}cm  "
                 f"US={('%.1f cm' % us_cm) if us_cm is not None else 'None':>8s}  "
                 f"ToF_near={tof_near!s:<5s}  US_near={us_near!s:<5s}  "
-                f"NF_scale={nf_scale:.2f} Lin_scale={lin_scale:.2f}  "
                 f"BLOCKS={block_str:<24s}  "
                 f"Lfront={fmt_lidar_cm(front_lidar_cm)}  "
                 f"Lright={fmt_lidar_cm(right_lidar_cm)}  "
                 f"Lback={fmt_lidar_cm(back_lidar_cm)}  "
                 f"Lleft={fmt_lidar_cm(left_lidar_cm)}  "
-                f"dFL={dfl:4d} dRL={drl:4d} dFR={dfr:4d} dRR={drr:4d}  "
                 f"blocked_cnt={blocked_counter}"
             )
 
