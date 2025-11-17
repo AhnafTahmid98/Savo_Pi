@@ -618,7 +618,7 @@ def main() -> None:
     ap.add_argument(
         "--us-th",
         type=float,
-        default=35.0,
+        default=40.0,
         help="Near-field threshold for ultrasonic (cm)",
     )
     ap.add_argument("--loop-hz", type=float, default=20.0)
@@ -642,7 +642,7 @@ def main() -> None:
     ap.add_argument(
         "--lidar-th",
         type=float,
-        default=0.40,
+        default=0.50,
         help="LiDAR obstacle threshold (m) for ALL sectors (front/right/back/left)",
     )
 
@@ -650,7 +650,7 @@ def main() -> None:
     ap.add_argument(
         "--lidar-slow-dist",
         type=float,
-        default=0.80,
+        default=1.00,
         help="Distance (m) where we start to slow motion in that direction",
     )
     ap.add_argument(
