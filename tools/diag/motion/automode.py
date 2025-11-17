@@ -211,7 +211,6 @@ class RobotSavo:
     def _clamp4(d1: int, d2: int, d3: int, d4: int) -> Tuple[int, int, int, int]:
         def c(v: int) -> int:
             return 4095 if v > 4095 else (-4095 if v < -4095 else int(v))
-
         return c(d1), c(d2), c(d3), c(d4)
 
     def _apply_quench(self, name: str, prev_sign: int, new_val: int, fn) -> int:
@@ -797,8 +796,12 @@ def main() -> None:
             back_block_lidar = back_lidar_cm is not None and back_lidar_cm < lidar_th_cm
             left_block_lidar = left_lidar_cm is not None and left_lidar_cm < lidar_th_cm
 
+            # ------------------------------------------------------------------
             # Combine ToF/US + LiDAR for each direction
-            front_blocked = front_near_nf or front_block_lidar or lidar_near_primary
+            # NOTE: we DO NOT use lidar_near_primary to hard-block front anymore.
+            #       It is used only for slow-down later.
+            # ------------------------------------------------------------------
+            front_blocked = front_near_nf or front_block_lidar
             left_blocked = left_near_nf or left_block_lidar
             right_blocked = right_near_nf or right_block_lidar
             back_blocked = back_block_lidar  # only LiDAR watches back
@@ -1013,6 +1016,17 @@ def main() -> None:
                 f"Lleft={fmt_lidar_cm(left_lidar_cm)}  "
                 f"blocked_cnt={blocked_counter}"
             )
+
+            # Extra debug line to see WHY it's blocked
+            if front_blocked or left_blocked or right_blocked or back_blocked:
+                print(
+                    f"[AutoDrive][DBG] front_near_nf={front_near_nf} "
+                    f"front_Li={front_block_lidar} "
+                    f"Li_primary={lidar_near_primary}  "
+                    f"left_near_nf={left_near_nf} right_near_nf={right_near_nf}  "
+                    f"Lfb={front_block_lidar} Lrb={right_block_lidar} "
+                    f"Lbb={back_block_lidar} Llb={left_block_lidar}"
+                )
 
             # Timing
             dt = loop_period - (time.time() - t0)
