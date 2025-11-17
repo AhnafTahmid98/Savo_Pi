@@ -23,20 +23,21 @@ Robot Savo — Expert Auto Drive (Non-ROS, Mecanum + Full 360° Safety)
          - 360° sectors FRONT / RIGHT / BACK / LEFT as safety bubble:
              * Avoid backing into close BACK obstacle.
              * Avoid strafing into close LEFT/RIGHT obstacles.
-             * Emergency STOP if ANY direction is too close (global min).
+             * Emergency STOP only if something VERY close in FRONT
+               (global min < emerg_lidar_m and |angle| <= 60°).
          - Speed reduction in ALL directions:
              * vx>0  → slow using FRONT sector
              * vx<0  → slow using BACK sector
              * vy>0  → slow using LEFT sector
              * vy<0  → slow using RIGHT sector
              * wz≠0 → slow using global LiDAR min
-    * EMERGENCY STOP if anything VERY close (LiDAR/ToF/US),
-      followed by clear escape motion for FRONT-type obstacles:
+    * EMERGENCY STOP if something VERY close in front (LiDAR/ToF/US),
+      followed by clear escape motion:
          - reverse + turn away from closer ToF side.
 
 Typical use (defaults match your teleop signs/inverts):
     cd ~/Savo_Pi
-    python3 tools/diag/motion/drive_automode.py
+    python3 tools/diag/motion/automode.py
 
 Face UI:
     - Starts tools/diag/ui/face.py by default on the DSI.
@@ -564,7 +565,7 @@ def main() -> None:
     ap.add_argument("--i2c-bus", type=int, default=1)
     ap.add_argument("--addr", type=lambda x: int(x, 0), default=0x40)
     ap.add_argument("--pwm-freq", type=float, default=50.0)
-    ap.add_argument("--max-duty", type=int, default=2200)
+    ap.add_argument("--max-duty", type=int, default=3200)
 
     ap.add_argument("--invert-fl", action="store_true")
     ap.add_argument("--invert-rl", action="store_true")
@@ -605,18 +606,18 @@ def main() -> None:
     )
     ap.add_argument("--loop-hz", type=float, default=20.0)
 
-    # EMERGENCY thresholds (hard stop)
+    # EMERGENCY thresholds (hard stop — FRONT only)
     ap.add_argument(
         "--emerg-front-cm",
         type=float,
         default=20.0,
-        help="Emergency stop if ToF/US < this (cm)",
+        help="Emergency stop if ToF/US < this (cm) in front",
     )
     ap.add_argument(
         "--emerg-lidar-m",
         type=float,
         default=0.25,
-        help="Emergency stop if LiDAR < this (m) anywhere in 360°",
+        help="Emergency stop if LiDAR < this (m) AND |angle| <= 60°",
     )
 
     # LiDAR
@@ -638,8 +639,8 @@ def main() -> None:
     ap.add_argument(
         "--min-speed-scale",
         type=float,
-        default=0.25,
-        help="Minimum speed fraction near obstacle (0.25 → 25%)",
+        default=0.40,
+        help="Minimum speed fraction near obstacle (0.40 → 40%)",
     )
 
     # Camera & face (face ON by default)
@@ -798,67 +799,65 @@ def main() -> None:
 
             # ------------------------------------------------------------------
             # Combine ToF/US + LiDAR for each direction
-            # NOTE: we DO NOT use lidar_near_primary to hard-block front anymore.
-            #       It is used only for slow-down later.
             # ------------------------------------------------------------------
             front_blocked = front_near_nf or front_block_lidar
             left_blocked = left_near_nf or left_block_lidar
             right_blocked = right_near_nf or right_block_lidar
             back_blocked = back_block_lidar  # only LiDAR watches back
 
-            # ---------- EMERGENCY STOP + ESCAPE ----------
+            # ---------- EMERGENCY STOP + ESCAPE (FRONT ONLY) ----------
             emerg = False
             emerg_reason = ""
+            front_emerg = False
+
+            # ToF + Ultrasonic in front
             if us_cm is not None and us_cm < args.emerg_front_cm:
                 emerg = True
+                front_emerg = True
                 emerg_reason = f"US {us_cm:.1f}cm"
+
             if fr_f >= 0.0 and fr_f < args.emerg_front_cm:
                 emerg = True
+                front_emerg = True
                 emerg_reason = (
                     (emerg_reason + " + ") if emerg_reason else ""
                 ) + f"FR {fr_f:.1f}cm"
+
             if fl_f >= 0.0 and fl_f < args.emerg_front_cm:
                 emerg = True
+                front_emerg = True
                 emerg_reason = (
                     (emerg_reason + " + ") if emerg_reason else ""
                 ) + f"FL {fl_f:.1f}cm"
-            if lidar_min_m is not None and lidar_min_m < args.emerg_lidar_m:
+
+            # LiDAR emergency ONLY if obstacle is in front sector (|angle| <= 60°)
+            if (
+                lidar_min_m is not None
+                and lidar_min_ang_deg is not None
+                and abs(lidar_min_ang_deg) <= 60.0
+                and lidar_min_m < args.emerg_lidar_m
+            ):
                 emerg = True
+                front_emerg = True
                 emerg_reason = (
                     (emerg_reason + " + ") if emerg_reason else ""
-                ) + f"LiDAR {lidar_min_m:.2f}m"
+                ) + f"LiDAR {lidar_min_m:.2f}m @ {lidar_min_ang_deg:.1f}°"
 
             if emerg:
                 # Hard stop first
                 bot.set_motor_model(0, 0, 0, 0)
                 print(
                     f"[AutoDrive][EMERG] HARD STOP  reason={emerg_reason}  "
-                    f"FR_f={fr_f:.1f}cm FL_f={fl_f:.1f}cm "
+                    f"FR_f={(fr_f if fr_f >= 0.0 else -1.0):.1f}cm "
+                    f"FL_f={(fl_f if fl_f >= 0.0 else -1.0):.1f}cm "
                     f"US={('%.1f cm' % us_cm) if us_cm is not None else 'None'} "
                     f"LiDAR_min={('%4.2f m' % lidar_min_m) if lidar_min_m is not None else 'None'} "
                     f"LiDAR_ang={('%5.1f deg' % lidar_min_ang_deg) if lidar_min_ang_deg is not None else 'None'}"
                 )
                 time.sleep(0.1)
 
-                # Decide if this is a FRONT-type emergency
-                front_emerg = False
-
-                if us_cm is not None and us_cm < (args.emerg_front_cm + 5.0):
-                    front_emerg = True
-                if (
-                    (fr_f >= 0.0 and fr_f < (args.emerg_front_cm + 5.0))
-                    or (fl_f >= 0.0 and fl_f < (args.emerg_front_cm + 5.0))
-                ):
-                    front_emerg = True
-                if (
-                    lidar_min_m is not None
-                    and lidar_min_m < (args.emerg_lidar_m + 0.05)
-                    and lidar_min_ang_deg is not None
-                    and abs(lidar_min_ang_deg) <= 60.0
-                ):
-                    front_emerg = True
-
                 if front_emerg:
+                    # FRONT-type escape: reverse + turn away from closer side
                     vx_b = -max(0.4, args.v_back)
                     vy_b = 0.0
 
@@ -899,9 +898,10 @@ def main() -> None:
 
                     bot.set_motor_model(0, 0, 0, 0)
                 else:
+                    # Should almost never happen now, but keep the message
                     print(
                         "[AutoDrive][EMERG] Obstacle not clearly in front sector -> "
-                        "staying stopped, no escape motion."
+                        "staying stopped for this cycle."
                     )
                     bot.set_motor_model(0, 0, 0, 0)
 
@@ -999,14 +999,17 @@ def main() -> None:
                 else:
                     block_tags.append("L(?)")
 
-            block_str = ",".join(block_tags) if block_tags else "none"
+            block_str = ",".join(block_tags) if block_str := ",".join(block_tags) else "none"
 
             def fmt_lidar_cm(v: Optional[float]) -> str:
                 return f"{v:5.1f}cm" if v is not None else "  N/A "
 
+            def fmt_tof_cm(v: float) -> str:
+                return f"{v:5.1f}cm" if v >= 0.0 else "  N/A "
+
             print(
                 f"[AutoDrive] mode={mode:9s}  "
-                f"FR_f={fr_f:5.1f}cm  FL_f={fl_f:5.1f}cm  "
+                f"FR_f={fmt_tof_cm(fr_f)}  FL_f={fmt_tof_cm(fl_f)}  "
                 f"US={('%.1f cm' % us_cm) if us_cm is not None else 'None':>8s}  "
                 f"ToF_near={tof_near!s:<5s}  US_near={us_near!s:<5s}  "
                 f"BLOCKS={block_str:<24s}  "
