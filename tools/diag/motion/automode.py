@@ -5,7 +5,7 @@ Robot Savo — Expert Auto Drive (Non-ROS, Mecanum + Full 360° Safety)
 --------------------------------------------------------------------
 - Self-contained:
     * PCA9685 class
-    * RobotSavo motor wrapper 
+    * RobotSavo motor wrapper
     * Mecanum kinematics helpers (mix_mecanum, to_duties)
 - Uses safety sensors:
     * DualToF (FR/FL) for near-field front
@@ -30,23 +30,15 @@ Robot Savo — Expert Auto Drive (Non-ROS, Mecanum + Full 360° Safety)
              * vy>0  → slow using LEFT sector
              * vy<0  → slow using RIGHT sector
              * wz≠0 → slow using global LiDAR min
-    * ToF/US roles:
-         - Near-field block for front/left/right.
-         - Extra forward slow-down when obstacle between front_th and nf_slow_dist.
     * EMERGENCY STOP if anything VERY close (LiDAR/ToF/US),
       followed by clear escape motion for FRONT-type obstacles:
          - reverse + turn away from closer ToF side.
 
-Typical use (defaults match your safe profile):
+Default run (your favourite params baked in):
     cd ~/Savo_Pi
-    python3 tools/diag/motion/drive_automode.py
+    python3 tools/diag/motion/automode.py
 
-Face UI:
-    - Starts tools/diag/ui/face.py by default on the DSI.
-    - Disable with:  --no-face
-
-Camera streaming (optional):
-    - Enable with:  --enable-camera --cam-host <laptop-ip> --cam-port 5000
+To override anything, pass CLI flags as usual.
 """
 
 import sys
@@ -329,7 +321,7 @@ def choose_mode(
     else:
         blocked_counter = 0
 
-    if blocked_counter > 40:  # ~2s at 20 Hz
+    if blocked_counter > 40:  # ~2s at 20–30 Hz
         return "STOPPED", blocked_counter
 
     # If front clear → always go forward
@@ -342,7 +334,7 @@ def choose_mode(
     if not right_blocked and left_blocked:
         return "STRAFE_R", blocked_counter
     if not left_blocked and not right_blocked:
-        # both sides available → prefer left (could be improved with LiDAR distance)
+        # both sides available → prefer left (simple heuristic)
         return "STRAFE_L", blocked_counter
 
     # Front + both sides blocked, back free → consider BACKUP
@@ -389,7 +381,7 @@ def lidar_slow_scale(
     min_scale: float,
 ) -> float:
     """
-    Compute a scale factor in [0..1] for a given direction:
+    Compute a scale factor in [0..1] for a given direction (LiDAR, meters):
       - dist <= stop_d       → 0.0  (stop)
       - dist >= slow_d       → 1.0  (no slowdown)
       - between              → linear scale, clamped to [min_scale, 1.0]
@@ -401,6 +393,26 @@ def lidar_slow_scale(
     if dist_m >= slow_d:
         return 1.0
     t = (dist_m - stop_d) / max(1e-3, (slow_d - stop_d))
+    return max(min_scale, min(1.0, t))
+
+
+def nf_slow_scale(
+    dist_cm: float,
+    stop_cm: float,
+    slow_cm: float,
+    min_scale: float,
+) -> float:
+    """
+    Near-field slow-down using ToF/US (centimetres):
+      - dist <= stop_cm      → min_scale (creep)
+      - dist >= slow_cm      → 1.0
+      - between              → linear [min_scale .. 1.0]
+    """
+    if dist_cm >= slow_cm:
+        return 1.0
+    if dist_cm <= stop_cm:
+        return min_scale
+    t = (dist_cm - stop_cm) / max(1e-3, (slow_cm - stop_cm))
     return max(min_scale, min(1.0, t))
 
 
@@ -567,7 +579,8 @@ def main() -> None:
     ap.add_argument("--i2c-bus", type=int, default=1)
     ap.add_argument("--addr", type=lambda x: int(x, 0), default=0x40)
     ap.add_argument("--pwm-freq", type=float, default=50.0)
-    ap.add_argument("--max-duty", type=int, default=2200)
+    # You were happy with 3200 before → default to that
+    ap.add_argument("--max-duty", type=int, default=3200)
 
     ap.add_argument("--invert-fl", action="store_true")
     ap.add_argument("--invert-rl", action="store_true")
@@ -581,13 +594,13 @@ def main() -> None:
     ap.add_argument("--rotate-sign", type=int, choices=[-1, 1], default=+1)
     ap.add_argument("--turn-gain", type=float, default=1.0)
 
-    # Motion magnitudes (SAFE DEFAULTS)
+    # Motion magnitudes  (your preferred command baked in)
     ap.add_argument("--v-forward", type=float, default=0.25)
     ap.add_argument("--v-side", type=float, default=0.25)
     ap.add_argument("--v-back", type=float, default=0.20)
     ap.add_argument("--w-rotate", type=float, default=0.45)
 
-    # Safety thresholds (near-field ToF + Ultrasonic)
+    # Safety thresholds (near-field ToF + Ultrasonic, cm)
     ap.add_argument(
         "--front-th",
         type=float,
@@ -597,7 +610,7 @@ def main() -> None:
     ap.add_argument(
         "--side-th",
         type=float,
-        default=25.0,
+        default=30.0,
         help="Side block threshold for ToF (cm)",
     )
     ap.add_argument(
@@ -607,20 +620,6 @@ def main() -> None:
         help="Near-field threshold for ultrasonic (cm)",
     )
     ap.add_argument("--loop-hz", type=float, default=30.0)
-
-    # Near-field slow-down (ToF/US) for forward motion
-    ap.add_argument(
-        "--nf-slow-dist",
-        type=float,
-        default=60.0,
-        help="Distance (cm) where we start ToF/US slow-down for forward motion",
-    )
-    ap.add_argument(
-        "--nf-min-speed-scale",
-        type=float,
-        default=0.20,
-        help="Min speed fraction near obstacle from ToF/US (0.2 -> 20%)",
-    )
 
     # EMERGENCY thresholds (hard stop)
     ap.add_argument(
@@ -656,7 +655,21 @@ def main() -> None:
         "--min-speed-scale",
         type=float,
         default=0.15,
-        help="Minimum speed fraction near obstacle (0.15 → 15%)",
+        help="Minimum LiDAR speed fraction near obstacle (0.15 → 15%)",
+    )
+
+    # Near-field slow-down (ToF + US, cm)
+    ap.add_argument(
+        "--nf-slow-dist",
+        type=float,
+        default=60.0,
+        help="Distance (cm) where we start to slow FORWARD using ToF/US",
+    )
+    ap.add_argument(
+        "--nf-min-speed-scale",
+        type=float,
+        default=0.20,
+        help="Minimum FORWARD speed fraction from ToF/US slow-down",
     )
 
     # Camera & face (face ON by default)
@@ -706,12 +719,11 @@ def main() -> None:
                 baudrate=115200,
                 timeout=2.0,
                 motor_pwm=None,
-                # PRIMARY sector: narrow front window for early detection
                 angle_min=-35.0,
                 angle_max=35.0,
                 range_min=0.05,
                 range_max=2.0,
-                obst_threshold=args.lidar_th,  # threshold for PRIMARY sector
+                obst_threshold=args.lidar_th,
                 debounce=3,
                 hyst=0.03,
                 min_len=120,
@@ -765,13 +777,10 @@ def main() -> None:
             if lidar is not None:
                 try:
                     r = lidar.poll()
-                    # PRIMARY sector (front window)
                     lidar_near_primary = r.obstacle
-                    # PRIMARY min
                     prim_min_m = r.min_dist_m
                     prim_min_ang = r.min_angle_deg
 
-                    # 360° sectors
                     if r.front_min_m is not None:
                         front_lidar_m = r.front_min_m
                         front_lidar_cm = r.front_min_m * 100.0
@@ -785,7 +794,6 @@ def main() -> None:
                         left_lidar_m = r.left_min_m
                         left_lidar_cm = r.left_min_m * 100.0
 
-                    # Global min: anywhere in 360°
                     if r.global_min_m is not None:
                         lidar_min_m = r.global_min_m
                         lidar_min_ang_deg = r.global_min_angle_deg
@@ -815,8 +823,6 @@ def main() -> None:
 
             # ------------------------------------------------------------------
             # Combine ToF/US + LiDAR for each direction
-            # NOTE: we DO NOT use lidar_near_primary to hard-block front anymore.
-            #       It is used only for slow-down later.
             # ------------------------------------------------------------------
             front_blocked = front_near_nf or front_block_lidar
             left_blocked = left_near_nf or left_block_lidar
@@ -949,6 +955,18 @@ def main() -> None:
                 args.w_rotate,
             )
 
+            # ---------- Near-field slow-down (ToF + US, FORWARD only) ----------
+            nf_scale = 1.0
+            if mode == "FORWARD":
+                front_nf_cm = min(fr_cm, fl_cm, us_cm_safe)
+                nf_scale = nf_slow_scale(
+                    front_nf_cm,
+                    args.front_th,
+                    args.nf_slow_dist,
+                    args.nf_min_speed_scale,
+                )
+                vx *= nf_scale
+
             # ---------- LiDAR-based speed reduction in ALL directions ----------
             if lidar is not None:
                 stop_d = args.lidar_th
@@ -976,18 +994,6 @@ def main() -> None:
                     scale_wz = lidar_slow_scale(lidar_min_m, stop_d, slow_d, min_sc)
                     wz *= scale_wz
 
-            # ---------- Near-field ToF/US speed reduction for forward ----------
-            if vx > 0.0:
-                front_nf_cm = min(fr_cm, fl_cm, us_cm_safe)
-                # Only apply slow-down between front_th and nf_slow_dist
-                if args.front_th < args.nf_slow_dist:
-                    if front_nf_cm >= args.front_th and front_nf_cm < args.nf_slow_dist:
-                        nf_scale = (front_nf_cm - args.front_th) / max(
-                            1e-3, (args.nf_slow_dist - args.front_th)
-                        )
-                        nf_scale = max(args.nf_min_speed_scale, min(1.0, nf_scale))
-                        vx *= nf_scale
-
             # Mix mecanum and send commands
             nfl, nrl, nfr, nrr = mix_mecanum(
                 vx,
@@ -1004,7 +1010,6 @@ def main() -> None:
             # ---------- Debug print ----------
             # Build blocked-sides string with distances
             block_tags = []
-            # FRONT: pick the "best" distance we have
             if front_blocked:
                 front_d = 9999.0
                 if front_lidar_cm is not None:
@@ -1035,18 +1040,20 @@ def main() -> None:
 
             print(
                 f"[AutoDrive] mode={mode:9s}  "
+                f"vx={vx:+.3f} vy={vy:+.3f} wz={wz:+.3f}  "
                 f"FR_f={fr_f:5.1f}cm  FL_f={fl_f:5.1f}cm  "
                 f"US={('%.1f cm' % us_cm) if us_cm is not None else 'None':>8s}  "
                 f"ToF_near={tof_near!s:<5s}  US_near={us_near!s:<5s}  "
+                f"NF_scale={nf_scale:.2f}  "
                 f"BLOCKS={block_str:<24s}  "
                 f"Lfront={fmt_lidar_cm(front_lidar_cm)}  "
                 f"Lright={fmt_lidar_cm(right_lidar_cm)}  "
                 f"Lback={fmt_lidar_cm(back_lidar_cm)}  "
                 f"Lleft={fmt_lidar_cm(left_lidar_cm)}  "
+                f"dFL={dfl:+4d} dRL={drl:+4d} dFR={dfr:+4d} dRR={drr:+4d}  "
                 f"blocked_cnt={blocked_counter}"
             )
 
-            # Extra debug line to see WHY it's blocked
             if front_blocked or left_blocked or right_blocked or back_blocked:
                 print(
                     f"[AutoDrive][DBG] front_near_nf={front_near_nf} "
