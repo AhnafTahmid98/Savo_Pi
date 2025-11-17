@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Robot Savo — Expert Auto Drive (Non-ROS, Mecanum + Full 360° Safety)
+Robot Savo — Expert Auto Drive (Mecanum + Full 360° Safety)
 --------------------------------------------------------------------
 - Self-contained:
     * PCA9685 class
@@ -34,10 +34,6 @@ Robot Savo — Expert Auto Drive (Non-ROS, Mecanum + Full 360° Safety)
     * EMERGENCY STOP if something VERY close in front (LiDAR/ToF/US),
       followed by clear escape motion:
          - reverse + turn away from closer ToF side.
-
-Typical use (defaults match your teleop signs/inverts):
-    cd ~/Savo_Pi
-    python3 tools/diag/motion/automode.py
 
 Face UI:
     - Starts tools/diag/ui/face.py by default on the DSI.
@@ -470,6 +466,7 @@ class UltrasonicReader:
 # ===================================================================
 # Camera & face helpers
 # ===================================================================
+
 def start_camera_stream(host: str, port: int) -> Optional[subprocess.Popen]:
     pipeline = [
         "gst-launch-1.0",
@@ -481,8 +478,9 @@ def start_camera_stream(host: str, port: int) -> Optional[subprocess.Popen]:
         "!",
         "x264enc",
         "tune=zerolatency",
-        "speed-preset=ultrafast",
-        "bitrate=2000",
+        "speed-preset=superfast",   # was ultrafast
+        "bitrate=6000",             # was 2000 → more bits = better quality
+        "key-int-max=30",
         "!",
         "rtph264pay",
         "config-interval=1",
@@ -495,10 +493,16 @@ def start_camera_stream(host: str, port: int) -> Optional[subprocess.Popen]:
     ]
     try:
         print(f"[AutoDrive] Starting camera stream to {host}:{port} ...")
+        env = os.environ.copy()
+        env["XDG_RUNTIME_DIR"] = "/run/user/1000"
+        env["WAYLAND_DISPLAY"] = "wayland-1"
+        env["GST_PLUGIN_PATH"] = "/usr/local/lib/aarch64-linux-gnu/gstreamer-1.0"
+        env["LD_LIBRARY_PATH"] = "/usr/local/lib/aarch64-linux-gnu:/usr/local/lib"
         return subprocess.Popen(
             pipeline,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
+            env=env,
         )
     except Exception as e:
         print(
@@ -506,7 +510,6 @@ def start_camera_stream(host: str, port: int) -> Optional[subprocess.Popen]:
             file=sys.stderr,
         )
         return None
-
 
 def start_face() -> Optional[subprocess.Popen]:
     """
@@ -587,21 +590,33 @@ def main() -> None:
 
     # Safety thresholds (near-field ToF + Ultrasonic)
     ap.add_argument(
-        "--front-th",
+        "--front-th-fr",
         type=float,
-        default=35.0,
-        help="Front block threshold for ToF/US (cm)",
+        default=40.0,
+        help="Front block threshold for FRONT-RIGHT ToF (cm)",
     )
     ap.add_argument(
-        "--side-th",
+        "--front-th-fl",
         type=float,
-        default=35.0,
-        help="Side block threshold for ToF (cm)",
+        default=40.0,
+        help="Front block threshold for FRONT-LEFT ToF (cm)",
+    )
+    ap.add_argument(
+        "--side-th-fr",
+        type=float,
+        default=40.0,
+        help="Side block threshold for FRONT-RIGHT ToF (cm)",
+    )
+    ap.add_argument(
+        "--side-th-fl",
+        type=float,
+        default=40.0,
+        help="Side block threshold for FRONT-LEFT ToF (cm)",
     )
     ap.add_argument(
         "--us-th",
         type=float,
-        default=35.0,
+        default=40.0,
         help="Near-field threshold for ultrasonic (cm)",
     )
     ap.add_argument("--loop-hz", type=float, default=20.0)
@@ -625,7 +640,7 @@ def main() -> None:
     ap.add_argument(
         "--lidar-th",
         type=float,
-        default=0.35,
+        default=0.40,   # was 0.50 → earlier stop & stronger slowdown zone
         help="LiDAR obstacle threshold (m) for ALL sectors (front/right/back/left)",
     )
 
@@ -633,13 +648,13 @@ def main() -> None:
     ap.add_argument(
         "--lidar-slow-dist",
         type=float,
-        default=0.80,
+        default=1.20,   # was 1.00 → start slowing earlier
         help="Distance (m) where we start to slow motion in that direction",
     )
     ap.add_argument(
         "--min-speed-scale",
         type=float,
-        default=0.40,
+        default=0.30,   # was 0.40 → allow slower crawl near obstacles
         help="Minimum speed fraction near obstacle (0.40 → 40%)",
     )
 
@@ -675,7 +690,9 @@ def main() -> None:
 
     # Sensors
     print("[AutoDrive] Initializing DualToF ...")
-    tof = DualToF(rate_hz=args.loop_hz, median=3, threshold_cm=args.front_th)
+    # Use the smaller front-threshold as the internal DualToF alert threshold
+    tof_threshold = min(args.front_th_fr, args.front_th_fl)
+    tof = DualToF(rate_hz=args.loop_hz, median=3, threshold_cm=tof_threshold)
 
     us_trig, us_echo = 27, 22  # locked mapping (TRIG=27, ECHO=22)
     print(f"[AutoDrive] Ultrasonic TRIG={us_trig} ECHO={us_echo}")
@@ -787,9 +804,15 @@ def main() -> None:
             fl_cm = safe_cm(fl_f)
             us_cm_safe = us_cm if us_cm is not None else 9999.0
 
-            front_near_nf = (us_cm_safe < args.front_th) or (min(fr_cm, fl_cm) < args.front_th)
-            left_near_nf = fl_cm < args.side_th
-            right_near_nf = fr_cm < args.side_th
+            # Front near-field: any of US, FR, FL under their own thresholds
+            front_near_nf = (
+                (us_cm_safe < args.us_th)
+                or (fr_cm < args.front_th_fr)
+                or (fl_cm < args.front_th_fl)
+            )
+            # Side near-field per sensor
+            left_near_nf = fl_cm < args.side_th_fl
+            right_near_nf = fr_cm < args.side_th_fr
 
             # ---------- LiDAR sector-based blocked flags ----------
             front_block_lidar = front_lidar_cm is not None and front_lidar_cm < lidar_th_cm
@@ -1000,7 +1023,6 @@ def main() -> None:
                     block_tags.append("L(?)")
 
             block_str = ",".join(block_tags) if block_tags else "none"
-
 
             def fmt_lidar_cm(v: Optional[float]) -> str:
                 return f"{v:5.1f}cm" if v is not None else "  N/A "
