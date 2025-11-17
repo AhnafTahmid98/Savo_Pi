@@ -30,11 +30,14 @@ Robot Savo — Expert Auto Drive (Non-ROS, Mecanum + Full 360° Safety)
              * vy>0  → slow using LEFT sector
              * vy<0  → slow using RIGHT sector
              * wz≠0 → slow using global LiDAR min
+    * ToF/US roles:
+         - Near-field block for front/left/right.
+         - Extra forward slow-down when obstacle between front_th and nf_slow_dist.
     * EMERGENCY STOP if anything VERY close (LiDAR/ToF/US),
       followed by clear escape motion for FRONT-type obstacles:
          - reverse + turn away from closer ToF side.
 
-Typical use (defaults match your teleop signs/inverts):
+Typical use (defaults match your safe profile):
     cd ~/Savo_Pi
     python3 tools/diag/motion/drive_automode.py
 
@@ -578,17 +581,17 @@ def main() -> None:
     ap.add_argument("--rotate-sign", type=int, choices=[-1, 1], default=+1)
     ap.add_argument("--turn-gain", type=float, default=1.0)
 
-    # Motion magnitudes
-    ap.add_argument("--v-forward", type=float, default=0.4)
-    ap.add_argument("--v-side", type=float, default=0.4)
-    ap.add_argument("--v-back", type=float, default=0.3)
-    ap.add_argument("--w-rotate", type=float, default=0.5)
+    # Motion magnitudes (SAFE DEFAULTS)
+    ap.add_argument("--v-forward", type=float, default=0.25)
+    ap.add_argument("--v-side", type=float, default=0.25)
+    ap.add_argument("--v-back", type=float, default=0.20)
+    ap.add_argument("--w-rotate", type=float, default=0.45)
 
     # Safety thresholds (near-field ToF + Ultrasonic)
     ap.add_argument(
         "--front-th",
         type=float,
-        default=25.0,
+        default=30.0,
         help="Front block threshold for ToF/US (cm)",
     )
     ap.add_argument(
@@ -600,22 +603,36 @@ def main() -> None:
     ap.add_argument(
         "--us-th",
         type=float,
-        default=25.0,
+        default=30.0,
         help="Near-field threshold for ultrasonic (cm)",
     )
-    ap.add_argument("--loop-hz", type=float, default=20.0)
+    ap.add_argument("--loop-hz", type=float, default=30.0)
+
+    # Near-field slow-down (ToF/US) for forward motion
+    ap.add_argument(
+        "--nf-slow-dist",
+        type=float,
+        default=60.0,
+        help="Distance (cm) where we start ToF/US slow-down for forward motion",
+    )
+    ap.add_argument(
+        "--nf-min-speed-scale",
+        type=float,
+        default=0.20,
+        help="Min speed fraction near obstacle from ToF/US (0.2 -> 20%)",
+    )
 
     # EMERGENCY thresholds (hard stop)
     ap.add_argument(
         "--emerg-front-cm",
         type=float,
-        default=20.0,
+        default=25.0,
         help="Emergency stop if ToF/US < this (cm)",
     )
     ap.add_argument(
         "--emerg-lidar-m",
         type=float,
-        default=0.25,
+        default=0.45,
         help="Emergency stop if LiDAR < this (m) anywhere in 360°",
     )
 
@@ -624,7 +641,7 @@ def main() -> None:
     ap.add_argument(
         "--lidar-th",
         type=float,
-        default=0.35,
+        default=0.45,
         help="LiDAR obstacle threshold (m) for ALL sectors (front/right/back/left)",
     )
 
@@ -632,14 +649,14 @@ def main() -> None:
     ap.add_argument(
         "--lidar-slow-dist",
         type=float,
-        default=0.80,
+        default=1.20,
         help="Distance (m) where we start to slow motion in that direction",
     )
     ap.add_argument(
         "--min-speed-scale",
         type=float,
-        default=0.25,
-        help="Minimum speed fraction near obstacle (0.25 → 25%)",
+        default=0.15,
+        help="Minimum speed fraction near obstacle (0.15 → 15%)",
     )
 
     # Camera & face (face ON by default)
@@ -958,6 +975,18 @@ def main() -> None:
                 if wz != 0.0 and lidar_min_m is not None:
                     scale_wz = lidar_slow_scale(lidar_min_m, stop_d, slow_d, min_sc)
                     wz *= scale_wz
+
+            # ---------- Near-field ToF/US speed reduction for forward ----------
+            if vx > 0.0:
+                front_nf_cm = min(fr_cm, fl_cm, us_cm_safe)
+                # Only apply slow-down between front_th and nf_slow_dist
+                if args.front_th < args.nf_slow_dist:
+                    if front_nf_cm >= args.front_th and front_nf_cm < args.nf_slow_dist:
+                        nf_scale = (front_nf_cm - args.front_th) / max(
+                            1e-3, (args.nf_slow_dist - args.front_th)
+                        )
+                        nf_scale = max(args.nf_min_speed_scale, min(1.0, nf_scale))
+                        vx *= nf_scale
 
             # Mix mecanum and send commands
             nfl, nrl, nfr, nrr = mix_mecanum(
