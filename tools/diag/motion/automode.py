@@ -589,19 +589,19 @@ def main() -> None:
     ap.add_argument(
         "--front-th-fr",
         type=float,
-        default=35.0,
+        default=40.0,
         help="Front block threshold for FRONT-RIGHT ToF (cm)",
     )
     ap.add_argument(
         "--front-th-fl",
         type=float,
-        default=35.0,
+        default=40.0,
         help="Front block threshold for FRONT-LEFT ToF (cm)",
     )
     ap.add_argument(
         "--side-th-fr",
         type=float,
-        default=35.0,
+        default=40.0,
         help="Side block threshold for FRONT-RIGHT ToF (cm)",
     )
     ap.add_argument(
@@ -637,7 +637,7 @@ def main() -> None:
     ap.add_argument(
         "--lidar-th",
         type=float,
-        default=0.35,
+        default=0.40,
         help="LiDAR obstacle threshold (m) for ALL sectors (front/right/back/left)",
     )
 
