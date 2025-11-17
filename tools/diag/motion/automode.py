@@ -479,7 +479,7 @@ def start_camera_stream(host: str, port: int) -> Optional[subprocess.Popen]:
         "x264enc",
         "tune=zerolatency",
         "speed-preset=superfast",   # was ultrafast
-        "bitrate=6000",             # was 2000 → more bits = better quality
+        "bitrate=10000",             # was 2000 → more bits = better quality
         "key-int-max=30",
         "!",
         "rtph264pay",
