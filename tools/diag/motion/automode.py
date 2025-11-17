@@ -587,16 +587,28 @@ def main() -> None:
 
     # Safety thresholds (near-field ToF + Ultrasonic)
     ap.add_argument(
-        "--front-th",
+        "--front-th-fr",
         type=float,
         default=35.0,
-        help="Front block threshold for ToF/US (cm)",
+        help="Front block threshold for FRONT-RIGHT ToF (cm)",
     )
     ap.add_argument(
-        "--side-th",
+        "--front-th-fl",
         type=float,
         default=35.0,
-        help="Side block threshold for ToF (cm)",
+        help="Front block threshold for FRONT-LEFT ToF (cm)",
+    )
+    ap.add_argument(
+        "--side-th-fr",
+        type=float,
+        default=35.0,
+        help="Side block threshold for FRONT-RIGHT ToF (cm)",
+    )
+    ap.add_argument(
+        "--side-th-fl",
+        type=float,
+        default=35.0,
+        help="Side block threshold for FRONT-LEFT ToF (cm)",
     )
     ap.add_argument(
         "--us-th",
@@ -675,7 +687,9 @@ def main() -> None:
 
     # Sensors
     print("[AutoDrive] Initializing DualToF ...")
-    tof = DualToF(rate_hz=args.loop_hz, median=3, threshold_cm=args.front_th)
+    # Use the smaller front-threshold as the internal DualToF alert threshold
+    tof_threshold = min(args.front_th_fr, args.front_th_fl)
+    tof = DualToF(rate_hz=args.loop_hz, median=3, threshold_cm=tof_threshold)
 
     us_trig, us_echo = 27, 22  # locked mapping (TRIG=27, ECHO=22)
     print(f"[AutoDrive] Ultrasonic TRIG={us_trig} ECHO={us_echo}")
@@ -787,9 +801,15 @@ def main() -> None:
             fl_cm = safe_cm(fl_f)
             us_cm_safe = us_cm if us_cm is not None else 9999.0
 
-            front_near_nf = (us_cm_safe < args.front_th) or (min(fr_cm, fl_cm) < args.front_th)
-            left_near_nf = fl_cm < args.side_th
-            right_near_nf = fr_cm < args.side_th
+            # Front near-field: any of US, FR, FL under their own thresholds
+            front_near_nf = (
+                (us_cm_safe < args.us_th)
+                or (fr_cm < args.front_th_fr)
+                or (fl_cm < args.front_th_fl)
+            )
+            # Side near-field per sensor
+            left_near_nf = fl_cm < args.side_th_fl
+            right_near_nf = fr_cm < args.side_th_fr
 
             # ---------- LiDAR sector-based blocked flags ----------
             front_block_lidar = front_lidar_cm is not None and front_lidar_cm < lidar_th_cm
@@ -1000,7 +1020,6 @@ def main() -> None:
                     block_tags.append("L(?)")
 
             block_str = ",".join(block_tags) if block_tags else "none"
-
 
             def fmt_lidar_cm(v: Optional[float]) -> str:
                 return f"{v:5.1f}cm" if v is not None else "  N/A "
