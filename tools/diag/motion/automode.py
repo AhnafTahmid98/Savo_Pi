@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Robot Savo — Expert Auto Drive (Non-ROS, Mecanum + Full 360° Safety)
+Robot Savo — Expert Auto Drive (Mecanum + Full 360° Safety)
 --------------------------------------------------------------------
 - Self-contained:
     * PCA9685 class
@@ -34,10 +34,6 @@ Robot Savo — Expert Auto Drive (Non-ROS, Mecanum + Full 360° Safety)
     * EMERGENCY STOP if something VERY close in front (LiDAR/ToF/US),
       followed by clear escape motion:
          - reverse + turn away from closer ToF side.
-
-Typical use (defaults match your teleop signs/inverts):
-    cd ~/Savo_Pi
-    python3 tools/diag/motion/automode.py
 
 Face UI:
     - Starts tools/diag/ui/face.py by default on the DSI.
@@ -470,6 +466,7 @@ class UltrasonicReader:
 # ===================================================================
 # Camera & face helpers
 # ===================================================================
+
 def start_camera_stream(host: str, port: int) -> Optional[subprocess.Popen]:
     pipeline = [
         "gst-launch-1.0",
@@ -483,6 +480,7 @@ def start_camera_stream(host: str, port: int) -> Optional[subprocess.Popen]:
         "tune=zerolatency",
         "speed-preset=ultrafast",
         "bitrate=2000",
+        "key-int-max=30",
         "!",
         "rtph264pay",
         "config-interval=1",
@@ -495,10 +493,16 @@ def start_camera_stream(host: str, port: int) -> Optional[subprocess.Popen]:
     ]
     try:
         print(f"[AutoDrive] Starting camera stream to {host}:{port} ...")
+        env = os.environ.copy()
+        env["XDG_RUNTIME_DIR"] = "/run/user/1000"
+        env["WAYLAND_DISPLAY"] = "wayland-1"
+        env["GST_PLUGIN_PATH"] = "/usr/local/lib/aarch64-linux-gnu/gstreamer-1.0"
+        env["LD_LIBRARY_PATH"] = "/usr/local/lib/aarch64-linux-gnu:/usr/local/lib"
         return subprocess.Popen(
             pipeline,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
+            env=env,
         )
     except Exception as e:
         print(
@@ -506,6 +510,7 @@ def start_camera_stream(host: str, port: int) -> Optional[subprocess.Popen]:
             file=sys.stderr,
         )
         return None
+
 
 
 def start_face() -> Optional[subprocess.Popen]:
