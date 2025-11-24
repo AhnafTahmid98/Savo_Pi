@@ -2,11 +2,27 @@
 <package format="3">
   <name>savo_msgs</name>
   <version>0.0.1</version>
-  <description>Custom interface messages for Robot Savo</description>
-  <maintainer email="todo@example.com">TODO_NAME</maintainer>
-  <license>MIT</license>
+  <description>
+    Robot Savo — custom ROS 2 message definitions for navigation, robot status,
+    and LLM intent results.
+  </description>
 
+  <!-- Project metadata -->
+  <maintainer email="tahmidahnaf998@gmail.com">Ahnaf Tahmid</maintainer>
+  <license>Proprietary</license>
+
+  <!-- Build system -->
   <buildtool_depend>ament_cmake</buildtool_depend>
-  <depend>rosidl_default_generators</depend>
+
+  <!-- Message generation (CMakeLists uses rosidl_default_generators) -->
+  <build_depend>rosidl_default_generators</build_depend>
   <exec_depend>rosidl_default_runtime</exec_depend>
+
+  <!-- Message dependencies used inside our .msg files -->
+  <depend>builtin_interfaces</depend>
+  <depend>std_msgs</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
 </package>
