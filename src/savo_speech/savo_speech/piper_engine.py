@@ -1,209 +1,158 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Robot Savo — Piper TTS engine wrapper.
+Robot Savo — PiperEngine wrapper
 
-This module wraps the piper-tts Python API so that ROS 2 nodes (tts_node)
-can synthesize speech from text using local .onnx models.
+Thin wrapper around the piper-tts Python API so that the TTS ROS node
+doesn't have to deal with model loading, JSON configs, or raw PCM bytes.
 
-Design goals:
-- Hide Piper internals behind a small, stable API (PiperEngine).
-- Support multiple "profiles" (male / female) by creating separate engines.
-- Return numpy int16 PCM at a known sample rate for playback with sounddevice.
+We use:
+  - piper.voice.PiperVoice
+  - local .onnx + .onnx.json files
+
+Typical usage (see tts_node.py):
+
+    engine = PiperEngine(
+        model_path="/home/savo/Savo_Pi/models/piper/en_US-ryan-high.onnx",
+        config_path="/home/savo/Savo_Pi/models/piper/en_US-ryan-high.onnx.json",
+    )
+
+    audio_i16 = engine.synthesize_to_pcm16("Hello, I am Robot Savo.")
 """
 
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Union, Iterable, Any, Dict
 
 import numpy as np
-from piper.voice import PiperVoice  # provided by piper-tts
+from piper.voice import PiperVoice  # provided by the piper-tts package
 
 logger = logging.getLogger(__name__)
+
+PathLike = Union[str, Path]
 
 
 class PiperEngine:
     """
-    Thin wrapper around piper.voice.PiperVoice.
+    Small wrapper around PiperVoice for a single voice/model.
 
-    Typical usage:
-
-        engine = PiperEngine(
-            model_path=Path("/home/savo/Savo_Pi/models/piper/en_US-ryan-high.onnx"),
-            sample_rate=22050,
-            length_scale=0.95,
-            noise_scale=0.667,
-            noise_w=0.8,
-            gain=1.0,
-            speaker_id=None,
-            max_chars=512,
-        )
-
-        audio_int16 = engine.synthesize_to_pcm16("Hello, I am Robot Savo.")
+    Responsibilities:
+    - Load ONNX model + JSON config from disk.
+    - Expose a simple synthesize_to_pcm16() method that returns
+      a mono int16 NumPy array (PCM).
+    - Optionally expose model metadata such as sample_rate.
     """
 
-    def __init__(
-        self,
-        model_path: Path,
-        *,
-        sample_rate: int = 22050,
-        length_scale: float = 1.0,
-        noise_scale: float = 0.667,
-        noise_w: float = 0.8,
-        gain: float = 1.0,
-        speaker_id: Optional[int] = None,
-        max_chars: Optional[int] = None,
-    ) -> None:
+    def __init__(self, model_path: PathLike, config_path: PathLike) -> None:
         """
-        Initialize the Piper voice.
+        Load a Piper ONNX model + JSON config from disk.
 
         Parameters
         ----------
-        model_path : Path
-            Path to the .onnx voice model file. The corresponding config file
-            is automatically inferred as "<model_path>.json", e.g.
-            "en_US-ryan-high.onnx" -> "en_US-ryan-high.onnx.json".
-        sample_rate : int
-            Target playback sample rate in Hz (usually 22050).
-        length_scale : float
-            Speech rate. >1 = faster, <1 = slower.
-        noise_scale : float
-            Controls prosody / variation.
-        noise_w : float
-            Another noise parameter (see Piper docs).
-        gain : float
-            Linear gain applied to synthesized audio.
-        speaker_id : Optional[int]
-            For multi-speaker models. Our voices are single-speaker, so this
-            is usually None, but we accept it to keep the API future-proof.
-        max_chars : Optional[int]
-            Optional maximum number of characters to synthesize per call.
-            If not None, input text will be truncated to this length.
+        model_path : PathLike
+            Path to .onnx file, e.g. en_US-ryan-high.onnx
+        config_path : PathLike
+            Path to .onnx.json file, e.g. en_US-ryan-high.onnx.json
         """
         self.model_path = Path(model_path)
-        # Infer config file path: "foo.onnx" -> "foo.onnx.json"
-        self.config_path = self.model_path.with_suffix(self.model_path.suffix + ".json")
-
-        self.sample_rate = int(sample_rate)
-        self.length_scale = float(length_scale)
-        self.noise_scale = float(noise_scale)
-        self.noise_w = float(noise_w)
-        self.gain = float(gain)
-        self.speaker_id = speaker_id
-        self.max_chars = max_chars
-
-        logger.info(
-            "PiperEngine: loading voice\n"
-            "  model_path   = %s\n"
-            "  config_path  = %s\n"
-            "  sample_rate  = %d\n"
-            "  length_scale = %.3f\n"
-            "  noise_scale  = %.3f\n"
-            "  noise_w      = %.3f\n"
-            "  gain         = %.3f\n"
-            "  speaker_id   = %s\n"
-            "  max_chars    = %s",
-            self.model_path,
-            self.config_path,
-            self.sample_rate,
-            self.length_scale,
-            self.noise_scale,
-            self.noise_w,
-            self.gain,
-            str(self.speaker_id),
-            str(self.max_chars),
-        )
+        self.config_path = Path(config_path)
 
         if not self.model_path.is_file():
-            raise FileNotFoundError(f"Piper model file not found: {self.model_path}")
-
+            raise FileNotFoundError(f"PiperEngine: model file not found: {self.model_path}")
         if not self.config_path.is_file():
-            raise FileNotFoundError(f"Piper config file not found: {self.config_path}")
+            raise FileNotFoundError(f"PiperEngine: config file not found: {self.config_path}")
 
-        # Load Piper voice into memory. This can take a second on the Pi.
-        # PiperVoice.load() returns a PiperVoice instance with a .synthesize()
-        # generator method.
-        self.voice: PiperVoice = PiperVoice.load(
-            str(self.model_path),
-            str(self.config_path),
+        logger.info(
+            "PiperEngine: loading model:\n"
+            f"  model  = {self.model_path}\n"
+            f"  config = {self.config_path}"
         )
 
-        logger.info("PiperEngine: voice loaded successfully")
+        # Load binary model
+        with self.model_path.open("rb") as f:
+            model_bytes = f.read()
 
-    # ------------------------------------------------------------------ #
-    # Public API                                                         #
-    # ------------------------------------------------------------------ #
+        # Load JSON config
+        with self.config_path.open("r", encoding="utf-8") as f:
+            self._config: Dict[str, Any] = json.load(f)
+
+        # Create PiperVoice instance
+        self._voice: PiperVoice = PiperVoice.load(model_bytes, self._config)
+
+        # Cache sample rate from config if available
+        audio_cfg = self._config.get("audio", {}) if isinstance(self._config, dict) else {}
+        self.sample_rate: int = int(audio_cfg.get("sample_rate", 22050))
+
+        logger.info(
+            "PiperEngine: model loaded successfully "
+            f"(sample_rate={self.sample_rate} Hz)"
+        )
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
 
     def synthesize_to_pcm16(self, text: str) -> np.ndarray:
         """
-        Synthesize text to a mono int16 PCM numpy array.
+        Synthesize speech from text to a mono int16 NumPy array.
 
         Parameters
         ----------
         text : str
-            Text to speak.
+            Input text (one utterance).
 
         Returns
         -------
-        audio : np.ndarray
-            1D numpy array, dtype=int16, mono PCM at self.sample_rate Hz.
-            Empty array if synthesis fails.
+        audio_i16 : np.ndarray
+            1D int16 array: PCM audio at the model's native sample rate
+            (self.sample_rate, typically 22050 Hz for English voices).
+            Empty array if synthesis fails or text is empty.
         """
-        text = (text or "").strip()
-        if not text:
-            logger.warning("PiperEngine.synthesize_to_pcm16() called with empty text")
+        clean = (text or "").strip()
+        if not clean:
+            logger.debug("PiperEngine.synthesize_to_pcm16() called with empty text")
             return np.zeros(0, dtype=np.int16)
 
-        # Optional truncation based on max_chars (safety / latency).
-        if self.max_chars is not None and self.max_chars > 0:
-            if len(text) > self.max_chars:
-                logger.debug(
-                    "PiperEngine: truncating text from %d to %d characters",
-                    len(text),
-                    self.max_chars,
-                )
-                text = text[: self.max_chars]
-
-        logger.debug(
-            "PiperEngine.synthesize_to_pcm16(): text='%s'",
-            text if len(text) < 120 else text[:117] + "...",
-        )
-
+        # PiperVoice.synthesize() normally returns an iterator/generator of
+        # raw PCM byte chunks. We support both iterator and plain-bytes cases.
         try:
-            chunks: list[np.ndarray] = []
-
-            # Piper's synthesize() yields chunks of raw int16 PCM bytes.
-            for chunk in self.voice.synthesize(
-                text,
-                length_scale=self.length_scale,
-                noise_scale=self.noise_scale,
-                noise_w=self.noise_w,
-                speaker_id=self.speaker_id,
-            ):
-                arr = np.frombuffer(chunk, dtype=np.int16)
-                if arr.size > 0:
-                    chunks.append(arr)
-
-            if not chunks:
-                logger.error("PiperEngine: synthesize() returned no audio chunks")
-                return np.zeros(0, dtype=np.int16)
-
-            audio = np.concatenate(chunks).astype(np.int16)
-
+            result = self._voice.synthesize(clean)
         except Exception as exc:  # noqa: BLE001
-            logger.error("PiperEngine.synthesize_to_pcm16() failed: %s", exc)
+            logger.error("PiperEngine.synthesize_to_pcm16() error: %s", exc)
             return np.zeros(0, dtype=np.int16)
 
-        # Apply linear gain, with clipping to int16 range.
-        if self.gain != 1.0:
-            audio_f32 = audio.astype(np.float32) * self.gain
-            audio = np.clip(audio_f32, -32768, 32767).astype(np.int16)
+        # If result is already bytes, wrap it; if iterable, concatenate.
+        audio_bytes: bytes
+        if isinstance(result, (bytes, bytearray)):
+            audio_bytes = bytes(result)
+        elif isinstance(result, Iterable):
+            chunks = []
+            for chunk in result:
+                if isinstance(chunk, (bytes, bytearray)):
+                    chunks.append(bytes(chunk))
+                else:
+                    logger.warning(
+                        "PiperEngine: unexpected synthesize() chunk type: %r",
+                        type(chunk),
+                    )
+            audio_bytes = b"".join(chunks)
+        else:
+            logger.error(
+                "PiperEngine: unexpected synthesize() return type: %r",
+                type(result),
+            )
+            return np.zeros(0, dtype=np.int16)
 
-        logger.debug(
-            "PiperEngine: synthesized %d samples at %d Hz",
-            audio.size,
-            self.sample_rate,
-        )
-        return audio
+        if not audio_bytes:
+            logger.warning("PiperEngine: synthesize() produced no audio bytes")
+            return np.zeros(0, dtype=np.int16)
+
+        # Convert bytes -> int16 NumPy array (little endian, signed 16-bit)
+        audio_i16 = np.frombuffer(audio_bytes, dtype="<i2")
+        if audio_i16.ndim != 1:
+            audio_i16 = audio_i16.flatten()
+
+        return audio_i16.copy()  # copy so we own the memory buffer
