@@ -1,0 +1,148 @@
+# ============================================================================
+# Robot Savo — TTS configuration for Piper
+#
+# This config is used by the savo_speech/tts_node.
+#
+# Usage on the Pi (after build + env.sh):
+#
+#   cd ~/Savo_Pi
+#   source tools/scripts/env.sh
+#
+#   ros2 run savo_speech tts_node \
+#     --ros-args \
+#       --log-level INFO \
+#       --params-file $(ros2 pkg prefix savo_speech)/share/savo_speech/config/tts_piper.yaml
+#
+# You can override parameters from CLI, e.g.:
+#   -p voice_profile:="female"
+#   -p output_device_index:=0
+# ============================================================================
+
+tts_node:
+  ros__parameters:
+
+    # ------------------------------------------------------------------------
+    # Piper model location + voice selection
+    # ------------------------------------------------------------------------
+
+    # Directory where local Piper models live on the Pi.
+    # NOTE: This is NOT inside the ROS share directory.
+    # If you change the workspace path, update this.
+    model_dir: "/home/savo/Savo_Pi/models/piper"
+
+    # Default voice profile Robot Savo will use for speech:
+    #
+    #   "male"   → en_US-ryan-high
+    #   "female" → en_US-hfc_female-medium
+    #
+    # You can switch at runtime via:
+    #   -p voice_profile:="female"
+    voice_profile: "male"
+
+    # Male voice (Ryan, US English, high quality)
+    male_model_file:  "en_US-ryan-high.onnx"
+    male_config_file: "en_US-ryan-high.onnx.json"
+
+    # Female voice (US English, medium quality)
+    female_model_file:  "en_US-hfc_female-medium.onnx"
+    female_config_file: "en_US-hfc_female-medium.onnx.json"
+
+    # ------------------------------------------------------------------------
+    # Synthesis parameters
+    # ------------------------------------------------------------------------
+    #
+    # These map to Piper’s usual controls. The exact effect can depend on
+    # the model, but these defaults are a good starting point for a robot:
+    #   - clear, not too fast, natural pitch.
+
+    # Target audio sample rate for synthesis.
+    # Most Piper English voices are trained for 22050 Hz.
+    sample_rate: 22050
+
+    # Global volume gain (linear).
+    #   1.0 → as-is
+    #   0.7 → a bit quieter
+    #   1.3 → slightly louder (watch for clipping)
+    gain: 1.0
+
+    # Speech rate (duration / tempo).
+    #   1.0 → normal speed
+    #   0.9 → slightly slower, easier to understand
+    #   1.1 → slightly faster
+    length_scale: 0.95
+
+    # Noise parameters (prosody / naturalness):
+    # Typical Piper defaults are around:
+    #   noise_scale ~ 0.667
+    #   noise_w     ~ 0.8
+    # You can tweak later if speech sounds too “robotic” or too “noisy”.
+    noise_scale: 0.667
+    noise_w: 0.8
+
+    # ------------------------------------------------------------------------
+    # Audio output device selection
+    # ------------------------------------------------------------------------
+    #
+    # sounddevice will use ALSA on the Pi.
+    # Use `python3 -c "import sounddevice as sd; print(sd.query_devices())"`
+    # to see device indices.
+    #
+    #   -1 → let sounddevice use its default output device.
+    #    0 → force first device, etc.
+    #
+    # For Robot Savo we usually keep -1 and control default via ALSA.
+    output_device_index: -1
+
+    # Optional global output gain for safety at the playback stage
+    # (in case the generated audio is hot). Applied on top of `gain`.
+    output_gain: 1.0
+
+    # ------------------------------------------------------------------------
+    # ROS topics (input text + optional mouth animation)
+    # ------------------------------------------------------------------------
+    #
+    # Input text topic:
+    #   - std_msgs/String
+    #   - Each message is one utterance.
+    #
+    # In the future, higher-level nodes (intent, UI, Nav2) will publish here
+    # whenever Robot Savo needs to speak to people.
+
+    input_text_topic: "/savo_speech/tts_text"
+
+    # Optional “speech done” topic (Bool or empty std_msgs/Empty).
+    # The tts_node can publish here after finishing each utterance so that
+    # other nodes (UI, behavior manager) know when speaking is complete.
+    #
+    # Leave empty string "" if you don’t want to publish anything.
+    speech_done_topic: "/savo_speech/tts_done"
+
+    # ------------------------------------------------------------------------
+    # Mouth animation integration (optional)
+    # ------------------------------------------------------------------------
+    #
+    # While speaking, tts_node can publish a simple “mouth open” signal for
+    # the 7" DSI UI node (savo_ui) or a separate mouth_anim node.
+    #
+    #   mouth_anim_topic:
+    #       - if non-empty, tts_node will publish a Float32 in [0.0, 1.0]
+    #         representing mouth openness over time.
+    #
+    # For now, we keep it simple: 0.0 when idle, ~1.0 while playing audio.
+
+    mouth_anim_topic: "/savo_speech/mouth_open"
+
+    # How often to update mouth animation during playback (Hz).
+    # Higher = smoother animation, more CPU.
+    mouth_anim_rate_hz: 25.0
+
+    # ------------------------------------------------------------------------
+    # Debug / logging
+    # ------------------------------------------------------------------------
+
+    # If true, tts_node will log the first N characters of every text it
+    # receives and generate short summaries about synthesis timings.
+    debug_log_text: true
+
+    # Limit how much text is printed in logs (to avoid huge wall of text).
+    max_logged_chars: 512
