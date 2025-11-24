@@ -55,7 +55,7 @@ metadata.yaml
 # -----------------------------------------------------------------------------
 # Models (Piper, Whisper, etc.)
 # -----------------------------------------------------------------------------
-# Piper TTS voices (DO NOT push these to GitHub)
+# Piper TTS voices
 models/piper/*.onnx
 models/piper/*.onnx.json
 models/piper/*.onnx.yaml
