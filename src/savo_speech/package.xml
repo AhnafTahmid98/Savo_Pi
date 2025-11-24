@@ -1,10 +1,34 @@
 <?xml version="1.0"?>
 <package format="3">
   <name>savo_speech</name>
-  <version>0.0.1</version>
-  <description>Speech IO (STT, TTS, mouth animation)</description>
-  <maintainer email="todo@example.com">TODO_NAME</maintainer>
-  <license>MIT</license>
-  <buildtool_depend>ament_cmake</buildtool_depend>
+  <version>0.1.0</version>
+
+  <description>
+    Robot Savo speech stack: faster-whisper speech-to-text, Piper text-to-speech,
+    and mouth animation integration with the robot UI.
+  </description>
+
+  <maintainer email="tahmidahnaf998@gmail.com">Ahnaf Tahmid</maintainer>
+  <license>Proprietary</license>
+
+  <!-- Build type: Python-based ROS 2 package -->
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <!-- Core ROS 2 runtime dependencies -->
   <exec_depend>rclpy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+
+  <!-- Launch system (for speech_bringup.launch.py etc.) -->
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+
+  <!-- testing + linting tools -->
+  <test_depend>ament_pytest</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+
+  <export>
+    <!-- Tell colcon/ament that this is an ament_python package -->
+    <build_type>ament_python</build_type>
+  </export>
 </package>
