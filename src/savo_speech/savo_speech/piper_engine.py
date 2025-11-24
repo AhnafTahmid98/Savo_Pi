@@ -38,6 +38,7 @@ class PiperEngine:
             noise_scale=0.667,
             noise_w=0.8,
             gain=1.0,
+            max_chars=512,
         )
 
         audio_int16 = engine.synthesize_to_pcm16("Hello, I am Robot Savo.")
@@ -54,6 +55,7 @@ class PiperEngine:
         noise_w: float = 0.8,
         gain: float = 1.0,
         speaker_id: Optional[int] = None,
+        max_chars: Optional[int] = None,
     ) -> None:
         """
         Initialize the Piper voice.
@@ -77,6 +79,9 @@ class PiperEngine:
         speaker_id : Optional[int]
             For multi-speaker models. Our voices are single-speaker, so this
             is usually None, but we accept it to keep the API future-proof.
+        max_chars : Optional[int]
+            Optional maximum number of characters to synthesize per call.
+            If not None, input text will be truncated to this length.
         """
         self.model_path = Path(model_path)
         self.config_path = Path(config_path)
@@ -86,17 +91,19 @@ class PiperEngine:
         self.noise_w = float(noise_w)
         self.gain = float(gain)
         self.speaker_id = speaker_id
+        self.max_chars = max_chars
 
         logger.info(
             "PiperEngine: loading voice\n"
-            "  model_path  = %s\n"
-            "  config_path = %s\n"
-            "  sample_rate = %d\n"
-            "  length_scale= %.3f\n"
-            "  noise_scale = %.3f\n"
-            "  noise_w     = %.3f\n"
-            "  gain        = %.3f\n"
-            "  speaker_id  = %s",
+            "  model_path   = %s\n"
+            "  config_path  = %s\n"
+            "  sample_rate  = %d\n"
+            "  length_scale = %.3f\n"
+            "  noise_scale  = %.3f\n"
+            "  noise_w      = %.3f\n"
+            "  gain         = %.3f\n"
+            "  speaker_id   = %s\n"
+            "  max_chars    = %s",
             self.model_path,
             self.config_path,
             self.sample_rate,
@@ -104,6 +111,8 @@ class PiperEngine:
             self.noise_scale,
             self.noise_w,
             self.gain,
+            str(self.speaker_id),
+            str(self.max_chars),
         )
 
         if not self.model_path.is_file():
@@ -146,15 +155,25 @@ class PiperEngine:
             logger.warning("PiperEngine.synthesize_to_pcm16() called with empty text")
             return np.zeros(0, dtype=np.int16)
 
+        # Optional truncation based on max_chars (safety / latency).
+        if self.max_chars is not None and self.max_chars > 0:
+            if len(text) > self.max_chars:
+                logger.debug(
+                    "PiperEngine: truncating text from %d to %d characters",
+                    len(text),
+                    self.max_chars,
+                )
+                text = text[: self.max_chars]
+
         logger.debug(
             "PiperEngine.synthesize_to_pcm16(): text='%s'",
             text if len(text) < 120 else text[:117] + "...",
         )
 
-        # Piper's synthesize() yields chunks of raw int16 PCM bytes.
         try:
             chunks: list[np.ndarray] = []
 
+            # Piper's synthesize() yields chunks of raw int16 PCM bytes.
             for chunk in self.voice.synthesize(
                 text,
                 length_scale=self.length_scale,
@@ -162,7 +181,6 @@ class PiperEngine:
                 noise_w=self.noise_w,
                 speaker_id=self.speaker_id,
             ):
-                # Each chunk is a bytes object containing little-endian int16 PCM
                 arr = np.frombuffer(chunk, dtype=np.int16)
                 if arr.size > 0:
                     chunks.append(arr)
