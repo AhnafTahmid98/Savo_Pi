@@ -2,18 +2,24 @@
 <package format="3">
   <name>savo_intent</name>
   <version>0.0.1</version>
-  <description>Robot Savo — ROS2 bridge between the robot and the LLM server. (Maintainer: Ahnaf Tahmid)</description>
+  <description>
+    Robot Savo — ROS 2 bridge between the robot and the LLM server.
+    (Maintainer: Ahnaf Tahmid)
+  </description>
 
+  <!-- Project metadata -->
   <maintainer email="tahmidahnaf998@gmail.com">Ahnaf Tahmid</maintainer>
   <license>Proprietary</license>
 
-  <!-- We use ament_python because this is a Python-based ROS2 package -->
+  <!-- Build system: Python-based ROS 2 package -->
   <buildtool_depend>ament_python</buildtool_depend>
 
-  <!-- Core runtime dependency: rclpy for ROS2 Python nodes -->
+  <!-- Core runtime dependencies -->
   <exec_depend>rclpy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>savo_msgs</exec_depend>
 
-  <!-- Optional: common lint/test tools (we can use later if we want) -->
+  <!-- Optional: lint/test tools (can be enabled later) -->
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 

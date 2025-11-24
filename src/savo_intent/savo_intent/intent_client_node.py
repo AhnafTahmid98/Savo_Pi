@@ -1,29 +1,45 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Robot Savo — ROS2 Intent Client Node
-------------------------------------
+Robot Savo — ROS 2 Intent Client Node
+-------------------------------------
 
-This node is the ROS2 bridge between the robot (Pi) and the LLM server.
+This node is the ROS 2 bridge between the robot (Pi) and the LLM server.
 
-- Subscribes to:  /savo_intent/user_text   (std_msgs/String)
+Subscriptions
+-------------
+- /savo_intent/user_text   (std_msgs/String)
     * Text that the robot heard from the user (after STT).
 
-- Calls:          HTTP POST /chat on the LLM server
-    * Sends user_text, robot_id (as session_id), and a small meta block.
-
-- Publishes to:   /savo_intent/reply_text  (std_msgs/String)
+Publications
+------------
+- /savo_intent/reply_text  (std_msgs/String)
     * Short spoken answer that TTS should say.
 
-Parameters:
+- /savo_intent/intent_result  (savo_msgs/IntentResult)
+    * Full result from the LLM server:
+        - user_text  (what the human said)
+        - reply_text (what the robot should say)
+        - intent     ("NAVIGATE", "FOLLOW", "STOP", "STATUS", "CHATBOT")
+        - nav_goal   (canonical location like "A201" or "Info Desk" or "")
+        - tier_used  ("tier1", "tier2", "tier3")
+        - session_id (LLM session id)
+        - header.stamp (ROS time when the result was published)
+        - header.frame_id (set to robot_id)
+
+Parameters
+----------
 - llm_server_url (string)
     Default: "http://127.0.0.1:8000"
+
 - robot_id (string)
     Default: "robot_savo"
-- timeout_s (double)
-    Default: 20.0 seconds (max allowed; you can override via ROS params)
 
-Usage example on the Pi:
+- timeout_s (double)
+    Default: 20.0 seconds (clamped to [0.5, 20.0])
+
+Usage example on the Pi
+-----------------------
 
     cd ~/Savo_Pi
     source /opt/ros/jazzy/setup.bash
@@ -34,12 +50,17 @@ Usage example on the Pi:
       -p llm_server_url:="http://192.168.164.119:8000" \
       -p robot_id:="robot_savo_pi"
 
-Then in another terminal:
+In other terminals:
 
+    # Send a test user text
     ros2 topic pub --once /savo_intent/user_text std_msgs/msg/String \
       "{data: 'Robot Savo, can you guide me to A201?'}"
 
+    # See only the spoken reply
     ros2 topic echo /savo_intent/reply_text
+
+    # See the full structured result
+    ros2 topic echo /savo_intent/intent_result
 """
 
 from __future__ import annotations
@@ -48,16 +69,18 @@ import json
 import sys
 import urllib.error
 import urllib.request
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
 
+from savo_msgs.msg import IntentResult
+
 
 class IntentClientNode(Node):
     """
-    ROS2 node that bridges ROS topics to the LLM HTTP API.
+    ROS 2 node that bridges ROS topics to the LLM HTTP API.
     """
 
     def __init__(self) -> None:
@@ -78,14 +101,19 @@ class IntentClientNode(Node):
             self.get_parameter("robot_id").get_parameter_value().string_value
         )
 
+        # timeout_s may come as double/float; clamp into [0.5, 20.0]
         try:
-            self.timeout_s: float = float(
+            timeout_value = (
                 self.get_parameter("timeout_s").get_parameter_value().double_value
             )
         except Exception:
+            timeout_value = 20.0
+
+        try:
+            self.timeout_s: float = float(timeout_value)
+        except Exception:
             self.timeout_s = 20.0
 
-        # Clamp timeout between 0.5 and 20.0 seconds
         if self.timeout_s < 0.5:
             self.timeout_s = 0.5
         if self.timeout_s > 20.0:
@@ -94,11 +122,21 @@ class IntentClientNode(Node):
         # ------------------------------------------------------------------
         # Publishers and subscribers
         # ------------------------------------------------------------------
+        # Simple reply text for TTS
         self.reply_text_pub = self.create_publisher(
             String,
             "/savo_intent/reply_text",
             10,
         )
+
+        # Full structured result from the LLM server
+        self.intent_result_pub = self.create_publisher(
+            IntentResult,
+            "/savo_intent/intent_result",
+            10,
+        )
+
+        # Incoming user text from speech system
         self.user_text_sub = self.create_subscription(
             String,
             "/savo_intent/user_text",
@@ -106,7 +144,7 @@ class IntentClientNode(Node):
             10,
         )
 
-        # Log startup info (only ONE formatted string, to avoid rcutils error)
+        # Log startup info (single string to avoid rcutils formatting issues)
         self.get_logger().info(
             "IntentClientNode starting with LLM server URL: %s, robot_id: %s, timeout: %.2fs"
             % (self.llm_server_url, self.robot_id, self.timeout_s)
@@ -121,16 +159,12 @@ class IntentClientNode(Node):
     def _check_health_once(self) -> None:
         """Call /health on the LLM server once at startup."""
         url = self.llm_server_url.rstrip("/") + "/health"
-        self.get_logger().info(
-            "Checking LLM server /health at: %s" % url
-        )
+        self.get_logger().info("Checking LLM server /health at: %s" % url)
         try:
             req = urllib.request.Request(url, method="GET")
             with urllib.request.urlopen(req, timeout=5.0) as resp:
                 data = resp.read().decode("utf-8", errors="ignore")
-            self.get_logger().info(
-                "LLM server /health response: %s" % data
-            )
+            self.get_logger().info("LLM server /health response: %s" % data)
         except Exception as exc:
             self.get_logger().warn(
                 "LLM server /health check failed: %r" % (exc,)
@@ -140,7 +174,7 @@ class IntentClientNode(Node):
     # ROS callback
     # ------------------------------------------------------------------
     def user_text_callback(self, msg: String) -> None:
-        """Handle incoming user_text, call LLM, and publish reply_text."""
+        """Handle incoming user_text, call LLM, and publish reply_text + IntentResult."""
         user_text = msg.data or ""
         user_text_stripped = user_text.strip()
 
@@ -149,35 +183,64 @@ class IntentClientNode(Node):
             self.get_logger().info("Received empty user_text; ignoring.")
             return
 
+        self.get_logger().info("Received user_text: %r" % (user_text_stripped,))
+
+        (
+            reply_text,
+            intent,
+            nav_goal,
+            tier_used,
+            session_id,
+        ) = self.call_llm_chat(user_text_stripped)
+
+        # ------------------------------------------------------------------
+        # Publish reply_text (for TTS)
+        # ------------------------------------------------------------------
+        reply_msg = String()
+        reply_msg.data = reply_text
+        self.reply_text_pub.publish(reply_msg)
+
+        self.get_logger().info("Published reply_text: %r" % (reply_text,))
+
+        # ------------------------------------------------------------------
+        # Publish full IntentResult
+        # ------------------------------------------------------------------
+        result_msg = IntentResult()
+        # Header: time + frame_id = robot_id
+        result_msg.header.stamp = self.get_clock().now().to_msg()
+        result_msg.header.frame_id = self.robot_id
+
+        result_msg.user_text = user_text_stripped
+        result_msg.reply_text = reply_text
+        result_msg.intent = intent or ""
+        result_msg.nav_goal = nav_goal or ""
+        result_msg.tier_used = tier_used or ""
+        result_msg.session_id = session_id or self.robot_id
+
+        self.intent_result_pub.publish(result_msg)
         self.get_logger().info(
-            "Received user_text: %r" % (user_text_stripped,)
+            "Published IntentResult: intent=%r, nav_goal=%r, tier=%r, session_id=%r"
+            % (result_msg.intent, result_msg.nav_goal, result_msg.tier_used, result_msg.session_id)
         )
-
-        reply_text, intent, nav_goal = self.call_llm_chat(user_text_stripped)
-
-        # For now, we only publish reply_text.
-        out = String()
-        out.data = reply_text
-        self.reply_text_pub.publish(out)
-
-        self.get_logger().info(
-            "Published reply_text: %r" % (reply_text,)
-        )
-        # Later we can publish intent/nav_goal via a custom message.
 
     # ------------------------------------------------------------------
     # HTTP helper
     # ------------------------------------------------------------------
-    def call_llm_chat(self, user_text: str) -> tuple[str, Optional[str], Optional[str]]:
+    def call_llm_chat(
+        self,
+        user_text: str,
+    ) -> Tuple[str, Optional[str], Optional[str], Optional[str], Optional[str]]:
         """
-        Call /chat on the LLM server and return (reply_text, intent, nav_goal).
+        Call /chat on the LLM server.
 
-        On any error or timeout, we return a safe fallback reply and (None, None).
+        Returns:
+            (reply_text, intent, nav_goal, tier_used, session_id)
+
+        On any error or timeout, we return a safe fallback reply and
+        (None, None, "tier_error", None).
         """
         url = self.llm_server_url.rstrip("/") + "/chat"
-        self.get_logger().info(
-            "Calling LLM /chat at: %s" % url
-        )
+        self.get_logger().info("Calling LLM /chat at: %s" % url)
 
         # Build JSON body following ChatRequest schema
         body: Dict[str, Any] = {
@@ -200,45 +263,33 @@ class IntentClientNode(Node):
             method="POST",
         )
 
+        # Default fallback values
+        fallback_reply = (
+            "Sorry, my brain server has a problem now. I cannot handle this request."
+        )
+
         try:
             with urllib.request.urlopen(req, timeout=self.timeout_s) as resp:
                 resp_raw = resp.read().decode("utf-8", errors="ignore")
         except urllib.error.HTTPError as exc:
-            self.get_logger().error(
-                "HTTPError calling LLM /chat: %s" % (exc,)
-            )
-            return (
-                "Sorry, my brain server has a problem now. I cannot handle this request.",
-                None,
-                None,
-            )
+            self.get_logger().error("HTTPError calling LLM /chat: %s" % (exc,))
+            return fallback_reply, None, None, "tier_error", None
         except urllib.error.URLError as exc:
-            self.get_logger().error(
-                "URLError calling LLM /chat: %s" % (exc,)
-            )
-            return (
-                "Sorry, my brain server has a problem now. I cannot handle this request.",
-                None,
-                None,
-            )
+            self.get_logger().error("URLError calling LLM /chat: %s" % (exc,))
+            return fallback_reply, None, None, "tier_error", None
         except TimeoutError as exc:
             self.get_logger().error(
                 "Error calling LLM /chat (TimeoutError): %r" % (exc,)
             )
-            return (
-                "Sorry, my brain server is too slow right now. I cannot answer this request.",
-                None,
-                None,
+            slow_reply = (
+                "Sorry, my brain server is too slow right now. I cannot answer this request."
             )
+            return slow_reply, None, None, "tier_error", None
         except Exception as exc:
             self.get_logger().error(
                 "Unexpected error calling LLM /chat: %r" % (exc,)
             )
-            return (
-                "Sorry, my brain server has a problem now. I cannot handle this request.",
-                None,
-                None,
-            )
+            return fallback_reply, None, None, "tier_error", None
 
         # Parse JSON reply
         try:
@@ -247,30 +298,26 @@ class IntentClientNode(Node):
             self.get_logger().error(
                 "Failed to parse LLM /chat JSON: %r, raw=%r" % (exc, resp_raw)
             )
-            return (
-                "Sorry, my brain server has a problem now. I cannot handle this request.",
-                None,
-                None,
-            )
+            return fallback_reply, None, None, "tier_error", None
 
         reply_text = obj.get("reply_text") or ""
         intent = obj.get("intent")
         nav_goal = obj.get("nav_goal")
+        session_id = obj.get("session_id")
+        tier_used = obj.get("tier_used")
 
         if not reply_text:
             self.get_logger().warn(
                 "LLM /chat response missing reply_text; raw=%r" % (obj,)
             )
-            reply_text = (
-                "Sorry, my brain server has a problem now. I cannot handle this request."
-            )
+            reply_text = fallback_reply
 
         self.get_logger().info(
-            "LLM /chat success. intent=%r, nav_goal=%r, reply_text=%r"
-            % (intent, nav_goal, reply_text)
+            "LLM /chat success. intent=%r, nav_goal=%r, tier=%r, session_id=%r, reply_text=%r"
+            % (intent, nav_goal, tier_used, session_id, reply_text)
         )
 
-        return reply_text, intent, nav_goal
+        return reply_text, intent, nav_goal, tier_used, session_id
 
 
 # ---------------------------------------------------------------------------
