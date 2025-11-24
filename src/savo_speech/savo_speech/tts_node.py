@@ -41,7 +41,8 @@ class TTSNode(Node):
         super().__init__("tts_node")
 
         # --------------------------------------------------------------
-        # Declare parameters (overridden by tts_piper.yaml)
+        # Declare parameters with reasonable defaults
+        # (normally overridden by tts_piper.yaml)
         # --------------------------------------------------------------
 
         self.declare_parameter("model_dir", "/home/savo/Savo_Pi/models/piper")
@@ -53,12 +54,12 @@ class TTSNode(Node):
         self.declare_parameter("female_model_file", "en_US-hfc_female-medium.onnx")
         self.declare_parameter("female_config_file", "en_US-hfc_female-medium.onnx.json")
 
-        # Synthesis controls (used mainly for logging + gain)
-        self.declare_parameter("sample_rate", 22050)  # typical Piper English voices
+        # Synthesis controls (for logging / future tuning)
+        self.declare_parameter("sample_rate", 22050)  # informational
         self.declare_parameter("gain", 1.0)
-        self.declare_parameter("length_scale", 0.95)   # reserved
-        self.declare_parameter("noise_scale", 0.667)   # reserved
-        self.declare_parameter("noise_w", 0.8)         # reserved
+        self.declare_parameter("length_scale", 0.95)
+        self.declare_parameter("noise_scale", 0.667)
+        self.declare_parameter("noise_w", 0.8)
 
         # Output device + gain at playback stage
         self.declare_parameter("output_device_index", -1)
@@ -97,8 +98,8 @@ class TTSNode(Node):
             self.get_parameter("female_config_file").get_parameter_value().string_value
         )
 
-        # Synthesis params
-        self.sample_rate: int = (
+        # Synthesis params (for logging + gain)
+        self.sample_rate_param: int = (
             self.get_parameter("sample_rate").get_parameter_value().integer_value
         )
         self.gain: float = self.get_parameter("gain").get_parameter_value().double_value
@@ -148,26 +149,34 @@ class TTSNode(Node):
         model_dir_path = Path(self.model_dir)
 
         try:
-            # Male voice
+            # Male
             male_model_path = model_dir_path / self.male_model_file
             male_config_path = model_dir_path / self.male_config_file
             if male_model_path.is_file() and male_config_path.is_file():
-                self._engines["male"] = PiperEngine(male_model_path, male_config_path)
+                self._engines["male"] = PiperEngine(
+                    model_path=male_model_path,
+                    config_path=male_config_path,
+                )
             else:
                 self.get_logger().warn(
-                    f"TTSNode: male model/config not found: "
-                    f"{male_model_path} / {male_config_path}"
+                    f"TTSNode: male model/config not found:\n"
+                    f"  model  = {male_model_path}\n"
+                    f"  config = {male_config_path}"
                 )
 
-            # Female voice
+            # Female
             female_model_path = model_dir_path / self.female_model_file
             female_config_path = model_dir_path / self.female_config_file
             if female_model_path.is_file() and female_config_path.is_file():
-                self._engines["female"] = PiperEngine(female_model_path, female_config_path)
+                self._engines["female"] = PiperEngine(
+                    model_path=female_model_path,
+                    config_path=female_config_path,
+                )
             else:
                 self.get_logger().warn(
-                    f"TTSNode: female model/config not found: "
-                    f"{female_model_path} / {female_config_path}"
+                    f"TTSNode: female model/config not found:\n"
+                    f"  model  = {female_model_path}\n"
+                    f"  config = {female_config_path}"
                 )
 
         except Exception as exc:  # noqa: BLE001
@@ -202,7 +211,11 @@ class TTSNode(Node):
         # Optional mouth animation publisher (0.0 idle, 1.0 speaking)
         self._mouth_anim_pub: Optional[rclpy.publisher.Publisher] = None
         if self.mouth_anim_topic:
-            self._mouth_anim_pub = self.create_publisher(Float32, self.mouth_anim_topic, 10)
+            self._mouth_anim_pub = self.create_publisher(
+                Float32,
+                self.mouth_anim_topic,
+                10,
+            )
 
         # --------------------------------------------------------------
         # Log final configuration summary
@@ -217,7 +230,7 @@ class TTSNode(Node):
             f"  length_scale     = {self.length_scale:.3f} (reserved)\n"
             f"  noise_scale      = {self.noise_scale:.3f} (reserved)\n"
             f"  noise_w          = {self.noise_w:.3f} (reserved)\n"
-            f"  sample_rate      = {self.sample_rate}\n"
+            f"  sample_rate      = {self.sample_rate_param}\n"
             f"  output_device    = {self.output_device_index}\n"
             f"  input_text_topic = {self.input_text_topic}\n"
             f"  speech_done_topic= {self.speech_done_topic or '(disabled)'}\n"
@@ -245,6 +258,7 @@ class TTSNode(Node):
         if profile in self._engines:
             return self._engines[profile]
 
+        # Fallbacks
         if "male" in self._engines:
             self.get_logger().warn(
                 f"TTSNode: requested voice_profile='{profile}' not available, "
@@ -252,6 +266,7 @@ class TTSNode(Node):
             )
             return self._engines["male"]
 
+        # As a last resort, pick any engine
         key = next(iter(self._engines.keys()))
         self.get_logger().warn(
             f"TTSNode: requested voice_profile='{profile}' not available, "
@@ -311,26 +326,26 @@ class TTSNode(Node):
 
         self._log_text_preview(text)
 
-        # Synthesize audio via PiperEngine (int16 PCM)
+        # Synthesize audio (int16 PCM at engine.sample_rate)
         try:
             audio_i16 = engine.synthesize_to_pcm16(text)
         except Exception as exc:  # noqa: BLE001
             self.get_logger().error(f"TTSNode: TTS synthesis failed: {exc}")
             return
 
-        if audio_i16 is None or audio_i16.size == 0:
+        if audio_i16.size == 0:
             self.get_logger().warn("TTSNode: TTS produced empty audio, skipping playback")
             return
 
-        # Convert int16 [-32768, 32767] → float32 [-1, 1]
+        # Convert int16 [-32768, 32767] → float32 [-1.0, 1.0]
         audio_f32 = audio_i16.astype(np.float32) / 32768.0
 
-        # Apply gains (Piper gain + playback gain)
+        # Apply gains (Piper-level gain + playback gain)
         total_gain = float(self.gain * self.output_gain)
         if total_gain != 1.0:
             audio_f32 *= total_gain
 
-        # Clip again just in case
+        # Clip to safe range
         max_abs = float(np.max(np.abs(audio_f32)))
         if max_abs > 1.0:
             audio_f32 = np.clip(audio_f32, -1.0, 1.0)
@@ -339,7 +354,7 @@ class TTSNode(Node):
         self._publish_mouth_open(1.0)
         try:
             device = None if self.output_device_index < 0 else self.output_device_index
-            play_pcm(audio_f32, sample_rate=self.sample_rate, device=device)
+            play_pcm(audio_f32, sample_rate=engine.sample_rate, device=device)
         except Exception as exc:  # noqa: BLE001
             self.get_logger().error(f"TTSNode: audio playback failed: {exc}")
         finally:
