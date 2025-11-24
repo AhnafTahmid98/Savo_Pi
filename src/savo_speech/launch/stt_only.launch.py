@@ -1,82 +1,71 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Robot Savo — TTS-only launch (Piper)
+Robot Savo — STT-only launch (Faster-Whisper)
 
-Brings up just the Piper-based TTS node with its YAML config.
-Use this when you want to test /savo_speech/tts_text → audio only.
+This launch file starts only the speech-to-text pipeline, using the
+savo_speech/stt_node with the Faster-Whisper backend.
 
-Example:
+It loads parameters from stt_whisper.yaml, which controls:
+  - model_dir / model_name (e.g. small.en)
+  - device (cpu / cuda / auto)
+  - VAD / chunking behaviour
+  - input/output topics
+
+Typical usage on the Pi:
 
   cd ~/Savo_Pi
   source tools/scripts/env.sh
 
-  ros2 launch savo_speech tts_only.launch.py
+  ros2 launch savo_speech stt_only.launch.py
 
-Then in another terminal:
+You can still override log level from the command line:
 
-  ros2 topic pub /savo_speech/tts_text std_msgs/String \
-    "{data: 'Hello, I am Robot Savo, testing TTS-only launch.'}" --once
+  ros2 launch savo_speech stt_only.launch.py log_level:=debug
 """
 
+from __future__ import annotations
+
+import os
+
+from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.actions import DeclareLaunchArgument, LogInfo
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description() -> LaunchDescription:
-    # Package share so we can find the YAML config at runtime
-    pkg_share = FindPackageShare("savo_speech")
+    # ------------------------------------------------------------------
+    # Locate package share + STT config file
+    # ------------------------------------------------------------------
+    pkg_share = get_package_share_directory("savo_speech")
+    stt_config_path = os.path.join(pkg_share, "config", "stt_whisper.yaml")
 
     # ------------------------------------------------------------------
-    # Launch arguments (overrides for key TTS parameters)
+    # Launch arguments
     # ------------------------------------------------------------------
-    voice_profile_arg = DeclareLaunchArgument(
-        "voice_profile",
-        default_value="male",
-        description="TTS voice profile to use: 'male' or 'female'",
-    )
-
-    output_device_arg = DeclareLaunchArgument(
-        "output_device_index",
-        default_value="0",
-        description=(
-            "sounddevice output index "
-            "(-1 = default device, 0 = first device, 1 = second, ...)"
-        ),
-    )
-
     log_level_arg = DeclareLaunchArgument(
         "log_level",
-        default_value="INFO",
-        description="ROS 2 log level for the TTS node (DEBUG, INFO, WARN, ERROR)",
+        default_value="info",
+        description="ROS 2 log level for stt_node (debug, info, warn, error, fatal).",
     )
 
-    # Path to the Piper TTS parameter file (tts_piper.yaml)
-    tts_params = PathJoinSubstitution(
-        [pkg_share, "config", "tts_piper.yaml"]
-    )
+    # In the future we could add overrides like:
+    #   model_name:=medium.en
+    #   device:=cuda
+    # but right now the defaults are taken from stt_whisper.yaml.
 
     # ------------------------------------------------------------------
-    # TTS node
+    # STT node (Faster-Whisper)
     # ------------------------------------------------------------------
-    tts_node = Node(
+    stt_node = Node(
         package="savo_speech",
-        executable="tts_node",
-        name="tts_node",
+        executable="stt_node",
+        name="stt_node",
         output="screen",
-        parameters=[
-            tts_params,
-            {
-                # These two can be overridden from the command line:
-                #   ros2 launch savo_speech tts_only.launch.py voice_profile:=female
-                #   ros2 launch savo_speech tts_only.launch.py output_device_index:=-1
-                "voice_profile": LaunchConfiguration("voice_profile"),
-                "output_device_index": LaunchConfiguration("output_device_index"),
-            },
-        ],
+        emulate_tty=True,
+        parameters=[stt_config_path],
         arguments=[
             "--ros-args",
             "--log-level",
@@ -84,14 +73,15 @@ def generate_launch_description() -> LaunchDescription:
         ],
     )
 
-    # ------------------------------------------------------------------
-    # LaunchDescription
-    # ------------------------------------------------------------------
+    info = LogInfo(msg=(
+        "[savo_speech/stt_only.launch] Starting Faster-Whisper STT node "
+        f"with config: {stt_config_path}"
+    ))
+
     return LaunchDescription(
         [
-            voice_profile_arg,
-            output_device_arg,
             log_level_arg,
-            tts_node,
+            info,
+            stt_node,
         ]
     )
