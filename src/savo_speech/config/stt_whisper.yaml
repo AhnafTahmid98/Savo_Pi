@@ -1,4 +1,4 @@
-# Robot Savo — STT configuration for faster-whisper (hallway / noisy campus)
+# Robot Savo — STT configuration for faster-whisper (tuned for ReSpeaker)
 
 stt_node:
   ros__parameters:
@@ -16,19 +16,22 @@ stt_node:
     # Audio capture + VAD
     # ------------------------------------------------------------------------
 
-    # 16 kHz audio, 3-second blocks
+    # 16 kHz audio, slightly shorter block for quicker reaction
     sample_rate: 16000
-    block_duration_s: 3.0
 
-    # More sensitive for now; we saw energy ~0.000166 at rest.
-    # So 0.001 is a good starting point to actually trigger on speech.
-    energy_threshold: 0.001
+    # Shorter block → faster feedback, still enough for one command sentence
+    block_duration_s: 2.5
 
-    # Ignore very short junk
-    min_transcript_chars: 4
+    # Noise floor we saw earlier was about 0.000166.
+    # Make the threshold very forgiving so speech is not missed:
+    # - 0.0003 ≈ clearly above idle noise but below normal speech.
+    energy_threshold: 0.0003
 
-    # Force input device to ReSpeaker 4 Mic Array (index 0 from your listing)
-    # -1 = let sounddevice choose default
+    # Accept even short transcripts like "stop", "status", "hello".
+    min_transcript_chars: 3
+
+    # Force input device to ReSpeaker 4 Mic Array (index 0 from sd.query_devices())
+    # -1 = default input, 0 = ReSpeaker card explicitly.
     input_device_index: 0
 
     # ------------------------------------------------------------------------
