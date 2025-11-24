@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Robot Savo — PiperEngine wrapper
+Robot Savo — PiperEngine wrapper (AudioChunk-aware)
 
 Thin wrapper around the piper-tts Python API so that the TTS ROS node
 doesn't have to deal with model loading, JSON configs, or raw PCM bytes.
 
 We use:
   - piper.voice.PiperVoice
+  - piper.voice.AudioChunk (for streaming API, if available)
   - local .onnx + .onnx.json files
 
 Typical usage (see tts_node.py):
@@ -24,10 +25,16 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Union, Iterable, Any, Dict, Optional
+from typing import Union, Iterable, Any, Dict, Optional, List
 
 import numpy as np
-from piper.voice import PiperVoice  # provided by the piper-tts package
+from piper.voice import PiperVoice
+
+# Newer piper-tts exposes AudioChunk; keep import defensive so we don't crash
+try:
+    from piper.voice import AudioChunk  # type: ignore[attr-defined]
+except Exception:  # noqa: BLE001
+    AudioChunk = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +49,7 @@ class PiperEngine:
     - Load ONNX model + JSON config using PiperVoice.load().
     - Expose a simple synthesize_to_pcm16() method that returns
       a mono int16 NumPy array (PCM).
-    - Expose model sample_rate if available.
+    - Track model sample_rate via config or AudioChunk metadata.
     """
 
     def __init__(self, model_path: PathLike, config_path: PathLike) -> None:
@@ -77,8 +84,9 @@ class PiperEngine:
             str(self.config_path),
         )
 
-        # Try to get sample_rate from the voice config if exposed.
-        self.sample_rate: int = 22050  # sensible default for English voices
+        # Default sample rate; will be overridden from config or stream
+        self.sample_rate: int = 22050
+
         sr = self._extract_sample_rate_from_voice(self._voice)
         if sr is not None:
             self.sample_rate = sr
@@ -95,7 +103,7 @@ class PiperEngine:
     @staticmethod
     def _extract_sample_rate_from_voice(voice: PiperVoice) -> Optional[int]:
         """
-        Try to extract sample_rate from PiperVoice.config if available.
+        Try to extract sample_rate from PiperVoice.config or attributes.
 
         We keep this defensive so changes in piper-tts internals
         won't crash Robot Savo.
@@ -115,6 +123,88 @@ class PiperEngine:
             return int(raw_sr)
 
         return None
+
+    def _collect_audio_bytes_from_result(self, result: Any) -> bytes:
+        """
+        Normalize the output of PiperVoice.synthesize(...) into a single
+        bytes object containing raw int16 PCM.
+
+        Supports:
+        - bytes / bytearray
+        - Iterable[bytes/bytearray]
+        - Iterable[AudioChunk] (new piper-tts streaming API)
+        """
+        # Direct bytes from the API
+        if isinstance(result, (bytes, bytearray)):
+            return bytes(result)
+
+        # Streaming / generator: may be bytes or AudioChunk objects
+        if isinstance(result, Iterable):
+            chunks: List[bytes] = []
+            detected_rate: Optional[int] = None
+
+            for chunk in result:
+                # Case 1: raw bytes chunk
+                if isinstance(chunk, (bytes, bytearray)):
+                    chunks.append(bytes(chunk))
+                    continue
+
+                # Case 2: AudioChunk from newer piper-tts
+                if AudioChunk is not None and isinstance(chunk, AudioChunk):  # type: ignore[arg-type]
+                    # AudioChunk typically has:
+                    #   chunk.audio -> bytes
+                    #   chunk.sample_rate -> int
+                    #   chunk.num_channels -> int
+                    try:
+                        audio_bytes = bytes(chunk.audio)
+                    except Exception as exc:  # noqa: BLE001
+                        logger.error("PiperEngine: failed to read AudioChunk.audio: %s", exc)
+                        continue
+
+                    chunks.append(audio_bytes)
+
+                    # Track sample rate from the stream if available
+                    try:
+                        sr = int(getattr(chunk, "sample_rate", 0))
+                        if sr > 0:
+                            if detected_rate is None:
+                                detected_rate = sr
+                            elif detected_rate != sr:
+                                logger.warning(
+                                    "PiperEngine: AudioChunk sample_rate changed "
+                                    f"from {detected_rate} to {sr} mid-stream"
+                                )
+                    except Exception:  # noqa: BLE001
+                        pass
+
+                    continue
+
+                # Fallback: unknown chunk type
+                logger.warning(
+                    "PiperEngine: unexpected synthesize() chunk type: %r",
+                    type(chunk),
+                )
+
+            audio_bytes = b"".join(chunks)
+
+            # If we discovered a sample_rate from the chunks, prefer that
+            if detected_rate is not None and detected_rate != 0 and detected_rate != self.sample_rate:
+                logger.info(
+                    "PiperEngine: overriding config sample_rate %d -> %d "
+                    "based on AudioChunk metadata",
+                    self.sample_rate,
+                    detected_rate,
+                )
+                self.sample_rate = detected_rate
+
+            return audio_bytes
+
+        # Unexpected top-level type
+        logger.error(
+            "PiperEngine: unexpected synthesize() return type: %r",
+            type(result),
+        )
+        return b""
 
     # ------------------------------------------------------------------
     # Public API
@@ -142,35 +232,14 @@ class PiperEngine:
             return np.zeros(0, dtype=np.int16)
 
         # PiperVoice.synthesize() normally returns an iterator/generator of
-        # raw PCM byte chunks. We support both iterator and plain-bytes cases.
+        # AudioChunk objects (new API) or raw PCM bytes (older API).
         try:
             result = self._voice.synthesize(clean)
         except Exception as exc:  # noqa: BLE001
             logger.error("PiperEngine.synthesize_to_pcm16() error: %s", exc)
             return np.zeros(0, dtype=np.int16)
 
-        audio_bytes: bytes
-
-        # If result is already bytes, wrap it; if iterable, concatenate.
-        if isinstance(result, (bytes, bytearray)):
-            audio_bytes = bytes(result)
-        elif isinstance(result, Iterable):
-            chunks = []
-            for chunk in result:
-                if isinstance(chunk, (bytes, bytearray)):
-                    chunks.append(bytes(chunk))
-                else:
-                    logger.warning(
-                        "PiperEngine: unexpected synthesize() chunk type: %r",
-                        type(chunk),
-                    )
-            audio_bytes = b"".join(chunks)
-        else:
-            logger.error(
-                "PiperEngine: unexpected synthesize() return type: %r",
-                type(result),
-            )
-            return np.zeros(0, dtype=np.int16)
+        audio_bytes = self._collect_audio_bytes_from_result(result)
 
         if not audio_bytes:
             logger.warning("PiperEngine: synthesize() produced no audio bytes")
