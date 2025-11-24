@@ -37,6 +37,10 @@ logger = logging.getLogger(__name__)
 class TTSNode(Node):
     """ROS 2 node that wraps Piper TTS via PiperEngine."""
 
+    # Target playback sample rate for the audio device (ReSpeaker output).
+    # Many USB devices are happy with 48000 Hz, but not 22050 Hz.
+    TARGET_PLAYBACK_SR = 48000
+
     def __init__(self) -> None:
         super().__init__("tts_node")
 
@@ -154,8 +158,8 @@ class TTSNode(Node):
             male_config_path = model_dir_path / self.male_config_file
             if male_model_path.is_file() and male_config_path.is_file():
                 self._engines["male"] = PiperEngine(
-                    model_path=str(male_model_path),
-                    config_path=str(male_config_path),
+                    model_path=male_model_path,
+                    config_path=male_config_path,
                 )
             else:
                 self.get_logger().warn(
@@ -169,8 +173,8 @@ class TTSNode(Node):
             female_config_path = model_dir_path / self.female_config_file
             if female_model_path.is_file() and female_config_path.is_file():
                 self._engines["female"] = PiperEngine(
-                    model_path=str(female_model_path),
-                    config_path=str(female_config_path),
+                    model_path=female_model_path,
+                    config_path=female_config_path,
                 )
             else:
                 self.get_logger().warn(
@@ -302,6 +306,39 @@ class TTSNode(Node):
         msg = Empty()
         self._speech_done_pub.publish(msg)
 
+    @staticmethod
+    def _resample_linear(audio: np.ndarray, src_sr: int, dst_sr: int) -> np.ndarray:
+        """
+        Simple linear resampler using NumPy.
+
+        Parameters
+        ----------
+        audio : np.ndarray
+            1D float32 array in [-1, 1].
+        src_sr : int
+            Source sample rate.
+        dst_sr : int
+            Target sample rate.
+
+        Returns
+        -------
+        np.ndarray
+            Resampled 1D float32 array.
+        """
+        if audio.size == 0 or src_sr <= 0 or dst_sr <= 0 or src_sr == dst_sr:
+            return audio
+
+        src_len = audio.shape[0]
+        dst_len = int(round(src_len * float(dst_sr) / float(src_sr)))
+        if dst_len <= 0:
+            return audio
+
+        # Time axes
+        src_x = np.linspace(0.0, 1.0, num=src_len, endpoint=False, dtype=np.float32)
+        dst_x = np.linspace(0.0, 1.0, num=dst_len, endpoint=False, dtype=np.float32)
+
+        return np.interp(dst_x, src_x, audio).astype(np.float32)
+
     # ------------------------------------------------------------------
     # Subscriber callback
     # ------------------------------------------------------------------
@@ -350,11 +387,28 @@ class TTSNode(Node):
         if max_abs > 1.0:
             audio_f32 = np.clip(audio_f32, -1.0, 1.0)
 
+        # Decide playback sample rate
+        playback_sr = engine.sample_rate or self.sample_rate_param or 22050
+
+        # Resample to a device-friendly sample rate if needed
+        if playback_sr != self.TARGET_PLAYBACK_SR:
+            self.get_logger().debug(
+                "TTSNode: resampling from %d Hz to %d Hz for audio device",
+                playback_sr,
+                self.TARGET_PLAYBACK_SR,
+            )
+            audio_f32 = self._resample_linear(
+                audio_f32,
+                src_sr=playback_sr,
+                dst_sr=self.TARGET_PLAYBACK_SR,
+            )
+            playback_sr = self.TARGET_PLAYBACK_SR
+
         # Playback — simple "mouth fully open during speech" model for now.
         self._publish_mouth_open(1.0)
         try:
             device = None if self.output_device_index < 0 else self.output_device_index
-            play_pcm(audio_f32, sample_rate=engine.sample_rate, device=device)
+            play_pcm(audio_f32, sample_rate=playback_sr, device=device)
         except Exception as exc:  # noqa: BLE001
             self.get_logger().error(f"TTSNode: audio playback failed: {exc}")
         finally:
