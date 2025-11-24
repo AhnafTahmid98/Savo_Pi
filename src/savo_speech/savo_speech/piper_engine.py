@@ -32,12 +32,12 @@ class PiperEngine:
 
         engine = PiperEngine(
             model_path=Path("/home/savo/Savo_Pi/models/piper/en_US-ryan-high.onnx"),
-            config_path=Path("/home/savo/Savo_Pi/models/piper/en_US-ryan-high.onnx.json"),
             sample_rate=22050,
             length_scale=0.95,
             noise_scale=0.667,
             noise_w=0.8,
             gain=1.0,
+            speaker_id=None,
             max_chars=512,
         )
 
@@ -47,7 +47,6 @@ class PiperEngine:
     def __init__(
         self,
         model_path: Path,
-        config_path: Path,
         *,
         sample_rate: int = 22050,
         length_scale: float = 1.0,
@@ -63,9 +62,9 @@ class PiperEngine:
         Parameters
         ----------
         model_path : Path
-            Path to the .onnx voice model file.
-        config_path : Path
-            Path to the .onnx.json voice config file.
+            Path to the .onnx voice model file. The corresponding config file
+            is automatically inferred as "<model_path>.json", e.g.
+            "en_US-ryan-high.onnx" -> "en_US-ryan-high.onnx.json".
         sample_rate : int
             Target playback sample rate in Hz (usually 22050).
         length_scale : float
@@ -84,7 +83,9 @@ class PiperEngine:
             If not None, input text will be truncated to this length.
         """
         self.model_path = Path(model_path)
-        self.config_path = Path(config_path)
+        # Infer config file path: "foo.onnx" -> "foo.onnx.json"
+        self.config_path = self.model_path.with_suffix(self.model_path.suffix + ".json")
+
         self.sample_rate = int(sample_rate)
         self.length_scale = float(length_scale)
         self.noise_scale = float(noise_scale)
