@@ -18,7 +18,6 @@ Publications
 
 - /savo_intent/intent_result  (savo_msgs/IntentResult)
     * Full result from the LLM server:
-        - stamp      (builtin_interfaces/Time, time when result was created)
         - source     ("system", "mic", "keyboard", "test", ...)
         - robot_id   (this robot, e.g. "robot_savo_pi")
         - user_text  (what the human said)
@@ -211,11 +210,12 @@ class IntentClientNode(Node):
         # ------------------------------------------------------------------
         result_msg = IntentResult()
 
-        # ROS time stamp (matches NavState/RobotStatus style: field name 'stamp')
-        result_msg.stamp = self.get_clock().now().to_msg()
+        # We are not setting a stamp field here,
+        # because current IntentResult.msg does not define it.
+        # If later you add `builtin_interfaces/Time stamp` to the .msg,
+        # we can add:
+        #   result_msg.stamp = self.get_clock().now().to_msg()
 
-        # Fill structured fields
-        # Source: where the text came from (for now, "system" because bridge)
         result_msg.source = "system"
         result_msg.robot_id = self.robot_id
 
