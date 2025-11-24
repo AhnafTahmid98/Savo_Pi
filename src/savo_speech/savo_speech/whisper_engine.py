@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Robot Savo — Faster-Whisper engine wrapper.
 
@@ -9,12 +11,13 @@ Design goals:
 - Hide faster-whisper internals behind a small, stable API.
 - Keep configuration minimal but explicit (model path, device, compute_type).
 - Be safe to call in a loop from STTNode's timer callback.
+- Allow STTNode to override language / beam_size per call if needed.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Iterable, Tuple
+from typing import Iterable, Optional
 
 import numpy as np
 from faster_whisper import WhisperModel
@@ -33,10 +36,10 @@ class FasterWhisperEngine:
             device="cpu",
             compute_type="int8",
             language="en",
-            beam_size=5,
+            beam_size=3,
         )
 
-        text = engine.transcribe_block(audio_np_float32_16k)
+        text = engine.transcribe_block(audio_np_float32_16k, sample_rate=16000)
     """
 
     def __init__(
@@ -62,7 +65,7 @@ class FasterWhisperEngine:
         language : str
             Language code, e.g. "en" for English.
         beam_size : int
-            Beam size for beam search. 5 is a good trade-off.
+            Default beam size for beam search. 3–5 is a good trade-off.
         """
         self.model_size_or_path = model_size_or_path
         self.device = device
@@ -98,7 +101,13 @@ class FasterWhisperEngine:
     # Public API                                                         #
     # ------------------------------------------------------------------ #
 
-    def transcribe_block(self, audio: np.ndarray) -> str:
+    def transcribe_block(
+        self,
+        audio: np.ndarray,
+        sample_rate: Optional[int] = None,
+        language: Optional[str] = None,
+        beam_size: Optional[int] = None,
+    ) -> str:
         """
         Transcribe a single audio block (mono float32, 16 kHz recommended).
 
@@ -107,12 +116,19 @@ class FasterWhisperEngine:
         audio : np.ndarray
             1D numpy array, float32, representing PCM audio at ~16 kHz.
             The STTNode is responsible for ensuring the sample rate.
+        sample_rate : Optional[int]
+            Used only for logging / sanity checks. faster-whisper assumes
+            16 kHz PCM when given a numpy array.
+        language : Optional[str]
+            Override language for this call. If None, uses self.language.
+        beam_size : Optional[int]
+            Override beam_size for this call. If None, uses self.beam_size.
 
         Returns
         -------
         text : str
-            The concatenated transcription for the block. Empty string
-            if nothing intelligible was recognized.
+            The concatenated transcription for the block/utterance. Empty
+            string if nothing intelligible was recognized.
         """
         if audio is None or audio.size == 0:
             logger.debug("transcribe_block() called with empty audio array")
@@ -123,21 +139,39 @@ class FasterWhisperEngine:
         if audio_f32.ndim != 1:
             audio_f32 = audio_f32.flatten()
 
+        # Effective settings for this call
+        lang = language or self.language
+        bs = int(beam_size or self.beam_size)
+
+        if sample_rate is not None and sample_rate != 16000:
+            # Not a fatal error, but worth logging so we remember.
+            logger.warning(
+                "FasterWhisperEngine.transcribe_block called with "
+                "sample_rate=%d (expected 16000). Audio will still be "
+                "passed to faster-whisper, but quality may be affected.",
+                sample_rate,
+            )
+
         logger.debug(
-            "Transcribing audio block: samples=%d, dtype=%s",
+            "Transcribing audio block: samples=%d, dtype=%s, "
+            "sample_rate=%s, language=%s, beam_size=%d",
             audio_f32.size,
             audio_f32.dtype,
+            str(sample_rate) if sample_rate is not None else "unknown",
+            lang,
+            bs,
         )
 
         # NOTE:
         # - We use a simple configuration here: language, beam_size.
         # - We do NOT enable built-in VAD (vad_filter=False) because the
-        #   STT node already uses energy-based gating before calling us.
+        #   STT node already uses energy-based gating / utterance buffering.
+        # - task="transcribe" for standard speech-to-text.
         try:
             segments, info = self._model.transcribe(
                 audio_f32,
-                language=self.language,
-                beam_size=self.beam_size,
+                language=lang,
+                beam_size=bs,
                 vad_filter=False,
                 task="transcribe",
             )
@@ -175,9 +209,10 @@ class FasterWhisperEngine:
         parts = []
         for seg in segments:
             seg_text = getattr(seg, "text", "")
+            if not seg_text:
+                continue
+            seg_text = seg_text.strip()
             if seg_text:
-                seg_text = seg_text.strip()
-                if seg_text:
-                    parts.append(seg_text)
+                parts.append(seg_text)
 
         return " ".join(parts).strip()

@@ -1,25 +1,35 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
-Robot Savo — STT Node (faster-whisper)
+Robot Savo — STT node (faster-whisper, utterance mode)
 
-This node:
-  - Captures audio from the input device (ReSpeaker on the Pi).
-  - Uses a simple energy-based VAD to ignore silence/background noise.
-  - Runs faster-whisper on each audio block to get a transcript.
-  - Publishes recognized text to /savo_intent/user_text (std_msgs/String).
+- Captures audio from ReSpeaker via sounddevice.
+- Buffers blocks into "utterances" while speech is active.
+- When speech stops, transcribes the whole utterance once.
+- Publishes recognized text to /savo_intent/user_text.
 
-Dependencies:
-  - rclpy
-  - std_msgs
-  - sounddevice
-  - numpy
-  - faster-whisper
+We can switch between:
+  - utterance_mode = True  → buffer until user stops talking, then STT once
+  - utterance_mode = False → old behavior: STT on each block
+
+Parameters (from YAML / CLI):
+  model_size_or_path   : "tiny.en", "base.en", "small.en", or path
+  device               : "cpu" on Pi
+  compute_type         : "int8" on Pi
+  language             : "en"
+  beam_size            : int (e.g. 3)
+  sample_rate          : 16000
+  block_duration_s     : 3.0–4.0 recommended
+  energy_threshold     : float, VAD gate on block energy
+  min_transcript_chars : ignore very short outputs
+  input_device_index   : ReSpeaker index (0 on your Pi)
+  publish_topic        : "/savo_intent/user_text"
+  utterance_mode       : True to enable utterance buffering
+  max_utterance_duration_s : safety limit, e.g. 12.0
 """
-
-from __future__ import annotations
 
 import math
-from typing import Optional
+from typing import List
 
 import numpy as np
 import rclpy
@@ -31,206 +41,285 @@ from .whisper_engine import FasterWhisperEngine
 
 
 class STTNode(Node):
-    """ROS 2 node for streaming STT using faster-whisper."""
-
     def __init__(self) -> None:
         super().__init__("stt_node")
 
-        # ------------------------------------------------------------------
-        # 1. Declare parameters (can be overridden via YAML or CLI)
-        # ------------------------------------------------------------------
-        # Model / inference
-        self.declare_parameter("model_size_or_path", "tiny.en")
-        self.declare_parameter("device", "cpu")          # "cpu" on Pi, "cuda" on PC later
-        self.declare_parameter("compute_type", "int8")   # good for Pi
-        self.declare_parameter("language", "en")
-        self.declare_parameter("beam_size", 5)
-
-        # Audio / VAD
-        self.declare_parameter("sample_rate", 16000)
-        self.declare_parameter("block_duration_s", 4.0)
-        self.declare_parameter("energy_threshold", 0.003)
-        self.declare_parameter("min_transcript_chars", 3)
-
-        # Audio device selection
-        # -1 = use sounddevice default input
-        #  0 = ReSpeaker 4 Mic Array (from your query_devices output)
-        self.declare_parameter("input_device_index", -1)
-
-        # ROS topics
-        self.declare_parameter("publish_topic", "/savo_intent/user_text")
-
-        # ------------------------------------------------------------------
-        # 2. Read parameters
-        # ------------------------------------------------------------------
-        model_size_or_path = (
-            self.get_parameter("model_size_or_path")
+        # ---------------------------------------------------------------------
+        # Parameters
+        # ---------------------------------------------------------------------
+        self.model_size_or_path = (
+            self.declare_parameter("model_size_or_path", "tiny.en")
             .get_parameter_value()
             .string_value
         )
-        device = self.get_parameter("device").get_parameter_value().string_value
-        compute_type = (
-            self.get_parameter("compute_type").get_parameter_value().string_value
+        self.device = (
+            self.declare_parameter("device", "cpu")
+            .get_parameter_value()
+            .string_value
         )
-        language = self.get_parameter("language").get_parameter_value().string_value
-        beam_size = (
-            self.get_parameter("beam_size").get_parameter_value().integer_value
+        self.compute_type = (
+            self.declare_parameter("compute_type", "int8")
+            .get_parameter_value()
+            .string_value
+        )
+        self.language = (
+            self.declare_parameter("language", "en")
+            .get_parameter_value()
+            .string_value
+        )
+        self.beam_size = (
+            self.declare_parameter("beam_size", 3)
+            .get_parameter_value()
+            .integer_value
         )
 
         self.sample_rate = (
-            self.get_parameter("sample_rate").get_parameter_value().integer_value
+            self.declare_parameter("sample_rate", 16000)
+            .get_parameter_value()
+            .integer_value
         )
         self.block_duration_s = (
-            self.get_parameter("block_duration_s").get_parameter_value().double_value
+            self.declare_parameter("block_duration_s", 3.0)
+            .get_parameter_value()
+            .double_value
         )
         self.energy_threshold = (
-            self.get_parameter("energy_threshold").get_parameter_value().double_value
+            self.declare_parameter("energy_threshold", 0.0003)
+            .get_parameter_value()
+            .double_value
         )
         self.min_transcript_chars = (
-            self.get_parameter("min_transcript_chars")
+            self.declare_parameter("min_transcript_chars", 3)
             .get_parameter_value()
             .integer_value
         )
         self.input_device_index = (
-            self.get_parameter("input_device_index")
+            self.declare_parameter("input_device_index", 0)
             .get_parameter_value()
             .integer_value
         )
-        publish_topic = (
-            self.get_parameter("publish_topic").get_parameter_value().string_value
+
+        self.publish_topic = (
+            self.declare_parameter(
+                "publish_topic", "/savo_intent/user_text"
+            )
+            .get_parameter_value()
+            .string_value
         )
 
-        # Clamp block duration to something sane
-        if self.block_duration_s <= 0.2:
-            self.get_logger().warn(
-                f"block_duration_s={self.block_duration_s:.3f} too small; "
-                "clamping to 0.5 s"
-            )
-            self.block_duration_s = 0.5
+        # New: utterance-level behavior.
+        self.utterance_mode = (
+            self.declare_parameter("utterance_mode", True)
+            .get_parameter_value()
+            .bool_value
+        )
+        self.max_utterance_duration_s = (
+            self.declare_parameter("max_utterance_duration_s", 12.0)
+            .get_parameter_value()
+            .double_value
+        )
 
-        # ------------------------------------------------------------------
-        # 3. Publisher
-        # ------------------------------------------------------------------
-        self.text_pub = self.create_publisher(String, publish_topic, 10)
+        # ---------------------------------------------------------------------
+        # Publisher
+        # ---------------------------------------------------------------------
+        self.publisher_ = self.create_publisher(String, self.publish_topic, 10)
 
-        # ------------------------------------------------------------------
-        # 4. Initialize faster-whisper engine
-        # ------------------------------------------------------------------
+        # ---------------------------------------------------------------------
+        # STT engine
+        # ---------------------------------------------------------------------
+        self.engine = FasterWhisperEngine(
+            model_size_or_path=self.model_size_or_path,
+            device=self.device,
+            compute_type=self.compute_type,
+        )
+
+        # ---------------------------------------------------------------------
+        # Utterance state
+        # ---------------------------------------------------------------------
+        self._block_index = 0
+        self._in_utterance = False
+        self._utterance_blocks: List[np.ndarray] = []
+        self._utterance_total_samples = 0
+        self._utterance_counter = 0
+
+        # ---------------------------------------------------------------------
+        # Timer
+        # ---------------------------------------------------------------------
+        self.timer = self.create_timer(
+            self.block_duration_s, self._timer_callback
+        )
+
+        # Log configuration
         self.get_logger().info(
             "STTNode starting with faster-whisper:\n"
-            f"  model_size_or_path = {model_size_or_path}\n"
-            f"  device             = {device}\n"
-            f"  compute_type       = {compute_type}\n"
-            f"  language           = {language}\n"
-            f"  beam_size          = {beam_size}\n"
+            f"  model_size_or_path = {self.model_size_or_path}\n"
+            f"  device             = {self.device}\n"
+            f"  compute_type       = {self.compute_type}\n"
+            f"  language           = {self.language}\n"
+            f"  beam_size          = {self.beam_size}\n"
             f"  sample_rate        = {self.sample_rate} Hz\n"
             f"  block_duration_s   = {self.block_duration_s:.2f} s\n"
             f"  energy_threshold   = {self.energy_threshold:.4f}\n"
             f"  input_device_index = {self.input_device_index}\n"
-            f"  publish_topic      = {publish_topic}"
+            f"  utterance_mode     = {self.utterance_mode}\n"
+            f"  max_utt_duration   = {self.max_utterance_duration_s:.1f} s\n"
+            f"  publish_topic      = {self.publish_topic}"
         )
 
-        try:
-            self.engine = FasterWhisperEngine(
-                model_size_or_path=model_size_or_path,
-                device=device,
-                compute_type=compute_type,
-                language=language,
-                beam_size=beam_size,
-            )
-        except Exception as exc:  # noqa: BLE001
-            self.get_logger().error(
-                f"Failed to initialize FasterWhisperEngine: {exc}"
-            )
-            raise
-
-        # ------------------------------------------------------------------
-        # 5. Timer to periodically capture & transcribe audio
-        # ------------------------------------------------------------------
-        self.timer = self.create_timer(self.block_duration_s, self._timer_cb)
-        self._block_index = 0
-
-    # ----------------------------------------------------------------------
-    # Timer callback: record audio block -> VAD -> transcription -> publish
-    # ----------------------------------------------------------------------
-    def _timer_cb(self) -> None:
+    # -------------------------------------------------------------------------
+    # Main timer loop
+    # -------------------------------------------------------------------------
+    def _timer_callback(self) -> None:
         self._block_index += 1
-        block_id = self._block_index
 
-        # 1) Record one block of audio
         try:
-            device = (
-                self.input_device_index
-                if self.input_device_index >= 0
-                else None
-            )
             audio = record_block(
-                self.sample_rate,
-                self.block_duration_s,
-                device=device,
+                sample_rate=self.sample_rate,
+                duration_s=self.block_duration_s,
+                input_device_index=self.input_device_index,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             self.get_logger().error(
-                f"[block {block_id}] Audio capture failed: {exc}"
+                f"[block {self._block_index}] audio capture failed: {exc}"
             )
             return
 
-        if audio.size == 0:
-            self.get_logger().warn(f"[block {block_id}] Empty audio block received")
-            return
-
-        # 2) Simple energy-based VAD
-        try:
-            energy = float(np.mean(np.square(audio, dtype=np.float32)))
-        except Exception as exc:  # noqa: BLE001
-            self.get_logger().error(
-                f"[block {block_id}] Failed to compute energy: {exc}"
+        if audio is None or len(audio) == 0:
+            self.get_logger().warning(
+                f"[block {self._block_index}] empty audio block"
             )
             return
+
+        # Convert to float32 and compute simple energy for VAD
+        audio_f32 = audio.astype(np.float32)
+        energy = float(np.mean(np.square(audio_f32)))
 
         self.get_logger().debug(
-            f"[block {block_id}] energy={energy:.6f} "
+            f"[block {self._block_index}] energy={energy:.6f} "
             f"(threshold={self.energy_threshold:.6f})"
         )
 
-        if not math.isfinite(energy):
-            self.get_logger().warn(
-                f"[block {block_id}] Non-finite energy value, skipping block"
+        if not self.utterance_mode:
+            # -------------------------------------------------------------
+            # LEGACY MODE: per-block STT (no buffering)
+            # -------------------------------------------------------------
+            if energy < self.energy_threshold:
+                return
+
+            try:
+                text = self.engine.transcribe_block(
+                    audio_f32, self.sample_rate, self.language, self.beam_size
+                )
+            except Exception as exc:
+                self.get_logger().error(f"STT error on block: {exc}")
+                return
+
+            text = (text or "").strip()
+            if len(text) < self.min_transcript_chars:
+                return
+
+            msg = String()
+            msg.data = text
+            self.publisher_.publish(msg)
+            self.get_logger().info(
+                f"[block {self._block_index}] STT transcript: '{text}'"
             )
             return
 
-        if energy < self.energy_threshold:
-            # Too quiet → treat as silence/background, skip STT
+        # -----------------------------------------------------------------
+        # UTTERANCE MODE: buffer blocks while speech is active
+        # -----------------------------------------------------------------
+        if energy >= self.energy_threshold:
+            # Speech detected in this block
+            if not self._in_utterance:
+                self.get_logger().debug(
+                    f"[block {self._block_index}] Utterance START"
+                )
+                self._in_utterance = True
+                self._utterance_blocks = []
+                self._utterance_total_samples = 0
+
+            self._utterance_blocks.append(audio_f32)
+            self._utterance_total_samples += audio_f32.shape[0]
+
+            # Safety: cut very long utterances
+            utt_duration = self._utterance_total_duration_s()
+            if utt_duration >= self.max_utterance_duration_s:
+                self.get_logger().debug(
+                    f"[block {self._block_index}] Utterance reached "
+                    f"max duration ({utt_duration:.2f}s), finalizing."
+                )
+                self._finalize_utterance()
+                self._in_utterance = False
+
+        else:
+            # Silence in this block
+            if self._in_utterance:
+                # We were in speech and now saw a silent block -> end utterance
+                self.get_logger().debug(
+                    f"[block {self._block_index}] Utterance END on silence"
+                )
+                self._finalize_utterance()
+                self._in_utterance = False
+            # else: still idle, nothing to do
+
+    # -------------------------------------------------------------------------
+    # Helpers
+    # -------------------------------------------------------------------------
+    def _utterance_total_duration_s(self) -> float:
+        if self.sample_rate <= 0:
+            return 0.0
+        return float(self._utterance_total_samples) / float(self.sample_rate)
+
+    def _finalize_utterance(self) -> None:
+        """Run STT on buffered utterance and publish one transcript."""
+        if not self._utterance_blocks:
             return
 
-        # 3) Run STT on the block
+        # Concatenate all blocks into one 1-D array
         try:
-            text = self.engine.transcribe_block(audio)
-        except Exception as exc:  # noqa: BLE001
-            self.get_logger().error(
-                f"[block {block_id}] Transcription error: {exc}"
-            )
+            audio_all = np.concatenate(self._utterance_blocks, axis=0)
+        except Exception as exc:
+            self.get_logger().error(f"Failed to concat utterance blocks: {exc}")
+            self._utterance_blocks = []
+            self._utterance_total_samples = 0
             return
 
-        text = text.strip()
+        utt_duration = self._utterance_total_duration_s()
+        self._utterance_blocks = []
+        self._utterance_total_samples = 0
+
+        self._utterance_counter += 1
+        utt_id = self._utterance_counter
+
+        self.get_logger().debug(
+            f"[utt {utt_id}] Finalizing utterance, duration={utt_duration:.2f}s"
+        )
+
+        try:
+            text = self.engine.transcribe_block(
+                audio_all, self.sample_rate, self.language, self.beam_size
+            )
+        except Exception as exc:
+            self.get_logger().error(f"STT error in utterance {utt_id}: {exc}")
+            return
+
+        text = (text or "").strip()
         if len(text) < self.min_transcript_chars:
             self.get_logger().debug(
-                f"[block {block_id}] Ignoring short transcript: '{text}'"
+                f"[utt {utt_id}] Ignored short transcript: '{text}'"
             )
             return
 
-        # 4) Publish transcript
         msg = String()
         msg.data = text
-        self.text_pub.publish(msg)
-
+        self.publisher_.publish(msg)
         self.get_logger().info(
-            f"[block {block_id}] STT transcript: '{text}'"
+            f"[utt {utt_id}] STT transcript: '{text}'"
         )
 
 
-def main(args: Optional[list[str]] = None) -> None:
-    """Entry point for ROS 2."""
+def main(args=None) -> None:
     rclpy.init(args=args)
     node = STTNode()
     try:
@@ -239,9 +328,11 @@ def main(args: Optional[list[str]] = None) -> None:
         node.get_logger().info("Shutting down STTNode (Ctrl+C)")
     finally:
         node.destroy_node()
-        # Avoid double-shutdown error: only call if still OK
-        if rclpy.ok():
+        try:
             rclpy.shutdown()
+        except Exception:
+            # Already shut down or context invalid; safe to ignore.
+            pass
 
 
 if __name__ == "__main__":

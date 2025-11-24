@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Robot Savo — Audio I/O utilities for savo_speech.
 
@@ -124,7 +126,7 @@ def get_default_output_device() -> Optional[int]:
 def record_block(
     sample_rate: int,
     duration_s: float,
-    device: Optional[int] = None,
+    input_device_index: Optional[int] = None,
     channels: int = 1,
     dtype: str = "float32",
 ) -> np.ndarray:
@@ -137,8 +139,9 @@ def record_block(
         Target sampling rate in Hz (e.g. 16000 for faster-whisper).
     duration_s : float
         Duration of the recording in seconds.
-    device : Optional[int]
-        Optional sounddevice device index. If None, use default input.
+    input_device_index : Optional[int]
+        Explicit sounddevice input device index. On Robot Savo, we usually
+        pass the ReSpeaker index (e.g. 0). If None, use default input device.
     channels : int
         Number of input channels to record. For STT, we typically want mono.
     dtype : str
@@ -159,7 +162,16 @@ def record_block(
             "result in zero frames"
         )
 
-    # If no device specified, we try to use the default input.
+    # Decide which device to use
+    device = input_device_index
+    if device is not None and device < 0:
+        logger.warning(
+            "record_block() called with invalid input_device_index=%s, "
+            "falling back to default input device.",
+            device,
+        )
+        device = None
+
     if device is None:
         device = get_default_input_device()
 

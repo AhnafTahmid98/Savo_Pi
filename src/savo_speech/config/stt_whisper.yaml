@@ -1,4 +1,23 @@
-# Robot Savo — STT configuration for faster-whisper (tuned for ReSpeaker)
+# ============================================================================
+# Robot Savo — STT configuration for faster-whisper (ReSpeaker + utterance mode)
+#
+# This config is used by the savo_speech/stt_node.
+#
+# Usage on the Pi (after build + env.sh):
+#
+#   cd ~/Savo_Pi
+#   source tools/scripts/env.sh
+#
+#   ros2 run savo_speech stt_node \
+#     --ros-args \
+#       --log-level INFO \
+#       --params-file $(ros2 pkg prefix savo_speech)/share/savo_speech/config/stt_whisper.yaml
+#
+# You can still override individual params from CLI, for example:
+#
+#   -p model_size_or_path:="base.en"
+#   -p block_duration_s:=3.0
+# ============================================================================
 
 stt_node:
   ros__parameters:
@@ -6,35 +25,95 @@ stt_node:
     # ------------------------------------------------------------------------
     # Faster-Whisper model configuration
     # ------------------------------------------------------------------------
-    model_size_or_path: "tiny.en"
+    #
+    # Model choices (for Pi 5, CPU, int8):
+    #   - "tiny.en"  : fastest, lowest quality (we tested: not good enough)
+    #   - "base.en"  : middle ground (OK option if small.en too heavy)
+    #   - "small.en" : best quality that is still realistic on Pi
+    #
+    # This config assumes you already downloaded "small.en" once.
+    model_size_or_path: "small.en"
+
+    # Device:
+    #   - "cpu" on the Pi
     device: "cpu"
+
+    # Compute type:
+    #   - "int8" is the right trade-off on ARM CPU (smaller, faster)
     compute_type: "int8"
+
+    # Language:
+    #   - "en" because Robot Savo speaks and listens in English in v1.
     language: "en"
+
+    # Beam search:
+    #   - 3 is a good balance. You can go to 1 for a bit more speed, or 5 for
+    #     a tiny quality boost if CPU allows.
     beam_size: 3
 
     # ------------------------------------------------------------------------
-    # Audio capture + VAD
+    # Audio capture + simple VAD
     # ------------------------------------------------------------------------
 
-    # 16 kHz audio, slightly shorter block for quicker reaction
+    # Input sample rate for STT:
+    #   - 16000 Hz is standard for Whisper models.
     sample_rate: 16000
 
-    # Shorter block → faster feedback, still enough for one command sentence
-    block_duration_s: 2.5
+    # Length of each raw audio block captured from ReSpeaker (seconds).
+    # In "utterance_mode" this is NOT the final sentence length; blocks are
+    # buffered until the user stops talking, then concatenated and sent once
+    # to Whisper.
+    #
+    #   - 3.0–4.0 s is a good trade-off on Pi:
+    #       * not too much latency
+    #       * enough context per chunk for stable VAD
+    block_duration_s: 4.0
 
-    # Noise floor we saw earlier was about 0.000166.
-    # Make the threshold very forgiving so speech is not missed:
-    # - 0.0003 ≈ clearly above idle noise but below normal speech.
+    # Energy threshold for simple block-level VAD:
+    #   - We saw idle noise ≈ 0.00016 in your hallway tests.
+    #   - 0.0003 is slightly above noise but still very forgiving, so speech
+    #     is not missed even if you speak softly or further from ReSpeaker.
+    #
+    # You can tighten this later if you see too many false triggers.
     energy_threshold: 0.0003
 
-    # Accept even short transcripts like "stop", "status", "hello".
+    # Minimum transcript length:
+    #   - Ignore extremely short outputs (noise, breath, partial syllables).
+    #   - Allow short commands like "stop", "status", "hello".
     min_transcript_chars: 3
 
-    # Force input device to ReSpeaker 4 Mic Array (index 0 from sd.query_devices())
-    # -1 = default input, 0 = ReSpeaker card explicitly.
+    # Force input device to ReSpeaker 4 Mic Array:
+    #   - From sd.query_devices() on your Pi:
+    #       0 ReSpeaker 4 Mic Array (UAC1.0): USB Audio (hw:0,0)
+    #   - So we fix input_device_index to 0.
+    #
+    # If you ever change audio hardware, update this index.
     input_device_index: 0
+
+    # ------------------------------------------------------------------------
+    # Utterance-level behavior
+    # ------------------------------------------------------------------------
+    #
+    # utterance_mode:
+    #   - True  → buffer multiple blocks while speech is present.
+    #             When a silent block arrives, treat it as end-of-utterance,
+    #             concatenate all buffered blocks, run Whisper once, and
+    #             publish ONE final transcript to /savo_intent/user_text.
+    #
+    #   - False → legacy per-block mode (every voiced block is sent directly
+    #             to Whisper, which leads to partial sentences).
+    utterance_mode: true
+
+    # Safety limit for a single utterance duration (seconds):
+    #   - Prevents buffering forever if someone talks non-stop.
+    #   - If exceeded, the node forces an utterance finalize and starts a
+    #     new one.
+    max_utterance_duration_s: 15.0
 
     # ------------------------------------------------------------------------
     # ROS topics
     # ------------------------------------------------------------------------
+    #
+    # Topic where recognized text is published as std_msgs/String.
+    # This is consumed by savo_intent/intent_client_node.
     publish_topic: "/savo_intent/user_text"
