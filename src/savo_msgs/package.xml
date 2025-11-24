@@ -14,11 +14,8 @@
   <!-- Build system -->
   <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <!-- Interface generation:
-       - rosidl_default_generators: used in CMakeLists.txt for msg generation
-       - rosidl_default_runtime: runtime support for generated types -->
-  <build_depend>rosidl_default_generators</build_depend>
-  <exec_depend>rosidl_default_runtime</exec_depend>
+  <!-- Interface generation (MUST be buildtool_depend for interface packages) -->
+  <buildtool_depend>rosidl_default_generators</buildtool_depend>
 
   <!-- Message dependencies used inside our .msg files -->
   <depend>builtin_interfaces</depend>
@@ -26,11 +23,14 @@
   <depend>geometry_msgs</depend>
   <depend>nav_msgs</depend>
 
+  <!-- Runtime support for generated messages -->
+  <exec_depend>rosidl_default_runtime</exec_depend>
+
+  <!-- REQUIRED for any package that installs .msg/.srv/.action files -->
+  <member_of_group>rosidl_interface_packages</member_of_group>
+
   <export>
     <!-- Standard build type for this package -->
     <build_type>ament_cmake</build_type>
-
-    <!-- REQUIRED for packages that install .msg/.srv/.action interfaces -->
-    <member_of_group>rosidl_interface_packages</member_of_group>
   </export>
 </package>
