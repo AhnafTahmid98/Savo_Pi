@@ -8,25 +8,13 @@ to synthesize speech, then plays it through the Pi's audio output.
 
 Key features:
 - Uses local Piper ONNX models (e.g. en_US-ryan-high, en_US-hfc_female-medium).
-- Supports a "voice_profile" parameter ("male" / "female") that can be changed
-  at runtime via `ros2 param set /tts_node voice_profile "female"`.
+- Supports a "voice_profile" parameter ("male" / "female").
 - Applies configurable gain/output_gain.
 - Optionally publishes a simple mouth animation signal and a "speech done"
   notification for UI/behavior coordination.
 
 Configuration is provided via:
   src/savo_speech/config/tts_piper.yaml
-
-Typical usage on the Pi:
-
-  cd ~/Savo_Pi
-  source tools/scripts/env.sh
-
-  ros2 run savo_speech tts_node \\
-    --ros-args \\
-      --log-level INFO \\
-      --params-file \\
-        $(ros2 pkg prefix savo_speech)/share/savo_speech/config/tts_piper.yaml
 """
 
 from __future__ import annotations
@@ -66,7 +54,7 @@ class TTSNode(Node):
         self.declare_parameter("female_model_file", "en_US-hfc_female-medium.onnx")
         self.declare_parameter("female_config_file", "en_US-hfc_female-medium.onnx.json")
 
-        # Synthesis controls (for logging + prosody tuning)
+        # Synthesis controls (for logging / future tuning)
         self.declare_parameter("sample_rate", 22050)  # informational
         self.declare_parameter("gain", 1.0)
         self.declare_parameter("length_scale", 0.95)
@@ -92,9 +80,6 @@ class TTSNode(Node):
         # --------------------------------------------------------------
 
         self.model_dir: str = self.get_parameter("model_dir").get_parameter_value().string_value
-
-        # Store initial voice_profile for logging; live value will be read
-        # from the parameter server each time we choose an engine.
         self.voice_profile: str = (
             self.get_parameter("voice_profile").get_parameter_value().string_value.lower()
         )
@@ -113,7 +98,7 @@ class TTSNode(Node):
             self.get_parameter("female_config_file").get_parameter_value().string_value
         )
 
-        # Synthesis params (used for gain + prosody)
+        # Synthesis params (for logging + gain)
         self.sample_rate_param: int = (
             self.get_parameter("sample_rate").get_parameter_value().integer_value
         )
@@ -169,15 +154,12 @@ class TTSNode(Node):
             male_config_path = model_dir_path / self.male_config_file
             if male_model_path.is_file() and male_config_path.is_file():
                 self._engines["male"] = PiperEngine(
-                    male_model_path,
-                    male_config_path,
-                    default_length_scale=self.length_scale,
-                    default_noise_scale=self.noise_scale,
-                    default_noise_w=self.noise_w,
+                    model_path=str(male_model_path),
+                    config_path=str(male_config_path),
                 )
             else:
                 self.get_logger().warn(
-                    "TTSNode: male model/config not found:\n"
+                    f"TTSNode: male model/config not found:\n"
                     f"  model  = {male_model_path}\n"
                     f"  config = {male_config_path}"
                 )
@@ -187,15 +169,12 @@ class TTSNode(Node):
             female_config_path = model_dir_path / self.female_config_file
             if female_model_path.is_file() and female_config_path.is_file():
                 self._engines["female"] = PiperEngine(
-                    female_model_path,
-                    female_config_path,
-                    default_length_scale=self.length_scale,
-                    default_noise_scale=self.noise_scale,
-                    default_noise_w=self.noise_w,
+                    model_path=str(female_model_path),
+                    config_path=str(female_config_path),
                 )
             else:
                 self.get_logger().warn(
-                    "TTSNode: female model/config not found:\n"
+                    f"TTSNode: female model/config not found:\n"
                     f"  model  = {female_model_path}\n"
                     f"  config = {female_config_path}"
                 )
@@ -264,18 +243,6 @@ class TTSNode(Node):
     # Helpers
     # ------------------------------------------------------------------
 
-    def _current_voice_profile(self) -> str:
-        """
-        Read the live voice_profile parameter so ros2 param set works
-        without restarting the node.
-        """
-        try:
-            vp_param = self.get_parameter("voice_profile")
-            vp = vp_param.get_parameter_value().string_value
-            return (vp or self.voice_profile).lower()
-        except Exception:  # noqa: BLE001
-            return self.voice_profile
-
     def _choose_engine(self) -> Optional[PiperEngine]:
         """
         Choose the appropriate PiperEngine based on voice_profile.
@@ -287,8 +254,7 @@ class TTSNode(Node):
         if not self._engines:
             return None
 
-        profile = self._current_voice_profile()
-
+        profile = self.voice_profile.lower()
         if profile in self._engines:
             return self._engines[profile]
 
@@ -362,12 +328,7 @@ class TTSNode(Node):
 
         # Synthesize audio (int16 PCM at engine.sample_rate)
         try:
-            audio_i16, sr = engine.synthesize_to_pcm16(
-                text,
-                length_scale=self.length_scale,
-                noise_scale=self.noise_scale,
-                noise_w=self.noise_w,
-            )
+            audio_i16 = engine.synthesize_to_pcm16(text)
         except Exception as exc:  # noqa: BLE001
             self.get_logger().error(f"TTSNode: TTS synthesis failed: {exc}")
             return
@@ -393,7 +354,7 @@ class TTSNode(Node):
         self._publish_mouth_open(1.0)
         try:
             device = None if self.output_device_index < 0 else self.output_device_index
-            play_pcm(audio_f32, sample_rate=sr, device=device)
+            play_pcm(audio_f32, sample_rate=engine.sample_rate, device=device)
         except Exception as exc:  # noqa: BLE001
             self.get_logger().error(f"TTSNode: audio playback failed: {exc}")
         finally:
