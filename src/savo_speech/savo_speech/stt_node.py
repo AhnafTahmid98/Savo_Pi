@@ -3,19 +3,17 @@
 Robot Savo — STT Node (faster-whisper)
 
 This node:
-  - Captures audio from the default input (ReSpeaker on the Pi).
+  - Captures audio from the input device (ReSpeaker on the Pi).
   - Uses a simple energy-based VAD to ignore silence/background noise.
   - Runs faster-whisper on each audio block to get a transcript.
   - Publishes recognized text to /savo_intent/user_text (std_msgs/String).
 
-Dependencies (already installed on your Pi):
+Dependencies:
   - rclpy
   - std_msgs
   - sounddevice
   - numpy
   - faster-whisper
-
-Configuration is done via ROS 2 parameters or YAML (stt_whisper.yaml).
 """
 
 from __future__ import annotations
@@ -26,6 +24,7 @@ from typing import Optional
 import numpy as np
 import rclpy
 from rclpy.node import Node
+from rclpy.exceptions import RCLError
 from std_msgs.msg import String
 
 from .audio_io import record_block
@@ -51,8 +50,13 @@ class STTNode(Node):
         # Audio / VAD
         self.declare_parameter("sample_rate", 16000)
         self.declare_parameter("block_duration_s", 4.0)
-        self.declare_parameter("energy_threshold", 0.01)
+        self.declare_parameter("energy_threshold", 0.003)
         self.declare_parameter("min_transcript_chars", 3)
+
+        # Audio device selection
+        # -1 = use sounddevice default input
+        #  0 = ReSpeaker 4 Mic Array (from your query_devices output)
+        self.declare_parameter("input_device_index", -1)
 
         # ROS topics
         self.declare_parameter("publish_topic", "/savo_intent/user_text")
@@ -88,6 +92,11 @@ class STTNode(Node):
             .get_parameter_value()
             .integer_value
         )
+        self.input_device_index = (
+            self.get_parameter("input_device_index")
+            .get_parameter_value()
+            .integer_value
+        )
         publish_topic = (
             self.get_parameter("publish_topic").get_parameter_value().string_value
         )
@@ -118,6 +127,7 @@ class STTNode(Node):
             f"  sample_rate        = {self.sample_rate} Hz\n"
             f"  block_duration_s   = {self.block_duration_s:.2f} s\n"
             f"  energy_threshold   = {self.energy_threshold:.4f}\n"
+            f"  input_device_index = {self.input_device_index}\n"
             f"  publish_topic      = {publish_topic}"
         )
 
@@ -133,17 +143,12 @@ class STTNode(Node):
             self.get_logger().error(
                 f"Failed to initialize FasterWhisperEngine: {exc}"
             )
-            # If we can't init the model, there's no point continuing.
-            # Raise so the node exits and systemd/supervisor can restart it.
             raise
 
         # ------------------------------------------------------------------
         # 5. Timer to periodically capture & transcribe audio
         # ------------------------------------------------------------------
-        # NOTE: This callback is blocking for block_duration_s because we use
-        # a simple record_block() call. For a single STT node this is fine.
         self.timer = self.create_timer(self.block_duration_s, self._timer_cb)
-
         self._block_index = 0
 
     # ----------------------------------------------------------------------
@@ -155,7 +160,16 @@ class STTNode(Node):
 
         # 1) Record one block of audio
         try:
-            audio = record_block(self.sample_rate, self.block_duration_s)
+            device = (
+                self.input_device_index
+                if self.input_device_index >= 0
+                else None
+            )
+            audio = record_block(
+                self.sample_rate,
+                self.block_duration_s,
+                device=device,
+            )
         except Exception as exc:  # noqa: BLE001
             self.get_logger().error(
                 f"[block {block_id}] Audio capture failed: {exc}"
@@ -167,7 +181,6 @@ class STTNode(Node):
             return
 
         # 2) Simple energy-based VAD
-        #    energy = mean(x^2)
         try:
             energy = float(np.mean(np.square(audio, dtype=np.float32)))
         except Exception as exc:  # noqa: BLE001
@@ -176,7 +189,6 @@ class STTNode(Node):
             )
             return
 
-        # Optionally log at debug level to avoid spamming the console
         self.get_logger().debug(
             f"[block {block_id}] energy={energy:.6f} "
             f"(threshold={self.energy_threshold:.6f})"
@@ -203,7 +215,6 @@ class STTNode(Node):
 
         text = text.strip()
         if len(text) < self.min_transcript_chars:
-            # Very short / empty text, likely noise or junk.
             self.get_logger().debug(
                 f"[block {block_id}] Ignoring short transcript: '{text}'"
             )
@@ -226,11 +237,14 @@ def main(args: Optional[list[str]] = None) -> None:
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
-        pass
+        node.get_logger().info("Shutting down STTNode (Ctrl+C)")
     finally:
-        node.get_logger().info("Shutting down STTNode")
         node.destroy_node()
-        rclpy.shutdown()
+        try:
+            rclpy.shutdown()
+        except RCLError:
+            # Already shut down by ROS signal handler; ignore.
+            pass
 
 
 if __name__ == "__main__":

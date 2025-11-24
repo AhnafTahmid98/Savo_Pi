@@ -1,14 +1,4 @@
 # Robot Savo — STT configuration for faster-whisper (hallway / noisy campus)
-#
-# This file configures the stt_node in the savo_speech package.
-#
-# Usage (on the Pi, after building and sourcing env.sh):
-#
-#   ros2 run savo_speech stt_node \
-#     --ros-args \
-#       --params-file $(ros2 pkg prefix savo_speech)/share/savo_speech/config/stt_whisper.yaml
-#
-# We can tune thresholds later based on real hallway tests.
 
 stt_node:
   ros__parameters:
@@ -16,66 +6,32 @@ stt_node:
     # ------------------------------------------------------------------------
     # Faster-Whisper model configuration
     # ------------------------------------------------------------------------
-
-    # Model size / path:
-    # - "tiny"      → fastest, lowest quality
-    # - "tiny.en"   → tiny English-only (good for Pi 5 + short commands)
-    # - "small.en"  → better accuracy, more CPU (use later on PC if needed)
-    #
-    # For Raspberry Pi 5, keep "tiny.en" first to get low latency.
     model_size_or_path: "tiny.en"
-
-    # Device:
-    # - "cpu"   → Raspberry Pi, default
-    # - "cuda"  → PC with NVIDIA GPU (later, if you move STT off the Pi)
     device: "cpu"
-
-    # Compute type:
-    # - "int8" is a good tradeoff for ARM CPUs (lower memory + faster).
     compute_type: "int8"
-
-    # Language:
-    # - "en" for English. You can change later if needed.
     language: "en"
-
-    # Beam search size:
-    # - 3 is a good balance in noisy environments (faster than 5).
     beam_size: 3
 
     # ------------------------------------------------------------------------
     # Audio capture + VAD
     # ------------------------------------------------------------------------
 
-    # Input sample rate for STT:
-    # - 16000 Hz is standard for Whisper.
+    # 16 kHz audio, 3-second blocks
     sample_rate: 16000
-
-    # Length of each recorded block given to the STT engine (seconds).
-    # - Larger blocks → better context but more latency & risk of cutting sentences.
-    # - 3.0 s is a good compromise for short robot commands:
-    #   "Robot Savo, take me to A201", "Stop please", "Status", etc.
     block_duration_s: 3.0
 
-    # Energy threshold for simple VAD:
-    # - The node computes mean(x^2) over the block.
-    # - If energy < threshold → treated as silence/background, skip STT.
-    #
-    # Hallway tuning:
-    # - 0.003  → very sensitive (may trigger on crowd noise).
-    # - 0.008  → stricter, better in a busy corridor.
-    #
-    # Start with 0.008. If STT almost never triggers, lower slowly (0.006, 0.005).
-    energy_threshold: 0.008
+    # More sensitive for now; we saw energy ~0.000166 at rest.
+    # So 0.001 is a good starting point to actually trigger on speech.
+    energy_threshold: 0.001
 
-    # Minimum transcript length:
-    # - Ignore extremely short outputs (noise, single weird word).
-    # - 4 chars filters out “uh”, “ok?”, random noise tokens.
+    # Ignore very short junk
     min_transcript_chars: 4
+
+    # Force input device to ReSpeaker 4 Mic Array (index 0 from your listing)
+    # -1 = let sounddevice choose default
+    input_device_index: 0
 
     # ------------------------------------------------------------------------
     # ROS topics
     # ------------------------------------------------------------------------
-
-    # Topic where recognized text is published.
-    # - This is what savo_intent/intent_client_node listens to.
     publish_topic: "/savo_intent/user_text"
