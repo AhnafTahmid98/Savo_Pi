@@ -18,14 +18,16 @@ Publications
 
 - /savo_intent/intent_result  (savo_msgs/IntentResult)
     * Full result from the LLM server:
+        - stamp      (builtin_interfaces/Time, time when result was created)
+        - source     ("system", "mic", "keyboard", "test", ...)
+        - robot_id   (this robot, e.g. "robot_savo_pi")
         - user_text  (what the human said)
         - reply_text (what the robot should say)
         - intent     ("NAVIGATE", "FOLLOW", "STOP", "STATUS", "CHATBOT")
         - nav_goal   (canonical location like "A201" or "Info Desk" or "")
-        - tier_used  ("tier1", "tier2", "tier3")
-        - session_id (LLM session id)
-        - header.stamp (ROS time when the result was published)
-        - header.frame_id (set to robot_id)
+        - tier_used  ("tier1", "tier2", "tier3", or "tier_error")
+        - success    (True if the LLM call succeeded)
+        - error      (empty string on success, short reason on failure)
 
 Parameters
 ----------
@@ -191,6 +193,8 @@ class IntentClientNode(Node):
             nav_goal,
             tier_used,
             session_id,
+            success,
+            error_msg,
         ) = self.call_llm_chat(user_text_stripped)
 
         # ------------------------------------------------------------------
@@ -206,21 +210,33 @@ class IntentClientNode(Node):
         # Publish full IntentResult
         # ------------------------------------------------------------------
         result_msg = IntentResult()
-        # Header: time + frame_id = robot_id
-        result_msg.header.stamp = self.get_clock().now().to_msg()
-        result_msg.header.frame_id = self.robot_id
+
+        # ROS time stamp (matches NavState/RobotStatus style: field name 'stamp')
+        result_msg.stamp = self.get_clock().now().to_msg()
+
+        # Fill structured fields
+        # Source: where the text came from (for now, "system" because bridge)
+        result_msg.source = "system"
+        result_msg.robot_id = self.robot_id
 
         result_msg.user_text = user_text_stripped
         result_msg.reply_text = reply_text
         result_msg.intent = intent or ""
         result_msg.nav_goal = nav_goal or ""
         result_msg.tier_used = tier_used or ""
-        result_msg.session_id = session_id or self.robot_id
+        result_msg.success = success
+        result_msg.error = error_msg or ""
 
         self.intent_result_pub.publish(result_msg)
         self.get_logger().info(
-            "Published IntentResult: intent=%r, nav_goal=%r, tier=%r, session_id=%r"
-            % (result_msg.intent, result_msg.nav_goal, result_msg.tier_used, result_msg.session_id)
+            "Published IntentResult: intent=%r, nav_goal=%r, tier=%r, success=%r, error=%r"
+            % (
+                result_msg.intent,
+                result_msg.nav_goal,
+                result_msg.tier_used,
+                result_msg.success,
+                result_msg.error,
+            )
         )
 
     # ------------------------------------------------------------------
@@ -229,15 +245,23 @@ class IntentClientNode(Node):
     def call_llm_chat(
         self,
         user_text: str,
-    ) -> Tuple[str, Optional[str], Optional[str], Optional[str], Optional[str]]:
+    ) -> Tuple[
+        str,
+        Optional[str],
+        Optional[str],
+        Optional[str],
+        Optional[str],
+        bool,
+        str,
+    ]:
         """
         Call /chat on the LLM server.
 
         Returns:
-            (reply_text, intent, nav_goal, tier_used, session_id)
+            (reply_text, intent, nav_goal, tier_used, session_id, success, error_msg)
 
         On any error or timeout, we return a safe fallback reply and
-        (None, None, "tier_error", None).
+        success = False with a short error string.
         """
         url = self.llm_server_url.rstrip("/") + "/chat"
         self.get_logger().info("Calling LLM /chat at: %s" % url)
@@ -245,7 +269,7 @@ class IntentClientNode(Node):
         # Build JSON body following ChatRequest schema
         body: Dict[str, Any] = {
             "user_text": user_text,
-            "source": "system",  # from robot pipeline
+            "source": "system",  # from robot pipeline / ROS bridge
             "session_id": self.robot_id,
             "language": "en",
             "meta": {
@@ -273,10 +297,10 @@ class IntentClientNode(Node):
                 resp_raw = resp.read().decode("utf-8", errors="ignore")
         except urllib.error.HTTPError as exc:
             self.get_logger().error("HTTPError calling LLM /chat: %s" % (exc,))
-            return fallback_reply, None, None, "tier_error", None
+            return fallback_reply, None, None, "tier_error", None, False, "http_error"
         except urllib.error.URLError as exc:
             self.get_logger().error("URLError calling LLM /chat: %s" % (exc,))
-            return fallback_reply, None, None, "tier_error", None
+            return fallback_reply, None, None, "tier_error", None, False, "url_error"
         except TimeoutError as exc:
             self.get_logger().error(
                 "Error calling LLM /chat (TimeoutError): %r" % (exc,)
@@ -284,12 +308,12 @@ class IntentClientNode(Node):
             slow_reply = (
                 "Sorry, my brain server is too slow right now. I cannot answer this request."
             )
-            return slow_reply, None, None, "tier_error", None
+            return slow_reply, None, None, "tier_error", None, False, "timeout"
         except Exception as exc:
             self.get_logger().error(
                 "Unexpected error calling LLM /chat: %r" % (exc,)
             )
-            return fallback_reply, None, None, "tier_error", None
+            return fallback_reply, None, None, "tier_error", None, False, "exception"
 
         # Parse JSON reply
         try:
@@ -298,7 +322,7 @@ class IntentClientNode(Node):
             self.get_logger().error(
                 "Failed to parse LLM /chat JSON: %r, raw=%r" % (exc, resp_raw)
             )
-            return fallback_reply, None, None, "tier_error", None
+            return fallback_reply, None, None, "tier_error", None, False, "json_error"
 
         reply_text = obj.get("reply_text") or ""
         intent = obj.get("intent")
@@ -311,13 +335,18 @@ class IntentClientNode(Node):
                 "LLM /chat response missing reply_text; raw=%r" % (obj,)
             )
             reply_text = fallback_reply
+            success = False
+            error_msg = "missing_reply_text"
+        else:
+            success = True
+            error_msg = ""
 
         self.get_logger().info(
             "LLM /chat success. intent=%r, nav_goal=%r, tier=%r, session_id=%r, reply_text=%r"
             % (intent, nav_goal, tier_used, session_id, reply_text)
         )
 
-        return reply_text, intent, nav_goal, tier_used, session_id
+        return reply_text, intent, nav_goal, tier_used, session_id, success, error_msg
 
 
 # ---------------------------------------------------------------------------
