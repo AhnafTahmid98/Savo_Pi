@@ -9,7 +9,7 @@ Interactive controls (default):
   C     : center both servos (pan=90°, tilt=55° by default)
   Q or ESC : quit
 
-Ranges:
+Ranges:   
   Pan  : 0 .. 180 degrees
   Tilt : 45 .. 180 degrees (defaults, can be changed with CLI)
   Default tilt center = 55 degrees.
