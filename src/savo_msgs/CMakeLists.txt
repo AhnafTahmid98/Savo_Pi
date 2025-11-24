@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.8)
 project(savo_msgs)
 
 # ---------------------------------------------------------------------------
-# Compiler settings
+# Compiler settings (future-proof, even if we add C++ nodes later)
 # ---------------------------------------------------------------------------
 if(NOT CMAKE_C_STANDARD)
   set(CMAKE_C_STANDARD 99)
@@ -13,16 +13,26 @@ if(NOT CMAKE_CXX_STANDARD)
 endif()
 
 # ---------------------------------------------------------------------------
-# Dependencies
+# Core dependencies
 # ---------------------------------------------------------------------------
 find_package(ament_cmake REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 
-# If any of your .msg files use builtin_interfaces (time, duration) or
-# std_msgs types, keep these in DEPENDENCIES below.
+# Message type dependencies:
+# - builtin_interfaces: for Time/Duration in messages
+# - std_msgs         : for basic types (if we embed them later)
+# - geometry_msgs    : for Pose, Twist, etc. (used in NavState / RobotStatus)
+# - nav_msgs         : for Odometry (used in NavState)
+find_package(builtin_interfaces REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+
 set(ROSIDL_DEPENDENCIES
   builtin_interfaces
   std_msgs
+  geometry_msgs
+  nav_msgs
 )
 
 # ---------------------------------------------------------------------------
