@@ -27,7 +27,7 @@ tts_node:
 
     # Directory where local Piper models live on the Pi.
     # NOTE: This is NOT inside the ROS share directory.
-    # If you change the workspace path, update this.
+    # If you change the workspace path, update this path as well.
     model_dir: "/home/savo/Savo_Pi/models/piper"
 
     # Default voice profile Robot Savo will use for speech:
@@ -59,7 +59,7 @@ tts_node:
     # Most Piper English voices are trained for 22050 Hz.
     sample_rate: 22050
 
-    # Global volume gain (linear).
+    # Global TTS gain applied inside the synthesis engine (linear).
     #   1.0 → as-is
     #   0.7 → a bit quieter
     #   1.3 → slightly louder (watch for clipping)
@@ -69,13 +69,17 @@ tts_node:
     #   1.0 → normal speed
     #   0.9 → slightly slower, easier to understand
     #   1.1 → slightly faster
+    #
+    # NOTE: Currently logged and reserved for future fine-tuning; Piper’s
+    # Python API does not yet expose this directly in our wrapper.
     length_scale: 0.95
 
-    # Noise parameters (prosody / naturalness):
+    # Noise parameters (prosody / naturalness).
     # Typical Piper defaults are around:
     #   noise_scale ~ 0.667
     #   noise_w     ~ 0.8
-    # You can tweak later if speech sounds too “robotic” or too “noisy”.
+    #
+    # These are also reserved for future tuning in the engine wrapper.
     noise_scale: 0.667
     noise_w: 0.8
 
@@ -84,37 +88,42 @@ tts_node:
     # ------------------------------------------------------------------------
     #
     # sounddevice will use ALSA on the Pi.
-    # Use `python3 -c "import sounddevice as sd; print(sd.query_devices())"`
+    # Use:
+    #
+    #   python3 -c "import sounddevice as sd; print(sd.query_devices())"
+    #
     # to see device indices.
     #
     #   -1 → let sounddevice use its default output device.
     #    0 → force first device, etc.
     #
-    # For Robot Savo we usually keep -1 and control default via ALSA.
-    output_device_index: -1
+    # On your Pi, ReSpeaker 4 Mic Array (UAC1.0) shows as device 0 and both
+    # mic + 3.5mm output live on that card, so we force index 0 here.
+    output_device_index: 0
 
-    # Optional global output gain for safety at the playback stage
+    # Optional global output gain applied just before playback
     # (in case the generated audio is hot). Applied on top of `gain`.
     output_gain: 1.0
 
     # ------------------------------------------------------------------------
-    # ROS topics (input text + optional mouth animation)
+    # ROS topics (input text + optional "speech done" signal)
     # ------------------------------------------------------------------------
     #
     # Input text topic:
     #   - std_msgs/String
-    #   - Each message is one utterance.
+    #   - Each message is one utterance that should be spoken completely.
     #
     # In the future, higher-level nodes (intent, UI, Nav2) will publish here
     # whenever Robot Savo needs to speak to people.
 
     input_text_topic: "/savo_speech/tts_text"
 
-    # Optional “speech done” topic (Bool or empty std_msgs/Empty).
-    # The tts_node can publish here after finishing each utterance so that
-    # other nodes (UI, behavior manager) know when speaking is complete.
+    # “Speech done” topic:
+    #   - std_msgs/Empty (as implemented in tts_node.py)
+    #   - Published once per utterance after playback is finished.
     #
-    # Leave empty string "" if you don’t want to publish anything.
+    # Other nodes (savo_ui, behavior manager) can subscribe here if they need
+    # to know when the robot has finished talking.
     speech_done_topic: "/savo_speech/tts_done"
 
     # ------------------------------------------------------------------------
