@@ -3,320 +3,266 @@
 """
 Robot Savo — Piper TTS engine wrapper.
 
-This module hides the details of the piper-tts Python API behind a small,
-stable interface that TTSNode can use:
-
-    engine = PiperEngine(
-        model_dir="/home/savo/Savo_Pi/models/piper",
-        default_profile="male",
-        length_scale=0.95,
-        noise_scale=0.667,
-        noise_w=0.8,
-    )
-
-    pcm16, sample_rate = engine.synthesize_to_pcm16("Hello, world!")
+This module hides the Piper/PiperVoice internals behind a small, stable API
+so that the ROS 2 TTS node (tts_node.py) can stay focused on ROS logic.
 
 Design goals:
-- Load a small set of known voice profiles (male/female) for Robot Savo.
-- Use the piper-tts streaming API (synthesize with chunk_size) so we can
-  generate audio in chunks, but still return a single NumPy array to TTSNode.
-- Keep all TTS logic out of ROS nodes; TTSNode just calls this engine.
+- Simple API: initialize once, then call synthesize_to_pcm16(text).
+- Robust to different Piper versions (with/without synthesize_stream_raw).
+- Return raw int16 PCM + sample rate so the node can play or post-process.
 """
 
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Iterable, List, Optional, Tuple
 
 import numpy as np
+
 from piper.voice import PiperVoice  # provided by the piper-tts package
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class VoiceConfig:
-    """Configuration for a single Piper voice profile."""
-
-    profile_name: str          # "male" / "female" / etc.
-    base_name: str             # e.g. "en_US-ryan-high"
-    model_path: Path           # .onnx
-    config_path: Path          # .onnx.json
-    voice: PiperVoice          # loaded PiperVoice instance
-
-
 class PiperEngine:
     """
-    Wrapper around piper-tts's PiperVoice for Robot Savo.
+    Thin wrapper around PiperVoice.
 
-    Main methods:
-        - list_profiles() -> List[str]
-        - set_default_profile(name: str) -> None
-        - synthesize_to_pcm16(text: str, profile: Optional[str] = None)
-            -> Tuple[np.ndarray, int]
+    This class is designed to be created once per voice (e.g. "male" / "female")
+    and reused for many utterances.
+
+    Typical usage from tts_node.py:
+
+        engine = PiperEngine(
+            model_path="/home/savo/Savo_Pi/models/piper/en_US-ryan-high.onnx",
+            config_path="/home/savo/Savo_Pi/models/piper/en_US-ryan-high.onnx.json",
+            sample_rate=22050,
+            gain=1.0,
+            length_scale=0.95,
+            noise_scale=0.667,
+            noise_w=0.8,
+        )
+
+        pcm_i16, sr = engine.synthesize_to_pcm16("Hello, I am Robot Savo.")
     """
-
-    # Map high-level profiles to concrete Piper model base names
-    PROFILE_MAP: Dict[str, str] = {
-        "male": "en_US-ryan-high",
-        "female": "en_US-hfc_female-medium",
-    }
 
     def __init__(
         self,
-        model_dir: str,
-        default_profile: str = "male",
+        *,
+        model_path: str,
+        config_path: Optional[str] = None,
+        sample_rate: Optional[int] = None,
+        gain: float = 1.0,
         length_scale: float = 1.0,
         noise_scale: float = 0.667,
         noise_w: float = 0.8,
-        chunk_size: int = 2048,
     ) -> None:
         """
-        Initialize the PiperEngine.
+        Initialize a PiperEngine from a model + config.
 
         Parameters
         ----------
-        model_dir : str
-            Directory containing the .onnx and .onnx.json voice files.
-        default_profile : str
-            Human-readable profile key ("male", "female").
+        model_path : str
+            Full path to the .onnx model file.
+        config_path : Optional[str]
+            Full path to the .onnx.json config file.
+            If None, PiperVoice.load() will try "<model_path>.json".
+        sample_rate : Optional[int]
+            Desired output sample rate. If None, use voice.config.sample_rate.
+        gain : float
+            Linear gain applied to the int16 PCM (e.g. 1.0, 0.8, 1.2).
         length_scale : float
-            Speaking rate (not yet wired directly to piper; left for future).
+            Controls speaking rate (lower = slower, higher = faster).
         noise_scale : float
-            Noise scale (not yet wired directly; future tuning).
+            Controls prosody / variation.
         noise_w : float
-            Noise_w parameter (not yet wired directly; future tuning).
-        chunk_size : int
-            Number of samples per synthesized chunk when streaming.
+            Controls noise on the waveform.
         """
-        self.model_dir = Path(model_dir).expanduser()
+        self.model_path = model_path
+        self.config_path = config_path
+        self.gain = float(gain)
         self.length_scale = float(length_scale)
         self.noise_scale = float(noise_scale)
         self.noise_w = float(noise_w)
-        self.chunk_size = int(chunk_size)
-
-        if not self.model_dir.is_dir():
-            raise FileNotFoundError(f"PiperEngine: model_dir does not exist: {self.model_dir}")
 
         logger.info(
-            "PiperEngine: initializing from %s (default_profile=%s)",
-            self.model_dir,
-            default_profile,
+            "PiperEngine: loading model\n"
+            "  model_path  = %s\n"
+            "  config_path = %s\n"
+            "  gain        = %.3f\n"
+            "  length_scale= %.3f\n"
+            "  noise_scale = %.3f\n"
+            "  noise_w     = %.3f",
+            self.model_path,
+            self.config_path,
+            self.gain,
+            self.length_scale,
+            self.noise_scale,
+            self.noise_w,
         )
 
-        # Loaded voice configs keyed by profile ("male", "female", ...)
-        self._voices: Dict[str, VoiceConfig] = {}
-        self._default_profile: Optional[str] = None
-        self.sample_rate: int = 22050  # will be overwritten by first loaded voice
+        # Use CPU (Pi 5). If later you have a GPU on PC, you could flip use_cuda=True.
+        self._voice: PiperVoice = PiperVoice.load(
+            model_path=self.model_path,
+            config_path=self.config_path,
+            use_cuda=False,
+        )
 
-        self._load_all_profiles()
-        self.set_default_profile(default_profile)
+        # Decide final sample rate: param overrides config, else use config.
+        if sample_rate is not None and sample_rate > 0:
+            self.sample_rate: int = int(sample_rate)
+        else:
+            # Piper config knows its own training sample rate (e.g. 22050)
+            self.sample_rate = int(getattr(self._voice.config, "sample_rate", 22050))
+
+        # Detect which API surface is available on this PiperVoice implementation.
+        self._has_stream_raw: bool = hasattr(self._voice, "synthesize_stream_raw")
+        self._has_ids_to_raw: bool = hasattr(self._voice, "synthesize_ids_to_raw")
+        self._has_phonemize: bool = hasattr(self._voice, "phonemize")
+        self._has_phonemes_to_ids: bool = hasattr(self._voice, "phonemes_to_ids")
 
         logger.info(
-            "PiperEngine: loaded profiles: %s (sample_rate=%d Hz)",
-            ", ".join(sorted(self._voices.keys())),
+            "PiperEngine: voice loaded (sample_rate=%d Hz, stream_raw=%s, ids_to_raw=%s)",
             self.sample_rate,
+            self._has_stream_raw,
+            self._has_ids_to_raw,
         )
 
     # ------------------------------------------------------------------ #
     # Public API                                                         #
     # ------------------------------------------------------------------ #
 
-    def list_profiles(self) -> List[str]:
-        """Return the list of available profiles (e.g. ['female', 'male'])."""
-        return sorted(self._voices.keys())
-
-    def set_default_profile(self, profile: str) -> None:
+    def synthesize_to_pcm16(self, text: str) -> Tuple[np.ndarray, int]:
         """
-        Set the default voice profile.
-
-        If the requested profile is not available, we keep the existing default
-        and log a warning.
-        """
-        if profile not in self._voices:
-            logger.warning(
-                "PiperEngine.set_default_profile(): profile '%s' not available. "
-                "Available: %s",
-                profile,
-                ", ".join(self.list_profiles()),
-            )
-            if self._default_profile is None and self._voices:
-                # fall back to the first known voice
-                self._default_profile = self.list_profiles()[0]
-            return
-
-        self._default_profile = profile
-        logger.info("PiperEngine: default profile set to '%s'", profile)
-
-    def synthesize_to_pcm16(
-        self,
-        text: str,
-        profile: Optional[str] = None,
-    ) -> Tuple[np.ndarray, int]:
-        """
-        Synthesize speech to a NumPy int16 PCM array.
-
-        Parameters
-        ----------
-        text : str
-            Text to speak.
-        profile : Optional[str]
-            Optional profile override ("male", "female"). If None, use the
-            current default profile.
+        Synthesize speech for `text` and return (pcm_int16, sample_rate).
 
         Returns
         -------
-        pcm16 : np.ndarray
-            1D NumPy array of dtype=int16. May be empty on failure.
+        pcm : np.ndarray
+            1D numpy array, dtype=int16. Empty array if synthesis fails.
         sample_rate : int
-            Sample rate in Hz (from Piper config).
+            Sample rate in Hz (usually 22050).
         """
-        text = self._normalize_text(text)
-
         if not text:
             logger.debug("PiperEngine.synthesize_to_pcm16() called with empty text")
-            return np.zeros(0, dtype=np.int16), self.sample_rate
+            return np.zeros((0,), dtype=np.int16), self.sample_rate
 
-        voice_cfg = self._select_voice(profile)
-        if voice_cfg is None:
-            logger.error("PiperEngine.synthesize_to_pcm16(): no voice available")
-            return np.zeros(0, dtype=np.int16), self.sample_rate
-
-        logger.debug(
-            "PiperEngine: synthesizing text (%d chars) with profile '%s'",
-            len(text),
-            voice_cfg.profile_name,
-        )
-
-        # piper-tts streaming API:
-        #   for audio_chunk in voice.synthesize(text, chunk_size=...):
-        #       audio_chunk is a NumPy int16 array of PCM samples
-        pcm_chunks: List[bytes] = []
+        text_clean = text.strip()
+        if not text_clean:
+            logger.debug("PiperEngine.synthesize_to_pcm16(): text only whitespace")
+            return np.zeros((0,), dtype=np.int16), self.sample_rate
 
         try:
-            for chunk in voice_cfg.voice.synthesize(text, chunk_size=self.chunk_size):
-                # chunk may be a NumPy array or something array-like
-                if hasattr(chunk, "tobytes"):
-                    pcm_chunks.append(chunk.tobytes())
-                else:
-                    arr = np.asarray(chunk, dtype=np.int16)
-                    pcm_chunks.append(arr.tobytes())
+            if self._has_stream_raw:
+                pcm = self._synthesize_via_stream_raw(text_clean)
+            elif self._has_ids_to_raw and self._has_phonemize and self._has_phonemes_to_ids:
+                pcm = self._synthesize_via_ids_path(text_clean)
+            else:
+                logger.error(
+                    "PiperEngine: PiperVoice lacks both synthesize_stream_raw() "
+                    "and synthesize_ids_to_raw()/phonemize(). Cannot synthesize."
+                )
+                return np.zeros((0,), dtype=np.int16), self.sample_rate
 
         except Exception as exc:  # noqa: BLE001
             logger.error("PiperEngine.synthesize_to_pcm16() failed: %s", exc)
-            return np.zeros(0, dtype=np.int16), self.sample_rate
+            return np.zeros((0,), dtype=np.int16), self.sample_rate
 
-        if not pcm_chunks:
-            logger.warning(
-                "PiperEngine.synthesize_to_pcm16(): no audio chunks produced for text '%s'",
-                text,
+        if pcm.size == 0:
+            return pcm, self.sample_rate
+
+        # Apply gain and clip to int16 range.
+        if self.gain != 1.0:
+            pcm = np.clip(pcm.astype(np.float32) * self.gain, -32768, 32767).astype(
+                np.int16
             )
-            return np.zeros(0, dtype=np.int16), self.sample_rate
 
-        pcm_bytes = b"".join(pcm_chunks)
-        pcm16 = np.frombuffer(pcm_bytes, dtype=np.int16)
-
-        logger.debug(
-            "PiperEngine: synthesized %d samples at %d Hz for text '%s'",
-            pcm16.size,
-            self.sample_rate,
-            text,
-        )
-        return pcm16, self.sample_rate
+        return pcm, self.sample_rate
 
     # ------------------------------------------------------------------ #
     # Internal helpers                                                   #
     # ------------------------------------------------------------------ #
 
-    def _select_voice(self, profile: Optional[str]) -> Optional[VoiceConfig]:
-        """Return the VoiceConfig for the requested or default profile."""
-        if profile and profile in self._voices:
-            return self._voices[profile]
-
-        if self._default_profile and self._default_profile in self._voices:
-            return self._voices[self._default_profile]
-
-        # Fallback: any available voice
-        if self._voices:
-            return self._voices[self.list_profiles()[0]]
-
-        return None
-
-    def _load_all_profiles(self) -> None:
-        """Load all known profiles (male/female) that have model files."""
-        for profile_name, base_name in self.PROFILE_MAP.items():
-            try:
-                model_path, config_path = self._resolve_voice_paths(base_name)
-            except FileNotFoundError as exc:
-                logger.warning(
-                    "PiperEngine: missing files for profile '%s' (%s): %s",
-                    profile_name,
-                    base_name,
-                    exc,
-                )
-                continue
-
-            try:
-                voice = PiperVoice.load(str(model_path), str(config_path))
-            except Exception as exc:  # noqa: BLE001
-                logger.error(
-                    "PiperEngine: failed to load PiperVoice for profile '%s' "
-                    "(model=%s, config=%s): %s",
-                    profile_name,
-                    model_path,
-                    config_path,
-                    exc,
-                )
-                continue
-
-            cfg = VoiceConfig(
-                profile_name=profile_name,
-                base_name=base_name,
-                model_path=model_path,
-                config_path=config_path,
-                voice=voice,
-            )
-            self._voices[profile_name] = cfg
-
-            # Use the first successfully loaded voice to set sample_rate
-            if len(self._voices) == 1:
-                try:
-                    self.sample_rate = int(voice.config.sample_rate)
-                except Exception:  # noqa: BLE001
-                    # Fallback to a common Piper default if config missing
-                    self.sample_rate = 22050
-
-        if not self._voices:
-            raise RuntimeError(
-                f"PiperEngine: no usable voices found in {self.model_dir}. "
-                "Expected files like 'en_US-ryan-high.onnx' and "
-                "'en_US-ryan-high.onnx.json'."
-            )
-
-    def _resolve_voice_paths(self, base_name: str) -> Tuple[Path, Path]:
+    def _synthesize_via_stream_raw(self, text: str) -> np.ndarray:
         """
-        Return (model_path, config_path) for a given base name.
+        Use PiperVoice.synthesize_stream_raw() if available.
 
-        base_name="en_US-ryan-high" -> model_path=".../en_US-ryan-high.onnx",
-                                       config_path=".../en_US-ryan-high.onnx.json"
+        This is the preferred path on modern Piper versions.
         """
-        model_path = self.model_dir / f"{base_name}.onnx"
-        config_path = self.model_dir / f"{base_name}.onnx.json"
+        assert self._has_stream_raw, "synthesize_stream_raw must exist here"
 
-        if not model_path.is_file():
-            raise FileNotFoundError(f"Model file not found: {model_path}")
-        if not config_path.is_file():
-            raise FileNotFoundError(f"Config file not found: {config_path}")
+        chunks: List[bytes] = []
 
-        return model_path, config_path
+        logger.debug(
+            "PiperEngine._synthesize_via_stream_raw(): text='%s'",
+            text,
+        )
 
-    @staticmethod
-    def _normalize_text(text: str) -> str:
-        """Simple normalization for input text."""
-        if text is None:
-            return ""
-        # Collapse whitespace and strip
-        normalized = " ".join(str(text).split())
-        return normalized.strip()
+        # sentence_silence = 0.0 → we control pauses at higher level if needed.
+        for audio_bytes in self._voice.synthesize_stream_raw(
+            text,
+            speaker_id=None,
+            length_scale=self.length_scale,
+            noise_scale=self.noise_scale,
+            noise_w=self.noise_w,
+            sentence_silence=0.0,
+        ):
+            if audio_bytes:
+                chunks.append(audio_bytes)
+
+        if not chunks:
+            logger.warning(
+                "PiperEngine._synthesize_via_stream_raw(): no audio chunks produced"
+            )
+            return np.zeros((0,), dtype=np.int16)
+
+        raw = b"".join(chunks)
+        pcm = np.frombuffer(raw, dtype=np.int16)
+
+        logger.debug(
+            "PiperEngine._synthesize_via_stream_raw(): produced %d samples", pcm.size
+        )
+        return pcm
+
+    def _synthesize_via_ids_path(self, text: str) -> np.ndarray:
+        """
+        Fallback path for older Piper implementations without synthesize_stream_raw().
+
+        We manually:
+          1) phonemize text → per-sentence phoneme lists
+          2) convert phonemes → ids
+          3) call synthesize_ids_to_raw()
+        """
+        assert self._has_ids_to_raw and self._has_phonemize and self._has_phonemes_to_ids
+
+        logger.debug("PiperEngine._synthesize_via_ids_path(): text='%s'", text)
+
+        # sentence_phonemes: List[List[str]]
+        sentence_phonemes: Iterable[List[str]] = self._voice.phonemize(text)
+        raw_chunks: List[bytes] = []
+
+        for phonemes in sentence_phonemes:
+            phoneme_ids = self._voice.phonemes_to_ids(phonemes)
+            raw_bytes = self._voice.synthesize_ids_to_raw(
+                phoneme_ids,
+                speaker_id=None,
+                length_scale=self.length_scale,
+                noise_scale=self.noise_scale,
+                noise_w=self.noise_w,
+            )
+            if raw_bytes:
+                raw_chunks.append(raw_bytes)
+
+        if not raw_chunks:
+            logger.warning(
+                "PiperEngine._synthesize_via_ids_path(): no audio produced for text"
+            )
+            return np.zeros((0,), dtype=np.int16)
+
+        raw = b"".join(raw_chunks)
+        pcm = np.frombuffer(raw, dtype=np.int16)
+
+        logger.debug(
+            "PiperEngine._synthesize_via_ids_path(): produced %d samples", pcm.size
+        )
+        return pcm
