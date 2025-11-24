@@ -1,21 +1,19 @@
 #!/usr/bin/env python3
 """
-Robot Savo — Intent Client Node (ROS2 ↔ LLM server bridge)
+Robot Savo — LLM Intent Client Node
 
-- Subscribes to: /savo_intent/user_text   (std_msgs/String)
-- Calls:        LLM server /health and /chat (HTTP)
-- Publishes to: /savo_intent/reply_text  (std_msgs/String)
+This ROS2 node acts as a bridge between ROS and the Robot Savo LLM server.
 
-Parameters:
-  - llm_server_url (string): "http://<PC_IP>:8000"
-  - robot_id       (string): "robot_savo_pi" (for session_id)
-  - timeout_s      (double): HTTP timeout in seconds (default 4.0)
+ROS topics:
+- Subscribes: /savo_intent/user_text   (std_msgs/String)
+- Publishes : /savo_intent/reply_text  (std_msgs/String)
+
+It sends user_text to the LLM server /chat endpoint and publishes the reply_text.
 """
 
 import json
-import sys
-import urllib.error
 import urllib.request
+import urllib.error
 from typing import Optional
 
 import rclpy
@@ -24,39 +22,51 @@ from std_msgs.msg import String
 
 
 class IntentClientNode(Node):
+    """
+    ROS2 node that talks to the LLM server and bridges user_text <-> reply_text.
+    """
+
     def __init__(self) -> None:
         super().__init__("intent_client_node")
 
-        # --- Declare parameters with defaults ---
-        self.declare_parameter("llm_server_url", "http://127.0.0.1:8000")
-        self.declare_parameter("robot_id", "robot_savo_pi")
-        self.declare_parameter("timeout_s", 4.0)
+        # --- Parameters -----------------------------------------------------
+        llm_server_param = self.declare_parameter(
+            "llm_server_url",
+            "http://127.0.0.1:8000",
+        )
+        robot_id_param = self.declare_parameter(
+            "robot_id",
+            "robot_savo_pi",
+        )
+        timeout_param = self.declare_parameter(
+            "timeout_s",
+            1.8,
+        )
 
-        # --- Read parameters (values from launch/CLI override defaults) ---
-        self.llm_server_url: str = str(
-            self.get_parameter("llm_server_url").get_parameter_value().string_value
-        )
-        self.robot_id: str = str(
-            self.get_parameter("robot_id").get_parameter_value().string_value
-        )
-        # Use double_value; fallback to default if not set as double
-        timeout_param = self.get_parameter("timeout_s").get_parameter_value()
-        if timeout_param.type_ == timeout_param.Type.DOUBLE:
-            self.timeout_s = float(timeout_param.double_value)
-        else:
-            # Fallback path (e.g. if parameter came as integer)
-            try:
-                self.timeout_s = float(timeout_param.integer_value)
-            except Exception:
-                self.timeout_s = 4.0
+        self.llm_server_url = str(llm_server_param.value).rstrip("/")
+        self.robot_id = str(robot_id_param.value)
+
+        # Parse timeout as float safely
+        try:
+            self.timeout_s = float(timeout_param.value)
+        except Exception:
+            self.get_logger().warn(
+                f"Invalid timeout_s parameter '{timeout_param.value}', "
+                "falling back to 1.8s"
+            )
+            self.timeout_s = 1.8
+
+        # Session ID: we keep one session per robot instance
+        self.session_id = f"ros2-{self.robot_id}"
 
         self.get_logger().info(
-            f"IntentClientNode starting with LLM server URL: {self.llm_server_url}, "
-            f"robot_id: {self.robot_id}, timeout: {self.timeout_s:.2f}s"
+            "IntentClientNode starting with "
+            f"LLM server URL: {self.llm_server_url}, "
+            f"robot_id: {self.robot_id}, "
+            f"timeout: {self.timeout_s:.2f}s"
         )
 
-        # --- Publishers / Subscribers ---
-        self.reply_pub = self.create_publisher(String, "/savo_intent/reply_text", 10)
+        # --- ROS I/O --------------------------------------------------------
         self.user_sub = self.create_subscription(
             String,
             "/savo_intent/user_text",
@@ -64,120 +74,138 @@ class IntentClientNode(Node):
             10,
         )
 
-        # Check /health once on startup so we see if the LLM server is alive
+        self.reply_pub = self.create_publisher(
+            String,
+            "/savo_intent/reply_text",
+            10,
+        )
+
+        # --- Optional: initial health check --------------------------------
         self._check_health_once()
 
-    # ------------------------------------------------------------------
-    # HTTP helpers
-    # ------------------------------------------------------------------
-    def _build_url(self, path: str) -> str:
-        base = self.llm_server_url.rstrip("/")
-        path = path.lstrip("/")
-        return f"{base}/{path}"
-
-    def _http_post_json(self, url: str, payload: dict) -> Optional[dict]:
-        """
-        Simple blocking HTTP POST with timeout and JSON decode.
-        Returns dict on success, None on any error.
-        """
-        try:
-            data = json.dumps(payload).encode("utf-8")
-            req = urllib.request.Request(
-                url,
-                data=data,
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=self.timeout_s) as resp:
-                body = resp.read().decode("utf-8")
-            return json.loads(body)
-        except urllib.error.URLError as e:
-            self.get_logger().error(
-                f"Error calling {url}: {e}. Payload={payload!r}"
-            )
-        except Exception as e:
-            self.get_logger().error(
-                f"Unexpected error calling {url}: {e}. Payload={payload!r}"
-            )
-        return None
-
-    # ------------------------------------------------------------------
-    # Startup /health check
-    # ------------------------------------------------------------------
+    # ----------------------------------------------------------------------
+    # Internal helpers
+    # ----------------------------------------------------------------------
     def _check_health_once(self) -> None:
-        url = self._build_url("/health")
+        """Check LLM /health endpoint once at startup and log the result."""
+        url = f"{self.llm_server_url}/health"
         self.get_logger().info(f"Checking LLM server /health at: {url}")
+
         try:
             with urllib.request.urlopen(url, timeout=self.timeout_s) as resp:
-                body = resp.read().decode("utf-8")
-            self.get_logger().info(f"LLM server /health response: {body}")
-        except Exception as e:
+                data = resp.read().decode("utf-8", errors="ignore")
+                self.get_logger().info(f"LLM server /health response: {data}")
+        except Exception as exc:
             self.get_logger().error(
-                f"Failed to reach LLM server /health: {e}. "
-                f"Robot will still run but will use fallback replies."
+                f"Failed to reach LLM server /health: {exc!r}. "
+                "Node will still run, but calls may fail."
             )
 
-    # ------------------------------------------------------------------
-    # ROS callback for incoming text
-    # ------------------------------------------------------------------
-    def user_text_callback(self, msg: String) -> None:
-        user_text = msg.data.strip()
-        if not user_text:
-            return
+    def _call_llm_chat(self, user_text: str) -> Optional[str]:
+        """
+        Call the LLM server /chat endpoint with user_text.
 
-        self.get_logger().info(f"Received user_text: {user_text!r}")
-
-        url = self._build_url("/chat")
+        Returns:
+            reply_text as string if successful, otherwise None.
+        """
+        url = f"{self.llm_server_url}/chat"
         payload = {
             "user_text": user_text,
-            # 'source' must be one of: 'mic', 'keyboard', 'system', 'test'
+            # For now we use 'system'. Later we can distinguish 'mic' vs 'keyboard'.
             "source": "system",
-            # Use robot_id as session_id so the server keeps history per robot
-            "session_id": self.robot_id,
+            "session_id": self.session_id,
         }
 
-        response = self._http_post_json(url, payload)
-        if response is None:
-            # HTTP error or timeout -> publish fallback
-            self._publish_fallback()
-            return
+        body = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            url,
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
 
-        reply_text = str(response.get("reply_text", "")).strip()
-        if not reply_text:
-            self.get_logger().warn(
-                "LLM /chat response had no reply_text. Using fallback."
+        self.get_logger().info(f"Calling LLM /chat at: {url}")
+
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout_s) as resp:
+                raw = resp.read().decode("utf-8", errors="ignore")
+        except urllib.error.URLError as exc:
+            self.get_logger().error(f"Error calling LLM /chat: {exc!r}")
+            return None
+        except Exception as exc:
+            self.get_logger().error(f"Unexpected error calling LLM /chat: {exc!r}")
+            return None
+
+        # Parse JSON
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            self.get_logger().error(
+                f"Failed to parse LLM /chat JSON: {exc!r}, raw={raw!r}"
             )
-            self._publish_fallback()
-            return
+            return None
 
-        # Normal happy path: publish LLM reply_text to ROS
-        out = String()
-        out.data = reply_text
-        self.reply_pub.publish(out)
-        self.get_logger().info(f"Published reply_text: {reply_text!r}")
+        reply_text = data.get("reply_text")
+        if not isinstance(reply_text, str):
+            self.get_logger().error(
+                f"LLM /chat response missing valid 'reply_text': {data!r}"
+            )
+            return None
+
+        self.get_logger().info(
+            f"LLM /chat success. intent={data.get('intent')}, "
+            f"nav_goal={data.get('nav_goal')}, reply_text={reply_text!r}"
+        )
+        return reply_text
+
+    def _publish_reply(self, text: str) -> None:
+        """Publish reply_text on /savo_intent/reply_text."""
+        msg = String()
+        msg.data = text
+        self.reply_pub.publish(msg)
+        self.get_logger().info(f"Published reply_text: {text!r}")
 
     def _publish_fallback(self) -> None:
-        """Safe fallback sentence when LLM server fails or times out."""
+        """Publish a safe fallback reply if LLM call fails."""
         fallback = (
             "Sorry, my brain server has a problem now. "
             "I cannot handle this request."
         )
-        msg = String()
-        msg.data = fallback
-        self.reply_pub.publish(msg)
-        self.get_logger().warn("Published fallback reply_text.")
+        self._publish_reply(fallback)
+
+    # ----------------------------------------------------------------------
+    # ROS callbacks
+    # ----------------------------------------------------------------------
+    def user_text_callback(self, msg: String) -> None:
+        """Handle incoming user_text from ROS."""
+        user_text = msg.data.strip()
+        if not user_text:
+            self.get_logger().warn("Received empty user_text; ignoring.")
+            return
+
+        self.get_logger().info(f"Received user_text: {user_text!r}")
+
+        reply = self._call_llm_chat(user_text)
+        if reply is None:
+            self._publish_fallback()
+        else:
+            self._publish_reply(reply)
 
 
 def main(args=None) -> None:
     rclpy.init(args=args)
-    node = IntentClientNode()
+    node = None
     try:
+        node = IntentClientNode()
         rclpy.spin(node)
     except KeyboardInterrupt:
-        node.get_logger().info("Shutting down IntentClientNode (Ctrl+C).")
+        if node is not None:
+            node.get_logger().info("Shutting down IntentClientNode (Ctrl+C).")
     finally:
-        node.destroy_node()
-        rclpy.shutdown()
+        if node is not None:
+            node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == "__main__":
