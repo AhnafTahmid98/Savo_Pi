@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 import numpy as np
-from piper.voice import PiperVoice  # provided by the piper-tts package
+from piper import PiperVoice  # provided by the piper-tts package
 
 logger = logging.getLogger(__name__)
 
