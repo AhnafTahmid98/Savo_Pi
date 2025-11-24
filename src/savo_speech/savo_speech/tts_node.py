@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 # Target playback sample rate for the audio device.
 # ReSpeaker 4-Mic Array is usually fine with 16000 or 48000.
-TARGET_PLAYBACK_SR = 48000  # you can change to 16000 if needed
+TARGET_PLAYBACK_SR = 16000  # you can change to 16000 if needed
 
 
 class TTSNode(Node):
