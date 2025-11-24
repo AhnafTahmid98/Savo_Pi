@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Robot Savo — TTS Node (Piper-based)
 
@@ -64,7 +66,8 @@ class TTSNode(Node):
         self.declare_parameter("female_config_file", "en_US-hfc_female-medium.onnx.json")
 
         # Synthesis controls (Piper-level)
-        self.declare_parameter("sample_rate", 22050)  # informational; Piper decides
+        # We use sample_rate only for playback; Piper config has the true rate.
+        self.declare_parameter("sample_rate", 22050)
         self.declare_parameter("gain", 1.0)
         self.declare_parameter("length_scale", 0.95)
         self.declare_parameter("noise_scale", 0.667)
@@ -96,11 +99,21 @@ class TTSNode(Node):
         self.male_model_file: str = (
             self.get_parameter("male_model_file").get_parameter_value().string_value
         )
+        self.male_config_file: str = (
+            self.get_parameter("male_config_file").get_parameter_value().string_value
+        )
+
         self.female_model_file: str = (
             self.get_parameter("female_model_file").get_parameter_value().string_value
         )
+        self.female_config_file: str = (
+            self.get_parameter("female_config_file").get_parameter_value().string_value
+        )
 
-        # Synthesis params
+        # Synthesis params (used for logging + gain; PiperEngine handles internals)
+        self.sample_rate: int = (
+            self.get_parameter("sample_rate").get_parameter_value().integer_value
+        )
         self.gain: float = self.get_parameter("gain").get_parameter_value().double_value
         self.length_scale: float = (
             self.get_parameter("length_scale").get_parameter_value().double_value
@@ -148,29 +161,34 @@ class TTSNode(Node):
         model_dir_path = Path(self.model_dir)
 
         try:
+            # Male
             male_model_path = model_dir_path / self.male_model_file
-            if male_model_path.is_file():
+            male_config_path = model_dir_path / self.male_config_file
+            if male_model_path.is_file() and male_config_path.is_file():
                 self._engines["male"] = PiperEngine(
-                    model_path=male_model_path,
-                    speaker_id=None,
-                    max_chars=self.max_logged_chars,
+                    male_model_path,
+                    male_config_path,
                 )
             else:
                 self.get_logger().warn(
-                    f"TTSNode: male model file not found: {male_model_path}"
+                    f"TTSNode: male model/config not found: "
+                    f"{male_model_path} / {male_config_path}"
                 )
 
+            # Female
             female_model_path = model_dir_path / self.female_model_file
-            if female_model_path.is_file():
+            female_config_path = model_dir_path / self.female_config_file
+            if female_model_path.is_file() and female_config_path.is_file():
                 self._engines["female"] = PiperEngine(
-                    model_path=female_model_path,
-                    speaker_id=None,
-                    max_chars=self.max_logged_chars,
+                    female_model_path,
+                    female_config_path,
                 )
             else:
                 self.get_logger().warn(
-                    f"TTSNode: female model file not found: {female_model_path}"
+                    f"TTSNode: female model/config not found: "
+                    f"{female_model_path} / {female_config_path}"
                 )
+
         except Exception as exc:  # noqa: BLE001
             self.get_logger().error(f"TTSNode: failed to initialize PiperEngine(s): {exc}")
 
@@ -219,9 +237,10 @@ class TTSNode(Node):
             f"  voice_profile    = {self.voice_profile}\n"
             f"  gain             = {self.gain:.3f}\n"
             f"  output_gain      = {self.output_gain:.3f}\n"
-            f"  length_scale     = {self.length_scale:.3f} (not yet wired)\n"
-            f"  noise_scale      = {self.noise_scale:.3f} (not yet wired)\n"
-            f"  noise_w          = {self.noise_w:.3f} (not yet wired)\n"
+            f"  length_scale     = {self.length_scale:.3f} (reserved)\n"
+            f"  noise_scale      = {self.noise_scale:.3f} (reserved)\n"
+            f"  noise_w          = {self.noise_w:.3f} (reserved)\n"
+            f"  sample_rate      = {self.sample_rate}\n"
             f"  output_device    = {self.output_device_index}\n"
             f"  input_text_topic = {self.input_text_topic}\n"
             f"  speech_done_topic= {self.speech_done_topic or '(disabled)'}\n"
@@ -317,33 +336,38 @@ class TTSNode(Node):
 
         self._log_text_preview(text)
 
-        # Synthesize audio
+        # ----------------- Synthesize audio via PiperEngine -----------------
         try:
-            audio_f32, sr = engine.synthesize_to_float32(text)
+            # PiperEngine currently exposes synthesize_to_pcm16(text)
+            # which returns a mono int16 NumPy array.
+            audio_i16 = engine.synthesize_to_pcm16(text)
         except Exception as exc:  # noqa: BLE001
             self.get_logger().error(f"TTSNode: TTS synthesis failed: {exc}")
             return
 
-        if audio_f32.size == 0:
+        if audio_i16 is None or audio_i16.size == 0:
             self.get_logger().warn("TTSNode: TTS produced empty audio, skipping playback")
             return
 
-        # Apply gains (Piper gain + playback gain)
+        # Convert int16 [-32768, 32767] → float32 [-1, 1]
+        audio_f32 = audio_i16.astype(np.float32) / 32768.0
+
+        # Apply gains (Piper-level gain + playback gain)
         total_gain = float(self.gain * self.output_gain)
         if total_gain != 1.0:
-            audio_f32 = audio_f32 * total_gain
+            audio_f32 *= total_gain
 
         # Clip again just in case
-        if np.max(np.abs(audio_f32)) > 1.0:
+        max_abs = float(np.max(np.abs(audio_f32)))
+        if max_abs > 1.0:
             audio_f32 = np.clip(audio_f32, -1.0, 1.0)
 
-        # Playback — we use a simple "mouth fully open during speech" model for now.
-        # In the future, we can split audio into chunks and drive mouth_anim at
-        # mouth_anim_rate_hz with a basic envelope.
+        # Playback — simple "mouth fully open during speech" model for now.
         self._publish_mouth_open(1.0)
         try:
             device = None if self.output_device_index < 0 else self.output_device_index
-            play_pcm(audio_f32, sample_rate=sr, device=device)
+            # Use configured sample_rate for playback (Piper voices are 22050 Hz)
+            play_pcm(audio_f32, sample_rate=self.sample_rate, device=device)
         except Exception as exc:  # noqa: BLE001
             self.get_logger().error(f"TTSNode: audio playback failed: {exc}")
         finally:
