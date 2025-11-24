@@ -3,16 +3,16 @@
 # Robot Savo — ROS 2 Jazzy environment setup
 #
 # Location (in repo):
-#   savo_ws/tools/scripts/env.sh
+#   tools/scripts/env.sh
 #
-# Usage (in every new terminal on the Pi):
-#   cd ~/Savo_Pi/savo_ws
+# Usage (in every new terminal on the Pi or PC:
+#   cd ~/Savo_Pi
 #   source tools/scripts/env.sh
 #
 # This script:
 #   - Sources /opt/ros/jazzy
 #   - Sources this workspace's install/setup.bash
-#   - Fixes PATH so ~/.local/bin tools (pip --user) are usable
+#   - Ensures ~/.local/bin is on PATH (for pip --user tools)
 #   - Prints a short status line
 # =============================================================================
 
@@ -27,13 +27,12 @@ _die() {
 # 1. Resolve workspace root (two levels up from this script)
 #    tools/scripts/env.sh -> workspace root = ../..
 # -----------------------------------------------------------------------------
-# BASH_SOURCE[0] works when sourced; $0 is fallback if executed.
 SCRIPT_PATH="${BASH_SOURCE[0]:-$0}"
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 WS_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # Allow overriding from outside if needed:
-#   export WS_ROOT=/some/other/path; source env.sh
+#   export WS_ROOT_OVERRIDE=/some/other/path; source tools/scripts/env.sh
 WS_ROOT="${WS_ROOT_OVERRIDE:-$WS_ROOT}"
 
 if [ ! -d "$WS_ROOT" ]; then
@@ -46,7 +45,7 @@ fi
 ROS_SETUP="/opt/ros/jazzy/setup.bash"
 
 if [ -f "$ROS_SETUP" ]; then
-  # shellcheck source=/dev/null
+  # shellcheck disable=SC1090
   source "$ROS_SETUP"
 else
   _die "ROS 2 Jazzy not found at $ROS_SETUP. Is ROS installed?"
@@ -58,7 +57,7 @@ fi
 WS_INSTALL_SETUP="$WS_ROOT/install/setup.bash"
 
 if [ -f "$WS_INSTALL_SETUP" ]; then
-  # shellcheck source=/dev/null
+  # shellcheck disable=SC1090
   source "$WS_INSTALL_SETUP"
 else
   echo "[env.sh] WARNING: $WS_INSTALL_SETUP not found."
@@ -66,7 +65,7 @@ else
 fi
 
 # -----------------------------------------------------------------------------
-# 4. Quality-of-life: ensure ~/.local/bin is on PATH (for pip --user tools)
+# 4. Ensure ~/.local/bin is on PATH (for pip --user tools like faster-whisper)
 # -----------------------------------------------------------------------------
 if [ -d "$HOME/.local/bin" ]; then
   case ":$PATH:" in
@@ -75,13 +74,13 @@ if [ -d "$HOME/.local/bin" ]; then
       export PATH="$HOME/.local/bin:$PATH"
       ;;
   esac
-fi`
+fi
 
 # -----------------------------------------------------------------------------
 # 5. Optional debug/diagnostics env (safe defaults)
 # -----------------------------------------------------------------------------
 # Show Python warnings (useful during development; comment out if annoying)
-export PYTHONWARNINGS=${PYTHONWARNINGS:-default}
+export PYTHONWARNINGS="${PYTHONWARNINGS:-default}"
 
 # You can set a fixed ROS_DOMAIN_ID for Robot Savo here if you want:
 # export ROS_DOMAIN_ID=42
