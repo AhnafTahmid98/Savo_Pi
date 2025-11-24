@@ -1,0 +1,54 @@
+# Robot Savo — Mouth Animation configuration
+#
+# This file configures the mouth_anim node in the savo_speech package.
+#
+# Usage (on the Pi, after building and sourcing env.sh):
+#
+#   ros2 run savo_speech mouth_anim \
+#     --ros-args \
+#       --params-file $(ros2 pkg prefix savo_speech)/share/savo_speech/config/mouth_anim.yaml
+#
+# The TTS node should publish Float32 in [0.0, 1.0] to /savo_speech/mouth_activity.
+# This node smooths that into a nicer UI mouth level on /savo_ui/mouth_level.
+
+mouth_anim:
+  ros__parameters:
+
+    # ------------------------------------------------------------------------
+    # Topics
+    # ------------------------------------------------------------------------
+
+    # Input: raw mouth activity from TTS (0.0–1.0, may be spiky/noisy)
+    input_topic: "/savo_speech/mouth_activity"
+
+    # Output: smoothed mouth level for the UI (0.0–1.0)
+    output_topic: "/savo_ui/mouth_level"
+
+    # ------------------------------------------------------------------------
+    # Update rate
+    # ------------------------------------------------------------------------
+
+    # How often to update the mouth level and publish to the UI (Hz).
+    # 30 Hz gives smooth animation without being too heavy.
+    update_rate_hz: 30.0
+
+    # ------------------------------------------------------------------------
+    # Smoothing / animation behavior
+    # ------------------------------------------------------------------------
+
+    # How fast the mouth opens when activity goes up.
+    # Higher = snappier open. 0.4–0.7 is a good range.
+    attack_gain: 0.6
+
+    # How fast the mouth closes when activity goes down.
+    # Lower = smoother closing. 0.1–0.3 is a good range.
+    decay_gain: 0.2
+
+    # Minimum visible level:
+    # - If the smoothed level is below this, we snap to 0.0
+    #   so tiny noise doesn't make the mouth "wiggle".
+    min_level: 0.05
+
+    # Maximum allowed mouth level:
+    # - Clamp everything to [0.0, max_level]
+    max_level: 1.0
