@@ -17,15 +17,14 @@ Typical usage (see tts_node.py):
         config_path="/home/savo/Savo_Pi/models/piper/en_US-ryan-high.onnx.json",
     )
 
-    audio_i16, sr = engine.synthesize_to_pcm16("Hello, I am Robot Savo.")
+    audio_i16 = engine.synthesize_to_pcm16("Hello, I am Robot Savo.")
 """
 
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
-from typing import Union, Iterable, Any, Dict, Optional, Tuple
+from typing import Union, Iterable, Any, Dict, Optional
 
 import numpy as np
 from piper.voice import PiperVoice  # provided by the piper-tts package
@@ -40,42 +39,25 @@ class PiperEngine:
     Small wrapper around PiperVoice for a single voice/model.
 
     Responsibilities:
-    - Load ONNX model + JSON config from disk.
+    - Load ONNX model + JSON config using PiperVoice.load().
     - Expose a simple synthesize_to_pcm16() method that returns
-      a mono int16 NumPy array (PCM) and the model sample rate.
-    - Optionally use default length_scale / noise params from config.
+      a mono int16 NumPy array (PCM).
+    - Expose model sample_rate if available.
     """
 
-    def __init__(
-        self,
-        model_path: Union[PathLike, Dict[str, PathLike]],
-        config_path: Optional[PathLike] = None,
-        *,
-        default_length_scale: float = 1.0,
-        default_noise_scale: float = 0.667,
-        default_noise_w: float = 0.8,
-    ) -> None:
+    def __init__(self, model_path: PathLike, config_path: PathLike) -> None:
         """
         Load a Piper ONNX model + JSON config from disk.
 
         Parameters
         ----------
-        model_path : PathLike or dict
-            - If str/Path: path to .onnx file, e.g. "en_US-ryan-high.onnx"
-              (then config_path must also be provided).
-            - If dict: must contain keys "model_path"/"config_path" OR
-              "model"/"config", each pointing to a str/Path.
-        config_path : Optional[PathLike]
-            Path to .onnx.json file, e.g. "en_US-ryan-high.onnx.json".
-            Ignored if model_path is given as a dict.
-        default_length_scale, default_noise_scale, default_noise_w :
-            Default prosody settings used when calling synthesize().
+        model_path : PathLike
+            Path to .onnx file, e.g. en_US-ryan-high.onnx
+        config_path : PathLike
+            Path to .onnx.json file, e.g. en_US-ryan-high.onnx.json
         """
-        # Normalize input into two concrete paths
-        model_p, config_p = self._normalize_paths(model_path, config_path)
-
-        self.model_path = model_p
-        self.config_path = config_p
+        self.model_path = Path(model_path)
+        self.config_path = Path(config_path)
 
         if not self.model_path.is_file():
             raise FileNotFoundError(f"PiperEngine: model file not found: {self.model_path}")
@@ -83,94 +65,62 @@ class PiperEngine:
             raise FileNotFoundError(f"PiperEngine: config file not found: {self.config_path}")
 
         logger.info(
-            "PiperEngine: loading model:\n"
+            "PiperEngine: loading model via PiperVoice.load():\n"
             f"  model  = {self.model_path}\n"
             f"  config = {self.config_path}"
         )
 
-        # Load binary model
-        with self.model_path.open("rb") as f:
-            model_bytes = f.read()
-
-        # Load JSON config
-        with self.config_path.open("r", encoding="utf-8") as f:
-            self._config: Dict[str, Any] = json.load(f)
-
-        # Create PiperVoice instance
-        self._voice: PiperVoice = PiperVoice.load(model_bytes, self._config)
-
-        # Cache sample rate and default prosody from config if available
-        audio_cfg = self._config.get("audio", {}) if isinstance(self._config, dict) else {}
-        self.sample_rate: int = int(audio_cfg.get("sample_rate", 22050))
-
-        self.length_scale_default: float = float(
-            self._config.get("length_scale", default_length_scale)
+        # IMPORTANT: use PiperVoice.load(model_path, config_path) exactly as
+        # the library expects. Do NOT pass a dict or raw bytes here.
+        self._voice: PiperVoice = PiperVoice.load(
+            str(self.model_path),
+            str(self.config_path),
         )
-        self.noise_scale_default: float = float(
-            self._config.get("noise_scale", default_noise_scale)
-        )
-        self.noise_w_default: float = float(
-            self._config.get("noise_w", default_noise_w)
-        )
+
+        # Try to get sample_rate from the voice config if exposed.
+        self.sample_rate: int = 22050  # sensible default for English voices
+        sr = self._extract_sample_rate_from_voice(self._voice)
+        if sr is not None:
+            self.sample_rate = sr
 
         logger.info(
             "PiperEngine: model loaded successfully "
-            f"(sample_rate={self.sample_rate} Hz, "
-            f"length_scale={self.length_scale_default:.3f}, "
-            f"noise_scale={self.noise_scale_default:.3f}, "
-            f"noise_w={self.noise_w_default:.3f})"
+            f"(sample_rate={self.sample_rate} Hz)"
         )
 
     # ------------------------------------------------------------------
-    # Path normalization helper
+    # Internal helpers
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _normalize_paths(
-        model_path: Union[PathLike, Dict[str, PathLike]],
-        config_path: Optional[PathLike],
-    ) -> Tuple[Path, Path]:
+    def _extract_sample_rate_from_voice(voice: PiperVoice) -> Optional[int]:
         """
-        Normalize model/config inputs into Path objects.
+        Try to extract sample_rate from PiperVoice.config if available.
 
-        Supports:
-        - PiperEngine("foo.onnx", "foo.onnx.json")
-        - PiperEngine({"model_path": "foo.onnx", "config_path": "foo.onnx.json"})
-        - PiperEngine({"model": "foo.onnx", "config": "foo.onnx.json"})
+        We keep this defensive so changes in piper-tts internals
+        won't crash Robot Savo.
         """
-        if isinstance(model_path, dict):
-            # Dict style
-            mp = model_path.get("model_path") or model_path.get("model")
-            cp = model_path.get("config_path") or model_path.get("config")
+        cfg: Any = getattr(voice, "config", None)
 
-            if mp is None or cp is None:
-                raise ValueError(
-                    "PiperEngine: model_path dict must contain "
-                    "'model_path'/'config_path' or 'model'/'config' keys"
-                )
+        if isinstance(cfg, dict):
+            audio_cfg = cfg.get("audio", {})
+            if isinstance(audio_cfg, dict):
+                sr = audio_cfg.get("sample_rate")
+                if isinstance(sr, (int, float)):
+                    return int(sr)
 
-            return Path(mp), Path(cp)
+        # Fallback: some versions might expose a 'sample_rate' attribute
+        raw_sr = getattr(voice, "sample_rate", None)
+        if isinstance(raw_sr, (int, float)):
+            return int(raw_sr)
 
-        # Positional style: model_path + config_path
-        if config_path is None:
-            raise ValueError(
-                "PiperEngine: config_path must be provided when model_path is not a dict"
-            )
-
-        return Path(model_path), Path(config_path)
+        return None
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
 
-    def synthesize_to_pcm16(
-        self,
-        text: str,
-        *,
-        length_scale: Optional[float] = None,
-        noise_scale: Optional[float] = None,
-        noise_w: Optional[float] = None,
-    ) -> Tuple[np.ndarray, int]:
+    def synthesize_to_pcm16(self, text: str) -> np.ndarray:
         """
         Synthesize speech from text to a mono int16 NumPy array.
 
@@ -178,36 +128,26 @@ class PiperEngine:
         ----------
         text : str
             Input text (one utterance).
-        length_scale, noise_scale, noise_w : optional
-            If provided, override the default prosody parameters for this call.
 
         Returns
         -------
         audio_i16 : np.ndarray
-            1D int16 array: PCM audio at the model's native sample rate.
-        sample_rate : int
-            The model sample rate (Hz), usually from the JSON config.
+            1D int16 array: PCM audio at the model's native sample rate
+            (self.sample_rate, typically 22050 Hz for English voices).
+            Empty array if synthesis fails or text is empty.
         """
         clean = (text or "").strip()
         if not clean:
             logger.debug("PiperEngine.synthesize_to_pcm16() called with empty text")
-            return np.zeros(0, dtype=np.int16), self.sample_rate
+            return np.zeros(0, dtype=np.int16)
 
-        ls = float(self.length_scale_default if length_scale is None else length_scale)
-        ns = float(self.noise_scale_default if noise_scale is None else noise_scale)
-        nw = float(self.noise_w_default if noise_w is None else noise_w)
-
+        # PiperVoice.synthesize() normally returns an iterator/generator of
+        # raw PCM byte chunks. We support both iterator and plain-bytes cases.
         try:
-            # PiperVoice.synthesize returns an iterator of raw PCM byte chunks.
-            result = self._voice.synthesize(
-                clean,
-                length_scale=ls,
-                noise_scale=ns,
-                noise_w=nw,
-            )
+            result = self._voice.synthesize(clean)
         except Exception as exc:  # noqa: BLE001
             logger.error("PiperEngine.synthesize_to_pcm16() error: %s", exc)
-            return np.zeros(0, dtype=np.int16), self.sample_rate
+            return np.zeros(0, dtype=np.int16)
 
         audio_bytes: bytes
 
@@ -230,16 +170,15 @@ class PiperEngine:
                 "PiperEngine: unexpected synthesize() return type: %r",
                 type(result),
             )
-            return np.zeros(0, dtype=np.int16), self.sample_rate
+            return np.zeros(0, dtype=np.int16)
 
         if not audio_bytes:
             logger.warning("PiperEngine: synthesize() produced no audio bytes")
-            return np.zeros(0, dtype=np.int16), self.sample_rate
+            return np.zeros(0, dtype=np.int16)
 
         # Convert bytes -> int16 NumPy array (little endian, signed 16-bit)
         audio_i16 = np.frombuffer(audio_bytes, dtype="<i2")
         if audio_i16.ndim != 1:
             audio_i16 = audio_i16.flatten()
 
-        # Return a copy so the buffer is owned by NumPy (safe to modify)
-        return audio_i16.copy(), self.sample_rate
+        return audio_i16.copy()  # copy so we own the memory buffer
