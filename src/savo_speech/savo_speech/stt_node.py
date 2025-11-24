@@ -24,7 +24,6 @@ from typing import Optional
 import numpy as np
 import rclpy
 from rclpy.node import Node
-from rclpy.exceptions import RCLError
 from std_msgs.msg import String
 
 from .audio_io import record_block
@@ -41,7 +40,7 @@ class STTNode(Node):
         # 1. Declare parameters (can be overridden via YAML or CLI)
         # ------------------------------------------------------------------
         # Model / inference
-        self.declare_parameter("model_size_or_path", "small.en")
+        self.declare_parameter("model_size_or_path", "tiny.en")
         self.declare_parameter("device", "cpu")          # "cpu" on Pi, "cuda" on PC later
         self.declare_parameter("compute_type", "int8")   # good for Pi
         self.declare_parameter("language", "en")
@@ -240,11 +239,9 @@ def main(args: Optional[list[str]] = None) -> None:
         node.get_logger().info("Shutting down STTNode (Ctrl+C)")
     finally:
         node.destroy_node()
-        try:
+        # Avoid double-shutdown error: only call if still OK
+        if rclpy.ok():
             rclpy.shutdown()
-        except RCLError:
-            # Already shut down by ROS signal handler; ignore.
-            pass
 
 
 if __name__ == "__main__":
