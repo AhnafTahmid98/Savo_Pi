@@ -78,11 +78,8 @@ class IntentClientNode(Node):
         )
 
         self.get_logger().info(
-            "IntentClientNode starting with LLM server URL: %s, robot_id: %s, "
-            "timeout: %.2fs",
-            self.llm_server_url,
-            self.robot_id,
-            self.timeout_s,
+            f"IntentClientNode starting with LLM server URL: {self.llm_server_url}, "
+            f"robot_id: {self.robot_id}, timeout: {self.timeout_s:.2f}s"
         )
 
         # ------------------------------------------------------------------
@@ -108,17 +105,17 @@ class IntentClientNode(Node):
     def _check_llm_health(self) -> None:
         """Call LLM server /health once at startup (best-effort)."""
         health_url = f"{self.llm_server_url}/health"
-        self.get_logger().info("Checking LLM server /health at: %s", health_url)
+        self.get_logger().info(f"Checking LLM server /health at: {health_url}")
 
         try:
             req = urllib.request.Request(health_url, method="GET")
             with urllib.request.urlopen(req, timeout=self.timeout_s) as resp:
                 body = resp.read().decode("utf-8", errors="replace")
-                self.get_logger().info("LLM server /health response: %s", body)
+                self.get_logger().info(f"LLM server /health response: {body}")
         except Exception as exc:
             # We just log; node can still run and publish fallback replies.
             self.get_logger().error(
-                "Failed to reach LLM server /health: %r", exc
+                f"Failed to reach LLM server /health: {exc!r}"
             )
 
     # ----------------------------------------------------------------------
@@ -132,7 +129,7 @@ class IntentClientNode(Node):
             self.get_logger().warn("Received empty user_text; ignoring.")
             return
 
-        self.get_logger().info("Received user_text: %r", user_text)
+        self.get_logger().info(f"Received user_text: {user_text!r}")
         reply = self._call_llm_chat(user_text)
         self._publish_reply(reply)
 
@@ -147,7 +144,7 @@ class IntentClientNode(Node):
         On any error or timeout, returns the fallback reply.
         """
         chat_url = f"{self.llm_server_url}/chat"
-        self.get_logger().info("Calling LLM /chat at: %s", chat_url)
+        self.get_logger().info(f"Calling LLM /chat at: {chat_url}")
 
         payload = {
             "user_text": user_text,
@@ -159,7 +156,12 @@ class IntentClientNode(Node):
 
         data_bytes = json.dumps(payload).encode("utf-8")
         headers = {"Content-Type": "application/json"}
-        req = urllib.request.Request(chat_url, data=data_bytes, headers=headers, method="POST")
+        req = urllib.request.Request(
+            chat_url,
+            data=data_bytes,
+            headers=headers,
+            method="POST",
+        )
 
         try:
             with urllib.request.urlopen(req, timeout=self.timeout_s) as resp:
@@ -173,35 +175,32 @@ class IntentClientNode(Node):
 
             if reply_text:
                 self.get_logger().info(
-                    "LLM /chat success. intent=%s, nav_goal=%s, reply_text=%r",
-                    intent,
-                    nav_goal,
-                    reply_text,
+                    f"LLM /chat success. intent={intent}, nav_goal={nav_goal}, "
+                    f"reply_text={reply_text!r}"
                 )
                 return reply_text
 
             # If no reply_text, log and fallback
             self.get_logger().error(
-                "LLM /chat response missing 'reply_text'. Raw body: %s",
-                body,
+                f"LLM /chat response missing 'reply_text'. Raw body: {body}"
             )
             return self.fallback_reply
 
         except json.JSONDecodeError as exc:
             self.get_logger().error(
-                "Failed to decode LLM /chat JSON response: %r", exc
+                f"Failed to decode LLM /chat JSON response: {exc!r}"
             )
         except urllib.error.URLError as exc:
             self.get_logger().error(
-                "Error calling LLM /chat (URLError): %r", exc
+                f"Error calling LLM /chat (URLError): {exc!r}"
             )
         except TimeoutError as exc:
             self.get_logger().error(
-                "Error calling LLM /chat (TimeoutError): %r", exc
+                f"Error calling LLM /chat (TimeoutError): {exc!r}"
             )
         except Exception as exc:  # noqa: BLE001
             self.get_logger().error(
-                "Unexpected error calling LLM /chat: %r", exc
+                f"Unexpected error calling LLM /chat: {exc!r}"
             )
 
         # Any exception path returns fallback
@@ -216,7 +215,7 @@ class IntentClientNode(Node):
         msg = String()
         msg.data = text
         self.reply_pub.publish(msg)
-        self.get_logger().info("Published reply_text: %r", text)
+        self.get_logger().info(f"Published reply_text: {text!r}")
 
 
 def main(args=None) -> None:
