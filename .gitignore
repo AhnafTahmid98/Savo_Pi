@@ -1,15 +1,105 @@
-# Python
+# =============================================================================
+# Robot Savo — .gitignore (Savo_Pi workspace)
+#
+# Goal:
+# - Track ONLY source code, configs, launch files, systemd units, docs, etc.
+# - Ignore build artifacts, local logs, models, rosbags, editor junk.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Python bytecode / cache
+# -----------------------------------------------------------------------------
 __pycache__/
-*.pyc
-# ROS 2
+*.py[cod]
+*$py.class
+
+# Virtual environments (if you ever create per-repo venvs)
+.venv/
+venv/
+env/
+
+# Python tooling caches
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# -----------------------------------------------------------------------------
+# ROS 2 / colcon build artifacts
+# -----------------------------------------------------------------------------
 build/
 install/
 log/
-# Editors
-.vscode/
-.idea/
-# OS
-.DS_Store
-Thumbs.db
-# Data
+
+# If you ever create separate overlays
+build_*/
+install_*/
+log_*/
+
+# -----------------------------------------------------------------------------
+# Data / bags / logs (runtime, not source)
+# -----------------------------------------------------------------------------
+# Rosbags directory (you already use this)
 bags/
+
+# ROS 2 bag files that might appear outside bags/
+*.db3
+*.mcap
+metadata.yaml
+
+# General large runtime data
+*.csv
+*.npz
+*.npy
+
+# -----------------------------------------------------------------------------
+# Models (Piper, Whisper, etc.)
+# -----------------------------------------------------------------------------
+# Piper TTS voices (DO NOT push these to GitHub)
+models/piper/*.onnx
+models/piper/*.onnx.json
+models/piper/*.onnx.yaml
+
+# If later you add other big models (Whisper, LLMs, etc.), keep them here:
+models/whisper/
+models/llm/
+models/checkpoints/
+
+# -----------------------------------------------------------------------------
+# Editor / IDE / OS junk
+# -----------------------------------------------------------------------------
+# VS Code
+.vscode/
+
+# JetBrains / PyCharm / CLion / etc.
+.idea/
+*.iml
+
+# MacOS
+.DS_Store
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# -----------------------------------------------------------------------------
+# Misc / temp
+# -----------------------------------------------------------------------------
+# Swap / backup files
+*~
+*.swp
+*.swo
+*.tmp
+*.bak
+
+# Local environment / secrets (if you store any here)
+.env
+.env.*
+*.secret
+*.key
+
+# -----------------------------------------------------------------------------
+# Docker / container artifacts (if you ever add them here)
+# -----------------------------------------------------------------------------
+# Docker build cache directories (optional, usually outside repo)
+.cache/
