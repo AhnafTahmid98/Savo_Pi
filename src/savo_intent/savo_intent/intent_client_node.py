@@ -32,6 +32,8 @@ Parameters
 ----------
 - llm_server_url (string)
     Default: "http://127.0.0.1:8000"
+    (Typically overridden via speech_bringup.launch.py, which reads
+     LLM_SERVER_URL from tools/scripts/env_llm.sh.)
 
 - robot_id (string)
     Default: "robot_savo"
@@ -43,12 +45,12 @@ Usage example on the Pi
 -----------------------
 
     cd ~/Savo_Pi
-    source /opt/ros/jazzy/setup.bash
+    source tools/scripts/env.sh
     source install/setup.bash
 
     ros2 run savo_intent intent_client_node \
       --ros-args \
-      -p llm_server_url:="http://192.168.164.119:8000" \
+      -p llm_server_url:="http://server_IP:8000" \
       -p robot_id:="robot_savo_pi"
 
 In other terminals:
@@ -84,6 +86,9 @@ class IntentClientNode(Node):
     ROS 2 node that bridges ROS topics to the LLM HTTP API.
     """
 
+    MIN_TIMEOUT_S: float = 0.5
+    MAX_TIMEOUT_S: float = 20.0
+
     def __init__(self) -> None:
         super().__init__("intent_client_node")
 
@@ -95,30 +100,28 @@ class IntentClientNode(Node):
         self.declare_parameter("timeout_s", 20.0)  # default 20 seconds
 
         # Read parameters safely
-        self.llm_server_url: str = (
+        self.llm_server_url = (
             self.get_parameter("llm_server_url").get_parameter_value().string_value
-        )
-        self.robot_id: str = (
-            self.get_parameter("robot_id").get_parameter_value().string_value
-        )
+        ) or "http://127.0.0.1:8000"
 
-        # timeout_s may come as double/float; clamp into [0.5, 20.0]
+        # Normalize base URL (strip trailing slash once)
+        self.base_url = self.llm_server_url.rstrip("/")
+
+        self.robot_id = (
+            self.get_parameter("robot_id").get_parameter_value().string_value
+        ) or "robot_savo"
+
+        # timeout_s may come as double/float; clamp into [MIN_TIMEOUT_S, MAX_TIMEOUT_S]
+        timeout_value = 20.0
         try:
             timeout_value = (
                 self.get_parameter("timeout_s").get_parameter_value().double_value
             )
         except Exception:
-            timeout_value = 20.0
+            # Keep default if parameter type is odd
+            pass
 
-        try:
-            self.timeout_s: float = float(timeout_value)
-        except Exception:
-            self.timeout_s = 20.0
-
-        if self.timeout_s < 0.5:
-            self.timeout_s = 0.5
-        if self.timeout_s > 20.0:
-            self.timeout_s = 20.0
+        self.timeout_s = self._clamp_timeout(timeout_value)
 
         # ------------------------------------------------------------------
         # Publishers and subscribers
@@ -148,18 +151,33 @@ class IntentClientNode(Node):
         # Log startup info (single string to avoid rcutils formatting issues)
         self.get_logger().info(
             "IntentClientNode starting with LLM server URL: %s, robot_id: %s, timeout: %.2fs"
-            % (self.llm_server_url, self.robot_id, self.timeout_s)
+            % (self.base_url, self.robot_id, self.timeout_s)
         )
 
         # Optional: health check at startup
         self._check_health_once()
 
     # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+    def _clamp_timeout(self, value: float) -> float:
+        """Clamp timeout into [MIN_TIMEOUT_S, MAX_TIMEOUT_S]."""
+        try:
+            t = float(value)
+        except Exception:
+            t = 20.0
+        if t < self.MIN_TIMEOUT_S:
+            t = self.MIN_TIMEOUT_S
+        if t > self.MAX_TIMEOUT_S:
+            t = self.MAX_TIMEOUT_S
+        return t
+
+    # ------------------------------------------------------------------
     # Health check helper
     # ------------------------------------------------------------------
     def _check_health_once(self) -> None:
         """Call /health on the LLM server once at startup."""
-        url = self.llm_server_url.rstrip("/") + "/health"
+        url = self.base_url + "/health"
         self.get_logger().info("Checking LLM server /health at: %s" % url)
         try:
             req = urllib.request.Request(url, method="GET")
@@ -167,6 +185,7 @@ class IntentClientNode(Node):
                 data = resp.read().decode("utf-8", errors="ignore")
             self.get_logger().info("LLM server /health response: %s" % data)
         except Exception as exc:
+            # Don't crash if health is down; just warn.
             self.get_logger().warn(
                 "LLM server /health check failed: %r" % (exc,)
             )
@@ -210,10 +229,7 @@ class IntentClientNode(Node):
         # ------------------------------------------------------------------
         result_msg = IntentResult()
 
-        # We are not setting a stamp field here,
-        # because current IntentResult.msg does not define it.
-        # If later you add `builtin_interfaces/Time stamp` to the .msg,
-        # we can add:
+        # If later you add a stamp field to IntentResult.msg, you can set:
         #   result_msg.stamp = self.get_clock().now().to_msg()
 
         result_msg.source = "system"
@@ -263,7 +279,7 @@ class IntentClientNode(Node):
         On any error or timeout, we return a safe fallback reply and
         success = False with a short error string.
         """
-        url = self.llm_server_url.rstrip("/") + "/chat"
+        url = self.base_url + "/chat"
         self.get_logger().info("Calling LLM /chat at: %s" % url)
 
         # Build JSON body following ChatRequest schema
@@ -300,6 +316,13 @@ class IntentClientNode(Node):
             return fallback_reply, None, None, "tier_error", None, False, "http_error"
         except urllib.error.URLError as exc:
             self.get_logger().error("URLError calling LLM /chat: %s" % (exc,))
+            # URLError often wraps timeouts as well
+            reason = getattr(exc, "reason", None)
+            if isinstance(reason, TimeoutError):
+                slow_reply = (
+                    "Sorry, my brain server is too slow right now. I cannot answer this request."
+                )
+                return slow_reply, None, None, "tier_error", None, False, "timeout"
             return fallback_reply, None, None, "tier_error", None, False, "url_error"
         except TimeoutError as exc:
             self.get_logger().error(

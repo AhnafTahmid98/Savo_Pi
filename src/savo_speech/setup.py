@@ -54,8 +54,8 @@ setup(
     version="0.1.0",
     packages=find_packages(exclude=["test*", "tests*"]),
     data_files=data_files,
-    # keep install_requires minimal and install heavy deps (sounddevice,
-    # faster-whisper, etc.) at system/user level via apt/pip, as decided.
+    # Keep install_requires minimal; heavy deps (sounddevice, faster-whisper,
+    # piper-tts, etc.) are installed at system/user level.
     install_requires=[
         "setuptools",
     ],
@@ -70,10 +70,18 @@ setup(
     tests_require=["pytest"],
     entry_points={
         "console_scripts": [
-            # Each of these modules must provide a main() function.
+            # Speech-to-text node (Faster-Whisper)
             "stt_node = savo_speech.stt_node:main",
+
+            # Text-to-speech node (Piper)
             "tts_node = savo_speech.tts_node:main",
-            "mouth_anim = savo_speech.mouth_anim:main",
+
+            # NEW: Bridge STT ↔ LLM ↔ TTS
+            "speech_bridge_node = savo_speech.speech_bridge_node:main",
+
+            # Mouth / face animation node for the DSI UI
+            # (module file is mouth_anim.py, executable name is mouth_anim_node)
+            "mouth_anim_node = savo_speech.mouth_anim:main",
         ],
     },
 )

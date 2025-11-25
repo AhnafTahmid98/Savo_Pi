@@ -5,14 +5,16 @@
 # Location (in repo):
 #   tools/scripts/env.sh
 #
-# Usage (in every new terminal on the Pi or PC:
+# Usage (in every new terminal on the Pi or PC):
 #   cd ~/Savo_Pi
 #   source tools/scripts/env.sh
 #
 # This script:
+#   - Resolves WS_ROOT (workspace root)
 #   - Sources /opt/ros/jazzy
 #   - Sources this workspace's install/setup.bash
 #   - Ensures ~/.local/bin is on PATH (for pip --user tools)
+#   - Loads LLM server URL from tools/scripts/env_llm.sh (if present)
 #   - Prints a short status line
 # =============================================================================
 
@@ -86,8 +88,30 @@ export PYTHONWARNINGS="${PYTHONWARNINGS:-default}"
 # export ROS_DOMAIN_ID=42
 
 # -----------------------------------------------------------------------------
-# 6. Final status message
+# 6. Load LLM server configuration (tools/scripts/env_llm.sh)
+#
+# This is where LLM_SERVER_URL is defined. You edit env_llm.sh on your PC/Mac,
+# commit + push, then git pull on the Pi. No need to touch this file again.
+# -----------------------------------------------------------------------------
+LLM_ENV="${WS_ROOT}/tools/scripts/env_llm.sh"
+
+if [ -f "$LLM_ENV" ]; then
+  # shellcheck source=/dev/null
+  . "$LLM_ENV"
+else
+  # Provide a safe fallback so things don't crash if env_llm.sh is missing
+  if [ -z "${LLM_SERVER_URL:-}" ]; then
+    export LLM_SERVER_URL="http://127.0.0.1:8000"
+    echo "[env.sh] WARNING: env_llm.sh not found, using fallback LLM_SERVER_URL=${LLM_SERVER_URL}"
+  else
+    echo "[env.sh] INFO: LLM_SERVER_URL already set externally: ${LLM_SERVER_URL}"
+  fi
+fi
+
+# -----------------------------------------------------------------------------
+# 7. Final status message
 # -----------------------------------------------------------------------------
 echo "[env.sh] Loaded Robot Savo ROS environment"
-echo "[env.sh]   WS_ROOT     = $WS_ROOT"
-echo "[env.sh]   ROS_DISTRO  = ${ROS_DISTRO:-unknown}"
+echo "[env.sh]   WS_ROOT        = $WS_ROOT"
+echo "[env.sh]   ROS_DISTRO     = ${ROS_DISTRO:-unknown}"
+echo "[env.sh]   LLM_SERVER_URL = ${LLM_SERVER_URL:-<not set>}"

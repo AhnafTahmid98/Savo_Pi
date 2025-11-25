@@ -67,7 +67,7 @@ stt_node:
     #   - 3.0–4.0 s is a good trade-off on Pi:
     #       * not too much latency
     #       * enough context per chunk for stable VAD
-    block_duration_s: 4.0
+    block_duration_s: 2.0
 
     # Energy threshold for simple block-level VAD:
     #   - We saw idle noise ≈ 0.00016 in your hallway tests.
