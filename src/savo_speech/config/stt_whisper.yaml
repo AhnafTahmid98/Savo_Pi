@@ -96,7 +96,8 @@ stt_node:
     #   EOF
     #
     # Then set input_device_index to that number.
-    input_device_index: -1
+    input_device_index: 0
+    
 
     # ------------------------------------------------------------------------
     # Utterance-level behavior
