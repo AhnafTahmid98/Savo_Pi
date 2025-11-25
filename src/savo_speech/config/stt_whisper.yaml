@@ -64,9 +64,9 @@ stt_node:
     # buffered until the user stops talking, then concatenated and sent once
     # to Whisper.
     #
-    #   - 3.0–4.0 s is a good trade-off on Pi:
-    #       * not too much latency
-    #       * enough context per chunk for stable VAD
+    #   - 2.0 s is a slightly snappier option than 3–4 s:
+    #       * lower perceived latency
+    #       * still OK for basic VAD
     block_duration_s: 2.0
 
     # Energy threshold for simple block-level VAD:
@@ -82,13 +82,21 @@ stt_node:
     #   - Allow short commands like "stop", "status", "hello".
     min_transcript_chars: 3
 
-    # Force input device to ReSpeaker 4 Mic Array:
-    #   - From sd.query_devices() on your Pi:
-    #       0 ReSpeaker 4 Mic Array (UAC1.0): USB Audio (hw:0,0)
-    #   - So we fix input_device_index to 0.
+    # Input device selection:
     #
-    # If you ever change audio hardware, update this index.
-    input_device_index: 0
+    #   -1  → let PortAudio choose the default input device.
+    #
+    # This is safer while we debug channels. Once you are happy, you can
+    # list devices with sounddevice and pin to a specific index:
+    #
+    #   python3 - << 'EOF'
+    #   import sounddevice as sd
+    #   for i, dev in enumerate(sd.query_devices()):
+    #       print(i, dev['name'], dev['max_input_channels'])
+    #   EOF
+    #
+    # Then set input_device_index to that number.
+    input_device_index: -1
 
     # ------------------------------------------------------------------------
     # Utterance-level behavior
@@ -98,7 +106,7 @@ stt_node:
     #   - True  → buffer multiple blocks while speech is present.
     #             When a silent block arrives, treat it as end-of-utterance,
     #             concatenate all buffered blocks, run Whisper once, and
-    #             publish ONE final transcript to /savo_intent/user_text.
+    #             publish ONE final transcript to publish_topic.
     #
     #   - False → legacy per-block mode (every voiced block is sent directly
     #             to Whisper, which leads to partial sentences).
@@ -115,5 +123,10 @@ stt_node:
     # ------------------------------------------------------------------------
     #
     # Topic where recognized text is published as std_msgs/String.
-    # This is consumed by savo_intent/intent_client_node.
-    publish_topic: "/savo_intent/user_text"
+    #
+    # In our current design:
+    #   STTNode publishes to /savo_speech/stt_text
+    #   SpeechBridgeNode subscribes there and forwards to:
+    #       /savo_intent/user_text  → LLM intent_client_node
+    #
+    publish_topic: "/savo_speech/stt_text"
