@@ -103,3 +103,9 @@ Desktop.ini
 # -----------------------------------------------------------------------------
 # Docker build cache directories (optional, usually outside repo)
 .cache/
+
+
+#env_llm 
+
+tools/scripts/env_llm.sh
+
