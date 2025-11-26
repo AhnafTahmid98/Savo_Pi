@@ -10,8 +10,10 @@ Key features:
 - Uses local Piper ONNX models (e.g. en_US-ryan-high, en_US-hfc_female-medium).
 - Supports a "voice_profile" parameter ("male" / "female").
 - Applies configurable gain/output_gain.
-- Optionally publishes a simple mouth animation signal and a "speech done"
-  notification for UI/behavior coordination.
+- Publishes mouth animation (0.0–1.0) while speaking.
+- Publishes a "speech done" notification when playback finishes.
+- NEW: publishes a Boolean "tts_speaking" flag so STT can mute itself
+  while the robot is talking.
 
 Configuration is provided via:
   src/savo_speech/config/tts_piper.yaml
@@ -26,7 +28,7 @@ from typing import Optional, Dict
 import numpy as np
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import String, Empty, Float32
+from std_msgs.msg import String, Empty, Float32, Bool
 
 from .audio_io import play_pcm
 from .piper_engine import PiperEngine
@@ -35,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 # Target playback sample rate for the audio device.
 # ReSpeaker 4-Mic Array is usually fine with 16000 or 48000.
-TARGET_PLAYBACK_SR = 16000  # you can change to 16000 if needed
+TARGET_PLAYBACK_SR = 16000
 
 
 class TTSNode(Node):
@@ -74,6 +76,9 @@ class TTSNode(Node):
         self.declare_parameter("speech_done_topic", "/savo_speech/tts_done")
         self.declare_parameter("mouth_anim_topic", "/savo_speech/mouth_open")
         self.declare_parameter("mouth_anim_rate_hz", 25.0)
+
+        # NEW: "TTS is speaking" flag for STT gating
+        self.declare_parameter("tts_speaking_topic", "/savo_speech/tts_speaking")
 
         # Logging / debug
         self.declare_parameter("debug_log_text", True)
@@ -135,6 +140,9 @@ class TTSNode(Node):
         )
         self.mouth_anim_rate_hz: float = (
             self.get_parameter("mouth_anim_rate_hz").get_parameter_value().double_value
+        )
+        self.tts_speaking_topic: str = (
+            self.get_parameter("tts_speaking_topic").get_parameter_value().string_value
         )
 
         # Debug logging
@@ -221,26 +229,36 @@ class TTSNode(Node):
                 10,
             )
 
+        # NEW: "TTS is speaking" Boolean publisher
+        self._tts_speaking_pub: Optional[rclpy.publisher.Publisher] = None
+        if self.tts_speaking_topic:
+            self._tts_speaking_pub = self.create_publisher(
+                Bool,
+                self.tts_speaking_topic,
+                10,
+            )
+
         # --------------------------------------------------------------
         # Log final configuration summary
         # --------------------------------------------------------------
 
         self.get_logger().info(
             "TTSNode starting with Piper:\n"
-            f"  model_dir        = {self.model_dir}\n"
-            f"  voice_profile    = {self.voice_profile}\n"
-            f"  gain             = {self.gain:.3f}\n"
-            f"  output_gain      = {self.output_gain:.3f}\n"
-            f"  length_scale     = {self.length_scale:.3f}\n"
-            f"  noise_scale      = {self.noise_scale:.3f}\n"
-            f"  noise_w          = {self.noise_w:.3f}\n"
-            f"  sample_rate      = {self.sample_rate_param}\n"
-            f"  output_device    = {self.output_device_index}\n"
-            f"  input_text_topic = {self.input_text_topic}\n"
-            f"  speech_done_topic= {self.speech_done_topic or '(disabled)'}\n"
-            f"  mouth_anim_topic = {self.mouth_anim_topic or '(disabled)'}\n"
-            f"  debug_log_text   = {self.debug_log_text}\n"
-            f"  max_logged_chars = {self.max_logged_chars}"
+            f"  model_dir         = {self.model_dir}\n"
+            f"  voice_profile     = {self.voice_profile}\n"
+            f"  gain              = {self.gain:.3f}\n"
+            f"  output_gain       = {self.output_gain:.3f}\n"
+            f"  length_scale      = {self.length_scale:.3f}\n"
+            f"  noise_scale       = {self.noise_scale:.3f}\n"
+            f"  noise_w           = {self.noise_w:.3f}\n"
+            f"  sample_rate       = {self.sample_rate_param}\n"
+            f"  output_device     = {self.output_device_index}\n"
+            f"  input_text_topic  = {self.input_text_topic}\n"
+            f"  speech_done_topic = {self.speech_done_topic or '(disabled)'}\n"
+            f"  mouth_anim_topic  = {self.mouth_anim_topic or '(disabled)'}\n"
+            f"  tts_speaking_topic= {self.tts_speaking_topic or '(disabled)'}\n"
+            f"  debug_log_text    = {self.debug_log_text}\n"
+            f"  max_logged_chars  = {self.max_logged_chars}"
         )
 
     # ------------------------------------------------------------------
@@ -306,6 +324,17 @@ class TTSNode(Node):
         msg = Empty()
         self._speech_done_pub.publish(msg)
 
+    def _publish_tts_speaking(self, speaking: bool) -> None:
+        """
+        Publish a Bool flag telling the rest of the system whether
+        the TTS is currently speaking.
+        """
+        if self._tts_speaking_pub is None:
+            return
+        msg = Bool()
+        msg.data = bool(speaking)
+        self._tts_speaking_pub.publish(msg)
+
     @staticmethod
     def _resample_linear(
         audio: np.ndarray,
@@ -362,6 +391,9 @@ class TTSNode(Node):
         This callback is *blocking* while speech is playing. For Robot Savo,
         that's acceptable because TTS output is short and we do not need
         concurrent overlapping speech from this node.
+
+        NEW: publishes tts_speaking=True while audio is playing,
+        and tts_speaking=False after playback completes.
         """
         text = (msg.data or "").strip()
         if not text:
@@ -432,7 +464,9 @@ class TTSNode(Node):
         )
 
         # Playback — simple "mouth fully open during speech" model for now.
+        # Also publish tts_speaking=True while we are talking.
         self._publish_mouth_open(1.0)
+        self._publish_tts_speaking(True)
         try:
             device = None if self.output_device_index < 0 else self.output_device_index
             play_pcm(audio_resampled, sample_rate=playback_sr, device=device)
@@ -440,6 +474,7 @@ class TTSNode(Node):
             self.get_logger().error(f"TTSNode: audio playback failed: {exc}")
         finally:
             self._publish_mouth_open(0.0)
+            self._publish_tts_speaking(False)
             self._publish_speech_done()
 
 
