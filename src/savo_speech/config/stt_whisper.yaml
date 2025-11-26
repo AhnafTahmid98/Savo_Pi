@@ -102,7 +102,7 @@ stt_node:
     #   - 0 = ReSpeaker 4 Mic Array  (what we want)
     #
     # If you ever change hardware, re-run the probe and update this.
-    input_device_index: 0
+    input_device_index: -1
 
     # ------------------------------------------------------------------------
     # Utterance-level behavior
