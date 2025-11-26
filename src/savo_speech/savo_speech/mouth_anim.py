@@ -15,8 +15,6 @@ The idea:
 - TTS node (Piper) will emit simple activity levels (per frame/segment).
 - This node smooths those into a natural-looking mouth animation so the
   UI doesn't flicker with every tiny change.
-
-
 """
 
 from __future__ import annotations
@@ -144,7 +142,7 @@ class MouthAnimNode(Node):
         # Basic exponential smoothing step
         current += delta * gain
 
-        # Clamp to [min_level, max_level]
+        # Clamp to [0, max_level]
         if current < 0.0:
             current = 0.0
         if current > self.max_level:
@@ -162,10 +160,7 @@ class MouthAnimNode(Node):
 
         # Debug logs can be noisy; keep at debug level
         self.get_logger().debug(
-            "MouthAnim update: target=%.3f, level=%.3f, gain=%.3f",
-            target,
-            current,
-            gain,
+            f"MouthAnim update: target={target:.3f}, level={current:.3f}, gain={gain:.3f}"
         )
 
 
