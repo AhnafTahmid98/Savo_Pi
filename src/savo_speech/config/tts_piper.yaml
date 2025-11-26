@@ -70,16 +70,13 @@ tts_node:
     #   0.9 → slightly slower, easier to understand
     #   1.1 → slightly faster
     #
-    # NOTE: Currently logged and reserved for future fine-tuning; Piper’s
-    # Python API does not yet expose this directly in our wrapper.
+    # Currently logged and reserved for future fine-tuning.
     length_scale: 0.95
 
     # Noise parameters (prosody / naturalness).
-    # Typical Piper defaults are around:
+    # Typical Piper defaults:
     #   noise_scale ~ 0.667
     #   noise_w     ~ 0.8
-    #
-    # These are also reserved for future tuning in the engine wrapper.
     noise_scale: 0.667
     noise_w: 0.8
 
@@ -90,7 +87,13 @@ tts_node:
     # sounddevice will use ALSA on the Pi.
     # Use:
     #
-    #   python3 -c "import sounddevice as sd; print(sd.query_devices())"
+    #   python3 - << 'EOF'
+    #   import sounddevice as sd
+    #   for i, dev in enumerate(sd.query_devices()):
+    #       print(f"{i}: {dev['name']!r}, "
+    #             f"max_input_channels={dev['max_input_channels']}, "
+    #             f"max_output_channels={dev['max_output_channels']}")
+    #   EOF
     #
     # to see device indices.
     #
@@ -106,15 +109,15 @@ tts_node:
     output_gain: 1.0
 
     # ------------------------------------------------------------------------
-    # ROS topics (input text + optional "speech done" signal)
+    # ROS topics (input text + "speech done" + TTS speaking flag)
     # ------------------------------------------------------------------------
     #
     # Input text topic:
     #   - std_msgs/String
     #   - Each message is one utterance that should be spoken completely.
     #
-    # In the future, higher-level nodes (intent, UI, Nav2) will publish here
-    # whenever Robot Savo needs to speak to people.
+    # Higher-level nodes (intent, UI, Nav2, etc.) will publish here whenever
+    # Robot Savo needs to speak to people.
 
     input_text_topic: "/savo_speech/tts_text"
 
@@ -126,6 +129,17 @@ tts_node:
     # to know when the robot has finished talking.
     speech_done_topic: "/savo_speech/tts_done"
 
+    # TTS speaking flag:
+    #   - std_msgs/Bool (implemented in tts_node.py)
+    #   - true  → TTS currently playing audio
+    #   - false → idle
+    #
+    # STTNode subscribes to this (via stt_whisper.yaml config) and uses it
+    # as a gate so Robot Savo does NOT transcribe its own voice.
+    #
+    # If you set this to an empty string, the publisher is disabled.
+    tts_speaking_topic: "/savo_speech/tts_speaking"
+
     # ------------------------------------------------------------------------
     # Mouth animation integration (optional)
     # ------------------------------------------------------------------------
@@ -135,9 +149,9 @@ tts_node:
     #
     #   mouth_anim_topic:
     #       - if non-empty, tts_node will publish a Float32 in [0.0, 1.0]
-    #         representing mouth openness over time.
+    #         representing mouth openness.
     #
-    # For now, we keep it simple: 0.0 when idle, ~1.0 while playing audio.
+    # For now, we keep it simple: 0.0 when idle, 1.0 while playing audio.
 
     mouth_anim_topic: "/savo_speech/mouth_open"
 
