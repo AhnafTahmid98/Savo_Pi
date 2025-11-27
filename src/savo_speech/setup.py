@@ -73,6 +73,10 @@ setup(
             # Speech-to-text node (Faster-Whisper)
             "stt_node = savo_speech.stt_node:main",
 
+            #STT remote
+            "remote_stt_client_node = savo_speech.remote_stt_client_node:main",
+
+
             # Text-to-speech node (Piper)
             "tts_node = savo_speech.tts_node:main",
 
