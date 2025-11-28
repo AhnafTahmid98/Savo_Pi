@@ -52,15 +52,19 @@ def generate_launch_description() -> LaunchDescription:
         description="If true, also start the mouth_anim node for screen animation.",
     )
 
-    # Kept for compatibility with earlier bringup files; not used directly here.
+    # Kept for compatibility, now wired to request_timeout_s in the client.
     timeout_s_arg = DeclareLaunchArgument(
         "timeout_s",
         default_value="20.0",
-        description="Legacy argument (kept for compatibility). Not used in this launch file.",
+        description=(
+            "Timeout (seconds) for a single /speech HTTP request. "
+            "Passed through as request_timeout_s to remote_speech_client_node."
+        ),
     )
 
     robot_id = LaunchConfiguration("robot_id")
     enable_mouth_anim = LaunchConfiguration("enable_mouth_anim")
+    timeout_s = LaunchConfiguration("timeout_s")
 
     # -------------------------------------------------------------------------
     # Config file paths
@@ -81,7 +85,7 @@ def generate_launch_description() -> LaunchDescription:
     # 1) Remote speech client node
     #
     # - Records from ReSpeaker (input_device_index from speech_remote.yaml)
-    # - Buffers utterances, sends to /speech (Robot_Savo_Server)
+    # - Sends chunks to /speech (Robot_Savo_Server)
     # - Publishes:
     #     /savo_speech/stt_text        (String)
     #     /savo_speech/tts_text        (String)
@@ -95,8 +99,10 @@ def generate_launch_description() -> LaunchDescription:
         parameters=[
             speech_remote_yaml,
             {
-                # Allow overriding robot_id from launch argument
+                # Override from launch arguments:
                 "robot_id": robot_id,
+                # Wire timeout_s → request_timeout_s in the node:
+                "request_timeout_s": timeout_s,
             },
         ],
     )
@@ -104,7 +110,7 @@ def generate_launch_description() -> LaunchDescription:
     # 2) TTS node (Piper)
     #
     # - Subscribes to /savo_speech/tts_text (String)
-    # - Publishes audio via sounddevice
+    # - Plays audio via sounddevice
     # - Publishes /savo_speech/tts_speaking (Bool) as a gate for STT
     #
     tts_node = Node(
@@ -129,7 +135,7 @@ def generate_launch_description() -> LaunchDescription:
     )
 
     # -------------------------------------------------------------------------
-    # Info log (static message to avoid substitution issues at import time)
+    # Info log (static message to avoid frontend substitution issues)
     # -------------------------------------------------------------------------
     info_msg = LogInfo(
         msg="[speech_bringup_v2] Starting remote speech pipeline "

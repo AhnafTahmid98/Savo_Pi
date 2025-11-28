@@ -47,7 +47,7 @@ remote_speech_client_node:
     # Length of each raw audio block captured from ReSpeaker (seconds).
     # This is the "block size" we record before checking energy.
     #
-    # In utterance_mode (planned upgrade), multiple blocks will be buffered
+    # In utterance_mode (future upgrade), multiple blocks could be buffered
     # until you stop talking; then all blocks are concatenated and sent once
     # to /speech.
     #
@@ -58,13 +58,11 @@ remote_speech_client_node:
     #
     # From hallway tests:
     #   - idle noise ≈ 0.00016
-    #   - 0.0003 was very sensitive (more random triggers)
+    #   - 0.0003 is just above idle, so:
+    #       * still sensitive enough to catch normal speech
+    #       * not too strict, so it does not clip the start of words
     #
-    # 0.0005 is a bit stricter:
-    #   - ignores tiny noises / breaths
-    #   - still reacts to normal speaking voice at typical distance
-    #
-    energy_threshold: 0.0005
+    energy_threshold: 0.0003
 
     # Input device selection:
     #
@@ -80,10 +78,8 @@ remote_speech_client_node:
     # Utterance-level behavior (for future upgrade)
     # ------------------------------------------------------------------------
     #
-    # These are here to mirror stt_whisper.yaml. The current Python node
-    # still works chunk-by-chunk, but these parameters are kept so we can
-    # switch to true utterance buffering later (buffer blocks until silence,
-    # then send ONE request).
+    # These match stt_whisper.yaml so we can later switch to true
+    # utterance buffering (buffer blocks until silence, then send ONE request).
     #
 
     # true  → buffer multiple blocks while speech is present and send once
@@ -100,9 +96,8 @@ remote_speech_client_node:
 
     # Timeout (seconds) for a single /speech HTTP request.
     #
-    # 20 s gives the Robot_Savo_Server container more time on the first
-    # call when models are still warming up, reducing spurious
-    # "connection problem" fallbacks after a fresh start.
+    # 20 s gives Robot_Savo_Server a bit more headroom on first use when
+    # models are still warming up, reducing early timeouts.
     #
     request_timeout_s: 20.0
 
@@ -118,9 +113,8 @@ remote_speech_client_node:
     #   - While this flag is true (plus cooldown), we should NOT send audio
     #     to /speech to avoid Robot Savo hearing itself.
     #
-    # The current Python node subscribes to /savo_speech/tts_speaking and
-    # skips recording when it is true. The cooldown parameter will be used
-    # more fully once we add advanced gating.
+    # The Python node already subscribes to /savo_speech/tts_speaking and
+    # skips recording during speaking + cooldown.
     #
 
     # Enable/disable TTS gating logic in the node.

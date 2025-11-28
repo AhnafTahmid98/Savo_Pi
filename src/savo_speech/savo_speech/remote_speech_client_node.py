@@ -70,12 +70,12 @@ class RemoteSpeechClientNode(Node):
                 ("chunk_duration_s", 2.0),
                 ("energy_threshold", 0.0003),
 
-                # Utterance-level behaviour (future use)
+                # Utterance-level behaviour (future)
                 ("utterance_mode", True),
                 ("max_utterance_duration_s", 15.0),
 
                 # HTTP client
-                ("request_timeout_s", 15.0),
+                ("request_timeout_s", 20.0),
                 ("max_retries", 2),
 
                 # TTS gate
@@ -270,6 +270,9 @@ class RemoteSpeechClientNode(Node):
 
             # Simple energy-based VAD
             rms = self._compute_rms(audio_data)
+            if self.debug_logging:
+                self.get_logger().debug(f"Chunk RMS={rms:.6f}")
+
             if rms < self.energy_threshold:
                 if self.debug_logging:
                     self.get_logger().debug(
