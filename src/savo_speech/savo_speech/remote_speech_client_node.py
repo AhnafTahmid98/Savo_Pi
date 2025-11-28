@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Robot Savo — Remote Speech Client Node (utterance-aware)
+Robot Savo — Remote Speech Client Node (utterance-aware, STT+LLM+TTS logger)
 
 This node runs on the Pi and connects the microphone to the Robot_Savo_Server
 "speech gateway" (/speech endpoint), which performs STT + LLM in one step.
@@ -20,9 +20,13 @@ Key features:
       * finalize utterance on silence or max duration
       * send ONE HTTP request to /speech per utterance
   - Simple energy-based VAD for block/utterance detection.
-  - HTTP POST to SPEECH_SERVER_URL with in-memory WAV.
-  - Respects /savo_speech/tts_speaking gate with cooldown to avoid self-listening.
-  - Robust error handling and logging.
+  - HTTP POST to SPEECH_SERVER_URL with in-memory WAV (no files on disk).
+  - Respects /savo_speech/tts_speaking gate + cooldown to avoid self-listening.
+  - Logs the full pipeline in one place:
+        [STT] transcript
+        [LLM] intent, nav_goal, tier_used, success, error
+        [TTS] reply_text
+  - Robust error handling and retry logic for /speech.
 """
 
 import io
@@ -66,7 +70,7 @@ class RemoteSpeechClientNode(Node):
         # ---------------------------------------------------------------------
         # Declare parameters with defaults
         # ---------------------------------------------------------------------
-        # IMPORTANT: We declare with DEFAULT VALUES instead of Parameter.Type.*,
+        # NOTE: we declare with DEFAULT VALUES instead of Parameter.Type.*,
         # so rclpy does not complain about "not initialized" parameters.
         # ---------------------------------------------------------------------
         self.declare_parameter("speech_server_url", "")
@@ -190,7 +194,7 @@ class RemoteSpeechClientNode(Node):
         self._utt_active = False
         self._utt_start_time = 0.0
         self._utt_last_voice_time = 0.0
-        self._utt_buffers = []  # list of np.ndarray blocks
+        self._utt_buffers = []  # list[np.ndarray]
 
         # Internal worker
         self._shutdown_flag = False
@@ -596,19 +600,35 @@ class RemoteSpeechClientNode(Node):
         error_msg: str,
     ) -> None:
         """
-        Publish transcript, reply_text, and IntentResult to ROS.
+        Publish transcript, reply_text, and IntentResult to ROS,
+        and log the full STT → LLM → TTS pipeline.
         """
-        # STT text
+        # --- LOG PIPELINE ----------------------------------------------------
+        # Always show the pipeline when we get a response.
+        self.get_logger().info(f"[STT] transcript: '{transcript}'")
+        self.get_logger().info(
+            "[LLM] intent=%s, nav_goal=%s, tier_used=%s, success=%s, error='%s'"
+            % (
+                intent,
+                nav_goal if nav_goal is not None else "",
+                tier_used,
+                llm_ok,
+                error_msg,
+            )
+        )
+        self.get_logger().info(f"[TTS] reply_text: '{reply_text}'")
+
+        # --- PUBLISH STT TEXT -----------------------------------------------
         stt_msg = String()
         stt_msg.data = transcript
         self.stt_text_pub.publish(stt_msg)
 
-        # TTS text
+        # --- PUBLISH TTS TEXT -----------------------------------------------
         tts_msg = String()
         tts_msg.data = reply_text
         self.tts_text_pub.publish(tts_msg)
 
-        # IntentResult
+        # --- PUBLISH IntentResult -------------------------------------------
         ir = IntentResult()
         ir.source = "remote_speech_client"
         ir.robot_id = self.robot_id
@@ -657,7 +677,11 @@ def main(args=None) -> None:
     finally:
         if node is not None:
             node.destroy_node()
-        rclpy.shutdown()
+        # Guard against double-shutdown RCLError
+        try:
+            rclpy.shutdown()
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":
