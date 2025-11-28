@@ -38,6 +38,9 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 from std_msgs.msg import String, Float32
 from sensor_msgs.msg import Image  # used as a placeholder type for camera
 
+# Pygame is the drawing backend
+import pygame
+
 # Import helper modules (you will implement these in separate files)
 try:
     from .face_view import draw_face_view
@@ -46,9 +49,6 @@ except ImportError:
     # For early development, we allow these to be missing and use stubs.
     draw_face_view = None
     draw_navigation_view = None
-
-# Pygame is the drawing backend
-import pygame
 
 
 RGB = Tuple[int, int, int]
@@ -204,7 +204,7 @@ class SavoUIDisplay(Node):
             "colors.text_subtitle", [210, 210, 210]
         )
 
-        # Text sizes (you can mirror ui_params.yaml exactly if you want)
+        # Text sizes
         self.declare_parameter("text.main.font_size", 32)
         self.declare_parameter("text.status.font_size", 28)
         self.declare_parameter("text.subtitle.font_size", 22)
@@ -312,23 +312,29 @@ class SavoUIDisplay(Node):
     # ======================================================================
 
     def _init_pygame(self) -> None:
-        """Initialize pygame display."""
-        # You can force a specific SDL video driver here if needed, e.g. "kmsdrm"
-        # os.environ.setdefault("SDL_VIDEODRIVER", "kmsdrm")
+        """Initialize pygame display (Wayland-first like tools/diag/ui/face.py)."""
+
+        # Prefer Wayland on the Pi (matches your face.py script)
+        os.environ.setdefault("SDL_VIDEODRIVER", "wayland")
+        os.environ.setdefault("SDL_VIDEO_WAYLAND_ALLOW_LIBDECOR", "0")
+        os.environ.setdefault("SDL_RENDER_VSYNC", "1")
 
         pygame.init()
         pygame.font.init()
 
         flags = 0
         if self.screen_fullscreen:
-            flags |= pygame.FULLSCREEN
+            flags |= pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF
 
         self._screen = pygame.display.set_mode(
             (self.screen_width, self.screen_height), flags
         )
         pygame.display.set_caption("Robot Savo UI")
+        pygame.mouse.set_visible(False)
 
-        self._clock = pygame.time.Clock()
+        # IMPORTANT: use a different name than self._clock to avoid
+        # overwriting the rclpy Node clock used by timers.
+        self._pg_clock = pygame.time.Clock()
 
         # Load fonts (if these fail, pygame will substitute defaults)
         self._font_main = pygame.font.SysFont("DejaVu Sans", self.font_size_main)
@@ -364,9 +370,9 @@ class SavoUIDisplay(Node):
         pygame.display.flip()
 
         # FPS cap & optional counter
-        dt_ms = self._clock.tick(self.screen_fps)
+        dt_ms = self._pg_clock.tick(self.screen_fps)
         if self.show_fps:
-            fps = self._clock.get_fps()
+            fps = self._pg_clock.get_fps()
             # Simple overlay in top-left corner
             fps_text = self._font_subtitle.render(f"{fps:5.1f} FPS", True, (255, 255, 0))
             self._screen.blit(fps_text, (10, 10))
