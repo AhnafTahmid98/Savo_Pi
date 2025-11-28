@@ -24,14 +24,15 @@ Notes:
   - tts_piper.yaml controls Piper TTS (voices, device, topics).
 """
 
+import os
+
+from ament_index_python.packages import get_package_share_directory
+
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, LogInfo
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-
-from ament_index_python.packages import get_package_share_directory
-import os
 
 
 def generate_launch_description() -> LaunchDescription:
@@ -41,7 +42,7 @@ def generate_launch_description() -> LaunchDescription:
     robot_id_arg = DeclareLaunchArgument(
         "robot_id",
         default_value="robot_savo_pi",
-        description="Robot ID to pass into remote_speech_client_node (for IntentResult.robot_id).",
+        description="Robot ID to pass into remote_speech_client_node (IntentResult.robot_id).",
     )
 
     enable_mouth_anim_arg = DeclareLaunchArgument(
@@ -128,15 +129,11 @@ def generate_launch_description() -> LaunchDescription:
     )
 
     # -------------------------------------------------------------------------
-    # Info for logs
+    # Info log (static message to avoid substitution issues at import time)
     # -------------------------------------------------------------------------
     info_msg = LogInfo(
-        msg=(
-            "[speech_bringup_v2] Starting remote speech pipeline "
-            "(remote_speech_client_node + tts_node, mouth_anim="
-            + LaunchConfiguration("enable_mouth_anim").perform({})
-            + ")"
-        )
+        msg="[speech_bringup_v2] Starting remote speech pipeline "
+            "(remote_speech_client_node + tts_node + optional mouth_anim_node)"
     )
 
     # -------------------------------------------------------------------------
