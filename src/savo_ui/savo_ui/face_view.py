@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Robot Savo — Face view helper
 
@@ -78,23 +79,25 @@ def draw_face_view(
             colors["text_status"]   -> status text
             colors["text_subtitle"] -> subtitle text
 
+        In the future we may also pass (optional):
+            colors["eye_white"], colors["eye_outline"], colors["pupil"],
+            colors["mouth"], colors["mouth_outline"]
+
     screen_size:
         (width, height) of the target surface in pixels.
     """
     width, height = screen_size
 
-    # --- Layout constants (tuned for 1024x600, scaled for other sizes) ----
-    # These are chosen to look sensible on the 7" 1024x600 DSI, but they
-    # scale proportionally with screen size.
+    # ------------------------------------------------------------------
+    # Layout constants (tuned for 1024x600, scaled for other sizes)
+    # ------------------------------------------------------------------
     cx = width // 2
     cy = int(height * 0.45)  # face center a bit above vertical middle
 
-    # Base scales
     base_w, base_h = 1024.0, 600.0
     scale_x = width / base_w
     scale_y = height / base_h
-    # Use average scale for radii
-    scale = 0.5 * (scale_x + scale_y)
+    scale = 0.5 * (scale_x + scale_y)  # average for radii
 
     # Eyes
     eye_radius = int(40 * scale)
@@ -108,17 +111,26 @@ def draw_face_view(
     mouth_height_min = int(10 * scale_y)
     mouth_height_max = int(90 * scale_y)
 
-    # --- Clamp inputs ------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Clamp inputs
+    # ------------------------------------------------------------------
     t = max(0.0, min(1.0, float(mouth_level)))
     status_text = (status_text or "").strip()
     subtitle_text = (subtitle_text or "").strip()
 
-    # --- Draw eyes ---------------------------------------------------------
-    eye_white_color: RGB = (235, 235, 235)
-    eye_outline_color: RGB = (255, 255, 255)
-    pupil_color: RGB = (30, 30, 30)
+    # ------------------------------------------------------------------
+    # Colors (with sensible defaults if keys not present)
+    # ------------------------------------------------------------------
+    eye_white_color: RGB = colors.get("eye_white", (235, 235, 235))
+    eye_outline_color: RGB = colors.get("eye_outline", (255, 255, 255))
+    pupil_color: RGB = colors.get("pupil", (30, 30, 30))
 
-    # You can override these from colors dict in the future if needed
+    mouth_color: RGB = colors.get("mouth", (230, 80, 80))
+    mouth_outline_color: RGB = colors.get("mouth_outline", (255, 255, 255))
+
+    # ------------------------------------------------------------------
+    # Draw eyes
+    # ------------------------------------------------------------------
     eye_left_center = (cx - eye_offset_x, cy + eye_offset_y)
     eye_right_center = (cx + eye_offset_x, cy + eye_offset_y)
 
@@ -134,11 +146,9 @@ def draw_face_view(
     pygame.draw.circle(surface, pupil_color, eye_left_center, pupil_radius)
     pygame.draw.circle(surface, pupil_color, eye_right_center, pupil_radius)
 
-    # --- Draw mouth --------------------------------------------------------
-    mouth_color: RGB = (230, 80, 80)
-    mouth_outline_color: RGB = (255, 255, 255)
-
-    # Compute mouth rect
+    # ------------------------------------------------------------------
+    # Draw mouth
+    # ------------------------------------------------------------------
     mouth_center_y = cy + mouth_offset_y
     current_height = int(_lerp(mouth_height_min, mouth_height_max, t))
     current_height = max(2, current_height)
@@ -150,30 +160,30 @@ def draw_face_view(
         current_height,
     )
 
-    # Slightly rounded effect by drawing two overlapping rects or by
-    # using rounded rectangles if available in your pygame version.
     try:
         # pygame.draw.rect supports border_radius in recent versions
+        radius = int(current_height * 0.4)
         pygame.draw.rect(
             surface,
             mouth_color,
             mouth_rect,
-            border_radius=int(current_height * 0.4),
+            border_radius=radius,
         )
         pygame.draw.rect(
             surface,
             mouth_outline_color,
             mouth_rect,
             width=2,
-            border_radius=int(current_height * 0.4),
+            border_radius=radius,
         )
     except TypeError:
         # Fallback if border_radius is not supported
         pygame.draw.rect(surface, mouth_color, mouth_rect)
         pygame.draw.rect(surface, mouth_outline_color, mouth_rect, width=2)
 
-    # --- Draw texts --------------------------------------------------------
-    # We assume fonts dict contains "status" and "subtitle".
+    # ------------------------------------------------------------------
+    # Draw texts (status + subtitle)
+    # ------------------------------------------------------------------
     font_status = fonts.get("status") or fonts.get("main")
     font_subtitle = fonts.get("subtitle") or fonts.get("status") or fonts.get("main")
 
@@ -240,7 +250,7 @@ def _draw_centered_text(
     if current:
         lines.append(current)
 
-    # Now render each line
+    # Render each line
     line_height = font.get_linesize()
     total_height = len(lines) * line_height
     start_y = y - total_height // 2
