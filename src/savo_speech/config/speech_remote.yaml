@@ -56,12 +56,15 @@ remote_speech_client_node:
 
     # Energy threshold for simple block-level VAD (normalized RMS [0..1]).
     #
-    # From your hallway tests:
+    # From hallway tests:
     #   - idle noise ≈ 0.00016
-    #   - 0.0003 is slightly above that but still forgiving, so speech is
-    #     not missed even if you speak softly or a bit further away.
+    #   - 0.0003 was very sensitive (more random triggers)
     #
-    energy_threshold: 0.0003
+    # 0.0005 is a bit stricter:
+    #   - ignores tiny noises / breaths
+    #   - still reacts to normal speaking voice at typical distance
+    #
+    energy_threshold: 0.0005
 
     # Input device selection:
     #
@@ -78,8 +81,9 @@ remote_speech_client_node:
     # ------------------------------------------------------------------------
     #
     # These are here to mirror stt_whisper.yaml. The current Python node
-    # ignores them, but we will hook them up when we add true utterance
-    # buffering (buffer blocks until silence, then send ONE request).
+    # still works chunk-by-chunk, but these parameters are kept so we can
+    # switch to true utterance buffering later (buffer blocks until silence,
+    # then send ONE request).
     #
 
     # true  → buffer multiple blocks while speech is present and send once
@@ -95,7 +99,12 @@ remote_speech_client_node:
     # ------------------------------------------------------------------------
 
     # Timeout (seconds) for a single /speech HTTP request.
-    request_timeout_s: 15.0
+    #
+    # 20 s gives the Robot_Savo_Server container more time on the first
+    # call when models are still warming up, reducing spurious
+    # "connection problem" fallbacks after a fresh start.
+    #
+    request_timeout_s: 20.0
 
     # Number of retry attempts on network/server errors.
     max_retries: 2
@@ -109,12 +118,12 @@ remote_speech_client_node:
     #   - While this flag is true (plus cooldown), we should NOT send audio
     #     to /speech to avoid Robot Savo hearing itself.
     #
-    # In the current Python node we already subscribe to /savo_speech/tts_speaking
-    # and simply skip recording when it is true. The cooldown parameter will
-    # be used once we add more advanced gating.
+    # The current Python node subscribes to /savo_speech/tts_speaking and
+    # skips recording when it is true. The cooldown parameter will be used
+    # more fully once we add advanced gating.
     #
 
-    # Enable/disable TTS gating logic in the node (planned).
+    # Enable/disable TTS gating logic in the node.
     tts_gate_enable: true
 
     # Topic where TTS speaking flag is published (Bool).
@@ -129,6 +138,14 @@ remote_speech_client_node:
 
     # Sleep in seconds between loops when idle or TTS is speaking.
     idle_sleep_s: 0.1
+
+    # Minimum transcript length (characters) for a "real" utterance.
+    #
+    # The Python node uses this to ignore pure noise / empty results:
+    #   - If transcript is shorter than this AND there is no reply_text
+    #     and no error message, the turn is skipped (no publish, no TTS).
+    #
+    min_transcript_chars: 3
 
     # Enable extra debug logs (JSON dumps, RMS values, etc.).
     debug_logging: false

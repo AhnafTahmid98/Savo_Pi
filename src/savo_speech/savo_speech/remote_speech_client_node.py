@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Robot Savo — Remote Speech Client Node (utterance-aware, STT+LLM+TTS logger)
+Robot Savo — Remote Speech Client Node
 
 This node runs on the Pi and connects the microphone to the Robot_Savo_Server
 "speech gateway" (/speech endpoint), which performs STT + LLM in one step.
@@ -14,24 +14,15 @@ Data flow:
   /savo_intent/intent_result   (savo_msgs/IntentResult: structured result)
 
 Key features:
-  - Utterance-level mode:
-      * capture small audio blocks (e.g. 2s)
-      * buffer while voice is present
-      * finalize utterance on silence or max duration
-      * send ONE HTTP request to /speech per utterance
-  - Simple energy-based VAD for block/utterance detection.
-  - HTTP POST to SPEECH_SERVER_URL with in-memory WAV (no files on disk).
-  - Respects /savo_speech/tts_speaking gate + cooldown to avoid self-listening.
-  - Logs the full pipeline in one place:
-        [STT] transcript
-        [LLM] intent, nav_goal, tier_used, success, error
-        [TTS] reply_text
-  - Robust error handling and retry logic for /speech.
+  - Chunked audio recording with simple energy-based VAD.
+  - HTTP POST to SPEECH_SERVER_URL with in-memory WAV.
+  - Robust error handling and logging.
+  - Respects /savo_speech/tts_speaking gate to avoid self-listening.
+  - Skips "no-op" turns (very short transcripts with no reply/error).
 """
 
 import io
 import json
-import os
 import threading
 import time
 import wave
@@ -43,6 +34,7 @@ import sounddevice as sd
 
 import rclpy
 from rclpy.node import Node
+from rclpy.parameter import Parameter
 
 from std_msgs.msg import String, Bool
 from savo_msgs.msg import IntentResult
@@ -52,9 +44,8 @@ class RemoteSpeechClientNode(Node):
     """
     RemoteSpeechClientNode
 
-    Continuously records audio from the Pi's microphone, groups it into
-    utterances (if enabled), sends them to the Robot_Savo_Server /speech
-    endpoint, and publishes:
+    Continuously records short audio segments from the Pi's microphone,
+    sends them to the Robot_Savo_Server /speech endpoint, and publishes:
 
       - /savo_speech/stt_text        (transcript)
       - /savo_speech/tts_text        (reply_text)
@@ -67,90 +58,86 @@ class RemoteSpeechClientNode(Node):
     def __init__(self) -> None:
         super().__init__("remote_speech_client_node")
 
-        # ---------------------------------------------------------------------
-        # Declare parameters with defaults
-        # ---------------------------------------------------------------------
-        # NOTE: we declare with DEFAULT VALUES instead of Parameter.Type.*,
-        # so rclpy does not complain about "not initialized" parameters.
-        # ---------------------------------------------------------------------
-        self.declare_parameter("speech_server_url", "")
-        self.declare_parameter("robot_id", "robot_savo_pi")
+        # Parameters (with environment variable fallbacks for URLs/IDs)
+        self.declare_parameters(
+            "",
+            [
+                ("speech_server_url", Parameter.Type.STRING),
+                ("robot_id", Parameter.Type.STRING),
 
-        # Audio capture
-        self.declare_parameter("sample_rate_hz", 16000)
-        self.declare_parameter("chunk_duration_s", 2.0)
-        self.declare_parameter("energy_threshold", 0.0003)
-        self.declare_parameter("input_device_index", 0)
+                # Audio capture
+                ("sample_rate_hz", 16000),
+                ("chunk_duration_s", 2.0),
+                ("energy_threshold", 0.0003),
 
-        # Utterance behavior
-        self.declare_parameter("utterance_mode", True)
-        self.declare_parameter("max_utterance_duration_s", 15.0)
+                # Utterance-level behaviour (future use)
+                ("utterance_mode", True),
+                ("max_utterance_duration_s", 15.0),
 
-        # HTTP /speech
-        self.declare_parameter("request_timeout_s", 15.0)
-        self.declare_parameter("max_retries", 2)
+                # HTTP client
+                ("request_timeout_s", 15.0),
+                ("max_retries", 2),
 
-        # TTS gate
-        self.declare_parameter("tts_gate_enable", True)
-        self.declare_parameter("tts_speaking_topic", "/savo_speech/tts_speaking")
-        self.declare_parameter("tts_gate_cooldown_s", 0.8)
+                # TTS gate
+                ("tts_gate_enable", True),
+                ("tts_speaking_topic", "/savo_speech/tts_speaking"),
+                ("tts_gate_cooldown_s", 0.8),
 
-        # Node behavior
-        self.declare_parameter("idle_sleep_s", 0.1)
-        self.declare_parameter("debug_logging", False)
+                # Loop behaviour
+                ("idle_sleep_s", 0.1),
+                ("input_device_index", 0),
 
-        # ---------------------------------------------------------------------
-        # Read parameters (with env overrides for server URL and robot ID)
-        # ---------------------------------------------------------------------
+                # Minimum transcript length for a "real" utterance
+                ("min_transcript_chars", 3),
 
-        # speech_server_url: env SPEECH_SERVER_URL wins, otherwise param
-        env_speech_url = os.environ.get("SPEECH_SERVER_URL", "").strip()
-        param_speech_url = str(self.get_parameter("speech_server_url").value or "")
-        self.speech_server_url = env_speech_url or param_speech_url
+                # Logging
+                ("debug_logging", False),
+            ],
+        )
 
-        # robot_id: env ROBOT_ID wins, otherwise param
-        env_robot_id = os.environ.get("ROBOT_ID", "").strip()
-        param_robot_id = str(self.get_parameter("robot_id").value or "")
-        self.robot_id = env_robot_id or param_robot_id
+        # URLs / identity with env fallbacks
+        self.speech_server_url = self._get_param_with_env(
+            "speech_server_url", env_name="SPEECH_SERVER_URL", default_value=""
+        )
+        self.robot_id = self._get_param_with_env(
+            "robot_id", env_name="ROBOT_ID", default_value="robot_savo_pi"
+        )
 
-        # Audio params
+        # Other parameters
         self.sample_rate_hz = int(self.get_parameter("sample_rate_hz").value)
         self.chunk_duration_s = float(self.get_parameter("chunk_duration_s").value)
         self.energy_threshold = float(self.get_parameter("energy_threshold").value)
-        self.input_device_index = int(self.get_parameter("input_device_index").value)
 
-        # Utterance params
         self.utterance_mode = bool(self.get_parameter("utterance_mode").value)
         self.max_utterance_duration_s = float(
             self.get_parameter("max_utterance_duration_s").value
         )
 
-        # HTTP params
         self.request_timeout_s = float(self.get_parameter("request_timeout_s").value)
         self.max_retries = int(self.get_parameter("max_retries").value)
 
-        # TTS gate params
         self.tts_gate_enable = bool(self.get_parameter("tts_gate_enable").value)
         self.tts_speaking_topic = str(
-            self.get_parameter("tts_speaking_topic").value or "/savo_speech/tts_speaking"
+            self.get_parameter("tts_speaking_topic").value
         )
         self.tts_gate_cooldown_s = float(
             self.get_parameter("tts_gate_cooldown_s").value
         )
 
-        # Node behavior
         self.idle_sleep_s = float(self.get_parameter("idle_sleep_s").value)
+        self.input_device_index = int(self.get_parameter("input_device_index").value)
+
+        self.min_transcript_chars = int(
+            self.get_parameter("min_transcript_chars").value
+        )
+
         self.debug_logging = bool(self.get_parameter("debug_logging").value)
 
-        # ---------------------------------------------------------------------
         # Basic validation
-        # ---------------------------------------------------------------------
         if not self.speech_server_url or not self.speech_server_url.startswith("http"):
             self.get_logger().error(
-                "speech_server_url is not set or invalid.\n"
-                "Set it via ROS param 'speech_server_url' or SPEECH_SERVER_URL env.\n"
-                "Example env (in env_robot_server.sh):\n"
-                '  export SPEECH_SERVER_URL="http://<PC-IP>:9000/speech"'
+                "speech_server_url is not set or invalid. "
+                "Set it via ROS param 'speech_server_url' or SPEECH_SERVER_URL env."
             )
             raise RuntimeError("Invalid speech_server_url")
 
@@ -170,6 +157,7 @@ class RemoteSpeechClientNode(Node):
             f"  tts_speaking_topic      = {self.tts_speaking_topic}\n"
             f"  tts_gate_cooldown_s     = {self.tts_gate_cooldown_s}\n"
             f"  idle_sleep_s            = {self.idle_sleep_s}\n"
+            f"  min_transcript_chars    = {self.min_transcript_chars}\n"
             f"  debug_logging           = {self.debug_logging}"
         )
 
@@ -182,7 +170,6 @@ class RemoteSpeechClientNode(Node):
 
         # Subscriber: TTS speaking gate
         self.tts_speaking = False
-        self._last_tts_state_change = time.monotonic()
         self.create_subscription(
             Bool,
             self.tts_speaking_topic,
@@ -190,13 +177,7 @@ class RemoteSpeechClientNode(Node):
             10,
         )
 
-        # Utterance buffer state
-        self._utt_active = False
-        self._utt_start_time = 0.0
-        self._utt_last_voice_time = 0.0
-        self._utt_buffers = []  # list[np.ndarray]
-
-        # Internal worker
+        # Internal state
         self._shutdown_flag = False
         self._worker_thread = threading.Thread(
             target=self._main_loop, name="remote_speech_worker", daemon=True
@@ -204,20 +185,44 @@ class RemoteSpeechClientNode(Node):
         self._worker_thread.start()
 
     # -------------------------------------------------------------------------
+    # Parameter helpers
+    # -------------------------------------------------------------------------
+
+    def _get_param_with_env(
+        self, name: str, env_name: Optional[str] = None, default_value: str = ""
+    ) -> str:
+        """
+        Helper to get a parameter, with an optional environment variable
+        as a fallback, and finally a default value.
+        """
+        param = self.get_parameter(name)
+        if param.type_ != Parameter.Type.NOT_SET and param.value not in ("", None):
+            return str(param.value)
+
+        if env_name:
+            import os
+
+            env_val = os.environ.get(env_name)
+            if env_val:
+                # Reflect env into ROS parameter as well for debugging
+                self.set_parameters(
+                    [Parameter(name=name, value=env_val)]
+                )
+                return env_val
+
+        # Use default
+        if default_value:
+            self.set_parameters([Parameter(name=name, value=default_value)])
+        return default_value
+
+    # -------------------------------------------------------------------------
     # Subscribers
     # -------------------------------------------------------------------------
 
     def _tts_speaking_cb(self, msg: Bool) -> None:
-        new_state = bool(msg.data)
-        if new_state != self.tts_speaking:
-            self.tts_speaking = new_state
-            self._last_tts_state_change = time.monotonic()
-            if self.debug_logging:
-                self.get_logger().debug(
-                    f"TTS speaking changed to {self.tts_speaking}"
-                )
-        else:
-            self.tts_speaking = new_state
+        self.tts_speaking = bool(msg.data)
+        if self.debug_logging:
+            self.get_logger().debug(f"TTS speaking state: {self.tts_speaking}")
 
     # -------------------------------------------------------------------------
     # Main loop
@@ -227,36 +232,27 @@ class RemoteSpeechClientNode(Node):
         """
         Background worker thread:
 
-        - Applies TTS gate (and cooldown).
-        - In utterance_mode:
-            * records blocks
-            * appends voiced blocks to utterance buffer
-            * finalizes on silence or max duration
-        - In non-utterance mode:
-            * treats each voiced block as a separate request
+        - Waits until TTS is not speaking (if gate enabled).
+        - Records a chunk of audio.
+        - Skips if silence (RMS below threshold).
         - Sends to /speech with retries.
         - Publishes transcript / reply / IntentResult.
         """
         self.get_logger().info("Remote speech worker thread started.")
 
+        last_tts_off_time: float = 0.0
+
         while rclpy.ok() and not self._shutdown_flag:
-            # Respect TTS gate if enabled
-            if self.tts_gate_enable:
-                now = time.monotonic()
-                if self.tts_speaking:
-                    # Robot is speaking → do not listen
-                    if self.debug_logging:
-                        self.get_logger().debug("TTS speaking; skipping capture.")
-                    time.sleep(self.idle_sleep_s)
-                    continue
-                # Cooldown after TTS stops
-                time_since_change = now - self._last_tts_state_change
-                if time_since_change < self.tts_gate_cooldown_s:
-                    if self.debug_logging:
-                        self.get_logger().debug(
-                            f"TTS cooldown ({time_since_change:.3f}s < "
-                            f"{self.tts_gate_cooldown_s}s); skipping capture."
-                        )
+            # Avoid listening to ourselves (basic gate)
+            if self.tts_gate_enable and self.tts_speaking:
+                last_tts_off_time = time.time()
+                time.sleep(self.idle_sleep_s)
+                continue
+
+            # Cooldown after TTS stops
+            if self.tts_gate_enable and not self.tts_speaking:
+                now = time.time()
+                if now - last_tts_off_time < self.tts_gate_cooldown_s:
                     time.sleep(self.idle_sleep_s)
                     continue
 
@@ -272,175 +268,47 @@ class RemoteSpeechClientNode(Node):
                 time.sleep(self.idle_sleep_s)
                 continue
 
+            # Simple energy-based VAD
             rms = self._compute_rms(audio_data)
+            if rms < self.energy_threshold:
+                if self.debug_logging:
+                    self.get_logger().debug(
+                        f"Chunk skipped due to low energy (rms={rms:.6f})."
+                    )
+                continue
 
             if self.debug_logging:
                 self.get_logger().debug(
-                    f"Recorded chunk: samples={len(audio_data)}, rms={rms:.6f}"
+                    f"Sending chunk to /speech (rms={rms:.6f}, "
+                    f"len={len(audio_data)} samples)..."
                 )
 
-            if self.utterance_mode:
-                self._handle_chunk_utterance_mode(audio_data, rms)
-            else:
-                self._handle_chunk_simple_mode(audio_data, rms)
+            # Convert to WAV bytes
+            wav_bytes = self._encode_wav_bytes(audio_data, self.sample_rate_hz)
+
+            # Call /speech with retries
+            (
+                transcript,
+                reply_text,
+                intent,
+                nav_goal,
+                tier_used,
+                llm_ok,
+                error_msg,
+            ) = self._call_speech_with_retries(wav_bytes)
+
+            # Publish outputs
+            self._publish_results(
+                transcript=transcript,
+                reply_text=reply_text,
+                intent=intent,
+                nav_goal=nav_goal,
+                tier_used=tier_used,
+                llm_ok=llm_ok,
+                error_msg=error_msg,
+            )
 
         self.get_logger().info("Remote speech worker thread exiting.")
-
-    # -------------------------------------------------------------------------
-    # Utterance logic
-    # -------------------------------------------------------------------------
-
-    def _handle_chunk_utterance_mode(self, audio_data: np.ndarray, rms: float) -> None:
-        """
-        Utterance-aware handling:
-          - Start utterance when voiced block arrives.
-          - Continue appending while voiced or until max duration.
-          - Finalize on sustained silence or duration limit.
-        """
-        now = time.monotonic()
-        voiced = rms >= self.energy_threshold
-
-        # Case 1: voiced block
-        if voiced:
-            if not self._utt_active:
-                # Start new utterance
-                self._utt_active = True
-                self._utt_start_time = now
-                self._utt_last_voice_time = now
-                self._utt_buffers = [audio_data]
-                if self.debug_logging:
-                    self.get_logger().debug(
-                        "Utterance started (first voiced block)."
-                    )
-            else:
-                # Continue existing utterance
-                self._utt_last_voice_time = now
-                self._utt_buffers.append(audio_data)
-                if self.debug_logging:
-                    duration = now - self._utt_start_time
-                    self.get_logger().debug(
-                        f"Utterance extended: blocks={len(self._utt_buffers)}, "
-                        f"duration={duration:.3f}s"
-                    )
-
-            # Check duration limit
-            if self._utt_active:
-                utt_duration = now - self._utt_start_time
-                if utt_duration >= self.max_utterance_duration_s:
-                    if self.debug_logging:
-                        self.get_logger().debug(
-                            "Utterance max duration reached; finalizing."
-                        )
-                    self._finalize_utterance_send_and_publish()
-            return
-
-        # Case 2: silent block
-        if not self._utt_active:
-            # No utterance in progress; ignore silence
-            if self.debug_logging:
-                self.get_logger().debug("Silent block, no active utterance.")
-            return
-
-        # We have an active utterance, and got a silent block -> end-of-utterance
-        if self.debug_logging:
-            duration = now - self._utt_start_time
-            silence_since_voice = now - self._utt_last_voice_time
-            self.get_logger().debug(
-                "Silent block with active utterance; finalizing. "
-                f"utt_duration={duration:.3f}s, "
-                f"silence_since_voice={silence_since_voice:.3f}s"
-            )
-
-        self._finalize_utterance_send_and_publish()
-
-    def _finalize_utterance_send_and_publish(self) -> None:
-        """
-        Concatenate buffered blocks, send to /speech, publish results,
-        then reset utterance state.
-        """
-        if not self._utt_buffers:
-            # Nothing to send
-            self._reset_utterance()
-            return
-
-        audio = np.concatenate(self._utt_buffers)
-        if self.debug_logging:
-            self.get_logger().debug(
-                f"Finalizing utterance: total_samples={len(audio)}"
-            )
-
-        wav_bytes = self._encode_wav_bytes(audio, self.sample_rate_hz)
-
-        (
-            transcript,
-            reply_text,
-            intent,
-            nav_goal,
-            tier_used,
-            llm_ok,
-            error_msg,
-        ) = self._call_speech_with_retries(wav_bytes)
-
-        self._publish_results(
-            transcript=transcript,
-            reply_text=reply_text,
-            intent=intent,
-            nav_goal=nav_goal,
-            tier_used=tier_used,
-            llm_ok=llm_ok,
-            error_msg=error_msg,
-        )
-
-        self._reset_utterance()
-
-    def _reset_utterance(self) -> None:
-        """
-        Reset utterance buffer state.
-        """
-        self._utt_active = False
-        self._utt_start_time = 0.0
-        self._utt_last_voice_time = 0.0
-        self._utt_buffers = []
-
-    def _handle_chunk_simple_mode(self, audio_data: np.ndarray, rms: float) -> None:
-        """
-        Simple per-block mode:
-          - If voiced, send this block directly to /speech.
-          - If silent, ignore.
-        """
-        if rms < self.energy_threshold:
-            if self.debug_logging:
-                self.get_logger().debug(
-                    f"Chunk skipped due to low energy (rms={rms:.6f})."
-                )
-            return
-
-        if self.debug_logging:
-            self.get_logger().debug(
-                "Simple mode: sending voiced block as a single request."
-            )
-
-        wav_bytes = self._encode_wav_bytes(audio_data, self.sample_rate_hz)
-
-        (
-            transcript,
-            reply_text,
-            intent,
-            nav_goal,
-            tier_used,
-            llm_ok,
-            error_msg,
-        ) = self._call_speech_with_retries(wav_bytes)
-
-        self._publish_results(
-            transcript=transcript,
-            reply_text=reply_text,
-            intent=intent,
-            nav_goal=nav_goal,
-            tier_used=tier_used,
-            llm_ok=llm_ok,
-            error_msg=error_msg,
-        )
 
     # -------------------------------------------------------------------------
     # Audio capture helpers
@@ -448,7 +316,7 @@ class RemoteSpeechClientNode(Node):
 
     def _record_chunk(self) -> Optional[np.ndarray]:
         """
-        Records a single chunk of audio from the selected input device.
+        Records a single chunk of audio from the default or selected input device.
 
         Returns:
             np.ndarray of shape (N,) with dtype int16, or None on error.
@@ -525,7 +393,7 @@ class RemoteSpeechClientNode(Node):
                 )
                 time.sleep(1.0)
 
-        # All attempts failed
+        # All attempts failed → fallback reply
         fallback_reply = (
             "I am having a connection problem with my server. "
             "Please try again in a moment."
@@ -600,35 +468,50 @@ class RemoteSpeechClientNode(Node):
         error_msg: str,
     ) -> None:
         """
-        Publish transcript, reply_text, and IntentResult to ROS,
-        and log the full STT → LLM → TTS pipeline.
-        """
-        # --- LOG PIPELINE ----------------------------------------------------
-        # Always show the pipeline when we get a response.
-        self.get_logger().info(f"[STT] transcript: '{transcript}'")
-        self.get_logger().info(
-            "[LLM] intent=%s, nav_goal=%s, tier_used=%s, success=%s, error='%s'"
-            % (
-                intent,
-                nav_goal if nav_goal is not None else "",
-                tier_used,
-                llm_ok,
-                error_msg,
-            )
-        )
-        self.get_logger().info(f"[TTS] reply_text: '{reply_text}'")
+        Publish transcript, reply_text, and IntentResult to ROS.
 
-        # --- PUBLISH STT TEXT -----------------------------------------------
+        Also logs a concise summary for debugging:
+          [STT] transcript: '...'
+          [LLM] intent=..., nav_goal=..., tier_used=..., success=..., error='...'
+          [TTS] reply_text: '...'
+        """
+
+        # Normalise strings
+        t_clean = (transcript or "").strip()
+        r_clean = (reply_text or "").strip()
+        e_clean = (error_msg or "").strip()
+
+        # Skip pure "no-op" turns: no meaningful transcript, no reply, no error
+        if len(t_clean) < self.min_transcript_chars and not r_clean and not e_clean:
+            if self.debug_logging:
+                self.get_logger().debug(
+                    "Skipping publish: transcript too short "
+                    f"(len={len(t_clean)}, min={self.min_transcript_chars}) "
+                    "and no reply/error."
+                )
+            return
+
+        # Log summary
+        self.get_logger().info(f"[STT] transcript: '{t_clean}'")
+        self.get_logger().info(
+            f"[LLM] intent={intent}, nav_goal={nav_goal or ''}, "
+            f"tier_used={tier_used}, success={llm_ok}, error='{e_clean}'"
+        )
+        self.get_logger().info(f"[TTS] reply_text: '{r_clean}'")
+
+        # Publish STT text (we still publish the raw transcript, even if short,
+        # as long as this is not a "no-op" turn).
         stt_msg = String()
         stt_msg.data = transcript
         self.stt_text_pub.publish(stt_msg)
 
-        # --- PUBLISH TTS TEXT -----------------------------------------------
+        # Publish TTS text (we always publish, even if llm_ok is False,
+        # since we might have a human-friendly error message).
         tts_msg = String()
         tts_msg.data = reply_text
         self.tts_text_pub.publish(tts_msg)
 
-        # --- PUBLISH IntentResult -------------------------------------------
+        # IntentResult
         ir = IntentResult()
         ir.source = "remote_speech_client"
         ir.robot_id = self.robot_id
@@ -644,10 +527,9 @@ class RemoteSpeechClientNode(Node):
 
         if self.debug_logging:
             self.get_logger().debug(
-                "Published IntentResult: "
-                f"intent={intent}, nav_goal={ir.nav_goal}, "
-                f"tier_used={tier_used}, success={ir.success}, "
-                f"error='{ir.error}'"
+                f"Published IntentResult: intent={intent}, "
+                f"nav_goal={ir.nav_goal}, tier_used={tier_used}, "
+                f"success={ir.success}, error='{ir.error}'"
             )
 
     # -------------------------------------------------------------------------
@@ -677,11 +559,7 @@ def main(args=None) -> None:
     finally:
         if node is not None:
             node.destroy_node()
-        # Guard against double-shutdown RCLError
-        try:
-            rclpy.shutdown()
-        except Exception:
-            pass
+        rclpy.shutdown()
 
 
 if __name__ == "__main__":
