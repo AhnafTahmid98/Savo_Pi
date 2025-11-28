@@ -364,9 +364,9 @@ class SavoUIDisplay(Node):
         driver = _choose_sdl_driver(self.get_logger())
         os.environ["SDL_VIDEODRIVER"] = driver
 
-        # Now actually init the display with the chosen driver
-        pygame.display.init()
-
+        # IMPORTANT:
+        # Do NOT call pygame.display.init() here.
+        # pygame.display.set_mode() will init the display using the chosen driver.
         flags = 0
         if self.screen_fullscreen:
             flags |= pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF
@@ -378,7 +378,7 @@ class SavoUIDisplay(Node):
         pygame.display.set_caption(f"Robot Savo UI [{driver}] {w}x{h}")
         pygame.mouse.set_visible(False)
 
-        # IMPORTANT: do not overwrite Node's internal clock.
+        # Use a separate pygame clock just for FPS limiting / measurement
         self._pg_clock = pygame.time.Clock()
 
         # Load fonts (if these fail, pygame will substitute defaults)
@@ -387,6 +387,7 @@ class SavoUIDisplay(Node):
         self._font_subtitle = pygame.font.SysFont(
             "DejaVu Sans", self.font_size_subtitle
         )
+
 
     def _on_timer(self) -> None:
         """Render loop callback (called at ~FPS rate)."""
