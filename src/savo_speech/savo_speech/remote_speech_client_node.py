@@ -27,6 +27,7 @@ Key features:
 
 import io
 import json
+import os
 import threading
 import time
 import wave
@@ -38,7 +39,6 @@ import sounddevice as sd
 
 import rclpy
 from rclpy.node import Node
-from rclpy.parameter import Parameter
 
 from std_msgs.msg import String, Bool
 from savo_msgs.msg import IntentResult
@@ -63,40 +63,51 @@ class RemoteSpeechClientNode(Node):
     def __init__(self) -> None:
         super().__init__("remote_speech_client_node")
 
-        # Parameters (with environment variable fallbacks where relevant)
-        self.declare_parameters(
-            "",
-            [
-                ("speech_server_url", Parameter.Type.STRING),
-                ("robot_id", Parameter.Type.STRING),
-                # Audio capture
-                ("sample_rate_hz", 16000),
-                ("chunk_duration_s", 2.0),
-                ("energy_threshold", 0.0003),
-                ("input_device_index", 0),
-                # Utterance behavior
-                ("utterance_mode", True),
-                ("max_utterance_duration_s", 15.0),
-                # HTTP /speech
-                ("request_timeout_s", 15.0),
-                ("max_retries", 2),
-                # TTS gate
-                ("tts_gate_enable", True),
-                ("tts_speaking_topic", "/savo_speech/tts_speaking"),
-                ("tts_gate_cooldown_s", 0.8),
-                # Node behavior
-                ("idle_sleep_s", 0.1),
-                ("debug_logging", False),
-            ],
-        )
+        # ---------------------------------------------------------------------
+        # Declare parameters with defaults
+        # ---------------------------------------------------------------------
+        # IMPORTANT: We declare with DEFAULT VALUES instead of Parameter.Type.*,
+        # so rclpy does not complain about "not initialized" parameters.
+        # ---------------------------------------------------------------------
+        self.declare_parameter("speech_server_url", "")
+        self.declare_parameter("robot_id", "robot_savo_pi")
 
-        # Endpoint + identity
-        self.speech_server_url = self._get_param_with_env(
-            "speech_server_url", env_name="SPEECH_SERVER_URL", default_value=""
-        )
-        self.robot_id = self._get_param_with_env(
-            "robot_id", env_name="ROBOT_ID", default_value="robot_savo_pi"
-        )
+        # Audio capture
+        self.declare_parameter("sample_rate_hz", 16000)
+        self.declare_parameter("chunk_duration_s", 2.0)
+        self.declare_parameter("energy_threshold", 0.0003)
+        self.declare_parameter("input_device_index", 0)
+
+        # Utterance behavior
+        self.declare_parameter("utterance_mode", True)
+        self.declare_parameter("max_utterance_duration_s", 15.0)
+
+        # HTTP /speech
+        self.declare_parameter("request_timeout_s", 15.0)
+        self.declare_parameter("max_retries", 2)
+
+        # TTS gate
+        self.declare_parameter("tts_gate_enable", True)
+        self.declare_parameter("tts_speaking_topic", "/savo_speech/tts_speaking")
+        self.declare_parameter("tts_gate_cooldown_s", 0.8)
+
+        # Node behavior
+        self.declare_parameter("idle_sleep_s", 0.1)
+        self.declare_parameter("debug_logging", False)
+
+        # ---------------------------------------------------------------------
+        # Read parameters (with env overrides for server URL and robot ID)
+        # ---------------------------------------------------------------------
+
+        # speech_server_url: env SPEECH_SERVER_URL wins, otherwise param
+        env_speech_url = os.environ.get("SPEECH_SERVER_URL", "").strip()
+        param_speech_url = str(self.get_parameter("speech_server_url").value or "")
+        self.speech_server_url = env_speech_url or param_speech_url
+
+        # robot_id: env ROBOT_ID wins, otherwise param
+        env_robot_id = os.environ.get("ROBOT_ID", "").strip()
+        param_robot_id = str(self.get_parameter("robot_id").value or "")
+        self.robot_id = env_robot_id or param_robot_id
 
         # Audio params
         self.sample_rate_hz = int(self.get_parameter("sample_rate_hz").value)
@@ -127,11 +138,15 @@ class RemoteSpeechClientNode(Node):
         self.idle_sleep_s = float(self.get_parameter("idle_sleep_s").value)
         self.debug_logging = bool(self.get_parameter("debug_logging").value)
 
+        # ---------------------------------------------------------------------
         # Basic validation
+        # ---------------------------------------------------------------------
         if not self.speech_server_url or not self.speech_server_url.startswith("http"):
             self.get_logger().error(
-                "speech_server_url is not set or invalid. "
-                "Set it via ROS param 'speech_server_url' or SPEECH_SERVER_URL env."
+                "speech_server_url is not set or invalid.\n"
+                "Set it via ROS param 'speech_server_url' or SPEECH_SERVER_URL env.\n"
+                "Example env (in env_robot_server.sh):\n"
+                '  export SPEECH_SERVER_URL="http://<PC-IP>:9000/speech"'
             )
             raise RuntimeError("Invalid speech_server_url")
 
@@ -183,35 +198,6 @@ class RemoteSpeechClientNode(Node):
             target=self._main_loop, name="remote_speech_worker", daemon=True
         )
         self._worker_thread.start()
-
-    # -------------------------------------------------------------------------
-    # Parameter helpers
-    # -------------------------------------------------------------------------
-
-    def _get_param_with_env(
-        self, name: str, env_name: Optional[str] = None, default_value: str = ""
-    ) -> str:
-        """
-        Helper to get a parameter, with an optional environment variable
-        as a fallback, and finally a default value.
-        """
-        param = self.get_parameter(name)
-        if param.type_ != Parameter.Type.NOT_SET and param.value not in ("", None):
-            return str(param.value)
-
-        if env_name:
-            import os
-
-            env_val = os.environ.get(env_name)
-            if env_val:
-                # Reflect env into ROS parameter as well for debugging
-                self.set_parameters([Parameter(name=name, value=env_val)])
-                return env_val
-
-        # Use default
-        if default_value:
-            self.set_parameters([Parameter(name=name, value=default_value)])
-        return default_value
 
     # -------------------------------------------------------------------------
     # Subscribers
