@@ -109,3 +109,6 @@ Desktop.ini
 
 tools/scripts/env_llm.sh
 
+#env_robot_robot server
+tools/scripts/env_robot_server.sh
+

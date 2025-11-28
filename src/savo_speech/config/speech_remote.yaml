@@ -1,0 +1,134 @@
+# ============================================================================
+# Robot Savo — Remote speech client configuration (Robot_Savo_Server /speech)
+#
+# This config is used by the savo_speech remote_speech_client_node.
+#
+# Data flow:
+#   ReSpeaker mic  -->  remote_speech_client_node (Pi)
+#                    --> /speech (Robot_Savo_Server: STT + LLM)
+#                    <-- JSON {transcript, reply_text, intent, nav_goal, ...}
+#                    --> /savo_speech/stt_text       (String)
+#                    --> /savo_speech/tts_text       (String)
+#                    --> /savo_intent/intent_result  (IntentResult)
+#
+# NOTE:
+#   - speech_server_url can be empty here → then SPEECH_SERVER_URL from
+#     env_robot_server.sh is used.
+#   - robot_id should normally match the Pi ID used everywhere else.
+# ============================================================================
+
+remote_speech_client_node:
+  ros__parameters:
+
+    # ------------------------------------------------------------------------
+    # Endpoint / identity
+    # ------------------------------------------------------------------------
+
+    # Full URL to the /speech endpoint.
+    # Example:
+    #   "http://192.168.164.119:9000/speech"
+    #
+    # Leave as "" to use SPEECH_SERVER_URL from env_robot_server.sh:
+    #   export SPEECH_SERVER_URL="http://<PC-IP>:9000/speech"
+    #
+    speech_server_url: ""
+
+    # Robot ID used in IntentResult and logs.
+    robot_id: "robot_savo_pi"
+
+    # ------------------------------------------------------------------------
+    # Audio capture (ReSpeaker)
+    # ------------------------------------------------------------------------
+
+    # Input sample rate:
+    #   16000 Hz matches Whisper / STT models and keeps bandwidth low.
+    sample_rate_hz: 16000
+
+    # Length of each raw audio block captured from ReSpeaker (seconds).
+    # This is the "block size" we record before checking energy.
+    #
+    # In utterance_mode (planned upgrade), multiple blocks will be buffered
+    # until you stop talking; then all blocks are concatenated and sent once
+    # to /speech.
+    #
+    # For now the node uses this as a simple "chunk duration".
+    chunk_duration_s: 2.0
+
+    # Energy threshold for simple block-level VAD (normalized RMS [0..1]).
+    #
+    # From your hallway tests:
+    #   - idle noise ≈ 0.00016
+    #   - 0.0003 is slightly above that but still forgiving, so speech is
+    #     not missed even if you speak softly or a bit further away.
+    #
+    energy_threshold: 0.0003
+
+    # Input device selection:
+    #
+    # From your earlier probe:
+    #   0: 'ReSpeaker 4 Mic Array (UAC1.0): USB Audio (hw:0,0)'
+    #
+    # So:
+    #   input_device_index: 0  → ReSpeaker 4 Mic Array (what we want)
+    #
+    input_device_index: 0
+
+    # ------------------------------------------------------------------------
+    # Utterance-level behavior (for future upgrade)
+    # ------------------------------------------------------------------------
+    #
+    # These are here to mirror stt_whisper.yaml. The current Python node
+    # ignores them, but we will hook them up when we add true utterance
+    # buffering (buffer blocks until silence, then send ONE request).
+    #
+
+    # true  → buffer multiple blocks while speech is present and send once
+    # false → simple per-block behavior
+    utterance_mode: true
+
+    # Safety limit for a single utterance duration (seconds).
+    # Prevents buffering forever if someone talks non-stop.
+    max_utterance_duration_s: 15.0
+
+    # ------------------------------------------------------------------------
+    # HTTP /speech behavior
+    # ------------------------------------------------------------------------
+
+    # Timeout (seconds) for a single /speech HTTP request.
+    request_timeout_s: 15.0
+
+    # Number of retry attempts on network/server errors.
+    max_retries: 2
+
+    # ------------------------------------------------------------------------
+    # TTS gate — ignore robot’s own voice
+    # ------------------------------------------------------------------------
+    #
+    # Idea:
+    #   - TTSNode publishes a Bool flag on /savo_speech/tts_speaking.
+    #   - While this flag is true (plus cooldown), we should NOT send audio
+    #     to /speech to avoid Robot Savo hearing itself.
+    #
+    # In the current Python node we already subscribe to /savo_speech/tts_speaking
+    # and simply skip recording when it is true. The cooldown parameter will
+    # be used once we add more advanced gating.
+    #
+
+    # Enable/disable TTS gating logic in the node (planned).
+    tts_gate_enable: true
+
+    # Topic where TTS speaking flag is published (Bool).
+    tts_speaking_topic: "/savo_speech/tts_speaking"
+
+    # Extra time after TTS stops speaking before we listen again (seconds).
+    tts_gate_cooldown_s: 0.8
+
+    # ------------------------------------------------------------------------
+    # Node behavior / debugging
+    # ------------------------------------------------------------------------
+
+    # Sleep in seconds between loops when idle or TTS is speaking.
+    idle_sleep_s: 0.1
+
+    # Enable extra debug logs (JSON dumps, RMS values, etc.).
+    debug_logging: false

@@ -76,11 +76,14 @@ setup(
             #STT remote
             "remote_stt_client_node = savo_speech.remote_stt_client_node:main",
 
+            # Remote speech client (Pi mic -> /speech -> IntentResult + TTS text)
+            "remote_speech_client_node = savo_speech.remote_speech_client_node:main",
+
 
             # Text-to-speech node (Piper)
             "tts_node = savo_speech.tts_node:main",
 
-            # NEW: Bridge STT ↔ LLM ↔ TTS
+            # Bridge STT ↔ LLM ↔ TTS
             "speech_bridge_node = savo_speech.speech_bridge_node:main",
 
             # Mouth / face animation node for the DSI UI
