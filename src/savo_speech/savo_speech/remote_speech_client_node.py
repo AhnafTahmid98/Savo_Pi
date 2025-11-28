@@ -14,7 +14,11 @@ Data flow:
   /savo_intent/intent_result   (savo_msgs/IntentResult: structured result)
 
 Key features:
-  - Chunked audio recording with simple energy-based VAD.
+  - Audio capture from ReSpeaker via sounddevice.
+  - Simple energy-based VAD.
+  - Optional "utterance mode":
+      * buffer multiple blocks while speech is present,
+      * when silence (or max duration) happens → send ONE WAV to /speech.
   - HTTP POST to SPEECH_SERVER_URL with in-memory WAV.
   - Robust error handling and logging.
   - Respects /savo_speech/tts_speaking gate to avoid self-listening.
@@ -26,7 +30,7 @@ import json
 import threading
 import time
 import wave
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 
 import numpy as np
 import requests
@@ -44,8 +48,8 @@ class RemoteSpeechClientNode(Node):
     """
     RemoteSpeechClientNode
 
-    Continuously records short audio segments from the Pi's microphone,
-    sends them to the Robot_Savo_Server /speech endpoint, and publishes:
+    Continuously records audio from the Pi's microphone,
+    sends it to the Robot_Savo_Server /speech endpoint, and publishes:
 
       - /savo_speech/stt_text        (transcript)
       - /savo_speech/tts_text        (reply_text)
@@ -70,12 +74,12 @@ class RemoteSpeechClientNode(Node):
                 ("chunk_duration_s", 2.0),
                 ("energy_threshold", 0.0003),
 
-                # Utterance-level behaviour (future)
+                # Utterance-level behaviour
                 ("utterance_mode", True),
                 ("max_utterance_duration_s", 15.0),
 
                 # HTTP client
-                ("request_timeout_s", 20.0),
+                ("request_timeout_s", 15.0),
                 ("max_retries", 2),
 
                 # TTS gate
@@ -177,8 +181,13 @@ class RemoteSpeechClientNode(Node):
             10,
         )
 
-        # Internal state
+        # Internal state for utterance mode
         self._shutdown_flag = False
+        self._in_utterance: bool = False
+        self._utterance_start_time: float = 0.0
+        self._utterance_buffers: List[np.ndarray] = []
+
+        # Background worker thread
         self._worker_thread = threading.Thread(
             target=self._main_loop, name="remote_speech_worker", daemon=True
         )
@@ -233,10 +242,12 @@ class RemoteSpeechClientNode(Node):
         Background worker thread:
 
         - Waits until TTS is not speaking (if gate enabled).
-        - Records a chunk of audio.
-        - Skips if silence (RMS below threshold).
-        - Sends to /speech with retries.
-        - Publishes transcript / reply / IntentResult.
+        - Records chunks of audio.
+        - In utterance_mode:
+            * while chunks have energy → buffer them,
+            * on silence or max duration → send full utterance to /speech.
+        - In non-utterance mode:
+            * every voiced chunk is sent as its own request.
         """
         self.get_logger().info("Remote speech worker thread started.")
 
@@ -271,47 +282,120 @@ class RemoteSpeechClientNode(Node):
             # Simple energy-based VAD
             rms = self._compute_rms(audio_data)
             if self.debug_logging:
-                self.get_logger().debug(f"Chunk RMS={rms:.6f}")
-
-            if rms < self.energy_threshold:
-                if self.debug_logging:
-                    self.get_logger().debug(
-                        f"Chunk skipped due to low energy (rms={rms:.6f})."
-                    )
-                continue
-
-            if self.debug_logging:
                 self.get_logger().debug(
-                    f"Sending chunk to /speech (rms={rms:.6f}, "
-                    f"len={len(audio_data)} samples)..."
+                    f"Chunk RMS={rms:.6f}, threshold={self.energy_threshold:.6f}, "
+                    f"in_utterance={self._in_utterance}"
                 )
 
-            # Convert to WAV bytes
-            wav_bytes = self._encode_wav_bytes(audio_data, self.sample_rate_hz)
+            # Silence
+            if rms < self.energy_threshold:
+                if self.utterance_mode and self._in_utterance:
+                    # End-of-utterance detected
+                    self._finalize_utterance()
+                # If not in utterance, just idle
+                continue
 
-            # Call /speech with retries
-            (
-                transcript,
-                reply_text,
-                intent,
-                nav_goal,
-                tier_used,
-                llm_ok,
-                error_msg,
-            ) = self._call_speech_with_retries(wav_bytes)
+            # Voiced chunk
+            if not self.utterance_mode:
+                # Simple per-chunk mode: send immediately
+                if self.debug_logging:
+                    self.get_logger().debug(
+                        f"Sending single chunk to /speech (len={len(audio_data)} samples)"
+                    )
+                wav_bytes = self._encode_wav_bytes(audio_data, self.sample_rate_hz)
+                (
+                    transcript,
+                    reply_text,
+                    intent,
+                    nav_goal,
+                    tier_used,
+                    llm_ok,
+                    error_msg,
+                ) = self._call_speech_with_retries(wav_bytes)
+                self._publish_results(
+                    transcript=transcript,
+                    reply_text=reply_text,
+                    intent=intent,
+                    nav_goal=nav_goal,
+                    tier_used=tier_used,
+                    llm_ok=llm_ok,
+                    error_msg=error_msg,
+                )
+                continue
 
-            # Publish outputs
-            self._publish_results(
-                transcript=transcript,
-                reply_text=reply_text,
-                intent=intent,
-                nav_goal=nav_goal,
-                tier_used=tier_used,
-                llm_ok=llm_ok,
-                error_msg=error_msg,
-            )
+            # Utterance mode: buffer while we have speech
+            now = time.time()
+            if not self._in_utterance:
+                # Start new utterance
+                self._in_utterance = True
+                self._utterance_start_time = now
+                self._utterance_buffers = [audio_data]
+                if self.debug_logging:
+                    self.get_logger().debug("Started new utterance buffer.")
+            else:
+                # Continue existing utterance
+                self._utterance_buffers.append(audio_data)
+
+            # Check max utterance duration
+            if now - self._utterance_start_time >= self.max_utterance_duration_s:
+                if self.debug_logging:
+                    self.get_logger().debug(
+                        "Max utterance duration reached. Finalizing utterance."
+                    )
+                self._finalize_utterance()
+
+        # If we exit the loop while still in an utterance, flush it
+        if self.utterance_mode and self._in_utterance:
+            self._finalize_utterance()
 
         self.get_logger().info("Remote speech worker thread exiting.")
+
+    def _finalize_utterance(self) -> None:
+        """
+        Concatenate buffered chunks into one utterance, send to /speech,
+        and publish the results.
+        """
+        if not self._utterance_buffers:
+            # Nothing to do
+            self._in_utterance = False
+            self._utterance_start_time = 0.0
+            return
+
+        audio_all = np.concatenate(self._utterance_buffers)
+        num_samples = len(audio_all)
+
+        if self.debug_logging:
+            duration = num_samples / float(self.sample_rate_hz)
+            self.get_logger().debug(
+                f"Finalizing utterance with {len(self._utterance_buffers)} chunks, "
+                f"{num_samples} samples (~{duration:.2f} s)."
+            )
+
+        # Reset utterance state BEFORE doing network I/O
+        self._utterance_buffers = []
+        self._in_utterance = False
+        self._utterance_start_time = 0.0
+
+        wav_bytes = self._encode_wav_bytes(audio_all, self.sample_rate_hz)
+        (
+            transcript,
+            reply_text,
+            intent,
+            nav_goal,
+            tier_used,
+            llm_ok,
+            error_msg,
+        ) = self._call_speech_with_retries(wav_bytes)
+
+        self._publish_results(
+            transcript=transcript,
+            reply_text=reply_text,
+            intent=intent,
+            nav_goal=nav_goal,
+            tier_used=tier_used,
+            llm_ok=llm_ok,
+            error_msg=error_msg,
+        )
 
     # -------------------------------------------------------------------------
     # Audio capture helpers
@@ -503,7 +587,7 @@ class RemoteSpeechClientNode(Node):
         self.get_logger().info(f"[TTS] reply_text: '{r_clean}'")
 
         # Publish STT text (we still publish the raw transcript, even if short,
-        # as long as this is not a "no-op" turn).
+        # as long as this is not a pure "no-op" turn).
         stt_msg = String()
         stt_msg.data = transcript
         self.stt_text_pub.publish(stt_msg)
