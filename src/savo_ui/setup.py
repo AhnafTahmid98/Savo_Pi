@@ -4,7 +4,7 @@ import os
 
 # ============================================================================
 # Robot Savo — savo_ui setup.py
-# ROS 2 package setup file for the savo_ui package.
+#
 # ament_python-style ROS 2 package:
 #   - Package name  : savo_ui
 #   - Python module : savo_ui
