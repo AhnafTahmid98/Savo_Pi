@@ -53,51 +53,6 @@ except ImportError:
 RGB = Tuple[int, int, int]
 
 
-def _choose_sdl_driver(logger: rclpy.node.Logger) -> str:
-    """
-    Try to find a usable SDL video driver.
-
-    Preference order:
-      1. Whatever SDL_VIDEODRIVER is already set to (or 'wayland')
-      2. 'wayland'
-      3. 'kmsdrm'
-      4. 'x11'
-    """
-    tried: List[str] = []
-    first = os.environ.get("SDL_VIDEODRIVER") or "wayland"
-    candidates = [first, "wayland", "kmsdrm", "x11"]
-
-    for drv in candidates:
-        if drv in tried:
-            continue
-        tried.append(drv)
-
-        try:
-            os.environ["SDL_VIDEODRIVER"] = drv
-            pygame.display.init()
-            info = pygame.display.get_desktop_sizes()
-            if info:
-                logger.info(
-                    f"SDL driver '{drv}' OK, desktop sizes: {info}"
-                )
-                return drv
-        except Exception as exc:
-            logger.warn(
-                f"SDL driver '{drv}' failed: {exc}. Trying next option..."
-            )
-        finally:
-            try:
-                pygame.display.quit()
-            except Exception:
-                pass
-
-    raise RuntimeError(
-        "No usable SDL video driver found (tried: "
-        + ", ".join(tried)
-        + "). Check that you have either Wayland, kmsdrm or X11 available."
-    )
-
-
 class SavoUIDisplay(Node):
     """Main display manager node for Robot Savo UI."""
 
@@ -329,6 +284,7 @@ class SavoUIDisplay(Node):
         self._status_text = msg.data or ""
 
     def _on_mouth_level(self, msg: Float32) -> None:
+        # Clamp to [0.0, 1.0]
         self._mouth_level = float(max(0.0, min(1.0, msg.data)))
 
     def _on_subtitle_text(self, msg: String) -> None:
@@ -351,34 +307,74 @@ class SavoUIDisplay(Node):
     # ======================================================================
 
     def _init_pygame(self) -> None:
-        """Initialize pygame display, with driver auto-selection."""
+        """Initialize pygame display with robust driver fallback."""
 
-        # These help when Wayland is available, but are harmless otherwise
+        # Helpful defaults; harmless if backend doesn't support them
         os.environ.setdefault("SDL_VIDEO_WAYLAND_ALLOW_LIBDECOR", "0")
         os.environ.setdefault("SDL_RENDER_VSYNC", "1")
 
         pygame.init()
         pygame.font.init()
 
-        # Choose SDL driver (wayland / kmsdrm / x11 ...)
-        driver = _choose_sdl_driver(self.get_logger())
-        os.environ["SDL_VIDEODRIVER"] = driver
+        # Build driver preference list.
+        # We *prefer* kmsdrm on bare Pi console, then wayland/x11 if available.
+        drivers: List[str] = []
+        env_drv = os.environ.get("SDL_VIDEODRIVER")
+        if env_drv:
+            drivers.append(env_drv)
+        # Add our preferred order, skipping duplicates
+        for drv in ("kmsdrm", "wayland", "x11"):
+            if drv not in drivers:
+                drivers.append(drv)
 
-        # IMPORTANT:
-        # Do NOT call pygame.display.init() here.
-        # pygame.display.set_mode() will init the display using the chosen driver.
-        flags = 0
-        if self.screen_fullscreen:
-            flags |= pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF
+        tried: List[str] = []
+        last_exc: Optional[BaseException] = None
+        chosen: Optional[str] = None
+        self._screen = None
 
-        self._screen = pygame.display.set_mode(
-            (self.screen_width, self.screen_height), flags
-        )
+        for drv in drivers:
+            if not drv or drv in tried:
+                continue
+            tried.append(drv)
+            os.environ["SDL_VIDEODRIVER"] = drv
+
+            try:
+                flags = 0
+                if self.screen_fullscreen:
+                    flags |= pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF
+
+                # This actually opens the display; if it fails we try next driver.
+                screen = pygame.display.set_mode(
+                    (self.screen_width, self.screen_height),
+                    flags,
+                )
+                self._screen = screen
+                chosen = drv
+                self.get_logger().info(
+                    f"SDL driver '{drv}' selected, screen size {screen.get_size()}"
+                )
+                break
+            except Exception as exc:
+                last_exc = exc
+                self.get_logger().warn(
+                    f"SDL driver '{drv}' failed in set_mode: {exc}. Trying next..."
+                )
+                try:
+                    pygame.display.quit()
+                except Exception:
+                    pass
+
+        if self._screen is None or chosen is None:
+            raise RuntimeError(
+                "Unable to initialize any SDL video driver "
+                f"(tried: {', '.join(tried)}). Last error: {last_exc}"
+            )
+
         w, h = self._screen.get_size()
-        pygame.display.set_caption(f"Robot Savo UI [{driver}] {w}x{h}")
+        pygame.display.set_caption(f"Robot Savo UI [{chosen}] {w}x{h}")
         pygame.mouse.set_visible(False)
 
-        # Use a separate pygame clock just for FPS limiting / measurement
+        # Separate pygame clock for FPS limiting / measurement
         self._pg_clock = pygame.time.Clock()
 
         # Load fonts (if these fail, pygame will substitute defaults)
@@ -388,12 +384,11 @@ class SavoUIDisplay(Node):
             "DejaVu Sans", self.font_size_subtitle
         )
 
-
     def _on_timer(self) -> None:
         """Render loop callback (called at ~FPS rate)."""
 
         # FPS timing (limit + compute FPS for overlay)
-        dt_ms = self._pg_clock.tick(self.screen_fps)  # noqa: F841
+        _dt_ms = self._pg_clock.tick(self.screen_fps)  # noqa: F841
         fps = self._pg_clock.get_fps() if self.show_fps else None
 
         # Handle pygame events (quit, ESC, etc.)
@@ -500,7 +495,7 @@ class SavoUIDisplay(Node):
         if draw_face_view is not None:
             draw_face_view(
                 surface=self._screen,
-                mouth_level=0.0,
+                mouth_level=0.0,  # typically not talking during map status
                 status_text=(
                     self._status_text
                     or "Mapping in progress, please keep distance."
