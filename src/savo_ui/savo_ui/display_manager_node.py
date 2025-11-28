@@ -36,6 +36,7 @@ from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 
 from std_msgs.msg import String, Float32
+from sensor_msgs.msg import Image  # used as a placeholder type for camera
 
 # Import helper modules (you will implement these in separate files)
 try:
@@ -115,11 +116,9 @@ class SavoUIDisplay(Node):
                 depth=1,
             )
             self.create_subscription(
-                # sensor_msgs/Image, but we avoid importing now to keep this
-                # file runnable before you wire camera.
-                rclpy.qos.AnyMsg,  # type: ignore
+                Image,                # placeholder; we only flag that frames arrive
                 self.camera_topic,
-                self._on_camera_anymsg,
+                self._on_camera_image,
                 qos_cam,
             )
             self._have_camera = True
@@ -236,20 +235,38 @@ class SavoUIDisplay(Node):
         """
         Helper to read an RGB color parameter.
 
-        Expects an integer array of length 3. If missing or malformed, falls
-        back to default_rgb.
-        """
-        self.declare_parameter(name, default_rgb)
-        param = self.get_parameter(name).get_parameter_value()
+        Accepts:
+        - integer array parameters: [r, g, b] or [r, g, b, a]
+        - list/tuple of 3 numeric values
 
-        if param.type_ == param.TYPE_INTEGER_ARRAY:
-            arr = list(param.integer_array_value)
-            if len(arr) == 3:
-                return int(arr[0]), int(arr[1]), int(arr[2])
+        If missing or malformed, falls back to default_rgb.
+        """
+        # Ensure parameter is declared so it can be overridden from YAML
+        self.declare_parameter(name, default_rgb)
+
+        try:
+            param = self.get_parameter(name)
+        except Exception:
+            # Not declared or some odd error -> default
+            return int(default_rgb[0]), int(default_rgb[1]), int(default_rgb[2])
+
+        value = param.value  # this is the Python value (list, int, etc.)
+
+        # Expect list-like [r, g, b] or [r, g, b, a]
+        if isinstance(value, (list, tuple)) and len(value) >= 3:
+            r, g, b = value[0], value[1], value[2]
+            try:
+                return int(r), int(g), int(b)
+            except (ValueError, TypeError):
+                self.get_logger().warn(
+                    f"Parameter '{name}' has non-numeric values {value}, "
+                    f"using default {default_rgb}"
+                )
+                return int(default_rgb[0]), int(default_rgb[1]), int(default_rgb[2])
 
         # Fallback if something is off
         self.get_logger().warn(
-            f"Parameter '{name}' not a valid RGB array, using default {default_rgb}"
+            f"Parameter '{name}' not a valid RGB list, using default {default_rgb}"
         )
         return int(default_rgb[0]), int(default_rgb[1]), int(default_rgb[2])
 
@@ -278,13 +295,12 @@ class SavoUIDisplay(Node):
     def _on_subtitle_text(self, msg: String) -> None:
         self._subtitle_text = msg.data or ""
 
-    def _on_camera_anymsg(self, msg) -> None:
+    def _on_camera_image(self, msg: Image) -> None:
         """
         Placeholder camera callback.
 
         For now we only flag that camera data is arriving. You will later
-        replace this with proper sensor_msgs/Image handling and a bridge to
-        nav_cam_view.py.
+        replace this with proper Image handling and a bridge to nav_cam_view.py.
         """
         if not self._camera_ready:
             self._camera_ready = True
@@ -388,7 +404,9 @@ class SavoUIDisplay(Node):
             )
         else:
             # Minimal placeholder if face_view is not implemented yet
-            text = self._font_status.render("INTERACT (face_view not implemented)", True, (255, 255, 255))
+            text = self._font_status.render(
+                "INTERACT (face_view not implemented)", True, (255, 255, 255)
+            )
             self._screen.blit(text, (40, self.screen_height // 2))
 
     def _draw_navigate_mode(self) -> None:
@@ -430,7 +448,10 @@ class SavoUIDisplay(Node):
             draw_face_view(
                 surface=self._screen,
                 mouth_level=0.0,  # typically not talking during map status
-                status_text=self._status_text or "Mapping in progress, please keep distance.",
+                status_text=(
+                    self._status_text
+                    or "Mapping in progress, please keep distance."
+                ),
                 subtitle_text=self._subtitle_text,
                 fonts={
                     "main": self._font_main,
