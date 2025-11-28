@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 from glob import glob
 import os
 
@@ -20,7 +20,7 @@ import os
 #   ros2 run savo_ui ui_debug_node
 #
 # IMPORTANT:
-#   Make sure you have this file present:
+#   Make sure this file exists:
 #     resource/savo_ui
 #   (even empty is fine). It registers the package in the ament index.
 # ============================================================================
@@ -30,10 +30,11 @@ package_name = "savo_ui"
 setup(
     name=package_name,
     version="0.1.0",
-    packages=[package_name],  # Python package directory: savo_ui/
-    # ------------------------------------------------------------------------
+    # Discover Python packages (should find the `savo_ui` directory)
+    packages=find_packages(),
+    # ----------------------------------------------------------------------
     # Data files installed into the share/ tree
-    # ------------------------------------------------------------------------
+    # ----------------------------------------------------------------------
     data_files=[
         # Register package with ament so `ros2 pkg` can find it
         (
@@ -56,9 +57,9 @@ setup(
             glob("launch/*.py"),
         ),
     ],
-    # ------------------------------------------------------------------------
+    # ----------------------------------------------------------------------
     # Core Python packaging metadata
-    # ------------------------------------------------------------------------
+    # ----------------------------------------------------------------------
     install_requires=["setuptools"],
     zip_safe=True,
     maintainer="Ahnaf Tahmid",
@@ -69,16 +70,16 @@ setup(
     ),
     license="Proprietary",
     tests_require=["pytest"],
-    # ------------------------------------------------------------------------
+    # ----------------------------------------------------------------------
     # Entry points: ROS 2 nodes exposed as console_scripts
-    # ------------------------------------------------------------------------
+    # ----------------------------------------------------------------------
     entry_points={
         "console_scripts": [
             # Full-screen display manager (Pygame)
             "display_manager_node = savo_ui.display_manager_node:main",
-            # Maps LLM intents + mapping state → UI mode + status text
+            # Maps intents + mapping state → UI mode + status text
             "ui_mode_router_node = savo_ui.ui_mode_router_node:main",
-            # Simple debug driver (cycles modes, optional fake mouth_level)
+            # Simple debug driver (cycles modes, fake mouth_level, etc.)
             "ui_debug_node = savo_ui.ui_debug_node:main",
         ],
     },
