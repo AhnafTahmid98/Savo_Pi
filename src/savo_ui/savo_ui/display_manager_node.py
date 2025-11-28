@@ -38,7 +38,6 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 from std_msgs.msg import String, Float32
 from sensor_msgs.msg import Image  # used as a placeholder type for camera
 
-# Pygame is the drawing backend
 import pygame
 
 # Import helper modules (you will implement these in separate files)
@@ -52,6 +51,51 @@ except ImportError:
 
 
 RGB = Tuple[int, int, int]
+
+
+def _choose_sdl_driver(logger: rclpy.node.Logger) -> str:
+    """
+    Try to find a usable SDL video driver.
+
+    Preference order:
+      1. Whatever SDL_VIDEODRIVER is already set to (or 'wayland')
+      2. 'wayland'
+      3. 'kmsdrm'
+      4. 'x11'
+    """
+    tried: List[str] = []
+    first = os.environ.get("SDL_VIDEODRIVER") or "wayland"
+    candidates = [first, "wayland", "kmsdrm", "x11"]
+
+    for drv in candidates:
+        if drv in tried:
+            continue
+        tried.append(drv)
+
+        try:
+            os.environ["SDL_VIDEODRIVER"] = drv
+            pygame.display.init()
+            info = pygame.display.get_desktop_sizes()
+            if info:
+                logger.info(
+                    f"SDL driver '{drv}' OK, desktop sizes: {info}"
+                )
+                return drv
+        except Exception as exc:
+            logger.warn(
+                f"SDL driver '{drv}' failed: {exc}. Trying next option..."
+            )
+        finally:
+            try:
+                pygame.display.quit()
+            except Exception:
+                pass
+
+    raise RuntimeError(
+        "No usable SDL video driver found (tried: "
+        + ", ".join(tried)
+        + "). Check that you have either Wayland, kmsdrm or X11 available."
+    )
 
 
 class SavoUIDisplay(Node):
@@ -116,7 +160,7 @@ class SavoUIDisplay(Node):
                 depth=1,
             )
             self.create_subscription(
-                Image,                # placeholder; we only flag that frames arrive
+                Image,
                 self.camera_topic,
                 self._on_camera_image,
                 qos_cam,
@@ -236,23 +280,20 @@ class SavoUIDisplay(Node):
         Helper to read an RGB color parameter.
 
         Accepts:
-        - integer array parameters: [r, g, b] or [r, g, b, a]
-        - list/tuple of 3 numeric values
+        - list/tuple of 3 numeric values (r, g, b)
+        - list/tuple of 4 values (r, g, b, a) → a is ignored
 
         If missing or malformed, falls back to default_rgb.
         """
-        # Ensure parameter is declared so it can be overridden from YAML
         self.declare_parameter(name, default_rgb)
 
         try:
             param = self.get_parameter(name)
         except Exception:
-            # Not declared or some odd error -> default
             return int(default_rgb[0]), int(default_rgb[1]), int(default_rgb[2])
 
-        value = param.value  # this is the Python value (list, int, etc.)
+        value = param.value
 
-        # Expect list-like [r, g, b] or [r, g, b, a]
         if isinstance(value, (list, tuple)) and len(value) >= 3:
             r, g, b = value[0], value[1], value[2]
             try:
@@ -264,7 +305,6 @@ class SavoUIDisplay(Node):
                 )
                 return int(default_rgb[0]), int(default_rgb[1]), int(default_rgb[2])
 
-        # Fallback if something is off
         self.get_logger().warn(
             f"Parameter '{name}' not a valid RGB list, using default {default_rgb}"
         )
@@ -289,7 +329,6 @@ class SavoUIDisplay(Node):
         self._status_text = msg.data or ""
 
     def _on_mouth_level(self, msg: Float32) -> None:
-        # Clamp to [0.0, 1.0] for safety
         self._mouth_level = float(max(0.0, min(1.0, msg.data)))
 
     def _on_subtitle_text(self, msg: String) -> None:
@@ -312,15 +351,21 @@ class SavoUIDisplay(Node):
     # ======================================================================
 
     def _init_pygame(self) -> None:
-        """Initialize pygame display (Wayland-first like tools/diag/ui/face.py)."""
+        """Initialize pygame display, with driver auto-selection."""
 
-        # Prefer Wayland on the Pi (matches your face.py script)
-        os.environ.setdefault("SDL_VIDEODRIVER", "wayland")
+        # These help when Wayland is available, but are harmless otherwise
         os.environ.setdefault("SDL_VIDEO_WAYLAND_ALLOW_LIBDECOR", "0")
         os.environ.setdefault("SDL_RENDER_VSYNC", "1")
 
         pygame.init()
         pygame.font.init()
+
+        # Choose SDL driver (wayland / kmsdrm / x11 ...)
+        driver = _choose_sdl_driver(self.get_logger())
+        os.environ["SDL_VIDEODRIVER"] = driver
+
+        # Now actually init the display with the chosen driver
+        pygame.display.init()
 
         flags = 0
         if self.screen_fullscreen:
@@ -329,20 +374,26 @@ class SavoUIDisplay(Node):
         self._screen = pygame.display.set_mode(
             (self.screen_width, self.screen_height), flags
         )
-        pygame.display.set_caption("Robot Savo UI")
+        w, h = self._screen.get_size()
+        pygame.display.set_caption(f"Robot Savo UI [{driver}] {w}x{h}")
         pygame.mouse.set_visible(False)
 
-        # IMPORTANT: use a different name than self._clock to avoid
-        # overwriting the rclpy Node clock used by timers.
+        # IMPORTANT: do not overwrite Node's internal clock.
         self._pg_clock = pygame.time.Clock()
 
         # Load fonts (if these fail, pygame will substitute defaults)
         self._font_main = pygame.font.SysFont("DejaVu Sans", self.font_size_main)
         self._font_status = pygame.font.SysFont("DejaVu Sans", self.font_size_status)
-        self._font_subtitle = pygame.font.SysFont("DejaVu Sans", self.font_size_subtitle)
+        self._font_subtitle = pygame.font.SysFont(
+            "DejaVu Sans", self.font_size_subtitle
+        )
 
     def _on_timer(self) -> None:
         """Render loop callback (called at ~FPS rate)."""
+
+        # FPS timing (limit + compute FPS for overlay)
+        dt_ms = self._pg_clock.tick(self.screen_fps)  # noqa: F841
+        fps = self._pg_clock.get_fps() if self.show_fps else None
 
         # Handle pygame events (quit, ESC, etc.)
         for event in pygame.event.get():
@@ -363,19 +414,17 @@ class SavoUIDisplay(Node):
         elif self._mode == "MAP":
             self._draw_map_mode()
         else:
-            # Should not happen, but keep it safe
             self._draw_fallback()
+
+        # Optional FPS overlay (top-left)
+        if fps is not None:
+            fps_text = self._font_subtitle.render(
+                f"{fps:5.1f} FPS", True, (255, 255, 0)
+            )
+            self._screen.blit(fps_text, (10, 10))
 
         # Flip buffer
         pygame.display.flip()
-
-        # FPS cap & optional counter
-        dt_ms = self._pg_clock.tick(self.screen_fps)
-        if self.show_fps:
-            fps = self._pg_clock.get_fps()
-            # Simple overlay in top-left corner
-            fps_text = self._font_subtitle.render(f"{fps:5.1f} FPS", True, (255, 255, 0))
-            self._screen.blit(fps_text, (10, 10))
 
     # ======================================================================
     # Per-mode drawing
@@ -409,7 +458,6 @@ class SavoUIDisplay(Node):
                 screen_size=(self.screen_width, self.screen_height),
             )
         else:
-            # Minimal placeholder if face_view is not implemented yet
             text = self._font_status.render(
                 "INTERACT (face_view not implemented)", True, (255, 255, 255)
             )
@@ -440,7 +488,6 @@ class SavoUIDisplay(Node):
                 camera_ready=self._camera_ready,
             )
         else:
-            # Placeholder if camera/nav view not implemented
             msg = "NAVIGATE mode (camera or nav_cam_view not implemented)"
             text = self._font_status.render(msg, True, (255, 255, 255))
             self._screen.blit(text, (40, self.screen_height // 2))
@@ -450,10 +497,9 @@ class SavoUIDisplay(Node):
         self._clear_background("MAP")
 
         if draw_face_view is not None:
-            # Reuse the same face with different background/status text
             draw_face_view(
                 surface=self._screen,
-                mouth_level=0.0,  # typically not talking during map status
+                mouth_level=0.0,
                 status_text=(
                     self._status_text
                     or "Mapping in progress, please keep distance."
@@ -499,7 +545,6 @@ def main(argv: Optional[list] = None) -> None:
     finally:
         node.destroy_node()
         rclpy.shutdown()
-        # Cleanly quit pygame to avoid leaving the display in a strange state
         pygame.quit()
 
 
