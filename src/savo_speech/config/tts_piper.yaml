@@ -62,7 +62,7 @@ tts_node:
     # Global TTS gain applied inside the synthesis engine (linear).
     #   1.0 → as-is
     #   0.7 → a bit quieter
-    #   1.3 → slightly louder (watch for clipping)
+    #   1.3 → slightly louder (watch for clipping).
     gain: 1.0
 
     # Speech rate (duration / tempo).
@@ -125,7 +125,7 @@ tts_node:
     #   - std_msgs/Empty (as implemented in tts_node.py)
     #   - Published once per utterance after playback is finished.
     #
-    # Other nodes (savo_ui, behavior manager) can subscribe here if they need
+    # Other nodes (savo_ui, behaviour manager) can subscribe here if they need
     # to know when the robot has finished talking.
     speech_done_topic: "/savo_speech/tts_done"
 
@@ -134,30 +134,41 @@ tts_node:
     #   - true  → TTS currently playing audio
     #   - false → idle
     #
-    # STTNode subscribes to this (via stt_whisper.yaml config) and uses it
-    # as a gate so Robot Savo does NOT transcribe its own voice.
+    # remote_speech_client_node subscribes to this (via speech_remote.yaml)
+    # and uses it as a gate so Robot Savo does NOT transcribe its own voice.
     #
     # If you set this to an empty string, the publisher is disabled.
     tts_speaking_topic: "/savo_speech/tts_speaking"
 
     # ------------------------------------------------------------------------
-    # Mouth animation integration (optional)
+    # Mouth / face integration
     # ------------------------------------------------------------------------
     #
-    # While speaking, tts_node can publish a simple “mouth open” signal for
-    # the 7" DSI UI node (savo_ui) or a separate mouth_anim node.
+    # There are *two* mouth-related outputs now:
     #
-    #   mouth_anim_topic:
-    #       - if non-empty, tts_node will publish a Float32 in [0.0, 1.0]
-    #         representing mouth openness.
+    # 1) mouth_anim_topic (simple flag / activity)
+    #    - std_msgs/Float32 in [0.0, 1.0]
+    #    - For simple or fallback mouth animation (activity mode).
     #
-    # For now, we keep it simple: 0.0 when idle, 1.0 while playing audio.
+    # 2) tts_pcm_topic (full PCM audio)
+    #    - std_msgs/Int16MultiArray (mono int16)
+    #    - Used by mouth_anim_node in "pcm" mode for real audio-driven mouth.
+    #
 
+    # Simple mouth-open signal (optional):
+    # - 0.0 when idle, 1.0 while playing audio (current implementation).
+    # - mouth_anim_node can use this in "activity" mode if you don't want PCM.
     mouth_anim_topic: "/savo_speech/mouth_open"
 
-    # How often to update mouth animation during playback (Hz).
+    # How often to update mouth_open during playback (Hz).
     # Higher = smoother animation, more CPU.
     mouth_anim_rate_hz: 25.0
+
+    # PCM stream for audio-driven mouth (used by mouth_anim_node in "pcm" mode).
+    # If non-empty, tts_node will publish one Int16MultiArray per utterance
+    # containing the *full* resampled PCM buffer at the playback rate
+    # (TARGET_PLAYBACK_SR in tts_node.py, currently 16000 Hz).
+    tts_pcm_topic: "/savo_speech/tts_pcm"
 
     # ------------------------------------------------------------------------
     # Debug / logging

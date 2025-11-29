@@ -1,11 +1,30 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Robot Savo — Speech bringup v2 (Robot_Savo_Server /speech pipeline)
 
-This launch file starts:
-  - remote_speech_client_node (Pi mic -> Robot_Savo_Server /speech)
-  - tts_node (Piper TTS on the Pi)
-  - optional mouth_anim node for screen animation
+This launch file starts on the Pi:
+  - remote_speech_client_node
+      * records from ReSpeaker mic
+      * sends audio to Robot_Savo_Server /speech endpoint
+      * publishes:
+          /savo_speech/stt_text        (String)
+          /savo_speech/tts_text        (String)
+          /savo_intent/intent_result   (savo_msgs/IntentResult)
+          /savo_ui/face_state          (String: idle/listening/thinking/speaking)
+
+  - tts_node (Piper TTS)
+      * subscribes to /savo_speech/tts_text
+      * plays audio via sounddevice
+      * publishes:
+          /savo_speech/tts_speaking    (Bool)   — STT gate + face state
+          /savo_speech/tts_pcm         (Int16MultiArray) — full utterance PCM
+          /savo_speech/tts_done        (Empty) (optional)
+          /savo_speech/mouth_open      (Float32) (simple mouth flag, optional)
+
+  - optional mouth_anim_node
+      * subscribes to /savo_speech/tts_pcm (PCM mode) or /savo_speech/mouth_open
+      * publishes /savo_ui/mouth_level (Float32 0.0–1.0) for the face UI
 
 Usage on the Pi:
 
@@ -16,12 +35,14 @@ Usage on the Pi:
 
   ros2 launch savo_speech speech_bringup_v2.launch.py \
     robot_id:=robot_savo_pi \
-    enable_mouth_anim:=false \
+    enable_mouth_anim:=true \
     timeout_s:=20.0
 
 Notes:
-  - speech_remote.yaml controls remote_speech_client_node params.
+  - speech_remote.yaml controls remote_speech_client_node params
+    (SPEECH_SERVER_URL, device index, VAD, wake words, etc.).
   - tts_piper.yaml controls Piper TTS (voices, device, topics).
+  - mouth_anim uses PCM mode by default (real audio-driven mouth).
 """
 
 import os
@@ -47,12 +68,12 @@ def generate_launch_description() -> LaunchDescription:
 
     enable_mouth_anim_arg = DeclareLaunchArgument(
         "enable_mouth_anim",
-        default_value="false",
+        default_value="true",
         choices=["true", "false"],
-        description="If true, also start the mouth_anim node for screen animation.",
+        description="If true, also start the mouth_anim_node for screen animation.",
     )
 
-    # Kept for compatibility, now wired to request_timeout_s in the client.
+    # Kept for compatibility, wired to request_timeout_s in the client.
     timeout_s_arg = DeclareLaunchArgument(
         "timeout_s",
         default_value="20.0",
@@ -62,9 +83,29 @@ def generate_launch_description() -> LaunchDescription:
         ),
     )
 
+    # Mouth animation mode: "pcm" (recommended) or "activity"
+    mouth_mode_arg = DeclareLaunchArgument(
+        "mouth_mode",
+        default_value="pcm",
+        description=(
+            "Mouth animation mode: 'pcm' uses full TTS audio from /savo_speech/tts_pcm, "
+            "'activity' uses simple /savo_speech/mouth_open Float32."
+        ),
+    )
+
+    # Mouth animation debug logging flag
+    mouth_debug_arg = DeclareLaunchArgument(
+        "mouth_debug_logging",
+        default_value="false",
+        choices=["true", "false"],
+        description="Enable extra debug logging in mouth_anim_node.",
+    )
+
     robot_id = LaunchConfiguration("robot_id")
     enable_mouth_anim = LaunchConfiguration("enable_mouth_anim")
     timeout_s = LaunchConfiguration("timeout_s")
+    mouth_mode = LaunchConfiguration("mouth_mode")
+    mouth_debug_logging = LaunchConfiguration("mouth_debug_logging")
 
     # -------------------------------------------------------------------------
     # Config file paths
@@ -84,12 +125,13 @@ def generate_launch_description() -> LaunchDescription:
 
     # 1) Remote speech client node
     #
-    # - Records from ReSpeaker (input_device_index from speech_remote.yaml)
-    # - Sends chunks to /speech (Robot_Savo_Server)
+    # - Records from ReSpeaker (input_device_index from speech_remote.yaml).
+    # - Sends utterances to Robot_Savo_Server /speech endpoint.
     # - Publishes:
     #     /savo_speech/stt_text        (String)
     #     /savo_speech/tts_text        (String)
     #     /savo_intent/intent_result   (IntentResult)
+    #     /savo_ui/face_state          (String state for display_manager)
     #
     remote_speech_node = Node(
         package="savo_speech",
@@ -109,9 +151,13 @@ def generate_launch_description() -> LaunchDescription:
 
     # 2) TTS node (Piper)
     #
-    # - Subscribes to /savo_speech/tts_text (String)
-    # - Plays audio via sounddevice
-    # - Publishes /savo_speech/tts_speaking (Bool) as a gate for STT
+    # - Subscribes to /savo_speech/tts_text (String).
+    # - Plays audio via sounddevice.
+    # - Publishes:
+    #     /savo_speech/tts_speaking  (Bool) as a gate for STT + face state
+    #     /savo_speech/tts_pcm       (Int16MultiArray) for audio-driven mouth
+    #     /savo_speech/tts_done      (Empty) optional
+    #     /savo_speech/mouth_open    (Float32) optional
     #
     tts_node = Node(
         package="savo_speech",
@@ -123,7 +169,14 @@ def generate_launch_description() -> LaunchDescription:
 
     # 3) Optional mouth animation node
     #
-    # - Subscribes to mouth/TTS topics and drives the on-robot screen.
+    # - PCM mode (default):
+    #     subscribes to /savo_speech/tts_pcm (Int16MultiArray),
+    #     outputs /savo_ui/mouth_level (Float32 0–1).
+    #
+    # - Activity mode:
+    #     subscribes to /savo_speech/mouth_open (Float32),
+    #     outputs /savo_ui/mouth_level (Float32 0–1).
+    #
     # - Only started if enable_mouth_anim:=true.
     #
     mouth_anim_node = Node(
@@ -132,6 +185,15 @@ def generate_launch_description() -> LaunchDescription:
         name="mouth_anim_node",
         output="screen",
         condition=IfCondition(enable_mouth_anim),
+        parameters=[
+            {
+                "mode": mouth_mode,
+                "debug_logging": mouth_debug_logging,
+                # You can also override other parameters here if needed, e.g.:
+                # "pcm_sample_rate": 16000.0,
+                # "update_rate_hz": 30.0,
+            }
+        ],
     )
 
     # -------------------------------------------------------------------------
@@ -151,6 +213,8 @@ def generate_launch_description() -> LaunchDescription:
     ld.add_action(robot_id_arg)
     ld.add_action(enable_mouth_anim_arg)
     ld.add_action(timeout_s_arg)
+    ld.add_action(mouth_mode_arg)
+    ld.add_action(mouth_debug_arg)
 
     # Info
     ld.add_action(info_msg)

@@ -1,15 +1,21 @@
 # ============================================================================
 # Robot Savo — Remote speech client configuration (Robot_Savo_Server /speech)
 #
-# This config is used by the savo_speech remote_speech_client_node.
+# This config is used by:
+#   src/savo_speech/savo_speech/remote_speech_client_node.py
 #
-# Data flow:
+# Data flow (v2 pipeline):
 #   ReSpeaker mic  -->  remote_speech_client_node (Pi)
-#                    --> /speech (Robot_Savo_Server: STT + LLM)
-#                    <-- JSON {transcript, reply_text, intent, nav_goal, ...}
-#                    --> /savo_speech/stt_text       (String)
-#                    --> /savo_speech/tts_text       (String)
-#                    --> /savo_intent/intent_result  (IntentResult)
+#                    --> /speech  (Robot_Savo_Server: STT + LLM)
+#                    <-- JSON {transcript, reply_text, intent, nav_goal, tier_used, llm_ok, ...}
+#                    --> /savo_speech/stt_text        (std_msgs/String)
+#                    --> /savo_speech/tts_text        (std_msgs/String)
+#                    --> /savo_intent/intent_result   (savo_msgs/IntentResult)
+#
+# Extra:
+#   - Uses /savo_speech/tts_speaking (Bool) from tts_node to avoid hearing itself.
+#   - Uses utterance_mode to buffer a full sentence before sending to /speech.
+#   - Skips “no-op” turns (very short transcript + no reply + no error).
 #
 # NOTE:
 #   - speech_server_url can be empty here → then SPEECH_SERVER_URL from
@@ -25,15 +31,22 @@ remote_speech_client_node:
     # ------------------------------------------------------------------------
 
     # Full URL to the /speech endpoint.
-    # Example:
+    #
+    # Example (direct IP):
     #   "http://192.168.164.119:9000/speech"
     #
-    # Leave as "" to use SPEECH_SERVER_URL from env_robot_server.sh:
+    # Recommended: leave as "" and set via env_robot_server.sh:
     #   export SPEECH_SERVER_URL="http://<PC-IP>:9000/speech"
+    #
+    # The node will:
+    #   - first look at ROS param speech_server_url
+    #   - if empty, read SPEECH_SERVER_URL from the environment
+    #   - if still empty/invalid → it will log an error and exit
     #
     speech_server_url: ""
 
     # Robot ID used in IntentResult and logs.
+    # Keep this consistent with your ROS / LLM configs (robot_savo_pi).
     robot_id: "robot_savo_pi"
 
     # ------------------------------------------------------------------------
@@ -41,67 +54,82 @@ remote_speech_client_node:
     # ------------------------------------------------------------------------
 
     # Input sample rate:
-    #   16000 Hz matches Whisper / STT models and keeps bandwidth low.
+    #   16000 Hz works well:
+    #     - matches Whisper-style STT models
+    #     - keeps bandwidth & CPU usage modest
     sample_rate_hz: 16000
 
     # Length of each raw audio block captured from ReSpeaker (seconds).
-    # This is the "block size" we record before checking energy.
     #
-    # In utterance_mode (future upgrade), multiple blocks could be buffered
-    # until you stop talking; then all blocks are concatenated and sent once
-    # to /speech.
+    # Example:
+    #   2.0 s @ 16 kHz → 32000 samples per block.
     #
-    # For now the node uses this as a simple "chunk duration".
+    # In utterance_mode (enabled below), multiple blocks are buffered
+    # while speech is present. When silence (or max_utterance_duration_s)
+    # is detected, all blocks are concatenated and sent once to /speech.
+    #
     chunk_duration_s: 2.0
 
     # Energy threshold for simple block-level VAD (normalized RMS [0..1]).
     #
     # From hallway tests:
     #   - idle noise ≈ 0.00016
-    #   - 0.0003 is just above idle, so:
-    #       * still sensitive enough to catch normal speech
-    #       * not too strict, so it does not clip the start of words
+    #   - 0.0003 is just above idle:
+    #       * sensitive enough to catch normal speech
+    #       * high enough to avoid triggering on pure noise
     #
     energy_threshold: 0.0003
 
     # Input device selection:
     #
-    # From your earlier probe:
+    # From earlier probe:
     #   0: 'ReSpeaker 4 Mic Array (UAC1.0): USB Audio (hw:0,0)'
     #
     # So:
-    #   input_device_index: 0  → ReSpeaker 4 Mic Array (what we want)
+    #   input_device_index: 0  → ReSpeaker 4 Mic Array (what we want).
     #
+    # You can change this if your audio card indices change.
     input_device_index: 0
 
     # ------------------------------------------------------------------------
-    # Utterance-level behavior (for future upgrade)
+    # Utterance-level behaviour
     # ------------------------------------------------------------------------
     #
-    # These match stt_whisper.yaml so we can later switch to true
-    # utterance buffering (buffer blocks until silence, then send ONE request).
+    # These control how the node groups audio into "utterances" before
+    # sending to /speech.
     #
 
-    # true  → buffer multiple blocks while speech is present and send once
-    # false → simple per-block behavior
+    # true  → buffer multiple chunks while speech is present and send ONE
+    #         WAV file per utterance.
+    # false → each voiced chunk is sent immediately as its own request.
     utterance_mode: true
 
     # Safety limit for a single utterance duration (seconds).
     # Prevents buffering forever if someone talks non-stop.
+    #
+    # Example:
+    #   max_utterance_duration_s: 15.0
+    #
     max_utterance_duration_s: 15.0
 
     # ------------------------------------------------------------------------
-    # HTTP /speech behavior
+    # HTTP /speech behaviour
     # ------------------------------------------------------------------------
 
     # Timeout (seconds) for a single /speech HTTP request.
     #
-    # 20 s gives Robot_Savo_Server a bit more headroom on first use when
-    # models are still warming up, reducing early timeouts.
+    # This is also overridden from the launch file:
+    #   speech_bringup_v2.launch.py passes timeout_s → request_timeout_s
+    #
+    # 20.0 s gives Robot_Savo_Server enough headroom on first use when
+    # models may still be warming up.
     #
     request_timeout_s: 20.0
 
     # Number of retry attempts on network/server errors.
+    # - If all retries fail, the node will publish a friendly fallback reply:
+    #     "I am having a connection problem with my server. Please try again..."
+    #
     max_retries: 2
 
     # ------------------------------------------------------------------------
@@ -109,37 +137,49 @@ remote_speech_client_node:
     # ------------------------------------------------------------------------
     #
     # Idea:
-    #   - TTSNode publishes a Bool flag on /savo_speech/tts_speaking.
-    #   - While this flag is true (plus cooldown), we should NOT send audio
-    #     to /speech to avoid Robot Savo hearing itself.
+    #   - tts_node publishes a Bool flag on /savo_speech/tts_speaking.
+    #   - While this flag is true (plus a short cooldown), the node does NOT
+    #     send audio to /speech, to avoid Robot Savo hearing itself.
     #
-    # The Python node already subscribes to /savo_speech/tts_speaking and
-    # skips recording during speaking + cooldown.
+    # The Python node already:
+    #   - subscribes to /savo_speech/tts_speaking
+    #   - pauses listening while speaking + tts_gate_cooldown_s
     #
 
     # Enable/disable TTS gating logic in the node.
     tts_gate_enable: true
 
     # Topic where TTS speaking flag is published (Bool).
+    # This should match the TTS node configuration.
     tts_speaking_topic: "/savo_speech/tts_speaking"
 
     # Extra time after TTS stops speaking before we listen again (seconds).
+    # Helps avoid capturing the tail of our own voice or audio echo.
     tts_gate_cooldown_s: 0.8
 
     # ------------------------------------------------------------------------
-    # Node behavior / debugging
+    # Node behaviour / debugging
     # ------------------------------------------------------------------------
 
-    # Sleep in seconds between loops when idle or TTS is speaking.
+    # Sleep in seconds between loops when idle or while TTS is speaking.
+    #
+    # Small value (0.1) = more responsive, slightly more CPU.
+    # Larger value (0.2–0.3) = less CPU, slightly more latency.
     idle_sleep_s: 0.1
 
     # Minimum transcript length (characters) for a "real" utterance.
     #
-    # The Python node uses this to ignore pure noise / empty results:
-    #   - If transcript is shorter than this AND there is no reply_text
-    #     and no error message, the turn is skipped (no publish, no TTS).
+    # The node uses this to ignore pure noise / empty results:
+    #   - If transcript length < min_transcript_chars
+    #     AND reply_text == ""
+    #     AND error_msg == ""
+    #     → the turn is treated as a "no-op" and is not published.
     #
     min_transcript_chars: 3
 
-    # Enable extra debug logs (JSON dumps, RMS values, etc.).
+    # Enable extra debug logs (JSON dumps, RMS values, state changes, etc.).
+    #
+    # true  → lots of logs in the console, good for tuning.
+    # false → normal info-level logs only.
+    #
     debug_logging: false

@@ -1,54 +1,148 @@
+# ============================================================================
 # Robot Savo — Mouth Animation configuration
 #
-# This file configures the mouth_anim node in the savo_speech package.
+# This file configures the mouth_anim_node in the savo_speech package.
 #
-# Usage (on the Pi, after building and sourcing env.sh):
+# Data flow (PCM mode, recommended):
+#   tts_node (Piper)          → /savo_speech/tts_pcm   (Int16MultiArray, int16 PCM)
+#   mouth_anim_node (this)    → /savo_ui/mouth_level   (Float32 0.0–1.0)
+#   display_manager_node      → uses mouth_level to animate the face
 #
-#   ros2 run savo_speech mouth_anim \
+# Alternative (activity mode, fallback):
+#   tts_node (Piper)          → /savo_speech/mouth_open (Float32 0.0–1.0)
+#   mouth_anim_node (this)    → /savo_ui/mouth_level    (Float32 0.0–1.0)
+#
+# Usage (manual, on the Pi, after build + env):
+#
+#   ros2 run savo_speech mouth_anim_node \
 #     --ros-args \
-#       --params-file $(ros2 pkg prefix savo_speech)/share/savo_speech/config/mouth_anim.yaml
+#       --params-file \
+#       $(ros2 pkg prefix savo_speech)/share/savo_speech/config/mouth_anim.yaml
 #
-# The TTS node should publish Float32 in [0.0, 1.0] to /savo_speech/mouth_activity.
-# This node smooths that into a nicer UI mouth level on /savo_ui/mouth_level.
+# NOTE:
+#   - speech_bringup_v2.launch.py can also override some of these parameters
+#     (mode, debug_logging, etc.) from launch arguments.
+# ============================================================================
 
-mouth_anim:
+mouth_anim_node:
   ros__parameters:
 
     # ------------------------------------------------------------------------
-    # Topics
+    # Mode selection
     # ------------------------------------------------------------------------
+    #
+    # "pcm"  → real audio-driven mouth (uses full TTS PCM from tts_node)
+    # "activity" → legacy / fallback (uses simple Float32 activity)
+    #
+    # Recommended: "pcm" (smoother and more natural mouth motion).
+    #
+    mode: "pcm"
 
-    # Input: raw mouth activity from TTS (0.0–1.0, may be spiky/noisy)
-    input_topic: "/savo_speech/mouth_activity"
+    # ------------------------------------------------------------------------
+    # PCM mode settings (used when mode == "pcm")
+    # ------------------------------------------------------------------------
+    #
+    # tts_node publishes the full TTS audio buffer as Int16MultiArray (mono)
+    # on /savo_speech/tts_pcm. This node then:
+    #   - walks through the buffer at update_rate_hz (e.g. 30 Hz),
+    #   - computes RMS in small windows,
+    #   - maps RMS → [0, 1] via rms_floor / rms_ceiling,
+    #   - smooths with attack/decay → mouth_level.
+    #
 
-    # Output: smoothed mouth level for the UI (0.0–1.0)
+    # Topic providing full TTS PCM (Int16MultiArray, mono int16).
+    pcm_topic: "/savo_speech/tts_pcm"
+
+    # Sample rate (Hz) of the PCM audio coming from tts_node.
+    # Should match TARGET_PLAYBACK_SR in tts_node.py (currently 16000).
+    pcm_sample_rate: 16000.0
+
+    # Duration of the RMS analysis window (seconds).
+    # Typical: 0.03–0.05 s (30–50 ms).
+    # Larger window → smoother but slightly laggy; smaller → more responsive.
+    window_duration_s: 0.04
+
+    # RMS floor/ceiling for mapping loudness → mouth level.
+    #
+    #   rms <= rms_floor   → level ≈ 0.0 (mouth closed)
+    #   rms >= rms_ceiling → level ≈ 1.0 (mouth fully open)
+    #
+    # Values in between are mapped linearly to [0.0, 1.0].
+    #
+    # You can tune these based on real recordings:
+    #   - if mouth barely moves → lower rms_floor / rms_ceiling
+    #   - if mouth always fully open → raise rms_ceiling
+    #
+    rms_floor: 0.02
+    rms_ceiling: 0.30
+
+    # ------------------------------------------------------------------------
+    # Activity mode settings (used when mode == "activity")
+    # ------------------------------------------------------------------------
+    #
+    # In this mode, the node skips RMS/PCM logic and just smooths a simple
+    # Float32 activity value from TTS (e.g. /savo_speech/mouth_open).
+    #
+    # Useful as a backup if you don't want to send full PCM.
+    #
+
+    # Input: raw mouth activity from TTS (0.0–1.0, may be spiky/noisy).
+    activity_topic: "/savo_speech/mouth_open"
+
+    # ------------------------------------------------------------------------
+    # Output topic
+    # ------------------------------------------------------------------------
+    #
+    # This is what the UI / face_view subscribes to.
+    # Value is a smoothed mouth level in [0.0, 1.0].
+    #
+
     output_topic: "/savo_ui/mouth_level"
 
     # ------------------------------------------------------------------------
     # Update rate
     # ------------------------------------------------------------------------
-
+    #
     # How often to update the mouth level and publish to the UI (Hz).
-    # 30 Hz gives smooth animation without being too heavy.
+    # 30 Hz → smooth animation with reasonable CPU usage.
+    #
+
     update_rate_hz: 30.0
 
     # ------------------------------------------------------------------------
-    # Smoothing / animation behavior
+    # Smoothing / animation behaviour
     # ------------------------------------------------------------------------
+    #
+    # Attack/decay are used in both modes:
+    #   - Attack: how fast the mouth opens when target_activity increases.
+    #   - Decay: how fast the mouth closes when target_activity decreases.
+    #
+    # They are applied as exponential smoothing:
+    #   current += (target - current) * gain
+    #
 
     # How fast the mouth opens when activity goes up.
-    # Higher = snappier open. 0.4–0.7 is a good range.
-    attack_gain: 0.6
+    # Higher → snappier, more “talky” feeling. 0.4–0.7 is a good range.
+    attack_gain: 0.5
 
     # How fast the mouth closes when activity goes down.
-    # Lower = smoother closing. 0.1–0.3 is a good range.
-    decay_gain: 0.2
+    # Lower → smoother closing, less “chatter”. 0.1–0.3 is a good range.
+    decay_gain: 0.15
 
     # Minimum visible level:
-    # - If the smoothed level is below this, we snap to 0.0
-    #   so tiny noise doesn't make the mouth "wiggle".
+    # - If the smoothed level is below this, it snaps to 0.0
+    #   → prevents tiny noise wiggles on the display.
     min_level: 0.05
 
     # Maximum allowed mouth level:
-    # - Clamp everything to [0.0, max_level]
+    # - Clamp everything to [0.0, max_level].
     max_level: 1.0
+
+    # ------------------------------------------------------------------------
+    # Debug logging
+    # ------------------------------------------------------------------------
+    #
+    # true  → logs RMS values, indices, levels each frame (noisy but good for tuning).
+    # false → normal logs only.
+    #
+    debug_logging: false
