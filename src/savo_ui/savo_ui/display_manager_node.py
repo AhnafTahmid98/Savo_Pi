@@ -70,7 +70,7 @@ class SavoUIDisplay(Node):
         # Internal state
         # ------------------------------------------------------------------
         self._mode: str = "INTERACT"
-        self._status_text: str = "Hello, I am Robot Savo!"
+        self._status_text: str = ""
         self._subtitle_text: str = ""
         self._mouth_level: float = 0.0
 
