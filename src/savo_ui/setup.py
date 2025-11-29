@@ -89,6 +89,10 @@ setup(
             # Fake camera publisher for NAVIGATE testing (gradient video on
             # /camera/image_rect so the UI can be tested without a real camera).
             "fake_cam_node = savo_ui.fake_cam_node:main",
+
+            # Real Pi camera publisher → /camera/image_rect
+            "real_cam_node = savo_ui.real_cam_node:main",
+            
         ],
     },
 )
