@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Robot Savo — Navigation camera view renderer (NAVIGATE mode)
--------------------------------------------------------------
 
 This module draws the NAVIGATE UI:
 
@@ -15,11 +13,8 @@ This module draws the NAVIGATE UI:
 
 Camera input:
 
-- numpy.ndarray with shape (H, W, 3), dtype uint8, RGB
 - sensor_msgs/Image (encoding rgb8/bgr8)
-
-This file is pure pygame + numpy; no ROS node here. It is called from
-display_manager_node.SavoUIDisplay via draw_navigation_view().
+- numpy.ndarray with shape (H, W, 3), dtype uint8 (RGB)
 """
 
 from __future__ import annotations
@@ -28,14 +23,9 @@ from typing import Dict, Tuple, Any
 
 import numpy as np
 import pygame
-from sensor_msgs.msg import Image as RosImage  # type: ignore[import-untyped]
+from sensor_msgs.msg import Image as RosImage  # type hint only
 
 RGB = Tuple[int, int, int]
-
-
-# ======================================================================
-# Text helpers
-# ======================================================================
 
 
 def _render_multiline_text(
@@ -50,11 +40,7 @@ def _render_multiline_text(
 ) -> int:
     """
     Render text as multiple lines within max_width.
-
-    Returns
-    -------
-    int
-        The y-coordinate after the last rendered line.
+    Returns the y-coordinate after the last rendered line.
     """
     if not text or font is None:
         return start_y
@@ -94,11 +80,6 @@ def _render_multiline_text(
     return y
 
 
-# ======================================================================
-# Camera blit helper
-# ======================================================================
-
-
 def _blit_camera_frame(
     surface: pygame.Surface,
     cam_rect: pygame.Rect,
@@ -113,8 +94,6 @@ def _blit_camera_frame(
     """
     if camera_frame is None:
         return
-
-    img_surface: pygame.Surface
 
     # -------------------------------------------------------------
     # Case 1: numpy array (H, W, 3)
@@ -162,7 +141,6 @@ def _blit_camera_frame(
             return
 
         try:
-            # step is bytes/row; step//3 is pixels/row
             frame = buf.reshape((height, step // 3, 3))
             frame = frame[:, :width, :]
         except Exception:
@@ -176,39 +154,39 @@ def _blit_camera_frame(
 
     # -------------------------------------------------------------
     # Letterbox into cam_rect while preserving aspect ratio
+    # NOTE: we use pygame.transform.scale (faster than smoothscale)
+    #       and skip scaling completely if sizes already match.
     # -------------------------------------------------------------
     src_w, src_h = img_surface.get_size()
-    if src_w == 0 or src_h == 0 or cam_rect.width <= 0 or cam_rect.height <= 0:
+
+    # Fast path: if panel and frame sizes match exactly → direct blit
+    if src_w == cam_rect.width and src_h == cam_rect.height:
+        surface.blit(img_surface, cam_rect)
         return
 
     src_aspect = src_w / float(src_h)
     dst_aspect = cam_rect.width / float(cam_rect.height)
 
-    # Same aspect → scale exactly to panel
     if abs(src_aspect - dst_aspect) < 1e-3:
-        disp = pygame.transform.smoothscale(img_surface, (cam_rect.width, cam_rect.height))
+        # Same aspect → scale exactly to panel
+        disp = pygame.transform.scale(img_surface, (cam_rect.width, cam_rect.height))
         surface.blit(disp, cam_rect)
         return
 
     if src_aspect > dst_aspect:
         # Source wider than panel → match width
         new_w = cam_rect.width
-        new_h = max(1, int(new_w / src_aspect))
-        disp = pygame.transform.smoothscale(img_surface, (new_w, new_h))
+        new_h = int(new_w / src_aspect)
+        disp = pygame.transform.scale(img_surface, (new_w, new_h))
         y = cam_rect.y + (cam_rect.height - new_h) // 2
         surface.blit(disp, (cam_rect.x, y))
     else:
         # Source taller → match height
         new_h = cam_rect.height
-        new_w = max(1, int(new_h * src_aspect))
-        disp = pygame.transform.smoothscale(img_surface, (new_w, new_h))
+        new_w = int(new_h * src_aspect)
+        disp = pygame.transform.scale(img_surface, (new_w, new_h))
         x = cam_rect.x + (cam_rect.width - new_w) // 2
         surface.blit(disp, (x, cam_rect.y))
-
-
-# ======================================================================
-# Small face overlay
-# ======================================================================
 
 
 def _draw_mini_face_same_style(
@@ -222,7 +200,7 @@ def _draw_mini_face_same_style(
     """
     m = max(0.0, min(1.0, float(mouth_level)))
 
-    # Small face area inside the camera rect
+    # --- choose a small face area inside the camera rect ---
     face_w = int(cam_rect.width * 0.24)
     face_h = int(cam_rect.height * 0.35)
     margin_x = int(cam_rect.width * 0.03)
@@ -249,7 +227,8 @@ def _draw_mini_face_same_style(
     pygame.draw.rect(surface, (0, 0, 0), border_rect, border_radius=border_radius + 2)
     pygame.draw.rect(surface, color_bg, face_rect, border_radius=border_radius)
 
-    # Local layout within mini rect
+    # Now draw eyes + mouth using same proportions as face_view,
+    # but local to this mini-rect.
     width = face_rect.width
     height = face_rect.height
     cx = face_rect.centerx
@@ -350,11 +329,6 @@ def _draw_mini_face_same_style(
     )
 
 
-# ======================================================================
-# Main public draw function
-# ======================================================================
-
-
 def draw_navigation_view(
     surface: pygame.Surface,
     status_text: str,
@@ -368,8 +342,6 @@ def draw_navigation_view(
 ) -> None:
     """
     Draw the NAVIGATE mode view.
-
-    This is called every frame from display_manager_node.SavoUIDisplay.
     """
     width, height = screen_size
 
@@ -410,12 +382,7 @@ def draw_navigation_view(
         _blit_camera_frame(surface, cam_rect, camera_frame)
     else:
         if font_status is not None:
-            if not camera_ready:
-                msg = "Starting camera…"
-            else:
-                # camera_ready True but no frame object; very rare
-                msg = "Camera active, no frame."
-
+            msg = "Starting camera…" if not camera_ready else "Camera active"
             cam_text = font_status.render(msg, True, color_text_main)
             cam_text_rect = cam_text.get_rect(center=cam_rect.center)
             surface.blit(cam_text, cam_text_rect)
@@ -423,7 +390,7 @@ def draw_navigation_view(
     # Border + corner markers
     pygame.draw.rect(surface, cam_border_color, cam_rect, width=4)
 
-    corner_len = max(8, min(cam_width, cam_height) // 10)
+    corner_len = min(cam_width, cam_height) // 10
     thickness = 3
 
     # top-left
@@ -542,7 +509,7 @@ def draw_navigation_view(
     level_color = (
         int(80 + 150 * m),
         int(120 + 80 * m),
-        110,
+        int(110),
     )
     inner_rect = pygame.Rect(
         bar_x + inner_margin,
