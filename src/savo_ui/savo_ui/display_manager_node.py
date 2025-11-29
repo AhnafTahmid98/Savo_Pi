@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Robot Savo — UI display manager node (v2, optimized)
+Robot Savo — UI display manager node (v2)
 
 This node drives the 7" DFRobot DSI display. It is responsible for:
 
@@ -18,11 +18,12 @@ Rendering (via helper modules):
     - INTERACT:
         - Big friendly face (eyes + mouth)
         - Status + subtitle overlaid
+        - Expression driven by /savo_ui/face_state
     - NAVIGATE:
         - Camera view as background (letterboxed)
         - Small face overlay + status + subtitle
     - MAP:
-        - Mapping status screen, reusing face layout
+        - Mapping status screen, optionally reusing face layout
 
 Camera handling:
     - Subscribes to sensor_msgs/Image on `navigation.camera_topic`
@@ -79,15 +80,14 @@ class SavoUIDisplay(Node):
         # ------------------------------------------------------------------
         # Internal state
         # ------------------------------------------------------------------
-        # UI mode (default: INTERACT when node starts)
         self._mode: str = "INTERACT"
-
-        # Text state
         self._status_text: str = ""
         self._subtitle_text: str = ""
 
         # Face / mouth state
-        self._face_state: str = "idle"  # "idle" / "listening" / "thinking" / "speaking"
+        #   face_state: "idle" / "listening" / "thinking" / "speaking"
+        #   mouth_level: [0.0, 1.0], derived from mouth_open or legacy mouth_level
+        self._face_state: str = "idle"
         self._mouth_level: float = 0.0
         self._mouth_open: bool = False
 
@@ -100,20 +100,40 @@ class SavoUIDisplay(Node):
         # ------------------------------------------------------------------
         # Subscriptions
         # ------------------------------------------------------------------
-        # UI mode & status
+        # UI mode and status text
         self.create_subscription(String, "/savo_ui/mode", self._on_mode, 10)
-        self.create_subscription(String, "/savo_ui/status_text", self._on_status_text, 10)
-
-        # Face state from speech client (not yet used by renderer, but stored)
-        self.create_subscription(String, "/savo_ui/face_state", self._on_face_state, 10)
-
-        # Mouth animation
-        self.create_subscription(Bool, "/savo_speech/mouth_open", self._on_mouth_open, 10)
         self.create_subscription(
-            Float32, "/savo_speech/mouth_level", self._on_mouth_level, 10
+            String,
+            "/savo_ui/status_text",
+            self._on_status_text,
+            10,
         )
 
-        # Subtitle (TTS text)
+        # Face state from remote_speech_client_node
+        self.create_subscription(
+            String,
+            "/savo_ui/face_state",
+            self._on_face_state,
+            10,
+        )
+
+        # Mouth animation:
+        #  - Preferred: Bool mouth_open
+        #  - Legacy: Float32 mouth_level (will still work if present)
+        self.create_subscription(
+            Bool,
+            "/savo_speech/mouth_open",
+            self._on_mouth_open,
+            10,
+        )
+        self.create_subscription(
+            Float32,
+            "/savo_speech/mouth_level",
+            self._on_mouth_level,
+            10,
+        )
+
+        # Subtitle of what Robot Savo is saying
         self.create_subscription(
             String,
             "/savo_speech/tts_text",
@@ -121,7 +141,7 @@ class SavoUIDisplay(Node):
             10,
         )
 
-        # Camera (optional; NAVIGATE will show placeholder if no topic)
+        # Camera (optional; placeholder if no topic)
         if self.camera_topic:
             qos_cam = QoSProfile(
                 reliability=ReliabilityPolicy.BEST_EFFORT,
@@ -150,7 +170,7 @@ class SavoUIDisplay(Node):
         # ------------------------------------------------------------------
         # Render loop timer
         # ------------------------------------------------------------------
-        period = 1.0 / float(max(self.screen_fps, 1))
+        period = 1.0 / float(self.screen_fps)
         self._timer = self.create_timer(period, self._on_timer)
 
         self.get_logger().info(
@@ -171,22 +191,22 @@ class SavoUIDisplay(Node):
         self.declare_parameter("screen.fps", 30)
         self.declare_parameter("screen.fullscreen", True)
 
-        self.screen_width: int = (
+        self.screen_width = int(
             self.get_parameter("screen.width").get_parameter_value().integer_value
         )
-        self.screen_height: int = (
+        self.screen_height = int(
             self.get_parameter("screen.height").get_parameter_value().integer_value
         )
-        self.screen_fps: int = (
+        self.screen_fps = int(
             self.get_parameter("screen.fps").get_parameter_value().integer_value
         )
-        self.screen_fullscreen: bool = (
+        self.screen_fullscreen = bool(
             self.get_parameter("screen.fullscreen").get_parameter_value().bool_value
         )
 
         # Camera topic (NAVIGATE mode)
         self.declare_parameter("navigation.camera_topic", "/camera/image_rect")
-        self.camera_topic: str = (
+        self.camera_topic = (
             self.get_parameter("navigation.camera_topic")
             .get_parameter_value()
             .string_value
@@ -200,17 +220,19 @@ class SavoUIDisplay(Node):
             "NAVIGATE": self._get_color_param(
                 "colors.background.NAVIGATE", [5, 35, 70]
             ),
-            "MAP": self._get_color_param("colors.background.MAP", [4, 50, 35]),
+            "MAP": self._get_color_param(
+                "colors.background.MAP", [4, 50, 35]
+            ),
         }
 
         # Text colors
-        self.color_text_main: RGB = self._get_color_param(
+        self.color_text_main = self._get_color_param(
             "colors.text_main", [255, 255, 255]
         )
-        self.color_text_status: RGB = self._get_color_param(
+        self.color_text_status = self._get_color_param(
             "colors.text_status", [240, 240, 240]
         )
-        self.color_text_subtitle: RGB = self._get_color_param(
+        self.color_text_subtitle = self._get_color_param(
             "colors.text_subtitle", [210, 210, 210]
         )
 
@@ -219,25 +241,25 @@ class SavoUIDisplay(Node):
         self.declare_parameter("text.status.font_size", 28)
         self.declare_parameter("text.subtitle.font_size", 22)
 
-        self.font_size_main: int = (
+        self.font_size_main = int(
             self.get_parameter("text.main.font_size")
-            .get_parameter_value()
-            .integer_value
+                .get_parameter_value()
+                .integer_value
         )
-        self.font_size_status: int = (
+        self.font_size_status = int(
             self.get_parameter("text.status.font_size")
-            .get_parameter_value()
-            .integer_value
+                .get_parameter_value()
+                .integer_value
         )
-        self.font_size_subtitle: int = (
+        self.font_size_subtitle = int(
             self.get_parameter("text.subtitle.font_size")
-            .get_parameter_value()
-            .integer_value
+                .get_parameter_value()
+                .integer_value
         )
 
         # Debug
         self.declare_parameter("debug.show_fps", False)
-        self.show_fps: bool = (
+        self.show_fps = bool(
             self.get_parameter("debug.show_fps").get_parameter_value().bool_value
         )
 
@@ -298,15 +320,11 @@ class SavoUIDisplay(Node):
         """
         Track the high-level face state for expressions:
           "idle" / "listening" / "thinking" / "speaking"
-
-        NOTE: Currently not forwarded to face_view/nav_cam_view, but kept
-        for future use.
         """
         state = (msg.data or "").strip().lower()
         if not state:
             return
         if state not in ("idle", "listening", "thinking", "speaking"):
-            # Keep last valid state; no spam
             self.get_logger().debug(
                 f"Unknown face_state '{state}', keeping '{self._face_state}'"
             )
@@ -327,8 +345,6 @@ class SavoUIDisplay(Node):
     def _on_mouth_level(self, msg: Float32) -> None:
         """
         Legacy Float32 channel (0.0–1.0). If present, we still honor it.
-
-        If both mouth_open and mouth_level are published, the *last* message wins.
         """
         level = float(msg.data)
         self._mouth_level = max(0.0, min(1.0, level))
@@ -370,8 +386,7 @@ class SavoUIDisplay(Node):
             if enc in ("rgb8", "rgb_8", "rgb8c"):
                 frame_rgb = frame
             elif enc in ("bgr8", "bgr_8", "bgr8c"):
-                # Convert BGR -> RGB
-                frame_rgb = frame[:, :, ::-1]
+                frame_rgb = frame[:, :, ::-1]  # BGR → RGB
             else:
                 if not self._warned_camera_encoding:
                     self._warned_camera_encoding = True
@@ -398,17 +413,13 @@ class SavoUIDisplay(Node):
     def _init_pygame(self) -> None:
         """Initialize pygame display with robust driver fallback."""
 
-        # Helpful defaults; harmless if backend doesn't support them
         os.environ.setdefault("SDL_VIDEO_WAYLAND_ALLOW_LIBDECOR", "0")
         os.environ.setdefault("SDL_RENDER_VSYNC", "1")
 
         pygame.init()
         pygame.font.init()
 
-        # Driver preference list:
-        #   - environment override
-        #   - kmsdrm (bare Pi console)
-        #   - wayland / x11 for desktop
+        # Driver preference list
         drivers: List[str] = []
         env_drv = os.environ.get("SDL_VIDEODRIVER")
         if env_drv:
@@ -420,7 +431,7 @@ class SavoUIDisplay(Node):
         tried: List[str] = []
         last_exc: Optional[BaseException] = None
         chosen: Optional[str] = None
-        self._screen: Optional[pygame.Surface] = None
+        self._screen = None
 
         for drv in drivers:
             if not drv or drv in tried:
@@ -463,13 +474,15 @@ class SavoUIDisplay(Node):
         pygame.display.set_caption(f"Robot Savo UI [{chosen}] {w}x{h}")
         pygame.mouse.set_visible(False)
 
-        # Pygame clock for FPS limiting / measurement
+        # Pygame clock for FPS limiting
         self._pg_clock = pygame.time.Clock()
 
-        # Fonts (fall back to defaults if DejaVu is missing)
+        # Fonts
         self._font_main = pygame.font.SysFont("DejaVu Sans", self.font_size_main)
         self._font_status = pygame.font.SysFont("DejaVu Sans", self.font_size_status)
-        self._font_subtitle = pygame.font.SysFont("DejaVu Sans", self.font_size_subtitle)
+        self._font_subtitle = pygame.font.SysFont(
+            "DejaVu Sans", self.font_size_subtitle
+        )
 
     def _on_timer(self) -> None:
         """Render loop callback (called at ~FPS rate)."""
@@ -478,15 +491,16 @@ class SavoUIDisplay(Node):
         _dt_ms = self._pg_clock.tick(self.screen_fps)  # noqa: F841
         fps = self._pg_clock.get_fps() if self.show_fps else None
 
-        # Handle pygame events (quit, ESC, etc.)
+        # Handle pygame events
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.get_logger().info("Pygame QUIT event received, shutting down UI.")
-                # Let main() handle rclpy.shutdown; just stop spinning
-                raise KeyboardInterrupt
+                rclpy.shutdown()
+                return
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 self.get_logger().info("ESC pressed, shutting down UI.")
-                raise KeyboardInterrupt
+                rclpy.shutdown()
+                return
 
         # Draw current mode
         if self._mode == "INTERACT":
@@ -498,14 +512,13 @@ class SavoUIDisplay(Node):
         else:
             self._draw_fallback()
 
-        # Optional FPS overlay
-        if fps is not None and self._font_subtitle is not None:
+        # Optional FPS overlay (top-left)
+        if fps is not None:
             fps_text = self._font_subtitle.render(
                 f"{fps:5.1f} FPS", True, (255, 255, 0)
             )
             self._screen.blit(fps_text, (10, 10))
 
-        # Flip buffer
         pygame.display.flip()
 
     # ======================================================================
@@ -521,11 +534,13 @@ class SavoUIDisplay(Node):
         self._clear_background("INTERACT")
 
         if draw_face_view is not None:
+            # New face_view signature REQUIRES face_state
             draw_face_view(
                 surface=self._screen,
                 mouth_level=self._mouth_level,
                 status_text=self._status_text,
                 subtitle_text=self._subtitle_text,
+                face_state=self._face_state,
                 fonts={
                     "main": self._font_main,
                     "status": self._font_status,
@@ -550,6 +565,7 @@ class SavoUIDisplay(Node):
         self._clear_background("NAVIGATE")
 
         if draw_navigation_view is not None and self._have_camera:
+            # nav_cam_view currently does NOT use face_state; keep signature simple.
             draw_navigation_view(
                 surface=self._screen,
                 status_text=self._status_text,
@@ -576,10 +592,11 @@ class SavoUIDisplay(Node):
             self._screen.blit(text, (40, self.screen_height // 2))
 
     def _draw_map_mode(self) -> None:
-        """Draw the MAP status view (reusing face layout)."""
+        """Draw the MAP status view (optionally reusing face layout)."""
         self._clear_background("MAP")
 
         if draw_face_view is not None:
+            # During mapping we typically show a calm face; mouth_level = 0.0.
             draw_face_view(
                 surface=self._screen,
                 mouth_level=0.0,
@@ -588,6 +605,7 @@ class SavoUIDisplay(Node):
                     or "Mapping in progress, please keep distance."
                 ),
                 subtitle_text=self._subtitle_text,
+                face_state="idle",
                 fonts={
                     "main": self._font_main,
                     "status": self._font_status,
@@ -614,9 +632,9 @@ class SavoUIDisplay(Node):
         self._screen.blit(text, (40, self.screen_height // 2))
 
 
-# ==========================================================================
+# ==========================================================================#
 # main()
-# ==========================================================================
+# ==========================================================================#
 
 def main(argv: Optional[list] = None) -> None:
     rclpy.init(args=argv)
@@ -627,11 +645,7 @@ def main(argv: Optional[list] = None) -> None:
         node.get_logger().info("KeyboardInterrupt, shutting down SavoUIDisplay.")
     finally:
         node.destroy_node()
-        try:
-            # Avoid RCLError if shutdown was already called by launcher
-            rclpy.shutdown()
-        except Exception:
-            pass
+        rclpy.shutdown()
         pygame.quit()
 
 
