@@ -41,7 +41,6 @@ from typing import Optional
 
 import rclpy
 from rclpy.node import Node
-from rclpy.exceptions import RCLError
 
 from std_msgs.msg import String, Bool, Float32
 
@@ -245,5 +244,6 @@ def main(argv: Optional[list] = None) -> None:
         node.destroy_node()
         try:
             rclpy.shutdown()
-        except RCLError:
+        except Exception:
             pass
+

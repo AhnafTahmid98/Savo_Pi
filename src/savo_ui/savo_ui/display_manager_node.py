@@ -45,8 +45,6 @@ from typing import Dict, List, Tuple, Optional
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
-from rclpy.exceptions import RCLError
-
 
 from std_msgs.msg import String, Float32, Bool
 from sensor_msgs.msg import Image
@@ -648,15 +646,13 @@ def main(argv: Optional[list] = None) -> None:
     finally:
         node.destroy_node()
         # ros2 launch already calls rclpy.shutdown() once.
-        # This try/except avoids the "rcl_shutdown already called" error
-        # if shutdown was already done by the launch system.
+        # This try/except avoids errors if shutdown was already done.
         try:
             rclpy.shutdown()
-        except RCLError:
+        except Exception:
             pass
         pygame.quit()
 
 
 if __name__ == "__main__":
     main(sys.argv)
-

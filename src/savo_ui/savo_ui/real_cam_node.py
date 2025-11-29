@@ -38,8 +38,6 @@ import numpy as np
 
 import rclpy
 from rclpy.node import Node
-from rclpy.exceptions import RCLError
-
 
 from sensor_msgs.msg import Image as RosImage
 
@@ -264,6 +262,10 @@ class RealCamNode(Node):
                 self._frames_published = 0
                 self._last_fps_log_time = now
 
+# ======================================================================#
+# main()
+# ======================================================================#
+
 
 def main(argv: Optional[list] = None) -> None:
     rclpy.init(args=argv)
@@ -276,6 +278,6 @@ def main(argv: Optional[list] = None) -> None:
         node.destroy_node()
         try:
             rclpy.shutdown()
-        except RCLError:
+        except Exception:
             pass
 
