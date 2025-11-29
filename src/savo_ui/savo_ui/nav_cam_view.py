@@ -9,7 +9,9 @@ This module draws the NAVIGATE UI:
 - Subtitle text (what Robot Savo is saying).
 - Simple "mouth bar" that reacts to mouth_level in a corner.
 
-Actual camera frames are provided as sensor_msgs/Image via display_manager_node.
+It supports two kinds of camera_frame:
+- sensor_msgs/Image (encoding rgb8/bgr8)
+- numpy.ndarray with shape (H, W, 3), dtype uint8 (RGB)
 """
 
 from __future__ import annotations
@@ -78,47 +80,80 @@ def _render_multiline_text(
 def _blit_camera_frame(
     surface: pygame.Surface,
     cam_rect: pygame.Rect,
-    camera_frame: RosImage,
+    camera_frame: Any,
 ) -> None:
     """
-    Convert a ROS Image (rgb8 / bgr8) into a pygame Surface and draw it
-    letterboxed inside cam_rect.
+    Draw the camera frame inside cam_rect with letterboxing.
+
+    Supports:
+    - numpy.ndarray: shape (H, W, 3), dtype uint8, RGB
+    - sensor_msgs/Image: encoding 'rgb8' or 'bgr8'
     """
     if camera_frame is None:
         return
 
-    encoding = (camera_frame.encoding or "").lower()
-    if encoding not in ("rgb8", "bgr8"):
-        # Unsupported encoding → let caller draw placeholder text instead.
-        return
+    # -------------------------------------------------------------
+    # Case 1: numpy array (H, W, 3)
+    # -------------------------------------------------------------
+    if isinstance(camera_frame, np.ndarray):
+        frame = camera_frame
 
-    width = camera_frame.width
-    height = camera_frame.height
-    if width == 0 or height == 0:
-        return
+        if frame.ndim != 3 or frame.shape[2] < 3:
+            return
 
-    # Interpret raw bytes as uint8 array
-    step = camera_frame.step  # bytes per row
-    buf = np.frombuffer(camera_frame.data, dtype=np.uint8)
+        # Ensure uint8
+        if frame.dtype != np.uint8:
+            frame = np.clip(frame, 0, 255).astype(np.uint8)
 
-    # Safety: allow for padding in each row using `step`
-    if step < width * 3:
-        return  # corrupt frame
-    try:
-        frame = buf.reshape((height, step // 3, 3))
-        frame = frame[:, :width, :]
-    except Exception:
-        return
+        height, width = frame.shape[:2]
 
-    if encoding == "bgr8":
-        frame = frame[:, :, ::-1]  # BGR → RGB
+        # Only use first 3 channels (RGB)
+        frame = frame[:, :, :3]
 
-    # Convert to pygame surface
-    frame_bytes = frame.tobytes()
-    img_surface = pygame.image.frombuffer(frame_bytes, (width, height), "RGB")
+        frame_bytes = frame.tobytes()
+        img_surface = pygame.image.frombuffer(frame_bytes, (width, height), "RGB")
 
-    # Letterbox into cam_rect while preserving aspect
-    src_aspect = width / float(height)
+    # -------------------------------------------------------------
+    # Case 2: ROS Image (rgb8 / bgr8)
+    # -------------------------------------------------------------
+    else:
+        if not hasattr(camera_frame, "encoding"):
+            return
+
+        msg: RosImage = camera_frame  # type: ignore[assignment]
+
+        encoding = (msg.encoding or "").lower()
+        if encoding not in ("rgb8", "bgr8"):
+            return
+
+        width = msg.width
+        height = msg.height
+        if width == 0 or height == 0:
+            return
+
+        step = msg.step  # bytes per row
+        buf = np.frombuffer(msg.data, dtype=np.uint8)
+
+        if step < width * 3:
+            return
+
+        try:
+            frame = buf.reshape((height, step // 3, 3))
+            frame = frame[:, :width, :]
+        except Exception:
+            return
+
+        if encoding == "bgr8":
+            frame = frame[:, :, ::-1]  # BGR → RGB
+
+        frame_bytes = frame.tobytes()
+        img_surface = pygame.image.frombuffer(frame_bytes, (width, height), "RGB")
+
+    # -------------------------------------------------------------
+    # Letterbox into cam_rect while preserving aspect ratio
+    # -------------------------------------------------------------
+    src_w, src_h = img_surface.get_size()
+    src_aspect = src_w / float(src_h)
     dst_aspect = cam_rect.width / float(cam_rect.height)
 
     if abs(src_aspect - dst_aspect) < 1e-3:
@@ -152,7 +187,7 @@ def draw_navigation_view(
     colors: Dict[str, RGB],
     screen_size: Tuple[int, int],
     camera_ready: bool,
-    camera_frame: Any = None,  # sensor_msgs/Image or None
+    camera_frame: Any = None,  # numpy array or RosImage
 ) -> None:
     """
     Draw the NAVIGATE mode view.
@@ -176,7 +211,7 @@ def draw_navigation_view(
     camera_ready:
         True if we have received at least one camera frame.
     camera_frame:
-        Latest camera frame (sensor_msgs/Image) or None.
+        Latest camera frame (numpy array or sensor_msgs/Image) or None.
     """
     width, height = screen_size
 
@@ -192,16 +227,16 @@ def draw_navigation_view(
     cam_border_color: RGB = (40, 120, 200)
     cam_inner_color: RGB = (10, 20, 40)
 
-    # Background (just to be safe)
+    # Background
     surface.fill(color_bg)
 
     # ----------------------------------------------------------------------
-    # Camera panel layout — centered in upper ~70% of screen
+    # Camera panel layout — centered in upper ~60% of screen
     # ----------------------------------------------------------------------
     margin_x = int(width * 0.05)
 
     cam_width = width - 2 * margin_x
-    cam_height = int(height * 0.60)  # 60% of height
+    cam_height = int(height * 0.60)
 
     cam_left = margin_x
     cam_top = int(height * 0.08)
@@ -212,7 +247,7 @@ def draw_navigation_view(
     # Panel background
     pygame.draw.rect(surface, cam_inner_color, cam_rect)
 
-    # If we have a frame, draw it; otherwise draw placeholder text
+    # Frame or placeholder
     if camera_ready and camera_frame is not None:
         _blit_camera_frame(surface, cam_rect, camera_frame)
     else:
@@ -317,7 +352,7 @@ def draw_navigation_view(
     )
 
     # ----------------------------------------------------------------------
-    # Tiny "mouth bar" in bottom-right corner reacting to mouth_level
+    # "Mouth bar" in bottom-right corner
     # ----------------------------------------------------------------------
     m = max(0.0, min(1.0, float(mouth_level)))
 
