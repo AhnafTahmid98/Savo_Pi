@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
 """
-Robot Savo — UI display manager node (v2.2, text drawing disabled)
+Robot Savo — UI display manager node (TEXT-OFF build)
 
-This version keeps ALL the existing behaviour (face, mouth, camera,
-mode changes) but NEVER draws any text on screen. It ignores:
+This build:
+- Keeps face + mouth + camera + modes.
+- Subscribes to /savo_ui/status_text and /savo_speech/tts_text
+  but NEVER draws any text on the screen.
 
-    - /savo_ui/status_text
-    - /savo_speech/tts_text
-
-They are still subscribed (for future use), but rendering always uses
-empty strings, so nothing appears under the face.
+If you still see any text, then a different file is being used.
 """
 
 from __future__ import annotations
@@ -41,12 +39,14 @@ RGB = Tuple[int, int, int]
 
 
 class SavoUIDisplay(Node):
-    """Main display manager node for Robot Savo UI (no text drawn)."""
+    """Main display manager node for Robot Savo UI (text drawing OFF)."""
 
     def __init__(self) -> None:
         super().__init__("savo_ui_display")
 
-        self.get_logger().info("Initializing SavoUIDisplay node (text drawing OFF)")
+        self.get_logger().info(
+            "Initializing SavoUIDisplay node — TEXT_DRAWING_DISABLED_VERSION=1"
+        )
 
         # ------------------------------------------------------------------
         # Parameters
@@ -58,12 +58,12 @@ class SavoUIDisplay(Node):
         # ------------------------------------------------------------------
         self._mode: str = "INTERACT"
 
-        # We still store text, but will NOT draw it.
+        # We still store text, but WILL NOT draw it.
         self._status_text: str = ""
         self._subtitle_text: str = ""
 
         # Face / mouth state
-        self._face_state: str = "idle"  # "idle" / "listening" / "thinking" / "speaking"
+        self._face_state: str = "idle"
         self._mouth_level: float = 0.0
         self._mouth_open: bool = False
 
@@ -119,7 +119,7 @@ class SavoUIDisplay(Node):
 
         self.get_logger().info(
             f"SavoUIDisplay started at {self.screen_width}x{self.screen_height} "
-            f"@ {self.screen_fps} FPS (mode={self._mode}) — text drawing OFF"
+            f"@ {self.screen_fps} FPS (mode={self._mode}) — TEXT OFF"
         )
 
     # ======================================================================
@@ -167,7 +167,7 @@ class SavoUIDisplay(Node):
             "MAP": self._get_color_param("colors.background.MAP", [4, 50, 35]),
         }
 
-        # Text colors (still needed for faces that may use them)
+        # Text colors (still required by face_view/nav_cam_view)
         self.color_text_main = self._get_color_param(
             "colors.text_main", [255, 255, 255]
         )
@@ -178,7 +178,7 @@ class SavoUIDisplay(Node):
             "colors.text_subtitle", [210, 210, 210]
         )
 
-        # Text sizes (for now only used inside helpers, but we won’t draw text)
+        # Text sizes
         self.declare_parameter("text.main.font_size", 32)
         self.declare_parameter("text.status.font_size", 28)
         self.declare_parameter("text.subtitle.font_size", 22)
@@ -247,7 +247,7 @@ class SavoUIDisplay(Node):
         self._mode = mode
 
     def _on_status_text(self, msg: String) -> None:
-        # We store it for possible future use, but won’t draw it.
+        # We store it but DO NOT draw.
         self._status_text = msg.data or ""
 
     def _on_face_state(self, msg: String) -> None:
@@ -272,7 +272,7 @@ class SavoUIDisplay(Node):
         self._mouth_level = max(0.0, min(1.0, level))
 
     def _on_subtitle_text(self, msg: String) -> None:
-        # We store it for possible future use, but won’t draw it.
+        # We store it but DO NOT draw.
         self._subtitle_text = msg.data or ""
 
     def _on_camera_image(self, msg: Image) -> None:
@@ -302,7 +302,7 @@ class SavoUIDisplay(Node):
             if enc in ("rgb8", "rgb_8", "rgb8c"):
                 frame_rgb = frame
             elif enc in ("bgr8", "bgr_8", "bgr8c"):
-                frame_rgb = frame[:, :, ::-1]  # BGR → RGB
+                frame_rgb = frame[:, :, ::-1]
             else:
                 if not self._warned_camera_encoding:
                     self._warned_camera_encoding = True
@@ -323,7 +323,7 @@ class SavoUIDisplay(Node):
                 )
 
     # ======================================================================
-    # Pygame initialization and render loop
+    # Pygame init + render loop
     # ======================================================================
 
     def _init_pygame(self) -> None:
@@ -389,7 +389,6 @@ class SavoUIDisplay(Node):
 
         self._pg_clock = pygame.time.Clock()
 
-        # We still create fonts; helpers may need them for layout.
         self._font_main = pygame.font.SysFont("DejaVu Sans", self.font_size_main)
         self._font_status = pygame.font.SysFont("DejaVu Sans", self.font_size_status)
         self._font_subtitle = pygame.font.SysFont(
@@ -438,7 +437,7 @@ class SavoUIDisplay(Node):
     def _draw_interact_mode(self) -> None:
         self._clear_background("INTERACT")
 
-        # HARD-OFF: no text drawn at all
+        # HARD OFF: no text
         status_text = ""
         subtitle_text = ""
 
@@ -462,9 +461,6 @@ class SavoUIDisplay(Node):
                 },
                 screen_size=(self.screen_width, self.screen_height),
             )
-        else:
-            # As a last resort, just fill background and do nothing else.
-            pass
 
     def _draw_navigate_mode(self) -> None:
         self._clear_background("NAVIGATE")
@@ -493,8 +489,6 @@ class SavoUIDisplay(Node):
                 camera_ready=self._camera_ready,
                 camera_frame=self._last_camera_frame,
             )
-        else:
-            pass
 
     def _draw_map_mode(self) -> None:
         self._clear_background("MAP")
@@ -522,12 +516,10 @@ class SavoUIDisplay(Node):
                 },
                 screen_size=(self.screen_width, self.screen_height),
             )
-        else:
-            pass
 
     def _draw_fallback(self) -> None:
         self._screen.fill((0, 0, 0))
-        # No text even in fallback.
+        # No text even here.
 
 
 # ==========================================================================#
