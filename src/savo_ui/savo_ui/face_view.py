@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Robot Savo — Face view renderer (INTERACT / MAP modes, v2)
+Robot Savo — Face view renderer (INTERACT / MAP modes, v3 — text-less)
 
 This module draws a friendly robot face:
 
@@ -13,8 +13,10 @@ This module draws a friendly robot face:
 - A mouth that opens/closes based on `mouth_level` (0.0–1.0),
   with a small extra boost in "speaking" state.
 - Date & time in the top-left corner.
-- Status text (one–two lines) above the bottom.
-- Subtitle text (current TTS text) near the bottom edge.
+
+IMPORTANT:
+- We IGNORE status_text and subtitle_text on purpose.
+- Only the small clock text is rendered; no bottom text is drawn.
 """
 
 from __future__ import annotations
@@ -27,58 +29,11 @@ import pygame
 RGB = Tuple[int, int, int]
 
 
-def _render_multiline_text(
-    surface: pygame.Surface,
-    text: str,
-    font: pygame.font.Font,
-    color: RGB,
-    max_width: int,
-    start_y: int,
-    line_spacing: int = 4,
-) -> int:
-    """Render text as multiple centered lines within max_width."""
-    if not text or font is None:
-        return start_y
-
-    words = text.split()
-    if not words:
-        return start_y
-
-    lines = []
-    current_line: list[str] = []
-
-    for word in words:
-        trial = " ".join(current_line + [word]) if current_line else word
-        w, _ = font.size(trial)
-        if w <= max_width:
-            current_line.append(word)
-        else:
-            if current_line:
-                lines.append(" ".join(current_line))
-            current_line = [word]
-
-    if current_line:
-        lines.append(" ".join(current_line))
-
-    y = start_y
-    center_x = surface.get_width() // 2
-
-    for line in lines:
-        surf = font.render(line, True, color)
-        rect = surf.get_rect()
-        rect.centerx = center_x
-        rect.y = y
-        surface.blit(surf, rect)
-        y = rect.bottom + line_spacing
-
-    return y
-
-
 def draw_face_view(
     surface: pygame.Surface,
     mouth_level: float,
-    status_text: str,
-    subtitle_text: str,
+    status_text: str,      # kept for API compatibility, but ignored
+    subtitle_text: str,    # kept for API compatibility, but ignored
     face_state: str,
     fonts: Dict[str, pygame.font.Font],
     colors: Dict[str, RGB],
@@ -94,9 +49,9 @@ def draw_face_view(
     mouth_level:
         0.0–1.0 value controlling mouth opening (from speech node).
     status_text:
-        Human-readable status line.
+        Human-readable status line (IGNORED in this version).
     subtitle_text:
-        TTS text (spoken sentence).
+        TTS text (spoken sentence, IGNORED in this version).
     face_state:
         High-level expression state:
             "idle" / "listening" / "thinking" / "speaking"
@@ -117,9 +72,7 @@ def draw_face_view(
     font_subtitle: pygame.font.Font | None = fonts.get("subtitle", font_main)
 
     color_bg: RGB = colors.get("bg", (0, 0, 0))
-    color_text_main: RGB = colors.get("text_main", (255, 255, 255))
     color_text_status: RGB = colors.get("text_status", (240, 240, 240))
-    color_text_subtitle: RGB = colors.get("text_subtitle", (210, 210, 210))
 
     # Base face palette
     eye_white: RGB = (245, 245, 245)
@@ -189,10 +142,6 @@ def draw_face_view(
 
     eye_center_y = int(height * 0.40)   # eyes a bit below center
     mouth_center_y = int(height * 0.66) # mouth lower
-    status_top_y = int(height * 0.80)
-    subtitle_top_y = int(height * 0.88)
-
-    max_text_width = int(width * 0.90)
 
     # ------------------------------------------------------------------ #
     # Subtle face "plate" behind the eyes/mouth (just a rounded rect)
@@ -378,25 +327,5 @@ def draw_face_view(
         width=3,
     )
 
-    # ------------------------------------------------------------------ #
-    # Status + subtitle (bottom text area)
-    # ------------------------------------------------------------------ #
-    _render_multiline_text(
-        surface=surface,
-        text=status_text or "",
-        font=font_status,
-        color=color_text_status,
-        max_width=max_text_width,
-        start_y=status_top_y,
-        line_spacing=4,
-    )
-
-    _render_multiline_text(
-        surface=surface,
-        text=subtitle_text or "",
-        font=font_subtitle,
-        color=color_text_subtitle,
-        max_width=max_text_width,
-        start_y=subtitle_top_y,
-        line_spacing=3,
-    )
+    # NOTE: We intentionally DO NOT draw status_text or subtitle_text here.
+    # Any spoken/debug lines on the screen must come from somewhere else.
