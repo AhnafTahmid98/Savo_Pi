@@ -114,7 +114,7 @@ savo_ui_display:
         font_size: 22
         max_lines: 2
         shadow: true
-        enabled: true           # set to false if you don't want subtitles
+        enabled: true           # legacy flag; real on/off is in ui.show_subtitle_text
 
     # ------------------------------------------------------------------------
     # Navigation (NAVIGATE mode) camera view settings
@@ -145,6 +145,17 @@ savo_ui_display:
       show_status_bar: true
       status_bar_height_px: 72
       default_status_text: "Mapping in progress, please keep distance."
+
+    # ------------------------------------------------------------------------
+    # UI text visibility toggles (new)
+    #
+    # These are read directly by display_manager_node:
+    #   ui.show_status_text   → controls status_text drawing
+    #   ui.show_subtitle_text → controls tts_text drawing
+    # ------------------------------------------------------------------------
+    ui:
+      show_status_text: false        # hide status text on screen
+      show_subtitle_text: false      # hide spoken text ("GREAT! I am glad...")
 
     # ------------------------------------------------------------------------
     # Debug / development options
