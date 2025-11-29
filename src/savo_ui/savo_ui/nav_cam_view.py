@@ -1,114 +1,76 @@
 #!/usr/bin/env python3
 """
-Robot Savo — NAVIGATE camera view renderer
+Robot Savo — Navigation camera view renderer (NAVIGATE mode)
 
-This module draws:
+This module draws the NAVIGATE UI:
 
-- Live camera view (full-screen, letter-boxed if needed).
-- A top status bar with guidance text (status_text).
-- A bottom bar with subtitle / speech text (subtitle_text).
-- A simple "talk level" meter based on mouth_level.
+- Large camera area (centered panel for live video).
+- Status text overlay (goal / guidance).
+- Subtitle text (what Robot Savo is saying).
+- Simple "mouth bar" that reacts to mouth_level in a corner.
 
-It expects that the display manager passes in the latest camera frame
-as a NumPy array of shape (H, W, 3) in RGB order.
+Actual camera frames will be wired later via nav_cam_view + Image messages.
 """
 
 from __future__ import annotations
 
-from typing import Dict, Tuple, Optional
+from typing import Dict, Tuple
 
 import pygame
 
 RGB = Tuple[int, int, int]
 
 
-def _render_multiline_centered(
+def _render_multiline_text(
     surface: pygame.Surface,
     text: str,
     font: pygame.font.Font,
     color: RGB,
     max_width: int,
-    center_y: int,
+    start_y: int,
     line_spacing: int = 4,
-) -> None:
-    """Render multi-line text centered horizontally around center_y."""
+    center_x: bool = True,
+) -> int:
+    """
+    Render text as multiple lines within max_width.
+    Returns the y-coordinate after the last rendered line.
+    """
     if not text or font is None:
-        return
+        return start_y
 
     words = text.split()
     if not words:
-        return
+        return start_y
 
-    lines = []
-    current_line: list[str] = []
+    lines: list[str] = []
+    current: list[str] = []
 
-    for word in words:
-        trial = " ".join(current_line + [word]) if current_line else word
-        w, _ = font.size(trial)
-        if w <= max_width:
-            current_line.append(word)
+    for w in words:
+        trial = " ".join(current + [w]) if current else w
+        width, _ = font.size(trial)
+        if width <= max_width:
+            current.append(w)
         else:
-            if current_line:
-                lines.append(" ".join(current_line))
-            current_line = [word]
+            if current:
+                lines.append(" ".join(current))
+            current = [w]
 
-    if current_line:
-        lines.append(" ".join(current_line))
+    if current:
+        lines.append(" ".join(current))
 
-    total_h = 0
-    line_surfs = []
+    y = start_y
     for line in lines:
         surf = font.render(line, True, color)
         rect = surf.get_rect()
-        line_surfs.append((surf, rect))
-        total_h += rect.height + line_spacing
-    total_h -= line_spacing  # remove last extra spacing
-
-    width = surface.get_width()
-    start_y = int(center_y - total_h / 2)
-
-    y = start_y
-    for surf, rect in line_surfs:
-        rect.centerx = width // 2
+        if center_x:
+            rect.centerx = surface.get_width() // 2
+        else:
+            rect.x = (surface.get_width() - max_width) // 2
         rect.y = y
         surface.blit(surf, rect)
         y = rect.bottom + line_spacing
 
-
-def _blit_camera_frame(
-    surface: pygame.Surface,
-    frame_rgb: Optional[object],
-    screen_size: Tuple[int, int],
-) -> None:
-    """
-    Draw camera frame (H, W, 3 RGB uint8 NumPy array) centered & scaled.
-
-    If frame_rgb is None, this function does nothing; caller should draw
-    placeholders/overlays.
-    """
-    if frame_rgb is None:
-        return
-
-    try:
-        h, w, _ = frame_rgb.shape  # type: ignore[attr-defined]
-    except Exception:
-        return
-
-    screen_w, screen_h = screen_size
-
-    # Compute scale factor to fit inside screen while preserving aspect ratio.
-    scale = min(screen_w / float(w), screen_h / float(h))
-    new_w = int(w * scale)
-    new_h = int(h * scale)
-
-    frame_bytes = frame_rgb.tobytes()  # type: ignore[attr-defined]
-    frame_surf = pygame.image.frombuffer(frame_bytes, (w, h), "RGB")
-    frame_surf = pygame.transform.smoothscale(frame_surf, (new_w, new_h))
-
-    # Center on screen
-    x = (screen_w - new_w) // 2
-    y = (screen_h - new_h) // 2
-    surface.blit(frame_surf, (x, y))
+    return y
 
 
 def draw_navigation_view(
@@ -120,21 +82,20 @@ def draw_navigation_view(
     colors: Dict[str, RGB],
     screen_size: Tuple[int, int],
     camera_ready: bool,
-    camera_frame: Optional[object],
 ) -> None:
     """
-    Draw the NAVIGATE view: live camera + overlays.
+    Draw the NAVIGATE mode view.
 
     Parameters
     ----------
     surface:
         Pygame surface to draw onto (already cleared by caller).
     status_text:
-        High-level guidance text ("Guiding to Info Desk, please follow me.").
+        Navigation status ("Guiding to A201", "Please follow me", etc.).
     subtitle_text:
-        TTS text.
+        TTS text (spoken sentence).
     mouth_level:
-        0.0–1.0, current talking intensity.
+        0.0–1.0 mouth activity signal.
     fonts:
         Dict with keys "main", "status", "subtitle".
     colors:
@@ -142,105 +103,187 @@ def draw_navigation_view(
     screen_size:
         (width, height) of the display.
     camera_ready:
-        True once at least one frame has been received.
-    camera_frame:
-        Latest RGB frame as NumPy array (H, W, 3), or None if not available.
+        True if we have received at least one camera frame.
+        For now this only changes placeholder text.
     """
     width, height = screen_size
 
-    font_main: pygame.font.Font | None = fonts.get("main")
-    font_status: pygame.font.Font | None = fonts.get("status", font_main)
-    font_subtitle: pygame.font.Font | None = fonts.get("subtitle", font_main)
+    font_main = fonts.get("main")
+    font_status = fonts.get("status", font_main)
+    font_subtitle = fonts.get("subtitle", font_main)
 
     color_bg: RGB = colors.get("bg", (0, 0, 0))
     color_text_main: RGB = colors.get("text_main", (255, 255, 255))
     color_text_status: RGB = colors.get("text_status", (240, 240, 240))
     color_text_subtitle: RGB = colors.get("text_subtitle", (210, 210, 210))
 
+    cam_border_color: RGB = (40, 120, 200)
+    cam_inner_color: RGB = (10, 20, 40)
+
+    # Background (caller will have cleared, but make sure)
     surface.fill(color_bg)
 
-    # ------------------------------------------------------------------ #
-    # 1) Camera frame or placeholder
-    # ------------------------------------------------------------------ #
-    if camera_ready and camera_frame is not None:
-        _blit_camera_frame(surface, camera_frame, screen_size)
-    else:
-        # Simple placeholder if camera is not ready
-        placeholder_rect = pygame.Rect(
-            int(width * 0.1),
-            int(height * 0.15),
-            int(width * 0.8),
-            int(height * 0.6),
-        )
-        pygame.draw.rect(surface, (15, 30, 60), placeholder_rect)
-        pygame.draw.rect(surface, (200, 200, 200), placeholder_rect, width=2)
+    # ----------------------------------------------------------------------
+    # Camera panel layout — centered in upper ~70% of screen
+    # ----------------------------------------------------------------------
+    margin_x = int(width * 0.05)
 
-        msg = "Waiting for camera..." if not camera_ready else "No camera frame"
-        if font_status is not None:
-            text_surf = font_status.render(msg, True, color_text_status)
-            text_rect = text_surf.get_rect(center=placeholder_rect.center)
-            surface.blit(text_surf, text_rect)
+    cam_width = width - 2 * margin_x
+    cam_height = int(height * 0.60)  # 60% of height
 
-    # ------------------------------------------------------------------ #
-    # 2) Top status bar (destination / guidance)
-    # ------------------------------------------------------------------ #
-    bar_h = int(height * 0.16)
-    status_bar = pygame.Surface((width, bar_h))
-    status_bar.set_alpha(170)
-    status_bar.fill((0, 0, 0))
-    surface.blit(status_bar, (0, 0))
+    cam_left = margin_x
+    cam_top = int(height * 0.08)
+    cam_rect = pygame.Rect(cam_left, cam_top, cam_width, cam_height)
+    cam_bottom = cam_rect.bottom
+    cam_right = cam_rect.right
 
-    _render_multiline_centered(
-        surface=surface,
-        text=status_text or "",
-        font=font_status or font_main,
-        color=color_text_status,
-        max_width=int(width * 0.94),
-        center_y=bar_h // 2,
-        line_spacing=3,
+    # Draw camera panel (for now, a placeholder rectangle)
+    pygame.draw.rect(surface, cam_inner_color, cam_rect)
+    pygame.draw.rect(surface, cam_border_color, cam_rect, width=4)
+
+    # Corner markers (simple "viewfinder" look)
+    corner_len = min(cam_width, cam_height) // 10
+    thickness = 3
+
+    # top-left
+    pygame.draw.line(
+        surface,
+        cam_border_color,
+        (cam_left, cam_top),
+        (cam_left + corner_len, cam_top),
+        thickness,
+    )
+    pygame.draw.line(
+        surface,
+        cam_border_color,
+        (cam_left, cam_top),
+        (cam_left, cam_top + corner_len),
+        thickness,
     )
 
-    # ------------------------------------------------------------------ #
-    # 3) Bottom subtitle bar (speech + "talk level")
-    # ------------------------------------------------------------------ #
-    bottom_bar_h = int(height * 0.18)
-    bottom_bar = pygame.Surface((width, bottom_bar_h))
-    bottom_bar.set_alpha(185)
-    bottom_bar.fill((0, 0, 0))
-    surface.blit(bottom_bar, (0, height - bottom_bar_h))
+    # top-right
+    pygame.draw.line(
+        surface,
+        cam_border_color,
+        (cam_right, cam_top),
+        (cam_right - corner_len, cam_top),
+        thickness,
+    )
+    pygame.draw.line(
+        surface,
+        cam_border_color,
+        (cam_right, cam_top),
+        (cam_right, cam_top + corner_len),
+        thickness,
+    )
 
-    _render_multiline_centered(
+    # bottom-left
+    pygame.draw.line(
+        surface,
+        cam_border_color,
+        (cam_left, cam_bottom),
+        (cam_left + corner_len, cam_bottom),
+        thickness,
+    )
+    pygame.draw.line(
+        surface,
+        cam_border_color,
+        (cam_left, cam_bottom),
+        (cam_left, cam_bottom - corner_len),
+        thickness,
+    )
+
+    # bottom-right
+    pygame.draw.line(
+        surface,
+        cam_border_color,
+        (cam_right, cam_bottom),
+        (cam_right - corner_len, cam_bottom),
+        thickness,
+    )
+    pygame.draw.line(
+        surface,
+        cam_border_color,
+        (cam_right, cam_bottom),
+        (cam_right, cam_bottom - corner_len),
+        thickness,
+    )
+
+    # Placeholder text inside camera area
+    if font_status is not None:
+        if camera_ready:
+            cam_msg = "Camera active"
+        else:
+            cam_msg = "Starting camera…"  # or "No camera feed"
+
+        cam_text = font_status.render(cam_msg, True, color_text_main)
+        cam_text_rect = cam_text.get_rect(center=cam_rect.center)
+        surface.blit(cam_text, cam_text_rect)
+
+    # ----------------------------------------------------------------------
+    # Navigation status overlay (just below camera)
+    # ----------------------------------------------------------------------
+    status_y = cam_bottom + int(height * 0.02)
+    max_status_width = int(width * 0.92)
+
+    _render_multiline_text(
         surface=surface,
-        text=subtitle_text or "",
-        font=font_subtitle or font_status or font_main,
-        color=color_text_subtitle,
-        max_width=int(width * 0.94),
-        center_y=height - bottom_bar_h // 2,
+        text=status_text or "Guiding…",
+        font=font_status,
+        color=color_text_status,
+        max_width=max_status_width,
+        start_y=status_y,
         line_spacing=2,
     )
 
-    # Simple "talk meter" on bottom-right based on mouth_level
+    # ----------------------------------------------------------------------
+    # Subtitle (TTS) near bottom center
+    # ----------------------------------------------------------------------
+    subtitle_y = int(height * 0.78)
+    max_subtitle_width = int(width * 0.88)
+
+    _render_multiline_text(
+        surface=surface,
+        text=subtitle_text or "",
+        font=font_subtitle,
+        color=color_text_subtitle,
+        max_width=max_subtitle_width,
+        start_y=subtitle_y,
+        line_spacing=3,
+    )
+
+    # ----------------------------------------------------------------------
+    # Tiny "mouth bar" in bottom-right corner reacting to mouth_level
+    # ----------------------------------------------------------------------
     m = max(0.0, min(1.0, float(mouth_level)))
-    meter_w = int(width * 0.18)
-    meter_h = int(bottom_bar_h * 0.22)
-    meter_x = width - meter_w - int(width * 0.03)
-    meter_y = height - meter_h - int(bottom_bar_h * 0.25)
 
-    # Background
-    pygame.draw.rect(surface, (60, 60, 60), (meter_x, meter_y, meter_w, meter_h), border_radius=6)
-    # Fill proportional to mouth_level
-    fill_w = int(meter_w * m)
-    if fill_w > 0:
-        pygame.draw.rect(
-            surface,
-            (0, 220, 160),
-            (meter_x, meter_y, fill_w, meter_h),
-            border_radius=6,
-        )
+    bar_width = int(width * 0.18)
+    bar_height = int(height * 0.04)
+    bar_margin_x = int(width * 0.04)
+    bar_margin_y = int(height * 0.05)
 
-    # Optional label "voice"
-    if font_subtitle is not None:
-        label = font_subtitle.render("voice", True, color_text_subtitle)
-        label_rect = label.get_rect()
-        label_rect.midbottom = (meter_x + meter_w // 2, meter_y - 2)
-        surface.blit(label, label_rect)
+    # Bottom-right so it does not collide with centered subtitle text
+    bar_x = width - bar_margin_x - bar_width
+    bar_y = height - bar_height - bar_margin_y
+
+    # Border
+    bar_rect = pygame.Rect(bar_x, bar_y, bar_width, bar_height)
+    pygame.draw.rect(surface, (220, 220, 220), bar_rect, width=2)
+
+    # Fill based on mouth_level
+    inner_margin = 3
+    inner_w = int((bar_width - 2 * inner_margin) * m)
+    inner_h = bar_height - 2 * inner_margin
+
+    level_color = (
+        int(80 + 150 * m),
+        int(120 + 80 * m),
+        int(110),
+    )
+    inner_rect = pygame.Rect(
+        bar_x + inner_margin,
+        bar_y + inner_margin,
+        inner_w,
+        inner_h,
+    )
+    pygame.draw.rect(surface, level_color, inner_rect)
