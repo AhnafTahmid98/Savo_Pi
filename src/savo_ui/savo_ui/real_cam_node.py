@@ -9,25 +9,28 @@ savo_ui.display_manager_node + nav_cam_view.py can show a live video panel.
 
 Design:
 - Primary path: GStreamer + libcamerasrc + appsink (recommended on Pi 5).
-- Fallback: plain /dev/videoN via V4L2 if use_gstreamer=False.
+- Fallback: plain /dev/videoN via V4L2 if use_gstreamer=False or pipeline fails.
 
 Supported output:
 - Encoding: 'bgr8'
-- Topic  : navigation.camera_topic param (default: /camera/image_rect)
+- Topic  : camera.topic param (default: /camera/image_rect)
 
 Parameters (ROS):
-- camera.width        (int, default: 800)
-- camera.height       (int, default: 480)
-- camera.fps          (int, default: 15)
-- camera.device       (string, default: "/dev/video0")   # used only in V4L2 mode
-- camera.use_gstreamer(bool, default: True)
-- camera.gst_pipeline (string, default: "" → auto-built pipeline)
-- camera.topic        (string, default: "/camera/image_rect")
+- camera.width          (int,   default: 800)
+- camera.height         (int,   default: 480)
+- camera.fps            (int,   default: 15)
+- camera.device         (str,   default: "/dev/video0")     # used only in V4L2 mode
+- camera.use_gstreamer  (bool,  default: True)
+- camera.gst_pipeline   (str,   default: "" → auto-built pipeline)
+- camera.topic          (str,   default: "/camera/image_rect")
+- camera.frame_id       (str,   default: "camera_link")
+- debug.log_fps         (bool,  default: False)  # simple FPS logging to ROS every few seconds
 """
 
 from __future__ import annotations
 
 import sys
+import time
 from typing import Optional
 
 import cv2
@@ -55,32 +58,24 @@ class RealCamNode(Node):
         self.declare_parameter("camera.use_gstreamer", True)
         self.declare_parameter("camera.gst_pipeline", "")
         self.declare_parameter("camera.topic", "/camera/image_rect")
+        self.declare_parameter("camera.frame_id", "camera_link")
 
-        self.width: int = (
-            self.get_parameter("camera.width").get_parameter_value().integer_value
+        self.declare_parameter("debug.log_fps", False)
+
+        self.width: int = int(self.get_parameter("camera.width").value)
+        self.height: int = int(self.get_parameter("camera.height").value)
+        self.fps: int = max(1, int(self.get_parameter("camera.fps").value))
+        self.device: str = str(self.get_parameter("camera.device").value)
+        self.use_gstreamer: bool = bool(
+            self.get_parameter("camera.use_gstreamer").value
         )
-        self.height: int = (
-            self.get_parameter("camera.height").get_parameter_value().integer_value
+        self.gst_pipeline_param: str = str(
+            self.get_parameter("camera.gst_pipeline").value
         )
-        self.fps: int = (
-            self.get_parameter("camera.fps").get_parameter_value().integer_value
-        )
-        self.device: str = (
-            self.get_parameter("camera.device").get_parameter_value().string_value
-        )
-        self.use_gstreamer: bool = (
-            self.get_parameter("camera.use_gstreamer")
-            .get_parameter_value()
-            .bool_value
-        )
-        self.gst_pipeline_param: str = (
-            self.get_parameter("camera.gst_pipeline")
-            .get_parameter_value()
-            .string_value
-        )
-        self.topic_name: str = (
-            self.get_parameter("camera.topic").get_parameter_value().string_value
-        )
+        self.topic_name: str = str(self.get_parameter("camera.topic").value)
+        self.frame_id: str = str(self.get_parameter("camera.frame_id").value)
+
+        self.log_fps: bool = bool(self.get_parameter("debug.log_fps").value)
 
         # --------------------------------------------------------------
         # Publisher
@@ -100,17 +95,25 @@ class RealCamNode(Node):
             )
         else:
             self.get_logger().info(
-                f"RealCamNode starting: "
-                f"{'GStreamer pipeline' if self.use_gstreamer else self.device}, "
-                f"{self.width}x{self.height} @ {self.fps}.0 FPS, topic={self.topic_name}"
+                "RealCamNode starting: %s, %dx%d @ %d FPS, topic=%s, frame_id=%s"
+                % (
+                    "GStreamer pipeline" if self.use_gstreamer else self.device,
+                    self.width,
+                    self.height,
+                    self.fps,
+                    self.topic_name,
+                    self.frame_id,
+                )
             )
 
         # Timer for capturing frames
-        period = 1.0 / float(max(self.fps, 1))
+        period = 1.0 / float(self.fps)
         self._timer = self.create_timer(period, self._on_timer)
 
-        # For rate-limited warnings
+        # For rate-limited warnings + optional FPS logging
         self._failed_reads: int = 0
+        self._frames_published: int = 0
+        self._last_fps_log_time: float = time.time()
 
     # ------------------------------------------------------------------
     # Camera open helpers
@@ -121,7 +124,7 @@ class RealCamNode(Node):
 
         Output format: BGR (for OpenCV) via appsink.
 
-        This matches the style we used in camera_stream.py:
+        This matches the style we use elsewhere:
             libcamerasrc !
               video/x-raw,format=I420,width=WxH,framerate=FPS/1 !
               videoconvert !
@@ -143,7 +146,8 @@ class RealCamNode(Node):
         if self.use_gstreamer:
             pipeline = self.gst_pipeline_param or self._build_default_gst_pipeline()
             self.get_logger().info(
-                f"[RealCamNode] Opening camera via GStreamer pipeline:\n  {pipeline}"
+                "[RealCamNode] Opening camera via GStreamer pipeline:\n"
+                f"  {pipeline}"
             )
             cap = cv2.VideoCapture(pipeline, cv2.CAP_GSTREAMER)
 
@@ -158,10 +162,11 @@ class RealCamNode(Node):
 
         # Fallback: V4L2 /dev/videoN
         try:
-            # If device is like "/dev/video0" → extract index 0
             dev_str = self.device
-            idx = None
+            idx: int
+
             if dev_str.startswith("/dev/video"):
+                # If device is like "/dev/video0" → extract index 0
                 try:
                     idx = int(dev_str.replace("/dev/video", "").strip())
                 except ValueError:
@@ -191,7 +196,7 @@ class RealCamNode(Node):
             cap.set(cv2.CAP_PROP_FPS, float(self.fps))
 
             self._cap = cap
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             self.get_logger().error(
                 f"[RealCamNode] Exception while opening camera: {exc}"
             )
@@ -202,7 +207,7 @@ class RealCamNode(Node):
     # ------------------------------------------------------------------
     def _on_timer(self) -> None:
         if self._cap is None or not self._cap.isOpened():
-            # Avoid spamming the log every tick
+            # Avoid spamming the log every tick (15–30 Hz)
             if self._failed_reads % 60 == 0:
                 self.get_logger().warn(
                     "[RealCamNode] Camera is not opened. Still waiting..."
@@ -232,7 +237,7 @@ class RealCamNode(Node):
         # Build ROS Image message (bgr8)
         msg = RosImage()
         msg.header.stamp = self.get_clock().now().to_msg()
-        msg.header.frame_id = "camera_link"  # can be changed later if needed
+        msg.header.frame_id = self.frame_id
 
         msg.height = h
         msg.width = w
@@ -242,6 +247,20 @@ class RealCamNode(Node):
         msg.data = frame.tobytes()
 
         self.pub.publish(msg)
+
+        # Optional FPS logging
+        if self.log_fps:
+            self._frames_published += 1
+            now = time.time()
+            if now - self._last_fps_log_time >= 5.0:  # every ~5 seconds
+                dt = now - self._last_fps_log_time
+                fps_eff = self._frames_published / dt if dt > 0 else 0.0
+                self.get_logger().info(
+                    "[RealCamNode] Published %d frames in %.1f s (%.1f FPS)"
+                    % (self._frames_published, dt, fps_eff)
+                )
+                self._frames_published = 0
+                self._last_fps_log_time = now
 
 
 def main(argv: Optional[list] = None) -> None:
