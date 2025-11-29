@@ -6,7 +6,7 @@ This module draws a friendly robot face:
 
 - Two eyes with pupils + small highlights.
 - A mouth that opens/closes based on `mouth_level` (0.0–1.0).
-- "Robot Savo" title at the top.
+- Date & time in the top-left corner.
 - Status text (one–two lines) above the bottom.
 - Subtitle text (current TTS text) near the bottom edge.
 """
@@ -14,6 +14,7 @@ This module draws a friendly robot face:
 from __future__ import annotations
 
 from typing import Dict, Tuple
+import datetime
 
 import pygame
 
@@ -117,26 +118,35 @@ def draw_face_view(
     surface.fill(color_bg)
 
     # ------------------------------------------------------------------ #
-    # Layout (tuned for 800x480, slightly shifted down)
+    # Layout (tuned for 800x480, with face slightly lower)
     # ------------------------------------------------------------------ #
     cx = width // 2
 
-    title_y = int(height * 0.08)       # a bit lower than before
-    eye_center_y = int(height * 0.44)  # was 0.30 → eyes moved down
-    mouth_center_y = int(height * 0.75)  # was 0.56 → mouth moved down
-    status_top_y = int(height * 0.82)    # was 0.68
-    subtitle_top_y = int(height * 1.3)  # was 0.80
+    # We no longer use a big title. Top-left is now date/time.
+    eye_center_y = int(height * 0.40)   # eyes a bit below center
+    mouth_center_y = int(height * 0.66) # mouth lower
+    status_top_y = int(height * 0.80)
+    subtitle_top_y = int(height * 0.88)
 
     max_text_width = int(width * 0.90)
 
-    # Title
-    if font_main is not None:
-        title_text = "Robot Savo"
-        title_surf = font_main.render(title_text, True, color_text_main)
-        title_rect = title_surf.get_rect(centerx=cx, y=title_y)
-        surface.blit(title_surf, title_rect)
+    # ------------------------------------------------------------------ #
+    # Date & time (top-left) — uses Pi local time
+    # ------------------------------------------------------------------ #
+    now = datetime.datetime.now()
+    # Example: "Sat 29 Nov 14:32"
+    dt_str = now.strftime("%a %d %b %H:%M")
 
+    clock_font = font_subtitle or font_status or font_main
+    if clock_font is not None:
+        clock_surf = clock_font.render(dt_str, True, color_text_status)
+        clock_rect = clock_surf.get_rect()
+        clock_rect.topleft = (int(width * 0.03), int(height * 0.03))
+        surface.blit(clock_surf, clock_rect)
+
+    # ------------------------------------------------------------------ #
     # Eyes
+    # ------------------------------------------------------------------ #
     eye_spacing = int(width * 0.16)
     eye_w = int(width * 0.14)
     eye_h = int(height * 0.22)
@@ -185,7 +195,9 @@ def draw_face_view(
         highlight_center = (rect.centerx - highlight_r, rect.centery - highlight_r)
         pygame.draw.circle(surface, (255, 255, 255), highlight_center, highlight_r)
 
+    # ------------------------------------------------------------------ #
     # Mouth
+    # ------------------------------------------------------------------ #
     mouth_width = int(width * 0.34)
     mouth_height_max = int(height * 0.16)
     mouth_height_min = int(height * 0.02)
@@ -229,7 +241,9 @@ def draw_face_view(
         width=3,
     )
 
-    # Status + subtitle
+    # ------------------------------------------------------------------ #
+    # Status + subtitle (bottom text area)
+    # ------------------------------------------------------------------ #
     _render_multiline_text(
         surface=surface,
         text=status_text or "",
