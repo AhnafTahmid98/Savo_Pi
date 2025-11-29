@@ -102,7 +102,7 @@ tts_node:
     #
     # On your Pi, ReSpeaker 4 Mic Array (UAC1.0) shows as device 0 and both
     # mic + 3.5mm output live on that card, so we force index 0 here.
-    output_device_index: 4
+    output_device_index: 0
 
     # Optional global output gain applied just before playback
     # (in case the generated audio is hot). Applied on top of `gain`.
