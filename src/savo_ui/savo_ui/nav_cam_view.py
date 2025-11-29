@@ -5,11 +5,13 @@ Robot Savo — Navigation camera view renderer (NAVIGATE mode)
 This module draws the NAVIGATE UI:
 
 - Large camera area (centered panel for live video).
+- Small "Robot Savo" face overlay in the top-left of the camera area.
 - Status text overlay (goal / guidance).
 - Subtitle text (what Robot Savo is saying).
 - Simple "mouth bar" that reacts to mouth_level in a corner.
 
-It supports two kinds of camera_frame:
+Camera input:
+
 - sensor_msgs/Image (encoding rgb8/bgr8)
 - numpy.ndarray with shape (H, W, 3), dtype uint8 (RGB)
 """
@@ -178,6 +180,116 @@ def _blit_camera_frame(
         surface.blit(disp, (x, cam_rect.y))
 
 
+def _draw_mini_face(
+    surface: pygame.Surface,
+    cam_rect: pygame.Rect,
+    mouth_level: float,
+) -> None:
+    """
+    Draw a small cute "Robot Savo" face in the top-left of the camera panel.
+
+    The face is a rounded rectangle with two eyes + mouth that opens with
+    mouth_level (0.0–1.0).
+    """
+    m = max(0.0, min(1.0, float(mouth_level)))
+
+    # Face rectangle: a small card inside top-left of camera area
+    face_w = int(cam_rect.width * 0.22)
+    face_h = int(cam_rect.height * 0.26)
+    margin_x = int(cam_rect.width * 0.03)
+    margin_y = int(cam_rect.height * 0.04)
+
+    face_rect = pygame.Rect(
+        cam_rect.x + margin_x,
+        cam_rect.y + margin_y,
+        face_w,
+        face_h,
+    )
+
+    # Colors styled roughly like the mockup icon
+    border_color: RGB = (160, 230, 255)
+    inner_bg: RGB = (15, 25, 55)
+    face_bg: RGB = (18, 30, 70)
+    eye_white: RGB = (245, 245, 245)
+    pupil_color: RGB = (0, 0, 0)
+    accent_blue: RGB = (60, 210, 255)
+    mouth_color: RGB = (255, 210, 120)
+
+    # Outer border
+    outer_rect = face_rect.inflate(10, 10)
+    pygame.draw.rect(
+        surface,
+        border_color,
+        outer_rect,
+        border_radius=18,
+    )
+
+    # Inner face background
+    pygame.draw.rect(
+        surface,
+        face_bg,
+        face_rect,
+        border_radius=14,
+    )
+
+    # Split into "screen" (top) and "chin" (bottom)
+    split_y = face_rect.y + int(face_rect.height * 0.58)
+    screen_rect = pygame.Rect(
+        face_rect.x,
+        face_rect.y,
+        face_rect.width,
+        split_y - face_rect.y,
+    )
+    chin_rect = pygame.Rect(
+        face_rect.x,
+        split_y,
+        face_rect.width,
+        face_rect.bottom - split_y,
+    )
+
+    pygame.draw.rect(surface, inner_bg, screen_rect, border_radius=14)
+    pygame.draw.rect(surface, (230, 240, 245), chin_rect, border_radius=12)
+
+    # Eyes
+    eye_radius = min(screen_rect.width, screen_rect.height) // 6
+    eye_y = screen_rect.y + int(screen_rect.height * 0.55)
+
+    left_eye_x = screen_rect.x + int(screen_rect.width * 0.32)
+    right_eye_x = screen_rect.x + int(screen_rect.width * 0.68)
+
+    for cx in (left_eye_x, right_eye_x):
+        # outer eye
+        pygame.draw.circle(surface, eye_white, (cx, eye_y), eye_radius)
+        pygame.draw.circle(surface, accent_blue, (cx, eye_y), eye_radius, width=2)
+
+        # pupil
+        pupil_r = max(2, int(eye_radius * 0.55))
+        pygame.draw.circle(surface, pupil_color, (cx, eye_y), pupil_r)
+
+        # highlight
+        hl_r = max(2, pupil_r // 2)
+        hl_center = (cx - hl_r, eye_y - hl_r)
+        pygame.draw.circle(surface, (255, 255, 255), hl_center, hl_r)
+
+    # Mouth in chin area (simple smiling arc that opens with m)
+    mouth_w = int(chin_rect.width * 0.50)
+    mouth_h_min = int(chin_rect.height * 0.20)
+    mouth_h_max = int(chin_rect.height * 0.65)
+    mouth_h = int(mouth_h_min + (mouth_h_max - mouth_h_min) * m)
+
+    mouth_rect = pygame.Rect(
+        0,
+        0,
+        mouth_w,
+        mouth_h,
+    )
+    mouth_rect.centerx = chin_rect.centerx
+    mouth_rect.centery = chin_rect.y + int(chin_rect.height * 0.65)
+
+    pygame.draw.ellipse(surface, mouth_color, mouth_rect)
+    pygame.draw.ellipse(surface, (200, 160, 90), mouth_rect, width=2)
+
+
 def draw_navigation_view(
     surface: pygame.Surface,
     status_text: str,
@@ -320,6 +432,11 @@ def draw_navigation_view(
     )
 
     # ----------------------------------------------------------------------
+    # Tiny face overlay in the top-left of the camera
+    # ----------------------------------------------------------------------
+    _draw_mini_face(surface, cam_rect, mouth_level)
+
+    # ----------------------------------------------------------------------
     # Navigation status overlay (just below camera)
     # ----------------------------------------------------------------------
     status_y = cam_bottom + int(height * 0.02)
@@ -352,7 +469,7 @@ def draw_navigation_view(
     )
 
     # ----------------------------------------------------------------------
-    # "Mouth bar" in bottom-right corner
+    # "Mouth bar" in bottom-right corner (same as before)
     # ----------------------------------------------------------------------
     m = max(0.0, min(1.0, float(mouth_level)))
 
