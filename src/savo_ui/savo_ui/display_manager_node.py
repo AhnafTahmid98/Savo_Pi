@@ -17,11 +17,11 @@ Speech UI signals:
 Rendering (via helper modules):
     - INTERACT:
         - Big friendly face (eyes + mouth)
-        - Status + subtitle overlaid (can be disabled by params)
+        - Status + subtitle overlaid (can be disabled via params)
         - Expression driven by /savo_ui/face_state
     - NAVIGATE:
         - Camera view as background (letterboxed)
-        - Small face overlay + status + subtitle (can be disabled)
+        - Small face overlay + status + subtitle
     - MAP:
         - Mapping status screen, optionally reusing face layout
 
@@ -34,11 +34,6 @@ Camera handling:
 Pygame:
     - Fullscreen rendering on DSI display with driver fallback
       (kmsdrm → wayland → x11).
-
-Text visibility:
-    - ui.show_status_text   (bool, default: True)
-    - ui.show_subtitle_text (bool, default: True)
-      Set these to false in ui_display.yaml to hide text for "clean" face-only UI.
 """
 
 from __future__ import annotations
@@ -62,7 +57,6 @@ try:
     from .face_view import draw_face_view
     from .nav_cam_view import draw_navigation_view
 except ImportError:
-    # For early dev / unit tests, allow these to be missing.
     draw_face_view = None
     draw_navigation_view = None
 
@@ -115,7 +109,7 @@ class SavoUIDisplay(Node):
             10,
         )
 
-        # Face state from remote_speech_client_node
+        # Face state from remote_speech_client_node (or other controller)
         self.create_subscription(
             String,
             "/savo_ui/face_state",
@@ -263,15 +257,20 @@ class SavoUIDisplay(Node):
             .integer_value
         )
 
-        # Text visibility toggles
-        self.declare_parameter("ui.show_status_text", True)
-        self.declare_parameter("ui.show_subtitle_text", True)
+        # UI text toggles: by default we hide status/subtitle to keep
+        # the screen clean when working with savo_speech.
+        self.declare_parameter("ui.show_status_text", False)
+        self.declare_parameter("ui.show_subtitle_text", False)
 
-        self.show_status_text = bool(
-            self.get_parameter("ui.show_status_text").get_parameter_value().bool_value
+        self.show_status_text: bool = bool(
+            self.get_parameter("ui.show_status_text")
+            .get_parameter_value()
+            .bool_value
         )
-        self.show_subtitle_text = bool(
-            self.get_parameter("ui.show_subtitle_text").get_parameter_value().bool_value
+        self.show_subtitle_text: bool = bool(
+            self.get_parameter("ui.show_subtitle_text")
+            .get_parameter_value()
+            .bool_value
         )
 
         # Debug
@@ -331,7 +330,25 @@ class SavoUIDisplay(Node):
         self._mode = mode
 
     def _on_status_text(self, msg: String) -> None:
-        self._status_text = msg.data or ""
+        """
+        Status bar text (usually from ui_mode_router or debug node).
+
+        We:
+          - ignore [DEBUG] messages (only for logs)
+          - respect ui.show_status_text flag
+        """
+        raw = msg.data or ""
+
+        # Ignore debug spam from ui_debug_node
+        if raw.startswith("[DEBUG]"):
+            return
+
+        if not self.show_status_text:
+            # Keep internal status empty; MAP mode will still show its default.
+            self._status_text = ""
+            return
+
+        self._status_text = raw
 
     def _on_face_state(self, msg: String) -> None:
         """
@@ -367,6 +384,14 @@ class SavoUIDisplay(Node):
         self._mouth_level = max(0.0, min(1.0, level))
 
     def _on_subtitle_text(self, msg: String) -> None:
+        """
+        Spoken text from TTS (for subtitles). We usually keep this
+        disabled when working with savo_speech to avoid clutter.
+        """
+        if not self.show_subtitle_text:
+            self._subtitle_text = ""
+            return
+
         self._subtitle_text = msg.data or ""
 
     def _on_camera_image(self, msg: Image) -> None:
@@ -430,7 +455,6 @@ class SavoUIDisplay(Node):
     def _init_pygame(self) -> None:
         """Initialize pygame display with robust driver fallback."""
 
-        # Helpful defaults; harmless if backend doesn't support them
         os.environ.setdefault("SDL_VIDEO_WAYLAND_ALLOW_LIBDECOR", "0")
         os.environ.setdefault("SDL_RENDER_VSYNC", "1")
 
@@ -552,15 +576,11 @@ class SavoUIDisplay(Node):
         self._clear_background("INTERACT")
 
         if draw_face_view is not None:
-            # Apply visibility toggles so we can hide text in production.
-            status = self._status_text if self.show_status_text else ""
-            subtitle = self._subtitle_text if self.show_subtitle_text else ""
-
             draw_face_view(
                 surface=self._screen,
                 mouth_level=self._mouth_level,
-                status_text=status,
-                subtitle_text=subtitle,
+                status_text=self._status_text,
+                subtitle_text=self._subtitle_text,
                 face_state=self._face_state,
                 fonts={
                     "main": self._font_main,
@@ -586,13 +606,10 @@ class SavoUIDisplay(Node):
         self._clear_background("NAVIGATE")
 
         if draw_navigation_view is not None and self._have_camera:
-            status = self._status_text if self.show_status_text else ""
-            subtitle = self._subtitle_text if self.show_subtitle_text else ""
-
             draw_navigation_view(
                 surface=self._screen,
-                status_text=status,
-                subtitle_text=subtitle,
+                status_text=self._status_text,
+                subtitle_text=self._subtitle_text,
                 mouth_level=self._mouth_level,
                 fonts={
                     "main": self._font_main,
@@ -619,20 +636,15 @@ class SavoUIDisplay(Node):
         self._clear_background("MAP")
 
         if draw_face_view is not None:
-            # Base status string (fallback if nothing is published)
-            base_status = (
-                self._status_text
-                or "Mapping in progress, please keep distance."
-            )
-            status = base_status if self.show_status_text else ""
-            subtitle = self._subtitle_text if self.show_subtitle_text else ""
-
             # During mapping we typically show a calm face; mouth_level = 0.0.
             draw_face_view(
                 surface=self._screen,
                 mouth_level=0.0,
-                status_text=status,
-                subtitle_text=subtitle,
+                status_text=(
+                    self._status_text
+                    or "Mapping in progress, please keep distance."
+                ),
+                subtitle_text=self._subtitle_text,
                 face_state="idle",
                 fonts={
                     "main": self._font_main,
@@ -663,6 +675,7 @@ class SavoUIDisplay(Node):
 # ==========================================================================#
 # main()
 # ==========================================================================#
+
 
 def main(argv: Optional[list] = None) -> None:
     rclpy.init(args=argv)
