@@ -9,14 +9,16 @@ This module draws the NAVIGATE UI:
 - Subtitle text (what Robot Savo is saying).
 - Simple "mouth bar" that reacts to mouth_level in a corner.
 
-Actual camera frames will be wired later via nav_cam_view + Image messages.
+Actual camera frames are provided as sensor_msgs/Image via display_manager_node.
 """
 
 from __future__ import annotations
 
 from typing import Dict, Tuple, Any
 
+import numpy as np
 import pygame
+from sensor_msgs.msg import Image as RosImage  # type hint only
 
 RGB = Tuple[int, int, int]
 
@@ -73,6 +75,74 @@ def _render_multiline_text(
     return y
 
 
+def _blit_camera_frame(
+    surface: pygame.Surface,
+    cam_rect: pygame.Rect,
+    camera_frame: RosImage,
+) -> None:
+    """
+    Convert a ROS Image (rgb8 / bgr8) into a pygame Surface and draw it
+    letterboxed inside cam_rect.
+    """
+    if camera_frame is None:
+        return
+
+    encoding = (camera_frame.encoding or "").lower()
+    if encoding not in ("rgb8", "bgr8"):
+        # Unsupported encoding → let caller draw placeholder text instead.
+        return
+
+    width = camera_frame.width
+    height = camera_frame.height
+    if width == 0 or height == 0:
+        return
+
+    # Interpret raw bytes as uint8 array
+    step = camera_frame.step  # bytes per row
+    buf = np.frombuffer(camera_frame.data, dtype=np.uint8)
+
+    # Safety: allow for padding in each row using `step`
+    if step < width * 3:
+        return  # corrupt frame
+    try:
+        frame = buf.reshape((height, step // 3, 3))
+        frame = frame[:, :width, :]
+    except Exception:
+        return
+
+    if encoding == "bgr8":
+        frame = frame[:, :, ::-1]  # BGR → RGB
+
+    # Convert to pygame surface
+    frame_bytes = frame.tobytes()
+    img_surface = pygame.image.frombuffer(frame_bytes, (width, height), "RGB")
+
+    # Letterbox into cam_rect while preserving aspect
+    src_aspect = width / float(height)
+    dst_aspect = cam_rect.width / float(cam_rect.height)
+
+    if abs(src_aspect - dst_aspect) < 1e-3:
+        # Same aspect → scale exactly to panel
+        disp = pygame.transform.smoothscale(img_surface, (cam_rect.width, cam_rect.height))
+        surface.blit(disp, cam_rect)
+        return
+
+    if src_aspect > dst_aspect:
+        # Source wider than panel → match width
+        new_w = cam_rect.width
+        new_h = int(new_w / src_aspect)
+        disp = pygame.transform.smoothscale(img_surface, (new_w, new_h))
+        y = cam_rect.y + (cam_rect.height - new_h) // 2
+        surface.blit(disp, (cam_rect.x, y))
+    else:
+        # Source taller → match height
+        new_h = cam_rect.height
+        new_w = int(new_h * src_aspect)
+        disp = pygame.transform.smoothscale(img_surface, (new_w, new_h))
+        x = cam_rect.x + (cam_rect.width - new_w) // 2
+        surface.blit(disp, (x, cam_rect.y))
+
+
 def draw_navigation_view(
     surface: pygame.Surface,
     status_text: str,
@@ -82,7 +152,7 @@ def draw_navigation_view(
     colors: Dict[str, RGB],
     screen_size: Tuple[int, int],
     camera_ready: bool,
-    camera_frame: Any = None,  # currently unused, but needed for compatibility
+    camera_frame: Any = None,  # sensor_msgs/Image or None
 ) -> None:
     """
     Draw the NAVIGATE mode view.
@@ -106,8 +176,7 @@ def draw_navigation_view(
     camera_ready:
         True if we have received at least one camera frame.
     camera_frame:
-        Latest camera frame (type to be defined later).
-        Currently unused; placeholder for future real video rendering.
+        Latest camera frame (sensor_msgs/Image) or None.
     """
     width, height = screen_size
 
@@ -140,26 +209,34 @@ def draw_navigation_view(
     cam_bottom = cam_rect.bottom
     cam_right = cam_rect.right
 
-    # If we later draw real camera_frame, it will go inside cam_rect.
-    # For now we still draw the placeholder panel.
+    # Panel background
     pygame.draw.rect(surface, cam_inner_color, cam_rect)
+
+    # If we have a frame, draw it; otherwise draw placeholder text
+    if camera_ready and camera_frame is not None:
+        _blit_camera_frame(surface, cam_rect, camera_frame)
+    else:
+        if font_status is not None:
+            msg = "Starting camera…" if not camera_ready else "Camera active"
+            cam_text = font_status.render(msg, True, color_text_main)
+            cam_text_rect = cam_text.get_rect(center=cam_rect.center)
+            surface.blit(cam_text, cam_text_rect)
+
+    # Border + corner markers
     pygame.draw.rect(surface, cam_border_color, cam_rect, width=4)
 
-    # Corner markers (simple "viewfinder" look)
     corner_len = min(cam_width, cam_height) // 10
     thickness = 3
 
     # top-left
     pygame.draw.line(
-        surface,
-        cam_border_color,
+        surface, cam_border_color,
         (cam_left, cam_top),
         (cam_left + corner_len, cam_top),
         thickness,
     )
     pygame.draw.line(
-        surface,
-        cam_border_color,
+        surface, cam_border_color,
         (cam_left, cam_top),
         (cam_left, cam_top + corner_len),
         thickness,
@@ -167,15 +244,13 @@ def draw_navigation_view(
 
     # top-right
     pygame.draw.line(
-        surface,
-        cam_border_color,
+        surface, cam_border_color,
         (cam_right, cam_top),
         (cam_right - corner_len, cam_top),
         thickness,
     )
     pygame.draw.line(
-        surface,
-        cam_border_color,
+        surface, cam_border_color,
         (cam_right, cam_top),
         (cam_right, cam_top + corner_len),
         thickness,
@@ -183,15 +258,13 @@ def draw_navigation_view(
 
     # bottom-left
     pygame.draw.line(
-        surface,
-        cam_border_color,
+        surface, cam_border_color,
         (cam_left, cam_bottom),
         (cam_left + corner_len, cam_bottom),
         thickness,
     )
     pygame.draw.line(
-        surface,
-        cam_border_color,
+        surface, cam_border_color,
         (cam_left, cam_bottom),
         (cam_left, cam_bottom - corner_len),
         thickness,
@@ -199,30 +272,17 @@ def draw_navigation_view(
 
     # bottom-right
     pygame.draw.line(
-        surface,
-        cam_border_color,
+        surface, cam_border_color,
         (cam_right, cam_bottom),
         (cam_right - corner_len, cam_bottom),
         thickness,
     )
     pygame.draw.line(
-        surface,
-        cam_border_color,
+        surface, cam_border_color,
         (cam_right, cam_bottom),
         (cam_right, cam_bottom - corner_len),
         thickness,
     )
-
-    # Placeholder text inside camera area
-    if font_status is not None:
-        if camera_ready:
-            cam_msg = "Camera active"
-        else:
-            cam_msg = "Starting camera…"
-
-        cam_text = font_status.render(cam_msg, True, color_text_main)
-        cam_text_rect = cam_text.get_rect(center=cam_rect.center)
-        surface.blit(cam_text, cam_text_rect)
 
     # ----------------------------------------------------------------------
     # Navigation status overlay (just below camera)
@@ -269,11 +329,9 @@ def draw_navigation_view(
     bar_x = width - bar_margin_x - bar_width
     bar_y = height - bar_height - bar_margin_y
 
-    # Border
     bar_rect = pygame.Rect(bar_x, bar_y, bar_width, bar_height)
     pygame.draw.rect(surface, (220, 220, 220), bar_rect, width=2)
 
-    # Fill based on mouth_level
     inner_margin = 3
     inner_w = int((bar_width - 2 * inner_margin) * m)
     inner_h = bar_height - 2 * inner_margin
