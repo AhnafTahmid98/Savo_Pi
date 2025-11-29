@@ -1,0 +1,155 @@
+# ============================================================================
+# Robot Savo — UI layout & styling configuration
+#
+# This file configures the display_manager_node in the savo_ui package.
+# It assumes:
+#   - 7" DFRobot DSI display on Raspberry Pi (native 800x480 or 1024x600 scaled)
+#   - Node name: "savo_ui_display"
+#
+# The node should load this with:
+#   rclpy.init()
+#   node = Node("savo_ui_display", parameter_overrides=[...])
+#
+# or via launch:
+#   Node(
+#     package="savo_ui",
+#     executable="display_manager_node",
+#     name="savo_ui_display",
+#     parameters=["config/ui_display.yaml"],
+#   )
+# ============================================================================
+
+savo_ui_display:
+  ros__parameters:
+
+    # ------------------------------------------------------------------------
+    # Screen & render loop
+    # ------------------------------------------------------------------------
+    screen:
+      width: 800           # Native width of DFR0678
+      height: 480          # Native height of DFR0678
+      fps: 30              # Target frames per second
+      fullscreen: true     # Use fullscreen on the DSI framebuffer
+      vsync: true          # If backend supports it, try to sync to display
+
+    # ------------------------------------------------------------------------
+    # Colors (RGB 0–255)
+    #
+    # These are intentionally slightly muted so the screen doesn't feel harsh
+    # indoors. You can tweak them later from this file only.
+    # ------------------------------------------------------------------------
+    colors:
+      background:
+        INTERACT: [10, 25, 50]    # calm dark blue
+        NAVIGATE: [5, 35, 70]     # slightly brighter blue for navigation
+        MAP:      [4, 50, 35]     # teal/green for mapping mode
+
+      eye_white:     [235, 235, 235]
+      eye_outline:   [255, 255, 255]
+      pupil:         [30, 30, 30]
+
+      mouth:         [230, 80, 80]   # mouth fill
+      mouth_outline: [255, 255, 255]
+
+      status_bar_bg:   [0, 0, 0]     # bar behind status text in NAVIGATE/MAP
+      status_bar_line: [255, 255, 255]
+
+      text_main:      [255, 255, 255]
+      text_status:    [240, 240, 240]
+      text_subtitle:  [210, 210, 210]
+      text_shadow:    [0, 0, 0]
+
+    # ------------------------------------------------------------------------
+    # Face layout (INTERACT + MAP modes)
+    #
+    # Coordinates are in screen pixels. We use the center of the face as
+    # reference and offsets for eyes and mouth.
+    # ------------------------------------------------------------------------
+    face:
+      # Overall face center (for 800x480, true center is 400x240)
+      center_x: 400
+      center_y: 240
+
+      # Eyes
+      eye_radius: 40          # radius of white eye area
+      eye_offset_x: 140       # horizontal distance from face center to each eye
+      eye_offset_y: -40       # vertical offset from face center (negative is up)
+      pupil_radius: 16        # radius of pupil inside each eye
+      pupil_max_offset: 8     # max "look" offset inside eye when you animate gaze
+
+      # Mouth
+      mouth_width: 280        # max width in pixels
+      mouth_height_min: 10    # minimum height when mouth_level ~= 0.0
+      mouth_height_max: 90    # maximum height when mouth_level ~= 1.0
+      mouth_offset_y: 80      # vertical offset from face center (positive is down)
+      mouth_corner_roundness: 0.4   # 0..1, you can interpret in drawing code
+
+      # Mouth level clamping (additional safety on top of [0,1] input)
+      mouth_level_min: 0.0
+      mouth_level_max: 1.0
+
+    # ------------------------------------------------------------------------
+    # Text layout (INTERACT / NAVIGATE / MAP)
+    # Positions are logical; your rendering code can translate them to pixels.
+    # ------------------------------------------------------------------------
+    text:
+      main:
+        position: "top_center"  # logical position: top_center / top_left / etc.
+        margin_px: 24           # margin from screen edge
+        font_size: 32
+        max_chars: 40           # truncate if longer
+        shadow: true
+
+      status:
+        position: "bottom_center"
+        margin_px: 36
+        font_size: 28
+        max_lines: 2
+        shadow: true
+
+      subtitle:
+        # Spoken text from /savo_speech/tts_text
+        position: "bottom_center"
+        margin_px: 10           # below status text; you can stack by adjusting
+        font_size: 22
+        max_lines: 2
+        shadow: true
+        enabled: true           # set to false if you don't want subtitles
+
+    # ------------------------------------------------------------------------
+    # Navigation (NAVIGATE mode) camera view settings
+    # ------------------------------------------------------------------------
+    navigation:
+      camera_topic: "/camera/image_rect"   # update to match your actual camera topic
+      use_letterbox: true                  # keep aspect ratio and letterbox if needed
+      crop_to_fill: false                  # if true, crop instead of letterbox
+
+      # Status bar overlay over the camera view
+      status_bar_height_px: 64
+      status_bar_position: "bottom"        # top or bottom
+
+      # Optional small face overlay on top of camera image
+      face_overlay:
+        enabled: true
+        width_px: 260
+        height_px: 160
+        position: "bottom_right"           # bottom_right / bottom_left / top_left / top_right
+        margin_px: 20
+
+    # ------------------------------------------------------------------------
+    # MAP mode specific options
+    # (Here you can later overlay map progress icons, etc.)
+    # ------------------------------------------------------------------------
+    map_mode:
+      show_face: true                      # reuse face layout for MAP mode
+      show_status_bar: true
+      status_bar_height_px: 72
+      default_status_text: "Mapping in progress, please keep distance."
+
+    # ------------------------------------------------------------------------
+    # Debug / development options
+    # ------------------------------------------------------------------------
+    debug:
+      show_fps: false                      # draw FPS counter on screen corner
+      fps_position: "top_left"
+      log_draw_timing: false               # extra logging in ROS for frame times
