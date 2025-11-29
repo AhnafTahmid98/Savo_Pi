@@ -1,23 +1,33 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
-Robot Savo — Real camera publisher for NAVIGATE UI
+Robot Savo — Real camera → ROS Image node for NAVIGATE UI
+---------------------------------------------------------
 
-This node:
+Publishes camera frames as sensor_msgs/Image on /camera/image_rect so that
+savo_ui.display_manager_node + nav_cam_view.py can show a live video panel.
 
-- Opens the Pi camera via V4L2 (/dev/videoX) using OpenCV.
-- Grabs frames at a fixed FPS.
-- Converts them to RGB (800x480 by default).
-- Publishes sensor_msgs/Image on /camera/image_rect.
+Design:
+- Primary path: GStreamer + libcamerasrc + appsink (recommended on Pi 5).
+- Fallback: plain /dev/videoN via V4L2 if use_gstreamer=False.
 
-The display_manager_node already subscribes to /camera/image_rect and
-nav_cam_view.py will show the live feed in NAVIGATE mode.
+Supported output:
+- Encoding: 'bgr8'
+- Topic  : navigation.camera_topic param (default: /camera/image_rect)
 
-Requirements:
-- python3-opencv installed in the ROS Python environment.
+Parameters (ROS):
+- camera.width        (int, default: 800)
+- camera.height       (int, default: 480)
+- camera.fps          (int, default: 15)
+- camera.device       (string, default: "/dev/video0")   # used only in V4L2 mode
+- camera.use_gstreamer(bool, default: True)
+- camera.gst_pipeline (string, default: "" → auto-built pipeline)
+- camera.topic        (string, default: "/camera/image_rect")
 """
 
 from __future__ import annotations
 
+import sys
 from typing import Optional
 
 import cv2
@@ -26,162 +36,230 @@ import numpy as np
 import rclpy
 from rclpy.node import Node
 
-from sensor_msgs.msg import Image
-from builtin_interfaces.msg import Time
+from sensor_msgs.msg import Image as RosImage
 
 
 class RealCamNode(Node):
-    """Simple V4L2 camera → ROS Image publisher for Robot Savo."""
+    """ROS 2 node that captures Pi camera frames and publishes them as bgr8."""
 
     def __init__(self) -> None:
         super().__init__("savo_ui_real_cam")
 
-        # ------------------------------------------------------------------
-        # Parameters (you can override via ROS params)
-        # ------------------------------------------------------------------
-        self.declare_parameter("device_id", 0)          # /dev/video0
-        self.declare_parameter("width", 800)
-        self.declare_parameter("height", 480)
-        self.declare_parameter("fps", 15.0)
-        self.declare_parameter("frame_id", "camera_link")
-        self.declare_parameter("camera_topic", "/camera/image_rect")
+        # --------------------------------------------------------------
+        # Declare & read parameters
+        # --------------------------------------------------------------
+        self.declare_parameter("camera.width", 800)
+        self.declare_parameter("camera.height", 480)
+        self.declare_parameter("camera.fps", 15)
+        self.declare_parameter("camera.device", "/dev/video0")
+        self.declare_parameter("camera.use_gstreamer", True)
+        self.declare_parameter("camera.gst_pipeline", "")
+        self.declare_parameter("camera.topic", "/camera/image_rect")
 
-        self.device_id: int = (
-            self.get_parameter("device_id").get_parameter_value().integer_value
-        )
         self.width: int = (
-            self.get_parameter("width").get_parameter_value().integer_value
+            self.get_parameter("camera.width").get_parameter_value().integer_value
         )
         self.height: int = (
-            self.get_parameter("height").get_parameter_value().integer_value
+            self.get_parameter("camera.height").get_parameter_value().integer_value
         )
-        self.fps: float = (
-            self.get_parameter("fps").get_parameter_value().double_value
+        self.fps: int = (
+            self.get_parameter("camera.fps").get_parameter_value().integer_value
         )
-        self.frame_id: str = (
-            self.get_parameter("frame_id").get_parameter_value().string_value
+        self.device: str = (
+            self.get_parameter("camera.device").get_parameter_value().string_value
         )
-        self.camera_topic: str = (
-            self.get_parameter("camera_topic").get_parameter_value().string_value
+        self.use_gstreamer: bool = (
+            self.get_parameter("camera.use_gstreamer")
+            .get_parameter_value()
+            .bool_value
         )
-
-        if self.fps <= 0.0:
-            self.get_logger().warn(
-                f"Invalid fps={self.fps}, clamping to 15.0"
-            )
-            self.fps = 15.0
-
-        self.get_logger().info(
-            f"RealCamNode starting: device=/dev/video{self.device_id}, "
-            f"{self.width}x{self.height} @ {self.fps:.1f} FPS, "
-            f"topic={self.camera_topic}"
+        self.gst_pipeline_param: str = (
+            self.get_parameter("camera.gst_pipeline")
+            .get_parameter_value()
+            .string_value
+        )
+        self.topic_name: str = (
+            self.get_parameter("camera.topic").get_parameter_value().string_value
         )
 
-        # ------------------------------------------------------------------
-        # Open camera via OpenCV
-        # ------------------------------------------------------------------
-        # CAP_V4L2 is usually the right backend on Linux/Pi
-        self._cap: Optional[cv2.VideoCapture] = cv2.VideoCapture(
-            self.device_id, cv2.CAP_V4L2
-        )
-
-        if not self._cap.isOpened():
-            self.get_logger().error(
-                f"Could not open camera /dev/video{self.device_id} "
-                "via OpenCV. Check that the Pi camera is enabled and "
-                "V4L2 compatibility is active."
-            )
-            self._cap = None
-            return
-
-        # Try to set resolution and fps (best-effort)
-        self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, float(self.width))
-        self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, float(self.height))
-        self._cap.set(cv2.CAP_PROP_FPS, float(self.fps))
-
+        # --------------------------------------------------------------
         # Publisher
-        self._pub = self.create_publisher(Image, self.camera_topic, 10)
+        # --------------------------------------------------------------
+        self.pub = self.create_publisher(RosImage, self.topic_name, 10)
 
-        # Timer for grabbing frames
-        period = 1.0 / float(self.fps)
+        # --------------------------------------------------------------
+        # Open the camera (GStreamer first, V4L2 fallback)
+        # --------------------------------------------------------------
+        self._cap: Optional[cv2.VideoCapture] = None
+        self._open_camera()
+
+        if self._cap is None or not self._cap.isOpened():
+            self.get_logger().error(
+                "RealCamNode could not open camera stream. "
+                "Check GStreamer support / libcamera / device node."
+            )
+        else:
+            self.get_logger().info(
+                f"RealCamNode starting: "
+                f"{'GStreamer pipeline' if self.use_gstreamer else self.device}, "
+                f"{self.width}x{self.height} @ {self.fps}.0 FPS, topic={self.topic_name}"
+            )
+
+        # Timer for capturing frames
+        period = 1.0 / float(max(self.fps, 1))
         self._timer = self.create_timer(period, self._on_timer)
 
-        self._seq = 0
-        self._drop_log_counter = 0
+        # For rate-limited warnings
+        self._failed_reads: int = 0
 
-    # ----------------------------------------------------------------------
-    # Timer callback: grab frame and publish
-    # ----------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Camera open helpers
+    # ------------------------------------------------------------------
+    def _build_default_gst_pipeline(self) -> str:
+        """
+        Build a sane default GStreamer pipeline using libcamerasrc.
+
+        Output format: BGR (for OpenCV) via appsink.
+
+        This matches the style we used in camera_stream.py:
+            libcamerasrc !
+              video/x-raw,format=I420,width=WxH,framerate=FPS/1 !
+              videoconvert !
+              video/x-raw,format=BGR !
+              appsink drop=true max-buffers=1
+        """
+        return (
+            "libcamerasrc ! "
+            f"video/x-raw,format=I420,width={self.width},height={self.height},"
+            f"framerate={self.fps}/1 ! "
+            "videoconvert ! "
+            "video/x-raw,format=BGR ! "
+            "appsink drop=true max-buffers=1"
+        )
+
+    def _open_camera(self) -> None:
+        """Open the camera using GStreamer or V4L2."""
+        # Try GStreamer first if requested
+        if self.use_gstreamer:
+            pipeline = self.gst_pipeline_param or self._build_default_gst_pipeline()
+            self.get_logger().info(
+                f"[RealCamNode] Opening camera via GStreamer pipeline:\n  {pipeline}"
+            )
+            cap = cv2.VideoCapture(pipeline, cv2.CAP_GSTREAMER)
+
+            if cap.isOpened():
+                self._cap = cap
+                return
+            else:
+                self.get_logger().error(
+                    "[RealCamNode] Failed to open GStreamer pipeline. "
+                    "Falling back to V4L2 (/dev/video*)."
+                )
+
+        # Fallback: V4L2 /dev/videoN
+        try:
+            # If device is like "/dev/video0" → extract index 0
+            dev_str = self.device
+            idx = None
+            if dev_str.startswith("/dev/video"):
+                try:
+                    idx = int(dev_str.replace("/dev/video", "").strip())
+                except ValueError:
+                    idx = 0
+            else:
+                # If param is "0" or "1" etc.
+                try:
+                    idx = int(dev_str)
+                except ValueError:
+                    idx = 0
+
+            self.get_logger().info(
+                f"[RealCamNode] Opening camera via V4L2: /dev/video{idx}"
+            )
+            cap = cv2.VideoCapture(idx, cv2.CAP_V4L2)
+
+            if not cap.isOpened():
+                self.get_logger().error(
+                    "[RealCamNode] V4L2 open failed as well. No camera available."
+                )
+                self._cap = None
+                return
+
+            # Try to configure size and FPS (best-effort)
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, float(self.width))
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, float(self.height))
+            cap.set(cv2.CAP_PROP_FPS, float(self.fps))
+
+            self._cap = cap
+        except Exception as exc:
+            self.get_logger().error(
+                f"[RealCamNode] Exception while opening camera: {exc}"
+            )
+            self._cap = None
+
+    # ------------------------------------------------------------------
+    # Timer callback: grab frame + publish
+    # ------------------------------------------------------------------
     def _on_timer(self) -> None:
-        if self._cap is None:
-            # Camera failed at startup; nothing to do.
+        if self._cap is None or not self._cap.isOpened():
+            # Avoid spamming the log every tick
+            if self._failed_reads % 60 == 0:
+                self.get_logger().warn(
+                    "[RealCamNode] Camera is not opened. Still waiting..."
+                )
+            self._failed_reads += 1
             return
 
         ok, frame = self._cap.read()
         if not ok or frame is None:
-            # Avoid spamming logs if the camera fails intermittently
-            self._drop_log_counter += 1
-            if self._drop_log_counter % int(self.fps * 2) == 0:
+            if self._failed_reads % 60 == 0:
                 self.get_logger().warn(
-                    "Failed to read frame from camera (no data)."
+                    "[RealCamNode] Failed to read frame from camera (no data)."
                 )
+            self._failed_reads += 1
             return
 
-        # frame is BGR (H, W, 3)
-        h, w, _ = frame.shape
+        self._failed_reads = 0  # reset since we got a good frame
 
-        # Resize if needed
-        if (w != self.width) or (h != self.height):
-            frame = cv2.resize(frame, (self.width, self.height), interpolation=cv2.INTER_AREA)
-            h, w, _ = frame.shape
+        # Expect frame as BGR uint8
+        if frame.dtype != np.uint8:
+            frame = np.clip(frame, 0, 255).astype(np.uint8)
 
-        # Optional flips (uncomment if orientation is wrong physically)
-        # frame = cv2.flip(frame, 0)  # vertical flip
-        # frame = cv2.flip(frame, 1)  # horizontal flip
+        h, w = frame.shape[:2]
+        if h == 0 or w == 0:
+            return
 
-        # Convert BGR → RGB for the NAVIGATE UI
-        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        # Build ROS Image message (bgr8)
+        msg = RosImage()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.header.frame_id = "camera_link"  # can be changed later if needed
 
-        # Build sensor_msgs/Image
-        msg = Image()
-        msg.header.stamp = self.get_clock().now().to_msg()  # type: ignore[assignment]
-        msg.header.frame_id = self.frame_id
         msg.height = h
         msg.width = w
-        msg.encoding = "rgb8"
+        msg.encoding = "bgr8"
         msg.is_bigendian = 0
         msg.step = w * 3
-        msg.data = rgb.tobytes()
+        msg.data = frame.tobytes()
 
-        self._pub.publish(msg)
-        self._seq += 1
-
-    # ----------------------------------------------------------------------
-    # Shutdown
-    # ----------------------------------------------------------------------
-    def destroy_node(self) -> bool:
-        if self._cap is not None:
-            try:
-                self._cap.release()
-                self.get_logger().info("Camera released.")
-            except Exception as exc:
-                self.get_logger().warn(f"Error releasing camera: {exc}")
-        return super().destroy_node()
+        self.pub.publish(msg)
 
 
-def main(args=None) -> None:
-    rclpy.init(args=args)
+def main(argv: Optional[list] = None) -> None:
+    rclpy.init(args=argv)
     node = RealCamNode()
     try:
-        # If camera failed to open, we still spin (no timer),
-        # so user can see errors in logs.
         rclpy.spin(node)
     except KeyboardInterrupt:
         node.get_logger().info("KeyboardInterrupt, shutting down RealCamNode.")
     finally:
+        if node._cap is not None:
+            try:
+                node._cap.release()
+            except Exception:
+                pass
         node.destroy_node()
         rclpy.shutdown()
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv)
