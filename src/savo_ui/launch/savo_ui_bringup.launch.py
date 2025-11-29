@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Robot Savo — UI bringup launch file
+Robot Savo — UI bringup launch file (v2)
 
 This launch file starts the Robot Savo UI stack on the Raspberry Pi.
 
@@ -15,7 +15,7 @@ Nodes
 
 2) ui_mode_router_node (optional, enabled by default)
    - Package:    savo_ui
-   - Executable: ui_mode_router_node.py
+   - Executable: ui_mode_router_node
    - Name:       savo_ui_mode_router
    - Parameters:
        - robot_id
@@ -27,7 +27,7 @@ Nodes
 
 3) ui_debug_node (optional, disabled by default)
    - Package:    savo_ui
-   - Executable: ui_debug_node.py
+   - Executable: ui_debug_node
    - Name:       savo_ui_debug
    - Parameters:
        - robot_id
@@ -150,7 +150,7 @@ def generate_launch_description() -> LaunchDescription:
     # ----------------------------------------------------------------------
     mode_router_node = Node(
         package="savo_ui",
-        executable="ui_mode_router_node.py",
+        executable="ui_mode_router_node",   # NOTE: console_script name, no .py
         name="savo_ui_mode_router",
         output="screen",
         condition=IfCondition(use_mode_router),
@@ -173,7 +173,7 @@ def generate_launch_description() -> LaunchDescription:
     # ----------------------------------------------------------------------
     debug_node = Node(
         package="savo_ui",
-        executable="ui_debug_node.py",
+        executable="ui_debug_node",         # NOTE: console_script name
         name="savo_ui_debug",
         output="screen",
         condition=IfCondition(use_debug),
@@ -192,7 +192,7 @@ def generate_launch_description() -> LaunchDescription:
     # ----------------------------------------------------------------------
     real_cam_node = Node(
         package="savo_ui",
-        executable="real_cam_node",
+        executable="real_cam_node",         # NOTE: console_script name
         name="savo_ui_real_cam",
         output="screen",
         condition=IfCondition(use_real_cam),
@@ -201,7 +201,7 @@ def generate_launch_description() -> LaunchDescription:
             {
                 "camera.width": 800,
                 "camera.height": 480,
-                "camera.fps": 15,
+                "camera.fps": 15,           # default; you can override on command line
                 "camera.use_gstreamer": True,
                 "camera.topic": "/camera/image_rect",
             }

@@ -1,41 +1,55 @@
 #!/usr/bin/env python3
 """
-Robot Savo — UI debug node
+Robot Savo — UI debug driver node
 
-This node is a small developer tool for testing the savo_ui display without
-requiring the full speech / navigation / mapping stack.
+Purpose
+=======
+This node is for **development only**. It lets you test the UI without
+the full robot stack running.
 
 It can:
-- Periodically cycle UI modes:
-    INTERACT -> NAVIGATE -> MAP -> INTERACT -> ...
-- Publish a matching /savo_ui/status_text for each mode.
-- Optionally publish a fake /savo_speech/mouth_level (0.0–1.0) ramp so you
-  can see mouth animation even if savo_speech is not running.
+- Cycle /savo_ui/mode between INTERACT → NAVIGATE → MAP.
+- Publish /savo_ui/status_text with simple debug strings.
+- Optionally publish a fake mouth animation on:
+    - /savo_speech/mouth_open  (Bool, preferred)
+    - /savo_speech/mouth_level (Float32, legacy support)
+- Optionally publish /savo_ui/face_state:
+    "idle" / "listening" / "thinking" / "speaking"
 
-WARNING:
-- If you enable fake mouth_level publishing while the real speech stack is
-  running, both may write to /savo_speech/mouth_level. Only use this node
-  alone, or disable fake_mouth in launch parameters.
+Parameters (ROS)
+================
+- robot_id              (string, default: "robot_savo_pi")
+- cycle_interval_s      (double, default: 10.0)
+    Total time for a full cycle:
+        INTERACT → NAVIGATE → MAP → INTERACT → ...
+
+- enable_fake_mouth     (bool, default: False)
+    If true, publish mouth_open + mouth_level wave.
+
+- mouth_wave_freq_hz    (double, default: 1.2)
+    Frequency of the fake mouth wave (Hz) when enable_fake_mouth=True.
+
+- publish_face_state    (bool, default: True)
+    If true, publish /savo_ui/face_state based on the mouth cycle.
 """
 
 from __future__ import annotations
 
 import math
+import sys
 from typing import Optional
 
 import rclpy
 from rclpy.node import Node
 
-from std_msgs.msg import String, Float32
+from std_msgs.msg import String, Bool, Float32
 
 
 class UIDebugNode(Node):
-    """Developer/debug node to drive the UI without the full robot stack."""
+    """Debug node that drives UI topics for visual testing."""
 
     def __init__(self) -> None:
         super().__init__("savo_ui_debug")
-
-        self.get_logger().info("Initializing UIDebugNode (UI test driver)")
 
         # ------------------------------------------------------------------
         # Parameters
@@ -44,6 +58,7 @@ class UIDebugNode(Node):
         self.declare_parameter("cycle_interval_s", 10.0)
         self.declare_parameter("enable_fake_mouth", False)
         self.declare_parameter("mouth_wave_freq_hz", 1.2)
+        self.declare_parameter("publish_face_state", True)
 
         self.robot_id: str = (
             self.get_parameter("robot_id").get_parameter_value().string_value
@@ -63,112 +78,163 @@ class UIDebugNode(Node):
             .get_parameter_value()
             .double_value
         )
+        self.publish_face_state: bool = (
+            self.get_parameter("publish_face_state")
+            .get_parameter_value()
+            .bool_value
+        )
 
-        if self.enable_fake_mouth:
+        if self.cycle_interval_s <= 0.0:
             self.get_logger().warn(
-                "enable_fake_mouth is TRUE - this node will publish to "
-                "/savo_speech/mouth_level. Make sure the real speech stack "
-                "is NOT running at the same time."
+                "cycle_interval_s must be > 0.0, using 10.0 instead."
             )
+            self.cycle_interval_s = 10.0
 
         # ------------------------------------------------------------------
         # Publishers
         # ------------------------------------------------------------------
         self.pub_mode = self.create_publisher(String, "/savo_ui/mode", 10)
         self.pub_status = self.create_publisher(String, "/savo_ui/status_text", 10)
-        self.pub_mouth: Optional[rclpy.publisher.Publisher] = None
 
-        if self.enable_fake_mouth:
-            self.pub_mouth = self.create_publisher(
-                Float32, "/savo_speech/mouth_level", 10
-            )
+        # Face / mouth debug topics
+        self.pub_mouth_open = self.create_publisher(
+            Bool, "/savo_speech/mouth_open", 10
+        )
+        self.pub_mouth_level = self.create_publisher(
+            Float32, "/savo_speech/mouth_level", 10
+        )
+        self.pub_face_state = self.create_publisher(
+            String, "/savo_ui/face_state", 10
+        )
 
         # ------------------------------------------------------------------
         # Internal state
         # ------------------------------------------------------------------
-        self._modes = ["INTERACT", "NAVIGATE", "MAP"]
-        self._mode_index = 0
+        self._time_s: float = 0.0
+        self._last_mode: str = ""
+        self._last_status: str = ""
 
-        # Timekeeping for mode cycle and fake mouth wave
-        self._t = 0.0
-        self._dt = 0.05  # ~20 Hz update
-
-        # ------------------------------------------------------------------
-        # Timers
-        # ------------------------------------------------------------------
-        # One timer drives both mode cycling and optional mouth animation.
+        # We run the timer at 20 Hz for smooth fake mouth animation.
+        self._dt = 0.05
         self._timer = self.create_timer(self._dt, self._on_timer)
 
-        # Publish initial state
-        self._publish_mode_and_status(initial=True)
+        self.get_logger().info(
+            "UIDebugNode started with:\n"
+            f"  robot_id           = {self.robot_id}\n"
+            f"  cycle_interval_s   = {self.cycle_interval_s:.2f}\n"
+            f"  enable_fake_mouth  = {self.enable_fake_mouth}\n"
+            f"  mouth_wave_freq_hz = {self.mouth_wave_freq_hz:.2f}\n"
+            f"  publish_face_state = {self.publish_face_state}"
+        )
 
-    # ======================================================================
-    # Timer
-    # ======================================================================
-
+    # ------------------------------------------------------------------
+    # Timer callback
+    # ------------------------------------------------------------------
     def _on_timer(self) -> None:
-        """Main debug loop: update time, cycle modes, animate fake mouth."""
+        # Advance debug time
+        self._time_s += self._dt
 
-        self._t += self._dt
+        # --------------------------------------------------------------
+        # 1) Mode cycle (INTERACT → NAVIGATE → MAP)
+        # --------------------------------------------------------------
+        # One full cycle is cycle_interval_s seconds. Divide it into 3 equal
+        # segments for INTERACT, NAVIGATE, MAP.
+        t_mod = self._time_s % self.cycle_interval_s
+        segment = self.cycle_interval_s / 3.0
 
-        # 1) Mode cycling
-        if self.cycle_interval_s > 0.0:
-            # Compute mode index from time
-            phase = self._t / self.cycle_interval_s
-            new_index = int(phase) % len(self._modes)
-            if new_index != self._mode_index:
-                self._mode_index = new_index
-                self._publish_mode_and_status(initial=False)
+        if t_mod < segment:
+            mode = "INTERACT"
+        elif t_mod < 2.0 * segment:
+            mode = "NAVIGATE"
+        else:
+            mode = "MAP"
 
+        status = f"[DEBUG] Mode = {mode}"
+
+        if mode != self._last_mode:
+            self.get_logger().info(f"[DEBUG] Switching UI mode to: {mode}")
+            self._publish_mode(mode)
+            self._last_mode = mode
+
+        if status != self._last_status:
+            self._publish_status(status)
+            self._last_status = status
+
+        # --------------------------------------------------------------
         # 2) Fake mouth animation (optional)
-        if self.enable_fake_mouth and self.pub_mouth is not None:
-            # Simple sine wave in [0.0, 1.0]
-            level = 0.5 * (1.0 + math.sin(2.0 * math.pi * self.mouth_wave_freq_hz * self._t))
-            msg = Float32()
-            msg.data = float(level)
-            self.pub_mouth.publish(msg)
+        # --------------------------------------------------------------
+        if self.enable_fake_mouth:
+            # Simple sine wave in [0, 1]
+            phase = 2.0 * math.pi * self.mouth_wave_freq_hz * self._time_s
+            level = 0.5 * (1.0 + math.sin(phase))  # 0..1
+            level_clamped = max(0.0, min(1.0, level))
+            open_flag = level_clamped > 0.25  # open if loud enough
 
-    # ======================================================================
+            self._publish_fake_mouth(level_clamped, open_flag)
+
+        # --------------------------------------------------------------
+        # 3) face_state (optional)
+        # --------------------------------------------------------------
+        if self.publish_face_state:
+            face_state = self._compute_face_state()
+            self._publish_face_state(face_state)
+
+    # ------------------------------------------------------------------
     # Helpers
-    # ======================================================================
+    # ------------------------------------------------------------------
+    def _publish_mode(self, mode: str) -> None:
+        msg = String()
+        msg.data = mode
+        self.pub_mode.publish(msg)
 
-    def _publish_mode_and_status(self, *, initial: bool) -> None:
-        """Publish /savo_ui/mode and /savo_ui/status_text for current index."""
-        mode = self._modes[self._mode_index]
+    def _publish_status(self, text: str) -> None:
+        msg = String()
+        msg.data = text
+        self.pub_status.publish(msg)
 
-        if mode == "INTERACT":
-            status = "Hello, I am Robot Savo!"
-        elif mode == "NAVIGATE":
-            status = "Guiding to A201 (demo)"
-        elif mode == "MAP":
-            status = "Mapping in progress (demo)"
+    def _publish_fake_mouth(self, level: float, open_flag: bool) -> None:
+        # /savo_speech/mouth_open
+        msg_open = Bool()
+        msg_open.data = open_flag
+        self.pub_mouth_open.publish(msg_open)
+
+        # /savo_speech/mouth_level (legacy, still useful for old tools)
+        msg_level = Float32()
+        msg_level.data = float(level)
+        self.pub_mouth_level.publish(msg_level)
+
+    def _compute_face_state(self) -> str:
+        """
+        Simple deterministic pattern for debugging:
+
+        - First quarter of cycle  → "idle"
+        - Second quarter          → "listening"
+        - Third quarter           → "thinking"
+        - Fourth quarter          → "speaking"
+        """
+        frac = (self._time_s % self.cycle_interval_s) / self.cycle_interval_s
+
+        if frac < 0.25:
+            return "idle"
+        elif frac < 0.50:
+            return "listening"
+        elif frac < 0.75:
+            return "thinking"
         else:
-            status = "Unknown mode (debug)"
+            return "speaking"
 
-        if initial:
-            self.get_logger().info(
-                f"Initial debug UI mode: {mode}, status='{status}'"
-            )
-        else:
-            self.get_logger().info(
-                f"Switching debug UI mode -> {mode}, status='{status}'"
-            )
-
-        msg_mode = String()
-        msg_mode.data = mode
-        self.pub_mode.publish(msg_mode)
-
-        msg_status = String()
-        msg_status.data = status
-        self.pub_status.publish(msg_status)
+    def _publish_face_state(self, state: str) -> None:
+        msg = String()
+        msg.data = state
+        self.pub_face_state.publish(msg)
 
 
-# ==========================================================================#
+# ======================================================================#
 # main()
-# ==========================================================================#
+# ======================================================================#
 
-def main(args: Optional[list] = None) -> None:
-    rclpy.init(args=args)
+def main(argv: Optional[list] = None) -> None:
+    rclpy.init(args=argv)
     node = UIDebugNode()
     try:
         rclpy.spin(node)
@@ -180,4 +246,4 @@ def main(args: Optional[list] = None) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv)

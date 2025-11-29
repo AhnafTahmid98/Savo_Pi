@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Robot Savo — UI display manager node (v2)
+Robot Savo — UI display manager node (v2, optimized)
 
 This node drives the 7" DFRobot DSI display. It is responsible for:
 
@@ -18,12 +18,11 @@ Rendering (via helper modules):
     - INTERACT:
         - Big friendly face (eyes + mouth)
         - Status + subtitle overlaid
-        - Expression driven by /savo_ui/face_state
     - NAVIGATE:
         - Camera view as background (letterboxed)
         - Small face overlay + status + subtitle
     - MAP:
-        - Mapping status screen, optionally reusing face layout
+        - Mapping status screen, reusing face layout
 
 Camera handling:
     - Subscribes to sensor_msgs/Image on `navigation.camera_topic`
@@ -57,7 +56,6 @@ try:
     from .face_view import draw_face_view
     from .nav_cam_view import draw_navigation_view
 except ImportError:
-    # For early development, we allow these to be missing and use stubs.
     draw_face_view = None
     draw_navigation_view = None
 
@@ -81,20 +79,17 @@ class SavoUIDisplay(Node):
         # ------------------------------------------------------------------
         # Internal state
         # ------------------------------------------------------------------
+        # UI mode (default: INTERACT when node starts)
         self._mode: str = "INTERACT"
+
+        # Text state
         self._status_text: str = ""
         self._subtitle_text: str = ""
 
         # Face / mouth state
-        # - _face_state is a high-level semantic state:
-        #       "idle" / "listening" / "thinking" / "speaking"
-        # - _mouth_level is a numeric [0.0, 1.0] used by the renderer.
-        #   It is derived from:
-        #       /savo_speech/mouth_open (Bool, preferred) OR
-        #       /savo_speech/mouth_level (Float32, legacy)
-        self._face_state: str = "idle"
+        self._face_state: str = "idle"  # "idle" / "listening" / "thinking" / "speaking"
         self._mouth_level: float = 0.0
-        self._mouth_open: bool = False  # last Bool from /savo_speech/mouth_open
+        self._mouth_open: bool = False
 
         # Camera state
         self._have_camera: bool = False
@@ -105,40 +100,20 @@ class SavoUIDisplay(Node):
         # ------------------------------------------------------------------
         # Subscriptions
         # ------------------------------------------------------------------
-        # UI mode and status text
+        # UI mode & status
         self.create_subscription(String, "/savo_ui/mode", self._on_mode, 10)
+        self.create_subscription(String, "/savo_ui/status_text", self._on_status_text, 10)
+
+        # Face state from speech client (not yet used by renderer, but stored)
+        self.create_subscription(String, "/savo_ui/face_state", self._on_face_state, 10)
+
+        # Mouth animation
+        self.create_subscription(Bool, "/savo_speech/mouth_open", self._on_mouth_open, 10)
         self.create_subscription(
-            String,
-            "/savo_ui/status_text",
-            self._on_status_text,
-            10,
+            Float32, "/savo_speech/mouth_level", self._on_mouth_level, 10
         )
 
-        # Face state from remote_speech_client_node
-        self.create_subscription(
-            String,
-            "/savo_ui/face_state",
-            self._on_face_state,
-            10,
-        )
-
-        # Mouth animation:
-        #  - Preferred: Bool mouth_open
-        #  - Legacy: Float32 mouth_level (will still work if present)
-        self.create_subscription(
-            Bool,
-            "/savo_speech/mouth_open",
-            self._on_mouth_open,
-            10,
-        )
-        self.create_subscription(
-            Float32,
-            "/savo_speech/mouth_level",
-            self._on_mouth_level,
-            10,
-        )
-
-        # Subtitle of what Robot Savo is saying
+        # Subtitle (TTS text)
         self.create_subscription(
             String,
             "/savo_speech/tts_text",
@@ -146,7 +121,7 @@ class SavoUIDisplay(Node):
             10,
         )
 
-        # Camera is optional; NAVIGATE mode will show a placeholder if no topic.
+        # Camera (optional; NAVIGATE will show placeholder if no topic)
         if self.camera_topic:
             qos_cam = QoSProfile(
                 reliability=ReliabilityPolicy.BEST_EFFORT,
@@ -175,7 +150,7 @@ class SavoUIDisplay(Node):
         # ------------------------------------------------------------------
         # Render loop timer
         # ------------------------------------------------------------------
-        period = 1.0 / float(self.screen_fps)
+        period = 1.0 / float(max(self.screen_fps, 1))
         self._timer = self.create_timer(period, self._on_timer)
 
         self.get_logger().info(
@@ -225,9 +200,7 @@ class SavoUIDisplay(Node):
             "NAVIGATE": self._get_color_param(
                 "colors.background.NAVIGATE", [5, 35, 70]
             ),
-            "MAP": self._get_color_param(
-                "colors.background.MAP", [4, 50, 35]
-            ),
+            "MAP": self._get_color_param("colors.background.MAP", [4, 50, 35]),
         }
 
         # Text colors
@@ -325,13 +298,15 @@ class SavoUIDisplay(Node):
         """
         Track the high-level face state for expressions:
           "idle" / "listening" / "thinking" / "speaking"
+
+        NOTE: Currently not forwarded to face_view/nav_cam_view, but kept
+        for future use.
         """
         state = (msg.data or "").strip().lower()
         if not state:
             return
-        # Accept only known states to avoid weird typos
         if state not in ("idle", "listening", "thinking", "speaking"):
-            # Do not spam logs; just keep last valid state
+            # Keep last valid state; no spam
             self.get_logger().debug(
                 f"Unknown face_state '{state}', keeping '{self._face_state}'"
             )
@@ -345,9 +320,6 @@ class SavoUIDisplay(Node):
         Preferred mouth animation channel:
           - True  → mouth fully open
           - False → mouth closed
-
-        We convert it to a [0.0, 1.0] mouth_level so face_view/nav_cam_view
-        can stay numeric and compatible with older code.
         """
         self._mouth_open = bool(msg.data)
         self._mouth_level = 1.0 if self._mouth_open else 0.0
@@ -356,13 +328,9 @@ class SavoUIDisplay(Node):
         """
         Legacy Float32 channel (0.0–1.0). If present, we still honor it.
 
-        NOTE:
-          If both mouth_open and mouth_level are published, the *last*
-          received message wins. This is fine in practice because we
-          normally only use mouth_open now.
+        If both mouth_open and mouth_level are published, the *last* message wins.
         """
         level = float(msg.data)
-        # Clamp to [0.0, 1.0]
         self._mouth_level = max(0.0, min(1.0, level))
 
     def _on_subtitle_text(self, msg: String) -> None:
@@ -437,13 +405,14 @@ class SavoUIDisplay(Node):
         pygame.init()
         pygame.font.init()
 
-        # Build driver preference list.
-        # We *prefer* kmsdrm on bare Pi console, then wayland/x11 if available.
+        # Driver preference list:
+        #   - environment override
+        #   - kmsdrm (bare Pi console)
+        #   - wayland / x11 for desktop
         drivers: List[str] = []
         env_drv = os.environ.get("SDL_VIDEODRIVER")
         if env_drv:
             drivers.append(env_drv)
-        # Add our preferred order, skipping duplicates
         for drv in ("kmsdrm", "wayland", "x11"):
             if drv not in drivers:
                 drivers.append(drv)
@@ -451,7 +420,7 @@ class SavoUIDisplay(Node):
         tried: List[str] = []
         last_exc: Optional[BaseException] = None
         chosen: Optional[str] = None
-        self._screen = None
+        self._screen: Optional[pygame.Surface] = None
 
         for drv in drivers:
             if not drv or drv in tried:
@@ -464,7 +433,6 @@ class SavoUIDisplay(Node):
                 if self.screen_fullscreen:
                     flags |= pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF
 
-                # This actually opens the display; if it fails we try next driver.
                 screen = pygame.display.set_mode(
                     (self.screen_width, self.screen_height),
                     flags,
@@ -495,33 +463,30 @@ class SavoUIDisplay(Node):
         pygame.display.set_caption(f"Robot Savo UI [{chosen}] {w}x{h}")
         pygame.mouse.set_visible(False)
 
-        # Separate pygame clock for FPS limiting / measurement
+        # Pygame clock for FPS limiting / measurement
         self._pg_clock = pygame.time.Clock()
 
-        # Load fonts (if these fail, pygame will substitute defaults)
+        # Fonts (fall back to defaults if DejaVu is missing)
         self._font_main = pygame.font.SysFont("DejaVu Sans", self.font_size_main)
         self._font_status = pygame.font.SysFont("DejaVu Sans", self.font_size_status)
-        self._font_subtitle = pygame.font.SysFont(
-            "DejaVu Sans", self.font_size_subtitle
-        )
+        self._font_subtitle = pygame.font.SysFont("DejaVu Sans", self.font_size_subtitle)
 
     def _on_timer(self) -> None:
         """Render loop callback (called at ~FPS rate)."""
 
-        # FPS timing (limit + compute FPS for overlay)
+        # FPS timing
         _dt_ms = self._pg_clock.tick(self.screen_fps)  # noqa: F841
         fps = self._pg_clock.get_fps() if self.show_fps else None
 
         # Handle pygame events (quit, ESC, etc.)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                self.get_logger().info("Pygame QUIT event received, shutting down.")
-                rclpy.shutdown()
-                return
+                self.get_logger().info("Pygame QUIT event received, shutting down UI.")
+                # Let main() handle rclpy.shutdown; just stop spinning
+                raise KeyboardInterrupt
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 self.get_logger().info("ESC pressed, shutting down UI.")
-                rclpy.shutdown()
-                return
+                raise KeyboardInterrupt
 
         # Draw current mode
         if self._mode == "INTERACT":
@@ -533,8 +498,8 @@ class SavoUIDisplay(Node):
         else:
             self._draw_fallback()
 
-        # Optional FPS overlay (top-left)
-        if fps is not None:
+        # Optional FPS overlay
+        if fps is not None and self._font_subtitle is not None:
             fps_text = self._font_subtitle.render(
                 f"{fps:5.1f} FPS", True, (255, 255, 0)
             )
@@ -556,47 +521,24 @@ class SavoUIDisplay(Node):
         self._clear_background("INTERACT")
 
         if draw_face_view is not None:
-            # Prefer new signature with face_state; fall back to old one if needed.
-            try:
-                draw_face_view(
-                    surface=self._screen,
-                    mouth_level=self._mouth_level,
-                    status_text=self._status_text,
-                    subtitle_text=self._subtitle_text,
-                    face_state=self._face_state,
-                    fonts={
-                        "main": self._font_main,
-                        "status": self._font_status,
-                        "subtitle": self._font_subtitle,
-                    },
-                    colors={
-                        "bg": self.colors_bg["INTERACT"],
-                        "text_main": self.color_text_main,
-                        "text_status": self.color_text_status,
-                        "text_subtitle": self.color_text_subtitle,
-                    },
-                    screen_size=(self.screen_width, self.screen_height),
-                )
-            except TypeError:
-                # Older face_view without face_state parameter.
-                draw_face_view(
-                    surface=self._screen,
-                    mouth_level=self._mouth_level,
-                    status_text=self._status_text,
-                    subtitle_text=self._subtitle_text,
-                    fonts={
-                        "main": self._font_main,
-                        "status": self._font_status,
-                        "subtitle": self._font_subtitle,
-                    },
-                    colors={
-                        "bg": self.colors_bg["INTERACT"],
-                        "text_main": self.color_text_main,
-                        "text_status": self.color_text_status,
-                        "text_subtitle": self.color_text_subtitle,
-                    },
-                    screen_size=(self.screen_width, self.screen_height),
-                )
+            draw_face_view(
+                surface=self._screen,
+                mouth_level=self._mouth_level,
+                status_text=self._status_text,
+                subtitle_text=self._subtitle_text,
+                fonts={
+                    "main": self._font_main,
+                    "status": self._font_status,
+                    "subtitle": self._font_subtitle,
+                },
+                colors={
+                    "bg": self.colors_bg["INTERACT"],
+                    "text_main": self.color_text_main,
+                    "text_status": self.color_text_status,
+                    "text_subtitle": self.color_text_subtitle,
+                },
+                screen_size=(self.screen_width, self.screen_height),
+            )
         else:
             text = self._font_status.render(
                 "INTERACT (face_view not implemented)", True, (255, 255, 255)
@@ -608,108 +550,57 @@ class SavoUIDisplay(Node):
         self._clear_background("NAVIGATE")
 
         if draw_navigation_view is not None and self._have_camera:
-            # Prefer new signature with face_state; fall back to old one if needed.
-            try:
-                draw_navigation_view(
-                    surface=self._screen,
-                    status_text=self._status_text,
-                    subtitle_text=self._subtitle_text,
-                    mouth_level=self._mouth_level,
-                    face_state=self._face_state,
-                    fonts={
-                        "main": self._font_main,
-                        "status": self._font_status,
-                        "subtitle": self._font_subtitle,
-                    },
-                    colors={
-                        "bg": self.colors_bg["NAVIGATE"],
-                        "text_main": self.color_text_main,
-                        "text_status": self.color_text_status,
-                        "text_subtitle": self.color_text_subtitle,
-                    },
-                    screen_size=(self.screen_width, self.screen_height),
-                    camera_ready=self._camera_ready,
-                    camera_frame=self._last_camera_frame,
-                )
-            except TypeError:
-                # Older nav_cam_view without face_state parameter.
-                draw_navigation_view(
-                    surface=self._screen,
-                    status_text=self._status_text,
-                    subtitle_text=self._subtitle_text,
-                    mouth_level=self._mouth_level,
-                    fonts={
-                        "main": self._font_main,
-                        "status": self._font_status,
-                        "subtitle": self._font_subtitle,
-                    },
-                    colors={
-                        "bg": self.colors_bg["NAVIGATE"],
-                        "text_main": self.color_text_main,
-                        "text_status": self.color_text_status,
-                        "text_subtitle": self.color_text_subtitle,
-                    },
-                    screen_size=(self.screen_width, self.screen_height),
-                    camera_ready=self._camera_ready,
-                    camera_frame=self._last_camera_frame,
-                )
+            draw_navigation_view(
+                surface=self._screen,
+                status_text=self._status_text,
+                subtitle_text=self._subtitle_text,
+                mouth_level=self._mouth_level,
+                fonts={
+                    "main": self._font_main,
+                    "status": self._font_status,
+                    "subtitle": self._font_subtitle,
+                },
+                colors={
+                    "bg": self.colors_bg["NAVIGATE"],
+                    "text_main": self.color_text_main,
+                    "text_status": self.color_text_status,
+                    "text_subtitle": self.color_text_subtitle,
+                },
+                screen_size=(self.screen_width, self.screen_height),
+                camera_ready=self._camera_ready,
+                camera_frame=self._last_camera_frame,
+            )
         else:
             msg = "NAVIGATE mode (camera or nav_cam_view not implemented)"
             text = self._font_status.render(msg, True, (255, 255, 255))
             self._screen.blit(text, (40, self.screen_height // 2))
 
     def _draw_map_mode(self) -> None:
-        """Draw the MAP status view (optionally reusing face layout)."""
+        """Draw the MAP status view (reusing face layout)."""
         self._clear_background("MAP")
 
         if draw_face_view is not None:
-            # During mapping we typically show a calm face; mouth_level = 0.0.
-            try:
-                draw_face_view(
-                    surface=self._screen,
-                    mouth_level=0.0,
-                    status_text=(
-                        self._status_text
-                        or "Mapping in progress, please keep distance."
-                    ),
-                    subtitle_text=self._subtitle_text,
-                    face_state="idle",
-                    fonts={
-                        "main": self._font_main,
-                        "status": self._font_status,
-                        "subtitle": self._font_subtitle,
-                    },
-                    colors={
-                        "bg": self.colors_bg["MAP"],
-                        "text_main": self.color_text_main,
-                        "text_status": self.color_text_status,
-                        "text_subtitle": self.color_text_subtitle,
-                    },
-                    screen_size=(self.screen_width, self.screen_height),
-                )
-            except TypeError:
-                # Older face_view without face_state parameter.
-                draw_face_view(
-                    surface=self._screen,
-                    mouth_level=0.0,
-                    status_text=(
-                        self._status_text
-                        or "Mapping in progress, please keep distance."
-                    ),
-                    subtitle_text=self._subtitle_text,
-                    fonts={
-                        "main": self._font_main,
-                        "status": self._font_status,
-                        "subtitle": self._font_subtitle,
-                    },
-                    colors={
-                        "bg": self.colors_bg["MAP"],
-                        "text_main": self.color_text_main,
-                        "text_status": self.color_text_status,
-                        "text_subtitle": self.color_text_subtitle,
-                    },
-                    screen_size=(self.screen_width, self.screen_height),
-                )
+            draw_face_view(
+                surface=self._screen,
+                mouth_level=0.0,
+                status_text=(
+                    self._status_text
+                    or "Mapping in progress, please keep distance."
+                ),
+                subtitle_text=self._subtitle_text,
+                fonts={
+                    "main": self._font_main,
+                    "status": self._font_status,
+                    "subtitle": self._font_subtitle,
+                },
+                colors={
+                    "bg": self.colors_bg["MAP"],
+                    "text_main": self.color_text_main,
+                    "text_status": self.color_text_status,
+                    "text_subtitle": self.color_text_subtitle,
+                },
+                screen_size=(self.screen_width, self.screen_height),
+            )
         else:
             msg = "MAP mode (face_view not implemented)"
             text = self._font_status.render(msg, True, (255, 255, 255))
@@ -723,9 +614,9 @@ class SavoUIDisplay(Node):
         self._screen.blit(text, (40, self.screen_height // 2))
 
 
-# ==========================================================================#
+# ==========================================================================
 # main()
-# ==========================================================================#
+# ==========================================================================
 
 def main(argv: Optional[list] = None) -> None:
     rclpy.init(args=argv)
@@ -736,7 +627,11 @@ def main(argv: Optional[list] = None) -> None:
         node.get_logger().info("KeyboardInterrupt, shutting down SavoUIDisplay.")
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        try:
+            # Avoid RCLError if shutdown was already called by launcher
+            rclpy.shutdown()
+        except Exception:
+            pass
         pygame.quit()
 
 

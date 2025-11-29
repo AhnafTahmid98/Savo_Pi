@@ -4,15 +4,15 @@
   <version>0.1.0</version>
 
   <description>
-    Robot Savo UI stack: drives the 7&quot; DFRobot DSI display on the Raspberry Pi.
+    Robot Savo UI stack: drives the 7" DFRobot DSI display on the Raspberry Pi.
     Renders eyes and mouth animation based on /savo_speech topics, and shows
-    navigation and mapping status (INTERACT / NAVIGATE / MAP modes).
+    interaction, navigation camera view, and mapping status (INTERACT / NAVIGATE / MAP modes).
   </description>
 
   <maintainer email="tahmidahnaf998@gmail.com">Ahnaf Tahmid</maintainer>
   <license>Proprietary</license>
 
-  <!-- Python-based ROS 2 package, same style as savo_speech -->
+  <!-- Python-based ROS 2 package (same style as savo_speech) -->
   <buildtool_depend>ament_python</buildtool_depend>
 
   <!-- Core ROS 2 runtime dependencies -->
@@ -20,7 +20,7 @@
   <exec_depend>std_msgs</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>
 
-  <!-- UI may listen to IntentResult / NavState / RobotStatus in future -->
+  <!-- UI listens to IntentResult and may use other Savo messages -->
   <exec_depend>savo_msgs</exec_depend>
 
   <!-- Launch system (for savo_ui_bringup.launch.py, debug launches, etc.) -->
@@ -30,7 +30,11 @@
   <!-- Drawing backend for the DSI screen (Pygame) -->
   <exec_depend>python3-pygame</exec_depend>
 
-  <!-- Testing + linting tools (optional but good to mirror savo_speech) -->
+  <!-- Camera + image processing (real_cam_node uses OpenCV + NumPy) -->
+  <exec_depend>python3-opencv</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
+
+  <!-- Testing + linting tools (optional, mirrors savo_speech style) -->
   <test_depend>ament_pytest</test_depend>
   <test_depend>ament_flake8</test_depend>
   <test_depend>ament_pep257</test_depend>
