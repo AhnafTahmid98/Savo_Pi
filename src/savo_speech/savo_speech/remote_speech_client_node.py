@@ -48,7 +48,7 @@ import json
 import threading
 import time
 import wave
-from typing import Optional, Tuple, List
+from typing import List, Optional, Tuple
 
 import numpy as np
 import requests
@@ -58,7 +58,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.parameter import Parameter
 
-from std_msgs.msg import String, Bool
+from std_msgs.msg import Bool, String
 from savo_msgs.msg import IntentResult
 
 
@@ -83,6 +83,8 @@ class RemoteSpeechClientNode(Node):
       - Face state publishing for the display UI
       - Auto-sleep if user is silent for too long (30s by default),
         only counting after TTS has finished.
+      - Timing logs for /speech calls:
+          [Timing] /speech total=XXXX ms, tier_used=tier1, llm_ok=True
     """
 
     def __init__(self) -> None:
@@ -750,11 +752,13 @@ class RemoteSpeechClientNode(Node):
             "file": ("audio.wav", wav_bytes, "audio/wav"),
         }
 
+        start_time = time.time()
         resp = requests.post(
             self.speech_server_url,
             files=files,
             timeout=self.request_timeout_s,
         )
+        elapsed_ms = (time.time() - start_time) * 1000.0
 
         if resp.status_code != 200:
             raise RuntimeError(
@@ -779,6 +783,12 @@ class RemoteSpeechClientNode(Node):
         # Normalize nav_goal: None or non-empty string
         if isinstance(nav_goal, str) and nav_goal.strip() == "":
             nav_goal = None
+
+        # Timing log (after we know tier_used + llm_ok)
+        self.get_logger().info(
+            f"[Timing] /speech total={elapsed_ms:.0f} ms, "
+            f"tier_used={tier_used}, llm_ok={llm_ok}"
+        )
 
         return transcript, reply_text, intent, nav_goal, tier_used, llm_ok, ""
 

@@ -147,7 +147,25 @@ remote_speech_client_node:
       - "that is all"
       - "that's all"
       - "kiitos"
+      - "bye"
+      - "goodbye"
+      - "see you later"
+      - "see ya"
+      - "talk to you later"
+      - "i am done"
+      - "i'm done"
+      - "stop listening"
       - "thanks robot"
+      - "bye robot"
+      - "goodbye robot"
+      - "see you later robot"
+      - "see ya robot"
+      - "talk to you later robot"
+      - "i am done robot"
+      - "i'm done robot"
+      - "stop listening robot"
+      - "bye bye"
+
 
     # Auto-sleep if robot is awake but user is silent for too long (seconds).
     # Countdown effectively starts after TTS has finished.
