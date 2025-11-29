@@ -45,6 +45,8 @@ from typing import Dict, List, Tuple, Optional
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
+from rclpy.exceptions import RCLError
+
 
 from std_msgs.msg import String, Float32, Bool
 from sensor_msgs.msg import Image
@@ -645,9 +647,16 @@ def main(argv: Optional[list] = None) -> None:
         node.get_logger().info("KeyboardInterrupt, shutting down SavoUIDisplay.")
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        # ros2 launch already calls rclpy.shutdown() once.
+        # This try/except avoids the "rcl_shutdown already called" error
+        # if shutdown was already done by the launch system.
+        try:
+            rclpy.shutdown()
+        except RCLError:
+            pass
         pygame.quit()
 
 
 if __name__ == "__main__":
     main(sys.argv)
+

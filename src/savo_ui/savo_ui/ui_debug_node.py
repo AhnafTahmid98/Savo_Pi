@@ -41,6 +41,7 @@ from typing import Optional
 
 import rclpy
 from rclpy.node import Node
+from rclpy.exceptions import RCLError
 
 from std_msgs.msg import String, Bool, Float32
 
@@ -242,8 +243,7 @@ def main(argv: Optional[list] = None) -> None:
         node.get_logger().info("KeyboardInterrupt, shutting down UIDebugNode.")
     finally:
         node.destroy_node()
-        rclpy.shutdown()
-
-
-if __name__ == "__main__":
-    main(sys.argv)
+        try:
+            rclpy.shutdown()
+        except RCLError:
+            pass

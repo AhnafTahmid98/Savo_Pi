@@ -38,6 +38,8 @@ import numpy as np
 
 import rclpy
 from rclpy.node import Node
+from rclpy.exceptions import RCLError
+
 
 from sensor_msgs.msg import Image as RosImage
 
@@ -271,14 +273,9 @@ def main(argv: Optional[list] = None) -> None:
     except KeyboardInterrupt:
         node.get_logger().info("KeyboardInterrupt, shutting down RealCamNode.")
     finally:
-        if node._cap is not None:
-            try:
-                node._cap.release()
-            except Exception:
-                pass
         node.destroy_node()
-        rclpy.shutdown()
+        try:
+            rclpy.shutdown()
+        except RCLError:
+            pass
 
-
-if __name__ == "__main__":
-    main(sys.argv)
