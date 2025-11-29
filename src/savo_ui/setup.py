@@ -11,13 +11,13 @@ import os
 #
 # Nodes (console_scripts):
 #   - display_manager_node  → savo_ui.display_manager_node:main
-#   - ui_mode_router_node   → savo_ui.ui_mode_router_node:main
-#   - ui_debug_node         → savo_ui.ui_debug_node:main
+#   - ui_mode_router_node   → savo_ui.ui_mode_router_node:main   (planned / optional)
+#   - ui_debug_node         → savo_ui.ui_debug_node:main         (planned / optional)
+#   - fake_cam_node         → savo_ui.fake_cam_node:main         (test camera source)
 #
-# After `colcon build` + `source install/setup.bash` you can run:
+# After `colcon build` + `source install/setup.bash` you can run for example:
 #   ros2 run savo_ui display_manager_node
-#   ros2 run savo_ui ui_mode_router_node
-#   ros2 run savo_ui ui_debug_node
+#   ros2 run savo_ui fake_cam_node
 #
 # IMPORTANT:
 #   Make sure this file exists:
@@ -46,12 +46,12 @@ setup(
             os.path.join("share", package_name),
             ["package.xml"],
         ),
-        # Install config files (ui_params.yaml, etc.)
+        # Install config files (ui_params.yaml, etc.) if present
         (
             os.path.join("share", package_name, "config"),
             glob("config/*.yaml"),
         ),
-        # Install launch files (savo_ui_bringup.launch.py, etc.)
+        # Install launch files (savo_ui_bringup.launch.py, etc.) if present
         (
             os.path.join("share", package_name, "launch"),
             glob("launch/*.py"),
@@ -75,12 +75,20 @@ setup(
     # ----------------------------------------------------------------------
     entry_points={
         "console_scripts": [
-            # Full-screen display manager (Pygame)
+            # Full-screen display manager (Pygame, face + camera views)
             "display_manager_node = savo_ui.display_manager_node:main",
-            # Maps intents + mapping state → UI mode + status text
+
+            # UI mode router (optional, future):
+            # maps intents / Nav2 state → /savo_ui/mode + /savo_ui/status_text
             "ui_mode_router_node = savo_ui.ui_mode_router_node:main",
-            # Simple debug driver (cycles modes, fake mouth_level, etc.)
+
+            # Simple debug driver (optional, future):
+            # can cycle modes, set fake mouth_level, etc.
             "ui_debug_node = savo_ui.ui_debug_node:main",
+
+            # Fake camera publisher for NAVIGATE testing (gradient video on
+            # /camera/image_rect so the UI can be tested without a real camera).
+            "fake_cam_node = savo_ui.fake_cam_node:main",
         ],
     },
 )
