@@ -1,20 +1,23 @@
 #!/usr/bin/env python3
 """
-Robot Savo — Face view renderer (INTERACT / MAP modes)
+Robot Savo — Face view renderer (INTERACT mode)
 
-This module draws a friendly robot face:
+This module draws the main Robot Savo face, inspired by the small square
+icon you liked:
 
-- Two eyes with pupils + small highlights.
-- A mouth that opens/closes based on `mouth_level` (0.0–1.0).
-- Date & time in the top-left corner.
-- Status text (one–two lines) above the bottom.
-- Subtitle text (current TTS text) near the bottom edge.
+- Rounded square with cyan border
+- Dark inner face area
+- Light bottom "chin" bar
+- Two big eyes with cyan rings and highlights
+- Simple smiling mouth whose height animates with mouth_level
+- Status text and subtitle below the face
+
+Used by display_manager_node._draw_interact_mode().
 """
 
 from __future__ import annotations
 
 from typing import Dict, Tuple
-import datetime
 
 import pygame
 
@@ -29,8 +32,9 @@ def _render_multiline_text(
     max_width: int,
     start_y: int,
     line_spacing: int = 4,
+    center_x: bool = True,
 ) -> int:
-    """Render text as multiple centered lines within max_width."""
+    """Render text as multiple lines within max_width, return final y."""
     if not text or font is None:
         return start_y
 
@@ -38,29 +42,30 @@ def _render_multiline_text(
     if not words:
         return start_y
 
-    lines = []
-    current_line: list[str] = []
+    lines: list[str] = []
+    current: list[str] = []
 
-    for word in words:
-        trial = " ".join(current_line + [word]) if current_line else word
-        w, _ = font.size(trial)
-        if w <= max_width:
-            current_line.append(word)
+    for w in words:
+        trial = " ".join(current + [w]) if current else w
+        width, _ = font.size(trial)
+        if width <= max_width:
+            current.append(w)
         else:
-            if current_line:
-                lines.append(" ".join(current_line))
-            current_line = [word]
+            if current:
+                lines.append(" ".join(current))
+            current = [w]
 
-    if current_line:
-        lines.append(" ".join(current_line))
+    if current:
+        lines.append(" ".join(current))
 
     y = start_y
-    center_x = surface.get_width() // 2
-
     for line in lines:
         surf = font.render(line, True, color)
         rect = surf.get_rect()
-        rect.centerx = center_x
+        if center_x:
+            rect.centerx = surface.get_width() // 2
+        else:
+            rect.x = (surface.get_width() - max_width) // 2
         rect.y = y
         surface.blit(surf, rect)
         y = rect.bottom + line_spacing
@@ -78,18 +83,18 @@ def draw_face_view(
     screen_size: Tuple[int, int],
 ) -> None:
     """
-    Draw Robot Savo's face view.
+    Draw the INTERACT face view.
 
     Parameters
     ----------
     surface:
-        Pygame surface to draw onto (already cleared by caller).
+        Pygame surface to draw onto.
     mouth_level:
-        0.0–1.0 value from /savo_speech/mouth_level controlling mouth opening.
+        0.0–1.0 mouth activity (controls mouth height).
     status_text:
-        Human-readable status line.
+        One or two short lines like "Hi, I am Robot Savo!".
     subtitle_text:
-        TTS text (spoken sentence).
+        Spoken text / extra info.
     fonts:
         Dict with keys "main", "status", "subtitle".
     colors:
@@ -99,167 +104,162 @@ def draw_face_view(
     """
     width, height = screen_size
 
-    # Fonts & colors
-    font_main: pygame.font.Font | None = fonts.get("main")
-    font_status: pygame.font.Font | None = fonts.get("status", font_main)
-    font_subtitle: pygame.font.Font | None = fonts.get("subtitle", font_main)
+    font_main = fonts.get("main")
+    font_status = fonts.get("status", font_main)
+    font_subtitle = fonts.get("subtitle", font_main)
 
-    color_bg: RGB = colors.get("bg", (0, 0, 0))
+    color_bg: RGB = colors.get("bg", (10, 25, 50))
     color_text_main: RGB = colors.get("text_main", (255, 255, 255))
     color_text_status: RGB = colors.get("text_status", (240, 240, 240))
     color_text_subtitle: RGB = colors.get("text_subtitle", (210, 210, 210))
 
-    eye_white: RGB = (245, 245, 245)
-    eye_border: RGB = (30, 50, 80)
-    pupil_color: RGB = (0, 0, 0)
-    mouth_border: RGB = (255, 200, 120)
-    mouth_fill: RGB = (255, 140, 100)
-
+    # Fill background
     surface.fill(color_bg)
 
-    # ------------------------------------------------------------------ #
-    # Layout (tuned for 800x480, with face slightly lower)
-    # ------------------------------------------------------------------ #
-    cx = width // 2
+    # ----------------------------------------------------------------------
+    # Face panel layout (roughly square, centered near top)
+    # ----------------------------------------------------------------------
+    face_size = int(min(width, height) * 0.55)
+    face_x = (width - face_size) // 2
+    face_y = int(height * 0.08)
+    face_rect = pygame.Rect(face_x, face_y, face_size, face_size)
 
-    # We no longer use a big title. Top-left is now date/time.
-    eye_center_y = int(height * 0.40)   # eyes a bit below center
-    mouth_center_y = int(height * 0.66) # mouth lower
-    status_top_y = int(height * 0.80)
-    subtitle_top_y = int(height * 0.88)
+    border_radius_outer = int(face_size * 0.18)
+    border_radius_inner = int(face_size * 0.16)
 
-    max_text_width = int(width * 0.90)
+    # Colors similar to the icon
+    border_color: RGB = (90, 230, 255)    # cyan border
+    inner_color: RGB = (20, 32, 64)       # dark navy face
+    chin_color: RGB = (235, 244, 255)     # light chin strip
 
-    # ------------------------------------------------------------------ #
-    # Date & time (top-left) — uses Pi local time
-    # ------------------------------------------------------------------ #
-    now = datetime.datetime.now()
-    # Example: "Sat 29 Nov 14:32"
-    dt_str = now.strftime("%a %d %b %H:%M")
+    # Outer rounded border
+    pygame.draw.rect(surface, border_color, face_rect, border_radius=border_radius_outer)
 
-    clock_font = font_subtitle or font_status or font_main
-    if clock_font is not None:
-        clock_surf = clock_font.render(dt_str, True, color_text_status)
-        clock_rect = clock_surf.get_rect()
-        clock_rect.topleft = (int(width * 0.03), int(height * 0.03))
-        surface.blit(clock_surf, clock_rect)
+    # Slight inner inset for dark face area
+    inset = max(4, face_size // 40)
+    inner_rect = face_rect.inflate(-2 * inset, -2 * inset)
+    pygame.draw.rect(surface, inner_color, inner_rect, border_radius=border_radius_inner)
 
-    # ------------------------------------------------------------------ #
-    # Eyes
-    # ------------------------------------------------------------------ #
-    eye_spacing = int(width * 0.16)
-    eye_w = int(width * 0.14)
-    eye_h = int(height * 0.22)
-
-    left_eye_rect = pygame.Rect(
-        cx - eye_spacing - eye_w // 2,
-        eye_center_y - eye_h // 2,
-        eye_w,
-        eye_h,
+    # ----------------------------------------------------------------------
+    # Chin strip (bottom light bar inside the face)
+    # ----------------------------------------------------------------------
+    chin_height = int(inner_rect.height * 0.32)
+    chin_rect = pygame.Rect(
+        inner_rect.x,
+        inner_rect.bottom - chin_height,
+        inner_rect.width,
+        chin_height,
     )
-    right_eye_rect = pygame.Rect(
-        cx + eye_spacing - eye_w // 2,
-        eye_center_y - eye_h // 2,
-        eye_w,
-        eye_h,
+    pygame.draw.rect(surface, chin_color, chin_rect, border_radius=int(border_radius_inner * 0.9))
+
+    # ----------------------------------------------------------------------
+    # Eyes (in dark upper part)
+    # ----------------------------------------------------------------------
+    eye_center_y = inner_rect.y + int(inner_rect.height * 0.33)
+    eye_offset_x = int(inner_rect.width * 0.23)
+    eye_radius_outer = int(face_size * 0.09)
+    eye_radius_inner = int(face_size * 0.06)
+    eye_radius_highlight = int(face_size * 0.025)
+
+    eye_left_center = (inner_rect.centerx - eye_offset_x, eye_center_y)
+    eye_right_center = (inner_rect.centerx + eye_offset_x, eye_center_y)
+
+    iris_outer_color: RGB = (100, 240, 255)  # cyan ring
+    iris_inner_color: RGB = (255, 255, 255)  # white inner
+    pupil_color: RGB = (25, 45, 80)          # dark blue
+    highlight_color: RGB = (255, 255, 255)
+
+    def _draw_eye(center: Tuple[int, int]) -> None:
+        # Outer glow ring
+        pygame.draw.circle(surface, iris_outer_color, center, eye_radius_outer)
+        # Inner white circle
+        pygame.draw.circle(surface, iris_inner_color, center, eye_radius_inner)
+        # Pupil
+        pupil_radius = int(eye_radius_inner * 0.55)
+        pygame.draw.circle(surface, pupil_color, center, pupil_radius)
+        # Highlight (small circle up-left in pupil)
+        highlight_center = (
+            center[0] - int(pupil_radius * 0.35),
+            center[1] - int(pupil_radius * 0.35),
+        )
+        pygame.draw.circle(surface, highlight_color, highlight_center, eye_radius_highlight)
+
+    _draw_eye(eye_left_center)
+    _draw_eye(eye_right_center)
+
+    # Optional small eyebrows (simple rounded rectangles)
+    brow_width = int(face_size * 0.16)
+    brow_height = int(face_size * 0.02)
+    brow_offset_y = int(face_size * 0.07)
+    brow_color: RGB = (210, 240, 255)
+
+    left_brow_rect = pygame.Rect(
+        eye_left_center[0] - brow_width // 2,
+        eye_left_center[1] - brow_offset_y,
+        brow_width,
+        brow_height,
+    )
+    right_brow_rect = pygame.Rect(
+        eye_right_center[0] - brow_width // 2,
+        eye_right_center[1] - brow_offset_y,
+        brow_width,
+        brow_height,
     )
 
-    pygame.draw.ellipse(surface, eye_white, left_eye_rect)
-    pygame.draw.ellipse(surface, eye_white, right_eye_rect)
-    pygame.draw.ellipse(surface, eye_border, left_eye_rect, width=3)
-    pygame.draw.ellipse(surface, eye_border, right_eye_rect, width=3)
+    pygame.draw.rect(surface, brow_color, left_brow_rect, border_radius=brow_height // 2)
+    pygame.draw.rect(surface, brow_color, right_brow_rect, border_radius=brow_height // 2)
 
-    m_clamped = max(0.0, min(1.0, float(mouth_level)))
+    # ----------------------------------------------------------------------
+    # Mouth (in the chin area, animated by mouth_level)
+    # ----------------------------------------------------------------------
+    m = max(0.0, min(1.0, float(mouth_level)))
 
-    pupil_w = int(eye_w * 0.32)
-    pupil_h = int(eye_h * 0.35)
-    pupil_offset_y = int(-0.06 * eye_h * m_clamped)
+    mouth_width = int(chin_rect.width * 0.26)
+    mouth_max_height = int(chin_rect.height * 0.35)
+    mouth_min_height = max(4, mouth_max_height // 3)
+    mouth_height = int(mouth_min_height + (mouth_max_height - mouth_min_height) * m)
 
-    left_pupil_rect = pygame.Rect(0, 0, pupil_w, pupil_h)
-    left_pupil_rect.center = (
-        left_eye_rect.centerx,
-        left_eye_rect.centery + pupil_offset_y,
-    )
-
-    right_pupil_rect = pygame.Rect(0, 0, pupil_w, pupil_h)
-    right_pupil_rect.center = (
-        right_eye_rect.centerx,
-        right_eye_rect.centery + pupil_offset_y,
-    )
-
-    pygame.draw.ellipse(surface, pupil_color, left_pupil_rect)
-    pygame.draw.ellipse(surface, pupil_color, right_pupil_rect)
-
-    highlight_r = max(2, pupil_w // 6)
-    for rect in (left_pupil_rect, right_pupil_rect):
-        highlight_center = (rect.centerx - highlight_r, rect.centery - highlight_r)
-        pygame.draw.circle(surface, (255, 255, 255), highlight_center, highlight_r)
-
-    # ------------------------------------------------------------------ #
-    # Mouth
-    # ------------------------------------------------------------------ #
-    mouth_width = int(width * 0.34)
-    mouth_height_max = int(height * 0.16)
-    mouth_height_min = int(height * 0.02)
-
-    open_height = int(
-        mouth_height_min + (mouth_height_max - mouth_height_min) * m_clamped
-    )
+    mouth_center_x = chin_rect.centerx
+    mouth_center_y = chin_rect.y + int(chin_rect.height * 0.55)
 
     mouth_rect = pygame.Rect(
-        cx - mouth_width // 2,
-        mouth_center_y - open_height // 2,
+        mouth_center_x - mouth_width // 2,
+        mouth_center_y - mouth_height // 2,
         mouth_width,
-        open_height,
+        mouth_height,
     )
 
-    pygame.draw.ellipse(surface, mouth_fill, mouth_rect)
-    pygame.draw.ellipse(surface, mouth_border, mouth_rect, width=4)
+    mouth_color: RGB = (40, 50, 90)
+    pygame.draw.ellipse(surface, mouth_color, mouth_rect)
 
-    smile_strength = 1.0 if m_clamped > 0.2 else m_clamped * 0.8
-    smile_color = (
-        min(255, int(mouth_border[0] + 40 * smile_strength)),
-        min(255, int(mouth_border[1] + 20 * smile_strength)),
-        mouth_border[2],
-    )
+    # ----------------------------------------------------------------------
+    # Status + subtitle text under the face
+    # ----------------------------------------------------------------------
+    text_block_top = face_rect.bottom + int(height * 0.03)
+    max_text_width = int(width * 0.90)
 
-    smile_y = mouth_rect.centery + open_height // 4
-    smile_left = mouth_rect.left + int(mouth_width * 0.08)
-    smile_right = mouth_rect.right - int(mouth_width * 0.08)
+    # Main status (slightly larger, maybe bold)
+    y = text_block_top
+    if status_text and font_main is not None:
+        y = _render_multiline_text(
+            surface=surface,
+            text=status_text,
+            font=font_main,
+            color=color_text_status,
+            max_width=max_text_width,
+            start_y=y,
+            line_spacing=4,
+        )
 
-    pygame.draw.arc(
-        surface,
-        smile_color,
-        pygame.Rect(
-            smile_left,
-            smile_y - open_height // 3,
-            smile_right - smile_left,
-            open_height,
-        ),
-        0.1,
-        3.0,
-        width=3,
-    )
-
-    # ------------------------------------------------------------------ #
-    # Status + subtitle (bottom text area)
-    # ------------------------------------------------------------------ #
-    _render_multiline_text(
-        surface=surface,
-        text=status_text or "",
-        font=font_status,
-        color=color_text_status,
-        max_width=max_text_width,
-        start_y=status_top_y,
-        line_spacing=4,
-    )
-
-    _render_multiline_text(
-        surface=surface,
-        text=subtitle_text or "",
-        font=font_subtitle,
-        color=color_text_subtitle,
-        max_width=max_text_width,
-        start_y=subtitle_top_y,
-        line_spacing=3,
-    )
+    # Subtitle (smaller, dimmer)
+    if subtitle_text and font_subtitle is not None:
+        y += int(height * 0.01)
+        _render_multiline_text(
+            surface=surface,
+            text=subtitle_text,
+            font=font_subtitle,
+            color=color_text_subtitle,
+            max_width=max_text_width,
+            start_y=y,
+            line_spacing=3,
+        )
