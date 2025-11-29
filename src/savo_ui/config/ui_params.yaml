@@ -26,8 +26,8 @@ savo_ui_display:
     # Screen & render loop
     # ------------------------------------------------------------------------
     screen:
-      width: 1024          # Native width of DFR0678
-      height: 600          # Native height of DFR0678
+      width: 800           # Native width of DFR0678
+      height: 480          # Native height of DFR0678
       fps: 30              # Target frames per second
       fullscreen: true     # Use fullscreen on the DSI framebuffer
       vsync: true          # If backend supports it, try to sync to display
