@@ -129,7 +129,7 @@ case "${TARGET_MODE}" in
   "NAVIGATE")
     log_info "Running NAVIGATE face demo..."
     pub_once "/savo_ui/mode"            "std_msgs/String"   "{data: 'NAVIGATE'}"
-    pub_once "/savo_ui/status_text"     "std_msgs/String"   "{data: 'Guiding to Info Desk, please follow me.'}"
+    pub_once "/savo_ui/status_text"     "std_msgs/String"   "{data: 'Navigation mode ON.'}"
     pub_once "/savo_speech/tts_text"    "std_msgs/String"   "{data: 'Please walk behind me. I will guide you safely to the Info Desk.'}"
     pub_once "/savo_speech/mouth_level" "std_msgs/Float32"  "{data: 0.6}"
     ;;
@@ -137,7 +137,7 @@ case "${TARGET_MODE}" in
   "MAP")
     log_info "Running MAP face demo..."
     pub_once "/savo_ui/mode"            "std_msgs/String"   "{data: 'MAP'}"
-    pub_once "/savo_ui/status_text"     "std_msgs/String"   "{data: 'Mapping in progress, please keep some distance from me.'}"
+    pub_once "/savo_ui/status_text"     "std_msgs/String"   "{data: 'Mapping in progress'}"
     pub_once "/savo_speech/tts_text"    "std_msgs/String"   "{data: 'I am now mapping this area. Please keep a little distance while I work.'}"
     pub_once "/savo_speech/mouth_level" "std_msgs/Float32"  "{data: 0.0}"
     ;;
