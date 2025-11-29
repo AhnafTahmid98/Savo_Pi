@@ -13,16 +13,16 @@ This node drives the 7" DFRobot DSI display. It is responsible for:
     - /savo_speech/tts_text    (subtitle of what Robot Savo is saying)
 
 - Rendering the appropriate view:
-    - INTERACT: eyes + mouth + friendly status + subtitle
-    - NAVIGATE: camera view + overlay status (goal, guidance, etc.)
-    - MAP: mapping status (optionally with a smaller face)
+    - INTERACT: eyes + mouth + friendly status + subtitle (face_view.py)
+    - NAVIGATE: camera view + overlay status / subtitle (nav_cam_view.py)
+    - MAP: mapping status (optionally reusing face layout)
 
 Rendering is implemented using pygame in fullscreen on the DSI display.
 
-NOTE:
-- Camera rendering is intentionally kept as a placeholder here; you can later
-  connect it to nav_cam_view.py with proper sensor_msgs/Image → pygame
-  conversion (via numpy/cv_bridge or a custom converter).
+Camera handling:
+- Subscribes to sensor_msgs/Image on `navigation.camera_topic` (default /camera/image_rect).
+- Supports `rgb8` and `bgr8` encodings.
+- Converts frames to NumPy RGB (H, W, 3) and passes them to nav_cam_view.py.
 """
 
 from __future__ import annotations
@@ -36,11 +36,12 @@ from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 
 from std_msgs.msg import String, Float32
-from sensor_msgs.msg import Image  # used as a placeholder type for camera
+from sensor_msgs.msg import Image
 
 import pygame
+import numpy as np
 
-# Import helper modules (you will implement these in separate files)
+# Import helper modules
 try:
     from .face_view import draw_face_view
     from .nav_cam_view import draw_navigation_view
@@ -70,13 +71,16 @@ class SavoUIDisplay(Node):
         # Internal state
         # ------------------------------------------------------------------
         self._mode: str = "INTERACT"
+        # Empty by default; higher-level nodes are expected to set status_text.
         self._status_text: str = ""
         self._subtitle_text: str = ""
         self._mouth_level: float = 0.0
 
-        # You can later store last camera frame here when you implement it
+        # Camera state
         self._have_camera: bool = False
         self._camera_ready: bool = False
+        self._last_camera_frame: Optional[np.ndarray] = None  # (H, W, 3) RGB
+        self._warned_camera_encoding: bool = False
 
         # ------------------------------------------------------------------
         # Subscriptions
@@ -106,8 +110,7 @@ class SavoUIDisplay(Node):
             10,
         )
 
-        # Camera is optional; we wire up the subscription but keep rendering as
-        # a placeholder unless you implement nav_cam_view.
+        # Camera is optional; NAVIGATE mode will show a placeholder if no topic.
         if self.camera_topic:
             qos_cam = QoSProfile(
                 reliability=ReliabilityPolicy.BEST_EFFORT,
@@ -292,15 +295,58 @@ class SavoUIDisplay(Node):
 
     def _on_camera_image(self, msg: Image) -> None:
         """
-        Placeholder camera callback.
+        Camera callback: convert ROS Image -> RGB NumPy frame for nav_cam_view.
 
-        For now we only flag that camera data is arriving. You will later
-        replace this with proper Image handling and a bridge to nav_cam_view.py.
+        - Supports rgb8 and bgr8 encodings.
+        - On first frame, marks camera as ready and logs once.
+        - Stores only the latest frame; rendering happens in the pygame timer.
         """
         if not self._camera_ready:
             self._camera_ready = True
             self.get_logger().info("Camera stream is active (first frame received).")
-        # TODO: store the latest frame in a suitable format for nav_cam_view
+
+        try:
+            enc = (msg.encoding or "").lower()
+        except Exception:
+            enc = ""
+
+        try:
+            buf = np.frombuffer(msg.data, dtype=np.uint8)
+            expected = msg.height * msg.width * 3
+            if buf.size != expected:
+                if not self._warned_camera_encoding:
+                    self._warned_camera_encoding = True
+                    self.get_logger().warn(
+                        f"Unexpected image size: got {buf.size}, "
+                        f"expected {expected} (height={msg.height}, width={msg.width})"
+                    )
+                return
+
+            frame = buf.reshape((msg.height, msg.width, 3))
+
+            if enc in ("rgb8", "rgb_8", "rgb8c"):
+                frame_rgb = frame
+            elif enc in ("bgr8", "bgr_8", "bgr8c"):
+                # Convert BGR -> RGB
+                frame_rgb = frame[:, :, ::-1]
+            else:
+                if not self._warned_camera_encoding:
+                    self._warned_camera_encoding = True
+                    self.get_logger().warn(
+                        f"Unsupported camera encoding '{msg.encoding}', "
+                        "expected rgb8 or bgr8; NAVIGATE view will show placeholder."
+                    )
+                return
+
+            self._last_camera_frame = frame_rgb
+
+        except Exception as exc:
+            if not self._warned_camera_encoding:
+                self._warned_camera_encoding = True
+                self.get_logger().warn(
+                    f"Error converting camera image: {exc}. "
+                    "NAVIGATE view will show placeholder."
+                )
 
     # ======================================================================
     # Pygame initialization and render loop
@@ -482,6 +528,7 @@ class SavoUIDisplay(Node):
                 },
                 screen_size=(self.screen_width, self.screen_height),
                 camera_ready=self._camera_ready,
+                camera_frame=self._last_camera_frame,
             )
         else:
             msg = "NAVIGATE mode (camera or nav_cam_view not implemented)"
@@ -495,7 +542,7 @@ class SavoUIDisplay(Node):
         if draw_face_view is not None:
             draw_face_view(
                 surface=self._screen,
-                mouth_level=0.0,  # typically not talking during map status
+                mouth_level=0.0,  # typically not talking during mapping status
                 status_text=(
                     self._status_text
                     or "Mapping in progress, please keep distance."
