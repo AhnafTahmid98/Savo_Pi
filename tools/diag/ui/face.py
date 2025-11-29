@@ -26,7 +26,6 @@ import pygame
 # ---------------------------------------------------------------------------
 # SDL / video backend hints
 # ---------------------------------------------------------------------------
-# Don't force SDL_VIDEODRIVER here; we'll choose in init_pygame().
 os.environ.setdefault("SDL_VIDEO_WAYLAND_ALLOW_LIBDECOR", "0")
 os.environ.setdefault("SDL_RENDER_VSYNC", "1")
 
@@ -46,36 +45,23 @@ MOUTH_XYWH       = (300, 350, 200, 25)
 
 # --- scaling helpers (GLOBAL after init) ---
 _SX, _SY = 1.0, 1.0
-
-
-def Sx(v: float) -> int:
-    return int(v * _SX)
-
-
-def Sy(v: float) -> int:
-    return int(v * _SY)
-
-
-def S2(pt: Tuple[float, float]) -> Tuple[int, int]:
-    return (Sx(pt[0]), Sy(pt[1]))
-
-
-def Sr() -> float:
-    """Radius / thickness scaling (use min so it looks consistent)."""
-    return min(_SX, _SY)
+def Sx(v: float) -> int: return int(v * _SX)
+def Sy(v: float) -> int: return int(v * _SY)
+def S2(pt: Tuple[float, float]) -> Tuple[int, int]: return (Sx(pt[0]), Sy(pt[1]))
+def Sr() -> float: return min(_SX, _SY)
 
 
 # ---------------------------------------------------------------------------
-# SDL driver selection (similar spirit to display_manager_node)
+# SDL driver selection — mirror the logic of display_manager_node
 # ---------------------------------------------------------------------------
 
 def _choose_driver() -> str:
     """
-    Try a couple of SDL video drivers and return the one that works.
+    Try SDL video drivers and pick one that works.
 
     Order:
-      1) Whatever SDL_VIDEODRIVER is currently set to (if any)
-      2) kmsdrm   (direct KMS on the Pi, what display_manager_node uses)
+      1) whatever SDL_VIDEODRIVER is currently set to (if any)
+      2) kmsdrm
       3) wayland
       4) x11
     """
@@ -86,12 +72,9 @@ def _choose_driver() -> str:
     if env_drv:
         candidates.append(env_drv)
 
-    # Add our preferred drivers
     for drv in ("kmsdrm", "wayland", "x11"):
         if drv not in candidates:
             candidates.append(drv)
-
-    pygame.display.quit()  # make sure we start clean
 
     for drv in candidates:
         if drv in tried:
@@ -101,35 +84,27 @@ def _choose_driver() -> str:
         try:
             os.environ["SDL_VIDEODRIVER"] = drv
             pygame.display.init()
-
-            # Try to open a fullscreen display using the logical size.
-            # SDL will pick the real mode; we just test if it works.
-            flags = pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF
-            screen = pygame.display.set_mode((NATIVE_W, NATIVE_H), flags)
-
-            # If we reach this point, the driver works; keep this screen.
-            w, h = screen.get_size()
-            print(
-                f"[face.py] SDL driver '{drv}' selected, "
-                f"screen size {w}x{h}",
-                flush=True,
-            )
-            return drv
-
+            info = pygame.display.get_desktop_sizes()
+            if info:
+                print(
+                    f"[face.py] SDL driver '{drv}' OK, desktop sizes: {info}",
+                    flush=True,
+                )
+                pygame.display.quit()
+                return drv
         except Exception as exc:
             print(
                 f"[face.py] SDL driver '{drv}' failed: {exc}",
                 flush=True,
             )
+        finally:
             try:
                 pygame.display.quit()
             except Exception:
                 pass
 
     raise RuntimeError(
-        "No usable SDL video driver found (tried: "
-        + ", ".join(tried)
-        + ")."
+        "No usable SDL video driver found (tried: " + ", ".join(tried) + ")."
     )
 
 
@@ -137,11 +112,11 @@ def init_pygame():
     pygame.init()
 
     drv = _choose_driver()
-    # At this point, display is already initialized and a screen exists.
-    screen = pygame.display.get_surface()
-    if screen is None:
-        raise RuntimeError("pygame.display.get_surface() returned None.")
+    os.environ["SDL_VIDEODRIVER"] = drv
 
+    # Now open the real fullscreen window
+    flags = pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF
+    screen = pygame.display.set_mode((NATIVE_W, NATIVE_H), flags)
     w, h = screen.get_size()
     pygame.display.set_caption(f"Robot Face [{drv}] {w}x{h}")
     pygame.mouse.set_visible(False)
@@ -227,7 +202,7 @@ def draw_face(surface, mood, eyes_closed):
     surface.fill(BLACK)
     draw_head(surface)
     draw_eyes(surface, eyes_closed)
-    draw_mouth(surface, mood, )
+    draw_mouth(surface, mood)
     pygame.display.flip()
 
 
@@ -237,6 +212,7 @@ def draw_face(surface, mood, eyes_closed):
 
 def main():
     screen, clock, _, driver = init_pygame()
+    print(f"[face.py] Using SDL driver '{driver}'", flush=True)
 
     mood = "neutral"
     eyes_closed = False
