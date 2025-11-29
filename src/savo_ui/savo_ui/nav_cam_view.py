@@ -14,7 +14,7 @@ Actual camera frames will be wired later via nav_cam_view + Image messages.
 
 from __future__ import annotations
 
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Any
 
 import pygame
 
@@ -82,6 +82,7 @@ def draw_navigation_view(
     colors: Dict[str, RGB],
     screen_size: Tuple[int, int],
     camera_ready: bool,
+    camera_frame: Any = None,  # currently unused, but needed for compatibility
 ) -> None:
     """
     Draw the NAVIGATE mode view.
@@ -104,7 +105,9 @@ def draw_navigation_view(
         (width, height) of the display.
     camera_ready:
         True if we have received at least one camera frame.
-        For now this only changes placeholder text.
+    camera_frame:
+        Latest camera frame (type to be defined later).
+        Currently unused; placeholder for future real video rendering.
     """
     width, height = screen_size
 
@@ -120,7 +123,7 @@ def draw_navigation_view(
     cam_border_color: RGB = (40, 120, 200)
     cam_inner_color: RGB = (10, 20, 40)
 
-    # Background (caller will have cleared, but make sure)
+    # Background (just to be safe)
     surface.fill(color_bg)
 
     # ----------------------------------------------------------------------
@@ -137,7 +140,8 @@ def draw_navigation_view(
     cam_bottom = cam_rect.bottom
     cam_right = cam_rect.right
 
-    # Draw camera panel (for now, a placeholder rectangle)
+    # If we later draw real camera_frame, it will go inside cam_rect.
+    # For now we still draw the placeholder panel.
     pygame.draw.rect(surface, cam_inner_color, cam_rect)
     pygame.draw.rect(surface, cam_border_color, cam_rect, width=4)
 
@@ -214,7 +218,7 @@ def draw_navigation_view(
         if camera_ready:
             cam_msg = "Camera active"
         else:
-            cam_msg = "Starting camera…"  # or "No camera feed"
+            cam_msg = "Starting camera…"
 
         cam_text = font_status.render(cam_msg, True, color_text_main)
         cam_text_rect = cam_text.get_rect(center=cam_rect.center)
@@ -262,7 +266,6 @@ def draw_navigation_view(
     bar_margin_x = int(width * 0.04)
     bar_margin_y = int(height * 0.05)
 
-    # Bottom-right so it does not collide with centered subtitle text
     bar_x = width - bar_margin_x - bar_width
     bar_y = height - bar_height - bar_margin_y
 
