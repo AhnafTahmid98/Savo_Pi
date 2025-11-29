@@ -121,11 +121,11 @@ def draw_face_view(
     # ------------------------------------------------------------------ #
     cx = width // 2
 
-    title_y = int(height * 0.04)       # a bit lower than before
-    eye_center_y = int(height * 0.34)  # was 0.30 → eyes moved down
-    mouth_center_y = int(height * 0.60)  # was 0.56 → mouth moved down
-    status_top_y = int(height * 0.72)    # was 0.68
-    subtitle_top_y = int(height * 0.84)  # was 0.80
+    title_y = int(height * 0.08)       # a bit lower than before
+    eye_center_y = int(height * 0.54)  # was 0.30 → eyes moved down
+    mouth_center_y = int(height * 0.80)  # was 0.56 → mouth moved down
+    status_top_y = int(height * 0.92)    # was 0.68
+    subtitle_top_y = int(height * 1.5)  # was 0.80
 
     max_text_width = int(width * 0.90)
 
