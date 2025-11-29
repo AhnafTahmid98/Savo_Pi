@@ -19,11 +19,10 @@
 #   bash src/savo_ui/scripts/test_face.sh map
 #
 
-set -euo pipefail
-
-# Work around ROS 2 setup using AMENT_TRACE_SETUP_FILES without defining it
-# when 'set -u' (nounset) is enabled.
-export AMENT_TRACE_SETUP_FILES="${AMENT_TRACE_SETUP_FILES-}"
+# -e : exit on error
+# -o pipefail : fail if any command in a pipeline fails
+# (no -u here, because ROS setup uses some vars before defining them)
+set -eo pipefail
 
 # --------------------------------------------------------------------------- #
 # Logging helpers
