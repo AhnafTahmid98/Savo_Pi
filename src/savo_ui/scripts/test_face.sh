@@ -2,21 +2,31 @@
 #
 # Robot Savo — Face UI test helper
 #
-# This script publishes sample messages to the svo_ui topics to exercise the
+# This script publishes sample messages to the savo_ui topics to exercise the
 # face UI (INTERACT / NAVIGATE / MAP) without needing the full speech/LLM stack.
 #
-# Usage:
+# Usage (from workspace root):
 #   cd ~/Savo_Pi
-#   bash src/savo_ui/scripts/test_face.sh              # INTERACT demo
-#   bash src/savo_ui/scripts/test_face.sh interact     # INTERACT demo
-#   bash src/savo_ui/scripts/test_face.sh navigate     # NAVIGATE demo
-#   bash src/savo_ui/scripts/test_face.sh map          # MAP demo
+#
+#   # INTERACT demo (default)
+#   bash src/savo_ui/scripts/test_face.sh
+#   bash src/savo_ui/scripts/test_face.sh interact
+#
+#   # NAVIGATE demo
+#   bash src/savo_ui/scripts/test_face.sh navigate
+#
+#   # MAP demo
+#   bash src/savo_ui/scripts/test_face.sh map
 #
 
 set -euo pipefail
 
+# Work around ROS 2 setup using AMENT_TRACE_SETUP_FILES without defining it
+# when 'set -u' (nounset) is enabled.
+export AMENT_TRACE_SETUP_FILES="${AMENT_TRACE_SETUP_FILES-}"
+
 # --------------------------------------------------------------------------- #
-# Helper: log function
+# Logging helpers
 # --------------------------------------------------------------------------- #
 log_info()  { echo "[test_face] [INFO ] $*"; }
 log_warn()  { echo "[test_face] [WARN ] $*" >&2; }
@@ -111,26 +121,26 @@ pub_once() {
 case "${TARGET_MODE}" in
   "INTERACT")
     log_info "Running INTERACT face demo..."
-    pub_once "/savo_ui/mode"         "std_msgs/String"   "{data: 'INTERACT'}"
-    pub_once "/savo_ui/status_text"  "std_msgs/String"   "{data: 'Ready to help you on campus.'}"
-    pub_once "/savo_speech/tts_text" "std_msgs/String"   "{data: 'Hello, I am Robot Savo. How can I guide you today?'}"
-    pub_once "/savo_speech/mouth_level" "std_msgs/Float32" "{data: 0.8}"
+    pub_once "/savo_ui/mode"            "std_msgs/String"   "{data: 'INTERACT'}"
+    pub_once "/savo_ui/status_text"     "std_msgs/String"   "{data: 'Ready to help you on campus.'}"
+    pub_once "/savo_speech/tts_text"    "std_msgs/String"   "{data: 'Hello, I am Robot Savo. How can I guide you today?'}"
+    pub_once "/savo_speech/mouth_level" "std_msgs/Float32"  "{data: 0.8}"
     ;;
 
   "NAVIGATE")
     log_info "Running NAVIGATE face demo..."
-    pub_once "/savo_ui/mode"         "std_msgs/String"   "{data: 'NAVIGATE'}"
-    pub_once "/savo_ui/status_text"  "std_msgs/String"   "{data: 'Guiding to Info Desk, please follow me.'}"
-    pub_once "/savo_speech/tts_text" "std_msgs/String"   "{data: 'Please walk behind me. I will guide you safely to the Info Desk.'}"
-    pub_once "/savo_speech/mouth_level" "std_msgs/Float32" "{data: 0.6}"
+    pub_once "/savo_ui/mode"            "std_msgs/String"   "{data: 'NAVIGATE'}"
+    pub_once "/savo_ui/status_text"     "std_msgs/String"   "{data: 'Guiding to Info Desk, please follow me.'}"
+    pub_once "/savo_speech/tts_text"    "std_msgs/String"   "{data: 'Please walk behind me. I will guide you safely to the Info Desk.'}"
+    pub_once "/savo_speech/mouth_level" "std_msgs/Float32"  "{data: 0.6}"
     ;;
 
   "MAP")
     log_info "Running MAP face demo..."
-    pub_once "/savo_ui/mode"         "std_msgs/String"   "{data: 'MAP'}"
-    pub_once "/savo_ui/status_text"  "std_msgs/String"   "{data: 'Mapping in progress, please keep some distance from me.'}"
-    pub_once "/savo_speech/tts_text" "std_msgs/String"   "{data: 'I am now mapping this area. Please keep a little distance while I work.'}"
-    pub_once "/savo_speech/mouth_level" "std_msgs/Float32" "{data: 0.0}"
+    pub_once "/savo_ui/mode"            "std_msgs/String"   "{data: 'MAP'}"
+    pub_once "/savo_ui/status_text"     "std_msgs/String"   "{data: 'Mapping in progress, please keep some distance from me.'}"
+    pub_once "/savo_speech/tts_text"    "std_msgs/String"   "{data: 'I am now mapping this area. Please keep a little distance while I work.'}"
+    pub_once "/savo_speech/mouth_level" "std_msgs/Float32"  "{data: 0.0}"
     ;;
 esac
 
