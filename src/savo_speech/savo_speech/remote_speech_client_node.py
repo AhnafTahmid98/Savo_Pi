@@ -109,7 +109,7 @@ class RemoteSpeechClientNode(Node):
                 ("max_utterance_duration_s", 15.0),
 
                 # HTTP client
-                ("request_timeout_s", 45.0), # was 15.0
+                ("request_timeout_s", 15.0), 
                 ("max_retries", 2),
 
                 # TTS gate (self-listening protection + speaking state)
@@ -122,7 +122,7 @@ class RemoteSpeechClientNode(Node):
                 ("input_device_index", 0),
 
                 # Minimum transcript length for a "real" utterance
-                ("min_transcript_chars", 1),  # optional: was 3
+                ("min_transcript_chars", 3),
 
                 # Logging
                 ("debug_logging", False),
@@ -131,7 +131,7 @@ class RemoteSpeechClientNode(Node):
                 ("face_state_topic", "/savo_ui/face_state"),
 
                 # Wake-word configuration
-                ("wake_word_enable", False),  # was True, for testing
+                ("wake_word_enable", True),
                 (
                     "wake_words",
                     [
