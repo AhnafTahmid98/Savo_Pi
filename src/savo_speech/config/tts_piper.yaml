@@ -179,4 +179,4 @@ tts_node:
     debug_log_text: true
 
     # Limit how much text is printed in logs (to avoid huge wall of text).
-    max_logged_chars: 512
+    max_logged_chars: 600

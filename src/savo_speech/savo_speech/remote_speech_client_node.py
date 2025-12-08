@@ -39,6 +39,10 @@ Key features:
         awake_idle_timeout_s seconds (default 30.0 s), it goes back to sleep.
       * the silence countdown effectively starts after TTS is done
         (we do not auto-sleep while tts_speaking = True).
+  - NEW: Thinking gate:
+      * while a /speech request is in flight ("thinking"), we temporarily
+        stop listening and ignore mic audio. This prevents "old buffered audio"
+        from leaking into the next question.
 """
 
 from __future__ import annotations
@@ -85,6 +89,12 @@ class RemoteSpeechClientNode(Node):
         only counting after TTS has finished.
       - Timing logs for /speech calls:
           [Timing] /speech total=XXXX ms, tier_used=tier1, llm_ok=True
+      - Thinking gate:
+          * when we finalize an utterance and call /speech, we set a
+            "_thinking" flag so the main loop ignores mic audio until the
+            /speech call + publish are finished. Combined with the TTS gate,
+            this ensures questions don't overlap and old audio doesn't leak
+            into the next turn.
     """
 
     def __init__(self) -> None:
@@ -109,7 +119,7 @@ class RemoteSpeechClientNode(Node):
                 ("max_utterance_duration_s", 15.0),
 
                 # HTTP client
-                ("request_timeout_s", 15.0), 
+                ("request_timeout_s", 15.0),
                 ("max_retries", 2),
 
                 # TTS gate (self-listening protection + speaking state)
@@ -295,6 +305,9 @@ class RemoteSpeechClientNode(Node):
         self._utterance_start_time: float = 0.0
         self._utterance_buffers: List[np.ndarray] = []
 
+        # NEW: thinking state — true while a /speech request is in flight
+        self._thinking: bool = False
+
         # Wake / sleep state
         self.wake_active: bool = False
         self._current_face_state: str = ""  # ensure we always go through setter
@@ -413,6 +426,7 @@ class RemoteSpeechClientNode(Node):
         Background worker thread:
 
         - Waits until TTS is not speaking (if gate enabled).
+        - Waits until we are not in "thinking" state (no /speech in flight).
         - Records chunks of audio.
         - In utterance_mode:
             * while chunks have energy → buffer them,
@@ -437,11 +451,17 @@ class RemoteSpeechClientNode(Node):
 
             # Cooldown after TTS stops
             if self.tts_gate_enable and not self.tts_speaking:
-                now = time.time()
-                if now - last_tts_off_time < self.tts_gate_cooldown_s:
+                now_gate = time.time()
+                if now_gate - last_tts_off_time < self.tts_gate_cooldown_s:
                     time.sleep(self.idle_sleep_s)
                     self._check_idle_timeout()
                     continue
+
+            # NEW: Do not listen while we are waiting for a /speech reply
+            if self._thinking:
+                time.sleep(self.idle_sleep_s)
+                self._check_idle_timeout()
+                continue
 
             # Record a chunk
             try:
@@ -484,6 +504,10 @@ class RemoteSpeechClientNode(Node):
                 # User activity: reset idle timer
                 self._last_user_activity_time = time.time()
 
+                # THINKING starts now for this chunk
+                self._thinking = True
+                self._set_face_state("thinking")
+
                 wav_bytes = self._encode_wav_bytes(audio_data, self.sample_rate_hz)
                 (
                     transcript,
@@ -494,6 +518,10 @@ class RemoteSpeechClientNode(Node):
                     llm_ok,
                     error_msg,
                 ) = self._call_speech_with_retries(wav_bytes)
+
+                # Done thinking (TTS gate may still be active later)
+                self._thinking = False
+
                 self._publish_results(
                     transcript=transcript,
                     reply_text=reply_text,
@@ -577,6 +605,9 @@ class RemoteSpeechClientNode(Node):
         if not self.tts_speaking:
             self._set_face_state("thinking")
 
+        # NEW: mark that a /speech request is in flight
+        self._thinking = True
+
         # Full utterance = user activity; reset idle timer
         self._last_user_activity_time = time.time()
 
@@ -590,6 +621,9 @@ class RemoteSpeechClientNode(Node):
             llm_ok,
             error_msg,
         ) = self._call_speech_with_retries(wav_bytes)
+
+        # Done thinking — after we have the reply (TTS may still speak)
+        self._thinking = False
 
         self._publish_results(
             transcript=transcript,
