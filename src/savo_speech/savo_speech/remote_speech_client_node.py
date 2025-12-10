@@ -288,12 +288,14 @@ class RemoteSpeechClientNode(Node):
         # ---------------------------------------------------------------------
         # TTS speaking gate (also drives "speaking"/"idle|listening" face state)
         self.tts_speaking: bool = False
+        self._tts_last_end_time: float = 0.0  # NEW: track when TTS last finished
         self.create_subscription(
             Bool,
             self.tts_speaking_topic,
             self._tts_speaking_cb,
             10,
-        )
+      )
+
 
         # ---------------------------------------------------------------------
         # Internal conversation state
@@ -403,6 +405,11 @@ class RemoteSpeechClientNode(Node):
 
         # When TTS starts, we are clearly "speaking".
         if self.tts_speaking:
+            # Extra safety: drop any partial utterance we were buffering
+            self._in_utterance = False
+            self._utterance_buffers = []
+            self._utterance_start_time = 0.0
+
             self._set_face_state("speaking")
             # Also count this as activity; we don't want to sleep while mid-sentence.
             self._last_user_activity_time = time.time()
@@ -410,8 +417,11 @@ class RemoteSpeechClientNode(Node):
 
         # TTS just stopped
         if was_speaking and not self.tts_speaking:
+            # Record when TTS finished → used by cooldown gate in _main_loop
+            self._tts_last_end_time = time.time()
+
             # Reset activity time so auto-sleep countdown starts AFTER TTS done.
-            self._last_user_activity_time = time.time()
+            self._last_user_activity_time = self._tts_last_end_time
             if self.wake_active:
                 self._set_face_state("listening")
             else:
@@ -439,20 +449,17 @@ class RemoteSpeechClientNode(Node):
         """
         self.get_logger().info("Remote speech worker thread started.")
 
-        last_tts_off_time: float = 0.0
-
         while rclpy.ok() and not self._shutdown_flag:
-            # Avoid listening to ourselves (basic gate)
+            # Avoid listening to ourselves while TTS is speaking
             if self.tts_gate_enable and self.tts_speaking:
-                last_tts_off_time = time.time()
                 time.sleep(self.idle_sleep_s)
                 self._check_idle_timeout()
                 continue
 
-            # Cooldown after TTS stops
+            # Cooldown after TTS stops: wait a short time after last TTS end
             if self.tts_gate_enable and not self.tts_speaking:
                 now_gate = time.time()
-                if now_gate - last_tts_off_time < self.tts_gate_cooldown_s:
+                if (now_gate - self._tts_last_end_time) < self.tts_gate_cooldown_s:
                     time.sleep(self.idle_sleep_s)
                     self._check_idle_timeout()
                     continue
