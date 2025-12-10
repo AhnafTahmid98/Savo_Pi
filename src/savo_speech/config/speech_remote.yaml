@@ -101,6 +101,8 @@ remote_speech_client_node:
       - "k-robo"
       - "krobo"
       - "k robo"
+      - "savu"
+      - "sabu"
 
       # English "hey/hi/hello" + names
       - "hey robo"
