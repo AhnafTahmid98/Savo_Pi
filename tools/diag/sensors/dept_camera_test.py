@@ -1,43 +1,31 @@
 #!/usr/bin/env python3
 """
-Robot Savo — Intel RealSense D435 Depth Diagnostic (non-ROS)
+Robot Savo — D435 Depth Diagnostic (ROS-based, reliable)
 
-Purpose (expert-level, practical):
-- Verify D435 streams are accessible via V4L2 on Raspberry Pi 5 (Ubuntu Server 24.04).
-- Compute a robust "front obstacle distance" from the depth stream using an ROI + percentile.
-- Optionally preview depth (false color) + color (YUYV) for quick sanity checks.
-- Optional CSV logging for later analysis.
+Why ROS-based:
+- Your D435 depth stream is confirmed working in ROS2 at ~30 Hz.
+- OpenCV/V4L2 often cannot reliably stream Z16 depth from /dev/video6.
+- This tool subscribes to the ROS depth topic and computes a robust "front obstacle distance".
 
-Your current device mapping (from v4l2-ctl):
-- Depth (Z16)  : /dev/video6
-- IR (GREY)    : /dev/video10
-- Color (YUYV) : /dev/video12
+What it does:
+- Subscribes: /camera/camera/depth/image_rect_raw   (sensor_msgs/Image, encoding usually 16UC1)
+- Computes: robust near distance (percentile) inside ROI
+- Prints: dist + status [OK/SLOW/STOP/NO_DATA]
+- Optional: publish /depth/min_front_m (std_msgs/Float32)
+- Optional: CSV logging
 
-Important reality:
-- Depth Z16 via OpenCV/V4L2 can be flaky on some platforms. If you see repeated
-  NO_DATA or read failures BUT ROS2 realsense2_camera works at 30 Hz, then your camera
-  is fine; it’s the non-ROS decode path. In that case, use a ROS-based diagnostic node.
+Run:
+  # Terminal A: start RealSense driver
+  ros2 launch realsense2_camera rs_launch.py
 
-Usage:
-  # Depth only (recommended first)
-  python3 dept_camera_test.py
+  # Terminal B: run this tool
+  python3 tools/diag/sensors/dept_camera_test.py
 
-  # With preview windows (requires display)
-  python3 dept_camera_test.py --preview
-
-  # Force devices / profiles
-  python3 dept_camera_test.py --depth-dev /dev/video6 --depth-w 848 --depth-h 480 --fps 30
-
-  # Log CSV
-  python3 dept_camera_test.py --csv depth_log.csv
-
-Keys:
-  q  -> quit (when --preview enabled)
-  Ctrl+C -> quit
-
-Exit codes:
-  0 success
-  2 cannot open depth device
+Options:
+  --depth-topic /camera/camera/depth/image_rect_raw
+  --publish-topic /depth/min_front_m
+  --no-publish
+  --csv out.csv
 """
 
 from __future__ import annotations
@@ -45,23 +33,21 @@ from __future__ import annotations
 import argparse
 import csv
 import math
-import sys
 import time
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
 import numpy as np
+import rclpy
+from rclpy.node import Node
+from sensor_msgs.msg import Image
+from std_msgs.msg import Float32
 
-try:
-    import cv2
-except Exception:
-    print("ERROR: OpenCV not available. Install: sudo apt install -y python3-opencv")
-    raise
+from cv_bridge import CvBridge
 
 
 @dataclass(frozen=True)
 class ROIFrac:
-    """ROI expressed as fractions of width/height."""
     x0: float = 0.40
     x1: float = 0.60
     y0: float = 0.35
@@ -80,269 +66,159 @@ class ROIFrac:
         return x0, x1, y0, y1
 
 
-def open_v4l2(
-    dev: str,
-    width: int,
-    height: int,
-    fps: int,
-    fourcc: Optional[str],
-) -> cv2.VideoCapture:
-    cap = cv2.VideoCapture(dev, cv2.CAP_V4L2)
-    if not cap.isOpened():
-        return cap
+class DepthDiag(Node):
+    def __init__(self, args):
+        super().__init__("dept_camera_test")
 
-    # Hint desired pixel format FIRST (helps avoid "Invalid argument")
-    if fourcc:
-        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*fourcc))
+        self.args = args
+        self.bridge = CvBridge()
+        self.roi = ROIFrac(args.roi_x0, args.roi_x1, args.roi_y0, args.roi_y1)
 
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, int(width))
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, int(height))
-    cap.set(cv2.CAP_PROP_FPS, int(fps))
+        self.pub: Optional[rclpy.publisher.Publisher] = None
+        if not args.no_publish:
+            self.pub = self.create_publisher(Float32, args.publish_topic, 10)
+            self.get_logger().info(f"Publishing: {args.publish_topic}")
 
-    # Reduce buffering latency if supported by backend
-    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-    return cap
+        self.csv_f = None
+        self.csv_w = None
+        if args.csv:
+            self.csv_f = open(args.csv, "w", newline="")
+            self.csv_w = csv.writer(self.csv_f)
+            self.csv_w.writerow(["t_s", "dist_m", "valid_px", "roi_x0", "roi_x1", "roi_y0", "roi_y1"])
 
+        self.last_print_t = 0.0
+        self.frame_count = 0
+        self.last_hz_t = time.time()
+        self.hz_est = 0.0
 
-def rate_estimate(prev_hz: float, dt: float) -> float:
-    if dt <= 0:
-        return prev_hz
-    hz = 1.0 / dt
-    return hz if prev_hz <= 0 else (0.9 * prev_hz + 0.1 * hz)
+        self.sub = self.create_subscription(Image, args.depth_topic, self.on_depth, 10)
+        self.get_logger().info(f"Subscribing: {args.depth_topic}")
 
+        self.get_logger().info(
+            f"ROI frac: x[{args.roi_x0:.2f},{args.roi_x1:.2f}] y[{args.roi_y0:.2f},{args.roi_y1:.2f}] "
+            f"percentile={args.percentile:.1f}"
+        )
 
-def compute_front_distance_m(
-    depth_frame: np.ndarray,
-    roi: ROIFrac,
-    unit_is_mm: bool,
-    min_valid_m: float,
-    max_valid_m: float,
-    percentile: float,
-) -> Tuple[float, int, int, int, int, int]:
-    """
-    Returns:
-      dist_m, x0, x1, y0, y1, valid_count
-
-    dist_m is NaN if insufficient valid pixels.
-    """
-    if depth_frame is None:
-        return float("nan"), 0, 0, 0, 0, 0
-
-    # Normalize depth array shape
-    if depth_frame.ndim == 3:
-        if depth_frame.shape[2] == 1:
-            depth_frame = depth_frame[:, :, 0]
-        else:
+    def _compute_distance(self, depth: np.ndarray) -> Tuple[float, int, int, int, int, int]:
+        # Depth image expected 16UC1 (often mm). We'll handle both mm and meters via flag.
+        if depth is None:
             return float("nan"), 0, 0, 0, 0, 0
 
-    if depth_frame.ndim != 2:
-        return float("nan"), 0, 0, 0, 0, 0
+        if depth.ndim == 3 and depth.shape[2] == 1:
+            depth = depth[:, :, 0]
 
-    h, w = depth_frame.shape[:2]
-    x0, x1, y0, y1 = roi.to_pixels(w, h)
+        if depth.ndim != 2:
+            return float("nan"), 0, 0, 0, 0, 0
 
-    roi_px = depth_frame[y0:y1, x0:x1].astype(np.float32)
+        h, w = depth.shape[:2]
+        x0, x1, y0, y1 = self.roi.to_pixels(w, h)
 
-    if unit_is_mm:
-        roi_px *= 0.001  # mm -> m
+        roi_px = depth[y0:y1, x0:x1].astype(np.float32)
 
-    # Filter valid depth
-    roi_px = roi_px[np.isfinite(roi_px)]
-    roi_px = roi_px[(roi_px >= min_valid_m) & (roi_px <= max_valid_m)]
-    valid = int(roi_px.size)
+        if self.args.unit_mm:
+            roi_px *= 0.001  # mm -> m
 
-    if valid < 50:
-        return float("nan"), x0, x1, y0, y1, valid
+        roi_px = roi_px[np.isfinite(roi_px)]
+        roi_px = roi_px[(roi_px >= self.args.min_valid_m) & (roi_px <= self.args.max_valid_m)]
+        valid = int(roi_px.size)
 
-    dist = float(np.percentile(roi_px, percentile))
-    return dist, x0, x1, y0, y1, valid
+        if valid < 50:
+            return float("nan"), x0, x1, y0, y1, valid
+
+        dist = float(np.percentile(roi_px, self.args.percentile))
+        return dist, x0, x1, y0, y1, valid
+
+    def on_depth(self, msg: Image):
+        # Convert using cv_bridge
+        try:
+            depth = self.bridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")
+        except Exception as e:
+            self.get_logger().warn(f"cv_bridge conversion failed: {e}")
+            return
+
+        dist_m, x0, x1, y0, y1, valid_px = self._compute_distance(depth)
+
+        # Publish Float32 if enabled
+        if self.pub is not None:
+            out = Float32()
+            out.data = float("nan") if math.isnan(dist_m) else dist_m
+            self.pub.publish(out)
+
+        # CSV
+        if self.csv_w:
+            self.csv_w.writerow([time.time(), dist_m, valid_px, x0, x1, y0, y1])
+            self.csv_f.flush()
+
+        # Print status (throttled)
+        label = "OK"
+        if math.isnan(dist_m):
+            label = "NO_DATA"
+        elif dist_m <= self.args.stop_th_m:
+            label = "STOP"
+        elif dist_m <= self.args.warn_th_m:
+            label = "SLOW"
+
+        now = time.time()
+        if now - self.last_print_t >= self.args.print_period_s:
+            print(f"dist={dist_m:5.2f} m  valid_px={valid_px:6d}  [{label}]")
+            self.last_print_t = now
+
+        # Hz estimate
+        if self.args.print_hz:
+            dt = now - self.last_hz_t
+            if dt > 0:
+                hz = 1.0 / dt
+                self.hz_est = hz if self.hz_est <= 0 else (0.9 * self.hz_est + 0.1 * hz)
+            self.last_hz_t = now
+            self.frame_count += 1
+            if self.frame_count % 30 == 0:
+                print(f"depth_cb_hz≈{self.hz_est:.1f}")
+
+    def close(self):
+        if self.csv_f:
+            self.csv_f.close()
 
 
-def depth_false_color(depth_m: np.ndarray, near_m: float = 0.15, far_m: float = 2.0) -> np.ndarray:
-    """
-    Create a displayable false-color image from depth (meters).
-    Maps [near_m..far_m] -> [0..255] then applies colormap.
-    """
-    d = np.clip(depth_m, near_m, far_m)
-    u8 = ((d - near_m) / (far_m - near_m) * 255.0).astype(np.uint8)
-    return cv2.applyColorMap(u8, cv2.COLORMAP_JET)
-
-
-def main() -> int:
-    ap = argparse.ArgumentParser(description="Robot Savo — D435 depth diagnostic (non-ROS)")
-    ap.add_argument("--depth-dev", default="/dev/video6", help="Depth V4L2 device (Z16). Default: /dev/video6")
-    ap.add_argument("--color-dev", default="/dev/video12", help="Color V4L2 device (YUYV). Default: /dev/video12")
-    ap.add_argument("--no-color", action="store_true", help="Disable color capture")
-
-    ap.add_argument("--depth-w", type=int, default=848)
-    ap.add_argument("--depth-h", type=int, default=480)
-    ap.add_argument("--color-w", type=int, default=640)
-    ap.add_argument("--color-h", type=int, default=480)
-    ap.add_argument("--fps", type=int, default=30)
+def parse_args():
+    ap = argparse.ArgumentParser(description="Robot Savo — D435 depth diagnostic (ROS subscriber)")
+    ap.add_argument("--depth-topic", default="/camera/camera/depth/image_rect_raw")
+    ap.add_argument("--publish-topic", default="/depth/min_front_m")
+    ap.add_argument("--no-publish", action="store_true")
 
     ap.add_argument("--roi-x0", type=float, default=0.40)
     ap.add_argument("--roi-x1", type=float, default=0.60)
     ap.add_argument("--roi-y0", type=float, default=0.35)
     ap.add_argument("--roi-y1", type=float, default=0.80)
 
-    ap.add_argument("--unit-mm", action="store_true", help="Interpret depth samples as millimeters (Z16 typical).")
+    ap.add_argument("--unit-mm", action="store_true", help="Interpret depth samples as millimeters (typical 16UC1).")
     ap.set_defaults(unit_mm=True)
 
     ap.add_argument("--min-valid-m", type=float, default=0.15)
-    ap.add_argument("--max-valid-m", type=float, default=4.0)
-    ap.add_argument("--percentile", type=float, default=5.0, help="Robust 'near obstacle' metric; 5th percentile recommended.")
-    ap.add_argument("--warn-th-m", type=float, default=0.45, help="Warn threshold (m) for printing.")
-    ap.add_argument("--stop-th-m", type=float, default=0.28, help="Stop threshold (m) for printing.")
+    ap.add_argument("--max-valid-m", type=float, default=4.00)
+    ap.add_argument("--percentile", type=float, default=5.0)
 
-    ap.add_argument("--preview", action="store_true", help="Show preview windows (needs display).")
-    ap.add_argument("--csv", default="", help="CSV output path (optional).")
-    ap.add_argument("--print-hz", action="store_true", help="Print estimated loop Hz occasionally.")
-    args = ap.parse_args()
+    ap.add_argument("--warn-th-m", type=float, default=0.45)
+    ap.add_argument("--stop-th-m", type=float, default=0.28)
 
-    roi = ROIFrac(args.roi_x0, args.roi_x1, args.roi_y0, args.roi_y1)
+    ap.add_argument("--csv", default="", help="Optional CSV log path")
+    ap.add_argument("--print-hz", action="store_true", help="Print callback Hz estimate")
+    ap.add_argument("--print-period-s", type=float, default=0.25, help="Console print throttle (seconds)")
+    return ap.parse_args()
 
-    # Depth: try to request Z16. Note: OpenCV may ignore FOURCC for some drivers.
-    depth_cap = open_v4l2(args.depth_dev, args.depth_w, args.depth_h, args.fps, fourcc="Z16 ")
-    if not depth_cap.isOpened():
-        print(f"ERROR: Cannot open depth device: {args.depth_dev}")
-        print("Checks:")
-        print("  - v4l2-ctl --list-devices  (confirm mapping)")
-        print("  - ensure no other process is using it (ROS node, ffplay, etc.)")
-        print("  - try: sudo python3 dept_camera_test.py  (permissions)")
-        return 2
 
-    color_cap: Optional[cv2.VideoCapture] = None
-    if not args.no_color and args.color_dev:
-        color_cap = open_v4l2(args.color_dev, args.color_w, args.color_h, args.fps, fourcc="YUYV")
-        if not color_cap.isOpened():
-            print(f"WARNING: Cannot open color device: {args.color_dev} (continuing depth-only)")
-            color_cap = None
-
-    csv_f = None
-    writer = None
-    if args.csv:
-        csv_f = open(args.csv, "w", newline="")
-        writer = csv.writer(csv_f)
-        writer.writerow(["t_s", "dist_m", "valid_px", "roi_x0", "roi_x1", "roi_y0", "roi_y1"])
-
-    print("\nRobot Savo — D435 Depth Diagnostic (non-ROS)")
-    print(f"Depth : {args.depth_dev}  profile={args.depth_w}x{args.depth_h}@{args.fps}  (expect Z16)")
-    if color_cap:
-        print(f"Color : {args.color_dev}  profile={args.color_w}x{args.color_h}@{args.fps}  (YUYV)")
-    else:
-        print("Color : disabled/unavailable")
-    print(f"ROI   : x[{roi.x0:.2f},{roi.x1:.2f}] y[{roi.y0:.2f},{roi.y1:.2f}]  percentile={args.percentile:.1f}")
-    print(f"Valid : [{args.min_valid_m:.2f}..{args.max_valid_m:.2f}] m  unit_mm={bool(args.unit_mm)}")
-    print(f"Thresh: warn={args.warn_th_m:.2f} m  stop={args.stop_th_m:.2f} m")
-    print("Ctrl+C to stop.\n")
-
-    last_t = time.time()
-    hz_est = 0.0
-    frame_i = 0
-    consecutive_read_fail = 0
-
+def main():
+    args = parse_args()
+    rclpy.init()
+    node = DepthDiag(args)
     try:
-        while True:
-            t0 = time.time()
-
-            ok_d, depth = depth_cap.read()
-            if not ok_d or depth is None:
-                consecutive_read_fail += 1
-                if consecutive_read_fail % 30 == 0:
-                    print("WARNING: Depth read failing repeatedly.")
-                    print("  If ROS2 realsense2_camera works (it does for you), this is likely OpenCV/V4L2 Z16 handling.")
-                    print("  In that case, keep using ROS for depth in production and convert this diagnostic to ROS subscriber.")
-                time.sleep(0.01)
-                continue
-            consecutive_read_fail = 0
-
-            # Compute distance
-            dist_m, x0, x1, y0, y1, valid_px = compute_front_distance_m(
-                depth_frame=depth,
-                roi=roi,
-                unit_is_mm=bool(args.unit_mm),
-                min_valid_m=float(args.min_valid_m),
-                max_valid_m=float(args.max_valid_m),
-                percentile=float(args.percentile),
-            )
-
-            label = "OK"
-            if math.isnan(dist_m):
-                label = "NO_DATA"
-            elif dist_m <= args.stop_th_m:
-                label = "STOP"
-            elif dist_m <= args.warn_th_m:
-                label = "SLOW"
-
-            print(f"dist={dist_m:5.2f} m  valid_px={valid_px:6d}  [{label}]")
-
-            if writer:
-                writer.writerow([t0, dist_m, valid_px, x0, x1, y0, y1])
-                csv_f.flush()
-
-            # Preview
-            if args.preview:
-                disp = depth
-                if disp.ndim == 3 and disp.shape[2] == 1:
-                    disp = disp[:, :, 0]
-
-                disp_f = disp.astype(np.float32)
-                if bool(args.unit_mm):
-                    disp_f *= 0.001
-
-                depth_img = depth_false_color(disp_f, near_m=0.15, far_m=2.0)
-                cv2.rectangle(depth_img, (x0, y0), (x1 - 1, y1 - 1), (255, 255, 255), 1)
-                cv2.putText(depth_img, f"{dist_m:.2f}m {label}", (10, 30),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
-                cv2.imshow("D435 Depth (diag)", depth_img)
-
-                if color_cap:
-                    ok_c, color = color_cap.read()
-                    if ok_c and color is not None:
-                        # Many OpenCV builds already output BGR for V4L2 YUYV.
-                        # If you see weird colors, uncomment conversion attempt.
-                        # if color.ndim == 2:
-                        #     color = cv2.cvtColor(color, cv2.COLOR_YUV2BGR_YUY2)
-                        cv2.imshow("D435 Color (diag)", color)
-
-                key = cv2.waitKey(1) & 0xFF
-                if key == ord("q"):
-                    break
-
-            # Hz estimate
-            if args.print_hz:
-                dt = t0 - last_t
-                hz_est = rate_estimate(hz_est, dt)
-                last_t = t0
-                frame_i += 1
-                if frame_i % 30 == 0:
-                    print(f"loop_hz≈{hz_est:.1f}")
-
+        rclpy.spin(node)
     except KeyboardInterrupt:
         pass
     finally:
-        try:
-            depth_cap.release()
-        except Exception:
-            pass
-        try:
-            if color_cap:
-                color_cap.release()
-        except Exception:
-            pass
-        try:
-            if writer and csv_f:
-                csv_f.close()
-        except Exception:
-            pass
-        try:
-            cv2.destroyAllWindows()
-        except Exception:
-            pass
-
-    print("\nDone.")
-    return 0
+        node.close()
+        node.destroy_node()
+        rclpy.shutdown()
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()
