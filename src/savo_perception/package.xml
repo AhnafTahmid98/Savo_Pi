@@ -2,9 +2,43 @@
 <package format="3">
   <name>savo_perception</name>
   <version>0.0.1</version>
-  <description>Vision: AprilTags, human-follow logic</description>
-  <maintainer email="todo@example.com">TODO_NAME</maintainer>
-  <license>MIT</license>
+  <description>
+    Robot Savo perception and safety package (hybrid Python + C++).
+    Provides range sensing (ToF, ultrasonic), depth front-min (RealSense),
+    safety stop decision, and a C++ cmd_vel safety gate (/cmd_vel -> /cmd_vel_safe).
+  </description>
+
+  <maintainer email="tahmidahnaf998@gmail.com">Ahnaf Tahmid</maintainer>
+  <license>Proprietary</license>
+
+  <!-- Build tools (HYBRID: Python + C++) -->
   <buildtool_depend>ament_cmake</buildtool_depend>
-  <exec_depend>rclpy</exec_depend>
+  <buildtool_depend>ament_cmake_python</buildtool_depend>
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <!-- C++ runtime/build deps -->
+  <depend>rclcpp</depend>
+
+  <!-- Python runtime deps -->
+  <depend>rclpy</depend>
+
+  <!-- Common ROS interfaces -->
+  <depend>std_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>sensor_msgs</depend>
+
+  <!-- Launch -->
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+
+  <!-- Optional, but common for parameterized nodes -->
+  <exec_depend>rcl_interfaces</exec_depend>
+
+  <!-- Testing (optional) -->
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
 </package>
