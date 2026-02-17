@@ -1,124 +1,132 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Robot Savo — Dual VL53L1X ToF API (no ROS2)
--------------------------------------------
-High-level helper for drive_automode.py and other Python-only scripts.
+Robot Savo — Dual VL53L1X ToF API (Python-only, no ROS)
+-------------------------------------------------------
+Why multiprocessing:
+- Many VL53L1X Python drivers keep global I2C state / are not safe across buses.
+- Running each sensor in its own process is the most reliable way.
 
-- Reads TWO VL53L1X sensors at 0x29:
-    * bus 1 -> Front-Right (FR)
-    * bus 0 -> Front-Left  (FL)
-- Uses multiprocessing: ONE worker process per sensor, because the Python
-  VL53L1X driver does not behave well when a single process talks to
-  both i2c-1 and i2c-0 at the same time.
-- Main process provides a clean API:
+Locked mapping (project standard):
+- bus 1 @ 0x29 -> RIGHT  (FR in your older naming)
+- bus 0 @ 0x29 -> LEFT   (FL in your older naming)
 
-    from vl53_dual_api import DualToF
-
-    tof = DualToF(rate_hz=20.0, median=3, threshold_cm=28.0)
-    fr_raw, fr_filt, fl_raw, fl_filt, alert_str, any_near = tof.read()
-
-Where:
-  * *_raw   are the latest unfiltered distances in cm (or -1.0 if none)
-  * *_filt  are median-filtered distances in cm (or -1.0 if none yet)
-  * alert_str is:
-        "-"                         = no near-field obstacle
-        "FR 5.4cm"                  = FR is closer than threshold
-        "FL 3.2cm"                  = FL is closer than threshold
-        "FR 6.1cm, FL 4.3cm"        = both are closer than threshold
-  * any_near is a boolean (True if either side is closer than threshold)
-
-IMPORTANT:
-- This module is intended for *Python-only* use (no ROS2).
-- For ROS2, we'll create one node per sensor using a simpler single-sensor API.
-
-You can also run this file directly as a demo:
-
-    python3 vl53_dual_api.py --rate 10 --threshold 28 --median 3
+Public API:
+- DualVL53() : starts workers + provides get_latest()
+- get_latest() returns distances in meters + health/stale info
 """
+
+from __future__ import annotations
 
 import sys
 import time
-import signal
 import queue
+from dataclasses import dataclass
 from collections import deque
 from typing import Optional, Dict, Tuple
-from multiprocessing import Process, Queue
+from multiprocessing import Process, Queue, Event
+
 
 I2C_ADDRESS = 0x29
 
+# Locked physical mapping
+BUS_RIGHT = 1  # "FR"
+BUS_LEFT  = 0  # "FL"
 
-# ---------------------------------------------------------------------------
-# Worker-side helpers (run in separate processes)
-# ---------------------------------------------------------------------------
-def _import_vl53():
-    """Import VL53L1X module inside a worker process."""
+
+# ----------------------------- Data models -----------------------------
+
+@dataclass
+class SensorSample:
+    raw_m: Optional[float]   # None if invalid
+    filt_m: Optional[float]  # None if invalid
+    t_mono: float            # monotonic timestamp
+
+
+@dataclass
+class DualVL53State:
+    right: SensorSample
+    left: SensorSample
+    right_ok: bool
+    left_ok: bool
+    right_stale: bool
+    left_stale: bool
+
+
+# ----------------------------- Worker helpers -----------------------------
+
+def _import_vl53_driver():
+    """
+    Import inside worker. Support common driver module names.
+    """
     try:
         from VL53L1X import VL53L1X  # type: ignore
         return VL53L1X
-    except ImportError:
+    except Exception:
         try:
             from vl53l1x import VL53L1X  # type: ignore
             return VL53L1X
-        except Exception:
-            print(
-                "ERROR (worker): Python module 'VL53L1X/vl53l1x' not found.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
+        except Exception as e:
+            raise ImportError("VL53L1X Python driver not found (VL53L1X or vl53l1x).") from e
 
 
-def _worker_read_mm(sensor) -> Optional[int]:
-    """Read distance in mm from a VL53L1X instance."""
+def _read_mm(sensor) -> Optional[int]:
+    """
+    Read distance in mm. Return None if invalid.
+    """
     try:
         if hasattr(sensor, "get_distance"):
             d = sensor.get_distance()
         else:
             d = getattr(sensor, "distance", None)
+        if d is None:
+            return None
+        if isinstance(d, float):
+            d = int(round(d))
+        d = int(d)
+        if d <= 0 or d >= 4000:
+            return None
+        return d
     except Exception:
         return None
 
-    if d is None:
+
+def _median(hist: deque) -> Optional[float]:
+    if not hist:
         return None
-    if isinstance(d, float):
-        d = int(round(d))
-    if d <= 0 or d >= 4000:
-        return None
-    return int(d)
+    s = sorted(hist)
+    n = len(s)
+    mid = n // 2
+    if n % 2:
+        return float(s[mid])
+    return 0.5 * (s[mid - 1] + s[mid])
 
 
-def _tof_worker(bus: int, role: str, rate_hz: float, median_n: int, out_q: Queue):
+def _tof_worker(bus: int, role: str, rate_hz: float, median_n: int, stop_evt: Event, out_q: Queue):
     """
-    Worker process for ONE ToF sensor.
-
-    Sends messages to main via out_q:
-      ("init_ok", bus, role, "")
-      ("init_error", bus, role, err_msg)
-      ("data", bus, role, raw_cm, filt_cm, t_now)
-      ("done", bus, role, "")
+    Worker process:
+    - init VL53L1X on bus
+    - loop: read, filter, push ("data", role, raw_m, filt_m, t_mono)
+    - sends ("init_ok"/"init_error")
     """
-    VL53L1X = _import_vl53()
-
-    period = 1.0 / rate_hz
-    hist = deque(maxlen=median_n)
-
     try:
+        VL53L1X = _import_vl53_driver()
         sensor = VL53L1X(i2c_bus=bus, i2c_address=I2C_ADDRESS)
+
         if hasattr(sensor, "open"):
             sensor.open()
 
-        mode = "short"
+        # Best-effort config (driver differences tolerated)
         try:
-            sensor.set_distance_mode(mode)
+            sensor.set_distance_mode("short")
         except Exception:
             try:
-                sensor.distance_mode = mode
+                sensor.distance_mode = "short"
             except Exception:
                 pass
 
         try:
             if hasattr(sensor, "set_timing"):
-                # 50 ms timing budget, ~70 ms inter-measurement
                 sensor.set_timing(50, 70)
         except Exception:
             pass
@@ -127,39 +135,31 @@ def _tof_worker(bus: int, role: str, rate_hz: float, median_n: int, out_q: Queue
             sensor.start_ranging()
         elif hasattr(sensor, "start"):
             sensor.start()
+
+        out_q.put(("init_ok", role, ""))
     except Exception as e:
-        out_q.put(("init_error", bus, role, str(e)))
+        out_q.put(("init_error", role, str(e)))
         return
 
-    out_q.put(("init_ok", bus, role, ""))
+    period = 1.0 / max(rate_hz, 0.1)
+    hist = deque(maxlen=median_n)
 
     try:
-        while True:
-            t_now = time.perf_counter()
-            d_mm = _worker_read_mm(sensor)
-            d_cm = round(d_mm / 10.0, 1) if d_mm is not None else -1.0
+        while not stop_evt.is_set():
+            t0 = time.perf_counter()
+            d_mm = _read_mm(sensor)
+            raw_m = (d_mm / 1000.0) if d_mm is not None else None
 
-            if d_cm > 0:
-                hist.append(d_cm)
+            if raw_m is not None:
+                hist.append(raw_m)
 
-            if median_n > 1 and len(hist) > 0:
-                s = sorted(hist)
-                n = len(s)
-                mid = n // 2
-                if n % 2:
-                    fv = float(s[mid])
-                else:
-                    fv = 0.5 * (s[mid - 1] + s[mid])
-            else:
-                fv = float(hist[-1]) if hist else -1.0
+            filt_m = _median(hist) if median_n > 1 else (hist[-1] if hist else None)
 
-            out_q.put(("data", bus, role, d_cm, fv, t_now))
+            out_q.put(("data", role, raw_m, filt_m, t0))
 
-            dt = period - (time.perf_counter() - t_now)
+            dt = period - (time.perf_counter() - t0)
             if dt > 0:
                 time.sleep(dt)
-    except KeyboardInterrupt:
-        pass
     finally:
         try:
             if hasattr(sensor, "stop_ranging"):
@@ -168,226 +168,171 @@ def _tof_worker(bus: int, role: str, rate_hz: float, median_n: int, out_q: Queue
                 sensor.stop()
         except Exception:
             pass
-        out_q.put(("done", bus, role, ""))
+        out_q.put(("done", role, ""))
 
 
-# ---------------------------------------------------------------------------
-# Public API class
-# ---------------------------------------------------------------------------
-class DualToF:
+# ----------------------------- Public API -----------------------------
+
+class DualVL53:
     """
-    Dual VL53L1X helper for Python-only code (e.g. drive_automode.py).
-
-    Usage:
-        from vl53_dual_api import DualToF
-
-        tof = DualToF(rate_hz=20.0, median=3, threshold_cm=28.0)
-
-        try:
-            while True:
-                fr_raw, fr_filt, fl_raw, fl_filt, alert_str, any_near = tof.read()
-                if any_near:
-                    print("ALERT:", alert_str)
-                time.sleep(0.05)
-        finally:
-            tof.close()
+    Dual VL53L1X ToF reader (RIGHT + LEFT) using one process per sensor.
     """
 
-    def __init__(self, rate_hz: float = 10.0, median: int = 3, threshold_cm: float = 28.0):
-        if rate_hz <= 0:
-            raise ValueError("rate_hz must be > 0")
-        if median < 1 or (median % 2) == 0:
-            raise ValueError("median must be an odd integer >= 1")
+    def __init__(
+        self,
+        rate_hz: float = 25.0,
+        median_n: int = 5,
+        stale_timeout_s: float = 0.30,
+        start_immediately: bool = True,
+    ):
+        if median_n < 1 or (median_n % 2) == 0:
+            raise ValueError("median_n must be odd and >= 1")
 
         self.rate_hz = rate_hz
-        self.median = median
-        self.threshold_cm = threshold_cm
-
-        # workers: bus 1 = FR, bus 0 = FL
-        self._workers_cfg = [
-            (1, "FR"),
-            (0, "FL"),
-        ]
+        self.median_n = median_n
+        self.stale_timeout_s = stale_timeout_s
 
         self._q: Queue = Queue()
-        self._procs = []
-        self._latest: Dict[str, Dict[str, float]] = {
-            "FR": {"raw": -1.0, "filt": -1.0},
-            "FL": {"raw": -1.0, "filt": -1.0},
+        self._stop_evt: Event = Event()
+        self._procs: Dict[str, Process] = {}
+
+        now = time.perf_counter()
+        self._latest: Dict[str, SensorSample] = {
+            "RIGHT": SensorSample(None, None, now),
+            "LEFT":  SensorSample(None, None, now),
         }
-        self._inited = False
-        self._init_fail = False
+        self._ok: Dict[str, bool] = {"RIGHT": False, "LEFT": False}
 
-        # For convenience, install a Ctrl+C handler for scripts that only use this API
-        signal.signal(signal.SIGINT, self._sigint_handler)
+        if start_immediately:
+            self.start()
 
-        self._start_workers()
-        self._wait_for_init(timeout_s=3.0)
+    def start(self) -> None:
+        if self._procs:
+            return
 
-        print(
-            f"[DualToF] Initialized: FR(bus1), FL(bus0), "
-            f"rate={self.rate_hz:.1f} Hz, median={self.median}, "
-            f"threshold={self.threshold_cm:.1f} cm"
-        )
-
-    # ---------------------- internal setup / teardown ----------------------
-    def _sigint_handler(self, signum, frame):
-        # Ensure we stop cleanly when Ctrl+C is pressed in main script
-        self.close()
-        raise KeyboardInterrupt
-
-    def _start_workers(self):
-        for bus, role in self._workers_cfg:
+        cfg = [
+            (BUS_RIGHT, "RIGHT"),
+            (BUS_LEFT,  "LEFT"),
+        ]
+        for bus, role in cfg:
             p = Process(
                 target=_tof_worker,
-                args=(bus, role, self.rate_hz, self.median, self._q),
+                args=(bus, role, self.rate_hz, self.median_n, self._stop_evt, self._q),
                 daemon=True,
             )
             p.start()
-            self._procs.append(p)
+            self._procs[role] = p
 
-    def _wait_for_init(self, timeout_s: float = 3.0):
-        """Wait for workers to report init status."""
-        start = time.perf_counter()
-        ok = set()
-
-        while time.perf_counter() - start < timeout_s and len(ok) < len(self._workers_cfg):
+        # Wait briefly for init results
+        deadline = time.perf_counter() + 2.0
+        while time.perf_counter() < deadline and not all(self._ok.values()):
             try:
-                msg = self._q.get(timeout=0.5)
+                msg = self._q.get(timeout=0.2)
             except queue.Empty:
                 continue
-
             kind = msg[0]
             if kind == "init_ok":
-                _, bus, role, _ = msg
-                print(f"[DualToF] OK: {role}(bus{bus}) online")
-                ok.add((bus, role))
+                _, role, _ = msg
+                self._ok[role] = True
             elif kind == "init_error":
-                _, bus, role, err = msg
-                sys.stderr.write(f"[DualToF] INIT FAIL {role}(bus{bus}): {err}\n")
-                self._init_fail = True
-                break
+                _, role, err = msg
+                self._ok[role] = False
+                raise RuntimeError(f"VL53 init failed for {role}: {err}")
 
-        if self._init_fail or not ok:
-            self.close()
-            raise RuntimeError("DualToF: one or more sensors failed to initialize.")
-
-        self._inited = True
-
-    # ---------------------- public API methods -----------------------------
-    def read(self, max_wait_s: float = 0.05) -> Tuple[float, float, float, float, str, bool]:
-        """
-        Pull new data from workers (non-blocking-ish) and return:
-
-            (fr_raw_cm, fr_filt_cm, fl_raw_cm, fl_filt_cm, alert_str, any_near)
-
-        - max_wait_s: how long we are willing to wait for at least one message.
-
-        raw/filt are -1.0 if no valid reading yet.
-        """
-        if not self._inited:
-            raise RuntimeError("DualToF: read() called before successful initialization.")
-
-        deadline = time.perf_counter() + max_wait_s
-
-        # Drain queue until timeout
-        while time.perf_counter() < deadline:
-            try:
-                msg = self._q.get(timeout=0.005)
-            except queue.Empty:
-                break
-
-            kind = msg[0]
-
-            if kind == "data":
-                _, bus, role, raw_cm, filt_cm, _t = msg
-                self._latest[role]["raw"] = float(raw_cm)
-                self._latest[role]["filt"] = float(filt_cm)
-            elif kind == "done":
-                _, bus, role, _ = msg
-                sys.stderr.write(f"[DualToF] worker {role}(bus{bus}) exited\n")
-
-        # Build alert string based on latest filtered values
-        fr_f = self._latest["FR"]["filt"]
-        fl_f = self._latest["FL"]["filt"]
-
-        alerts = []
-        if fr_f >= 0.0 and fr_f < self.threshold_cm:
-            alerts.append(f"FR {fr_f:.1f}cm")
-        if fl_f >= 0.0 and fl_f < self.threshold_cm:
-            alerts.append(f"FL {fl_f:.1f}cm")
-
-        alert_str = ", ".join(alerts) if alerts else "-"
-        any_near = bool(alerts)
-
-        fr_raw = self._latest["FR"]["raw"]
-        fl_raw = self._latest["FL"]["raw"]
-
-        return fr_raw, fr_f, fl_raw, fl_f, alert_str, any_near
-
-    def close(self):
-        """Terminate worker processes and clean up."""
-        for p in self._procs:
+    def stop(self) -> None:
+        self._stop_evt.set()
+        for p in self._procs.values():
+            p.join(timeout=1.0)
+        # If something is stuck, terminate last resort
+        for p in self._procs.values():
             if p.is_alive():
                 p.terminate()
-        for p in self._procs:
-            p.join(timeout=1.0)
         self._procs.clear()
 
+    def pump(self, max_msgs: int = 10) -> None:
+        """
+        Drain queue (non-blocking) and update latest samples.
+        Call this regularly in your main loop.
+        """
+        n = 0
+        while n < max_msgs:
+            try:
+                msg = self._q.get_nowait()
+            except queue.Empty:
+                break
+            kind = msg[0]
+            if kind == "data":
+                _, role, raw_m, filt_m, t_mono = msg
+                self._latest[role] = SensorSample(raw_m, filt_m, t_mono)
+            n += 1
 
-# ---------------------------------------------------------------------------
-# Simple demo when run directly
-# ---------------------------------------------------------------------------
-def _demo():
+    def get_latest(self) -> DualVL53State:
+        """
+        Returns latest samples + health flags.
+        """
+        self.pump()
+
+        now = time.perf_counter()
+        r = self._latest["RIGHT"]
+        l = self._latest["LEFT"]
+
+        right_stale = (now - r.t_mono) > self.stale_timeout_s
+        left_stale  = (now - l.t_mono) > self.stale_timeout_s
+
+        return DualVL53State(
+            right=r,
+            left=l,
+            right_ok=self._ok["RIGHT"],
+            left_ok=self._ok["LEFT"],
+            right_stale=right_stale,
+            left_stale=left_stale,
+        )
+
+
+# ----------------------------- CLI test (viewer) -----------------------------
+
+def _fmt_m(v: Optional[float]) -> str:
+    return f"{v:6.3f}" if v is not None else "  --- "
+
+def main():
     import argparse
-
-    ap = argparse.ArgumentParser(description="Robot Savo — Dual ToF demo using DualToF API")
-    ap.add_argument("--rate", type=float, default=10.0, help="Sample rate in Hz (default: 10.0)")
-    ap.add_argument("--median", type=int, default=3, help="Median window (odd ≥1, default: 3)")
-    ap.add_argument(
-        "--threshold",
-        type=float,
-        default=28.0,
-        help="Near-field alert threshold in cm (default: 28.0)",
-    )
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--rate", type=float, default=25.0)
+    ap.add_argument("--median", type=int, default=5)
+    ap.add_argument("--stale", type=float, default=0.30)
+    ap.add_argument("--threshold", type=float, default=0.20, help="alert threshold in meters")
     args = ap.parse_args()
 
-    tof = DualToF(rate_hz=args.rate, median=args.median, threshold_cm=args.threshold)
-
-    print(
-        "\n t(s)  | FR_raw(cm) | FR_filt(cm) | FL_raw(cm) | FL_filt(cm) | Alert"
-    )
-    print("-" * 78)
-
+    tof = DualVL53(rate_hz=args.rate, median_n=args.median, stale_timeout_s=args.stale)
     t0 = time.perf_counter()
 
+    print(" t(s) | R_raw  R_filt | L_raw  L_filt | Alert")
+    print("-" * 60)
     try:
-        period = 1.0 / args.rate
         while True:
-            loop_start = time.perf_counter()
-            fr_raw, fr_f, fl_raw, fl_f, alert_str, any_near = tof.read()
+            st = tof.get_latest()
+            tr = time.perf_counter() - t0
 
-            t_rel = loop_start - t0
+            alerts = []
+            if st.right.filt_m is not None and st.right.filt_m < args.threshold:
+                alerts.append(f"RIGHT {st.right.filt_m:.3f}m")
+            if st.left.filt_m is not None and st.left.filt_m < args.threshold:
+                alerts.append(f"LEFT {st.left.filt_m:.3f}m")
 
-            def fmt(v: float) -> str:
-                return f"{v:>7.1f}" if v >= 0.0 else "   --- "
+            if st.right_stale: alerts.append("RIGHT STALE")
+            if st.left_stale:  alerts.append("LEFT STALE")
 
-            line = (
-                f"{t_rel:6.2f} | "
-                f"{fmt(fr_raw)} | {fmt(fr_f)} | "
-                f"{fmt(fl_raw)} | {fmt(fl_f)} | {alert_str}"
+            alert = ", ".join(alerts) if alerts else "-"
+
+            print(
+                f"{tr:5.1f} | {_fmt_m(st.right.raw_m)} {_fmt_m(st.right.filt_m)} | "
+                f"{_fmt_m(st.left.raw_m)} {_fmt_m(st.left.filt_m)} | {alert}"
             )
-            print(line)
-
-            dt = period - (time.perf_counter() - loop_start)
-            if dt > 0:
-                time.sleep(dt)
+            time.sleep(0.1)
     except KeyboardInterrupt:
-        print("\n[DualToF] Demo interrupted by user.")
+        pass
     finally:
-        tof.close()
-        print("[DualToF] Clean shutdown.")
-
+        tof.stop()
 
 if __name__ == "__main__":
-    _demo()
+    sys.exit(main())
