@@ -15,9 +15,10 @@ What it does:
   - Filters invalid values (min/max range)
   - Handles stale images (publishes NaN + warning)
 
-Why this approach:
-  - Works reliably with RealSense depth via ROS2 (16UC1 mm or 32FC1 meters)
-  - No cv_bridge required (pure numpy)
+Reliability improvements in this version:
+  - Uses qos_profile_sensor_data by default for camera topic compatibility
+  - Optional parameter to force RELIABLE subscription if needed
+  - Robust numpy view using msg.step (handles row padding)
 """
 
 from __future__ import annotations
@@ -28,7 +29,13 @@ from typing import Optional, Tuple
 import numpy as np
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
+from rclpy.qos import (
+    QoSProfile,
+    ReliabilityPolicy,
+    HistoryPolicy,
+    DurabilityPolicy,
+    qos_profile_sensor_data,
+)
 from sensor_msgs.msg import Image
 from std_msgs.msg import Float32
 
@@ -45,23 +52,32 @@ class DepthFrontMinNode(Node):
         self.declare_parameter("depth_topic", "/camera/camera/depth/image_rect_raw")
         self.declare_parameter("publish_topic", "/depth/min_front_m")
 
-        # ROI as fractions of image size (0..1). Default: centered, lower-middle band.
-        # Adjust later if needed for your camera mounting height/tilt.
-        self.declare_parameter("roi_x", 0.35)   # left fraction
-        self.declare_parameter("roi_y", 0.35)   # top fraction
-        self.declare_parameter("roi_w", 0.30)   # width fraction
-        self.declare_parameter("roi_h", 0.35)   # height fraction
+        # ROI as fractions of image size (0..1). Default tuned for your mount (~33 cm)
+        self.declare_parameter("roi_x", 0.30)   # left fraction
+        self.declare_parameter("roi_y", 0.45)   # top fraction
+        self.declare_parameter("roi_w", 0.40)   # width fraction
+        self.declare_parameter("roi_h", 0.40)   # height fraction
 
-        self.declare_parameter("percentile", 10.0)     # robust near distance (p10)
-        self.declare_parameter("min_valid_m", 0.02)    # clamp invalid
+        self.declare_parameter("percentile", 10.0)
+        self.declare_parameter("min_valid_m", 0.02)
         self.declare_parameter("max_valid_m", 3.00)
 
-        self.declare_parameter("publish_hz", 30.0)     # publish loop; node uses latest frame
+        self.declare_parameter("publish_hz", 30.0)
         self.declare_parameter("stale_timeout_s", 0.30)
         self.declare_parameter("warn_every_s", 1.0)
 
         # For 16UC1 depth: RealSense typically publishes in millimeters.
         self.declare_parameter("depth_scale_m_per_unit", 0.001)
+
+        # QoS control:
+        #   sensor      -> qos_profile_sensor_data (recommended for camera topics)
+        #   best_effort -> explicit BEST_EFFORT
+        #   reliable    -> explicit RELIABLE (use if your DDS setup requires it)
+        self.declare_parameter("depth_qos", "sensor")  # "sensor"|"best_effort"|"reliable"
+
+        # Debug: log when frames are received (rate-limited)
+        self.declare_parameter("log_rx", False)
+        self.declare_parameter("log_rx_every_s", 2.0)
 
         depth_topic = str(self.get_parameter("depth_topic").value)
         publish_topic = str(self.get_parameter("publish_topic").value)
@@ -81,30 +97,57 @@ class DepthFrontMinNode(Node):
 
         self.depth_scale = float(self.get_parameter("depth_scale_m_per_unit").value)
 
+        self.depth_qos = str(self.get_parameter("depth_qos").value).strip().lower()
+        self.log_rx = bool(self.get_parameter("log_rx").value)
+        self.log_rx_every_s = float(self.get_parameter("log_rx_every_s").value)
+
         self.publish_hz = max(1.0, min(self.publish_hz, 60.0))
         self.percentile = max(0.0, min(self.percentile, 100.0))
+        self.log_rx_every_s = max(0.2, self.log_rx_every_s)
 
-        # ---------------- QoS ----------------
-        qos_sensor = QoSProfile(
-            reliability=ReliabilityPolicy.BEST_EFFORT,
+        # ---------------- QoS selection ----------------
+        if self.depth_qos == "sensor":
+            sub_qos = qos_profile_sensor_data
+        elif self.depth_qos == "reliable":
+            sub_qos = QoSProfile(
+                reliability=ReliabilityPolicy.RELIABLE,
+                durability=DurabilityPolicy.VOLATILE,
+                history=HistoryPolicy.KEEP_LAST,
+                depth=5,
+            )
+        else:
+            # best_effort (default fallback)
+            sub_qos = QoSProfile(
+                reliability=ReliabilityPolicy.BEST_EFFORT,
+                durability=DurabilityPolicy.VOLATILE,
+                history=HistoryPolicy.KEEP_LAST,
+                depth=5,
+            )
+
+        # Publisher QoS: keep it simple/reliable for downstream safety nodes
+        pub_qos = QoSProfile(
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.VOLATILE,
             history=HistoryPolicy.KEEP_LAST,
-            depth=5,
+            depth=10,
         )
 
-        self.pub = self.create_publisher(Float32, publish_topic, qos_sensor)
-        self.sub = self.create_subscription(Image, depth_topic, self._on_depth, qos_sensor)
+        self.pub = self.create_publisher(Float32, publish_topic, pub_qos)
+        self.sub = self.create_subscription(Image, depth_topic, self._on_depth, sub_qos)
 
-        # Latest frame cache (store only what we need)
+        # Latest frame cache
         self._latest_msg: Optional[Image] = None
         self._latest_rx_t: float = 0.0
 
         self._last_warn_t: float = 0.0
+        self._last_rx_log_t: float = 0.0
 
         self.get_logger().info(
             f"DepthFrontMinNode started. sub={depth_topic} pub={publish_topic} "
             f"ROI=({self.roi_x:.2f},{self.roi_y:.2f},{self.roi_w:.2f},{self.roi_h:.2f}) "
             f"p={self.percentile:.1f} valid=[{self.min_valid_m:.2f},{self.max_valid_m:.2f}]m "
-            f"stale={self.stale_timeout_s:.2f}s hz={self.publish_hz:.1f}"
+            f"stale={self.stale_timeout_s:.2f}s hz={self.publish_hz:.1f} "
+            f"depth_qos={self.depth_qos}"
         )
 
         self._timer = self.create_timer(1.0 / self.publish_hz, self._tick)
@@ -113,15 +156,22 @@ class DepthFrontMinNode(Node):
 
     def _on_depth(self, msg: Image) -> None:
         self._latest_msg = msg
-        self._latest_rx_t = time.perf_counter()
+        self._latest_rx_t = time.monotonic()
+
+        if self.log_rx:
+            now = time.monotonic()
+            if (now - self._last_rx_log_t) >= self.log_rx_every_s:
+                self.get_logger().info(
+                    f"RX depth frame: enc={msg.encoding} size={msg.width}x{msg.height} step={msg.step}"
+                )
+                self._last_rx_log_t = now
 
     # ---------------- Core logic ----------------
 
     def _tick(self) -> None:
-        now = time.perf_counter()
+        now = time.monotonic()
 
         if self._latest_msg is None or (now - self._latest_rx_t) > self.stale_timeout_s:
-            # stale / no data
             self.pub.publish(Float32(data=_nan()))
             self._warn_rate_limited("Depth image stale/no data. Publishing NaN.")
             return
@@ -141,13 +191,12 @@ class DepthFrontMinNode(Node):
             self.pub.publish(Float32(data=float(d_m)))
 
     def _warn_rate_limited(self, text: str) -> None:
-        now = time.perf_counter()
+        now = time.monotonic()
         if (now - self._last_warn_t) >= self.warn_every_s:
             self.get_logger().warn(text)
             self._last_warn_t = now
 
     def _roi_pixels(self, w: int, h: int) -> Tuple[int, int, int, int]:
-        # clamp fractions
         rx = min(max(self.roi_x, 0.0), 0.95)
         ry = min(max(self.roi_y, 0.0), 0.95)
         rw = min(max(self.roi_w, 0.01), 1.0 - rx)
@@ -158,37 +207,66 @@ class DepthFrontMinNode(Node):
         x1 = int(round((rx + rw) * w))
         y1 = int(round((ry + rh) * h))
 
-        # enforce bounds and non-empty ROI
         x0 = max(0, min(x0, w - 1))
         y0 = max(0, min(y0, h - 1))
         x1 = max(x0 + 1, min(x1, w))
         y1 = max(y0 + 1, min(y1, h))
         return x0, y0, x1, y1
 
+    # -------- Robust ROS Image -> numpy (handles msg.step padding) --------
+
+    def _as_depth_m(self, msg: Image) -> np.ndarray:
+        """
+        Returns a float32 (H,W) depth image in meters.
+        Handles row padding using msg.step.
+        """
+        h = int(msg.height)
+        w = int(msg.width)
+        enc = (msg.encoding or "").lower()
+        step = int(msg.step)
+
+        if h <= 0 or w <= 0:
+            raise ValueError("Invalid image dimensions")
+
+        if enc in ("16uc1", "mono16"):
+            bytes_per_px = 2
+            row_bytes_needed = w * bytes_per_px
+            if step < row_bytes_needed:
+                raise ValueError(f"Invalid step {step} for 16UC1 width {w}")
+
+            buf = np.frombuffer(msg.data, dtype=np.uint8)
+            if buf.size < step * h:
+                raise ValueError("Image data smaller than step*height")
+
+            rows = buf[: step * h].reshape((h, step))
+            pix = rows[:, :row_bytes_needed].view(np.uint16).reshape((h, w))
+            depth_m = pix.astype(np.float32) * float(self.depth_scale)
+            return depth_m
+
+        if enc in ("32fc1",):
+            bytes_per_px = 4
+            row_bytes_needed = w * bytes_per_px
+            if step < row_bytes_needed:
+                raise ValueError(f"Invalid step {step} for 32FC1 width {w}")
+
+            buf = np.frombuffer(msg.data, dtype=np.uint8)
+            if buf.size < step * h:
+                raise ValueError("Image data smaller than step*height")
+
+            rows = buf[: step * h].reshape((h, step))
+            pix = rows[:, :row_bytes_needed].view(np.float32).reshape((h, w))
+            return pix
+
+        raise ValueError(f"Unsupported depth encoding: '{msg.encoding}' (expected 16UC1 or 32FC1)")
+
     def _compute_front_min_m(self, msg: Image) -> Optional[float]:
-        """
-        Return robust near obstacle distance in meters (percentile in ROI),
-        or None if no valid pixels.
-        """
         if msg.height <= 0 or msg.width <= 0:
             return None
 
-        enc = (msg.encoding or "").lower()
         w = int(msg.width)
         h = int(msg.height)
 
-        # Convert ROS Image -> numpy array (no cv_bridge)
-        if enc in ("16uc1", "mono16"):
-            # uint16 depth, typically millimeters for RealSense
-            frame = np.frombuffer(msg.data, dtype=np.uint16).reshape((h, w))
-            depth_m = frame.astype(np.float32) * float(self.depth_scale)
-        elif enc in ("32fc1",):
-            frame = np.frombuffer(msg.data, dtype=np.float32).reshape((h, w))
-            depth_m = frame
-        else:
-            # Try to infer based on step/size
-            # Most RealSense setups are 16UC1; be strict to avoid wrong parses.
-            raise ValueError(f"Unsupported depth encoding: '{msg.encoding}' (expected 16UC1 or 32FC1)")
+        depth_m = self._as_depth_m(msg)
 
         x0, y0, x1, y1 = self._roi_pixels(w, h)
         roi = depth_m[y0:y1, x0:x1].reshape(-1)
@@ -196,17 +274,13 @@ class DepthFrontMinNode(Node):
         if roi.size == 0:
             return None
 
-        # Valid range filtering
         valid = roi[np.isfinite(roi)]
         valid = valid[(valid >= self.min_valid_m) & (valid <= self.max_valid_m)]
 
         if valid.size < 20:
-            # too few pixels -> treat as invalid (prevents noise spikes)
             return None
 
-        # robust near estimate
-        d = float(np.percentile(valid, self.percentile))
-        return d
+        return float(np.percentile(valid, self.percentile))
 
 
 def main() -> None:
