@@ -1,5 +1,5 @@
 # Robot Savo — Depth Front Min Configuration (RealSense D435)
-# File: savo_ws/src/savo_perception/config/depth_front.yaml
+# File: Savo_Pi/src/savo_perception/config/depth_front.yaml
 #
 # Node:
 #   savo_perception/nodes/depth_front_min_node.py
@@ -16,46 +16,48 @@
 #   - ROI is fractions of image width/height (0..1)
 #   - Percentile (p10) is robust against depth noise/outliers
 
-depth_front_min:
+depth_front_min_node:
+  ros__parameters:
+    # -----------------------------
+    # Topics
+    # -----------------------------
+    depth_topic: "/camera/camera/depth/image_rect_raw"
+    publish_topic: "/depth/min_front_m"
 
-  # -----------------------------
-  # Topics
-  # -----------------------------
-  depth_topic: "/camera/camera/depth/image_rect_raw"
-  publish_topic: "/depth/min_front_m"
+    # -----------------------------
+    # Publish loop + staleness
+    # -----------------------------
+    # Node publishes using the latest received frame
+    publish_hz: 30.0
 
-  # -----------------------------
-  # Publish loop + staleness
-  # -----------------------------
-  # Node publishes using the latest received frame
-  publish_hz: 30.0
+    # If no fresh frames arrive within this time -> publish NaN + warning
+    stale_timeout_s: 0.30
+    warn_every_s: 1.0
 
-  # If no fresh frames arrive within this time -> publish NaN + warning
-  stale_timeout_s: 0.30
-  warn_every_s: 1.0
+    # -----------------------------
+    # Depth scaling + validity window
+    # -----------------------------
+    # For 16UC1: RealSense is typically millimeters => 0.001 m per unit
+    # (Your node may name this param depth_scale or depth_scale_m_per_unit.
+    #  Keep THIS name if your node expects it.)
+    depth_scale_m_per_unit: 0.001
 
-  # -----------------------------
-  # Depth scaling + validity window
-  # -----------------------------
-  # For 16UC1: RealSense is typically millimeters => 0.001 m per unit
-  depth_scale_m_per_unit: 0.001
+    # Reject zeros / too-near noise / far noise
+    min_valid_m: 0.02
+    max_valid_m: 3.00
 
-  # Reject zeros / too-near noise / far noise
-  min_valid_m: 0.02
-  max_valid_m: 3.00
+    # -----------------------------
+    # Robust near-distance estimate
+    # -----------------------------
+    # Use a low percentile to estimate the "nearest obstacle" robustly
+    percentile: 10.0
 
-  # -----------------------------
-  # Robust near-distance estimate
-  # -----------------------------
-  # Use a low percentile to estimate the "nearest obstacle" robustly
-  percentile: 10.0
-
-  # -----------------------------
-  # ROI (fractions of image size)
-  # Tuned for ~33 cm mounting height without needing angle measurement
-  # -----------------------------
-  # Focus on lower-middle region where legs/bags appear.
-  roi_x: 0.30   # left
-  roi_y: 0.45   # top
-  roi_w: 0.40   # width
-  roi_h: 0.40   # height
+    # -----------------------------
+    # ROI (fractions of image size)
+    # Tuned for ~33 cm mounting height without needing angle measurement
+    # -----------------------------
+    # Focus on lower-middle region where legs/bags appear.
+    roi_x: 0.30   # left
+    roi_y: 0.45   # top
+    roi_w: 0.40   # width
+    roi_h: 0.40   # height

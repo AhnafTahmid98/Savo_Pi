@@ -1,125 +1,93 @@
 # Robot Savo — Range Safety Configuration (Front: Depth + Ultrasonic, Sides: ToF L/R)
-# File: savo_ws/src/savo_perception/config/range_safety.yaml
+# File: Savo_Pi/src/savo_perception/config/range_safety.yaml
 #
 # Purpose:
 #  - Near-field safety thresholds + stability settings (debounce/hysteresis/stale)
 #  - Single source of truth for your safety stack parameters
 #
-# Used by (via launch -> ros__parameters mapping):
-#  - savo_perception/nodes/vl53_node.py
-#  - savo_perception/nodes/ultrasonic_node.py
-#  - savo_perception/nodes/depth_front_min_node.py
-#  - savo_perception/nodes/safety_stop_node.py
-#  - (later) cmd_vel_safety_gate (C++) can also read these
+# Used by:
+#  - savo_perception/nodes/safety_stop_node.py  (this file is passed as --params-file)
 #
 # Robot mounting (latest):
 #  - FRONT: RealSense D435 front-min + Ultrasonic (backup)
 #  - SIDES: VL53L1X ToF LEFT + RIGHT
 #  - LiDAR: for SLAM/Nav2 costmaps (not configured here)
 
-range_safety:
+safety_stop_node:
+  ros__parameters:
+    # -----------------------------
+    # Topic names (LOCKED CONTRACT)
+    # -----------------------------
+    depth_topic: "/depth/min_front_m"
+    ultrasonic_topic: "/savo_perception/range/front_ultrasonic_m"
+    left_topic: "/savo_perception/range/left_m"
+    right_topic: "/savo_perception/range/right_m"
 
-  # -----------------------------
-  # Global safety behavior
-  # -----------------------------
-  # If true: if required sensor topic becomes stale/missing -> STOP (fail-safe)
-  fail_safe_on_stale: true
-  stale_timeout_s: 0.30
+    stop_topic: "/safety/stop"
+    slowdown_topic: "/safety/slowdown_factor"
 
-  # Clamp invalid readings (reject spikes / zeros / nonsense)
-  min_valid_m: 0.02
-  max_valid_m: 3.00
+    # -----------------------------
+    # Global safety behavior
+    # -----------------------------
+    # If true: if required sensor topic becomes stale/missing -> STOP (fail-safe)
+    fail_safe_on_stale: true
+    stale_timeout_s: 0.30
 
-  # -----------------------------
-  # Enable/disable inputs (future-proof; used by launch or later logic)
-  # -----------------------------
-  enable_depth_front: true
-  enable_ultrasonic_front: true
-  enable_tof_left: true
-  enable_tof_right: true
+    # Clamp invalid readings (reject spikes / zeros / nonsense)
+    min_valid_m: 0.02
+    max_valid_m: 3.00
 
-  # -----------------------------
-  # FRONT safety (Depth + Ultrasonic)
-  # -----------------------------
-  front:
-    # Hard stop distance (meters)
-    stop_m: 0.28
+    # -----------------------------
+    # Enable/disable inputs (future-proof)
+    # -----------------------------
+    enable_depth_front: true
+    enable_ultrasonic_front: true
+    enable_tof_left: true
+    enable_tof_right: true
 
-    # Start slowing down when obstacle closer than this (meters)
-    slow_m: 0.60
+    # -----------------------------
+    # FRONT safety (Depth + Ultrasonic)
+    # -----------------------------
+    front_stop_m: 0.28
+    front_slow_m: 0.60
+    front_hysteresis_m: 0.06
+    front_stop_debounce_count: 2
+    front_clear_debounce_count: 4
 
     # Sensor preference (front): depth primary, ultrasonic backup
     depth_weight: 1.00
     ultrasonic_weight: 0.50
 
-    # Anti-flicker (STOP latch stability)
-    stop_debounce_count: 2      # require N consecutive stop samples to latch STOP
-    clear_debounce_count: 4     # require N consecutive clear samples to release STOP
-    hysteresis_m: 0.06          # clear only when distance > stop_m + hysteresis_m
-
-  # -----------------------------
-  # SIDE safety (ToF left/right)
-  # -----------------------------
-  side:
-    # Side sensors protect lateral motion (vy). Use smaller distances than front.
-    stop_m: 0.20
-    slow_m: 0.45
-
-    stop_debounce_count: 2
-    clear_debounce_count: 4
-    hysteresis_m: 0.05
+    # -----------------------------
+    # SIDE safety (ToF left/right)
+    # -----------------------------
+    side_stop_m: 0.20
+    side_slow_m: 0.45
+    side_hysteresis_m: 0.05
+    side_stop_debounce_count: 2
+    side_clear_debounce_count: 4
 
     # If true: very close side obstacle can force global STOP.
     # Recommended false for mecanum (prefer directional scaling later).
     global_stop_on_side: false
 
-  # -----------------------------
-  # Slowdown publishing (recommended)
-  # -----------------------------
-  slowdown:
-    # Publish global slowdown factor [min_global_scale..1.0]
+    # -----------------------------
+    # Slowdown publishing (recommended)
+    # -----------------------------
     publish_global_factor: true
-
-    # Minimum global scale while slowing (keeps robot moving slowly until hard stop)
     min_global_scale: 0.20
-
-    # Smooth to avoid jitter (EMA)
     ema_alpha: 0.35
 
-    # Directional scaling (future feature):
-    #  - front obstacle affects vx
-    #  - left/right obstacle affects vy
+    # Directional scaling (future feature)
     publish_directional: false
-    topics:
-      vx_scale: "/safety/slowdown_vx"
-      vy_scale: "/safety/slowdown_vy"
+    slowdown_vx_topic: "/safety/slowdown_vx"
+    slowdown_vy_topic: "/safety/slowdown_vy"
 
-  # -----------------------------
-  # Sensor node rates + filter hints
-  # (Launch should pass these to nodes; nodes may clamp/override)
-  # -----------------------------
-  sensors:
+    # -----------------------------
+    # Optional sensor-rate hints (informational / future use)
+    # (Your safety node may ignore these; keeping them for completeness.)
+    # -----------------------------
     tof_publish_hz: 25.0
     ultrasonic_publish_hz: 15.0
-
-    # Median/moving filter window (odd numbers recommended)
     tof_filter_window: 5
     ultrasonic_filter_window: 3
-
-  # -----------------------------
-  # Topic names (LOCKED CONTRACT)
-  # -----------------------------
-  topics:
-    # Depth front-min (published by depth_front_min_node.py)
-    depth_front_min: "/depth/min_front_m"
-
-    # Ultrasonic front (published by ultrasonic_node.py)
-    ultrasonic_front: "/savo_perception/range/front_ultrasonic_m"
-
-    # Side ToFs (published by vl53_node.py)
-    tof_left: "/savo_perception/range/left_m"
-    tof_right: "/savo_perception/range/right_m"
-
-    # Safety outputs (published by safety_stop_node.py)
-    safety_stop: "/safety/stop"
-    slowdown_factor: "/safety/slowdown_factor"
