@@ -1,27 +1,34 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Robot Savo — Perception Bringup Launch (savo_perception)
-
-Starts the full near-field safety perception chain:
-
-Nodes:
-  - vl53_node              -> /savo_perception/range/left_m, /right_m
-  - ultrasonic_node        -> /savo_perception/range/front_ultrasonic_m
-  - depth_front_min_node   -> /depth/min_front_m
-  - safety_stop_node       -> /safety/stop, /safety/slowdown_factor
-
-Optional:
-  - realsense2_camera can be started by separate launch (realsense_bringup.launch.py)
-    or enabled here via `start_realsense:=true`.
-
-Config (recommended):
-  - config/range_safety.yaml
-  - config/depth_front.yaml
-"""
+# File: Savo_Pi/src/savo_perception/launch/perception_bringup.launch.py
+#
+# Robot Savo — Perception Bringup (professional, one-command)
+#
+# What it starts (optional flags):
+#   - RealSense driver (realsense2_camera)  [optional]
+#   - depth_front_min_node                  [optional, depends on RealSense topics]
+#   - vl53_node
+#   - ultrasonic_node
+#   - safety_stop_node
+#   - cmd_vel_safety_gate (C++ node)
+#
+# Run:
+#   source /opt/ros/jazzy/setup.bash
+#   source ~/Savo_Pi/install/setup.bash
+#   ros2 launch savo_perception perception_bringup.launch.py
+#
+# Common variants:
+#   # run everything (recommended)
+#   ros2 launch savo_perception perception_bringup.launch.py use_realsense:=true
+#
+#   # run without RealSense (ToF + ultrasonic + safety still work, depth node disabled)
+#   ros2 launch savo_perception perception_bringup.launch.py use_realsense:=false
+#
+# Notes:
+#   - Your depth node subscribes to: /camera/camera/depth/image_rect_raw
+#   - Those topics only exist while realsense2_camera is running.
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, GroupAction
+from launch.actions import DeclareLaunchArgument, GroupAction, IncludeLaunchDescription
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
@@ -29,92 +36,76 @@ from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description() -> LaunchDescription:
-    # ---- Launch args ----
-    start_realsense_arg = DeclareLaunchArgument(
-        "start_realsense",
-        default_value="false",
-        description="If true, also start RealSense driver (realsense_bringup.launch.py).",
+    pkg_share = FindPackageShare("savo_perception")
+
+    # ---------------------------
+    # Launch arguments
+    # ---------------------------
+    use_realsense = LaunchConfiguration("use_realsense")
+    use_depth_node = LaunchConfiguration("use_depth_node")
+    use_vl53 = LaunchConfiguration("use_vl53")
+    use_ultrasonic = LaunchConfiguration("use_ultrasonic")
+    use_safety_stop = LaunchConfiguration("use_safety_stop")
+    use_cmd_gate = LaunchConfiguration("use_cmd_gate")
+
+    # RealSense profile switches (keep safe defaults for Pi)
+    rs_enable_depth = LaunchConfiguration("rs_enable_depth")
+    rs_enable_color = LaunchConfiguration("rs_enable_color")
+    rs_enable_infra1 = LaunchConfiguration("rs_enable_infra1")
+    rs_enable_infra2 = LaunchConfiguration("rs_enable_infra2")
+    rs_pointcloud = LaunchConfiguration("rs_pointcloud")
+    rs_align_depth = LaunchConfiguration("rs_align_depth")
+
+    # Config files (your locked baselines)
+    depth_yaml = PathJoinSubstitution([pkg_share, "config", "depth_front.yaml"])
+    safety_yaml = PathJoinSubstitution([pkg_share, "config", "range_safety.yaml"])
+
+    # RealSense launch file path
+    realsense_launch = PathJoinSubstitution(
+        [FindPackageShare("realsense2_camera"), "launch", "rs_launch.py"]
     )
 
-    range_cfg_arg = DeclareLaunchArgument(
-        "range_cfg",
-        default_value=PathJoinSubstitution(
-            [FindPackageShare("savo_perception"), "config", "range_safety.yaml"]
-        ),
-        description="Path to range safety config YAML.",
-    )
-
-    depth_cfg_arg = DeclareLaunchArgument(
-        "depth_cfg",
-        default_value=PathJoinSubstitution(
-            [FindPackageShare("savo_perception"), "config", "depth_front.yaml"]
-        ),
-        description="Path to depth front-min config YAML.",
-    )
-
-    start_realsense = LaunchConfiguration("start_realsense")
-    range_cfg = LaunchConfiguration("range_cfg")
-    depth_cfg = LaunchConfiguration("depth_cfg")
-
-    # ---- Optional: include RealSense bringup ----
-    realsense_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            PathJoinSubstitution(
-                [FindPackageShare("savo_perception"), "launch", "realsense_bringup.launch.py"]
-            )
-        ),
-        launch_arguments={
-            # Keep defaults; you can override from CLI if needed
-            "camera_name": "camera",
-            "enable_depth": "true",
-            "enable_color": "true",
-            "pointcloud": "false",
-            "align_depth": "false",
-        }.items(),
-    )
-
-    # Wrap in a group so you can toggle it cleanly
+    # ---------------------------
+    # RealSense driver (optional)
+    # ---------------------------
     realsense_group = GroupAction(
-        actions=[realsense_launch],
-        condition=None,  # we'll control via "if" style below using launch_ros Node? Not needed; use Python if.
-    )
-
-    # NOTE: LaunchConditions are possible, but simplest is: include always, and let user set start_realsense true/false
-    # via an `IfCondition`. We’ll use IfCondition for correctness.
-    from launch.conditions import IfCondition  # local import keeps file clean
-    realsense_launch_with_if = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            PathJoinSubstitution(
-                [FindPackageShare("savo_perception"), "launch", "realsense_bringup.launch.py"]
+        actions=[
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(realsense_launch),
+                launch_arguments={
+                    # Keep resource usage sane on Pi 5
+                    "enable_depth": rs_enable_depth,
+                    "enable_color": rs_enable_color,
+                    "enable_infra1": rs_enable_infra1,
+                    "enable_infra2": rs_enable_infra2,
+                    "pointcloud.enable": rs_pointcloud,
+                    "align_depth.enable": rs_align_depth,
+                }.items(),
             )
-        ),
-        condition=IfCondition(start_realsense),
-        launch_arguments={
-            "camera_name": "camera",
-            "enable_depth": "true",
-            "enable_color": "true",
-            "pointcloud": "false",
-            "align_depth": "false",
-        }.items(),
+        ],
+        condition=IfCondition(use_realsense),
     )
 
-    # ---- Perception nodes ----
+    # ---------------------------
+    # Nodes (all optional toggles)
+    # ---------------------------
+    depth_front_min_node = Node(
+        package="savo_perception",
+        executable="depth_front_min_node",
+        name="depth_front_min_node",
+        output="screen",
+        parameters=[depth_yaml],
+        condition=IfCondition(use_depth_node),
+    )
+
     vl53_node = Node(
         package="savo_perception",
         executable="vl53_node",
         name="vl53_node",
         output="screen",
-        parameters=[
-            # Keep node params aligned with range_safety.yaml hints (but node has its own defaults too)
-            {
-                "rate_hz": 25.0,
-                "median_n": 5,
-                "stale_timeout_s": 0.30,
-                "min_valid_m": 0.02,
-                "max_valid_m": 3.00,
-                "publish_raw": False,
-            }
-        ],
+        # uses node defaults; override here if needed
+        # parameters=[{"rate_hz": 25.0, "median_n": 5}],
+        condition=IfCondition(use_vl53),
     )
 
     ultrasonic_node = Node(
@@ -122,22 +113,8 @@ def generate_launch_description() -> LaunchDescription:
         executable="ultrasonic_node",
         name="ultrasonic_node",
         output="screen",
-        parameters=[
-            {
-                "rate_hz": 15.0,
-                "stale_timeout_s": 0.30,
-                "min_valid_m": 0.02,
-                "max_valid_m": 3.00,
-            }
-        ],
-    )
-
-    depth_front_min_node = Node(
-        package="savo_perception",
-        executable="depth_front_min_node",
-        name="depth_front_min_node",
-        output="screen",
-        parameters=[depth_cfg],  # YAML drives ROI/percentile/scale/topic
+        # parameters=[{"rate_hz": 15.0}],
+        condition=IfCondition(use_ultrasonic),
     )
 
     safety_stop_node = Node(
@@ -145,22 +122,69 @@ def generate_launch_description() -> LaunchDescription:
         executable="safety_stop_node",
         name="safety_stop_node",
         output="screen",
-        parameters=[range_cfg],  # YAML drives thresholds, debounce, topics, etc.
+        parameters=[safety_yaml],
+        condition=IfCondition(use_safety_stop),
     )
 
+    cmd_vel_safety_gate = Node(
+        package="savo_perception",
+        executable="cmd_vel_safety_gate",
+        name="cmd_vel_safety_gate",
+        output="screen",
+        # You can override topics here if you later add a mux:
+        # parameters=[{"cmd_in_topic": "/cmd_vel", "cmd_out_topic": "/cmd_vel_safe"}],
+        condition=IfCondition(use_cmd_gate),
+    )
+
+    # ---------------------------
+    # LaunchDescription
+    # ---------------------------
     return LaunchDescription(
         [
-            start_realsense_arg,
-            range_cfg_arg,
-            depth_cfg_arg,
-
-            # Optional RealSense driver
-            realsense_launch_with_if,
-
-            # Core chain
+            # Primary toggles
+            DeclareLaunchArgument(
+                "use_realsense",
+                default_value="true",
+                description="Start realsense2_camera driver (publishes /camera/camera/depth/image_rect_raw).",
+            ),
+            DeclareLaunchArgument(
+                "use_depth_node",
+                default_value="true",
+                description="Start depth_front_min_node (requires RealSense depth topic).",
+            ),
+            DeclareLaunchArgument(
+                "use_vl53",
+                default_value="true",
+                description="Start vl53_node (publishes /savo_perception/range/left_m and right_m).",
+            ),
+            DeclareLaunchArgument(
+                "use_ultrasonic",
+                default_value="true",
+                description="Start ultrasonic_node (publishes /savo_perception/range/front_ultrasonic_m).",
+            ),
+            DeclareLaunchArgument(
+                "use_safety_stop",
+                default_value="true",
+                description="Start safety_stop_node (publishes /safety/stop and /safety/slowdown_factor).",
+            ),
+            DeclareLaunchArgument(
+                "use_cmd_gate",
+                default_value="true",
+                description="Start cmd_vel_safety_gate (sub /cmd_vel, pub /cmd_vel_safe).",
+            ),
+            # RealSense fine controls (defaults match your working command)
+            DeclareLaunchArgument("rs_enable_depth", default_value="true"),
+            DeclareLaunchArgument("rs_enable_color", default_value="false"),
+            DeclareLaunchArgument("rs_enable_infra1", default_value="false"),
+            DeclareLaunchArgument("rs_enable_infra2", default_value="false"),
+            DeclareLaunchArgument("rs_pointcloud", default_value="false"),
+            DeclareLaunchArgument("rs_align_depth", default_value="false"),
+            # Actions
+            realsense_group,
+            depth_front_min_node,
             vl53_node,
             ultrasonic_node,
-            depth_front_min_node,
             safety_stop_node,
+            cmd_vel_safety_gate,
         ]
     )
