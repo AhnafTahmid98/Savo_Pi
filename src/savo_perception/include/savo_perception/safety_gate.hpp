@@ -5,35 +5,35 @@
 #include <memory>
 #include <string>
 
-#include <rclcpp/rclcpp/rclcpp.hpp>
-#include <geometry_msgs/msg/twist.hpp>
-#include <std_msgs/msg/bool.hpp>
-#include <std_msgs/msg/float32.hpp>
+#include "rclcpp/rclcpp/rclcpp.hpp"
+#include "geometry_msgs/msg/twist.hpp"
+#include "std_msgs/msg/bool.hpp"
+#include "std_msgs/msg/float32.hpp"
 
 namespace savo_perception
 {
 
-// Clamp helper (header-only)
+/// Clamp helper (header-only)
 inline float clampf(float v, float lo, float hi)
 {
   return std::max(lo, std::min(v, hi));
 }
 
 /**
- * @brief CmdVel Safety Gate
+ * @brief CmdVel Safety Gate (C++ / rclcpp)
  *
  * Subscribes:
- *   - /cmd_vel                  (geometry_msgs/Twist)
- *   - /safety/stop              (std_msgs/Bool)
- *   - /safety/slowdown_factor   (std_msgs/Float32)  [0..1], optional
+ *   - /cmd_vel                  (geometry_msgs::msg::Twist)
+ *   - /safety/stop              (std_msgs::msg::Bool)
+ *   - /safety/slowdown_factor   (std_msgs::msg::Float32)  [0..1], optional
  *
  * Publishes:
- *   - /cmd_vel_safe             (geometry_msgs/Twist)
+ *   - /cmd_vel_safe             (geometry_msgs::msg::Twist)
  *
  * Behavior:
- *   - If stop==true -> publish zero Twist
- *   - Else apply global slowdown_factor to vx, vy, omega
- *   - Fail-safe: if stop topic becomes stale and fail_safe_on_stale==true -> zero Twist
+ *   - If stop==true -> publish zero Twist immediately (hard stop).
+ *   - Else apply global slowdown_factor to vx, vy, omega (optional).
+ *   - Fail-safe: if stop topic becomes stale and fail_safe_on_stale==true -> publish zero Twist.
  */
 class CmdVelSafetyGate : public rclcpp::Node
 {
@@ -52,12 +52,12 @@ public:
 
     // Slowdown behavior
     bool use_slowdown{true};
-    float min_scale{0.20f};   // floor for slowdown_factor when used
-    float max_scale{1.00f};
+    float min_scale{0.20f};   // clamp floor for slowdown_factor
+    float max_scale{1.00f};   // clamp ceiling for slowdown_factor
 
-    // Output rate limit (optional):
-    //  - 0.0 => publish only on cmd callback
-    //  - >0  => also publish last gated cmd on timer (keeps output alive)
+    // Output publish mode
+    //  - 0.0 => publish only on /cmd_vel callback
+    //  - >0  => also republish gated cmd on a timer (keeps output alive)
     double publish_hz{0.0};
   };
 
@@ -77,13 +77,15 @@ private:
 private:
   Params p_;
 
-  // Latest inputs
+  // Latest cmd_vel input (cached)
   geometry_msgs::msg::Twist last_cmd_{};
   bool have_cmd_{false};
 
+  // Safety stop state
   bool stop_{false};
   double last_stop_rx_s_{0.0};
 
+  // Global slowdown factor
   float scale_{1.0f};
   double last_scale_rx_s_{0.0};
 
