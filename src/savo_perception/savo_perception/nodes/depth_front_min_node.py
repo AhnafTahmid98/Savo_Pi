@@ -19,6 +19,7 @@ Reliability improvements in this version:
   - Uses qos_profile_sensor_data by default for camera topic compatibility
   - Optional parameter to force RELIABLE subscription if needed
   - Robust numpy view using msg.step (handles row padding)
+  - Uses ROS header stamp for staleness (more robust than callback scheduling)
 """
 
 from __future__ import annotations
@@ -124,7 +125,7 @@ class DepthFrontMinNode(Node):
                 depth=5,
             )
 
-        # Publisher QoS: keep it simple/reliable for downstream safety nodes
+        # Publisher QoS: reliable for downstream safety nodes
         pub_qos = QoSProfile(
             reliability=ReliabilityPolicy.RELIABLE,
             durability=DurabilityPolicy.VOLATILE,
@@ -137,7 +138,8 @@ class DepthFrontMinNode(Node):
 
         # Latest frame cache
         self._latest_msg: Optional[Image] = None
-        self._latest_rx_t: float = 0.0
+        self._latest_rx_t: float = 0.0           # wall-clock fallback (monotonic)
+        self._latest_stamp_s: float = 0.0        # ROS stamp seconds (preferred)
 
         self._last_warn_t: float = 0.0
         self._last_rx_log_t: float = 0.0
@@ -156,22 +158,38 @@ class DepthFrontMinNode(Node):
 
     def _on_depth(self, msg: Image) -> None:
         self._latest_msg = msg
+
+        # Wall time fallback (robust for stamp=0 situations)
         self._latest_rx_t = time.monotonic()
+
+        # Prefer ROS stamp for staleness (more stable than callback scheduling)
+        self._latest_stamp_s = float(msg.header.stamp.sec) + float(msg.header.stamp.nanosec) * 1e-9
 
         if self.log_rx:
             now = time.monotonic()
             if (now - self._last_rx_log_t) >= self.log_rx_every_s:
                 self.get_logger().info(
-                    f"RX depth frame: enc={msg.encoding} size={msg.width}x{msg.height} step={msg.step}"
+                    f"RX depth frame: enc={msg.encoding} size={msg.width}x{msg.height} step={msg.step} "
+                    f"stamp={msg.header.stamp.sec}.{msg.header.stamp.nanosec:09d}"
                 )
                 self._last_rx_log_t = now
 
     # ---------------- Core logic ----------------
 
     def _tick(self) -> None:
-        now = time.monotonic()
+        if self._latest_msg is None:
+            self.pub.publish(Float32(data=_nan()))
+            self._warn_rate_limited("Depth image stale/no data. Publishing NaN.")
+            return
 
-        if self._latest_msg is None or (now - self._latest_rx_t) > self.stale_timeout_s:
+        # Prefer ROS time freshness, fall back to wall time if stamp is 0
+        now_ros_s = float(self.get_clock().now().nanoseconds) * 1e-9
+        if self._latest_stamp_s > 0.0:
+            age_s = now_ros_s - self._latest_stamp_s
+        else:
+            age_s = time.monotonic() - self._latest_rx_t
+
+        if age_s > self.stale_timeout_s:
             self.pub.publish(Float32(data=_nan()))
             self._warn_rate_limited("Depth image stale/no data. Publishing NaN.")
             return
@@ -257,7 +275,9 @@ class DepthFrontMinNode(Node):
             pix = rows[:, :row_bytes_needed].view(np.float32).reshape((h, w))
             return pix
 
-        raise ValueError(f"Unsupported depth encoding: '{msg.encoding}' (expected 16UC1 or 32FC1)")
+        raise ValueError(
+            f"Unsupported depth encoding: '{msg.encoding}' (expected 16UC1 or 32FC1)"
+        )
 
     def _compute_front_min_m(self, msg: Image) -> Optional[float]:
         if msg.height <= 0 or msg.width <= 0:
