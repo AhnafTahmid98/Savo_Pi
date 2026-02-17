@@ -32,6 +32,7 @@ setup(
             "depth_front_min_node = savo_perception.nodes.depth_front_min_node:main",
             "safety_stop_node = savo_perception.nodes.safety_stop_node:main",
             "sensor_dashboard = savo_perception.nodes.sensor_dashboard_node:main",
+
         ],
     },
 )

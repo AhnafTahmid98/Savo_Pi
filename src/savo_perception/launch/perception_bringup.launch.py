@@ -9,6 +9,7 @@
 #   - ultrasonic_node
 #   - safety_stop_node
 #   - cmd_vel_safety_gate (C++ node)
+#   - sensor_dashboard (terminal UI)        [optional]
 #
 # Run:
 #   source /opt/ros/jazzy/setup.bash
@@ -20,7 +21,10 @@
 #   ros2 launch savo_perception perception_bringup.launch.py use_realsense:=true
 #
 #   # run without RealSense (ToF + ultrasonic + safety still work, depth node disabled)
-#   ros2 launch savo_perception perception_bringup.launch.py use_realsense:=false
+#   ros2 launch savo_perception perception_bringup.launch.py use_realsense:=false use_depth_node:=false
+#
+#   # include dashboard
+#   ros2 launch savo_perception perception_bringup.launch.py use_dashboard:=true
 #
 # Notes:
 #   - Your depth node subscribes to: /camera/camera/depth/image_rect_raw
@@ -47,6 +51,7 @@ def generate_launch_description() -> LaunchDescription:
     use_ultrasonic = LaunchConfiguration("use_ultrasonic")
     use_safety_stop = LaunchConfiguration("use_safety_stop")
     use_cmd_gate = LaunchConfiguration("use_cmd_gate")
+    use_dashboard = LaunchConfiguration("use_dashboard")
 
     # RealSense profile switches (keep safe defaults for Pi)
     rs_enable_depth = LaunchConfiguration("rs_enable_depth")
@@ -136,6 +141,18 @@ def generate_launch_description() -> LaunchDescription:
         condition=IfCondition(use_cmd_gate),
     )
 
+    # Terminal dashboard (optional)
+    # NOTE: executable name must match setup.py console_script:
+    #   "sensor_dashboard = savo_perception.nodes.sensor_dashboard_node:main"
+    sensor_dashboard_node = Node(
+        package="savo_perception",
+        executable="sensor_dashboard",
+        name="sensor_dashboard",
+        output="screen",
+        # parameters=[{"refresh_hz": 10.0, "stale_timeout_s": 0.30}],
+        condition=IfCondition(use_dashboard),
+    )
+
     # ---------------------------
     # LaunchDescription
     # ---------------------------
@@ -172,6 +189,11 @@ def generate_launch_description() -> LaunchDescription:
                 default_value="true",
                 description="Start cmd_vel_safety_gate (sub /cmd_vel, pub /cmd_vel_safe).",
             ),
+            DeclareLaunchArgument(
+                "use_dashboard",
+                default_value="false",
+                description="Start terminal sensor dashboard (curses UI).",
+            ),
             # RealSense fine controls (defaults match your working command)
             DeclareLaunchArgument("rs_enable_depth", default_value="true"),
             DeclareLaunchArgument("rs_enable_color", default_value="false"),
@@ -186,5 +208,6 @@ def generate_launch_description() -> LaunchDescription:
             ultrasonic_node,
             safety_stop_node,
             cmd_vel_safety_gate,
+            sensor_dashboard_node,
         ]
     )
