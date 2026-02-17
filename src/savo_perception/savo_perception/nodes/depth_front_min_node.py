@@ -65,7 +65,7 @@ class DepthFrontMinNode(Node):
         self.declare_parameter("max_valid_m", 3.00)
 
         self.declare_parameter("publish_hz", 30.0)
-        self.declare_parameter("stale_timeout_s", 1.0)   # recommended for USB jitter
+        self.declare_parameter("stale_timeout_s", 1.0)  # recommended for USB jitter
         self.declare_parameter("warn_every_s", 1.0)
 
         # Startup grace: suppress stale warnings briefly after node start (RealSense bringup)
@@ -75,9 +75,9 @@ class DepthFrontMinNode(Node):
         self.declare_parameter("depth_scale_m_per_unit", 0.001)
 
         # QoS control:
-        #   sensor      -> qos_profile_sensor_data
-        #   best_effort -> explicit BEST_EFFORT
-        #   reliable    -> RELIABLE + TRANSIENT_LOCAL (matches your RealSense publisher)
+        #   sensor      -> qos_profile_sensor_data (NOTE: BEST_EFFORT + VOLATILE)
+        #   best_effort -> explicit BEST_EFFORT + VOLATILE
+        #   reliable    -> RELIABLE + TRANSIENT_LOCAL (matches RealSense publisher in your logs)
         self.declare_parameter("depth_qos", "reliable")  # "sensor"|"best_effort"|"reliable"
 
         # Debug RX logging
@@ -108,6 +108,7 @@ class DepthFrontMinNode(Node):
         self.log_rx = bool(self.get_parameter("log_rx").value)
         self.log_rx_every_s = float(self.get_parameter("log_rx_every_s").value)
 
+        # Sanity clamps
         self.publish_hz = max(1.0, min(self.publish_hz, 60.0))
         self.percentile = max(0.0, min(self.percentile, 100.0))
         self.log_rx_every_s = max(0.2, self.log_rx_every_s)
@@ -116,10 +117,12 @@ class DepthFrontMinNode(Node):
 
         # ---------------- QoS selection ----------------
         if self.depth_qos == "sensor":
+            # WARNING: qos_profile_sensor_data is BEST_EFFORT + VOLATILE.
+            # It may NOT match RealSense publisher (RELIABLE + TRANSIENT_LOCAL).
             sub_qos = qos_profile_sensor_data
 
         elif self.depth_qos == "reliable":
-            # IMPORTANT: match the RealSense publisher:
+            # Match RealSense (from your ros2 topic info):
             # Reliability: RELIABLE
             # Durability: TRANSIENT_LOCAL
             sub_qos = QoSProfile(
@@ -138,7 +141,7 @@ class DepthFrontMinNode(Node):
                 depth=5,
             )
 
-        # Publisher QoS: RELIABLE is best for safety consumers
+        # Publisher QoS: RELIABLE (best for safety consumers)
         pub_qos = QoSProfile(
             reliability=ReliabilityPolicy.RELIABLE,
             durability=DurabilityPolicy.VOLATILE,
@@ -192,31 +195,31 @@ class DepthFrontMinNode(Node):
     # ---------------- Core logic ----------------
 
     def _tick(self) -> None:
+        # During startup grace: publish NaN quietly (no stale warnings)
+        if (time.monotonic() - self._start_t) < self.startup_grace_s:
+            self.pub.publish(Float32(data=_nan()))
+            return
+
         if self._latest_msg is None:
             self.pub.publish(Float32(data=_nan()))
-            self._warn_stale_if_not_in_startup_grace()
+            self._warn_rate_limited("Depth image stale/no data. Publishing NaN.")
             return
 
         # Prefer ROS stamp freshness when valid; otherwise wall-time freshness
         age_s = self._compute_age_s()
         if age_s is None or age_s > self.stale_timeout_s:
             self.pub.publish(Float32(data=_nan()))
-            self._warn_stale_if_not_in_startup_grace()
+            self._warn_rate_limited("Depth image stale/no data. Publishing NaN.")
             return
 
         try:
             d_m = self._compute_front_min_m(self._latest_msg)
         except Exception as e:
             self.pub.publish(Float32(data=_nan()))
-            # Compute errors are real issues; warn even during startup (rate-limited)
             self._warn_rate_limited(f"Depth compute error: {e}. Publishing NaN.")
             return
 
         self.pub.publish(Float32(data=_nan() if d_m is None else float(d_m)))
-
-    def _warn_stale_if_not_in_startup_grace(self) -> None:
-        if (time.monotonic() - self._start_t) >= self.startup_grace_s:
-            self._warn_rate_limited("Depth image stale/no data. Publishing NaN.")
 
     def _compute_age_s(self) -> Optional[float]:
         """
@@ -226,7 +229,6 @@ class DepthFrontMinNode(Node):
         # If stamp looks valid, try ROS clock
         if self._latest_stamp_s > 0.0:
             now_ros_s = float(self.get_clock().now().nanoseconds) * 1e-9
-            # Guard against weird clock (e.g., jump backwards)
             if now_ros_s > 0.0:
                 age = now_ros_s - self._latest_stamp_s
                 if age >= 0.0:
@@ -302,9 +304,7 @@ class DepthFrontMinNode(Node):
             rows = buf[: step * h].reshape((h, step))
             return rows[:, :row_bytes_needed].view(np.float32).reshape((h, w))
 
-        raise ValueError(
-            f"Unsupported depth encoding: '{msg.encoding}' (expected 16UC1 or 32FC1)"
-        )
+        raise ValueError(f"Unsupported depth encoding: '{msg.encoding}' (expected 16UC1 or 32FC1)")
 
     def _compute_front_min_m(self, msg: Image) -> Optional[float]:
         w = int(msg.width)
@@ -321,7 +321,6 @@ class DepthFrontMinNode(Node):
         valid = roi[np.isfinite(roi)]
         valid = valid[(valid >= self.min_valid_m) & (valid <= self.max_valid_m)]
 
-        # avoid noise spikes when too few pixels are valid
         if valid.size < 20:
             return None
 

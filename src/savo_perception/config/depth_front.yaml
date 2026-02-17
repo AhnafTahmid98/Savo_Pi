@@ -29,6 +29,7 @@ depth_front_min_node:
     # -----------------------------
     publish_hz: 30.0
 
+
     # RealSense can briefly pause during startup/USB jitter.
     # 1.0s avoids false stale during normal operation.
     stale_timeout_s: 1.0

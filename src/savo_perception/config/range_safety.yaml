@@ -31,7 +31,8 @@ safety_stop_node:
     # -----------------------------
     # If true: if required sensor topic becomes stale/missing -> STOP (fail-safe)
     fail_safe_on_stale: true
-    stale_timeout_s: 0.60
+    stale_timeout_s: 1.0
+
 
     # Clamp invalid readings (reject spikes / zeros / nonsense)
     min_valid_m: 0.02
