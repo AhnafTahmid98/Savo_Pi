@@ -48,6 +48,30 @@ install(DIRECTORY include/
 # -----------------------------
 ament_python_install_package(${PROJECT_NAME})
 
+# Install Python node entrypoints as executables for `ros2 run`
+# NOTE: We "RENAME" to remove .py so the command is clean:
+#   ros2 run svo_perception vl53_node
+install(PROGRAMS
+  savo_perception/nodes/vl53_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME vl53_node
+)
+install(PROGRAMS
+  savo_perception/nodes/ultrasonic_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME ultrasonic_node
+)
+install(PROGRAMS
+  savo_perception/nodes/depth_front_min_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME depth_front_min_node
+)
+install(PROGRAMS
+  savo_perception/nodes/safety_stop_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME safety_stop_node
+)
+
 # Install launch + config
 install(DIRECTORY
   launch
