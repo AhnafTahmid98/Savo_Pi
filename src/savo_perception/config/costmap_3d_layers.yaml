@@ -1,0 +1,141 @@
+# Robot Savo — Nav2 Costmap Layer Configuration (LiDAR-first, Depth optional)
+# File: savo_pi/src/savo_perception/config/costmap_3d_layers.yaml
+#
+# Strategy (professional + safe on Pi 5):
+#  - PRIMARY obstacle source for Nav2: RPLIDAR A1 -> /scan (LaserScan)
+#  - Near-field safety (always): depth_front_min_node + ultrasonic + ToF -> safety_stop_node -> cmd_vel_safety_gate
+#  - OPTIONAL (future): RealSense pointcloud -> voxel_layer (3D obstacles) when /points is available
+#
+# Reality check (your current topics):
+#  - You DO have depth image:   /camera/camera/depth/image_rect_raw
+#  - You DO NOT have /points topic right now -> voxel_layer must stay disabled
+#
+# How to enable voxel_layer later:
+#  1) Configure realsense2_camera to publish PointCloud2
+#  2) Confirm: ros2 topic list | grep points
+#  3) Set voxel_layer.enabled=true and set depth_points.topic to the correct /points topic
+
+# -----------------------------
+# LOCAL COSTMAP (rolling window)
+# -----------------------------
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      global_frame: odom
+      robot_base_frame: base_link
+      update_frequency: 10.0
+      publish_frequency: 5.0
+      transform_tolerance: 0.2
+      rolling_window: true
+      width: 3.5
+      height: 3.5
+      resolution: 0.05
+
+      # If you have a footprint, prefer footprint; otherwise robot_radius is OK.
+      robot_radius: 0.22
+
+      # Plugin order: static -> obstacles -> inflation
+      # voxel_layer is included but DISABLED by default (future enable)
+      plugins: ["static_layer", "obstacle_layer", "voxel_layer", "inflation_layer"]
+
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        enabled: true
+
+      # ---- 2D LiDAR obstacles (PRIMARY) ----
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: true
+        observation_sources: scan
+        scan:
+          topic: /scan
+          data_type: "LaserScan"
+          marking: true
+          clearing: true
+          max_obstacle_height: 1.50
+          obstacle_max_range: 3.00
+          obstacle_min_range: 0.05
+          raytrace_max_range: 3.50
+          raytrace_min_range: 0.05
+
+      # ---- 3D depth obstacles (OPTIONAL, FUTURE) ----
+      # Disabled because you currently have no PointCloud2 /points topic.
+      voxel_layer:
+        plugin: "nav2_costmap_2d::VoxelLayer"
+        enabled: false
+        publish_voxel_map: false
+
+        # 3D voxel settings (reasonable defaults)
+        origin_z: 0.0
+        z_resolution: 0.05
+        z_voxels: 16
+        max_obstacle_height: 1.50
+        mark_threshold: 0
+
+        observation_sources: depth_points
+        depth_points:
+          # TODO (future): set this to your actual PointCloud2 topic when enabled
+          # Common RealSense topic when pointcloud enabled:
+          #   /camera/camera/depth/color/points
+          topic: /camera/camera/depth/color/points
+          data_type: "PointCloud2"
+          marking: true
+          clearing: true
+          obstacle_max_range: 2.50
+          obstacle_min_range: 0.15
+          raytrace_max_range: 3.00
+          raytrace_min_range: 0.15
+
+          # Height filtering to reduce floor noise (tune later if enabling voxel)
+          min_obstacle_height: 0.05
+          max_obstacle_height: 1.20
+
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        enabled: true
+        inflation_radius: 0.45
+        cost_scaling_factor: 3.0
+
+
+# -----------------------------
+# GLOBAL COSTMAP (map frame)
+# -----------------------------
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      global_frame: map
+      robot_base_frame: base_link
+      update_frequency: 2.0
+      publish_frequency: 1.0
+      transform_tolerance: 0.3
+      rolling_window: false
+      resolution: 0.05
+      robot_radius: 0.22
+
+      # Keep global costmap light: 2D only
+      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        enabled: true
+
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: true
+        observation_sources: scan
+        scan:
+          topic: /scan
+          data_type: "LaserScan"
+          marking: true
+          clearing: true
+          max_obstacle_height: 1.50
+          obstacle_max_range: 5.00
+          obstacle_min_range: 0.05
+          raytrace_max_range: 6.00
+          raytrace_min_range: 0.05
+
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        enabled: true
+        inflation_radius: 0.60
+        cost_scaling_factor: 3.0
