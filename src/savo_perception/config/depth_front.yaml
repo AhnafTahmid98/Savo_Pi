@@ -37,8 +37,14 @@ depth_front_min_node:
     # -----------------------------
     # QoS (camera topics)
     # -----------------------------
-    # Options: "sensor" (recommended), "best_effort", "reliable"
-    depth_qos: "sensor"
+    # Your RealSense depth publisher is:
+    #   Reliability: RELIABLE
+    #   Durability: TRANSIENT_LOCAL
+    # So we MUST subscribe as "reliable" to actually receive frames.
+    #
+    # Options supported by your node:
+    #   "sensor" | "best_effort" | "reliable"
+    depth_qos: "reliable"
 
     # Debug RX logging (keep off normally)
     log_rx: false
