@@ -29,18 +29,20 @@ depth_front_min_node:
     # -----------------------------
     publish_hz: 30.0
 
-    # RealSense can briefly pause during startup/USB jitter
-    # Using 1.0s prevents false NaN + safety flicker.
+    # RealSense can briefly pause during startup/USB jitter.
+    # 1.0s avoids false stale during normal operation.
     stale_timeout_s: 1.0
     warn_every_s: 1.0
+
+    # Optional: suppress the *initial* stale warning during camera startup.
+    # (Only effective if your node implements this parameter.)
+    startup_grace_s: 1.5
 
     # -----------------------------
     # QoS (camera topics)
     # -----------------------------
-    # Your RealSense depth publisher is:
-    #   Reliability: RELIABLE
-    #   Durability: TRANSIENT_LOCAL
-    # So we MUST subscribe as "reliable" to actually receive frames.
+    # Your RealSense depth publisher is RELIABLE + TRANSIENT_LOCAL,
+    # so this node must subscribe as RELIABLE to receive frames.
     #
     # Options supported by your node:
     #   "sensor" | "best_effort" | "reliable"
