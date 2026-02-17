@@ -11,7 +11,9 @@ Terminal UI dashboard showing:
 - Safety outputs (/safety/stop, /safety/slowdown_factor)
 - cmd_vel_safe (/cmd_vel_safe) if running cmd_vel_safety_gate
 
-Displays STALE state if no update within stale_timeout_s.
+Key fix:
+- Subscribe with QoS compatible with sensor publishers (BEST_EFFORT).
+  Uses qos_profile_sensor_data for sensor-ish streams to avoid RELIABILITY mismatch.
 
 Run:
   ros2 run savo_perception sensor_dashboard
@@ -27,6 +29,7 @@ from typing import Optional, Tuple, Dict
 
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data, QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 
 from std_msgs.msg import Float32, Bool
 from geometry_msgs.msg import Twist
@@ -93,17 +96,44 @@ class SensorDashboardNode(Node):
         self.slow = Val()
         self.cmd = {"vx": Val(), "vy": Val(), "wz": Val()}
 
-        # Subs
-        self.create_subscription(Float32, self.t_depth, self._on_depth, 10)
-        self.create_subscription(Float32, self.t_ultra, self._on_ultra, 10)
-        self.create_subscription(Float32, self.t_left, self._on_left, 10)
-        self.create_subscription(Float32, self.t_right, self._on_right, 10)
-        self.create_subscription(Bool, self.t_stop, self._on_stop, 10)
-        self.create_subscription(Float32, self.t_slow, self._on_slow, 10)
-        self.create_subscription(Twist, self.t_cmd_safe, self._on_cmd, 10)
+        # ---------------- QoS Profiles ----------------
+        # Sensor streams (ToF/ultrasonic/cmd_vel_safe, and depth typically) are best with sensor profile:
+        # - BEST_EFFORT, VOLATILE, small queue
+        sensor_qos = qos_profile_sensor_data
+
+        # Safety outputs often are RELIABLE; subscribing as RELIABLE is safe (it can also receive BEST_EFFORT? no).
+        # We'll keep stop/slow RELIABLE to match typical publishers.
+        reliable_qos = QoSProfile(
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.VOLATILE,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=10,
+        )
+
+        # Depth: your depth_front_min_node publishes RELIABLE, so RELIABLE subscription is fine.
+        # But using sensor_qos also works if publisher is BEST_EFFORT (not the case here).
+        # We'll use RELIABLE for depth to match your current setup.
+        depth_qos = reliable_qos
+
+        # ---------------- Subscriptions ----------------
+        # Depth (RELIABLE publisher from depth_front_min_node)
+        self.create_subscription(Float32, self.t_depth, self._on_depth, depth_qos)
+
+        # Ultrasonic + ToF publishers are sensor style (BEST_EFFORT) -> MUST use sensor_qos.
+        self.create_subscription(Float32, self.t_ultra, self._on_ultra, sensor_qos)
+        self.create_subscription(Float32, self.t_left, self._on_left, sensor_qos)
+        self.create_subscription(Float32, self.t_right, self._on_right, sensor_qos)
+
+        # Safety outputs (typically RELIABLE)
+        self.create_subscription(Bool, self.t_stop, self._on_stop, reliable_qos)
+        self.create_subscription(Float32, self.t_slow, self._on_slow, reliable_qos)
+
+        # cmd_vel_safe often published at high rate, sensor-ish -> use sensor_qos to avoid mismatch
+        self.create_subscription(Twist, self.t_cmd_safe, self._on_cmd, sensor_qos)
 
         self.get_logger().info(
-            f"Dashboard running. stale_timeout_s={self.stale_timeout_s:0.2f}, refresh_hz={self.refresh_hz:0.1f}"
+            f"Dashboard running. stale_timeout_s={self.stale_timeout_s:0.2f}, refresh_hz={self.refresh_hz:0.1f} "
+            f"| QoS: depth=RELIABLE, tof/ultra/cmd=BEST_EFFORT(sensor), stop/slow=RELIABLE"
         )
 
     def _now(self) -> float:
@@ -151,7 +181,7 @@ class SensorDashboardNode(Node):
         def row(label: str, val_s: str, stale: bool, topic: str) -> Tuple[str, str, str, str]:
             return (label, val_s, "STALE" if stale else "OK", topic)
 
-        rows = {}
+        rows: Dict[str, Tuple[str, str, str, str]] = {}
         rows["depth"] = row(
             "Depth front min",
             _fmt_m(self.depth.value),
@@ -249,7 +279,7 @@ def _curses_main(stdscr, node: SensorDashboardNode) -> None:
             )
             y += 1
 
-        draw_line(y + 1, "Tip: if depth is STALE, check ROS_DOMAIN_ID / ROS_LOCALHOST_ONLY and QoS.")
+        draw_line(y + 1, "Tip: If a signal is STALE, check ROS_DOMAIN_ID / ROS_LOCALHOST_ONLY and QoS compatibility.")
         stdscr.refresh()
 
         ch = stdscr.getch()
