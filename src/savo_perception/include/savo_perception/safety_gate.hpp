@@ -1,19 +1,19 @@
-// File: savo_ws/src/savo_perception/include/savo_perception/safety_gate.hpp
+// File: Savo_Pi/src/savo_perception/include/savo_perception/safety_gate.hpp
 #pragma once
 
-#include <string>
-#include <memory>
 #include <algorithm>
+#include <memory>
+#include <string>
 
-#include "rclcpp/rclcpp.hpp"
-#include "geometry_msgs/msg/twist.hpp"
-#include "std_msgs/msg/bool.hpp"
-#include "std_msgs/msg/float32.hpp"
+#include <rclcpp/rclcpp/rclcpp.hpp>
+#include <geometry_msgs/msg/twist.hpp>
+#include <std_msgs/msg/bool.hpp>
+#include <std_msgs/msg/float32.hpp>
 
 namespace savo_perception
 {
 
-// Clamp helper
+// Clamp helper (header-only)
 inline float clampf(float v, float lo, float hi)
 {
   return std::max(lo, std::min(v, hi));
@@ -32,7 +32,7 @@ inline float clampf(float v, float lo, float hi)
  *
  * Behavior:
  *   - If stop==true -> publish zero Twist
- *   - Else apply global slowdown_factor to vx, vy, omega (optional per-axis can be added later)
+ *   - Else apply global slowdown_factor to vx, vy, omega
  *   - Fail-safe: if stop topic becomes stale and fail_safe_on_stale==true -> zero Twist
  */
 class CmdVelSafetyGate : public rclcpp::Node
@@ -52,10 +52,12 @@ public:
 
     // Slowdown behavior
     bool use_slowdown{true};
-    float min_scale{0.20f};   // floor for slowdown_factor when used (safety_stop_node already enforces, but keep safe)
+    float min_scale{0.20f};   // floor for slowdown_factor when used
     float max_scale{1.00f};
 
-    // Output rate limit (optional): if 0 -> publish only on cmd input callback
+    // Output rate limit (optional):
+    //  - 0.0 => publish only on cmd callback
+    //  - >0  => also publish last gated cmd on timer (keeps output alive)
     double publish_hz{0.0};
   };
 
@@ -63,6 +65,7 @@ public:
 
 private:
   void declare_and_get_params_();
+
   void on_cmd_(const geometry_msgs::msg::Twist::SharedPtr msg);
   void on_stop_(const std_msgs::msg::Bool::SharedPtr msg);
   void on_slow_(const std_msgs::msg::Float32::SharedPtr msg);
