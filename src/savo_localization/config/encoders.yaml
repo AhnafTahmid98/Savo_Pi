@@ -1,0 +1,53 @@
+# encoders.yaml
+# Robot SAVO — Encoder + Wheel Odom params (ROS 2 Jazzy)
+#
+# Applies to:
+#   - svo_localization wheel_odom_node (C++) publishing /wheel/odom
+#
+# Notes:
+# - You have TWO rear-wheel encoders (A/B per wheel = 4 GPIO lines total).
+# - For mecanum with rear-only encoders: vy is not observable → node sets vy=0.0.
+# - You use external pull-ups → use_pullups=false.
+#
+# Run example:
+#   ros2 run savo_localization wheel_odom_node --ros-args --params-file encoders.yaml
+
+wheel_odom_node:
+  ros__parameters:
+    # GPIO (BCM numbering)
+    left_a: 21
+    left_b: 20
+    right_a: 12
+    right_b: 26
+
+    # Make "forward drive" count positive (matches your usual tests)
+    invert_left: true
+    invert_right: true
+
+    # Kinematics / encoder model
+    wheel_dia_m: 0.065
+    cpr: 20
+    decoding: 4
+    gear: 1.0
+    track_m: 0.165
+
+    # Timing
+    publish_hz: 50.0        # odom publish rate
+    poll_hz: 2000.0         # GPIO sampling rate in background thread
+
+    # GPIO conditioning
+    debounce_us: 300        # 0 disables; 300us matches your python test defaults
+    use_pullups: false      # you have external pull-ups (recommended)
+    gpiochip: -1            # -1 autodetect; set 0/1/etc if you want fixed
+
+    # Frames (EKF will publish TF; this node does NOT publish TF)
+    frame_odom: "odom"
+    frame_base: "base_link"
+
+    # Covariances (conservative; vy unknown => large)
+    cov_x: 0.02
+    cov_y: 0.50
+    cov_yaw: 0.05
+    cov_vx: 0.05
+    cov_vy: 1.00
+    cov_wz: 0.05

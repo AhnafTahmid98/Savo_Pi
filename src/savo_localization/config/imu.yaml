@@ -1,0 +1,33 @@
+# Robot SAVO — imu.yaml
+# --------------------
+# Parameters for svo_localization imu_node (BNO055).
+#
+# Professional defaults:
+# - IMU-only mode (acc + gyro), NO magnetometer / NO fused orientation
+# - Address is configurable (0x28 or 0x29)
+# - Publish /imu/data for robot_localization EKF input
+#
+# Usage:
+#   ros2 run svo_localization imu_node --ros-args --params-file path/to/imu.yaml
+#
+# Note:
+# - Keep frame_id consistent with your TF tree (usually imu_link).
+# - If your EKF expects base_link, we’ll add a static TF later: imu_link -> base_link.
+
+imu_node:
+  ros__parameters:
+    bus: 1
+    addr: 0x28          # change to 0x29 if ADR pin high
+    imu_only: true      # recommended for indoor (magnetometer noisy)
+
+    topic: "/imu/data"
+    frame_id: "imu_link"
+
+    rate_hz: 25.0
+
+    # Keep OFF unless you are sure magnetometer environment is clean (not your case now)
+    publish_orientation: false
+
+    # Status logging (extra I2C reads, but useful for debugging)
+    publish_status: true
+    status_every_s: 5.0

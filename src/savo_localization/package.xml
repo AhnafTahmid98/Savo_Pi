@@ -1,0 +1,55 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>savo_localization</name>
+  <version>0.0.1</version>
+
+  <description>
+    Robot SAVO — Localization stack (C++ wheel odom + Python IMU publisher + robot_localization EKF).
+    - C++: wheel_odom_node publishes /wheel/odom (vx + omega; vy unsupported with 2 rear encoders)
+    - Python: imu_node publishes /imu/data (gyro-based yaw rate; mag yaw not required)
+    - EKF (robot_localization) outputs /odometry/filtered and TF odom->base_link
+    RViz2 is run on PC/Mac (not required on the Pi).
+  </description>
+
+  <maintainer email="tahmidahnaf998@gmail.com">Ahnaf Tahmid</maintainer>
+  <license>Proprietary</license>
+
+  <!-- Hybrid build: C++ (ament_cmake) + Python (ament_python) -->
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <!-- C++ dependencies -->
+  <depend>rclcpp</depend>
+  <depend>rclcpp_components</depend>
+  <depend>nav_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>tf2</depend>
+  <depend>tf2_ros</depend>
+  <depend>tf2_geometry_msgs</depend>
+
+  <!-- Python nodes -->
+  <depend>rclpy</depend>
+  <depend>std_msgs</depend>
+
+  <!-- Launch support -->
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+
+  <!-- EKF we launch -->
+  <exec_depend>robot_localization</exec_depend>
+
+  <!-- Optional runtime helper: only needed if any Python code loads YAML directly -->
+  <exec_depend>python3-yaml</exec_depend>
+
+  <!-- Useful for runtime parameter files -->
+  <exec_depend>ament_index_python</exec_depend>
+
+  <!-- Tests (optional, safe to keep) -->
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
