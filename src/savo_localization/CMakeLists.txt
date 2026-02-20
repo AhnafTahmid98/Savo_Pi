@@ -5,6 +5,9 @@
 # - C++: wheel_odom_node (production) built with ament_cmake
 # - Python: imu_node + fallback node + sensors_api installed with ament_python
 # - Installs: launch/, config/, include/, and ament resource marker
+#
+# NOTE:
+# - wheel_odom_node uses liblgpio (C API). We must link against -llgpio.
 
 cmake_minimum_required(VERSION 3.8)
 project(savo_localization)
@@ -16,6 +19,10 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# Optional but recommended
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 # -----------------------
 # Dependencies
 # -----------------------
@@ -26,6 +33,7 @@ find_package(rclcpp REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 
@@ -46,9 +54,17 @@ ament_target_dependencies(wheel_odom_node
   nav_msgs
   geometry_msgs
   sensor_msgs
+  std_msgs
   tf2
   tf2_ros
 )
+
+# ---- Link liblgpio (required for lgGpio* symbols) ----
+find_library(LGPIO_LIB lgpio)
+if(NOT LGPIO_LIB)
+  message(FATAL_ERROR "lgpio library not found. Install with: sudo apt install -y liblgpio-dev")
+endif()
+target_link_libraries(wheel_odom_node ${LGPIO_LIB})
 
 install(TARGETS wheel_odom_node
   DESTINATION lib/${PROJECT_NAME}
