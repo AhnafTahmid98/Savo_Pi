@@ -1,0 +1,92 @@
+# Robot Savo — savo_localization/config/localization_common.yaml
+# --------------------------------------------------------------
+# Common localization parameters shared by multiple nodes.
+#
+# This file is intended to be loaded by:
+# - imu_node.py
+# - wheel_odom_node (C++ node) and/or wheel_odom_fallback_node.py
+# - localization_bringup.launch.py (as a shared params file)
+#
+# Keep numbers conservative at first. We will tune after real robot tests.
+
+localization_common:
+
+  # -------------------------
+  # Timing / health
+  # -------------------------
+  use_sim_time: false
+
+  # Default loop rates (each node may override)
+  imu_rate_hz: 50.0
+  wheel_odom_rate_hz: 50.0
+
+  # Stale logic:
+  # If a stream stops updating for longer than this, consider it stale.
+  # Use the same value as your overall safety/perception philosophy (fast fail).
+  stale_timeout_s: 0.30
+
+  # dt clamp (prevents integration blowups if the loop stalls)
+  dt_min_s: 0.0001
+  dt_max_s: 0.50
+  dt_fallback_s: 0.02
+
+  # -------------------------
+  # Frame defaults
+  # -------------------------
+  # These are safe defaults. If you load frames.yaml separately, you can override.
+  frames:
+    map: "map"
+    odom: "odom"
+    base: "base_link"
+    base_footprint: "base_footprint"
+    imu: "imu_link"
+
+  # -------------------------
+  # Wheel odom (rear encoders only)
+  # -------------------------
+  wheel_odom:
+    # Physical parameters (update with your measured robot)
+    wheel_diameter_m: 0.065
+    track_width_m: 0.165
+
+    # Encoder conversion:
+    # - cpr: counts per revolution (per channel) at the encoder source
+    # - decoding: 1/2/4 depending on quadrature decode multiplier
+    # - gear_ratio: set 1.0 unless your CPR is motor-side and you need scaling
+    cpr: 20
+    decoding: 4
+    gear_ratio: 1.0
+
+    # Sign conventions:
+    # If counts increase in the opposite direction, set invert flags to true.
+    invert_left: true
+    invert_right: true
+
+    # Optional: clamp unrealistic spikes
+    max_wheel_speed_mps: 2.0
+    max_yaw_rate_rps: 6.0
+
+    # Default covariance (conservative; EKF will refine)
+    covariance:
+      pose_xy_var: 1.0e-3
+      yaw_var: 1.0e-2
+      lin_vel_var: 1.0e-2
+      yaw_rate_var: 1.0e-1
+
+  # -------------------------
+  # IMU (BNO055)
+  # -------------------------
+  imu:
+    # BNO055 I2C address. Typical: 0x28 (default). Only change if configured.
+    i2c_address: 0x28
+
+    # If IMU axes/sign are flipped in your mounting, apply here
+    # (we will fill these after verifying live data)
+    invert_yaw: false
+    invert_gyro_z: false
+
+    # Covariance defaults (start conservative)
+    covariance:
+      orientation_var: 2.5e-2
+      angular_velocity_var: 5.0e-2
+      linear_acceleration_var: 1.0e-1
