@@ -8,8 +8,9 @@
 # - Publish TF: odom -> base_link (single TF authority for odom->base)
 #
 # Notes (mecanum + 2 rear encoders):
-# - Wheel odom provides vx and wz (approx), vy is not observable -> keep vy disabled
-# - IMU stabilizes yaw / yaw rate
+# - Rear-only encoders can reliably provide: x displacement, vx, yaw rate (wz) (approx)
+# - Rear-only encoders cannot observe: vy and true y displacement -> DO NOT fuse y from wheel odom
+# - IMU stabilizes yaw + yaw rate
 # - Global drift correction comes later via AMCL/SLAM providing map->odom
 
 ekf_filter_node:
@@ -21,6 +22,7 @@ ekf_filter_node:
     frequency: 50.0
     sensor_timeout: 0.30
     two_d_mode: true
+
     transform_time_offset: 0.0
     transform_timeout: 0.10
 
@@ -29,41 +31,45 @@ ekf_filter_node:
     publish_acceleration: false
     print_diagnostics: true
 
+    # -------------------------
     # Frames
-    map_frame: map            # not used in pure odom EKF, but required by node
-    odom_frame: odom
-    base_link_frame: base_link
-    world_frame: odom         # ODOM EKF: world frame is odom
+    # -------------------------
+    # map_frame is required by the node even in odom-only mode.
+    map_frame: "map"
+    odom_frame: "odom"
+    base_link_frame: "base_link"
+    world_frame: "odom"   # ODOM EKF: world frame is odom
 
     # Optional: if you use base_footprint in your TF tree, swap base_link_frame.
-    # base_link_frame: base_footprint
+    # base_link_frame: "base_footprint"
 
     # -------------------------
     # Input 1: Wheel odometry
     # -------------------------
-    odom0: /wheel/odom
+    odom0: "/wheel/odom"
+
+    # IMPORTANT:
+    # - Disable y (and vy) because rear-only encoders cannot observe lateral motion (mecanum).
+    # - Keep x, yaw, vx, vyaw enabled.
     odom0_config: [
-      true,  true,  false,   # x, y, z
+      true,  false, false,   # x, y, z
       false, false, true,    # roll, pitch, yaw
       true,  false, false,   # vx, vy, vz
       false, false, true,    # vroll, vpitch, vyaw
       false, false, false    # ax, ay, az
     ]
 
-    # Generally keep pose from wheel odom enabled (x, y, yaw) + twist (vx, vyaw).
-    # We explicitly disable vy because we cannot observe it with 2 rear encoders.
     odom0_queue_size: 10
     odom0_nodelay: true
     odom0_differential: false
     odom0_relative: false
 
-    # If your wheel_odom publishes huge covariance on y and vy, EKF naturally down-weights it,
-    # but we still keep vy disabled in the config for correctness.
-
     # -------------------------
     # Input 2: IMU
     # -------------------------
-    imu0: /imu/data
+    imu0: "/imu/data"
+
+    # 2D fusion: yaw + yaw rate only
     imu0_config: [
       false, false, false,   # x, y, z
       false, false, true,    # roll, pitch, yaw
@@ -75,20 +81,17 @@ ekf_filter_node:
     imu0_queue_size: 20
     imu0_nodelay: true
 
-    # Important:
-    # - If your IMU orientation is absolute and stable, keep this false.
-    # - If IMU is drifting or you only trust gyro integration, you might set imu0_differential=true.
+    # Keep false initially (typical for BNO055 orientation output).
+    # If you later decide to trust only gyro integration, we can switch to imu0_differential: true.
     imu0_differential: false
     imu0_relative: false
 
-    # If IMU provides gravity-compensated linear acceleration and you want it later, enable publish_acceleration
-    # and set imu0_remove_gravitational_acceleration: true/false accordingly.
     imu0_remove_gravitational_acceleration: true
 
     # -------------------------
     # Filter tuning (conservative defaults)
     # -------------------------
-    # These values are safe starting points; tune after you validate sensor noise.
+    # Safe starting point; tune later after validating sensor noise on real hardware.
     process_noise_covariance: [
       0.05, 0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
       0,    0.05, 0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
@@ -107,7 +110,7 @@ ekf_filter_node:
       0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0.6
     ]
 
-    # Start with identity-ish initial estimate covariance (not too confident)
+    # Start with moderate uncertainty (not too confident)
     initial_estimate_covariance: [
       1.0, 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
       0,   1.0, 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,

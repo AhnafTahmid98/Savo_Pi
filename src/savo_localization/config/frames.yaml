@@ -1,27 +1,37 @@
 # Robot Savo — savo_localization/config/frames.yaml
 # -------------------------------------------------
-# Canonical frame IDs for the localization stack.
+# ROS 2 PARAMS FILE (valid for --params-file)
 #
-# This YAML is used by:
-# - imu_node.py
-# - wheel_odom_node (C++ via parameters)
-# - wheel_odom_fallback_node.py
-# - localization_bringup.launch.py (pass-through)
+# Purpose:
+# Centralize frame IDs so all localization nodes use the same TF names.
 #
 # Conventions:
-# - EKF publishes TF: odom -> base_link (or base_footprint if you choose)
+# - EKF (robot_localization) publishes TF: odom -> base_link (or base_footprint)
 # - AMCL/SLAM publishes TF: map -> odom
 #
-# Keep these values consistent across Nav2, robot_localization, and all publishers.
+# IMPORTANT:
+# ROS2 parameter files MUST be node-scoped:
+#   <node_name>:
+#     ros__parameters:
+#       ...
 
-frames:
-  map: "map"
-  odom: "odom"
-  base_link: "base_link"
-  base_footprint: "base_footprint"
-  imu_link: "imu_link"
+wheel_odom_node:
+  ros__parameters:
+    frame_odom: "odom"
+    frame_base: "base_link"
 
-# Optional: if you ever introduce an intermediate child frame for wheel odom.
-# Not required for the current design (EKF owns the TF tree).
-optional:
-  wheel_odom_child: "wheel_odom"
+imu_node:
+  ros__parameters:
+    frame_id: "imu_link"
+
+wheel_odom_fallback_node:
+  ros__parameters:
+    frame_odom: "odom"
+    frame_base: "base_link"
+
+# EKF config (robot_localization) also uses these frames, but that is managed in ekf_odom.yaml:
+#   map_frame, odom_frame, base_link_frame, world_frame
+#
+# Optional / future:
+# If you ever create an intermediate child frame for wheel odom (not recommended now),
+# you can introduce a param in nodes later. Currently unused by the code.
