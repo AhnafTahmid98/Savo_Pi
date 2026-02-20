@@ -76,6 +76,15 @@ install(TARGETS wheel_odom_node
 ament_python_install_package(${PROJECT_NAME})
 
 # -----------------------
+# Install Python node entry scripts (ros2 run)
+# -----------------------
+install(PROGRAMS
+  scripts/imu_node
+  scripts/wheel_odom_fallback_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+# -----------------------
 # Install headers
 # -----------------------
 install(
