@@ -6,11 +6,14 @@ project(savo_localization)
 # Hybrid package:
 #   - C++ node: wheel_odom_node (production odometry)
 #   - Python nodes: imu_node, wheel_odom_fallback_node, localization_dashboard
-#     (installed via setup.py + ament_python_install_package)
+#     (installed explicitly via CMake install(PROGRAMS ...))
 #
-# Notes:
-# - DO NOT install Python executables here if using setup.py entry_points.
-# - CMake handles C++ build + package assets (launch/config/include).
+# Rationale:
+# - In this package layout, relying only on setup.py entry_points has not
+#   consistently produced ROS executables in install/lib/savo_localization.
+# - This CMake file installs Python ROS nodes directly for reliable `ros2 run`.
+# - Python package modules/libraries are still installed via
+#   ament_python_install_package().
 # ============================================================
 
 # -----------------------
@@ -75,10 +78,20 @@ install(TARGETS wheel_odom_node
 )
 
 # -----------------------
-# Python package install
-# (Python nodes installed via setup.py entry_points)
+# Python package install (modules, imports)
 # -----------------------
 ament_python_install_package(${PROJECT_NAME})
+
+# -----------------------
+# Install Python ROS executable nodes explicitly
+# (reliable `ros2 run` in hybrid package)
+# -----------------------
+install(PROGRAMS
+  savo_localization/nodes/imu_node.py
+  savo_localization/nodes/wheel_odom_fallback_node.py
+  savo_localization/nodes/localization_dashboard.py
+  DESTINATION lib/${PROJECT_NAME}
+)
 
 # -----------------------
 # Install headers (if present)
