@@ -1,17 +1,17 @@
 # Robot Savo — savo_localization/config/ekf_odom.yaml
 # ---------------------------------------------------
-# robot_localization EKF configuration (ODOM mode).
+# robot_localization EKF configuration (ODOM mode)
 #
 # Purpose:
 # - Fuse wheel odometry (rear encoders -> /wheel/odom) with IMU (/imu/data)
-# - Publish /odometry/filtered for Nav2
-# - Publish TF: odom -> base_link (single TF authority for odom->base)
+# - Publish /odometry/filtered for downstream localization/navigation
+# - Publish TF: odom -> base_link (single TF authority for odom->base_link)
 #
-# Notes (mecanum + 2 rear encoders):
-# - Rear-only encoders can reliably provide: x displacement, vx, yaw rate (wz) (approx)
-# - Rear-only encoders cannot observe: vy and true y displacement -> DO NOT fuse y from wheel odom
+# Notes (mecanum + 2 rear encoders baseline):
+# - Rear-only encoders can reasonably provide: x, yaw (approx), vx, wz
+# - Rear-only encoders cannot observe: true lateral motion (y, vy) on mecanum
 # - IMU stabilizes yaw + yaw rate
-# - Global drift correction comes later via AMCL/SLAM providing map->odom
+# - Global drift correction comes later via AMCL/SLAM (map -> odom)
 
 ekf_filter_node:
   ros__parameters:
@@ -19,38 +19,42 @@ ekf_filter_node:
     # -------------------------
     # Core
     # -------------------------
-    frequency: 50.0
+    frequency: 50.0              # 30.0 is also fine on Pi if CPU load becomes a concern
     sensor_timeout: 0.30
     two_d_mode: true
 
     transform_time_offset: 0.0
     transform_timeout: 0.10
 
+    # Useful on real systems if clock jumps or /clock behavior changes
+    reset_on_time_jump: true
+
     # Publish filtered output + TF
     publish_tf: true
     publish_acceleration: false
+    permit_corrected_publication: true
     print_diagnostics: true
 
     # -------------------------
     # Frames
     # -------------------------
-    # map_frame is required by the node even in odom-only mode.
+    # map_frame is still required by robot_localization, even in odom-only mode.
     map_frame: "map"
     odom_frame: "odom"
     base_link_frame: "base_link"
     world_frame: "odom"   # ODOM EKF: world frame is odom
 
-    # Optional: if you use base_footprint in your TF tree, swap base_link_frame.
+    # If you later standardize on base_footprint, update both here and the TF tree.
     # base_link_frame: "base_footprint"
 
     # -------------------------
-    # Input 1: Wheel odometry
+    # Input 1: Wheel odometry (/wheel/odom)
     # -------------------------
     odom0: "/wheel/odom"
 
-    # IMPORTANT:
-    # - Disable y (and vy) because rear-only encoders cannot observe lateral motion (mecanum).
-    # - Keep x, yaw, vx, vyaw enabled.
+    # IMPORTANT (rear-only encoder baseline):
+    # - Disable y and vy because rear-only encoders cannot observe mecanum lateral motion.
+    # - Fuse x, yaw, vx, wz.
     odom0_config: [
       true,  false, false,   # x, y, z
       false, false, true,    # roll, pitch, yaw
@@ -65,11 +69,11 @@ ekf_filter_node:
     odom0_relative: false
 
     # -------------------------
-    # Input 2: IMU
+    # Input 2: IMU (/imu/data)
     # -------------------------
     imu0: "/imu/data"
 
-    # 2D fusion: yaw + yaw rate only
+    # 2D fusion: yaw + yaw rate
     imu0_config: [
       false, false, false,   # x, y, z
       false, false, true,    # roll, pitch, yaw
@@ -81,17 +85,19 @@ ekf_filter_node:
     imu0_queue_size: 20
     imu0_nodelay: true
 
-    # Keep false initially (typical for BNO055 orientation output).
-    # If you later decide to trust only gyro integration, we can switch to imu0_differential: true.
+    # Keep false initially (typical when using BNO055 orientation output directly).
+    # If later using gyro-only yaw integration behavior, we can revisit this.
     imu0_differential: false
     imu0_relative: false
 
-    imu0_remove_gravitational_acceleration: true
+    # Not used right now because linear acceleration is NOT fused (ax/ay/az all false),
+    # but keep explicit for clarity.
+    imu0_remove_gravitational_acceleration: false
 
     # -------------------------
     # Filter tuning (conservative defaults)
     # -------------------------
-    # Safe starting point; tune later after validating sensor noise on real hardware.
+    # Safe baseline. Tune only after validating raw /wheel/odom and /imu/data behavior.
     process_noise_covariance: [
       0.05, 0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
       0,    0.05, 0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
@@ -110,7 +116,7 @@ ekf_filter_node:
       0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0.6
     ]
 
-    # Start with moderate uncertainty (not too confident)
+    # Start with moderate uncertainty (not overconfident)
     initial_estimate_covariance: [
       1.0, 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
       0,   1.0, 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
