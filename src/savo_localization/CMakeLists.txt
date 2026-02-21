@@ -1,25 +1,25 @@
-# CMakeLists.txt
-# Robot SAVO — savo_localization (ROS 2 Jazzy)
-#
-# Hybrid package (ament_cmake + ament_python):
-# - C++: wheel_odom_node (production) built with ament_cmake
-# - Python: imu_node + fallback node + sensors_api installed with ament_python
-# - Installs: launch/, config/, include/, and ament resource marker
-#
-# NOTE:
-# - wheel_odom_node uses liblgpio (C API). We must link against -llgpio.
-
 cmake_minimum_required(VERSION 3.8)
 project(savo_localization)
 
+# ============================================================
+# Robot SAVO — savo_localization (ROS 2 Jazzy)
+# Hybrid package:
+#   - C++ node: wheel_odom_node (production odometry)
+#   - Python nodes: imu_node, wheel_odom_fallback_node, localization_dashboard
+#     (installed via setup.py + ament_python_install_package)
+#
+# Notes:
+# - DO NOT install Python executables here if using setup.py entry_points.
+# - CMake handles C++ build + package assets (launch/config/include).
+# ============================================================
+
 # -----------------------
-# Build settings
+# Compiler settings
 # -----------------------
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# Optional but recommended
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -59,53 +59,68 @@ ament_target_dependencies(wheel_odom_node
   tf2_ros
 )
 
-# ---- Link liblgpio (required for lgGpio* symbols) ----
+# -----------------------
+# Link lgpio (required)
+# -----------------------
 find_library(LGPIO_LIB lgpio)
 if(NOT LGPIO_LIB)
   message(FATAL_ERROR "lgpio library not found. Install with: sudo apt install -y liblgpio-dev")
 endif()
+
 target_link_libraries(wheel_odom_node ${LGPIO_LIB})
 
+# Install C++ executable
 install(TARGETS wheel_odom_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
 # -----------------------
 # Python package install
+# (Python nodes installed via setup.py entry_points)
 # -----------------------
 ament_python_install_package(${PROJECT_NAME})
 
 # -----------------------
-# Install Python node entry scripts (ros2 run)
+# Install headers (if present)
 # -----------------------
-install(PROGRAMS
-  scripts/imu_node
-  scripts/wheel_odom_fallback_node
-  DESTINATION lib/${PROJECT_NAME}
-)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/include")
+  install(
+    DIRECTORY include/
+    DESTINATION include/
+  )
+endif()
 
 # -----------------------
-# Install headers
+# Install launch folder (if present)
 # -----------------------
-install(
-  DIRECTORY include/
-  DESTINATION include/
-)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/launch")
+  install(
+    DIRECTORY launch/
+    DESTINATION share/${PROJECT_NAME}/launch
+  )
+endif()
 
 # -----------------------
-# Install launch + config
+# Install config folder (if present)
 # -----------------------
-install(
-  DIRECTORY launch config
-  DESTINATION share/${PROJECT_NAME}
-)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/config")
+  install(
+    DIRECTORY config/
+    DESTINATION share/${PROJECT_NAME}/config
+  )
+endif()
 
 # -----------------------
-# Install resource marker
+# Install rviz folder (optional)
 # -----------------------
-install(
-  FILES resource/${PROJECT_NAME}
-  DESTINATION share/ament_index/resource_index/packages
-)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/rviz")
+  install(
+    DIRECTORY rviz/
+    DESTINATION share/${PROJECT_NAME}/rviz
+  )
+endif()
 
+# -----------------------
+# Package
+# -----------------------
 ament_package()

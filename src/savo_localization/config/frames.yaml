@@ -32,6 +32,3 @@ wheel_odom_fallback_node:
 # EKF config (robot_localization) also uses these frames, but that is managed in ekf_odom.yaml:
 #   map_frame, odom_frame, base_link_frame, world_frame
 #
-# Optional / future:
-# If you ever create an intermediate child frame for wheel odom (not recommended now),
-# you can introduce a param in nodes later. Currently unused by the code.
