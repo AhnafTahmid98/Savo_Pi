@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Robot Savo — Localization Dashboard (ROS2 Jazzy) [v2.0 Professional]
+Robot Savo — Localization Dashboard (ROS2 Jazzy) [v2.1 Professional]
 ---------------------------------------------------------------------
 Terminal dashboard for localization bringup/debug on the Pi.
 
@@ -19,10 +19,11 @@ Features:
 - Message rate estimate (dashboard sampling rate)
 - IMU / Odom live summaries
 - IMU inferred motion state (STATIONARY / MOVING / ROTATING)
-- Motion mode classification (IDLE / FWD / REV / STRAFE_L / STRAFE_R / TURN_CW / TURN_CCW / MIXED)
-  using cmd_vel (preferred) or odom (fallback), with IMU-only fallback
+- Motion mode classification (IDLE / FORWARD / REVERSE / STRAFE_LEFT / STRAFE_RIGHT / TURN_CW / TURN_CCW / MIXED)
+  using odom/cmd_vel/IMU fallbacks
 - Per-motion-mode IMU statistics in Ctrl+C / q summary
 - Motion mode transition log (recent events)
+- Phase 1 sign-check helper (wheel / IMU / EKF hints)
 - Safe rendering on small terminal windows
 - Exit with Ctrl+C or q
 
@@ -76,6 +77,17 @@ def rad2deg(x: float) -> float:
     return x * 180.0 / math.pi
 
 
+def mean_or_none(seq) -> Optional[float]:
+    vals = list(seq)
+    if not vals:
+        return None
+    return sum(vals) / len(vals)
+
+
+def safe_fmean(vals: List[float]) -> float:
+    return statistics.fmean(vals) if vals else 0.0
+
+
 def quat_to_euler_rpy(x: float, y: float, z: float, w: float) -> Tuple[float, float, float]:
     """Quaternion -> roll, pitch, yaw (radians)."""
     sinr_cosp = 2.0 * (w * x + y * z)
@@ -93,17 +105,6 @@ def quat_to_euler_rpy(x: float, y: float, z: float, w: float) -> Tuple[float, fl
     yaw = math.atan2(siny_cosp, cosy_cosp)
 
     return roll, pitch, yaw
-
-
-def mean_or_none(seq) -> Optional[float]:
-    vals = list(seq)
-    if not vals:
-        return None
-    return sum(vals) / len(vals)
-
-
-def safe_fmean(vals: List[float]) -> float:
-    return statistics.fmean(vals) if vals else 0.0
 
 
 # ============================================================
@@ -208,8 +209,16 @@ class LocalizationDashboardNode(Node):
         # -------------------------
         self.declare_parameter("motion_lin_deadband_m_s", 0.03)    # for vx/vy
         self.declare_parameter("motion_ang_deadband_rad_s", 0.08)  # for wz
-        self.declare_parameter("motion_mix_allow_ratio", 1.8)      # dominant axis ratio threshold
-        self.declare_parameter("motion_source_preference", "cmd_then_ekf_then_wheel")  # or "ekf_then_wheel_then_cmd"
+        self.declare_parameter("motion_mix_allow_ratio", 1.8)
+        # For localization testing, EKF/wheel-first is usually more meaningful than cmd_vel-first.
+        self.declare_parameter("motion_source_preference", "ekf_then_wheel_then_cmd")
+
+        # -------------------------
+        # Parameters: Phase 1 helper
+        # -------------------------
+        self.declare_parameter("phase1_sign_checks_enabled", True)
+        self.declare_parameter("phase1_sign_check_deadband_vx", 0.03)
+        self.declare_parameter("phase1_sign_check_deadband_wz", 0.08)
 
         # -------------------------
         # Read params
@@ -231,6 +240,10 @@ class LocalizationDashboardNode(Node):
         self.motion_ang_deadband = float(self.get_parameter("motion_ang_deadband_rad_s").value)
         self.motion_mix_allow_ratio = float(self.get_parameter("motion_mix_allow_ratio").value)
         self.motion_source_preference = str(self.get_parameter("motion_source_preference").value)
+
+        self.phase1_sign_checks_enabled = bool(self.get_parameter("phase1_sign_checks_enabled").value)
+        self.phase1_vx_deadband = float(self.get_parameter("phase1_sign_check_deadband_vx").value)
+        self.phase1_wz_deadband = float(self.get_parameter("phase1_sign_check_deadband_wz").value)
 
         # -------------------------
         # Topic stats
@@ -274,7 +287,7 @@ class LocalizationDashboardNode(Node):
         self.imu_recent_acc_norm: Deque[float] = deque(maxlen=40)
 
         # -------------------------
-        # Motion mode tracking (NEW)
+        # Motion mode tracking
         # -------------------------
         self.current_motion_mode: str = "NO_DATA"
         self.current_motion_source: str = "none"
@@ -282,8 +295,25 @@ class LocalizationDashboardNode(Node):
         self.current_motion_since_s: float = now_monotonic()
         self.motion_transition_log: Deque[str] = deque(maxlen=20)
 
+        # -------------------------
+        # Phase 1 sign-check status
+        # -------------------------
+        self.phase1_sign_status: Dict[str, str] = {
+            "wheel_vx": "n/a",
+            "wheel_wz": "n/a",
+            "imu_gz": "n/a",
+            "ekf_vx": "n/a",
+            "ekf_wz": "n/a",
+        }
+        self.phase1_sign_reason: Dict[str, str] = {
+            "wheel_vx": "waiting",
+            "wheel_wz": "waiting",
+            "imu_gz": "waiting",
+            "ekf_vx": "waiting",
+            "ekf_wz": "waiting",
+        }
+
         # Per-mode IMU stats
-        # mode -> signal -> list
         self.imu_mode_stats: DefaultDict[str, Dict[str, List[float]]] = defaultdict(
             lambda: {
                 "gz": [],
@@ -313,7 +343,8 @@ class LocalizationDashboardNode(Node):
         self.get_logger().info(
             "[localization_dashboard] started | "
             f"imu={self.imu_topic}, wheel={self.wheel_odom_topic}, ekf={self.ekf_odom_topic}, "
-            f"cmd={self.cmd_vel_topic}, stop={self.safety_stop_topic}, compact_mode={self.compact_mode}"
+            f"cmd={self.cmd_vel_topic}, stop={self.safety_stop_topic}, compact_mode={self.compact_mode}, "
+            f"motion_source_preference={self.motion_source_preference}"
         )
 
     # --------------------------------------------------------
@@ -352,7 +383,7 @@ class LocalizationDashboardNode(Node):
 
         imu_state, imu_reason = self._infer_imu_motion_state()
 
-        # Motion mode (cmd/odom preferred, IMU fallback)
+        # Motion mode (odom/cmd preferred, IMU fallback)
         mode, source, reason = self._classify_motion_mode()
         self._update_motion_mode(mode, source, reason)
 
@@ -379,13 +410,15 @@ class LocalizationDashboardNode(Node):
         self.imu_ay_hist.append(ay)
         self.imu_az_hist.append(az)
 
-        # Per-mode IMU histories (key request)
+        # Per-mode IMU histories
         mode_key = self.current_motion_mode
         self.imu_mode_stats[mode_key]["gz"].append(gz)
         self.imu_mode_stats[mode_key]["acc_norm"].append(acc_norm)
         self.imu_mode_stats[mode_key]["ax"].append(ax)
         self.imu_mode_stats[mode_key]["ay"].append(ay)
         self.imu_mode_stats[mode_key]["az"].append(az)
+
+        self._update_phase1_sign_checks()
 
     def cb_wheel_odom(self, msg: Odometry) -> None:
         self.stats["wheel_odom"].on_message(msg.header.stamp.sec, msg.header.stamp.nanosec)
@@ -394,12 +427,21 @@ class LocalizationDashboardNode(Node):
         self.wheel_vy_hist.append(self.wheel_odom_data["vy"])
         self.wheel_wz_hist.append(self.wheel_odom_data["wz"])
 
+        # Keep motion mode responsive even if IMU callback rate changes.
+        mode, source, reason = self._classify_motion_mode()
+        self._update_motion_mode(mode, source, reason)
+        self._update_phase1_sign_checks()
+
     def cb_ekf_odom(self, msg: Odometry) -> None:
         self.stats["ekf_odom"].on_message(msg.header.stamp.sec, msg.header.stamp.nanosec)
         self.ekf_odom_data = self._extract_odom(msg)
         self.ekf_vx_hist.append(self.ekf_odom_data["vx"])
         self.ekf_vy_hist.append(self.ekf_odom_data["vy"])
         self.ekf_wz_hist.append(self.ekf_odom_data["wz"])
+
+        mode, source, reason = self._classify_motion_mode()
+        self._update_motion_mode(mode, source, reason)
+        self._update_phase1_sign_checks()
 
     def cb_cmd_vel(self, msg: Twist) -> None:
         self.stats["cmd_vel"].on_message()
@@ -411,6 +453,8 @@ class LocalizationDashboardNode(Node):
             "wy": msg.angular.y,
             "wz": msg.angular.z,
         }
+        mode, source, reason = self._classify_motion_mode()
+        self._update_motion_mode(mode, source, reason)
 
     def cb_safety_stop(self, msg: Bool) -> None:
         self.stats["safety_stop"].on_message()
@@ -450,7 +494,14 @@ class LocalizationDashboardNode(Node):
         py = msg.pose.pose.position.y
         pz = msg.pose.pose.position.z
         q = msg.pose.pose.orientation
-        roll, pitch, yaw = quat_to_euler_rpy(q.x, q.y, q.z, q.w)
+
+        try:
+            roll, pitch, yaw = quat_to_euler_rpy(q.x, q.y, q.z, q.w)
+            roll_deg = rad2deg(roll)
+            pitch_deg = rad2deg(pitch)
+            yaw_deg = rad2deg(yaw)
+        except Exception:
+            roll_deg = pitch_deg = yaw_deg = float("nan")
 
         tw = msg.twist.twist
         vx, vy, vz = tw.linear.x, tw.linear.y, tw.linear.z
@@ -460,35 +511,39 @@ class LocalizationDashboardNode(Node):
             "frame_id": msg.header.frame_id,
             "child_frame_id": msg.child_frame_id,
             "px": px, "py": py, "pz": pz,
-            "roll_deg": rad2deg(roll),
-            "pitch_deg": rad2deg(pitch),
-            "yaw_deg": rad2deg(yaw),
+            "roll_deg": roll_deg,
+            "pitch_deg": pitch_deg,
+            "yaw_deg": yaw_deg,
             "vx": vx, "vy": vy, "vz": vz,
             "wx": wx, "wy": wy, "wz": wz,
         }
 
     # --------------------------------------------------------
-    # Motion mode classification (NEW)
+    # Motion mode classification
     # --------------------------------------------------------
     def _classify_motion_mode(self) -> Tuple[str, str, str]:
         """
         Returns (mode, source, reason)
         mode in:
-          NO_DATA, IDLE, FORWARD, REVERSE, STRAFE_LEFT, STRAFE_RIGHT, TURN_CCW, TURN_CW, MIXED
+          NO_DATA, IDLE, FORWARD, REVERSE, STRAFE_LEFT, STRAFE_RIGHT, TURN_CW, TURN_CCW, MIXED
         """
-        # Choose source by preference
-        candidates: List[Tuple[str, Optional[Dict[str, Any]]]] = []
-        if self.motion_source_preference == "ekf_then_wheel_then_cmd":
+        if self.motion_source_preference == "cmd_then_ekf_then_wheel":
             candidates = [
+                ("cmd_vel", self.cmd_vel_data if self._topic_has_fresh_data("cmd_vel") else None),
                 ("ekf_odom", self.ekf_odom_data if self._topic_has_fresh_data("ekf_odom") else None),
                 ("wheel_odom", self.wheel_odom_data if self._topic_has_fresh_data("wheel_odom") else None),
+            ]
+        elif self.motion_source_preference == "wheel_then_ekf_then_cmd":
+            candidates = [
+                ("wheel_odom", self.wheel_odom_data if self._topic_has_fresh_data("wheel_odom") else None),
+                ("ekf_odom", self.ekf_odom_data if self._topic_has_fresh_data("ekf_odom") else None),
                 ("cmd_vel", self.cmd_vel_data if self._topic_has_fresh_data("cmd_vel") else None),
             ]
         else:
             candidates = [
-                ("cmd_vel", self.cmd_vel_data if self._topic_has_fresh_data("cmd_vel") else None),
                 ("ekf_odom", self.ekf_odom_data if self._topic_has_fresh_data("ekf_odom") else None),
                 ("wheel_odom", self.wheel_odom_data if self._topic_has_fresh_data("wheel_odom") else None),
+                ("cmd_vel", self.cmd_vel_data if self._topic_has_fresh_data("cmd_vel") else None),
             ]
 
         for source, data in candidates:
@@ -508,7 +563,6 @@ class LocalizationDashboardNode(Node):
             if imu_state == "STATIONARY":
                 return "IDLE", "imu_fallback", imu_reason
             if imu_state == "ROTATING":
-                # Direction can be estimated from gz sign if available
                 gz = self.imu_data.get("gz")
                 if isinstance(gz, (int, float)):
                     if gz > self.motion_ang_deadband:
@@ -534,33 +588,21 @@ class LocalizationDashboardNode(Node):
         lin_active_y = ay > lv
         ang_active = aw > av
 
-        # nothing active
         if not lin_active_x and not lin_active_y and not ang_active:
             return "IDLE", f"|vx|,|vy|<={lv:.2f}, |wz|<={av:.2f}"
 
-        # pure turn
         if ang_active and not lin_active_x and not lin_active_y:
-            if wz > 0.0:
-                return "TURN_CCW", f"wz={wz:.3f} (> {av:.2f})"
-            return "TURN_CW", f"wz={wz:.3f} (< -{av:.2f})"
+            return ("TURN_CCW", f"wz={wz:.3f} (> {av:.2f})") if wz > 0.0 else ("TURN_CW", f"wz={wz:.3f} (< -{av:.2f})")
 
-        # pure-ish linear (x vs y dominant)
         if (lin_active_x or lin_active_y) and not ang_active:
-            # dominant X
             if ax > lv and ax >= ratio * max(ay, 1e-9):
-                if vx > 0.0:
-                    return "FORWARD", f"vx={vx:.3f} dominates vy={vy:.3f}"
-                return "REVERSE", f"vx={vx:.3f} dominates vy={vy:.3f}"
+                return ("FORWARD", f"vx={vx:.3f} dominates vy={vy:.3f}") if vx > 0.0 else ("REVERSE", f"vx={vx:.3f} dominates vy={vy:.3f}")
 
-            # dominant Y
             if ay > lv and ay >= ratio * max(ax, 1e-9):
-                if vy > 0.0:
-                    return "STRAFE_LEFT", f"vy={vy:.3f} dominates vx={vx:.3f}"
-                return "STRAFE_RIGHT", f"vy={vy:.3f} dominates vx={vx:.3f}"
+                return ("STRAFE_LEFT", f"vy={vy:.3f} dominates vx={vx:.3f}") if vy > 0.0 else ("STRAFE_RIGHT", f"vy={vy:.3f} dominates vx={vx:.3f}")
 
             return "MIXED", f"linear mixed vx={vx:.3f}, vy={vy:.3f}"
 
-        # turning + translation => mixed
         return "MIXED", f"vx={vx:.3f}, vy={vy:.3f}, wz={wz:.3f}"
 
     def _topic_has_fresh_data(self, key: str) -> bool:
@@ -586,12 +628,99 @@ class LocalizationDashboardNode(Node):
         self.current_motion_reason = reason
 
     # --------------------------------------------------------
+    # Phase 1 sign checks (soft diagnostics)
+    # --------------------------------------------------------
+    def _set_sign_check(self, key: str, status: str, reason: str) -> None:
+        self.phase1_sign_status[key] = status
+        self.phase1_sign_reason[key] = reason
+
+    def _sign_expected_from_mode(self, mode: str, signal: str) -> Optional[int]:
+        """
+        Returns expected sign:
+          +1 positive, -1 negative, 0 near-zero/idle, None not applicable
+        """
+        # signal in {"vx", "wz", "gz"}
+        if mode == "IDLE":
+            return 0
+        if signal == "vx":
+            if mode == "FORWARD":
+                return +1
+            if mode == "REVERSE":
+                return -1
+            if mode in ("TURN_CCW", "TURN_CW", "STRAFE_LEFT", "STRAFE_RIGHT", "MIXED"):
+                return None
+        if signal in ("wz", "gz"):
+            if mode == "TURN_CCW":
+                return +1
+            if mode == "TURN_CW":
+                return -1
+            if mode in ("FORWARD", "REVERSE", "STRAFE_LEFT", "STRAFE_RIGHT", "MIXED"):
+                return None
+        return None
+
+    def _eval_sign(self, value: Optional[float], expected: Optional[int], deadband: float, label: str) -> Tuple[str, str]:
+        if expected is None:
+            return "n/a", f"{label}: not checked in this motion mode"
+        if value is None:
+            return "n/a", f"{label}: no data"
+
+        if expected == 0:
+            if abs(value) <= deadband:
+                return "OK", f"{label}≈0 within deadband ({abs(value):.3f} <= {deadband:.3f})"
+            return "WARN", f"{label} not near zero ({value:.3f})"
+
+        if expected > 0:
+            if value > deadband:
+                return "OK", f"{label}>0 ({value:.3f})"
+            if value < -deadband:
+                return "FAIL", f"{label}<0 ({value:.3f}), expected positive"
+            return "WARN", f"{label} near zero ({value:.3f}), expected positive"
+
+        # expected < 0
+        if value < -deadband:
+            return "OK", f"{label}<0 ({value:.3f})"
+        if value > deadband:
+            return "FAIL", f"{label}>0 ({value:.3f}), expected negative"
+        return "WARN", f"{label} near zero ({value:.3f}), expected negative"
+
+    def _update_phase1_sign_checks(self) -> None:
+        if not self.phase1_sign_checks_enabled:
+            return
+
+        mode = self.current_motion_mode
+
+        wheel_vx = self.wheel_odom_data.get("vx") if self.wheel_odom_data else None
+        wheel_wz = self.wheel_odom_data.get("wz") if self.wheel_odom_data else None
+        ekf_vx = self.ekf_odom_data.get("vx") if self.ekf_odom_data else None
+        ekf_wz = self.ekf_odom_data.get("wz") if self.ekf_odom_data else None
+        imu_gz = self.imu_data.get("gz") if self.imu_data else None
+
+        exp_vx = self._sign_expected_from_mode(mode, "vx")
+        exp_wz = self._sign_expected_from_mode(mode, "wz")
+        exp_gz = self._sign_expected_from_mode(mode, "gz")
+
+        st, rs = self._eval_sign(wheel_vx, exp_vx, self.phase1_vx_deadband, "wheel.vx")
+        self._set_sign_check("wheel_vx", st, rs)
+
+        st, rs = self._eval_sign(wheel_wz, exp_wz, self.phase1_wz_deadband, "wheel.wz")
+        self._set_sign_check("wheel_wz", st, rs)
+
+        st, rs = self._eval_sign(imu_gz, exp_gz, self.phase1_wz_deadband, "imu.gz")
+        self._set_sign_check("imu_gz", st, rs)
+
+        st, rs = self._eval_sign(ekf_vx, exp_vx, self.phase1_vx_deadband, "ekf.vx")
+        self._set_sign_check("ekf_vx", st, rs)
+
+        st, rs = self._eval_sign(ekf_wz, exp_wz, self.phase1_wz_deadband, "ekf.wz")
+        self._set_sign_check("ekf_wz", st, rs)
+
+    # --------------------------------------------------------
     # Summary printing
     # --------------------------------------------------------
     def print_summary(self) -> None:
-        print("\n" + "=" * 86)
+        print("\n" + "=" * 92)
         print("Robot Savo — Localization Dashboard Summary")
-        print("=" * 86)
+        print("=" * 92)
         up = now_monotonic() - self._start_wall
         print(f"Uptime: {up:.1f} s\n")
 
@@ -637,7 +766,10 @@ class LocalizationDashboardNode(Node):
         print(f"  source: {self.current_motion_source}")
         print(f"  reason: {self.current_motion_reason}")
 
-        # Key requested summary: per-mode IMU stats
+        print("\nLatest Phase 1 sign checks:")
+        for k in ["wheel_vx", "wheel_wz", "imu_gz", "ekf_vx", "ekf_wz"]:
+            print(f"  {k:<9}: {self.phase1_sign_status.get(k, 'n/a'):<5}  {self.phase1_sign_reason.get(k, '')}")
+
         print("\nPer-motion-mode IMU summaries (grouped by classified mode)")
         mode_order = [
             "IDLE",
@@ -692,7 +824,7 @@ class LocalizationDashboardNode(Node):
             for line in self.motion_transition_log:
                 print(f"  {line}")
 
-        print("=" * 86 + "\n")
+        print("=" * 92 + "\n")
 
 
 # ============================================================
@@ -722,6 +854,11 @@ class CursesUI:
         age_str = f"{age:5.2f}s" if age is not None else "  n/a "
         return f"{label:<14} [{state:^5}]  rate={hz_str}  age={age_str}  count={st.count}"
 
+    def _phase1_status_line(self, key: str, label: str) -> str:
+        st = self.node.phase1_sign_status.get(key, "n/a")
+        rs = self.node.phase1_sign_reason.get(key, "")
+        return f"{label:<10} [{st:^5}]  {rs}"
+
     def run(self) -> None:
         curses.wrapper(self._main)
 
@@ -731,7 +868,6 @@ class CursesUI:
         stdscr.timeout(50)
 
         while rclpy.ok() and not self.stop_requested:
-            # Dashboard sampling/spin (not full message drain)
             rclpy.spin_once(self.node, timeout_sec=0.02)
 
             key = stdscr.getch()
@@ -742,17 +878,17 @@ class CursesUI:
             stdscr.erase()
             h, w = stdscr.getmaxyx()
 
-            if h < 16 or w < 76:
+            if h < 18 or w < 90:
                 self._safe_addstr(stdscr, 0, 0, "Robot Savo — Localization Dashboard", curses.A_BOLD)
                 self._safe_addstr(stdscr, 2, 0, f"Terminal too small ({w}x{h}). Please enlarge window.")
-                self._safe_addstr(stdscr, 4, 0, "Minimum recommended: 76 cols x 16 rows")
+                self._safe_addstr(stdscr, 4, 0, "Minimum recommended: 90 cols x 18 rows")
                 self._safe_addstr(stdscr, h - 2, 0, "Press q to quit")
                 stdscr.refresh()
                 time.sleep(0.05)
                 continue
 
             y = 0
-            self._safe_addstr(stdscr, y, 0, "Robot Savo — Localization Dashboard (q to quit)", curses.A_BOLD)
+            self._safe_addstr(stdscr, y, 0, "Robot Savo — Localization Dashboard (Phase 1 bringup)  [q to quit]", curses.A_BOLD)
             y += 1
 
             up = now_monotonic() - self.node._start_wall
@@ -760,11 +896,11 @@ class CursesUI:
                 stdscr,
                 y,
                 0,
-                f"Uptime: {up:7.1f}s   Node: {self.node.get_name()}   Compact: {self.node.compact_mode}",
+                f"Uptime: {up:7.1f}s   Node: {self.node.get_name()}   Compact: {self.node.compact_mode}   "
+                f"MotionSrcPref: {self.node.motion_source_preference}",
             )
             y += 1
 
-            # Motion mode line (NEW)
             mode_age = now_monotonic() - self.node.current_motion_since_s
             self._safe_addstr(
                 stdscr,
@@ -786,6 +922,15 @@ class CursesUI:
             self._safe_addstr(stdscr, y, 0, self._topic_status_line("EKF Odom", self.node.stats["ekf_odom"])); y += 1
             self._safe_addstr(stdscr, y, 0, self._topic_status_line("cmd_vel_safe", self.node.stats["cmd_vel"])); y += 1
             self._safe_addstr(stdscr, y, 0, self._topic_status_line("safety_stop", self.node.stats["safety_stop"])); y += 2
+
+            # Phase 1 sign checks
+            self._safe_addstr(stdscr, y, 0, "Phase 1 Sign Checks (soft hints)", curses.A_UNDERLINE)
+            y += 1
+            self._safe_addstr(stdscr, y, 0, self._phase1_status_line("wheel_vx", "wheel.vx")); y += 1
+            self._safe_addstr(stdscr, y, 0, self._phase1_status_line("wheel_wz", "wheel.wz")); y += 1
+            self._safe_addstr(stdscr, y, 0, self._phase1_status_line("imu_gz",   "imu.gz"));   y += 1
+            self._safe_addstr(stdscr, y, 0, self._phase1_status_line("ekf_vx",   "ekf.vx"));   y += 1
+            self._safe_addstr(stdscr, y, 0, self._phase1_status_line("ekf_wz",   "ekf.wz"));   y += 2
 
             if self.node.compact_mode:
                 imu = self.node.imu_data
@@ -829,7 +974,7 @@ class CursesUI:
 
             else:
                 # IMU block
-                if y < h - 6:
+                if y < h - 8:
                     self._safe_addstr(stdscr, y, 0, "IMU (/imu/data)", curses.A_UNDERLINE); y += 1
                     imu = self.node.imu_data
                     if imu:
@@ -864,7 +1009,7 @@ class CursesUI:
                     y += 1
 
                 # Wheel odom block
-                if y < h - 6:
+                if y < h - 8:
                     self._safe_addstr(stdscr, y, 0, "Wheel Odometry (/wheel/odom)", curses.A_UNDERLINE); y += 1
                     wod = self.node.wheel_odom_data
                     if wod:
@@ -882,7 +1027,7 @@ class CursesUI:
                     y += 1
 
                 # EKF odom block
-                if y < h - 6:
+                if y < h - 8:
                     self._safe_addstr(stdscr, y, 0, "EKF Odometry (/odometry/filtered)", curses.A_UNDERLINE); y += 1
                     eod = self.node.ekf_odom_data
                     if eod:
@@ -900,7 +1045,7 @@ class CursesUI:
                     y += 1
 
                 # Motion + safety
-                if y < h - 6:
+                if y < h - 8:
                     self._safe_addstr(stdscr, y, 0, "Motion + Safety", curses.A_UNDERLINE); y += 1
                     cmd = self.node.cmd_vel_data
                     stp = self.node.safety_stop_data
@@ -917,10 +1062,10 @@ class CursesUI:
                         self._safe_addstr(stdscr, y, 0, f"/safety/stop: {'TRUE (STOP)' if stp.get('stop') else 'false'}"); y += 1
                     else:
                         self._safe_addstr(stdscr, y, 0, "/safety/stop: no data"); y += 1
-
-                # Quick per-mode counts (useful while testing)
-                if y < h - 5:
                     y += 1
+
+                # Quick per-mode counts
+                if y < h - 6:
                     self._safe_addstr(stdscr, y, 0, "Per-mode IMU sample counts (current session)", curses.A_UNDERLINE); y += 1
                     counts_line = []
                     for mode in ["IDLE", "FORWARD", "REVERSE", "STRAFE_LEFT", "STRAFE_RIGHT", "TURN_CCW", "TURN_CW", "MIXED"]:
@@ -928,8 +1073,10 @@ class CursesUI:
                         counts_line.append(f"{mode}:{n}")
                     self._safe_addstr(stdscr, y, 0, " | ".join(counts_line)); y += 1
 
-            footer = "Tip: Test sequence = IDLE -> FWD -> REV -> STRAFE_L -> STRAFE_R -> TURN_CCW -> TURN_CW, then press q."
-            self._safe_addstr(stdscr, h - 2, 0, footer)
+            footer1 = "Phase 1 live script: 10s IDLE -> 5s FWD -> 5s REV -> 5s TURN_CCW -> 5s TURN_CW -> q"
+            footer2 = "Verify separately (EKF mode): ros2 run tf2_ros tf2_echo odom base_link"
+            self._safe_addstr(stdscr, h - 3, 0, footer1)
+            self._safe_addstr(stdscr, h - 2, 0, footer2)
 
             stdscr.refresh()
             time.sleep(max(0.0, 1.0 / max(self.node.ui_hz, 1.0) - 0.01))
