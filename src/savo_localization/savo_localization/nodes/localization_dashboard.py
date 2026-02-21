@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Robot Savo — Localization Dashboard (ROS2 Jazzy) [v1.1 Professional]
+Robot Savo — Localization Dashboard (ROS2 Jazzy) [v2.0 Professional]
 ---------------------------------------------------------------------
 Terminal dashboard for localization bringup/debug on the Pi.
 
@@ -16,22 +16,25 @@ Shows live status for:
 Features:
 - Curses terminal UI
 - Stale detection per topic
-- Message rate estimate (Hz)
-- Basic IMU / Odom summaries
+- Message rate estimate (dashboard sampling rate)
+- IMU / Odom live summaries
 - IMU inferred motion state (STATIONARY / MOVING / ROTATING)
+- Motion mode classification (IDLE / FWD / REV / STRAFE_L / STRAFE_R / TURN_CW / TURN_CCW / MIXED)
+  using cmd_vel (preferred) or odom (fallback), with IMU-only fallback
+- Per-motion-mode IMU statistics in Ctrl+C / q summary
+- Motion mode transition log (recent events)
 - Safe rendering on small terminal windows
 - Exit with Ctrl+C or q
-- Prints summary statistics on exit (great for test sessions)
 
 Run:
   source /opt/ros/jazzy/setup.bash
   source ~/Savo_Pi/install/setup.bash
-  ros2 run savo_localization localization_dashboard
+  ros2 run savo_localization localization_dashboard.py
 
 Notes:
 - If a topic is not running, it is shown as STALE / no data.
 - This node is read-only (diagnostic only).
-- Default IMU QoS is RELIABLE (matches your current imu_node).
+- IMU publisher may be 50 Hz, but dashboard sampling/rendering rate is lower (normal).
 """
 
 import math
@@ -40,8 +43,8 @@ import curses
 import signal
 import statistics
 from dataclasses import dataclass, field
-from collections import deque
-from typing import Optional, Deque, Dict, Any, Tuple
+from collections import deque, defaultdict
+from typing import Optional, Deque, Dict, Any, Tuple, List, DefaultDict
 
 import rclpy
 from rclpy.node import Node
@@ -53,16 +56,12 @@ from geometry_msgs.msg import Twist
 from std_msgs.msg import Bool
 
 
-# -----------------------------
+# ============================================================
 # Utility helpers
-# -----------------------------
+# ============================================================
 
 def now_monotonic() -> float:
     return time.monotonic()
-
-
-def clamp(x: float, lo: float, hi: float) -> float:
-    return max(lo, min(hi, x))
 
 
 def fmt_float(x: Optional[float], width: int = 8, prec: int = 3, nan_text: str = "n/a") -> str:
@@ -79,19 +78,16 @@ def rad2deg(x: float) -> float:
 
 def quat_to_euler_rpy(x: float, y: float, z: float, w: float) -> Tuple[float, float, float]:
     """Quaternion -> roll, pitch, yaw (radians)."""
-    # roll (x-axis rotation)
     sinr_cosp = 2.0 * (w * x + y * z)
     cosr_cosp = 1.0 - 2.0 * (x * x + y * y)
     roll = math.atan2(sinr_cosp, cosr_cosp)
 
-    # pitch (y-axis rotation)
     sinp = 2.0 * (w * y - z * x)
     if abs(sinp) >= 1.0:
         pitch = math.copysign(math.pi / 2.0, sinp)
     else:
         pitch = math.asin(sinp)
 
-    # yaw (z-axis rotation)
     siny_cosp = 2.0 * (w * z + x * y)
     cosy_cosp = 1.0 - 2.0 * (y * y + z * z)
     yaw = math.atan2(siny_cosp, cosy_cosp)
@@ -99,15 +95,20 @@ def quat_to_euler_rpy(x: float, y: float, z: float, w: float) -> Tuple[float, fl
     return roll, pitch, yaw
 
 
-def mean_or_none(seq: Deque[float]) -> Optional[float]:
-    if not seq:
+def mean_or_none(seq) -> Optional[float]:
+    vals = list(seq)
+    if not vals:
         return None
-    return sum(seq) / len(seq)
+    return sum(vals) / len(vals)
 
 
-# -----------------------------
+def safe_fmean(vals: List[float]) -> float:
+    return statistics.fmean(vals) if vals else 0.0
+
+
+# ============================================================
 # Topic tracking
-# -----------------------------
+# ============================================================
 
 @dataclass
 class TopicStats:
@@ -153,63 +154,66 @@ class TopicStats:
             return None
         return 1.0 / mean_dt
 
-    def total_runtime_s(self) -> Optional[float]:
-        if self.first_rx_wall_s is None or self.last_rx_wall_s is None:
-            return None
-        return max(0.0, self.last_rx_wall_s - self.first_rx_wall_s)
 
-    def summary(self) -> str:
-        hz = self.hz()
-        age = self.age_s()
-        runtime = self.total_runtime_s()
-
-        hz_part = f"hz~{hz:.2f}" if hz is not None else "hz~n/a"
-        age_part = f"age={age:.3f}s" if age is not None else "age=n/a"
-        runtime_part = f", runtime={runtime:.1f}s" if runtime is not None else ""
-
-        return f"{self.name}: count={self.count}, {hz_part}, {age_part}{runtime_part}"
-
-
-# -----------------------------
+# ============================================================
 # Main dashboard node
-# -----------------------------
+# ============================================================
 
 class LocalizationDashboardNode(Node):
     def __init__(self) -> None:
         super().__init__("localization_dashboard")
 
-        # ---- Parameters: topics ----
+        # -------------------------
+        # Parameters: topics
+        # -------------------------
         self.declare_parameter("imu_topic", "/imu/data")
         self.declare_parameter("wheel_odom_topic", "/wheel/odom")
         self.declare_parameter("ekf_odom_topic", "/odometry/filtered")
         self.declare_parameter("cmd_vel_topic", "/cmd_vel_safe")
         self.declare_parameter("safety_stop_topic", "/safety/stop")
 
-        # ---- Parameters: UI ----
+        # -------------------------
+        # Parameters: UI
+        # -------------------------
         self.declare_parameter("ui_hz", 10.0)
         self.declare_parameter("compact_mode", False)
 
-        # ---- Parameters: stale timeouts ----
+        # -------------------------
+        # Parameters: stale timeouts
+        # -------------------------
         self.declare_parameter("imu_stale_timeout_s", 0.50)
         self.declare_parameter("wheel_odom_stale_timeout_s", 0.50)
         self.declare_parameter("ekf_odom_stale_timeout_s", 0.50)
         self.declare_parameter("cmd_vel_stale_timeout_s", 1.00)
         self.declare_parameter("safety_stop_stale_timeout_s", 1.00)
 
-        # ---- Parameters: QoS toggles ----
-        # Keep defaults aligned with typical publishers in your stack
-        self.declare_parameter("use_best_effort_for_imu", False)          # your imu_node is reliable
-        self.declare_parameter("use_best_effort_for_wheel_odom", False)   # C++ wheel odom usually reliable
-        self.declare_parameter("use_best_effort_for_ekf_odom", False)     # robot_localization usually reliable
-        self.declare_parameter("use_best_effort_for_cmd_vel", False)      # cmd_vel_safe often reliable
-        self.declare_parameter("use_best_effort_for_safety_stop", True)   # Python publishers often BE
+        # -------------------------
+        # Parameters: QoS toggles
+        # -------------------------
+        self.declare_parameter("use_best_effort_for_imu", False)
+        self.declare_parameter("use_best_effort_for_wheel_odom", False)
+        self.declare_parameter("use_best_effort_for_ekf_odom", False)
+        self.declare_parameter("use_best_effort_for_cmd_vel", False)
+        self.declare_parameter("use_best_effort_for_safety_stop", True)
 
-        # ---- Parameters: IMU inference thresholds ----
+        # -------------------------
+        # Parameters: IMU inference thresholds
+        # -------------------------
         self.declare_parameter("imu_stationary_gyro_abs_th_rad_s", 0.03)
         self.declare_parameter("imu_stationary_acc_norm_err_th_m_s2", 0.35)
         self.declare_parameter("imu_rotating_gyro_abs_th_rad_s", 0.12)
 
-        # ---- Read params ----
+        # -------------------------
+        # Parameters: motion classification thresholds
+        # -------------------------
+        self.declare_parameter("motion_lin_deadband_m_s", 0.03)    # for vx/vy
+        self.declare_parameter("motion_ang_deadband_rad_s", 0.08)  # for wz
+        self.declare_parameter("motion_mix_allow_ratio", 1.8)      # dominant axis ratio threshold
+        self.declare_parameter("motion_source_preference", "cmd_then_ekf_then_wheel")  # or "ekf_then_wheel_then_cmd"
+
+        # -------------------------
+        # Read params
+        # -------------------------
         self.imu_topic = str(self.get_parameter("imu_topic").value)
         self.wheel_odom_topic = str(self.get_parameter("wheel_odom_topic").value)
         self.ekf_odom_topic = str(self.get_parameter("ekf_odom_topic").value)
@@ -223,7 +227,14 @@ class LocalizationDashboardNode(Node):
         self.imu_stationary_acc_err_th = float(self.get_parameter("imu_stationary_acc_norm_err_th_m_s2").value)
         self.imu_rotating_gyro_abs_th = float(self.get_parameter("imu_rotating_gyro_abs_th_rad_s").value)
 
+        self.motion_lin_deadband = float(self.get_parameter("motion_lin_deadband_m_s").value)
+        self.motion_ang_deadband = float(self.get_parameter("motion_ang_deadband_rad_s").value)
+        self.motion_mix_allow_ratio = float(self.get_parameter("motion_mix_allow_ratio").value)
+        self.motion_source_preference = str(self.get_parameter("motion_source_preference").value)
+
+        # -------------------------
         # Topic stats
+        # -------------------------
         self.stats: Dict[str, TopicStats] = {
             "imu": TopicStats(self.imu_topic, float(self.get_parameter("imu_stale_timeout_s").value)),
             "wheel_odom": TopicStats(self.wheel_odom_topic, float(self.get_parameter("wheel_odom_stale_timeout_s").value)),
@@ -232,31 +243,63 @@ class LocalizationDashboardNode(Node):
             "safety_stop": TopicStats(self.safety_stop_topic, float(self.get_parameter("safety_stop_stale_timeout_s").value)),
         }
 
+        # -------------------------
         # Latest data snapshots
+        # -------------------------
         self.imu_data: Dict[str, Any] = {}
         self.wheel_odom_data: Dict[str, Any] = {}
         self.ekf_odom_data: Dict[str, Any] = {}
         self.cmd_vel_data: Dict[str, Any] = {}
         self.safety_stop_data: Dict[str, Any] = {}
 
-        # Histories for exit summary (and smoothing/inspection)
-        self.imu_gyro_z_hist: Deque[float] = deque(maxlen=5000)
-        self.imu_acc_norm_hist: Deque[float] = deque(maxlen=5000)
-        self.wheel_vx_hist: Deque[float] = deque(maxlen=5000)
-        self.wheel_wz_hist: Deque[float] = deque(maxlen=5000)
-        self.ekf_vx_hist: Deque[float] = deque(maxlen=5000)
-        self.ekf_wz_hist: Deque[float] = deque(maxlen=5000)
+        # -------------------------
+        # Histories for exit summary
+        # -------------------------
+        self.imu_gyro_z_hist: Deque[float] = deque(maxlen=20000)
+        self.imu_acc_norm_hist: Deque[float] = deque(maxlen=20000)
+        self.imu_ax_hist: Deque[float] = deque(maxlen=20000)
+        self.imu_ay_hist: Deque[float] = deque(maxlen=20000)
+        self.imu_az_hist: Deque[float] = deque(maxlen=20000)
 
-        # Short recent windows for inferred state
-        self.imu_recent_gyro_z: Deque[float] = deque(maxlen=40)     # ~0.8s at 50Hz
+        self.wheel_vx_hist: Deque[float] = deque(maxlen=20000)
+        self.wheel_vy_hist: Deque[float] = deque(maxlen=20000)
+        self.wheel_wz_hist: Deque[float] = deque(maxlen=20000)
+
+        self.ekf_vx_hist: Deque[float] = deque(maxlen=20000)
+        self.ekf_vy_hist: Deque[float] = deque(maxlen=20000)
+        self.ekf_wz_hist: Deque[float] = deque(maxlen=20000)
+
+        # Short windows for IMU inferred state
+        self.imu_recent_gyro_z: Deque[float] = deque(maxlen=40)      # ~0.8s at 50Hz
         self.imu_recent_acc_norm: Deque[float] = deque(maxlen=40)
 
+        # -------------------------
+        # Motion mode tracking (NEW)
+        # -------------------------
+        self.current_motion_mode: str = "NO_DATA"
+        self.current_motion_source: str = "none"
+        self.current_motion_reason: str = "waiting"
+        self.current_motion_since_s: float = now_monotonic()
+        self.motion_transition_log: Deque[str] = deque(maxlen=20)
+
+        # Per-mode IMU stats
+        # mode -> signal -> list
+        self.imu_mode_stats: DefaultDict[str, Dict[str, List[float]]] = defaultdict(
+            lambda: {
+                "gz": [],
+                "acc_norm": [],
+                "ax": [],
+                "ay": [],
+                "az": [],
+            }
+        )
+
         # Build QoS profiles
-        imu_qos = self._make_qos(use_best_effort=bool(self.get_parameter("use_best_effort_for_imu").value))
-        wheel_qos = self._make_qos(use_best_effort=bool(self.get_parameter("use_best_effort_for_wheel_odom").value))
-        ekf_qos = self._make_qos(use_best_effort=bool(self.get_parameter("use_best_effort_for_ekf_odom").value))
-        cmd_qos = self._make_qos(use_best_effort=bool(self.get_parameter("use_best_effort_for_cmd_vel").value))
-        stop_qos = self._make_qos(use_best_effort=bool(self.get_parameter("use_best_effort_for_safety_stop").value))
+        imu_qos = self._make_qos(bool(self.get_parameter("use_best_effort_for_imu").value))
+        wheel_qos = self._make_qos(bool(self.get_parameter("use_best_effort_for_wheel_odom").value))
+        ekf_qos = self._make_qos(bool(self.get_parameter("use_best_effort_for_ekf_odom").value))
+        cmd_qos = self._make_qos(bool(self.get_parameter("use_best_effort_for_cmd_vel").value))
+        stop_qos = self._make_qos(bool(self.get_parameter("use_best_effort_for_safety_stop").value))
 
         # Subscriptions
         self.sub_imu = self.create_subscription(Imu, self.imu_topic, self.cb_imu, imu_qos)
@@ -273,6 +316,9 @@ class LocalizationDashboardNode(Node):
             f"cmd={self.cmd_vel_topic}, stop={self.safety_stop_topic}, compact_mode={self.compact_mode}"
         )
 
+    # --------------------------------------------------------
+    # QoS helper
+    # --------------------------------------------------------
     def _make_qos(self, use_best_effort: bool) -> QoSProfile:
         return QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT if use_best_effort else ReliabilityPolicy.RELIABLE,
@@ -281,15 +327,14 @@ class LocalizationDashboardNode(Node):
             durability=DurabilityPolicy.VOLATILE,
         )
 
-    # ---- callbacks ----
-
+    # --------------------------------------------------------
+    # Callbacks
+    # --------------------------------------------------------
     def cb_imu(self, msg: Imu) -> None:
         self.stats["imu"].on_message(msg.header.stamp.sec, msg.header.stamp.nanosec)
 
         ox, oy, oz, ow = msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w
-        orientation_valid = not (
-            len(msg.orientation_covariance) > 0 and msg.orientation_covariance[0] < 0.0
-        )
+        orientation_valid = not (len(msg.orientation_covariance) > 0 and msg.orientation_covariance[0] < 0.0)
 
         roll = pitch = yaw = None
         if orientation_valid:
@@ -305,7 +350,11 @@ class LocalizationDashboardNode(Node):
         self.imu_recent_gyro_z.append(gz)
         self.imu_recent_acc_norm.append(acc_norm)
 
-        motion_state, motion_reason = self._infer_imu_motion_state()
+        imu_state, imu_reason = self._infer_imu_motion_state()
+
+        # Motion mode (cmd/odom preferred, IMU fallback)
+        mode, source, reason = self._classify_motion_mode()
+        self._update_motion_mode(mode, source, reason)
 
         self.imu_data = {
             "frame_id": msg.header.frame_id,
@@ -316,24 +365,66 @@ class LocalizationDashboardNode(Node):
             "gx": gx, "gy": gy, "gz": gz,
             "ax": ax, "ay": ay, "az": az,
             "acc_norm": acc_norm,
-            "motion_state": motion_state,
-            "motion_reason": motion_reason,
+            "imu_motion_state": imu_state,
+            "imu_motion_reason": imu_reason,
+            "motion_mode": self.current_motion_mode,
+            "motion_mode_source": self.current_motion_source,
+            "motion_mode_reason": self.current_motion_reason,
         }
 
+        # Global histories
         self.imu_gyro_z_hist.append(gz)
         self.imu_acc_norm_hist.append(acc_norm)
+        self.imu_ax_hist.append(ax)
+        self.imu_ay_hist.append(ay)
+        self.imu_az_hist.append(az)
 
+        # Per-mode IMU histories (key request)
+        mode_key = self.current_motion_mode
+        self.imu_mode_stats[mode_key]["gz"].append(gz)
+        self.imu_mode_stats[mode_key]["acc_norm"].append(acc_norm)
+        self.imu_mode_stats[mode_key]["ax"].append(ax)
+        self.imu_mode_stats[mode_key]["ay"].append(ay)
+        self.imu_mode_stats[mode_key]["az"].append(az)
+
+    def cb_wheel_odom(self, msg: Odometry) -> None:
+        self.stats["wheel_odom"].on_message(msg.header.stamp.sec, msg.header.stamp.nanosec)
+        self.wheel_odom_data = self._extract_odom(msg)
+        self.wheel_vx_hist.append(self.wheel_odom_data["vx"])
+        self.wheel_vy_hist.append(self.wheel_odom_data["vy"])
+        self.wheel_wz_hist.append(self.wheel_odom_data["wz"])
+
+    def cb_ekf_odom(self, msg: Odometry) -> None:
+        self.stats["ekf_odom"].on_message(msg.header.stamp.sec, msg.header.stamp.nanosec)
+        self.ekf_odom_data = self._extract_odom(msg)
+        self.ekf_vx_hist.append(self.ekf_odom_data["vx"])
+        self.ekf_vy_hist.append(self.ekf_odom_data["vy"])
+        self.ekf_wz_hist.append(self.ekf_odom_data["wz"])
+
+    def cb_cmd_vel(self, msg: Twist) -> None:
+        self.stats["cmd_vel"].on_message()
+        self.cmd_vel_data = {
+            "vx": msg.linear.x,
+            "vy": msg.linear.y,
+            "vz": msg.linear.z,
+            "wx": msg.angular.x,
+            "wy": msg.angular.y,
+            "wz": msg.angular.z,
+        }
+
+    def cb_safety_stop(self, msg: Bool) -> None:
+        self.stats["safety_stop"].on_message()
+        self.safety_stop_data = {"stop": bool(msg.data)}
+
+    # --------------------------------------------------------
+    # IMU inferred motion state (coarse)
+    # --------------------------------------------------------
     def _infer_imu_motion_state(self) -> Tuple[str, str]:
-        """
-        Simple and practical IMU motion inference for diagnostics.
-        Uses gyro z and accel norm only (works even without orientation).
-        """
         if not self.imu_recent_gyro_z or not self.imu_recent_acc_norm:
             return "NO_DATA", "waiting for samples"
 
-        mean_abs_gz = mean_or_none(deque(abs(v) for v in self.imu_recent_gyro_z))
+        mean_abs_gz = mean_or_none(abs(v) for v in self.imu_recent_gyro_z)
         mean_acc_norm = mean_or_none(self.imu_recent_acc_norm)
-
         if mean_abs_gz is None or mean_acc_norm is None:
             return "NO_DATA", "waiting for samples"
 
@@ -343,15 +434,17 @@ class LocalizationDashboardNode(Node):
             return "ROTATING", f"|gz|~{mean_abs_gz:.3f} >= {self.imu_rotating_gyro_abs_th:.3f}"
 
         if (mean_abs_gz <= self.imu_stationary_gyro_abs_th) and (acc_err <= self.imu_stationary_acc_err_th):
-            return "STATIONARY", (
+            return (
+                "STATIONARY",
                 f"|gz|~{mean_abs_gz:.3f} <= {self.imu_stationary_gyro_abs_th:.3f}, "
-                f"| |a|-g |~{acc_err:.3f} <= {self.imu_stationary_acc_err_th:.3f}"
+                f"| |a|-g |~{acc_err:.3f} <= {self.imu_stationary_acc_err_th:.3f}",
             )
 
-        return "MOVING", (
-            f"|gz|~{mean_abs_gz:.3f}, | |a|-g |~{acc_err:.3f}"
-        )
+        return "MOVING", f"|gz|~{mean_abs_gz:.3f}, | |a|-g |~{acc_err:.3f}"
 
+    # --------------------------------------------------------
+    # Odom extraction
+    # --------------------------------------------------------
     def _extract_odom(self, msg: Odometry) -> Dict[str, Any]:
         px = msg.pose.pose.position.x
         py = msg.pose.pose.position.y
@@ -374,39 +467,131 @@ class LocalizationDashboardNode(Node):
             "wx": wx, "wy": wy, "wz": wz,
         }
 
-    def cb_wheel_odom(self, msg: Odometry) -> None:
-        self.stats["wheel_odom"].on_message(msg.header.stamp.sec, msg.header.stamp.nanosec)
-        self.wheel_odom_data = self._extract_odom(msg)
-        self.wheel_vx_hist.append(self.wheel_odom_data["vx"])
-        self.wheel_wz_hist.append(self.wheel_odom_data["wz"])
+    # --------------------------------------------------------
+    # Motion mode classification (NEW)
+    # --------------------------------------------------------
+    def _classify_motion_mode(self) -> Tuple[str, str, str]:
+        """
+        Returns (mode, source, reason)
+        mode in:
+          NO_DATA, IDLE, FORWARD, REVERSE, STRAFE_LEFT, STRAFE_RIGHT, TURN_CCW, TURN_CW, MIXED
+        """
+        # Choose source by preference
+        candidates: List[Tuple[str, Optional[Dict[str, Any]]]] = []
+        if self.motion_source_preference == "ekf_then_wheel_then_cmd":
+            candidates = [
+                ("ekf_odom", self.ekf_odom_data if self._topic_has_fresh_data("ekf_odom") else None),
+                ("wheel_odom", self.wheel_odom_data if self._topic_has_fresh_data("wheel_odom") else None),
+                ("cmd_vel", self.cmd_vel_data if self._topic_has_fresh_data("cmd_vel") else None),
+            ]
+        else:
+            candidates = [
+                ("cmd_vel", self.cmd_vel_data if self._topic_has_fresh_data("cmd_vel") else None),
+                ("ekf_odom", self.ekf_odom_data if self._topic_has_fresh_data("ekf_odom") else None),
+                ("wheel_odom", self.wheel_odom_data if self._topic_has_fresh_data("wheel_odom") else None),
+            ]
 
-    def cb_ekf_odom(self, msg: Odometry) -> None:
-        self.stats["ekf_odom"].on_message(msg.header.stamp.sec, msg.header.stamp.nanosec)
-        self.ekf_odom_data = self._extract_odom(msg)
-        self.ekf_vx_hist.append(self.ekf_odom_data["vx"])
-        self.ekf_wz_hist.append(self.ekf_odom_data["wz"])
+        for source, data in candidates:
+            if not data:
+                continue
+            mode, reason = self._classify_from_twist_like(
+                vx=float(data.get("vx", 0.0)),
+                vy=float(data.get("vy", 0.0)),
+                wz=float(data.get("wz", 0.0)),
+            )
+            return mode, source, reason
 
-    def cb_cmd_vel(self, msg: Twist) -> None:
-        self.stats["cmd_vel"].on_message()
-        self.cmd_vel_data = {
-            "vx": msg.linear.x,
-            "vy": msg.linear.y,
-            "vz": msg.linear.z,
-            "wx": msg.angular.x,
-            "wy": msg.angular.y,
-            "wz": msg.angular.z,
-        }
+        # IMU fallback (coarse only)
+        if self.imu_data:
+            imu_state = self.imu_data.get("imu_motion_state", "NO_DATA")
+            imu_reason = self.imu_data.get("imu_motion_reason", "n/a")
+            if imu_state == "STATIONARY":
+                return "IDLE", "imu_fallback", imu_reason
+            if imu_state == "ROTATING":
+                # Direction can be estimated from gz sign if available
+                gz = self.imu_data.get("gz")
+                if isinstance(gz, (int, float)):
+                    if gz > self.motion_ang_deadband:
+                        return "TURN_CCW", "imu_fallback", f"gz={gz:.3f} > +{self.motion_ang_deadband:.3f}"
+                    if gz < -self.motion_ang_deadband:
+                        return "TURN_CW", "imu_fallback", f"gz={gz:.3f} < -{self.motion_ang_deadband:.3f}"
+                return "TURN_CCW", "imu_fallback", imu_reason
+            if imu_state == "MOVING":
+                return "MIXED", "imu_fallback", imu_reason
 
-    def cb_safety_stop(self, msg: Bool) -> None:
-        self.stats["safety_stop"].on_message()
-        self.safety_stop_data = {"stop": bool(msg.data)}
+        return "NO_DATA", "none", "no fresh cmd_vel/odom and no imu fallback"
 
-    # ---- summary on exit ----
+    def _classify_from_twist_like(self, vx: float, vy: float, wz: float) -> Tuple[str, str]:
+        lv = self.motion_lin_deadband
+        av = self.motion_ang_deadband
+        ratio = max(1.0, self.motion_mix_allow_ratio)
 
+        ax = abs(vx)
+        ay = abs(vy)
+        aw = abs(wz)
+
+        lin_active_x = ax > lv
+        lin_active_y = ay > lv
+        ang_active = aw > av
+
+        # nothing active
+        if not lin_active_x and not lin_active_y and not ang_active:
+            return "IDLE", f"|vx|,|vy|<={lv:.2f}, |wz|<={av:.2f}"
+
+        # pure turn
+        if ang_active and not lin_active_x and not lin_active_y:
+            if wz > 0.0:
+                return "TURN_CCW", f"wz={wz:.3f} (> {av:.2f})"
+            return "TURN_CW", f"wz={wz:.3f} (< -{av:.2f})"
+
+        # pure-ish linear (x vs y dominant)
+        if (lin_active_x or lin_active_y) and not ang_active:
+            # dominant X
+            if ax > lv and ax >= ratio * max(ay, 1e-9):
+                if vx > 0.0:
+                    return "FORWARD", f"vx={vx:.3f} dominates vy={vy:.3f}"
+                return "REVERSE", f"vx={vx:.3f} dominates vy={vy:.3f}"
+
+            # dominant Y
+            if ay > lv and ay >= ratio * max(ax, 1e-9):
+                if vy > 0.0:
+                    return "STRAFE_LEFT", f"vy={vy:.3f} dominates vx={vx:.3f}"
+                return "STRAFE_RIGHT", f"vy={vy:.3f} dominates vx={vx:.3f}"
+
+            return "MIXED", f"linear mixed vx={vx:.3f}, vy={vy:.3f}"
+
+        # turning + translation => mixed
+        return "MIXED", f"vx={vx:.3f}, vy={vy:.3f}, wz={wz:.3f}"
+
+    def _topic_has_fresh_data(self, key: str) -> bool:
+        st = self.stats.get(key)
+        if st is None:
+            return False
+        return (st.count > 0) and (not st.is_stale())
+
+    def _update_motion_mode(self, mode: str, source: str, reason: str) -> None:
+        now_s = now_monotonic()
+
+        if mode != self.current_motion_mode or source != self.current_motion_source:
+            elapsed = now_s - self.current_motion_since_s
+            if self.current_motion_mode != "NO_DATA":
+                t_rel = now_s - self._start_wall
+                self.motion_transition_log.append(
+                    f"{t_rel:7.1f}s  {self.current_motion_mode} -> {mode}  ({source})  after {elapsed:.1f}s"
+                )
+            self.current_motion_since_s = now_s
+
+        self.current_motion_mode = mode
+        self.current_motion_source = source
+        self.current_motion_reason = reason
+
+    # --------------------------------------------------------
+    # Summary printing
+    # --------------------------------------------------------
     def print_summary(self) -> None:
-        print("\n" + "=" * 78)
+        print("\n" + "=" * 86)
         print("Robot Savo — Localization Dashboard Summary")
-        print("=" * 78)
+        print("=" * 86)
         up = now_monotonic() - self._start_wall
         print(f"Uptime: {up:.1f} s\n")
 
@@ -432,25 +617,87 @@ class LocalizationDashboardNode(Node):
             std_v = statistics.pstdev(vals) if len(vals) >= 2 else 0.0
             print(f"{name}: mean={mean_v:.4f}  min={min_v:.4f}  max={max_v:.4f}  std={std_v:.4f}  n={len(vals)}")
 
-        print("Signal summaries")
+        print("Global signal summaries")
         _describe_hist("IMU gyro z (rad/s)", self.imu_gyro_z_hist)
         _describe_hist("IMU accel norm (m/s^2)", self.imu_acc_norm_hist)
         _describe_hist("wheel odom vx (m/s)", self.wheel_vx_hist)
+        _describe_hist("wheel odom vy (m/s)", self.wheel_vy_hist)
         _describe_hist("wheel odom wz (rad/s)", self.wheel_wz_hist)
         _describe_hist("EKF odom vx (m/s)", self.ekf_vx_hist)
+        _describe_hist("EKF odom vy (m/s)", self.ekf_vy_hist)
         _describe_hist("EKF odom wz (rad/s)", self.ekf_wz_hist)
 
         if self.imu_data:
             print("\nLatest IMU inferred state:")
-            print(f"  state:  {self.imu_data.get('motion_state', 'n/a')}")
-            print(f"  reason: {self.imu_data.get('motion_reason', 'n/a')}")
+            print(f"  state:  {self.imu_data.get('imu_motion_state', 'n/a')}")
+            print(f"  reason: {self.imu_data.get('imu_motion_reason', 'n/a')}")
 
-        print("=" * 78 + "\n")
+        print("\nLatest classified motion mode:")
+        print(f"  mode:   {self.current_motion_mode}")
+        print(f"  source: {self.current_motion_source}")
+        print(f"  reason: {self.current_motion_reason}")
+
+        # Key requested summary: per-mode IMU stats
+        print("\nPer-motion-mode IMU summaries (grouped by classified mode)")
+        mode_order = [
+            "IDLE",
+            "FORWARD",
+            "REVERSE",
+            "STRAFE_LEFT",
+            "STRAFE_RIGHT",
+            "TURN_CCW",
+            "TURN_CW",
+            "MIXED",
+            "NO_DATA",
+        ]
+        all_modes = set(self.imu_mode_stats.keys())
+        ordered_modes = [m for m in mode_order if m in all_modes] + sorted(all_modes - set(mode_order))
+
+        if not ordered_modes:
+            print("  No IMU per-mode samples.")
+        else:
+            for mode in ordered_modes:
+                data = self.imu_mode_stats[mode]
+                gz = data["gz"]
+                an = data["acc_norm"]
+                ax = data["ax"]
+                ay = data["ay"]
+                az = data["az"]
+                n = len(gz)
+                if n == 0:
+                    continue
+
+                def _stats(vals: List[float]) -> Tuple[float, float, float, float]:
+                    if not vals:
+                        return (math.nan, math.nan, math.nan, math.nan)
+                    mean_v = safe_fmean(vals)
+                    min_v = min(vals)
+                    max_v = max(vals)
+                    std_v = statistics.pstdev(vals) if len(vals) >= 2 else 0.0
+                    return mean_v, min_v, max_v, std_v
+
+                gz_m, gz_min, gz_max, gz_std = _stats(gz)
+                an_m, an_min, an_max, an_std = _stats(an)
+                ax_m, _, _, _ = _stats(ax)
+                ay_m, _, _, _ = _stats(ay)
+                az_m, _, _, _ = _stats(az)
+
+                print(f"  [{mode}] n={n}")
+                print(f"    gyro_z   : mean={gz_m:.4f}  min={gz_min:.4f}  max={gz_max:.4f}  std={gz_std:.4f}")
+                print(f"    acc_norm : mean={an_m:.4f}  min={an_min:.4f}  max={an_max:.4f}  std={an_std:.4f}")
+                print(f"    acc_xyz  : mean_ax={ax_m:.4f}  mean_ay={ay_m:.4f}  mean_az={az_m:.4f}")
+
+        if self.motion_transition_log:
+            print("\nRecent motion transitions")
+            for line in self.motion_transition_log:
+                print(f"  {line}")
+
+        print("=" * 86 + "\n")
 
 
-# -----------------------------
+# ============================================================
 # Curses UI
-# -----------------------------
+# ============================================================
 
 class CursesUI:
     def __init__(self, node: LocalizationDashboardNode) -> None:
@@ -461,7 +708,7 @@ class CursesUI:
         h, w = stdscr.getmaxyx()
         if y < 0 or y >= h or x < 0 or x >= w:
             return
-        s = s[:max(0, w - x - 1)]
+        s = s[: max(0, w - x - 1)]
         try:
             stdscr.addstr(y, x, s, attr)
         except curses.error:
@@ -484,6 +731,7 @@ class CursesUI:
         stdscr.timeout(50)
 
         while rclpy.ok() and not self.stop_requested:
+            # Dashboard sampling/spin (not full message drain)
             rclpy.spin_once(self.node, timeout_sec=0.02)
 
             key = stdscr.getch()
@@ -494,11 +742,10 @@ class CursesUI:
             stdscr.erase()
             h, w = stdscr.getmaxyx()
 
-            # Minimum terminal size guard
-            if h < 16 or w < 70:
+            if h < 16 or w < 76:
                 self._safe_addstr(stdscr, 0, 0, "Robot Savo — Localization Dashboard", curses.A_BOLD)
                 self._safe_addstr(stdscr, 2, 0, f"Terminal too small ({w}x{h}). Please enlarge window.")
-                self._safe_addstr(stdscr, 4, 0, "Minimum recommended: 70 cols x 16 rows")
+                self._safe_addstr(stdscr, 4, 0, "Minimum recommended: 76 cols x 16 rows")
                 self._safe_addstr(stdscr, h - 2, 0, "Press q to quit")
                 stdscr.refresh()
                 time.sleep(0.05)
@@ -510,9 +757,25 @@ class CursesUI:
 
             up = now_monotonic() - self.node._start_wall
             self._safe_addstr(
-                stdscr, y, 0,
-                f"Uptime: {up:7.1f}s   Node: {self.node.get_name()}   Compact: {self.node.compact_mode}"
+                stdscr,
+                y,
+                0,
+                f"Uptime: {up:7.1f}s   Node: {self.node.get_name()}   Compact: {self.node.compact_mode}",
             )
+            y += 1
+
+            # Motion mode line (NEW)
+            mode_age = now_monotonic() - self.node.current_motion_since_s
+            self._safe_addstr(
+                stdscr,
+                y,
+                0,
+                f"Motion mode: {self.node.current_motion_mode:<12} source={self.node.current_motion_source:<12} "
+                f"for {mode_age:5.1f}s",
+                curses.A_BOLD,
+            )
+            y += 1
+            self._safe_addstr(stdscr, y, 0, f"Reason: {self.node.current_motion_reason}")
             y += 2
 
             # Topic health
@@ -524,17 +787,19 @@ class CursesUI:
             self._safe_addstr(stdscr, y, 0, self._topic_status_line("cmd_vel_safe", self.node.stats["cmd_vel"])); y += 1
             self._safe_addstr(stdscr, y, 0, self._topic_status_line("safety_stop", self.node.stats["safety_stop"])); y += 2
 
-            # Compact mode only shows health + one-line summaries
             if self.node.compact_mode:
                 imu = self.node.imu_data
                 wod = self.node.wheel_odom_data
                 eod = self.node.ekf_odom_data
 
                 self._safe_addstr(stdscr, y, 0, "Compact Summary", curses.A_UNDERLINE); y += 1
+
                 if imu:
                     self._safe_addstr(
                         stdscr, y, 0,
-                        f"IMU: state={imu.get('motion_state','n/a')}  gz={fmt_float(imu.get('gz'),7,3)}  |a|={fmt_float(imu.get('acc_norm'),7,3)}"
+                        f"IMU: coarse={imu.get('imu_motion_state','n/a'):<10} "
+                        f"mode={imu.get('motion_mode','n/a'):<12} "
+                        f"gz={fmt_float(imu.get('gz'),7,3)}  |a|={fmt_float(imu.get('acc_norm'),7,3)}"
                     )
                 else:
                     self._safe_addstr(stdscr, y, 0, "IMU: no data")
@@ -543,8 +808,9 @@ class CursesUI:
                 if wod:
                     self._safe_addstr(
                         stdscr, y, 0,
-                        f"Wheel: x={fmt_float(wod.get('px'),7,3)} y={fmt_float(wod.get('py'),7,3)} yaw={fmt_float(wod.get('yaw_deg'),7,2)}deg "
-                        f"vx={fmt_float(wod.get('vx'),7,3)} wz={fmt_float(wod.get('wz'),7,3)}"
+                        f"Wheel: x={fmt_float(wod.get('px'),7,3)} y={fmt_float(wod.get('py'),7,3)} "
+                        f"yaw={fmt_float(wod.get('yaw_deg'),7,2)}deg  "
+                        f"vx={fmt_float(wod.get('vx'),7,3)} vy={fmt_float(wod.get('vy'),7,3)} wz={fmt_float(wod.get('wz'),7,3)}"
                     )
                 else:
                     self._safe_addstr(stdscr, y, 0, "Wheel: no data")
@@ -553,16 +819,17 @@ class CursesUI:
                 if eod:
                     self._safe_addstr(
                         stdscr, y, 0,
-                        f"EKF:   x={fmt_float(eod.get('px'),7,3)} y={fmt_float(eod.get('py'),7,3)} yaw={fmt_float(eod.get('yaw_deg'),7,2)}deg "
-                        f"vx={fmt_float(eod.get('vx'),7,3)} wz={fmt_float(eod.get('wz'),7,3)}"
+                        f"EKF:   x={fmt_float(eod.get('px'),7,3)} y={fmt_float(eod.get('py'),7,3)} "
+                        f"yaw={fmt_float(eod.get('yaw_deg'),7,2)}deg  "
+                        f"vx={fmt_float(eod.get('vx'),7,3)} vy={fmt_float(eod.get('vy'),7,3)} wz={fmt_float(eod.get('wz'),7,3)}"
                     )
                 else:
                     self._safe_addstr(stdscr, y, 0, "EKF: no data")
                 y += 2
 
             else:
-                # ---- IMU block ----
-                if y < h - 4:
+                # IMU block
+                if y < h - 6:
                     self._safe_addstr(stdscr, y, 0, "IMU (/imu/data)", curses.A_UNDERLINE); y += 1
                     imu = self.node.imu_data
                     if imu:
@@ -585,25 +852,26 @@ class CursesUI:
                         ); y += 1
                         self._safe_addstr(
                             stdscr, y, 0,
-                            f"inferred state: {imu.get('motion_state','n/a')}   ({imu.get('motion_reason','')})"
+                            f"IMU coarse state: {imu.get('imu_motion_state','n/a')}   ({imu.get('imu_motion_reason','')})"
+                        ); y += 1
+                        self._safe_addstr(
+                            stdscr, y, 0,
+                            f"Classified mode : {imu.get('motion_mode','n/a')} via {imu.get('motion_mode_source','n/a')} "
+                            f"({imu.get('motion_mode_reason','')})"
                         ); y += 1
                     else:
                         self._safe_addstr(stdscr, y, 0, "No IMU data received yet."); y += 1
                     y += 1
 
-                # ---- Wheel odom block ----
-                if y < h - 4:
+                # Wheel odom block
+                if y < h - 6:
                     self._safe_addstr(stdscr, y, 0, "Wheel Odometry (/wheel/odom)", curses.A_UNDERLINE); y += 1
                     wod = self.node.wheel_odom_data
                     if wod:
+                        self._safe_addstr(stdscr, y, 0, f"frame={wod.get('frame_id','')}  child={wod.get('child_frame_id','')}"); y += 1
                         self._safe_addstr(
                             stdscr, y, 0,
-                            f"frame={wod.get('frame_id','')}  child={wod.get('child_frame_id','')}"
-                        ); y += 1
-                        self._safe_addstr(
-                            stdscr, y, 0,
-                            f"pose: x={fmt_float(wod.get('px'))}  y={fmt_float(wod.get('py'))}  "
-                            f"yaw={fmt_float(wod.get('yaw_deg'),7,2)} deg"
+                            f"pose : x={fmt_float(wod.get('px'))}  y={fmt_float(wod.get('py'))}  yaw={fmt_float(wod.get('yaw_deg'),7,2)} deg"
                         ); y += 1
                         self._safe_addstr(
                             stdscr, y, 0,
@@ -613,19 +881,15 @@ class CursesUI:
                         self._safe_addstr(stdscr, y, 0, "No /wheel/odom data received yet."); y += 1
                     y += 1
 
-                # ---- EKF odom block ----
-                if y < h - 4:
+                # EKF odom block
+                if y < h - 6:
                     self._safe_addstr(stdscr, y, 0, "EKF Odometry (/odometry/filtered)", curses.A_UNDERLINE); y += 1
                     eod = self.node.ekf_odom_data
                     if eod:
+                        self._safe_addstr(stdscr, y, 0, f"frame={eod.get('frame_id','')}  child={eod.get('child_frame_id','')}"); y += 1
                         self._safe_addstr(
                             stdscr, y, 0,
-                            f"frame={eod.get('frame_id','')}  child={eod.get('child_frame_id','')}"
-                        ); y += 1
-                        self._safe_addstr(
-                            stdscr, y, 0,
-                            f"pose: x={fmt_float(eod.get('px'))}  y={fmt_float(eod.get('py'))}  "
-                            f"yaw={fmt_float(eod.get('yaw_deg'),7,2)} deg"
+                            f"pose : x={fmt_float(eod.get('px'))}  y={fmt_float(eod.get('py'))}  yaw={fmt_float(eod.get('yaw_deg'),7,2)} deg"
                         ); y += 1
                         self._safe_addstr(
                             stdscr, y, 0,
@@ -635,8 +899,8 @@ class CursesUI:
                         self._safe_addstr(stdscr, y, 0, "No /odometry/filtered data received yet."); y += 1
                     y += 1
 
-                # ---- Motion + safety block ----
-                if y < h - 4:
+                # Motion + safety
+                if y < h - 6:
                     self._safe_addstr(stdscr, y, 0, "Motion + Safety", curses.A_UNDERLINE); y += 1
                     cmd = self.node.cmd_vel_data
                     stp = self.node.safety_stop_data
@@ -654,17 +918,26 @@ class CursesUI:
                     else:
                         self._safe_addstr(stdscr, y, 0, "/safety/stop: no data"); y += 1
 
-            # Footer (always visible if possible)
-            footer = "Tip: Start IMU + wheel odom + EKF, then move robot slowly forward/rotate to verify signs and rates."
+                # Quick per-mode counts (useful while testing)
+                if y < h - 5:
+                    y += 1
+                    self._safe_addstr(stdscr, y, 0, "Per-mode IMU sample counts (current session)", curses.A_UNDERLINE); y += 1
+                    counts_line = []
+                    for mode in ["IDLE", "FORWARD", "REVERSE", "STRAFE_LEFT", "STRAFE_RIGHT", "TURN_CCW", "TURN_CW", "MIXED"]:
+                        n = len(self.node.imu_mode_stats.get(mode, {}).get("gz", [])) if mode in self.node.imu_mode_stats else 0
+                        counts_line.append(f"{mode}:{n}")
+                    self._safe_addstr(stdscr, y, 0, " | ".join(counts_line)); y += 1
+
+            footer = "Tip: Test sequence = IDLE -> FWD -> REV -> STRAFE_L -> STRAFE_R -> TURN_CCW -> TURN_CW, then press q."
             self._safe_addstr(stdscr, h - 2, 0, footer)
 
             stdscr.refresh()
             time.sleep(max(0.0, 1.0 / max(self.node.ui_hz, 1.0) - 0.01))
 
 
-# -----------------------------
+# ============================================================
 # main
-# -----------------------------
+# ============================================================
 
 def main() -> None:
     rclpy.init()
