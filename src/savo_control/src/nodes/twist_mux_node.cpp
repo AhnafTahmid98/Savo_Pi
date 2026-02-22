@@ -8,10 +8,15 @@
 //
 // Typical pipeline (current Robot SAVO architecture)
 // --------------------------------------------------
-//   /cmd_vel_manual   \
-//   /cmd_vel_auto      >-- twist_mux_node --> /cmd_vel_mux --> cmd_vel_shaper --> /cmd_vel
-//   /cmd_vel_nav      /
-//   /cmd_vel_recovery (priority override)
+// Inputs:
+//   /cmd_vel_manual
+//   /cmd_vel_auto
+//   /cmd_vel_nav
+//   /cmd_vel_recovery   (priority override when enabled/active)
+//
+// Flow:
+//   twist_mux_node --> /cmd_vel_mux --> cmd_vel_shaper_node --> /cmd_vel
+//   --> savo_perception cmd_vel_safety_gate --> /cmd_vel_safe
 //
 // Design goals
 // ------------
@@ -34,6 +39,7 @@
 #include <algorithm>
 #include <cctype>
 #include <chrono>
+#include <cmath>
 #include <memory>
 #include <string>
 #include <utility>
@@ -86,20 +92,12 @@ public:
       this->declare_parameter<bool>("mode_state_publish_on_change_only", false);
 
     // Sanitize parameters
-    if (!(publish_rate_hz_ > 0.0) || !std::isfinite(publish_rate_hz_)) {
-      publish_rate_hz_ = 20.0;
-    }
-    if (!(cmd_timeout_sec_ > 0.0) || !std::isfinite(cmd_timeout_sec_)) {
-      cmd_timeout_sec_ = 0.30;
-    }
-    if (!(recovery_cmd_timeout_sec_ > 0.0) || !std::isfinite(recovery_cmd_timeout_sec_)) {
-      recovery_cmd_timeout_sec_ = 0.50;
-    }
-    if (!(recovery_trigger_timeout_sec_ > 0.0) || !std::isfinite(recovery_trigger_timeout_sec_)) {
-      recovery_trigger_timeout_sec_ = 3.0;
-    }
+    sanitize_params_();
 
     active_mode_ = normalize_mode_(default_mode_);
+    if (active_mode_.empty()) {
+      active_mode_ = "MANUAL";
+    }
 
     // -------------------------------------------------------------------------
     // Publishers
@@ -164,10 +162,12 @@ public:
 
     RCLCPP_INFO(
       this->get_logger(),
-      "twist_mux_node started | mode=%s | pub=%.1f Hz | cmd_timeout=%.2fs | recovery_override=%s | safety_gate=%s",
+      "twist_mux_node started | mode=%s | pub=%.1f Hz | cmd_timeout=%.2fs | "
+      "recovery_cmd_timeout=%.2fs | recovery_override=%s | safety_gate=%s",
       active_mode_.c_str(),
       publish_rate_hz_,
       cmd_timeout_sec_,
+      recovery_cmd_timeout_sec_,
       recovery_override_enabled_ ? "true" : "false",
       use_safety_stop_gate_ ? "true" : "false");
   }
@@ -180,6 +180,9 @@ private:
     bool has_msg{false};
   };
 
+  // ---------------------------------------------------------------------------
+  // Callbacks
+  // ---------------------------------------------------------------------------
   void on_cmd_(CmdChannel & ch, const geometry_msgs::msg::Twist & msg)
   {
     ch.last_msg = sanitize_twist_(msg);
@@ -217,7 +220,7 @@ private:
     recovery_trigger_stamp_ = this->now();
 
     if (!latch_recovery_trigger_ && !recovery_trigger_active_) {
-      // Explicit clear path for non-latching behavior
+      // Non-latching mode: explicit false immediately clears.
       recovery_trigger_active_ = false;
     }
   }
@@ -235,12 +238,11 @@ private:
   {
     const rclcpp::Time now = this->now();
 
-    // Select source
     geometry_msgs::msg::Twist selected{};
     std::string selected_source = "NONE";
     bool selected_valid = false;
 
-    // 1) Recovery override (highest priority when active and fresh)
+    // 1) Recovery override (highest priority when enabled + active)
     if (should_use_recovery_override_(now)) {
       if (is_fresh_(recovery_, now, recovery_cmd_timeout_sec_)) {
         selected = recovery_.last_msg;
@@ -255,11 +257,14 @@ private:
     } else {
       // 2) Mode-selected source
       if (active_mode_ == "MANUAL") {
-        selected_valid = select_from_channel_(manual_, "MANUAL", now, cmd_timeout_sec_, selected, selected_source);
+        selected_valid = select_from_channel_(
+          manual_, "MANUAL", now, cmd_timeout_sec_, selected, selected_source);
       } else if (active_mode_ == "AUTO") {
-        selected_valid = select_from_channel_(auto_, "AUTO", now, cmd_timeout_sec_, selected, selected_source);
+        selected_valid = select_from_channel_(
+          auto_, "AUTO", now, cmd_timeout_sec_, selected, selected_source);
       } else if (active_mode_ == "NAV") {
-        selected_valid = select_from_channel_(nav_, "NAV", now, cmd_timeout_sec_, selected, selected_source);
+        selected_valid = select_from_channel_(
+          nav_, "NAV", now, cmd_timeout_sec_, selected, selected_source);
       } else if (active_mode_ == "STOP" || active_mode_ == "IDLE") {
         selected = zero_twist_();
         selected_source = active_mode_;
@@ -277,7 +282,9 @@ private:
       }
     }
 
-    // 3) Optional safety-stop hard gate (main safety gate remains in perception)
+    // 3) Optional safety-stop hard gate
+    // Main safety gate remains in savo_perception (/cmd_vel -> /cmd_vel_safe),
+    // but this optional local gate can help during bringup/testing.
     if (use_safety_stop_gate_ && is_recent_safety_stop_(now) && safety_stop_active_) {
       selected = zero_twist_();
       selected_source += "+SAFETY_STOP";
@@ -295,7 +302,7 @@ private:
     // 5) Mode state periodic/conditional publish
     publish_mode_state_(false);
 
-    // 6) Throttled diagnostics
+    // 6) Diagnostics
     RCLCPP_DEBUG_THROTTLE(
       this->get_logger(), *this->get_clock(), 1000,
       "Mux mode=%s src=%s out[vx=%.3f vy=%.3f wz=%.3f]",
@@ -303,6 +310,9 @@ private:
       selected.linear.x, selected.linear.y, selected.angular.z);
   }
 
+  // ---------------------------------------------------------------------------
+  // Selection helpers
+  // ---------------------------------------------------------------------------
   bool select_from_channel_(
     const CmdChannel & ch,
     const std::string & label,
@@ -314,7 +324,7 @@ private:
     if (!is_fresh_(ch, now, timeout_sec)) {
       out_twist = zero_twist_();
       out_source = label + "_STALE_ZERO";
-      return true;  // explicit safe output
+      return true;  // explicit safe output for selected mode
     }
 
     out_twist = ch.last_msg;
@@ -330,6 +340,7 @@ private:
     if (!(timeout_sec > 0.0) || !std::isfinite(timeout_sec)) {
       return true;
     }
+
     const double age = (now - ch.last_stamp).seconds();
     return std::isfinite(age) && age >= 0.0 && age <= timeout_sec;
   }
@@ -344,7 +355,7 @@ private:
       return false;
     }
 
-    // If trigger is latched with timeout, auto-clear after timeout
+    // Latching behavior: auto-clear after timeout
     if (latch_recovery_trigger_ && (recovery_trigger_timeout_sec_ > 0.0)) {
       const double age = (now - recovery_trigger_stamp_).seconds();
       if (!std::isfinite(age) || age < 0.0 || age > recovery_trigger_timeout_sec_) {
@@ -358,7 +369,6 @@ private:
 
   bool is_recent_safety_stop_(const rclcpp::Time & now) const
   {
-    // Treat safety stop as recent if we got any update in a short window.
     if (safety_stop_stamp_.nanoseconds() == 0) {
       return false;
     }
@@ -366,6 +376,9 @@ private:
     return std::isfinite(age) && age >= 0.0 && age <= 1.0;
   }
 
+  // ---------------------------------------------------------------------------
+  // Data sanitation / formatting helpers
+  // ---------------------------------------------------------------------------
   static geometry_msgs::msg::Twist zero_twist_()
   {
     return geometry_msgs::msg::Twist{};
@@ -380,7 +393,7 @@ private:
   {
     geometry_msgs::msg::Twist out = in;
 
-    // Keep only the fields used by cmd_vel for Robot Savo control path.
+    // Keep only the fields used by cmd_vel in Robot Savo control path
     out.linear.x  = finite_(out.linear.x)  ? out.linear.x  : 0.0;
     out.linear.y  = finite_(out.linear.y)  ? out.linear.y  : 0.0;
     out.angular.z = finite_(out.angular.z) ? out.angular.z : 0.0;
@@ -414,12 +427,12 @@ private:
   {
     std::string s = to_upper_copy_(trim_copy_(raw));
 
-    // Allow a few friendly aliases
-    if (s == "TELEOP")  s = "MANUAL";
-    if (s == "MAN")     s = "MANUAL";
-    if (s == "AUTONOMOUS") s = "AUTO";
-    if (s == "AUTON")   s = "AUTO";
-    if (s == "NAV2")    s = "NAV";
+    // Friendly aliases
+    if (s == "TELEOP")      s = "MANUAL";
+    if (s == "MAN")         s = "MANUAL";
+    if (s == "AUTONOMOUS")  s = "AUTO";
+    if (s == "AUTON")       s = "AUTO";
+    if (s == "NAV2")        s = "NAV";
 
     if (s == "MANUAL" || s == "AUTO" || s == "NAV" || s == "STOP" || s == "IDLE") {
       return s;
@@ -443,6 +456,27 @@ private:
     last_published_mode_ = active_mode_;
   }
 
+  void sanitize_params_()
+  {
+    if (!(publish_rate_hz_ > 0.0) || !std::isfinite(publish_rate_hz_)) {
+      publish_rate_hz_ = 20.0;
+    }
+    if (!(cmd_timeout_sec_ > 0.0) || !std::isfinite(cmd_timeout_sec_)) {
+      cmd_timeout_sec_ = 0.30;
+    }
+    if (!(recovery_cmd_timeout_sec_ > 0.0) || !std::isfinite(recovery_cmd_timeout_sec_)) {
+      recovery_cmd_timeout_sec_ = 0.50;
+    }
+    if (!(recovery_trigger_timeout_sec_ > 0.0) || !std::isfinite(recovery_trigger_timeout_sec_)) {
+      recovery_trigger_timeout_sec_ = 3.0;
+    }
+
+    default_mode_ = normalize_mode_(default_mode_);
+    if (default_mode_.empty()) {
+      default_mode_ = "MANUAL";
+    }
+  }
+
 private:
   // Publishers
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr pub_cmd_mux_;
@@ -460,7 +494,7 @@ private:
 
   rclcpp::TimerBase::SharedPtr timer_;
 
-  // Channels
+  // Command channels
   CmdChannel manual_;
   CmdChannel auto_;
   CmdChannel nav_;
@@ -477,7 +511,7 @@ private:
   bool safety_stop_active_{false};
   rclcpp::Time safety_stop_stamp_{0, 0, RCL_ROS_TIME};
 
-  // Params
+  // Parameters
   double publish_rate_hz_{20.0};
   double cmd_timeout_sec_{0.30};
   double recovery_cmd_timeout_sec_{0.50};

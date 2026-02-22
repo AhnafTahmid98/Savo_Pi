@@ -75,11 +75,11 @@ public:
     wz_deadband_ = this->declare_parameter<double>("limits.wz.deadband", 0.00);
 
     // Slew rates (units/s)
-    vx_rise_rate_ = this->declare_parameter<double>("limits.vx.max_rise_rate", 0.60);   // m/s^2 equiv
-    vx_fall_rate_ = this->declare_parameter<double>("limits.vx.max_fall_rate", 0.80);   // braking faster okay
+    vx_rise_rate_ = this->declare_parameter<double>("limits.vx.max_rise_rate", 0.60);
+    vx_fall_rate_ = this->declare_parameter<double>("limits.vx.max_fall_rate", 0.80);
     vy_rise_rate_ = this->declare_parameter<double>("limits.vy.max_rise_rate", 0.60);
     vy_fall_rate_ = this->declare_parameter<double>("limits.vy.max_fall_rate", 0.80);
-    wz_rise_rate_ = this->declare_parameter<double>("limits.wz.max_rise_rate", 2.50);   // rad/s^2
+    wz_rise_rate_ = this->declare_parameter<double>("limits.wz.max_rise_rate", 2.50);
     wz_fall_rate_ = this->declare_parameter<double>("limits.wz.max_fall_rate", 3.00);
 
     // Internal dt guards for limiter calls
@@ -207,8 +207,9 @@ private:
     // Optional local hard stop gate (defensive; authoritative safety remains downstream)
     if (use_safety_stop_gate_ && is_recent_safety_stop_(now) && safety_stop_active_) {
       target_twist = zero_twist_();
-      // Important safety behavior: reset limiter state so release does not create
-      // a stored nonzero baseline.
+
+      // Important safety behavior:
+      // reset limiter state so release does not resume from stale nonzero history.
       limiter_.reset();
     }
 
@@ -306,6 +307,13 @@ private:
     if (limiter_max_dt_sec_ < limiter_min_dt_sec_) {
       limiter_max_dt_sec_ = std::max(0.50, limiter_min_dt_sec_);
     }
+
+    if (log_stale_warn_throttle_ms_ < 0) {
+      log_stale_warn_throttle_ms_ = 2000;
+    }
+    if (log_debug_throttle_ms_ < 0) {
+      log_debug_throttle_ms_ = 1000;
+    }
   }
 
   static double finite_nonneg_or_(double v, double fallback)
@@ -366,7 +374,10 @@ private:
     return t;
   }
 
-  bool is_input_fresh_(const TwistInputState & st, const rclcpp::Time & now, double timeout_sec) const
+  bool is_input_fresh_(
+    const TwistInputState & st,
+    const rclcpp::Time & now,
+    double timeout_sec) const
   {
     if (!st.has_msg) {
       return false;

@@ -6,10 +6,10 @@
 // ROS2 node wrapper for the reusable ControlModeManager policy helper.
 //
 // This node:
-//   - receives mode requests (STOP / MANUAL / AUTO / NAV)
+//   - receives mode requests (STOP / MANUAL / AUTO / NAV / RECOVERY)
 //   - monitors safety stop and recovery state hints
 //   - applies deterministic arbitration via ControlModeManager
-//   - publishes current mode state / status for other nodes (e.g. twist mux)
+//   - publishes current mode state / status for other nodes (e.g. twist_mux_node)
 //
 // Design intent
 // -------------
@@ -19,19 +19,19 @@
 // Notes
 // -----
 // - This node does NOT mux Twist messages directly.
-// - It publishes selected mode + route hints so your `twist_mux_node` (or a
-//   future mux) can decide which command source to pass through.
-// - Recovery status integration is string-based for flexibility with your
-//   current recovery nodes. You can replace with a custom message later.
+// - It publishes a plain mode string on /savo_control/mode_state so `twist_mux_node`
+//   can consume it directly ("MANUAL", "AUTO", "NAV", "STOP").
+// - It also publishes richer debug/status text on /savo_control/control_status and
+//   /savo_control/control_debug for observability.
 // =============================================================================
 
+#include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <memory>
-#include <string>
-#include <algorithm>
-#include <cctype>
 #include <sstream>
+#include <string>
 
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/bool.hpp"
@@ -78,7 +78,7 @@ public:
       rclcpp::QoS(10),
       std::bind(&ControlModeManagerNode::on_recovery_state_, this, std::placeholders::_1));
 
-    // Optional helper input topics (not part of locked topic_names contract yet).
+    // Optional helper input topics
     if (!manual_override_topic_.empty()) {
       sub_manual_override_ = this->create_subscription<std_msgs::msg::Bool>(
         manual_override_topic_,
@@ -93,25 +93,27 @@ public:
         std::bind(&ControlModeManagerNode::on_external_stop_, this, std::placeholders::_1));
     }
 
-    // Optional source availability topics (Bool=true available)
     if (!manual_available_topic_.empty()) {
       sub_manual_available_ = this->create_subscription<std_msgs::msg::Bool>(
         manual_available_topic_,
         rclcpp::QoS(10),
         std::bind(&ControlModeManagerNode::on_manual_available_, this, std::placeholders::_1));
     }
+
     if (!auto_available_topic_.empty()) {
       sub_auto_available_ = this->create_subscription<std_msgs::msg::Bool>(
         auto_available_topic_,
         rclcpp::QoS(10),
         std::bind(&ControlModeManagerNode::on_auto_available_, this, std::placeholders::_1));
     }
+
     if (!nav_available_topic_.empty()) {
       sub_nav_available_ = this->create_subscription<std_msgs::msg::Bool>(
         nav_available_topic_,
         rclcpp::QoS(10),
         std::bind(&ControlModeManagerNode::on_nav_available_, this, std::placeholders::_1));
     }
+
     if (!recovery_available_topic_.empty()) {
       sub_recovery_available_ = this->create_subscription<std_msgs::msg::Bool>(
         recovery_available_topic_,
@@ -122,8 +124,10 @@ public:
     // -------------------------
     // Publishers
     // -------------------------
+    // IMPORTANT: twist_mux_node expects plain mode strings on this topic.
     pub_mode_state_ = this->create_publisher<std_msgs::msg::String>(
-      topic_names::kControlModeState, rclcpp::QoS(10));
+      topic_names::kControlModeState,
+      rclcpp::QoS(10).transient_local());
 
     pub_control_status_ = this->create_publisher<std_msgs::msg::String>(
       topic_names::kControlStatus, rclcpp::QoS(10));
@@ -131,11 +135,14 @@ public:
     pub_control_debug_ = this->create_publisher<std_msgs::msg::String>(
       topic_names::kControlDebug, rclcpp::QoS(10));
 
-    // Optional route selection topic for twist mux integration
     if (publish_route_topic_) {
       pub_selected_route_ = this->create_publisher<std_msgs::msg::String>(
         selected_route_topic_, rclcpp::QoS(10));
     }
+
+    // Publish startup state immediately (latched)
+    // Use cfg_.startup_mode directly (ControlModeManager has no status() accessor).
+    publish_plain_mode_state_(cfg_.startup_mode);
 
     // -------------------------
     // Main timer
@@ -147,7 +154,7 @@ public:
 
     RCLCPP_INFO(
       get_logger(),
-      "control_mode_manager_node started (%.1f Hz). startup_mode=%s, route_topic=%s",
+      "control_mode_manager_node started (%.1f Hz) | startup_mode=%s | route_topic=%s",
       update_rate_hz_,
       to_string_(cfg_.startup_mode).c_str(),
       publish_route_topic_ ? selected_route_topic_.c_str() : "<disabled>");
@@ -155,11 +162,10 @@ public:
 
 private:
   // ---------------------------------------------------------------------------
-  // Parameter setup
+  // Parameters
   // ---------------------------------------------------------------------------
   void declare_parameters_()
   {
-    // Core loop
     this->declare_parameter<double>("update_rate_hz", 20.0);
 
     // Policy config
@@ -184,17 +190,17 @@ private:
     this->declare_parameter<std::string>("nav_available_topic", "");
     this->declare_parameter<std::string>("recovery_available_topic", "");
 
-    // Route selection publishing (for twist mux / supervisor)
+    // Optional route selection topic
     this->declare_parameter<bool>("publish_selected_route_topic", true);
     this->declare_parameter<std::string>("selected_route_topic", "/savo_control/selected_cmd_source");
 
-    // Defaults for source availability if no availability topics are used
+    // Defaults for source availability if no availability topics exist
     this->declare_parameter<bool>("manual_source_available_default", true);
     this->declare_parameter<bool>("auto_source_available_default", true);
     this->declare_parameter<bool>("nav_source_available_default", true);
     this->declare_parameter<bool>("recovery_source_available_default", true);
 
-    // Logging verbosity
+    // Logging
     this->declare_parameter<bool>("log_mode_changes", true);
     this->declare_parameter<bool>("log_request_changes", false);
   }
@@ -250,31 +256,35 @@ private:
     log_mode_changes_ = this->get_parameter("log_mode_changes").as_bool();
     log_request_changes_ = this->get_parameter("log_request_changes").as_bool();
 
-    if (update_rate_hz_ <= 0.0 || !std::isfinite(update_rate_hz_)) {
+    if (!(update_rate_hz_ > 0.0) || !std::isfinite(update_rate_hz_)) {
       update_rate_hz_ = 20.0;
     }
   }
 
   // ---------------------------------------------------------------------------
-  // Subscribers callbacks
+  // Callbacks
   // ---------------------------------------------------------------------------
   void on_mode_cmd_(const std_msgs::msg::String::SharedPtr msg)
   {
+    if (!msg) {
+      return;
+    }
+
     const std::string s = upper_trim_(msg->data);
 
-    // Latching style command topic: command sets desired mode and stays until changed.
-    // We convert command to "request flags" consumed by update().
     if (s == "STOP") {
       requested_mode_cmd_ = ControlMode::kStop;
-    } else if (s == "MANUAL") {
+    } else if (s == "MANUAL" || s == "TELEOP" || s == "MAN") {
       requested_mode_cmd_ = ControlMode::kManual;
-    } else if (s == "AUTO") {
+    } else if (s == "AUTO" || s == "AUTONOMOUS" || s == "AUTON") {
       requested_mode_cmd_ = ControlMode::kAuto;
-    } else if (s == "NAV") {
+    } else if (s == "NAV" || s == "NAV2") {
       requested_mode_cmd_ = ControlMode::kNav;
     } else if (s == "RECOVERY") {
-      // Usually recovery is driven by recovery_active/trigger, but allow explicit command.
       requested_mode_cmd_ = ControlMode::kRecovery;
+    } else if (s == "IDLE") {
+      // Treat IDLE as STOP for compatibility with simple mux command styles
+      requested_mode_cmd_ = ControlMode::kStop;
     } else {
       RCLCPP_WARN_THROTTLE(
         get_logger(), *get_clock(), 2000,
@@ -289,24 +299,25 @@ private:
 
   void on_safety_stop_(const std_msgs::msg::Bool::SharedPtr msg)
   {
+    if (!msg) return;
     inputs_.safety_stop_active = msg->data;
   }
 
   void on_recovery_trigger_(const std_msgs::msg::Bool::SharedPtr msg)
   {
-    // Edge-like hint; consumed/cleared in timer cycle
+    if (!msg) return;
+    // one-shot style hint (consumed in timer and cleared)
     inputs_.recovery_triggered = msg->data;
   }
 
   void on_recovery_state_(const std_msgs::msg::String::SharedPtr msg)
   {
+    if (!msg) return;
+
     const std::string s = upper_trim_(msg->data);
     last_recovery_state_raw_ = s;
 
-    // Flexible parsing for current/future recovery node strings.
-    // Examples accepted:
-    //   "ACTIVE", "BACKING_UP", "TURNING", "SETTLING"
-    //   "IDLE", "COMPLETE", "COMPLETED", "ABORTED", "COOLDOWN"
+    // Reset one-shot completion/abort edges each time we parse a state string
     inputs_.recovery_completed = false;
     inputs_.recovery_aborted = false;
 
@@ -328,49 +339,54 @@ private:
     {
       inputs_.recovery_active = true;
     } else {
-      // Unknown string: keep current active flag, just log
       RCLCPP_DEBUG(get_logger(), "Unrecognized recovery_state string: '%s'", s.c_str());
     }
   }
 
   void on_manual_override_(const std_msgs::msg::Bool::SharedPtr msg)
   {
+    if (!msg) return;
     inputs_.manual_override_active = msg->data;
   }
 
   void on_external_stop_(const std_msgs::msg::Bool::SharedPtr msg)
   {
+    if (!msg) return;
     inputs_.external_stop_active = msg->data;
   }
 
   void on_manual_available_(const std_msgs::msg::Bool::SharedPtr msg)
   {
+    if (!msg) return;
     inputs_.manual_source_available = msg->data;
   }
 
   void on_auto_available_(const std_msgs::msg::Bool::SharedPtr msg)
   {
+    if (!msg) return;
     inputs_.auto_source_available = msg->data;
   }
 
   void on_nav_available_(const std_msgs::msg::Bool::SharedPtr msg)
   {
+    if (!msg) return;
     inputs_.nav_source_available = msg->data;
   }
 
   void on_recovery_available_(const std_msgs::msg::Bool::SharedPtr msg)
   {
+    if (!msg) return;
     inputs_.recovery_source_available = msg->data;
   }
 
   // ---------------------------------------------------------------------------
-  // Main timer loop
+  // Main timer
   // ---------------------------------------------------------------------------
   void on_timer_()
   {
     const double now_sec = this->now().seconds();
 
-    // Build request flags from latched command
+    // Build request flags from latched mode command
     inputs_.request_stop = false;
     inputs_.request_manual = false;
     inputs_.request_auto = false;
@@ -378,13 +394,20 @@ private:
 
     if (have_mode_cmd_) {
       switch (requested_mode_cmd_) {
-        case ControlMode::kStop:     inputs_.request_stop = true; break;
-        case ControlMode::kManual:   inputs_.request_manual = true; break;
-        case ControlMode::kAuto:     inputs_.request_auto = true; break;
-        case ControlMode::kNav:      inputs_.request_nav = true; break;
+        case ControlMode::kStop:
+          inputs_.request_stop = true;
+          break;
+        case ControlMode::kManual:
+          inputs_.request_manual = true;
+          break;
+        case ControlMode::kAuto:
+          inputs_.request_auto = true;
+          break;
+        case ControlMode::kNav:
+          inputs_.request_nav = true;
+          break;
         case ControlMode::kRecovery:
-          // Explicit RECOVERY command is represented as AUTO request + recovery active hint,
-          // or direct recovery active if source is available.
+          // explicit RECOVERY command maps to recovery trigger/active hint
           inputs_.recovery_triggered = true;
           if (inputs_.recovery_source_available) {
             inputs_.recovery_active = true;
@@ -393,11 +416,10 @@ private:
       }
     }
 
-    // Run policy update
     const auto status = manager_.update(now_sec, inputs_);
 
     // Publish outputs
-    publish_mode_state_(status);
+    publish_plain_mode_state_(status.active_mode);   // <-- mux-compatible plain string
     publish_control_status_(status);
     publish_control_debug_(status);
 
@@ -405,11 +427,10 @@ private:
       publish_selected_route_(status);
     }
 
-    // Logging (throttled / edge-based)
     if (status.mode_changed && log_mode_changes_) {
       RCLCPP_INFO(
         get_logger(),
-        "Mode changed: active=%s requested=%s reason=%s recovery_latched=%s",
+        "Mode changed | active=%s requested=%s reason=%s recovery_latched=%s",
         to_string_(status.active_mode).c_str(),
         to_string_(status.requested_mode).c_str(),
         to_string_(status.reason).c_str(),
@@ -417,7 +438,7 @@ private:
     } else if (status.request_changed && log_request_changes_) {
       RCLCPP_INFO(
         get_logger(),
-        "Mode request changed: requested=%s",
+        "Mode request changed | requested=%s",
         to_string_(status.requested_mode).c_str());
     }
 
@@ -430,23 +451,15 @@ private:
   // ---------------------------------------------------------------------------
   // Publishers helpers
   // ---------------------------------------------------------------------------
-  void publish_mode_state_(const ControlModeManagerStatus & status)
+  void publish_plain_mode_state_(ControlMode active_mode)
   {
-    // Compact machine-readable string:
-    // "ACTIVE=MANUAL;REQUESTED=AUTO;REASON=MANUAL_OVERRIDE;RECOVERY_LATCHED=false"
     std_msgs::msg::String msg;
-    std::ostringstream ss;
-    ss << "ACTIVE=" << to_string_(status.active_mode)
-       << ";REQUESTED=" << to_string_(status.requested_mode)
-       << ";REASON=" << to_string_(status.reason)
-       << ";RECOVERY_LATCHED=" << (status.recovery_latched ? "true" : "false");
-    msg.data = ss.str();
+    msg.data = plain_mux_mode_string_(active_mode);
     pub_mode_state_->publish(msg);
   }
 
   void publish_control_status_(const ControlModeManagerStatus & status)
   {
-    // JSON-ish plain text to avoid custom message dependency for now.
     std_msgs::msg::String msg;
     std::ostringstream ss;
     ss << "{"
@@ -494,12 +507,11 @@ private:
   // ---------------------------------------------------------------------------
   static std::string upper_trim_(std::string s)
   {
-    // trim
     auto not_space = [](unsigned char c) { return !std::isspace(c); };
+
     s.erase(s.begin(), std::find_if(s.begin(), s.end(), not_space));
     s.erase(std::find_if(s.rbegin(), s.rend(), not_space).base(), s.end());
 
-    // upper
     std::transform(
       s.begin(), s.end(), s.begin(),
       [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
@@ -509,10 +521,10 @@ private:
   static ControlMode parse_mode_or_default_(const std::string & s, ControlMode def)
   {
     const auto u = upper_trim_(s);
-    if (u == "STOP") return ControlMode::kStop;
-    if (u == "MANUAL") return ControlMode::kManual;
-    if (u == "AUTO") return ControlMode::kAuto;
-    if (u == "NAV") return ControlMode::kNav;
+    if (u == "STOP" || u == "IDLE") return ControlMode::kStop;
+    if (u == "MANUAL" || u == "TELEOP" || u == "MAN") return ControlMode::kManual;
+    if (u == "AUTO" || u == "AUTONOMOUS" || u == "AUTON") return ControlMode::kAuto;
+    if (u == "NAV" || u == "NAV2") return ControlMode::kNav;
     if (u == "RECOVERY") return ControlMode::kRecovery;
     return def;
   }
@@ -547,6 +559,27 @@ private:
     }
   }
 
+  // Map control-mode helper enum to the plain strings expected by twist_mux_node.
+  static std::string plain_mux_mode_string_(ControlMode m)
+  {
+    switch (m) {
+      case ControlMode::kManual:
+        return "MANUAL";
+      case ControlMode::kAuto:
+        return "AUTO";
+      case ControlMode::kNav:
+        return "NAV";
+      case ControlMode::kRecovery:
+        // twist_mux_node uses recovery trigger + /cmd_vel_recovery override,
+        // so plain mode should remain a non-recovery base mode.
+        // STOP is the safest neutral value when recovery is active.
+        return "STOP";
+      case ControlMode::kStop:
+      default:
+        return "STOP";
+    }
+  }
+
   static std::string route_name_from_action_(const ControlModeAction & a)
   {
     if (a.select_manual)   return topic_names::kCmdVelManual;
@@ -567,8 +600,8 @@ private:
   // Mode command latch
   bool have_mode_cmd_ {false};
   ControlMode requested_mode_cmd_ {ControlMode::kStop};
-  std::string last_mode_cmd_raw_ {};
-  std::string last_recovery_state_raw_ {};
+  std::string last_mode_cmd_raw_;
+  std::string last_recovery_state_raw_;
 
   // Parameters
   double update_rate_hz_ {20.0};
