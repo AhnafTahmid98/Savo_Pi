@@ -1,0 +1,89 @@
+# File: Savo_Pi/src/savo_base/config/safety_timeouts.yaml
+#
+# Robot SAVO — Safety Timeouts Configuration
+# ------------------------------------------
+# Purpose:
+#   Centralized timeout and timing-related safety parameters for `savo_base`
+#   (especially base_driver_node watchdog behavior and future safety modules).
+#
+# Notes:
+#   - This file is intentionally focused on timeout/timing behavior only.
+#   - It can be layered together with:
+#       1) base_driver_node.yaml
+#       2) motor_board_freenove.yaml
+#       3) mecanum_kinematics.yaml
+#
+# Typical use:
+#   ros2 run savo_base base_driver_node --ros-args \
+#     --params-file <path>/base_driver_node.yaml \
+#     --params-file <path>/motor_board_freenove.yaml \
+#     --params-file <path>/mecanum_kinematics.yaml \
+#     --params-file <path>/safety_timeouts.yaml
+
+/base_driver_node:
+  ros__parameters:
+
+    # -------------------------------------------------------------------------
+    # Main command watchdog (critical)
+    # -------------------------------------------------------------------------
+    # If no fresh /cmd_vel_safe command is received within this timeout,
+    # base_driver_node must zero outputs and stop the motors.
+    #
+    # Robot Savo recommended baseline:
+    #   0.30 s  (matches your perception/localization safety stack timing)
+    watchdog_timeout_s: 0.30
+
+    # -------------------------------------------------------------------------
+    # Control loop + status publish timing
+    # -------------------------------------------------------------------------
+    # Control execution timer for base command application
+    loop_hz: 30.0
+
+    # Lightweight JSON state publishing rate (/savo_base/watchdog_state, /savo_base/base_state)
+    publish_status_hz: 2.0
+
+    # -------------------------------------------------------------------------
+    # Safety stop / slowdown topic integration toggles
+    # -------------------------------------------------------------------------
+    use_safety_stop: true
+    use_slowdown_factor: true
+
+    # -------------------------------------------------------------------------
+    # Slowdown factor bounds and default
+    # -------------------------------------------------------------------------
+    # slowdown_factor is expected from /safety/slowdown_factor (0.0..1.0)
+    # 1.0 = no slowdown, 0.0 = full stop equivalent scaling
+    slowdown_default: 1.0
+    slowdown_min: 0.0
+    slowdown_max: 1.0
+
+    # -------------------------------------------------------------------------
+    # Future-safe timeout placeholders (ignored if unsupported by current node)
+    # -------------------------------------------------------------------------
+    # These are included as a professional config contract for future expansion
+    # (e.g., stale safety topics, board heartbeat, e-stop source freshness).
+    #
+    # Keep enabled defaults conservative and aligned with current Robot Savo stack.
+    safety_stop_stale_timeout_s: 0.50        # future: mark /safety/stop stale if needed
+    slowdown_stale_timeout_s: 0.50           # future: mark /safety/slowdown_factor stale
+    board_command_ack_timeout_s: 0.10        # future: backend command/ack timeout
+    board_init_timeout_s: 2.00               # future: hardware init timeout guard
+    estop_input_stale_timeout_s: 0.20        # future: physical e-stop freshness
+    diagnostics_publish_timeout_s: 1.00      # future: diagnostics freshness budget
+
+    # -------------------------------------------------------------------------
+    # Watchdog policy tuning placeholders (ignored if unsupported)
+    # -------------------------------------------------------------------------
+    # These match the intent of your integrated safety classes and help document
+    # expected behavior even before all params are wired dynamically.
+    watchdog_enabled: true
+    watchdog_auto_rearm: true
+    watchdog_zero_on_trip: true
+    watchdog_warning_ratio: 0.70
+
+    # Stale command policy intent
+    stale_policy_zero_on_stale: true
+    stale_policy_hold_last_on_stale: false
+
+    # E-stop latch behavior intent
+    estop_auto_rearm: false

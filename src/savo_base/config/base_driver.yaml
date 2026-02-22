@@ -1,0 +1,98 @@
+# File: Savo_Pi/src/savo_base/config/base_driver_node.yaml
+#
+# Robot SAVO — base_driver_node parameters (ROS 2 Jazzy)
+# ------------------------------------------------------
+# Production-oriented defaults for the real Robot Savo mecanum base.
+#
+# Topics (aligned with current locked stack)
+# - Input command:       /cmd_vel_safe
+# - Safety stop:         /safety/stop
+# - Slowdown factor:     /safety/slowdown_factor
+# - Diagnostics outputs: /savo_base/watchdog_state, /savo_base/base_state
+#
+# Notes
+# -----
+# - Keep `dryrun: false` on the real robot.
+# - If testing on laptop/PC without hardware, set `dryrun: true`.
+# - Signs/inverts below match Robot Savo’s proven teleop/base conventions
+#   unless your live wheel test says otherwise.
+
+base_driver_node:
+  ros__parameters:
+    # -------------------------------------------------------------------------
+    # Topics
+    # -------------------------------------------------------------------------
+    cmd_topic: "/cmd_vel_safe"
+    safety_stop_topic: "/safety/stop"
+    slowdown_topic: "/safety/slowdown_factor"
+
+    use_safety_stop: true
+    use_slowdown_factor: true
+
+    # Safety slowdown factor clamp (input from safety stack)
+    slowdown_default: 1.0
+    slowdown_min: 0.0
+    slowdown_max: 1.0
+
+    # -------------------------------------------------------------------------
+    # Loop / watchdog / status rates
+    # -------------------------------------------------------------------------
+    loop_hz: 30.0
+    watchdog_timeout_s: 0.30
+    publish_status_hz: 2.0
+
+    # -------------------------------------------------------------------------
+    # Command-space limits (normalized cmd_vel domain expected by this node)
+    # These are not physical m/s limits; they are execution clamps for safety.
+    # -------------------------------------------------------------------------
+    vx_limit: 1.0
+    vy_limit: 1.0
+    wz_limit: 1.0
+
+    # -------------------------------------------------------------------------
+    # Motor output scaling
+    # PCA9685 full-scale is 4095; Robot Savo proven safe default is 3000
+    # -------------------------------------------------------------------------
+    max_duty: 3000
+    turn_gain: 1.0
+
+    # -------------------------------------------------------------------------
+    # Mecanum conventions (match Robot Savo proven teleop defaults)
+    # -------------------------------------------------------------------------
+    forward_sign: -1
+    strafe_sign: 1
+    rotate_sign: 1
+
+    # -------------------------------------------------------------------------
+    # Board backend
+    # -------------------------------------------------------------------------
+    # "auto" recommended on Pi (factory decides actual backend)
+    # Use "dryrun" only for no-hardware testing (or set dryrun: true)
+    board_backend: "auto"
+    board_name: "robot_savo_freenove_mecanum"
+    dryrun: false
+
+    # -------------------------------------------------------------------------
+    # Freenove / PCA9685 hardware settings
+    # -------------------------------------------------------------------------
+    i2c_bus: 1
+    pca9685_addr: "0x40"
+    pwm_freq_hz: 50.0
+    quench_ms: 18
+
+    # -------------------------------------------------------------------------
+    # Per-wheel invert flags
+    # Set based on real wheel direction verification on hardware.
+    # Start with false; change only if wheel direction test requires it.
+    # Wheel order: FL, RL, FR, RR
+    # -------------------------------------------------------------------------
+    invert_fl: false
+    invert_rl: false
+    invert_fr: false
+    invert_rr: false
+
+    # -------------------------------------------------------------------------
+    # Diagnostics / dashboard-friendly JSON summary topics
+    # -------------------------------------------------------------------------
+    watchdog_state_topic: "/savo_base/watchdog_state"
+    base_state_topic: "/savo_base/base_state"

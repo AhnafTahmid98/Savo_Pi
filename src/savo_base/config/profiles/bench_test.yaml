@@ -1,0 +1,99 @@
+# File: savo_base/config/profiles/bench_test.yaml
+#
+# Robot SAVO — Bench Test Profile (savo_base / base_driver_node)
+#
+# Purpose:
+#   Safe bench / desk testing for base driver + motor board integration.
+#   Intended for wheel-direction checks, PWM sweep checks, watchdog tests,
+#   and stop/slowdown integration validation before floor driving.
+#
+# Notes:
+# - This file matches parameters declared in:
+#   savo_base/nodes/base_driver_node.py
+# - Keep speeds and max_duty conservative for bench work.
+# - For first power-on, consider dryrun:=true or keep robot lifted.
+
+base_driver_node:
+  ros__parameters:
+
+    # ----------------------------------------------------------------------
+    # Topics (aligned with project defaults)
+    # ----------------------------------------------------------------------
+    cmd_topic: "/cmd_vel_safe"
+    safety_stop_topic: "/safety/stop"
+    slowdown_topic: "/safety/slowdown_factor"
+    watchdog_state_topic: "/savo_base/watchdog_state"
+    base_state_topic: "/savo_base/base_state"
+
+    # ----------------------------------------------------------------------
+    # Safety integrations
+    # ----------------------------------------------------------------------
+    use_safety_stop: true
+    use_slowdown_factor: true
+
+    # Bench-safe slowdown bounds
+    slowdown_default: 1.0
+    slowdown_min: 0.0
+    slowdown_max: 1.0
+
+    # ----------------------------------------------------------------------
+    # Control loop / watchdog / status publish
+    # ----------------------------------------------------------------------
+    # 20 Hz is sufficient for bench testing and reduces spam while debugging.
+    loop_hz: 20.0
+
+    # Tight watchdog for safety validation (stale cmd -> stop quickly)
+    watchdog_timeout_s: 0.25
+
+    # Status at 2 Hz is readable in terminals/dashboards
+    publish_status_hz: 2.0
+
+    # ----------------------------------------------------------------------
+    # Command-space limits (Twist clamp before mixing)
+    # These are normalized command-space limits in your node.
+    # Keep conservative for bench work.
+    # ----------------------------------------------------------------------
+    vx_limit: 0.35
+    vy_limit: 0.30
+    wz_limit: 0.30
+
+    # ----------------------------------------------------------------------
+    # Motor output scaling
+    # max_duty range in code: 0..4095
+    # Bench-safe cap (much lower than full-power operation)
+    # ----------------------------------------------------------------------
+    max_duty: 1200
+    turn_gain: 1.0
+
+    # ----------------------------------------------------------------------
+    # Robot Savo proven sign conventions (matches your locked teleop defaults)
+    # ----------------------------------------------------------------------
+    forward_sign: -1
+    strafe_sign: 1
+    rotate_sign: 1
+
+    # ----------------------------------------------------------------------
+    # Board backend selection
+    # ----------------------------------------------------------------------
+    # Use "auto" for real board if drivers are available.
+    # Set dryrun=true for no-hardware / parser testing.
+    board_backend: "auto"
+    board_name: "robot_savo_freenove_mecanum"
+    dryrun: false
+
+    # ----------------------------------------------------------------------
+    # Freenove PCA9685 hardware settings (your real platform defaults)
+    # ----------------------------------------------------------------------
+    i2c_bus: 1
+    pca9685_addr: "0x40"
+    pwm_freq_hz: 50.0
+    quench_ms: 18
+
+    # ----------------------------------------------------------------------
+    # Per-wheel inversion flags
+    # Keep false here unless wheel_direction_check confirms a mismatch.
+    # ----------------------------------------------------------------------
+    invert_fl: false
+    invert_rl: false
+    invert_fr: false
+    invert_rr: false

@@ -1,0 +1,94 @@
+# File: Savo_Pi/src/savo_base/config/motor_board_freenove.yaml
+#
+# Robot SAVO — Freenove PCA9685 Motor Board Configuration
+# --------------------------------------------------------
+# Purpose:
+#   Hardware/backend-specific parameters for the real Robot Savo mecanum base
+#   using the Freenove motor board (PCA9685-based).
+#
+# Notes:
+#   - Keep this file focused on board/hardware parameters only.
+#   - Base execution behavior (watchdog, topics, limits) belongs in base_driver_node.yaml.
+#   - Mecanum geometry/sign conventions belong in mecanum_kinematics.yaml.
+#
+# Typical use:
+#   ros2 run savo_base base_driver_node --ros-args \
+#     --params-file <path>/base_driver_node.yaml \
+#     --params-file <path>/motor_board_freenove.yaml \
+#     --params-file <path>/mecanum_kinematics.yaml
+
+/base_driver_node:
+  ros__parameters:
+
+    # -------------------------------------------------------------------------
+    # Backend selection
+    # -------------------------------------------------------------------------
+    # Supported examples (depends on your factory implementation):
+    #   auto | freenove | dryrun
+    board_backend: "freenove"
+    board_name: "robot_savo_freenove_mecanum"
+    dryrun: false
+
+    # -------------------------------------------------------------------------
+    # PCA9685 / I2C (Robot Savo locked hardware defaults)
+    # -------------------------------------------------------------------------
+    i2c_bus: 1
+    pca9685_addr: "0x40"
+    pwm_freq_hz: 50.0
+
+    # Direction-change protection delay (matches your proven teleop behavior)
+    quench_ms: 18
+
+    # -------------------------------------------------------------------------
+    # PWM / output range
+    # -------------------------------------------------------------------------
+    # PCA9685 raw range is 0..4095; Robot Savo uses conservative 3000 default
+    # for safer testing and stable bringup.
+    max_duty: 3000
+
+    # -------------------------------------------------------------------------
+    # Freenove board motor channel mapping (LOCKED for Robot Savo)
+    # -------------------------------------------------------------------------
+    # Wheel pairs on PCA9685 (from your validated scripts):
+    #   FL -> (0,1)
+    #   RL -> (3,2)
+    #   FR -> (6,7)
+    #   RR -> (4,5)
+    #
+    # These keys are OPTIONAL and only take effect if your `make_motor_board()`
+    # / Freenove backend supports explicit channel mapping parameters.
+    #
+    # If your current board factory ignores them, keep them here anyway as
+    # canonical documentation for the hardware mapping.
+    fl_ch_a: 0
+    fl_ch_b: 1
+
+    rl_ch_a: 3
+    rl_ch_b: 2
+
+    fr_ch_a: 6
+    fr_ch_b: 7
+
+    rr_ch_a: 4
+    rr_ch_b: 5
+
+    # -------------------------------------------------------------------------
+    # Per-wheel inversion flags (hardware/backend level)
+    # -------------------------------------------------------------------------
+    # Keep these FALSE here unless you intentionally want motor-level inversion.
+    # Prefer to tune motion direction first via mecanum_kinematics.yaml signs.
+    #
+    # If one wheel is wired reversed physically, set that specific wheel true.
+    invert_fl: false
+    invert_rl: false
+    invert_fr: false
+    invert_rr: false
+
+    # -------------------------------------------------------------------------
+    # Optional backend diagnostics/logging (future-safe placeholders)
+    # -------------------------------------------------------------------------
+    # These are harmless if unsupported by the backend/factory.
+    board_init_retry_count: 1
+    board_init_retry_delay_s: 0.5
+    board_log_writes: false
+    board_fail_safe_stop_on_error: true

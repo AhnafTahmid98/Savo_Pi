@@ -1,0 +1,53 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>savo_base</name>
+  <version>0.0.1</version>
+
+  <description>
+    Robot SAVO — Low-level drivetrain hardware execution stack (PCA9685/Freenove motor board
+    + mecanum kinematics + command safety/watchdog + base state/diagnostics) for ROS 2 Jazzy.
+    - Python drivers: PCA9685 and Freenove mecanum board motor execution (real + dryrun paths)
+    - Python kinematics: mecanum wheel mixing and scaling helpers
+    - Python ROS nodes: base_driver_node, watchdog/state/heartbeat/diagnostics runners
+    - Launch/config profiles for dryrun, bench testing, and real robot bringup
+  </description>
+
+  <maintainer email="tahmidahnaf998@gmail.com">Ahnaf Tahmid</maintainer>
+  <license>Proprietary</license>
+
+  <!-- Hybrid build: C++ capable (ament_cmake) + Python package/nodes (ament_python) -->
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <!-- Core ROS dependencies -->
+  <depend>rclpy</depend>
+  <depend>rclcpp</depend>
+
+  <!-- Message types for command / safety / state / diagnostics -->
+  <depend>geometry_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>diagnostic_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>savo_msgs</depend>
+
+  <!-- Launch support -->
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+
+  <!-- Python runtime helpers -->
+  <exec_depend>python3-yaml</exec_depend>
+  <exec_depend>ament_index_python</exec_depend>
+
+  <!-- Raspberry Pi I2C access (PCA9685 real hardware driver path) -->
+  <exec_depend>python3-smbus</exec_depend>
+
+  <!-- Tests / lint (optional, safe to keep) -->
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+  <test_depend>ament_cmake_pytest</test_depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

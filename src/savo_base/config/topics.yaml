@@ -1,0 +1,62 @@
+# File: Savo_Pi/src/savo_base/config/topics.yaml
+#
+# Robot SAVO — Topic Names Configuration (savo_base)
+# --------------------------------------------------
+# Purpose:
+#   Centralize ROS topic names used by `savo_base` nodes so they can be
+#   remapped consistently without editing code.
+#
+# Notes:
+#   - This file is safe to layer with:
+#       1) base_driver_node.yaml
+#       2) motor_board_freenove.yaml
+#       3) mecanum_kinematics.yaml
+#       4) safety_timeouts.yaml
+#   - Parameters below match the current `base_driver_node.py` contract.
+#   - Keep names aligned with your locked Robot Savo perception/control stack:
+#       /cmd_vel -> /cmd_vel_safe (safety gate)
+#       /safety/stop
+#       /safety/slowdown_factor
+
+/base_driver_node:
+  ros__parameters:
+
+    # -------------------------------------------------------------------------
+    # Command input (already safety-gated upstream)
+    # -------------------------------------------------------------------------
+    cmd_topic: "/cmd_vel_safe"
+
+    # -------------------------------------------------------------------------
+    # Safety inputs (from savo_perception / safety stack)
+    # -------------------------------------------------------------------------
+    safety_stop_topic: "/safety/stop"
+    slowdown_topic: "/safety/slowdown_factor"
+
+    # -------------------------------------------------------------------------
+    # Lightweight diagnostics / state outputs (JSON in std_msgs/String)
+    # -------------------------------------------------------------------------
+    watchdog_state_topic: "/savo_base/watchdog_state"
+    base_state_topic: "/savo_base/base_state"
+
+
+# -----------------------------------------------------------------------------
+# Future-ready placeholders (documentation only)
+# -----------------------------------------------------------------------------
+# If you add more nodes in `savo_base` (examples: odom relay, board monitor,
+# actuator diagnostics, heartbeat bridge), keep topic naming consistent using:
+#
+# /savo_base/...
+# /savo_base/diag/...
+# /savo_base/events/...
+#
+# Example conventions (NOT loaded by current node unless implemented):
+#
+# /motor_board_monitor:
+#   ros__parameters:
+#     board_status_topic: "/savo_base/motor_board_status"
+#     board_events_topic: "/savo_base/events/motor_board"
+#
+# /base_driver_node:
+#   ros__parameters:
+#     heartbeat_topic: "/savo_base/heartbeat"
+#     command_debug_topic: "/savo_base/command_debug"

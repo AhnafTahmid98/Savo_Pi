@@ -1,0 +1,131 @@
+# File: Savo_Pi/src/savo_base/config/mecanum_kinematics.yaml
+#
+# Robot SAVO — Mecanum Kinematics Configuration (ROS 2 Jazzy)
+# -----------------------------------------------------------
+# Canonical kinematics + convention parameters for Robot Savo base stack.
+#
+# Purpose
+# -------
+# This file centralizes mecanum-related parameters used by:
+# - savo_base/nodes/base_driver_node.py
+# - teleop/manual drive nodes
+# - future odometry / controller tuning utilities
+#
+# Notes
+# -----
+# 1) Robot Savo currently uses normalized command-space in base_driver_node
+#    (vx, vy, wz typically clamped to [-1, 1] before wheel mixing).
+# 2) wheel_radius_m / wheel_diameter_m / track / wheelbase are included now
+#    so the same file can be reused later for physically-scaled controllers
+#    and full mecanum odometry (4 encoders).
+# 3) Sign conventions below match your proven Robot Savo teleop defaults:
+#      forward_sign = -1
+#      strafe_sign  = +1
+#      rotate_sign  = +1
+# 4) Per-wheel invert flags are motor-board wiring compensation flags.
+#    Keep false until real wheel direction validation requires a change.
+#
+# Wheel order (canonical everywhere)
+# ----------------------------------
+#   FL, RL, FR, RR
+#
+# Locked hardware context (Robot Savo)
+# ------------------------------------
+# - Freenove 4WD mecanum base + PCA9685
+# - Typical PWM: 50 Hz
+# - Typical max duty in base_driver_node: 3000
+# - Current encoder baseline: rear encoders only (full 4-wheel odom later)
+
+mecanum_kinematics:
+  ros__parameters:
+    # -------------------------------------------------------------------------
+    # Core geometry (physical)
+    # -------------------------------------------------------------------------
+    # Wheel diameter from your locked encoder test defaults (0.065 m)
+    wheel_diameter_m: 0.065
+    wheel_radius_m: 0.0325
+
+    # Track width (left-right wheel center distance), from locked encoder defaults
+    track_width_m: 0.165
+
+    # Front-rear wheel center distance (measure on the real robot and update if needed)
+    # Placeholder professional default for Freenove-style 4WD chassis.
+    wheelbase_m: 0.165
+
+    # Effective half-geometry term commonly used in mecanum formulas:
+    #   k = (L + W)
+    # where L = wheelbase/2 and W = track/2, so k = (wheelbase + track)/2
+    # Keep explicit toggle to compute internally from dimensions.
+    compute_k_from_geometry: true
+    kinematic_k_m: 0.165   # used only if compute_k_from_geometry := false
+
+    # -------------------------------------------------------------------------
+    # Command convention (Robot Savo canonical)
+    # -------------------------------------------------------------------------
+    # These match your proven teleop/base_driver defaults
+    forward_sign: -1
+    strafe_sign: 1
+    rotate_sign: 1
+
+    # Extra rotation shaping (kept in kinematics for consistent reuse)
+    turn_gain: 1.0
+
+    # -------------------------------------------------------------------------
+    # Mixer normalization / saturation behavior
+    # -------------------------------------------------------------------------
+    # Normalize wheel commands if any |wheel| > 1.0
+    normalize_output: true
+
+    # Clamp input command-space before mixing (normalized domain)
+    clamp_input: true
+    vx_limit: 1.0
+    vy_limit: 1.0
+    wz_limit: 1.0
+
+    # Deadbands to suppress tiny joystick/noise motion (normalized domain)
+    deadband_vx: 0.00
+    deadband_vy: 0.00
+    deadband_wz: 0.00
+
+    # -------------------------------------------------------------------------
+    # Wheel mapping (canonical order and labels)
+    # Useful for validation/logging/telemetry consistency
+    # -------------------------------------------------------------------------
+    wheel_order: ["FL", "RL", "FR", "RR"]
+
+    # Motor-board direction inversion compensation (wiring-dependent)
+    # Keep false by default; change ONLY after wheel direction test.
+    invert_fl: false
+    invert_rl: false
+    invert_fr: false
+    invert_rr: false
+
+    # -------------------------------------------------------------------------
+    # Optional physically-scaled limits (future-ready)
+    # -------------------------------------------------------------------------
+    # These are not required by current normalized base_driver execution,
+    # but they are useful for future planners/controllers and validation.
+    use_physical_limits: false
+    max_linear_x_mps: 0.50
+    max_linear_y_mps: 0.40
+    max_angular_z_radps: 1.50
+
+    # -------------------------------------------------------------------------
+    # Encoder / odometry related placeholders (future 4-encoder upgrade)
+    # -------------------------------------------------------------------------
+    # Current rear-encoder-only baseline can still reuse these fields for consistency.
+    encoder_cpr: 20
+    encoder_decoding: 4
+    gearbox_ratio: 1.0
+
+    # For future full mecanum odom:
+    # "approx_rear_diff"   = current staged localization baseline (rear encoders only)
+    # "full_mecanum_4enc"  = future after 2 extra encoders installed
+    odom_model_mode: "approx_rear_diff"
+
+    # -------------------------------------------------------------------------
+    # Validation / diagnostics metadata
+    # -------------------------------------------------------------------------
+    robot_name: "Robot Savo"
+    convention_name: "robot_savo_default"
+    notes: "Canonical mecanum kinematics config for savo_base; aligned with current teleop/base_driver signs and staged localization baseline."
