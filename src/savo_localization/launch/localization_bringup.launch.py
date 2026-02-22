@@ -28,7 +28,7 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, LogInfo, LogWarning
+from launch.actions import DeclareLaunchArgument, LogInfo
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
@@ -236,18 +236,18 @@ def generate_launch_description() -> LaunchDescription:
     ld.add_action(LogInfo(msg=["[savo_localization] encoders_yaml: ", encoders_yaml]))
     ld.add_action(LogInfo(msg=["[savo_localization] ekf_yaml: ", ekf_yaml]))
 
-    # Warnings for common misconfiguration
-    ld.add_action(LogWarning(
+    # Warnings for common misconfiguration (use LogInfo with warning prefix for Jazzy compatibility)
+    ld.add_action(LogInfo(
         condition=IfCondition(PythonExpression([
-            "('", use_wheel_odom, "' == 'true') and ('", use_wheel_odom_fallback, "' == 'true')"
+            use_wheel_odom, " == 'true' and ", use_wheel_odom_fallback, " == 'true'"
         ])),
         msg="[savo_localization] WARNING: use_wheel_odom and use_wheel_odom_fallback are both true. "
             "This may create duplicate /wheel/odom publishers. Enable only one.",
     ))
 
-    ld.add_action(LogWarning(
+    ld.add_action(LogInfo(
         condition=IfCondition(PythonExpression([
-            "('", use_ekf, "' == 'true') and ('", wheel_odom_publish_tf, "' == 'true')"
+            use_ekf, " == 'true' and ", wheel_odom_publish_tf, " == 'true'"
         ])),
         msg="[savo_localization] WARNING: EKF is enabled while wheel_odom_publish_tf=true. "
             "This can cause duplicate TF (odom->base_link). Recommended: wheel_odom_publish_tf:=false.",
