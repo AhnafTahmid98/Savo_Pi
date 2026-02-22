@@ -1,0 +1,55 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>savo_control</name>
+  <version>0.1.0</version>
+
+  <description>
+    Robot Savo control layer (hybrid C++ + Python) for command multiplexing,
+    velocity shaping, PID-based motion control, autonomous control tests,
+    and local recovery primitives (stuck detection / backup escape) before full Nav2 integration.
+  </description>
+
+  <maintainer email="tahmidahnaf998@gmail.com">Ahnaf Tahmid</maintainer>
+  <license>Proprietary</license>
+
+  <!-- Build tools (hybrid ament_cmake + ament_python package) -->
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_cmake_python</buildtool_depend>
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <!-- Core ROS 2 dependencies -->
+  <depend>rclcpp</depend>
+  <depend>rclpy</depend>
+
+  <!-- Messages -->
+  <depend>std_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>builtin_interfaces</depend>
+
+  <!-- Project custom messages (future/current control status integration) -->
+  <depend>savo_msgs</depend>
+
+  <!-- TF / transforms (add now for planned heading/control math integration) -->
+  <depend>tf2</depend>
+  <depend>tf2_ros</depend>
+  <depend>tf2_geometry_msgs</depend>
+
+  <!-- Launch -->
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+
+  <!-- Python runtime packaging -->
+  <exec_depend>python3-setuptools</exec_depend>
+
+  <!-- Testing / lint -->
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+  <test_depend>ament_cmake_gtest</test_depend>
+  <test_depend>ament_cmake_pytest</test_depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

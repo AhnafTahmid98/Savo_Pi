@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 
 """
-Robot Savo — Localization Dashboard (ROS2 Jazzy) [v2.1 Professional]
----------------------------------------------------------------------
+Robot Savo — Localization Dashboard (ROS2 Jazzy) [v3.0 Professional | Phase 1 + Phase 2]
+------------------------------------------------------------------------------------------
 Terminal dashboard for localization bringup/debug on the Pi.
 
 Shows live status for:
@@ -13,19 +13,24 @@ Shows live status for:
 - /cmd_vel_safe             (geometry_msgs/Twist) [optional]
 - /safety/stop              (std_msgs/Bool)       [optional]
 
+Phase 1 focus (kept):
+- Topic health + stale detection
+- REAL measured message rate (Hz) per topic from arrival timestamps
+- IMU / Odom live summaries
+- Motion mode classification
+- Phase 1 sign-check helper (wheel / IMU / EKF hints)
+
+Phase 2 focus (added):
+- Standstill (IDLE) drift monitor for wheel odom / EKF / IMU yaw during current idle segment
+- Phase 2 soft quality hints (direction/timing/stationary health overview)
+- Explicit "real Hz" display emphasis for IMU / wheel odom / EKF
+- Phase 2 readiness snapshot (soft diagnostic, not hard pass/fail)
+
 Features:
 - Curses terminal UI
-- Stale detection per topic
-- Message rate estimate (dashboard sampling rate)
-- IMU / Odom live summaries
-- IMU inferred motion state (STATIONARY / MOVING / ROTATING)
-- Motion mode classification (IDLE / FORWARD / REVERSE / STRAFE_LEFT / STRAFE_RIGHT / TURN_CW / TURN_CCW / MIXED)
-  using odom/cmd_vel/IMU fallbacks
-- Per-motion-mode IMU statistics in Ctrl+C / q summary
-- Motion mode transition log (recent events)
-- Phase 1 sign-check helper (wheel / IMU / EKF hints)
 - Safe rendering on small terminal windows
 - Exit with Ctrl+C or q
+- Ctrl+C/q summary with global + per-mode stats
 
 Run:
   source /opt/ros/jazzy/setup.bash
@@ -35,7 +40,7 @@ Run:
 Notes:
 - If a topic is not running, it is shown as STALE / no data.
 - This node is read-only (diagnostic only).
-- IMU publisher may be 50 Hz, but dashboard sampling/rendering rate is lower (normal).
+- "real Hz" is measured from message arrival intervals (rolling window), not YAML config.
 """
 
 import math
@@ -46,6 +51,7 @@ import statistics
 from dataclasses import dataclass, field
 from collections import deque, defaultdict
 from typing import Optional, Deque, Dict, Any, Tuple, List, DefaultDict
+
 
 import rclpy
 from rclpy.node import Node
@@ -75,6 +81,10 @@ def fmt_float(x: Optional[float], width: int = 8, prec: int = 3, nan_text: str =
 
 def rad2deg(x: float) -> float:
     return x * 180.0 / math.pi
+
+
+def deg2rad(x: float) -> float:
+    return x * math.pi / 180.0
 
 
 def mean_or_none(seq) -> Optional[float]:
@@ -107,6 +117,23 @@ def quat_to_euler_rpy(x: float, y: float, z: float, w: float) -> Tuple[float, fl
     return roll, pitch, yaw
 
 
+def wrap_angle_rad(a: float) -> float:
+    """Wrap angle to [-pi, pi]."""
+    while a > math.pi:
+        a -= 2.0 * math.pi
+    while a < -math.pi:
+        a += 2.0 * math.pi
+    return a
+
+
+def angle_diff_rad(current: float, reference: float) -> float:
+    return wrap_angle_rad(current - reference)
+
+
+def hypot2(x: float, y: float) -> float:
+    return math.sqrt(x * x + y * y)
+
+
 # ============================================================
 # Topic tracking
 # ============================================================
@@ -117,7 +144,7 @@ class TopicStats:
     stale_timeout_s: float = 0.50
     last_rx_wall_s: Optional[float] = None
     count: int = 0
-    intervals: Deque[float] = field(default_factory=lambda: deque(maxlen=300))
+    intervals: Deque[float] = field(default_factory=lambda: deque(maxlen=300))  # rolling arrival intervals
     first_rx_wall_s: Optional[float] = None
     last_msg_stamp: Optional[Tuple[int, int]] = None  # (sec, nsec)
 
@@ -148,12 +175,53 @@ class TopicStats:
         return age > self.stale_timeout_s
 
     def hz(self) -> Optional[float]:
+        """REAL measured message rate from arrival intervals (rolling window)."""
         if not self.intervals:
             return None
         mean_dt = sum(self.intervals) / len(self.intervals)
         if mean_dt <= 0.0:
             return None
         return 1.0 / mean_dt
+
+
+# ============================================================
+# Phase 2 standstill drift tracking
+# ============================================================
+
+@dataclass
+class IdleDriftTracker:
+    active: bool = False
+    start_wall_s: Optional[float] = None
+
+    # Baselines captured at start of idle segment (if available)
+    wheel_px0: Optional[float] = None
+    wheel_py0: Optional[float] = None
+    wheel_yaw_deg0: Optional[float] = None
+
+    ekf_px0: Optional[float] = None
+    ekf_py0: Optional[float] = None
+    ekf_yaw_deg0: Optional[float] = None
+
+    imu_yaw_deg0: Optional[float] = None
+
+    # Live drift metrics for current idle segment
+    wheel_pos_drift_m: Optional[float] = None
+    wheel_yaw_drift_deg: Optional[float] = None
+    ekf_pos_drift_m: Optional[float] = None
+    ekf_yaw_drift_deg: Optional[float] = None
+    imu_yaw_drift_deg: Optional[float] = None
+
+    # Latest quality status
+    status: str = "n/a"
+    reason: str = "waiting"
+
+    def idle_age_s(self) -> float:
+        if not self.active or self.start_wall_s is None:
+            return 0.0
+        return now_monotonic() - self.start_wall_s
+
+    def reset(self) -> None:
+        self.__dict__.update(IdleDriftTracker().__dict__)
 
 
 # ============================================================
@@ -210,7 +278,6 @@ class LocalizationDashboardNode(Node):
         self.declare_parameter("motion_lin_deadband_m_s", 0.03)    # for vx/vy
         self.declare_parameter("motion_ang_deadband_rad_s", 0.08)  # for wz
         self.declare_parameter("motion_mix_allow_ratio", 1.8)
-        # For localization testing, EKF/wheel-first is usually more meaningful than cmd_vel-first.
         self.declare_parameter("motion_source_preference", "ekf_then_wheel_then_cmd")
 
         # -------------------------
@@ -219,6 +286,21 @@ class LocalizationDashboardNode(Node):
         self.declare_parameter("phase1_sign_checks_enabled", True)
         self.declare_parameter("phase1_sign_check_deadband_vx", 0.03)
         self.declare_parameter("phase1_sign_check_deadband_wz", 0.08)
+
+        # -------------------------
+        # Parameters: Phase 2 soft checks (standstill drift)
+        # -------------------------
+        self.declare_parameter("phase2_enabled", True)
+        self.declare_parameter("phase2_idle_min_eval_s", 5.0)
+
+        # "Warn" vs "Fail" are soft guidance thresholds for current IDLE segment
+        self.declare_parameter("phase2_idle_warn_ekf_pos_drift_m", 0.05)
+        self.declare_parameter("phase2_idle_fail_ekf_pos_drift_m", 0.15)
+        self.declare_parameter("phase2_idle_warn_ekf_yaw_drift_deg", 5.0)
+        self.declare_parameter("phase2_idle_fail_ekf_yaw_drift_deg", 20.0)
+
+        self.declare_parameter("phase2_idle_warn_imu_yaw_drift_deg", 8.0)
+        self.declare_parameter("phase2_idle_fail_imu_yaw_drift_deg", 30.0)
 
         # -------------------------
         # Read params
@@ -244,6 +326,15 @@ class LocalizationDashboardNode(Node):
         self.phase1_sign_checks_enabled = bool(self.get_parameter("phase1_sign_checks_enabled").value)
         self.phase1_vx_deadband = float(self.get_parameter("phase1_sign_check_deadband_vx").value)
         self.phase1_wz_deadband = float(self.get_parameter("phase1_sign_check_deadband_wz").value)
+
+        self.phase2_enabled = bool(self.get_parameter("phase2_enabled").value)
+        self.phase2_idle_min_eval_s = float(self.get_parameter("phase2_idle_min_eval_s").value)
+        self.phase2_idle_warn_ekf_pos_drift_m = float(self.get_parameter("phase2_idle_warn_ekf_pos_drift_m").value)
+        self.phase2_idle_fail_ekf_pos_drift_m = float(self.get_parameter("phase2_idle_fail_ekf_pos_drift_m").value)
+        self.phase2_idle_warn_ekf_yaw_drift_deg = float(self.get_parameter("phase2_idle_warn_ekf_yaw_drift_deg").value)
+        self.phase2_idle_fail_ekf_yaw_drift_deg = float(self.get_parameter("phase2_idle_fail_ekf_yaw_drift_deg").value)
+        self.phase2_idle_warn_imu_yaw_drift_deg = float(self.get_parameter("phase2_idle_warn_imu_yaw_drift_deg").value)
+        self.phase2_idle_fail_imu_yaw_drift_deg = float(self.get_parameter("phase2_idle_fail_imu_yaw_drift_deg").value)
 
         # -------------------------
         # Topic stats
@@ -313,15 +404,16 @@ class LocalizationDashboardNode(Node):
             "ekf_wz": "waiting",
         }
 
+        # -------------------------
+        # Phase 2 standstill drift tracker + readiness summary
+        # -------------------------
+        self.phase2_idle = IdleDriftTracker()
+        self.phase2_readiness_status: str = "n/a"
+        self.phase2_readiness_reason: str = "waiting"
+
         # Per-mode IMU stats
         self.imu_mode_stats: DefaultDict[str, Dict[str, List[float]]] = defaultdict(
-            lambda: {
-                "gz": [],
-                "acc_norm": [],
-                "ax": [],
-                "ay": [],
-                "az": [],
-            }
+            lambda: {"gz": [], "acc_norm": [], "ax": [], "ay": [], "az": []}
         )
 
         # Build QoS profiles
@@ -344,7 +436,7 @@ class LocalizationDashboardNode(Node):
             "[localization_dashboard] started | "
             f"imu={self.imu_topic}, wheel={self.wheel_odom_topic}, ekf={self.ekf_odom_topic}, "
             f"cmd={self.cmd_vel_topic}, stop={self.safety_stop_topic}, compact_mode={self.compact_mode}, "
-            f"motion_source_preference={self.motion_source_preference}"
+            f"motion_source_preference={self.motion_source_preference}, phase2_enabled={self.phase2_enabled}"
         )
 
     # --------------------------------------------------------
@@ -403,7 +495,7 @@ class LocalizationDashboardNode(Node):
             "motion_mode_reason": self.current_motion_reason,
         }
 
-        # Global histories
+        # Histories
         self.imu_gyro_z_hist.append(gz)
         self.imu_acc_norm_hist.append(acc_norm)
         self.imu_ax_hist.append(ax)
@@ -419,6 +511,7 @@ class LocalizationDashboardNode(Node):
         self.imu_mode_stats[mode_key]["az"].append(az)
 
         self._update_phase1_sign_checks()
+        self._update_phase2_idle_monitor()
 
     def cb_wheel_odom(self, msg: Odometry) -> None:
         self.stats["wheel_odom"].on_message(msg.header.stamp.sec, msg.header.stamp.nanosec)
@@ -427,10 +520,10 @@ class LocalizationDashboardNode(Node):
         self.wheel_vy_hist.append(self.wheel_odom_data["vy"])
         self.wheel_wz_hist.append(self.wheel_odom_data["wz"])
 
-        # Keep motion mode responsive even if IMU callback rate changes.
         mode, source, reason = self._classify_motion_mode()
         self._update_motion_mode(mode, source, reason)
         self._update_phase1_sign_checks()
+        self._update_phase2_idle_monitor()
 
     def cb_ekf_odom(self, msg: Odometry) -> None:
         self.stats["ekf_odom"].on_message(msg.header.stamp.sec, msg.header.stamp.nanosec)
@@ -442,6 +535,7 @@ class LocalizationDashboardNode(Node):
         mode, source, reason = self._classify_motion_mode()
         self._update_motion_mode(mode, source, reason)
         self._update_phase1_sign_checks()
+        self._update_phase2_idle_monitor()
 
     def cb_cmd_vel(self, msg: Twist) -> None:
         self.stats["cmd_vel"].on_message()
@@ -455,6 +549,7 @@ class LocalizationDashboardNode(Node):
         }
         mode, source, reason = self._classify_motion_mode()
         self._update_motion_mode(mode, source, reason)
+        self._update_phase2_idle_monitor()
 
     def cb_safety_stop(self, msg: Bool) -> None:
         self.stats["safety_stop"].on_message()
@@ -715,12 +810,209 @@ class LocalizationDashboardNode(Node):
         self._set_sign_check("ekf_wz", st, rs)
 
     # --------------------------------------------------------
+    # Phase 2 soft checks (standstill drift + readiness)
+    # --------------------------------------------------------
+    def _update_phase2_idle_monitor(self) -> None:
+        if not self.phase2_enabled:
+            self.phase2_readiness_status = "n/a"
+            self.phase2_readiness_reason = "phase2 disabled"
+            return
+
+        mode = self.current_motion_mode
+
+        # Start/reset IDLE segment tracking on transitions
+        if mode != "IDLE":
+            if self.phase2_idle.active:
+                self.phase2_idle.status = "n/a"
+                self.phase2_idle.reason = "left IDLE"
+            self.phase2_idle.reset()
+            self._update_phase2_readiness()
+            return
+
+        # mode == IDLE
+        if not self.phase2_idle.active:
+            self.phase2_idle.active = True
+            self.phase2_idle.start_wall_s = now_monotonic()
+            # Capture baselines if available
+            if self.wheel_odom_data:
+                self.phase2_idle.wheel_px0 = self.wheel_odom_data.get("px")
+                self.phase2_idle.wheel_py0 = self.wheel_odom_data.get("py")
+                self.phase2_idle.wheel_yaw_deg0 = self.wheel_odom_data.get("yaw_deg")
+            if self.ekf_odom_data:
+                self.phase2_idle.ekf_px0 = self.ekf_odom_data.get("px")
+                self.phase2_idle.ekf_py0 = self.ekf_odom_data.get("py")
+                self.phase2_idle.ekf_yaw_deg0 = self.ekf_odom_data.get("yaw_deg")
+            if self.imu_data:
+                self.phase2_idle.imu_yaw_deg0 = self.imu_data.get("yaw_deg")
+
+            self.phase2_idle.status = "WARMUP"
+            self.phase2_idle.reason = "captured IDLE baseline"
+            self._update_phase2_readiness()
+            return
+
+        # Update live drift metrics during IDLE
+        if self.wheel_odom_data and self.phase2_idle.wheel_px0 is not None and self.phase2_idle.wheel_py0 is not None:
+            px = self.wheel_odom_data.get("px")
+            py = self.wheel_odom_data.get("py")
+            if isinstance(px, (int, float)) and isinstance(py, (int, float)):
+                self.phase2_idle.wheel_pos_drift_m = hypot2(px - self.phase2_idle.wheel_px0, py - self.phase2_idle.wheel_py0)
+
+        if self.wheel_odom_data and self.phase2_idle.wheel_yaw_deg0 is not None:
+            yawd = self.wheel_odom_data.get("yaw_deg")
+            if isinstance(yawd, (int, float)) and not math.isnan(yawd):
+                d = angle_diff_rad(deg2rad(yawd), deg2rad(self.phase2_idle.wheel_yaw_deg0))
+                self.phase2_idle.wheel_yaw_drift_deg = abs(rad2deg(d))
+
+        if self.ekf_odom_data and self.phase2_idle.ekf_px0 is not None and self.phase2_idle.ekf_py0 is not None:
+            px = self.ekf_odom_data.get("px")
+            py = self.ekf_odom_data.get("py")
+            if isinstance(px, (int, float)) and isinstance(py, (int, float)):
+                self.phase2_idle.ekf_pos_drift_m = hypot2(px - self.phase2_idle.ekf_px0, py - self.phase2_idle.ekf_py0)
+
+        if self.ekf_odom_data and self.phase2_idle.ekf_yaw_deg0 is not None:
+            yawd = self.ekf_odom_data.get("yaw_deg")
+            if isinstance(yawd, (int, float)) and not math.isnan(yawd):
+                d = angle_diff_rad(deg2rad(yawd), deg2rad(self.phase2_idle.ekf_yaw_deg0))
+                self.phase2_idle.ekf_yaw_drift_deg = abs(rad2deg(d))
+
+        if self.imu_data and self.phase2_idle.imu_yaw_deg0 is not None:
+            yawd = self.imu_data.get("yaw_deg")
+            if isinstance(yawd, (int, float)) and not math.isnan(yawd):
+                d = angle_diff_rad(deg2rad(yawd), deg2rad(self.phase2_idle.imu_yaw_deg0))
+                self.phase2_idle.imu_yaw_drift_deg = abs(rad2deg(d))
+
+        idle_age = self.phase2_idle.idle_age_s()
+        if idle_age < self.phase2_idle_min_eval_s:
+            self.phase2_idle.status = "WARMUP"
+            self.phase2_idle.reason = f"IDLE {idle_age:.1f}s < eval {self.phase2_idle_min_eval_s:.1f}s"
+            self._update_phase2_readiness()
+            return
+
+        # Soft evaluation (prefer EKF metrics, IMU yaw as supporting indicator)
+        status = "OK"
+        reasons = []
+
+        # EKF position drift
+        ep = self.phase2_idle.ekf_pos_drift_m
+        if ep is not None:
+            if ep >= self.phase2_idle_fail_ekf_pos_drift_m:
+                status = "FAIL"
+                reasons.append(f"EKF pos drift {ep:.3f}m >= fail {self.phase2_idle_fail_ekf_pos_drift_m:.3f}")
+            elif ep >= self.phase2_idle_warn_ekf_pos_drift_m and status != "FAIL":
+                status = "WARN"
+                reasons.append(f"EKF pos drift {ep:.3f}m >= warn {self.phase2_idle_warn_ekf_pos_drift_m:.3f}")
+        else:
+            reasons.append("EKF pos drift n/a")
+
+        # EKF yaw drift
+        ey = self.phase2_idle.ekf_yaw_drift_deg
+        if ey is not None:
+            if ey >= self.phase2_idle_fail_ekf_yaw_drift_deg:
+                status = "FAIL"
+                reasons.append(f"EKF yaw drift {ey:.1f}deg >= fail {self.phase2_idle_fail_ekf_yaw_drift_deg:.1f}")
+            elif ey >= self.phase2_idle_warn_ekf_yaw_drift_deg and status != "FAIL":
+                status = "WARN"
+                reasons.append(f"EKF yaw drift {ey:.1f}deg >= warn {self.phase2_idle_warn_ekf_yaw_drift_deg:.1f}")
+        else:
+            reasons.append("EKF yaw drift n/a")
+
+        # IMU yaw drift (supporting signal only)
+        iy = self.phase2_idle.imu_yaw_drift_deg
+        if iy is not None:
+            if iy >= self.phase2_idle_fail_imu_yaw_drift_deg:
+                status = "FAIL"
+                reasons.append(f"IMU yaw drift {iy:.1f}deg >= fail {self.phase2_idle_fail_imu_yaw_drift_deg:.1f}")
+            elif iy >= self.phase2_idle_warn_imu_yaw_drift_deg and status != "FAIL":
+                if status == "OK":
+                    status = "WARN"
+                reasons.append(f"IMU yaw drift {iy:.1f}deg >= warn {self.phase2_idle_warn_imu_yaw_drift_deg:.1f}")
+
+        # Timing/staleness on key streams also affects Phase 2 readiness
+        key_stale = []
+        for key in ("imu", "wheel_odom", "ekf_odom"):
+            if self.stats[key].is_stale():
+                key_stale.append(key)
+        if key_stale:
+            status = "FAIL" if "ekf_odom" in key_stale else ("WARN" if status != "FAIL" else status)
+            reasons.append("stale: " + ",".join(key_stale))
+
+        self.phase2_idle.status = status
+        self.phase2_idle.reason = " | ".join(reasons) if reasons else "IDLE drift looks acceptable"
+        self._update_phase2_readiness()
+
+    def _update_phase2_readiness(self) -> None:
+        # Soft overall "Phase 2 now" summary (not strict automation)
+        if not self.phase2_enabled:
+            self.phase2_readiness_status = "n/a"
+            self.phase2_readiness_reason = "phase2 disabled"
+            return
+
+        # Basic topic health first
+        core_missing = []
+        for key in ("imu", "wheel_odom", "ekf_odom"):
+            if self.stats[key].count <= 0:
+                core_missing.append(key)
+        if core_missing:
+            self.phase2_readiness_status = "WAIT"
+            self.phase2_readiness_reason = "no data: " + ",".join(core_missing)
+            return
+
+        core_stale = []
+        for key in ("imu", "wheel_odom", "ekf_odom"):
+            if self.stats[key].is_stale():
+                core_stale.append(key)
+        if core_stale:
+            self.phase2_readiness_status = "FAIL"
+            self.phase2_readiness_reason = "core stale: " + ",".join(core_stale)
+            return
+
+        # Motion sign check failures are real blockers
+        if any(self.phase1_sign_status.get(k) == "FAIL" for k in ("wheel_vx", "wheel_wz", "imu_gz", "ekf_vx", "ekf_wz")):
+            self.phase2_readiness_status = "FAIL"
+            self.phase2_readiness_reason = "Phase1 sign FAIL present"
+            return
+
+        # Idle drift status if currently idle and warmed up
+        if self.current_motion_mode == "IDLE":
+            idle_status = self.phase2_idle.status
+            if idle_status == "FAIL":
+                self.phase2_readiness_status = "FAIL"
+                self.phase2_readiness_reason = f"IDLE drift fail: {self.phase2_idle.reason}"
+                return
+            if idle_status in ("WARN", "WARMUP"):
+                self.phase2_readiness_status = "WARN"
+                self.phase2_readiness_reason = f"IDLE drift {idle_status.lower()}: {self.phase2_idle.reason}"
+                return
+
+        # Hz sanity soft check (real measured Hz)
+        hz_issues = []
+        imu_hz = self.stats["imu"].hz()
+        wheel_hz = self.stats["wheel_odom"].hz()
+        ekf_hz = self.stats["ekf_odom"].hz()
+
+        # Very gentle minimums (just to catch obvious runtime problems)
+        if imu_hz is not None and imu_hz < 5.0:
+            hz_issues.append(f"imu {imu_hz:.1f}Hz")
+        if wheel_hz is not None and wheel_hz < 3.0:
+            hz_issues.append(f"wheel {wheel_hz:.1f}Hz")
+        if ekf_hz is not None and ekf_hz < 3.0:
+            hz_issues.append(f"ekf {ekf_hz:.1f}Hz")
+
+        if hz_issues:
+            self.phase2_readiness_status = "WARN"
+            self.phase2_readiness_reason = "low real Hz: " + ", ".join(hz_issues)
+            return
+
+        self.phase2_readiness_status = "OK"
+        self.phase2_readiness_reason = "core topics fresh, no sign FAIL, no obvious Phase2 blockers"
+
+    # --------------------------------------------------------
     # Summary printing
     # --------------------------------------------------------
     def print_summary(self) -> None:
-        print("\n" + "=" * 92)
-        print("Robot Savo — Localization Dashboard Summary")
-        print("=" * 92)
+        print("\n" + "=" * 100)
+        print("Robot Savo — Localization Dashboard Summary (Phase 1 + Phase 2)")
+        print("=" * 100)
         up = now_monotonic() - self._start_wall
         print(f"Uptime: {up:.1f} s\n")
 
@@ -730,7 +1022,7 @@ class LocalizationDashboardNode(Node):
             age = st.age_s()
             print(f"{st.name}")
             print(f"  Messages: {st.count}")
-            print(f"  Rate:     {hz:.2f} Hz" if hz is not None else "  Rate:     n/a")
+            print(f"  REAL rate (arrival): {hz:.2f} Hz" if hz is not None else "  REAL rate (arrival): n/a")
             print(f"  Last age: {age:.3f} s" if age is not None else "  Last age: n/a")
             print(f"  Stale:    {'YES' if st.is_stale() else 'NO'}")
             print("")
@@ -770,17 +1062,20 @@ class LocalizationDashboardNode(Node):
         for k in ["wheel_vx", "wheel_wz", "imu_gz", "ekf_vx", "ekf_wz"]:
             print(f"  {k:<9}: {self.phase1_sign_status.get(k, 'n/a'):<5}  {self.phase1_sign_reason.get(k, '')}")
 
+        print("\nLatest Phase 2 soft checks:")
+        print(f"  readiness: {self.phase2_readiness_status}  ({self.phase2_readiness_reason})")
+        print(f"  idle drift: {self.phase2_idle.status}  ({self.phase2_idle.reason})")
+        print(f"  idle age:   {self.phase2_idle.idle_age_s():.1f} s")
+        print(f"    wheel pos drift [m]: {self.phase2_idle.wheel_pos_drift_m}")
+        print(f"    wheel yaw drift [deg]: {self.phase2_idle.wheel_yaw_drift_deg}")
+        print(f"    ekf pos drift [m]: {self.phase2_idle.ekf_pos_drift_m}")
+        print(f"    ekf yaw drift [deg]: {self.phase2_idle.ekf_yaw_drift_deg}")
+        print(f"    imu yaw drift [deg]: {self.phase2_idle.imu_yaw_drift_deg}")
+
         print("\nPer-motion-mode IMU summaries (grouped by classified mode)")
         mode_order = [
-            "IDLE",
-            "FORWARD",
-            "REVERSE",
-            "STRAFE_LEFT",
-            "STRAFE_RIGHT",
-            "TURN_CCW",
-            "TURN_CW",
-            "MIXED",
-            "NO_DATA",
+            "IDLE", "FORWARD", "REVERSE", "STRAFE_LEFT", "STRAFE_RIGHT",
+            "TURN_CCW", "TURN_CW", "MIXED", "NO_DATA"
         ]
         all_modes = set(self.imu_mode_stats.keys())
         ordered_modes = [m for m in mode_order if m in all_modes] + sorted(all_modes - set(mode_order))
@@ -824,7 +1119,7 @@ class LocalizationDashboardNode(Node):
             for line in self.motion_transition_log:
                 print(f"  {line}")
 
-        print("=" * 92 + "\n")
+        print("=" * 100 + "\n")
 
 
 # ============================================================
@@ -852,12 +1147,21 @@ class CursesUI:
         state = "STALE" if st.is_stale() else "OK"
         hz_str = f"{hz:6.2f}Hz" if hz is not None else "   n/a "
         age_str = f"{age:5.2f}s" if age is not None else "  n/a "
-        return f"{label:<14} [{state:^5}]  rate={hz_str}  age={age_str}  count={st.count}"
+        return f"{label:<14} [{state:^5}]  real_hz={hz_str}  age={age_str}  count={st.count}"
 
     def _phase1_status_line(self, key: str, label: str) -> str:
         st = self.node.phase1_sign_status.get(key, "n/a")
         rs = self.node.phase1_sign_reason.get(key, "")
         return f"{label:<10} [{st:^5}]  {rs}"
+
+    def _phase2_idle_line(self) -> str:
+        it = self.node.phase2_idle
+        return (
+            f"IDLE drift [{it.status:^6}]  idle_age={it.idle_age_s():5.1f}s  "
+            f"ekf_pos={fmt_float(it.ekf_pos_drift_m,7,3)}m  "
+            f"ekf_yaw={fmt_float(it.ekf_yaw_drift_deg,7,2)}deg  "
+            f"imu_yaw={fmt_float(it.imu_yaw_drift_deg,7,2)}deg"
+        )
 
     def run(self) -> None:
         curses.wrapper(self._main)
@@ -878,17 +1182,21 @@ class CursesUI:
             stdscr.erase()
             h, w = stdscr.getmaxyx()
 
-            if h < 18 or w < 90:
-                self._safe_addstr(stdscr, 0, 0, "Robot Savo — Localization Dashboard", curses.A_BOLD)
+            if h < 22 or w < 96:
+                self._safe_addstr(stdscr, 0, 0, "Robot Savo — Localization Dashboard (Phase 1 + Phase 2)", curses.A_BOLD)
                 self._safe_addstr(stdscr, 2, 0, f"Terminal too small ({w}x{h}). Please enlarge window.")
-                self._safe_addstr(stdscr, 4, 0, "Minimum recommended: 90 cols x 18 rows")
+                self._safe_addstr(stdscr, 4, 0, "Minimum recommended: 96 cols x 22 rows")
                 self._safe_addstr(stdscr, h - 2, 0, "Press q to quit")
                 stdscr.refresh()
                 time.sleep(0.05)
                 continue
 
             y = 0
-            self._safe_addstr(stdscr, y, 0, "Robot Savo — Localization Dashboard (Phase 1 bringup)  [q to quit]", curses.A_BOLD)
+            self._safe_addstr(
+                stdscr, y, 0,
+                "Robot Savo — Localization Dashboard (Phase 1 + Phase 2)  [q to quit]",
+                curses.A_BOLD
+            )
             y += 1
 
             up = now_monotonic() - self.node._start_wall
@@ -897,7 +1205,7 @@ class CursesUI:
                 y,
                 0,
                 f"Uptime: {up:7.1f}s   Node: {self.node.get_name()}   Compact: {self.node.compact_mode}   "
-                f"MotionSrcPref: {self.node.motion_source_preference}",
+                f"MotionSrcPref: {self.node.motion_source_preference}   Phase2: {self.node.phase2_enabled}",
             )
             y += 1
 
@@ -912,10 +1220,15 @@ class CursesUI:
             )
             y += 1
             self._safe_addstr(stdscr, y, 0, f"Reason: {self.node.current_motion_reason}")
+            y += 1
+            self._safe_addstr(
+                stdscr, y, 0,
+                f"Phase2 readiness: [{self.node.phase2_readiness_status:^5}]  {self.node.phase2_readiness_reason}"
+            )
             y += 2
 
             # Topic health
-            self._safe_addstr(stdscr, y, 0, "Topic Health", curses.A_UNDERLINE)
+            self._safe_addstr(stdscr, y, 0, "Topic Health (REAL measured Hz from arrivals)", curses.A_UNDERLINE)
             y += 1
             self._safe_addstr(stdscr, y, 0, self._topic_status_line("IMU", self.node.stats["imu"])); y += 1
             self._safe_addstr(stdscr, y, 0, self._topic_status_line("Wheel Odom", self.node.stats["wheel_odom"])); y += 1
@@ -932,6 +1245,12 @@ class CursesUI:
             self._safe_addstr(stdscr, y, 0, self._phase1_status_line("ekf_vx",   "ekf.vx"));   y += 1
             self._safe_addstr(stdscr, y, 0, self._phase1_status_line("ekf_wz",   "ekf.wz"));   y += 2
 
+            # Phase 2 soft checks
+            self._safe_addstr(stdscr, y, 0, "Phase 2 Soft Checks (standstill drift + timing)", curses.A_UNDERLINE)
+            y += 1
+            self._safe_addstr(stdscr, y, 0, self._phase2_idle_line()); y += 1
+            self._safe_addstr(stdscr, y, 0, f"IDLE reason: {self.node.phase2_idle.reason}"); y += 2
+
             if self.node.compact_mode:
                 imu = self.node.imu_data
                 wod = self.node.wheel_odom_data
@@ -944,7 +1263,8 @@ class CursesUI:
                         stdscr, y, 0,
                         f"IMU: coarse={imu.get('imu_motion_state','n/a'):<10} "
                         f"mode={imu.get('motion_mode','n/a'):<12} "
-                        f"gz={fmt_float(imu.get('gz'),7,3)}  |a|={fmt_float(imu.get('acc_norm'),7,3)}"
+                        f"gz={fmt_float(imu.get('gz'),7,3)}  |a|={fmt_float(imu.get('acc_norm'),7,3)}  "
+                        f"yaw={fmt_float(imu.get('yaw_deg'),7,2)}deg"
                     )
                 else:
                     self._safe_addstr(stdscr, y, 0, "IMU: no data")
@@ -974,7 +1294,7 @@ class CursesUI:
 
             else:
                 # IMU block
-                if y < h - 8:
+                if y < h - 10:
                     self._safe_addstr(stdscr, y, 0, "IMU (/imu/data)", curses.A_UNDERLINE); y += 1
                     imu = self.node.imu_data
                     if imu:
@@ -1009,7 +1329,7 @@ class CursesUI:
                     y += 1
 
                 # Wheel odom block
-                if y < h - 8:
+                if y < h - 10:
                     self._safe_addstr(stdscr, y, 0, "Wheel Odometry (/wheel/odom)", curses.A_UNDERLINE); y += 1
                     wod = self.node.wheel_odom_data
                     if wod:
@@ -1027,7 +1347,7 @@ class CursesUI:
                     y += 1
 
                 # EKF odom block
-                if y < h - 8:
+                if y < h - 10:
                     self._safe_addstr(stdscr, y, 0, "EKF Odometry (/odometry/filtered)", curses.A_UNDERLINE); y += 1
                     eod = self.node.ekf_odom_data
                     if eod:
@@ -1045,7 +1365,7 @@ class CursesUI:
                     y += 1
 
                 # Motion + safety
-                if y < h - 8:
+                if y < h - 10:
                     self._safe_addstr(stdscr, y, 0, "Motion + Safety", curses.A_UNDERLINE); y += 1
                     cmd = self.node.cmd_vel_data
                     stp = self.node.safety_stop_data
@@ -1065,7 +1385,7 @@ class CursesUI:
                     y += 1
 
                 # Quick per-mode counts
-                if y < h - 6:
+                if y < h - 7:
                     self._safe_addstr(stdscr, y, 0, "Per-mode IMU sample counts (current session)", curses.A_UNDERLINE); y += 1
                     counts_line = []
                     for mode in ["IDLE", "FORWARD", "REVERSE", "STRAFE_LEFT", "STRAFE_RIGHT", "TURN_CCW", "TURN_CW", "MIXED"]:
@@ -1073,8 +1393,8 @@ class CursesUI:
                         counts_line.append(f"{mode}:{n}")
                     self._safe_addstr(stdscr, y, 0, " | ".join(counts_line)); y += 1
 
-            footer1 = "Phase 1 live script: 10s IDLE -> 5s FWD -> 5s REV -> 5s TURN_CCW -> 5s TURN_CW -> q"
-            footer2 = "Verify separately (EKF mode): ros2 run tf2_ros tf2_echo odom base_link"
+            footer1 = "Phase 1+2 flow: sign checks -> standstill drift (IDLE) -> repeatability tests -> optional RViz verify"
+            footer2 = "RViz (optional/late): TF + /wheel/odom + /odometry/filtered    | TF check: ros2 run tf2_ros tf2_echo odom base_link"
             self._safe_addstr(stdscr, h - 3, 0, footer1)
             self._safe_addstr(stdscr, h - 2, 0, footer2)
 
