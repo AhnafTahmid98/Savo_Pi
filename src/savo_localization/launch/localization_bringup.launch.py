@@ -43,7 +43,7 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, LogInfo  # Jazzy-safe (no LogWarning import)
+from launch.actions import DeclareLaunchArgument, LogInfo
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
@@ -104,7 +104,7 @@ def generate_launch_description() -> LaunchDescription:
     # Recommended for normal operation (better performance than Python fallback)
     wheel_odom_node = Node(
         package=pkg,
-        executable="wheel_odom_node",
+        executable="wheel_odom_node",  # C++ binary (correct: no .py)
         name="wheel_odom_node",
         output="screen",
         parameters=[
@@ -122,7 +122,7 @@ def generate_launch_description() -> LaunchDescription:
     # Use only when C++ wheel_odom_node is disabled
     wheel_odom_fallback_node = Node(
         package=pkg,
-        executable="wheel_odom_fallback_node",
+        executable="wheel_odom_fallback_node.py",  # matches installed filename
         name="wheel_odom_fallback_node",
         output="screen",
         parameters=[
@@ -139,7 +139,7 @@ def generate_launch_description() -> LaunchDescription:
     # IMU publisher node (e.g., BNO055): publishes /imu/data
     imu_node = Node(
         package=pkg,
-        executable="imu_node",
+        executable="imu_node.py",  # matches installed filename
         name="imu_node",
         output="screen",
         parameters=[
@@ -168,7 +168,7 @@ def generate_launch_description() -> LaunchDescription:
     # Optional terminal diagnostics dashboard for localization bringup
     localization_dashboard_node = Node(
         package=pkg,
-        executable="localization_dashboard",
+        executable="localization_dashboard.py",  # matches installed filename
         name="localization_dashboard",
         output="screen",
         parameters=[
@@ -281,12 +281,6 @@ def generate_launch_description() -> LaunchDescription:
 
     # -------------------------------------------------------------------------
     # Conditional warning-style logs (Jazzy-safe using LogInfo + condition)
-    #
-    # IMPORTANT:
-    # LaunchConfiguration values are strings. PythonExpression evaluates Python code.
-    # If you compare to bare true/false, you'll get:
-    #   name 'true' is not defined
-    # So we compare quoted strings: "true" / "false".
     # -------------------------------------------------------------------------
 
     # Warning if BOTH wheel odom sources are enabled (duplicate /wheel/odom risk)
