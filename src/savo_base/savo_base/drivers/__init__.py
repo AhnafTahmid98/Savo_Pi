@@ -13,10 +13,10 @@ Purpose
 
 Examples
 --------
-from savo_base.drivers import create_board
+from savo_base.drivers import create_board, make_motor_board
 from savo_base.drivers import FreenoveMecanumBoard, DryRunMotorBoard
 from savo_base.drivers import PCA9685Driver
-from savo_base.drivers import BoardException
+from svo_base.drivers import BoardException
 """
 
 from __future__ import annotations
@@ -67,6 +67,9 @@ from .board_factory import (
     create_robot_savo_default_mecanum_board,
     describe_supported_boards,
 )
+
+# Backward-compatible alias used by older nodes (e.g., base_driver_node)
+make_motor_board = create_board
 
 # =============================================================================
 # Driver / board classes (best-effort imports for evolving codebase)
@@ -179,6 +182,7 @@ def available_driver_symbols() -> dict:
         "DryRunMotorBoard": DryRunMotorBoard is not None,
         "DryRunMecanumBoard": DryRunMecanumBoard is not None,
         "MockMotorBoard": MockMotorBoard is not None,
+        "make_motor_board": make_motor_board is not None,
     }
 
 
@@ -220,6 +224,7 @@ __all__ = [
     "create_pca9685_driver",
     "create_freenove_mecanum_board",
     "create_board",
+    "make_motor_board",  # backward-compatible alias
     "create_robot_savo_default_mecanum_board",
     "describe_supported_boards",
 
