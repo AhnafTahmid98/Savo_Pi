@@ -32,22 +32,28 @@ find_package(savo_msgs REQUIRED)
 # -----------------------------------------------------------------------------
 # Python package install
 # -----------------------------------------------------------------------------
-# Installs the Python package directory:
-#   savo_base/
-# so imports like "from savo_base.drivers ... " work.
 ament_python_install_package(${PROJECT_NAME})
 
 # -----------------------------------------------------------------------------
 # Install Python executables
 # -----------------------------------------------------------------------------
-# Professional split:
-# - ROS nodes are installed via setup.py console_scripts (preferred)
-# - CLI/helper scripts are installed here as raw executables
+# Hybrid-package strategy:
+# - Install ROS node Python files explicitly (reliable for ament_cmake hybrids)
+# - Install CLI/helper scripts explicitly
 install(PROGRAMS
+  # CLI tools (scripts/)
   scripts/teleop_letters_cli.py
   scripts/poke_test_cli.py
   scripts/base_smoke_test_cli.py
   scripts/dump_effective_params.py
+
+  # ROS nodes (savo_base/nodes/)
+  savo_base/nodes/base_driver_node.py
+  savo_base/nodes/base_watchdog_node.py
+  savo_base/nodes/base_state_publisher_node.py
+  savo_base/nodes/base_diag_runner_node.py
+  savo_base/nodes/base_heartbeat_node.py
+
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -61,7 +67,6 @@ install(DIRECTORY
   DESTINATION share/${PROJECT_NAME}
 )
 
-# README is useful in install tree for deployed robot docs/troubleshooting
 install(FILES
   README.md
   package.xml
@@ -71,17 +76,7 @@ install(FILES
 # -----------------------------------------------------------------------------
 # Optional C++ targets (future-ready scaffold)
 # -----------------------------------------------------------------------------
-# Add C++ nodes/libraries here later if needed, e.g.:
-#
-# add_executable(example_cpp_node src/example_cpp_node.cpp)
-# ament_target_dependencies(example_cpp_node
-#   rclcpp
-#   std_msgs
-# )
-# install(TARGETS
-#   example_cpp_node
-#   DESTINATION lib/${PROJECT_NAME}
-# )
+# Add C++ nodes/libraries here later if needed.
 
 # -----------------------------------------------------------------------------
 # Testing / Lint
@@ -90,10 +85,8 @@ if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   ament_lint_auto_find_test_dependencies()
 
-  # Python tests via pytest (works with ament_cmake + ament_python hybrid)
   find_package(ament_cmake_pytest REQUIRED)
 
-  # Add tests only if files exist (safe while scaffolding)
   if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test/test_mecanum_mix.py")
     ament_add_pytest_test(test_mecanum_mix test/test_mecanum_mix.py)
   endif()
