@@ -25,8 +25,9 @@ find_package(diagnostic_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(savo_msgs REQUIRED)
 
-# Launch/runtime helper package used by Python launch/config lookup
-find_package(ament_index_python REQUIRED)
+# NOTE:
+# ament_index_python is a Python runtime package, not a CMake package.
+# Keep it in package.xml / Python imports, but DO NOT find_package() it here.
 
 # -----------------------------------------------------------------------------
 # Python package install
