@@ -1,0 +1,149 @@
+# File: savo_base/config/diagnostics.yaml
+#
+# Robot SAVO — Diagnostics & Helper Nodes Configuration (savo_base)
+# -----------------------------------------------------------------
+# Purpose:
+#   Centralize parameters for ROS helper/monitor/diagnostic nodes used by
+#   `savo_base` bringup and debugging launches.
+#
+# Scope:
+#   - base_watchdog_node
+#   - base_state_publisher_node
+#   - base_heartbeat_node
+#   - base_diag_runner_node
+#
+# Notes:
+#   - This file is NOT for base_driver_node motor/kinematics parameters.
+#   - It is intended to be loaded by launch files such as:
+#       * base_bringup.launch.py
+#       * base_safe_idle.launch.py
+#       * base_teleop_test.launch.py
+#   - Topic names are aligned with the locked Robot Savo safety pipeline:
+#       /cmd_vel_safe
+#       /safety/stop
+#       /safety/slowdown_factor
+
+/base_watchdog_node:
+  ros__parameters:
+    robot_name: "Robot Savo"
+
+    # Command freshness supervision
+    cmd_topic: "/cmd_vel_safe"
+    loop_hz: 20.0
+    publish_hz: 5.0
+    timeout_s: 0.30
+    warn_ratio: 0.70
+
+    # Debounce / rearm behavior
+    trip_debounce_count: 2
+    clear_debounce_count: 2
+    auto_rearm: true
+
+    # Outputs
+    watchdog_state_topic: "/savo_base/watchdog_state"
+    watchdog_trip_topic: "/savo_base/watchdog_trip"
+    publish_trip_topic: true
+
+    # Optional stop request topic (monitor-only by default)
+    publish_stop_request: false
+    stop_request_topic: "/savo_base/watchdog_stop_request"
+
+
+/base_state_publisher_node:
+  ros__parameters:
+    robot_name: "Robot Savo"
+
+    # Inputs to aggregate into a summary/status stream
+    cmd_topic: "/cmd_vel_safe"
+    safety_stop_topic: "/safety/stop"
+    slowdown_topic: "/safety/slowdown_factor"
+    watchdog_topic: "/savo_base/watchdog_state"
+    base_state_topic: "/savo_base/base_state"
+    motor_board_status_topic: "/savo_base/motor_board_status"
+
+    # Enable/disable subscriptions (useful during staged bringup)
+    subscribe_cmd: true
+    subscribe_safety_stop: true
+    subscribe_slowdown: true
+    subscribe_watchdog: true
+    subscribe_base_state: true
+    subscribe_motor_board_status: false
+
+    # Outputs
+    summary_topic: "/savo_base/state_summary"
+    heartbeat_topic: "/savo_base/state_heartbeat"
+
+    # Publish timing
+    publish_hz: 5.0
+    heartbeat_hz: 1.0
+
+    # Staleness thresholds for summary quality flags
+    cmd_stale_s: 0.30
+    safety_stale_s: 0.50
+    watchdog_stale_s: 1.50
+    base_state_stale_s: 1.50
+    motor_board_status_stale_s: 1.50
+
+    # JSON formatting
+    pretty_json: false
+
+
+/base_heartbeat_node:
+  ros__parameters:
+    robot_name: "Robot Savo"
+
+    # Heartbeat outputs
+    heartbeat_topic: "/savo_base/heartbeat"
+    heartbeat_state_topic: "/savo_base/heartbeat_state"
+    heartbeat_hz: 2.0
+    state_publish_hz: 1.0
+    pulse_mode: "toggle"   # e.g. toggle | pulse (depends on node implementation)
+
+    # Optional monitored inputs (for richer heartbeat state)
+    monitor_cmd: true
+    monitor_watchdog_trip: true
+    monitor_watchdog_state: true
+    monitor_base_state: false
+
+    cmd_topic: "/cmd_vel_safe"
+    watchdog_trip_topic: "/savo_base/watchdog_trip"
+    watchdog_state_topic: "/savo_base/watchdog_state"
+    base_state_topic: "/savo_base/base_state"
+
+    # Staleness thresholds for monitored topics
+    cmd_stale_s: 0.30
+    watchdog_trip_stale_s: 1.00
+    watchdog_state_stale_s: 1.50
+    base_state_stale_s: 1.50
+
+    # JSON formatting
+    pretty_json: false
+
+
+/base_diag_runner_node:
+  ros__parameters:
+    robot_name: "Robot Savo"
+
+    # Control topics
+    run_request_topic: "/savo_base/diag/run_request"
+    cancel_request_topic: "/savo_base/diag/cancel_request"
+
+    # State / event outputs
+    state_topic: "/savo_base/diag/state"
+    event_topic: "/savo_base/diag/event"
+    busy_topic: "/savo_base/diag/busy"
+
+    # Runtime behavior
+    state_publish_hz: 2.0
+    default_timeout_s: 20.0
+    max_timeout_s: 120.0
+    terminate_grace_s: 2.0
+
+    # Safety / execution policy
+    allow_parallel_runs: false
+    shell_mode: false
+    capture_output: true
+    max_output_chars: 4000
+
+    # JSON formatting
+    pretty_json: false

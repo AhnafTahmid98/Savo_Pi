@@ -1,148 +1,102 @@
-# Robot SAVO - Real Robot Configuration v1
-# ==========================================================
-# This YAML configuration is intended for the real hardware setup.
-# It defines key parameters for robot performance, safety,
-# and general settings for communication and control.
+# File: savo_base/config/profiles/real_robot_v1.yaml
+#
+# Robot SAVO — Real Robot Profile v1 (savo_base / base_driver_node)
+# ------------------------------------------------------------------
+# Purpose:
+#   Production-oriented real-hardware profile for Robot Savo base_driver_node.
+#   Intended for on-robot driving with Freenove PCA9685 motor board and
+#   upstream safety-gated commands from the perception/control pipeline.
+#
+# Layering (recommended):
+#   1) config/topics.yaml
+#   2) config/safety_timeouts.yaml
+#   3) config/motor_board_freenove.yaml
+#   4) config/mecanum_kinematics.yaml
+#   5) config/profiles/real_robot_v1.yaml   <-- profile overrides last
+#
+# Notes:
+#   - Parameters below match the current `savo_base/nodes/base_driver_node.py`.
+#   - Topics align with locked Robot Savo perception safety contract:
+#       /cmd_vel_safe
+#       /safety/stop
+#       /safety/slowdown_factor
+#   - This profile is for REAL hardware (not dryrun).
 
-# ==========================================================
-# General Robot Settings
-# ==========================================================
-robot_name: "Robot Savo"
-robot_version: "v1"
-node_name: "base_driver_node"
-robot_description: "Mecanum-based indoor navigation robot"
+/base_driver_node:
+  ros__parameters:
 
-# ==========================================================
-# Motion Control Parameters
-# ==========================================================
-motion_control:
-  max_linear_velocity: 1.0  # Max linear velocity in m/s
-  max_angular_velocity: 1.0  # Max angular velocity in rad/s
-  linear_velocity_limit: 0.8  # Operational limit for linear velocity
-  angular_velocity_limit: 0.8  # Operational limit for angular velocity
-  velocity_deadzone: 0.05  # Threshold for zero velocity detection
+    # -------------------------------------------------------------------------
+    # Topics (aligned with Robot Savo stack)
+    # -------------------------------------------------------------------------
+    cmd_topic: "/cmd_vel_safe"
+    safety_stop_topic: "/safety/stop"
+    slowdown_topic: "/safety/slowdown_factor"
+    watchdog_state_topic: "/savo_base/watchdog_state"
+    base_state_topic: "/savo_base/base_state"
 
-# ==========================================================
-# Safety Settings
-# ==========================================================
-safety:
-  emergency_stop:
-    enable: true
-    stop_topic: "/safety/stop"
-    timeout_seconds: 2.0
-  watchdog:
-    enable: true
-    timeout: 0.5  # Seconds before triggering a safety stop
-    reset_interval: 2.0  # How often the watchdog checks the system
-  slowdown_factor:
-    enable: true
-    default: 1.0
-    min: 0.0
-    max: 1.0
-  safety_stop_threshold: 0.28  # Distance (m) from obstacles to trigger stop
+    # -------------------------------------------------------------------------
+    # Safety integrations (keep enabled on real robot)
+    # -------------------------------------------------------------------------
+    use_safety_stop: true
+    use_slowdown_factor: true
 
-# ==========================================================
-# I2C Motor Board Configuration (PCA9685)
-# ==========================================================
-motor_board:
-  i2c_bus: 1
-  pca9685_address: "0x40"
-  pwm_frequency: 50  # Frequency in Hz for PWM control
-  quench_time_ms: 18  # Milliseconds to prevent immediate reversal of motors
+    # Slowdown factor clamp from /safety/slowdown_factor (expected 0.0..1.0)
+    slowdown_default: 1.0
+    slowdown_min: 0.0
+    slowdown_max: 1.0
 
-# ==========================================================
-# Localization and Odometry (savo_localization)
-# ==========================================================
-localization:
-  ekf_topic: "/odometry/filtered"  # Topic for filtered EKF odometry
-  ekf_frame_id: "odom"
-  base_frame_id: "base_link"
-  odom_topic: "/wheel/odom"  # Wheel odometry topic (raw data)
-  imu_topic: "/imu/data"  # IMU topic for sensor fusion
-  imu_frame_id: "imu_link"
-  odom_source: "wheel"  # Choose between "wheel", "lidar", or "fusion" for odometry source
+    # -------------------------------------------------------------------------
+    # Timing / watchdog / status publishing
+    # -------------------------------------------------------------------------
+    # Matches your locked safety timing style across the stack.
+    loop_hz: 30.0
+    watchdog_timeout_s: 0.30
+    publish_status_hz: 2.0
 
-# ==========================================================
-# Perception and Obstacle Detection (savo_perception)
-# ==========================================================
-perception:
-  lidar_topic: "/scan"  # LIDAR topic (using RPLIDAR A1)
-  front_obstacle_topic: "/savo_perception/range/front_ultrasonic_m"
-  left_obstacle_topic: "/savo_perception/range/left_m"
-  right_obstacle_topic: "/savo_perception/range/right_m"
-  safety_stop_threshold: 0.28  # Distance threshold (m) to trigger stop
-  obstacle_safety_buffer: 0.30  # Extra buffer distance to stop robot
+    # -------------------------------------------------------------------------
+    # Command-space limits (Twist clamp before mecanum mixing)
+    # These are normalized limits handled by base_driver_node.
+    # -------------------------------------------------------------------------
+    # Real robot v1: conservative but usable for indoor testing.
+    vx_limit: 0.80
+    vy_limit: 0.70
+    wz_limit: 0.70
 
-  # Depth Camera Integration (RealSense D435)
-  depth_camera:
-    enable: true
-    topic: "/camera/depth/image_rect_raw"  # Depth image topic
-    camera_info_topic: "/camera/depth/camera_info"  # Camera info topic
-    frame_id: "camera_link"
-    depth_scale: 0.001  # Scale factor to convert depth to meters
-    min_depth: 0.2  # Minimum depth threshold (in meters)
-    max_depth: 5.0  # Maximum depth threshold (in meters)
+    # -------------------------------------------------------------------------
+    # Motor output scaling
+    # -------------------------------------------------------------------------
+    # PCA9685 raw range is 0..4095. Robot Savo proven conservative cap is 3000.
+    max_duty: 3000
+    turn_gain: 1.0
 
-# ==========================================================
-# Navigation Control (savo_control)
-# ==========================================================
-control:
-  cmd_vel_topic: "/cmd_vel_safe"  # Final velocity command topic (safe cmd_vel)
-  max_linear_velocity: 1.0  # Max linear velocity for navigation
-  max_angular_velocity: 1.0  # Max angular velocity for navigation
-  speed_limit: 0.8  # Max speed for safety
-  turn_gain: 1.0  # Gain for turning velocity
-  rotate_sign: 1  # Directional sign for rotation
+    # -------------------------------------------------------------------------
+    # Robot Savo command sign conventions (locked/proven)
+    # -------------------------------------------------------------------------
+    forward_sign: -1
+    strafe_sign: 1
+    rotate_sign: 1
 
-# ==========================================================
-# Path Planning and Global Navigation (Nav2)
-# ==========================================================
-nav2:
-  use_nav2: true  # Enable Nav2 navigation stack
-  global_frame: "map"
-  base_frame: "base_link"
-  robot_radius: 0.3  # Robot radius in meters
-  path_planner:
-    global_planner: "NavfnPlanner"
-    local_planner: "DWBPlanner"
-  costmap:
-    robot_radius: 0.3
-    inflation_radius: 0.5
-    observation_sources: "scan"
-    scan_topic: "/scan"  # LIDAR scan topic for costmap
-    # Include depth camera for mapping if necessary
-    depth_camera_enabled: true
-    depth_camera_topic: "/camera/depth/image_rect_raw"
+    # -------------------------------------------------------------------------
+    # Real hardware backend selection (Freenove PCA9685 motor board)
+    # -------------------------------------------------------------------------
+    board_backend: "freenove"
+    board_name: "robot_savo_freenove_mecanum"
+    dryrun: false
 
-# ==========================================================
-# Localization (EKF + Odometry from LIDAR/Wheel Encoders)
-# ==========================================================
-localization_params:
-  ekf_enable: true  # Enable EKF for fusion of wheel odometry and IMU/LIDAR
-  ekf_covariance: 0.1  # EKF covariance for better state estimation
-  wheel_odom_topic: "/wheel/odom"  # Topic for wheel odometry
-  lidar_odom_topic: "/lidar/odom"  # Topic for LIDAR-based odometry (if applicable)
+    # -------------------------------------------------------------------------
+    # Freenove / PCA9685 hardware settings (locked Robot Savo defaults)
+    # -------------------------------------------------------------------------
+    i2c_bus: 1
+    pca9685_addr: "0x40"
+    pwm_freq_hz: 50.0
+    quench_ms: 18
 
-# ==========================================================
-# Control Loop Parameters
-# ==========================================================
-control_loop:
-  loop_frequency: 30.0  # Control loop frequency (Hz)
-  safety_timeout: 0.5  # Safety timeout before emergency stop
-  max_velocity: 1.0  # Maximum velocity for the robot
-
-# ==========================================================
-# Debugging and Diagnostics
-# ==========================================================
-diagnostics:
-  enable_diagnostics: true
-  diagnostic_topic: "/robot_savo/diagnostics"
-  heartbeat_topic: "/savo_base/heartbeat"
-  motor_status_topic: "/savo_base/motor_board_status"
-
-# ==========================================================
-# Logging and Telemetry
-# ==========================================================
-logging:
-  log_level: "INFO"  # Log level (DEBUG, INFO, WARN, ERROR)
-  log_topic: "/robot_savo/logs"
+    # -------------------------------------------------------------------------
+    # Per-wheel inversion flags
+    # Keep false unless wheel_direction_check confirms one wheel needs inversion.
+    # Wheel order: FL, RL, FR, RR
+    # -------------------------------------------------------------------------
+    invert_fl: false
+    invert_rl: false
+    invert_fr: false
+    invert_rr: false

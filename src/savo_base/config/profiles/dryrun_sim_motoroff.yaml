@@ -1,0 +1,103 @@
+# File: savo_base/config/profiles/dryrun_sim_motoroff.yaml
+#
+# Robot SAVO — Dryrun Simulation (Motor-Off) Profile
+# --------------------------------------------------
+# Purpose:
+#   Software-only validation profile for base_driver_node with zero motor output.
+#
+# Use this profile when you want to test:
+#   - parameter loading / layered YAML overrides
+#   - /cmd_vel_safe subscription path
+#   - /safety/stop and /safety/slowdown_factor integration
+#   - watchdog behavior (stale command -> stop)
+#   - base state / watchdog state publishing
+#   - launch wiring and topic contracts
+#
+# WITHOUT:
+#   - touching real I2C hardware
+#   - sending any non-zero PWM-equivalent output
+#
+# Safety strategy:
+#   - dryrun backend enabled (no real motor board access)
+#   - max_duty = 0 (motor-off guarantee even in dryrun command path)
+#   - conservative limits and normal safety topics kept enabled
+#
+# Parameter compatibility:
+#   - Matches current `savo_base/nodes/base_driver_node.py` declared parameters.
+
+ /base_driver_node:
+  ros__parameters:
+
+    # -------------------------------------------------------------------------
+    # Topics (aligned with locked Robot Savo stack)
+    # -------------------------------------------------------------------------
+    cmd_topic: "/cmd_vel_safe"
+    safety_stop_topic: "/safety/stop"
+    slowdown_topic: "/safety/slowdown_factor"
+    watchdog_state_topic: "/savo_base/watchdog_state"
+    base_state_topic: "/savo_base/base_state"
+
+    # -------------------------------------------------------------------------
+    # Safety integrations (keep ON to validate end-to-end behavior)
+    # -------------------------------------------------------------------------
+    use_safety_stop: true
+    use_slowdown_factor: true
+
+    # slowdown_factor input clamp
+    slowdown_default: 1.0
+    slowdown_min: 0.0
+    slowdown_max: 1.0
+
+    # -------------------------------------------------------------------------
+    # Control loop / watchdog / status publishing
+    # -------------------------------------------------------------------------
+    # Keep rates moderate for readable logs and stable dryrun testing.
+    loop_hz: 20.0
+    watchdog_timeout_s: 0.25
+    publish_status_hz: 2.0
+
+    # -------------------------------------------------------------------------
+    # Command-space limits (normalized clamp before mixing)
+    # These still matter for logic-path testing even though motors are OFF.
+    # -------------------------------------------------------------------------
+    vx_limit: 0.50
+    vy_limit: 0.50
+    wz_limit: 0.50
+
+    # -------------------------------------------------------------------------
+    # Motor output scaling
+    # Motor-OFF guarantee: force no PWM-equivalent command output.
+    # -------------------------------------------------------------------------
+    max_duty: 0
+    turn_gain: 1.0
+
+    # -------------------------------------------------------------------------
+    # Robot Savo canonical command signs
+    # -------------------------------------------------------------------------
+    forward_sign: -1
+    strafe_sign: 1
+    rotate_sign: 1
+
+    # -------------------------------------------------------------------------
+    # Backend selection (software-only)
+    # -------------------------------------------------------------------------
+    board_backend: "dryrun"
+    board_name: "robot_savo_freenove_mecanum_dryrun_motoroff"
+    dryrun: true
+
+    # -------------------------------------------------------------------------
+    # Hardware fields retained for contract completeness / layered compatibility
+    # (unused by dryrun backend, but kept valid and documented)
+    # -------------------------------------------------------------------------
+    i2c_bus: 1
+    pca9685_addr: "0x40"
+    pwm_freq_hz: 50.0
+    quench_ms: 18
+
+    # -------------------------------------------------------------------------
+    # Per-wheel inversion flags (canonical defaults)
+    # -------------------------------------------------------------------------
+    invert_fl: false
+    invert_rl: false
+    invert_fr: false
+    invert_rr: false
