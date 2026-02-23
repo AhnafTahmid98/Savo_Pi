@@ -12,8 +12,8 @@ Purpose:
     * setup.cfg       -> places console_scripts into lib/savo_base
 
 Layout note:
-- CLI tools are currently kept in `scripts/` and installed by CMakeLists.txt
-  (install(PROGRAMS ...)).
+- CLI tools are kept in `scripts/` and installed by CMakeLists.txt
+  via install(PROGRAMS ...).
 - ROS nodes live in `savo_base/nodes/` and are exposed here via console_scripts.
 
 Package role:
@@ -21,14 +21,15 @@ Package role:
   (motor board driver, mecanum kinematics, watchdog/safety, base state/diagnostics).
 """
 
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 package_name = "savo_base"
 
 setup(
     name=package_name,
     version="0.0.1",
-    packages=find_packages(exclude=["test", "test.*"]),
+    packages=find_packages(exclude=("test", "test.*")),
+    include_package_data=True,
     data_files=[
         # ament index resource (required for ROS 2 package discovery)
         ("share/ament_index/resource_index/packages", [f"resource/{package_name}"]),
