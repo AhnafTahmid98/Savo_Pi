@@ -72,9 +72,7 @@ SUPPORTED_BOARD_TYPES: Tuple[str, ...] = (
 # =============================================================================
 @dataclass(frozen=True)
 class PCA9685FactoryConfig:
-    """
-    Factory config for creating a PCA9685 driver instance.
-    """
+    """Factory config for creating a PCA9685 driver instance."""
     i2c_bus: int = 1
     address: int = 0x40
     debug: bool = False
@@ -90,16 +88,11 @@ class FreenoveMecanumFactoryConfig:
     i2c_bus: int = 1
     address: int = 0x40
     pwm_freq_hz: float = 50.0
-
-    # Robot Savo proven wheel invert defaults usually start as +1/+1/+1/+1;
-    # final runtime command may still pass --invert-* flags.
-    wheel_inverts: Tuple[int, int, int, int] = (+1, +1, +1, +1)
-
+    wheel_inverts: Tuple[int, int, int, int] = (+1, +1, +1, +1)  # (FL, RL, FR, RR)
     quench_ms: int = 18
     max_duty: int = 3000
     debug: bool = False
-
-    # Future-safe extension storage (ignored by factory unless needed)
+    # Future-safe extension storage (ignored by current strict constructor attempts)
     extra: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -116,7 +109,7 @@ def _normalize_board_type(board_type: str) -> str:
         "mecanum": BOARD_TYPE_FREENOVE_MECANUM,
         "mecanum_board": BOARD_TYPE_FREENOVE_MECANUM,
         "robot_savo_freenove_mecanum": BOARD_TYPE_FREENOVE_MECANUM,
-        "robot_savo_freenove_mecanum_dryrun_motoroff": BOARD_TYPE_FREENOVE_MECANUM,  # profile name safety
+        "robot_savo_freenove_mecanum_dryrun_motoroff": BOARD_TYPE_FREENOVE_MECANUM,  # profile safety alias
     }
     return aliases.get(bt, bt)
 
@@ -136,9 +129,7 @@ def _require_float(name: str, value: Any) -> float:
 
 
 def _parse_i2c_address(value: Any) -> int:
-    """
-    Accept int or string forms like '0x40' / '64'.
-    """
+    """Accept int or string forms like '0x40' / '64'."""
     if isinstance(value, str):
         s = value.strip().lower()
         try:
@@ -164,8 +155,9 @@ def _validate_i2c_address(address: int) -> int:
 
 def _validate_sign_tuple4(name: str, values: Any) -> Tuple[int, int, int, int]:
     if not isinstance(values, (tuple, list)):
-        raise BoardConfigError(f"{name} must be a 4-item tuple/list of +/-1, got {type(values).__name__}")
-
+        raise BoardConfigError(
+            f"{name} must be a 4-item tuple/list of +/-1, got {type(values).__name__}"
+        )
     if len(values) != 4:
         raise BoardConfigError(f"{name} must contain exactly 4 items (FL, RL, FR, RR), got {len(values)}")
 
@@ -235,7 +227,7 @@ def _import_pca9685_driver_class():
             return PCA9685
         except Exception as e:
             raise BoardConfigError(
-                "Could not import PCA9685 driver class from savu_base.drivers.pca9685_driver "
+                "Could not import PCA9685 driver class from svo_base.drivers.pca9685_driver "
                 "(expected PCA9685Driver or PCA9685)"
             ) from e
 
@@ -253,13 +245,9 @@ def _import_freenove_mecanum_board_class():
         from .freenove_mecanum_board import FreenoveMecanumBoard  # type: ignore
         return FreenoveMecanumBoard
     except ImportError:
-        # Backward-compatible fallbacks
         for cls_name in ("RobotSavoBoard", "RobotSavo"):
             try:
-                mod = __import__(
-                    "savo_base.drivers.freenove_mecanum_board",
-                    fromlist=[cls_name]
-                )
+                mod = __import__("savo_base.drivers.freenove_mecanum_board", fromlist=[cls_name])
                 return getattr(mod, cls_name)
             except Exception:
                 continue
@@ -289,10 +277,7 @@ def create_pca9685_driver(cfg: PCA9685FactoryConfig):
     address = _validate_i2c_address(cfg.address)
     debug = bool(cfg.debug)
 
-    # We support common constructor signatures:
-    #   (bus=1, address=0x40, debug=False)
-    #   (i2c_bus=1, address=0x40, debug=False)
-    #   (busno=1, address=0x40, debug=False)
+    # Common constructor signatures in evolving codebase
     ctor_attempts = [
         dict(bus=i2c_bus, address=address, debug=debug),
         dict(i2c_bus=i2c_bus, address=address, debug=debug),
@@ -336,23 +321,30 @@ def create_freenove_mecanum_board(cfg: FreenoveMecanumFactoryConfig):
 
     invert_flags = _sign_tuple_to_invert_flags(wheel_inverts)
 
-    # Constructor compatibility matrix for your CURRENT freenove_mecanum_board.py:
-    # def __init__(*, i2c_bus=1, addr=0x40, pwm_freq_hz=50.0,
-    #              invert_fl=False, invert_rl=False, invert_fr=False, invert_rr=False,
-    #              quench_ms=18, debug=False)
+    # IMPORTANT:
+    # Current FreenoveMecanumBoard constructor is strict. Do NOT pass node metadata
+    # / extra kwargs into the primary strict attempts.
     #
-    # We also keep a couple of legacy attempts for older variants.
+    # Typical current constructor:
+    #   __init__(*, i2c_bus=1, addr=0x40, pwm_freq_hz=50.0,
+    #            invert_fl=False, invert_rl=False, invert_fr=False, invert_rr=False,
+    #            quench_ms=18, debug=False)
     extra = dict(cfg.extra)
 
-    # Drop keys that commonly break current constructor if forwarded accidentally.
+    # Drop keys that are node/factory metadata or known mismatches for legacy attempts too.
     for k in (
         "backend", "board_backend", "name", "board_name", "dryrun",
-        "max_duty", "wheel_inverts", "inv", "address", "bus", "pwm_freq"
+        "source_name", "timing_utils", "topic_names",
+        "max_duty", "wheel_inverts", "inv",
+        "address", "addr", "bus",
+        "pwm_freq", "pwm_freq_hz",
+        "invert_fl", "invert_rl", "invert_fr", "invert_rr",
+        "board_type",
     ):
         extra.pop(k, None)
 
     ctor_attempts = [
-        # === Current locked constructor (most important) ===
+        # === Current locked constructor (strict; NO extra kwargs) ===
         dict(
             i2c_bus=i2c_bus,
             addr=address,
@@ -360,9 +352,8 @@ def create_freenove_mecanum_board(cfg: FreenoveMecanumFactoryConfig):
             quench_ms=quench_ms,
             debug=debug,
             **invert_flags,
-            **extra,
         ),
-        # alt address kw
+        # alt address kw (strict; NO extra kwargs)
         dict(
             i2c_bus=i2c_bus,
             address=address,
@@ -370,9 +361,9 @@ def create_freenove_mecanum_board(cfg: FreenoveMecanumFactoryConfig):
             quench_ms=quench_ms,
             debug=debug,
             **invert_flags,
-            **extra,
         ),
-        # legacy tuple/inv style
+
+        # === Legacy attempts (allow leftover extra if an older class supports it) ===
         dict(
             i2c_bus=i2c_bus,
             addr=address,
@@ -382,7 +373,6 @@ def create_freenove_mecanum_board(cfg: FreenoveMecanumFactoryConfig):
             debug=debug,
             **extra,
         ),
-        # legacy bus/address names
         dict(
             bus=i2c_bus,
             address=address,
@@ -428,22 +418,6 @@ def create_board(board_type: str, config: Optional[Mapping[str, Any]] = None):
 
     Returns:
         Instantiated board/driver object
-
-    Examples
-    --------
-    PCA9685:
-        create_board("pca9685", {"i2c_bus": 1, "address": "0x40", "debug": False})
-
-    Freenove mecanum:
-        create_board("freenove_mecanum", {
-            "i2c_bus": 1,
-            "address": "0x40",
-            "pwm_freq_hz": 50.0,
-            "wheel_inverts": [1, 1, 1, 1],
-            "quench_ms": 18,
-            "max_duty": 3000,
-            "debug": True,
-        })
     """
     bt = _normalize_board_type(board_type)
     cfg = dict(config or {})
@@ -469,12 +443,11 @@ def create_board(board_type: str, config: Optional[Mapping[str, Any]] = None):
         debug_raw = extra.pop("debug", False)
 
         # Remove metadata / compatibility keys that are not constructor params
-        extra.pop("backend", None)
-        extra.pop("board_backend", None)
-        extra.pop("name", None)
-        extra.pop("board_name", None)
-        extra.pop("dryrun", None)
-        extra.pop("board_type", None)
+        for k in (
+            "backend", "board_backend", "name", "board_name", "dryrun",
+            "source_name", "timing_utils", "topic_names", "board_type",
+        ):
+            extra.pop(k, None)
 
         f_cfg = FreenoveMecanumFactoryConfig(
             i2c_bus=_validate_i2c_bus(i2c_bus_raw),
@@ -507,17 +480,18 @@ def make_motor_board(**kwargs):
 
     Returns:
       A motor board object (dryrun or Freenove mecanum)
-
-    Notes:
-    - If backend/dryrun requests dryrun, this function tries to instantiate DryRunMotorBoard
-      directly (if available). Otherwise it falls back to Freenove factory with max_duty=0-like config.
-    - Unknown metadata keys are ignored where safe.
     """
     data = dict(kwargs)
 
     backend = str(data.pop("backend", data.pop("board_backend", "auto"))).strip().lower()
     _name = data.pop("name", data.pop("board_name", None))  # kept for compatibility/logging only
     dryrun_flag = bool(data.pop("dryrun", False))
+
+    # Strip node metadata that must never reach constructors
+    data.pop("source_name", None)
+    data.pop("timing_utils", None)
+    data.pop("topic_names", None)
+    data.pop("board_type", None)
 
     # normalize common fields
     i2c_bus = data.pop("i2c_bus", data.pop("bus", 1))
@@ -539,15 +513,12 @@ def make_motor_board(**kwargs):
         -1 if invert_rr else +1,
     )
 
-    # Decide dryrun vs hardware
     wants_dryrun = dryrun_flag or (backend in ("dryrun", "mock", "sim"))
 
     if wants_dryrun:
-        # Try dryrun board class first
         try:
             from .dryrun_motor_board import DryRunMotorBoard  # type: ignore
 
-            # attempt several evolving constructor signatures
             ctor_attempts = [
                 dict(max_duty=max_duty, debug=debug),
                 dict(debug=debug),
@@ -560,11 +531,10 @@ def make_motor_board(**kwargs):
                 except TypeError as e:
                     last_error = e
                     continue
-            raise BoardConfigError(
-                "DryRunMotorBoard constructor signature mismatch."
-            ) from last_error
+
+            raise BoardConfigError("DryRunMotorBoard constructor signature mismatch.") from last_error
         except Exception:
-            # fallback: use Freenove wrapper but caller can still keep max_duty low/0 in node logic
+            # fallback to hardware wrapper path if dryrun board unavailable
             pass
 
     # Hardware (or dryrun fallback) -> Freenove board
@@ -579,7 +549,6 @@ def make_motor_board(**kwargs):
     }
 
     # carry through only safe extras
-    # (avoid passing node-only metadata keys into constructors)
     for k, v in data.items():
         if k in ("backend", "board_backend", "name", "board_name", "dryrun"):
             continue
@@ -589,7 +558,7 @@ def make_motor_board(**kwargs):
 
 
 # =============================================================================
-# Convenience APIs for your Robot Savo default hardware
+# Convenience APIs for Robot Savo default hardware
 # =============================================================================
 def create_robot_savo_default_mecanum_board(
     *,
@@ -601,9 +570,7 @@ def create_robot_savo_default_mecanum_board(
     max_duty: int = 3000,
     debug: bool = False,
 ):
-    """
-    Convenience builder using Robot Savo's current proven hardware defaults.
-    """
+    """Convenience builder using Robot Savo's current proven hardware defaults."""
     cfg = FreenoveMecanumFactoryConfig(
         i2c_bus=i2c_bus,
         address=address,
@@ -660,7 +627,10 @@ def describe_supported_boards() -> Dict[str, Dict[str, Any]]:
                     "FR": [6, 7],
                     "RR": [4, 5],
                 },
-                "real_robot_testing": "Use proven sign/invert settings from motor_direction_test and teleop diagnostics.",
+                "real_robot_testing": (
+                    "Use proven sign/invert settings from motor_direction_test "
+                    "and teleop diagnostics."
+                ),
             },
         },
     }
