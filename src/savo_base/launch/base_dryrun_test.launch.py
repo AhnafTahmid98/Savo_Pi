@@ -8,7 +8,7 @@ Professional one-command DRYRUN validation for the `savo_base` stack.
 
 What this launch does
 ---------------------
-1) Starts `base_bringup.launch.py` with profile `dryrun_sim_motoroff`
+1) Starts `base_bringup.launch.py` with profile `dryrun_sim_motoroff.yaml`
    (software-only, motor-off safety profile)
 2) Optionally dumps effective runtime params from /base_driver_node
 3) Optionally runs a smoke command (zero / pulse / cmd)
@@ -31,7 +31,7 @@ ros2 launch savo_base base_dryrun_test.launch.py
 ros2 launch savo_base base_dryrun_test.launch.py run_dump_params:=true
 
 # Run a short watchdog pulse test after startup
-ros2 launch savo_base base_dryrun_test.launch.py run_smoke:=true smoke_mode:=pulse
+ros2 launch svo_base base_dryrun_test.launch.py run_smoke:=true smoke_mode:=pulse
 
 # Run poke test in dryrun
 ros2 launch savo_base base_dryrun_test.launch.py run_poke:=true
@@ -102,7 +102,7 @@ def _build_smoke_process(context, *args, **kwargs):
         # safe fallback
         cmd += ["zero"]
 
-    # Common topic overrides (supported by your smoke CLI design pattern)
+    # Common topic overrides
     cmd += [
         "--cmd-topic", str(cmd_topic),
         "--safety-stop-topic", str(stop_topic),
@@ -185,8 +185,8 @@ def generate_launch_description() -> LaunchDescription:
     include_base_bringup = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(base_bringup_launch),
         launch_arguments={
-            # Force DRYRUN profile for this launch
-            "profile": "dryrun_sim_motoroff",
+            # Force DRYRUN profile for this launch (IMPORTANT: full filename)
+            "profile": "dryrun_sim_motoroff.yaml",
             "use_watchdog": use_watchdog,
             "use_state_publisher": use_state_publisher,
             "use_heartbeat": use_heartbeat,
@@ -274,7 +274,7 @@ def generate_launch_description() -> LaunchDescription:
         # ---------------------------------------------------------------------
         # Main bringup
         # ---------------------------------------------------------------------
-        LogInfo(msg="[savo_base] Starting DRYRUN test launch (profile=dryrun_sim_motoroff)"),
+        LogInfo(msg="[savo_base] Starting DRYRUN test launch (profile=dryrun_sim_motoroff.yaml)"),
         include_base_bringup,
 
         # ---------------------------------------------------------------------

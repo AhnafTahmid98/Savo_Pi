@@ -7,7 +7,7 @@ Robot SAVO — Base Hardware-Only Launch (savo_base)
 Minimal bringup for the low-level base hardware execution node only.
 
 Starts:
-- base_driver_node
+- base_driver_node.py
 
 Purpose
 -------
@@ -25,20 +25,20 @@ Typical use-cases
 Profiles
 --------
 Loads layered config files and applies a profile last:
-- dryrun_sim_motoroff
-- bench_test
-- real_robot_v1
+- dryrun_sim_motoroff.yaml
+- bench_test.yaml
+- real_robot_v1.yaml
 
 Examples
 --------
 # Safe dryrun (motor-off)
-ros2 launch savo_base base_hw_only.launch.py profile:=dryrun_sim_motoroff
+ros2 launch savo_base base_hw_only.launch.py profile:=dryrun_sim_motoroff.yaml
 
 # Bench test (robot lifted)
-ros2 launch savo_base base_hw_only.launch.py profile:=bench_test
+ros2 launch savo_base base_hw_only.launch.py profile:=bench_test.yaml
 
 # Real robot hardware
-ros2 launch savo_base base_hw_only.launch.py profile:=real_robot_v1
+ros2 launch savo_base base_hw_only.launch.py profile:=real_robot_v1.yaml
 """
 
 from launch import LaunchDescription
@@ -59,7 +59,7 @@ def generate_launch_description() -> LaunchDescription:
     log_level = LaunchConfiguration("log_level")
 
     # -------------------------------------------------------------------------
-    # Layered config files (shared + profile)
+    # Layered config files (shared + profile override last)
     # -------------------------------------------------------------------------
     topics_yaml = PathJoinSubstitution([pkg_share, "config", "topics.yaml"])
     safety_yaml = PathJoinSubstitution([pkg_share, "config", "safety_timeouts.yaml"])
@@ -73,7 +73,7 @@ def generate_launch_description() -> LaunchDescription:
 
     base_driver = Node(
         package="savo_base",
-        executable="base_driver_node",
+        executable="base_driver_node.py",  # hybrid package executable installed via CMake
         name="base_driver_node",
         output=output,
         parameters=[
@@ -106,7 +106,6 @@ def generate_launch_description() -> LaunchDescription:
                 default_value="info",
                 description="ROS log level (debug|info|warn|error|fatal).",
             ),
-
             LogInfo(msg="[savo_base] Starting base_hw_only.launch.py"),
             LogInfo(msg=["[savo_base] Profile: ", profile]),
             LogInfo(
@@ -115,7 +114,6 @@ def generate_launch_description() -> LaunchDescription:
                     "(no watchdog/state/heartbeat helper nodes)."
                 )
             ),
-
             base_driver,
         ]
     )
