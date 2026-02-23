@@ -10,16 +10,12 @@ Purpose
 - Provide stable import paths for Robot Savo driver modules
 - Re-export commonly used board/driver classes, factory helpers, and exceptions
 - Support staged development (real hardware drivers + dry-run driver)
-
-Examples
---------
-from savo_base.drivers import create_board, make_motor_board
-from savo_base.drivers import FreenoveMecanumBoard, DryRunMotorBoard
-from savo_base.drivers import PCA9685Driver
-from svo_base.drivers import BoardException
+- Provide backward-compatible `make_motor_board(...)` wrapper for older nodes
 """
 
 from __future__ import annotations
+
+from typing import Any, Dict
 
 # =============================================================================
 # Exceptions (always export)
@@ -68,15 +64,62 @@ from .board_factory import (
     describe_supported_boards,
 )
 
-# Backward-compatible alias used by older nodes (e.g., base_driver_node)
-make_motor_board = create_board
+# =============================================================================
+# Backward-compatible factory wrapper
+# =============================================================================
+def make_motor_board(*args: Any, **kwargs: Any):
+    """
+    Backward-compatible wrapper used by older `base_driver_node.py` code.
+
+    Older code may call:
+        make_motor_board(backend="auto"/"dryrun"/"freenove", ...)
+    while the newer factory is:
+        create_board(board_type=..., ...)
+
+    This wrapper translates legacy kwargs to the current factory style as safely
+    as possible and forwards everything else.
+    """
+    if args:
+        # If caller already uses positional style, just forward to create_board.
+        return create_board(*args, **kwargs)
+
+    # Copy so we can mutate safely
+    k: Dict[str, Any] = dict(kwargs)
+
+    backend = k.pop("backend", None)
+    # Some older code may use "board_backend"
+    if backend is None:
+        backend = k.pop("board_backend", None)
+
+    # If caller already provides board_type, honor it.
+    if "board_type" not in k and backend is not None:
+        b = str(backend).strip().lower()
+
+        # Map legacy backend names -> modern board_type
+        if b in ("dryrun", "mock", "sim", "simulation"):
+            # Prefer Freenove mecanum + dryrun flag, because Robot Savo base driver
+            # usually expects mecanum board interface shape.
+            k.setdefault("board_type", BOARD_TYPE_FREENOVE_MECANUM)
+            k.setdefault("dryrun", True)
+        elif b in ("freenove", "mecanum", "robot_savo", "auto"):
+            k.setdefault("board_type", BOARD_TYPE_FREENOVE_MECANUM)
+            # "auto" usually means real board unless dryrun flag says otherwise.
+        elif b in ("pca9685",):
+            k.setdefault("board_type", BOARD_TYPE_PCA9685)
+        else:
+            # Unknown backend string: let create_board raise a clear error later.
+            k.setdefault("board_type", b)
+
+    # Some legacy callsites may pass "addr" instead of "pca9685_addr"
+    if "addr" in k and "pca9685_addr" not in k:
+        k["pca9685_addr"] = k.pop("addr")
+
+    return create_board(**k)
+
 
 # =============================================================================
 # Driver / board classes (best-effort imports for evolving codebase)
 # =============================================================================
-# We keep imports resilient because your package is being built file-by-file.
-# If a module/class is not present yet, symbol remains None (package import still works).
-
 PCA9685Driver = None
 PCA9685 = None
 
@@ -101,7 +144,6 @@ try:
 except Exception:
     pass
 
-# Alias fill for PCA9685 names
 if PCA9685Driver is None and PCA9685 is not None:
     PCA9685Driver = PCA9685
 if PCA9685 is None and PCA9685Driver is not None:
@@ -126,7 +168,6 @@ try:
 except Exception:
     pass
 
-# Alias fill for Freenove names
 if FreenoveMecanumBoard is None and RobotSavoBoard is not None:
     FreenoveMecanumBoard = RobotSavoBoard
 if FreenoveMecanumBoard is None and RobotSavo is not None:
@@ -156,7 +197,6 @@ try:
 except Exception:
     pass
 
-# Alias fill for dry-run names
 if DryRunMecanumBoard is None and DryRunMotorBoard is not None:
     DryRunMecanumBoard = DryRunMotorBoard
 if MockMotorBoard is None and DryRunMotorBoard is not None:
@@ -169,10 +209,6 @@ if DryRunMotorBoard is None and DryRunMecanumBoard is not None:
 # Package metadata helpers
 # =============================================================================
 def available_driver_symbols() -> dict:
-    """
-    Report which key driver classes are currently importable.
-    Useful during staged bringup while files are added incrementally.
-    """
     return {
         "PCA9685Driver": PCA9685Driver is not None,
         "PCA9685": PCA9685 is not None,
@@ -182,14 +218,11 @@ def available_driver_symbols() -> dict:
         "DryRunMotorBoard": DryRunMotorBoard is not None,
         "DryRunMecanumBoard": DryRunMecanumBoard is not None,
         "MockMotorBoard": MockMotorBoard is not None,
-        "make_motor_board": make_motor_board is not None,
+        "make_motor_board": callable(make_motor_board),
     }
 
 
 def driver_package_summary() -> dict:
-    """
-    Compact summary of the `savo_base.drivers` package state.
-    """
     return {
         "package": "savo_base.drivers",
         "supported_board_types": list(SUPPORTED_BOARD_TYPES),
@@ -224,7 +257,7 @@ __all__ = [
     "create_pca9685_driver",
     "create_freenove_mecanum_board",
     "create_board",
-    "make_motor_board",  # backward-compatible alias
+    "make_motor_board",
     "create_robot_savo_default_mecanum_board",
     "describe_supported_boards",
 
