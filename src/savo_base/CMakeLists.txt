@@ -30,16 +30,16 @@ find_package(savo_msgs REQUIRED)
 # Keep it in package.xml / Python imports, but DO NOT find_package() it here.
 
 # -----------------------------------------------------------------------------
-# Python package install
+# Python package install (modules/imports)
 # -----------------------------------------------------------------------------
 ament_python_install_package(${PROJECT_NAME})
 
 # -----------------------------------------------------------------------------
-# Install Python executables
+# Install Python executables (reliable for hybrid packages)
 # -----------------------------------------------------------------------------
-# Hybrid-package strategy:
-# - Install ROS node Python files explicitly (reliable for ament_cmake hybrids)
-# - Install CLI/helper scripts explicitly
+# Hybrid strategy:
+# - Install ROS node Python files explicitly for reliable `ros2 run` / launch
+# - Install helper CLI scripts explicitly
 install(PROGRAMS
   # CLI tools (scripts/)
   scripts/teleop_letters_cli.py
@@ -60,13 +60,28 @@ install(PROGRAMS
 # -----------------------------------------------------------------------------
 # Install non-code resources
 # -----------------------------------------------------------------------------
-install(DIRECTORY
-  launch
-  config
-  resource
-  DESTINATION share/${PROJECT_NAME}
-)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/launch")
+  install(DIRECTORY
+    launch/
+    DESTINATION share/${PROJECT_NAME}/launch
+  )
+endif()
 
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/config")
+  install(DIRECTORY
+    config/
+    DESTINATION share/${PROJECT_NAME}/config
+  )
+endif()
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resource")
+  install(DIRECTORY
+    resource/
+    DESTINATION share/${PROJECT_NAME}/resource
+  )
+endif()
+
+# README/package.xml in install tree is useful for deployed robot troubleshooting
 install(FILES
   README.md
   package.xml
@@ -76,7 +91,17 @@ install(FILES
 # -----------------------------------------------------------------------------
 # Optional C++ targets (future-ready scaffold)
 # -----------------------------------------------------------------------------
-# Add C++ nodes/libraries here later if needed.
+# Add C++ nodes/libraries here later if needed, e.g.:
+#
+# add_executable(example_cpp_node src/example_cpp_node.cpp)
+# ament_target_dependencies(example_cpp_node
+#   rclcpp
+#   std_msgs
+# )
+# install(TARGETS
+#   example_cpp_node
+#   DESTINATION lib/${PROJECT_NAME}
+# )
 
 # -----------------------------------------------------------------------------
 # Testing / Lint
@@ -85,8 +110,10 @@ if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   ament_lint_auto_find_test_dependencies()
 
+  # Python tests via pytest (works with ament_cmake + ament_python hybrid)
   find_package(ament_cmake_pytest REQUIRED)
 
+  # Add tests only if files exist (safe while scaffolding)
   if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test/test_mecanum_mix.py")
     ament_add_pytest_test(test_mecanum_mix test/test_mecanum_mix.py)
   endif()

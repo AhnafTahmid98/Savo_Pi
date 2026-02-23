@@ -6,19 +6,18 @@ Robot SAVO — setup.py (ROS 2 Jazzy, hybrid package)
 ---------------------------------------------------
 Purpose:
 - Package the Python modules under `savo_base/`
-- Expose ROS 2 Python node entry points (from `savo_base/nodes/`)
 - Work together with:
-    * CMakeLists.txt  -> installs scripts/, launch/, config/, resources
-    * setup.cfg       -> places console_scripts into lib/savo_base
+    * CMakeLists.txt  -> installs scripts/, Python ROS nodes, launch/, config/, resources
+    * setup.cfg       -> standard ROS 2 script install path (kept for compatibility)
 
-Layout note:
-- CLI tools are kept in `scripts/` and installed by CMakeLists.txt
-  via install(PROGRAMS ...).
-- ROS nodes live in `savo_base/nodes/` and are exposed here via console_scripts.
+Important (hybrid package pattern)
+----------------------------------
+In this project, Python ROS node executables are installed explicitly via
+CMake `install(PROGRAMS ...)` for reliable `ros2 run` / launch in hybrid
+ament_cmake packages.
 
-Package role:
-- `savo_base` is Robot Savo's low-level drivetrain hardware execution package
-  (motor board driver, mecanum kinematics, watchdog/safety, base state/diagnostics).
+`entry_points` may be kept for future compatibility/documentation, but runtime
+execution should rely on the installed `.py` scripts in lib/savo_base.
 """
 
 from setuptools import find_packages, setup
@@ -51,7 +50,7 @@ setup(
     tests_require=["pytest"],
     entry_points={
         "console_scripts": [
-            # ROS 2 nodes (savo_base/nodes/)
+            # Optional in this hybrid package (CMake installs .py node executables directly)
             "base_driver_node = savo_base.nodes.base_driver_node:main",
             "base_watchdog_node = savo_base.nodes.base_watchdog_node:main",
             "base_state_publisher_node = savo_base.nodes.base_state_publisher_node:main",
