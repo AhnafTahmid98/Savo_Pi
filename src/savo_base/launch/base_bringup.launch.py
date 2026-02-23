@@ -7,38 +7,38 @@ Robot SAVO — Base Bringup Launch (savo_base)
 Professional one-command bringup for Robot Savo base stack.
 
 Starts:
-- base_driver_node            (hardware execution / dryrun capable)
-- base_watchdog_node          (command freshness watchdog, optional)
-- base_state_publisher_node   (state summary aggregator, optional)
-- base_heartbeat_node         (liveness pulse/state, optional)
-- base_diag_runner_node       (diagnostic command runner, optional)
+- base_driver_node.py            (hardware execution / dryrun capable)
+- base_watchdog_node.py          (command freshness watchdog, optional)
+- base_state_publisher_node.py   (state summary aggregator, optional)
+- base_heartbeat_node.py         (liveness pulse/state, optional)
+- base_diag_runner_node.py       (diagnostic command runner, optional)
 
 Design goals
 ------------
 - Clean layered YAML loading (shared configs + profile override)
-- Easy profile switching:
-    * dryrun_sim_motoroff
-    * bench_test
-    * real_robot_v1
+- Easy profile switching using YAML filenames:
+    * dryrun_sim_motoroff.yaml
+    * bench_test.yaml
+    * real_robot_v1.yaml
 - Optional supervisor/telemetry nodes for bringup and debugging
 - Consistent topic wiring with locked Robot Savo perception/control pipeline
 
 Recommended usage
 -----------------
 # Dry software-only test (no motor output)
-ros2 launch savo_base base_bringup.launch.py profile:=dryrun_sim_motoroff
+ros2 launch savo_base base_bringup.launch.py profile:=dryrun_sim_motoroff.yaml
 
 # Bench test (robot lifted / controlled test)
-ros2 launch savo_base base_bringup.launch.py profile:=bench_test
+ros2 launch savo_base base_bringup.launch.py profile:=bench_test.yaml
 
 # Real robot driving
-ros2 launch savo_base base_bringup.launch.py profile:=real_robot_v1
+ros2 launch savo_base base_bringup.launch.py profile:=real_robot_v1.yaml
 """
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, LogInfo
 from launch.conditions import IfCondition
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
@@ -67,46 +67,73 @@ def generate_launch_description() -> LaunchDescription:
     safety_yaml = PathJoinSubstitution([pkg_share, "config", "safety_timeouts.yaml"])
     board_yaml = PathJoinSubstitution([pkg_share, "config", "motor_board_freenove.yaml"])
     mecanum_yaml = PathJoinSubstitution([pkg_share, "config", "mecanum_kinematics.yaml"])
+    diagnostics_yaml = PathJoinSubstitution([pkg_share, "config", "diagnostics.yaml"])
 
-    selected_profile_yaml = PathJoinSubstitution(
-        [pkg_share, "config", "profiles", PythonExpression([profile, " + '.yaml'"])]
-    )
-
-    # If profile_path is empty string -> use selected_profile_yaml
-    # else -> use profile_path
-    effective_profile_yaml = PythonExpression(
-        ["'", profile_path, "' if '", profile_path, "' != '' else '", selected_profile_yaml, "'"]
-    )
+    # Profile handling (professional + robust):
+    # - profile is a YAML filename (e.g. "dryrun_sim_motoroff.yaml")
+    # - profile_path can override it if user provides a custom absolute path
+    selected_profile_yaml = PathJoinSubstitution([pkg_share, "config", "profiles", profile])
 
     # -------------------------------------------------------------------------
-    # Common base_driver_node parameter layering (profile last = strongest override)
+    # Common parameter layering
     # NOTE:
-    #   This is the intended professional layering model for your package.
+    # - base_driver gets layered YAML files
+    # - profile override should be last
     # -------------------------------------------------------------------------
-    base_driver_params = [
+    base_driver_params_default = [
         topics_yaml,
         safety_yaml,
         board_yaml,
         mecanum_yaml,
-        effective_profile_yaml,
+        diagnostics_yaml,
+        selected_profile_yaml,
+    ]
+
+    base_driver_params_custom_profile = [
+        topics_yaml,
+        safety_yaml,
+        board_yaml,
+        mecanum_yaml,
+        diagnostics_yaml,
+        profile_path,  # custom absolute path override
     ]
 
     # -------------------------------------------------------------------------
     # Nodes
+    # IMPORTANT:
+    # In your current hybrid package setup, Python executables are installed
+    # as files in lib/savo_base and must be referenced with ".py".
     # -------------------------------------------------------------------------
-    base_driver_node = Node(
+    base_driver_node_default = Node(
         package="savo_base",
-        executable="base_driver_node",
+        executable="base_driver_node.py",
         name="base_driver_node",
         output=output,
-        parameters=base_driver_params,
+        condition=IfCondition(
+            # run this node when profile_path == ""
+            LaunchConfiguration("use_profile_name")
+        ),
+        parameters=base_driver_params_default,
+        arguments=["--ros-args", "--log-level", log_level],
+    )
+
+    base_driver_node_custom = Node(
+        package="savo_base",
+        executable="base_driver_node.py",
+        name="base_driver_node",
+        output=output,
+        condition=IfCondition(
+            # run this node when profile_path != ""
+            LaunchConfiguration("use_profile_path")
+        ),
+        parameters=base_driver_params_custom_profile,
         arguments=["--ros-args", "--log-level", log_level],
     )
 
     # Watchdog supervisor (does not directly drive motors)
     base_watchdog_node = Node(
         package="savo_base",
-        executable="base_watchdog_node",
+        executable="base_watchdog_node.py",
         name="base_watchdog_node",
         output=output,
         condition=IfCondition(use_watchdog),
@@ -131,7 +158,7 @@ def generate_launch_description() -> LaunchDescription:
     # Aggregated state summary publisher
     base_state_publisher_node = Node(
         package="savo_base",
-        executable="base_state_publisher_node",
+        executable="base_state_publisher_node.py",
         name="base_state_publisher_node",
         output=output,
         condition=IfCondition(use_state_publisher),
@@ -167,7 +194,7 @@ def generate_launch_description() -> LaunchDescription:
     # Simple liveness heartbeat node
     base_heartbeat_node = Node(
         package="savo_base",
-        executable="base_heartbeat_node",
+        executable="base_heartbeat_node.py",
         name="base_heartbeat_node",
         output=output,
         condition=IfCondition(use_heartbeat),
@@ -199,7 +226,7 @@ def generate_launch_description() -> LaunchDescription:
     # Diagnostics runner (optional; useful for remote-triggered checks)
     base_diag_runner_node = Node(
         package="savo_base",
-        executable="base_diag_runner_node",
+        executable="base_diag_runner_node.py",
         name="base_diag_runner_node",
         output=output,
         condition=IfCondition(use_diag_runner),
@@ -232,10 +259,10 @@ def generate_launch_description() -> LaunchDescription:
             # Arguments
             DeclareLaunchArgument(
                 "profile",
-                default_value="dryrun_sim_motoroff",
+                default_value="dryrun_sim_motoroff.yaml",
                 description=(
-                    "Base profile name under config/profiles/ without .yaml "
-                    "(e.g. dryrun_sim_motoroff | bench_test | real_robot_v1)"
+                    "Base profile YAML filename under config/profiles/ "
+                    "(e.g. dryrun_sim_motoroff.yaml | bench_test.yaml | real_robot_v1.yaml)"
                 ),
             ),
             DeclareLaunchArgument(
@@ -246,25 +273,38 @@ def generate_launch_description() -> LaunchDescription:
                     "overrides the 'profile' selection."
                 ),
             ),
+
+            # Internal booleans for robust profile_path switching without PythonExpression
+            DeclareLaunchArgument(
+                "use_profile_name",
+                default_value="true",
+                description="Internal: use selected profile under config/profiles/",
+            ),
+            DeclareLaunchArgument(
+                "use_profile_path",
+                default_value="false",
+                description="Internal: use custom profile_path override",
+            ),
+
             DeclareLaunchArgument(
                 "use_watchdog",
                 default_value="true",
-                description="Start base_watchdog_node (command freshness supervisor).",
+                description="Start base_watchdog_node.py (command freshness supervisor).",
             ),
             DeclareLaunchArgument(
                 "use_state_publisher",
                 default_value="true",
-                description="Start base_state_publisher_node (aggregated state summary).",
+                description="Start base_state_publisher_node.py (aggregated state summary).",
             ),
             DeclareLaunchArgument(
                 "use_heartbeat",
                 default_value="true",
-                description="Start base_heartbeat_node (liveness pulse/state).",
+                description="Start base_heartbeat_node.py (liveness pulse/state).",
             ),
             DeclareLaunchArgument(
                 "use_diag_runner",
                 default_value="false",
-                description="Start base_diag_runner_node (diagnostic command runner).",
+                description="Start base_diag_runner_node.py (diagnostic command runner).",
             ),
             DeclareLaunchArgument(
                 "output",
@@ -276,8 +316,24 @@ def generate_launch_description() -> LaunchDescription:
                 default_value="info",
                 description="ROS log level (debug|info|warn|error|fatal).",
             ),
+
+            # Informational logs
+            LogInfo(msg="[savo_base] Starting base_bringup.launch.py"),
+            LogInfo(msg=["[savo_base] profile: ", profile]),
+            LogInfo(msg=["[savo_base] profile_path: ", profile_path]),
+            LogInfo(msg=["[savo_base] use_watchdog: ", use_watchdog]),
+            LogInfo(msg=["[savo_base] use_state_publisher: ", use_state_publisher]),
+            LogInfo(msg=["[savo_base] use_heartbeat: ", use_heartbeat]),
+            LogInfo(msg=["[savo_base] use_diag_runner: ", use_diag_runner]),
+
             # Nodes
-            base_driver_node,
+            # Default profile-based driver node
+            base_driver_node_default,
+
+            # Optional custom-profile-path driver node (enable manually with:
+            #   use_profile_name:=false use_profile_path:=true profile_path:=/abs/path/file.yaml)
+            base_driver_node_custom,
+
             base_watchdog_node,
             base_state_publisher_node,
             base_heartbeat_node,
