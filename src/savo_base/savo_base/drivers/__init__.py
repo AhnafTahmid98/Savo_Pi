@@ -10,7 +10,16 @@ Purpose
 - Provide stable import paths for Robot Savo driver modules
 - Re-export commonly used board/driver classes, factory helpers, and exceptions
 - Support staged development (real hardware drivers + dry-run driver)
-- Provide backward-compatible `make_motor_board(...)` wrapper for older nodes
+- Provide backward-compatible `make_motor_board(...)` wrapper for legacy callers
+  (e.g., base_driver_node.py) that pass old kwargs.
+
+Examples
+--------
+from savo_base.drivers import create_board
+from savo_base.drivers import FreenoveMecanumBoard, DryRunMotorBoard
+from savo_base.drivers import PCA9685Driver
+from savo_base.drivers import BoardException
+from savo_base.drivers import make_motor_board
 """
 
 from __future__ import annotations
@@ -65,61 +74,11 @@ from .board_factory import (
 )
 
 # =============================================================================
-# Backward-compatible factory wrapper
-# =============================================================================
-def make_motor_board(*args: Any, **kwargs: Any):
-    """
-    Backward-compatible wrapper used by older `base_driver_node.py` code.
-
-    Older code may call:
-        make_motor_board(backend="auto"/"dryrun"/"freenove", ...)
-    while the newer factory is:
-        create_board(board_type=..., ...)
-
-    This wrapper translates legacy kwargs to the current factory style as safely
-    as possible and forwards everything else.
-    """
-    if args:
-        # If caller already uses positional style, just forward to create_board.
-        return create_board(*args, **kwargs)
-
-    # Copy so we can mutate safely
-    k: Dict[str, Any] = dict(kwargs)
-
-    backend = k.pop("backend", None)
-    # Some older code may use "board_backend"
-    if backend is None:
-        backend = k.pop("board_backend", None)
-
-    # If caller already provides board_type, honor it.
-    if "board_type" not in k and backend is not None:
-        b = str(backend).strip().lower()
-
-        # Map legacy backend names -> modern board_type
-        if b in ("dryrun", "mock", "sim", "simulation"):
-            # Prefer Freenove mecanum + dryrun flag, because Robot Savo base driver
-            # usually expects mecanum board interface shape.
-            k.setdefault("board_type", BOARD_TYPE_FREENOVE_MECANUM)
-            k.setdefault("dryrun", True)
-        elif b in ("freenove", "mecanum", "robot_savo", "auto"):
-            k.setdefault("board_type", BOARD_TYPE_FREENOVE_MECANUM)
-            # "auto" usually means real board unless dryrun flag says otherwise.
-        elif b in ("pca9685",):
-            k.setdefault("board_type", BOARD_TYPE_PCA9685)
-        else:
-            # Unknown backend string: let create_board raise a clear error later.
-            k.setdefault("board_type", b)
-
-    # Some legacy callsites may pass "addr" instead of "pca9685_addr"
-    if "addr" in k and "pca9685_addr" not in k:
-        k["pca9685_addr"] = k.pop("addr")
-
-    return create_board(**k)
-
-
-# =============================================================================
 # Driver / board classes (best-effort imports for evolving codebase)
 # =============================================================================
+# We keep imports resilient because your package is being built file-by-file.
+# If a module/class is not present yet, symbol remains None (package import still works).
+
 PCA9685Driver = None
 PCA9685 = None
 
@@ -144,6 +103,7 @@ try:
 except Exception:
     pass
 
+# Alias fill for PCA9685 names
 if PCA9685Driver is None and PCA9685 is not None:
     PCA9685Driver = PCA9685
 if PCA9685 is None and PCA9685Driver is not None:
@@ -168,6 +128,7 @@ try:
 except Exception:
     pass
 
+# Alias fill for Freenove names
 if FreenoveMecanumBoard is None and RobotSavoBoard is not None:
     FreenoveMecanumBoard = RobotSavoBoard
 if FreenoveMecanumBoard is None and RobotSavo is not None:
@@ -197,6 +158,7 @@ try:
 except Exception:
     pass
 
+# Alias fill for dry-run names
 if DryRunMecanumBoard is None and DryRunMotorBoard is not None:
     DryRunMecanumBoard = DryRunMotorBoard
 if MockMotorBoard is None and DryRunMotorBoard is not None:
@@ -206,9 +168,124 @@ if DryRunMotorBoard is None and DryRunMecanumBoard is not None:
 
 
 # =============================================================================
+# Backward-compatible factory wrapper for legacy base_driver_node callers
+# =============================================================================
+def _to_int_addr(value: Any) -> int:
+    """Accept 0x40 / '0x40' / '64'."""
+    if isinstance(value, str):
+        return int(value.strip(), 0)
+    return int(value)
+
+
+def _invert_bool_to_sign(v: Any) -> int:
+    """
+    Legacy base_driver_node often passes invert_* as booleans.
+    Factory expects wheel_inverts tuple of +/-1.
+    """
+    return -1 if bool(v) else +1
+
+
+def make_motor_board(**kwargs):
+    """
+    Backward-compatible wrapper expected by legacy `base_driver_node.py`.
+
+    Converts legacy kwargs into:
+        create_board(board_type=..., config={...})
+
+    Supported legacy kwargs (best-effort)
+    -------------------------------------
+    backend, dryrun, name, board_name,
+    i2c_bus, pca9685_addr, pwm_freq_hz, quench_ms, max_duty,
+    invert_fl, invert_rl, invert_fr, invert_rr,
+    debug, ...
+    """
+    k: Dict[str, Any] = dict(kwargs)
+
+    # -------------------------------------------------------------------------
+    # Detect backend / dryrun intent
+    # -------------------------------------------------------------------------
+    backend = str(k.pop("backend", "auto")).strip().lower()
+    dryrun = bool(k.pop("dryrun", False))
+
+    # Legacy metadata keys (not used by current create_board signature)
+    # Keep removed to avoid unexpected keyword errors.
+    _legacy_name = k.pop("name", None)
+    _legacy_board_name = k.pop("board_name", None)
+    _ = (_legacy_name, _legacy_board_name)  # intentionally unused
+
+    # -------------------------------------------------------------------------
+    # Common config mapping
+    # -------------------------------------------------------------------------
+    config: Dict[str, Any] = {}
+
+    if "i2c_bus" in k:
+        config["i2c_bus"] = int(k.pop("i2c_bus"))
+
+    # Legacy base_driver uses pca9685_addr; factory expects address
+    if "pca9685_addr" in k:
+        config["address"] = _to_int_addr(k.pop("pca9685_addr"))
+    elif "address" in k:
+        config["address"] = _to_int_addr(k.pop("address"))
+
+    if "pwm_freq_hz" in k:
+        config["pwm_freq_hz"] = float(k.pop("pwm_freq_hz"))
+
+    if "quench_ms" in k:
+        config["quench_ms"] = int(k.pop("quench_ms"))
+
+    if "max_duty" in k:
+        config["max_duty"] = int(k.pop("max_duty"))
+
+    if "debug" in k:
+        config["debug"] = bool(k.pop("debug"))
+
+    # Legacy invert flags -> factory wheel_inverts=(FL, RL, FR, RR)
+    inv_keys = ("invert_fl", "invert_rl", "invert_fr", "invert_rr")
+    if any(key in k for key in inv_keys):
+        fl = _invert_bool_to_sign(k.pop("invert_fl", False))
+        rl = _invert_bool_to_sign(k.pop("invert_rl", False))
+        fr = _invert_bool_to_sign(k.pop("invert_fr", False))
+        rr = _invert_bool_to_sign(k.pop("invert_rr", False))
+        config["wheel_inverts"] = (fl, rl, fr, rr)
+
+    # Any unrecognized kwargs are preserved in extra (future-safe)
+    # This avoids breaking older callers while not polluting create_board signature.
+    if k:
+        config["extra"] = dict(k)
+
+    # -------------------------------------------------------------------------
+    # Choose construction path
+    # -------------------------------------------------------------------------
+    # If explicitly dryrun OR backend says dryrun/sim/mock, construct dryrun board directly
+    if dryrun or backend in ("dryrun", "sim", "mock"):
+        if DryRunMotorBoard is None:
+            raise BoardConfigError(
+                "DryRunMotorBoard is not importable, but dryrun backend was requested."
+            )
+        return DryRunMotorBoard(**config)
+
+    # backend auto / freenove / real -> Freenove mecanum board via factory
+    if backend in ("auto", "freenove", "freenove_mecanum", "real", "hardware", "hw"):
+        return create_board(BOARD_TYPE_FREENOVE_MECANUM, config=config)
+
+    # optional direct PCA path
+    if backend in ("pca", "pca9685", BOARD_TYPE_PCA9685):
+        return create_board(BOARD_TYPE_PCA9685, config=config)
+
+    raise BoardConfigError(
+        f"Unsupported backend in make_motor_board(): {backend!r}. "
+        f"Expected auto/freenove/dryrun/pca9685."
+    )
+
+
+# =============================================================================
 # Package metadata helpers
 # =============================================================================
 def available_driver_symbols() -> dict:
+    """
+    Report which key driver classes are currently importable.
+    Useful during staged bringup while files are added incrementally.
+    """
     return {
         "PCA9685Driver": PCA9685Driver is not None,
         "PCA9685": PCA9685 is not None,
@@ -218,11 +295,14 @@ def available_driver_symbols() -> dict:
         "DryRunMotorBoard": DryRunMotorBoard is not None,
         "DryRunMecanumBoard": DryRunMecanumBoard is not None,
         "MockMotorBoard": MockMotorBoard is not None,
-        "make_motor_board": callable(make_motor_board),
+        "make_motor_board": True,
     }
 
 
 def driver_package_summary() -> dict:
+    """
+    Compact summary of the `savo_base.drivers` package state.
+    """
     return {
         "package": "savo_base.drivers",
         "supported_board_types": list(SUPPORTED_BOARD_TYPES),
@@ -237,6 +317,9 @@ __all__ = [
     # package helpers
     "available_driver_symbols",
     "driver_package_summary",
+
+    # compatibility wrapper
+    "make_motor_board",
 
     # class exports (resolved best-effort)
     "PCA9685Driver",
@@ -257,7 +340,6 @@ __all__ = [
     "create_pca9685_driver",
     "create_freenove_mecanum_board",
     "create_board",
-    "make_motor_board",
     "create_robot_savo_default_mecanum_board",
     "describe_supported_boards",
 
