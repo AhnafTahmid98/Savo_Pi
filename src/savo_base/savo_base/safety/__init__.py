@@ -16,7 +16,9 @@ Typical usage
 -------------
 from savo_base.safety import (
     CommandGuard,
-    EstopLatch,
+    CommandLimits,
+    Velocity3,
+    EStopLatch,
     TimeoutWatchdog,
     TimeoutWatchdogConfig,
     StaleCommandPolicy,
@@ -32,28 +34,29 @@ from savo_base.safety import (
 # nodes can use short imports (`from savo_base.safety import ...`) and we can
 # refactor internal file organization later without breaking callers.
 
-from .command_guard import CommandGuard
-from .estop_latch import EstopLatch
+from .command_guard import CommandGuard, CommandLimits, Velocity3
+from .estop_latch import EStopLatch
 from .timeout_watchdog import TimeoutWatchdog, TimeoutWatchdogConfig
 from .stale_command_policy import StaleCommandPolicy, StaleCommandPolicyConfig
 from .watchdog_policy import WatchdogPolicy, WatchdogPolicyConfig, MotionPermission
 
-__all__ = [
-    # command validation / clamping
-    "CommandGuard",
+# Compatibility alias
+EstopLatch = EStopLatch
 
-    # stop / e-stop state handling
+__all__ = [
+    "CommandGuard",
+    "CommandLimits",
+    "Velocity3",
+
+    "EStopLatch",
     "EstopLatch",
 
-    # timeout watchdog core
     "TimeoutWatchdog",
     "TimeoutWatchdogConfig",
 
-    # stale command policy
     "StaleCommandPolicy",
     "StaleCommandPolicyConfig",
 
-    # combined decision policy
     "WatchdogPolicy",
     "WatchdogPolicyConfig",
     "MotionPermission",

@@ -89,11 +89,11 @@ def generate_launch_description() -> LaunchDescription:
         # ---------------------------------------------------------------------
         DeclareLaunchArgument(
             "profile",
-            default_value="bench_test",
+            default_value="bench_test.yaml",
             description=(
-                "Profile name under config/profiles/ without .yaml "
-                "(dryrun_sim_motoroff | bench_test | real_robot_v1). "
-                "Default is bench_test for a conservative idle bringup."
+                "Profile YAML filename under config/profiles/ "
+                "(dryrun_sim_motoroff.yaml | bench_test.yaml | real_robot_v1.yaml). "
+                "Default is bench_test.yaml for a conservative idle bringup."
             ),
         ),
         DeclareLaunchArgument(

@@ -22,7 +22,7 @@ from savo_base.models import make_robot_savo_watchdog_state
 # ============================================================================
 from .base_limits import (
     BaseLimits,
-    BaseLimitsValidationError,
+    LimitsValidationError,
     make_robot_savo_base_limits,
 )
 
@@ -74,7 +74,7 @@ from .wheel_command import (
 __all__ = [
     # base_limits
     "BaseLimits",
-    "BaseLimitsValidationError",
+    "LimitsValidationError",
     "make_robot_savo_base_limits",
 
     # base_state

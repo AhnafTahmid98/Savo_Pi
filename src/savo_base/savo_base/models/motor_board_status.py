@@ -778,6 +778,38 @@ def make_robot_savo_dryrun_board_status(
     return status.validate()
 
 
+def make_robot_savo_motor_board_status(
+    *,
+    board_type: str = "freenove_mecanum",
+    i2c_bus: int = 1,
+    i2c_addr: int = 0x40,
+    pwm_freq_hz: float = 50.0,
+    max_abs_duty: int = 3000,
+    quench_ms: int = 18,
+    invert_fl: bool = False,
+    invert_rl: bool = False,
+    invert_fr: bool = False,
+    invert_rr: bool = False,
+) -> MotorBoardStatus:
+    """
+    Create a validated MotorBoardStatus for the requested Robot Savo backend.
+    """
+    if str(board_type).lower() in {"dryrun", "dry_run", "sim", "simulation"}:
+        return make_robot_savo_dryrun_board_status(max_abs_duty=max_abs_duty)
+
+    return make_robot_savo_freenove_board_status(
+        i2c_bus=i2c_bus,
+        i2c_addr=i2c_addr,
+        pwm_freq_hz=pwm_freq_hz,
+        max_abs_duty=max_abs_duty,
+        quench_ms=quench_ms,
+        invert_fl=invert_fl,
+        invert_rl=invert_rl,
+        invert_fr=invert_fr,
+        invert_rr=invert_rr,
+    )
+
+
 # =============================================================================
 # Public exports
 # =============================================================================
@@ -787,6 +819,7 @@ __all__ = [
     "MotorBoardFaultState",
     "MotorBoardConfigSnapshot",
     "MotorBoardStatus",
+    "make_robot_savo_motor_board_status",
     "make_robot_savo_freenove_board_status",
     "make_robot_savo_dryrun_board_status",
 ]

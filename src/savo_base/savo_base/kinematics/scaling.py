@@ -494,6 +494,40 @@ def apply_signed_duty_scale(
     return tuple(_clamp_signed(v) for v in vals)  # type: ignore[return-value]
 
 
+def normalized_to_signed_duty(
+    fl: float,
+    rl: float,
+    fr: float,
+    rr: float,
+    *,
+    max_abs_duty: int,
+) -> Tuple[int, int, int, int]:
+    """
+    Convert normalized mecanum wheel commands [-1.0, +1.0]
+    into signed PCA9685 duty values.
+
+    Returns:
+        (fl_duty, rl_duty, fr_duty, rr_duty)
+    """
+
+    md = int(max_abs_duty)
+
+    if md < 0:
+        md = abs(md)
+
+    def one(value: float) -> int:
+        v = float(value)
+
+        if v > 1.0:
+            v = 1.0
+        elif v < -1.0:
+            v = -1.0
+
+        return int(round(v * md))
+
+    return one(fl), one(rl), one(fr), one(rr)
+
+
 # =============================================================================
 # Convenience pipeline helpers
 # =============================================================================

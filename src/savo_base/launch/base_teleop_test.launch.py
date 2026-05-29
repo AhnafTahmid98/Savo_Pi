@@ -180,11 +180,11 @@ def generate_launch_description() -> LaunchDescription:
         # ---------------------------------------------------------------------
         DeclareLaunchArgument(
             "profile",
-            default_value="dryrun_sim_motoroff",
+            default_value="dryrun_sim_motoroff.yaml",
             description=(
-                "Profile name under config/profiles/ without .yaml "
-                "(dryrun_sim_motoroff | bench_test | real_robot_v1). "
-                "Default is dryrun for safest teleop testing."
+                "Profile YAML filename under config/profiles/ "
+                "(dryrun_sim_motoroff.yaml | bench_test.yaml | real_robot_v1.yaml). "
+                "Default is dryrun_sim_motoroff.yaml for safest teleop testing."
             ),
         ),
         DeclareLaunchArgument(

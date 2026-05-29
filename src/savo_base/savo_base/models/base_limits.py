@@ -487,6 +487,13 @@ def robot_savo_default_base_limits() -> BaseLimits:
     return BaseLimits().validate()
 
 
+def make_robot_savo_base_limits() -> BaseLimits:
+    """
+    Create the canonical Robot Savo base limits profile.
+    """
+    return robot_savo_default_base_limits()
+
+
 def robot_savo_safe_indoor_limits() -> BaseLimits:
     """
     More conservative indoor profile for first tests / crowded environments.
@@ -543,6 +550,7 @@ __all__ = [
     "BaseLimits",
 
     # profiles
+    "make_robot_savo_base_limits",
     "robot_savo_default_base_limits",
     "robot_savo_safe_indoor_limits",
 ]

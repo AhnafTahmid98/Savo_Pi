@@ -520,7 +520,7 @@ def make_motor_board(**kwargs):
             from .dryrun_motor_board import DryRunMotorBoard  # type: ignore
 
             ctor_attempts = [
-                dict(max_duty=max_duty, debug=debug),
+                dict(max_abs_duty=max_duty, debug=debug),
                 dict(debug=debug),
                 dict(),
             ]

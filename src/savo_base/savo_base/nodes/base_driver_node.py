@@ -110,6 +110,8 @@ except Exception:
 try:
     from savo_base.safety import (
         CommandGuard,
+        CommandLimits,
+        Velocity3,
         EstopLatch,
         TimeoutWatchdog,
         TimeoutWatchdogConfig,
@@ -123,6 +125,8 @@ try:
 except Exception:
     _HAS_SAFETY_POLICIES = False
     CommandGuard = None
+    CommandLimits = None
+    Velocity3 = None
     EstopLatch = None
     TimeoutWatchdog = None
     TimeoutWatchdogConfig = None
@@ -373,42 +377,48 @@ class BaseDriverNode(Node):
 
         if _HAS_SAFETY_POLICIES:
             try:
-                # Command guard (clamp/sanitize cmd_vel)
+                # Command guard: clamps/sanitizes cmd_vel
                 self._cmd_guard = CommandGuard(
-                    vx_limit=self.vx_limit,
-                    vy_limit=self.vy_limit,
-                    wz_limit=self.wz_limit,
+                    CommandLimits(
+                        max_vx_mps=self.vx_limit,
+                        max_vy_mps=self.vy_limit,
+                        max_wz_radps=self.wz_limit,
+                    ),
+                    command_timeout_s=self.watchdog_timeout_s,
+                    require_enable=False,
                 )
 
-                # E-stop latch (latched semantics; /safety/stop can feed it)
-                self._estop_latch = EstopLatch(auto_rearm=False)
+                # E-stop latch: latched semantics for /safety/stop
+                self._estop_latch = EstopLatch(
+                    start_latched=False,
+                    require_input_inactive_to_clear=True,
+                    record_timestamps=True,
+                )
 
                 # Timeout watchdog
-                self._timeout_wd = TimeoutWatchdog(
-                    TimeoutWatchdogConfig(
-                        timeout_s=self.watchdog_timeout_s,
-                        warning_ratio=0.7,
-                        enabled=True,
-                        auto_rearm=True,
-                        zero_on_trip=True,
-                    )
+                timeout_cfg = TimeoutWatchdogConfig(
+                    timeout_s=self.watchdog_timeout_s,
+                    auto_clear_on_fresh_kick=True,
+                    trip_if_never_kicked=False,
                 )
 
-                # Stale policy (currently advisory / future expansion)
-                self._stale_policy = StaleCommandPolicy(
-                    StaleCommandPolicyConfig(
-                        timeout_s=self.watchdog_timeout_s,
-                        zero_on_stale=True,
-                        hold_last_on_stale=False,
-                    )
+                self._timeout_wd = TimeoutWatchdog(timeout_cfg)
+
+                # Stale command policy
+                stale_cfg = StaleCommandPolicyConfig(
+                    force_zero_on_stale=True,
                 )
 
-                # Combined policy (preferred decision path)
+                self._stale_policy = StaleCommandPolicy(stale_cfg)
+
+                # Combined watchdog policy
                 self._watchdog_policy = WatchdogPolicy(
                     WatchdogPolicyConfig(
-                        timeout_s=self.watchdog_timeout_s,
-                        zero_on_trip=True,
-                        auto_rearm=True,
+                        enabled=True,
+                        timeout_watchdog=timeout_cfg,
+                        stale_policy=stale_cfg,
+                        estop_has_priority=True,
+                        pass_when_disabled=False,
                     )
                 )
 
@@ -416,6 +426,7 @@ class BaseDriverNode(Node):
                     "savo_base safety policies enabled "
                     "(CommandGuard + EstopLatch + TimeoutWatchdog + WatchdogPolicy)."
                 )
+
             except Exception as e:
                 self.get_logger().warn(f"Safety policy init failed, using local logic only: {e}")
                 self._cmd_guard = None
@@ -511,9 +522,9 @@ class BaseDriverNode(Node):
             if hasattr(decision, "to_dict"):
                 return decision.to_dict()
             return {
-                "must_stop": bool(getattr(decision, "must_stop", False)),
+                "force_zero": bool(getattr(decision, "force_zero", False)),
+                "blocked": bool(getattr(decision, "blocked", False)),
                 "reason": getattr(decision, "reason", None),
-                "slowdown_factor": getattr(decision, "slowdown_factor", None),
             }
         except Exception:
             return None
@@ -650,12 +661,19 @@ class BaseDriverNode(Node):
         # Preferred path: centralized command guard (if available)
         if self._cmd_guard is not None:
             try:
-                guarded = self._cmd_guard.guard(raw_vx, raw_vy, raw_wz)
-                vx = float(guarded.vx)
-                vy = float(guarded.vy)
-                wz = float(guarded.wz)
+                result = self._cmd_guard.evaluate(
+                    raw_cmd=Velocity3(raw_vx, raw_vy, raw_wz),
+                    base_enabled=True,
+                    estop_active=self._safety_stop,
+                    watchdog_tripped=False,
+                    command_stamp_monotonic_s=now_mono_s(),
+                    now_monotonic_s=now_mono_s(),
+                )
+                vx = float(result.command.vx)
+                vy = float(result.command.vy)
+                wz = float(result.command.wz)
             except Exception as e:
-                self.get_logger().warn(f"CommandGuard.guard() failed, fallback clamp used: {e}")
+                self.get_logger().warn(f"CommandGuard.evaluate() failed, fallback clamp used: {e}")
                 vx = _clamp(raw_vx, -self.vx_limit, self.vx_limit) if self.vx_limit > 0 else 0.0
                 vy = _clamp(raw_vy, -self.vy_limit, self.vy_limit) if self.vy_limit > 0 else 0.0
                 wz = _clamp(raw_wz, -self.wz_limit, self.wz_limit) if self.wz_limit > 0 else 0.0
@@ -678,22 +696,22 @@ class BaseDriverNode(Node):
         # Safety watchdog hooks (on command RX)
         if self._timeout_wd is not None:
             try:
-                self._timeout_wd.record_command_rx(
+                self._timeout_wd.kick(
+                    source="cmd_vel_safe",
                     now_monotonic_s=t_now,
-                    sequence=self._cmd_seq,
                 )
             except Exception as e:
-                self.get_logger().warn(f"TimeoutWatchdog.record_command_rx failed: {e}")
+                self.get_logger().warn(f"TimeoutWatchdog.kick failed: {e}")
 
         if self._watchdog_policy is not None:
             try:
-                self._watchdog_policy.record_command_rx(
-                    now_monotonic_s=t_now,
+                step_result = self._watchdog_policy.on_fresh_command_event(
                     source="cmd_vel_safe",
-                    sequence=self._cmd_seq,
+                    now_monotonic_s=t_now,
                 )
+                self._policy_last_decision = step_result.decision
             except Exception as e:
-                self.get_logger().warn(f"WatchdogPolicy.record_command_rx failed: {e}")
+                self.get_logger().warn(f"WatchdogPolicy.on_fresh_command_event failed: {e}")
 
         # Structured watchdog model (if available)
         if self._watchdog is not None:
@@ -710,16 +728,25 @@ class BaseDriverNode(Node):
         # Estop latch integration (latched behavior)
         if self._estop_latch is not None:
             try:
-                self._estop_latch.update(input_stop=incoming_stop, now_monotonic_s=t_now)
+                self._estop_latch.update(
+                    estop_input_active=incoming_stop,
+                    source="/safety/stop",
+                    now_monotonic_s=t_now,
+                )
             except Exception as e:
                 self.get_logger().warn(f"EstopLatch.update failed: {e}")
 
         # Combined policy hook
         if self._watchdog_policy is not None:
             try:
-                self._watchdog_policy.set_safety_stop(incoming_stop, now_monotonic_s=t_now)
+                self._watchdog_policy.set_estop_state(
+                    estop_active=incoming_stop,
+                    estop_latched=incoming_stop,
+                    source="/safety/stop",
+                    now_monotonic_s=t_now,
+                )
             except Exception as e:
-                self.get_logger().warn(f"WatchdogPolicy.set_safety_stop failed: {e}")
+                self.get_logger().warn(f"WatchdogPolicy.set_estop_state failed: {e}")
 
     def _on_slowdown_factor(self, msg: Float32) -> None:
         self._slowdown_factor = _clamp(float(msg.data), self.slowdown_min, self.slowdown_max)
@@ -737,20 +764,31 @@ class BaseDriverNode(Node):
         # -----------------------------------------------------------------
         if self._timeout_wd is not None:
             try:
-                self._timeout_wd.tick(now_monotonic_s=now)
+                self._timeout_wd.check(
+                    source="base_driver_loop",
+                    now_monotonic_s=now,
+                )
             except Exception as e:
-                self.get_logger().warn(f"TimeoutWatchdog.tick failed: {e}")
+                self.get_logger().warn(f"TimeoutWatchdog.check failed: {e}")
 
         if self._watchdog_policy is not None:
             try:
-                self._policy_last_decision = self._watchdog_policy.step(
+                self._watchdog_policy.set_estop_state(
+                    estop_active=bool(self._safety_stop or self._manual_estop_input),
+                    estop_latched=bool(self._safety_stop or self._manual_estop_input),
+                    source="base_driver_loop",
                     now_monotonic_s=now,
-                    cmd_timestamp_s=self._last_cmd.t_mono if self._last_cmd.t_mono > 0.0 else None,
-                    manual_estop=self._manual_estop_input,
-                    safety_stop=self._safety_stop,
                 )
+
+                step_result = self._watchdog_policy.update_watchdog_and_policy(
+                    source="base_driver_loop",
+                    now_monotonic_s=now,
+                )
+
+                self._policy_last_decision = step_result.decision
+
             except Exception as e:
-                self.get_logger().warn(f"WatchdogPolicy.step failed: {e}")
+                self.get_logger().warn(f"WatchdogPolicy.update_watchdog_and_policy failed: {e}")
                 self._policy_last_decision = None
 
         # Legacy / parallel telemetry watchdog model
@@ -765,18 +803,21 @@ class BaseDriverNode(Node):
         # -----------------------------------------------------------------
         if self._policy_last_decision is not None:
             try:
-                if bool(getattr(self._policy_last_decision, "must_stop", False)):
-                    reason = getattr(self._policy_last_decision, "reason", "watchdog_policy_stop")
+                if bool(getattr(self._policy_last_decision, "force_zero", False)) or bool(
+                    getattr(self._policy_last_decision, "blocked", False)
+                ):
+                    reason = getattr(
+                        self._policy_last_decision,
+                        "reason",
+                        "watchdog_policy_force_zero",
+                    )
                     self._apply_stop(reason=str(reason))
                     return
 
-                policy_slowdown = getattr(self._policy_last_decision, "slowdown_factor", None)
-                if policy_slowdown is not None:
-                    self._slowdown_factor = _clamp(
-                        float(policy_slowdown), self.slowdown_min, self.slowdown_max
-                    )
             except Exception as e:
-                self.get_logger().warn(f"Policy decision handling failed, fallback local logic used: {e}")
+                self.get_logger().warn(
+                    f"Policy decision handling failed, fallback local logic used: {e}"
+                )
 
         # Local stale detection (always active as fallback)
         cmd_age = math.inf if self._last_cmd.t_mono <= 0.0 else max(0.0, now - self._last_cmd.t_mono)
@@ -801,18 +842,12 @@ class BaseDriverNode(Node):
             # Advisory stale policy hook (best effort; API may evolve)
             if self._stale_policy is not None:
                 try:
-                    _ = self._stale_policy.evaluate(
+                    _ = self._stale_policy.step(
+                        watchdog_is_stale=True,
+                        fresh_command_event=False,
+                        source="base_driver_local_stale",
                         now_monotonic_s=now,
-                        cmd_timestamp_s=self._last_cmd.t_mono if self._last_cmd.t_mono > 0.0 else None,
                     )
-                except TypeError:
-                    try:
-                        _ = self._stale_policy.step(
-                            now_monotonic_s=now,
-                            cmd_timestamp_s=self._last_cmd.t_mono if self._last_cmd.t_mono > 0.0 else None,
-                        )
-                    except Exception:
-                        pass
                 except Exception:
                     pass
 

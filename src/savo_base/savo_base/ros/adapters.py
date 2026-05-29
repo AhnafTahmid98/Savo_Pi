@@ -41,10 +41,17 @@ from std_msgs.msg import Bool, String
 from geometry_msgs.msg import Twist
 
 # Internal models (created earlier in your savo_base package)
-from savo_base.models.wheel_command import WheelCommand
+from savo_base.models.wheel_command import (
+    WheelCommand,
+    WheelNorm,
+    make_robot_savo_wheel_command,
+)
 from savo_base.models.base_state import BaseState
 from savo_base.models.watchdog_state import WatchdogState
 from savo_base.models.motor_board_status import MotorBoardStatus
+
+# Kinematics
+from savo_base.kinematics.mecanum import mix_mecanum
 
 
 # =============================================================================
@@ -132,33 +139,43 @@ def twist_to_wheel_command(
     source: str = "ros:/cmd_vel_safe",
 ) -> WheelCommand:
     """
-    Convert Twist to internal WheelCommand (command frame only).
-
-    Notes
-    -----
-    This helper stores the *robot command intent* (vx, vy, wz).
-    Actual wheel mixing (mecanum kinematics) is handled elsewhere
-    (e.g., `savo_base.kinematics.mecanum`).
+    Convert Twist to internal WheelCommand.
     """
     vx, vy, wz = twist_to_planar_components(msg)
-    ts = monotonic_s() if stamp_mono_s is None else float(stamp_mono_s)
 
-    # Supports the dataclass structure we created earlier for WheelCommand
-    # (vx, vy, wz + metadata fields).
-    return WheelCommand(
-        vx=vx,
-        vy=vy,
-        wz=wz,
-        stamp_mono_s=ts,
-        source=source,
+    fl, rl, fr, rr = mix_mecanum(
+        vx,
+        vy,
+        wz,
+        forward_sign=-1,
+        strafe_sign=+1,
+        rotate_sign=+1,
+        turn_gain=1.0,
     )
+
+    cmd = make_robot_savo_wheel_command(
+        source=source,
+        mode="cmd_vel",
+        wheel_norm=WheelNorm(fl=fl, rl=rl, fr=fr, rr=rr),
+        note=f"vx={vx:.3f} vy={vy:.3f} wz={wz:.3f}",
+    )
+
+    cmd.vx_cmd = float(vx)
+    cmd.vy_cmd = float(vy)
+    cmd.wz_cmd = float(wz)
+
+    return cmd
 
 
 def wheel_command_to_twist(cmd: WheelCommand) -> Twist:
     """
     Convert internal WheelCommand back to geometry_msgs/Twist.
     """
-    return planar_components_to_twist(cmd.vx, cmd.vy, cmd.wz)
+    return planar_components_to_twist(
+        0.0 if cmd.vx_cmd is None else cmd.vx_cmd,
+        0.0 if cmd.vy_cmd is None else cmd.vy_cmd,
+        0.0 if cmd.wz_cmd is None else cmd.wz_cmd,
+    )
 
 
 # =============================================================================
