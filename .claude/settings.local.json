@@ -1,7 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(python3 -m py_compile src/savo_base/savo_base/nodes/base_driver_node.py src/savo_base/launch/base_safe_idle.launch.py src/savo_base/launch/base_teleop_test.launch.py src/savo_base/test/test_param_loader.py src/savo_base/test/test_timeout_watchdog_logic.py src/savo_base/test/test_topic_names.py)"
-    ]
-  }
-}
