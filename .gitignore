@@ -71,6 +71,14 @@ models/checkpoints/
 # VS Code
 .vscode/
 
+# -----------------------------------------------------------------------------
+# AI assistant / local agent tool folders
+# -----------------------------------------------------------------------------
+.agents/
+.claude/
+.codex/
+.pylibs/
+
 # JetBrains / PyCharm / CLion / etc.
 .idea/
 *.iml

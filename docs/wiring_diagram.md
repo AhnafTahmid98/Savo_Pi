@@ -1,1 +1,0 @@
-# wiring_diagram.md
