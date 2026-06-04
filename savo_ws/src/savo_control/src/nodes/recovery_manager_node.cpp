@@ -64,8 +64,11 @@ public:
     topic_stuck_detected_ = this->declare_parameter<std::string>(
       "topics.stuck_detected", topic_names::kStuckDetected);
 
-    topic_recovery_trigger_ = this->declare_parameter<std::string>(
-      "topics.recovery_trigger", topic_names::kRecoveryTrigger);
+    topic_recovery_request_ = this->declare_parameter<std::string>(
+      "topics.recovery_request", topic_names::kRecoveryRequest);
+
+    topic_recovery_active_ = this->declare_parameter<std::string>(
+      "topics.recovery_active", topic_names::kRecoveryActive);
 
     topic_safety_stop_ = this->declare_parameter<std::string>(
       "topics.safety_stop", topic_names::kSafetyStop);
@@ -81,7 +84,7 @@ public:
 
     // Optional/manual integration topics (defaults kept reusable)
     topic_manual_override_ = this->declare_parameter<std::string>(
-      "topics.manual_override", topic_names::kControlModeCmd);  // can remap to Bool topic
+      "topics.manual_override", "");  // optional Bool topic; empty => use param default
 
     topic_motion_allowed_ = this->declare_parameter<std::string>(
       "topics.motion_allowed", "");  // optional Bool topic; empty => use param default
@@ -155,10 +158,10 @@ public:
     pub_recovery_status_ = this->create_publisher<std_msgs::msg::String>(
       topic_recovery_status_, rclcpp::QoS(10));
 
-    // Also publish Bool on kRecoveryTrigger for observability / downstream simple use
+    // Also publish Bool on kRecoveryActive for observability / downstream use
     // (true when active recovery action is running)
-    pub_recovery_trigger_bool_ = this->create_publisher<std_msgs::msg::Bool>(
-      topic_recovery_trigger_, rclcpp::QoS(10));
+    pub_recovery_active_bool_ = this->create_publisher<std_msgs::msg::Bool>(
+      topic_recovery_active_, rclcpp::QoS(10));
 
     // -------------------------------------------------------------------------
     // Subscribers (core inputs)
@@ -170,6 +173,10 @@ public:
     sub_safety_stop_ = this->create_subscription<std_msgs::msg::Bool>(
       topic_safety_stop_, rclcpp::QoS(10),
       std::bind(&RecoveryManagerNode::on_safety_stop_, this, std::placeholders::_1));
+
+    sub_recovery_request_ = this->create_subscription<std_msgs::msg::Bool>(
+      topic_recovery_request_, rclcpp::QoS(10),
+      std::bind(&RecoveryManagerNode::on_recovery_request_, this, std::placeholders::_1));
 
     // NOTE: topic_names::kControlModeCmd is string in your layout; if left default,
     // this Bool subscriber may not match any publisher (harmless). Set a real Bool
@@ -278,6 +285,14 @@ private:
     no_progress_.stamp = this->now();
   }
 
+  void on_recovery_request_(const std_msgs::msg::Bool::SharedPtr msg)
+  {
+    if (!msg) return;
+    recovery_request_.value = msg->data;
+    recovery_request_.has_msg = true;
+    recovery_request_.stamp = this->now();
+  }
+
   void on_backup_completed_(const std_msgs::msg::Bool::SharedPtr msg)
   {
     if (!msg) return;
@@ -305,9 +320,11 @@ private:
     // Build manager inputs using stale-aware reads
     RecoveryInputs in{};
     in.stuck_detected = read_input_(stuck_detected_, stale_stuck_as_false_ ? false : true);
+    const bool recovery_requested = read_input_(recovery_request_, false);
+
     in.no_progress = has_no_progress_topic_
-      ? read_input_(no_progress_, stale_no_progress_as_false_ ? false : true)
-      : false;
+      ? read_input_(no_progress_, stale_no_progress_as_false_ ? false : true) || recovery_requested
+      : recovery_requested;
     in.safety_stop_active = read_input_(safety_stop_, stale_safety_stop_as_true_ ? true : false);
     in.manual_override = (!topic_manual_override_.empty())
       ? read_input_(manual_override_, stale_manual_override_as_true_ ? true : false)
@@ -320,9 +337,8 @@ private:
       in.motion_allowed = true;
     }
 
-    // External cancel trigger: edge on /recovery_trigger bool false->true from outside is awkward
-    // because this node also publishes same topic as state. To keep clean behavior, treat ONLY
-    // manual_override as cancel in current wiring unless user maps a dedicated cancel topic later.
+    // External cancel: treat only manual_override as cancel in current wiring.
+    // A dedicated cancel topic can be mapped via params if needed later.
     in.external_cancel = false;
 
     in.backup_completed = (use_external_backup_completed_ && !topic_backup_completed_.empty())
@@ -346,10 +362,10 @@ private:
       pub_cmd_vel_recovery_->publish(cmd);
     }
 
-    // Publish Bool trigger/state (true when active recovery commanding stage is active)
-    std_msgs::msg::Bool trig_msg;
-    trig_msg.data = s.active;
-    pub_recovery_trigger_bool_->publish(trig_msg);
+    // Publish Bool active state (true when active recovery commanding stage is active)
+    std_msgs::msg::Bool active_msg;
+    active_msg.data = s.active;
+    pub_recovery_active_bool_->publish(active_msg);
 
     // Publish status strings / debug snapshots (throttled by change + periodic)
     maybe_publish_state_and_status_(s, now_ros);
@@ -498,7 +514,13 @@ private:
     if (topic_cmd_vel_recovery_.empty()) topic_cmd_vel_recovery_ = topic_names::kCmdVelRecovery;
     if (topic_recovery_state_.empty()) topic_recovery_state_ = topic_names::kRecoveryState;
     if (topic_recovery_status_.empty()) topic_recovery_status_ = topic_names::kRecoveryStatus;
-    if (topic_recovery_trigger_.empty()) topic_recovery_trigger_ = topic_names::kRecoveryTrigger;
+    if (topic_recovery_request_.empty()) {
+      topic_recovery_request_ = topic_names::kRecoveryRequest;
+    }
+
+    if (topic_recovery_active_.empty()) {
+      topic_recovery_active_ = topic_names::kRecoveryActive;
+    }
   }
 
   static const char * phase_to_cstr_(RecoveryPhase p)
@@ -538,10 +560,11 @@ private:
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr pub_cmd_vel_recovery_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr pub_recovery_state_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr pub_recovery_status_;
-  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr pub_recovery_trigger_bool_;
+  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr pub_recovery_active_bool_;
 
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_stuck_detected_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_safety_stop_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_recovery_request_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_manual_override_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_motion_allowed_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_no_progress_;
@@ -552,7 +575,8 @@ private:
 
   // Topic names
   std::string topic_stuck_detected_;
-  std::string topic_recovery_trigger_;
+  std::string topic_recovery_request_;
+  std::string topic_recovery_active_;
   std::string topic_safety_stop_;
   std::string topic_cmd_vel_recovery_;
   std::string topic_recovery_state_;
@@ -588,6 +612,7 @@ private:
   TimedBool safety_stop_{};
   TimedBool manual_override_{};
   TimedBool motion_allowed_{};
+  TimedBool recovery_request_{};
   TimedBool no_progress_{};
   TimedBool backup_completed_{};
   TimedBool turn_completed_{};

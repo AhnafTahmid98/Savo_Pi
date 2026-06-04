@@ -1,0 +1,250 @@
+# =============================================================================
+# Robot Savo — savo_control/config/stuck_detector.yaml
+#
+# Purpose:
+#   Detect possible stuck conditions using commanded motion and fused odometry.
+#
+# Package role:
+#   savo_control can detect and report "stuck" conditions, and later request
+#   recovery behavior. It must NOT control hardware directly.
+#
+# Data sources:
+#   /cmd_vel              = shaped command leaving savo_control
+#   /cmd_vel_safe         = safety-gated command going to savo_base
+#   /odometry/filtered    = fused odometry from savo_localization
+#   /safety/stop          = obstacle/safety stop from savo_perception
+#
+# Future /odometry/filtered inputs:
+#   - 4 wheel encoder odometry on savo-core
+#   - IMU on savo-core
+#   - VO / visual odometry from savo-edge
+#
+# Important:
+#   - Do not detect "stuck" while /safety/stop is true.
+#   - Do not detect "stuck" if /cmd_vel_safe is already zero because safety
+#     gate stopped the robot.
+#   - Recovery command generation should publish only to /cmd_vel_recovery.
+# =============================================================================
+
+stuck_detector_node:
+  ros__parameters:
+
+    # -------------------------------------------------------------------------
+    # Enable / disable
+    # -------------------------------------------------------------------------
+    enabled: true
+
+    # For first build/testing, this can be false if odometry is not ready yet.
+    # When /odometry/filtered is stable, set true.
+    active_detection: true
+
+    # -------------------------------------------------------------------------
+    # Topic configuration
+    # -------------------------------------------------------------------------
+    topics:
+      # Command before safety gate.
+      cmd_vel: "/cmd_vel"
+
+      # Command after safety gate, going to savo_base.
+      cmd_vel_safe: "/cmd_vel_safe"
+
+      # Fused odometry from robot_localization.
+      odom: "/odometry/filtered"
+
+      # Safety stop from savo_perception.
+      safety_stop: "/safety/stop"
+
+      # Optional slowdown factor from safety layer.
+      slowdown_factor: "/safety/slowdown_factor"
+
+      # Stuck state output.
+      stuck_state: "/savo_control/stuck_state"
+
+      # Optional debug/status output.
+      status: "/savo_control/stuck_detector_status"
+
+      # Optional recovery request topic (stuck detector may publish here to request recovery).
+      recovery_request: "/savo_control/recovery_request"
+
+      # Optional mode command if detector is allowed to request RECOVERY.
+      mode_cmd: "/savo_control/mode_cmd"
+
+    # -------------------------------------------------------------------------
+    # Timing / freshness
+    # -------------------------------------------------------------------------
+    timing:
+      loop_hz: 20.0
+
+      # Required topic freshness.
+      cmd_timeout_s: 0.40
+      cmd_safe_timeout_s: 0.40
+      odom_timeout_s: 0.50
+      safety_timeout_s: 0.50
+
+      # Minimum time of poor movement before declaring stuck.
+      stuck_time_s: 2.0
+
+      # Time of normal movement before clearing stuck.
+      clear_time_s: 1.0
+
+      # Cooldown after declaring stuck, before declaring again.
+      retrigger_cooldown_s: 3.0
+
+    # -------------------------------------------------------------------------
+    # Command thresholds
+    # -------------------------------------------------------------------------
+    #
+    # The detector only runs when the robot is clearly commanded to move.
+    # These are conservative because your current Twist values may be normalized
+    # command strengths before final physical calibration.
+    command_thresholds:
+      min_cmd_vx: 0.08
+      min_cmd_vy: 0.08
+      min_cmd_wz: 0.20
+
+      # Use /cmd_vel_safe to confirm the command actually reached base layer.
+      # If /cmd_vel is nonzero but /cmd_vel_safe is zero, that is safety gating,
+      # not a mechanical stuck condition.
+      require_cmd_vel_safe_nonzero: true
+
+      min_cmd_safe_vx: 0.05
+      min_cmd_safe_vy: 0.05
+      min_cmd_safe_wz: 0.12
+
+    # -------------------------------------------------------------------------
+    # Observed movement thresholds
+    # -------------------------------------------------------------------------
+    #
+    # If command is above threshold but odometry motion is below these values
+    # for stuck_time_s, declare stuck.
+    observed_motion_thresholds:
+      min_linear_speed_m_s: 0.025
+      min_angular_speed_rad_s: 0.06
+
+      # For mecanum, lateral movement can slip more than forward motion.
+      # Be slightly tolerant during strafe tests.
+      min_strafe_speed_m_s: 0.020
+
+      # If odometry is noisy, require the motion to be below threshold for
+      # several cycles before counting as stuck.
+      require_consistent_low_motion: true
+
+    # -------------------------------------------------------------------------
+    # Detection logic
+    # -------------------------------------------------------------------------
+    detection:
+      # Detect stuck for translation commands.
+      detect_linear_stuck: true
+
+      # Detect stuck for rotation commands.
+      detect_angular_stuck: true
+
+      # Detect stuck during strafe commands.
+      detect_strafe_stuck: true
+
+      # Ignore when safety stop is true.
+      # This is critical: if obstacle is in front, being stopped is correct.
+      ignore_when_safety_stop_true: true
+
+      # Ignore when slowdown factor is very low.
+      # If safety layer slowed the robot strongly, low odom speed is expected.
+      ignore_when_slowdown_below: 0.30
+
+      # Ignore when command is too small.
+      ignore_small_commands: true
+
+      # Ignore for a short time after mode changes or startup.
+      startup_grace_s: 2.0
+
+      # If odometry is stale, do not declare stuck.
+      # Instead publish status "ODOM_STALE".
+      do_not_declare_stuck_on_odom_stale: true
+
+      # If cmd_vel_safe is stale, do not declare stuck.
+      do_not_declare_stuck_on_cmd_safe_stale: true
+
+    # -------------------------------------------------------------------------
+    # Debounce / confidence
+    # -------------------------------------------------------------------------
+    debounce:
+      # Number of consecutive low-motion samples before internal stuck counter.
+      stuck_count_required: 5
+
+      # Number of consecutive moving samples before clearing stuck.
+      clear_count_required: 5
+
+      # Confidence threshold from 0.0 to 1.0 for publishing stuck=true.
+      stuck_confidence_threshold: 0.75
+
+      # Confidence increase/decrease per detection cycle.
+      confidence_rise_per_cycle: 0.10
+      confidence_fall_per_cycle: 0.15
+
+    # -------------------------------------------------------------------------
+    # Recovery integration
+    # -------------------------------------------------------------------------
+    recovery:
+      # For first real tests, keep this false.
+      # First verify stuck detection only; then enable recovery triggering.
+      publish_recovery_request: false
+
+      # If true, detector may publish RECOVERY to /savo_control/mode_cmd.
+      request_recovery_mode: false
+
+      recovery_mode_name: "RECOVERY"
+
+      # Minimum time stuck before requesting recovery.
+      min_stuck_time_before_recovery_s: 2.5
+
+      # Maximum recovery requests per stuck event.
+      max_recovery_requests_per_event: 1
+
+    # -------------------------------------------------------------------------
+    # Output behavior
+    # -------------------------------------------------------------------------
+    output:
+      # Publish std_msgs/Bool or a future custom status message depending on node.
+      stuck_state_topic_type: "std_msgs/Bool"
+
+      publish_status: true
+      status_hz: 5.0
+
+      # Publish false on startup.
+      publish_clear_on_startup: true
+
+      # Publish false after clear_time_s of normal movement.
+      publish_clear_when_unstuck: true
+
+    # -------------------------------------------------------------------------
+    # Safety behavior
+    # -------------------------------------------------------------------------
+    safety:
+      # Never command motors directly.
+      allow_direct_hardware_control: false
+
+      # Never publish directly to /cmd_vel_safe.
+      allow_direct_cmd_vel_safe_publish: false
+
+      # Do not trigger recovery if safety stop is active.
+      block_recovery_when_safety_stop_true: true
+
+      # Do not trigger recovery if odometry is stale.
+      block_recovery_when_odom_stale: true
+
+      # Do not trigger recovery if cmd_vel_safe is stale.
+      block_recovery_when_cmd_safe_stale: true
+
+    # -------------------------------------------------------------------------
+    # Diagnostics / logging
+    # -------------------------------------------------------------------------
+    diagnostics:
+      enable_logs: true
+      log_stuck_detected: true
+      log_stuck_cleared: true
+      log_ignored_due_to_safety_stop: true
+      log_odom_stale: true
+      log_cmd_safe_stale: true
+      log_throttle_s: 2.0
+
+      # Useful during first tuning.
+      publish_debug_values: true

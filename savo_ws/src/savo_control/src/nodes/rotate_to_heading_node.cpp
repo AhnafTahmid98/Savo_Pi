@@ -73,7 +73,7 @@ public:
       "enable_topic", topic_names::kHeadingHoldEnable);  // reusable Bool topic (can override)
 
     cancel_topic_ = this->declare_parameter<std::string>(
-      "cancel_topic", topic_names::kRecoveryTrigger);    // reusable trigger topic (Bool true=cxl)
+      "cancel_topic", topic_names::kRecoveryRequest);    // Bool true = cancel active rotation
 
     output_topic_ = this->declare_parameter<std::string>(
       "output_topic", topic_names::kCmdVelRecovery);
@@ -516,7 +516,7 @@ private:
     if (odom_topic_.empty()) odom_topic_ = topic_names::kOdomFiltered;
     if (rotate_target_topic_.empty()) rotate_target_topic_ = topic_names::kRotateTarget;
     if (enable_topic_.empty()) enable_topic_ = topic_names::kHeadingHoldEnable;
-    if (cancel_topic_.empty()) cancel_topic_ = topic_names::kRecoveryTrigger;
+    if (cancel_topic_.empty()) cancel_topic_ = topic_names::kRecoveryRequest;
     if (output_topic_.empty()) output_topic_ = topic_names::kCmdVelRecovery;
     if (state_topic_.empty()) state_topic_ = topic_names::kRotateState;
     if (status_topic_.empty()) status_topic_ = topic_names::kRecoveryStatus;

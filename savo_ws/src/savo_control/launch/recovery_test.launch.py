@@ -1,0 +1,316 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+Robot Savo — savo_control / recovery_test.launch.py
+===================================================
+
+Recovery test launch file for Robot Savo.
+
+Purpose
+-------
+Starts the recovery test manager plus the control chain needed to test local
+recovery behavior safely.
+
+Recovery test command chain:
+
+    recovery_test_manager_node
+        -> /cmd_vel_recovery
+        -> twist_mux_node
+        -> /cmd_vel_mux
+        -> cmd_vel_shaper_node
+        -> /cmd_vel
+        -> savo_perception/cmd_vel_safety_gate
+        -> /cmd_vel_safe
+        -> savo_base/base_driver_node
+        -> motors
+
+Recovery status contract:
+
+    /savo_control/recovery_request  # request input
+    /savo_control/recovery_active   # active output/status
+
+Important package boundaries:
+    - recovery_test_manager_node publishes only /cmd_vel_recovery
+    - recovery_manager_node may publish /savo_control/recovery_active
+    - savo_control publishes /cmd_vel
+    - safety gate publishes /cmd_vel_safe
+    - savo_base executes motor hardware
+
+This launch file does NOT:
+    - start savo_base
+    - start savo_perception safety gate
+    - publish directly to /cmd_vel_safe
+    - touch motor hardware directly
+
+Safety
+------
+First recovery tests should be done with:
+    - wheels lifted
+    - very low speed
+    - safety gate running before floor tests
+    - no person/object close to the robot
+    - hand near E-stop / power switch
+"""
+
+from __future__ import annotations
+
+import os
+
+from ament_index_python.packages import get_package_share_directory
+from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument, LogInfo
+from launch.conditions import IfCondition
+from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node
+
+
+def generate_launch_description() -> LaunchDescription:
+    pkg_share = get_package_share_directory("savo_control")
+
+    control_common_yaml = os.path.join(pkg_share, "config", "control_common.yaml")
+    twist_mux_yaml = os.path.join(pkg_share, "config", "twist_mux.yaml")
+    cmd_vel_shaper_yaml = os.path.join(pkg_share, "config", "cmd_vel_shaper.yaml")
+    recovery_yaml = os.path.join(pkg_share, "config", "recovery.yaml")
+
+    use_mode_manager = LaunchConfiguration("use_mode_manager")
+    use_twist_mux = LaunchConfiguration("use_twist_mux")
+    use_cmd_vel_shaper = LaunchConfiguration("use_cmd_vel_shaper")
+    use_recovery_manager = LaunchConfiguration("use_recovery_manager")
+    use_backup_escape = LaunchConfiguration("use_backup_escape")
+    use_recovery_test_manager = LaunchConfiguration("use_recovery_test_manager")
+    use_control_status = LaunchConfiguration("use_control_status")
+    use_recovery_status = LaunchConfiguration("use_recovery_status")
+    use_dashboard = LaunchConfiguration("use_dashboard")
+
+    startup_mode = LaunchConfiguration("startup_mode")
+    auto_start = LaunchConfiguration("auto_start")
+    default_test_name = LaunchConfiguration("default_test_name")
+
+    return LaunchDescription(
+        [
+            # -----------------------------------------------------------------
+            # Launch arguments
+            # -----------------------------------------------------------------
+            DeclareLaunchArgument(
+                "use_mode_manager",
+                default_value="true",
+                description="Start control_mode_manager_node.",
+            ),
+            DeclareLaunchArgument(
+                "use_twist_mux",
+                default_value="true",
+                description="Start twist_mux_node.",
+            ),
+            DeclareLaunchArgument(
+                "use_cmd_vel_shaper",
+                default_value="true",
+                description="Start cmd_vel_shaper_node.",
+            ),
+            DeclareLaunchArgument(
+                "use_recovery_manager",
+                default_value="true",
+                description="Start recovery_manager_node.",
+            ),
+            DeclareLaunchArgument(
+                "use_backup_escape",
+                default_value="true",
+                description="Start backup_escape_node.",
+            ),
+            DeclareLaunchArgument(
+                "use_recovery_test_manager",
+                default_value="true",
+                description="Start recovery_test_manager_node.py.",
+            ),
+            DeclareLaunchArgument(
+                "use_control_status",
+                default_value="true",
+                description="Start control_status_node.py.",
+            ),
+            DeclareLaunchArgument(
+                "use_recovery_status",
+                default_value="true",
+                description="Start recovery_status_node.py.",
+            ),
+            DeclareLaunchArgument(
+                "use_dashboard",
+                default_value="false",
+                description=(
+                    "Start curses dashboard. Usually false; run dashboard "
+                    "separately in its own terminal."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "startup_mode",
+                default_value="RECOVERY",
+                description="Startup control mode. For recovery tests this should be RECOVERY.",
+            ),
+            DeclareLaunchArgument(
+                "auto_start",
+                default_value="false",
+                description=(
+                    "If true, recovery_test_manager_node starts default_test_name immediately. "
+                    "Keep false unless wheels are lifted."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "default_test_name",
+                default_value="BACKUP_ONLY",
+                description=(
+                    "Default recovery test name: BACKUP_ONLY, ROTATE_LEFT, ROTATE_RIGHT, "
+                    "BACKUP_THEN_ROTATE_LEFT, BACKUP_THEN_ROTATE_RIGHT, STOP_ONLY."
+                ),
+            ),
+            LogInfo(
+                msg=[
+                    "Starting Robot Savo recovery test | startup_mode=",
+                    startup_mode,
+                    " | auto_start=",
+                    auto_start,
+                    " | default_test=",
+                    default_test_name,
+                    " | output path: /cmd_vel_recovery -> /cmd_vel_mux -> /cmd_vel -> /cmd_vel_safe",
+                ]
+            ),
+
+            # -----------------------------------------------------------------
+            # Core mode/mux/shaper chain
+            # -----------------------------------------------------------------
+            Node(
+                condition=IfCondition(use_mode_manager),
+                package="savo_control",
+                executable="control_mode_manager_node",
+                name="control_mode_manager_node",
+                output="screen",
+                parameters=[
+                    control_common_yaml,
+                    {
+                        "startup_mode": startup_mode,
+                    },
+                ],
+            ),
+            Node(
+                condition=IfCondition(use_twist_mux),
+                package="savo_control",
+                executable="twist_mux_node",
+                name="twist_mux_node",
+                output="screen",
+                parameters=[
+                    control_common_yaml,
+                    twist_mux_yaml,
+                    {
+                        "default_mode": startup_mode,
+                    },
+                ],
+            ),
+            Node(
+                condition=IfCondition(use_cmd_vel_shaper),
+                package="savo_control",
+                executable="cmd_vel_shaper_node",
+                name="cmd_vel_shaper_node",
+                output="screen",
+                parameters=[
+                    control_common_yaml,
+                    cmd_vel_shaper_yaml,
+                    {
+                        "default_profile": "safe_default",
+                    },
+                ],
+            ),
+
+            # -----------------------------------------------------------------
+            # Recovery manager / backup escape
+            # -----------------------------------------------------------------
+            Node(
+                condition=IfCondition(use_recovery_manager),
+                package="savo_control",
+                executable="recovery_manager_node",
+                name="recovery_manager_node",
+                output="screen",
+                parameters=[
+                    control_common_yaml,
+                    recovery_yaml,
+                ],
+            ),
+            Node(
+                condition=IfCondition(use_backup_escape),
+                package="savo_control",
+                executable="backup_escape_node",
+                name="backup_escape_node",
+                output="screen",
+                parameters=[
+                    control_common_yaml,
+                    recovery_yaml,
+                ],
+            ),
+
+            # -----------------------------------------------------------------
+            # Python recovery test manager
+            # -----------------------------------------------------------------
+            Node(
+                condition=IfCondition(use_recovery_test_manager),
+                package="savo_control",
+                executable="recovery_test_manager_node.py",
+                name="recovery_test_manager_node",
+                output="screen",
+                parameters=[
+                    control_common_yaml,
+                    recovery_yaml,
+                    {
+                        "auto_start": auto_start,
+                        "default_test_name": default_test_name,
+                        "request_recovery_mode_on_start": True,
+                        "required_mode": "RECOVERY",
+                        "return_to_stop_on_finish": False,
+                    },
+                ],
+            ),
+
+            # -----------------------------------------------------------------
+            # Status/dashboard
+            # -----------------------------------------------------------------
+            Node(
+                condition=IfCondition(use_control_status),
+                package="savo_control",
+                executable="control_status_node.py",
+                name="control_status_node",
+                output="screen",
+                parameters=[
+                    control_common_yaml,
+                    {
+                        "watch_odom": False,
+                        "publish_console_log": True,
+                    },
+                ],
+            ),
+            Node(
+                condition=IfCondition(use_recovery_status),
+                package="savo_control",
+                executable="recovery_status_node.py",
+                name="recovery_status_node",
+                output="screen",
+                parameters=[
+                    control_common_yaml,
+                    recovery_yaml,
+                    {
+                        "watch_odom": False,
+                    },
+                ],
+            ),
+            Node(
+                condition=IfCondition(use_dashboard),
+                package="savo_control",
+                executable="control_dashboard_node.py",
+                name="control_dashboard_node",
+                output="screen",
+                emulate_tty=True,
+                parameters=[
+                    control_common_yaml,
+                    {
+                        "watch_odom": False,
+                        "watch_depth": False,
+                    },
+                ],
+            ),
+        ]
+    )

@@ -1,0 +1,249 @@
+# =============================================================================
+# Robot Savo — savo_control/config/auto_test_modes.yaml
+#
+# Purpose:
+#   Defines safe, repeatable automatic test motion profiles for Robot Savo.
+#
+# Important architecture rule:
+#   This file is for command-generation tests only.
+#   It does NOT bypass safety.
+#
+# Expected command chain:
+#   auto_test_manager / velocity_test_pattern
+#       -> /cmd_vel_auto
+#       -> twist_mux_node
+#       -> /cmd_vel_mux
+#       -> cmd_vel_shaper_node
+#       -> /cmd_vel
+#       -> savo_perception/cmd_vel_safety_gate
+#       -> /cmd_vel_safe
+#       -> savo_base/base_driver_node
+#
+# Notes:
+#   - Values are intentionally conservative for real robot testing.
+#   - At the current stage, Twist values are treated as normalized command
+#     strengths unless the base is fully calibrated to real m/s and rad/s.
+#   - Use only on a lifted robot first, then on open floor with E-stop ready.
+# =============================================================================
+
+auto_test_manager_node:
+  ros__parameters:
+
+    # -------------------------------------------------------------------------
+    # Global safety/test settings
+    # -------------------------------------------------------------------------
+    enabled: true
+
+    # All auto test commands should publish here.
+    # twist_mux_node must subscribe to this topic as the AUTO source.
+    output_topic: "/cmd_vel_auto"
+
+    # Stop command is always sent before and after each test.
+    send_stop_before_test: true
+    send_stop_after_test: true
+
+    # Time to publish zero Twist before starting and after finishing.
+    stop_hold_s: 1.0
+
+    # Publish frequency for generated Twist commands.
+    publish_hz: 20.0
+
+    # Hard timeout for any single test.
+    # Prevents a broken test from driving forever.
+    max_test_duration_s: 10.0
+
+    # If true, the test manager must refuse to run unless the requested test
+    # name exists in this YAML.
+    require_known_test_name: true
+
+    # -------------------------------------------------------------------------
+    # Conservative global command limits for tests
+    # -------------------------------------------------------------------------
+    limits:
+      max_vx: 0.18          # forward/backward command limit
+      max_vy: 0.18          # strafe command limit
+      max_wz: 0.45          # rotation command limit
+
+      # Extra conservative mode for first floor tests.
+      low_speed_scale: 0.50
+
+    # -------------------------------------------------------------------------
+    # Test profile list
+    # -------------------------------------------------------------------------
+    #
+    # type:
+    #   constant_twist  = hold one Twist for duration_s
+    #   pulse_twist     = alternate command and stop
+    #   sequence        = run multiple named stages
+    #
+    # Twist fields:
+    #   vx = linear.x
+    #   vy = linear.y
+    #   wz = angular.z
+    #
+    # Mecanum expected signs:
+    #   vx > 0  = forward
+    #   vx < 0  = backward
+    #   vy > 0  = strafe left or right depending your base convention
+    #             Verify with lifted robot first.
+    #   wz > 0  = rotate counter-clockwise by ROS convention
+    #
+    tests:
+
+      # -----------------------------------------------------------------------
+      # Basic forward/backward tests
+      # -----------------------------------------------------------------------
+      forward_slow:
+        description: "Drive forward slowly for basic motion check."
+        type: "constant_twist"
+        duration_s: 2.0
+        vx: 0.10
+        vy: 0.00
+        wz: 0.00
+
+      backward_slow:
+        description: "Drive backward slowly for basic motion check."
+        type: "constant_twist"
+        duration_s: 2.0
+        vx: -0.10
+        vy: 0.00
+        wz: 0.00
+
+      # -----------------------------------------------------------------------
+      # Mecanum strafe tests
+      # -----------------------------------------------------------------------
+      strafe_left_slow:
+        description: "Slow lateral test. Confirm actual left/right direction on robot."
+        type: "constant_twist"
+        duration_s: 1.5
+        vx: 0.00
+        vy: 0.10
+        wz: 0.00
+
+      strafe_right_slow:
+        description: "Slow lateral test. Confirm actual left/right direction on robot."
+        type: "constant_twist"
+        duration_s: 1.5
+        vx: 0.00
+        vy: -0.10
+        wz: 0.00
+
+      # -----------------------------------------------------------------------
+      # Rotation tests
+      # -----------------------------------------------------------------------
+      rotate_ccw_slow:
+        description: "Rotate counter-clockwise slowly."
+        type: "constant_twist"
+        duration_s: 1.5
+        vx: 0.00
+        vy: 0.00
+        wz: 0.25
+
+      rotate_cw_slow:
+        description: "Rotate clockwise slowly."
+        type: "constant_twist"
+        duration_s: 1.5
+        vx: 0.00
+        vy: 0.00
+        wz: -0.25
+
+      # -----------------------------------------------------------------------
+      # Pulse tests
+      # -----------------------------------------------------------------------
+      forward_pulse:
+        description: "Short forward pulses for checking watchdog, acceleration, and stop behavior."
+        type: "pulse_twist"
+        pulses: 3
+        active_s: 0.6
+        rest_s: 0.8
+        vx: 0.10
+        vy: 0.00
+        wz: 0.00
+
+      rotate_pulse:
+        description: "Short rotation pulses for checking heading response and safe stop."
+        type: "pulse_twist"
+        pulses: 3
+        active_s: 0.5
+        rest_s: 0.8
+        vx: 0.00
+        vy: 0.00
+        wz: 0.25
+
+      # -----------------------------------------------------------------------
+      # Full mecanum sanity sequence
+      # -----------------------------------------------------------------------
+      mecanum_sanity:
+        description: "Short sequence: forward, backward, strafe, rotate. Use on open floor only."
+        type: "sequence"
+        stages:
+          - name: "forward"
+            duration_s: 1.2
+            vx: 0.10
+            vy: 0.00
+            wz: 0.00
+
+          - name: "stop_1"
+            duration_s: 0.8
+            vx: 0.00
+            vy: 0.00
+            wz: 0.00
+
+          - name: "backward"
+            duration_s: 1.2
+            vx: -0.10
+            vy: 0.00
+            wz: 0.00
+
+          - name: "stop_2"
+            duration_s: 0.8
+            vx: 0.00
+            vy: 0.00
+            wz: 0.00
+
+          - name: "strafe_left"
+            duration_s: 1.0
+            vx: 0.00
+            vy: 0.10
+            wz: 0.00
+
+          - name: "stop_3"
+            duration_s: 0.8
+            vx: 0.00
+            vy: 0.00
+            wz: 0.00
+
+          - name: "strafe_right"
+            duration_s: 1.0
+            vx: 0.00
+            vy: -0.10
+            wz: 0.00
+
+          - name: "stop_4"
+            duration_s: 0.8
+            vx: 0.00
+            vy: 0.00
+            wz: 0.00
+
+          - name: "rotate_ccw"
+            duration_s: 1.0
+            vx: 0.00
+            vy: 0.00
+            wz: 0.25
+
+          - name: "stop_5"
+            duration_s: 0.8
+            vx: 0.00
+            vy: 0.00
+            wz: 0.00
+
+          - name: "rotate_cw"
+            duration_s: 1.0
+            vx: 0.00
+            vy: 0.00
+            wz: -0.25
+
+    # -------------------------------------------------------------------------
+    # Default selected test
+    # -------------------------------------------------------------------------
+    default_test_name: "forward_slow"

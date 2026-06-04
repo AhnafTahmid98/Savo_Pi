@@ -1,0 +1,310 @@
+# =============================================================================
+# Robot Savo — savo_control/config/heading_pid.yaml
+#
+# Purpose:
+#   Heading / yaw PID settings for controlled rotation tests and rotate-to-heading
+#   behavior.
+#
+# Package role:
+#   savo_control computes safe Twist commands.
+#   It does NOT control motors directly.
+#
+# Command chain:
+#   heading_pid_node / rotate_to_heading_node
+#       -> /cmd_vel_auto or /cmd_vel_recovery
+#       -> twist_mux_node
+#       -> /cmd_vel_mux
+#       -> cmd_vel_shaper_node
+#       -> /cmd_vel
+#       -> savo_perception/cmd_vel_safety_gate
+#       -> /cmd_vel_safe
+#       -> savo_base/base_driver_node
+#
+# Notes:
+#   - Positive angular.z follows ROS convention: counter-clockwise yaw.
+#   - Use conservative gains first. Mecanum bases can rotate quickly.
+#   - Do first tests with wheels lifted or with very low max_wz.
+# =============================================================================
+
+heading_pid_node:
+  ros__parameters:
+
+    # -------------------------------------------------------------------------
+    # Enable / disable
+    # -------------------------------------------------------------------------
+    enabled: true
+
+    # -------------------------------------------------------------------------
+    # Topic configuration
+    # -------------------------------------------------------------------------
+    topics:
+      # Input heading target.
+      # Recommended message type depends on your node implementation.
+      # Common choices:
+      #   std_msgs/Float32 or Float64 in radians
+      target_heading: "/savo_control/target_heading_rad"
+
+      # Current orientation source.
+      # Prefer /odometry/filtered from robot_localization EKF.
+      odom: "/odometry/filtered"
+
+      # Output command.
+      # For tests, publish into AUTO source and select AUTO mode in twist_mux.
+      cmd_vel_out: "/cmd_vel_auto"
+
+      # Optional state/status topic.
+      state: "/savo_control/heading_state"
+
+      # Optional safety stop input.
+      safety_stop: "/safety/stop"
+
+    # -------------------------------------------------------------------------
+    # Frame / angle convention
+    # -------------------------------------------------------------------------
+    frames:
+      base_frame: "base_link"
+      odom_frame: "odom"
+
+    angle:
+      # Heading units used by target topic.
+      # Recommended: radians.
+      unit: "rad"
+
+      # Normalize heading error to [-pi, pi].
+      normalize_error: true
+
+      # If true, use shortest rotation direction.
+      shortest_path: true
+
+    # -------------------------------------------------------------------------
+    # PID gains
+    # -------------------------------------------------------------------------
+    #
+    # Conservative starting values for real Robot Savo testing.
+    # Start with P-only behavior. Add I/D only if needed after logs.
+    pid:
+      kp: 0.85
+      ki: 0.00
+      kd: 0.04
+
+      # Integral anti-windup.
+      integral_limit: 0.25
+
+      # Ignore integral when error is large.
+      integral_active_error_rad: 0.25
+
+      # Reset integral when a new target arrives.
+      reset_integral_on_new_target: true
+
+      # Reset integral when target is reached.
+      reset_integral_on_goal: true
+
+      # Derivative filtering to reduce IMU/odom noise.
+      derivative_filter_alpha: 0.35
+
+    # -------------------------------------------------------------------------
+    # Output limits
+    # -------------------------------------------------------------------------
+    output_limits:
+      # Conservative angular command.
+      max_wz: 0.45
+
+      # Minimum angular command to overcome static friction.
+      # If too high, robot will jerk near goal. Tune carefully.
+      min_wz_when_active: 0.08
+
+      # If error is very small, command zero instead of min_wz.
+      disable_min_wz_below_error_rad: 0.04
+
+      # No translation during heading PID by default.
+      force_vx_zero: true
+      force_vy_zero: true
+
+      max_vx: 0.00
+      max_vy: 0.00
+
+    # -------------------------------------------------------------------------
+    # Goal tolerance
+    # -------------------------------------------------------------------------
+    goal:
+      # About 3.4 degrees.
+      tolerance_rad: 0.06
+
+      # Must stay inside tolerance for this long before success.
+      hold_time_s: 0.35
+
+      # Hard timeout for one heading action.
+      timeout_s: 8.0
+
+      # Publish zero after goal.
+      stop_on_goal: true
+      stop_hold_s: 0.4
+
+    # -------------------------------------------------------------------------
+    # Timing
+    # -------------------------------------------------------------------------
+    timing:
+      loop_hz: 30.0
+
+      # If odom is stale, output zero.
+      odom_timeout_s: 0.40
+
+      # If target is stale and latch_target is false, output zero.
+      target_timeout_s: 5.0
+
+      # If true, latest target stays active until reached or cancelled.
+      latch_target: true
+
+    # -------------------------------------------------------------------------
+    # Safety behavior
+    # -------------------------------------------------------------------------
+    safety:
+      # Stop immediately if /safety/stop is true.
+      respect_safety_stop: true
+
+      # If odometry is stale, publish zero.
+      zero_on_odom_stale: true
+
+      # If target invalid, publish zero.
+      zero_on_invalid_target: true
+
+      # Reject NaN/Inf.
+      reject_invalid_values: true
+
+      # Publish zero on shutdown if node supports it.
+      publish_zero_on_shutdown: true
+      shutdown_zero_publish_count: 5
+
+      # Never publish directly to /cmd_vel_safe.
+      allow_direct_cmd_vel_safe_publish: false
+
+    # -------------------------------------------------------------------------
+    # Diagnostics
+    # -------------------------------------------------------------------------
+    diagnostics:
+      publish_state: true
+      state_hz: 10.0
+      log_target_updates: true
+      log_goal_reached: true
+      log_timeout: true
+      log_throttle_s: 2.0
+
+
+rotate_to_heading_node:
+  ros__parameters:
+
+    # -------------------------------------------------------------------------
+    # Enable / disable
+    # -------------------------------------------------------------------------
+    enabled: true
+
+    # -------------------------------------------------------------------------
+    # Topic configuration
+    # -------------------------------------------------------------------------
+    topics:
+      target_heading: "/savo_control/target_heading_rad"
+      odom: "/odometry/filtered"
+      cmd_vel_out: "/cmd_vel_auto"
+      state: "/savo_control/rotate_state"
+      safety_stop: "/safety/stop"
+
+      # Optional mode command.
+      # If enabled, node may request AUTO mode while rotating.
+      mode_cmd: "/savo_control/mode_cmd"
+
+    # -------------------------------------------------------------------------
+    # Mode behavior
+    # -------------------------------------------------------------------------
+    mode:
+      request_mode_on_start: true
+      requested_mode: "AUTO"
+      return_to_stop_on_finish: false
+
+    # -------------------------------------------------------------------------
+    # Rotation controller
+    # -------------------------------------------------------------------------
+    controller:
+      kp: 0.80
+      ki: 0.00
+      kd: 0.03
+
+      max_wz: 0.42
+      min_wz_when_active: 0.08
+
+      tolerance_rad: 0.06
+      hold_time_s: 0.35
+      timeout_s: 8.0
+
+      normalize_error: true
+      shortest_path: true
+
+    # -------------------------------------------------------------------------
+    # Motion output
+    # -------------------------------------------------------------------------
+    output:
+      vx: 0.00
+      vy: 0.00
+      publish_hz: 30.0
+      publish_zero_on_goal: true
+      publish_zero_on_timeout: true
+
+    # -------------------------------------------------------------------------
+    # Safety behavior
+    # -------------------------------------------------------------------------
+    safety:
+      respect_safety_stop: true
+      zero_on_odom_stale: true
+      odom_timeout_s: 0.40
+      reject_invalid_values: true
+      allow_direct_cmd_vel_safe_publish: false
+      publish_zero_on_shutdown: true
+      shutdown_zero_publish_count: 5
+
+    # -------------------------------------------------------------------------
+    # Diagnostics
+    # -------------------------------------------------------------------------
+    diagnostics:
+      publish_state: true
+      log_transitions: true
+      log_throttle_s: 2.0
+
+
+heading_pid_test:
+  ros__parameters:
+
+    # -------------------------------------------------------------------------
+    # Test behavior
+    # -------------------------------------------------------------------------
+    enabled: true
+
+    # Output target heading topic.
+    target_topic: "/savo_control/target_heading_rad"
+
+    # Test should be used with twist_mux mode AUTO.
+    required_mode: "AUTO"
+
+    # -------------------------------------------------------------------------
+    # Safe test targets
+    # -------------------------------------------------------------------------
+    #
+    # These are relative/absolute targets depending on your test node design.
+    # Recommended first tests:
+    #   +0.30 rad ≈ +17 degrees
+    #   -0.30 rad ≈ -17 degrees
+    #
+    targets_rad:
+      small_left: 0.30
+      small_right: -0.30
+      quarter_left: 1.5708
+      quarter_right: -1.5708
+      half_turn: 3.1416
+
+    default_target_name: "small_left"
+
+    # -------------------------------------------------------------------------
+    # Test safety
+    # -------------------------------------------------------------------------
+    safety:
+      require_robot_lifted_for_first_test: true
+      max_test_duration_s: 8.0
+      send_stop_after_test: true

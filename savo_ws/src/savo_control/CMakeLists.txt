@@ -174,6 +174,7 @@ set(SAVO_CONTROL_PY_NODES
   savo_control/nodes/control_dashboard_node.py
   savo_control/nodes/recovery_test_manager_node.py
   savo_control/nodes/recovery_status_node.py
+  savo_control/nodes/keyboard_teleop_node.py
 )
 
 set(SAVO_CONTROL_PY_NODES_EXISTING "")

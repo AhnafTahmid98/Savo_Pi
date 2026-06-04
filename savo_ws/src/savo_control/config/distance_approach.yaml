@@ -1,0 +1,293 @@
+# =============================================================================
+# Robot Savo — savo_control/config/distance_approach.yaml
+#
+# Purpose:
+#   Controlled slow approach behavior using high-level distance feedback.
+#
+# Package role:
+#   savo_control generates safe Twist commands.
+#   It does NOT read raw hardware directly.
+#   It does NOT command motors directly.
+#
+# Expected data source:
+#   /depth/min_front_m is produced by the RealSense/depth stack on savo-edge
+#   and consumed over the ROS network by savo-core.
+#
+# Command chain:
+#   distance_pid_test_node / distance_approach_node
+#       -> /cmd_vel_auto
+#       -> twist_mux_node
+#       -> /cmd_vel_mux
+#       -> cmd_vel_shaper_node
+#       -> /cmd_vel
+#       -> savo_perception/cmd_vel_safety_gate
+#       -> /cmd_vel_safe
+#       -> savo_base/base_driver_node
+#
+# Important:
+#   - This behavior must never bypass /cmd_vel_safe.
+#   - The safety gate has final authority.
+#   - Start with very slow values on the real robot.
+#
+# Current Robot Savo stage:
+#   Twist values are conservative command strengths unless the base is fully
+#   calibrated to physical m/s and rad/s.
+# =============================================================================
+
+distance_pid_test_node:
+  ros__parameters:
+
+    # -------------------------------------------------------------------------
+    # Enable / disable
+    # -------------------------------------------------------------------------
+    enabled: true
+
+    # -------------------------------------------------------------------------
+    # Topic configuration
+    # -------------------------------------------------------------------------
+    topics:
+      # Distance input.
+      # Recommended current front distance topic from savo_perception.
+      distance_in: "/depth/min_front_m"
+
+      # Output command should enter AUTO source of twist_mux_node.
+      cmd_vel_out: "/cmd_vel_auto"
+
+      # Optional mode command.
+      # If enabled, node can request AUTO mode before approach test.
+      mode_cmd: "/savo_control/mode_cmd"
+
+      # Optional safety topic.
+      safety_stop: "/safety/stop"
+
+      # Optional status topic.
+      status: "/savo_control/distance_approach_status"
+
+    # -------------------------------------------------------------------------
+    # Target distance
+    # -------------------------------------------------------------------------
+    #
+    # Example:
+    #   target_distance_m = 0.60 means the robot approaches until the front
+    #   measured distance is approximately 60 cm.
+    target:
+      distance_m: 0.60
+
+      # Stop when absolute error is below this value.
+      tolerance_m: 0.04
+
+      # Must remain inside tolerance for this time before success.
+      hold_time_s: 0.40
+
+      # Do not approach closer than this distance from the front reading.
+      hard_min_distance_m: 0.35
+
+    # -------------------------------------------------------------------------
+    # Distance sensor validity
+    # -------------------------------------------------------------------------
+    sensor:
+      min_valid_m: 0.05
+      max_valid_m: 3.00
+
+      # If distance reading is older than this, output zero.
+      timeout_s: 0.40
+
+      # Reject NaN/Inf/negative values.
+      reject_invalid_values: true
+
+      # Optional smoothing on measured distance.
+      smoothing_enabled: true
+      smoothing_alpha: 0.45
+
+    # -------------------------------------------------------------------------
+    # PID controller
+    # -------------------------------------------------------------------------
+    #
+    # Error convention:
+    #   error = measured_distance - target_distance
+    #
+    # If measured distance is too large, robot moves forward.
+    # If measured distance is too small, robot should stop or optionally reverse.
+    #
+    # Start with P-only. Add D only if approach oscillates.
+    pid:
+      kp: 0.45
+      ki: 0.00
+      kd: 0.03
+
+      integral_limit: 0.15
+
+      # Integral only active near target.
+      integral_active_error_m: 0.20
+
+      reset_integral_on_goal: true
+      reset_integral_on_invalid_sensor: true
+
+      derivative_filter_alpha: 0.35
+
+    # -------------------------------------------------------------------------
+    # Output command limits
+    # -------------------------------------------------------------------------
+    output_limits:
+      # Forward approach command limit.
+      max_forward_vx: 0.12
+
+      # Reverse is disabled by default for distance approach.
+      # Recovery behavior should handle backup, not this approach controller.
+      allow_reverse: false
+      max_reverse_vx: 0.06
+
+      # No strafing or rotation in distance approach.
+      force_vy_zero: true
+      force_wz_zero: true
+
+      max_abs_vy: 0.00
+      max_abs_wz: 0.00
+
+      # Minimum command to overcome static friction.
+      # Disabled near the target to avoid jerking.
+      min_vx_when_active: 0.04
+      disable_min_vx_below_error_m: 0.08
+
+    # -------------------------------------------------------------------------
+    # Behavior
+    # -------------------------------------------------------------------------
+    behavior:
+      # Request AUTO mode when test starts.
+      request_auto_mode_on_start: true
+      required_mode: "AUTO"
+
+      # Stop after reaching target.
+      stop_on_goal: true
+      stop_hold_s: 0.50
+
+      # Hard timeout for one approach test.
+      timeout_s: 10.0
+
+      # If robot is already closer than target, do not reverse by default.
+      stop_if_too_close: true
+
+      # If closer than hard_min_distance_m, immediately output zero.
+      stop_if_below_hard_min: true
+
+      # If safety stop becomes true, immediately output zero.
+      stop_on_safety_stop: true
+
+    # -------------------------------------------------------------------------
+    # Timing
+    # -------------------------------------------------------------------------
+    timing:
+      loop_hz: 30.0
+      publish_hz: 30.0
+
+    # -------------------------------------------------------------------------
+    # Diagnostics
+    # -------------------------------------------------------------------------
+    diagnostics:
+      publish_status: true
+      status_hz: 5.0
+      log_target_reached: true
+      log_invalid_sensor: true
+      log_timeout: true
+      log_throttle_s: 2.0
+
+
+distance_approach_node:
+  ros__parameters:
+
+    # -------------------------------------------------------------------------
+    # Enable / disable
+    # -------------------------------------------------------------------------
+    enabled: true
+
+    # -------------------------------------------------------------------------
+    # Topic configuration
+    # -------------------------------------------------------------------------
+    topics:
+      distance_in: "/depth/min_front_m"
+      cmd_vel_out: "/cmd_vel_auto"
+      mode_cmd: "/savo_control/mode_cmd"
+      safety_stop: "/safety/stop"
+      status: "/savo_control/distance_approach_status"
+
+    # -------------------------------------------------------------------------
+    # Approach profiles
+    # -------------------------------------------------------------------------
+    profiles:
+
+      # Very safe profile for first real robot tests.
+      cautious:
+        target_distance_m: 0.70
+        tolerance_m: 0.05
+        hard_min_distance_m: 0.40
+        max_forward_vx: 0.08
+        kp: 0.35
+        ki: 0.00
+        kd: 0.02
+        timeout_s: 10.0
+
+      # Manual mapping helper profile.
+      # Useful when approaching doors/walls slowly while mapping.
+      mapping_slow:
+        target_distance_m: 0.60
+        tolerance_m: 0.04
+        hard_min_distance_m: 0.35
+        max_forward_vx: 0.10
+        kp: 0.42
+        ki: 0.00
+        kd: 0.03
+        timeout_s: 8.0
+
+      # Slightly faster open-floor test.
+      # Do not use near people.
+      open_floor_test:
+        target_distance_m: 0.80
+        tolerance_m: 0.05
+        hard_min_distance_m: 0.45
+        max_forward_vx: 0.12
+        kp: 0.45
+        ki: 0.00
+        kd: 0.03
+        timeout_s: 10.0
+
+    default_profile: "cautious"
+
+    # -------------------------------------------------------------------------
+    # Safety
+    # -------------------------------------------------------------------------
+    safety:
+      require_safety_gate: true
+      allow_direct_cmd_vel_safe_publish: false
+      stop_on_safety_stop: true
+      zero_on_invalid_distance: true
+      zero_on_distance_timeout: true
+      publish_zero_on_shutdown: true
+      shutdown_zero_publish_count: 5
+
+    # -------------------------------------------------------------------------
+    # Sensor assumptions
+    # -------------------------------------------------------------------------
+    sensor:
+      min_valid_m: 0.05
+      max_valid_m: 3.00
+      timeout_s: 0.40
+      smoothing_enabled: true
+      smoothing_alpha: 0.45
+
+    # -------------------------------------------------------------------------
+    # Output assumptions
+    # -------------------------------------------------------------------------
+    output:
+      force_vy_zero: true
+      force_wz_zero: true
+      allow_reverse: false
+      publish_hz: 30.0
+
+    # -------------------------------------------------------------------------
+    # Diagnostics
+    # -------------------------------------------------------------------------
+    diagnostics:
+      publish_status: true
+      status_hz: 5.0
+      log_transitions: true
+      log_throttle_s: 2.0

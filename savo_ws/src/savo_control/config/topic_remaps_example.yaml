@@ -1,0 +1,449 @@
+# =============================================================================
+# Robot Savo — savo_control/config/topic_remaps_example.yaml
+#
+# Purpose:
+#   Example topic remap/reference file for Robot Savo control-layer integration.
+#
+# This file documents how command topics should be connected between:
+#   - teleop / keyboard
+#   - Nav2
+#   - autonomous mapping / exploration
+#   - recovery behavior
+#   - twist_mux_node
+#   - cmd_vel_shaper_node
+#   - safety gate
+#   - savo_base
+#
+# Important:
+#   This file is mainly for reference and launch design.
+#   It is not required to be loaded by every node.
+#
+# Core safety rule:
+#   Nothing in savo_control should publish directly to /cmd_vel_safe.
+#   /cmd_vel_safe is produced by the safety gate and consumed by savo_base.
+# =============================================================================
+
+
+# =============================================================================
+# 1. Canonical command chain
+# =============================================================================
+#
+# Manual keyboard:
+#   keyboard_teleop_node
+#       -> /cmd_vel_manual
+#
+# Nav2:
+#   Nav2 controller output must be remapped:
+#       /cmd_vel -> /cmd_vel_nav
+#
+# Auto test / autonomous mapping:
+#   test or exploration node
+#       -> /cmd_vel_auto
+#
+# Recovery:
+#   recovery node
+#       -> /cmd_vel_recovery
+#
+# Control mux:
+#   twist_mux_node
+#       input:  /cmd_vel_manual
+#       input:  /cmd_vel_nav
+#       input:  /cmd_vel_auto
+#       input:  /cmd_vel_recovery
+#       output: /cmd_vel_mux
+#
+# Command shaping:
+#   cmd_vel_shaper_node
+#       input:  /cmd_vel_mux
+#       output: /cmd_vel
+#
+# Safety gate:
+#   cmd_vel_safety_gate
+#       input:  /cmd_vel
+#       output: /cmd_vel_safe
+#
+# Base hardware:
+#   savo_base/base_driver_node
+#       input: /cmd_vel_safe
+# =============================================================================
+
+
+topic_contract:
+  command_sources:
+    manual: "/cmd_vel_manual"
+    nav: "/cmd_vel_nav"
+    auto: "/cmd_vel_auto"
+    recovery: "/cmd_vel_recovery"
+
+  control_internal:
+    mux_output: "/cmd_vel_mux"
+    shaped_output: "/cmd_vel"
+
+  safety_and_base:
+    safety_gate_input: "/cmd_vel"
+    safety_gate_output: "/cmd_vel_safe"
+    base_driver_input: "/cmd_vel_safe"
+
+  mode_topics:
+    mode_cmd: "/savo_control/mode_cmd"
+    mode_state: "/savo_control/mode_state"
+
+
+# =============================================================================
+# 2. Manual mapping remaps
+# =============================================================================
+#
+# Use case:
+#   Drive Robot Savo manually while slam_toolbox builds the map.
+#
+# Expected flow:
+#   keyboard -> /cmd_vel_manual -> mux -> shaper -> /cmd_vel
+#   -> safety gate -> /cmd_vel_safe -> savo_base
+#
+# Launch idea:
+#   teleop_control.launch.py starts:
+#     - keyboard_teleop_node
+#     - twist_mux_node
+#     - cmd_vel_shaper_node
+#
+#   manual_mapping.launch.py starts:
+#     - slam_toolbox
+#     - map saver tools
+#
+# Mode:
+#   Set mode to MANUAL.
+# =============================================================================
+
+manual_mapping:
+  mode: "MANUAL"
+
+  remaps:
+    keyboard_output:
+      from: "/cmd_vel"
+      to: "/cmd_vel_manual"
+
+    twist_mux_manual_input:
+      from: "manual_input"
+      to: "/cmd_vel_manual"
+
+    twist_mux_output:
+      from: "cmd_vel_out"
+      to: "/cmd_vel_mux"
+
+    shaper_input:
+      from: "cmd_vel_in"
+      to: "/cmd_vel_mux"
+
+    shaper_output:
+      from: "cmd_vel_out"
+      to: "/cmd_vel"
+
+  required_topics:
+    - "/cmd_vel_manual"
+    - "/cmd_vel_mux"
+    - "/cmd_vel"
+    - "/cmd_vel_safe"
+    - "/safety/stop"
+
+
+# =============================================================================
+# 3. Nav2 remaps
+# =============================================================================
+#
+# Important:
+#   Nav2 normally publishes /cmd_vel.
+#   In Robot Savo, Nav2 must NOT publish directly to /cmd_vel because /cmd_vel
+#   is the shaped output from savo_control.
+#
+# Correct:
+#   Nav2 /cmd_vel -> /cmd_vel_nav
+#
+# Then:
+#   /cmd_vel_nav -> twist_mux_node -> /cmd_vel_mux -> cmd_vel_shaper_node
+#   -> /cmd_vel -> safety gate -> /cmd_vel_safe -> savo_base
+# =============================================================================
+
+nav2:
+  mode: "NAV"
+
+  required_nav2_output_remap:
+    from: "/cmd_vel"
+    to: "/cmd_vel_nav"
+
+  remaps:
+    nav2_controller_cmd_vel:
+      from: "/cmd_vel"
+      to: "/cmd_vel_nav"
+
+    twist_mux_nav_input:
+      from: "nav_input"
+      to: "/cmd_vel_nav"
+
+  required_topics:
+    - "/cmd_vel_nav"
+    - "/cmd_vel_mux"
+    - "/cmd_vel"
+    - "/cmd_vel_safe"
+    - "/odometry/filtered"
+    - "/scan"
+
+
+# =============================================================================
+# 4. Auto test remaps
+# =============================================================================
+#
+# Use case:
+#   Controlled test patterns, distance approach, rotate-to-heading tests,
+#   autonomous mapping/exploration command source.
+#
+# Expected flow:
+#   auto node -> /cmd_vel_auto -> mux -> shaper -> /cmd_vel
+#   -> safety gate -> /cmd_vel_safe -> savo_base
+# =============================================================================
+
+auto_test:
+  mode: "AUTO"
+
+  remaps:
+    auto_test_output:
+      from: "/cmd_vel"
+      to: "/cmd_vel_auto"
+
+    velocity_test_pattern_output:
+      from: "cmd_vel_out"
+      to: "/cmd_vel_auto"
+
+    distance_approach_output:
+      from: "cmd_vel_out"
+      to: "/cmd_vel_auto"
+
+    rotate_to_heading_output:
+      from: "cmd_vel_out"
+      to: "/cmd_vel_auto"
+
+  required_topics:
+    - "/cmd_vel_auto"
+    - "/cmd_vel_mux"
+    - "/cmd_vel"
+    - "/cmd_vel_safe"
+
+
+# =============================================================================
+# 5. Recovery remaps
+# =============================================================================
+#
+# Use case:
+#   Recovery behavior requests a short safe motion such as:
+#     stop -> backup -> stop -> rotate -> stop
+#
+# Expected flow:
+#   recovery node -> /cmd_vel_recovery -> mux -> shaper -> /cmd_vel
+#   -> safety gate -> /cmd_vel_safe -> savo_base
+#
+# Important:
+#   Recovery must still be blocked by /safety/stop and /cmd_vel_safe gate.
+# =============================================================================
+
+recovery:
+  mode: "RECOVERY"
+
+  remaps:
+    backup_escape_output:
+      from: "cmd_vel_out"
+      to: "/cmd_vel_recovery"
+
+    recovery_manager_output:
+      from: "cmd_vel_out"
+      to: "/cmd_vel_recovery"
+
+    twist_mux_recovery_input:
+      from: "recovery_input"
+      to: "/cmd_vel_recovery"
+
+  recovery_flow:
+    recovery_request: "/savo_control/recovery_request"   # input  — request to start recovery
+    recovery_active: "/savo_control/recovery_active"     # output — true while recovery is running
+
+  required_topics:
+    - "/cmd_vel_recovery"
+    - "/savo_control/recovery_request"
+    - "/savo_control/recovery_active"
+    - "/cmd_vel_mux"
+    - "/cmd_vel"
+    - "/cmd_vel_safe"
+    - "/safety/stop"
+
+
+# =============================================================================
+# 6. Safety gate topic contract
+# =============================================================================
+#
+# The safety gate may live in savo_perception.
+#
+# Required behavior:
+#   Subscribe:
+#     /cmd_vel
+#     /safety/stop
+#     /safety/slowdown_factor
+#
+#   Publish:
+#     /cmd_vel_safe
+#
+# If /safety/stop is true:
+#   /cmd_vel_safe should become zero.
+#
+# If slowdown_factor is less than 1:
+#   /cmd_vel_safe should be scaled down.
+# =============================================================================
+
+safety_gate:
+  package: "savo_perception"
+  node: "cmd_vel_safety_gate"
+
+  input_cmd_vel: "/cmd_vel"
+  output_cmd_vel_safe: "/cmd_vel_safe"
+
+  safety_stop: "/safety/stop"
+  slowdown_factor: "/safety/slowdown_factor"
+
+  rules:
+    stop_if_safety_stop_true: true
+    scale_by_slowdown_factor: true
+    publish_zero_on_timeout: true
+
+
+# =============================================================================
+# 7. savo_base contract
+# =============================================================================
+#
+# savo_base is the only package that executes real motor hardware.
+#
+# It should subscribe to:
+#   /cmd_vel_safe
+#
+# It should NOT subscribe directly to:
+#   /cmd_vel_manual
+#   /cmd_vel_nav
+#   /cmd_vel_auto
+#   /cmd_vel_recovery
+#   /cmd_vel
+#
+# This keeps safety and command authority clean.
+# =============================================================================
+
+savo_base:
+  package: "savo_base"
+  node: "base_driver_node"
+
+  required_input: "/cmd_vel_safe"
+
+  forbidden_direct_inputs:
+    - "/cmd_vel_manual"
+    - "/cmd_vel_nav"
+    - "/cmd_vel_auto"
+    - "/cmd_vel_recovery"
+    - "/cmd_vel_mux"
+    - "/cmd_vel"
+
+
+# =============================================================================
+# 8. savo-edge data topics used by control
+# =============================================================================
+#
+# RealSense/depth and VO may run on savo-edge.
+#
+# The control layer should not care which Pi produces the data.
+# It only consumes stable ROS topics visible over the network.
+# =============================================================================
+
+savo_edge_inputs:
+  depth_front_min:
+    producer: "savo-edge"
+    topic: "/depth/min_front_m"
+    consumer_examples:
+      - "distance_approach_node"
+      - "savo_perception safety logic"
+
+  visual_odometry:
+    producer: "savo-edge"
+    topic: "/vo/odom"
+    consumer_examples:
+      - "savo_localization EKF"
+
+  fused_odometry:
+    producer: "savo_localization"
+    topic: "/odometry/filtered"
+    consumer_examples:
+      - "heading_pid_node"
+      - "rotate_to_heading_node"
+      - "stuck_detector_node"
+
+
+# =============================================================================
+# 9. Example launch remap snippets
+# =============================================================================
+#
+# These are examples for launch files. They are not automatically applied by
+# this YAML unless a launch file reads them.
+# =============================================================================
+
+launch_examples:
+
+  keyboard_teleop_node:
+    remappings:
+      - from: "/cmd_vel"
+        to: "/cmd_vel_manual"
+
+  nav2_controller:
+    remappings:
+      - from: "/cmd_vel"
+        to: "/cmd_vel_nav"
+
+  velocity_test_pattern_node:
+    remappings:
+      - from: "/cmd_vel"
+        to: "/cmd_vel_auto"
+
+  distance_approach_node:
+    remappings:
+      - from: "/cmd_vel"
+        to: "/cmd_vel_auto"
+
+  rotate_to_heading_node:
+    remappings:
+      - from: "/cmd_vel"
+        to: "/cmd_vel_auto"
+
+  backup_escape_node:
+    remappings:
+      - from: "/cmd_vel"
+        to: "/cmd_vel_recovery"
+
+
+# =============================================================================
+# 10. Quick verification commands
+# =============================================================================
+#
+# Manual mode:
+#   ros2 topic pub /savo_control/mode_cmd std_msgs/msg/String "{data: 'MANUAL'}" --once
+#
+# Nav mode:
+#   ros2 topic pub /savo_control/mode_cmd std_msgs/msg/String "{data: 'NAV'}" --once
+#
+# Auto mode:
+#   ros2 topic pub /savo_control/mode_cmd std_msgs/msg/String "{data: 'AUTO'}" --once
+#
+# Recovery mode:
+#   ros2 topic pub /savo_control/mode_cmd std_msgs/msg/String "{data: 'RECOVERY'}" --once
+#
+# Check command chain:
+#   ros2 topic echo /cmd_vel_manual
+#   ros2 topic echo /cmd_vel_mux
+#   ros2 topic echo /cmd_vel
+#   ros2 topic echo /cmd_vel_safe
+#
+# Check edge data:
+#   ros2 topic echo /depth/min_front_m
+#   ros2 topic echo /vo/odom
+#   ros2 topic echo /odometry/filtered
+# =============================================================================

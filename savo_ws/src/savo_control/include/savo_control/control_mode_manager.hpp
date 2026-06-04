@@ -91,7 +91,7 @@ struct ControlModeInputs
 
   // Recovery status/command integration
   bool recovery_active {false};          // recovery behavior currently producing commands
-  bool recovery_triggered {false};       // edge hint (optional)
+  bool recovery_requested {false};       // edge hint (optional)
   bool recovery_completed {false};       // edge hint (optional)
   bool recovery_aborted {false};         // edge hint (optional)
 
@@ -350,7 +350,7 @@ public:
       recovery_latched_ = false;
     }
 
-    if (config_.latch_recovery_mode && (in.recovery_active || in.recovery_triggered)) {
+    if (config_.latch_recovery_mode && (in.recovery_active || in.recovery_requested)) {
       recovery_latched_ = true;
     }
 

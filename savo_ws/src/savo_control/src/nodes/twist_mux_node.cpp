@@ -79,11 +79,11 @@ public:
     recovery_override_enabled_ =
       this->declare_parameter<bool>("recovery_override_enabled", true);
 
-    latch_recovery_trigger_ =
-      this->declare_parameter<bool>("latch_recovery_trigger", true);
+    latch_recovery_active_ =
+      this->declare_parameter<bool>("latch_recovery_active", true);
 
-    recovery_trigger_timeout_sec_ =
-      this->declare_parameter<double>("recovery_trigger_timeout_sec", 3.0);
+    recovery_active_timeout_sec_ =
+      this->declare_parameter<double>("recovery_active_timeout_sec", 3.0);
 
     use_safety_stop_gate_ =
       this->declare_parameter<bool>("use_safety_stop_gate", false);
@@ -139,12 +139,12 @@ public:
     // Subscribers: mode / recovery / optional safety-stop
     // -------------------------------------------------------------------------
     sub_mode_cmd_ = this->create_subscription<std_msgs::msg::String>(
-      topic_names::kControlModeCmd, rclcpp::QoS(10),
+      topic_names::kControlModeState, rclcpp::QoS(10),
       std::bind(&TwistMuxNode::on_mode_cmd_, this, std::placeholders::_1));
 
-    sub_recovery_trigger_ = this->create_subscription<std_msgs::msg::Bool>(
-      topic_names::kRecoveryTrigger, rclcpp::QoS(10),
-      std::bind(&TwistMuxNode::on_recovery_trigger_, this, std::placeholders::_1));
+    sub_recovery_active_ = this->create_subscription<std_msgs::msg::Bool>(
+      topic_names::kRecoveryActive, rclcpp::QoS(10),
+      std::bind(&TwistMuxNode::on_recovery_active_, this, std::placeholders::_1));
 
     sub_safety_stop_ = this->create_subscription<std_msgs::msg::Bool>(
       topic_names::kSafetyStop, rclcpp::QoS(10),
@@ -210,18 +210,18 @@ private:
     }
   }
 
-  void on_recovery_trigger_(const std_msgs::msg::Bool::SharedPtr msg)
+  void on_recovery_active_(const std_msgs::msg::Bool::SharedPtr msg)
   {
     if (!msg) {
       return;
     }
 
-    recovery_trigger_active_ = msg->data;
-    recovery_trigger_stamp_ = this->now();
+    recovery_active_ = msg->data;
+    recovery_active_stamp_ = this->now();
 
-    if (!latch_recovery_trigger_ && !recovery_trigger_active_) {
+    if (!latch_recovery_active_ && !recovery_active_) {
       // Non-latching mode: explicit false immediately clears.
-      recovery_trigger_active_ = false;
+      recovery_active_ = false;
     }
   }
 
@@ -351,15 +351,15 @@ private:
       return false;
     }
 
-    if (!recovery_trigger_active_) {
+    if (!recovery_active_) {
       return false;
     }
 
     // Latching behavior: auto-clear after timeout
-    if (latch_recovery_trigger_ && (recovery_trigger_timeout_sec_ > 0.0)) {
-      const double age = (now - recovery_trigger_stamp_).seconds();
-      if (!std::isfinite(age) || age < 0.0 || age > recovery_trigger_timeout_sec_) {
-        recovery_trigger_active_ = false;
+    if (latch_recovery_active_ && (recovery_active_timeout_sec_ > 0.0)) {
+      const double age = (now - recovery_active_stamp_).seconds();
+      if (!std::isfinite(age) || age < 0.0 || age > recovery_active_timeout_sec_) {
+        recovery_active_ = false;
         return false;
       }
     }
@@ -467,8 +467,8 @@ private:
     if (!(recovery_cmd_timeout_sec_ > 0.0) || !std::isfinite(recovery_cmd_timeout_sec_)) {
       recovery_cmd_timeout_sec_ = 0.50;
     }
-    if (!(recovery_trigger_timeout_sec_ > 0.0) || !std::isfinite(recovery_trigger_timeout_sec_)) {
-      recovery_trigger_timeout_sec_ = 3.0;
+    if (!(recovery_active_timeout_sec_ > 0.0) || !std::isfinite(recovery_active_timeout_sec_)) {
+      recovery_active_timeout_sec_ = 3.0;
     }
 
     default_mode_ = normalize_mode_(default_mode_);
@@ -489,7 +489,7 @@ private:
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr sub_cmd_recovery_;
 
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr sub_mode_cmd_;
-  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_recovery_trigger_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_recovery_active_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_safety_stop_;
 
   rclcpp::TimerBase::SharedPtr timer_;
@@ -505,8 +505,8 @@ private:
   std::string default_mode_{"MANUAL"};
   std::string last_published_mode_;
 
-  bool recovery_trigger_active_{false};
-  rclcpp::Time recovery_trigger_stamp_{0, 0, RCL_ROS_TIME};
+  bool recovery_active_{false};
+  rclcpp::Time recovery_active_stamp_{0, 0, RCL_ROS_TIME};
 
   bool safety_stop_active_{false};
   rclcpp::Time safety_stop_stamp_{0, 0, RCL_ROS_TIME};
@@ -515,11 +515,11 @@ private:
   double publish_rate_hz_{20.0};
   double cmd_timeout_sec_{0.30};
   double recovery_cmd_timeout_sec_{0.50};
-  double recovery_trigger_timeout_sec_{3.0};
+  double recovery_active_timeout_sec_{3.0};
 
   bool zero_on_unknown_mode_{true};
   bool recovery_override_enabled_{true};
-  bool latch_recovery_trigger_{true};
+  bool latch_recovery_active_{true};
   bool use_safety_stop_gate_{false};
   bool mode_state_publish_on_change_only_{false};
 };

@@ -1,0 +1,164 @@
+# =============================================================================
+# Robot Savo — savo_control/config/twist_mux.yaml
+#
+# Purpose:
+#   Select exactly one velocity command source and publish it to /cmd_vel_mux.
+#
+# Architecture:
+#   keyboard/manual       -> /cmd_vel_manual
+#   autonomous test       -> /cmd_vel_auto
+#   Nav2 navigation       -> /cmd_vel_nav
+#   recovery behavior     -> /cmd_vel_recovery
+#
+#   twist_mux_node        -> /cmd_vel_mux
+#   cmd_vel_shaper_node   -> /cmd_vel
+#   safety gate           -> /cmd_vel_safe
+#   savo_base             -> motors
+#
+# Important:
+#   - This node does NOT publish directly to /cmd_vel_safe.
+#   - This node does NOT control hardware.
+#   - /cmd_vel_safe belongs to savo_perception/safety gate + savo_base.
+# =============================================================================
+
+twist_mux_node:
+  ros__parameters:
+
+    # -------------------------------------------------------------------------
+    # Topic configuration
+    # -------------------------------------------------------------------------
+
+    # Input command sources
+    topics:
+      manual: "/cmd_vel_manual"
+      auto: "/cmd_vel_auto"
+      nav: "/cmd_vel_nav"
+      recovery: "/cmd_vel_recovery"
+
+      # Selected output from this node
+      output: "/cmd_vel_mux"
+
+      # Mode command topic.
+      #
+      # Early testing:
+      #   twist_mux_node may listen directly to this topic.
+      #
+      # Future production:
+      #   external requests -> /savo_control/mode_cmd
+      #   control_mode_manager_node -> /savo_control/mode_state
+      #   twist_mux_node listens to /savo_control/mode_state
+      #
+      mode: "/savo_control/mode_cmd"
+
+      # Optional status output from mux
+      status: "/savo_control/twist_mux_status"
+
+    # -------------------------------------------------------------------------
+    # Default control mode
+    # -------------------------------------------------------------------------
+    #
+    # Valid modes expected by twist_mux_node:
+    #   MANUAL
+    #   AUTO
+    #   NAV
+    #   RECOVERY
+    #   STOP
+    #
+    # For safe startup, STOP is best.
+    # For manual mapping launch, the launch file can override this to MANUAL.
+    default_mode: "STOP"
+
+    # If true, publish zero Twist when mode is STOP or when active source is stale.
+    publish_zero_on_stop: true
+
+    # Publish zero Twist immediately when switching mode.
+    stop_on_mode_change: true
+
+    # How long to hold zero after a mode change before accepting new commands.
+    mode_change_stop_hold_s: 0.20
+
+    # -------------------------------------------------------------------------
+    # Input timeout / stale protection
+    # -------------------------------------------------------------------------
+    #
+    # If selected source does not publish within this time, output zero Twist.
+    # Keep this short for real robot safety.
+    source_timeout_s: 0.35
+
+    # Timer loop rate for checking stale commands and publishing output.
+    loop_hz: 30.0
+
+    # -------------------------------------------------------------------------
+    # Priority policy
+    # -------------------------------------------------------------------------
+    #
+    # This is documentation + future-proof config.
+    # Your current C++ node may use mode-based selection instead of priority.
+    #
+    # Recommended priority:
+    #   RECOVERY highest, then MANUAL, then NAV, then AUTO.
+    #
+    priority:
+      recovery: 100
+      manual: 80
+      nav: 60
+      auto: 40
+
+    # Allow recovery commands to override current mode if recovery topic is active.
+    # Useful later for stuck recovery.
+    recovery_override_enabled: true
+
+    # Allow manual command to override NAV/AUTO when manual mode is requested.
+    manual_override_enabled: true
+
+    # -------------------------------------------------------------------------
+    # Per-source safety limits before mux output
+    # -------------------------------------------------------------------------
+    #
+    # These are extra limits before cmd_vel_shaper_node.
+    # Final shaping/acceleration limiting should still happen in cmd_vel_shaper.
+    #
+    # Current Robot Savo stage:
+    #   Treat values as conservative normalized command strengths unless the base
+    #   is fully calibrated to real m/s and rad/s.
+    #
+    source_limits:
+      manual:
+        max_vx: 0.25
+        max_vy: 0.25
+        max_wz: 0.60
+
+      nav:
+        max_vx: 0.22
+        max_vy: 0.18
+        max_wz: 0.50
+
+      auto:
+        max_vx: 0.18
+        max_vy: 0.18
+        max_wz: 0.45
+
+      recovery:
+        max_vx: 0.12
+        max_vy: 0.00
+        max_wz: 0.35
+
+    # -------------------------------------------------------------------------
+    # Manual mapping profile
+    # -------------------------------------------------------------------------
+    #
+    # Used by teleop_control.launch.py or manual_mapping bringup.
+    manual_mapping:
+      recommended_mode: "MANUAL"
+      recommended_input_topic: "/cmd_vel_manual"
+      recommended_output_topic: "/cmd_vel_mux"
+
+      # Conservative speed for mapping corridors.
+      slow_vx: 0.12
+      slow_vy: 0.12
+      slow_wz: 0.35
+
+      # Slightly faster but still safe on open floor.
+      normal_vx: 0.20
+      normal_vy: 0.18
+      normal_wz: 0.50

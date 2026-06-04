@@ -1,0 +1,11 @@
+[Unit]
+Description=Savo Core Service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/env bash /home/ahnaf-tahmid/Savo_Pi/tools/scripts/run_core.sh
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

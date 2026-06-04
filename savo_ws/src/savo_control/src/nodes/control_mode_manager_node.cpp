@@ -68,10 +68,15 @@ public:
       rclcpp::QoS(10),
       std::bind(&ControlModeManagerNode::on_safety_stop_, this, std::placeholders::_1));
 
-    sub_recovery_trigger_ = this->create_subscription<std_msgs::msg::Bool>(
-      topic_names::kRecoveryTrigger,
+    sub_recovery_request_ = this->create_subscription<std_msgs::msg::Bool>(
+      topic_names::kRecoveryRequest,
       rclcpp::QoS(10),
-      std::bind(&ControlModeManagerNode::on_recovery_trigger_, this, std::placeholders::_1));
+      std::bind(&ControlModeManagerNode::on_recovery_request_, this, std::placeholders::_1));
+
+    sub_recovery_active_ = this->create_subscription<std_msgs::msg::Bool>(
+      topic_names::kRecoveryActive,
+      rclcpp::QoS(10),
+      std::bind(&ControlModeManagerNode::on_recovery_active_, this, std::placeholders::_1));
 
     sub_recovery_state_ = this->create_subscription<std_msgs::msg::String>(
       topic_names::kRecoveryState,
@@ -303,11 +308,17 @@ private:
     inputs_.safety_stop_active = msg->data;
   }
 
-  void on_recovery_trigger_(const std_msgs::msg::Bool::SharedPtr msg)
+  void on_recovery_request_(const std_msgs::msg::Bool::SharedPtr msg)
   {
     if (!msg) return;
     // one-shot style hint (consumed in timer and cleared)
-    inputs_.recovery_triggered = msg->data;
+    inputs_.recovery_requested = msg->data;
+  }
+
+  void on_recovery_active_(const std_msgs::msg::Bool::SharedPtr msg)
+  {
+    if (!msg) return;
+    inputs_.recovery_active = msg->data;
   }
 
   void on_recovery_state_(const std_msgs::msg::String::SharedPtr msg)
@@ -408,7 +419,7 @@ private:
           break;
         case ControlMode::kRecovery:
           // explicit RECOVERY command maps to recovery trigger/active hint
-          inputs_.recovery_triggered = true;
+          inputs_.recovery_requested = true;
           if (inputs_.recovery_source_available) {
             inputs_.recovery_active = true;
           }
@@ -443,7 +454,7 @@ private:
     }
 
     // Clear one-shot edge hints after update cycle
-    inputs_.recovery_triggered = false;
+    inputs_.recovery_requested = false;
     inputs_.recovery_completed = false;
     inputs_.recovery_aborted = false;
   }
@@ -623,7 +634,8 @@ private:
   // ROS interfaces
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr sub_mode_cmd_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_safety_stop_;
-  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_recovery_trigger_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_recovery_request_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_recovery_active_;
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr sub_recovery_state_;
 
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_manual_override_;

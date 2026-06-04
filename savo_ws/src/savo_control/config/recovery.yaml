@@ -1,0 +1,347 @@
+# =============================================================================
+# Robot Savo — savo_control/config/recovery.yaml
+#
+# Purpose:
+#   Conservative recovery behavior settings for Robot Savo.
+#
+# Package role:
+#   savo_control may generate recovery velocity commands, but it must never
+#   command motors directly.
+#
+# Recovery command chain:
+#   recovery_manager_node / backup_escape_node
+#       -> /cmd_vel_recovery
+#       -> twist_mux_node
+#       -> /cmd_vel_mux
+#       -> cmd_vel_shaper_node
+#       -> /cmd_vel
+#       -> savo_perception/cmd_vel_safety_gate
+#       -> /cmd_vel_safe
+#       -> savo_base/base_driver_node
+#
+# Safety rule:
+#   Recovery is allowed to request motion, but the safety gate and savo_base
+#   watchdog always have final authority.
+#
+# Current Robot Savo stage:
+#   Values are conservative. Treat vx/vy/wz as normalized command strengths
+#   unless the base is fully calibrated to physical m/s and rad/s.
+# =============================================================================
+
+recovery_manager_node:
+  ros__parameters:
+
+    # -------------------------------------------------------------------------
+    # Enable / disable
+    # -------------------------------------------------------------------------
+    enabled: true
+
+    # If true, recovery node can request RECOVERY mode using mode topic.
+    request_recovery_mode: true
+
+    # If true, recovery node returns to STOP after recovery attempt finishes.
+    return_to_stop_after_recovery: true
+
+    # -------------------------------------------------------------------------
+    # Topic configuration
+    # -------------------------------------------------------------------------
+    topics:
+      # Recovery command output. This must be selected by twist_mux_node.
+      cmd_vel_recovery: "/cmd_vel_recovery"
+
+      # Control mode command topic.
+      # recovery_manager_node may publish "RECOVERY" or "STOP" here if enabled.
+      mode_cmd: "/savo_control/mode_cmd"
+
+      # Recovery status topic.
+      status: "/savo_control/recovery_status"
+
+      # Recovery request input (e.g. from stuck_detector_node).
+      recovery_request: "/savo_control/recovery_request"
+
+      # Recovery active output (published true while recovery action is running).
+      recovery_active: "/savo_control/recovery_active"
+
+      # Optional safety topics.
+      safety_stop: "/safety/stop"
+      slowdown_factor: "/safety/slowdown_factor"
+
+      # IMPORTANT:
+      # Keep manual_override empty unless a real Bool topic is created.
+      # Do NOT use /savo_control/mode_cmd here because mode_cmd is String,
+      # while manual_override would be Bool.
+      manual_override: ""
+
+    # -------------------------------------------------------------------------
+    # Timing
+    # -------------------------------------------------------------------------
+    loop_hz: 20.0
+
+    # Maximum time a recovery attempt may run.
+    max_recovery_duration_s: 4.0
+
+    # Time to publish zero command before starting recovery.
+    pre_stop_hold_s: 0.5
+
+    # Time to publish zero command after recovery finishes.
+    post_stop_hold_s: 0.8
+
+    # If no useful progress is detected within this time, stop recovery.
+    no_progress_timeout_s: 2.5
+
+    # Cooldown between recovery attempts.
+    recovery_cooldown_s: 2.0
+
+    # Number of recovery attempts before giving up.
+    max_attempts: 2
+
+    # -------------------------------------------------------------------------
+    # Trigger conditions
+    # -------------------------------------------------------------------------
+    triggers:
+      # If true, recovery may be triggered by an external recovery command.
+      allow_external_trigger: true
+
+      # If true, recovery may start when a stuck detector reports stuck.
+      allow_stuck_trigger: true
+
+      # If true, recovery may start after safety stop clears.
+      allow_after_safety_clear: true
+
+      # Never start recovery while safety_stop is currently true.
+      # This is important because front obstacle may still be too close.
+      block_if_safety_stop_true: true
+
+      # If slowdown factor is below this value, recovery should not start.
+      min_slowdown_factor_to_recover: 0.30
+
+    # -------------------------------------------------------------------------
+    # Recovery strategy selection
+    # -------------------------------------------------------------------------
+    #
+    # Supported strategy names for future manager logic:
+    #   BACKUP_ONLY
+    #   BACKUP_THEN_ROTATE
+    #   ROTATE_ONLY
+    #   STOP_ONLY
+    #
+    default_strategy: "BACKUP_THEN_ROTATE"
+
+    strategies:
+      enabled:
+        - "BACKUP_ONLY"
+        - "BACKUP_THEN_ROTATE"
+        - "ROTATE_ONLY"
+        - "STOP_ONLY"
+
+      fallback_strategy: "STOP_ONLY"
+
+    # -------------------------------------------------------------------------
+    # Conservative recovery velocity limits
+    # -------------------------------------------------------------------------
+    limits:
+      max_backup_vx: 0.10
+      max_forward_vx: 0.08
+      max_strafe_vy: 0.00
+      max_rotate_wz: 0.28
+
+      # Recovery should not use lateral mecanum movement by default.
+      # Strafe recovery can be enabled later after real testing.
+      allow_strafe_recovery: false
+
+    # -------------------------------------------------------------------------
+    # Backup behavior
+    # -------------------------------------------------------------------------
+    backup:
+      enabled: true
+
+      # Negative vx = backward.
+      vx: -0.08
+
+      # Keep recovery reverse short and gentle.
+      duration_s: 0.8
+
+      # Publish frequency for backup command.
+      publish_hz: 20.0
+
+      # Send zero command after backup.
+      stop_after_backup: true
+      stop_after_backup_s: 0.4
+
+    # -------------------------------------------------------------------------
+    # Rotation behavior
+    # -------------------------------------------------------------------------
+    rotate:
+      enabled: true
+
+      # Positive wz = counter-clockwise by ROS convention.
+      # The manager can alternate signs between attempts.
+      wz: 0.25
+
+      # Short rotation to change heading slightly.
+      duration_s: 0.7
+
+      # Alternate direction between recovery attempts.
+      alternate_direction: true
+
+      # Send zero command after rotate.
+      stop_after_rotate: true
+      stop_after_rotate_s: 0.4
+
+    # -------------------------------------------------------------------------
+    # Safety behavior
+    # -------------------------------------------------------------------------
+    safety:
+      # Always publish zero if safety_stop becomes true during recovery.
+      stop_immediately_on_safety_stop: true
+
+      # Publish zero if invalid command is generated.
+      zero_on_invalid_command: true
+
+      # Publish zero on shutdown if node supports it.
+      publish_zero_on_shutdown: true
+      shutdown_zero_publish_count: 5
+
+      # Do not exceed normal cmd_vel_shaper limits.
+      respect_cmd_vel_shaper_limits: true
+
+      # Do not publish directly to /cmd_vel_safe.
+      allow_direct_cmd_vel_safe_publish: false
+
+    # -------------------------------------------------------------------------
+    # Status / diagnostics
+    # -------------------------------------------------------------------------
+    diagnostics:
+      publish_status: true
+      status_hz: 5.0
+      log_transitions: true
+      log_attempts: true
+      log_throttle_s: 2.0
+
+
+backup_escape_node:
+  ros__parameters:
+
+    # -------------------------------------------------------------------------
+    # Enable / disable
+    # -------------------------------------------------------------------------
+    enabled: true
+
+    # -------------------------------------------------------------------------
+    # Topic configuration
+    # -------------------------------------------------------------------------
+    topics:
+      output: "/cmd_vel_recovery"
+      safety_stop: "/safety/stop"
+      status: "/savo_control/backup_escape_status"
+
+    # -------------------------------------------------------------------------
+    # Command behavior
+    # -------------------------------------------------------------------------
+    #
+    # This node is a simple low-level recovery command generator.
+    # It should still go through twist_mux + shaper + safety gate.
+    backup_vx: -0.08
+    rotate_wz: 0.25
+
+    backup_duration_s: 0.8
+    rotate_duration_s: 0.7
+    stop_duration_s: 0.4
+
+    # If true, sequence is:
+    #   stop -> backup -> stop -> rotate -> stop
+    use_rotate_after_backup: true
+
+    # Alternate rotate direction each time the node runs.
+    alternate_rotate_direction: true
+
+    # -------------------------------------------------------------------------
+    # Limits
+    # -------------------------------------------------------------------------
+    max_abs_vx: 0.10
+    max_abs_vy: 0.00
+    max_abs_wz: 0.28
+
+    # -------------------------------------------------------------------------
+    # Timing
+    # -------------------------------------------------------------------------
+    publish_hz: 20.0
+
+    # Hard stop timeout.
+    max_total_duration_s: 3.5
+
+    # -------------------------------------------------------------------------
+    # Safety behavior
+    # -------------------------------------------------------------------------
+    stop_if_safety_stop_true: true
+    publish_zero_on_finish: true
+    publish_zero_on_shutdown: true
+    shutdown_zero_publish_count: 5
+
+    # -------------------------------------------------------------------------
+    # Diagnostics
+    # -------------------------------------------------------------------------
+    diagnostics:
+      publish_status: true
+      log_steps: true
+      log_throttle_s: 2.0
+
+
+stuck_detector:
+  ros__parameters:
+
+    # -------------------------------------------------------------------------
+    # Enable / disable
+    # -------------------------------------------------------------------------
+    enabled: true
+
+    # -------------------------------------------------------------------------
+    # Topic configuration
+    # -------------------------------------------------------------------------
+    topics:
+      cmd_vel: "/cmd_vel"
+      cmd_vel_safe: "/cmd_vel_safe"
+      odom: "/odometry/filtered"
+      safety_stop: "/safety/stop"
+      stuck_state: "/savo_control/stuck_state"
+
+    # -------------------------------------------------------------------------
+    # Stuck detection logic
+    # -------------------------------------------------------------------------
+    #
+    # Basic idea:
+    #   If command says robot should move, but odometry shows almost no movement
+    #   for a period of time, declare stuck.
+    #
+    # Use carefully because early odometry may not be fully calibrated.
+    detection:
+      min_command_vx: 0.08
+      min_command_vy: 0.08
+      min_command_wz: 0.20
+
+      min_observed_linear_speed: 0.02
+      min_observed_angular_speed: 0.05
+
+      stuck_time_s: 2.0
+      clear_time_s: 1.0
+
+      # Do not declare stuck while safety stop is true.
+      ignore_when_safety_stop_true: true
+
+      # Do not declare stuck if command is already almost zero.
+      ignore_small_commands: true
+
+    # -------------------------------------------------------------------------
+    # Debounce / confidence
+    # -------------------------------------------------------------------------
+    debounce:
+      stuck_count_required: 3
+      clear_count_required: 3
+
+    # -------------------------------------------------------------------------
+    # Diagnostics
+    # -------------------------------------------------------------------------
+    diagnostics:
+      publish_debug: true
+      log_stuck_events: true
+      log_throttle_s: 2.0

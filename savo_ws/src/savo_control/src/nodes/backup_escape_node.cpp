@@ -57,7 +57,7 @@ public:
     // Parameters: topics
     // -------------------------------------------------------------------------
     topic_trigger_ = declare_parameter<std::string>(
-      "topics.trigger", topic_names::kRecoveryTrigger);        // Bool (manual trigger)
+      "topics.trigger", topic_names::kRecoveryRequest);        // Bool (manual trigger / request)
     topic_cancel_ = declare_parameter<std::string>(
       "topics.cancel", "");                                    // optional Bool
     topic_safety_stop_ = declare_parameter<std::string>(
@@ -504,7 +504,7 @@ private:
     if (!std::isfinite(min_slowdown_factor_) || min_slowdown_factor_ < 0.0) min_slowdown_factor_ = 0.20;
     if (min_slowdown_factor_ > 1.0) min_slowdown_factor_ = 1.0;
 
-    if (topic_trigger_.empty()) topic_trigger_ = topic_names::kRecoveryTrigger;
+    if (topic_trigger_.empty()) topic_trigger_ = topic_names::kRecoveryRequest;
     if (topic_safety_stop_.empty()) topic_safety_stop_ = topic_names::kSafetyStop;
     if (topic_cmd_out_.empty()) topic_cmd_out_ = topic_names::kCmdVelRecovery;
     if (topic_state_.empty()) topic_state_ = topic_names::kRecoveryState;

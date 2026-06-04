@@ -1,0 +1,189 @@
+# =============================================================================
+# Robot Savo — savo_control/config/cmd_vel_shaper.yaml
+#
+# Purpose:
+#   Smooth and limit the selected velocity command before it reaches the safety
+#   gate. This protects the real mecanum base from sudden jumps in velocity.
+#
+# Command chain:
+#   /cmd_vel_manual, /cmd_vel_nav, /cmd_vel_auto, /cmd_vel_recovery
+#       -> twist_mux_node
+#       -> /cmd_vel_mux
+#       -> cmd_vel_shaper_node
+#       -> /cmd_vel
+#       -> savo_perception/cmd_vel_safety_gate
+#       -> /cmd_vel_safe
+#       -> savo_base/base_driver_node
+#
+# Important:
+#   - This node does NOT publish /cmd_vel_safe.
+#   - This node does NOT touch hardware.
+#   - Hardware execution belongs only to savo_base.
+#
+# Current Robot Savo stage:
+#   Values are conservative. Treat vx/vy/wz as normalized command strengths
+#   unless the base is fully calibrated to real m/s and rad/s.
+# =============================================================================
+
+cmd_vel_shaper_node:
+  ros__parameters:
+
+    # -------------------------------------------------------------------------
+    # Topic configuration
+    # -------------------------------------------------------------------------
+    topics:
+      input: "/cmd_vel_mux"
+      output: "/cmd_vel"
+      status: "/savo_control/cmd_vel_shaper_status"
+
+    # -------------------------------------------------------------------------
+    # Node timing
+    # -------------------------------------------------------------------------
+    loop_hz: 30.0
+
+    # If no fresh input command is received within this time, output zero.
+    input_timeout_s: 0.35
+
+    # Publish zero Twist when input is stale.
+    publish_zero_on_timeout: true
+
+    # Publish zero Twist on startup until first valid command arrives.
+    zero_on_startup: true
+
+    # -------------------------------------------------------------------------
+    # Absolute command limits
+    # -------------------------------------------------------------------------
+    #
+    # vx = linear.x
+    # vy = linear.y
+    # wz = angular.z
+    #
+    # Conservative limits for indoor testing and manual mapping.
+    # Later, after wheel odom calibration, these can be raised.
+    limits:
+      max_vx: 0.25
+      max_vy: 0.22
+      max_wz: 0.60
+
+      # Optional reverse-specific limit.
+      # Backward driving should usually be slower than forward driving.
+      max_reverse_vx: 0.18
+
+      # Minimum small command deadband.
+      # Helps remove joystick/keyboard noise or tiny unstable commands.
+      deadband_vx: 0.005
+      deadband_vy: 0.005
+      deadband_wz: 0.005
+
+    # -------------------------------------------------------------------------
+    # Acceleration limits
+    # -------------------------------------------------------------------------
+    #
+    # These prevent sudden jumps that can make mecanum wheels slip.
+    #
+    # Units:
+    #   If Twist is normalized: command units per second.
+    #   If Twist is calibrated: m/s^2 and rad/s^2.
+    acceleration_limits:
+      max_accel_vx: 0.35
+      max_accel_vy: 0.30
+      max_accel_wz: 0.90
+
+      # Deceleration can be a little stronger than acceleration so the robot
+      # can stop safely but still not violently.
+      max_decel_vx: 0.55
+      max_decel_vy: 0.45
+      max_decel_wz: 1.20
+
+    # -------------------------------------------------------------------------
+    # Jerk / smoothing behavior
+    # -------------------------------------------------------------------------
+    #
+    # Use a simple first-order low-pass filter after rate limiting.
+    # alpha:
+    #   1.0 = no smoothing
+    #   0.0 = never changes
+    #
+    # 0.35–0.55 is a good range for indoor mecanum testing.
+    smoothing:
+      enabled: true
+      alpha_vx: 0.45
+      alpha_vy: 0.45
+      alpha_wz: 0.40
+
+    # -------------------------------------------------------------------------
+    # Mecanum-specific shaping
+    # -------------------------------------------------------------------------
+    #
+    # Mecanum drive can draw high current when combining forward/strafe/rotate.
+    # This scaling keeps the combined command inside a safe normalized envelope.
+    mecanum:
+      normalize_combined_command: true
+
+      # If |vx| + |vy| + |wz_scaled| is above this value, scale all components
+      # down together.
+      max_combined: 1.00
+
+      # Weight rotation when calculating combined demand.
+      # Rotation is usually less current-heavy than full translation, so 0.7 is
+      # a reasonable first value.
+      wz_combined_weight: 0.70
+
+      # For manual mapping, sideways movement should stay gentle.
+      strafe_scale: 0.90
+
+    # -------------------------------------------------------------------------
+    # Safety behavior
+    # -------------------------------------------------------------------------
+    safety:
+      # Clamp NaN/Inf to zero.
+      reject_invalid_commands: true
+
+      # If any command is invalid, output zero instead of last command.
+      zero_on_invalid_command: true
+
+      # On shutdown, publish zero several times if the node supports it.
+      publish_zero_on_shutdown: true
+      shutdown_zero_publish_count: 5
+
+    # -------------------------------------------------------------------------
+    # Profiles
+    # -------------------------------------------------------------------------
+    #
+    # The launch file can later choose a profile.
+    # For now, default_profile should be "manual_mapping" or "safe_default".
+    default_profile: "manual_mapping"
+
+    profiles:
+
+      safe_default:
+        max_vx: 0.18
+        max_vy: 0.16
+        max_wz: 0.45
+        max_accel_vx: 0.25
+        max_accel_vy: 0.22
+        max_accel_wz: 0.70
+
+      manual_mapping:
+        max_vx: 0.20
+        max_vy: 0.18
+        max_wz: 0.50
+        max_accel_vx: 0.30
+        max_accel_vy: 0.25
+        max_accel_wz: 0.80
+
+      nav:
+        max_vx: 0.22
+        max_vy: 0.18
+        max_wz: 0.55
+        max_accel_vx: 0.32
+        max_accel_vy: 0.25
+        max_accel_wz: 0.85
+
+      bench_lifted:
+        max_vx: 0.12
+        max_vy: 0.12
+        max_wz: 0.30
+        max_accel_vx: 0.20
+        max_accel_vy: 0.20
+        max_accel_wz: 0.50

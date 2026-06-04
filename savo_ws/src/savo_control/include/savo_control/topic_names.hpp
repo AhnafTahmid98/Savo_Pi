@@ -98,6 +98,9 @@ inline constexpr const char * kStraightTestState    = "/savo_control/straight_te
 
 // Recovery topics
 inline constexpr const char * kStuckDetected        = "/savo_control/stuck_detected";
+inline constexpr const char * kRecoveryRequest      = "/savo_control/recovery_request";
+inline constexpr const char * kRecoveryActive       = "/savo_control/recovery_active";
+// Deprecated name. Do not use in new code.
 inline constexpr const char * kRecoveryTrigger      = "/savo_control/recovery_trigger";
 inline constexpr const char * kRecoveryState        = "/savo_control/recovery_state";
 inline constexpr const char * kRecoveryStatus       = "/savo_control/recovery_status";

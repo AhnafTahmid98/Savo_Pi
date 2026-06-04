@@ -1,0 +1,294 @@
+# =============================================================================
+# Robot Savo — savo_control/config/rotate_to_heading.yaml
+#
+# Purpose:
+#   Rotate Robot Savo to a requested heading/yaw using fused odometry.
+#
+# Package role:
+#   savo_control computes safe Twist commands.
+#   It does NOT control motors directly.
+#
+# Odometry source:
+#   /odometry/filtered
+#
+# Future fused inputs behind /odometry/filtered:
+#   - 4 wheel encoders on savo-core
+#   - IMU on savo-core
+#   - visual odometry / VO from savo-edge
+#
+# Command chain:
+#   rotate_to_heading_node
+#       -> /cmd_vel_auto
+#       -> twist_mux_node
+#       -> /cmd_vel_mux
+#       -> cmd_vel_shaper_node
+#       -> /cmd_vel
+#       -> savo_perception/cmd_vel_safety_gate
+#       -> /cmd_vel_safe
+#       -> savo_base/base_driver_node
+#
+# Important:
+#   - This file does NOT bypass /cmd_vel_safe.
+#   - Rotation should start with very low angular speed on the real robot.
+#   - First live test should be small angle, e.g. 0.30 rad.
+# =============================================================================
+
+rotate_to_heading_node:
+  ros__parameters:
+
+    # -------------------------------------------------------------------------
+    # Enable / disable
+    # -------------------------------------------------------------------------
+    enabled: true
+
+    # -------------------------------------------------------------------------
+    # Topic configuration
+    # -------------------------------------------------------------------------
+    topics:
+      # Target heading input.
+      # Recommended message type: std_msgs/Float64
+      # Unit: radians
+      target_heading: "/savo_control/target_heading_rad"
+
+      # Fused odometry input from robot_localization.
+      odom: "/odometry/filtered"
+
+      # Output command goes into AUTO source of twist_mux_node.
+      cmd_vel_out: "/cmd_vel_auto"
+
+      # Optional control mode command.
+      # Node may request AUTO mode before rotating.
+      mode_cmd: "/savo_control/mode_cmd"
+
+      # Optional safety stop input from perception.
+      safety_stop: "/safety/stop"
+
+      # Status output.
+      state: "/savo_control/rotate_state"
+
+    # -------------------------------------------------------------------------
+    # Mode behavior
+    # -------------------------------------------------------------------------
+    mode:
+      # If true, node publishes AUTO to /savo_control/mode_cmd when a target starts.
+      request_mode_on_start: true
+
+      requested_mode: "AUTO"
+
+      # For tests, keep false so operator stays in control of mode.
+      # Later, for action-style behavior, this can become true.
+      return_to_stop_on_finish: false
+
+      # If true, publish STOP to mode topic on timeout/failure.
+      return_to_stop_on_failure: true
+
+    # -------------------------------------------------------------------------
+    # Heading convention
+    # -------------------------------------------------------------------------
+    heading:
+      unit: "rad"
+
+      # Normalize heading error to [-pi, pi].
+      normalize_error: true
+
+      # Always choose shortest rotation direction.
+      shortest_path: true
+
+      # If true, target heading is treated as absolute yaw in odom/map frame.
+      # If false, target heading can be interpreted as relative turn request
+      # depending on node implementation.
+      absolute_target: true
+
+      # Optional future setting.
+      allow_relative_targets: true
+
+    # -------------------------------------------------------------------------
+    # Controller gains
+    # -------------------------------------------------------------------------
+    #
+    # Conservative P + small D controller for mecanum base rotation.
+    # Keep Ki at 0 unless you prove steady-state heading error is a problem.
+    controller:
+      kp: 0.80
+      ki: 0.00
+      kd: 0.03
+
+      integral_limit: 0.20
+      integral_active_error_rad: 0.25
+      reset_integral_on_new_target: true
+      reset_integral_on_goal: true
+
+      derivative_filter_alpha: 0.35
+
+    # -------------------------------------------------------------------------
+    # Output limits
+    # -------------------------------------------------------------------------
+    output:
+      # No translation during rotate-to-heading.
+      vx: 0.00
+      vy: 0.00
+
+      force_vx_zero: true
+      force_vy_zero: true
+
+      # Conservative angular command.
+      max_wz: 0.42
+
+      # Minimum command to overcome static friction.
+      # Disabled near the goal to avoid jerking.
+      min_wz_when_active: 0.08
+      disable_min_wz_below_error_rad: 0.04
+
+      # Publish frequency.
+      publish_hz: 30.0
+
+      # Always publish zero when done.
+      publish_zero_on_goal: true
+      publish_zero_on_timeout: true
+      publish_zero_on_cancel: true
+
+      # Send zero for a short hold after finishing.
+      stop_hold_s: 0.40
+
+    # -------------------------------------------------------------------------
+    # Goal criteria
+    # -------------------------------------------------------------------------
+    goal:
+      # 0.06 rad ≈ 3.4 degrees.
+      tolerance_rad: 0.06
+
+      # Must stay inside tolerance for this long before success.
+      hold_time_s: 0.35
+
+      # Hard timeout for one rotation action.
+      timeout_s: 8.0
+
+      # If heading error is already inside tolerance, do not move.
+      no_motion_if_already_reached: true
+
+    # -------------------------------------------------------------------------
+    # Odometry validity
+    # -------------------------------------------------------------------------
+    odom:
+      # If odom is stale, output zero.
+      timeout_s: 0.40
+
+      # Reject invalid orientation.
+      reject_invalid_quaternion: true
+
+      # Reject NaN/Inf.
+      reject_nan_or_inf: true
+
+      # If true, use yaw from odom.pose.pose.orientation.
+      use_pose_orientation: true
+
+      # If true, optionally use angular velocity for damping if implemented.
+      use_twist_angular_z_for_damping: false
+
+    # -------------------------------------------------------------------------
+    # Safety behavior
+    # -------------------------------------------------------------------------
+    safety:
+      # Stop immediately when /safety/stop is true.
+      respect_safety_stop: true
+
+      # If odometry is missing/stale, publish zero.
+      zero_on_odom_stale: true
+
+      # If target is invalid, publish zero.
+      zero_on_invalid_target: true
+
+      # Never publish directly to /cmd_vel_safe.
+      allow_direct_cmd_vel_safe_publish: false
+
+      # Publish zero on shutdown if node supports it.
+      publish_zero_on_shutdown: true
+      shutdown_zero_publish_count: 5
+
+    # -------------------------------------------------------------------------
+    # Test presets
+    # -------------------------------------------------------------------------
+    test_presets:
+      # Small safe first tests.
+      small_left_rad: 0.30
+      small_right_rad: -0.30
+
+      # Larger tests only after small tests pass.
+      quarter_left_rad: 1.5708
+      quarter_right_rad: -1.5708
+      half_turn_rad: 3.1416
+
+      default_test: "small_left_rad"
+
+    # -------------------------------------------------------------------------
+    # Diagnostics
+    # -------------------------------------------------------------------------
+    diagnostics:
+      publish_state: true
+      state_hz: 10.0
+
+      log_target_received: true
+      log_goal_reached: true
+      log_timeout: true
+      log_odom_stale: true
+      log_safety_stop: true
+
+      log_throttle_s: 2.0
+
+
+rotate_to_heading_test:
+  ros__parameters:
+
+    # -------------------------------------------------------------------------
+    # Test helper behavior
+    # -------------------------------------------------------------------------
+    enabled: true
+
+    # Publish target heading here.
+    target_topic: "/savo_control/target_heading_rad"
+
+    # Expected mode for twist_mux.
+    required_mode: "AUTO"
+
+    # If true, test helper may request AUTO mode.
+    request_auto_mode: true
+    mode_cmd: "/savo_control/mode_cmd"
+
+    # -------------------------------------------------------------------------
+    # Safe test sequence
+    # -------------------------------------------------------------------------
+    tests:
+      small_left:
+        target_rad: 0.30
+        description: "Small left rotation, about 17 degrees."
+
+      small_right:
+        target_rad: -0.30
+        description: "Small right rotation, about -17 degrees."
+
+      quarter_left:
+        target_rad: 1.5708
+        description: "90 degree left rotation. Use only after small tests."
+
+      quarter_right:
+        target_rad: -1.5708
+        description: "90 degree right rotation. Use only after small tests."
+
+      half_turn:
+        target_rad: 3.1416
+        description: "180 degree turn. Use only after heading PID is stable."
+
+    default_test_name: "small_left"
+
+    # -------------------------------------------------------------------------
+    # Safety for tests
+    # -------------------------------------------------------------------------
+    safety:
+      require_odometry_filtered: true
+      require_safety_gate: true
+
+      # First live test should be lifted or very open floor.
+      require_robot_lifted_for_first_test: true
+
+      max_test_duration_s: 8.0
+      send_stop_after_test: true

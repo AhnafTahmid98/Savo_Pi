@@ -2,535 +2,613 @@
 # -*- coding: utf-8 -*-
 
 """
-Robot SAVO — savo_control / nodes / distance_pid_test_node.py (ROS2 Jazzy)
-============================================================================
+Robot Savo — savo_control / distance_pid_test_node.py
+====================================================
+
+Distance-based approach test node for Robot Savo.
 
 Purpose
 -------
-Real-robot-safe ROS2 test node for distance PID approach control using the
-Python controller wrappers (`pid_py.py` + `distance_pid_py.py`).
+This node performs a conservative front-distance approach test. It reads a
+high-level front distance topic, such as:
 
-This node is intended for:
-- controlled tuning sessions
-- diagnostics / bringup
-- validating distance control behavior before/alongside C++ runtime controllers
+    /depth/min_front_m
 
-Safety-first defaults
----------------------
-- Publishes to /cmd_vel_test (NOT /cmd_vel) by default
-- Zero command on sensor stale / invalid distance / disabled / safety stop
-- Conservative default max velocity and deadband
-- Optional target updates from topic, otherwise uses parameter target_distance_m
+and publishes velocity commands to:
 
-Expected sensor input
----------------------
-By default subscribes to a std_msgs/Float32 distance topic (meters), e.g.:
-- /depth/min_front_m
-or another range estimate topic you choose.
+    /cmd_vel_auto
 
-Notes
------
-- This node is ROS2-only wiring + safety guards around the Python DistancePid wrapper.
-- Higher-level mode arbitration / muxing should remain in C++ for production.
+Correct command chain:
+
+    distance_pid_test_node
+        -> /cmd_vel_auto
+        -> twist_mux_node
+        -> /cmd_vel_mux
+        -> cmd_vel_shaper_node
+        -> /cmd_vel
+        -> savo_perception/cmd_vel_safety_gate
+        -> /cmd_vel_safe
+        -> savo_base/base_driver_node
+        -> motors
+
+Architecture rules
+------------------
+- This node does NOT publish directly to /cmd_vel_safe.
+- This node does NOT control PCA9685, GPIO, PWM, Freenove board, or motors.
+- This node consumes high-level distance only.
+- Final safety authority remains in savo_perception and savo_base.
+
+Typical use
+-----------
+This is useful for:
+- slow approach tests
+- stopping before a wall/door
+- validating /depth/min_front_m from savo-edge
+- controlled distance PID experiments
+
+First real robot test:
+- wheels lifted or open floor
+- very low speed
+- safety gate running
+- hand near E-stop / power switch
 """
 
 from __future__ import annotations
 
 import math
-from dataclasses import asdict
+import time
+from dataclasses import dataclass
+from enum import Enum
 from typing import Optional
 
 import rclpy
-from rcl_interfaces.msg import SetParametersResult
-from rclpy.node import Node
-from rclpy.parameter import Parameter
-from std_msgs.msg import Bool, Float32, String
 from geometry_msgs.msg import Twist
+from rclpy.node import Node
+from std_msgs.msg import Bool, Float32, Float64, String
 
-from savo_control.controllers import (
-    PidConfig,
-    DistancePid,
-    DistanceControllerConfig,
-)
+
+class ApproachState(str, Enum):
+    IDLE = "IDLE"
+    RUNNING = "RUNNING"
+    GOAL_REACHED = "GOAL_REACHED"
+    STOPPED_TOO_CLOSE = "STOPPED_TOO_CLOSE"
+    SENSOR_STALE = "SENSOR_STALE"
+    SENSOR_INVALID = "SENSOR_INVALID"
+    SAFETY_STOP = "SAFETY_STOP"
+    TIMEOUT = "TIMEOUT"
+    DISABLED = "DISABLED"
+
+
+@dataclass
+class PIDState:
+    integral: float = 0.0
+    previous_error: Optional[float] = None
+    previous_time: Optional[float] = None
+    derivative_filtered: float = 0.0
 
 
 class DistancePidTestNode(Node):
+    """Conservative distance approach controller."""
+
     def __init__(self) -> None:
         super().__init__("distance_pid_test_node")
 
-        # ---------------------------------------------------------------------
-        # Parameters (topics / runtime)
-        # ---------------------------------------------------------------------
-        self.declare_parameter("update_rate_hz", 20.0)
+        # ------------------------------------------------------------------
+        # Parameters
+        # ------------------------------------------------------------------
+        self.declare_parameter("enabled", True)
 
+        # Topics
         self.declare_parameter("distance_topic", "/depth/min_front_m")
-        self.declare_parameter("target_distance_topic", "")         # optional std_msgs/Float32
-        self.declare_parameter("enable_topic", "/savo_control/distance_pid_enable")  # optional Bool
-        self.declare_parameter("safety_stop_topic", "/safety/stop")                  # optional Bool
+        self.declare_parameter("cmd_vel_out_topic", "/cmd_vel_auto")
+        self.declare_parameter("mode_cmd_topic", "/savo_control/mode_cmd")
+        self.declare_parameter("safety_stop_topic", "/safety/stop")
+        self.declare_parameter("status_topic", "/savo_control/distance_approach_status")
 
-        self.declare_parameter("cmd_vel_out_topic", "/cmd_vel_test")  # safe default
-        self.declare_parameter("status_topic", "/savo_control/distance_pid/status")
-        self.declare_parameter("debug_topic", "/savo_control/distance_pid/debug")
-
-        self.declare_parameter("publish_debug", True)
-        self.declare_parameter("publish_status", True)
-        self.declare_parameter("publish_zero_when_disabled", True)
-
-        # Sensor validity / stale handling
-        self.declare_parameter("distance_min_valid_m", 0.02)
-        self.declare_parameter("distance_max_valid_m", 5.00)
-        self.declare_parameter("distance_stale_timeout_s", 0.30)
-
-        # Enable state
-        self.declare_parameter("start_enabled", False)
+        # Behavior
+        self.declare_parameter("auto_start", False)
+        self.declare_parameter("request_auto_mode_on_start", True)
+        self.declare_parameter("required_mode", "AUTO")
+        self.declare_parameter("stop_on_goal", True)
+        self.declare_parameter("stop_if_too_close", True)
 
         # Target
-        self.declare_parameter("target_distance_m", 0.80)
-        self.declare_parameter("use_target_topic", False)
+        self.declare_parameter("target_distance_m", 0.60)
+        self.declare_parameter("tolerance_m", 0.04)
+        self.declare_parameter("hold_time_s", 0.40)
+        self.declare_parameter("hard_min_distance_m", 0.35)
 
-        # Frame/control options
-        self.declare_parameter("command_axis", "x")  # currently only "x" used
-        self.declare_parameter("invert_output_sign", False)
+        # Sensor validity
+        self.declare_parameter("min_valid_distance_m", 0.05)
+        self.declare_parameter("max_valid_distance_m", 3.00)
+        self.declare_parameter("distance_timeout_s", 0.40)
+        self.declare_parameter("smoothing_enabled", True)
+        self.declare_parameter("smoothing_alpha", 0.45)
 
-        # Stop behavior
-        self.declare_parameter("zero_cmd_on_safety_stop", True)
-        self.declare_parameter("zero_cmd_on_stale", True)
+        # PID
+        self.declare_parameter("kp", 0.45)
+        self.declare_parameter("ki", 0.00)
+        self.declare_parameter("kd", 0.03)
+        self.declare_parameter("integral_limit", 0.15)
+        self.declare_parameter("integral_active_error_m", 0.20)
+        self.declare_parameter("derivative_filter_alpha", 0.35)
 
-        # ---------------------------------------------------------------------
-        # Parameters (distance controller config)
-        # ---------------------------------------------------------------------
-        # PID gains
-        self.declare_parameter("pid.kp", 0.8)
-        self.declare_parameter("pid.ki", 0.0)
-        self.declare_parameter("pid.kd", 0.02)
+        # Output limits
+        self.declare_parameter("max_forward_vx", 0.12)
+        self.declare_parameter("allow_reverse", False)
+        self.declare_parameter("max_reverse_vx", 0.06)
+        self.declare_parameter("min_vx_when_active", 0.04)
+        self.declare_parameter("disable_min_vx_below_error_m", 0.08)
 
-        # PID clamps / filters
-        self.declare_parameter("pid.output_min", -0.12)
-        self.declare_parameter("pid.output_max", 0.12)
-        self.declare_parameter("pid.integral_clamp", 0.50)
-        self.declare_parameter("pid.d_filter_alpha", 0.10)
-        self.declare_parameter("pid.min_dt_sec", 1e-4)
-        self.declare_parameter("pid.max_dt_sec", 0.50)
-        self.declare_parameter("pid.freeze_integral_on_invalid_dt", True)
-        self.declare_parameter("pid.derivative_on_measurement", False)  # reserved compatibility
+        # Timing
+        self.declare_parameter("loop_hz", 30.0)
+        self.declare_parameter("timeout_s", 10.0)
+        self.declare_parameter("stop_hold_s", 0.50)
+        self.declare_parameter("shutdown_zero_count", 5)
 
-        # Distance controller wrapper settings
-        self.declare_parameter("distance_tolerance_m", 0.03)
-        self.declare_parameter("output_deadband_m_s", 0.005)
-        self.declare_parameter("min_effective_vx_m_s", 0.02)
-        self.declare_parameter("max_vx_m_s", 0.10)
-        self.declare_parameter("zero_output_within_tolerance", True)
-        self.declare_parameter("reset_pid_on_target_change", True)
-        self.declare_parameter("target_change_reset_threshold_m", 0.01)
-        self.declare_parameter("ctrl_min_dt_sec", 1e-4)
-        self.declare_parameter("ctrl_max_dt_sec", 0.50)
-        self.declare_parameter("direction_mode", "bidirectional")
+        # Safety
+        self.declare_parameter("respect_safety_stop", True)
+        self.declare_parameter("zero_on_invalid_distance", True)
+        self.declare_parameter("zero_on_distance_timeout", True)
 
-        # Logging
-        self.declare_parameter("log_status_throttle_sec", 2.0)
+        # Diagnostics
+        self.declare_parameter("publish_status", True)
+        self.declare_parameter("status_hz", 5.0)
+        self.declare_parameter("log_throttle_s", 2.0)
 
-        # ---------------------------------------------------------------------
-        # Internal state
-        # ---------------------------------------------------------------------
-        self._enabled: bool = False
-        self._safety_stop_active: bool = False
+        self._load_parameters()
+        self._validate_parameters()
 
-        self._distance_m: Optional[float] = None
-        self._distance_stamp_sec: Optional[float] = None
-
-        self._target_distance_m: float = 0.80
-        self._last_loop_time_sec: Optional[float] = None
-
-        self._last_status_log_sec: float = 0.0
-        self._last_cmd_vx: float = 0.0
-
-        # Controller
-        self._controller = DistancePid()
-        self._rebuild_controller_from_params()
-
-        # Dynamic parameter callback
-        self.add_on_set_parameters_callback(self._on_set_parameters)
-
-        # ---------------------------------------------------------------------
+        # ------------------------------------------------------------------
         # ROS interfaces
-        # ---------------------------------------------------------------------
-        self._distance_topic = self.get_parameter("distance_topic").get_parameter_value().string_value
-        self._target_distance_topic = self.get_parameter("target_distance_topic").get_parameter_value().string_value
-        self._enable_topic = self.get_parameter("enable_topic").get_parameter_value().string_value
-        self._safety_stop_topic = self.get_parameter("safety_stop_topic").get_parameter_value().string_value
+        # ------------------------------------------------------------------
+        self._cmd_pub = self.create_publisher(Twist, self._cmd_vel_out_topic, 10)
+        self._mode_pub = self.create_publisher(String, self._mode_cmd_topic, 10)
 
-        self._cmd_vel_out_topic = self.get_parameter("cmd_vel_out_topic").get_parameter_value().string_value
-        self._status_topic = self.get_parameter("status_topic").get_parameter_value().string_value
-        self._debug_topic = self.get_parameter("debug_topic").get_parameter_value().string_value
+        self._status_pub = None
+        if self._publish_status:
+            self._status_pub = self.create_publisher(String, self._status_topic, 10)
 
-        # Subscribers
-        self.sub_distance = self.create_subscription(
-            Float32, self._distance_topic, self._on_distance, 10
+        self._distance_sub = self.create_subscription(
+            Float32,
+            self._distance_topic,
+            self._on_distance_float32,
+            10,
         )
 
-        self.sub_target = None
-        if self.get_parameter("use_target_topic").get_parameter_value().bool_value:
-            if self._target_distance_topic:
-                self.sub_target = self.create_subscription(
-                    Float32, self._target_distance_topic, self._on_target_distance, 10
-                )
-            else:
-                self.get_logger().warn(
-                    "use_target_topic=True but target_distance_topic is empty; using parameter target_distance_m"
-                )
+        # Also support Float64 by using a second subscription on the same topic.
+        # ROS 2 will only match the publisher type that exists.
+        self._distance_sub64 = self.create_subscription(
+            Float64,
+            self._distance_topic,
+            self._on_distance_float64,
+            10,
+        )
 
-        self.sub_enable = None
-        if self._enable_topic:
-            self.sub_enable = self.create_subscription(
-                Bool, self._enable_topic, self._on_enable, 10
-            )
+        self._safety_sub = self.create_subscription(
+            Bool,
+            self._safety_stop_topic,
+            self._on_safety_stop,
+            10,
+        )
 
-        self.sub_safety_stop = None
-        if self._safety_stop_topic:
-            self.sub_safety_stop = self.create_subscription(
-                Bool, self._safety_stop_topic, self._on_safety_stop, 10
-            )
+        # ------------------------------------------------------------------
+        # Runtime state
+        # ------------------------------------------------------------------
+        self._pid = PIDState()
+        self._state = ApproachState.IDLE
 
-        # Publishers
-        self.pub_cmd = self.create_publisher(Twist, self._cmd_vel_out_topic, 10)
-        self.pub_status = None
-        if self.get_parameter("publish_status").get_parameter_value().bool_value:
-            self.pub_status = self.create_publisher(String, self._status_topic, 10)
+        self._latest_distance_m: Optional[float] = None
+        self._filtered_distance_m: Optional[float] = None
+        self._last_distance_time: Optional[float] = None
 
-        self.pub_debug = None
-        if self.get_parameter("publish_debug").get_parameter_value().bool_value:
-            self.pub_debug = self.create_publisher(String, self._debug_topic, 10)
+        self._safety_stop = False
+        self._started_time: Optional[float] = None
+        self._goal_enter_time: Optional[float] = None
+        self._last_status_time = 0.0
+        self._last_log_time = 0.0
 
-        # Startup enable state and target
-        self._enabled = self.get_parameter("start_enabled").get_parameter_value().bool_value
-        self._target_distance_m = self.get_parameter("target_distance_m").get_parameter_value().double_value
-        self._controller.set_target_distance(self._target_distance_m)
+        if self._auto_start and self._enabled:
+            self._start_approach()
+        elif not self._enabled:
+            self._state = ApproachState.DISABLED
 
-        # Timer
-        rate_hz = self.get_parameter("update_rate_hz").get_parameter_value().double_value
-        if (not math.isfinite(rate_hz)) or rate_hz <= 0.0:
-            rate_hz = 20.0
-        self._update_rate_hz = rate_hz
-        self._timer = self.create_timer(1.0 / self._update_rate_hz, self._on_timer)
+        self._timer = self.create_timer(1.0 / self._loop_hz, self._on_timer)
 
         self.get_logger().info(
-            f"distance_pid_test_node started | out={self._cmd_vel_out_topic} | "
-            f"distance_topic={self._distance_topic} | target={self._target_distance_m:.3f} m | "
-            f"enabled={self._enabled} | safety_topic={self._safety_stop_topic or '<disabled>'}"
+            "DistancePidTestNode started | "
+            f"distance={self._distance_topic} | output={self._cmd_vel_out_topic} | "
+            f"target={self._target_distance_m:.2f} m | auto_start={self._auto_start}"
         )
 
-    # =========================================================================
-    # Parameter handling
-    # =========================================================================
-    def _on_set_parameters(self, params: list[Parameter]) -> SetParametersResult:
-        # Accept all, then rebuild selected runtime config safely.
-        # (Topic changes usually require restart; controller tuning can update live.)
-        rebuild_controller = False
-        update_target = False
+    # ----------------------------------------------------------------------
+    # Parameter loading
+    # ----------------------------------------------------------------------
+    def _load_parameters(self) -> None:
+        self._enabled = self.get_parameter("enabled").value
 
-        for p in params:
-            if p.name in {
-                "pid.kp", "pid.ki", "pid.kd",
-                "pid.output_min", "pid.output_max", "pid.integral_clamp",
-                "pid.d_filter_alpha", "pid.min_dt_sec", "pid.max_dt_sec",
-                "pid.freeze_integral_on_invalid_dt", "pid.derivative_on_measurement",
-                "distance_tolerance_m", "output_deadband_m_s", "min_effective_vx_m_s",
-                "max_vx_m_s", "zero_output_within_tolerance",
-                "reset_pid_on_target_change", "target_change_reset_threshold_m",
-                "ctrl_min_dt_sec", "ctrl_max_dt_sec", "direction_mode",
-            }:
-                rebuild_controller = True
+        self._distance_topic = str(self.get_parameter("distance_topic").value)
+        self._cmd_vel_out_topic = str(self.get_parameter("cmd_vel_out_topic").value)
+        self._mode_cmd_topic = str(self.get_parameter("mode_cmd_topic").value)
+        self._safety_stop_topic = str(self.get_parameter("safety_stop_topic").value)
+        self._status_topic = str(self.get_parameter("status_topic").value)
 
-            if p.name == "target_distance_m":
-                update_target = True
+        self._auto_start = self.get_parameter("auto_start").value
+        self._request_auto_mode_on_start = self.get_parameter(
+            "request_auto_mode_on_start"
+        ).value
+        self._required_mode = str(self.get_parameter("required_mode").value)
+        self._stop_on_goal = self.get_parameter("stop_on_goal").value
+        self._stop_if_too_close = self.get_parameter("stop_if_too_close").value
 
-        if rebuild_controller:
-            try:
-                self._rebuild_controller_from_params()
-            except Exception as e:
-                return SetParametersResult(
-                    successful=False,
-                    reason=f"Failed to rebuild controller: {e}"
-                )
-
-        if update_target:
-            try:
-                target = self.get_parameter("target_distance_m").get_parameter_value().double_value
-                if math.isfinite(target):
-                    self._target_distance_m = float(target)
-                    self._controller.set_target_distance(self._target_distance_m)
-            except Exception as e:
-                return SetParametersResult(
-                    successful=False,
-                    reason=f"Failed to set target_distance_m: {e}"
-                )
-
-        return SetParametersResult(successful=True)
-
-    def _rebuild_controller_from_params(self) -> None:
-        pid_cfg = PidConfig(
-            kp=self.get_parameter("pid.kp").get_parameter_value().double_value,
-            ki=self.get_parameter("pid.ki").get_parameter_value().double_value,
-            kd=self.get_parameter("pid.kd").get_parameter_value().double_value,
-            output_min=self.get_parameter("pid.output_min").get_parameter_value().double_value,
-            output_max=self.get_parameter("pid.output_max").get_parameter_value().double_value,
-            integral_clamp=self.get_parameter("pid.integral_clamp").get_parameter_value().double_value,
-            d_filter_alpha=self.get_parameter("pid.d_filter_alpha").get_parameter_value().double_value,
-            min_dt_sec=self.get_parameter("pid.min_dt_sec").get_parameter_value().double_value,
-            max_dt_sec=self.get_parameter("pid.max_dt_sec").get_parameter_value().double_value,
-            freeze_integral_on_invalid_dt=self.get_parameter("pid.freeze_integral_on_invalid_dt").get_parameter_value().bool_value,
-            derivative_on_measurement=self.get_parameter("pid.derivative_on_measurement").get_parameter_value().bool_value,
+        self._target_distance_m = float(self.get_parameter("target_distance_m").value)
+        self._tolerance_m = float(self.get_parameter("tolerance_m").value)
+        self._hold_time_s = float(self.get_parameter("hold_time_s").value)
+        self._hard_min_distance_m = float(
+            self.get_parameter("hard_min_distance_m").value
         )
 
-        ctrl_cfg = DistanceControllerConfig(
-            pid=pid_cfg,
-            distance_tolerance_m=self.get_parameter("distance_tolerance_m").get_parameter_value().double_value,
-            output_deadband_m_s=self.get_parameter("output_deadband_m_s").get_parameter_value().double_value,
-            min_effective_vx_m_s=self.get_parameter("min_effective_vx_m_s").get_parameter_value().double_value,
-            max_vx_m_s=self.get_parameter("max_vx_m_s").get_parameter_value().double_value,
-            zero_output_within_tolerance=self.get_parameter("zero_output_within_tolerance").get_parameter_value().bool_value,
-            reset_pid_on_target_change=self.get_parameter("reset_pid_on_target_change").get_parameter_value().bool_value,
-            target_change_reset_threshold_m=self.get_parameter("target_change_reset_threshold_m").get_parameter_value().double_value,
-            min_dt_sec=self.get_parameter("ctrl_min_dt_sec").get_parameter_value().double_value,
-            max_dt_sec=self.get_parameter("ctrl_max_dt_sec").get_parameter_value().double_value,
-            direction_mode=self.get_parameter("direction_mode").get_parameter_value().string_value,
+        self._min_valid_distance_m = float(
+            self.get_parameter("min_valid_distance_m").value
+        )
+        self._max_valid_distance_m = float(
+            self.get_parameter("max_valid_distance_m").value
+        )
+        self._distance_timeout_s = float(self.get_parameter("distance_timeout_s").value)
+        self._smoothing_enabled = self.get_parameter("smoothing_enabled").value
+        self._smoothing_alpha = float(self.get_parameter("smoothing_alpha").value)
+
+        self._kp = float(self.get_parameter("kp").value)
+        self._ki = float(self.get_parameter("ki").value)
+        self._kd = float(self.get_parameter("kd").value)
+        self._integral_limit = float(self.get_parameter("integral_limit").value)
+        self._integral_active_error_m = float(
+            self.get_parameter("integral_active_error_m").value
+        )
+        self._derivative_filter_alpha = float(
+            self.get_parameter("derivative_filter_alpha").value
         )
 
-        self._controller.set_config(ctrl_cfg)
+        self._max_forward_vx = float(self.get_parameter("max_forward_vx").value)
+        self._allow_reverse = self.get_parameter("allow_reverse").value
+        self._max_reverse_vx = float(self.get_parameter("max_reverse_vx").value)
+        self._min_vx_when_active = float(self.get_parameter("min_vx_when_active").value)
+        self._disable_min_vx_below_error_m = float(
+            self.get_parameter("disable_min_vx_below_error_m").value
+        )
 
-    # =========================================================================
+        self._loop_hz = float(self.get_parameter("loop_hz").value)
+        self._timeout_s = float(self.get_parameter("timeout_s").value)
+        self._stop_hold_s = float(self.get_parameter("stop_hold_s").value)
+        self._shutdown_zero_count = int(self.get_parameter("shutdown_zero_count").value)
+
+        self._respect_safety_stop = self.get_parameter("respect_safety_stop").value
+        self._zero_on_invalid_distance = self.get_parameter(
+            "zero_on_invalid_distance"
+        ).value
+        self._zero_on_distance_timeout = self.get_parameter(
+            "zero_on_distance_timeout"
+        ).value
+
+        self._publish_status = self.get_parameter("publish_status").value
+        self._status_hz = float(self.get_parameter("status_hz").value)
+        self._log_throttle_s = float(self.get_parameter("log_throttle_s").value)
+
+    def _validate_parameters(self) -> None:
+        if self._loop_hz <= 0:
+            raise ValueError("loop_hz must be > 0")
+
+        if self._target_distance_m <= 0:
+            raise ValueError("target_distance_m must be > 0")
+
+        if self._tolerance_m <= 0:
+            raise ValueError("tolerance_m must be > 0")
+
+        if self._min_valid_distance_m <= 0:
+            raise ValueError("min_valid_distance_m must be > 0")
+
+        if self._max_valid_distance_m <= self._min_valid_distance_m:
+            raise ValueError("max_valid_distance_m must be greater than min_valid_distance_m")
+
+        if not (0.0 < self._smoothing_alpha <= 1.0):
+            raise ValueError("smoothing_alpha must be in (0, 1]")
+
+        if not (0.0 <= self._derivative_filter_alpha <= 1.0):
+            raise ValueError("derivative_filter_alpha must be in [0, 1]")
+
+        self._max_forward_vx = abs(self._max_forward_vx)
+        self._max_reverse_vx = abs(self._max_reverse_vx)
+        self._min_vx_when_active = abs(self._min_vx_when_active)
+
+    # ----------------------------------------------------------------------
     # Subscribers
-    # =========================================================================
-    def _on_distance(self, msg: Float32) -> None:
-        if msg is None:
-            return
-        d = float(msg.data)
-        self._distance_m = d
-        self._distance_stamp_sec = self.get_clock().now().nanoseconds * 1e-9
+    # ----------------------------------------------------------------------
+    def _on_distance_float32(self, msg: Float32) -> None:
+        self._update_distance(float(msg.data))
 
-    def _on_target_distance(self, msg: Float32) -> None:
-        if msg is None:
-            return
-        d = float(msg.data)
-        if not math.isfinite(d):
-            return
-        self._target_distance_m = d
-        self._controller.set_target_distance(d)
-
-    def _on_enable(self, msg: Bool) -> None:
-        if msg is None:
-            return
-        new_state = bool(msg.data)
-        if new_state != self._enabled:
-            self._enabled = new_state
-            self._controller.reset()  # safe reset on enable edge
-            self.get_logger().info(f"Distance PID {'ENABLED' if self._enabled else 'DISABLED'}")
+    def _on_distance_float64(self, msg: Float64) -> None:
+        self._update_distance(float(msg.data))
 
     def _on_safety_stop(self, msg: Bool) -> None:
-        if msg is None:
-            return
-        was_active = self._safety_stop_active
-        self._safety_stop_active = bool(msg.data)
-        if self._safety_stop_active and not was_active:
-            self._controller.reset()  # prevent integral/derivative carryover after stop
+        self._safety_stop = bool(msg.data)
 
-    # =========================================================================
-    # Main control loop
-    # =========================================================================
-    def _on_timer(self) -> None:
-        now_sec = self.get_clock().now().nanoseconds * 1e-9
-        if self._last_loop_time_sec is None:
-            self._last_loop_time_sec = now_sec
-            self._publish_zero(reason="startup")
-            self._publish_status_debug(now_sec, reason="startup")
+    def _update_distance(self, distance_m: float) -> None:
+        now = time.monotonic()
+
+        if not self._is_valid_distance(distance_m):
+            self._latest_distance_m = None
+            self._last_distance_time = now
+            self._state = ApproachState.SENSOR_INVALID
+            self._throttled_warn(f"Invalid distance reading: {distance_m}")
             return
 
-        dt_sec = now_sec - self._last_loop_time_sec
-        self._last_loop_time_sec = now_sec
+        self._latest_distance_m = distance_m
+        self._last_distance_time = now
 
-        # Read params used frequently (cheap enough here; keeps behavior live)
-        dist_min = self.get_parameter("distance_min_valid_m").get_parameter_value().double_value
-        dist_max = self.get_parameter("distance_max_valid_m").get_parameter_value().double_value
-        stale_timeout = self.get_parameter("distance_stale_timeout_s").get_parameter_value().double_value
-        zero_on_stale = self.get_parameter("zero_cmd_on_stale").get_parameter_value().bool_value
-        zero_on_safety = self.get_parameter("zero_cmd_on_safety_stop").get_parameter_value().bool_value
-        pub_zero_when_disabled = self.get_parameter("publish_zero_when_disabled").get_parameter_value().bool_value
-        invert_sign = self.get_parameter("invert_output_sign").get_parameter_value().bool_value
-
-        # Target from parameter if not using topic
-        use_target_topic = self.get_parameter("use_target_topic").get_parameter_value().bool_value
-        if not use_target_topic:
-            p_target = self.get_parameter("target_distance_m").get_parameter_value().double_value
-            if math.isfinite(p_target) and p_target != self._target_distance_m:
-                self._target_distance_m = p_target
-                self._controller.set_target_distance(p_target)
-
-        # Enable gate
-        if not self._enabled:
-            self._controller.reset()
-            if pub_zero_when_disabled:
-                self._publish_zero(reason="disabled")
-            self._publish_status_debug(now_sec, reason="disabled")
-            return
-
-        # Safety stop gate
-        if self._safety_stop_active and zero_on_safety:
-            self._controller.reset()
-            self._publish_zero(reason="safety_stop")
-            self._publish_status_debug(now_sec, reason="safety_stop")
-            return
-
-        # Sensor availability / staleness
-        if self._distance_m is None or self._distance_stamp_sec is None:
-            self._controller.reset()
-            self._publish_zero(reason="no_distance")
-            self._publish_status_debug(now_sec, reason="no_distance")
-            return
-
-        age_sec = now_sec - self._distance_stamp_sec
-        if (not math.isfinite(age_sec)) or age_sec < 0.0 or age_sec > stale_timeout:
-            self._controller.reset()
-            if zero_on_stale:
-                self._publish_zero(reason="distance_stale")
-            self._publish_status_debug(now_sec, reason="distance_stale")
-            return
-
-        # Distance range validity
-        current_distance = float(self._distance_m)
-        if (not math.isfinite(current_distance)) or current_distance < dist_min or current_distance > dist_max:
-            self._controller.reset()
-            self._publish_zero(reason="distance_invalid")
-            self._publish_status_debug(now_sec, reason="distance_invalid")
-            return
-
-        # Controller update
-        result = self._controller.update(current_distance, dt_sec)
-
-        vx_cmd = 0.0
-        reason = "ok"
-        if result.valid:
-            vx_cmd = result.vx_cmd_m_s
-            if invert_sign:
-                vx_cmd = -vx_cmd
+        if self._filtered_distance_m is None or not self._smoothing_enabled:
+            self._filtered_distance_m = distance_m
         else:
-            self._controller.reset()
-            vx_cmd = 0.0
-            reason = "controller_invalid"
+            alpha = self._smoothing_alpha
+            self._filtered_distance_m = (
+                alpha * distance_m + (1.0 - alpha) * self._filtered_distance_m
+            )
 
-        self._publish_cmd(vx_cmd)
-        self._publish_status_debug(now_sec, result=result, reason=reason, sensor_age_sec=age_sec)
+    # ----------------------------------------------------------------------
+    # Main loop
+    # ----------------------------------------------------------------------
+    def _on_timer(self) -> None:
+        if not self._enabled:
+            self._state = ApproachState.DISABLED
+            self._publish_zero()
+            self._publish_status_if_needed()
+            return
 
-    # =========================================================================
-    # Publishers
-    # =========================================================================
-    def _publish_cmd(self, vx_cmd: float) -> None:
-        cmd = Twist()
-        axis = self.get_parameter("command_axis").get_parameter_value().string_value.lower().strip()
+        # If not auto-starting, node remains idle but alive.
+        # It can still be changed later by adding service/action control.
+        if self._state == ApproachState.IDLE and not self._auto_start:
+            self._publish_zero()
+            self._publish_status_if_needed()
+            return
 
-        # For this node we only support linear.x intentionally (real-robot safety simplicity)
-        if axis != "x":
-            axis = "x"
+        if self._state == ApproachState.IDLE and self._auto_start:
+            self._start_approach()
 
-        cmd.linear.x = float(vx_cmd)
-        cmd.linear.y = 0.0
-        cmd.linear.z = 0.0
-        cmd.angular.x = 0.0
-        cmd.angular.y = 0.0
-        cmd.angular.z = 0.0
+        if self._respect_safety_stop and self._safety_stop:
+            self._state = ApproachState.SAFETY_STOP
+            self._publish_zero()
+            self._publish_status_if_needed()
+            return
 
-        self.pub_cmd.publish(cmd)
-        self._last_cmd_vx = float(vx_cmd)
+        distance = self._get_valid_current_distance()
+        if distance is None:
+            if self._zero_on_distance_timeout:
+                self._publish_zero()
+            self._publish_status_if_needed()
+            return
 
-    def _publish_zero(self, reason: str = "zero") -> None:
+        if self._started_time is not None:
+            elapsed = time.monotonic() - self._started_time
+            if elapsed > self._timeout_s:
+                self._state = ApproachState.TIMEOUT
+                self._publish_zero()
+                self._publish_status_if_needed()
+                self._throttled_warn("Distance approach timed out")
+                return
+
+        if self._stop_if_too_close and distance < self._hard_min_distance_m:
+            self._state = ApproachState.STOPPED_TOO_CLOSE
+            self._publish_zero()
+            self._publish_status_if_needed()
+            self._throttled_warn(
+                f"Too close: distance={distance:.3f} m < hard_min={self._hard_min_distance_m:.3f} m"
+            )
+            return
+
+        error = distance - self._target_distance_m
+
+        if abs(error) <= self._tolerance_m:
+            if self._goal_enter_time is None:
+                self._goal_enter_time = time.monotonic()
+
+            if (time.monotonic() - self._goal_enter_time) >= self._hold_time_s:
+                self._state = ApproachState.GOAL_REACHED
+                self._publish_zero()
+                self._publish_status_if_needed()
+                return
+        else:
+            self._goal_enter_time = None
+
+        self._state = ApproachState.RUNNING
+        vx = self._compute_pid_vx(error)
+        self._publish_cmd(vx=vx)
+        self._publish_status_if_needed()
+
+    # ----------------------------------------------------------------------
+    # Behavior
+    # ----------------------------------------------------------------------
+    def _start_approach(self) -> None:
+        self._pid = PIDState()
+        self._started_time = time.monotonic()
+        self._goal_enter_time = None
+        self._state = ApproachState.RUNNING
+
+        if self._request_auto_mode_on_start:
+            msg = String()
+            msg.data = self._required_mode
+            self._mode_pub.publish(msg)
+
+        self.get_logger().info(
+            f"Distance approach started | target={self._target_distance_m:.2f} m | "
+            f"mode={self._required_mode}"
+        )
+
+    def _compute_pid_vx(self, error_m: float) -> float:
+        now = time.monotonic()
+
+        if self._pid.previous_time is None:
+            dt = 1.0 / self._loop_hz
+        else:
+            dt = max(1.0e-4, now - self._pid.previous_time)
+
+        # Integral only near target.
+        if abs(error_m) <= self._integral_active_error_m:
+            self._pid.integral += error_m * dt
+            self._pid.integral = self._clamp(
+                self._pid.integral,
+                -self._integral_limit,
+                self._integral_limit,
+            )
+        else:
+            self._pid.integral = 0.0
+
+        if self._pid.previous_error is None:
+            derivative = 0.0
+        else:
+            derivative = (error_m - self._pid.previous_error) / dt
+
+        alpha = self._derivative_filter_alpha
+        self._pid.derivative_filtered = (
+            alpha * derivative + (1.0 - alpha) * self._pid.derivative_filtered
+        )
+
+        raw = (
+            self._kp * error_m
+            + self._ki * self._pid.integral
+            + self._kd * self._pid.derivative_filtered
+        )
+
+        self._pid.previous_error = error_m
+        self._pid.previous_time = now
+
+        # If too far away, raw is positive and robot moves forward.
+        if raw >= 0.0:
+            vx = min(raw, self._max_forward_vx)
+        else:
+            if self._allow_reverse:
+                vx = max(raw, -self._max_reverse_vx)
+            else:
+                vx = 0.0
+
+        # Minimum active command, but not very close to target.
+        if (
+            vx > 0.0
+            and abs(error_m) > self._disable_min_vx_below_error_m
+            and vx < self._min_vx_when_active
+        ):
+            vx = self._min_vx_when_active
+
+        return self._safe_float(vx)
+
+    # ----------------------------------------------------------------------
+    # Validation helpers
+    # ----------------------------------------------------------------------
+    def _get_valid_current_distance(self) -> Optional[float]:
+        now = time.monotonic()
+
+        if self._last_distance_time is None:
+            self._state = ApproachState.SENSOR_STALE
+            self._throttled_warn("No distance data received yet")
+            return None
+
+        if (now - self._last_distance_time) > self._distance_timeout_s:
+            self._state = ApproachState.SENSOR_STALE
+            self._throttled_warn("Distance data stale")
+            return None
+
+        if self._filtered_distance_m is None:
+            self._state = ApproachState.SENSOR_INVALID
+            return None
+
+        if not self._is_valid_distance(self._filtered_distance_m):
+            self._state = ApproachState.SENSOR_INVALID
+            self._throttled_warn(f"Filtered distance invalid: {self._filtered_distance_m}")
+            return None
+
+        return self._filtered_distance_m
+
+    def _is_valid_distance(self, distance_m: float) -> bool:
+        return (
+            math.isfinite(distance_m)
+            and self._min_valid_distance_m <= distance_m <= self._max_valid_distance_m
+        )
+
+    # ----------------------------------------------------------------------
+    # Publishing
+    # ----------------------------------------------------------------------
+    def _publish_cmd(self, vx: float) -> None:
+        msg = Twist()
+        msg.linear.x = self._safe_float(vx)
+        msg.linear.y = 0.0
+        msg.linear.z = 0.0
+        msg.angular.x = 0.0
+        msg.angular.y = 0.0
+        msg.angular.z = 0.0
+        self._cmd_pub.publish(msg)
+
+    def _publish_zero(self) -> None:
         self._publish_cmd(0.0)
 
-    def _publish_status_debug(
-        self,
-        now_sec: float,
-        *,
-        result=None,
-        reason: str = "",
-        sensor_age_sec: Optional[float] = None,
-    ) -> None:
-        # Throttled INFO log
-        throttle_s = self.get_parameter("log_status_throttle_sec").get_parameter_value().double_value
-        if math.isfinite(throttle_s) and throttle_s > 0.0:
-            if (now_sec - self._last_status_log_sec) >= throttle_s:
-                self._last_status_log_sec = now_sec
-                dist_str = f"{self._distance_m:.3f}" if self._distance_m is not None and math.isfinite(self._distance_m) else "nan"
-                age_str = f"{sensor_age_sec:.3f}" if sensor_age_sec is not None and math.isfinite(sensor_age_sec) else "nan"
-                self.get_logger().info(
-                    f"state enabled={self._enabled} safety={self._safety_stop_active} "
-                    f"dist={dist_str}m target={self._target_distance_m:.3f}m "
-                    f"cmd_vx={self._last_cmd_vx:+.3f}m/s age={age_str}s reason={reason}"
-                )
+    def _publish_status_if_needed(self) -> None:
+        if not self._publish_status or self._status_pub is None:
+            return
 
-        if self.pub_status is not None:
-            msg = String()
-            msg.data = (
-                "{"
-                f"\"node\":\"distance_pid_test\","
-                f"\"enabled\":{str(self._enabled).lower()},"
-                f"\"safety_stop\":{str(self._safety_stop_active).lower()},"
-                f"\"target_distance_m\":{self._fmt_num(self._target_distance_m)},"
-                f"\"current_distance_m\":{self._fmt_num(self._distance_m)},"
-                f"\"cmd_vx_m_s\":{self._fmt_num(self._last_cmd_vx)},"
-                f"\"sensor_age_sec\":{self._fmt_num(sensor_age_sec)},"
-                f"\"reason\":\"{reason}\""
-                "}"
-            )
-            self.pub_status.publish(msg)
+        now = time.monotonic()
+        period = 1.0 / max(0.1, self._status_hz)
+        if (now - self._last_status_time) < period:
+            return
 
-        if self.pub_debug is not None:
-            msg = String()
-            if result is None:
-                msg.data = (
-                    f"enabled={int(self._enabled)} safety_stop={int(self._safety_stop_active)} "
-                    f"dist={self._fmt_num(self._distance_m)} target={self._fmt_num(self._target_distance_m)} "
-                    f"cmd_vx={self._fmt_num(self._last_cmd_vx)} reason={reason}"
-                )
-            else:
-                msg.data = (
-                    f"enabled={int(self._enabled)} safety_stop={int(self._safety_stop_active)} "
-                    f"dist={self._fmt_num(getattr(result, 'current_distance_m', None))} "
-                    f"target={self._fmt_num(getattr(result, 'target_distance_m', None))} "
-                    f"err={self._fmt_num(getattr(result, 'error_distance_m', None))} "
-                    f"vx={self._fmt_num(getattr(result, 'vx_cmd_m_s', None))} "
-                    f"tol={int(bool(getattr(result, 'within_tolerance', False)))} "
-                    f"valid={int(bool(getattr(result, 'valid', False)))} "
-                    f"dir_lim={int(bool(getattr(result, 'direction_limited', False)))} "
-                    f"reason={reason}"
-                )
-            self.pub_debug.publish(msg)
+        self._last_status_time = now
+
+        distance = self._filtered_distance_m
+        distance_text = "nan" if distance is None else f"{distance:.3f}"
+
+        msg = String()
+        msg.data = (
+            f"state={self._state.value}; "
+            f"distance_m={distance_text}; "
+            f"target_m={self._target_distance_m:.3f}; "
+            f"safety_stop={self._safety_stop}"
+        )
+        self._status_pub.publish(msg)
+
+    # ----------------------------------------------------------------------
+    # Utility
+    # ----------------------------------------------------------------------
+    @staticmethod
+    def _clamp(value: float, low: float, high: float) -> float:
+        return max(low, min(high, value))
 
     @staticmethod
-    def _fmt_num(v) -> str:
-        try:
-            if v is None:
-                return "null"
-            x = float(v)
-            if not math.isfinite(x):
-                return "null"
-            return f"{x:.6f}"
-        except Exception:
-            return "null"
+    def _safe_float(value: float) -> float:
+        if not math.isfinite(value):
+            return 0.0
+        return float(value)
+
+    def _throttled_warn(self, text: str) -> None:
+        now = time.monotonic()
+        if (now - self._last_log_time) >= self._log_throttle_s:
+            self._last_log_time = now
+            self.get_logger().warning(text)
 
 
 def main(args=None) -> None:
     rclpy.init(args=args)
     node = DistancePidTestNode()
+
     try:
         rclpy.spin(node)
+
     except KeyboardInterrupt:
-        pass
+        node.get_logger().info("Keyboard interrupt received. Sending zero command.")
+
     finally:
-        # Safe stop on exit
         try:
-            node._publish_zero(reason="shutdown")
-        except Exception:
-            pass
-        node.destroy_node()
-        rclpy.shutdown()
+            for _ in range(max(1, node._shutdown_zero_count)):
+                node._publish_zero()
+                time.sleep(0.05)
+        finally:
+            node.destroy_node()
+            rclpy.shutdown()
 
 
 if __name__ == "__main__":
