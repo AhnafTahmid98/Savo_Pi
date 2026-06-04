@@ -1,27 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/utils/diagnostics.py
--------------------------------------------
-Lightweight diagnostics helpers for `savo_base` (ROS2 Jazzy friendly).
-
-Purpose
--------
-Provide small, reusable utilities for:
-- status level normalization (OK/WARN/ERROR)
-- safe exception formatting
-- monotonic timing helpers
-- counters / rate estimation
-- JSON-safe diagnostic payload building
-
-Design goals
-------------
-- Dependency-free (standard library only)
-- Safe in real robot runtime loops
-- Easy to use from nodes, drivers, and safety policies
-- Human-readable outputs for dashboards/logs
-"""
+"""Lightweight diagnostics helpers: status normalization, exception formatting, timing, counters."""
 
 from __future__ import annotations
 

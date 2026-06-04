@@ -1,28 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_control.controllers.pid_py
-============================================
-
-Purpose
--------
-ROS-independent scalar PID controller utility for Python-side tools and wrappers,
-aligned with the C++ `pid.hpp` / `pid.cpp` implementation.
-
-Intended for
-------------
-- heading_pid_py.py
-- distance_pid_py.py
-- Python test/tuning nodes
-- diagnostics dashboards / offline analysis
-
-Important
----------
-The C++ PID remains the authoritative production/runtime implementation.
-This Python module mirrors behavior for testing and tooling, and should not
-replace the real-time C++ control path on the robot.
-"""
+"""Scalar PID controller for Python test/tuning nodes, mirroring C++ pid.hpp behavior."""
 
 from __future__ import annotations
 

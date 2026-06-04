@@ -1,32 +1,4 @@
-// =============================================================================
-// Robot SAVO — savo_control / src/nodes/rotate_to_heading_node.cpp (ROS 2 Jazzy)
-// =============================================================================
-// Purpose
-// -------
-// Professional rotate-in-place primitive for Robot SAVO using the reusable
-// HeadingController (PID-based yaw control).
-//
-// This node is ideal for:
-// - PID tuning of yaw control on real robot
-// - rotate-to-angle validation before Nav2 behaviors
-// - recovery primitives (future integration with recovery_manager)
-// - heading alignment tests using EKF / odometry feedback
-//
-// Behavior summary
-// ----------------
-// - Subscribes to odometry yaw (default: /odometry/filtered)
-// - Accepts target heading in radians on /savo_control/rotate_target (Float64)
-// - Publishes angular.z-only Twist to /cmd_vel_recovery by default
-// - Supports enable/disable and cancel
-// - Uses "settle" logic (must remain within tolerance for N cycles)
-// - Handles stale odometry safely (zero command)
-// - Publishes simple state/status strings for debugging
-//
-// Notes
-// -----
-// - This node outputs wz only (linear x/y = 0) for true rotate-in-place behavior.
-// - Keep cmd_vel_shaper + safety gate in the pipeline for real-robot tests.
-// =============================================================================
+// Rotate-in-place to target heading using HeadingController. Outputs wz-only Twist.
 
 #include <algorithm>
 #include <chrono>

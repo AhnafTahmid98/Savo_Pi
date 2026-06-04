@@ -1,37 +1,4 @@
-# =============================================================================
-# Robot Savo — savo_control/config/rotate_to_heading.yaml
-#
-# Purpose:
-#   Rotate Robot Savo to a requested heading/yaw using fused odometry.
-#
-# Package role:
-#   savo_control computes safe Twist commands.
-#   It does NOT control motors directly.
-#
-# Odometry source:
-#   /odometry/filtered
-#
-# Future fused inputs behind /odometry/filtered:
-#   - 4 wheel encoders on savo-core
-#   - IMU on savo-core
-#   - visual odometry / VO from savo-edge
-#
-# Command chain:
-#   rotate_to_heading_node
-#       -> /cmd_vel_auto
-#       -> twist_mux_node
-#       -> /cmd_vel_mux
-#       -> cmd_vel_shaper_node
-#       -> /cmd_vel
-#       -> savo_perception/cmd_vel_safety_gate
-#       -> /cmd_vel_safe
-#       -> savo_base/base_driver_node
-#
-# Important:
-#   - This file does NOT bypass /cmd_vel_safe.
-#   - Rotation should start with very low angular speed on the real robot.
-#   - First live test should be small angle, e.g. 0.30 rad.
-# =============================================================================
+# First live test: small angle (~0.30 rad), low angular speed, wheels lifted.
 
 rotate_to_heading_node:
   ros__parameters:

@@ -1,52 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot Savo — savo_control / heading_pid_test.launch.py
-======================================================
-
-Heading PID test launch file for Robot Savo.
-
-Purpose
--------
-Starts the control chain plus heading/straight-line test support for validating
-heading correction using fused odometry:
-
-    /odometry/filtered
-
-Future fused odometry inputs behind /odometry/filtered:
-    - 4 wheel encoder odometry on savo-core
-    - IMU on savo-core
-    - VO / visual odometry from savo-edge
-
-Command chain:
-
-    straight_line_pid_test_node.py / heading PID behavior
-        -> /cmd_vel_auto
-        -> twist_mux_node
-        -> /cmd_vel_mux
-        -> cmd_vel_shaper_node
-        -> /cmd_vel
-        -> savo_perception/cmd_vel_safety_gate
-        -> /cmd_vel_safe
-        -> savo_base/base_driver_node
-        -> motors
-
-Important package boundaries:
-    - this launch does not start hardware drivers
-    - this launch does not start the safety gate
-    - this launch does not publish directly to /cmd_vel_safe
-    - this launch expects /odometry/filtered from savo_localization
-
-Safety
-------
-First test:
-    - use a very short distance
-    - keep speed low
-    - safety gate running before floor tests
-    - wheels lifted or open floor
-    - hand near E-stop / power switch
-"""
+"""Heading PID / straight-line test launch. First test: short distance, wheels lifted, safety gate running."""
 
 from __future__ import annotations
 

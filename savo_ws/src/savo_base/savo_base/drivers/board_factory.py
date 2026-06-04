@@ -1,29 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/drivers/board_factory.py
------------------------------------------------
-Professional driver/board factory for Robot Savo (ROS 2 Jazzy).
-
-Purpose
-- Create hardware driver instances from explicit arguments or config dictionaries
-- Centralize board construction logic for:
-    * CLI teleop tools
-    * ROS2 base nodes
-    * diagnostics / bringup scripts
-- Keep real-robot hardware setup consistent across modules
-
-Supported targets (current)
-- PCA9685 driver (`savo_base.drivers.pca9685_driver.PCA9685Driver`)
-- Freenove mecanum motor board wrapper
-  (`savo_base.drivers.freenove_mecanum_board.FreenoveMecanumBoard`)
-
-Design notes
-- This module does not import ROS
-- It is safe for non-ROS scripts and ROS nodes
-- Lazy imports are used so import errors are raised only when a requested driver is built
-"""
+"""Factory functions for constructing motor board driver instances from config."""
 
 from __future__ import annotations
 

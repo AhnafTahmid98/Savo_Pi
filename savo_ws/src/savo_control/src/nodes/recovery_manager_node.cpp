@@ -1,37 +1,4 @@
-// =============================================================================
-// Robot SAVO — savo_control / src/nodes/recovery_manager_node.cpp (ROS 2 Jazzy)
-// =============================================================================
-// Purpose
-// -------
-// ROS2 node wrapper for the reusable RecoveryManager policy/state helper.
-//
-// This node:
-// - Subscribes to stuck/safety/manual/cancel signals
-// - Runs RecoveryManager at a fixed loop rate
-// - Publishes recovery command Twist on /cmd_vel_recovery
-// - Publishes recovery state/status/debug strings
-// - Publishes Bool trigger/state topics for observability
-//
-// Design notes
-// ------------
-// - The recovery policy/state machine lives in recovery_manager.hpp (ROS-free).
-// - This node only handles ROS I/O, parameter loading, and command generation.
-// - Commands are intentionally simple and deterministic:
-//     * BackingUp -> negative linear.x
-//     * Settling  -> zero Twist
-//     * Turning   -> angular.z with alternating sign from manager
-//
-// Professional usage
-// ------------------
-// Use this node before full Nav2 recovery behavior integration to validate local
-// recovery on real hardware with your existing cmd_vel pipeline:
-//
-//   recovery_manager_node -> /cmd_vel_recovery
-//                        -> twist_mux_node
-//                        -> cmd_vel_shaper_node
-//                        -> /cmd_vel
-//                        -> safety gate -> /cmd_vel_safe
-// =============================================================================
+// ROS node wrapper for RecoveryManager. Publishes recovery Twist to /cmd_vel_recovery.
 
 #include <chrono>
 #include <cmath>

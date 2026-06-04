@@ -1,43 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/nodes/base_driver_node.py
--------------------------------------------------
-ROS 2 Jazzy base execution node for the real Robot Savo mecanum platform.
-
-Role in stack
--------------
-This is the *hardware execution* node inside `savo_base`.
-It converts base motion commands (Twist) into wheel commands and sends them to
-the physical motor board (Freenove PCA9685 mecanum board) through `savo_base.drivers`.
-
-Why this node matters
----------------------
-Without this layer, the robot does not move on real hardware.
-Higher layers (teleop, nav, follow, LLM/voice pipeline) can decide *what to do*,
-but `base_driver_node.py` is the layer that actually drives motors safely.
-
-Inputs
-------
-- /cmd_vel_safe               (geometry_msgs/Twist)   [default]
-- /safety/slowdown_factor     (std_msgs/Float32)      [optional]
-- /safety/stop                (std_msgs/Bool)         [optional]
-
-Outputs (optional, lightweight)
--------------------------------
-- /savo_base/watchdog_state   (std_msgs/String JSON summary)
-- /savo_base/base_state       (std_msgs/String JSON summary)
-
-Safety
-------
-- Watchdog timeout on stale commands
-- Optional safety stop topic integration
-- Optional slowdown factor integration
-- Clean stop on shutdown
-- Dry-run backend support for no-hardware testing
-- Optional centralized safety policy integration (`savo_base.safety`)
-"""
+"""Hardware execution node. Converts Twist to wheel duty via Freenove/PCA9685 board."""
 
 from __future__ import annotations
 

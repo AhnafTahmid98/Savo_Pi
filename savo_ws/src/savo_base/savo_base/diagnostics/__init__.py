@@ -1,34 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/diagnostics/__init__.py
----------------------------------------------
-Diagnostics package exports for `savo_base`.
-
-Purpose
--------
-Provides a clean import surface for shared diagnostics utilities
-(e.g., report formatter models/helpers) used by hardware validation scripts.
-
-Examples
---------
-from savo_base.diagnostics import (
-    DiagnosticReport,
-    DiagnosticCheckResult,
-    Severity,
-    ReportStatus,
-    TerminalStyle,
-    print_report,
-    report_to_json_str,
-    write_report_json,
-    report_to_text,
-    write_report_text,
-    make_pass,
-    make_warn,
-    make_fail,
-)
-"""
+"""Exports for savo_base.diagnostics: report models, formatters, and result builders."""
 
 from __future__ import annotations
 

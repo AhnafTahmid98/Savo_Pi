@@ -1,30 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/ros/qos_profiles.py
-------------------------------------------
-Professional ROS2 Jazzy QoS profiles for `savo_base`.
-
-Purpose
--------
-Centralize QoS policy choices used by `savo_base` nodes so all publishers/
-subscribers use consistent, production-safe defaults during real robot testing.
-
-Why this module exists
-----------------------
-QoS mismatches are a common source of silent ROS2 failures (especially with
-mixed Python/C++ nodes and sensor/control pipelines). This file provides:
-- named QoS profiles for common patterns
-- helper builders for custom depths
-- lightweight documentation in one place
-
-Design principles
------------------
-- Conservative defaults for control/safety paths
-- Explicit names (avoid "magic QoS" in nodes)
-- Easy to override per-node if needed
-"""
+"""Named QoS profiles for savo_base publishers and subscribers."""
 
 from __future__ import annotations
 

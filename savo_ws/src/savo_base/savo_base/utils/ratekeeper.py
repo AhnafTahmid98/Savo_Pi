@@ -1,37 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/utils/ratekeeper.py
-------------------------------------------
-Professional timing helper for fixed-rate loops (ROS2 Jazzy friendly).
-
-Purpose
--------
-Provide a small, deterministic utility to keep software loops running near a
-target frequency (Hz) while exposing timing diagnostics useful for real robot
-testing.
-
-Typical use-cases in `savo_base`
---------------------------------
-- Non-ROS hardware polling loops (motor tests, board diagnostics)
-- Internal worker loops in nodes (if not using ROS timers)
-- Safety/diagnostic routines where loop timing quality matters
-
-Design goals
-------------
-- Monotonic-clock based (safe against system time changes)
-- Low overhead
-- Jitter/overrun statistics for diagnostics
-- Optional "reset on overrun" behavior
-- Clean import without ROS dependency
-
-Important note
---------------
-In ROS2 nodes, prefer `create_timer(...)` for normal callback scheduling.
-Use this utility when you intentionally need a manual loop (e.g. hardware driver
-threads, non-ROS scripts, or tight bringup tools).
-"""
+"""Fixed-rate loop timing helper."""
 
 from __future__ import annotations
 

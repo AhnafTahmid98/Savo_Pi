@@ -2,77 +2,18 @@
 # -*- coding: utf-8 -*-
 
 """
-Robot SAVO — savo_base/scripts/teleop_letters_cli.py
-----------------------------------------------------
-Professional ROS 2 Jazzy terminal teleop (letters-only) for Robot Savo.
+Terminal keyboard teleop. Single-key, no Enter. Publishes to /cmd_vel_safe by default.
 
-Purpose
--------
-Manual keyboard teleoperation for quick bringup and diagnostics of the ROS base stack:
-- Publishes Twist to /cmd_vel_safe (default) or custom topic
-- Optional /safety/stop toggle publishing
-- Optional /safety/slowdown_factor publishing
-- Re-publishes commands at fixed rate to avoid base watchdog timeout
-- Linux terminal raw-key mode (single key press, no Enter needed)
+Keys:
+  w/s  forward/backward    a/d  strafe L/R    q/e  rotate CCW/CW    x  stop
+  r/t  fwd+strafe L/R      f/g  bwd+strafe L/R
+  z/c  speed scale -/+     v    reset scale    m  toggle hold/pulse
+  p    toggle /safety/stop  o  publish slowdown  k/l  slowdown -/+
+  h/i  help    .  quit
 
-Design notes
-------------
-- "Letters-only" control style (matches your Robot Savo test workflow)
-- Keeps command values normalized (typically -1..+1) unless you choose otherwise
-- Safe defaults: low speeds + immediate stop key
-- Clean zero command on exit (Ctrl+C / quit)
-
-Default keymap (letters only)
------------------------------
-Motion:
-  w = forward (+vx)
-  s = backward (-vx)
-  a = strafe left (+vy)
-  d = strafe right (-vy)
-  q = rotate left (+wz)
-  e = rotate right (-wz)
-  x = stop (zero cmd)
-
-Diagonals / combined:
-  r = forward + strafe left
-  t = forward + strafe right
-  f = backward + strafe left
-  g = backward + strafe right
-
-Speed scaling:
-  z = decrease speed scale
-  c = increase speed scale
-  v = reset speed scale to 1.0
-
-Safety / helpers:
-  p = toggle /safety/stop publish (True/False)
-  o = publish slowdown factor once (current slowdown value)
-  k = decrease slowdown factor (if using slowdown topic)
-  l = increase slowdown factor (if using slowdown topic)
-  i = print help/status
-  m = toggle hold-mode (latched command) vs pulse-mode (default hold-mode ON)
-  h = help
-  . = quit
-
-Important
----------
-If your sign conventions differ in base_driver_node (forward_sign/strafe_sign/rotate_sign),
-the robot's real motion may look inverted relative to the keyboard labels. That is OK during
-bringup—this tool is for verification and operator testing.
-
-Examples
---------
-# Default (publishes to /cmd_vel_safe)
-ros2 run savo_base teleop_letters_cli.py
-
-# Publish to raw /cmd_vel (only if you intentionally want this path)
-ros2 run savo_base teleop_letters_cli.py --cmd-topic /cmd_vel
-
-# Lower amplitudes for first hardware test
-ros2 run savo_base teleop_letters_cli.py --vx 0.10 --vy 0.10 --wz 0.15
-
-# Start with slowdown factor and allow publishing to /safety/slowdown_factor
-ros2 run savo_base teleop_letters_cli.py --enable-slowdown-pub --slowdown 0.40
+  ros2 run savo_base teleop_letters_cli.py
+  ros2 run savo_base teleop_letters_cli.py --vx 0.10 --vy 0.10 --wz 0.15
+  ros2 run savo_base teleop_letters_cli.py --enable-slowdown-pub --slowdown 0.40
 """
 
 from __future__ import annotations

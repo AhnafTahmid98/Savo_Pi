@@ -1,57 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot Savo — savo_control / recovery_test.launch.py
-===================================================
-
-Recovery test launch file for Robot Savo.
-
-Purpose
--------
-Starts the recovery test manager plus the control chain needed to test local
-recovery behavior safely.
-
-Recovery test command chain:
-
-    recovery_test_manager_node
-        -> /cmd_vel_recovery
-        -> twist_mux_node
-        -> /cmd_vel_mux
-        -> cmd_vel_shaper_node
-        -> /cmd_vel
-        -> savo_perception/cmd_vel_safety_gate
-        -> /cmd_vel_safe
-        -> savo_base/base_driver_node
-        -> motors
-
-Recovery status contract:
-
-    /savo_control/recovery_request  # request input
-    /savo_control/recovery_active   # active output/status
-
-Important package boundaries:
-    - recovery_test_manager_node publishes only /cmd_vel_recovery
-    - recovery_manager_node may publish /savo_control/recovery_active
-    - savo_control publishes /cmd_vel
-    - safety gate publishes /cmd_vel_safe
-    - savo_base executes motor hardware
-
-This launch file does NOT:
-    - start savo_base
-    - start savo_perception safety gate
-    - publish directly to /cmd_vel_safe
-    - touch motor hardware directly
-
-Safety
-------
-First recovery tests should be done with:
-    - wheels lifted
-    - very low speed
-    - safety gate running before floor tests
-    - no person/object close to the robot
-    - hand near E-stop / power switch
-"""
+"""Recovery test launch. First tests: wheels lifted, very low speed, safety gate running, nobody nearby."""
 
 from __future__ import annotations
 

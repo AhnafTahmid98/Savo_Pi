@@ -2,35 +2,12 @@
 # -*- coding: utf-8 -*-
 
 """
-Robot SAVO — Base Bringup Launch (savo_base)
---------------------------------------------
-Professional one-command bringup for Robot Savo base stack.
+Full base stack bringup with profile selection.
 
-Starts:
-- base_driver_node.py            (hardware execution / dryrun capable)
-- base_watchdog_node.py          (command freshness watchdog, optional)
-- base_state_publisher_node.py   (state summary aggregator, optional)
-- base_heartbeat_node.py         (liveness pulse/state, optional)
-- base_diag_runner_node.py       (diagnostic command runner, optional)
-
-Profile selection (automatic — no extra flags needed):
-
-  profile_path given  →  use that exact YAML file
-  profile_path empty  →  use config/profiles/<profile> from savo_base package
-
-Recommended usage
------------------
-# Dry software-only test (no motor output)
-ros2 launch savo_base base_bringup.launch.py profile:=dryrun_sim_motoroff.yaml
-
-# Bench test (robot lifted / controlled test)
-ros2 launch savo_base base_bringup.launch.py profile:=bench_test.yaml
-
-# Real robot driving
-ros2 launch savo_base base_bringup.launch.py profile:=real_robot_v1.yaml
-
-# Custom profile at an arbitrary path
-ros2 launch savo_base base_bringup.launch.py profile_path:=/home/savo/custom.yaml
+  ros2 launch savo_base base_bringup.launch.py profile:=dryrun_sim_motoroff.yaml
+  ros2 launch savo_base base_bringup.launch.py profile:=bench_test.yaml
+  ros2 launch savo_base base_bringup.launch.py profile:=real_robot_v1.yaml
+  ros2 launch savo_base base_bringup.launch.py profile_path:=/path/to/custom.yaml
 """
 
 import os
@@ -45,10 +22,7 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 
-# =============================================================================
-# Base driver node — built inside OpaqueFunction so profile_path vs profile
-# is resolved at launch time using plain Python (no extra boolean flags needed).
-# =============================================================================
+# profile_path vs profile resolved at launch time — OpaqueFunction avoids boolean flag gymnastics
 def _build_base_driver_node(context, *args, **kwargs):
     profile = LaunchConfiguration("profile").perform(context)
     profile_path = LaunchConfiguration("profile_path").perform(context)
@@ -94,9 +68,7 @@ def generate_launch_description() -> LaunchDescription:
     output = LaunchConfiguration("output")
     log_level = LaunchConfiguration("log_level")
 
-    # -------------------------------------------------------------------------
-    # Nodes that do NOT depend on the profile path
-    # -------------------------------------------------------------------------
+    # helper nodes
     base_watchdog_node = Node(
         package="savo_base",
         executable="base_watchdog_node.py",
@@ -214,11 +186,8 @@ def generate_launch_description() -> LaunchDescription:
         arguments=["--ros-args", "--log-level", log_level],
     )
 
-    # -------------------------------------------------------------------------
-    # Launch description
-    # -------------------------------------------------------------------------
     return LaunchDescription([
-        # --- Profile arguments -----------------------------------------------
+        # profile arguments
         DeclareLaunchArgument(
             "profile",
             default_value="dryrun_sim_motoroff.yaml",
@@ -237,7 +206,7 @@ def generate_launch_description() -> LaunchDescription:
             ),
         ),
 
-        # --- Helper node toggles ---------------------------------------------
+        # helper node toggles
         DeclareLaunchArgument(
             "use_watchdog",
             default_value="true",
@@ -259,7 +228,7 @@ def generate_launch_description() -> LaunchDescription:
             description="Start base_diag_runner_node.py (diagnostic command runner).",
         ),
 
-        # --- Output / logging ------------------------------------------------
+        # output / logging
         DeclareLaunchArgument(
             "output",
             default_value="screen",
@@ -271,17 +240,17 @@ def generate_launch_description() -> LaunchDescription:
             description="ROS log level (debug|info|warn|error|fatal).",
         ),
 
-        # --- Informational logs ----------------------------------------------
+        # informational logs
         LogInfo(msg="[savo_base] Starting base_bringup.launch.py"),
         LogInfo(msg=["[savo_base] use_watchdog: ", use_watchdog]),
         LogInfo(msg=["[savo_base] use_state_publisher: ", use_state_publisher]),
         LogInfo(msg=["[savo_base] use_heartbeat: ", use_heartbeat]),
         LogInfo(msg=["[savo_base] use_diag_runner: ", use_diag_runner]),
 
-        # --- base_driver_node (profile resolved at launch time) --------------
+        # base_driver_node (profile resolved at launch time)
         OpaqueFunction(function=_build_base_driver_node),
 
-        # --- Helper nodes ----------------------------------------------------
+        # helper nodes
         base_watchdog_node,
         base_state_publisher_node,
         base_heartbeat_node,

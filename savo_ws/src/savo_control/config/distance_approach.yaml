@@ -1,38 +1,4 @@
-# =============================================================================
-# Robot Savo — savo_control/config/distance_approach.yaml
-#
-# Purpose:
-#   Controlled slow approach behavior using high-level distance feedback.
-#
-# Package role:
-#   savo_control generates safe Twist commands.
-#   It does NOT read raw hardware directly.
-#   It does NOT command motors directly.
-#
-# Expected data source:
-#   /depth/min_front_m is produced by the RealSense/depth stack on savo-edge
-#   and consumed over the ROS network by savo-core.
-#
-# Command chain:
-#   distance_pid_test_node / distance_approach_node
-#       -> /cmd_vel_auto
-#       -> twist_mux_node
-#       -> /cmd_vel_mux
-#       -> cmd_vel_shaper_node
-#       -> /cmd_vel
-#       -> savo_perception/cmd_vel_safety_gate
-#       -> /cmd_vel_safe
-#       -> savo_base/base_driver_node
-#
-# Important:
-#   - This behavior must never bypass /cmd_vel_safe.
-#   - The safety gate has final authority.
-#   - Start with very slow values on the real robot.
-#
-# Current Robot Savo stage:
-#   Twist values are conservative command strengths unless the base is fully
-#   calibrated to physical m/s and rad/s.
-# =============================================================================
+# /depth/min_front_m comes from the RealSense stack on savo-edge over the ROS network.
 
 distance_pid_test_node:
   ros__parameters:

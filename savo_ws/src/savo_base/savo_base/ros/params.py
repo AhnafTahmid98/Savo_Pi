@@ -1,38 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/ros/params.py
-------------------------------------
-Professional ROS2 Jazzy parameter helpers for `savo_base`.
-
-Purpose
--------
-Centralize parameter declaration + reading logic used by `savo_base` nodes.
-
-Why this module exists
-----------------------
-Without a shared params helper, each node repeats:
-- declare_parameter(...)
-- type conversions
-- range clamping
-- common topic names/defaults
-
-This module keeps parameter handling:
-- consistent
-- readable
-- safer for real robot testing
-- easier to maintain as your `savo_base` grows
-
-Scope
------
-This module does NOT:
-- access hardware directly
-- create publishers/subscribers
-- run kinematics or motor output
-
-It ONLY helps nodes declare/read/validate parameters.
-"""
+"""Parameter declaration and typed loading helpers for savo_base nodes."""
 
 from __future__ import annotations
 

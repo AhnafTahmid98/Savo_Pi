@@ -1,36 +1,4 @@
-// =============================================================================
-// Robot SAVO — savo_control / src/nodes/velocity_test_pattern_node.cpp (ROS 2 Jazzy)
-// =============================================================================
-// Purpose
-// -------
-// Publish deterministic velocity test patterns for bringup and validation of
-// the Robot SAVO control pipeline.
-//
-// Typical usage
-// -------------
-// This node can publish to a selectable topic (default: /cmd_vel_test_pattern)
-// and is usually wired into the control pipeline via twist_mux_node (AUTO mode)
-// or directly during diagnostics.
-//
-// Examples:
-//   ros2 run savo_control velocity_test_pattern_node
-//   ros2 run savo_control velocity_test_pattern_node --ros-args -p mode:=square
-//   ros2 run savo_control velocity_test_pattern_node --ros-args -p output_topic:=/cmd_vel_auto
-//
-// What it helps verify
-// --------------------
-// - twist_mux source selection (AUTO input)
-// - cmd_vel_shaper limiting/slew behavior
-// - savo_perception safety gate (/cmd_vel_safe)
-// - mecanum holonomic motion signs (vx / vy / wz)
-// - localization response during controlled motion tests
-//
-// Safety notes
-// ------------
-// - Start with small velocities and short durations.
-// - Test with wheels lifted first, then floor tests in open area.
-// - Keep E-stop / STOP command ready.
-// =============================================================================
+// Publishes deterministic velocity test patterns. First tests: wheels lifted, low speed.
 
 #include <algorithm>
 #include <cmath>

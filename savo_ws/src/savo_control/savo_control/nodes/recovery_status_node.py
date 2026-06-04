@@ -1,52 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot Savo — savo_control / recovery_status_node.py
-===================================================
-
-Recovery status monitor for Robot Savo.
-
-Purpose
--------
-This node monitors recovery-related topics and publishes a compact recovery
-status summary.
-
-It watches:
-
-    /cmd_vel_recovery
-    /savo_control/recovery_status
-    /savo_control/backup_escape_status
-    /savo_control/stuck_state
-    /savo_control/recovery_request
-    /savo_control/recovery_active
-    /savo_control/mode_cmd
-    /savo_control/mode_state
-    /safety/stop
-    /safety/slowdown_factor
-    /cmd_vel_safe
-    /odometry/filtered
-
-Architecture rules
-------------------
-- This node does NOT publish velocity commands.
-- This node does NOT publish /cmd_vel_safe.
-- This node does NOT control hardware.
-- This node does NOT trigger recovery automatically.
-- This node is only for monitoring and diagnostics.
-
-Output
-------
-Publishes compact status string to:
-
-    /savo_control/recovery_monitor_status
-
-Useful for:
-- terminal verification
-- dashboard integration
-- real robot recovery testing
-- checking whether recovery is blocked by safety stop
-"""
+"""Monitors recovery topics and publishes a compact status string to /savo_control/recovery_monitor_status."""
 
 from __future__ import annotations
 

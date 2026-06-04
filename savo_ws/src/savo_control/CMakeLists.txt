@@ -1,31 +1,8 @@
 cmake_minimum_required(VERSION 3.8)
 project(savo_control)
 
-# ============================================================
-# Robot SAVO — savo_control (ROS 2 Jazzy)
-# Hybrid package:
-#   - C++ nodes: mux, shaper, PID/heading, recovery, mode manager
-#   - Python nodes: test managers, dashboards, status helpers (optional/future)
-#
-# Rationale:
-# - In this repo style, relying only on setup.py entry_points has not always
-#   produced reliable ROS executables in install/lib/<pkg>.
-# - We therefore install Python ROS nodes explicitly via CMake install(PROGRAMS)
-#   for reliable `ros2 run`.
-# - Python package modules/libraries are still installed via
-#   ament_python_install_package().
-#
-# Notes
-# -----
-# - This CMakeLists matches the organized src layout:
-#     src/controllers/
-#     src/filters/
-#     src/utils/
-#     src/recovery/
-#     src/nodes/
-# - Header-only utilities still get placeholder .cpp files so the core library
-#   can keep a stable structure and link target.
-# ============================================================
+# Python ROS nodes installed via install(PROGRAMS) not entry_points — entry_points
+# has been unreliable for ros2 run in this repo (same pattern as savo_localization).
 
 # -----------------------
 # Compiler settings
@@ -59,7 +36,6 @@ find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 
-# Project messages (optional today, useful later)
 find_package(savo_msgs REQUIRED)
 
 # -----------------------
@@ -71,7 +47,6 @@ include_directories(include)
 # -----------------------
 # C++ library: core control utilities
 # -----------------------
-# Keep reusable logic in one library so nodes stay thin and professional.
 add_library(savo_control_core
   # Controllers
   src/controllers/pid.cpp
@@ -93,8 +68,6 @@ target_include_directories(savo_control_core PUBLIC
   $<INSTALL_INTERFACE:include>
 )
 
-# Keep this library ROS-friendly. Some files are header-only today, but linking
-# ROS deps here is fine and simplifies downstream node targets.
 ament_target_dependencies(savo_control_core
   rclcpp
   std_msgs
@@ -151,6 +124,7 @@ savo_add_node(rotate_to_heading_node         src/nodes/rotate_to_heading_node.cp
 savo_add_node(velocity_test_pattern_node     src/nodes/velocity_test_pattern_node.cpp)
 
 # Recovery path
+savo_add_node(stuck_detector_node            src/nodes/stuck_detector_node.cpp)
 savo_add_node(recovery_manager_node          src/nodes/recovery_manager_node.cpp)
 savo_add_node(backup_escape_node             src/nodes/backup_escape_node.cpp)
 
@@ -161,11 +135,8 @@ savo_add_node(backup_escape_node             src/nodes/backup_escape_node.cpp)
 ament_python_install_package(${PYTHON_PACKAGE_NAME})
 
 # -----------------------
-# Install Python ROS executable nodes explicitly
-# (reliable `ros2 run` in hybrid package)
+# Install Python ROS executable nodes
 # -----------------------
-# Keep only files that actually exist in your current layout.
-# Add/remove entries as you create Python nodes.
 set(SAVO_CONTROL_PY_NODES
   savo_control/nodes/auto_test_manager_node.py
   savo_control/nodes/straight_line_pid_test_node.py

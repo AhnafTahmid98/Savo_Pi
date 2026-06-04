@@ -1,28 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/utils/clamp.py
--------------------------------------
-Small, reusable clamping helpers for the `savo_base` package.
-
-Why this file exists
---------------------
-Real robot control code touches many values that must stay bounded:
-- normalized velocity commands (e.g. -1.0 .. 1.0)
-- duty cycle limits (e.g. 0 .. 4095)
-- slowdown factors (e.g. 0.0 .. 1.0)
-- watchdog ratios / safety parameters
-
-Keeping clamp logic centralized avoids duplicated edge-case handling.
-
-Design goals
-------------
-- Tiny and dependency-free
-- Predictable behavior (no hidden side effects)
-- ROS2 Jazzy friendly (safe in both nodes and pure Python modules)
-- Explicit helpers for float / int / tuple use-cases
-"""
+"""Clamping helpers for normalized velocities, duty cycles, and safety parameters."""
 
 from __future__ import annotations
 

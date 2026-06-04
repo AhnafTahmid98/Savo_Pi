@@ -1,32 +1,5 @@
-// =============================================================================
-// Robot SAVO — savo_control / src/nodes/backup_escape_node.cpp (ROS 2 Jazzy)
-// =============================================================================
-// Purpose
-// -------
-// Simple local backup/escape behavior node for Robot Savo.
-//
-// This node is a practical pre-Nav2 recovery primitive. It can be used:
-// - standalone (manual trigger)
-// - as a helper test node while validating your recovery pipeline
-// - later alongside recovery_manager_node (manager decides *when*;
-//   this node performs a deterministic backup/turn maneuver)
-//
-// Behavior (default)
-// ------------------
-// IDLE -> BACKUP -> SETTLE -> TURN -> DONE -> IDLE
-//
-// Safety
-// ------
-// - Subscribes to /safety/stop and immediately aborts motion if active
-// - Command timeout style behavior is implicit through state machine timing
-// - Publishes zero Twist when inactive (configurable)
-//
-// Notes
-// -----
-// - This node publishes to /cmd_vel_recovery by default
-// - It is ROS-only orchestration; no direct motor/PCA9685 code here
-// - For real hardware, keep speeds very low at first
-// =============================================================================
+// Backup/escape recovery primitive. State: IDLE -> BACKUP -> SETTLE -> TURN -> DONE.
+// Aborts immediately on /safety/stop. Publishes to /cmd_vel_recovery.
 
 #include <chrono>
 #include <cmath>

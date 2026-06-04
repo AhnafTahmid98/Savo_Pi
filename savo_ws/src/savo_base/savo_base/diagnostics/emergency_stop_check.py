@@ -1,57 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/diagnostics/emergency_stop_check.py
-----------------------------------------------------------
-Professional emergency-stop diagnostic for Robot Savo base/safety pipeline.
-
-Purpose
--------
-Validate that an emergency stop signal (`/safety/stop`) is correctly propagated
-through the control chain and that the base command output (`/cmd_vel_safe`)
-goes to zero (or remains zero) when stop is active.
-
-This script is NON-INTRUSIVE by default:
-- It subscribes to topics and observes behavior.
-- It can optionally publish a test stop pulse for validation.
-
-What it checks
---------------
-1) `/safety/stop` topic is present and updates.
-2) Optional `/cmd_vel_safe` is observed.
-3) When stop becomes TRUE:
-   - `/cmd_vel_safe` should be zero (within epsilon), or become zero within timeout.
-4) Optional recovery observation when stop becomes FALSE.
-
-Typical use-cases
------------------
-- Bringup validation after `savo_perception` + `cmd_vel_safety_gate`
-- Regression check after refactoring `savo_base` / `savo_control`
-- Demo-day preflight safety verification
-
-Examples
---------
-# Passive observe only (recommended first)
-ros2 run savo_base emergency_stop_check.py
-
-# Observe custom topics
-ros2 run savo_base emergency_stop_check.py --stop-topic /safety/stop --cmd-topic /cmd_vel_safe
-
-# Publish a 1-second test stop pulse and verify cmd_vel_safe zeroing
-ros2 run savo_base emergency_stop_check.py --pulse-stop --pulse-duration 1.0
-
-# Stricter zero threshold
-ros2 run savo_base emergency_stop_check.py --epsilon-lin 0.005 --epsilon-ang 0.01
-
-Notes
------
-- This script checks EFFECT on `/cmd_vel_safe`. It does not directly command motors.
-- For full end-to-end hardware validation, combine with:
-  - `base_smoke_test_cli.py`
-  - dashboard (`/savo_base/base_state`)
-  - visual confirmation that the robot does not move
-"""
+"""Validates that /safety/stop correctly zeroes /cmd_vel_safe. Passive observer by default; can pulse-test."""
 
 from __future__ import annotations
 

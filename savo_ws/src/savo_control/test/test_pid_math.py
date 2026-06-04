@@ -1,22 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot Savo — savo_control / test_pid_math.py
-============================================
-
-Unit tests for Python PID helper controllers.
-
-These tests validate:
-  - generic PID behavior
-  - output limiting
-  - integral limiting / anti-windup
-  - reset behavior
-  - distance PID sign convention
-  - heading PID shortest-angle behavior
-
-These tests are ROS-independent and do not require robot hardware.
-"""
+"""Unit tests for PID, HeadingPID, and DistancePID: gains, limits, anti-windup, reset, sign conventions."""
 
 from __future__ import annotations
 

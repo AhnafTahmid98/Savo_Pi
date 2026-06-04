@@ -2,65 +2,15 @@
 # -*- coding: utf-8 -*-
 
 """
-Robot Savo — savo_control / keyboard_teleop_node.py
-===================================================
+Keyboard teleop publishing to /cmd_vel_manual. Requires an interactive terminal.
 
-Keyboard teleoperation node for Robot Savo manual driving and manual mapping.
+Controls:
+  w/s   forward/backward    q/e  rotate CCW/CW
+  a/d   strafe left/right   x/space  stop
+  t/g   linear speed +/-    y/h  angular speed +/-
+  r     reset speeds        p    print help    Ctrl+C  quit
 
-Role
-----
-This node publishes manual velocity commands to:
-
-    /cmd_vel_manual
-
-It does NOT publish directly to /cmd_vel_safe.
-It does NOT control hardware.
-It does NOT touch PCA9685, GPIO, motors, or Freenove board.
-
-Correct command chain:
-
-    keyboard_teleop_node
-        -> /cmd_vel_manual
-        -> twist_mux_node
-        -> /cmd_vel_mux
-        -> cmd_vel_shaper_node
-        -> /cmd_vel
-        -> savo_perception/cmd_vel_safety_gate
-        -> /cmd_vel_safe
-        -> savo_base/base_driver_node
-        -> motors
-
-Keyboard controls
------------------
-    w : forward
-    s : backward
-    a : strafe left
-    d : strafe right
-    q : rotate left / CCW
-    e : rotate right / CW
-
-    x or space : stop
-
-    t : increase linear speed
-    g : decrease linear speed
-
-    y : increase angular speed
-    h : decrease angular speed
-
-    r : reset speeds to defaults
-    p : print help
-    Ctrl+C : quit safely
-
-Notes
------
-This node is designed for terminal use. Run it in a real terminal, not from a
-background launch process unless stdin is available.
-
-For first real robot tests:
-    - lift wheels first
-    - keep speed low
-    - make sure safety gate is running
-    - keep hand near power switch / E-stop
+First real robot test: wheels lifted, safety gate running.
 """
 
 from __future__ import annotations
@@ -100,22 +50,16 @@ class KeyboardTeleopNode(Node):
         self.declare_parameter("cmd_vel_topic", "/cmd_vel_manual")
         self.declare_parameter("publish_hz", 20.0)
 
-        # Default command strengths.
-        # Current Robot Savo base may treat Twist as normalized command strength
-        # until full velocity calibration is completed.
         self.declare_parameter("default_linear_speed", 0.12)
         self.declare_parameter("default_angular_speed", 0.35)
 
-        # Maximum command limits.
         self.declare_parameter("max_linear_speed", 0.25)
         self.declare_parameter("max_angular_speed", 0.60)
 
-        # Speed step when pressing t/g/y/h.
         self.declare_parameter("linear_speed_step", 0.02)
         self.declare_parameter("angular_speed_step", 0.05)
 
-        # If no key command is received for this long, publish zero.
-        # This is a safety feature for terminal focus loss.
+        # publish zero if no key received (guards against terminal focus loss)
         self.declare_parameter("key_timeout_s", 0.50)
 
         # Publish zero repeatedly on shutdown.
@@ -250,12 +194,10 @@ class KeyboardTeleopNode(Node):
         elif key == "s":
             self._set_command(vx=-self._linear_speed, vy=0.0, wz=0.0)
         elif key == "a":
-            # ROS convention: positive linear.y = left
             self._set_command(vx=0.0, vy=self._linear_speed, wz=0.0)
         elif key == "d":
             self._set_command(vx=0.0, vy=-self._linear_speed, wz=0.0)
         elif key == "q":
-            # ROS convention: positive angular.z = CCW
             self._set_command(vx=0.0, vy=0.0, wz=self._angular_speed)
         elif key == "e":
             self._set_command(vx=0.0, vy=0.0, wz=-self._angular_speed)
@@ -314,7 +256,6 @@ class KeyboardTeleopNode(Node):
         if key is not None:
             self._handle_key(key)
 
-        # Safety timeout: if no fresh key command arrives, stop.
         now = time.monotonic()
         if (now - self._last_key_time) > self._key_timeout_s:
             self._current_cmd = TeleopCommand()

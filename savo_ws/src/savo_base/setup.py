@@ -1,24 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — setup.py (ROS 2 Jazzy, hybrid package)
----------------------------------------------------
-Purpose:
-- Package the Python modules under `savo_base/`
-- Work together with:
-    * CMakeLists.txt  -> installs scripts/, Python ROS nodes, launch/, config/, resources
-    * setup.cfg       -> standard ROS 2 script install path (kept for compatibility)
-
-Important (hybrid package pattern)
-----------------------------------
-In this project, Python ROS node executables are installed explicitly via
-CMake `install(PROGRAMS ...)` for reliable `ros2 run` / launch in hybrid
-ament_cmake packages.
-
-`entry_points` may be kept for future compatibility/documentation, but runtime
-execution should rely on the installed `.py` scripts in lib/savo_base.
-"""
+# Python ROS node executables are installed by CMakeLists.txt install(PROGRAMS), not entry_points,
+# because entry_points has been unreliable for ros2 run in this hybrid ament_cmake layout.
 
 from setuptools import find_packages, setup
 

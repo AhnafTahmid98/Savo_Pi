@@ -2,64 +2,13 @@
 # -*- coding: utf-8 -*-
 
 """
-Robot SAVO — savo_base/scripts/poke_test_cli.py
------------------------------------------------
-Professional ROS 2 Jazzy CLI utility for *short motion poke tests* of the base stack.
+Short motion poke test: pulses +vx/-vx/+vy/-vy/+wz/-wz to verify command path and sign conventions.
+Wheels lifted for first test after wiring or invert flag changes.
 
-Purpose
--------
-This tool publishes brief Twist commands (small "pokes") to verify:
-- base_driver_node command path is alive
-- mecanum wheel direction/sign conventions
-- motor board writes are happening
-- safety stop topic behavior (optional quick test)
-- slowdown factor effect (optional)
-
-It is intentionally short-duration and low-speed by default.
-
-Typical use cases
------------------
-- After bringup of `savo_base/base_driver_node.py`
-- After changing invert flags / sign conventions
-- After wiring/motor board changes
-- During dry-run backend validation (no hardware movement expected)
-
-Default behavior
-----------------
-Publishes short pulses on:
-1) +vx  (forward test in robot command frame)
-2) -vx
-3) +vy  (strafe left/right depending conventions)
-4) -vy
-5) +wz  (CCW/CW depending conventions)
-6) -wz
-
-Safety notes
-------------
-- Keep robot lifted or wheels off ground for first test after changes.
-- Start with low amplitudes.
-- This script does NOT bypass your `cmd_vel_safety_gate`; it should publish to /cmd_vel_safe by default.
-- Optional `--test-safety-stop` briefly toggles /safety/stop and confirms motor stop behavior via observation.
-
-Examples
---------
-# Default quick poke sequence
-ros2 run savo_base poke_test_cli.py
-
-# Publish to raw /cmd_vel (only if you intentionally want that path)
-ros2 run savo_base poke_test_cli.py --cmd-topic /cmd_vel
-
-# Smaller, safer amplitudes
-ros2 run savo_base poke_test_cli.py --vx 0.08 --vy 0.08 --wz 0.15 --pulse 0.25
-
-# Test only rotation pokes
-ros2 run savo_base poke_test_cli.py --only rotate
-
-# Include safety stop toggle test
-ros2 run savo_base poke_test_cli.py --test-safety-stop
-
-# Apply slowdown factor during test (if base_driver_node uses slowdown topic)
-ros2 run savo_base poke_test_cli.py --set-slowdown 0.40
+  ros2 run savo_base poke_test_cli.py
+  ros2 run savo_base poke_test_cli.py --vx 0.08 --vy 0.08 --wz 0.15 --pulse 0.25
+  ros2 run savo_base poke_test_cli.py --only rotate
+  ros2 run savo_base poke_test_cli.py --test-safety-stop
 """
 
 from __future__ import annotations

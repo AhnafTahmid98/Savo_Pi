@@ -1,22 +1,5 @@
 # -*- coding: utf-8 -*-
-"""
-Robot SAVO — savo_base/utils/topic_names.py
--------------------------------------------
-Centralized ROS topic-name constants and helpers for `savo_base`.
-
-Why this file exists
---------------------
-- Prevents hard-coded topic strings across multiple nodes
-- Keeps naming consistent during bringup/refactors
-- Makes launch/config overrides easier to audit
-
-Design goals
-------------
-- Zero ROS dependency (pure Python utility)
-- Safe defaults matching current Robot Savo contracts
-- Small helper functions for namespacing/normalization
-- Prefer `savo_base.constants` as single source of truth (with fallback)
-"""
+"""Topic name constants and helpers for savo_base. Zero ROS dependency."""
 
 from __future__ import annotations
 

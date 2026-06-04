@@ -1,70 +1,8 @@
-# =============================================================================
-# Robot Savo — savo_control/config/topic_remaps_example.yaml
-#
-# Purpose:
-#   Example topic remap/reference file for Robot Savo control-layer integration.
-#
-# This file documents how command topics should be connected between:
-#   - teleop / keyboard
-#   - Nav2
-#   - autonomous mapping / exploration
-#   - recovery behavior
-#   - twist_mux_node
-#   - cmd_vel_shaper_node
-#   - safety gate
-#   - savo_base
-#
-# Important:
-#   This file is mainly for reference and launch design.
-#   It is not required to be loaded by every node.
-#
-# Core safety rule:
-#   Nothing in savo_control should publish directly to /cmd_vel_safe.
-#   /cmd_vel_safe is produced by the safety gate and consumed by savo_base.
-# =============================================================================
+# Reference file for control-layer topic connections. Not loaded by nodes at runtime.
 
 
 # =============================================================================
 # 1. Canonical command chain
-# =============================================================================
-#
-# Manual keyboard:
-#   keyboard_teleop_node
-#       -> /cmd_vel_manual
-#
-# Nav2:
-#   Nav2 controller output must be remapped:
-#       /cmd_vel -> /cmd_vel_nav
-#
-# Auto test / autonomous mapping:
-#   test or exploration node
-#       -> /cmd_vel_auto
-#
-# Recovery:
-#   recovery node
-#       -> /cmd_vel_recovery
-#
-# Control mux:
-#   twist_mux_node
-#       input:  /cmd_vel_manual
-#       input:  /cmd_vel_nav
-#       input:  /cmd_vel_auto
-#       input:  /cmd_vel_recovery
-#       output: /cmd_vel_mux
-#
-# Command shaping:
-#   cmd_vel_shaper_node
-#       input:  /cmd_vel_mux
-#       output: /cmd_vel
-#
-# Safety gate:
-#   cmd_vel_safety_gate
-#       input:  /cmd_vel
-#       output: /cmd_vel_safe
-#
-# Base hardware:
-#   savo_base/base_driver_node
-#       input: /cmd_vel_safe
 # =============================================================================
 
 
@@ -91,27 +29,6 @@ topic_contract:
 
 # =============================================================================
 # 2. Manual mapping remaps
-# =============================================================================
-#
-# Use case:
-#   Drive Robot Savo manually while slam_toolbox builds the map.
-#
-# Expected flow:
-#   keyboard -> /cmd_vel_manual -> mux -> shaper -> /cmd_vel
-#   -> safety gate -> /cmd_vel_safe -> savo_base
-#
-# Launch idea:
-#   teleop_control.launch.py starts:
-#     - keyboard_teleop_node
-#     - twist_mux_node
-#     - cmd_vel_shaper_node
-#
-#   manual_mapping.launch.py starts:
-#     - slam_toolbox
-#     - map saver tools
-#
-# Mode:
-#   Set mode to MANUAL.
 # =============================================================================
 
 manual_mapping:
@@ -150,17 +67,8 @@ manual_mapping:
 # 3. Nav2 remaps
 # =============================================================================
 #
-# Important:
-#   Nav2 normally publishes /cmd_vel.
-#   In Robot Savo, Nav2 must NOT publish directly to /cmd_vel because /cmd_vel
-#   is the shaped output from savo_control.
-#
-# Correct:
-#   Nav2 /cmd_vel -> /cmd_vel_nav
-#
-# Then:
-#   /cmd_vel_nav -> twist_mux_node -> /cmd_vel_mux -> cmd_vel_shaper_node
-#   -> /cmd_vel -> safety gate -> /cmd_vel_safe -> savo_base
+# Nav2 must be remapped: /cmd_vel -> /cmd_vel_nav, not directly to /cmd_vel
+# (which is the shaped output owned by savo_control).
 # =============================================================================
 
 nav2:
@@ -190,15 +98,6 @@ nav2:
 
 # =============================================================================
 # 4. Auto test remaps
-# =============================================================================
-#
-# Use case:
-#   Controlled test patterns, distance approach, rotate-to-heading tests,
-#   autonomous mapping/exploration command source.
-#
-# Expected flow:
-#   auto node -> /cmd_vel_auto -> mux -> shaper -> /cmd_vel
-#   -> safety gate -> /cmd_vel_safe -> savo_base
 # =============================================================================
 
 auto_test:
@@ -230,18 +129,6 @@ auto_test:
 
 # =============================================================================
 # 5. Recovery remaps
-# =============================================================================
-#
-# Use case:
-#   Recovery behavior requests a short safe motion such as:
-#     stop -> backup -> stop -> rotate -> stop
-#
-# Expected flow:
-#   recovery node -> /cmd_vel_recovery -> mux -> shaper -> /cmd_vel
-#   -> safety gate -> /cmd_vel_safe -> savo_base
-#
-# Important:
-#   Recovery must still be blocked by /safety/stop and /cmd_vel_safe gate.
 # =============================================================================
 
 recovery:
@@ -277,24 +164,6 @@ recovery:
 # =============================================================================
 # 6. Safety gate topic contract
 # =============================================================================
-#
-# The safety gate may live in savo_perception.
-#
-# Required behavior:
-#   Subscribe:
-#     /cmd_vel
-#     /safety/stop
-#     /safety/slowdown_factor
-#
-#   Publish:
-#     /cmd_vel_safe
-#
-# If /safety/stop is true:
-#   /cmd_vel_safe should become zero.
-#
-# If slowdown_factor is less than 1:
-#   /cmd_vel_safe should be scaled down.
-# =============================================================================
 
 safety_gate:
   package: "savo_perception"
@@ -315,21 +184,6 @@ safety_gate:
 # =============================================================================
 # 7. savo_base contract
 # =============================================================================
-#
-# savo_base is the only package that executes real motor hardware.
-#
-# It should subscribe to:
-#   /cmd_vel_safe
-#
-# It should NOT subscribe directly to:
-#   /cmd_vel_manual
-#   /cmd_vel_nav
-#   /cmd_vel_auto
-#   /cmd_vel_recovery
-#   /cmd_vel
-#
-# This keeps safety and command authority clean.
-# =============================================================================
 
 savo_base:
   package: "savo_base"
@@ -348,12 +202,6 @@ savo_base:
 
 # =============================================================================
 # 8. savo-edge data topics used by control
-# =============================================================================
-#
-# RealSense/depth and VO may run on savo-edge.
-#
-# The control layer should not care which Pi produces the data.
-# It only consumes stable ROS topics visible over the network.
 # =============================================================================
 
 savo_edge_inputs:
@@ -381,10 +229,6 @@ savo_edge_inputs:
 
 # =============================================================================
 # 9. Example launch remap snippets
-# =============================================================================
-#
-# These are examples for launch files. They are not automatically applied by
-# this YAML unless a launch file reads them.
 # =============================================================================
 
 launch_examples:

@@ -1,41 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot Savo — savo_control / control_bringup.launch.py
-=====================================================
-
-Main bringup launch file for the Robot Savo control layer.
-
-Purpose
--------
-Starts the core control nodes that sit between command sources and the safety
-gate.
-
-Control chain:
-
-    /cmd_vel_manual
-    /cmd_vel_auto
-    /cmd_vel_nav
-    /cmd_vel_recovery
-        -> twist_mux_node
-        -> /cmd_vel_mux
-        -> cmd_vel_shaper_node
-        -> /cmd_vel
-        -> savo_perception/cmd_vel_safety_gate
-        -> /cmd_vel_safe
-        -> savo_base/base_driver_node
-
-This launch file does NOT start hardware drivers.
-This launch file does NOT start the safety gate.
-This launch file does NOT start Nav2.
-This launch file does NOT start keyboard teleop by default.
-
-Package boundaries:
-    - savo_control: command selection, shaping, mode/recovery/status
-    - savo_perception: safety gate /cmd_vel -> /cmd_vel_safe
-    - savo_base: hardware execution from /cmd_vel_safe
-"""
+"""Main bringup for the savo_control layer: mode manager, twist mux, shaper, recovery, and status nodes."""
 
 from __future__ import annotations
 

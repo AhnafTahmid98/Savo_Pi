@@ -2,63 +2,15 @@
 # -*- coding: utf-8 -*-
 
 """
-Robot Savo — savo_control / recovery_test_manager_node.py
-=========================================================
+Controlled recovery test sequences publishing to /cmd_vel_recovery.
 
-Recovery test manager for Robot Savo.
+Commands via /savo_control/recovery_test_cmd (std_msgs/String):
+  BACKUP_ONLY, ROTATE_LEFT, ROTATE_RIGHT,
+  BACKUP_THEN_ROTATE_LEFT, BACKUP_THEN_ROTATE_RIGHT, STOP
 
-Purpose
--------
-This node runs controlled recovery test sequences and publishes recovery
-velocity commands to:
+  ros2 topic pub /savo_control/recovery_test_cmd std_msgs/msg/String "{data: 'BACKUP_ONLY'}" --once
 
-    /cmd_vel_recovery
-
-Correct command chain:
-
-    recovery_test_manager_node
-        -> /cmd_vel_recovery
-        -> twist_mux_node
-        -> /cmd_vel_mux
-        -> cmd_vel_shaper_node
-        -> /cmd_vel
-        -> savo_perception/cmd_vel_safety_gate
-        -> /cmd_vel_safe
-        -> savo_base/base_driver_node
-        -> motors
-
-Architecture rules
-------------------
-- This node does NOT publish directly to /cmd_vel_safe.
-- This node does NOT control hardware directly.
-- This node does NOT touch PCA9685, GPIO, PWM, Freenove board, or motors.
-- The safety gate and savo_base watchdog always have final authority.
-
-Test control
-------------
-The node listens for recovery test commands on:
-
-    /savo_control/recovery_test_cmd
-
-Message type:
-
-    std_msgs/String
-
-Supported commands:
-    BACKUP_ONLY
-    ROTATE_LEFT
-    ROTATE_RIGHT
-    BACKUP_THEN_ROTATE_LEFT
-    BACKUP_THEN_ROTATE_RIGHT
-    STOP
-
-Example:
-    ros2 topic pub /savo_control/recovery_test_cmd std_msgs/msg/String "{data: 'BACKUP_ONLY'}" --once
-
-Safety
-------
-First test with wheels lifted. Then test on open floor only.
-Keep recovery velocities very low.
+First test: wheels lifted, low speeds.
 """
 
 from __future__ import annotations

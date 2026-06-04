@@ -1,30 +1,3 @@
-# =============================================================================
-# Robot Savo — savo_control/config/stuck_detector.yaml
-#
-# Purpose:
-#   Detect possible stuck conditions using commanded motion and fused odometry.
-#
-# Package role:
-#   savo_control can detect and report "stuck" conditions, and later request
-#   recovery behavior. It must NOT control hardware directly.
-#
-# Data sources:
-#   /cmd_vel              = shaped command leaving savo_control
-#   /cmd_vel_safe         = safety-gated command going to savo_base
-#   /odometry/filtered    = fused odometry from savo_localization
-#   /safety/stop          = obstacle/safety stop from savo_perception
-#
-# Future /odometry/filtered inputs:
-#   - 4 wheel encoder odometry on savo-core
-#   - IMU on savo-core
-#   - VO / visual odometry from savo-edge
-#
-# Important:
-#   - Do not detect "stuck" while /safety/stop is true.
-#   - Do not detect "stuck" if /cmd_vel_safe is already zero because safety
-#     gate stopped the robot.
-#   - Recovery command generation should publish only to /cmd_vel_recovery.
-# =============================================================================
 
 stuck_detector_node:
   ros__parameters:

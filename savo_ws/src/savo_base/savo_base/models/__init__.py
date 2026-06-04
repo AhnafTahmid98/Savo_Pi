@@ -1,21 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/models/__init__.py
------------------------------------------
-Public exports for `savo_base.models`.
-
-Purpose
-- Provide clean, stable imports for the rest of the Robot Savo stack
-- Centralize model exports (state, limits, watchdog, wheel commands, board status)
-
-Usage examples
---------------
-from savo_base.models import BaseLimits, BaseState, WatchdogState
-from savo_base.models import WheelCommand, WheelNorm, WheelDuty
-from savo_base.models import make_robot_savo_watchdog_state
-"""
+"""Public exports for savo_base.models: state, limits, watchdog, wheel commands, board status."""
 
 # ============================================================================
 # Base limits / configuration models

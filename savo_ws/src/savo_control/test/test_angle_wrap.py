@@ -1,22 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot Savo — savo_control / test_angle_wrap.py
-==============================================
-
-Unit tests for angle helper utilities.
-
-These tests validate:
-  - radians/degrees conversion
-  - angle normalization
-  - shortest angular distance
-  - angle reached tolerance
-  - yaw extraction from quaternion
-  - yaw-only quaternion generation
-
-These tests are ROS-independent and do not require robot hardware.
-"""
+"""Unit tests for angle helpers: wrap, shortest angular distance, deg/rad, quaternion yaw."""
 
 from __future__ import annotations
 

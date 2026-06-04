@@ -2,48 +2,12 @@
 # -*- coding: utf-8 -*-
 
 """
-Robot SAVO — Base Board Diagnostics Launch (savo_base)
-------------------------------------------------------
-Professional board-level diagnostics launcher for Robot Savo `savo_base`.
+Board diagnostics: I2C device check + optional PWM sweep.
 
-Purpose
--------
-Runs package-local diagnostics for base-board bringup in a controlled way:
-
-1) I2C board/device visibility check
-   - validates expected devices on I2C bus(es)
-   - confirms PCA9685 / ADS7830 / UPS HAT visibility (and optional others)
-
-2) PWM sweep check (optional)
-   - validates motor board write path through `savo_base.drivers`
-   - supports DRYRUN or real hardware
-   - supports conservative, lift-the-robot bench testing
-
-Design notes
-------------
-- Uses `python3 -m savo_base.diagnostics.<tool>` so it works with the installed
-  Python package layout (`ament_python_install_package(savo_base)`).
-- Keeps diagnostics outside the main base driver bringup path.
-- Safe defaults:
-  * I2C check enabled
-  * PWM sweep disabled by default
-  * PWM dryrun enabled by default if you turn it on
-
-Examples
---------
-# I2C check only (default)
-ros2 launch savo_base base_diag_board.launch.py
-
-# I2C strict check on bus 1 + also check bus 0
-ros2 launch savo_base base_diag_board.launch.py i2c_strict:=true include_bus0:=true
-
-# PWM dryrun smoke test (no motor movement)
-ros2 launch savo_base base_diag_board.launch.py run_pwm_sweep:=true pwm_dryrun:=true pwm_verbose:=true
-
-# Real hardware PWM single-wheel sweep (robot lifted!)
-ros2 launch savo_base base_diag_board.launch.py \
-  run_pwm_sweep:=true pwm_dryrun:=false pwm_backend:=freenove \
-  pwm_pattern:=single pwm_max_duty:=700 pwm_step_duty:=350 pwm_no_confirm:=false
+  ros2 launch savo_base base_diag_board.launch.py
+  ros2 launch savo_base base_diag_board.launch.py i2c_strict:=true include_bus0:=true
+  ros2 launch savo_base base_diag_board.launch.py run_pwm_sweep:=true pwm_dryrun:=true
+  ros2 launch savo_base base_diag_board.launch.py run_pwm_sweep:=true pwm_dryrun:=false pwm_pattern:=single pwm_max_duty:=700
 """
 
 from launch import LaunchDescription
@@ -176,9 +140,7 @@ def generate_launch_description() -> LaunchDescription:
 
     return LaunchDescription(
         [
-            # =================================================================
-            # I2C board/device check arguments
-            # =================================================================
+            # I2C board/device check
             DeclareLaunchArgument(
                 "run_i2c_check",
                 default_value="true",
@@ -205,9 +167,7 @@ def generate_launch_description() -> LaunchDescription:
                 description="Verbose output for board_i2c_check.",
             ),
 
-            # =================================================================
-            # PWM sweep diagnostic arguments (optional)
-            # =================================================================
+            # PWM sweep (optional)
             DeclareLaunchArgument(
                 "run_pwm_sweep",
                 default_value="false",
@@ -294,9 +254,6 @@ def generate_launch_description() -> LaunchDescription:
                 description="Do not zero between PWM sweep steps.",
             ),
 
-            # =================================================================
-            # Diagnostics execution
-            # =================================================================
             LogInfo(
                 msg=(
                     "[savo_base] Base board diagnostics launch starting. "

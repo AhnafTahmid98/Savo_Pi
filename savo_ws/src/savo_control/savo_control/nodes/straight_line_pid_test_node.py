@@ -2,55 +2,9 @@
 # -*- coding: utf-8 -*-
 
 """
-Robot Savo — savo_control / straight_line_pid_test_node.py
-==========================================================
+Drives forward or backward for a target distance using /odometry/filtered. Publishes to /cmd_vel_auto.
 
-Straight-line PID test node for Robot Savo.
-
-Purpose
--------
-This node drives Robot Savo forward or backward for a target distance while
-using fused odometry feedback from:
-
-    /odometry/filtered
-
-It publishes motion commands to:
-
-    /cmd_vel_auto
-
-Correct command chain:
-
-    straight_line_pid_test_node
-        -> /cmd_vel_auto
-        -> twist_mux_node
-        -> /cmd_vel_mux
-        -> cmd_vel_shaper_node
-        -> /cmd_vel
-        -> savo_perception/cmd_vel_safety_gate
-        -> /cmd_vel_safe
-        -> savo_base/base_driver_node
-        -> motors
-
-Architecture rules
-------------------
-- This node does NOT publish directly to /cmd_vel_safe.
-- This node does NOT control hardware.
-- This node does NOT read raw encoders.
-- This node does NOT read raw IMU.
-- This node does NOT read raw VO.
-- It only uses /odometry/filtered from savo_localization.
-
-Future /odometry/filtered inputs:
-    - 4 wheel encoder odometry on savo-core
-    - IMU on savo-core
-    - VO / visual odometry from savo-edge
-
-First real test:
-    - wheels lifted if possible
-    - very short distance, e.g. 0.20 m
-    - very low speed
-    - safety gate running
-    - hand near power switch / E-stop
+First test: wheels lifted, short distance (~0.20 m), low speed, safety gate running.
 """
 
 from __future__ import annotations

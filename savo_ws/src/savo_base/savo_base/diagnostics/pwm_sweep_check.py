@@ -1,55 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/diagnostics/pwm_sweep_check.py
------------------------------------------------------
-Professional PWM/motor sweep diagnostic for Robot Savo Freenove mecanum base.
-
-Purpose
--------
-Safely validate the motor board write path (PCA9685/Freenove backend) and basic
-wheel direction behavior by sending short, controlled signed-duty sweeps.
-
-What this checks
-----------------
-- `savo_base.drivers.make_motor_board(...)` factory integration
-- PCA9685 I2C communication and motor write path
-- Per-wheel command mapping path (FL, RL, FR, RR order)
-- Direction changes with configurable quench delay
-- Optional sequence patterns: single-wheel, all-wheel forward/reverse, rotate
-
-What this does NOT check
-------------------------
-- Closed-loop odometry accuracy
-- Kinematics correctness under load
-- Encoder sign correctness (use your encoder / wheel odom diagnostics for that)
-
-Safety Notes (IMPORTANT)
-------------------------
-- Run with robot lifted (wheels off the ground) for initial testing.
-- Keep a physical emergency stop / power cut ready.
-- Start with low duty (e.g., 400–1000).
-- This script is open-loop and can move the robot if on the ground.
-- By default, dry-run is available and recommended first.
-
-Examples
---------
-# Dry-run smoke test (no hardware movement)
-python3 pwm_sweep_check.py --dryrun --pattern single --verbose
-
-# Real hardware, low duty single-wheel sweep (recommended first)
-python3 pwm_sweep_check.py --backend auto --pattern single --max-duty 700 --step-duty 350
-
-# All wheels forward/reverse sequence
-python3 pwm_sweep_check.py --pattern all --max-duty 900 --step-duty 300
-
-# Include rotate-style pattern (CCW / CW)
-python3 pwm_sweep_check.py --pattern rotate --max-duty 900 --step-duty 300
-
-# Custom board params
-python3 pwm_sweep_check.py --backend freenove --i2c-bus 1 --addr 0x40 --pwm-freq-hz 50 --quench-ms 18
-"""
+"""PWM sweep diagnostic for Freenove/PCA9685 — validates motor board write path and wheel direction."""
 
 from __future__ import annotations
 

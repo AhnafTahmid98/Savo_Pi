@@ -1,32 +1,3 @@
-# =============================================================================
-# Robot Savo — savo_control/config/recovery.yaml
-#
-# Purpose:
-#   Conservative recovery behavior settings for Robot Savo.
-#
-# Package role:
-#   savo_control may generate recovery velocity commands, but it must never
-#   command motors directly.
-#
-# Recovery command chain:
-#   recovery_manager_node / backup_escape_node
-#       -> /cmd_vel_recovery
-#       -> twist_mux_node
-#       -> /cmd_vel_mux
-#       -> cmd_vel_shaper_node
-#       -> /cmd_vel
-#       -> savo_perception/cmd_vel_safety_gate
-#       -> /cmd_vel_safe
-#       -> savo_base/base_driver_node
-#
-# Safety rule:
-#   Recovery is allowed to request motion, but the safety gate and savo_base
-#   watchdog always have final authority.
-#
-# Current Robot Savo stage:
-#   Values are conservative. Treat vx/vy/wz as normalized command strengths
-#   unless the base is fully calibrated to physical m/s and rad/s.
-# =============================================================================
 
 recovery_manager_node:
   ros__parameters:
@@ -66,10 +37,7 @@ recovery_manager_node:
       safety_stop: "/safety/stop"
       slowdown_factor: "/safety/slowdown_factor"
 
-      # IMPORTANT:
-      # Keep manual_override empty unless a real Bool topic is created.
-      # Do NOT use /savo_control/mode_cmd here because mode_cmd is String,
-      # while manual_override would be Bool.
+      # empty — mode_cmd is String, not Bool; these must stay separate topics
       manual_override: ""
 
     # -------------------------------------------------------------------------

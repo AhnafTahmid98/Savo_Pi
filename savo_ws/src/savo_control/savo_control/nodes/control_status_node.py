@@ -1,55 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot Savo — savo_control / control_status_node.py
-==================================================
-
-Control-layer status monitor for Robot Savo.
-
-Purpose
--------
-This node monitors the health of the control command chain:
-
-    /cmd_vel_manual
-    /cmd_vel_auto
-    /cmd_vel_nav
-    /cmd_vel_recovery
-        -> twist_mux_node
-        -> /cmd_vel_mux
-        -> cmd_vel_shaper_node
-        -> /cmd_vel
-        -> safety gate
-        -> /cmd_vel_safe
-        -> savo_base
-
-It also watches:
-
-    /safety/stop
-    /safety/slowdown_factor
-    /savo_control/mode_cmd
-    /savo_control/mode_state
-    /odometry/filtered
-
-Architecture rules
-------------------
-- This node does NOT publish velocity commands.
-- This node does NOT publish /cmd_vel_safe.
-- This node does NOT control hardware.
-- This node is for diagnostics/status only.
-
-Output
-------
-Publishes a human-readable compact status string to:
-
-    /savo_control/status
-
-This is useful for:
-- terminal monitoring
-- future dashboard nodes
-- launch diagnostics
-- real robot test proof
-"""
+"""Monitors the control command chain and publishes a compact status string to /savo_control/status."""
 
 from __future__ import annotations
 

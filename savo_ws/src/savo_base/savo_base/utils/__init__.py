@@ -1,9 +1,5 @@
 # -*- coding: utf-8 -*-
-"""
-savo_base.utils
-
-Shared helper utilities for Robot Savo base package.
-"""
+"""Shared utility helpers for savo_base: clamp, timing, logging, params, QoS, topic names."""
 
 from __future__ import annotations
 

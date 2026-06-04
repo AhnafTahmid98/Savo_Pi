@@ -2,41 +2,12 @@
 # -*- coding: utf-8 -*-
 
 """
-Robot SAVO — Wheel & Safety Diagnostics Launch (savo_base)
-----------------------------------------------------------
-Professional diagnostics launcher for wheel-direction validation and
-emergency-stop behavior checks.
+Wheel direction check and emergency-stop behavior diagnostics.
 
-Runs package-local diagnostics (CLI tools) in a controlled workflow:
-
-1) wheel_direction_check.py (optional)
-   - one-wheel-at-a-time direction verification (FL/RL/FR/RR)
-   - direct PCA9685 access (non-ROS hardware diagnostic)
-
-2) emergency_stop_check.py (optional)
-   - observes /safety/stop and verifies /cmd_vel_safe zeroing
-   - can optionally publish a test stop pulse
-
-Safe defaults
--------------
-- Wheel direction check: OFF (because it can move wheels)
-- Emergency stop check: ON (passive observe mode)
-- Wheel diagnostic dry-run: ON if wheel check is enabled
-
-Examples
---------
-# Passive safety check only (default)
-ros2 launch savo_base base_diag_wheels.launch.py
-
-# Wheel direction dry-run (no hardware writes)
-ros2 launch savo_base base_diag_wheels.launch.py run_wheel_check:=true wheel_dry_run:=true
-
-# Real wheel direction test (ROBOT LIFTED!)
-ros2 launch savo_base base_diag_wheels.launch.py \
-  run_wheel_check:=true wheel_dry_run:=false wheel_yes:=false wheel_verbose:=true
-
-# Emergency-stop active pulse test
-ros2 launch savo_base base_diag_wheels.launch.py estop_pulse_stop:=true estop_pulse_duration:=1.0
+  ros2 launch savo_base base_diag_wheels.launch.py
+  ros2 launch savo_base base_diag_wheels.launch.py run_wheel_check:=true wheel_dry_run:=true
+  ros2 launch savo_base base_diag_wheels.launch.py run_wheel_check:=true wheel_dry_run:=false wheel_yes:=false
+  ros2 launch savo_base base_diag_wheels.launch.py estop_pulse_stop:=true
 """
 
 from launch import LaunchDescription
@@ -170,9 +141,7 @@ def generate_launch_description() -> LaunchDescription:
     run_estop_check = LaunchConfiguration("run_estop_check")
 
     return LaunchDescription([
-        # ---------------------------------------------------------------------
-        # Wheel direction diagnostic (non-ROS hardware check)
-        # ---------------------------------------------------------------------
+        # wheel direction diagnostic
         DeclareLaunchArgument(
             "run_wheel_check",
             default_value="false",
@@ -210,9 +179,7 @@ def generate_launch_description() -> LaunchDescription:
             description="Skip wheel diagnostic safety confirmation prompt.",
         ),
 
-        # ---------------------------------------------------------------------
-        # Emergency stop diagnostic (ROS topic behavior check)
-        # ---------------------------------------------------------------------
+        # emergency stop diagnostic
         DeclareLaunchArgument(
             "run_estop_check",
             default_value="true",
@@ -240,9 +207,6 @@ def generate_launch_description() -> LaunchDescription:
             description="Duration of test STOP=TRUE pulse (s).",
         ),
 
-        # ---------------------------------------------------------------------
-        # Execution
-        # ---------------------------------------------------------------------
         LogInfo(
             msg=(
                 "[savo_base] Wheel/Safety diagnostics launch starting. "

@@ -2,60 +2,10 @@
 # -*- coding: utf-8 -*-
 
 """
-Robot Savo — savo_control / teleop_control.launch.py
-====================================================
+Keyboard teleop plus control chain for manual driving and mapping.
 
-Manual teleoperation launch file for Robot Savo.
-
-Purpose
--------
-Starts keyboard teleop plus the control chain needed for manual driving and
-manual mapping.
-
-Manual mapping command chain:
-
-    keyboard_teleop_node
-        -> /cmd_vel_manual
-        -> twist_mux_node
-        -> /cmd_vel_mux
-        -> cmd_vel_shaper_node
-        -> /cmd_vel
-        -> savo_perception/cmd_vel_safety_gate
-        -> /cmd_vel_safe
-        -> savo_base/base_driver_node
-        -> motors
-
-Important package boundaries:
-    - keyboard teleop publishes only /cmd_vel_manual
-    - savo_control publishes /cmd_vel
-    - safety gate publishes /cmd_vel_safe
-    - savo_base executes motor hardware
-
-This launch file does NOT:
-    - start savo_base
-    - start savo_perception safety gate
-    - start slam_toolbox
-    - start Nav2
-    - publish directly to /cmd_vel_safe
-
-Typical use for manual mapping:
-    Terminal 1:
-        ros2 launch savo_base base_bringup.launch.py
-
-    Terminal 2:
-        ros2 launch savo_perception safety_bringup.launch.py
-
-    Terminal 3:
-        ros2 launch savo_mapping manual_mapping.launch.py
-
-    Terminal 4:
-        ros2 launch savo_control teleop_control.launch.py
-
-Notes
------
-The keyboard node needs an interactive terminal. If keyboard input does not work
-when launched, run keyboard_teleop_node.py directly with ros2 run in its own
-terminal and launch the rest of the control chain separately.
+The keyboard node requires an interactive terminal. If keyboard input does not
+work when launched, run keyboard_teleop_node.py with ros2 run in its own terminal.
 """
 
 from __future__ import annotations

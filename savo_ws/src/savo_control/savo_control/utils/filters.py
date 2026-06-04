@@ -1,38 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot Savo — savo_control / utils / filters.py
-==============================================
-
-Small ROS-independent filtering and limiting helpers for Robot Savo control
-nodes.
-
-Purpose
--------
-Shared helpers for:
-
-    - command clamping
-    - deadband handling
-    - exponential moving average filtering
-    - rate limiting
-    - finite-value safety checks
-    - Twist-like velocity shaping logic
-
-Architecture
-------------
-This file is pure Python utility code.
-
-It does NOT:
-    - create ROS nodes
-    - publish topics
-    - subscribe to topics
-    - command hardware
-    - touch /cmd_vel_safe
-    - access GPIO, PCA9685, motors, encoders, or sensors
-
-All functions/classes are deterministic and safe to unit test.
-"""
+"""ROS-independent filtering and limiting helpers: clamp, deadband, EMA, rate limit."""
 
 from __future__ import annotations
 

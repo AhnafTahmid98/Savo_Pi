@@ -1,31 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/safety/timeout_watchdog.py
--------------------------------------------------
-Professional timeout watchdog helper for `savo_base` (ROS2 Jazzy / real robot).
-
-Purpose
--------
-Detect stale command/control updates and expose a deterministic watchdog trip state
-for safe motor stopping.
-
-Typical use in Robot Savo
--------------------------
-- `base_driver_node.py` or `base_watchdog_node.py` feeds timestamps whenever a
-  fresh motion command is received (e.g., from /cmd_vel_safe).
-- If no fresh command arrives within timeout, watchdog trips.
-- Base output path forces stop until valid commands resume (or manual reset,
-  depending on policy).
-
-Design goals
-------------
-- Pure Python (no ROS dependency)
-- Monotonic time-based (safe against wall-clock jumps)
-- Explicit policy and state transitions
-- Rich status for logs / state topics / dashboards
-"""
+"""Detects stale commands via elapsed-time check and exposes a watchdog trip state."""
 
 from __future__ import annotations
 

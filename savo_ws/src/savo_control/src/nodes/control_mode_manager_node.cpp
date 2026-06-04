@@ -1,29 +1,4 @@
-// =============================================================================
-// Robot SAVO — savo_control / src/nodes/control_mode_manager_node.cpp (ROS 2 Jazzy)
-// =============================================================================
-// Purpose
-// -------
-// ROS2 node wrapper for the reusable ControlModeManager policy helper.
-//
-// This node:
-//   - receives mode requests (STOP / MANUAL / AUTO / NAV / RECOVERY)
-//   - monitors safety stop and recovery state hints
-//   - applies deterministic arbitration via ControlModeManager
-//   - publishes current mode state / status for other nodes (e.g. twist_mux_node)
-//
-// Design intent
-// -------------
-// Keep mode policy in `control_mode_manager.hpp` (ROS-independent),
-// and keep ROS wiring / parameter parsing / topic I/O in this node.
-//
-// Notes
-// -----
-// - This node does NOT mux Twist messages directly.
-// - It publishes a plain mode string on /savo_control/mode_state so `twist_mux_node`
-//   can consume it directly ("MANUAL", "AUTO", "NAV", "STOP").
-// - It also publishes richer debug/status text on /savo_control/control_status and
-//   /savo_control/control_debug for observability.
-// =============================================================================
+// ROS node wrapper for ControlModeManager. Publishes mode string to /savo_control/mode_state.
 
 #include <algorithm>
 #include <cctype>

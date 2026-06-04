@@ -1,24 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/models/base_state.py
--------------------------------------------
-Professional base-state models for Robot Savo (ROS 2 Jazzy, real robot testing).
-
-Purpose
-- Represent the runtime state of the mobile base in a clean, reusable way
-- Track commanded motion, applied motion, wheel duties, and safety flags
-- Provide validation and helper methods for controllers, dashboards, and logging
-
-Scope
-- Pure data models + helper methods (no ROS imports, no hardware I/O)
-- Can be used by:
-  - savo_base motor execution node
-  - dry-run board tests
-  - cmd_vel shaper / mux integration
-  - dashboards and telemetry serializers
-"""
+"""Runtime base state models: commanded motion, applied motion, wheel duties, safety flags."""
 
 from __future__ import annotations
 

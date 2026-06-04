@@ -17,6 +17,7 @@
 
   <!-- Hybrid build: C++ capable (ament_cmake) + Python package/nodes (ament_python) -->
   <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_cmake_python</buildtool_depend>
   <buildtool_depend>ament_python</buildtool_depend>
 
   <!-- Core ROS dependencies -->

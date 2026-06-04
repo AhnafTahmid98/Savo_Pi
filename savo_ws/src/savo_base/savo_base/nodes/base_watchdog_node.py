@@ -1,47 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/nodes/base_watchdog_node.py
---------------------------------------------------
-Professional ROS 2 Jazzy watchdog node for Robot Savo base command safety.
-
-Purpose
--------
-This node supervises the command path feeding the mobile base and publishes a
-clear watchdog state for safety, dashboards, and diagnostics. It can also
-optionally publish a stop request topic when commands go stale.
-
-Why this node exists
---------------------
-In real robot testing, if command messages stop arriving (teleop crash, network
-delay, upstream node failure, etc.), the robot must not continue moving based on
-old commands.
-
-This watchdog provides:
-- command freshness monitoring
-- warning/trip thresholds
-- debouncing to avoid false trips
-- optional stop request publishing
-- JSON state summary for dashboards/logging
-
-Typical usage in Robot Savo
----------------------------
-Monitor:
-- /cmd_vel_safe   (preferred, after safety gate)
-or
-- /cmd_vel
-
-Publish:
-- /savo_base/watchdog_state          (std_msgs/String, JSON)
-- /savo_base/watchdog_trip           (std_msgs/Bool)
-- /savo_base/watchdog_stop_request   (std_msgs/Bool) [optional]
-
-Important
----------
-This node does NOT directly drive motors. `base_driver_node` remains the hardware
-execution layer. This watchdog is a safety supervisor / telemetry layer.
-"""
+"""Supervises /cmd_vel_safe freshness and publishes watchdog state."""
 
 from __future__ import annotations
 

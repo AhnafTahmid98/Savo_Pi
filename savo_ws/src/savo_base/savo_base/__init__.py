@@ -1,25 +1,8 @@
 # -*- coding: utf-8 -*-
-"""
-Robot SAVO — savo_base/__init__.py
-----------------------------------
-Package root exports for `savo_base`.
-
-This file provides:
-- package version helpers
-- centralized base defaults/constants helpers
-
-Design notes
-------------
-- Keep imports lightweight and dependency-safe.
-- Avoid importing ROS-heavy modules here (nodes, drivers, rclpy, etc.).
-- Expose stable package-level APIs for scripts and downstream packages.
-"""
+"""Package root. Exports version, constants, and top-level helpers. No ROS imports."""
 
 from __future__ import annotations
 
-# ---------------------------------------------------------------------------
-# Version exports (preferred source)
-# ---------------------------------------------------------------------------
 try:
     from .version import (
         __version__,
@@ -28,7 +11,6 @@ try:
         get_package_version_info,
     )
 except Exception:
-    # Graceful fallback if version.py is temporarily missing during refactor
     __version__ = "0.0.0"
     VERSION = __version__
 
@@ -43,12 +25,8 @@ except Exception:
         }
 
 
-# ---------------------------------------------------------------------------
-# Central defaults / constants exports (single source: constants.py)
-# ---------------------------------------------------------------------------
 try:
     from .constants import (
-        # Structured defaults (if present in your constants.py)
         DEFAULTS,
         BaseDriverDefaults,
         get_base_driver_defaults,
@@ -67,7 +45,6 @@ try:
         clamp_duty,
     )
 except Exception:
-    # Minimal fallback surface so package import does not crash
     DEFAULTS = None
     BaseDriverDefaults = None
 
@@ -94,15 +71,8 @@ except Exception:
         return v
 
 
-# ---------------------------------------------------------------------------
-# Package metadata helpers
-# ---------------------------------------------------------------------------
 def get_package_info() -> dict:
-    """
-    Return lightweight package metadata and key exported defaults.
-
-    Safe to call from scripts/tools without importing ROS dependencies.
-    """
+    """Lightweight package metadata — safe to call without ROS."""
     return {
         "package": PACKAGE_NAME,
         "robot_name": ROBOT_NAME,

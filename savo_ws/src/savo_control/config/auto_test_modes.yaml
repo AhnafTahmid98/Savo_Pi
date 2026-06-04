@@ -1,30 +1,4 @@
-# =============================================================================
-# Robot Savo — savo_control/config/auto_test_modes.yaml
-#
-# Purpose:
-#   Defines safe, repeatable automatic test motion profiles for Robot Savo.
-#
-# Important architecture rule:
-#   This file is for command-generation tests only.
-#   It does NOT bypass safety.
-#
-# Expected command chain:
-#   auto_test_manager / velocity_test_pattern
-#       -> /cmd_vel_auto
-#       -> twist_mux_node
-#       -> /cmd_vel_mux
-#       -> cmd_vel_shaper_node
-#       -> /cmd_vel
-#       -> savo_perception/cmd_vel_safety_gate
-#       -> /cmd_vel_safe
-#       -> savo_base/base_driver_node
-#
-# Notes:
-#   - Values are intentionally conservative for real robot testing.
-#   - At the current stage, Twist values are treated as normalized command
-#     strengths unless the base is fully calibrated to real m/s and rad/s.
-#   - Use only on a lifted robot first, then on open floor with E-stop ready.
-# =============================================================================
+# First use: wheels lifted. Then open floor with E-stop ready.
 
 auto_test_manager_node:
   ros__parameters:

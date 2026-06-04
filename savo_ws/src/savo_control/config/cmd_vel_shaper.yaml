@@ -1,29 +1,3 @@
-# =============================================================================
-# Robot Savo — savo_control/config/cmd_vel_shaper.yaml
-#
-# Purpose:
-#   Smooth and limit the selected velocity command before it reaches the safety
-#   gate. This protects the real mecanum base from sudden jumps in velocity.
-#
-# Command chain:
-#   /cmd_vel_manual, /cmd_vel_nav, /cmd_vel_auto, /cmd_vel_recovery
-#       -> twist_mux_node
-#       -> /cmd_vel_mux
-#       -> cmd_vel_shaper_node
-#       -> /cmd_vel
-#       -> savo_perception/cmd_vel_safety_gate
-#       -> /cmd_vel_safe
-#       -> savo_base/base_driver_node
-#
-# Important:
-#   - This node does NOT publish /cmd_vel_safe.
-#   - This node does NOT touch hardware.
-#   - Hardware execution belongs only to savo_base.
-#
-# Current Robot Savo stage:
-#   Values are conservative. Treat vx/vy/wz as normalized command strengths
-#   unless the base is fully calibrated to real m/s and rad/s.
-# =============================================================================
 
 cmd_vel_shaper_node:
   ros__parameters:
@@ -149,9 +123,6 @@ cmd_vel_shaper_node:
     # -------------------------------------------------------------------------
     # Profiles
     # -------------------------------------------------------------------------
-    #
-    # The launch file can later choose a profile.
-    # For now, default_profile should be "manual_mapping" or "safe_default".
     default_profile: "manual_mapping"
 
     profiles:

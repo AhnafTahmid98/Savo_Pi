@@ -1,41 +1,6 @@
-# =============================================================================
-# Robot SAVO — savo_control / setup.py (ROS 2 Jazzy, hybrid C++ + Python)
-# =============================================================================
-# Purpose
-# -------
-# Installs Python modules/packages for the `savo_control` ROS 2 package:
-#   - savo_control.controllers
-#   - savo_control.interfaces
-#   - savo_control.nodes
-#   - savo_control.utils
-#
-# Hybrid package note (important)
-# -------------------------------
-# In this project, Python ROS executable nodes are installed explicitly by
-# CMakeLists.txt using:
-#
-#   install(PROGRAMS ... DESTINATION lib/${PROJECT_NAME})
-#
-# This is intentional and follows the proven Robot SAVO hybrid-package pattern
-# (same reliability approach used in `savo_localization`) to avoid cases where
-# `ros2 run` cannot find Python executables in install/lib/<pkg>.
-#
-# Therefore:
-#   - setup.py is used for Python package/module installation and metadata
-#   - CMake handles:
-#       * C++ executables
-#       * Python ROS executable scripts
-#       * launch/config/docs installation
-#
-# Consistency requirements
-# ------------------------
-# Keep these names exactly aligned:
-#   package.xml   -> <name>savo_control</name>
-#   CMakeLists    -> project(savo_control)
-#   CMakeLists    -> set(PYTHON_PACKAGE_NAME "savo_control")
-#   setup.py      -> package_name = "savo_control"
-#   folder        -> savo_control/
-# =============================================================================
+# Python ROS executables are installed by CMakeLists.txt install(PROGRAMS), not via
+# console_scripts, because entry_points has been unreliable for ros2 run in this repo.
+# Keep package_name aligned with package.xml, CMakeLists project(), and the folder name.
 
 from setuptools import find_packages, setup
 

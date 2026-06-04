@@ -1,59 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/diagnostics/report_formatter.py
-------------------------------------------------------
-Professional formatting utilities for `savo_base` diagnostics scripts.
-
-Purpose
--------
-This module standardizes how diagnostics scripts print, summarize, and export
-results (PASS/WARN/FAIL, metadata, observations, recommendations) so all
-`savo_base/diagnostics/*.py` tools look consistent and are easy to review in:
-
-- terminal output
-- logs
-- CI / automated checks (JSON)
-- internship / engineering documentation screenshots
-
-Design goals
-------------
-- Zero ROS dependency (pure Python)
-- Reusable across all diagnostics scripts
-- Human-friendly terminal formatting + machine-friendly JSON
-- Safe default behavior (never crashes on non-serializable values)
-
-Typical usage
--------------
-from savo_base.diagnostics.report_formatter import (
-    DiagnosticReport,
-    DiagnosticCheckResult,
-    Severity,
-    print_report,
-    report_to_json_str,
-)
-
-report = DiagnosticReport(
-    tool="wheel_direction_check",
-    robot_name="Robot Savo",
-    target="Freenove PCA9685 mecanum base",
-)
-report.add_result(DiagnosticCheckResult(
-    name="FL forward spin",
-    passed=True,
-    severity=Severity.INFO,
-    observed="Wheel rotates as expected",
-))
-print_report(report)
-print(report_to_json_str(report))
-
-Notes
------
-- This module is a formatter/helper only; it does not access hardware.
-- Individual diagnostic scripts should collect raw measurements and convert them
-  into `DiagnosticCheckResult` entries.
-"""
+"""Diagnostic report formatting: PASS/WARN/FAIL models, terminal output, and JSON export."""
 
 from __future__ import annotations
 

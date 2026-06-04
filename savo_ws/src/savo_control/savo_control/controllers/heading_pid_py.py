@@ -2,28 +2,9 @@
 # -*- coding: utf-8 -*-
 
 """
-Robot SAVO — savo_control.controllers.heading_pid_py
-====================================================
+Python heading/yaw PID controller mirroring C++ HeadingController, for Python test nodes and diagnostics.
 
-Purpose
--------
-Python heading/yaw controller helper aligned with the C++ HeadingController
-(`heading_controller.hpp/.cpp`) for tuning, diagnostics, and Python test nodes.
-
-Important
----------
-- ROS-independent (pure Python)
-- Intended for Python tools/test nodes, not to replace the authoritative C++ path
-- Built on top of `pid_py.py` (Python PID mirror of C++ pid.hpp)
-
-Behavior aligned with C++ HeadingController
--------------------------------------------
-- heading target management (set/clear/capture hold)
-- wrapped angular error (shortest angular distance)
-- PID-based yaw-rate command generation (wz)
-- optional max clamp / min effective command / deadband
-- heading tolerance check
-- update_to_target() without mutating stored target
+update_to_target() does not mutate stored target state — safe for one-shot use.
 """
 
 from __future__ import annotations

@@ -1,24 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/drivers/board_exceptions.py
---------------------------------------------------
-Professional driver/board exception hierarchy for Robot Savo (ROS 2 Jazzy).
-
-Purpose
-- Provide a clear, reusable exception hierarchy across `savo_base/drivers`
-- Standardize error handling for:
-    * PCA9685 driver
-    * Freenove mecanum board wrapper
-    * future board / motor / GPIO driver modules
-- Improve debugging on real hardware by attaching structured context to failures
-
-Design notes
-- No ROS dependencies
-- Safe to import from any CLI tool, test script, or ROS node
-- Exceptions support optional metadata for better logs / diagnostics
-"""
+"""Exception hierarchy for hardware failures: I2C, PCA9685, motor board, and wheel errors."""
 
 from __future__ import annotations
 

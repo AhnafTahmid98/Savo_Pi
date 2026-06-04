@@ -1,38 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/safety/command_guard.py
-----------------------------------------------
-Professional command guarding utilities for `savo_base` (ROS2 Jazzy / real robot).
-
-Purpose
--------
-Sanitize and gate incoming base motion commands before they reach the motor board.
-
-This module is intentionally ROS-message agnostic at its core so it can be used by:
-- base_driver_node.py
-- base_watchdog_node.py
-- teleop adapters
-- future LLM/text-command adapters (after conversion to vx/vy/wz)
-
-What it handles
----------------
-- finite-value validation (reject NaN/Inf)
-- deadbanding (small noise -> zero)
-- velocity limit clamping
-- acceleration limiting (slew-rate limiting)
-- timeout checks (command freshness)
-- estop/watchdog/enable gating (force stop)
-- safe fallback behavior
-
-Notes
------
-- This module does NOT talk to hardware.
-- This module does NOT require ROS imports.
-- It works with your `savo_base.models` dataclasses if available, but also
-  supports plain values and returns generic dataclasses defined here.
-"""
+"""Sanitizes and gates incoming motion commands before they reach the motor board."""
 
 from __future__ import annotations
 

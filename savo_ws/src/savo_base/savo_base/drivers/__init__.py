@@ -1,26 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/drivers/__init__.py
-------------------------------------------
-Professional public exports for the `savo_base.drivers` package (ROS 2 Jazzy).
-
-Purpose
-- Provide stable import paths for Robot Savo driver modules
-- Re-export commonly used board/driver classes, factory helpers, and exceptions
-- Support staged development (real hardware drivers + dry-run driver)
-- Provide backward-compatible `make_motor_board(...)` wrapper for legacy callers
-  (e.g., base_driver_node.py) that pass old kwargs.
-
-Examples
---------
-from savo_base.drivers import create_board
-from savo_base.drivers import FreenoveMecanumBoard, DryRunMotorBoard
-from savo_base.drivers import PCA9685Driver
-from savo_base.drivers import BoardException
-from savo_base.drivers import make_motor_board
-"""
+"""Public exports for savo_base.drivers: board factory, Freenove board, PCA9685, dryrun, and exceptions."""
 
 from __future__ import annotations
 

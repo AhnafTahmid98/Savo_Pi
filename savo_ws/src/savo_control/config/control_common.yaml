@@ -1,29 +1,3 @@
-# =============================================================================
-# Robot Savo — savo_control/config/control_common.yaml
-#
-# Purpose:
-#   Shared common parameters for the Robot Savo control layer.
-#
-# Package role:
-#   savo_control selects, shapes, and supervises motion commands.
-#   It does NOT control hardware directly.
-#
-# Safety chain:
-#   /cmd_vel_manual, /cmd_vel_nav, /cmd_vel_auto, /cmd_vel_recovery
-#       -> twist_mux_node
-#       -> /cmd_vel_mux
-#       -> cmd_vel_shaper_node
-#       -> /cmd_vel
-#       -> savo_perception/cmd_vel_safety_gate
-#       -> /cmd_vel_safe
-#       -> savo_base/base_driver_node
-#
-# Important:
-#   - /cmd_vel_safe is owned by the safety gate and consumed by savo_base.
-#   - PCA9685, GPIO, PWM, and motor execution stay only inside savo_base.
-#   - For now, velocity values are conservative command strengths unless the
-#     base is fully calibrated to physical m/s and rad/s.
-# =============================================================================
 
 /**:
   ros__parameters:

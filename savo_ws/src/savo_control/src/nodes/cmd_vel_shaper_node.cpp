@@ -1,30 +1,4 @@
-// =============================================================================
-// Robot SAVO — savo_control / src/nodes/cmd_vel_shaper_node.cpp (ROS 2 Jazzy)
-// =============================================================================
-// Purpose
-// -------
-// Shape / sanitize multiplexed velocity commands before they enter the safety
-// gate. This node typically sits between:
-//
-//   twist_mux_node -> /cmd_vel_mux -> cmd_vel_shaper_node -> /cmd_vel
-//                                                -> savo_perception safety gate
-//                                                -> /cmd_vel_safe
-//
-// What this node does
-// -------------------
-// - Subscribes to /cmd_vel_mux (selected command source)
-// - Applies command limiting (clamp + deadband + slew-rate) using CommandLimiter
-// - Handles stale-input timeout and publishes zero on timeout
-// - Supports optional hard stop from /safety/stop (disabled by default;
-//   main authoritative safety gate remains in `savo_perception`)
-// - Publishes shaped command to /cmd_vel
-//
-// Notes
-// -----
-// - This node is ROS-facing glue. The math/limiting logic stays in
-//   `command_limiter.hpp`.
-// - Current CommandLimiter is header-only, which is fine for this stage.
-// =============================================================================
+// Applies clamp + deadband + slew-rate to /cmd_vel_mux and publishes to /cmd_vel.
 
 #include <algorithm>
 #include <chrono>

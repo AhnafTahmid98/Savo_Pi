@@ -2,32 +2,12 @@
 # -*- coding: utf-8 -*-
 
 """
-Robot SAVO — savo_base/kinematics/conventions.py
-------------------------------------------------
-Professional kinematics conventions and typed constants for Robot Savo (ROS 2 Jazzy).
+Shared kinematics conventions for Robot Savo.
 
-Purpose
-- Centralize motion/kinematics conventions used across `savo_base`
-- Keep CLI teleop, ROS nodes, and future autonomy code consistent
-- Document Robot Savo's *locked* wheel order and default axis sign conventions
-
-Why this file exists
-- `mecanum.py` should focus on math (mixing)
-- `scaling.py` should focus on scaling/smoothing
-- `conventions.py` should define shared conventions/constants/types so every module
-  uses the same vocabulary and ordering
-
-Locked Robot Savo conventions (from real hardware testing)
-- Wheel order for tuples/arrays everywhere:
-    (FL, RL, FR, RR)
-- Default teleop-compatible axis signs:
-    forward_sign = -1
-    strafe_sign  = +1
-    rotate_sign  = +1
-- CLI teleop key intent:
-    W/S -> vx (+/-)
-    A/D -> vy (-/+)
-    Q/E -> wz (+/-)   [CCW/CW]
+Locked values from real hardware testing:
+  Wheel order: (FL, RL, FR, RR)
+  forward_sign=-1  strafe_sign=+1  rotate_sign=+1
+  W/S=vx  A/D=vy  Q/E=wz(CCW/CW)
 """
 
 from __future__ import annotations

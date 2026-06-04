@@ -1,33 +1,4 @@
-// =============================================================================
-// Robot SAVO — savo_control / src/nodes/heading_pid_node.cpp (ROS 2 Jazzy)
-// =============================================================================
-// Purpose
-// -------
-// Closed-loop heading (yaw) controller node for Robot SAVO using the reusable
-// `HeadingController` + `Pid` utilities.
-//
-// Typical use cases
-// -----------------
-// - Heading hold while driving (keep robot facing same direction)
-// - Rotate-to-heading tests (publish target yaw and let node generate angular.z)
-// - PID tuning on real robot before deeper Nav2 integration
-//
-// Typical pipeline example
-// ------------------------
-//   base cmd source (/cmd_vel_raw or test pattern linear commands)
-//          + /odometry/filtered (yaw feedback)
-//          + /savo_control/heading_target (optional)
-//          + /savo_control/heading_hold_enable
-//      --> heading_pid_node --> /cmd_vel_auto
-//      --> twist_mux_node (AUTO mode) --> cmd_vel_shaper_node --> /cmd_vel
-//      --> safety gate (savo_perception) --> /cmd_vel_safe
-//
-// Notes
-// -----
-// - This node controls angular.z only (heading / yaw).
-// - linear.x and linear.y can be passed through from a base command topic.
-// - Mecanum-friendly: vy pass-through is supported.
-// =============================================================================
+// Closed-loop yaw controller using HeadingController. Controls angular.z; passes through linear x/y.
 
 #include <algorithm>
 #include <chrono>

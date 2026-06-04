@@ -2,42 +2,13 @@
 # -*- coding: utf-8 -*-
 
 """
-Robot SAVO — Dryrun Test Launch (savo_base)
--------------------------------------------
-Professional one-command DRYRUN validation for the `savo_base` stack.
+Dryrun stack validation (profile=dryrun_sim_motoroff, no hardware movement).
 
-What this launch does
----------------------
-1) Starts `base_bringup.launch.py` with profile `dryrun_sim_motoroff.yaml`
-   (software-only, motor-off safety profile)
-2) Optionally dumps effective runtime params from /base_driver_node
-3) Optionally runs a smoke command (zero / pulse / cmd)
-4) Optionally starts poke-test CLI (short motion pokes in dryrun)
-5) Optionally starts interactive letters teleop (dryrun)
-
-Design goals
-------------
-- Safe by default (no real hardware movement)
-- Verifies launch wiring + topic contracts + watchdog behavior
-- Works with your installed scripts from CMakeLists.txt
-- Reuses `base_bringup.launch.py` for consistency
-
-Examples
---------
-# Default dryrun stack bringup only
-ros2 launch savo_base base_dryrun_test.launch.py
-
-# Also dump effective params after startup
-ros2 launch savo_base base_dryrun_test.launch.py run_dump_params:=true
-
-# Run a short watchdog pulse test after startup
-ros2 launch svo_base base_dryrun_test.launch.py run_smoke:=true smoke_mode:=pulse
-
-# Run poke test in dryrun
-ros2 launch savo_base base_dryrun_test.launch.py run_poke:=true
-
-# Start keyboard teleop (dryrun)
-ros2 launch savo_base base_dryrun_test.launch.py run_teleop:=true
+  ros2 launch savo_base base_dryrun_test.launch.py
+  ros2 launch savo_base base_dryrun_test.launch.py run_dump_params:=true
+  ros2 launch savo_base base_dryrun_test.launch.py run_smoke:=true smoke_mode:=pulse
+  ros2 launch savo_base base_dryrun_test.launch.py run_poke:=true
+  ros2 launch savo_base base_dryrun_test.launch.py run_teleop:=true
 """
 
 from launch import LaunchDescription
@@ -99,10 +70,8 @@ def _build_smoke_process(context, *args, **kwargs):
     elif smoke_mode == "cmd":
         cmd += ["cmd", "--vx", "0.10", "--duration", "1.0"]
     else:
-        # safe fallback
         cmd += ["zero"]
 
-    # Common topic overrides
     cmd += [
         "--cmd-topic", str(cmd_topic),
         "--safety-stop-topic", str(stop_topic),
@@ -162,7 +131,6 @@ def generate_launch_description() -> LaunchDescription:
     pkg_share = FindPackageShare("savo_base")
     base_bringup_launch = PathJoinSubstitution([pkg_share, "launch", "base_bringup.launch.py"])
 
-    # Base bringup args passthrough
     use_watchdog = LaunchConfiguration("use_watchdog")
     use_state_publisher = LaunchConfiguration("use_state_publisher")
     use_heartbeat = LaunchConfiguration("use_heartbeat")
@@ -170,13 +138,11 @@ def generate_launch_description() -> LaunchDescription:
     log_level = LaunchConfiguration("log_level")
     output = LaunchConfiguration("output")
 
-    # Optional actions
     run_dump_params = LaunchConfiguration("run_dump_params")
     run_smoke = LaunchConfiguration("run_smoke")
     run_poke = LaunchConfiguration("run_poke")
     run_teleop = LaunchConfiguration("run_teleop")
 
-    # Startup delays (seconds)
     dump_delay_s = LaunchConfiguration("dump_delay_s")
     smoke_delay_s = LaunchConfiguration("smoke_delay_s")
     poke_delay_s = LaunchConfiguration("poke_delay_s")
@@ -185,7 +151,6 @@ def generate_launch_description() -> LaunchDescription:
     include_base_bringup = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(base_bringup_launch),
         launch_arguments={
-            # Force DRYRUN profile for this launch (IMPORTANT: full filename)
             "profile": "dryrun_sim_motoroff.yaml",
             "use_watchdog": use_watchdog,
             "use_state_publisher": use_state_publisher,
@@ -197,9 +162,7 @@ def generate_launch_description() -> LaunchDescription:
     )
 
     return LaunchDescription([
-        # ---------------------------------------------------------------------
-        # Bringup controls (forwarded to base_bringup)
-        # ---------------------------------------------------------------------
+        # bringup controls
         DeclareLaunchArgument("use_watchdog", default_value="true"),
         DeclareLaunchArgument("use_state_publisher", default_value="true"),
         DeclareLaunchArgument("use_heartbeat", default_value="true"),
@@ -207,9 +170,7 @@ def generate_launch_description() -> LaunchDescription:
         DeclareLaunchArgument("log_level", default_value="info"),
         DeclareLaunchArgument("output", default_value="screen"),
 
-        # ---------------------------------------------------------------------
-        # Optional helper actions
-        # ---------------------------------------------------------------------
+        # optional helper actions
         DeclareLaunchArgument(
             "run_dump_params",
             default_value="true",
@@ -231,23 +192,19 @@ def generate_launch_description() -> LaunchDescription:
             description="Start teleop_letters_cli after startup (interactive).",
         ),
 
-        # Delays
+        # startup delays
         DeclareLaunchArgument("dump_delay_s", default_value="2.0"),
         DeclareLaunchArgument("smoke_delay_s", default_value="2.5"),
         DeclareLaunchArgument("poke_delay_s", default_value="3.0"),
         DeclareLaunchArgument("teleop_delay_s", default_value="3.0"),
 
-        # ---------------------------------------------------------------------
-        # Dump params options
-        # ---------------------------------------------------------------------
+        # dump params options
         DeclareLaunchArgument("dump_node", default_value="/base_driver_node"),
         DeclareLaunchArgument("dump_format", default_value="yaml"),
         DeclareLaunchArgument("dump_ros2_yaml", default_value="true"),
         DeclareLaunchArgument("dump_out", default_value=""),
 
-        # ---------------------------------------------------------------------
-        # Smoke test options
-        # ---------------------------------------------------------------------
+        # smoke test options
         DeclareLaunchArgument(
             "smoke_mode",
             default_value="zero",
@@ -257,29 +214,20 @@ def generate_launch_description() -> LaunchDescription:
         DeclareLaunchArgument("smoke_stop_topic", default_value="/safety/stop"),
         DeclareLaunchArgument("smoke_slowdown_topic", default_value="/safety/slowdown_factor"),
 
-        # ---------------------------------------------------------------------
-        # Poke CLI topic options
-        # ---------------------------------------------------------------------
+        # poke CLI options
         DeclareLaunchArgument("poke_cmd_topic", default_value="/cmd_vel_safe"),
         DeclareLaunchArgument("poke_stop_topic", default_value="/safety/stop"),
         DeclareLaunchArgument("poke_slowdown_topic", default_value="/safety/slowdown_factor"),
 
-        # ---------------------------------------------------------------------
-        # Teleop CLI topic options
-        # ---------------------------------------------------------------------
+        # teleop CLI options
         DeclareLaunchArgument("teleop_cmd_topic", default_value="/cmd_vel_safe"),
         DeclareLaunchArgument("teleop_stop_topic", default_value="/safety/stop"),
         DeclareLaunchArgument("teleop_slowdown_topic", default_value="/safety/slowdown_factor"),
 
-        # ---------------------------------------------------------------------
-        # Main bringup
-        # ---------------------------------------------------------------------
         LogInfo(msg="[savo_base] Starting DRYRUN test launch (profile=dryrun_sim_motoroff.yaml)"),
         include_base_bringup,
 
-        # ---------------------------------------------------------------------
-        # Optional post-start actions (delayed)
-        # ---------------------------------------------------------------------
+        # optional post-start actions
         TimerAction(
             period=dump_delay_s,
             actions=[

@@ -1,32 +1,6 @@
 #pragma once
 
-// =============================================================================
-// Robot SAVO — savo_control / watchdog.hpp (ROS 2 Jazzy)
-// =============================================================================
-// Purpose
-// -------
-// Lightweight watchdog / freshness helper for command and sensor streams.
-//
-// This utility is ROS-independent and intended for use in nodes such as:
-//   - twist_mux_node.cpp         (source command freshness / timeout)
-//   - cmd_vel_shaper_node.cpp    (input timeout -> zero command / reset limiter)
-//   - recovery_manager_node.cpp  (stale status / heartbeat checks)
-//   - status/debug nodes         (fresh/stale reporting)
-//
-// What it provides
-// ----------------
-// - Marking "last seen" timestamps
-// - Fresh/stale timeout checks
-// - Optional startup grace behavior
-// - Timeout edge detection (fresh -> stale, stale -> fresh)
-// - Simple state reset
-//
-// Design note
-// -----------
-// This class intentionally uses plain time values (seconds as double).
-// Node code should convert ROS clocks/timestamps to seconds and pass them in.
-// This keeps the helper reusable and easy to unit test.
-// =============================================================================
+// Lightweight freshness watchdog. kick() marks a source seen; check() returns fresh/stale state.
 
 #include <cmath>
 #include <cstdint>

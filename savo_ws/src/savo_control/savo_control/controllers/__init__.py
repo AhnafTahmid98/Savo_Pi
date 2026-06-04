@@ -1,21 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_control.controllers
+"""Python controller helpers for testing and diagnostics. C++ remains the runtime path."""
 
-Python-side reusable controller helpers for testing, tuning, and diagnostics.
-
-Notes
------
-- C++ controllers remain the authoritative production/runtime path.
-- These Python modules mirror core behavior for prototyping and tooling.
-"""
-
-# Generic scalar PID core (Python mirror of C++ pid.hpp)
+# Generic PID core
 from .pid_py import PidConfig, PidResult, Pid
 
-# Heading/yaw controller wrapper built on top of Pid
+# Heading/yaw controller
 from .heading_pid_py import (
     HeadingControllerConfig,
     HeadingControllerResult,
@@ -23,7 +14,7 @@ from .heading_pid_py import (
     HeadingPid,
 )
 
-# Distance/approach controller wrapper built on top of Pid
+# Distance/approach controller
 from .distance_pid_py import (
     DistanceControllerConfig,
     DistanceControllerResult,

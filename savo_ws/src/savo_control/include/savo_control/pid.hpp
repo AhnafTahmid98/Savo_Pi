@@ -1,34 +1,6 @@
 #pragma once
 
-// =============================================================================
-// Robot SAVO — savo_control / pid.hpp (ROS 2 Jazzy)
-// =============================================================================
-// Purpose
-// -------
-// Reusable PID controller utility for Robot Savo control nodes.
-//
-// This class is ROS-independent and intended for use in:
-//   - heading_pid_node
-//   - rotate_to_heading_node
-//   - distance/approach controllers
-//   - recovery alignment primitives (future)
-//
-// Features
-// --------
-// - P / I / D control with runtime gain updates
-// - dt validation and safe fallback behavior
-// - output saturation (min/max)
-// - integral clamp (anti-windup, clamp-based)
-// - optional derivative low-pass filtering
-// - reset() / reset_to() for mode changes, stop events, and recovery transitions
-//
-// Design note
-// -----------
-// This PID class operates on scalar values only. Nodes are responsible for:
-//   - computing the correct error signal (e.g., wrapped angular error)
-//   - choosing dt from the control loop timing
-//   - publishing outputs / handling ROS topics
-// =============================================================================
+// Scalar PID controller with output clamp, integral anti-windup, and derivative filtering.
 
 #include <algorithm>
 #include <cmath>

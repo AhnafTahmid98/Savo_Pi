@@ -1,47 +1,7 @@
 #pragma once
 
-// =============================================================================
-// Robot SAVO — savo_control / control_mode_manager.hpp (ROS 2 Jazzy)
-// =============================================================================
-// Purpose
-// -------
-// Reusable control-mode arbitration policy helper for Robot Savo.
-//
-// This utility provides a deterministic, ROS-independent state/policy layer for
-// deciding which command source should be active at a given moment, e.g.:
-//
-//   - MANUAL   (teleop / operator)
-//   - AUTO     (test controllers / local autonomous behaviors)
-//   - NAV      (future Nav2 / high-level navigation)
-//   - RECOVERY (local recovery behaviors such as backup_escape)
-//   - STOP     (forced zero-command mode)
-//
-// It is intended for use in:
-//   - control_mode_manager_node.cpp
-//   - future mode-aware mux / supervisors
-//
-// What it does
-// ------------
-// - Tracks requested and active control modes
-// - Applies deterministic priority rules (e.g. recovery > auto/nav)
-// - Handles manual override, safety stop, and external stop conditions
-// - Supports optional "latched" recovery mode until explicitly released
-// - Provides status/action snapshots for ROS nodes to publish
-//
-// What it does NOT do
-// -------------------
-// - Does not publish/subscribe ROS topics directly
-// - Does not mux Twist messages itself
-// - Does not generate motor commands
-//
-// Design note
-// -----------
-// Keep this class as pure policy logic. ROS nodes should feed inputs into
-// update(), then use the returned state/action to:
-//   - select active cmd_vel source
-//   - publish mode state/debug topics
-//   - command downstream mux/shaper nodes
-// =============================================================================
+// ROS-independent control-mode arbitration helper. Feed inputs into update(),
+// read back state/action to drive mux and status publishing.
 
 #include <algorithm>
 #include <cmath>

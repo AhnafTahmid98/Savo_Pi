@@ -1,60 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/diagnostics/wheel_direction_check.py
------------------------------------------------------------
-Professional wheel-direction diagnostic for the Robot Savo Freenove/PCA9685 mecanum base.
-
-Purpose
--------
-Validate that each wheel spins in the expected direction for a commanded signed duty
-before running higher-level teleop / nav stacks.
-
-What it checks
---------------
-- Drives ONE wheel at a time (FL, RL, FR, RR)
-- Tests forward and reverse for each wheel
-- Uses the locked Robot Savo Freenove channel mapping:
-    FL -> (0,1)
-    RL -> (3,2)
-    FR -> (6,7)
-    RR -> (4,5)
-- Safe stop between steps + direction-change quench delay
-
-Why this matters
-----------------
-If wheel polarity/channel mapping is wrong, mecanum motion will be unstable:
-- forward may drift / rotate
-- strafe may fail
-- nav control may become unsafe
-
-This diagnostic should be run BEFORE base_driver_node bringup on new hardware wiring,
-after board replacement, or after motor driver code refactors.
-
-Examples
---------
-# Basic test (all wheels, default duty)
-ros2 run savo_base wheel_direction_check.py
-
-# Safer low-duty test
-ros2 run savo_base wheel_direction_check.py --duty 1200 --step-time 0.8
-
-# Test only front-left and front-right
-ros2 run savo_base wheel_direction_check.py --wheels FL,FR
-
-# Invert a wheel in software for the diagnostic (temporary)
-ros2 run savo_base wheel_direction_check.py --invert-fl
-
-# Dry-run (no hardware writes)
-ros2 run savo_base wheel_direction_check.py --dry-run
-
-Notes
------
-- This script uses direct PCA9685 I2C control (smbus2) and does NOT require ROS topics.
-- Confirm the robot is lifted so wheels can spin freely.
-- Keep clear of moving parts.
-"""
+"""Drives one wheel at a time to validate direction against the locked Freenove channel mapping."""
 
 from __future__ import annotations
 

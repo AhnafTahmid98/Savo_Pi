@@ -1,42 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_control.controllers.distance_pid_py
-=====================================================
-
-Purpose
--------
-Python distance/approach controller helper built on top of `pid_py.Pid`,
-aligned with the design style used in C++ reusable controllers.
-
-Intended for
-------------
-- distance approach test nodes
-- docking/alignment experiments (linear axis)
-- diagnostics/tuning tools
-- Python prototyping before/alongside C++ runtime implementations
-
-Important
----------
-- ROS-independent (pure Python)
-- Uses the generic PID core from `pid_py.py`
-- C++ runtime controllers remain authoritative for production robot control
-- Higher-level nodes are responsible for safety gating and final command routing
-
-Behavior
---------
-- Target distance management (set/clear)
-- Error = target_distance - current_distance
-- PID-based linear velocity command generation (vx_cmd_m_s)
-- Goal tolerance checks (within distance tolerance)
-- Optional output deadband / min effective command / max clamp
-- Optional direction constraints:
-    * bidirectional (default)
-    * approach_from_far_only  (no reverse command if too close)
-    * back_away_only          (no forward command if too far)
-- Optional zero command when within tolerance (safe default)
-"""
+"""Python distance/approach PID controller. error = target_distance - current_distance -> vx_cmd."""
 
 from __future__ import annotations
 

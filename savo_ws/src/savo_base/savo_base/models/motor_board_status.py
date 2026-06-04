@@ -1,24 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/models/motor_board_status.py
----------------------------------------------------
-Professional motor-board status models for Robot Savo (ROS 2 Jazzy, real robot).
-
-Purpose
-- Represent runtime health/state of the low-level motor board interface
-- Track connection/readiness, output enable state, active wheel duties, and faults
-- Provide safe validation + serialization for dashboards/logging/telemetry
-
-Scope
-- Pure Python data models (no ROS imports, no hardware I/O)
-- Intended for use by:
-  - savo_base execution node
-  - Freenove/PCA9685 board drivers
-  - dry-run motor board backend
-  - diagnostics and dashboards
-"""
+"""Motor board health/state models: readiness, output enable, wheel duties, faults."""
 
 from __future__ import annotations
 

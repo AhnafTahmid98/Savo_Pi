@@ -1,26 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/version.py
----------------------------------
-Version and package metadata helpers for the `savo_base` package.
-
-Purpose
--------
-Provide a single source of truth for package version strings and lightweight
-metadata that can be imported by:
-- ROS2 nodes (startup logs)
-- CLI scripts (`--version`)
-- diagnostics / status endpoints
-- tests
-
-Design notes
-------------
-- No ROS imports (safe in any environment).
-- No external dependencies.
-- Semantic-version style fields exposed for tooling.
-"""
+"""Package version and metadata. No ROS imports — safe to import anywhere."""
 
 from __future__ import annotations
 
@@ -35,16 +16,7 @@ VERSION_MAJOR: Final[int] = 0
 VERSION_MINOR: Final[int] = 1
 VERSION_PATCH: Final[int] = 0
 
-# Optional prerelease / build metadata (SemVer-style)
-# Examples:
-#   PRERELEASE = "alpha.1"
-#   PRERELEASE = "rc.2"
-#   PRERELEASE = ""
 PRERELEASE: Final[str] = ""
-
-# Examples:
-#   BUILD_METADATA = "local"
-#   BUILD_METADATA = "20260222"
 BUILD_METADATA: Final[str] = ""
 
 
@@ -58,7 +30,7 @@ SUPPORTED_ROS_DISTRO: Final[str] = "jazzy"
 
 
 # =============================================================================
-# Derived Version Strings
+# Derived
 # =============================================================================
 def _build_version_string() -> str:
     base = f"{VERSION_MAJOR}.{VERSION_MINOR}.{VERSION_PATCH}"
@@ -78,7 +50,7 @@ VERSION_TUPLE: Final[Tuple[int, int, int]] = (VERSION_MAJOR, VERSION_MINOR, VERS
 
 
 # =============================================================================
-# Structured Metadata (useful for logs / diagnostics)
+# Structured metadata
 # =============================================================================
 @dataclass(frozen=True)
 class PackageVersionInfo:
@@ -144,7 +116,7 @@ def get_package_version_info() -> PackageVersionInfo:
 
 
 # =============================================================================
-# CLI entry (optional convenience)
+# CLI entry
 # =============================================================================
 def main() -> None:
     """Simple CLI output for quick checks: `python -m savo_base.version`."""

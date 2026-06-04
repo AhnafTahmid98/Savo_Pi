@@ -1,28 +1,6 @@
 #pragma once
 
-// =============================================================================
-// Robot SAVO — savo_control / control_math.hpp (ROS 2 Jazzy)
-// =============================================================================
-// Purpose
-// -------
-// Reusable math helpers for Robot Savo control nodes and controllers.
-//
-// This header provides small, ROS-independent utility functions commonly needed
-// in motion control and PID/recovery logic, such as:
-//   - clamping / saturation
-//   - sign helpers
-//   - deadband
-//   - near-zero checks
-//   - angle normalization (wrap to [-pi, pi])
-//   - shortest angular distance
-//   - finite-value validation
-//
-// Design note
-// -----------
-// Keep these helpers independent from ROS messages and node code.
-// Nodes should convert ROS messages to plain values, call these helpers,
-// and then publish outputs. This improves reuse, testability, and clarity.
-// =============================================================================
+// ROS-independent math utilities: clamp, deadband, angle wrap, shortest angular distance.
 
 #include <algorithm>
 #include <cmath>

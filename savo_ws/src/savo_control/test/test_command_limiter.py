@@ -1,31 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot Savo — savo_control / test_command_limiter.py
-===================================================
-
-Unit tests for command limiting/filtering helpers.
-
-These tests validate:
-  - finite value safety
-  - clamp and clamp_abs
-  - deadband behavior
-  - scaled deadband behavior
-  - linear interpolation
-  - sign helper
-  - 2D normalization
-  - mecanum combined command normalization
-  - exponential moving average
-  - rate limiter
-  - 3-axis slew limiter
-  - first-order command filter
-  - boolean debounce
-  - timeout tracker
-  - full command tuple shaping
-
-These tests are ROS-independent and do not require robot hardware.
-"""
+"""Unit tests for command limiting helpers: clamp, deadband, normalization, EMA, rate limiter."""
 
 from __future__ import annotations
 

@@ -1,58 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/nodes/base_diag_runner_node.py
------------------------------------------------------
-Professional ROS 2 Jazzy diagnostic runner node for Robot Savo `savo_base`.
-
-Purpose
--------
-Runs whitelisted base diagnostics (real hardware / dry-run) as external commands
-from a controlled registry and publishes structured JSON status/results.
-
-Why this node exists
---------------------
-During real robot testing, you often want to trigger diagnostics from ROS tools,
-dashboards, or launch workflows without manually switching terminals every time.
-
-This node provides:
-- Whitelisted diagnostic execution (no arbitrary shell execution)
-- One-job-at-a-time safety lock
-- Timeout + terminate/kill handling
-- Live state publishing (IDLE/RUNNING/SUCCEEDED/FAILED/TIMEOUT/CANCELLED)
-- Trigger + cancel via ROS topics
-- JSON outputs for dashboard integration
-
-Primary topics
---------------
-Subscriptions:
-- /savo_base/diag/run_request      (std_msgs/String)  JSON or plain diagnostic key
-- /savo_base/diag/cancel_request   (std_msgs/Bool)    true => cancel active job
-
-Publications:
-- /savo_base/diag/state            (std_msgs/String)  JSON state snapshot
-- /savo_base/diag/event            (std_msgs/String)  JSON event messages
-- /savo_base/diag/busy             (std_msgs/Bool)    runner busy flag
-
-Request format (examples)
--------------------------
-1) Plain text key:
-   "motor_direction_test"
-
-2) JSON:
-   {
-     "diag_key": "motor_direction_test",
-     "args": ["--with-rotate"],
-     "timeout_s": 25.0
-   }
-
-Notes
------
-- This node does NOT execute arbitrary shell strings.
-- Only diagnostics defined in the internal registry can be run.
-- Intended for real robot bringup and controlled hardware validation.
-"""
+"""Runs whitelisted diagnostics as subprocesses and publishes JSON results."""
 
 from __future__ import annotations
 
@@ -271,7 +220,7 @@ class BaseDiagRunnerNode(Node):
     # =========================================================================
     def _build_registry(self) -> Dict[str, DiagSpec]:
         """
-        Whitelisted diagnostics registry. This is the professional, safe path:
+        Whitelisted diagnostics registry — only these commands can be executed:
         no arbitrary shell execution, only known commands.
         """
         py = "python3"

@@ -1,41 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/nodes/base_heartbeat_node.py
----------------------------------------------------
-Professional ROS 2 Jazzy heartbeat node for the `savo_base` package.
-
-Purpose
--------
-This node provides a lightweight heartbeat/liveness signal for the Robot Savo
-base stack during real robot testing and staged bringup.
-
-Why this node is useful
------------------------
-- Confirms that the base stack is alive even before motors move
-- Gives a simple signal for dashboards, launch validation, and supervisors
-- Publishes both a boolean heartbeat and a compact JSON status summary
-- Can optionally monitor other base topics and include "seen/stale" flags
-
-Primary outputs
----------------
-- /savo_base/heartbeat         (std_msgs/Bool)
-- /savo_base/heartbeat_state   (std_msgs/String, JSON)
-
-Optional monitored topics
--------------------------
-- /cmd_vel_safe               (geometry_msgs/Twist)
-- /savo_base/watchdog_trip    (std_msgs/Bool)
-- /savo_base/watchdog_state   (std_msgs/String, JSON)
-- /savo_base/base_state       (std_msgs/String, JSON)
-
-Design notes
-------------
-- This node does NOT control motors.
-- It is intentionally simple and robust for real hardware bringup.
-- Missing optional topics do not cause failures (graceful degradation).
-"""
+"""Lightweight liveness pulse node for the base stack."""
 
 from __future__ import annotations
 

@@ -1,52 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot Savo — savo_control / rotate_test.launch.py
-=================================================
-
-Rotate-to-heading test launch file for Robot Savo.
-
-Purpose
--------
-Starts the control chain plus rotate-to-heading test support for validating
-controlled yaw rotation using fused odometry:
-
-    /odometry/filtered
-
-Future fused odometry inputs behind /odometry/filtered:
-    - 4 wheel encoder odometry on savo-core
-    - IMU on savo-core
-    - VO / visual odometry from savo-edge
-
-Command chain:
-
-    rotate_to_heading_node
-        -> /cmd_vel_auto
-        -> twist_mux_node
-        -> /cmd_vel_mux
-        -> cmd_vel_shaper_node
-        -> /cmd_vel
-        -> savo_perception/cmd_vel_safety_gate
-        -> /cmd_vel_safe
-        -> savo_base/base_driver_node
-        -> motors
-
-Important package boundaries:
-    - this launch does not start hardware drivers
-    - this launch does not start the safety gate
-    - this launch does not publish directly to /cmd_vel_safe
-    - this launch expects /odometry/filtered from savo_localization
-
-Safety
-------
-First test:
-    - use a very small target angle, e.g. 0.30 rad
-    - keep angular speed low
-    - safety gate running before floor tests
-    - wheels lifted or open floor
-    - hand near E-stop / power switch
-"""
+"""Rotate-to-heading test launch. First test: small angle (~0.30 rad), wheels lifted, safety gate running."""
 
 from __future__ import annotations
 

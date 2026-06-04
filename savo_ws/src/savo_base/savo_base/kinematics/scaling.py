@@ -1,27 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/kinematics/scaling.py
---------------------------------------------
-Professional command scaling helpers for Robot Savo (ROS 2 Jazzy).
-
-Purpose
-- Provide reusable, hardware-safe scaling utilities for base motion commands
-- Keep teleop / ROS node behavior consistent across:
-    * CLI teleop tools
-    * base driver nodes
-    * future autonomy pipelines
-- Preserve the feel of your proven real-robot teleop workflow (max duty scaling,
-  optional decay-style smoothing, clamping, deadband handling)
-
-Design notes
-- Math/utility only (no ROS imports, no hardware imports)
-- These helpers do NOT perform mecanum mixing (that belongs in mecanum.py)
-- These helpers are intended to be used before or after mixing depending on need:
-    * body-command scaling (vx, vy, wz)
-    * duty scaling (max_duty adjustments)
-"""
+"""Command scaling helpers: duty clamping, smoothing, deadband. No ROS or hardware imports."""
 
 from __future__ import annotations
 

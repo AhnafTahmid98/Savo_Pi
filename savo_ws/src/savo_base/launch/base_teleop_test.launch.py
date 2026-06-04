@@ -2,41 +2,12 @@
 # -*- coding: utf-8 -*-
 
 """
-Robot SAVO — Base Teleop Test Launch (savo_base)
-------------------------------------------------
-Professional teleop test bringup for Robot Savo `savo_base`.
+Base stack + teleop_letters_cli. Defaults to dryrun motor-off; teleop starts delayed.
 
-Purpose
--------
-Starts the base stack (driver + monitoring helper nodes) and then launches
-`teleop_letters_cli.py` for manual keyboard testing.
-
-This launch is designed for:
-- dryrun teleop validation (safe software-only)
-- bench teleop tests (robot lifted)
-- controlled real-robot manual tests
-
-Safety design
--------------
-- Defaults to DRYRUN motor-off profile (`dryrun_sim_motoroff`)
-- Teleop amplitudes default to conservative values
-- Optional safety-stop and slowdown publishers can be enabled in teleop
-- Teleop starts after a short delay so base stack initializes first
-
-Examples
---------
-# Safe default (dryrun motor-off)
-ros2 launch savo_base base_teleop_test.launch.py
-
-# Bench teleop (robot lifted)
-ros2 launch savo_base base_teleop_test.launch.py profile:=bench_test
-
-# Real robot teleop (clear area, operator ready)
-ros2 launch savo_base base_teleop_test.launch.py \
-  profile:=real_robot_v1 teleop_enable_safety_stop_pub:=true teleop_enable_slowdown_pub:=true
-
-# Start teleop in pulse mode
-ros2 launch savo_base base_teleop_test.launch.py teleop_pulse_mode:=true
+  ros2 launch savo_base base_teleop_test.launch.py
+  ros2 launch savo_base base_teleop_test.launch.py profile:=bench_test.yaml
+  ros2 launch savo_base base_teleop_test.launch.py profile:=real_robot_v1.yaml teleop_enable_safety_stop_pub:=true
+  ros2 launch savo_base base_teleop_test.launch.py teleop_pulse_mode:=true
 """
 
 from launch import LaunchDescription
@@ -137,12 +108,8 @@ def _build_dump_params_process(context, *args, **kwargs):
 def generate_launch_description() -> LaunchDescription:
     pkg_share = FindPackageShare("savo_base")
 
-    # Reuse base_safe_idle (which reuses base_bringup) so teleop launch stays clean
     base_safe_idle_launch = PathJoinSubstitution([pkg_share, "launch", "base_safe_idle.launch.py"])
 
-    # -------------------------------------------------------------------------
-    # Base stack args
-    # -------------------------------------------------------------------------
     profile = LaunchConfiguration("profile")
     profile_path = LaunchConfiguration("profile_path")
 
@@ -154,7 +121,6 @@ def generate_launch_description() -> LaunchDescription:
     output = LaunchConfiguration("output")
     log_level = LaunchConfiguration("log_level")
 
-    # Optional helper actions
     run_dump_params = LaunchConfiguration("run_dump_params")
     run_teleop = LaunchConfiguration("run_teleop")
     dump_delay_s = LaunchConfiguration("dump_delay_s")
@@ -175,9 +141,7 @@ def generate_launch_description() -> LaunchDescription:
     )
 
     return LaunchDescription([
-        # ---------------------------------------------------------------------
-        # Base stack profile / helper nodes
-        # ---------------------------------------------------------------------
+        # base stack profile
         DeclareLaunchArgument(
             "profile",
             default_value="dryrun_sim_motoroff.yaml",
@@ -201,9 +165,7 @@ def generate_launch_description() -> LaunchDescription:
         DeclareLaunchArgument("output", default_value="screen"),
         DeclareLaunchArgument("log_level", default_value="info"),
 
-        # ---------------------------------------------------------------------
-        # Teleop controls
-        # ---------------------------------------------------------------------
+        # teleop controls
         DeclareLaunchArgument(
             "run_teleop",
             default_value="true",
@@ -215,18 +177,15 @@ def generate_launch_description() -> LaunchDescription:
             description="Delay before starting teleop CLI (seconds).",
         ),
 
-        # Teleop topics (match locked stack defaults)
         DeclareLaunchArgument("teleop_cmd_topic", default_value="/cmd_vel_safe"),
         DeclareLaunchArgument("teleop_safety_stop_topic", default_value="/safety/stop"),
         DeclareLaunchArgument("teleop_slowdown_topic", default_value="/safety/slowdown_factor"),
 
-        # Teleop amplitudes / cadence (conservative defaults)
         DeclareLaunchArgument("teleop_vx", default_value="0.12"),
         DeclareLaunchArgument("teleop_vy", default_value="0.12"),
         DeclareLaunchArgument("teleop_wz", default_value="0.20"),
         DeclareLaunchArgument("teleop_publish_hz", default_value="20.0"),
 
-        # Teleop mode / helper publisher options
         DeclareLaunchArgument("teleop_pulse_mode", default_value="false"),
         DeclareLaunchArgument("teleop_enable_safety_stop_pub", default_value="false"),
         DeclareLaunchArgument("teleop_enable_slowdown_pub", default_value="false"),
@@ -234,9 +193,7 @@ def generate_launch_description() -> LaunchDescription:
         DeclareLaunchArgument("teleop_slowdown_step", default_value="0.10"),
         DeclareLaunchArgument("teleop_slowdown", default_value="1.0"),
 
-        # ---------------------------------------------------------------------
-        # Optional params dump (useful during bringup)
-        # ---------------------------------------------------------------------
+        # optional params dump
         DeclareLaunchArgument("run_dump_params", default_value="false"),
         DeclareLaunchArgument("dump_delay_s", default_value="1.5"),
         DeclareLaunchArgument("dump_node", default_value="/base_driver_node"),
@@ -244,27 +201,10 @@ def generate_launch_description() -> LaunchDescription:
         DeclareLaunchArgument("dump_ros2_yaml", default_value="true"),
         DeclareLaunchArgument("dump_out", default_value=""),
 
-        # ---------------------------------------------------------------------
-        # Informational logs
-        # ---------------------------------------------------------------------
         LogInfo(msg="[savo_base] Starting base_teleop_test.launch.py"),
-        LogInfo(msg=(
-            "[savo_base] Professional teleop workflow: base safe-idle bringup first, "
-            "then delayed teleop_letters_cli start."
-        )),
-        LogInfo(msg=(
-            "[savo_base] SAFETY: For bench/real tests, clear the area and keep stop/power cut ready. "
-            "Use profile=dryrun_sim_motoroff for software-only validation."
-        )),
-
-        # ---------------------------------------------------------------------
-        # Base stack bringup (safe idle style)
-        # ---------------------------------------------------------------------
         include_base_safe_idle,
 
-        # ---------------------------------------------------------------------
-        # Optional post-start actions
-        # ---------------------------------------------------------------------
+        # optional post-start actions
         TimerAction(
             period=dump_delay_s,
             actions=[

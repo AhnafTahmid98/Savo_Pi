@@ -1,34 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/ros/adapters.py
---------------------------------------
-Professional ROS2 Jazzy adapter helpers for `savo_base`.
-
-Purpose
--------
-This module provides small, reusable conversion helpers ("adapters") between:
-- internal `savo_base.models.*` dataclasses
-- ROS messages (std_msgs / geometry_msgs)
-- JSON string payloads used by lightweight state topics
-
-Why this module exists
-----------------------
-Keeps node code clean and consistent:
-- `base_driver_node.py`
-- `base_state_publisher_node.py`
-- `base_watchdog_node.py`
-- `base_heartbeat_node.py`
-- `base_diag_runner_node.py`
-
-Design principles
------------------
-- No hardware access here
-- No ROS node initialization here
-- Safe defaults + tolerant parsing
-- JSON outputs are compact and dashboard-friendly
-"""
+"""Converters between savo_base.models dataclasses and ROS messages."""
 
 from __future__ import annotations
 

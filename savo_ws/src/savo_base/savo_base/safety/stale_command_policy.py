@@ -1,31 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/safety/stale_command_policy.py
------------------------------------------------------
-Professional stale-command safety policy for `savo_base` (ROS2 Jazzy / real robot).
-
-Purpose
--------
-Decide what the base should do when motion commands become stale (timeout watchdog trip),
-while also supporting optional recovery behavior (hold zero, require fresh command burst,
-manual clear, etc.).
-
-Why this exists
----------------
-`timeout_watchdog.py` detects timing/freshness.
-This file defines the *control policy* that turns watchdog state into safe base behavior.
-
-Example usage in Robot Savo
----------------------------
-- `base_driver_node.py` receives Twist/WheelCommand
-- `TimeoutWatchdog` trips when command stream stops
-- `StaleCommandPolicy` decides:
-    - force zero immediately
-    - whether output remains blocked
-    - what is required to recover (fresh kick, N fresh commands, operator clear)
-"""
+"""Policy for what the base does on watchdog trip: force-zero, hold, or require rearm."""
 
 from __future__ import annotations
 
@@ -126,7 +102,7 @@ class StaleCommandPolicyResult:
 # =============================================================================
 class StaleCommandPolicy:
     """
-    Professional stale-command output policy.
+    Stale-command output policy.
 
     Integration concept
     -------------------

@@ -1,32 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/ros/topic_contract.py
---------------------------------------------
-Professional ROS2 Jazzy topic contract definitions for `savo_base`.
-
-Purpose
--------
-Single source of truth for:
-- canonical topic names
-- expected ROS message types
-- direction (pub/sub)
-- role/meaning in the base stack
-
-Why this module exists
-----------------------
-As the robot grows (base, perception, localization, control, nav, speech, LLM),
-topic-name drift becomes a real integration risk. This file helps keep the
-`savo_base` package consistent and integration-friendly.
-
-Design principles
------------------
-- Stable canonical defaults (can still be remapped in launch)
-- Human-readable contract metadata
-- Zero hardware access
-- Zero ROS node startup side effects
-"""
+"""Topic name constants, expected message types, and role annotations for savo_base."""
 
 from __future__ import annotations
 

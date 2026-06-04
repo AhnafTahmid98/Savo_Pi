@@ -1,25 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/kinematics/__init__.py
----------------------------------------------
-Professional public exports for the `savo_base.kinematics` package (ROS 2 Jazzy).
-
-Purpose
-- Provide stable import paths for Robot Savo kinematics helpers
-- Re-export mecanum mixing, scaling utilities, and convention helpers
-- Support staged development (some modules may be added later)
-
-Wheel order convention (Robot Savo, locked)
-- (FL, RL, FR, RR)
-
-Examples
---------
-from savo_base.kinematics import mix_mecanum
-from savo_base.kinematics import signed_normalize_4, signed_clamp_4
-from savo_base.kinematics import ControlAxes, default_robot_savo_conventions
-"""
+"""Public exports for savo_base.kinematics: mecanum mixing, scaling, and conventions."""
 
 from __future__ import annotations
 

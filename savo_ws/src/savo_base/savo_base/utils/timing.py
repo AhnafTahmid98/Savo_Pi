@@ -1,31 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/utils/timing.py
---------------------------------------
-Professional timing utilities for ROS2 Jazzy / real robot testing.
-
-Purpose
--------
-Centralized, ROS-independent timing helpers used across `savo_base` modules for:
-- monotonic timestamps (safe for watchdogs / loop timing)
-- wall-clock UTC timestamps (logs / diagnostics)
-- elapsed-time checks
-- stale-data checks
-- periodic execution gating
-- lightweight stopwatch / scope timing
-
-Why this file exists
---------------------
-Real robot safety logic must use monotonic time for correctness.
-Wall-clock time can jump (NTP sync, manual clock changes), but monotonic time does not.
-
-Recommended usage
------------------
-- Watchdogs, staleness, command age -> use monotonic helpers
-- Log messages / JSON diagnostics timestamps -> use wall-clock UTC helpers
-"""
+"""Monotonic and wall-clock timing helpers for watchdogs, elapsed checks, and rate limiting."""
 
 from __future__ import annotations
 

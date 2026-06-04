@@ -2,47 +2,11 @@
 # -*- coding: utf-8 -*-
 
 """
-Robot Savo — savo_control / utils / topic_wait.py
-=================================================
+Wait helpers for confirming required ROS topics are visible before starting a test.
 
-ROS 2 topic waiting helpers for Robot Savo control nodes and test scripts.
-
-Purpose
--------
-This module provides small helper functions/classes for waiting until required
-ROS topics are visible before starting a test or behavior.
-
-Useful for checking topics such as:
-
-    /cmd_vel_manual
-    /cmd_vel_mux
-    /cmd_vel
-    /cmd_vel_safe
-    /safety/stop
-    /odometry/filtered
-    /depth/min_front_m
-
-Architecture
-------------
-This utility does NOT:
-    - publish velocity commands
-    - publish /cmd_vel_safe
-    - control motors
-    - access GPIO/PCA9685/Freenove hardware
-    - read raw sensors directly
-
-It only inspects topic names/types through the ROS graph.
-
-Typical use
------------
     from savo_control.utils.topic_wait import wait_for_topics
 
-    ok = wait_for_topics(
-        node,
-        ["/cmd_vel_safe", "/safety/stop"],
-        timeout_s=5.0,
-    )
-
+    ok = wait_for_topics(node, ["/cmd_vel_safe", "/safety/stop"], timeout_s=5.0)
     if not ok:
         node.get_logger().error("Required topics missing; refusing to start test.")
 """

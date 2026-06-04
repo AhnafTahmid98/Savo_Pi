@@ -1,45 +1,10 @@
 #pragma once
 
-// =============================================================================
-// Robot SAVO — savo_control / heading_controller.hpp (ROS 2 Jazzy)
-// =============================================================================
-// Purpose
-// -------
-// Reusable heading/yaw controller utility for Robot Savo motion control.
+// Heading/yaw PID controller. Wraps pid.hpp with angular error and goal-tolerance logic.
 //
-// This class is built on top of the scalar PID controller (`pid.hpp`) and is
-// intended for use in higher-level control nodes such as:
-//   - heading_pid_node.cpp        (hold heading while moving)
-//   - rotate_to_heading_node.cpp  (rotate in place to target heading)
-//   - future follow / docking alignment controllers
-//
-// What this class provides
-// ------------------------
-// - Heading target management (set/clear/hold-current)
-// - Wrapped angular error computation (shortest angular distance)
-// - PID-based yaw-rate command generation (angular.z)
-// - Optional output deadband / min/max yaw-rate shaping helpers
-// - Goal tolerance checks for rotate-to-heading behavior
-//
-// Design note
-// -----------
-// This utility is ROS-independent. Nodes should:
-//   - read yaw from odometry/IMU
-//   - pass current yaw + dt into this class
-//   - publish returned yaw-rate command to Twist.angular.z
-//
-// Mecanum suitability
-// -------------------
-// Fully suitable for mecanum robots. This class controls heading (yaw / wz)
-// only. It does NOT perform wheel kinematics or motor mixing.
-//
-// Important note about update_to_target()
-// ---------------------------------------
-// The `update_to_target()` method below is implemented as a truly temporary
-// target update path (no persistent target mutation, no PID reset side-effect
-// from set_target_yaw()). This is intentional so it can be safely used for
-// one-shot computations without altering the controller's stored target state.
-// =============================================================================
+// update_to_target() does NOT mutate stored target state and does NOT trigger
+// reset_pid_on_target_change — safe for one-shot computations. Use set_target_yaw()
+// + update() when you want persistent target behavior.
 
 #include <cmath>
 #include <limits>
@@ -310,20 +275,6 @@ public:
     return out;
   }
 
-  // -------------------------
-  // Convenience update with explicit temporary target
-  // -------------------------
-  // This method does NOT modify the stored target state and does NOT call
-  // set_target_yaw(), specifically to avoid accidental PID reset side-effects
-  // from reset_pid_on_target_change during one-shot computations.
-  //
-  // Use cases:
-  // - temporary target evaluation in a test routine
-  // - explicit rotate control path where persistent target storage is not needed
-  //
-  // If you want persistent target behavior, use:
-  //   set_target_yaw(...)
-  //   update(...)
   HeadingControllerResult update_to_target(
     double current_yaw_rad,
     double target_yaw_rad,

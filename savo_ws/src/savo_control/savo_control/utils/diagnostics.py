@@ -1,42 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot Savo — savo_control / utils / diagnostics.py
-==================================================
-
-ROS-independent diagnostics helpers for Robot Savo control Python nodes.
-
-Purpose
--------
-Shared helpers for:
-
-    - topic freshness checking
-    - compact status text formatting
-    - Twist-like command formatting
-    - boolean/scalar/string sample status
-    - simple diagnostic level calculation
-    - real robot test readability
-
-Architecture
-------------
-This file is pure Python utility code.
-
-It does NOT:
-    - create ROS nodes
-    - publish topics
-    - subscribe to topics
-    - command hardware
-    - publish /cmd_vel_safe
-    - access GPIO, PCA9685, motors, encoders, sensors, or cameras
-
-It is safe to use in:
-    - control_status_node.py
-    - recovery_status_node.py
-    - control_dashboard_node.py
-    - future dashboard/status nodes
-    - unit tests
-"""
+"""ROS-independent diagnostics helpers: freshness checks, status text formatting, diagnostic levels."""
 
 from __future__ import annotations
 

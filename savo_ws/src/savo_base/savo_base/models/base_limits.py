@@ -1,32 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/models/base_limits.py
---------------------------------------------
-Professional motion/safety limit models for Robot Savo base control.
-
-Purpose
-- Centralize numeric limits used by teleop, base controllers, and safety shaping
-- Provide validation and clamping helpers for translational/rotational commands
-- Keep limits explicit and reusable across ROS2 Jazzy and non-ROS tools
-
-Scope
-- This file models *limits* only (not motor drivers, not kinematics)
-- It can be used by:
-  - CLI teleop (letters / keyboard)
-  - cmd_vel shaper nodes
-  - safety gates / recovery behaviors
-  - dry-run simulations
-
-Notes
-- Robot Savo is a mecanum base (holonomic), so commands are modeled as:
-  - vx (forward/back)
-  - vy (strafe left/right)
-  - wz (yaw rate / rotate)
-- Values are typically normalized in [-1..1] before mapping to wheel duties,
-  but this module supports both normalized limits and physical SI limits.
-"""
+"""Motion/safety limit models with validation and clamping helpers."""
 
 from __future__ import annotations
 

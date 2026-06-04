@@ -1,55 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/utils/param_loader.py
---------------------------------------------
-Professional ROS2 Jazzy-friendly parameter loading helpers for `savo_base`.
-
-Why this exists
----------------
-`savo_base` nodes (especially real hardware execution nodes) need:
-- consistent parameter declaration
-- typed parameter reads with safe defaults
-- string/int/float/bool parsing helpers (including "0x40" style hex)
-- compact logging of loaded parameter values
-- optional grouped loading via dataclasses
-
-This module keeps parameter handling clean and reusable across:
-- base_driver_node
-- base_watchdog_node
-- base_state_publisher_node
-- diagnostics / bringup helpers
-
-Design goals
-------------
-- Safe defaults for real robot testing
-- Minimal dependencies (stdlib + rclpy only when used with a Node)
-- Works even if called outside ROS2 (for unit tests / dry-run tooling)
-
-Usage examples
---------------
-# 1) Simple typed reads
-from savo_base.utils.param_loader import ParamLoader
-
-pl = ParamLoader(self)  # self = ROS2 Node
-pl.declare("max_duty", 3000)
-max_duty = pl.get_int("max_duty", default=3000, lo=0, hi=4095)
-
-# 2) Hex/string parsing
-pl.declare("pca9685_addr", "0x40")
-addr = pl.get_int("pca9685_addr", default=0x40, base_auto=True)  # -> 64
-
-# 3) Bulk declaration
-pl.declare_many({
-    "loop_hz": 30.0,
-    "watchdog_timeout_s": 0.30,
-    "dryrun": False,
-})
-
-# 4) Structured summary logging
-pl.log_loaded(component="base_driver_node")
-"""
+"""Typed parameter loading helpers for savo_base nodes: declaration, reading, hex parsing."""
 
 from __future__ import annotations
 
@@ -243,7 +195,7 @@ class ParamLoadSummary:
 
 class ParamLoader:
     """
-    Professional parameter loader wrapper for ROS2 Nodes.
+    Parameter loader wrapper for ROS2 nodes.
 
     Features
     --------

@@ -1,29 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/safety/estop_latch.py
---------------------------------------------
-Professional latching Emergency Stop (E-Stop) helper for `savo_base`.
-
-Purpose
--------
-Provide a deterministic, reusable latching E-Stop state machine for real robot
-testing and production bringup.
-
-Why a latch?
-------------
-A transient "False" message or operator mistake should NOT automatically clear
-an emergency stop. The latch ensures the robot remains stopped until an explicit,
-intentional reset/clear action is performed.
-
-Design principles
------------------
-- Pure Python, no ROS dependency (easy to unit test)
-- Explicit state transitions
-- Operator-intent clear/reset required
-- Rich status for logging/state topics
-"""
+"""Latching emergency stop — stays latched until explicit reset."""
 
 from __future__ import annotations
 

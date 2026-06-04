@@ -1,24 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/models/watchdog_state.py
------------------------------------------------
-Professional watchdog state models for Robot Savo (ROS 2 Jazzy, real robot).
-
-Purpose
-- Track command freshness / watchdog timing for savo_base motion execution
-- Support safe timeout behavior (zero outputs when commands become stale)
-- Provide clear runtime status for logging, dashboards, and diagnostics
-
-Scope
-- Pure Python data models (no ROS imports, no hardware I/O)
-- Intended for use by:
-  - savo_base execution node / cmd loop
-  - motor board adapters
-  - teleop / LLM text-command bridge (indirectly via command timestamps)
-  - diagnostics dashboards and telemetry
-"""
+"""Watchdog state models: command freshness tracking for safe timeout behavior."""
 
 from __future__ import annotations
 

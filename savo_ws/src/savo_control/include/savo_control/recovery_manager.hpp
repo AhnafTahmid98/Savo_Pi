@@ -1,36 +1,7 @@
 #pragma once
 
-// =============================================================================
-// Robot Savo — savo_control / recovery_manager.hpp
-// =============================================================================
-//
-// Purpose
-// -------
-// ROS-independent local recovery policy/state helper for Robot Savo.
-//
-// This file does NOT publish ROS topics.
-// This file does NOT create Twist messages.
-// This file does NOT control motors or hardware.
-//
-// Nodes should:
-//   - feed inputs into RecoveryManager::update()
-//   - inspect RecoveryManagerStatus / RecoveryAction
-//   - publish commands to /cmd_vel_recovery if appropriate
-//
-// Correct command chain:
-//
-//   RecoveryManager policy
-//       -> recovery_manager_node / backup_escape_node
-//       -> /cmd_vel_recovery
-//       -> twist_mux_node
-//       -> /cmd_vel_mux
-//       -> cmd_vel_shaper_node
-//       -> /cmd_vel
-//       -> safety gate
-//       -> /cmd_vel_safe
-//       -> savo_base
-//
-// =============================================================================
+// ROS-independent recovery state machine. Feed inputs into update(),
+// read RecoveryAction to drive /cmd_vel_recovery publishing.
 
 #include <algorithm>
 #include <cmath>

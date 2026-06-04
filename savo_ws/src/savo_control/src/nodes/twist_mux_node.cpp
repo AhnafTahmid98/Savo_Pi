@@ -1,40 +1,4 @@
-// =============================================================================
-// Robot SAVO — savo_control / src/nodes/twist_mux_node.cpp (ROS 2 Jazzy)
-// =============================================================================
-// Purpose
-// -------
-// Multiplex multiple Twist command sources into a single selected command stream
-// for the Robot SAVO control pipeline.
-//
-// Typical pipeline (current Robot SAVO architecture)
-// --------------------------------------------------
-// Inputs:
-//   /cmd_vel_manual
-//   /cmd_vel_auto
-//   /cmd_vel_nav
-//   /cmd_vel_recovery   (priority override when enabled/active)
-//
-// Flow:
-//   twist_mux_node --> /cmd_vel_mux --> cmd_vel_shaper_node --> /cmd_vel
-//   --> savo_perception cmd_vel_safety_gate --> /cmd_vel_safe
-//
-// Design goals
-// ------------
-// - Keep ROS-facing mux logic here; reusable control math stays elsewhere
-// - Deterministic source selection with clear priority
-// - Freshness (stale timeout) protection
-// - Recovery override support (to avoid fighting normal modes)
-// - Optional safety-stop hard-zero gate (disabled by default; main safety gate
-//   remains in `savo_perception` -> /cmd_vel_safe)
-//
-// Notes
-// -----
-// - This node uses std_msgs/String for mode command/state for simplicity.
-// - Supported mode_cmd strings (case-insensitive examples):
-//     "MANUAL", "AUTO", "NAV", "STOP", "IDLE"
-// - Recovery command can override selected mode when recovery is active and its
-//   command stream is fresh.
-// =============================================================================
+// Selects one of /cmd_vel_manual/auto/nav/recovery and publishes to /cmd_vel_mux.
 
 #include <algorithm>
 #include <cctype>

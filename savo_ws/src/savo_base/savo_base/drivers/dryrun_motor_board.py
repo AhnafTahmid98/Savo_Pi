@@ -1,34 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/drivers/dryrun_motor_board.py
-----------------------------------------------------
-Professional dry-run motor board for Robot Savo (ROS 2 Jazzy / non-ROS tools).
-
-Purpose
-- Safe software-only stand-in for the real Freenove mecanum motor board driver
-- Lets you test teleop, kinematics, scaling, and control logic without hardware
-- Preserves the same wheel-order conventions and API style used by real board drivers
-
-Wheel order (locked, Robot Savo)
-- (FL, RL, FR, RR)
-
-Design goals
-- No hardware dependencies (no smbus / I2C)
-- Same style as the real board interface (`set_motor_model`, `stop`, `close`)
-- Optional command logging/history for diagnostics and unit tests
-- Clamp behavior matches PCA9685 signed duty expectations (-4095..4095)
-
-Typical use
------------
-from savo_base.drivers.dryrun_motor_board import DryRunMotorBoard
-
-board = DryRunMotorBoard(debug=True)
-board.set_motor_model(1000, 1000, 1000, 1000)
-board.stop()
-board.close()
-"""
+"""Software-only motor board stub — same API as real board, no hardware access."""
 
 from __future__ import annotations
 
@@ -101,7 +74,7 @@ class DryRunMotorBoardState:
 # =============================================================================
 class DryRunMotorBoard:
     """
-    Professional software-only motor board simulator for Robot Savo.
+    Software-only motor board simulator.
 
     API compatibility target (real board wrappers)
     ---------------------------------------------
@@ -277,7 +250,7 @@ class DryRunMotorBoard:
             print(f"[{self.name}] close()")
 
     # -------------------------------------------------------------------------
-    # Optional professional helpers
+    # optional helpers
     # -------------------------------------------------------------------------
     def set_emergency_stop(self, active: bool = True) -> None:
         """

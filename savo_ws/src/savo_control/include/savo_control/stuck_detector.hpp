@@ -1,38 +1,7 @@
 #pragma once
 
-// =============================================================================
-// Robot SAVO — savo_control / stuck_detector.hpp (ROS 2 Jazzy)
-// =============================================================================
-// Purpose
-// -------
-// Reusable ROS-independent stuck / no-progress detector for Robot Savo.
-//
-// Intended use in:
-//   - recovery_manager_node.cpp
-//   - auto_test_manager_node.py / C++ equivalents (through wrapped logic)
-//   - future navigation-support control nodes
-//
-// What it does
-// ------------
-// Detects "robot is commanded to move but is not making expected progress"
-// using simple, robust heuristics:
-//
-//   1) Command activity gating (ignore when robot is intentionally stopped)
-//   2) Low-motion persistence check (odom speed too low for too long)
-//   3) Optional progress-distance check (pose change too small over window)
-//   4) Optional safety-stop context pass-through for richer diagnostics
-//
-// Design note
-// -----------
-// This class does NOT read ROS topics directly. Nodes should feed in:
-//   - current time (seconds)
-//   - commanded velocities (vx, vy, wz)
-//   - measured odom velocities (vx, vy, wz) OR pose deltas
-//   - optional safety stop state
-//
-// It returns a compact status/result that nodes can publish or pass to
-// RecoveryManager.
-// =============================================================================
+// ROS-independent stuck detector. Feed commanded and measured motion into update(),
+// read StuckDetectorStatus.stuck to trigger recovery.
 
 #include <algorithm>
 #include <cmath>

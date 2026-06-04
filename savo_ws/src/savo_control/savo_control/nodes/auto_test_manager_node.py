@@ -2,65 +2,13 @@
 # -*- coding: utf-8 -*-
 
 """
-Robot Savo — savo_control / auto_test_manager_node.py
-=====================================================
+Runs test motion profiles from auto_test_modes.yaml, publishing to /cmd_vel_auto.
 
-Automatic test motion manager for Robot Savo.
+Commands via /savo_control/auto_test_cmd (std_msgs/String):
+  ros2 topic pub /savo_control/auto_test_cmd std_msgs/msg/String "{data: 'forward_slow'}" --once
+  ros2 topic pub /savo_control/auto_test_cmd std_msgs/msg/String "{data: 'STOP'}" --once
 
-Purpose
--------
-This node runs safe, repeatable test motion profiles defined by parameters
-normally loaded from:
-
-    config/auto_test_modes.yaml
-
-It publishes velocity commands to:
-
-    /cmd_vel_auto
-
-Correct command chain:
-
-    auto_test_manager_node
-        -> /cmd_vel_auto
-        -> twist_mux_node
-        -> /cmd_vel_mux
-        -> cmd_vel_shaper_node
-        -> /cmd_vel
-        -> savo_perception/cmd_vel_safety_gate
-        -> /cmd_vel_safe
-        -> savo_base/base_driver_node
-        -> motors
-
-Architecture rules
-------------------
-- This node does NOT publish directly to /cmd_vel_safe.
-- This node does NOT control hardware.
-- This node does NOT touch PCA9685, GPIO, PWM, Freenove board, or motors.
-- Final safety authority stays in savo_perception and savo_base.
-
-Test control
-------------
-The node can run a default test automatically if auto_start:=true.
-
-It can also listen for test name commands on:
-
-    /savo_control/auto_test_cmd
-
-Message type:
-
-    std_msgs/String
-
-Example:
-
-    ros2 topic pub /savo_control/auto_test_cmd std_msgs/msg/String "{data: 'forward_slow'}" --once
-
-Stop command:
-
-    ros2 topic pub /savo_control/auto_test_cmd std_msgs/msg/String "{data: 'STOP'}" --once
-
-Safety
-------
-First test with wheels lifted. Then test on open floor only with low values.
+First test: wheels lifted, auto_start:=false.
 """
 
 from __future__ import annotations
@@ -151,12 +99,6 @@ class AutoTestManagerNode(Node):
         self.declare_parameter("limits.max_wz", 0.45)
         self.declare_parameter("limits.low_speed_scale", 0.50)
 
-        # ------------------------------------------------------------------
-        # Default test parameters
-        #
-        # These defaults allow the node to run even if YAML is not loaded.
-        # auto_test_modes.yaml can override or extend these.
-        # ------------------------------------------------------------------
         self._declare_default_tests()
 
         self._load_parameters()
@@ -200,11 +142,7 @@ class AutoTestManagerNode(Node):
     # Parameter declarations
     # ----------------------------------------------------------------------
     def _declare_default_tests(self) -> None:
-        """Declare default test parameters.
-
-        YAML files may override these.
-        """
-
+        """Declare defaults matching auto_test_modes.yaml so the node works without YAML loaded."""
         # Keep these names aligned with config/auto_test_modes.yaml.
         self.declare_parameter("tests.forward_slow.type", "constant_twist")
         self.declare_parameter("tests.forward_slow.duration_s", 2.0)
@@ -317,12 +255,7 @@ class AutoTestManagerNode(Node):
             raise ValueError("status_hz must be > 0")
 
     def _load_known_tests(self) -> Dict[str, Dict[str, Any]]:
-        """Load tests from declared parameters.
-
-        ROS 2 Python cannot easily accept arbitrary nested dictionaries from YAML
-        as one Python dict parameter, so this node reads known test names from
-        declared parameters. This is stable for our first production baseline.
-        """
+        """ROS 2 Python can't receive arbitrary nested YAML dicts as one param, so test names are enumerated."""
 
         test_names = [
             "forward_slow",

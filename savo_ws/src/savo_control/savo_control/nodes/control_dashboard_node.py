@@ -2,62 +2,10 @@
 # -*- coding: utf-8 -*-
 
 """
-Robot Savo — savo_control / control_dashboard_node.py
-=====================================================
+Live curses terminal dashboard for savo_control topics.
 
-Terminal dashboard for Robot Savo control-layer monitoring.
-
-Purpose
--------
-This node displays a live terminal dashboard for the control command chain:
-
-    /cmd_vel_manual
-    /cmd_vel_auto
-    /cmd_vel_nav
-    /cmd_vel_recovery
-        -> twist_mux_node
-        -> /cmd_vel_mux
-        -> cmd_vel_shaper_node
-        -> /cmd_vel
-        -> safety gate
-        -> /cmd_vel_safe
-        -> savo_base
-
-It also watches:
-
-    /savo_control/mode_cmd
-    /savo_control/mode_state
-    /savo_control/status
-    /savo_control/auto_test_status
-    /savo_control/recovery_test_status
-    /savo_control/recovery_monitor_status
-    /savo_control/stuck_state
-    /safety/stop
-    /safety/slowdown_factor
-    /odometry/filtered
-    /depth/min_front_m
-
-Architecture rules
-------------------
-- This node does NOT publish velocity commands.
-- This node does NOT publish /cmd_vel_safe.
-- This node does NOT control hardware.
-- This node is display/diagnostics only.
-
-Usage
------
-Run in a real terminal:
-
-    ros2 run savo_control control_dashboard_node.py
-
-Quit:
-
-    Ctrl+C
-
-Notes
------
-This node uses curses. It is best run directly in a terminal, not inside a
-launch file output window.
+Run directly in a terminal, not inside a launch file output window.
+Quit with q or Ctrl+C.
 """
 
 from __future__ import annotations

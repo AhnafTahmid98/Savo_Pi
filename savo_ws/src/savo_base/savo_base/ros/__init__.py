@@ -1,26 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# -----------------------------------------------------------------------------
-# Robot SAVO — savo_base/ros/__init__.py
-# -----------------------------------------------------------------------------
-# Professional package exports for ROS helpers used by `savo_base`.
-#
-# This module intentionally re-exports the most commonly used utilities so nodes
-# can import from a single place, e.g.:
-#
-#   from savo_base.ros import (
-#       qos_cmd_vel,
-#       read_driver_hardware_params,
-#       get_topic_name,
-#   )
-#
-# Notes
-# -----
-# - Keep imports lightweight and side-effect free.
-# - Do not create ROS nodes or touch hardware here.
-# - Re-export only stable helper APIs used across the package.
-# -----------------------------------------------------------------------------
+# Public exports for savo_base.ros: QoS profiles, params, adapters, topic contract.
 
 from .adapters import *          # noqa: F401,F403
 from .params import *            # noqa: F401,F403

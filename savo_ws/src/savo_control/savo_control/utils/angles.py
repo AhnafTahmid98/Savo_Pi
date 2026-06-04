@@ -1,34 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot Savo — savo_control / utils / angles.py
-=============================================
-
-Small ROS-independent angle helpers for Robot Savo control nodes.
-
-Purpose
--------
-Shared angle/yaw utilities for:
-
-    - heading PID
-    - rotate-to-heading tests
-    - straight-line heading hold
-    - diagnostics/dashboard formatting
-
-Architecture
-------------
-This file is pure Python utility code.
-
-It does NOT:
-    - create ROS nodes
-    - publish topics
-    - subscribe to topics
-    - command hardware
-    - touch /cmd_vel_safe
-
-All functions are deterministic and safe to unit test.
-"""
+"""ROS-independent angle/yaw helpers: wrap, shortest angular distance, deg/rad conversion."""
 
 from __future__ import annotations
 

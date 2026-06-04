@@ -2,41 +2,11 @@
 # -*- coding: utf-8 -*-
 
 """
-Robot SAVO — Base Safe Idle Launch (savo_base)
-----------------------------------------------
-Professional "safe idle" bringup for the Robot Savo base stack.
+Brings up the base stack with no motion commands — good for first power-on and pre-drive checks.
 
-Purpose
--------
-Start the base stack in a non-commanding state so you can safely verify:
-- parameter layering
-- hardware backend initialization (or dryrun)
-- watchdog/state/heartbeat helper nodes
-- /safety/stop and /safety/slowdown_factor subscriptions
-- base state publishing
-
-This launch does NOT publish motion commands. It is intended for:
-- first power-on checks
-- pre-drive verification
-- bench or real robot idle monitoring
-
-Profiles
---------
-Loads layered configs and applies a profile last:
-- dryrun_sim_motoroff.yaml
-- bench_test.yaml
-- real_robot_v1.yaml
-
-Recommended usage
------------------
-# Safest possible idle (software-only motor-off)
-ros2 launch savo_base base_safe_idle.launch.py profile:=dryrun_sim_motoroff.yaml
-
-# Bench idle (robot lifted)
-ros2 launch savo_base base_safe_idle.launch.py profile:=bench_test.yaml
-
-# Real robot idle monitoring (motors initialized, no commands sent)
-ros2 launch savo_base base_safe_idle.launch.py profile:=real_robot_v1.yaml
+  ros2 launch savo_base base_safe_idle.launch.py profile:=dryrun_sim_motoroff.yaml
+  ros2 launch savo_base base_safe_idle.launch.py profile:=bench_test.yaml
+  ros2 launch savo_base base_safe_idle.launch.py profile:=real_robot_v1.yaml
 """
 
 from launch import LaunchDescription
@@ -49,29 +19,22 @@ from launch_ros.substitutions import FindPackageShare
 def generate_launch_description() -> LaunchDescription:
     pkg_share = FindPackageShare("savo_base")
 
-    # -------------------------------------------------------------------------
-    # Launch args
-    # -------------------------------------------------------------------------
     profile = LaunchConfiguration("profile")
     output = LaunchConfiguration("output")
     log_level = LaunchConfiguration("log_level")
 
-    # Helper nodes (safe idle usually wants visibility ON)
     use_watchdog = LaunchConfiguration("use_watchdog")
     use_state_publisher = LaunchConfiguration("use_state_publisher")
     use_heartbeat = LaunchConfiguration("use_heartbeat")
     use_diag_runner = LaunchConfiguration("use_diag_runner")
 
-    # Optional custom absolute profile path
     profile_path = LaunchConfiguration("profile_path")
 
-    # Reuse the professional base bringup (single source of truth)
     base_bringup_launch = PathJoinSubstitution([pkg_share, "launch", "base_bringup.launch.py"])
 
     include_base_bringup = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(base_bringup_launch),
         launch_arguments={
-            # If profile_path is non-empty, base_bringup will use it (as designed)
             "profile": profile,
             "profile_path": profile_path,
             "use_watchdog": use_watchdog,
@@ -84,9 +47,7 @@ def generate_launch_description() -> LaunchDescription:
     )
 
     return LaunchDescription([
-        # ---------------------------------------------------------------------
-        # Profile selection
-        # ---------------------------------------------------------------------
+        # profile
         DeclareLaunchArgument(
             "profile",
             default_value="bench_test.yaml",
@@ -104,9 +65,7 @@ def generate_launch_description() -> LaunchDescription:
             ),
         ),
 
-        # ---------------------------------------------------------------------
-        # Helper nodes (safe idle visibility defaults)
-        # ---------------------------------------------------------------------
+        # helper nodes
         DeclareLaunchArgument(
             "use_watchdog",
             default_value="true",
@@ -128,9 +87,7 @@ def generate_launch_description() -> LaunchDescription:
             description="Start base_diag_runner_node (optional).",
         ),
 
-        # ---------------------------------------------------------------------
-        # Logging/output
-        # ---------------------------------------------------------------------
+        # output
         DeclareLaunchArgument(
             "output",
             default_value="screen",
@@ -142,24 +99,6 @@ def generate_launch_description() -> LaunchDescription:
             description="ROS log level (debug|info|warn|error|fatal).",
         ),
 
-        # ---------------------------------------------------------------------
-        # Info logs
-        # ---------------------------------------------------------------------
-        LogInfo(msg="[savo_base] Starting base_safe_idle.launch.py"),
-        LogInfo(msg=[
-            "[savo_base] Safe-idle mode: no motion test CLI is started. ",
-            "This launch only brings up the base stack and monitoring nodes."
-        ]),
-        LogInfo(msg=[
-            "[savo_base] Selected profile (or profile_path override): ", profile
-        ]),
-        LogInfo(msg=(
-            "[savo_base] For real robot first power-on, keep robot lifted / clear area "
-            "and verify /safety/stop, /safety/slowdown_factor, and /savo_base/base_state."
-        )),
-
-        # ---------------------------------------------------------------------
-        # Reused base stack bringup
-        # ---------------------------------------------------------------------
+        LogInfo(msg=["[savo_base] base_safe_idle profile: ", profile]),
         include_base_bringup,
     ])

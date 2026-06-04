@@ -1,34 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/utils/qos.py
------------------------------------
-Professional ROS2 Jazzy QoS helpers for `savo_base`.
-
-Purpose
--------
-Provide a single place for QoS profile creation so all `savo_base` nodes use
-consistent QoS settings for:
-- command topics (/cmd_vel_safe)
-- safety topics (/safety/stop, /safety/slowdown_factor)
-- state/diagnostic topics (/savo_base/base_state, /savo_base/watchdog_state)
-- optional latched status/config topics
-
-Design goals
-------------
-- ROS2 Jazzy compatible
-- explicit and readable
-- easy reuse across Python nodes
-- safe fallbacks if imported outside ROS2 (unit tests / lint environments)
-
-Notes for Robot Savo
---------------------
-- Command topics are typically RELIABLE + KEEP_LAST.
-- Safety sensor-like topics are often BEST_EFFORT + KEEP_LAST for compatibility.
-- JSON state summaries can be RELIABLE + KEEP_LAST.
-- "Latched" behavior in ROS2 = TRANSIENT_LOCAL durability.
-"""
+"""QoS profile helpers for savo_base nodes."""
 
 from __future__ import annotations
 

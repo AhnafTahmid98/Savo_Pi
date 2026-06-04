@@ -2,33 +2,17 @@
 # -*- coding: utf-8 -*-
 
 """
-Robot SAVO — savo_base/drivers/freenove_mecanum_board.py
---------------------------------------------------------
-Professional Freenove/PCA9685 mecanum motor-board wrapper for Robot Savo
-(ROS 2 Jazzy, real hardware testing).
+Freenove/PCA9685 mecanum motor board wrapper with locked Robot Savo channel mapping.
 
-Purpose
-- Encode the *board-specific* motor channel map and direction semantics that were
-  proven on the real Robot Savo hardware
-- Provide a clean API for ROS nodes and CLI tools (teleop, smoke test, automode)
-- Build on top of the generic low-level PCA9685 driver
+Channel map (proven on real hardware):
+  FL: (0,1)   RL: (3,2)   FR: (6,7)   RR: (4,5)
 
-IMPORTANT (locked real hardware behavior)
-- Channel map (proven):
-    FL (front-left)  : (0,1)
-    RL (rear-left)   : (3,2)
-    FR (front-right) : (6,7)
-    RR (rear-right)  : (4,5)
-- Wheel direction semantics (proven):
-    d > 0  -> first channel = 0, second channel = d
-    d < 0  -> second channel = 0, first channel = -d
-    d = 0  -> BOTH channels = 4095   (board-proven stop behavior)
-- Sign-flip quench (default 18 ms) is preserved to protect real hardware during reversals.
+Direction semantics (proven):
+  d > 0 -> ch_a=0,    ch_b=d
+  d < 0 -> ch_a=-d,   ch_b=0
+  d = 0 -> ch_a=4095, ch_b=4095  (board-proven stop)
 
-Design notes
-- This module is hardware-focused (no ROS imports)
-- Kinematics (vx, vy, wz -> wheel mixing) should remain in kinematics modules
-- Safety/watchdog logic should remain in nodes/safety modules
+18 ms quench on direction flip to protect H-bridge.
 """
 
 from __future__ import annotations

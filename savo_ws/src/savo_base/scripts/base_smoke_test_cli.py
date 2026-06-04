@@ -2,52 +2,14 @@
 # -*- coding: utf-8 -*-
 
 """
-Robot SAVO — savo_base/scripts/base_smoke_test_cli.py
------------------------------------------------------
-CLI smoke-test tool for `savo_base` / `base_driver_node`.
+CLI smoke test for the base command path.
 
-Purpose
--------
-Quickly validate the base command path on real robot or dry-run:
-  cmd source -> /cmd_vel_safe -> base_driver_node -> motor board
-
-Also validates optional safety inputs:
-  - /safety/stop
-  - /safety/slowdown_factor
-
-Typical use cases
------------------
-1) Dry-run bringup validation (no hardware damage risk)
-2) Real hardware low-speed motion sanity checks
-3) Safety stop topic test
-4) Slowdown factor scaling test
-5) Watchdog timeout behavior (stop publishing and observe zero output)
-
-Examples
---------
-# 1) Publish zeros once
-ros2 run savo_base base_smoke_test_cli.py zero
-
-# 2) Forward at low speed for 2 seconds
-ros2 run savo_base base_smoke_test_cli.py cmd --vx 0.15 --duration 2.0
-
-# 3) Strafe right
-ros2 run savo_base base_smoke_test_cli.py cmd --vy 0.12 --duration 2.0
-
-# 4) Rotate in place
-ros2 run savo_base base_smoke_test_cli.py cmd --wz 0.20 --duration 2.0
-
-# 5) Set slowdown factor to 0.40
-ros2 run savo_base base_smoke_test_cli.py slowdown --value 0.40
-
-# 6) Trigger safety stop latch path (if enabled in base_driver_node)
-ros2 run savo_base base_smoke_test_cli.py estop --set true
-
-# 7) Run a professional smoke sequence (safe low-speed)
-ros2 run savo_base base_smoke_test_cli.py sequence --profile basic --confirm-real
-
-# 8) Watchdog test: send command briefly then stop publishing
-ros2 run savo_base base_smoke_test_cli.py pulse --vx 0.15 --on 0.5 --off 1.0
+  ros2 run savo_base base_smoke_test_cli.py zero
+  ros2 run savo_base base_smoke_test_cli.py cmd --vx 0.15 --duration 2.0
+  ros2 run savo_base base_smoke_test_cli.py cmd --vy 0.12 --duration 2.0
+  ros2 run savo_base base_smoke_test_cli.py cmd --wz 0.20 --duration 2.0
+  ros2 run savo_base base_smoke_test_cli.py slowdown --value 0.40
+  ros2 run savo_base base_smoke_test_cli.py sequence --profile basic --confirm-real
 """
 
 from __future__ import annotations

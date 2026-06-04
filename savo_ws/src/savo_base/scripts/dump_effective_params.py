@@ -2,44 +2,12 @@
 # -*- coding: utf-8 -*-
 
 """
-Robot SAVO — savo_base/scripts/dump_effective_params.py
--------------------------------------------------------
-Professional ROS 2 Jazzy CLI utility to dump the *effective runtime parameters*
-from a target node (default: /base_driver_node).
+Dumps effective runtime parameters from a live ROS node (default: /base_driver_node).
 
-Why this is useful
-------------------
-- Confirms what parameters are actually active after launch/YAML overrides
-- Helps debugging when multiple YAML files are merged
-- Creates reproducible snapshots for logs / issue reports
-- Verifies base_driver_node safety + motor config on real hardware
-
-Features
---------
-- Waits for parameter services
-- Lists all parameters from target node
-- Fetches values in batches
-- Outputs YAML (default) or JSON
-- Can save to file
-- Can optionally include hidden/internal parameters (names starting with "_")
-- Can wrap output in ROS2-compatible YAML structure:
-    /base_driver_node:
-      ros__parameters:
-        ...
-
-Examples
---------
-# Print effective params from base_driver_node (YAML)
-ros2 run savo_base dump_effective_params.py
-
-# Dump another node
-ros2 run savo_base dump_effective_params.py --node /safety_stop_node
-
-# Save to file (ROS2 YAML wrapper)
-ros2 run savo_base dump_effective_params.py --out /tmp/base_driver_effective.yaml --ros2-yaml
-
-# JSON output
-ros2 run savo_base dump_effective_params.py --format json
+  ros2 run savo_base dump_effective_params.py
+  ros2 run savo_base dump_effective_params.py --node /safety_stop_node
+  ros2 run savo_base dump_effective_params.py --out /tmp/base_driver_effective.yaml --ros2-yaml
+  ros2 run savo_base dump_effective_params.py --format json
 """
 
 from __future__ import annotations

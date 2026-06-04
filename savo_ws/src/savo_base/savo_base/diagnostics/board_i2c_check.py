@@ -1,54 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/diagnostics/board_i2c_check.py
------------------------------------------------------
-Professional I2C diagnostic for Robot Savo base/board bringup.
-
-Purpose
--------
-Quickly verify that expected I2C devices are visible on the selected bus(es)
-before running `savo_base` motor-control nodes.
-
-This script supports multiple probe methods (in order):
-1) Python SMBus via `smbus2` (preferred)
-2) Python SMBus via legacy `smbus`
-3) `i2cdetect` command fallback (if installed)
-
-Why this matters
-----------------
-Robot Savo uses multiple I2C devices across buses (Pi + Freenove + UPS HAT).
-Before base bringup, this script helps confirm:
-- PCA9685 motor PWM board is visible (0x40)
-- ADS7830 ADC is visible (0x48)
-- PCA9685 all-call responds (0x70) [optional/diagnostic]
-- UPS HAT fuel gauge is visible (0x36) [on I2C-1]
-- IMU / ToF devices are visible if connected on same bus (0x28, 0x29)
-
-Examples
---------
-# Default Robot Savo check (bus 1 primary, bus 0 optional if present)
-python3 board_i2c_check.py
-
-# Check only bus 1 with verbose output
-python3 board_i2c_check.py --bus 1 --verbose
-
-# Custom expected addresses
-python3 board_i2c_check.py --bus 1 --expect 0x40 0x48 0x70
-
-# Strict mode (exit non-zero if required devices are missing)
-python3 board_i2c_check.py --strict
-
-# Include bus 0 left ToF check (VL53L1X-FL on I2C-0 in Robot Savo)
-python3 board_i2c_check.py --include-bus0
-
-Notes
------
-- Accessing I2C may require permissions (run as root or ensure i2c group access).
-- Addresses like 0x70 (PCA9685 all-call) may or may not ACK depending on device state.
-- This is a diagnostic tool; it does not configure devices.
-"""
+"""I2C device presence check for Robot Savo bringup. Supports smbus2, smbus, or i2cdetect fallback."""
 
 from __future__ import annotations
 
@@ -61,9 +14,9 @@ from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 
 # =============================================================================
-# Robot Savo expected devices (informational + defaults)
+# Expected I2C devices
 # =============================================================================
-# Locked Robot Savo I2C map context (relevant subset for diagnostics):
+# I2C address map:
 # I2C-1: 0x28 BNO055, 0x29 VL53L1X-FR, 0x36 UPS HAT fuel gauge, 0x40 PCA9685,
 #        0x48 ADS7830, 0x70 PCA9685 all-call
 # I2C-0: 0x29 VL53L1X-FL (left ToF)
@@ -472,7 +425,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     # Build primary expected catalog
     if args.expect is None:
-        # Robot Savo professional defaults for bus 1 or generic fallback
+        # Robot Savo defaults for bus 1, or generic fallback
         if primary_bus == 1:
             expected_primary = dict(ROBOT_SAVO_BUS1_DEFAULTS)
             default_required = set(ROBOT_SAVO_BASE_REQUIRED_BUS1)

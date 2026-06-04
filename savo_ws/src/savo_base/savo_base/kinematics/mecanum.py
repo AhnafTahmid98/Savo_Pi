@@ -1,38 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/kinematics/mecanum.py
---------------------------------------------
-Professional mecanum kinematics helpers for Robot Savo (ROS 2 Jazzy).
-
-Purpose
-- Provide a shared, tested kinematics layer for:
-    * CLI teleop tools (non-ROS diagnostics)
-    * ROS 2 base driver nodes
-    * future autonomous control pipelines
-- Preserve Robot Savo's proven wheel mixing behavior from real hardware testing
-
-Design notes
-- This module is math/utility only (no ROS imports, no hardware imports)
-- Output wheel order is always:
-    (FL, RL, FR, RR)
-- Sign conventions are configurable using axis sign parameters, matching your
-  proven teleop workflow:
-    forward_sign = -1 (default)
-    strafe_sign  = +1 (default)
-    rotate_sign  = +1 (default)
-
-Robot Savo proven normalized mix (locked behavior)
-- fl = vx - vy - w
-- rl = vx + vy - w
-- fr = vx + vy + w
-- rr = vx - vy + w
-where:
-- vx: forward/backward command
-- vy: left/right strafe command
-- w : yaw/rotation command after rotate_sign * turn_gain
-"""
+"""Mecanum wheel mixing math. Output order: (FL, RL, FR, RR). No ROS or hardware imports."""
 
 from __future__ import annotations
 

@@ -1,50 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot Savo — savo_control / auto_test_control.launch.py
-=======================================================
-
-Automatic control test launch file for Robot Savo.
-
-Purpose
--------
-Starts the control chain plus auto_test_manager_node.py for controlled,
-repeatable movement tests.
-
-Auto test command chain:
-
-    auto_test_manager_node
-        -> /cmd_vel_auto
-        -> twist_mux_node
-        -> /cmd_vel_mux
-        -> cmd_vel_shaper_node
-        -> /cmd_vel
-        -> savo_perception/cmd_vel_safety_gate
-        -> /cmd_vel_safe
-        -> savo_base/base_driver_node
-        -> motors
-
-Important package boundaries:
-    - auto_test_manager_node publishes only /cmd_vel_auto
-    - savo_control publishes /cmd_vel
-    - safety gate publishes /cmd_vel_safe
-    - savo_base executes motor hardware
-
-This launch file does NOT:
-    - start savo_base
-    - start savo_perception safety gate
-    - start real motor hardware directly
-    - publish directly to /cmd_vel_safe
-
-Safety
-------
-First auto tests should be done with:
-    - wheels lifted
-    - low speed
-    - safety gate running before floor tests
-    - hand near E-stop / power switch
-"""
+"""Auto-test launch: control chain plus auto_test_manager_node. First tests: wheels lifted, low speed, safety gate running."""
 
 from __future__ import annotations
 

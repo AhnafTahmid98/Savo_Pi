@@ -1,38 +1,6 @@
 #pragma once
 
-// =============================================================================
-// Robot SAVO — savo_control / command_limiter.hpp (ROS 2 Jazzy)
-// =============================================================================
-// Purpose
-// -------
-// Reusable command limiting utility for motion commands in `savo_control`.
-// It is designed for the cmd_vel shaping stage and can be reused by test,
-// PID, and recovery nodes.
-//
-// What it does
-// ------------
-// - Axis-wise value clamping        (vx, vy, omega)
-// - Axis-wise deadband              (optional zeroing near 0)
-// - Slew-rate limiting              (accel/decel style limiting per update)
-// - Optional timeout-safe reset helper support (via reset())
-// - Stateless helpers + stateful per-axis limiter
-//
-// Design note
-// -----------
-// This header is intentionally lightweight and reusable. ROS message handling
-// should stay in nodes (e.g., cmd_vel_shaper_node.cpp). This utility focuses on
-// pure control/math behavior so it is easy to test and reuse.
-//
-// Professional usage pattern
-// --------------------------
-// 1) Configure limits once from parameters
-// 2) On each control loop tick:
-//      - sanitize dt
-//      - clamp target command
-//      - apply deadband
-//      - apply slew-rate limit from previous output
-// 3) Publish shaped command
-// =============================================================================
+// Axis-wise clamp, deadband, and slew-rate limiter for motion commands.
 
 #include <algorithm>
 #include <cmath>

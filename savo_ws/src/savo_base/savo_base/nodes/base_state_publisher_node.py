@@ -1,46 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/nodes/base_state_publisher_node.py
-----------------------------------------------------------
-Professional ROS 2 Jazzy state aggregation / publishing node for `savo_base`.
-
-Purpose
--------
-This node collects runtime signals related to the mobile base and publishes a
-single consolidated JSON state summary for dashboards, logging, and debugging.
-
-Why this node is useful
------------------------
-- Keeps `base_driver_node` focused on motor execution (real hardware path)
-- Centralizes status reporting in one place
-- Makes it easier to monitor Robot Savo during real robot testing
-- Works even if some topics are missing (graceful degradation)
-
-Typical inputs
---------------
-- /cmd_vel_safe                     (geometry_msgs/Twist)
-- /safety/stop                      (std_msgs/Bool)
-- /safety/slowdown_factor           (std_msgs/Float32)
-- /savo_base/watchdog_state         (std_msgs/String JSON from base_driver_node)
-- /savo_base/base_state             (std_msgs/String JSON from base_driver_node)
-- /savo_base/motor_board_status     (std_msgs/String JSON, optional future topic)
-
-Primary output
---------------
-- /savo_base/state_summary          (std_msgs/String JSON)
-
-Optional outputs
-----------------
-- /savo_base/state_heartbeat        (std_msgs/Bool)
-
-Design notes
-------------
-- JSON string transport is intentional for easy dashboard integration and logs.
-- Uses stale detection per input topic.
-- Safe for partial bringup (missing topics do not crash the node).
-"""
+"""Aggregates base signals into a consolidated JSON state summary topic."""
 
 from __future__ import annotations
 

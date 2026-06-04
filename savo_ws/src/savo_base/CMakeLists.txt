@@ -37,9 +37,7 @@ ament_python_install_package(${PROJECT_NAME})
 # -----------------------------------------------------------------------------
 # Install Python executables (reliable for hybrid packages)
 # -----------------------------------------------------------------------------
-# Hybrid strategy:
-# - Install ROS node Python files explicitly for reliable `ros2 run` / launch
-# - Install helper CLI scripts explicitly
+# explicit install for reliable ros2 run in this hybrid ament_cmake layout
 install(PROGRAMS
   # CLI tools (scripts/)
   scripts/teleop_letters_cli.py
@@ -88,20 +86,6 @@ install(FILES
   DESTINATION share/${PROJECT_NAME}
 )
 
-# -----------------------------------------------------------------------------
-# Optional C++ targets (future-ready scaffold)
-# -----------------------------------------------------------------------------
-# Add C++ nodes/libraries here later if needed, e.g.:
-#
-# add_executable(example_cpp_node src/example_cpp_node.cpp)
-# ament_target_dependencies(example_cpp_node
-#   rclcpp
-#   std_msgs
-# )
-# install(TARGETS
-#   example_cpp_node
-#   DESTINATION lib/${PROJECT_NAME}
-# )
 
 # -----------------------------------------------------------------------------
 # Testing / Lint

@@ -1,23 +1,6 @@
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/constants.py
------------------------------------
-Centralized package-wide constants for `savo_base`.
-
-Purpose
--------
-Keep stable/default values in one place so nodes, scripts, and utilities use
-the same names and defaults (topics, timing, PWM, safety thresholds, etc.).
-
-Notes
------
-- This file is intentionally dependency-free (no ROS imports).
-- These are *code defaults* only. Runtime ROS parameters/YAML should override
-  them when needed.
-- Place this file in the same package directory as `version.py`:
-    Savo_Pi/src/savo_base/savo_base/constants.py
-"""
+"""Package-wide constants. No ROS imports — safe to import anywhere."""
 
 from __future__ import annotations
 
@@ -72,14 +55,13 @@ SLOWDOWN_MAX_DEFAULT: Final[float] = 1.0
 
 
 # =============================================================================
-# Mecanum Convention Defaults (matches your proven teleop baseline)
+# Mecanum Convention Defaults
 # =============================================================================
 FORWARD_SIGN_DEFAULT: Final[int] = -1
 STRAFE_SIGN_DEFAULT: Final[int] = +1
 ROTATE_SIGN_DEFAULT: Final[int] = +1
 TURN_GAIN_DEFAULT: Final[float] = 1.0
 
-# Wheel order used consistently in Robot Savo code paths
 WHEEL_ORDER: Final[Tuple[str, str, str, str]] = ("FL", "RL", "FR", "RR")
 
 
@@ -93,11 +75,11 @@ I2C_BUS_DEFAULT: Final[int] = 1
 PCA9685_ADDR_DEFAULT: Final[int] = 0x40
 PCA9685_PWM_FREQ_HZ_DEFAULT: Final[float] = 50.0
 
-# Safe motor duty ceiling used in your teleop/base defaults
+# 3000 = conservative default; PCA9685 absolute max is 4095
 MAX_DUTY_DEFAULT: Final[int] = 3000
 MAX_DUTY_ABSOLUTE: Final[int] = 4095
 
-# Direction flip quench to protect H-bridge / avoid hard reversals
+# quench protects H-bridge from hard reversals
 QUENCH_MS_DEFAULT: Final[int] = 18
 
 
@@ -111,7 +93,7 @@ INVERT_RR_DEFAULT: Final[bool] = False
 
 
 # =============================================================================
-# QoS Defaults (informational constants for helper modules)
+# QoS Defaults
 # =============================================================================
 QOS_DEPTH_DEFAULT: Final[int] = 10
 QOS_DEPTH_SENSOR_DEFAULT: Final[int] = 10
@@ -120,7 +102,7 @@ QOS_SENSOR_RELIABILITY_DEFAULT: Final[str] = "best_effort"
 
 
 # =============================================================================
-# CLI / Script Timing Defaults (smoke test / poke / teleop helper scripts)
+# CLI / Script Timing Defaults
 # =============================================================================
 CLI_STEP_SLEEP_S_DEFAULT: Final[float] = 0.25
 CLI_POKE_DURATION_S_DEFAULT: Final[float] = 0.60
@@ -140,7 +122,7 @@ WATCHDOG_NAME_BASE_COMMAND: Final[str] = "base_command_watchdog"
 
 
 # =============================================================================
-# Structured defaults (optional convenience for importers)
+# Structured defaults
 # =============================================================================
 @dataclass(frozen=True)
 class BaseDriverDefaults:

@@ -2,55 +2,9 @@
 # -*- coding: utf-8 -*-
 
 """
-Robot Savo — savo_control / distance_pid_test_node.py
-====================================================
+Front-distance approach using /depth/min_front_m from savo-edge. Publishes to /cmd_vel_auto.
 
-Distance-based approach test node for Robot Savo.
-
-Purpose
--------
-This node performs a conservative front-distance approach test. It reads a
-high-level front distance topic, such as:
-
-    /depth/min_front_m
-
-and publishes velocity commands to:
-
-    /cmd_vel_auto
-
-Correct command chain:
-
-    distance_pid_test_node
-        -> /cmd_vel_auto
-        -> twist_mux_node
-        -> /cmd_vel_mux
-        -> cmd_vel_shaper_node
-        -> /cmd_vel
-        -> savo_perception/cmd_vel_safety_gate
-        -> /cmd_vel_safe
-        -> savo_base/base_driver_node
-        -> motors
-
-Architecture rules
-------------------
-- This node does NOT publish directly to /cmd_vel_safe.
-- This node does NOT control PCA9685, GPIO, PWM, Freenove board, or motors.
-- This node consumes high-level distance only.
-- Final safety authority remains in savo_perception and savo_base.
-
-Typical use
------------
-This is useful for:
-- slow approach tests
-- stopping before a wall/door
-- validating /depth/min_front_m from savo-edge
-- controlled distance PID experiments
-
-First real robot test:
-- wheels lifted or open floor
-- very low speed
-- safety gate running
-- hand near E-stop / power switch
+First test: wheels lifted or open floor, low speed, safety gate running.
 """
 
 from __future__ import annotations

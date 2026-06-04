@@ -1,27 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_control.interfaces.control_modes
-==================================================
-
-Purpose
--------
-Lean Python-side control mode contract aligned with the authoritative
-C++ control mode manager (`control_mode_manager_node.cpp` + control_mode_manager.hpp).
-
-This module is intentionally minimal:
-- enum names aligned with C++ runtime mode strings
-- parsing aliases aligned with C++ on_mode_cmd_() behavior
-- helper functions for Python dashboards/tests/tools
-- no transition policy or arbitration logic (owned by C++)
-
-Why this matters (real robot)
------------------------------
-On a real robot, duplicated mode-policy logic across C++ and Python can drift and
-cause unsafe behavior. The C++ mode manager is the single source of truth.
-Python uses this file only for parsing, validation, and display convenience.
-"""
+"""Python mode enum and parsing helpers, aligned with C++ control_mode_manager mode strings."""
 
 from __future__ import annotations
 

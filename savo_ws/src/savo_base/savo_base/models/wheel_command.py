@@ -1,24 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/models/wheel_command.py
-----------------------------------------------
-Professional wheel-command models for Robot Savo (ROS 2 Jazzy, real robot).
-
-Purpose
-- Represent wheel-space motion commands for the Robot Savo mecanum base
-- Keep command metadata (source, timing, mode, watchdog-friendly fields)
-- Validate and serialize commands for execution, logging, and telemetry
-
-Scope
-- Pure Python data models (no ROS imports, no hardware I/O)
-- Intended for use by:
-  - savo_base command intake / execution node
-  - teleop / nav / follow / LLM-text command bridge
-  - motor board adapters (after scaling/clamping)
-  - watchdog and diagnostics layers
-"""
+"""Wheel-space motion command models with metadata, validation, and serialization."""
 
 from __future__ import annotations
 

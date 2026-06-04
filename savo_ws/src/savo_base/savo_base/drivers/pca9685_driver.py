@@ -1,25 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/drivers/pca9685_driver.py
-------------------------------------------------
-Professional low-level PCA9685 I2C PWM driver for Robot Savo (ROS 2 Jazzy stack).
-
-Purpose
-- Provide a clean, reusable, hardware-focused PCA9685 driver
-- Serve as the foundation for board-specific wrappers (e.g., Freenove mecanum board)
-- Support real robot testing on Raspberry Pi (I2C bus + PCA9685 @ 0x40)
-
-Important note (Robot Savo real hardware)
-- This file is the *generic low-level PCA9685 driver*.
-- Your proven physical board behavior (wheel channel pairs, sign semantics, quench, stop=4095/4095)
-  belongs in `freenove_mecanum_board.py`, which should use this driver.
-- We keep this module generic and stable so it can be reused safely.
-
-Dependencies
-- python3-smbus  (imported as `smbus`)
-"""
+"""Generic low-level PCA9685 I2C PWM driver. Board-specific behavior belongs in freenove_mecanum_board.py."""
 
 from __future__ import annotations
 

@@ -1,101 +1,48 @@
-# File: savo_base/config/profiles/real_robot_v1.yaml
-#
-# Robot SAVO — Real Robot Profile v1 (savo_base / base_driver_node)
-# ------------------------------------------------------------------
-# Purpose:
-#   Production-oriented real-hardware profile for Robot Savo base_driver_node.
-#   Intended for on-robot driving with Freenove PCA9685 motor board and
-#   upstream safety-gated commands from the perception/control pipeline.
-#
-# Layering (recommended):
-#   1) config/topics.yaml
-#   2) config/safety_timeouts.yaml
-#   3) config/motor_board_freenove.yaml
-#   4) config/mecanum_kinematics.yaml
-#   5) config/profiles/real_robot_v1.yaml   <-- profile overrides last
-#
-# Notes:
-#   - Parameters below match the current `savo_base/nodes/base_driver_node.py`.
-#   - Topics align with locked Robot Savo perception safety contract:
-#       /cmd_vel_safe
-#       /safety/stop
-#       /safety/slowdown_factor
-#   - This profile is for REAL hardware (not dryrun).
+# Real robot production profile — Freenove PCA9685 hardware, safety gate upstream.
 
 /base_driver_node:
   ros__parameters:
 
-    # -------------------------------------------------------------------------
-    # Topics (aligned with Robot Savo stack)
-    # -------------------------------------------------------------------------
     cmd_topic: "/cmd_vel_safe"
     safety_stop_topic: "/safety/stop"
     slowdown_topic: "/safety/slowdown_factor"
     watchdog_state_topic: "/savo_base/watchdog_state"
     base_state_topic: "/savo_base/base_state"
 
-    # -------------------------------------------------------------------------
-    # Safety integrations (keep enabled on real robot)
-    # -------------------------------------------------------------------------
     use_safety_stop: true
     use_slowdown_factor: true
 
-    # Slowdown factor clamp from /safety/slowdown_factor (expected 0.0..1.0)
     slowdown_default: 1.0
     slowdown_min: 0.0
     slowdown_max: 1.0
 
-    # -------------------------------------------------------------------------
-    # Timing / watchdog / status publishing
-    # -------------------------------------------------------------------------
-    # Matches your locked safety timing style across the stack.
     loop_hz: 30.0
     watchdog_timeout_s: 0.30
     publish_status_hz: 2.0
 
-    # -------------------------------------------------------------------------
-    # Command-space limits (Twist clamp before mecanum mixing)
-    # These are normalized limits handled by base_driver_node.
-    # -------------------------------------------------------------------------
-    # Real robot v1: conservative but usable for indoor testing.
+    # conservative but usable for indoor testing
     vx_limit: 0.80
     vy_limit: 0.70
     wz_limit: 0.70
 
-    # -------------------------------------------------------------------------
-    # Motor output scaling
-    # -------------------------------------------------------------------------
-    # PCA9685 raw range is 0..4095. Robot Savo proven conservative cap is 3000.
+    # 3000 = proven safe cap; PCA9685 max is 4095
     max_duty: 3000
     turn_gain: 1.0
 
-    # -------------------------------------------------------------------------
-    # Robot Savo command sign conventions (locked/proven)
-    # -------------------------------------------------------------------------
     forward_sign: -1
     strafe_sign: 1
     rotate_sign: 1
 
-    # -------------------------------------------------------------------------
-    # Real hardware backend selection (Freenove PCA9685 motor board)
-    # -------------------------------------------------------------------------
     board_backend: "freenove"
     board_name: "robot_savo_freenove_mecanum"
     dryrun: false
 
-    # -------------------------------------------------------------------------
-    # Freenove / PCA9685 hardware settings (locked Robot Savo defaults)
-    # -------------------------------------------------------------------------
     i2c_bus: 1
     pca9685_addr: "0x40"
     pwm_freq_hz: 50.0
     quench_ms: 18
 
-    # -------------------------------------------------------------------------
-    # Per-wheel inversion flags
-    # Keep false unless wheel_direction_check confirms one wheel needs inversion.
-    # Wheel order: FL, RL, FR, RR
-    # -------------------------------------------------------------------------
+    # change only after wheel direction test confirms a wiring reversal
     invert_fl: false
     invert_rl: false
     invert_fr: false

@@ -1,38 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/utils/logging.py
----------------------------------------
-Lightweight logging helpers for `savo_base` (ROS2 Jazzy friendly).
-
-Purpose
--------
-Provide a small abstraction layer so modules can log consistently whether they
-run:
-- inside ROS2 nodes (`rclpy` logger available), or
-- in plain Python scripts / diagnostics (no ROS logger)
-
-Design goals
-------------
-- Dependency-light (standard library only in this file)
-- Safe in real robot runtime loops
-- Consistent message style for hardware/base bringup
-- Easy drop-in usage from drivers, safety policies, and utils
-
-Typical usage
--------------
-from savo_base.utils.logging import (
-    get_logger_adapter,
-    log_info,
-    log_warn,
-    log_error,
-    log_debug,
-)
-
-logger = get_logger_adapter(self)   # self can be a ROS2 node
-log_info(logger, "Motor board initialized")
-"""
+"""Logging abstraction that works with rclpy loggers or plain Python print."""
 
 from __future__ import annotations
 

@@ -1,40 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot SAVO — savo_base/safety/watchdog_policy.py
-------------------------------------------------
-Professional combined watchdog/safety policy for `savo_base` (ROS2 Jazzy / real robot).
-
-Purpose
--------
-Combine:
-- timeout watchdog (command freshness timing)
-- stale-command recovery policy (force-zero / unblock logic)
-- optional e-stop latch state (external input / software latch)
-
-into one deterministic decision point for base motion output.
-
-Typical integration in Robot Savo base_driver_node
---------------------------------------------------
-1) On every fresh /cmd_vel_safe (or WheelCommand) callback:
-      policy.on_fresh_command_event(source="cmd_vel_safe")
-
-2) In control loop (e.g., 30–50 Hz):
-      policy.update_watchdog_and_policy()
-      decision = policy.evaluate_motion_permission()
-
-3) If decision.force_zero is True:
-      send zero command to motor board
-   else:
-      pass shaped/scaled command to motor board
-
-Notes
------
-- This file is intentionally pure Python (no ROS dependency).
-- It can be used directly in ROS nodes or in non-ROS diagnostics.
-- It supports optional e-stop input by boolean signal (recommended).
-"""
+"""Combines timeout watchdog, stale-command policy, and e-stop latch into one decision point."""
 
 from __future__ import annotations
 
