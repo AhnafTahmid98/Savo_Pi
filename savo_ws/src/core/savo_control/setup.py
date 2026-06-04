@@ -25,7 +25,7 @@ setup(
         "setuptools",
     ],
     python_requires=">=3.10",
-    zip_safe=True,
+    zip_safe=False,
     maintainer="Ahnaf Tahmid",
     maintainer_email="tahmidahnaf998@gmail.com",
     description=(
