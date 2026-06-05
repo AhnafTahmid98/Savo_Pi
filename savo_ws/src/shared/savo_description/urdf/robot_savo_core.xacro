@@ -1,0 +1,79 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:macro name="robot_savo_core"
+    params="
+      base_length:=0.330
+      base_width:=0.240
+      base_height:=0.060
+      base_link_z:=0.065
+      deck_thickness:=0.004
+      deck_spacing:=0.070
+      base_mass:=1.20
+      deck_mass:=0.20
+    ">
+
+    <link name="base_footprint"/>
+
+    <link name="base_link">
+      <inertial>
+        <mass value="0.001"/>
+        <inertia
+          ixx="0.000001"
+          ixy="0.0"
+          ixz="0.0"
+          iyy="0.000001"
+          iyz="0.0"
+          izz="0.000001"/>
+      </inertial>
+    </link>
+
+    <joint name="base_footprint_to_base_link" type="fixed">
+      <parent link="base_footprint"/>
+      <child link="base_link"/>
+      <origin xyz="0 0 ${base_link_z}" rpy="0 0 0"/>
+    </joint>
+
+    <xacro:fixed_box
+      name="chassis_link"
+      parent="base_link"
+      xyz="0 0 0"
+      rpy="0 0 0"
+      size_xyz="${base_length} ${base_width} ${base_height}"
+      mass="${base_mass}"
+      material="savo_dark_gray"
+    />
+
+    <xacro:fixed_box
+      name="lower_deck_link"
+      parent="base_link"
+      xyz="0 0 ${base_height / 2.0 + deck_thickness / 2.0}"
+      rpy="0 0 0"
+      size_xyz="${base_length} ${base_width} ${deck_thickness}"
+      mass="${deck_mass}"
+      material="savo_black"
+    />
+
+    <xacro:fixed_box
+      name="middle_deck_link"
+      parent="base_link"
+      xyz="0 0 ${base_height / 2.0 + deck_spacing}"
+      rpy="0 0 0"
+      size_xyz="${base_length * 0.92} ${base_width * 0.92} ${deck_thickness}"
+      mass="${deck_mass}"
+      material="savo_gray"
+    />
+
+    <xacro:fixed_box
+      name="top_deck_link"
+      parent="base_link"
+      xyz="0 0 ${base_height / 2.0 + deck_spacing * 2.0}"
+      rpy="0 0 0"
+      size_xyz="${base_length * 0.82} ${base_width * 0.82} ${deck_thickness}"
+      mass="${deck_mass}"
+      material="savo_light_gray"
+    />
+
+  </xacro:macro>
+
+</robot>

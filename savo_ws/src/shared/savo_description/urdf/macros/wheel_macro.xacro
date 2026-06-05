@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:macro name="mecanum_wheel" params="name parent xyz rpy radius width mass material">
+    <link name="${name}">
+      <visual>
+        <origin xyz="0 0 0" rpy="1.57079632679 0 0"/>
+        <geometry>
+          <cylinder radius="${radius}" length="${width}"/>
+        </geometry>
+        <material name="${material}"/>
+      </visual>
+
+      <collision>
+        <origin xyz="0 0 0" rpy="1.57079632679 0 0"/>
+        <geometry>
+          <cylinder radius="${radius}" length="${width}"/>
+        </geometry>
+      </collision>
+
+      <xacro:cylinder_inertial
+        mass="${mass}"
+        radius="${radius}"
+        length="${width}"
+        axis="y"
+      />
+    </link>
+
+    <joint name="${name}_joint" type="continuous">
+      <parent link="${parent}"/>
+      <child link="${name}"/>
+      <origin xyz="${xyz}" rpy="${rpy}"/>
+      <axis xyz="0 1 0"/>
+    </joint>
+  </xacro:macro>
+
+</robot>

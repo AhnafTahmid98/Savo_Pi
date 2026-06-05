@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:macro name="robot_savo_costmap_frames"
+    params="
+      parent:=base_link
+      depth_obstacle_x:=0.135
+      depth_obstacle_z:=0.155
+      local_costmap_z:=0.000
+      footprint_z:=0.000
+    ">
+
+    <link name="depth_obstacle_frame"/>
+
+    <joint name="depth_obstacle_frame_joint" type="fixed">
+      <parent link="${parent}"/>
+      <child link="depth_obstacle_frame"/>
+      <origin xyz="${depth_obstacle_x} 0 ${depth_obstacle_z}" rpy="0 0 0"/>
+    </joint>
+
+    <link name="local_costmap_frame"/>
+
+    <joint name="local_costmap_frame_joint" type="fixed">
+      <parent link="base_footprint"/>
+      <child link="local_costmap_frame"/>
+      <origin xyz="0 0 ${local_costmap_z}" rpy="0 0 0"/>
+    </joint>
+
+    <link name="footprint_debug_frame"/>
+
+    <joint name="footprint_debug_frame_joint" type="fixed">
+      <parent link="base_footprint"/>
+      <child link="footprint_debug_frame"/>
+      <origin xyz="0 0 ${footprint_z}" rpy="0 0 0"/>
+    </joint>
+
+  </xacro:macro>
+
+</robot>

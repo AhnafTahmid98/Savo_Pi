@@ -1,0 +1,46 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:macro name="pi_mount" params="name parent xyz rpy size_xyz mass material">
+    <xacro:fixed_box
+      name="${name}"
+      parent="${parent}"
+      xyz="${xyz}"
+      rpy="${rpy}"
+      size_xyz="${size_xyz}"
+      mass="${mass}"
+      material="${material}"
+    />
+  </xacro:macro>
+
+  <xacro:macro name="pi_mount_with_hat" params="name parent xyz rpy board_size_xyz hat_size_xyz board_mass hat_mass board_material hat_material">
+    <xacro:fixed_box
+      name="${name}_board_link"
+      parent="${parent}"
+      xyz="${xyz}"
+      rpy="${rpy}"
+      size_xyz="${board_size_xyz}"
+      mass="${board_mass}"
+      material="${board_material}"
+    />
+
+    <xacro:fixed_box
+      name="${name}_hat_link"
+      parent="${name}_board_link"
+      xyz="0 0 0.014"
+      rpy="0 0 0"
+      size_xyz="${hat_size_xyz}"
+      mass="${hat_mass}"
+      material="${hat_material}"
+    />
+
+    <link name="${name}_frame"/>
+
+    <joint name="${name}_frame_joint" type="fixed">
+      <parent link="${name}_board_link"/>
+      <child link="${name}_frame"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+  </xacro:macro>
+
+</robot>

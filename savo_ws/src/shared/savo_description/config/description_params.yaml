@@ -1,0 +1,21 @@
+description:
+  robot_name: robot_savo
+  use_sim_time: false
+
+xacro:
+  use_transmissions: false
+  use_gazebo: false
+
+robot_state_publisher:
+  publish_frequency_hz: 30.0
+  frame_prefix: ""
+
+joint_state_publisher:
+  use_gui: false
+
+rviz:
+  default_config: robot_model.rviz
+
+debug:
+  enable_tf_debug_view: false
+  enable_costmap_debug_view: false

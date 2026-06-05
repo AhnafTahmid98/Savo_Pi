@@ -1,0 +1,41 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:macro name="wheel_transmission" params="name joint mechanical_reduction:=1.0">
+    <transmission name="${name}">
+      <type>transmission_interface/SimpleTransmission</type>
+
+      <joint name="${joint}">
+        <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
+      </joint>
+
+      <actuator name="${name}_motor">
+        <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
+        <mechanicalReduction>${mechanical_reduction}</mechanicalReduction>
+      </actuator>
+    </transmission>
+  </xacro:macro>
+
+  <xacro:macro name="robot_savo_transmissions">
+    <xacro:wheel_transmission
+      name="wheel_fl_transmission"
+      joint="wheel_fl_link_joint"
+    />
+
+    <xacro:wheel_transmission
+      name="wheel_fr_transmission"
+      joint="wheel_fr_link_joint"
+    />
+
+    <xacro:wheel_transmission
+      name="wheel_rl_transmission"
+      joint="wheel_rl_link_joint"
+    />
+
+    <xacro:wheel_transmission
+      name="wheel_rr_transmission"
+      joint="wheel_rr_link_joint"
+    />
+  </xacro:macro>
+
+</robot>

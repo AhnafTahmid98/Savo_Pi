@@ -1,0 +1,60 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:macro name="robot_savo_gazebo">
+
+    <gazebo reference="chassis_link">
+      <material>Gazebo/DarkGrey</material>
+    </gazebo>
+
+    <gazebo reference="lower_deck_link">
+      <material>Gazebo/Black</material>
+    </gazebo>
+
+    <gazebo reference="middle_deck_link">
+      <material>Gazebo/Grey</material>
+    </gazebo>
+
+    <gazebo reference="top_deck_link">
+      <material>Gazebo/White</material>
+    </gazebo>
+
+    <gazebo reference="wheel_fl_link">
+      <material>Gazebo/Black</material>
+      <mu1>1.0</mu1>
+      <mu2>1.0</mu2>
+    </gazebo>
+
+    <gazebo reference="wheel_fr_link">
+      <material>Gazebo/Black</material>
+      <mu1>1.0</mu1>
+      <mu2>1.0</mu2>
+    </gazebo>
+
+    <gazebo reference="wheel_rl_link">
+      <material>Gazebo/Black</material>
+      <mu1>1.0</mu1>
+      <mu2>1.0</mu2>
+    </gazebo>
+
+    <gazebo reference="wheel_rr_link">
+      <material>Gazebo/Black</material>
+      <mu1>1.0</mu1>
+      <mu2>1.0</mu2>
+    </gazebo>
+
+    <gazebo reference="laser_frame">
+      <material>Gazebo/Black</material>
+    </gazebo>
+
+    <gazebo reference="camera_body">
+      <material>Gazebo/Black</material>
+    </gazebo>
+
+    <gazebo reference="display_link">
+      <material>Gazebo/Black</material>
+    </gazebo>
+
+  </xacro:macro>
+
+</robot>

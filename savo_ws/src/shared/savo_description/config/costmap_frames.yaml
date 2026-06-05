@@ -1,0 +1,27 @@
+costmap:
+  global_frame: map
+  odom_frame: odom
+  robot_base_frame: base_footprint
+  robot_body_frame: base_link
+
+lidar:
+  frame: laser_frame
+  scan_topic: /scan
+
+depth:
+  camera_link: camera_link
+  depth_frame: camera_depth_frame
+  depth_optical_frame: camera_depth_optical_frame
+  pointcloud_topic: /camera/camera/depth/color/points
+  front_min_topic: /depth/min_front_m
+  obstacle_frame: depth_obstacle_frame
+
+nav2:
+  global_costmap_topic: /global_costmap/costmap
+  local_costmap_topic: /local_costmap/costmap
+  local_costmap_frame: local_costmap_frame
+  footprint_topic: /local_costmap/published_footprint
+
+debug:
+  footprint_frame: footprint_debug_frame
+  rviz_config: costmap_debug.rviz

@@ -1,0 +1,46 @@
+frames:
+  global:
+    map: map
+    odom: odom
+
+  base:
+    footprint: base_footprint
+    base_link: base_link
+    chassis: chassis_link
+
+  wheels:
+    front_left: wheel_fl_link
+    front_right: wheel_fr_link
+    rear_left: wheel_rl_link
+    rear_right: wheel_rr_link
+
+  sensors:
+    lidar: laser_frame
+    imu: imu_link
+    tof_left: tof_left_link
+    tof_right: tof_right_link
+    ultrasonic_front: ultrasonic_front_link
+
+  camera:
+    base: camera_link
+    color: camera_color_frame
+    color_optical: camera_color_optical_frame
+    depth: camera_depth_frame
+    depth_optical: camera_depth_optical_frame
+
+  interface:
+    display: display_link
+    respeaker: respeaker_link
+
+  compute:
+    savo_core_board: savo_core_board_link
+    savo_core_hat: savo_core_hat_link
+    savo_core_frame: savo_core_frame
+    savo_edge_board: savo_edge_board_link
+    savo_edge_hat: savo_edge_hat_link
+    savo_edge_frame: savo_edge_frame
+
+  costmap_debug:
+    depth_obstacle: depth_obstacle_frame
+    local_costmap: local_costmap_frame
+    footprint_debug: footprint_debug_frame

@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:macro name="robot_savo_two_pi"
+    params="
+      parent:=base_link
+      core_x:=-0.045
+      core_y:=0.045
+      core_z:=0.080
+      edge_x:=-0.045
+      edge_y:=-0.045
+      edge_z:=0.080
+      board_size_xyz:=0.085 0.056 0.010
+      hat_size_xyz:=0.085 0.056 0.014
+      board_mass:=0.050
+      hat_mass:=0.045
+    ">
+
+    <xacro:pi_mount_with_hat
+      name="savo_core"
+      parent="${parent}"
+      xyz="${core_x} ${core_y} ${core_z}"
+      rpy="0 0 0"
+      board_size_xyz="${board_size_xyz}"
+      hat_size_xyz="${hat_size_xyz}"
+      board_mass="${board_mass}"
+      hat_mass="${hat_mass}"
+      board_material="savo_core_pi"
+      hat_material="savo_pcb"
+    />
+
+    <xacro:pi_mount_with_hat
+      name="savo_edge"
+      parent="${parent}"
+      xyz="${edge_x} ${edge_y} ${edge_z}"
+      rpy="0 0 0"
+      board_size_xyz="${board_size_xyz}"
+      hat_size_xyz="${hat_size_xyz}"
+      board_mass="${board_mass}"
+      hat_mass="${hat_mass}"
+      board_material="savo_edge_pi"
+      hat_material="savo_pcb"
+    />
+
+  </xacro:macro>
+
+</robot>

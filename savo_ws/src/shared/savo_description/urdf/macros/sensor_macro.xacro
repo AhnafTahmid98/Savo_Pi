@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:macro name="sensor_box" params="name parent xyz rpy size_xyz mass material">
+    <xacro:fixed_box
+      name="${name}"
+      parent="${parent}"
+      xyz="${xyz}"
+      rpy="${rpy}"
+      size_xyz="${size_xyz}"
+      mass="${mass}"
+      material="${material}"
+    />
+  </xacro:macro>
+
+  <xacro:macro name="sensor_cylinder" params="name parent xyz rpy radius length mass material axis:=z">
+    <xacro:fixed_cylinder
+      name="${name}"
+      parent="${parent}"
+      xyz="${xyz}"
+      rpy="${rpy}"
+      radius="${radius}"
+      length="${length}"
+      mass="${mass}"
+      material="${material}"
+      axis="${axis}"
+    />
+  </xacro:macro>
+
+  <xacro:macro name="sensor_frame" params="name parent xyz rpy">
+    <link name="${name}"/>
+
+    <joint name="${name}_joint" type="fixed">
+      <parent link="${parent}"/>
+      <child link="${name}"/>
+      <origin xyz="${xyz}" rpy="${rpy}"/>
+    </joint>
+  </xacro:macro>
+
+</robot>

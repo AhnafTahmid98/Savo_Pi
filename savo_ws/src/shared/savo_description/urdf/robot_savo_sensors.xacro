@@ -1,0 +1,107 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:macro name="robot_savo_sensors"
+    params="
+      parent:=base_link
+      lidar_z:=0.205
+      imu_z:=0.075
+      camera_x:=0.135
+      camera_z:=0.155
+      tof_x:=0.125
+      tof_y:=0.090
+      tof_z:=0.070
+      ultrasonic_x:=0.150
+      ultrasonic_z:=0.070
+      display_x:=0.115
+      display_z:=0.145
+      respeaker_z:=0.180
+    ">
+
+    <xacro:sensor_cylinder
+      name="laser_frame"
+      parent="${parent}"
+      xyz="0 0 ${lidar_z}"
+      rpy="0 0 0"
+      radius="0.038"
+      length="0.040"
+      mass="0.18"
+      material="savo_lidar"
+      axis="z"
+    />
+
+    <xacro:sensor_box
+      name="imu_link"
+      parent="${parent}"
+      xyz="0 0 ${imu_z}"
+      rpy="0 0 0"
+      size_xyz="0.028 0.020 0.006"
+      mass="0.01"
+      material="savo_pcb"
+    />
+
+    <xacro:depth_camera
+      name="camera"
+      parent="${parent}"
+      xyz="${camera_x} 0 ${camera_z}"
+      rpy="0 0 0"
+      size_xyz="0.090 0.025 0.025"
+      mass="0.075"
+      material="savo_camera"
+    />
+
+    <xacro:sensor_box
+      name="tof_left_link"
+      parent="${parent}"
+      xyz="${tof_x} ${tof_y} ${tof_z}"
+      rpy="0 0 0"
+      size_xyz="0.018 0.012 0.006"
+      mass="0.005"
+      material="savo_pcb"
+    />
+
+    <xacro:sensor_box
+      name="tof_right_link"
+      parent="${parent}"
+      xyz="${tof_x} ${-tof_y} ${tof_z}"
+      rpy="0 0 0"
+      size_xyz="0.018 0.012 0.006"
+      mass="0.005"
+      material="savo_pcb"
+    />
+
+    <xacro:sensor_box
+      name="ultrasonic_front_link"
+      parent="${parent}"
+      xyz="${ultrasonic_x} 0 ${ultrasonic_z}"
+      rpy="0 0 0"
+      size_xyz="0.045 0.018 0.018"
+      mass="0.015"
+      material="savo_blue"
+    />
+
+    <xacro:sensor_box
+      name="display_link"
+      parent="${parent}"
+      xyz="${display_x} 0 ${display_z}"
+      rpy="0 0 0"
+      size_xyz="0.165 0.010 0.100"
+      mass="0.18"
+      material="savo_display"
+    />
+
+    <xacro:sensor_cylinder
+      name="respeaker_link"
+      parent="${parent}"
+      xyz="0 0 ${respeaker_z}"
+      rpy="0 0 0"
+      radius="0.033"
+      length="0.008"
+      mass="0.025"
+      material="savo_pcb"
+      axis="z"
+    />
+
+  </xacro:macro>
+
+</robot>

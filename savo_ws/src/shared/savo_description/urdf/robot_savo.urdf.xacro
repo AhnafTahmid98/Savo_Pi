@@ -1,1 +1,43 @@
-<!-- TODO: robot physical model (Pi, LiDAR, wheels, etc.) -->
+<?xml version="1.0"?>
+<robot name="robot_savo" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:arg name="use_transmissions" default="false"/>
+  <xacro:arg name="use_gazebo" default="false"/>
+
+  <xacro:include filename="$(find savo_description)/urdf/materials.xacro"/>
+
+  <xacro:include filename="$(find savo_description)/urdf/macros/inertial_macro.xacro"/>
+  <xacro:include filename="$(find savo_description)/urdf/macros/box_macro.xacro"/>
+  <xacro:include filename="$(find savo_description)/urdf/macros/cylinder_macro.xacro"/>
+  <xacro:include filename="$(find savo_description)/urdf/macros/wheel_macro.xacro"/>
+  <xacro:include filename="$(find savo_description)/urdf/macros/sensor_macro.xacro"/>
+  <xacro:include filename="$(find savo_description)/urdf/macros/camera_macro.xacro"/>
+  <xacro:include filename="$(find savo_description)/urdf/macros/pi_mount_macro.xacro"/>
+
+  <xacro:include filename="$(find savo_description)/urdf/robot_savo_core.xacro"/>
+  <xacro:include filename="$(find savo_description)/urdf/robot_savo_wheels.xacro"/>
+  <xacro:include filename="$(find savo_description)/urdf/robot_savo_sensors.xacro"/>
+  <xacro:include filename="$(find savo_description)/urdf/robot_savo_two_pi.xacro"/>
+  <xacro:include filename="$(find savo_description)/urdf/robot_savo_costmap_frames.xacro"/>
+  <xacro:include filename="$(find savo_description)/urdf/robot_savo_transmissions.xacro"/>
+  <xacro:include filename="$(find savo_description)/urdf/robot_savo_gazebo.xacro"/>
+
+  <xacro:robot_savo_core/>
+
+  <xacro:robot_savo_wheels/>
+
+  <xacro:robot_savo_sensors/>
+
+  <xacro:robot_savo_two_pi/>
+
+  <xacro:robot_savo_costmap_frames/>
+
+  <xacro:if value="$(arg use_transmissions)">
+    <xacro:robot_savo_transmissions/>
+  </xacro:if>
+
+  <xacro:if value="$(arg use_gazebo)">
+    <xacro:robot_savo_gazebo/>
+  </xacro:if>
+
+</robot>

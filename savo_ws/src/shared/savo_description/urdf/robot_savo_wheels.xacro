@@ -1,0 +1,61 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:macro name="robot_savo_wheels"
+    params="
+      parent:=base_link
+      wheel_radius:=0.0325
+      wheel_width:=0.030
+      wheel_x:=0.115
+      wheel_y:=0.100
+      wheel_z:=-0.030
+      wheel_mass:=0.12
+    ">
+
+    <xacro:mecanum_wheel
+      name="wheel_fl_link"
+      parent="${parent}"
+      xyz="${wheel_x} ${wheel_y} ${wheel_z}"
+      rpy="0 0 0"
+      radius="${wheel_radius}"
+      width="${wheel_width}"
+      mass="${wheel_mass}"
+      material="savo_rubber"
+    />
+
+    <xacro:mecanum_wheel
+      name="wheel_fr_link"
+      parent="${parent}"
+      xyz="${wheel_x} ${-wheel_y} ${wheel_z}"
+      rpy="0 0 0"
+      radius="${wheel_radius}"
+      width="${wheel_width}"
+      mass="${wheel_mass}"
+      material="savo_rubber"
+    />
+
+    <xacro:mecanum_wheel
+      name="wheel_rl_link"
+      parent="${parent}"
+      xyz="${-wheel_x} ${wheel_y} ${wheel_z}"
+      rpy="0 0 0"
+      radius="${wheel_radius}"
+      width="${wheel_width}"
+      mass="${wheel_mass}"
+      material="savo_rubber"
+    />
+
+    <xacro:mecanum_wheel
+      name="wheel_rr_link"
+      parent="${parent}"
+      xyz="${-wheel_x} ${-wheel_y} ${wheel_z}"
+      rpy="0 0 0"
+      radius="${wheel_radius}"
+      width="${wheel_width}"
+      mass="${wheel_mass}"
+      material="savo_rubber"
+    />
+
+  </xacro:macro>
+
+</robot>

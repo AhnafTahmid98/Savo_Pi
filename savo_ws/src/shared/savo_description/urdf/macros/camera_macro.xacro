@@ -1,0 +1,73 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:macro name="camera_body" params="name parent xyz rpy size_xyz mass material">
+    <xacro:fixed_box
+      name="${name}"
+      parent="${parent}"
+      xyz="${xyz}"
+      rpy="${rpy}"
+      size_xyz="${size_xyz}"
+      mass="${mass}"
+      material="${material}"
+    />
+  </xacro:macro>
+
+  <xacro:macro name="camera_frames" params="name parent xyz rpy">
+    <link name="${name}_link"/>
+
+    <joint name="${name}_joint" type="fixed">
+      <parent link="${parent}"/>
+      <child link="${name}_link"/>
+      <origin xyz="${xyz}" rpy="${rpy}"/>
+    </joint>
+
+    <link name="${name}_color_frame"/>
+    <joint name="${name}_color_joint" type="fixed">
+      <parent link="${name}_link"/>
+      <child link="${name}_color_frame"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+
+    <link name="${name}_color_optical_frame"/>
+    <joint name="${name}_color_optical_joint" type="fixed">
+      <parent link="${name}_color_frame"/>
+      <child link="${name}_color_optical_frame"/>
+      <origin xyz="0 0 0" rpy="-1.57079632679 0 -1.57079632679"/>
+    </joint>
+
+    <link name="${name}_depth_frame"/>
+    <joint name="${name}_depth_joint" type="fixed">
+      <parent link="${name}_link"/>
+      <child link="${name}_depth_frame"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+
+    <link name="${name}_depth_optical_frame"/>
+    <joint name="${name}_depth_optical_joint" type="fixed">
+      <parent link="${name}_depth_frame"/>
+      <child link="${name}_depth_optical_frame"/>
+      <origin xyz="0 0 0" rpy="-1.57079632679 0 -1.57079632679"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:macro name="depth_camera" params="name parent xyz rpy size_xyz mass material">
+    <xacro:camera_body
+      name="${name}_body"
+      parent="${parent}"
+      xyz="${xyz}"
+      rpy="${rpy}"
+      size_xyz="${size_xyz}"
+      mass="${mass}"
+      material="${material}"
+    />
+
+    <xacro:camera_frames
+      name="${name}"
+      parent="${name}_body"
+      xyz="0 0 0"
+      rpy="0 0 0"
+    />
+  </xacro:macro>
+
+</robot>
