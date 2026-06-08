@@ -1,0 +1,9 @@
+frames:
+  base_frame: base_link
+  camera_link: camera_link
+  color_optical_frame: camera_color_optical_frame
+  depth_optical_frame: camera_depth_optical_frame
+
+tf:
+  publish_driver_tf: true
+  tf_publish_rate: 0.0

@@ -1,0 +1,76 @@
+realsense2_camera:
+  ros__parameters:
+    camera_name: camera
+    camera_namespace: camera
+
+    serial_no: ""
+    usb_port_id: ""
+    device_type: ""
+
+    enable_color: true
+    enable_depth: true
+    enable_infra1: false
+    enable_infra2: false
+    enable_gyro: false
+    enable_accel: false
+
+    color_width: 640
+    color_height: 480
+    color_fps: 30
+
+    depth_width: 640
+    depth_height: 480
+    depth_fps: 30
+
+    align_depth.enable: true
+    pointcloud.enable: true
+    pointcloud.stream_filter: 2
+    pointcloud.stream_index_filter: 0
+    pointcloud.ordered_pc: false
+
+    enable_sync: true
+    publish_tf: true
+    tf_publish_rate: 0.0
+
+    initial_reset: false
+    reconnect_timeout: 6.0
+    wait_for_device_timeout: -1.0
+
+camera_topic_monitor_node:
+  ros__parameters:
+    publish_hz: 2.0
+    stale_timeout_s: 0.50
+
+    expected_color_hz: 30.0
+    expected_depth_hz: 30.0
+    expected_camera_info_hz: 30.0
+    expected_pointcloud_hz: 10.0
+
+    require_pointcloud: true
+
+camera_health_node:
+  ros__parameters:
+    status_hz: 2.0
+    stale_timeout_s: 0.50
+
+    expected_color_hz: 30.0
+    expected_depth_hz: 30.0
+    expected_camera_info_hz: 30.0
+    expected_pointcloud_hz: 10.0
+
+    require_pointcloud: true
+
+depth_front_min_node:
+  ros__parameters:
+    input_topic: /camera/camera/depth/image_rect_raw
+    output_topic: /depth/min_front_m
+
+    depth_scale: 0.001
+    min_valid_m: 0.02
+    max_valid_m: 3.00
+    percentile: 10.0
+
+    x_min_ratio: 0.35
+    x_max_ratio: 0.65
+    y_min_ratio: 0.35
+    y_max_ratio: 0.75

@@ -1,0 +1,30 @@
+qos:
+  image:
+    history: keep_last
+    depth: 5
+    reliability: best_effort
+    durability: volatile
+
+  camera_info:
+    history: keep_last
+    depth: 10
+    reliability: reliable
+    durability: volatile
+
+  pointcloud:
+    history: keep_last
+    depth: 5
+    reliability: best_effort
+    durability: volatile
+
+  status:
+    history: keep_last
+    depth: 10
+    reliability: reliable
+    durability: volatile
+
+  diagnostics:
+    history: keep_last
+    depth: 10
+    reliability: reliable
+    durability: volatile
