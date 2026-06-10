@@ -1,0 +1,24 @@
+qos:
+  camera:
+    history: "keep_last"
+    depth: 5
+    reliability: "best_effort"
+    durability: "volatile"
+
+  odometry:
+    history: "keep_last"
+    depth: 10
+    reliability: "reliable"
+    durability: "volatile"
+
+  status:
+    history: "keep_last"
+    depth: 10
+    reliability: "reliable"
+    durability: "volatile"
+
+  diagnostics:
+    history: "keep_last"
+    depth: 10
+    reliability: "reliable"
+    durability: "volatile"

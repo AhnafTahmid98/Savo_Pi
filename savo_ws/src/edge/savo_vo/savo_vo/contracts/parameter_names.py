@@ -1,0 +1,63 @@
+"""Parameter names used by savo_vo nodes."""
+
+COLOR_IMAGE_TOPIC_PARAM = "color_image_topic"
+COLOR_CAMERA_INFO_TOPIC_PARAM = "color_camera_info_topic"
+
+DEPTH_IMAGE_TOPIC_PARAM = "depth_image_topic"
+DEPTH_CAMERA_INFO_TOPIC_PARAM = "depth_camera_info_topic"
+
+ODOM_TOPIC_PARAM = "odom_topic"
+ODOM_RAW_TOPIC_PARAM = "odom_raw_topic"
+STATUS_TOPIC_PARAM = "status_topic"
+HEALTH_TOPIC_PARAM = "health_topic"
+TRACKING_QUALITY_TOPIC_PARAM = "tracking_quality_topic"
+
+ODOM_FRAME_PARAM = "odom_frame"
+BASE_FRAME_PARAM = "base_frame"
+CAMERA_FRAME_PARAM = "camera_frame"
+
+PUBLISH_RATE_HZ_PARAM = "publish_rate_hz"
+DIAGNOSTICS_RATE_HZ_PARAM = "diagnostics_rate_hz"
+
+MAX_IMAGE_DELAY_S_PARAM = "max_image_delay_s"
+MAX_DEPTH_DELAY_S_PARAM = "max_depth_delay_s"
+STALE_TIMEOUT_S_PARAM = "stale_timeout_s"
+
+MIN_FEATURES_PARAM = "min_features"
+GOOD_FEATURES_TARGET_PARAM = "good_features_target"
+MAX_FEATURES_PARAM = "max_features"
+
+MIN_TRACKING_QUALITY_PARAM = "min_tracking_quality"
+MAX_TRANSLATION_JUMP_M_PARAM = "max_translation_jump_m"
+MAX_ROTATION_JUMP_RAD_PARAM = "max_rotation_jump_rad"
+
+PUBLISH_TF_PARAM = "publish_tf"
+PUBLISH_DIAGNOSTICS_PARAM = "publish_diagnostics"
+
+__all__ = [
+    "COLOR_IMAGE_TOPIC_PARAM",
+    "COLOR_CAMERA_INFO_TOPIC_PARAM",
+    "DEPTH_IMAGE_TOPIC_PARAM",
+    "DEPTH_CAMERA_INFO_TOPIC_PARAM",
+    "ODOM_TOPIC_PARAM",
+    "ODOM_RAW_TOPIC_PARAM",
+    "STATUS_TOPIC_PARAM",
+    "HEALTH_TOPIC_PARAM",
+    "TRACKING_QUALITY_TOPIC_PARAM",
+    "ODOM_FRAME_PARAM",
+    "BASE_FRAME_PARAM",
+    "CAMERA_FRAME_PARAM",
+    "PUBLISH_RATE_HZ_PARAM",
+    "DIAGNOSTICS_RATE_HZ_PARAM",
+    "MAX_IMAGE_DELAY_S_PARAM",
+    "MAX_DEPTH_DELAY_S_PARAM",
+    "STALE_TIMEOUT_S_PARAM",
+    "MIN_FEATURES_PARAM",
+    "GOOD_FEATURES_TARGET_PARAM",
+    "MAX_FEATURES_PARAM",
+    "MIN_TRACKING_QUALITY_PARAM",
+    "MAX_TRANSLATION_JUMP_M_PARAM",
+    "MAX_ROTATION_JUMP_RAD_PARAM",
+    "PUBLISH_TF_PARAM",
+    "PUBLISH_DIAGNOSTICS_PARAM",
+]

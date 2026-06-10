@@ -1,0 +1,14 @@
+vo_covariance:
+  ros__parameters:
+    position_variance_good: 0.03
+    position_variance_ok: 0.08
+    position_variance_poor: 0.25
+    position_variance_invalid: 999.0
+
+    yaw_variance_good: 0.04
+    yaw_variance_ok: 0.12
+    yaw_variance_poor: 0.35
+    yaw_variance_invalid: 999.0
+
+    disable_z_fusion: true
+    disable_roll_pitch_fusion: true

@@ -1,0 +1,10 @@
+frames:
+  odom_frame: "odom"
+  base_frame: "base_link"
+
+  vo_odom_frame: "vo_odom"
+  vo_camera_frame: "vo_camera_link"
+
+  camera_link_frame: "camera_link"
+  camera_color_frame: "camera_color_optical_frame"
+  camera_depth_frame: "camera_depth_optical_frame"

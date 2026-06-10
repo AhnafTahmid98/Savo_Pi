@@ -14,7 +14,7 @@ import rclpy
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
-from std_msgs.msg import Bool, Float32, Float64, String
+from std_msgs.msg import Bool, Float32, String
 
 
 @dataclass
@@ -169,13 +169,9 @@ class ControlStatusNode(Node):
 
         self.create_subscription(Bool, self._safety_stop_topic, self._on_safety_stop, 10)
 
-        # Support either Float32 or Float64 for slowdown factor.
         if self._watch_slowdown_factor:
             self.create_subscription(
                 Float32, self._slowdown_factor_topic, self._on_slowdown_float32, 10
-            )
-            self.create_subscription(
-                Float64, self._slowdown_factor_topic, self._on_slowdown_float64, 10
             )
 
         self.create_subscription(String, self._mode_cmd_topic, self._on_mode_cmd, 10)
@@ -220,9 +216,6 @@ class ControlStatusNode(Node):
         self._safety_stop = BoolSample(value=bool(msg.data), stamp=time.monotonic())
 
     def _on_slowdown_float32(self, msg: Float32) -> None:
-        self._slowdown = ScalarSample(value=self._safe_float(msg.data), stamp=time.monotonic())
-
-    def _on_slowdown_float64(self, msg: Float64) -> None:
         self._slowdown = ScalarSample(value=self._safe_float(msg.data), stamp=time.monotonic())
 
     def _on_mode_cmd(self, msg: String) -> None:

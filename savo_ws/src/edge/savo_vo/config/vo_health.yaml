@@ -1,0 +1,7 @@
+vo_health_node:
+  ros__parameters:
+    odom_topic: "/vo/odom"
+    status_topic: "/vo/status"
+    health_topic: "/vo/health"
+
+    stale_timeout_s: 0.50
