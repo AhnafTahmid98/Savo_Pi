@@ -1,296 +1,511 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Robot Savo — Encoders Test (lgpio, counts + direction + m/s + omega, CSV)
-Raspberry Pi 5 • Ubuntu 24.04 • lgpio-based polling quadrature counter
------------------------------------------------------------
-Author: Robot Savo
+Robot Savo — 4 Wheel Encoder Test
 
+Reads four quadrature wheel encoders on Raspberry Pi 5 using lgpio.
+Designed for Robot Savo's external 12k pull-up wiring.
 """
 
 import argparse
 import csv
+import math
+import signal
 import sys
 import time
-import signal
-import math
 
 try:
     import lgpio
 except Exception:
-    print("ERROR: python3-lgpio is required. Install with: sudo apt install -y python3-lgpio", file=sys.stderr)
+    print(
+        "ERROR: python3-lgpio is required. Install with: sudo apt install -y python3-lgpio",
+        file=sys.stderr,
+    )
     raise
 
-# Valid Gray-code transitions (A:bit1, B:bit0)
+
+# Valid Gray-code transitions. A is bit 1, B is bit 0.
 DELTA = {
-    (0b00,0b01): +1, (0b01,0b11): +1, (0b11,0b10): +1, (0b10,0b00): +1,
-    (0b01,0b00): -1, (0b11,0b01): -1, (0b10,0b11): -1, (0b00,0b10): -1
+    (0b00, 0b01): +1,
+    (0b01, 0b11): +1,
+    (0b11, 0b10): +1,
+    (0b10, 0b00): +1,
+    (0b01, 0b00): -1,
+    (0b11, 0b01): -1,
+    (0b10, 0b11): -1,
+    (0b00, 0b10): -1,
 }
 
-def autodetect_chip(pins, start=0, end=7, pullup=True):
-    """
-    Try gpiochip[start..end] and return (chip_index, handle) that can claim all pins.
-    """
+
+def maybe_pullup_flags(use_internal_pullup: bool) -> int:
+    if not use_internal_pullup:
+        return 0
+
+    return getattr(lgpio, "SET_PULL_UP", 0)
+
+
+def autodetect_chip(pins, start=0, end=7, use_internal_pullup=False):
     last_error = None
+    flags = maybe_pullup_flags(use_internal_pullup)
+
     for chip in range(start, end + 1):
         try:
-            h = lgpio.gpiochip_open(chip)
+            handle = lgpio.gpiochip_open(chip)
             claimed = []
+
             try:
-                for p in pins:
-                    lgpio.gpio_claim_input(h, p)
-                    claimed.append(p)
-                    if pullup:
-                        try:
-                            lgpio.gpio_set_flags(h, p, lgpio.BIAS_PULL_UP)
-                        except Exception:
-                            pass
-                for p in claimed:
-                    lgpio.gpio_free(h, p)
-                lgpio.gpiochip_close(h)
+                for pin in pins:
+                    lgpio.gpio_claim_input(handle, pin, flags)
+                    claimed.append(pin)
+
+                for pin in claimed:
+                    lgpio.gpio_free(handle, pin)
+
+                lgpio.gpiochip_close(handle)
                 return chip, lgpio.gpiochip_open(chip)
-            except Exception as e:
-                last_error = e
-                for p in claimed:
-                    try: lgpio.gpio_free(h, p)
-                    except: pass
-                lgpio.gpiochip_close(h)
-        except Exception as e:
-            last_error = e
-    raise RuntimeError(f"Could not find a gpiochip that can claim pins {pins}. Last error: {last_error}")
 
-class QuadSide:
-    def __init__(self, h, a, b, debounce_s, invert=1, use_hw_debounce=True, pullup=True):
-        self.h, self.a, self.b = h, a, b
+            except Exception as exc:
+                last_error = exc
+
+                for pin in claimed:
+                    try:
+                        lgpio.gpio_free(handle, pin)
+                    except Exception:
+                        pass
+
+                lgpio.gpiochip_close(handle)
+
+        except Exception as exc:
+            last_error = exc
+
+    raise RuntimeError(
+        f"Could not find a gpiochip that can claim pins {pins}. Last error: {last_error}"
+    )
+
+
+class QuadEncoder:
+    def __init__(
+        self,
+        handle,
+        name,
+        a_pin,
+        b_pin,
+        debounce_s,
+        invert=False,
+        use_hw_debounce=True,
+        use_internal_pullup=False,
+    ):
+        self.handle = handle
+        self.name = name
+        self.a_pin = a_pin
+        self.b_pin = b_pin
         self.debounce_s = max(0.0, debounce_s)
-        self.use_hw_debounce = use_hw_debounce
-        self.pullup = pullup
-        self.invert = 1 if invert >= 0 else -1
+        self.invert = -1 if invert else +1
 
-        # Claim inputs
-        lgpio.gpio_claim_input(h, a)
-        lgpio.gpio_claim_input(h, b)
+        flags = maybe_pullup_flags(use_internal_pullup)
 
-        # Pull-ups (harmless if ignored by the driver)
-        if pullup:
-            try:
-                lgpio.gpio_set_flags(h, a, lgpio.BIAS_PULL_UP)
-                lgpio.gpio_set_flags(h, b, lgpio.BIAS_PULL_UP)
-            except Exception:
-                pass
+        lgpio.gpio_claim_input(handle, a_pin, flags)
+        lgpio.gpio_claim_input(handle, b_pin, flags)
 
-        # Hardware debounce (if available)
         self.hw_debounce = False
         if use_hw_debounce and self.debounce_s > 0:
             try:
-                usec = int(self.debounce_s * 1e6)
-                lgpio.gpio_set_debounce_micros(h, a, usec)
-                lgpio.gpio_set_debounce_micros(h, b, usec)
+                debounce_us = int(self.debounce_s * 1_000_000)
+                lgpio.gpio_set_debounce_micros(handle, a_pin, debounce_us)
+                lgpio.gpio_set_debounce_micros(handle, b_pin, debounce_us)
                 self.hw_debounce = True
             except Exception:
                 self.hw_debounce = False
 
-        # Software debounce bookkeeping
         now = time.monotonic()
-        self.last_change = {a: now, b: now}
-        self.state_bits = {a: lgpio.gpio_read(h, a), b: lgpio.gpio_read(h, b)}
-        self.prev_state = ((self.state_bits[a] & 1) << 1) | (self.state_bits[b] & 1)
+        self.last_change = {a_pin: now, b_pin: now}
+        self.state_bits = {
+            a_pin: lgpio.gpio_read(handle, a_pin),
+            b_pin: lgpio.gpio_read(handle, b_pin),
+        }
 
-        self.count = 0      # signed count (includes invert)
-        self.dir = 0        # last step dir: -1, 0, +1
-        self.illegal = 0    # illegal Gray-code jumps
+        self.prev_state = self._state_from_bits()
+        self.count = 0
+        self.dir = 0
+        self.illegal = 0
+
+    def _state_from_bits(self):
+        a_value = self.state_bits[self.a_pin] & 1
+        b_value = self.state_bits[self.b_pin] & 1
+        return (a_value << 1) | b_value
 
     def sample_once(self, now):
-        a_val = lgpio.gpio_read(self.h, self.a)
-        b_val = lgpio.gpio_read(self.h, self.b)
+        a_value = lgpio.gpio_read(self.handle, self.a_pin)
+        b_value = lgpio.gpio_read(self.handle, self.b_pin)
 
         if not self.hw_debounce and self.debounce_s > 0:
-            if a_val != self.state_bits[self.a]:
-                if (now - self.last_change[self.a]) >= self.debounce_s:
-                    self.state_bits[self.a] = a_val
-                    self.last_change[self.a] = now
-                else:
-                    a_val = self.state_bits[self.a]
-            else:
-                self.last_change[self.a] = now
+            a_value = self._software_debounce(self.a_pin, a_value, now)
+            b_value = self._software_debounce(self.b_pin, b_value, now)
 
-            if b_val != self.state_bits[self.b]:
-                if (now - self.last_change[self.b]) >= self.debounce_s:
-                    self.state_bits[self.b] = b_val
-                    self.last_change[self.b] = now
-                else:
-                    b_val = self.state_bits[self.b]
-            else:
-                self.last_change[self.b] = now
+        new_state = ((a_value & 1) << 1) | (b_value & 1)
 
-        s_new = ((a_val & 1) << 1) | (b_val & 1)
-        if s_new != self.prev_state:
-            d = DELTA.get((self.prev_state, s_new), None)
-            if d is None:
-                self.illegal += 1
+        if new_state == self.prev_state:
+            return
+
+        delta = DELTA.get((self.prev_state, new_state))
+
+        if delta is None:
+            self.illegal += 1
+        else:
+            delta *= self.invert
+            self.count += delta
+            self.dir = 1 if delta > 0 else -1
+
+        self.prev_state = new_state
+
+    def _software_debounce(self, pin, raw_value, now):
+        if raw_value != self.state_bits[pin]:
+            if (now - self.last_change[pin]) >= self.debounce_s:
+                self.state_bits[pin] = raw_value
+                self.last_change[pin] = now
             else:
-                d *= self.invert
-                self.count += d
-                self.dir = 1 if d > 0 else -1
-            self.prev_state = s_new
+                raw_value = self.state_bits[pin]
+        else:
+            self.last_change[pin] = now
+
+        return raw_value
+
+
+def direction_symbol(direction):
+    if direction > 0:
+        return "→"
+    if direction < 0:
+        return "←"
+    return "•"
+
+
+def wheel_speed_mps(delta_count, dt, counts_per_wheel_rev, wheel_dia_m):
+    counts_per_second = delta_count / max(dt, 1e-9)
+    rev_per_second = counts_per_second / max(counts_per_wheel_rev, 1)
+    return rev_per_second * math.pi * wheel_dia_m
+
+
+def estimate_mecanum_body_velocity(fl_v, fr_v, rl_v, rr_v, wheelbase_m, track_m):
+    """
+    Diagnostic mecanum estimate.
+
+    Sign conventions may need adjustment after motor/encoder direction calibration.
+    This is mainly for checking whether values are plausible.
+    """
+    radius_sum = max(1e-9, wheelbase_m + track_m)
+
+    vx = (fl_v + fr_v + rl_v + rr_v) / 4.0
+    vy = (-fl_v + fr_v + rl_v - rr_v) / 4.0
+    omega = (-fl_v + fr_v - rl_v + rr_v) / (4.0 * radius_sum)
+
+    return vx, vy, omega
+
 
 def run(args):
-    pins = [args.l_a, args.l_b, args.r_a, args.r_b]
+    pin_pairs = {
+        "FL": (args.fl_a, args.fl_b),
+        "FR": (args.fr_a, args.fr_b),
+        "RL": (args.rl_a, args.rl_b),
+        "RR": (args.rr_a, args.rr_b),
+    }
 
-    # Pick gpiochip
+    all_pins = [pin for pair in pin_pairs.values() for pin in pair]
+
     if args.chip is not None:
-        h = lgpio.gpiochip_open(args.chip)
         chip_used = args.chip
+        handle = lgpio.gpiochip_open(chip_used)
     else:
-        chip_used, h = autodetect_chip(pins, pullup=not args.no_pullup)
+        chip_used, handle = autodetect_chip(
+            all_pins,
+            use_internal_pullup=args.internal_pullup,
+        )
 
-    print(f"[Encoders] gpiochip{chip_used}  Pins L({args.l_a},{args.l_b}) R({args.r_a},{args.r_b})")
-    print(f"[Debounce] target={int(args.debounce_s*1e6)} µs  polling={int(args.poll_s*1e6)} µs")
-    print(f"[Kinematics] wheel_dia={args.wheel_dia:.3f} m  CPR={args.cpr}  decoding={args.decoding}x  gear={args.gear:.3f}  track={args.track:.3f} m")
-    edges_per_rev = args.cpr * args.decoding
-    counts_per_wrev = max(1, int(edges_per_rev * args.gear))
+    print(f"[Encoders] gpiochip{chip_used}")
+    print(
+        "[Pins] "
+        f"FL({args.fl_a},{args.fl_b})  "
+        f"FR({args.fr_a},{args.fr_b})  "
+        f"RL({args.rl_a},{args.rl_b})  "
+        f"RR({args.rr_a},{args.rr_b})"
+    )
 
-    # Build sides (apply invert flags so forward is positive)
-    L = QuadSide(h, args.l_a, args.l_b, debounce_s=args.debounce_s,
-                 invert=(-1 if args.invert_left else +1),
-                 use_hw_debounce=not args.no_hw_debounce, pullup=not args.no_pullup)
-    R = QuadSide(h, args.r_a, args.r_b, debounce_s=args.debounce_s,
-                 invert=(-1 if args.invert_right else +1),
-                 use_hw_debounce=not args.no_hw_debounce, pullup=not args.no_pullup)
+    if args.internal_pullup:
+        print("[Pull-up] Internal Pi pull-ups requested")
+    else:
+        print("[Pull-up] External pull-ups expected, e.g. 12kΩ to 3.3V")
 
-    # CSV setup
-    csvf = None
-    writer = None
-    if args.csv:
-        csvf = open(args.csv, "w", newline="")
-        writer = csv.writer(csvf)
-        writer.writerow([
-            "t_s",
-            "L_count","R_count",
-            "L_delta","R_delta",
-            "L_dir","R_dir",
-            "L_v_mps","R_v_mps",
-            "v_mps","omega_rad_s",
-            "L_illegal","R_illegal"
-        ])
+    print(
+        f"[Timing] debounce={int(args.debounce_s * 1e6)} µs  "
+        f"poll={int(args.poll_s * 1e6)} µs  interval={args.interval:.3f}s"
+    )
 
-    stop = False
-    def on_sigint(sig, frame):
-        nonlocal stop
-        stop = True
-    signal.signal(signal.SIGINT, on_sigint)
+    counts_per_wheel_rev = max(1, int(args.cpr * args.decoding * args.gear))
 
-    t0 = time.monotonic()
-    last_print = t0
-    lastL = L.count
-    lastR = R.count
+    print(
+        f"[Kinematics] wheel_dia={args.wheel_dia:.3f} m  "
+        f"CPR={args.cpr}  decoding={args.decoding}x  gear={args.gear:.3f}  "
+        f"counts_per_wheel_rev={counts_per_wheel_rev}"
+    )
 
-    # Pretty header
-    print("\n t(s) |   L_cnt    R_cnt | dL  dR |  L_v   R_v  (m/s) |    v     ω(rad/s) | L_illeg R_illeg | dirL dirR")
-    print("---------------------------------------------------------------------------------------------------------")
+    encoders = {}
 
     try:
+        encoders["FL"] = QuadEncoder(
+            handle,
+            "FL",
+            args.fl_a,
+            args.fl_b,
+            args.debounce_s,
+            invert=args.invert_fl,
+            use_hw_debounce=not args.no_hw_debounce,
+            use_internal_pullup=args.internal_pullup,
+        )
+        encoders["FR"] = QuadEncoder(
+            handle,
+            "FR",
+            args.fr_a,
+            args.fr_b,
+            args.debounce_s,
+            invert=args.invert_fr,
+            use_hw_debounce=not args.no_hw_debounce,
+            use_internal_pullup=args.internal_pullup,
+        )
+        encoders["RL"] = QuadEncoder(
+            handle,
+            "RL",
+            args.rl_a,
+            args.rl_b,
+            args.debounce_s,
+            invert=args.invert_rl,
+            use_hw_debounce=not args.no_hw_debounce,
+            use_internal_pullup=args.internal_pullup,
+        )
+        encoders["RR"] = QuadEncoder(
+            handle,
+            "RR",
+            args.rr_a,
+            args.rr_b,
+            args.debounce_s,
+            invert=args.invert_rr,
+            use_hw_debounce=not args.no_hw_debounce,
+            use_internal_pullup=args.internal_pullup,
+        )
+
+        csv_file = None
+        writer = None
+
+        if args.csv:
+            csv_file = open(args.csv, "w", newline="")
+            writer = csv.writer(csv_file)
+            writer.writerow(
+                [
+                    "t_s",
+                    "FL_count",
+                    "FR_count",
+                    "RL_count",
+                    "RR_count",
+                    "FL_delta",
+                    "FR_delta",
+                    "RL_delta",
+                    "RR_delta",
+                    "FL_v_mps",
+                    "FR_v_mps",
+                    "RL_v_mps",
+                    "RR_v_mps",
+                    "vx_mps",
+                    "vy_mps",
+                    "omega_rad_s",
+                    "FL_illegal",
+                    "FR_illegal",
+                    "RL_illegal",
+                    "RR_illegal",
+                ]
+            )
+
+        stop = False
+
+        def on_sigint(_sig, _frame):
+            nonlocal stop
+            stop = True
+
+        signal.signal(signal.SIGINT, on_sigint)
+
+        t0 = time.monotonic()
+        last_print = t0
+        last_counts = {name: encoder.count for name, encoder in encoders.items()}
+
+        print()
+        print(
+            " t(s) |"
+            "   FL_cnt   FR_cnt   RL_cnt   RR_cnt |"
+            " dFL dFR dRL dRR |"
+            "  FL_v   FR_v   RL_v   RR_v |"
+            "   vx     vy      omega |"
+            " illegal FL FR RL RR | dir FL FR RL RR"
+        )
+        print("-" * 138)
+
         while not stop:
             now = time.monotonic()
+
             if args.duration > 0 and (now - t0) >= args.duration:
                 break
 
-            # Tight polling for resolution
-            L.sample_once(now)
-            R.sample_once(now)
+            for encoder in encoders.values():
+                encoder.sample_once(now)
 
-            # Emit at fixed intervals
             if (now - last_print) >= args.interval:
                 dt = now - last_print
-                dL = L.count - lastL
-                dR = R.count - lastR
-                lastL, lastR = L.count, R.count
                 last_print = now
 
-                # wheel linear speeds (m/s)
-                # counts/sec -> rev/sec -> m/s
-                L_v = (dL / max(1e-6, dt)) / counts_per_wrev * (math.pi * args.wheel_dia)
-                R_v = (dR / max(1e-6, dt)) / counts_per_wrev * (math.pi * args.wheel_dia)
+                counts = {name: encoder.count for name, encoder in encoders.items()}
+                deltas = {
+                    name: counts[name] - last_counts[name]
+                    for name in encoders
+                }
+                last_counts = counts
 
-                # differential model (diagnostic)
-                v = 0.5 * (L_v + R_v)
-                omega = (R_v - L_v) / max(1e-9, args.track)
+                speeds = {
+                    name: wheel_speed_mps(
+                        deltas[name],
+                        dt,
+                        counts_per_wheel_rev,
+                        args.wheel_dia,
+                    )
+                    for name in encoders
+                }
 
-                dirL = "→" if L.dir > 0 else ("←" if L.dir < 0 else "•")
-                dirR = "→" if R.dir > 0 else ("←" if R.dir < 0 else "•")
+                vx, vy, omega = estimate_mecanum_body_velocity(
+                    speeds["FL"],
+                    speeds["FR"],
+                    speeds["RL"],
+                    speeds["RR"],
+                    args.wheelbase,
+                    args.track,
+                )
 
-                print(f"{now - t0:5.1f} | {L.count:7d} {R.count:7d} | {dL:3d} {dR:3d} | "
-                      f"{L_v: .3f} {R_v: .3f} | {v: .3f}  {omega: .3f}   | "
-                      f"{L.illegal:7d} {R.illegal:7d} |  {dirL:^3s}  {dirR:^3s}")
+                print(
+                    f"{now - t0:5.1f} |"
+                    f" {counts['FL']:8d} {counts['FR']:8d} {counts['RL']:8d} {counts['RR']:8d} |"
+                    f" {deltas['FL']:3d} {deltas['FR']:3d} {deltas['RL']:3d} {deltas['RR']:3d} |"
+                    f" {speeds['FL']: .3f} {speeds['FR']: .3f} {speeds['RL']: .3f} {speeds['RR']: .3f} |"
+                    f" {vx: .3f} {vy: .3f} {omega: .3f} |"
+                    f" {encoders['FL'].illegal:3d} {encoders['FR'].illegal:3d}"
+                    f" {encoders['RL'].illegal:3d} {encoders['RR'].illegal:3d} |"
+                    f"  {direction_symbol(encoders['FL'].dir):^3s}"
+                    f" {direction_symbol(encoders['FR'].dir):^3s}"
+                    f" {direction_symbol(encoders['RL'].dir):^3s}"
+                    f" {direction_symbol(encoders['RR'].dir):^3s}",
+                    flush=True,
+                )
 
                 if writer:
-                    writer.writerow([
-                        f"{now - t0:.3f}",
-                        L.count, R.count,
-                        dL, dR,
-                        L.dir, R.dir,
-                        f"{L_v:.6f}", f"{R_v:.6f}",
-                        f"{v:.6f}", f"{omega:.6f}",
-                        L.illegal, R.illegal
-                    ])
+                    writer.writerow(
+                        [
+                            f"{now - t0:.3f}",
+                            counts["FL"],
+                            counts["FR"],
+                            counts["RL"],
+                            counts["RR"],
+                            deltas["FL"],
+                            deltas["FR"],
+                            deltas["RL"],
+                            deltas["RR"],
+                            f"{speeds['FL']:.6f}",
+                            f"{speeds['FR']:.6f}",
+                            f"{speeds['RL']:.6f}",
+                            f"{speeds['RR']:.6f}",
+                            f"{vx:.6f}",
+                            f"{vy:.6f}",
+                            f"{omega:.6f}",
+                            encoders["FL"].illegal,
+                            encoders["FR"].illegal,
+                            encoders["RL"].illegal,
+                            encoders["RR"].illegal,
+                        ]
+                    )
 
             time.sleep(args.poll_s)
 
     finally:
-        # Cleanup
-        for p in (args.l_a, args.l_b, args.r_a, args.r_b):
-            try: lgpio.gpio_free(h, p)
-            except: pass
-        try: lgpio.gpiochip_close(h)
-        except: pass
-        if csvf: csvf.close()
+        for pin in all_pins:
+            try:
+                lgpio.gpio_free(handle, pin)
+            except Exception:
+                pass
 
-    # Summary
-    T = time.monotonic() - t0
-    print("\n=== Summary ===")
-    print(f"Duration: {T:.2f} s")
-    print(f"L total: {L.count}   R total: {R.count}")
-    print(f"L_illegal={L.illegal}  R_illegal={R.illegal}")
-    if T > 0:
-        print(f"Avg L rate: {L.count/T:.2f} counts/s   Avg R rate: {R.count/T:.2f} counts/s")
-    print("Tip: If forward looks negative, add --invert-left and/or --invert-right.")
+        try:
+            lgpio.gpiochip_close(handle)
+        except Exception:
+            pass
+
+        if "csv_file" in locals() and csv_file:
+            csv_file.close()
+
+    elapsed = time.monotonic() - t0
+
+    print()
+    print("=== Summary ===")
+    print(f"Duration: {elapsed:.2f} s")
+
+    for name in ("FL", "FR", "RL", "RR"):
+        encoder = encoders[name]
+        rate = encoder.count / elapsed if elapsed > 0 else 0.0
+        print(
+            f"{name}: total={encoder.count:+d}  "
+            f"avg_rate={rate:+.2f} counts/s  "
+            f"illegal={encoder.illegal}"
+        )
+
+    print()
+    print("Tip: If forward rotation is negative, use --invert-fl/fr/rl/rr for that wheel.")
+
 
 def parse_args():
-    ap = argparse.ArgumentParser(
-        description="Polling quadrature encoder test with speeds and omega (Pi 5 / lgpio)",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    parser = argparse.ArgumentParser(
+        description="Robot Savo 4-wheel quadrature encoder test for Raspberry Pi 5",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    # Pins
-    ap.add_argument("--l-a", type=int, default=21, help="Left encoder A (BCM)")
-    ap.add_argument("--l-b", type=int, default=20, help="Left encoder B (BCM)")
-    ap.add_argument("--r-a", type=int, default=12, help="Right encoder A (BCM)")
-    ap.add_argument("--r-b", type=int, default=26, help="Right encoder B (BCM)")
 
-    # Direction
-    ap.add_argument("--invert-left", action="store_true", help="Invert left wheel direction (make forward positive)")
-    ap.add_argument("--invert-right", action="store_true", help="Invert right wheel direction (make forward positive)")
+    # Final Robot Savo GPIO map.
+    parser.add_argument("--fl-a", type=int, default=25, help="Front-left encoder A BCM GPIO")
+    parser.add_argument("--fl-b", type=int, default=13, help="Front-left encoder B BCM GPIO")
 
-    # Timing / debounce
-    ap.add_argument("--poll-s", type=float, default=0.001, help="Polling period (s)")
-    ap.add_argument("--debounce-s", type=float, default=0.0003, help="Per-line debounce (s)")
-    ap.add_argument("--interval", type=float, default=0.5, help="Print/CSV interval (s)")
-    ap.add_argument("--duration", type=float, default=20.0, help="Duration (s); 0 = until Ctrl+C")
+    parser.add_argument("--fr-a", type=int, default=20, help="Front-right encoder A BCM GPIO")
+    parser.add_argument("--fr-b", type=int, default=21, help="Front-right encoder B BCM GPIO")
 
-    # Hardware params (for speed math)
-    ap.add_argument("--wheel-dia", type=float, default=0.065, help="Wheel diameter (m)")
-    ap.add_argument("--cpr", type=int, default=20, help="Encoder counts per revolution (per channel)")
-    ap.add_argument("--decoding", type=int, default=4, choices=[1,2,4], help="1/2/4x decoding assumed by count math")
-    ap.add_argument("--gear", type=float, default=1.0, help="Motor:wheel gear ratio (counts * gear per wheel rev)")
-    ap.add_argument("--track", type=float, default=0.165, help="Track width (m) for omega = (vR - vL)/track")
+    parser.add_argument("--rl-a", type=int, default=23, help="Rear-left encoder A BCM GPIO")
+    parser.add_argument("--rl-b", type=int, default=24, help="Rear-left encoder B BCM GPIO")
 
-    # GPIO chip / pulls / debounce mode
-    ap.add_argument("--chip", type=int, default=None, help="gpiochip index (auto if omitted)")
-    ap.add_argument("--no-hw-debounce", action="store_true", help="Force software debounce only")
-    ap.add_argument("--no-pullup", action="store_true", help="Do not request pull-ups (use external)")
+    parser.add_argument("--rr-a", type=int, default=26, help="Rear-right encoder A BCM GPIO")
+    parser.add_argument("--rr-b", type=int, default=12, help="Rear-right encoder B BCM GPIO")
 
-    # CSV
-    ap.add_argument("--csv", type=str, default="", help="CSV output path")
-    return ap.parse_args()
+    parser.add_argument("--invert-fl", action="store_true", help="Invert front-left encoder count")
+    parser.add_argument("--invert-fr", action="store_true", help="Invert front-right encoder count")
+    parser.add_argument("--invert-rl", action="store_true", help="Invert rear-left encoder count")
+    parser.add_argument("--invert-rr", action="store_true", help="Invert rear-right encoder count")
+
+    parser.add_argument("--poll-s", type=float, default=0.001, help="Polling period in seconds")
+    parser.add_argument("--debounce-s", type=float, default=0.0003, help="Per-line debounce in seconds")
+    parser.add_argument("--interval", type=float, default=0.5, help="Print interval in seconds")
+    parser.add_argument("--duration", type=float, default=20.0, help="Duration in seconds; 0 means until Ctrl+C")
+
+    parser.add_argument("--wheel-dia", type=float, default=0.065, help="Wheel diameter in meters")
+    parser.add_argument("--cpr", type=int, default=20, help="Encoder counts per revolution per channel")
+    parser.add_argument("--decoding", type=int, default=4, choices=[1, 2, 4], help="Quadrature decoding factor")
+    parser.add_argument("--gear", type=float, default=1.0, help="Motor-to-wheel gear multiplier")
+
+    parser.add_argument("--wheelbase", type=float, default=0.165, help="Front-rear wheel spacing in meters")
+    parser.add_argument("--track", type=float, default=0.165, help="Left-right wheel spacing in meters")
+
+    parser.add_argument("--chip", type=int, default=None, help="gpiochip index; auto if omitted")
+    parser.add_argument("--internal-pullup", action="store_true", help="Request Pi internal pull-ups")
+    parser.add_argument("--no-hw-debounce", action="store_true", help="Force software debounce only")
+
+    parser.add_argument("--csv", type=str, default="", help="Optional CSV output path")
+
+    return parser.parse_args()
+
 
 if __name__ == "__main__":
     run(parse_args())
