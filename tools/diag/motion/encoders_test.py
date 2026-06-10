@@ -458,7 +458,7 @@ def run(args):
         )
 
     print()
-    print("Tip: If forward rotation is negative, use --invert-fl/fr/rl/rr for that wheel.")
+    print("Tip: All encoders default to inverted. Use --no-invert-fl/fr/rl/rr to disable inversion per wheel.")
 
 
 def parse_args():
@@ -477,13 +477,40 @@ def parse_args():
     parser.add_argument("--rl-a", type=int, default=23, help="Rear-left encoder A BCM GPIO")
     parser.add_argument("--rl-b", type=int, default=24, help="Rear-left encoder B BCM GPIO")
 
-    parser.add_argument("--rr-a", type=int, default=26, help="Rear-right encoder A BCM GPIO")
-    parser.add_argument("--rr-b", type=int, default=12, help="Rear-right encoder B BCM GPIO")
+    parser.add_argument("--rr-a", type=int, default=12, help="Rear-right encoder A BCM GPIO")
+    parser.add_argument("--rr-b", type=int, default=26, help="Rear-right encoder B BCM GPIO")
 
-    parser.add_argument("--invert-fl", action="store_true", help="Invert front-left encoder count")
-    parser.add_argument("--invert-fr", action="store_true", help="Invert front-right encoder count")
-    parser.add_argument("--invert-rl", action="store_true", help="Invert rear-left encoder count")
-    parser.add_argument("--invert-rr", action="store_true", help="Invert rear-right encoder count")
+    parser.add_argument(
+        "--no-invert-fl",
+        dest="invert_fl",
+        action="store_false",
+        help="Disable front-left encoder inversion",
+    )
+    parser.add_argument(
+        "--no-invert-fr",
+        dest="invert_fr",
+        action="store_false",
+        help="Disable front-right encoder inversion",
+    )
+    parser.add_argument(
+        "--no-invert-rl",
+        dest="invert_rl",
+        action="store_false",
+        help="Disable rear-left encoder inversion",
+    )
+    parser.add_argument(
+        "--no-invert-rr",
+        dest="invert_rr",
+        action="store_false",
+        help="Disable rear-right encoder inversion",
+    )
+
+    parser.set_defaults(
+        invert_fl=True,
+        invert_fr=True,
+        invert_rl=True,
+        invert_rr=True,
+    )
 
     parser.add_argument("--poll-s", type=float, default=0.001, help="Polling period in seconds")
     parser.add_argument("--debounce-s", type=float, default=0.0003, help="Per-line debounce in seconds")
