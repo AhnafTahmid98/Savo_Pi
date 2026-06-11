@@ -43,7 +43,7 @@ Robot Savo uses two main repositories:
 | [`hardware/`](hardware/)         | Robot layer layout, wiring, GPIO/I2C map, power, sensor mounting, mechanical notes, and measurement checklist                                      |
 | [`setup/`](setup/)               | Setup guides for `savo-core`, `savo-edge`, Ethernet, ROS networking, RealSense, audio, Tailscale, and time sync                                    |
 | [`deployment/`](deployment/)     | Role-based builds, Docker services, systemd services, and production startup                                                                       |
-| [`testing/`](testing/)           | Test plans for base, control, perception, localization, description, mapping, navigation, speech, VO, and full robot validation                    |
+| [`testing/`](testing/)           | Component validation overview, per-unit hardware validation tables, and test plans for base, control, perception, localization, description, mapping, navigation, speech, VO, and full robot validation |
 | [`diagrams/`](diagrams/)         | Draw.io diagrams for compute split, ROS graph, networking, safety, perception, and navigation pipelines                                            |
 | [`assets/`](assets/)             | Screenshots, RViz views, TF trees, test proof, and documentation images                                                                            |
 
@@ -57,6 +57,8 @@ Start with these documents:
 4. [`hardware/robot_layer_layout.md`](hardware/robot_layer_layout.md)
 5. [`hardware/measurement_checklist.md`](hardware/measurement_checklist.md)
 6. [`deployment/role_based_builds.md`](deployment/role_based_builds.md)
+7. [`setup/ups_hat_setup.md`](setup/ups_hat_setup.md)
+8. [`testing/component_validation_overview.md`](testing/component_validation_overview.md)
 
 ## Current engineering direction
 
