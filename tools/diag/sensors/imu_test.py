@@ -255,13 +255,17 @@ def main():
     if args.csv:
         cols = [
             "t_s","sys_stat","sys_err","c_sys","c_gyr","c_acc","c_mag",
-            "yaw_deg","roll_deg","pitch_deg","ax","ay","az","gx","gy","gz","mag_uT","temp_C",
+            "heading_yaw_deg","roll_deg","pitch_deg",
+            "acc_x_mps2","acc_y_mps2","acc_z_mps2",
+            "gyro_x_dps","gyro_y_dps","gyro_z_dps",
+            "mag_uT","temp_C",
             "moving","vibe_score"
         ]
         _print(",".join(cols))
     else:
-        _print("\n t(s) | stat err calib |   yaw     roll    pitch |    ax     ay     az  |   gx     gy     gz  |  |B|(uT) | T(°C) | M | Vibe")
-        _print("-"*118)
+        _print("\n time_s | sys err calib(S,G,A,M) | yaw/heading  roll   pitch |"
+               " acc_x   acc_y   acc_z  | gyro_x  gyro_y  gyro_z | mag_uT | temp_C | moving | vibe")
+        _print("-" * 132)
 
     # Buffers for stats + motion windows
     ax_all: List[float] = []
@@ -366,11 +370,11 @@ def main():
             roll_s = f"{roll:6.2f}"  if roll is not None else "      "
             pitch_s= f"{pitch:6.2f}" if pitch is not None else "      "
             bmag_s = f"{b_mag:7.2f}" if b_mag is not None else "       "
-            _print(f"{t:5.2f} | {sys_stat:3d} {sys_err:3d} {c_sys}{c_gyr}{c_acc}{c_mag} |"
-                   f"{yaw_s}  {roll_s}  {pitch_s} |"
+            _print(f"{t:6.2f} | {sys_stat:3d} {sys_err:3d}      {c_sys}{c_gyr}{c_acc}{c_mag}      |"
+                   f"{yaw_s}      {roll_s} {pitch_s} |"
                    f"{ax:7.3f} {ay:7.3f} {az:7.3f} |"
                    f"{gx:7.3f} {gy:7.3f} {gz:7.3f} |"
-                   f"{bmag_s} | {temp_c:5.1f} | {moving:d} | {vibe_score:5.3f}")
+                   f"{bmag_s} | {temp_c:6.1f} |   {moving:d}    | {vibe_score:5.3f}")
 
         # pacing
         dt = time.monotonic() - t_loop
