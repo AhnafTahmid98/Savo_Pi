@@ -324,52 +324,14 @@ system_health.py
 
 These scripts are used for power and system health checks before long-running robot services are enabled.
 
-## Validation checklist
+## Validation
 
-Run these commands after setup:
+After completing the setup, validate the UPS HAT using the component validation documents:
 
-```bash
-hostname
-whoami
-sudo i2cdetect -y 1
-sudo rpi-eeprom-config | grep -E "PSU_MAX_CURRENT|POWER_OFF_ON_HALT"
-python3 /opt/x120x/qtx120xTerminal.py
-```
+- [`../testing/savo_edge_component_validation.md`](../testing/savo_edge_component_validation.md)
+- [`../testing/savo_core_component_validation.md`](../testing/savo_core_component_validation.md)
 
-Expected results:
-
-```text
-hostname: edge or core
-whoami: savo
-I2C: 0x36 visible
-POWER_OFF_ON_HALT=1
-PSU_MAX_CURRENT=5000
-UPS monitor shows battery, voltage, input power, AC status, CPU temperature, and fan RPM
-```
-
-## Validation evidence
-
-The following screenshots were captured on `savo-edge` after the UPS HAT setup was completed.
-
-### Pi 5 fan profile
-
-![Pi 5 fan profile](../assets/hardware/pi5_fan_profile.png)
-
-This screenshot shows the Raspberry Pi 5 active cooler profile added under `/boot/firmware/config.txt`. The fan profile starts at 45°C and increases fan speed at 55°C, 65°C, and 75°C.
-
-### UPS HAT validation
-
-![UPS HAT validation](../assets/hardware/ups_hat.png)
-
-This screenshot confirms:
-
-* UPS HAT detected on I²C bus 1 at `0x36`
-* EEPROM power settings are correct:
-
-  * `POWER_OFF_ON_HALT=1`
-  * `PSU_MAX_CURRENT=5000`
-* UPS monitor is working through `/opt/x120x/qtx120xTerminal.py`
-* Battery percentage, UPS voltage, input voltage, CPU temperature, fan RPM, AC power, and power adapter status are visible
+The setup is not considered complete until the UPS HAT is detected on I²C, the EEPROM power configuration is confirmed, and the UPS monitor reports valid battery and power status.
 
 ## Notes
 

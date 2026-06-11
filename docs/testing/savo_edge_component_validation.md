@@ -18,6 +18,28 @@ Follow the process in [`component_validation_overview.md`](component_validation_
 | Docker Robot Savo Server   | Network / Docker  | `docker compose up`; check service health endpoints           | All containers start; health endpoints return 200               | Not started |
 | UI / display (if used)     | HDMI / USB-C DP   | Boot to desktop or launch UI node                             | Display renders without artefacts; touch or input responds      | Not started |
 
+## Validation evidence
+
+### Pi 5 fan profile
+
+![Pi 5 fan profile](../assets/hardware/pi5_fan_profile.png)
+
+This screenshot shows the Raspberry Pi 5 active cooler profile added under `/boot/firmware/config.txt`. The fan profile starts at 45°C and increases fan speed at 55°C, 65°C, and 75°C.
+
+### UPS HAT validation
+
+![UPS HAT validation](../assets/hardware/ups_hat.png)
+
+This screenshot confirms:
+
+* UPS HAT detected on I²C bus 1 at `0x36`
+* EEPROM power settings are correct:
+
+  * `POWER_OFF_ON_HALT=1`
+  * `PSU_MAX_CURRENT=5000`
+* UPS monitor is working through `/opt/x120x/qtx120xTerminal.py`
+* Battery percentage, UPS voltage, input voltage, CPU temperature, fan RPM, AC power, and power adapter status are visible
+
 ## Notes
 
 - Validate audio input and output separately before testing STT/TTS end-to-end.
