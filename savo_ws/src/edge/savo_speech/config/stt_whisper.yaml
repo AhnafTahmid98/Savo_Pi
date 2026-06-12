@@ -1,165 +1,41 @@
-# ============================================================================
-# Robot Savo — STT configuration for faster-whisper (ReSpeaker + utterance mode)
-#
-# This config is used by the savo_speech STT node ("stt_node").
-#
-# Usage on the Pi (after build + env.sh):
-#
-#   cd ~/Savo_Pi
-#   source tools/scripts/env.sh
-#
-#   ros2 launch savo_speech stt_only.launch.py
-#     # (launch file already points to this params file)
-#
-# You can still override individual params from CLI, for example:
-#
-#   ros2 run savo_speech stt_node \
-#     --ros-args \
-#       --params-file $(ros2 pkg prefix savo_speech)/share/savo_speech/config/stt_whisper.yaml \
-#       -p model_size_or_path:="base.en" \
-#       -p block_duration_s:=3.0
-# ============================================================================
-
 stt_node:
   ros__parameters:
 
-    # ------------------------------------------------------------------------
-    # Faster-Whisper model configuration
-    # ------------------------------------------------------------------------
-    #
-    # Model choices (for Pi 5, CPU, int8):
-    #   - "tiny.en"  : fastest, lowest quality  (tested: not good enough)
-    #   - "base.en"  : middle ground            (OK if small.en is too heavy)
-    #   - "small.en" : better quality, still realistic on Pi 5 CPU int8
-    #
-    # This config assumes you already downloaded "small.en" once.
+    # small.en is the Pi 5 CPU/int8 quality-speed baseline.
     model_size_or_path: "small.en"
 
-    # Device:
-    #   - "cpu" on the Pi
     device: "cpu"
 
-    # Compute type:
-    #   - "int8" is the right trade-off on ARM CPU (smaller, faster)
+    # int8 keeps faster-whisper practical on ARM CPU.
     compute_type: "int8"
 
-    # Language:
-    #   - "en" because Robot Savo v1 listens/speaks English.
     language: "en"
 
-    # Beam search:
-    #   - 3 is a good balance. You can go to 1 for a bit more speed, or 5 for
-    #     a tiny quality boost if CPU allows.
+    # 3 is the current quality/latency balance on Pi.
     beam_size: 3
 
-    # ------------------------------------------------------------------------
-    # Audio capture + simple VAD
-    # ------------------------------------------------------------------------
-
-    # Input sample rate for STT:
-    #   - 16000 Hz is standard for Whisper models.
     sample_rate: 16000
 
-    # Length of each raw audio block captured from ReSpeaker (seconds).
-    # In "utterance_mode" this is NOT the final sentence length; blocks are
-    # buffered until the user stops talking, then concatenated and sent once
-    # to Whisper.
-    #
-    #   - 2.0 s is a snappy option:
-    #       * lower perceived latency
-    #       * still OK for simple VAD
+    # Short enough for low latency, long enough for stable VAD.
     block_duration_s: 2.0
 
-    # Energy threshold for simple block-level VAD:
-    #   - In your hallway tests, idle noise was around ~0.00016.
-    #   - 0.0003 is slightly above that but still forgiving, so speech
-    #     is not missed even if you speak softly or a bit further away.
-    #
-    # You can tighten this later if you see too many false triggers.
+    # Hallway idle noise was about 0.00016; 0.0003 still catches soft speech.
     energy_threshold: 0.0003
 
-    # Minimum transcript length:
-    #   - Ignore extremely short outputs (noise, breaths, half syllables).
-    #   - Still allow short commands like "stop", "status", "hello".
+    # Keeps noise fragments out while allowing "stop" and "status".
     min_transcript_chars: 3
 
-    # Input device selection:
-    #
-    # We probed devices with:
-    #
-    #   python3 - << 'EOF'
-    #   import sounddevice as sd
-    #   for i, dev in enumerate(sd.query_devices()):
-    #       print(f"{i}: {dev['name']!r}, "
-    #             f"max_input_channels={dev['max_input_channels']}, "
-    #             f"max_output_channels={dev['max_output_channels']}")
-    #   EOF
-    #
-    # On this Pi:
-    #   0: 'ReSpeaker 4 Mic Array (UAC1.0): USB Audio (hw:0,0)', max_input_channels=6
-    #
-    # So:
-    #   - 0 = ReSpeaker 4 Mic Array  (what we want)
-    #
-    # If you ever change hardware, re-run the probe and update this.
+    # ReSpeaker 4 Mic Array is device 0 on this Pi.
     input_device_index: 0
 
-    # ------------------------------------------------------------------------
-    # Utterance-level behavior
-    # ------------------------------------------------------------------------
-    #
-    # utterance_mode:
-    #   - true  → buffer multiple blocks while speech is present.
-    #             When a silent block arrives, treat it as end-of-utterance,
-    #             concatenate all buffered blocks, run Whisper once, and
-    #             publish ONE final transcript to publish_topic.
-    #
-    #   - false → legacy per-block mode (every voiced block is sent directly
-    #             to Whisper, causing partial/duplicated sentences).
+    # Buffering whole utterances avoids partial/duplicated sentences.
     utterance_mode: true
 
-    # Safety limit for a single utterance duration (seconds):
-    #   - Prevents buffering forever if someone talks non-stop.
-    #   - If exceeded, the node forces an utterance finalize and starts a
-    #     new one.
     max_utterance_duration_s: 15.0
 
-    # ------------------------------------------------------------------------
-    # TTS gate — ignore robot’s own voice
-    # ------------------------------------------------------------------------
-    #
-    # Idea:
-    #   - TTSNode publishes a "speaking" flag on a Bool topic.
-    #   - While this flag is true (plus a short cooldown), STTNode
-    #     *still records audio* internally but *skips transcription*.
-    #   - This stops "Robot Savo" from hearing and repeating itself
-    #     ("Ha ha, I am Robot Savo..." loops).
-    #
-    # tts_gate_enable:
-    #   - true  → enable this gating behavior
-    #   - false → ignore TTS speaking flag, always transcribe as usual
-    #
-    # tts_speaking_topic:
-    #   - Must match the topic configured in tts_piper.yaml.
-    #
-    # tts_gate_cooldown_s:
-    #   - After TTS finishes (speaking flag goes false), STT continues to
-    #     ignore audio for this extra time to allow for speaker ringing/
-    #     echo through the room & ReSpeaker mics.
-    #
+    # Prevents Robot Savo from transcribing its own speaker output.
     tts_gate_enable: true
     tts_speaking_topic: "/savo_speech/tts_speaking"
     tts_gate_cooldown_s: 0.8
 
-    # ------------------------------------------------------------------------
-    # ROS topics
-    # ------------------------------------------------------------------------
-    #
-    # Topic where recognized text is published as std_msgs/String.
-    #
-    # Current design:
-    #   STTNode publishes to /savo_speech/stt_text
-    #   SpeechBridgeNode subscribes there and forwards to:
-    #       /savo_intent/user_text  → LLM intent_client_node
-    #
     publish_topic: "/savo_speech/stt_text"

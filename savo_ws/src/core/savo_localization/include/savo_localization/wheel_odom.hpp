@@ -1,25 +1,3 @@
-// wheel_odom.hpp
-// Robot SAVO — Wheel Odometry (C++)
-// ------------------------------------------------------------
-// Header for a lightweight wheel odometry node that reads two
-// rear-wheel quadrature encoders (A/B per wheel) and publishes
-// nav_msgs/Odometry on /wheel/odom.
-//
-// IMPORTANT (mecanum + 2 encoders):
-// We read quadrature A/B on the two rear wheels (4 GPIO signals total), so we have
-// direction + high-resolution counts for Left and Right. However, it is still only
-// two-wheel odometry on a mecanum base.
-// - We estimate vx and wz using a differential-style approximation from rear wheels.
-// - We set vy = 0.0 because lateral motion is not observable without front wheel
-//   encoders or additional sensing.
-// Fuse with IMU + SLAM/AMCL in robot_localization for stable navigation.
-//
-// Notes:
-// - This file is header-only style for clarity; you can split into .cpp later.
-// - GPIO backend can be lgpio (recommended on Pi 5). Replace placeholders as needed.
-//
-// ------------------------------------------------------------
-
 #pragma once
 
 #include <cstdint>
@@ -35,9 +13,6 @@
 namespace savo_localization
 {
 
-// ------------------------------------------------------------
-// Utility: yaw -> quaternion
-// ------------------------------------------------------------
 inline geometry_msgs::msg::Quaternion yawToQuat(double yaw_rad)
 {
   tf2::Quaternion q;
@@ -50,10 +25,7 @@ inline geometry_msgs::msg::Quaternion yawToQuat(double yaw_rad)
   return out;
 }
 
-// ------------------------------------------------------------
-// Quadrature decoding (Gray-code transition table)
-// A is bit1, B is bit0
-// ------------------------------------------------------------
+// Gray-code transition table; A is bit1, B is bit0.
 inline int8_t quadDelta(uint8_t prev, uint8_t curr)
 {
   // Valid transitions:

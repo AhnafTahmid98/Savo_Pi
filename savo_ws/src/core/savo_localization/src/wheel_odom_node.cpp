@@ -1,23 +1,4 @@
-// wheel_odom_node.cpp
-// Robot SAVO — Wheel Odometry Node (C++, ROS 2 Jazzy)
-// ------------------------------------------------------------
-// Style: explicit includes like your other nodes (rclcpp + msgs)
-//
-// Reads TWO rear-wheel quadrature encoders (A/B per wheel; 4 GPIO lines total)
-// via lgpio on Raspberry Pi 5, publishes nav_msgs/Odometry on /wheel/odom.
-//
-// IMPORTANT (mecanum + 2 encoders):
-// - Estimates vx and wz using a differential-style approximation
-// - Sets vy = 0.0 (not observable with rear-only encoders)
-// Fuse with IMU + SLAM/AMCL in robot_localization EKF for navigation.
-//
-// Notes:
-// - This node does NOT publish TF. Let EKF be the only TF publisher (odom->base_link).
-// - Tight polling in a background thread for reliable edge capture.
-// - ROS timer publishes at publish_hz.
-//
-// System deps:
-//   sudo apt install -y liblgpio-dev
+// Rear-wheel quadrature odom via lgpio. Lateral motion is not observable here.
 
 #include <rclcpp/rclcpp.hpp>
 #include <geometry_msgs/msg/twist.hpp>
@@ -47,8 +28,6 @@ namespace
 
 inline geometry_msgs::msg::Quaternion yaw_to_quat(double yaw_rad)
 {
-  // quaternion from yaw only (roll=pitch=0)
-  // q = [x,y,z,w] = [0,0,sin(yaw/2),cos(yaw/2)]
   geometry_msgs::msg::Quaternion q;
   q.x = 0.0;
   q.y = 0.0;
@@ -198,7 +177,7 @@ public:
     claim_input(right_.pins.a);
     claim_input(right_.pins.b);
 
-    // Hardware debounce (best effort; may be ignored depending on driver)
+    // Hardware debounce is best-effort in lgpio.
     if (debounce_us_ > 0) {
       (void)lgGpioSetDebounce(gpio_h_, left_.pins.a, debounce_us_);
       (void)lgGpioSetDebounce(gpio_h_, left_.pins.b, debounce_us_);

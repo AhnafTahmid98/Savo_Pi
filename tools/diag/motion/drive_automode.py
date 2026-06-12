@@ -1,47 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Robot Savo — Expert Auto Drive (Mecanum + Full 360° Safety)
---------------------------------------------------------------------
-- Self-contained:
-    * PCA9685 class
-    * RobotSavo motor wrapper 
-    * Mecanum kinematics helpers (mix_mecanum, to_duties)
-- Uses safety sensors:
-    * DualToF (FR/FL) for near-field front
-    * Ultrasonic (front-center) via gpiozero DistanceSensor
-    * LiDAR 360° bubble via LidarSafetyAPI
-- Behaviour:
-    * Prefer FORWARD when front is clear.
-    * If front blocked:
-         - Try STRAFE LEFT / RIGHT.
-         - If both sides blocked → rely on LiDAR to see if BACK is safe.
-             - If back free → short BACKUP.
-             - If back also blocked → ROTATE in place.
-    * LiDAR roles:
-         - PRIMARY front window (−35..+35°) for early front slow-down.
-         - 360° sectors FRONT / RIGHT / BACK / LEFT as safety bubble:
-             * Avoid backing into close BACK obstacle.
-             * Avoid strafing into close LEFT/RIGHT obstacles.
-             * Emergency STOP only if something VERY close in FRONT
-               (global min < emerg_lidar_m and |angle| <= 60°).
-         - Speed reduction in ALL directions:
-             * vx>0  → slow using FRONT sector
-             * vx<0  → slow using BACK sector
-             * vy>0  → slow using LEFT sector
-             * vy<0  → slow using RIGHT sector
-             * wz≠0 → slow using global LiDAR min
-    * EMERGENCY STOP if something VERY close in front (LiDAR/ToF/US),
-      followed by clear escape motion:
-         - reverse + turn away from closer ToF side.
-
-Face UI:
-    - Starts tools/diag/ui/face.py by default on the DSI.
-    - Disable with:  --no-face
-
-Camera streaming (optional):
-    - Enable with:  --enable-camera --cam-host <laptop-ip> --cam-port 5000
-"""
+"""Direct mecanum auto-drive diagnostic with local sensor checks."""
 
 import sys
 import os
@@ -54,10 +13,6 @@ from typing import Optional, Tuple
 import smbus
 from gpiozero import DistanceSensor
 from gpiozero.pins.lgpio import LGPIOFactory
-
-# -------------------------------------------------------------------
-# Project root (Savo_Pi)
-# -------------------------------------------------------------------
 PROJECT_ROOT = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..", "..")
 )
@@ -66,11 +21,6 @@ if PROJECT_ROOT not in sys.path:
 
 from tools.diag.sensors.api.vl53_dual_api import DualToF
 from tools.diag.sensors.api.lidar_api import LidarSafetyAPI, RPLidarException
-
-
-# ===================================================================
-# PCA9685 driver
-# ===================================================================
 class PCA9685:
     __SUBADR1 = 0x02
     __SUBADR2 = 0x03
@@ -128,21 +78,8 @@ class PCA9685:
 
     def close(self) -> None:
         self.bus.close()
-
-
-# ===================================================================
-# Robot motor wrapper
-# ===================================================================
 class RobotSavo:
-    """
-    Channel map (LOCKED):
-      FL (front-left)  : (0,1)
-      RL (rear-left)   : (3,2)
-      FR (front-right) : (6,7)
-      RR (rear-right)  : (4,5)
-
-    Positive duty => "forward" according to your wiring & invert flags.
-    """
+    """Locked map: FL=(0,1), RL=(3,2), FR=(6,7), RR=(4,5); invert flags define forward."""
 
     def __init__(
         self,
@@ -158,8 +95,6 @@ class RobotSavo:
         self.FL_INV, self.RL_INV, self.FR_INV, self.RR_INV = inv
         self.quench_ms = max(0, int(quench_ms))
         self._last_sign = {"fl": 0, "rl": 0, "fr": 0, "rr": 0}
-
-    # low-level wheel writers (positive = IN_hi on 2nd channel of each pair)
     def _wheel_fl(self, d: int) -> None:
         if d > 0:
             self.pwm.set_motor_pwm(0, 0)
@@ -243,11 +178,6 @@ class RobotSavo:
             self.stop()
         finally:
             self.pwm.close()
-
-
-# ===================================================================
-# Kinematics helpers
-# ===================================================================
 def mix_mecanum(
     vx: float,
     vy: float,
@@ -258,13 +188,7 @@ def mix_mecanum(
     rotate_sign: int,
     turn_gain: float,
 ) -> Tuple[float, float, float, float]:
-    """
-    Return normalized wheel commands (fl, rl, fr, rr) in [-1..1].
-      fl =  vx - vy - w
-      rl =  vx + vy - w
-      fr =  vx + vy + w
-      rr =  vx - vy + w
-    """
+    """Return normalized wheel commands using the local mecanum sign convention."""
     vx *= forward_sign
     vy *= strafe_sign
     w = rotate_sign * turn_gain * wz
@@ -285,11 +209,6 @@ def to_duties(
         int(nfr * max_duty),
         int(nrr * max_duty),
     )
-
-
-# ===================================================================
-# Reactive planner helpers
-# ===================================================================
 def safe_cm(v: Optional[float]) -> float:
     """Normalize distances: >=0.0 is valid cm; None / negative => treat as very far."""
     if v is None or v < 0.0:
@@ -305,19 +224,7 @@ def choose_mode(
     mode_prev: str,
     blocked_counter: int,
 ) -> Tuple[str, int]:
-    """
-    Decide high-level motion mode based on near-field + LiDAR bubbles.
-
-    Modes:
-      FORWARD    : move forward
-      STRAFE_L   : strafe left
-      STRAFE_R   : strafe right
-      ROTATE_L   : rotate CCW
-      ROTATE_R   : rotate CW
-      BACKUP     : short reverse (only if back not blocked)
-      STOPPED    : fully stopped when boxed for a while
-    """
-    # Boxed: front+back+both sides
+    """Pick a reactive motion mode from near-field and LiDAR bubbles."""
     if front_blocked and back_blocked and left_blocked and right_blocked:
         blocked_counter += 1
     else:
@@ -325,12 +232,8 @@ def choose_mode(
 
     if blocked_counter > 40:  # ~2s at 20 Hz
         return "STOPPED", blocked_counter
-
-    # If front clear → always go forward
     if not front_blocked:
         return "FORWARD", blocked_counter
-
-    # Front blocked: try lateral motion
     if not left_blocked and right_blocked:
         return "STRAFE_L", blocked_counter
     if not right_blocked and left_blocked:
@@ -338,12 +241,8 @@ def choose_mode(
     if not left_blocked and not right_blocked:
         # both sides available → prefer left (could be improved with LiDAR distance)
         return "STRAFE_L", blocked_counter
-
-    # Front + both sides blocked, back free → consider BACKUP
     if front_blocked and left_blocked and right_blocked and not back_blocked:
         return "BACKUP", blocked_counter
-
-    # Everything nasty → rotate in place to search
     if mode_prev != "ROTATE_L":
         return "ROTATE_L", blocked_counter
     else:
@@ -357,10 +256,7 @@ def mode_to_cmd(
     v_back: float,
     w_rotate: float,
 ) -> Tuple[float, float, float]:
-    """
-    Convert mode -> (vx, vy, wz) in [-1..1].
-    vx: +forward, vy: +left, wz: +CCW
-    """
+    """Convert the selected mode into body-frame command components."""
     if mode == "FORWARD":
         return v_forward, 0.0, 0.0
     if mode == "STRAFE_L":
@@ -382,12 +278,7 @@ def lidar_slow_scale(
     slow_d: float,
     min_scale: float,
 ) -> float:
-    """
-    Compute a scale factor in [0..1] for a given direction:
-      - dist <= stop_d       → 0.0  (stop)
-      - dist >= slow_d       → 1.0  (no slowdown)
-      - between              → linear scale, clamped to [min_scale, 1.0]
-    """
+    """Linear speed scale between stop_d and slow_d, clamped to min_scale."""
     if dist_m is None:
         return 1.0
     if dist_m <= stop_d:
@@ -396,17 +287,8 @@ def lidar_slow_scale(
         return 1.0
     t = (dist_m - stop_d) / max(1e-3, (slow_d - stop_d))
     return max(min_scale, min(1.0, t))
-
-
-# ===================================================================
-# Ultrasonic helper — SINGLE sensor, reused
-# ===================================================================
 class UltrasonicReader:
-    """
-    Front-center ultrasonic helper:
-    - Uses LGPIOFactory + DistanceSensor once.
-    - Provides read_cm() method, safe for use in tight loops.
-    """
+    """Front-center ultrasonic reader reused inside the drive loop."""
 
     def __init__(self, trig_pin: int, echo_pin: int, max_distance_m: float = 4.0):
         self.trig_pin = trig_pin
@@ -461,12 +343,6 @@ class UltrasonicReader:
             except Exception:
                 pass
             self.sensor = None
-
-
-# ===================================================================
-# Camera & face helpers
-# ===================================================================
-
 def start_camera_stream(host: str, port: int) -> Optional[subprocess.Popen]:
     pipeline = [
         "gst-launch-1.0",
@@ -512,12 +388,7 @@ def start_camera_stream(host: str, port: int) -> Optional[subprocess.Popen]:
         return None
 
 def start_face() -> Optional[subprocess.Popen]:
-    """
-    Start the emotion-based face UI on the DSI display.
-
-    Expected script:
-        PROJECT_ROOT/tools/diag/ui/face.py
-    """
+    """Start the DSI face UI process."""
     face_script = os.path.join(PROJECT_ROOT, "tools", "diag", "ui", "face.py")
     if not os.path.exists(face_script):
         print(
@@ -555,16 +426,10 @@ def stop_proc(proc: Optional[subprocess.Popen], name: str) -> None:
             proc.kill()
     except Exception:
         pass
-
-
-# ===================================================================
-# Main auto-drive loop
-# ===================================================================
 def main() -> None:
     ap = argparse.ArgumentParser(
         description="Robot Savo — Expert Auto Drive (Non-ROS Mecanum + 360° LiDAR)"
     )
-    # Motor / board
     ap.add_argument("--i2c-bus", type=int, default=1)
     ap.add_argument("--addr", type=lambda x: int(x, 0), default=0x40)
     ap.add_argument("--pwm-freq", type=float, default=50.0)
@@ -581,8 +446,6 @@ def main() -> None:
     ap.add_argument("--strafe-sign", type=int, choices=[-1, 1], default=+1)
     ap.add_argument("--rotate-sign", type=int, choices=[-1, 1], default=+1)
     ap.add_argument("--turn-gain", type=float, default=1.0)
-
-    # Motion magnitudes
     ap.add_argument("--v-forward", type=float, default=0.4)
     ap.add_argument("--v-side", type=float, default=0.4)
     ap.add_argument("--v-back", type=float, default=0.3)
@@ -634,8 +497,6 @@ def main() -> None:
         default=0.25,
         help="Emergency stop if LiDAR < this (m) AND |angle| <= 60°",
     )
-
-    # LiDAR
     ap.add_argument("--no-lidar", action="store_true")
     ap.add_argument(
         "--lidar-th",
@@ -669,8 +530,6 @@ def main() -> None:
     )
 
     args = ap.parse_args()
-
-    # Build inversion vector
     inv = (
         -1 if args.invert_fl else +1,
         -1 if args.invert_rl else +1,
@@ -678,8 +537,6 @@ def main() -> None:
         -1 if args.invert_rr else +1,
     )
     max_duty = max(0, min(4095, args.max_duty))
-
-    # Init robot
     bot = RobotSavo(
         i2c_bus=args.i2c_bus,
         addr=args.addr,
@@ -687,8 +544,6 @@ def main() -> None:
         inv=inv,
         quench_ms=args.quench_ms,
     )
-
-    # Sensors
     print("[AutoDrive] Initializing DualToF ...")
     # Use the smaller front-threshold as the internal DualToF alert threshold
     tof_threshold = min(args.front_th_fr, args.front_th_fl)
@@ -726,16 +581,12 @@ def main() -> None:
                 file=sys.stderr,
             )
             lidar = None
-
-    # Camera & face
     cam_proc = (
         start_camera_stream(args.cam_host, args.cam_port)
         if args.enable_camera
         else None
     )
     face_proc = None if args.no_face else start_face()
-
-    # Reactive loop state
     mode = "STOPPED"
     blocked_counter = 0
     loop_period = 1.0 / max(5.0, float(args.loop_hz))
@@ -747,15 +598,9 @@ def main() -> None:
     try:
         while True:
             t0 = time.time()
-
-            # ---------- ToF ----------
             fr_raw, fr_f, fl_raw, fl_f, alert_str, tof_near = tof.read()
-
-            # ---------- Ultrasonic ----------
             us_cm = us_reader.read_cm()
             us_near = us_cm is not None and us_cm < args.us_th
-
-            # ---------- LiDAR (360° bubble) ----------
             lidar_near_primary = False
             lidar_min_m: Optional[float] = None
             lidar_min_ang_deg: Optional[float] = None
@@ -766,13 +611,9 @@ def main() -> None:
             if lidar is not None:
                 try:
                     r = lidar.poll()
-                    # PRIMARY sector (front window)
                     lidar_near_primary = r.obstacle
-                    # PRIMARY min
                     prim_min_m = r.min_dist_m
                     prim_min_ang = r.min_angle_deg
-
-                    # 360° sectors
                     if r.front_min_m is not None:
                         front_lidar_m = r.front_min_m
                         front_lidar_cm = r.front_min_m * 100.0
@@ -785,8 +626,6 @@ def main() -> None:
                     if r.left_min_m is not None:
                         left_lidar_m = r.left_min_m
                         left_lidar_cm = r.left_min_m * 100.0
-
-                    # Global min: anywhere in 360°
                     if r.global_min_m is not None:
                         lidar_min_m = r.global_min_m
                         lidar_min_ang_deg = r.global_min_angle_deg
@@ -798,42 +637,27 @@ def main() -> None:
                     print(f"[AutoDrive] LiDAR error: {e}", file=sys.stderr)
                 except Exception:
                     pass
-
-            # ---------- Combined near-field (ToF + US) ----------
             fr_cm = safe_cm(fr_f)
             fl_cm = safe_cm(fl_f)
             us_cm_safe = us_cm if us_cm is not None else 9999.0
-
-            # Front near-field: any of US, FR, FL under their own thresholds
             front_near_nf = (
                 (us_cm_safe < args.us_th)
                 or (fr_cm < args.front_th_fr)
                 or (fl_cm < args.front_th_fl)
             )
-            # Side near-field per sensor
             left_near_nf = fl_cm < args.side_th_fl
             right_near_nf = fr_cm < args.side_th_fr
-
-            # ---------- LiDAR sector-based blocked flags ----------
             front_block_lidar = front_lidar_cm is not None and front_lidar_cm < lidar_th_cm
             right_block_lidar = right_lidar_cm is not None and right_lidar_cm < lidar_th_cm
             back_block_lidar = back_lidar_cm is not None and back_lidar_cm < lidar_th_cm
             left_block_lidar = left_lidar_cm is not None and left_lidar_cm < lidar_th_cm
-
-            # ------------------------------------------------------------------
-            # Combine ToF/US + LiDAR for each direction
-            # ------------------------------------------------------------------
             front_blocked = front_near_nf or front_block_lidar
             left_blocked = left_near_nf or left_block_lidar
             right_blocked = right_near_nf or right_block_lidar
             back_blocked = back_block_lidar  # only LiDAR watches back
-
-            # ---------- EMERGENCY STOP + ESCAPE (FRONT ONLY) ----------
             emerg = False
             emerg_reason = ""
             front_emerg = False
-
-            # ToF + Ultrasonic in front
             if us_cm is not None and us_cm < args.emerg_front_cm:
                 emerg = True
                 front_emerg = True
@@ -867,7 +691,6 @@ def main() -> None:
                 ) + f"LiDAR {lidar_min_m:.2f}m @ {lidar_min_ang_deg:.1f}°"
 
             if emerg:
-                # Hard stop first
                 bot.set_motor_model(0, 0, 0, 0)
                 print(
                     f"[AutoDrive][EMERG] HARD STOP  reason={emerg_reason}  "
@@ -933,9 +756,6 @@ def main() -> None:
 
                 time.sleep(loop_period)
                 continue
-            # --------------------------------------------------------
-
-            # Decide mode (planner layer; uses full 360° blocked flags)
             prev_mode = mode
             mode, blocked_counter = choose_mode(
                 front_blocked=front_blocked,
@@ -945,8 +765,6 @@ def main() -> None:
                 mode_prev=prev_mode,
                 blocked_counter=blocked_counter,
             )
-
-            # Convert mode -> (vx,vy,wz)
             vx, vy, wz = mode_to_cmd(
                 mode,
                 args.v_forward,
@@ -954,35 +772,25 @@ def main() -> None:
                 args.v_back,
                 args.w_rotate,
             )
-
-            # ---------- LiDAR-based speed reduction in ALL directions ----------
             if lidar is not None:
                 stop_d = args.lidar_th
                 slow_d = args.lidar_slow_dist
                 min_sc = args.min_speed_scale
-
-                # Forward / backward component
                 if vx > 0.0 and front_lidar_m is not None:
                     scale_vx = lidar_slow_scale(front_lidar_m, stop_d, slow_d, min_sc)
                     vx *= scale_vx
                 elif vx < 0.0 and back_lidar_m is not None:
                     scale_vx = lidar_slow_scale(back_lidar_m, stop_d, slow_d, min_sc)
                     vx *= scale_vx
-
-                # Left / right component
                 if vy > 0.0 and left_lidar_m is not None:
                     scale_vy = lidar_slow_scale(left_lidar_m, stop_d, slow_d, min_sc)
                     vy *= scale_vy
                 elif vy < 0.0 and right_lidar_m is not None:
                     scale_vy = lidar_slow_scale(right_lidar_m, stop_d, slow_d, min_sc)
                     vy *= scale_vy
-
-                # Rotation component (any close obstacle around)
                 if wz != 0.0 and lidar_min_m is not None:
                     scale_wz = lidar_slow_scale(lidar_min_m, stop_d, slow_d, min_sc)
                     wz *= scale_wz
-
-            # Mix mecanum and send commands
             nfl, nrl, nfr, nrr = mix_mecanum(
                 vx,
                 vy,
@@ -994,11 +802,7 @@ def main() -> None:
             )
             dfl, drl, dfr, drr = to_duties(nfl, nrl, nfr, nrr, max_duty)
             bot.set_motor_model(dfl, drl, dfr, drr)
-
-            # ---------- Debug print ----------
-            # Build blocked-sides string with distances
             block_tags = []
-            # FRONT: pick the "best" distance we have
             if front_blocked:
                 front_d = 9999.0
                 if front_lidar_cm is not None:
@@ -1042,8 +846,6 @@ def main() -> None:
                 f"Lleft={fmt_lidar_cm(left_lidar_cm)}  "
                 f"blocked_cnt={blocked_counter}"
             )
-
-            # Extra debug line to see WHY it's blocked
             if front_blocked or left_blocked or right_blocked or back_blocked:
                 print(
                     f"[AutoDrive][DBG] front_near_nf={front_near_nf} "
@@ -1053,8 +855,6 @@ def main() -> None:
                     f"Lfb={front_block_lidar} Lrb={right_block_lidar} "
                     f"Lbb={back_block_lidar} Llb={left_block_lidar}"
                 )
-
-            # Timing
             dt = loop_period - (time.time() - t0)
             if dt > 0:
                 time.sleep(dt)

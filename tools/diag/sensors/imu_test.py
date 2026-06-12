@@ -1,21 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-imu_test.py
-IMU (BNO055) diagnostic streamer + health checker for Robot Savo
-Author: Robot Savo
-
-FEATURES
----------------------------------------------------------------
-- IMU-only (acc+gyro) or NDOF (fusion with magnetometer).
-- Live stream at a fixed sample rate (e.g. 25 Hz).
-- Motion-aware health grading (grades when stationary).
-- Stats summary (mean/std) over the streamed window.
-- CSV logging for offline analysis.
-- Clear PASS/CAUTION/FAIL reasons.
-
-
-"""
+"""BNO055 IMU diagnostic streamer with motion-aware health grading."""
 
 import argparse
 import math
@@ -31,8 +16,6 @@ try:
 except Exception:
     print("ERROR: smbus2 is required. Install with: pip3 install smbus2", file=sys.stderr)
     raise
-
-# ---------------- BNO055 minimal map ----------------
 BNO055_ADDRESS_A         = 0x28
 BNO055_ID                = 0xA0
 BNO055_PAGE_ID_ADDR      = 0x07
@@ -57,8 +40,6 @@ OPERATION_MODE_NDOF      = 0x0C
 
 # Units: metric + deg + dps + °C
 UNIT_SEL_METRIC_DEG_DPS_C = 0b00000000
-
-# --- Correct scales (datasheet with above units) ---
 # Accel: 1 LSB = 0.01 m/s² → scale = 1/100
 # Gyro : 1 LSB = 1/16 dps  → scale = 1/16
 # Euler: 1 LSB = 1/16 deg  → already deg scale
@@ -141,8 +122,6 @@ class BNO055:
         self.write8(BNO055_SYS_TRIGGER_ADDR, 0x00)
         time.sleep(0.01)
         self.set_mode(OPERATION_MODE_IMU if imu_only else OPERATION_MODE_NDOF)
-
-    # Reads
     def chip_id(self) -> int:      return self.read8(BNO055_CHIP_ID_ADDR)
     def sys_status(self) -> int:   return self.read8(BNO055_SYS_STATUS_ADDR)
     def sys_err(self) -> int:      return self.read8(BNO055_SYS_ERR_ADDR)
@@ -162,8 +141,6 @@ class BNO055:
     def read_accel(self): return self.read_vec3(BNO055_ACCEL_DATA_X_LSB, ACC_SCALE)
     def read_gyro(self):  return self.read_vec3(BNO055_GYRO_DATA_X_LSB, GYR_SCALE)
     def read_mag(self):   return self.read_vec3(BNO055_MAG_DATA_X_LSB, MAG_SCALE)
-
-# ---------------- helpers ----------------
 def mag3(x,y,z):
     return math.sqrt(x*x + y*y + z*z)
 
@@ -192,8 +169,6 @@ def compute_rms(vals: List[float]) -> float:
 
 def grade_health(reasons: List[str]) -> str:
     return "C" if any(r.startswith("MAJOR:") for r in reasons) else ("B" if reasons else "A")
-
-# ---------------- main ----------------
 def main():
     ap = argparse.ArgumentParser(description="Robot Savo BNO055 IMU diagnostic (LiDAR+Motion aware)")
     ap.add_argument("--bus", type=int, default=1)
@@ -213,8 +188,6 @@ def main():
     ap.add_argument("--acc_std_th", type=float, default=0.15, help="m/s² threshold for MOVING")
     ap.add_argument("--window", type=int, default=20, help="window (samples) for motion/vibe calc")
     args = ap.parse_args()
-
-    # Output sink
     out = None
     if args.out:
         out = open(args.out, "w", buffering=1)
@@ -223,8 +196,6 @@ def main():
         print(s)
         if out:
             print(s, file=out)
-
-    # Connect sensor
     bno = BNO055(bus=args.bus, addr=args.addr)
     chip = bno.chip_id()
     if chip != BNO055_ID:
@@ -235,8 +206,6 @@ def main():
 
     bno.reset()
     bno.initialize(imu_only=args.imu_only)
-
-    # Status banner
     sys_stat = bno.sys_status()
     sys_err  = bno.sys_err()
     calib = bno.calib_tuple()
@@ -250,8 +219,6 @@ def main():
     _print(f"Mode: {mode}  Rate: {args.rate:.1f} Hz  Samples: {args.samples}")
     if tag:
         _print(f"TAG: {tag}")
-
-    # Headers
     if args.csv:
         cols = [
             "t_s","sys_stat","sys_err","c_sys","c_gyr","c_acc","c_mag",
@@ -266,8 +233,6 @@ def main():
         _print("\n time_s | sys err calib(S,G,A,M) | yaw/heading  roll   pitch |"
                " acc_x   acc_y   acc_z  | gyro_x  gyro_y  gyro_z | mag_uT | temp_C | moving | vibe")
         _print("-" * 132)
-
-    # Buffers for stats + motion windows
     ax_all: List[float] = []
     ay_all: List[float] = []
     az_all: List[float] = []
@@ -310,8 +275,6 @@ def main():
                 b_mag = None
         temp_c = bno.temperature_c()
         t = t_loop - t0
-
-        # Motion/vibration window update
         if args.detect_motion:
             for buf,val in ((win_ax,ax),(win_ay,ay),(win_az,az),(win_gx,gx),(win_gy,gy),(win_gz,gz)):
                 buf.append(val)
@@ -319,7 +282,6 @@ def main():
                     buf.pop(0)
 
             if len(win_ax) >= max(5, args.window//2):
-                # accel std and gyro RMS
                 def _std(ws: List[float]) -> float:
                     n=len(ws)
                     if n<2:
@@ -344,13 +306,9 @@ def main():
         else:
             moving = 0
             vibe_score = 0.0
-
-        # Record stat buffers
         ax_all.append(ax); ay_all.append(ay); az_all.append(az)
         gz_all.append(gz)
         gnorm_all.append(mag3(ax,ay,az))
-
-        # Emit row
         if args.csv:
             row = [
                 f"{t:.2f}", str(sys_stat), str(sys_err), str(c_sys), str(c_gyr), str(c_acc), str(c_mag),
@@ -375,14 +333,10 @@ def main():
                    f"{ax:7.3f} {ay:7.3f} {az:7.3f} |"
                    f"{gx:7.3f} {gy:7.3f} {gz:7.3f} |"
                    f"{bmag_s} | {temp_c:6.1f} |   {moving:d}    | {vibe_score:5.3f}")
-
-        # pacing
         dt = time.monotonic() - t_loop
         slp = period - dt
         if slp > 0:
             time.sleep(slp)
-
-    # ------- Summary -------
     if args.stats or args.health:
         _print("\n--- Summary ---")
 
@@ -457,8 +411,6 @@ def main():
 
     if out:
         out.close()
-
-    # Exit with pass/fail when --health was requested
     if args.health:
         sys.exit(exit_code)
 

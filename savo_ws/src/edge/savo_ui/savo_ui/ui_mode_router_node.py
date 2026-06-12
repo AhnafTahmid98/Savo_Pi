@@ -1,56 +1,5 @@
 #!/usr/bin/env python3
-"""
-Robot Savo — UI mode router node (v2)
-
-Purpose
-=======
-Decides which UI mode to show on the 7" display based on:
-
-- Mapping state
-- Latest LLM intent result
-
-Inputs
-======
-- /savo_mapping/mapping_active         (std_msgs/Bool)
-- /savo_intent/intent_result           (savo_msgs/IntentResult)
-
-Outputs
-=======
-- /savo_ui/mode                        (std_msgs/String)
-    "INTERACT" / "NAVIGATE" / "MAP"
-
-- /savo_ui/status_text                 (std_msgs/String)
-    Short human-readable message for the current mode.
-
-Parameters (ROS)
-================
-- robot_id                (string, default: "robot_savo_pi")
-    Only process IntentResult with matching robot_id (if non-empty).
-
-- mapping_active_topic    (string, default: "/savo_mapping/mapping_active")
-
-- idle_status_text        (string, default: "Hello, I am Robot Savo!")
-    Used when in INTERACT mode with no special condition.
-
-- mapping_status_text     (string, default: "Mapping in progress, please keep distance.")
-
-- stopped_status_text     (string, default: "Stopped here.")
-
-- status_from_reply       (bool, default: True)
-    If true and last IntentResult has non-empty reply_text, use it as status in
-    NAVIGATE mode (truncated).
-
-- nav_mode_timeout_s      (double, default: 20.0)
-    How long after a NAVIGATE/FOLLOW intent we keep NAVIGATE mode active.
-
-- stopped_mode_timeout_s  (double, default: 10.0)
-    How long after a STOP intent we keep showing stopped_status_text.
-
-Notes
-=====
-- This node is **optional**. You can disable it and publish /savo_ui/mode
-  and /savo_ui/status_text yourself.
-"""
+"""Route display mode from mapping state and the latest intent result."""
 
 from __future__ import annotations
 

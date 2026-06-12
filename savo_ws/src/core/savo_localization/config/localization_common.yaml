@@ -52,7 +52,6 @@ wheel_odom_node:
     decoding: 4
     gear: 1.0
 
-    # Optional clamps (not enforced in current C++ code, kept for future)
     max_wheel_speed_mps: 2.0
     max_yaw_rate_rps: 6.0
 

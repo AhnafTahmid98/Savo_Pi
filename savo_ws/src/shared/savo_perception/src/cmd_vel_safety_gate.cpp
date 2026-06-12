@@ -1,31 +1,4 @@
-// File: savo_ws/src/savo_perception/src/cmd_vel_safety_gate.cpp
-//
-// Robot Savo — CmdVel Safety Gate (C++ / rclcpp)
-// ---------------------------------------------
-// Purpose:
-//   Safety layer that sits between any /cmd_vel source (Nav2, teleop, etc.)
-//   and the motor driver. It enforces an immediate STOP and/or a global
-//   slowdown factor produced by your perception safety stack.
-//
-// Subscribes:
-//   - /cmd_vel                (geometry_msgs::msg::Twist)
-//   - /safety/stop            (std_msgs::msg::Bool)
-//   - /safety/slowdown_factor (std_msgs::msg::Float32)  [0..1], optional
-//
-// Publishes:
-//   - /cmd_vel_safe           (geometry_msgs::msg::Twist)
-//
-// Behavior (high level):
-//   - If STOP asserted -> publish zero Twist immediately.
-//   - Else apply global slowdown factor to vx, vy, omega_z (optional).
-//   - Fail-safe: if stop topic is stale and fail_safe_on_stale==true -> zero Twist.
-//   - Optional timer mode: re-publish last gated command at publish_hz to keep output alive.
-//
-// Notes:
-//   - This is intentionally simple and deterministic.
-//   - Directional scaling (vx/vy) can be added later when you enable it in YAML.
-//
-// Author: Robot Savo (savo_perception)
+// Safety gate for /cmd_vel: stop wins, then optional global slowdown.
 
 #include "savo_perception/safety_gate.hpp"
 
@@ -41,9 +14,7 @@ CmdVelSafetyGate::CmdVelSafetyGate(const rclcpp::NodeOptions & options)
 {
   declare_and_get_params_();
 
-  // QoS:
-  // - cmd_vel is commonly RELIABLE from Nav2/teleop
-  // - safety signals are "sensor-ish", BEST_EFFORT is fine and reduces backpressure
+  // Safety signals are sensor-like; BEST_EFFORT avoids backpressure.
   rclcpp::QoS qos_cmd(rclcpp::KeepLast(10));
   qos_cmd.reliable();
 
@@ -67,8 +38,7 @@ CmdVelSafetyGate::CmdVelSafetyGate(const rclcpp::NodeOptions & options)
     qos_safety,
     std::bind(&CmdVelSafetyGate::on_slow_, this, std::placeholders::_1));
 
-  // Optional timer publishing:
-  // Useful if downstream expects periodic commands even when upstream is quiet.
+  // Timer mode keeps downstream drivers alive when upstream publishes sparsely.
   if (p_.publish_hz > 0.0) {
     const double hz = std::max(1.0, std::min(p_.publish_hz, 200.0));
     timer_ = create_wall_timer(
@@ -94,25 +64,20 @@ CmdVelSafetyGate::CmdVelSafetyGate(const rclcpp::NodeOptions & options)
 
 void CmdVelSafetyGate::declare_and_get_params_()
 {
-  // Topics
   declare_parameter<std::string>("cmd_in_topic", p_.cmd_in_topic);
   declare_parameter<std::string>("cmd_out_topic", p_.cmd_out_topic);
   declare_parameter<std::string>("stop_topic", p_.stop_topic);
   declare_parameter<std::string>("slowdown_topic", p_.slowdown_topic);
 
-  // Fail-safe / staleness
   declare_parameter<bool>("fail_safe_on_stale", p_.fail_safe_on_stale);
   declare_parameter<double>("stale_timeout_s", p_.stale_timeout_s);
 
-  // Slowdown
   declare_parameter<bool>("use_slowdown", p_.use_slowdown);
   declare_parameter<double>("min_scale", static_cast<double>(p_.min_scale));
   declare_parameter<double>("max_scale", static_cast<double>(p_.max_scale));
 
-  // Publishing
   declare_parameter<double>("publish_hz", p_.publish_hz);
 
-  // Load
   p_.cmd_in_topic = get_parameter("cmd_in_topic").as_string();
   p_.cmd_out_topic = get_parameter("cmd_out_topic").as_string();
   p_.stop_topic = get_parameter("stop_topic").as_string();

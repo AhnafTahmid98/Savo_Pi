@@ -1,23 +1,7 @@
-# Robot Savo — Range Safety Configuration (Front: Depth + Ultrasonic, Sides: ToF L/R)
-# File: Savo_Pi/src/savo_perception/config/range_safety.yaml
-#
-# Purpose:
-#  - Near-field safety thresholds + stability settings (debounce/hysteresis/stale)
-#  - Single source of truth for your safety stack parameters
-#
-# Used by:
-#  - savo_perception/nodes/safety_stop_node.py  (this file is passed as --params-file)
-#
-# Robot mounting (latest):
-#  - FRONT: RealSense D435 front-min + Ultrasonic (backup)
-#  - SIDES: VL53L1X ToF LEFT + RIGHT
-#  - LiDAR: for SLAM/Nav2 costmaps (not configured here)
+# Front sensors are RealSense depth plus ultrasonic backup; sides are VL53L1X ToF.
 
 safety_stop_node:
   ros__parameters:
-    # -----------------------------
-    # Topic names (LOCKED CONTRACT)
-    # -----------------------------
     depth_topic: "/depth/min_front_m"
     ultrasonic_topic: "/savo_perception/range/front_ultrasonic_m"
     left_topic: "/savo_perception/range/left_m"
@@ -26,68 +10,46 @@ safety_stop_node:
     stop_topic: "/safety/stop"
     slowdown_topic: "/safety/slowdown_factor"
 
-    # -----------------------------
-    # Global safety behavior
-    # -----------------------------
-    # If true: if required sensor topic becomes stale/missing -> STOP (fail-safe)
+    # Missing or stale required sensor data forces stop.
     fail_safe_on_stale: true
     stale_timeout_s: 1.0
 
 
-    # Clamp invalid readings (reject spikes / zeros / nonsense)
     min_valid_m: 0.02
     max_valid_m: 3.00
 
-    # -----------------------------
-    # Enable/disable inputs (future-proof)
-    # -----------------------------
     enable_depth_front: true
     enable_ultrasonic_front: true
     enable_tof_left: true
     enable_tof_right: true
 
-    # -----------------------------
-    # FRONT safety (Depth + Ultrasonic)
-    # -----------------------------
     front_stop_m: 0.28
     front_slow_m: 0.60
     front_hysteresis_m: 0.06
     front_stop_debounce_count: 2
     front_clear_debounce_count: 4
 
-    # Sensor preference (front): depth primary, ultrasonic backup
+    # Depth is the primary front signal; ultrasonic is a backup.
     depth_weight: 1.00
     ultrasonic_weight: 0.50
 
-    # -----------------------------
-    # SIDE safety (ToF left/right)
-    # -----------------------------
     side_stop_m: 0.20
     side_slow_m: 0.45
     side_hysteresis_m: 0.05
     side_stop_debounce_count: 2
     side_clear_debounce_count: 4
 
-    # If true: very close side obstacle can force global STOP.
-    # Recommended false for mecanum (prefer directional scaling later).
+    # Mecanum should not global-stop on side proximity until directional scaling is wired.
     global_stop_on_side: false
 
-    # -----------------------------
-    # Slowdown publishing (recommended)
-    # -----------------------------
     publish_global_factor: true
     min_global_scale: 0.20
     ema_alpha: 0.35
 
-    # Directional scaling (future feature)
     publish_directional: false
     slowdown_vx_topic: "/safety/slowdown_vx"
     slowdown_vy_topic: "/safety/slowdown_vy"
 
-    # -----------------------------
-    # Optional sensor-rate hints (informational / future use)
-    # (Your safety node may ignore these; keeping them for completeness.)
-    # -----------------------------
     tof_publish_hz: 25.0
     ultrasonic_publish_hz: 15.0
     tof_filter_window: 5

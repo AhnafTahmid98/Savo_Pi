@@ -1,28 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Robot Savo — Expert PCA9685 Mecanum Teleop (NO ROS2, letters only)
-------------------------------------------------------------------
-Controls
-  W / S : forward / backward
-  A / D : strafe left / right
-  Q / E : rotate CCW / CW
-  W + A = forward-left
-  W + D = forward-right
-  S + A = backward-left
-  S + D = backward-right
-  X or SPACE : stop (zero all)
-  Z / C : speed scale down / up
-  R : reset velocities & scale
-  ESC : quit
-
-Author: Robot Savo
-"""
+"""Direct PCA9685 mecanum teleop diagnostic."""
 
 import sys, time, tty, termios, select, math, argparse
 import smbus
-
-# ================== PCA9685 (embedded) ==================
 class PCA9685:
     __SUBADR1=0x02; __SUBADR2=0x03; __SUBADR3=0x04
     __MODE1=0x00;   __PRESCALE=0xFE
@@ -71,16 +52,8 @@ class PCA9685:
 
     def close(self) -> None:
         self.bus.close()
-
-# ================== Robot motor wrapper ==================
 class RobotSavo:
-    """
-    Channel map (locked to your earlier code):
-      FL (front-left)  : (0,1)
-      RL (rear-left)   : (3,2)
-      FR (front-right) : (6,7)
-      RR (rear-right)  : (4,5)
-    """
+    """Locked channel map: FL=(0,1), RL=(3,2), FR=(6,7), RR=(4,5)."""
     def __init__(self, *, i2c_bus: int, addr: int, pwm_freq: float,
                  inv=(+1,+1,+1,+1), quench_ms: int = 18):
         self.pwm = PCA9685(bus=i2c_bus, address=addr, debug=True)
@@ -89,7 +62,6 @@ class RobotSavo:
         self.quench_ms = max(0, int(quench_ms))
         self._last_sign = {'fl':0,'rl':0,'fr':0,'rr':0}
 
-    # low-level wheel writers (positive = IN_hi on 2nd channel of each pair)
     def _wheel_fl(self, d):
         if   d > 0:  self.pwm.set_motor_pwm(0,0);   self.pwm.set_motor_pwm(1,d)
         elif d < 0:  self.pwm.set_motor_pwm(1,0);   self.pwm.set_motor_pwm(0,-d)
@@ -136,8 +108,6 @@ class RobotSavo:
     def close(self): 
         try: self.stop()
         finally: self.pwm.close()
-
-# ================== Terminal helpers (letters only) ==================
 class RawTerminal:
     def __enter__(self):
         self.fd = sys.stdin.fileno()
@@ -148,26 +118,15 @@ class RawTerminal:
         termios.tcsetattr(self.fd, termios.TCSADRAIN, self.old)
 
 def read_key():
-    """
-    Non-blocking single-char reader (letters/space/ESC only).
-    Returns: 'w','a','s','d','q','e','x',' ','z','c','r','esc',''
-    """
+    """Read one teleop key without blocking."""
     r,_,_ = select.select([sys.stdin], [], [], 0)
     if not r: return ''
     ch = sys.stdin.read(1)
     if ch == '\x1b':   # ESC
         return 'esc'
     return ch.lower()
-
-# ================== Kinematics ==================
 def mix_mecanum(vx, vy, wz, *, forward_sign, strafe_sign, rotate_sign, turn_gain):
-    """
-    Return normalized wheel commands (fl, rl, fr, rr) in [-1..1].
-      fl =  vx - vy - w
-      rl =  vx + vy - w
-      fr =  vx + vy + w
-      rr =  vx - vy + w
-    """
+    """Return normalized wheel commands using the local mecanum sign convention."""
     vx *= forward_sign
     vy *= strafe_sign
     w  = rotate_sign * turn_gain * wz
@@ -180,8 +139,6 @@ def mix_mecanum(vx, vy, wz, *, forward_sign, strafe_sign, rotate_sign, turn_gain
 
 def to_duties(nfl, nrl, nfr, nrr, max_duty):
     return int(nfl*max_duty), int(nrl*max_duty), int(nfr*max_duty), int(nrr*max_duty)
-
-# ================== Poke (diagnostic) ==================
 def run_poke(bot: RobotSavo, duty: int = 1200, hold_s: float = 0.6, gap_s: float = 0.4):
     seq = [
         ("FL +", ( duty,    0,    0,    0)), ("FL -", (-duty,    0,    0,    0)),
@@ -196,35 +153,24 @@ def run_poke(bot: RobotSavo, duty: int = 1200, hold_s: float = 0.6, gap_s: float
             bot.stop(); time.sleep(gap_s)
     finally:
         bot.stop()
-
-# ================== Main (teleop) ==================
 def main():
     ap = argparse.ArgumentParser(description="Robot Savo — Expert PCA9685 Mecanum Teleop (letters only)")
-    # hardware
     ap.add_argument("--i2c-bus", type=int, default=1, help="I²C bus number (default: 1)")
     ap.add_argument("--addr", type=lambda x:int(x,0), default=0x40, help="PCA9685 I²C addr (default: 0x40)")
     ap.add_argument("--pwm-freq", type=float, default=50.0, help="PWM frequency Hz (default: 50.0)")
-
-    # control loop & scale
     ap.add_argument("--hz", type=float, default=30.0, help="Control loop Hz (default: 30)")
     ap.add_argument("--max-duty", type=int, default=3000, help="Max duty (0..4095) (default: 3000)")
     ap.add_argument("--step", type=float, default=0.15, help="Increment per keypress (default: 0.15)")
     ap.add_argument("--decay", type=float, default=0.85, help="Decay factor (0..1, higher = coast) (default: 0.85)")
-
-    # kinematics signs & turn gain
     ap.add_argument("--forward-sign", type=int, choices=[-1,1], default=-1, help="Flip forward axis (+1/-1) (default: -1)")
     ap.add_argument("--strafe-sign", type=int, choices=[-1,1], default=+1, help="Flip strafe axis (+1/-1) (default: +1)")
     ap.add_argument("--rotate-sign", type=int, choices=[-1,1], default=+1, help="Flip rotate axis (+1/-1) (default: +1)")
     ap.add_argument("--turn-gain", type=float, default=1.0, help="Rotation gain (default: 1.0)")
-
-    # per-wheel invert & quench
     ap.add_argument("--invert-fl", action="store_true", help="Invert FL wheel")
     ap.add_argument("--invert-rl", action="store_true", help="Invert RL wheel")
     ap.add_argument("--invert-fr", action="store_true", help="Invert FR wheel")
     ap.add_argument("--invert-rr", action="store_true", help="Invert RR wheel")
     ap.add_argument("--quench-ms", type=int, default=18, help="Neutral ms on sign flip (0 to disable) (default: 18)")
-
-    # modes
     ap.add_argument("--poke", action="store_true", help="Run wheel poke test and exit")
     ap.add_argument("--timeout", type=float, default=0.0, help="Auto-exit after N seconds (0=off)")
 
@@ -251,8 +197,6 @@ def main():
         finally:
             bot.close()
         return
-
-    # Teleop
     vx = vy = wz = 0.0
     max_duty  = max(0, min(4095, args.max_duty))
     step      = args.step
@@ -269,7 +213,6 @@ def main():
             last = time.time()
             t0 = last
             while True:
-                # optional timeout
                 if args.timeout and (time.time() - t0) >= args.timeout:
                     print("[info] timeout reached, exiting.")
                     break
@@ -295,13 +238,9 @@ def main():
                         max_duty  = max(0, min(4095, args.max_duty))
                         turn_gain = args.turn_gain
                         print("[reset] zeroed; scale/turn_gain reset.")
-
-                # smooth decay toward zero
                 now = time.time(); dt = now - last; last = now
                 d = decay ** (dt * hz)
                 vx *= d; vy *= d; wz *= d
-
-                # mix and send
                 fl, rl, fr, rr = mix_mecanum(vx, vy, wz,
                     forward_sign=args.forward_sign,
                     strafe_sign=args.strafe_sign,
@@ -309,8 +248,6 @@ def main():
                     turn_gain=turn_gain)
                 dfl, drl, dfr, drr = to_duties(fl, rl, fr, rr, max_duty)
                 bot.set_motor_model(dfl, drl, dfr, drr)
-
-                # ~hz loop
                 sleep_left = (1.0/hz) - (time.time()-now)
                 if sleep_left > 0: time.sleep(sleep_left)
 

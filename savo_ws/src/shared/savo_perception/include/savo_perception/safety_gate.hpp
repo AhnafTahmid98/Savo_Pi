@@ -1,4 +1,3 @@
-// File: Savo_Pi/src/savo_perception/include/savo_perception/safety_gate.hpp
 #pragma once
 
 #include <algorithm>

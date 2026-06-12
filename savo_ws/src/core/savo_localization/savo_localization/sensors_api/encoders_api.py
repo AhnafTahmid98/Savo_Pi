@@ -106,7 +106,6 @@ class _QuadSide:
         lgpio.gpio_claim_input(h, a)
         lgpio.gpio_claim_input(h, b)
 
-        # Pull-ups (harmless if ignored by driver)
         if self.pullup:
             try:
                 lgpio.gpio_set_flags(h, a, lgpio.BIAS_PULL_UP)

@@ -1,15 +1,11 @@
 #pragma once
 
-// Centralized topic and frame name constants for savo_control.
-
 namespace savo_control
 {
 namespace topic_names
 {
 
-// -----------------------------------------------------------------------------
 // command sources
-// -----------------------------------------------------------------------------
 inline constexpr const char * kCmdVelManual = "/cmd_vel_manual";
 inline constexpr const char * kCmdVelAuto   = "/cmd_vel_auto";
 inline constexpr const char * kCmdVelNav    = "/cmd_vel_nav";      // Nav2 controller output (remapped)
@@ -22,19 +18,15 @@ inline constexpr const char * kCmdVelSafe        = "/cmd_vel_safe";  // output o
 inline constexpr const char * kCmdVelRaw = "/cmd_vel_raw";
 inline constexpr const char * kCmdVelTestPattern = "/cmd_vel_test_pattern";
 
-// -----------------------------------------------------------------------------
 // localization / state feedback
-// -----------------------------------------------------------------------------
-// stable name regardless of encoder count
+// Stable name regardless of encoder count.
 inline constexpr const char * kWheelOdom     = "/wheel/odom";
 inline constexpr const char * kOdomFiltered  = "/odometry/filtered";
 
 inline constexpr const char * kImuData       = "/imu/data";
 inline constexpr const char * kImuDataRaw    = "/imu/data_raw";
 
-// -----------------------------------------------------------------------------
 // perception safety interfaces
-// -----------------------------------------------------------------------------
 inline constexpr const char * kSafetyStop           = "/safety/stop";
 inline constexpr const char * kSafetySlowdownFactor = "/safety/slowdown_factor";
 
@@ -43,9 +35,7 @@ inline constexpr const char * kRangeFrontUltrasonic = "/savo_perception/range/fr
 inline constexpr const char * kRangeLeft            = "/savo_perception/range/left_m";
 inline constexpr const char * kRangeRight           = "/savo_perception/range/right_m";
 
-// -----------------------------------------------------------------------------
 // control package internal topics
-// -----------------------------------------------------------------------------
 inline constexpr const char * kControlModeCmd       = "/savo_control/mode_cmd";
 inline constexpr const char * kControlModeState     = "/savo_control/mode_state";
 
@@ -73,9 +63,6 @@ inline constexpr const char * kRecoveryStatus       = "/savo_control/recovery_st
 inline constexpr const char * kControlStatus        = "/savo_control/control_status";
 inline constexpr const char * kControlDebug         = "/savo_control/control_debug";
 
-// -----------------------------------------------------------------------------
-// frame IDs
-// -----------------------------------------------------------------------------
 inline constexpr const char * kFrameMap      = "map";
 inline constexpr const char * kFrameOdom     = "odom";
 inline constexpr const char * kFrameBaseLink = "base_link";

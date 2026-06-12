@@ -42,9 +42,6 @@ struct PidConfig
   // (recommended default behavior)
   bool freeze_integral_on_invalid_dt {true};
 
-  // If true, derivative is computed on measurement change (caller must supply
-  // measurement path separately; current class computes derivative on error only).
-  // Reserved for future compatibility / clarity in config files.
   bool derivative_on_measurement {false};
 
   // Helper utilities

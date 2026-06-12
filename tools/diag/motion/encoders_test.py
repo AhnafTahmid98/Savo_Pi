@@ -1,11 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Robot Savo — 4 Wheel Encoder Test
-
-Reads four quadrature wheel encoders on Raspberry Pi 5 using lgpio.
-Designed for Robot Savo's external 12k pull-up wiring.
-"""
+"""Four-wheel encoder diagnostic for Pi 5 lgpio wiring."""
 
 import argparse
 import csv
@@ -186,12 +181,7 @@ def wheel_speed_mps(delta_count, dt, counts_per_wheel_rev, wheel_dia_m):
 
 
 def estimate_mecanum_body_velocity(fl_v, fr_v, rl_v, rr_v, wheelbase_m, track_m):
-    """
-    Diagnostic mecanum estimate.
-
-    Sign conventions may need adjustment after motor/encoder direction calibration.
-    This is mainly for checking whether values are plausible.
-    """
+    """Rough mecanum estimate; signs depend on motor/encoder calibration."""
     radius_sum = max(1e-9, wheelbase_m + track_m)
 
     vx = (fl_v + fr_v + rl_v + rr_v) / 4.0

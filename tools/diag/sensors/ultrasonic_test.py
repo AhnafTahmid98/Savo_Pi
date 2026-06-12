@@ -1,25 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Robot Savo — Ultrasonic Tester (gpiozero)
------------------------------------------
-- Works with Freenove HAT (5V sensor, level-shifted to 3.3V).
-- Defaults: TRIG=27, ECHO=22 (per your board).
-- Uses gpiozero DistanceSensor (robust on this HAT).
-- Pin factory selectable: lgpio (default) or pigpio (higher timing accuracy).
-- Optional buzzer on BCM17 for near-field alert.
-
-Author: Robot Savo
-
-"""
+"""HC-SR04 ultrasonic diagnostic for the Freenove HAT wiring."""
 
 import argparse
 import csv
 import sys
 import time
 from statistics import mean, pstdev
-
-# gpiozero + pin factories
 try:
     from gpiozero import DistanceSensor, Device
     from gpiozero.pins.lgpio import LGPIOFactory
@@ -45,10 +32,7 @@ def choose_factory(name: str):
         Device.pin_factory = LGPIOFactory()
 
 def make_sensor(trig: int, echo: int, max_m: float, queue_len: int = 1) -> DistanceSensor:
-    """
-    queue_len=1 (no extra smoothing) → better for diagnostics.
-    gpiozero returns distance in meters [0..max_distance], or inf for no echo.
-    """
+    """Use queue_len=1 so diagnostic readings are not smoothed."""
     return DistanceSensor(echo=echo, trigger=trig, max_distance=max_m, queue_len=queue_len)
 
 def maybe_beep(buzzer_pin: int | None, near: bool, last_state: list):
@@ -82,15 +66,9 @@ def main():
     ap.add_argument("--tag", type=str, default=None, help="Optional tag for CSV rows")
     ap.add_argument("--factory", choices=["lgpio", "pigpio"], default="lgpio", help="Pin factory (default lgpio)")
     args = ap.parse_args()
-
-    # Pin factory
     choose_factory(args.factory)
-
-    # Create sensor
     sensor = make_sensor(args.trig, args.echo, args.max, queue_len=1)
     sensor.threshold_distance = args.thresh  # informational (not used for events here)
-
-    # CSV setup
     writer = None; fcsv = None
     if args.csv:
         try:
@@ -135,8 +113,6 @@ def main():
             n += 1
             if args.samples > 0 and n >= args.samples:
                 break
-
-            # rate control
             dt = time.time() - t0
             left = period - dt
             if left > 0:

@@ -1,18 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Robot Savo — Faster-Whisper engine wrapper.
-
-This module provides a thin, robust wrapper around faster-whisper so that
-ROS 2 nodes (like stt_node.py) can use a simple Python class instead of
-dealing with model loading and transcription options directly.
-
-Design goals:
-- Hide faster-whisper internals behind a small, stable API.
-- Keep configuration minimal but explicit (model path, device, compute_type).
-- Be safe to call in a loop from STTNode's timer callback.
-- Allow STTNode to override language / beam_size per call if needed.
-"""
+"""Small faster-whisper wrapper used by the STT node."""
 
 from __future__ import annotations
 
@@ -26,21 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class FasterWhisperEngine:
-    """
-    Wrapper around faster-whisper's WhisperModel.
-
-    Typical usage:
-
-        engine = FasterWhisperEngine(
-            model_size_or_path="small.en",
-            device="cpu",
-            compute_type="int8",
-            language="en",
-            beam_size=3,
-        )
-
-        text = engine.transcribe_block(audio_np_float32_16k, sample_rate=16000)
-    """
+    """Wrapper around faster-whisper's WhisperModel."""
 
     def __init__(
         self,
@@ -50,23 +24,7 @@ class FasterWhisperEngine:
         language: str = "en",
         beam_size: int = 5,
     ) -> None:
-        """
-        Initialize the WhisperModel.
-
-        Parameters
-        ----------
-        model_size_or_path : str
-            e.g. "tiny", "small.en", "/path/to/local/model".
-        device : str
-            "cpu", "cuda", or "auto". On the Pi, use "cpu".
-        compute_type : str
-            e.g. "int8", "int8_float16", "float16", "float32".
-            "int8" is recommended on ARM for speed & memory.
-        language : str
-            Language code, e.g. "en" for English.
-        beam_size : int
-            Default beam size for beam search. 3–5 is a good trade-off.
-        """
+        """Load the Whisper model once."""
         self.model_size_or_path = model_size_or_path
         self.device = device
         self.compute_type = compute_type
@@ -87,7 +45,6 @@ class FasterWhisperEngine:
             self.beam_size,
         )
 
-        # Load the underlying WhisperModel.
         # This may take a few seconds on the Pi, so we do it once in __init__.
         self._model = WhisperModel(
             self.model_size_or_path,
@@ -96,11 +53,6 @@ class FasterWhisperEngine:
         )
 
         logger.info("FasterWhisperEngine model loaded successfully")
-
-    # ------------------------------------------------------------------ #
-    # Public API                                                         #
-    # ------------------------------------------------------------------ #
-
     def transcribe_block(
         self,
         audio: np.ndarray,
@@ -108,38 +60,15 @@ class FasterWhisperEngine:
         language: Optional[str] = None,
         beam_size: Optional[int] = None,
     ) -> str:
-        """
-        Transcribe a single audio block (mono float32, 16 kHz recommended).
-
-        Parameters
-        ----------
-        audio : np.ndarray
-            1D numpy array, float32, representing PCM audio at ~16 kHz.
-            The STTNode is responsible for ensuring the sample rate.
-        sample_rate : Optional[int]
-            Used only for logging / sanity checks. faster-whisper assumes
-            16 kHz PCM when given a numpy array.
-        language : Optional[str]
-            Override language for this call. If None, uses self.language.
-        beam_size : Optional[int]
-            Override beam_size for this call. If None, uses self.beam_size.
-
-        Returns
-        -------
-        text : str
-            The concatenated transcription for the block/utterance. Empty
-            string if nothing intelligible was recognized.
-        """
+        """Transcribe one mono float32 audio block."""
         if audio is None or audio.size == 0:
             logger.debug("transcribe_block() called with empty audio array")
             return ""
 
-        # Ensure we pass a float32 mono array to faster-whisper
         audio_f32 = np.asarray(audio, dtype=np.float32)
         if audio_f32.ndim != 1:
             audio_f32 = audio_f32.flatten()
 
-        # Effective settings for this call
         lang = language or self.language
         bs = int(beam_size or self.beam_size)
 
@@ -162,11 +91,7 @@ class FasterWhisperEngine:
             bs,
         )
 
-        # NOTE:
-        # - We use a simple configuration here: language, beam_size.
-        # - We do NOT enable built-in VAD (vad_filter=False) because the
-        #   STT node already uses energy-based gating / utterance buffering.
-        # - task="transcribe" for standard speech-to-text.
+        # STT nodes already do energy gating, so faster-whisper VAD stays off.
         try:
             segments, info = self._model.transcribe(
                 audio_f32,
@@ -186,26 +111,9 @@ class FasterWhisperEngine:
             text,
         )
         return text
-
-    # ------------------------------------------------------------------ #
-    # Internal helpers                                                   #
-    # ------------------------------------------------------------------ #
-
     @staticmethod
     def _segments_to_text(segments: Iterable) -> str:
-        """
-        Combine segments into a single clean string.
-
-        Parameters
-        ----------
-        segments : Iterable
-            Iterable of faster-whisper segment objects with .text attributes.
-
-        Returns
-        -------
-        text : str
-            Concatenated and stripped transcript.
-        """
+        """Combine faster-whisper segments into one clean string."""
         parts = []
         for seg in segments:
             seg_text = getattr(seg, "text", "")

@@ -1,20 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Robot Savo — Dual VL53L1X ToF API (Python-only, no ROS)
--------------------------------------------------------
-Why multiprocessing:
-- Many VL53L1X Python drivers keep global I2C state / are not safe across buses.
-- Running each sensor in its own process is the most reliable way.
-
-Locked mapping (project standard):
-- bus 1 @ 0x29 -> RIGHT  (FR in your older naming)
-- bus 0 @ 0x29 -> LEFT   (FL in your older naming)
-
-Public API:
-- DualVL53() : starts workers + provides get_latest()
-- get_latest() returns distances in meters + health/stale info
-"""
+"""Dual VL53L1X range diagnostic with process-isolated sensors."""
 
 from __future__ import annotations
 
@@ -33,9 +19,6 @@ I2C_ADDRESS = 0x29
 BUS_RIGHT = 1  # "FR"
 BUS_LEFT  = 0  # "FL"
 
-
-# ----------------------------- Data models -----------------------------
-
 @dataclass
 class SensorSample:
     raw_m: Optional[float]   # None if invalid
@@ -52,13 +35,8 @@ class DualVL53State:
     right_stale: bool
     left_stale: bool
 
-
-# ----------------------------- Worker helpers -----------------------------
-
 def _import_vl53_driver():
-    """
-    Import inside worker. Support common driver module names.
-    """
+    """Import the VL53L1X driver inside each worker process."""
     try:
         from VL53L1X import VL53L1X  # type: ignore
         return VL53L1X
@@ -71,9 +49,7 @@ def _import_vl53_driver():
 
 
 def _read_mm(sensor) -> Optional[int]:
-    """
-    Read distance in mm. Return None if invalid.
-    """
+    """Read distance in mm, returning None for invalid samples."""
     try:
         if hasattr(sensor, "get_distance"):
             d = sensor.get_distance()
@@ -103,12 +79,7 @@ def _median(hist: deque) -> Optional[float]:
 
 
 def _tof_worker(bus: int, role: str, rate_hz: float, median_n: int, stop_evt: Event, out_q: Queue):
-    """
-    Worker process:
-    - init VL53L1X on bus
-    - loop: read, filter, push ("data", role, raw_m, filt_m, t_mono)
-    - sends ("init_ok"/"init_error")
-    """
+    """Run one VL53L1X sensor in its own process."""
     try:
         VL53L1X = _import_vl53_driver()
         sensor = VL53L1X(i2c_bus=bus, i2c_address=I2C_ADDRESS)
@@ -170,13 +141,8 @@ def _tof_worker(bus: int, role: str, rate_hz: float, median_n: int, stop_evt: Ev
             pass
         out_q.put(("done", role, ""))
 
-
-# ----------------------------- Public API -----------------------------
-
 class DualVL53:
-    """
-    Dual VL53L1X ToF reader (RIGHT + LEFT) using one process per sensor.
-    """
+    """Dual VL53L1X reader using one process per sensor."""
 
     def __init__(
         self,
@@ -250,10 +216,7 @@ class DualVL53:
         self._procs.clear()
 
     def pump(self, max_msgs: int = 10) -> None:
-        """
-        Drain queue (non-blocking) and update latest samples.
-        Call this regularly in your main loop.
-        """
+        """Drain worker messages without blocking."""
         n = 0
         while n < max_msgs:
             try:
@@ -267,9 +230,7 @@ class DualVL53:
             n += 1
 
     def get_latest(self) -> DualVL53State:
-        """
-        Returns latest samples + health flags.
-        """
+        """Return latest samples and health flags."""
         self.pump()
 
         now = time.perf_counter()
@@ -287,9 +248,6 @@ class DualVL53:
             right_stale=right_stale,
             left_stale=left_stale,
         )
-
-
-# ----------------------------- CLI test (viewer) -----------------------------
 
 def _fmt_m(v: Optional[float]) -> str:
     return f"{v:6.3f}" if v is not None else "  --- "

@@ -1,20 +1,4 @@
-"""
-Robot Savo — Remote STT Client Node (Pi side)
-
-This node runs on the Pi and:
-  - Captures audio from the ReSpeaker mic using sounddevice
-  - Performs simple VAD + utterance detection
-  - Sends each utterance as a WAV file to a remote STT server
-  - Publishes the returned text to /savo_speech/stt_text
-
-The STT server is your PC/Mac STT microservice (FastAPI + faster-whisper),
-listening e.g. on http://robot-llm.local:9000/transcribe.
-
-Design goals:
-  - Do NOT modify existing stt_node / speech_bringup.
-  - This is an ALTERNATIVE STT path, selected via a different launch file.
-  - Keep parameters similar to your existing stt config.
-"""
+"""Pi-side STT client for a remote faster-whisper service."""
 
 from __future__ import annotations
 
@@ -35,10 +19,6 @@ from std_msgs.msg import String, Bool
 class RemoteSTTClientNode(Node):
     def __init__(self) -> None:
         super().__init__("remote_stt_client_node")
-
-        # ------------------------------------------------------------------
-        # Parameters
-        # ------------------------------------------------------------------
         self.declare_parameter("stt_server_url", "http://robot-llm.local:9000")
         self.declare_parameter("endpoint_path", "/transcribe")
         self.declare_parameter("sample_rate", 16000)
@@ -48,12 +28,11 @@ class RemoteSTTClientNode(Node):
         self.declare_parameter("max_utterance_duration_s", 10.0)
         self.declare_parameter("min_transcript_chars", 3)
 
-        # TTS gate (so robot doesn't transcribe its own voice)
+        # Prevent Robot Savo from transcribing its own speaker output.
         self.declare_parameter("tts_gate_enable", True)
         self.declare_parameter("tts_speaking_topic", "/savo_speech/tts_speaking")
         self.declare_parameter("tts_gate_cooldown_s", 0.8)
 
-        # Resolve parameter values
         self.stt_server_url: str = (
             self.get_parameter("stt_server_url").get_parameter_value().string_value
         )
@@ -113,10 +92,6 @@ class RemoteSTTClientNode(Node):
             f"  tts_gate_topic     : {self.tts_speaking_topic}\n"
             f"  tts_gate_cooldown  : {self.tts_gate_cooldown_s}"
         )
-
-        # ------------------------------------------------------------------
-        # ROS pubs/subs
-        # ------------------------------------------------------------------
         self.pub_text = self.create_publisher(String, "/savo_speech/stt_text", 10)
 
         self._tts_speaking: bool = False
@@ -129,10 +104,6 @@ class RemoteSTTClientNode(Node):
                 self._on_tts_speaking,
                 10,
             )
-
-        # ------------------------------------------------------------------
-        # Audio stream state
-        # ------------------------------------------------------------------
         self._buffer_blocks: list[np.ndarray] = []
         self._utterance_started: bool = False
         self._utterance_start_time: float = 0.0
@@ -153,10 +124,6 @@ class RemoteSTTClientNode(Node):
             raise
 
         self.get_logger().info("Remote STT client node is running.")
-
-    # ----------------------------------------------------------------------
-    # TTS speaking callback (gate)
-    # ----------------------------------------------------------------------
     def _on_tts_speaking(self, msg: Bool) -> None:
         self._tts_speaking = msg.data
         if msg.data:
@@ -168,26 +135,20 @@ class RemoteSTTClientNode(Node):
         now = time.time()
         if self._tts_speaking:
             return True
-        # Cooldown after TTS stops
         if now - self._tts_last_speaking_time < self.tts_gate_cooldown_s:
             return True
         return False
 
-    # ----------------------------------------------------------------------
-    # Audio callback / utterance logic
-    # ----------------------------------------------------------------------
     def _audio_callback(self, indata, frames, time_info, status) -> None:
         if status:
             self.get_logger().warn(f"Audio callback status: {status}")
 
-        # Always copy to avoid sounddevice buffer reuse issues
+        # sounddevice reuses callback buffers.
         block = indata.copy().astype(np.float32)
         energy = float(np.mean(block**2))
         now = time.time()
 
-        # If robot is speaking (TTS gate), do not build utterances
         if self._tts_gate_active():
-            # reset current utterance
             if self._utterance_started:
                 self._buffer_blocks.clear()
                 self._utterance_started = False
@@ -200,17 +161,14 @@ class RemoteSTTClientNode(Node):
                 self._utterance_started = True
                 self._utterance_start_time = now
                 self._buffer_blocks = []
-                # Optional: short log for debugging
                 self.get_logger().debug("Utterance started")
             self._buffer_blocks.append(block)
 
-            # Safety: cut off extremely long continuous speech
+            # Cut off stuck or continuous speech before it grows unbounded.
             if now - self._utterance_start_time > self.max_utterance_duration_s:
                 self._finish_utterance()
         else:
-            # Silence
             if self._utterance_started:
-                # One silent block after speech → finalize
                 self._finish_utterance()
 
     def _finish_utterance(self) -> None:
@@ -221,14 +179,11 @@ class RemoteSTTClientNode(Node):
 
         self._utterance_started = False
 
-        # Concatenate blocks into one 1D float32 array
         audio = np.concatenate(self._buffer_blocks, axis=0).flatten()
         self._buffer_blocks = []
 
-        # Convert to WAV bytes (16 kHz mono, PCM16)
         wav_bytes = self._to_wav_bytes(audio)
 
-        # Send to STT server
         try:
             self.get_logger().info(
                 f"Sending utterance to remote STT (len={len(wav_bytes)} bytes)..."
@@ -257,7 +212,6 @@ class RemoteSTTClientNode(Node):
 
     def _to_wav_bytes(self, audio: np.ndarray) -> bytes:
         """Convert float32 audio [-1.0, 1.0] to 16-bit mono WAV bytes."""
-        # Clip and scale
         audio = np.clip(audio, -1.0, 1.0)
         int16 = np.int16(audio * 32767.0)
 
@@ -269,9 +223,6 @@ class RemoteSTTClientNode(Node):
             wf.writeframes(int16.tobytes())
         return buf.getvalue()
 
-    # ----------------------------------------------------------------------
-    # Shutdown
-    # ----------------------------------------------------------------------
     def destroy_node(self) -> None:
         try:
             if hasattr(self, "_stream"):

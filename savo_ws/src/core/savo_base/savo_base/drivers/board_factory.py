@@ -70,7 +70,6 @@ class FreenoveMecanumFactoryConfig:
     quench_ms: int = 18
     max_duty: int = 3000
     debug: bool = False
-    # Future-safe extension storage (ignored by current strict constructor attempts)
     extra: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -294,7 +293,7 @@ def create_freenove_mecanum_board(cfg: FreenoveMecanumFactoryConfig):
     pwm_freq_hz = _validate_pwm_freq_hz(cfg.pwm_freq_hz)
     wheel_inverts = _validate_sign_tuple4("wheel_inverts", cfg.wheel_inverts)
     quench_ms = _validate_quench_ms(cfg.quench_ms)
-    _ = _validate_max_duty(cfg.max_duty)  # validated for config consistency (board may ignore)
+    _ = _validate_max_duty(cfg.max_duty)
     debug = bool(cfg.debug)
 
     invert_flags = _sign_tuple_to_invert_flags(wheel_inverts)
@@ -522,7 +521,7 @@ def make_motor_board(**kwargs):
         "pwm_freq_hz": pwm_freq_hz,
         "wheel_inverts": wheel_inverts,
         "quench_ms": quench_ms,
-        "max_duty": max_duty,  # validated + may be ignored by current constructor
+        "max_duty": max_duty,
         "debug": debug,
     }
 

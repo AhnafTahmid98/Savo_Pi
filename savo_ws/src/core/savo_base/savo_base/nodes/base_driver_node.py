@@ -336,7 +336,7 @@ class BaseDriverNode(Node):
         self._timeout_wd = None
         self._stale_policy = None
         self._watchdog_policy = None
-        self._manual_estop_input = False   # reserved for future physical e-stop source
+        self._manual_estop_input = False
         self._policy_last_decision = None  # cached for status/debug
 
         if _HAS_SAFETY_POLICIES:
@@ -792,7 +792,6 @@ class BaseDriverNode(Node):
             self._apply_stop(reason="safety_stop_topic")
             return
 
-        # Latched e-stop (future physical e-stop ready)
         if self._estop_latch is not None:
             try:
                 if bool(getattr(self._estop_latch, "latched", False)):

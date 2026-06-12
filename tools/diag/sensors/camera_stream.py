@@ -1,15 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Robot Savo — Camera Live Stream (Pi → Laptop, GStreamer + libcamerasrc)
------------------------------------------------------------------------
-- Uses libcamerasrc + x264enc + rtph264pay to stream H.264 over UDP.
-- No files are saved; it's purely a live preview.
-- Avoids libcamera-vid completely (better on Ubuntu 24.04).
-- Matches the working caps style from camera_test.py (format=I420).
-
-Author: Robot Savo
-"""
+"""GStreamer/libcamerasrc H.264 UDP camera stream for Pi preview."""
 
 import argparse
 import shutil
@@ -32,28 +23,14 @@ def build_gst_pipeline(host: str,
                        height: int,
                        fps: int,
                        bitrate_kbps: int) -> list[str]:
-    """
-    Build a GStreamer pipeline:
-
-      libcamerasrc !
-        video/x-raw,format=I420,width=WxH,framerate=FPS/1 !
-        videoconvert !
-        x264enc tune=zerolatency bitrate=(kbps) speed-preset=superfast key-int-max=60 !
-        rtph264pay config-interval=1 pt=96 !
-        udpsink host=HOST port=PORT sync=false async=false
-
-    This produces an RTP H.264 stream suitable for:
-
-      udpsrc caps=application/x-rtp,media=video,encoding-name=H264,payload=96 !
-      rtph264depay ! h264parse ! avdec_h264 ! videoconvert ! autovideosink
-    """
+    """Build the RTP H.264 pipeline with camera_test-compatible caps."""
     # x264enc bitrate is in kbit/s (not bits/s)
     bitrate = int(bitrate_kbps)
 
     pipeline = [
         "gst-launch-1.0", "-v",
         "libcamerasrc", "!",
-        # IMPORTANT: match camera_test.py – force I420 so negotiation is happy.
+        # Match camera_test.py: I420 avoids GStreamer negotiation failures.
         f"video/x-raw,format=I420,width={width},height={height},framerate={fps}/1", "!",
         "videoconvert", "!",
         "x264enc",
@@ -119,8 +96,6 @@ def main() -> None:
     )
 
     args = ap.parse_args()
-
-    # Check that GStreamer is available
     require("gst-launch-1.0", "GStreamer (gst-launch-1.0)")
 
     cmd = build_gst_pipeline(

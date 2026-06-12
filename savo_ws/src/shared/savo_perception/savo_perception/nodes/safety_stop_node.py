@@ -1,38 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Robot Savo — Safety Stop Node (ROS2, savo_perception)
-
-Purpose
--------
-Fuse near-field safety sensors and publish:
-  - /safety/stop            (std_msgs/Bool)
-  - /safety/slowdown_factor (std_msgs/Float32)  in [min_global_scale..1.0]
-
-Inputs (locked topic contracts)
-------------------------------
-  - /depth/min_front_m                          (std_msgs/Float32)  front depth min
-  - /savo_perception/range/front_ultrasonic_m   (std_msgs/Float32)  front ultrasonic
-  - /savo_perception/range/left_m               (std_msgs/Float32)  left ToF
-  - /savo_perception/range/right_m              (std_msgs/Float32)  right ToF
-
-Behavior (default matches your locked range_safety.yaml)
--------------------------------------------------------
-Front:
-  - stop_m = 0.28, slow_m = 0.60, hysteresis = 0.06
-  - weights: depth=1.0, ultrasonic=0.5
-Sides:
-  - stop_m = 0.20, slow_m = 0.45, hysteresis = 0.05
-Stale:
-  - fail_safe_on_stale = True, stale_timeout_s = 0.30
-
-Debounce:
-  - stop_debounce_count = 2
-  - clear_debounce_count = 4
-
-Slowdown:
-  - global slowdown_factor is EMA filtered
-"""
+"""Fuse near-field sensors into stop and slowdown signals."""
 
 from __future__ import annotations
 
@@ -69,7 +37,7 @@ class SafetyStopNode(Node):
     def __init__(self) -> None:
         super().__init__("safety_stop_node")
 
-        # ---------------- Parameters (aligned with locked config) ----------------
+        # parameters
         self.declare_parameter("fail_safe_on_stale", True)
         self.declare_parameter("stale_timeout_s", 0.30)
         self.declare_parameter("min_valid_m", 0.02)

@@ -1,99 +1,34 @@
-# ============================================================================
-# Robot Savo — Remote speech client configuration (Robot_Savo_Server /speech)
-#
-# This config is used by:
-#   src/savo_speech/savo_speech/remote_speech_client_node.py
-#
-# Data flow (v2 pipeline):
-#   ReSpeaker mic  -->  remote_speech_client_node (Pi)
-#                    --> /speech  (Robot_Savo_Server: STT + LLM)
-#                    <-- JSON {transcript, reply_text, intent, nav_goal, tier_used, llm_ok, ...}
-#                    --> /savo_speech/stt_text        (std_msgs/String)
-#                    --> /savo_speech/tts_text        (std_msgs/String)
-#                    --> /savo_intent/intent_result   (savo_msgs/IntentResult)
-#
-# Extra:
-#   - Uses /savo_speech/tts_speaking (Bool) from tts_node to avoid hearing itself.
-#   - Uses utterance_mode to buffer a full sentence before sending to /speech.
-#   - Skips “no-op” turns (very short transcript + no reply + no error).
-#
-# NOTE:
-#   - speech_server_url can be empty here → then SPEECH_SERVER_URL from
-#     env_robot_server.sh is used.
-#   - robot_id should normally match the Pi ID used everywhere else.
-# ============================================================================
-
 remote_speech_client_node:
   ros__parameters:
 
-    # ------------------------------------------------------------------------
-    # Endpoint / identity
-    # ------------------------------------------------------------------------
-
-    # Full URL to the /speech endpoint.
-    #
-    # Example (direct IP):
-    #   "http://192.168.164.119:9000/speech"
-    #
-    # Recommended: leave as "" and set via env_robot_server.sh:
-    #   export SPEECH_SERVER_URL="http://<PC-IP>:9000/speech"
-    #
+    # Empty uses SPEECH_SERVER_URL from env_robot_server.sh.
     speech_server_url: ""
 
-    # Robot ID used in IntentResult and logs.
     robot_id: "robot_savo_pi"
 
-    # ------------------------------------------------------------------------
-    # Audio capture (ReSpeaker)
-    # ------------------------------------------------------------------------
-
-    # Input sample rate (Hz).
     sample_rate_hz: 16000
 
-    # Length of each raw audio block captured from ReSpeaker (seconds).
     chunk_duration_s: 2.0
 
-    # Energy threshold for simple block-level VAD (normalized RMS [0..1]).
+    # Hallway baseline; low enough for soft speech at normal distance.
     energy_threshold: 0.0003
 
-    # Input device selection:
-    #   0 → ReSpeaker 4 Mic Array (UAC1.0): USB Audio (hw:0,0)
+    # ReSpeaker 4 Mic Array is device 0 on this Pi.
     input_device_index: 0
 
-    # ------------------------------------------------------------------------
-    # Utterance-level behaviour
-    # ------------------------------------------------------------------------
-
-    # true  → buffer multiple chunks while speech is present
-    # false → each voiced chunk is sent immediately as its own request
+    # Full-utterance requests avoid duplicate partial answers.
     utterance_mode: true
 
-    # Safety limit for a single utterance duration (seconds).
     max_utterance_duration_s: 15.0
 
-    # ------------------------------------------------------------------------
-    # HTTP /speech behaviour
-    # ------------------------------------------------------------------------
-
-    # Timeout (seconds) for a single /speech HTTP request.
     request_timeout_s: 20.0
 
-    # Number of retry attempts on network/server errors.
     max_retries: 2
 
-    # ------------------------------------------------------------------------
-    # Wake-word configuration
-    # ------------------------------------------------------------------------
-
-    # Master switch: enable/disable wake-word gating.
     wake_word_enable: true
 
-    # Phrases that wake the robot.
-    #
-    # All matching is done on lowercase transcript with simple "substring"
-    # search, so "hey robo, can you..." will match "hey robo".
+    # Substring matching on lowercase transcripts; include common ASR variants.
     wake_words:
-      # Single-word names
       - "savo"
       - "sabo"
       - "robo"
@@ -104,7 +39,6 @@ remote_speech_client_node:
       - "savu"
       - "sabu"
 
-      # English "hey/hi/hello" + names
       - "hey robo"
       - "hey robot"
       - "hey savo"
@@ -117,7 +51,6 @@ remote_speech_client_node:
       - "hello robot"
       - "hello savo"
 
-      # Finnish-style "hei" + names
       - "hei robo"
       - "hei robot"
       - "hei savo"
@@ -125,7 +58,6 @@ remote_speech_client_node:
       - "hei robot savo"
       - "hei robo savo"
 
-      # Full “Robot Savo” / “Robo Savo” variants
       - "robot savo"
       - "robot sabo"
       - "robo savo"
@@ -137,12 +69,10 @@ remote_speech_client_node:
       - "hello robot savo"
       - "hello robo savo"
 
-      # Campus style variants
       - "savonia robot"
       - "hey savonia robot"
       - "hei savonia robot"
 
-    # Phrases that politely put the robot back to sleep.
     sleep_phrases:
       - "go to sleep"
       - "you can rest"
@@ -169,40 +99,20 @@ remote_speech_client_node:
       - "bye bye"
 
 
-    # Auto-sleep if robot is awake but user is silent for too long (seconds).
-    # Countdown effectively starts after TTS has finished.
+    # Countdown starts after TTS finishes.
     awake_idle_timeout_s: 30.0
 
-    # ------------------------------------------------------------------------
-    # TTS gate — ignore robot’s own voice
-    # ------------------------------------------------------------------------
-
-    # Enable/disable TTS gating logic in the node.
+    # Prevents the mic from feeding Piper output back into /speech.
     tts_gate_enable: true
 
-    # Topic where TTS speaking flag is published (Bool).
     tts_speaking_topic: "/savo_speech/tts_speaking"
 
-    # Extra time after TTS stops speaking before we listen again (seconds).
     tts_gate_cooldown_s: 0.8
 
-    # ------------------------------------------------------------------------
-    # Face / UI integration
-    # ------------------------------------------------------------------------
-
-    # Topic where the node publishes face state (String):
-    #   "idle" | "listening" | "thinking" | "speaking"
     face_state_topic: "/savo_ui/face_state"
 
-    # ------------------------------------------------------------------------
-    # Node behaviour / debugging
-    # ------------------------------------------------------------------------
-
-    # Sleep in seconds between loops when idle or while TTS is speaking.
     idle_sleep_s: 0.1
 
-    # Minimum transcript length (characters) for a "real" utterance.
     min_transcript_chars: 3
 
-    # Enable extra debug logs (JSON dumps, RMS values, wake events, etc.).
     debug_logging: false

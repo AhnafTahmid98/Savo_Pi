@@ -229,8 +229,6 @@ def make_motor_board(**kwargs):
         rr = _invert_bool_to_sign(k.pop("invert_rr", False))
         config["wheel_inverts"] = (fl, rl, fr, rr)
 
-    # Any unrecognized kwargs are preserved in extra (future-safe)
-    # This avoids breaking older callers while not polluting create_board signature.
     if k:
         config["extra"] = dict(k)
 

@@ -1,26 +1,4 @@
-# Robot Savo — savo_localization/config/frames.yaml
-# -------------------------------------------------
-# ROS 2 params file (valid for --params-file)
-#
-# Purpose:
-# Centralize frame IDs so localization nodes use consistent TF names.
-#
-# Phase 1 canonical frames:
-# - odom      : local odometry/world frame (continuous, drift allowed)
-# - base_link : robot base frame
-# - imu_link  : IMU sensor frame
-#
-# TF ownership policy (Phase 1 EKF baseline):
-# - robot_localization (ekf_node) publishes: odom -> base_link
-# - wheel_odom_node / wheel_odom_fallback_node should NOT publish TF when EKF is enabled
-#
-# Notes:
-# - ROS 2 parameter files are node-scoped:
-#     <node_name>:
-#       ros__parameters:
-#         ...
-# - EKF frame parameters are configured in config/ekf_odom.yaml
-#   (map_frame, odom_frame, base_link_frame, world_frame)
+# EKF owns odom -> base_link in the normal localization bringup.
 
 wheel_odom_node:
   ros__parameters:

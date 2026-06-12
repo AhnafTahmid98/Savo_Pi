@@ -1,21 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Robot Savo — Ultrasonic API (HC-SR04 via gpiozero)
----------------------------------------------------
-Import in control code:
-    from tools.diag.sensors.api.ultrasonic_api import read_ultrasonic_cm, read_ultrasonic_stats
-    d_cm = read_ultrasonic_cm()  # centimeters or None
-
-CLI probe (run directly):
-    python3 tools/diag/sensors/api/ultrasonic_api.py
-"""
+"""HC-SR04 helper built on gpiozero with graceful import fallback."""
 
 from typing import Optional, Tuple
 import time
 from statistics import mean, pstdev
-
-# gpiozero + pin factories (lazy, degrade gracefully if missing)
 try:
     from gpiozero import DistanceSensor, Device
     from gpiozero.pins.lgpio import LGPIOFactory
@@ -32,14 +21,8 @@ except Exception:
     PiGPIOFactory = None   # type: ignore
     _HAS_PIGPIO = False
 
-
-# ---------------------------- internal helpers ----------------------------
-
 def _choose_factory(factory: str = "lgpio") -> None:
-    """
-    Select gpiozero pin factory.
-    - If 'pigpio' requested but daemon is not running, gracefully fall back to lgpio.
-    """
+    """Use pigpio when available, otherwise fall back to lgpio."""
     if Device is None:
         return
     if factory == "pigpio" and _HAS_PIGPIO and PiGPIOFactory is not None:
@@ -58,37 +41,17 @@ def _make_sensor(trig_pin: int, echo_pin: int, max_m: float, queue_len: int = 1)
         return None
     return DistanceSensor(echo=echo_pin, trigger=trig_pin, max_distance=max_m, queue_len=queue_len)
 
-
-# ------------------------------- public API --------------------------------
-
 def read_ultrasonic_cm(
-    trig_pin: int = 27,         # default aligned to your tester
-    echo_pin: int = 22,         # default aligned to your tester
+    trig_pin: int = 27,
+    echo_pin: int = 22,
     *,
-    factory: str = "lgpio",     # "lgpio" | "pigpio"
+    factory: str = "lgpio",
     max_distance_m: float = 3.0,
     samples: int = 5,
     per_sample_timeout_s: float = 0.08,
     sample_period_s: float = 0.02,
 ) -> Optional[float]:
-    """
-    Return a single averaged distance in **centimeters**, or None on failure.
-
-    - Non-blocking style suitable for control loops.
-    - queue_len=1 (no internal smoothing).
-    - If gpiozero/factory unavailable, returns None.
-
-    Args:
-      trig_pin, echo_pin: BCM pins (LOCKED default: TRIG=27, ECHO=22)
-      factory: "lgpio" (default) or "pigpio"
-      max_distance_m: gpiozero scaling (meters)
-      samples: how many quick reads to average (≥1)
-      per_sample_timeout_s: time budget per-sample window
-      sample_period_s: delay between raw reads
-
-    Returns:
-      float centimeters or None.
-    """
+    """Return averaged centimeters, or None when no valid echo is available."""
     _choose_factory(factory)
     sen = _make_sensor(trig_pin, echo_pin, max_m=max_distance_m, queue_len=1)
     if sen is None:
@@ -132,9 +95,7 @@ def read_ultrasonic_stats(
     per_sample_timeout_s: float = 0.08,
     sample_period_s: float = 0.02,
 ) -> Tuple[bool, Optional[float], Optional[float]]:
-    """
-    Take N samples and return (ok, mean_cm, std_cm). ok=False if no valid echo.
-    """
+    """Return validity, mean distance, and standard deviation."""
     _choose_factory(factory)
     sen = _make_sensor(trig_pin, echo_pin, max_m=max_distance_m, queue_len=1)
     if sen is None:
@@ -171,12 +132,8 @@ def ultrasonic_available() -> bool:
     """True if gpiozero is present and at least one pin factory is usable."""
     return DistanceSensor is not None and (LGPIOFactory is not None or (_HAS_PIGPIO and PiGPIOFactory is not None))
 
-
-# -------------------------------- CLI shim ---------------------------------
-
 if __name__ == "__main__":
     import argparse, sys, warnings
-    # allow suppressing the common gpiozero warnings in CLI mode
     try:
         from gpiozero.exc import DistanceSensorNoEcho, PWMSoftwareFallback  # type: ignore
     except Exception:
@@ -215,8 +172,6 @@ if __name__ == "__main__":
             sys.exit(2)
         print(f"mean={mean_cm:.1f} cm  std={std_cm:.1f} cm")
         sys.exit(0)
-
-    # streaming prints
     period = 1.0 / max(0.5, args.rate)
     i = 0
     try:

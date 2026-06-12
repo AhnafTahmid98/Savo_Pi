@@ -1,26 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Robot Savo — TTS Node (Piper-based, with PCM publish)
-
-This ROS 2 node subscribes to a text topic and uses Piper TTS models
-to synthesize speech, then plays it through the Pi's audio output.
-
-Key features:
-- Uses local Piper ONNX models (e.g. en_US-ryan-high, en_US-hfc_female-medium).
-- Supports a "voice_profile" parameter ("male" / "female").
-- Applies configurable gain/output_gain.
-- Publishes simple mouth animation (0.0–1.0) while speaking.
-- Publishes a "speech done" notification when playback finishes.
-- Publishes a Boolean "tts_speaking" flag so STT can mute itself
-  while the robot is talking.
-- NEW: publishes the full TTS PCM audio for each utterance on
-  /savo_speech/tts_pcm so a separate node (e.g. mouth_anim.py) can
-  compute a real audio-driven mouth level.
-
-Configuration is provided via:
-  src/savo_speech/config/tts_piper.yaml
-"""
+"""Piper TTS node with speaking, done, and PCM mouth-animation outputs."""
 
 from __future__ import annotations
 
@@ -46,22 +26,15 @@ from .piper_engine import PiperEngine
 
 logger = logging.getLogger(__name__)
 
-# Target playback sample rate for the audio device.
 # ReSpeaker 4-Mic Array is usually fine with 16000 or 48000.
 TARGET_PLAYBACK_SR = 16000
 
 
 class TTSNode(Node):
-    """ROS 2 node that wraps Piper TTS via PiperEngine."""
+    """Wrap Piper TTS for ROS text input and audio output."""
 
     def __init__(self) -> None:
         super().__init__("tts_node")
-
-        # --------------------------------------------------------------
-        # Declare parameters with reasonable defaults
-        # (normally overridden by tts_piper.yaml)
-        # --------------------------------------------------------------
-
         self.declare_parameter("model_dir", "/home/savo/Savo_Pi/models/piper")
         self.declare_parameter("voice_profile", "male")
 
@@ -71,37 +44,26 @@ class TTSNode(Node):
         self.declare_parameter("female_model_file", "en_US-hfc_female-medium.onnx")
         self.declare_parameter("female_config_file", "en_US-hfc_female-medium.onnx.json")
 
-        # Synthesis controls (for logging / future tuning)
-        self.declare_parameter("sample_rate", 22050)  # informational
+        self.declare_parameter("sample_rate", 22050)
         self.declare_parameter("gain", 1.0)
         self.declare_parameter("length_scale", 0.95)
         self.declare_parameter("noise_scale", 0.667)
         self.declare_parameter("noise_w", 0.8)
 
-        # Output device + gain at playback stage
         self.declare_parameter("output_device_index", -1)
         self.declare_parameter("output_gain", 1.0)
 
-        # ROS topics
         self.declare_parameter("input_text_topic", "/savo_speech/tts_text")
         self.declare_parameter("speech_done_topic", "/savo_speech/tts_done")
         self.declare_parameter("mouth_anim_topic", "/savo_speech/mouth_open")
         self.declare_parameter("mouth_anim_rate_hz", 25.0)
 
-        # NEW: "TTS is speaking" flag for STT gating
         self.declare_parameter("tts_speaking_topic", "/savo_speech/tts_speaking")
 
-        # NEW: PCM topic for audio-driven mouth animation
-        # The audio is sent as Int16MultiArray at TARGET_PLAYBACK_SR.
         self.declare_parameter("tts_pcm_topic", "/savo_speech/tts_pcm")
 
-        # Logging / debug
         self.declare_parameter("debug_log_text", True)
         self.declare_parameter("max_logged_chars", 512)
-
-        # --------------------------------------------------------------
-        # Read parameters
-        # --------------------------------------------------------------
 
         self.model_dir: str = (
             self.get_parameter("model_dir").get_parameter_value().string_value
@@ -124,7 +86,6 @@ class TTSNode(Node):
             self.get_parameter("female_config_file").get_parameter_value().string_value
         )
 
-        # Synthesis params (for logging + gain)
         self.sample_rate_param: int = (
             self.get_parameter("sample_rate").get_parameter_value().integer_value
         )
@@ -141,7 +102,6 @@ class TTSNode(Node):
             self.get_parameter("noise_w").get_parameter_value().double_value
         )
 
-        # Playback device + extra gain
         self.output_device_index: int = (
             self.get_parameter("output_device_index").get_parameter_value().integer_value
         )
@@ -149,7 +109,6 @@ class TTSNode(Node):
             self.get_parameter("output_gain").get_parameter_value().double_value
         )
 
-        # ROS topics
         self.input_text_topic: str = (
             self.get_parameter("input_text_topic").get_parameter_value().string_value
         )
@@ -169,23 +128,16 @@ class TTSNode(Node):
             self.get_parameter("tts_pcm_topic").get_parameter_value().string_value
         )
 
-        # Debug logging
         self.debug_log_text: bool = (
             self.get_parameter("debug_log_text").get_parameter_value().bool_value
         )
         self.max_logged_chars: int = (
             self.get_parameter("max_logged_chars").get_parameter_value().integer_value
         )
-
-        # --------------------------------------------------------------
-        # Initialize Piper engines (one per voice profile, if available)
-        # --------------------------------------------------------------
-
         self._engines: Dict[str, PiperEngine] = {}
         model_dir_path = Path(self.model_dir)
 
         try:
-            # Male
             male_model_path = model_dir_path / self.male_model_file
             male_config_path = model_dir_path / self.male_config_file
             if male_model_path.is_file() and male_config_path.is_file():
@@ -200,7 +152,6 @@ class TTSNode(Node):
                     f"  config = {male_config_path}"
                 )
 
-            # Female
             female_model_path = model_dir_path / self.female_model_file
             female_config_path = model_dir_path / self.female_config_file
             if female_model_path.is_file() and female_config_path.is_file():
@@ -227,11 +178,6 @@ class TTSNode(Node):
             engine_list = ", ".join(sorted(self._engines.keys()))
             self.get_logger().info(f"TTSNode: initialized voices: {engine_list}")
 
-        # --------------------------------------------------------------
-        # Publishers / subscribers
-        # --------------------------------------------------------------
-
-        # Input text subscriber
         self._text_sub = self.create_subscription(
             String,
             self.input_text_topic,
@@ -239,12 +185,10 @@ class TTSNode(Node):
             10,
         )
 
-        # Optional "speech done" publisher
         self._speech_done_pub: Optional[rclpy.publisher.Publisher] = None
         if self.speech_done_topic:
             self._speech_done_pub = self.create_publisher(Empty, self.speech_done_topic, 10)
 
-        # Optional mouth animation publisher (0.0 idle, 1.0 speaking)
         self._mouth_anim_pub: Optional[rclpy.publisher.Publisher] = None
         if self.mouth_anim_topic:
             self._mouth_anim_pub = self.create_publisher(
@@ -253,7 +197,6 @@ class TTSNode(Node):
                 10,
             )
 
-        # "TTS is speaking" Boolean publisher
         self._tts_speaking_pub: Optional[rclpy.publisher.Publisher] = None
         if self.tts_speaking_topic:
             self._tts_speaking_pub = self.create_publisher(
@@ -262,7 +205,6 @@ class TTSNode(Node):
                 10,
             )
 
-        # NEW: PCM publisher for full utterance audio
         self._tts_pcm_pub: Optional[rclpy.publisher.Publisher] = None
         if self.tts_pcm_topic:
             self._tts_pcm_pub = self.create_publisher(
@@ -270,11 +212,6 @@ class TTSNode(Node):
                 self.tts_pcm_topic,
                 10,
             )
-
-        # --------------------------------------------------------------
-        # Log final configuration summary
-        # --------------------------------------------------------------
-
         self.get_logger().info(
             "TTSNode starting with Piper:\n"
             f"  model_dir          = {self.model_dir}\n"
@@ -295,19 +232,8 @@ class TTSNode(Node):
             f"  max_logged_chars   = {self.max_logged_chars}\n"
             f"  TARGET_PLAYBACK_SR = {TARGET_PLAYBACK_SR}"
         )
-
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
-
     def _choose_engine(self) -> Optional[PiperEngine]:
-        """
-        Choose the appropriate PiperEngine based on voice_profile.
-
-        Fallbacks:
-        - If requested profile not loaded, fall back to "male" if available.
-        - If no engines loaded, return None.
-        """
+        """Choose the configured voice, falling back to any loaded engine."""
         if not self._engines:
             return None
 
@@ -315,7 +241,6 @@ class TTSNode(Node):
         if profile in self._engines:
             return self._engines[profile]
 
-        # Fallbacks
         if "male" in self._engines:
             self.get_logger().warn(
                 f"TTSNode: requested voice_profile='{profile}' not available, "
@@ -323,7 +248,6 @@ class TTSNode(Node):
             )
             return self._engines["male"]
 
-        # As a last resort, pick any engine
         key = next(iter(self._engines.keys()))
         self.get_logger().warn(
             f"TTSNode: requested voice_profile='{profile}' not available, "
@@ -360,10 +284,7 @@ class TTSNode(Node):
         self._speech_done_pub.publish(msg)
 
     def _publish_tts_speaking(self, speaking: bool) -> None:
-        """
-        Publish a Bool flag telling the rest of the system whether
-        the TTS is currently speaking.
-        """
+        """Publish the TTS self-listening gate state."""
         if self._tts_speaking_pub is None:
             return
         msg = Bool()
@@ -371,21 +292,12 @@ class TTSNode(Node):
         self._tts_speaking_pub.publish(msg)
 
     def _publish_tts_pcm(self, audio_f32: np.ndarray, sample_rate: int) -> None:
-        """
-        Publish the full utterance PCM as Int16MultiArray on tts_pcm_topic.
-
-        - audio_f32 is mono float32 in [-1.0, 1.0]
-        - sample_rate is the playback sample rate (expected TARGET_PLAYBACK_SR)
-
-        The mouth_anim node should assume it is receiving data at the same
-        sample_rate as this node's playback.
-        """
+        """Publish full-utterance PCM for audio-driven mouth animation."""
         if self._tts_pcm_pub is None:
             return
         if audio_f32.size == 0:
             return
 
-        # Clip to [-1, 1], convert to int16
         audio_clipped = np.clip(audio_f32, -1.0, 1.0)
         pcm_i16 = (audio_clipped * 32767.0).astype(np.int16)
 
@@ -398,7 +310,6 @@ class TTSNode(Node):
         layout.dim = [dim]
         layout.data_offset = 0
         msg.layout = layout
-        # Convert to a Python list for ROS message
         msg.data = pcm_i16.tolist()
 
         self._tts_pcm_pub.publish(msg)
@@ -413,23 +324,7 @@ class TTSNode(Node):
         src_sr: int,
         dst_sr: int,
     ) -> np.ndarray:
-        """
-        Simple linear resampler for mono float32 audio.
-
-        Parameters
-        ----------
-        audio : np.ndarray
-            1D float32 array, mono audio.
-        src_sr : int
-            Source sample rate.
-        dst_sr : int
-            Target sample rate.
-
-        Returns
-        -------
-        np.ndarray
-            Resampled mono float32 array.
-        """
+        """Resample mono float32 audio with linear interpolation."""
         if src_sr <= 0 or dst_sr <= 0:
             return audio
         if src_sr == dst_sr:
@@ -442,7 +337,6 @@ class TTSNode(Node):
         duration = n_src / float(src_sr)
         n_dst = max(1, int(round(duration * dst_sr)))
 
-        # Interpolation positions in source index space
         src_positions = np.linspace(0, n_src - 1, num=n_dst, dtype=np.float64)
         src_indices = np.floor(src_positions).astype(np.int64)
         frac = src_positions - src_indices
@@ -451,29 +345,8 @@ class TTSNode(Node):
         audio_np = audio.astype(np.float32, copy=False)
         resampled = (1.0 - frac) * audio_np[src_indices] + frac * audio_np[src_indices_plus]
         return resampled.astype(np.float32, copy=False)
-
-    # ------------------------------------------------------------------
-    # Subscriber callback
-    # ------------------------------------------------------------------
-
     def _on_text_message(self, msg: String) -> None:
-        """
-        Handle incoming text messages and perform TTS playback.
-
-        This callback is *blocking* while speech is playing. For Robot Savo,
-        that's acceptable because TTS output is short and we do not need
-        concurrent overlapping speech from this node.
-
-        Behaviour:
-          - Synthesizes TTS via PiperEngine.
-          - Resamples to TARGET_PLAYBACK_SR.
-          - Applies gain + clipping.
-          - Publishes:
-              * tts_speaking=True before playback, False after.
-              * mouth_open=1.0 during playback, 0.0 after.
-              * tts_pcm (Int16MultiArray) once per utterance.
-              * speech_done (Empty) when finished.
-        """
+        """Synthesize and play one TTS message."""
         text = (msg.data or "").strip()
         if not text:
             self.get_logger().debug("TTSNode: received empty text, skipping")
@@ -486,7 +359,6 @@ class TTSNode(Node):
 
         self._log_text_preview(text)
 
-        # Synthesize audio (int16 PCM at engine.sample_rate)
         try:
             audio_i16 = engine.synthesize_to_pcm16(text)
         except Exception as exc:  # noqa: BLE001
@@ -497,7 +369,6 @@ class TTSNode(Node):
             self.get_logger().warn("TTSNode: TTS produced empty audio, skipping playback")
             return
 
-        # Convert int16 [-32768, 32767] → float32 [-1.0, 1.0]
         audio_f32 = audio_i16.astype(np.float32) / 32768.0
         max_abs_raw = float(np.max(np.abs(audio_f32)))
         self.get_logger().debug(
@@ -505,7 +376,6 @@ class TTSNode(Node):
             f"samples={audio_f32.shape[0]}, max_abs={max_abs_raw:.4f}"
         )
 
-        # Resample to a device-friendly rate if needed.
         playback_sr = TARGET_PLAYBACK_SR
         if playback_sr <= 0:
             playback_sr = engine.sample_rate
@@ -526,12 +396,10 @@ class TTSNode(Node):
             audio_resampled = audio_f32
             max_abs_res = max_abs_raw
 
-        # Apply gains (Piper-level gain + playback gain)
         total_gain = float(self.gain * self.output_gain)
         if total_gain != 1.0:
             audio_resampled = audio_resampled * total_gain
 
-        # Clip to safe range
         max_abs_after = float(np.max(np.abs(audio_resampled)))
         if max_abs_after > 1.0:
             audio_resampled = np.clip(audio_resampled, -1.0, 1.0)
@@ -542,12 +410,8 @@ class TTSNode(Node):
             f"max_abs={max_abs_after:.4f}"
         )
 
-        # Publish PCM once per utterance (for audio-driven mouth animation).
-        # The mouth_anim node should assume sample_rate == TARGET_PLAYBACK_SR.
         self._publish_tts_pcm(audio_resampled, playback_sr)
 
-        # Playback — simple "mouth fully open during speech" model for now.
-        # Also publish tts_speaking=True while we are talking.
         self._publish_mouth_open(1.0)
         self._publish_tts_speaking(True)
         try:
@@ -559,12 +423,6 @@ class TTSNode(Node):
             self._publish_mouth_open(0.0)
             self._publish_tts_speaking(False)
             self._publish_speech_done()
-
-
-# ----------------------------------------------------------------------
-# Main entry point
-# ----------------------------------------------------------------------
-
 
 def main(args=None) -> None:
     rclpy.init(args=args)

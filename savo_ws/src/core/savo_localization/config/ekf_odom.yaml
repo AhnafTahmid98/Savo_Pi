@@ -1,24 +1,8 @@
-# Robot Savo — savo_localization/config/ekf_odom.yaml
-# ---------------------------------------------------
-# robot_localization EKF configuration (ODOM mode)
-#
-# Purpose:
-# - Fuse wheel odometry (rear encoders -> /wheel/odom) with IMU (/imu/data)
-# - Publish /odometry/filtered for downstream localization/navigation
-# - Publish TF: odom -> base_link (single TF authority for odom->base_link)
-#
-# Notes (mecanum + 2 rear encoders baseline):
-# - Rear-only encoders can reasonably provide: x, yaw (approx), vx, wz
-# - Rear-only encoders cannot observe: true lateral motion (y, vy) on mecanum
-# - IMU stabilizes yaw + yaw rate
-# - Global drift correction comes later via AMCL/SLAM (map -> odom)
+# Rear encoders provide x/yaw/vx/wz; IMU stabilizes yaw and yaw rate.
 
 ekf_filter_node:
   ros__parameters:
 
-    # -------------------------
-    # Core
-    # -------------------------
     frequency: 50.0              # 30.0 is also fine on Pi if CPU load becomes a concern
     sensor_timeout: 0.30
     two_d_mode: true
@@ -26,35 +10,24 @@ ekf_filter_node:
     transform_time_offset: 0.0
     transform_timeout: 0.10
 
-    # Useful on real systems if clock jumps or /clock behavior changes
+    # Handles /clock jumps cleanly during sim or bag replay.
     reset_on_time_jump: true
 
-    # Publish filtered output + TF
+    # EKF is the single odom -> base_link TF publisher.
     publish_tf: true
     publish_acceleration: false
     permit_corrected_publication: true
     print_diagnostics: true
 
-    # -------------------------
-    # Frames
-    # -------------------------
     # map_frame is still required by robot_localization, even in odom-only mode.
     map_frame: "map"
     odom_frame: "odom"
     base_link_frame: "base_link"
     world_frame: "odom"   # ODOM EKF: world frame is odom
 
-    # If you later standardize on base_footprint, update both here and the TF tree.
-    # base_link_frame: "base_footprint"
-
-    # -------------------------
-    # Input 1: Wheel odometry (/wheel/odom)
-    # -------------------------
     odom0: "/wheel/odom"
 
-    # IMPORTANT (rear-only encoder baseline):
-    # - Disable y and vy because rear-only encoders cannot observe mecanum lateral motion.
-    # - Fuse x, yaw, vx, wz.
+    # Rear-only mecanum odom cannot observe y/vy; fuse x/yaw/vx/wz only.
     odom0_config: [
       true,  false, false,   # x, y, z
       false, false, true,    # roll, pitch, yaw
@@ -68,12 +41,9 @@ ekf_filter_node:
     odom0_differential: false
     odom0_relative: false
 
-    # -------------------------
-    # Input 2: IMU (/imu/data)
-    # -------------------------
     imu0: "/imu/data"
 
-    # 2D fusion: yaw + yaw rate
+    # 2D fusion: yaw + yaw rate.
     imu0_config: [
       false, false, false,   # x, y, z
       false, false, true,    # roll, pitch, yaw
@@ -85,18 +55,12 @@ ekf_filter_node:
     imu0_queue_size: 20
     imu0_nodelay: true
 
-    # Keep false initially (typical when using BNO055 orientation output directly).
-    # If later using gyro-only yaw integration behavior, we can revisit this.
+    # BNO055 orientation is already absolute enough for this baseline.
     imu0_differential: false
     imu0_relative: false
 
-    # Not used right now because linear acceleration is NOT fused (ax/ay/az all false),
-    # but keep explicit for clarity.
     imu0_remove_gravitational_acceleration: false
 
-    # -------------------------
-    # Filter tuning (conservative defaults)
-    # -------------------------
     # Safe baseline. Tune only after validating raw /wheel/odom and /imu/data behavior.
     # NOTE: ROS2 param parser requires uniform numeric type in sequences -> use floats everywhere.
     process_noise_covariance: [
@@ -117,7 +81,7 @@ ekf_filter_node:
       0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.6
     ]
 
-    # Start with moderate uncertainty (not overconfident)
+    # Moderate startup uncertainty; do not let the filter begin overconfident.
     initial_estimate_covariance: [
       1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
       0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,

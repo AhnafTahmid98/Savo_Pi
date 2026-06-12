@@ -1,42 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Robot Savo — Motor Direction Test (PCA9685 pair-mode + Encoder Polling)
-------------------------------------------------------------------------
-Goal
-  Verify encoder sign conventions:
-    • Forward      ⇒ ΔL > 0 and ΔR > 0
-    • Reverse      ⇒ ΔL < 0 and ΔR < 0
-    • Rotate CCW   ⇒ ΔL < 0 and ΔR > 0  (optional)
-    • Rotate CW    ⇒ ΔL > 0 and ΔR < 0  (optional)
-
-Aligned with drive_manual_direct.py:
-  • Pair-mode per wheel (NO PWM/IN1/IN2 triplets)
-  • Channel pairs (LOCKED):
-        FL(0,1)  RL(3,2)  FR(6,7)  RR(4,5)
-  • Quench on sign flip to protect H-bridge
-  • Defaults: pwm-freq=50 Hz, max-duty=3000, quench=18 ms
-
-Hardware assumptions
-  • PCA9685 @ 0x40 on I²C-1 (Pi 5)
-  • Encoders (LOCKED) with external pull-ups:
-        Left  : L_A=21, L_B=20
-        Right : R_A=12, R_B=26
-  • Robot on blocks (wheels free)
-
-Why this updated version
-  • Fixes Raspberry Pi 5 gpiochip mismatch issues ("GPIO busy" on wrong chip)
-  • Adds gpiochip auto-detection (like your working encoders_test.py)
-  • Supports explicit --chip override (recommended on Pi 5: --chip 4)
-  • Cleans up claimed GPIO lines on exit
-
-Usage
-  # Recommended on Pi 5 (explicit chip + external pull-ups)
-  python3 motor_direction_test.py --chip 4 --no-pullup --with-rotate
-
-  # Auto-detect gpiochip (tries gpiochip0..7)
-  python3 motor_direction_test.py --no-pullup --with-rotate
-"""
+"""Motor direction and encoder sign diagnostic for PCA9685 pair-mode wiring."""
 
 from __future__ import annotations
 
@@ -46,8 +10,6 @@ import math
 import argparse
 from dataclasses import dataclass
 from typing import Tuple, Optional
-
-# ============================ Encoders (lgpio) ================================
 try:
     import lgpio
 except Exception:
@@ -79,17 +41,7 @@ def autodetect_gpiochip_for_pins(
     end: int = 7,
     pullup: bool = False,
 ) -> Tuple[int, int]:
-    """
-    Find a gpiochip that can claim all requested BCM lines.
-
-    Returns:
-        (chip_index, chip_handle_opened)
-
-    Notes:
-    - On Raspberry Pi 5, user GPIO lines are usually on gpiochip4.
-    - This method prevents false success on gpiochip0 where line numbers may exist
-      but refer to unrelated SoC/internal lines (e.g., power button GPIO).
-    """
+    """Find a gpiochip that can claim the encoder BCM lines; Pi 5 is usually gpiochip4."""
     last_error = None
 
     for chip_idx in range(start, end + 1):
@@ -220,17 +172,11 @@ def encoders_open_poll(
     pullup: bool,
     poll_debounce_s: float = 0.0003,
 ) -> Encoders:
-    """
-    Open encoder poller with optional gpiochip autodetect.
-
-    If chip_idx is None:
-      - tries to autodetect a gpiochip that can claim BCM 21,20,12,26
-      - this avoids Pi 5 gpiochip0 false/invalid mapping issues
-    """
+    """Open encoder pollers, avoiding Pi 5 gpiochip0 false mappings."""
     pins = (L_A, L_B, R_A, R_B)
 
     if chip_idx is not None:
-        # Explicit path (recommended on Pi 5: --chip 4)
+        # Pi 5 usually exposes these lines on gpiochip4.
         chip_handle = lgpio.gpiochip_open(chip_idx)
         selected_idx = chip_idx
     else:
@@ -275,9 +221,6 @@ def encoders_close(E: Encoders):
         lgpio.gpiochip_close(E.chip)
     except Exception:
         pass
-
-
-# ============================= PCA9685 (pair) =================================
 import smbus
 
 
@@ -331,11 +274,7 @@ class PCA9685:
 
 
 class PairMotorDriver:
-    """
-    Pair-mode (matches drive_manual_direct.py):
-      Wheels order: 0=FL, 1=RL, 2=FR, 3=RR
-      Channel pairs (LOCKED): FL(0,1) RL(3,2) FR(6,7) RR(4,5)
-    """
+    """Pair-mode driver: wheels 0=FL, 1=RL, 2=FR, 3=RR; pairs match drive_manual_direct."""
     PAIRS_A = [0, 3, 6, 4]  # first channel of each pair
     PAIRS_B = [1, 2, 7, 5]  # second channel of each pair
 
@@ -396,9 +335,6 @@ class PairMotorDriver:
             self.stop()
         finally:
             self.pca.close()
-
-
-# ================================ Test Core ===================================
 def measure_poll(E: Encoders, seconds: float):
     L0, R0 = E.L.count, E.R.count
     iL0, iR0 = E.L.illegal, E.R.illegal
@@ -446,9 +382,6 @@ def parse_group(group_s: str) -> Tuple[int, ...]:
         if v not in (0, 1, 2, 3):
             raise ValueError(f"group index must be one of 0,1,2,3; got {v}")
     return vals
-
-
-# =================================== Main =====================================
 def main():
     ap = argparse.ArgumentParser(description="Motor direction test (PCA9685 pair-mode) + encoder polling")
 
@@ -525,8 +458,6 @@ def main():
                 max_duty=args.max_duty,
                 quench_ms=args.quench_ms,
             )
-
-        # --- LEFT FORWARD ---
         if drv is None:
             input(f">>> Step 1: LEFT FORWARD — power ONLY LEFT side forward for {args.seconds:.1f}s, then Enter...")
         else:
@@ -536,8 +467,6 @@ def main():
             drv.stop()
         print_step("LEFT forward", dL1, dR1, iL1, iR1, "L")
         time.sleep(args.settle)
-
-        # --- LEFT REVERSE ---
         if drv is None:
             input(f">>> Step 2: LEFT REVERSE — power ONLY LEFT side reverse for {args.seconds:.1f}s, then Enter...")
         else:
@@ -547,8 +476,6 @@ def main():
             drv.stop()
         print_step("LEFT reverse", dL2, dR2, iL2, iR2, "L")
         time.sleep(args.settle)
-
-        # --- RIGHT FORWARD ---
         if drv is None:
             input(f">>> Step 3: RIGHT FORWARD — power ONLY RIGHT side forward for {args.seconds:.1f}s, then Enter...")
         else:
@@ -558,8 +485,6 @@ def main():
             drv.stop()
         print_step("RIGHT forward", dL3, dR3, iL3, iR3, "R")
         time.sleep(args.settle)
-
-        # --- RIGHT REVERSE ---
         if drv is None:
             input(f">>> Step 4: RIGHT REVERSE — power ONLY RIGHT side reverse for {args.seconds:.1f}s, then Enter...")
         else:
@@ -568,8 +493,6 @@ def main():
         if drv:
             drv.stop()
         print_step("RIGHT reverse", dL4, dR4, iL4, iR4, "R")
-
-        # --- ROTATION (optional) ---
         dL_ccw = dR_ccw = iL_ccw = iR_ccw = 0
         dL_cw = dR_cw = iL_cw = iR_cw = 0
 

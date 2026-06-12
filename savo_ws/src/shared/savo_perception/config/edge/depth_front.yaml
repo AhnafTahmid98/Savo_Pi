@@ -1,77 +1,36 @@
-# Robot Savo — Depth Front Min Configuration (RealSense D435)
-# File: Savo_Pi/src/savo_perception/config/depth_front.yaml
-#
-# Node:
-#   savo_perception/nodes/depth_front_min_node.py
-#
-# Purpose:
-#   - Compute a robust "front obstacle distance" from the depth image
-#   - Publish it as /depth/min_front_m for safety_stop_node
-#
-# Hardware context:
-#   - RealSense D435 mounted ~33 cm above the floor (angle not measured)
-#
-# Notes:
-#   - Supports depth encodings: 16UC1 (usually mm) or 32FC1 (meters)
-#   - ROI is fractions of image width/height (0..1)
-#   - Percentile (p10) is robust against depth noise/outliers
+# RealSense D435 is mounted about 33 cm above the floor.
 
 depth_front_min_node:
   ros__parameters:
-    # -----------------------------
-    # Topics
-    # -----------------------------
     depth_topic: "/camera/camera/depth/image_rect_raw"
     publish_topic: "/depth/min_front_m"
 
-    # -----------------------------
-    # Publish loop + staleness
-    # -----------------------------
     publish_hz: 30.0
 
 
-    # RealSense can briefly pause during startup/USB jitter.
-    # 1.0s avoids false stale during normal operation.
+    # RealSense can briefly pause during startup and USB jitter.
     stale_timeout_s: 1.0
     warn_every_s: 1.0
 
-    # Optional: suppress the *initial* stale warning during camera startup.
-    # (Only effective if your node implements this parameter.)
+    # Suppress the initial stale warning while the camera starts.
     startup_grace_s: 1.5
 
-    # -----------------------------
-    # QoS (camera topics)
-    # -----------------------------
-    # Your RealSense depth publisher is RELIABLE + TRANSIENT_LOCAL,
-    # so this node must subscribe as RELIABLE to receive frames.
-    #
-    # Options supported by your node:
-    #   "sensor" | "best_effort" | "reliable"
+    # RealSense depth publisher is RELIABLE + TRANSIENT_LOCAL.
     depth_qos: "reliable"
 
-    # Debug RX logging (keep off normally)
     log_rx: false
     log_rx_every_s: 2.0
 
-    # -----------------------------
-    # Depth scaling + validity window
-    # -----------------------------
-    # For 16UC1: RealSense is typically millimeters => 0.001 m per unit
+    # 16UC1 depth images are millimeters.
     depth_scale_m_per_unit: 0.001
 
-    # Reject zeros / too-near noise / far noise
     min_valid_m: 0.02
     max_valid_m: 3.00
 
-    # -----------------------------
-    # Robust near-distance estimate
-    # -----------------------------
+    # p10 is less jumpy than raw min on speckled depth frames.
     percentile: 10.0
 
-    # -----------------------------
-    # ROI (fractions of image size)
-    # Tuned for ~33 cm mounting height without needing angle measurement
-    # -----------------------------
+    # ROI is tuned for the current front D435 height.
     roi_x: 0.30   # left
     roi_y: 0.45   # top
     roi_w: 0.40   # width

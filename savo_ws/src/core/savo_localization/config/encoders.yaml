@@ -1,50 +1,40 @@
-# encoders.yaml
-# Robot SAVO — Encoder + Wheel Odom params (ROS 2 Jazzy)
-#
-# Applies to:
-#   - svo_localization wheel_odom_node (C++) publishing /wheel/odom
-#
-# Notes:
-# - You have TWO rear-wheel encoders (A/B per wheel = 4 GPIO lines total).
-# - For mecanum with rear-only encoders: vy is not observable → node sets vy=0.0.
-# - You use external pull-ups → use_pullups=false.
-#
-# Run example:
-#   ros2 run savo_localization wheel_odom_node --ros-args --params-file encoders.yaml
+# Rear-wheel encoders only: lateral velocity is not observable, so odom reports vy=0.
 
 wheel_odom_node:
   ros__parameters:
-    # GPIO (BCM numbering)
+    # BCM numbering.
     left_a: 21
     left_b: 20
     right_a: 12
     right_b: 26
 
-    # Make "forward drive" count positive (matches your usual tests)
+    # Forward drive counts positive with the current motor wiring.
     invert_left: true
     invert_right: true
 
-    # Kinematics / encoder model
+    # 20 CPR with x4 decoding matches quadrature edge counting.
     wheel_dia_m: 0.065
     cpr: 20
     decoding: 4
     gear: 1.0
     track_m: 0.165
 
-    # Timing
-    publish_hz: 50.0        # odom publish rate
-    poll_hz: 2000.0         # GPIO sampling rate in background thread
+    publish_hz: 50.0
+    # Fast polling keeps quadrature edges reliable on Pi GPIO.
+    poll_hz: 2000.0
 
-    # GPIO conditioning
-    debounce_us: 300        # 0 disables; 300us matches your python test defaults
-    use_pullups: false      # you have external pull-ups (recommended)
-    gpiochip: -1            # -1 autodetect; set 0/1/etc if you want fixed
+    # 300us matches the bench encoder tests.
+    debounce_us: 300
+    # External pull-ups are installed on the encoder lines.
+    use_pullups: false
+    # -1 autodetects the GPIO chip.
+    gpiochip: -1
 
-    # Frames (EKF will publish TF; this node does NOT publish TF)
+    # EKF owns odom -> base_link TF; wheel odom only stamps messages with these frames.
     frame_odom: "odom"
     frame_base: "base_link"
 
-    # Covariances (conservative; vy unknown => large)
+    # Rear-only mecanum odom cannot measure lateral motion, so y/vy stay loose.
     cov_x: 0.02
     cov_y: 0.50
     cov_yaw: 0.05

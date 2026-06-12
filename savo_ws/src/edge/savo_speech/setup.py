@@ -4,29 +4,19 @@ import os
 
 package_name = "savo_speech"
 
-#
-# Collect extra data files (ament index, launch files, config files)
-#
-
-# ament index resource file
 resource_files = [os.path.join("resource", package_name)]
 
-# package manifest
 package_xml = ["package.xml"]
 
-# all launch files under launch/
 launch_files = glob(os.path.join("launch", "*.launch.py"))
 
-# all YAML config files under config/
 config_files = glob(os.path.join("config", "*.yaml"))
 
 data_files = [
-    # Required by ament so the package is discoverable
     (
         "share/ament_index/resource_index/packages",
         resource_files,
     ),
-    # Install package.xml
     (
         f"share/{package_name}",
         package_xml,
@@ -70,24 +60,11 @@ setup(
     tests_require=["pytest"],
     entry_points={
         "console_scripts": [
-            # Speech-to-text node (Faster-Whisper)
             "stt_node = savo_speech.stt_node:main",
-
-            #STT remote
             "remote_stt_client_node = savo_speech.remote_stt_client_node:main",
-
-            # Remote speech client (Pi mic -> /speech -> IntentResult + TTS text)
             "remote_speech_client_node = savo_speech.remote_speech_client_node:main",
-
-
-            # Text-to-speech node (Piper)
             "tts_node = savo_speech.tts_node:main",
-
-            # Bridge STT ↔ LLM ↔ TTS
             "speech_bridge_node = savo_speech.speech_bridge_node:main",
-
-            # Mouth / face animation node for the DSI UI
-            # (module file is mouth_anim.py, executable name is mouth_anim_node)
             "mouth_anim_node = savo_speech.mouth_anim:main",
         ],
     },

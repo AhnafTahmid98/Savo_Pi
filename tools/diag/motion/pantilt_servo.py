@@ -1,21 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Robot Savo — Pan-Tilt Servo Test (PCA9685)
-------------------------------------------
-Interactive controls (default):
-  W / S : tilt up / tilt down
-  A / D : pan left / pan right
-  C     : center both servos (pan=90°, tilt=55° by default)
-  Q or ESC : quit
-
-Ranges:   
-  Pan  : 0 .. 180 degrees
-  Tilt : 45 .. 180 degrees (defaults, can be changed with CLI)
-  Default tilt center = 55 degrees.
-
-Author: Robot Savo
-"""
+"""Interactive PCA9685 pan-tilt servo diagnostic."""
 
 import sys
 import time
@@ -25,13 +10,7 @@ import termios
 import tty
 
 import smbus
-
-
-# ---------------------------------------------------------------------------
-# PCA9685 driver
-# ---------------------------------------------------------------------------
 class PCA9685:
-    # Registers/etc.
     __SUBADR1            = 0x02
     __SUBADR2            = 0x03
     __SUBADR3            = 0x04
@@ -89,11 +68,6 @@ class PCA9685:
 
     def close(self) -> None:
         self.bus.close()
-
-
-# ---------------------------------------------------------------------------
-# Servo helper
-# ---------------------------------------------------------------------------
 class Servo:
     def __init__(self, addr: int = 0x40, debug: bool = True):
         self.pwm_frequency = 50
@@ -134,11 +108,6 @@ class Servo:
 
     def close(self) -> None:
         self.pwm_servo.close()
-
-
-# ---------------------------------------------------------------------------
-# Keyboard helpers
-# ---------------------------------------------------------------------------
 class RawKeyReader:
     def __init__(self):
         self.fd = sys.stdin.fileno()
@@ -155,11 +124,6 @@ class RawKeyReader:
 
     def read_key(self) -> str:
         return sys.stdin.read(1)
-
-
-# ---------------------------------------------------------------------------
-# Main interactive test
-# ---------------------------------------------------------------------------
 def interactive_test(
     pan_chan: str,
     tilt_chan: str,
@@ -168,18 +132,11 @@ def interactive_test(
     step: int,
     tilt_center: int = 55,
 ) -> None:
-    """
-    Interactive WASD pan-tilt test.
-
-    Pan range:  0 .. 180 deg
-    Tilt range: tilt_min .. tilt_max (e.g. 45 .. 180)
-    """
+    """Interactive WASD pan-tilt test."""
     PAN_MIN = 0
     PAN_MAX = 180
 
     servo = Servo(addr=0x40, debug=True)
-
-    # Clamp center and initial angles into allowed range
     tilt_center = max(tilt_min, min(tilt_max, tilt_center))
 
     pan_angle = 90

@@ -1,26 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Robot Savo — Camera Diagnostic (Ubuntu 24.04 on Raspberry Pi 5)
-----------------------------------------------------------------
-- List cameras (libcamera 'cam -l' or gst-device-monitor).
-- Live preview to 7" DSI: Wayland, X11, or DRM/KMS (kmssink).
-- Record MP4 (H.264) with valid moov (graceful EOS), GOP control, faststart.
-- Capture a JPEG still using a minimal GStreamer pipeline.
-- Optional CSV logging of config + results.
-- No Picamera2 required; works with libcamera + GStreamer.
-
-
-Wayland env (for DSI preview):
-  export XDG_RUNTIME_DIR=/run/user/1000
-  export WAYLAND_DISPLAY=wayland-1
-  # If you compiled GStreamer/libcamera to /usr/local:
-  export GST_PLUGIN_PATH=/usr/local/lib/aarch64-linux-gnu/gstreamer-1.0
-  export LD_LIBRARY_PATH=/usr/local/lib/aarch64-linux-gnu:/usr/local/lib
-
-Author: Robot Savo
-
-"""
+"""Camera diagnostic using libcamera and GStreamer on Pi 5."""
 
 import argparse
 import os
@@ -36,8 +16,6 @@ import json
 import shlex
 from datetime import datetime, timezone
 from typing import Optional, List, Tuple
-
-# -------- Utilities --------
 
 def require(bin_name: str, human: str):
     if shutil.which(bin_name) is None:
@@ -72,7 +50,6 @@ def pick_encoder(enc: str) -> str:
     if enc not in ("x264", "openh264"):
         print(f"WARNING: Unknown encoder '{enc}', falling back to x264.")
         enc = "x264"
-    # Presence hints (no hard fail)
     if shutil.which("gst-inspect-1.0"):
         rc_x264, _ = run(["gst-inspect-1.0", "x264"], capture=True)
         rc_oh, _  = run(["gst-inspect-1.0", "openh264"], capture=True)
@@ -110,11 +87,8 @@ def write_csv_row(csv_path: str, data: dict):
 
 def print_config(namespace: argparse.Namespace):
     cfg = vars(namespace).copy()
-    # Hide long/unused fields if any later
     print("# Config:")
     print(json.dumps(cfg, indent=2, sort_keys=True))
-
-# -------- Listing --------
 
 def list_devices():
     # Prefer libcamera 'cam -l' (from libcamera-tools)
@@ -124,7 +98,6 @@ def list_devices():
         if out:
             print(out.strip())
             return
-    # Fallback: gst-device-monitor
     mon = shutil.which("gst-device-monitor-1.0")
     if mon:
         env = os.environ.copy()
@@ -138,8 +111,6 @@ def list_devices():
     print("Install (if missing):")
     print("  sudo apt install libcamera-tools")
     print("  sudo apt install gstreamer1.0-plugins-base-apps")
-
-# -------- Still capture --------
 
 def snap_gst(path: str, w: int, h: int, fps: int, hflip: bool, vflip: bool):
     """Take a single JPEG using GStreamer; save to `path`."""
@@ -167,8 +138,6 @@ def snap_gst(path: str, w: int, h: int, fps: int, hflip: bool, vflip: bool):
     ]
     print("Running:", " ".join(shlex.quote(x) for x in pipeline))
     rc, _ = run(pipeline, capture=False)
-
-    # pick last frame
     try:
         files = sorted(glob.glob(os.path.join(tmpdir, "frame-*.jpg")))
         if not files:
@@ -184,18 +153,11 @@ def snap_gst(path: str, w: int, h: int, fps: int, hflip: bool, vflip: bool):
             pass
     print(f"Saved still (gst): {path}")
 
-# -------- Recording --------
-
 def record_gst(path: str, w: int, h: int, fps: int, bitrate: int,
                duration: float, encoder: str = "x264", gop: Optional[int] = 60,
                timeout_int: Optional[float] = None, faststart: bool = True,
                hflip: bool = False, vflip: bool = False) -> dict:
-    """
-    Record MP4/H.264 with EOS finalization:
-    - External timeout: `timeout --signal=INT <N>` wraps gst-launch
-    - Else internal SIGINT after <duration>
-    Returns a small result dict for logging.
-    """
+    """Record MP4/H.264 with EOS finalization so mp4mux writes a valid file."""
     require("gst-launch-1.0", "GStreamer (gst-launch-1.0)")
     ensure_dir_for(path)
     enc = pick_encoder(encoder)
@@ -277,8 +239,6 @@ def record_gst(path: str, w: int, h: int, fps: int, bitrate: int,
         "encoder": enc
     }
 
-# -------- Preview --------
-
 def preview_wayland(w: int, h: int, fps: int, latency: str, hflip: bool, vflip: bool):
     require("gst-launch-1.0", "GStreamer (gst-launch-1.0)")
     display = os.environ.get("WAYLAND_DISPLAY", "wayland-1")
@@ -352,8 +312,6 @@ def preview_drm(w: int, h: int, fps: int, hflip: bool, vflip: bool):
     print("Running (Ctrl+C to quit):", " ".join(shlex.quote(x) for x in pipeline))
     os.execvp(pipeline[0], pipeline)
 
-# -------- Main --------
-
 def main():
     ap = argparse.ArgumentParser(description="Robot Savo Camera Diagnostic")
     ap.add_argument("--list", action="store_true", help="List detected cameras.")
@@ -382,16 +340,12 @@ def main():
     ap.add_argument("--vflip", action="store_true", help="Vertical flip (preview/record/snap).")
 
     args = ap.parse_args()
-
-    # Sanity
     if args.width <= 0 or args.height <= 0 or args.fps <= 0:
         print("ERROR: width/height/fps must be positive.", file=sys.stderr)
         sys.exit(2)
 
     if args.print_config:
         print_config(args)
-
-    # Actions
     if args.list:
         list_devices()
         return
@@ -427,7 +381,6 @@ def main():
         did_something = True
 
     if args.preview:
-        # Execs (replaces process)
         if args.preview == "wayland":
             preview_wayland(args.width, args.height, args.fps, args.latency, args.hflip, args.vflip)
         elif args.preview == "x11":

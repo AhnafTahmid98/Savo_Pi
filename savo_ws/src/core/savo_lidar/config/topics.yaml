@@ -1,0 +1,19 @@
+topics:
+  scan:
+    raw: /scan
+    filtered: /scan/filtered
+
+  state:
+    driver: /savo_lidar/state
+    health: /savo_lidar/health
+    watchdog: /savo_lidar/watchdog_state
+    summary: /savo_lidar/state_summary
+    scan_quality: /savo_lidar/scan_quality
+    heartbeat: /savo_lidar/heartbeat
+
+  sectors:
+    front: /savo_lidar/front_sector
+
+  downstream:
+    mapping_scan: /scan
+    nav_scan: /scan

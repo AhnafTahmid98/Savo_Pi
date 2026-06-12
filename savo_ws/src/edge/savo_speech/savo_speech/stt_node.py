@@ -1,41 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Robot Savo — STT node (faster-whisper, utterance mode + TTS gate)
-
-- Captures audio from ReSpeaker via sounddevice.
-- Buffers blocks into "utterances" while speech is active.
-- When speech stops, transcribes the whole utterance once.
-- Publishes recognized text to /savo_intent/user_text (or configured topic).
-
-New in this version:
-- Subscribes to a TTS state topic (e.g. /savo_speech/tts_speaking, std_msgs/Bool).
-- While the robot is speaking (and for a short cooldown) STT is gated OFF
-  so we do not transcribe the robot's own replies.
-
-We can switch between:
-  - utterance_mode = True  → buffer until user stops talking, then STT once
-  - utterance_mode = False → per-block STT (legacy behavior)
-
-Key parameters (from YAML / CLI):
-  model_size_or_path           : "tiny.en", "base.en", "small.en", or path
-  device                       : "cpu" on Pi
-  compute_type                 : "int8" on Pi
-  language                     : "en"
-  beam_size                    : int (e.g. 3)
-  sample_rate                  : 16000
-  block_duration_s             : 2.0–4.0 recommended
-  energy_threshold             : float, VAD gate on block energy
-  min_transcript_chars         : ignore very short outputs
-  input_device_index           : ReSpeaker index (0 on your Pi)
-  publish_topic                : "/savo_speech/stt_text" or "/savo_intent/user_text"
-  utterance_mode               : True to enable utterance buffering
-  max_utterance_duration_s     : safety limit, e.g. 15.0
-
-  use_tts_gate                 : True → ignore audio while robot TTS is active
-  tts_speaking_topic           : "/savo_speech/tts_speaking"
-  tts_cooldown_blocks          : number of blocks to skip after TTS stops
-"""
+"""Faster-Whisper STT node with utterance buffering and TTS gating."""
 
 from __future__ import annotations
 
@@ -53,10 +18,6 @@ from .whisper_engine import FasterWhisperEngine
 class STTNode(Node):
     def __init__(self) -> None:
         super().__init__("stt_node")
-
-        # ---------------------------------------------------------------------
-        # Parameters: STT / Whisper configuration
-        # ---------------------------------------------------------------------
         self.model_size_or_path: str = (
             self.declare_parameter("model_size_or_path", "tiny.en")
             .get_parameter_value()
@@ -114,10 +75,6 @@ class STTNode(Node):
             .get_parameter_value()
             .string_value
         )
-
-        # ---------------------------------------------------------------------
-        # Parameters: utterance-level behavior
-        # ---------------------------------------------------------------------
         self.utterance_mode: bool = (
             self.declare_parameter("utterance_mode", True)
             .get_parameter_value()
@@ -128,10 +85,7 @@ class STTNode(Node):
             .get_parameter_value()
             .double_value
         )
-
-        # ---------------------------------------------------------------------
-        # Parameters: TTS gate (ignore robot's own voice)
-        # ---------------------------------------------------------------------
+        # Prevent Robot Savo from transcribing its own speaker output.
         self.use_tts_gate: bool = (
             self.declare_parameter("use_tts_gate", True)
             .get_parameter_value()
@@ -147,15 +101,7 @@ class STTNode(Node):
             .get_parameter_value()
             .integer_value
         )
-
-        # ---------------------------------------------------------------------
-        # Publisher
-        # ---------------------------------------------------------------------
         self.publisher_ = self.create_publisher(String, self.publish_topic, 10)
-
-        # ---------------------------------------------------------------------
-        # TTS speaking state subscriber (for gating)
-        # ---------------------------------------------------------------------
         self._tts_speaking: bool = False
         self._tts_cooldown_blocks_remaining: int = 0
 
@@ -167,33 +113,17 @@ class STTNode(Node):
                 self._on_tts_speaking,
                 10,
             )
-
-        # ---------------------------------------------------------------------
-        # STT engine
-        # ---------------------------------------------------------------------
         self.engine = FasterWhisperEngine(
             model_size_or_path=self.model_size_or_path,
             device=self.device,
             compute_type=self.compute_type,
         )
-
-        # ---------------------------------------------------------------------
-        # Utterance state
-        # ---------------------------------------------------------------------
         self._block_index: int = 0
         self._in_utterance: bool = False
         self._utterance_blocks: List[np.ndarray] = []
         self._utterance_total_samples: int = 0
         self._utterance_counter: int = 0
-
-        # ---------------------------------------------------------------------
-        # Timer
-        # ---------------------------------------------------------------------
         self.timer = self.create_timer(self.block_duration_s, self._timer_callback)
-
-        # ---------------------------------------------------------------------
-        # Log configuration
-        # ---------------------------------------------------------------------
         self.get_logger().info(
             "STTNode starting with faster-whisper:\n"
             f"  model_size_or_path     = {self.model_size_or_path}\n"
@@ -212,10 +142,6 @@ class STTNode(Node):
             f"  tts_speaking_topic     = {self.tts_speaking_topic}\n"
             f"  tts_cooldown_blocks    = {self.tts_cooldown_blocks}"
         )
-
-    # -------------------------------------------------------------------------
-    # TTS speaking callback (gate STT while robot is talking)
-    # -------------------------------------------------------------------------
     def _on_tts_speaking(self, msg: Bool) -> None:
         """Update TTS speaking state and reset utterance when robot starts talking."""
         new_state = bool(msg.data)
@@ -223,7 +149,6 @@ class STTNode(Node):
         self._tts_speaking = new_state
 
         if new_state and not old_state:
-            # TTS just started: cancel any current utterance and start cooldown.
             self.get_logger().debug("STTNode: TTS started, cancelling current utterance and gating STT.")
             self._in_utterance = False
             self._utterance_blocks = []
@@ -231,22 +156,13 @@ class STTNode(Node):
             self._tts_cooldown_blocks_remaining = self.tts_cooldown_blocks
 
         elif not new_state and old_state:
-            # TTS just stopped: cooldown will be handled in timer.
             self.get_logger().debug(
                 f"STTNode: TTS stopped, starting cooldown for {self.tts_cooldown_blocks} block(s)."
             )
             self._tts_cooldown_blocks_remaining = self.tts_cooldown_blocks
 
-    # -------------------------------------------------------------------------
-    # Main timer loop
-    # -------------------------------------------------------------------------
     def _timer_callback(self) -> None:
         self._block_index += 1
-
-        # -------------------------------------------------------------
-        # Step 1: TTS gate — skip capturing while robot is speaking
-        #         or during a short cooldown after TTS stops.
-        # -------------------------------------------------------------
         if self.use_tts_gate:
             if self._tts_speaking:
                 self.get_logger().debug(
@@ -261,10 +177,6 @@ class STTNode(Node):
                     f"({self._tts_cooldown_blocks_remaining} blocks left)."
                 )
                 return
-
-        # -------------------------------------------------------------
-        # Step 2: Capture audio
-        # -------------------------------------------------------------
         try:
             audio = record_block(
                 sample_rate=self.sample_rate,
@@ -283,7 +195,6 @@ class STTNode(Node):
             )
             return
 
-        # Convert to float32 and compute simple energy for VAD
         audio_f32 = audio.astype(np.float32)
         energy = float(np.mean(np.square(audio_f32)))
 
@@ -291,10 +202,6 @@ class STTNode(Node):
             f"[block {self._block_index}] energy={energy:.6f} "
             f"(threshold={self.energy_threshold:.6f})"
         )
-
-        # -------------------------------------------------------------
-        # Legacy mode: per-block STT (no utterance buffering)
-        # -------------------------------------------------------------
         if not self.utterance_mode:
             if energy < self.energy_threshold:
                 return
@@ -318,12 +225,7 @@ class STTNode(Node):
                 f"[block {self._block_index}] STT transcript: '{text}'"
             )
             return
-
-        # -------------------------------------------------------------
-        # Utterance mode: buffer blocks while speech is active
-        # -------------------------------------------------------------
         if energy >= self.energy_threshold:
-            # Speech detected in this block
             if not self._in_utterance:
                 self.get_logger().debug(
                     f"[block {self._block_index}] Utterance START"
@@ -335,7 +237,7 @@ class STTNode(Node):
             self._utterance_blocks.append(audio_f32)
             self._utterance_total_samples += audio_f32.shape[0]
 
-            # Safety: cut very long utterances
+            # Cut off stuck or continuous speech before it grows unbounded.
             utt_duration = self._utterance_total_duration_s()
             if utt_duration >= self.max_utterance_duration_s:
                 self.get_logger().debug(
@@ -346,19 +248,13 @@ class STTNode(Node):
                 self._in_utterance = False
 
         else:
-            # Silence in this block
             if self._in_utterance:
-                # We were in speech and now saw a silent block -> end utterance
                 self.get_logger().debug(
                     f"[block {self._block_index}] Utterance END on silence"
                 )
                 self._finalize_utterance()
                 self._in_utterance = False
-            # else: still idle, nothing to do
 
-    # -------------------------------------------------------------------------
-    # Helpers
-    # -------------------------------------------------------------------------
     def _utterance_total_duration_s(self) -> float:
         if self.sample_rate <= 0:
             return 0.0
@@ -369,7 +265,6 @@ class STTNode(Node):
         if not self._utterance_blocks:
             return
 
-        # Concatenate all blocks into one 1-D array
         try:
             audio_all = np.concatenate(self._utterance_blocks, axis=0)
         except Exception as exc:  # noqa: BLE001
@@ -424,7 +319,6 @@ def main(args=None) -> None:
         try:
             rclpy.shutdown()
         except Exception:
-            # Already shut down or context invalid; safe to ignore.
             pass
 
 

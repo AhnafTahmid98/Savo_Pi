@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.8)
 project(savo_msgs)
 
 # ---------------------------------------------------------------------------
-# Compiler settings (future-proof, even if we add C++ nodes later)
+# compiler settings
 # ---------------------------------------------------------------------------
 if(NOT CMAKE_C_STANDARD)
   set(CMAKE_C_STANDARD 99)

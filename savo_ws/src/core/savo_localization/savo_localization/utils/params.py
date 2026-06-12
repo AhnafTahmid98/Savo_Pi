@@ -1,30 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot Savo — savo_localization/utils/params.py
-----------------------------------------------
-Professional ROS2 parameter utilities for localization nodes.
-
-Why this file exists:
-- Keep parameter declaration + reading consistent across imu_node / wheel_odom / EKF helpers
-- Reduce boilerplate and prevent silent type mistakes (YAML int vs float, list vs scalar)
-- Provide light validation (range checks) and clear error messages
-- Safe to import outside ROS2: ROS interfaces are imported lazily only when needed
-
-Usage:
-    from savo_localization.utils.params import (
-        ParamSpec, declare_params,
-        get_param_float, get_param_int, get_param_bool, get_param_str
-    )
-
-    declare_params(self, [
-        ParamSpec("rate_hz", 50.0, "Loop rate (Hz)"),
-        ParamSpec("track_width_m", 0.165, "Track width (m)"),
-    ])
-
-    rate_hz = get_param_float(self, "rate_hz", min_value=1.0, max_value=200.0)
-"""
+"""Parameter helpers with type coercion and range validation."""
 
 from __future__ import annotations
 
@@ -32,44 +9,23 @@ from dataclasses import dataclass
 from typing import Any, Iterable, List, Optional, Sequence, Tuple, Type, Union
 
 
-# ---------------------------
-# Types
-# ---------------------------
-
 ParamScalar = Union[bool, int, float, str]
 ParamValue = Union[ParamScalar, Sequence[ParamScalar]]
 
 
 @dataclass(frozen=True)
 class ParamSpec:
-    """
-    Parameter declaration spec.
-
-    name: parameter name
-    default: default value (scalar, list, or tuple)
-    description: shown via `ros2 param describe`
-    """
+    """Parameter declaration spec."""
     name: str
     default: ParamValue
     description: str = ""
 
 
-# ---------------------------
-# Public API
-# ---------------------------
-
 def declare_params(
     node: Any,
     specs: Iterable[Union[ParamSpec, Tuple[str, ParamValue], Tuple[str, ParamValue, str]]],
 ) -> None:
-    """
-    Declare a set of parameters on a ROS2 node.
-
-    Specs can be:
-      - ParamSpec(...)
-      - ("name", default)
-      - ("name", default, "description")
-    """
+    """Declare ParamSpec entries or compact tuple specs on a ROS node."""
     for item in specs:
         spec = _to_spec(item)
 
@@ -93,16 +49,7 @@ def get_param(
     max_value: Optional[float] = None,
     allow_none: bool = False,
 ) -> Any:
-    """
-    Read a parameter with type enforcement + optional numeric range checks.
-
-    Notes:
-    - YAML often provides ints where floats are expected (e.g., 30 instead of 30.0).
-      We allow int->float coercion when expected_type is float.
-
-    Raises:
-        ValueError on type mismatch or range violation.
-    """
+    """Read a parameter with type enforcement and optional numeric range checks."""
     p = node.get_parameter(name)
     value = getattr(p, "value", None)
 
@@ -113,7 +60,6 @@ def get_param(
             return default
         raise ValueError(f"Parameter '{name}' is unset (None) and no default was provided")
 
-    # List/tuple parameters
     if expected_type in (list, tuple):
         if not isinstance(value, (list, tuple)):
             raise ValueError(f"Parameter '{name}' expected {expected_type.__name__}, got {type(value).__name__}")

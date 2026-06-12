@@ -32,8 +32,8 @@ RGB = Tuple[int, int, int]
 def draw_face_view(
     surface: pygame.Surface,
     mouth_level: float,
-    status_text: str,      # kept for API compatibility, but ignored
-    subtitle_text: str,    # kept for API compatibility, but ignored
+    status_text: str,
+    subtitle_text: str,
     face_state: str,
     fonts: Dict[str, pygame.font.Font],
     colors: Dict[str, RGB],

@@ -1,41 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Robot Savo — savo_localization/launch/localization_bringup.launch.py
---------------------------------------------------------------------
-Professional one-command bringup for the localization stack.
-
-What this launch file can start (toggleable with launch args):
-- wheel_odom_node (C++):
-    Publishes /wheel/odom using rear wheel encoders (primary wheel odometry source).
-- wheel_odom_fallback_node (Python):
-    Debug/fallback odometry publisher for /wheel/odom (use only if C++ node is unavailable).
-- imu_node (Python):
-    Publishes IMU data on /imu/data (e.g., BNO055).
-- ekf_node (robot_localization):
-    Fuses /wheel/odom + /imu/data and publishes:
-      - /odometry/filtered
-      - TF: odom -> base_link
-- localization_dashboard (Python, optional):
-    Terminal diagnostics dashboard for quick bringup/status checks.
-
-Design notes / bringup rules:
-- If robot_localization is not installed on the Pi, launch with:
-    use_ekf:=false
-- During EKF baseline testing, EKF should be the only node publishing:
-    TF odom -> base_link
-- wheel_odom_node TF publishing is OFF by default in this launch file
-  to avoid duplicate TF publishers when EKF is enabled.
-- Do NOT enable both wheel_odom_node and wheel_odom_fallback_node at the same time,
-  because both may publish /wheel/odom (duplicate publishers / conflicting data).
-- Recommended baseline mode on real robot:
-    use_wheel_odom:=true
-    use_wheel_odom_fallback:=false
-    use_imu:=true
-    use_ekf:=true
-    wheel_odom_publish_tf:=false
-"""
+"""Launch wheel odom, IMU, EKF, and the optional localization dashboard."""
 
 from __future__ import annotations
 
@@ -55,20 +21,11 @@ def _pkg_share(pkg: str) -> str:
 
 
 def generate_launch_description() -> LaunchDescription:
-    """
-    Build and return the full launch description for the localization stack.
-
-    Notes:
-    - LaunchConfiguration values are strings at launch-time ("true"/"false"), not Python booleans.
-    - We declare all arguments first, then add logs, then add nodes.
-    """
+    """Build the localization launch description."""
     pkg = "savo_localization"
     share = _pkg_share(pkg)
 
-    # -------------------------------------------------------------------------
-    # LaunchConfiguration handles (runtime string values resolved by launch)
-    # -------------------------------------------------------------------------
-    # Core toggles (string booleans: "true"/"false")
+    # launch arguments
     use_sim_time = LaunchConfiguration("use_sim_time")
     use_wheel_odom = LaunchConfiguration("use_wheel_odom")
     use_wheel_odom_fallback = LaunchConfiguration("use_wheel_odom_fallback")
@@ -76,40 +33,32 @@ def generate_launch_description() -> LaunchDescription:
     use_ekf = LaunchConfiguration("use_ekf")
     use_dashboard = LaunchConfiguration("use_dashboard")
 
-    # TF ownership behavior
-    # Keep wheel odom TF OFF by default so EKF owns odom -> base_link
+    # Keep wheel odom TF off when EKF owns odom -> base_link.
     wheel_odom_publish_tf = LaunchConfiguration("wheel_odom_publish_tf")
 
-    # Optional YAML path overrides from CLI
+    # config path overrides
     frames_yaml = LaunchConfiguration("frames_yaml")
     common_yaml = LaunchConfiguration("common_yaml")
     imu_yaml = LaunchConfiguration("imu_yaml")
     encoders_yaml = LaunchConfiguration("encoders_yaml")
     ekf_yaml = LaunchConfiguration("ekf_yaml")
 
-    # -------------------------------------------------------------------------
-    # Default config file paths (from installed package share)
-    # -------------------------------------------------------------------------
+    # default config paths
     default_frames_yaml = os.path.join(share, "config", "frames.yaml")
     default_common_yaml = os.path.join(share, "config", "localization_common.yaml")
     default_imu_yaml = os.path.join(share, "config", "imu.yaml")
     default_encoders_yaml = os.path.join(share, "config", "encoders.yaml")
     default_ekf_yaml = os.path.join(share, "config", "ekf_odom.yaml")
 
-    # -------------------------------------------------------------------------
-    # Nodes
-    # -------------------------------------------------------------------------
-
-    # Primary wheel odometry (C++): publishes /wheel/odom
-    # Recommended for normal operation (better performance than Python fallback)
+    # nodes
     wheel_odom_node = Node(
         package=pkg,
-        executable="wheel_odom_node",  # C++ binary (correct: no .py)
+        executable="wheel_odom_node",
         name="wheel_odom_node",
         output="screen",
         parameters=[
             {"use_sim_time": use_sim_time},
-            # Keep false when EKF is enabled to avoid duplicate odom->base_link TF
+            # EKF should be the only odom -> base_link TF publisher.
             {"publish_tf": wheel_odom_publish_tf},
             common_yaml,
             frames_yaml,
@@ -118,16 +67,15 @@ def generate_launch_description() -> LaunchDescription:
         condition=IfCondition(use_wheel_odom),
     )
 
-    # Python fallback wheel odometry: publishes /wheel/odom (debug/fallback only)
-    # Use only when C++ wheel_odom_node is disabled
+    # Python fallback for boards where the C++ GPIO path is unavailable.
     wheel_odom_fallback_node = Node(
         package=pkg,
-        executable="wheel_odom_fallback_node.py",  # matches installed filename
+        executable="wheel_odom_fallback_node.py",
         name="wheel_odom_fallback_node",
         output="screen",
         parameters=[
             {"use_sim_time": use_sim_time},
-            # Keep fallback TF OFF too; EKF should own TF when enabled
+            # EKF should be the only odom -> base_link TF publisher.
             {"publish_tf": False},
             common_yaml,
             frames_yaml,
@@ -136,7 +84,6 @@ def generate_launch_description() -> LaunchDescription:
         condition=IfCondition(use_wheel_odom_fallback),
     )
 
-    # IMU publisher node (e.g., BNO055): publishes /imu/data
     imu_node = Node(
         package=pkg,
         executable="imu_node.py",  # matches installed filename

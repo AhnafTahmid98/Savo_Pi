@@ -1,38 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Robot Savo — Battery Health Diagnostic (UPS HAT + Robot Kit Pack)
------------------------------------------------------------------
-Location: savo_ws/tools/diag/power/battery_health.py
-
-Features
-========
-- Read Raspberry Pi UPS HAT (X1200/X1201/X1202 compatible) over I²C @ 0x36:
-    * Pack voltage (V)
-    * Relative capacity (%)
-
-- Read Robot Kit main battery via ADS7830 ADC @ 0x48:
-    * Uses PCB version 1 or 2 scaling (divider ratio) for Freenove-style boards.
-    * Default channel 2 for battery sense, but configurable via CLI.
-    * Simple SoC estimate (%) using a linear 2S Li-ion model:
-        - V_empty (default 6.40 V) -> 0%
-        - V_full  (default 8.40 V) -> 100%
-
-- Kit SoC-based notes similar to UPS, but printed in human language:
-    * "Kit low – needs charging"
-    * "UPS low"
-    * "Both low – needs charging"
-    * "Good condition"
-    * Error messages: "UPS error", "Kit error", "UPS and kit error"
-
-- Print a compact, timestamped status line each interval.
-- Optional CSV logging for long-term plots.
-- Programmable low-voltage warnings and (optional) automatic shutdown
-  when the UPS HAT voltage falls below a critical threshold.
-
-This script is *standalone*: it does not require ROS 2. It is meant for
-bench diagnostics and troubleshooting on the live robot.
-"""
+"""Battery health diagnostic for the UPS HAT and robot kit pack."""
 
 import argparse
 import csv
@@ -45,9 +13,8 @@ from pathlib import Path
 from typing import Optional
 
 try:
-    from smbus2 import SMBus  # Preferred modern I²C library
+    from smbus2 import SMBus
 except ImportError:
-    # Fallback to smbus if smbus2 is not available
     try:
         from smbus import SMBus  # type: ignore
     except ImportError as exc:  # pragma: no cover - environment specific
@@ -66,29 +33,22 @@ ADS7830_CMD_BASE = 0x84
 
 @dataclass
 class UpsReading:
-    voltage: Optional[float]  # Pack voltage in volts
-    capacity: Optional[float]  # Remaining capacity in percent
+    voltage: Optional[float]
+    capacity: Optional[float]
     ok: bool
     error: Optional[str] = None
 
 
 @dataclass
 class KitReading:
-    voltage: Optional[float]  # Pack voltage in volts
-    soc: Optional[float] = None  # State of charge in percent
+    voltage: Optional[float]
+    soc: Optional[float] = None
     ok: bool = False
     error: Optional[str] = None
 
 
 class UpsHat:
-    """
-    Simple helper for UPS Shield X1200/X1201/X1202.
-
-    Address: 0x36 on I²C-1.
-
-    Voltage formula derived from vendor example:
-        raw_word -> byte swap -> * 1.25 / 1000 / 16
-    """
+    """UPS Shield helper; vendor voltage formula is byte-swapped raw * 1.25 / 1000 / 16."""
 
     def __init__(self, bus_id: int = 1, address: int = UPS_I2C_ADDR) -> None:
         self.address = address
@@ -122,28 +82,7 @@ class UpsHat:
 
 
 class KitBattery:
-    """
-    Robot kit main battery via ADS7830 @ 0x48.
-
-    We do not depend on ParameterManager here; instead we expose PCB
-    version as a CLI argument.
-
-    - PCB v1:
-        adc_voltage_coefficient = 3.3
-        battery_voltage = adc_voltage * 3
-    - PCB v2:
-        adc_voltage_coefficient = 5.2
-        battery_voltage = adc_voltage * 2
-
-    SoC estimation:
-    ----------------
-    A simple *linear* mapping between two points:
-
-      V_empty -> 0%
-      V_full  -> 100%
-
-    Values below V_empty are clamped to 0%, above V_full to 100%.
-    """
+    """ADS7830 kit battery reader; v1 uses 3.3*3, v2 uses 5.2*2."""
 
     def __init__(
         self,
@@ -177,7 +116,6 @@ class KitBattery:
                 return value1
 
     def _read_adc_channel(self) -> float:
-        # ADS7830 channel encoding (same as vendor example)
         cmd = ADS7830_CMD_BASE | (
             (((self.channel << 2) | (self.channel >> 1)) & 0x07) << 4
         )
@@ -318,9 +256,7 @@ def parse_args(argv=None):
 
 
 def maybe_shutdown(ups_v: float, args) -> None:
-    """
-    Optionally request system shutdown if UPS voltage is critically low.
-    """
+    """Request shutdown if enabled and UPS voltage is critically low."""
     if ups_v <= args.ups_shutdown_v and args.allow_shutdown:
         print(
             ">>> UPS voltage below shutdown threshold "
@@ -382,11 +318,9 @@ def main(argv=None) -> int:
     csv_file = None
     csv_writer = None
     if args.csv is not None:
-        # Create parent dirs if needed
         args.csv.parent.mkdir(parents=True, exist_ok=True)
         csv_file = args.csv.open("a", newline="")
         csv_writer = csv.writer(csv_file)
-        # Write header if file is empty
         if args.csv.stat().st_size == 0:
             csv_writer.writerow(
                 [
@@ -402,15 +336,11 @@ def main(argv=None) -> int:
 
     print("-" * 80)
     print("Robot Savo — Battery Health Diagnostic")
-
-    # UPS status line
     if args.no_ups or ups is None:
         ups_line = "disabled"
     else:
         ups_line = f"I2C-{args.ups_bus} @ 0x{UPS_I2C_ADDR:02X}"
     print(f"UPS HAT    : {ups_line}")
-
-    # Kit battery status line
     if args.no_kit or kit is None:
         kit_line = "disabled"
     else:
@@ -440,12 +370,8 @@ def main(argv=None) -> int:
 
             ups_read = UpsReading(voltage=None, capacity=None, ok=False)
             kit_read = KitReading(voltage=None, soc=None, ok=False)
-
-            # Internal state flags
             ups_state = "ok"
             kit_state = "ok"
-
-            # ----- UPS state -----
             if ups is not None:
                 ups_read = ups.safe_read()
                 if ups_read.ok and ups_read.voltage is not None:
@@ -457,8 +383,6 @@ def main(argv=None) -> int:
                         ups_state = "ok"
                 else:
                     ups_state = "error"
-
-            # ----- Kit battery state -----
             if kit is not None:
                 kit_read = kit.safe_read()
                 if kit_read.ok and kit_read.voltage is not None:
@@ -479,8 +403,6 @@ def main(argv=None) -> int:
                         kit_state = "ok"
                 else:
                     kit_state = "error"
-
-            # ----- Human-readable Notes -----
             if ups_state == "error" and kit_state == "error":
                 notes = "UPS and kit error"
             elif ups_state == "error":
@@ -488,7 +410,6 @@ def main(argv=None) -> int:
             elif kit_state == "error":
                 notes = "Kit error"
             else:
-                # No errors: talk about condition / charging
                 ups_low_flag = ups_state in ("low", "critical")
                 kit_low_flag = kit_state == "low"
 
@@ -507,8 +428,6 @@ def main(argv=None) -> int:
             kit_soc_str = f"{kit_read.soc:5.1f}" if kit_read.soc is not None else "  n/a"
 
             print(f"{now}  {ups_v_str}  {ups_c_str}  {kit_v_str}  {kit_soc_str}   {notes}")
-
-            # CSV logging (store internal states too)
             if csv_writer is not None:
                 csv_writer.writerow(
                     [
@@ -522,8 +441,6 @@ def main(argv=None) -> int:
                     ]
                 )
                 csv_file.flush()
-
-            # Optional shutdown
             if ups is not None and ups_read.ok and ups_read.voltage is not None:
                 maybe_shutdown(ups_read.voltage, args)
 

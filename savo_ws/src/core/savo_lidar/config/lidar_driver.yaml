@@ -1,0 +1,21 @@
+lidar_driver_node:
+  ros__parameters:
+    model: rplidar_a1
+    backend: dryrun
+
+    scan_topic: /scan
+    frame_id: laser
+
+    serial_port: /dev/ttyUSB0
+    baudrate: 115200
+    scan_mode: standard
+
+    min_range_m: 0.15
+    max_range_m: 12.0
+
+    expected_scan_rate_hz: 5.5
+    publish_rate_hz: 10.0
+    stale_timeout_s: 1.0
+
+    inverted: false
+    angle_compensate: true

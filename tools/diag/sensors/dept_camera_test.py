@@ -1,32 +1,5 @@
 #!/usr/bin/env python3
-"""
-Robot Savo — D435 Depth Diagnostic (ROS-based, reliable)
-
-Why ROS-based:
-- Your D435 depth stream is confirmed working in ROS2 at ~30 Hz.
-- OpenCV/V4L2 often cannot reliably stream Z16 depth from /dev/video6.
-- This tool subscribes to the ROS depth topic and computes a robust "front obstacle distance".
-
-What it does:
-- Subscribes: /camera/camera/depth/image_rect_raw   (sensor_msgs/Image, encoding usually 16UC1)
-- Computes: robust near distance (percentile) inside ROI
-- Prints: dist + status [OK/SLOW/STOP/NO_DATA]
-- Optional: publish /depth/min_front_m (std_msgs/Float32)
-- Optional: CSV logging
-
-Run:
-  # Terminal A: start RealSense driver
-  ros2 launch realsense2_camera rs_launch.py
-
-  # Terminal B: run this tool
-  python3 tools/diag/sensors/dept_camera_test.py
-
-Options:
-  --depth-topic /camera/camera/depth/image_rect_raw
-  --publish-topic /depth/min_front_m
-  --no-publish
-  --csv out.csv
-"""
+"""ROS-based D435 depth diagnostic for robust front-distance checks."""
 
 from __future__ import annotations
 
@@ -129,7 +102,6 @@ class DepthDiag(Node):
         return dist, x0, x1, y0, y1, valid
 
     def on_depth(self, msg: Image):
-        # Convert using cv_bridge
         try:
             depth = self.bridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")
         except Exception as e:
@@ -137,19 +109,13 @@ class DepthDiag(Node):
             return
 
         dist_m, x0, x1, y0, y1, valid_px = self._compute_distance(depth)
-
-        # Publish Float32 if enabled
         if self.pub is not None:
             out = Float32()
             out.data = float("nan") if math.isnan(dist_m) else dist_m
             self.pub.publish(out)
-
-        # CSV
         if self.csv_w:
             self.csv_w.writerow([time.time(), dist_m, valid_px, x0, x1, y0, y1])
             self.csv_f.flush()
-
-        # Print status (throttled)
         label = "OK"
         if math.isnan(dist_m):
             label = "NO_DATA"
@@ -162,8 +128,6 @@ class DepthDiag(Node):
         if now - self.last_print_t >= self.args.print_period_s:
             print(f"dist={dist_m:5.2f} m  valid_px={valid_px:6d}  [{label}]")
             self.last_print_t = now
-
-        # Hz estimate
         if self.args.print_hz:
             dt = now - self.last_hz_t
             if dt > 0:
