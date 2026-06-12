@@ -13,8 +13,7 @@ This repository contains the main ROS 2 workspace, hardware validation tools, di
 Robot Savo uses a two-Pi architecture.
 
 | Device | Hostname | Role |
-
-|---|---|---|
+| --- | --- | --- |
 | Main robot controller | `savo-core` | Movement authority, base control, safety, LiDAR, localization, Nav2 |
 | Edge/helper computer | `savo-edge` | RealSense, speech, display, visual odometry, AI helper services |
 
@@ -38,8 +37,7 @@ The main controller keeps all movement-critical responsibility. The edge compute
 Supported high-level robot intents include:
 
 | Intent | Meaning |
-
-|---|---|
+| --- | --- |
 | `NAVIGATE` | Guide the user to a known location |
 | `FOLLOW` | Follow a person |
 | `STOP` | Stop robot movement |
@@ -83,8 +81,7 @@ tools/
 ## Hardware Overview
 
 | Area | Hardware |
-
-|---|---|
+| --- | --- |
 | Compute | Raspberry Pi 5 units for `savo-core` and `savo-edge` |
 | Base | Freenove 4WD mecanum platform |
 | Motor control | PCA9685-based motor control |
@@ -104,8 +101,7 @@ tools/
 Robot Savo is organized into four physical layers.
 
 | Layer | Main Components |
-
-|---|---|
+| --- | --- |
 | Layer 0 / Base | Freenove board, motors, mecanum wheels, ToF sensors, ultrasonic sensor |
 | Layer 1 | `savo-core`, breadboard, speakers, display |
 | Layer 2 | ReSpeaker mic array, `savo-edge`, RealSense camera, pan-tilt camera |
@@ -116,8 +112,7 @@ Robot Savo is organized into four physical layers.
 ## Software Stack
 
 | Layer | Technology |
-
-|---|---|
+| --- | --- |
 | Operating system | Ubuntu Server 24.04 |
 | Robotics middleware | ROS 2 Jazzy |
 | Mapping | SLAM Toolbox |
@@ -136,8 +131,7 @@ Robot Savo is organized into four physical layers.
 Robot Savo is organized into focused ROS 2 packages. Each package owns one clear part of the robot.
 
 | Package | Responsibility |
-
-|---|---|
+| --- | --- |
 | `savo_base` | Base driver, mecanum motor control, watchdogs, base diagnostics |
 | `savo_control` | Velocity shaping, control modes, twist muxing, recovery logic |
 | `savo_lidar` | RPLIDAR ownership, filtering, health checks, scan publishing |
@@ -222,8 +216,7 @@ The AI helper server is kept as a separate project from this ROS 2 repository.
 Expected services on `savo-edge`:
 
 | Service | Port | Purpose |
-
-|---|---:|---|
+| --- | ---: | --- |
 | `robot-llm` | `8000` | Intent handling, chatbot replies, navigation command interpretation |
 | `robot-stt` | `9000` | Speech-to-text service |
 
