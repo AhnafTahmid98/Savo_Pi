@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Publish a compact LiDAR state summary for dashboards and logs."""
+# -*- coding: utf-8 -*-
+"""LiDAR state summary node - publishes one compact JSON summary."""
 
 from __future__ import annotations
 
@@ -10,9 +11,17 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
 
-from savo_lidar.constants import STATUS_OFFLINE
+from savo_lidar.constants import (
+    DEFAULT_HEALTH_TOPIC,
+    DEFAULT_STATE_TOPIC,
+    DEFAULT_WATCHDOG_STATE_TOPIC,
+    STATUS_ERROR,
+    STATUS_OK,
+    STATUS_WARN,
+)
 from savo_lidar.ros import get_float_param, get_string_param
-from savo_lidar.utils import node_start_message, status_qos
+from savo_lidar.utils import RateTracker, node_start_message, node_stop_message, status_qos
+from savo_lidar.utils.diagnostics import make_status_payload, payload_to_json
 
 
 class LidarStatePublisherNode(Node):
@@ -22,17 +31,17 @@ class LidarStatePublisherNode(Node):
         self._driver_state_topic = get_string_param(
             self,
             "driver_state_topic",
-            "/savo_lidar/state",
+            DEFAULT_STATE_TOPIC,
         )
         self._health_topic = get_string_param(
             self,
             "health_topic",
-            "/savo_lidar/health",
+            DEFAULT_HEALTH_TOPIC,
         )
-        self._watchdog_topic = get_string_param(
+        self._watchdog_state_topic = get_string_param(
             self,
             "watchdog_state_topic",
-            "/savo_lidar/watchdog_state",
+            DEFAULT_WATCHDOG_STATE_TOPIC,
         )
         self._summary_topic = get_string_param(
             self,
@@ -41,8 +50,9 @@ class LidarStatePublisherNode(Node):
         )
         self._publish_hz = get_float_param(self, "publish_hz", 1.0)
 
-        if self._publish_hz <= 0.0:
-            raise ValueError(f"publish_hz must be > 0.0, got {self._publish_hz}")
+        self._validate_config()
+
+        self._rate_tracker = RateTracker()
 
         self._driver_state: dict[str, Any] = {}
         self._health_state: dict[str, Any] = {}
@@ -63,84 +73,125 @@ class LidarStatePublisherNode(Node):
         self._health_sub = self.create_subscription(
             String,
             self._health_topic,
-            self._on_health,
+            self._on_health_state,
             status_qos(),
         )
         self._watchdog_sub = self.create_subscription(
             String,
-            self._watchdog_topic,
-            self._on_watchdog,
+            self._watchdog_state_topic,
+            self._on_watchdog_state,
             status_qos(),
         )
 
-        self._timer = self.create_timer(1.0 / self._publish_hz, self._on_timer)
+        self._timer = self.create_timer(
+            1.0 / self._publish_hz,
+            self._on_timer,
+        )
 
         self.get_logger().info(
             node_start_message(
                 "lidar_state_publisher_node",
                 driver_state_topic=self._driver_state_topic,
                 health_topic=self._health_topic,
-                watchdog_topic=self._watchdog_topic,
+                watchdog_state_topic=self._watchdog_state_topic,
                 summary_topic=self._summary_topic,
                 publish_hz=self._publish_hz,
             )
         )
 
+    def destroy_node(self) -> bool:
+        self.get_logger().info(node_stop_message("lidar_state_publisher_node"))
+        return super().destroy_node()
+
+    def _validate_config(self) -> None:
+        if self._publish_hz <= 0.0:
+            raise ValueError(f"publish_hz must be > 0.0, got {self._publish_hz}")
+
     def _on_driver_state(self, msg: String) -> None:
-        self._driver_state = _parse_json_msg(msg.data)
+        self._driver_state = self._safe_json_loads(msg.data)
 
-    def _on_health(self, msg: String) -> None:
-        self._health_state = _parse_json_msg(msg.data)
+    def _on_health_state(self, msg: String) -> None:
+        self._health_state = self._safe_json_loads(msg.data)
 
-    def _on_watchdog(self, msg: String) -> None:
-        self._watchdog_state = _parse_json_msg(msg.data)
+    def _on_watchdog_state(self, msg: String) -> None:
+        self._watchdog_state = self._safe_json_loads(msg.data)
 
     def _on_timer(self) -> None:
-        status = str(self._health_state.get("status", STATUS_OFFLINE))
-        message = str(self._health_state.get("message", "waiting for LiDAR health"))
-
-        payload = {
-            "node": "lidar_state_publisher_node",
-            "status": status,
-            "message": message,
-            "backend": self._driver_state.get("backend"),
-            "model": self._driver_state.get("model"),
-            "frame_id": self._driver_state.get("frame_id"),
-            "scan_topic": self._driver_state.get("scan_topic"),
-            "driver_running": bool(self._driver_state.get("driver_running", False)),
-            "hardware_ok": bool(self._health_state.get("hardware_ok", False)),
-            "scan_ok": bool(self._health_state.get("scan_ok", False)),
-            "stale": bool(self._watchdog_state.get("stale", True)),
-            "scan_count": int(self._watchdog_state.get("scan_count", 0) or 0),
-            "last_scan_age_s": self._watchdog_state.get("last_scan_age_s"),
-            "scan_rate_hz": _safe_float(self._health_state.get("scan_rate_hz", 0.0)),
-            "valid_ratio": _safe_float(self._health_state.get("valid_ratio", 0.0)),
-            "fault_latched": bool(self._health_state.get("fault_latched", False)),
-            "fault_reason": str(self._health_state.get("fault_reason", "")),
-        }
+        summary_publish_rate_hz = self._rate_tracker.tick()
+        status = self._combined_status()
 
         msg = String()
-        msg.data = json.dumps(payload, separators=(",", ":"), sort_keys=True)
+        msg.data = payload_to_json(
+            make_status_payload(
+                component="lidar_state_publisher_node",
+                status=status,
+                message=self._summary_message(status),
+                driver_status=self._driver_state.get("status"),
+                health_status=self._health_state.get("status"),
+                watchdog_status=self._watchdog_state.get("status"),
+                driver_running=self._driver_state.get("driver_running"),
+                hardware_ok=self._health_state.get("hardware_ok"),
+                scan_ok=self._health_state.get("scan_ok"),
+                stale=self._watchdog_state.get("stale"),
+                scan_count=self._driver_state.get("scan_count"),
+                scan_rate_hz=self._health_state.get("scan_rate_hz")
+                or self._driver_state.get("scan_rate_hz"),
+                valid_ratio=self._health_state.get("valid_ratio")
+                or self._driver_state.get("valid_ratio"),
+                last_scan_age_s=self._watchdog_state.get("last_scan_age_s"),
+                summary_publish_rate_hz=summary_publish_rate_hz,
+                driver_state_received=bool(self._driver_state),
+                health_state_received=bool(self._health_state),
+                watchdog_state_received=bool(self._watchdog_state),
+            )
+        )
         self._summary_pub.publish(msg)
 
+    def _combined_status(self) -> str:
+        statuses = [
+            str(self._driver_state.get("status", "")).upper(),
+            str(self._health_state.get("status", "")).upper(),
+            str(self._watchdog_state.get("status", "")).upper(),
+        ]
 
-def _parse_json_msg(data: str) -> dict[str, Any]:
-    try:
-        parsed = json.loads(data)
-    except json.JSONDecodeError:
-        return {}
+        if STATUS_ERROR in statuses:
+            return STATUS_ERROR
 
-    if not isinstance(parsed, dict):
-        return {}
+        if "STALE" in statuses:
+            return "STALE"
 
-    return parsed
+        if STATUS_WARN in statuses:
+            return STATUS_WARN
 
+        if all(status == STATUS_OK for status in statuses if status):
+            return STATUS_OK
 
-def _safe_float(value: Any, default: float = 0.0) -> float:
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return float(default)
+        return STATUS_WARN
+
+    def _summary_message(self, status: str) -> str:
+        if status == STATUS_OK:
+            return "LiDAR stack healthy"
+
+        if status == STATUS_ERROR:
+            return "LiDAR stack error"
+
+        if status == "STALE":
+            return "LiDAR scan stream stale"
+
+        return "LiDAR stack degraded"
+
+    def _safe_json_loads(self, data: str) -> dict[str, Any]:
+        try:
+            loaded = json.loads(data)
+        except json.JSONDecodeError as exc:
+            self.get_logger().warning(f"Invalid LiDAR status JSON: {exc}")
+            return {}
+
+        if not isinstance(loaded, dict):
+            self.get_logger().warning("LiDAR status JSON is not an object")
+            return {}
+
+        return loaded
 
 
 def main(args: list[str] | None = None) -> None:

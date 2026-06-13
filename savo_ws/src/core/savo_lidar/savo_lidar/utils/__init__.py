@@ -25,14 +25,28 @@ from .logging import (
     node_stop_message,
     status_message,
 )
-from .qos import (
-    health_qos,
-    heartbeat_qos,
-    scan_qos,
-    service_command_qos,
-    status_qos,
-    watchdog_qos,
-)
+try:
+    from .qos import (
+        health_qos,
+        heartbeat_qos,
+        scan_qos,
+        service_command_qos,
+        status_qos,
+        watchdog_qos,
+    )
+except ModuleNotFoundError as exc:
+    if exc.name != "rclpy":
+        raise
+
+    def _missing_ros_qos(*args, **kwargs):
+        raise ModuleNotFoundError("rclpy is required for LiDAR QoS helpers")
+
+    health_qos = _missing_ros_qos
+    heartbeat_qos = _missing_ros_qos
+    scan_qos = _missing_ros_qos
+    service_command_qos = _missing_ros_qos
+    status_qos = _missing_ros_qos
+    watchdog_qos = _missing_ros_qos
 from .ratekeeper import RateKeeper
 from .timing import RateTracker, elapsed_s, is_stale, monotonic_now_s, wall_time_s
 from .topic_names import (

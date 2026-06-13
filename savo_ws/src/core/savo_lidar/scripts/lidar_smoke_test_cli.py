@@ -1,20 +1,30 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """Run a quick non-ROS LiDAR smoke test."""
 
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 import time
+from typing import Any
 
-from savo_lidar.constants import BACKEND_DRYRUN, BACKEND_REAL
+from savo_lidar.constants import (
+    BACKEND_DRYRUN,
+    BACKEND_REAL,
+    DEFAULT_BAUDRATE,
+    DEFAULT_MAX_RANGE_M,
+    DEFAULT_MIN_RANGE_M,
+    DEFAULT_SCAN_RATE_HZ,
+    DEFAULT_SERIAL_PORT,
+)
 from savo_lidar.diagnostics import (
     check_lidar_port,
     check_motor_spin,
     check_range_quality,
     compact_status_line,
     format_json_report,
+    format_key_value_report,
 )
 from savo_lidar.drivers import create_lidar_driver
 from savo_lidar.models import LidarDriverConfig
@@ -23,6 +33,7 @@ from savo_lidar.utils.timing import RateTracker
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
+        prog="lidar_smoke_test_cli.py",
         description="Run a quick Robot Savo LiDAR smoke test.",
     )
     parser.add_argument(
@@ -33,13 +44,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--serial-port",
-        default="/dev/ttyUSB0",
+        default=DEFAULT_SERIAL_PORT,
         help="Preferred RPLIDAR serial port when backend=real.",
     )
     parser.add_argument(
         "--baudrate",
         type=int,
-        default=115200,
+        default=DEFAULT_BAUDRATE,
         help="RPLIDAR serial baudrate.",
     )
     parser.add_argument(
@@ -51,19 +62,19 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--min-range",
         type=float,
-        default=0.15,
+        default=DEFAULT_MIN_RANGE_M,
         help="Minimum valid range in metres.",
     )
     parser.add_argument(
         "--max-range",
         type=float,
-        default=12.0,
+        default=DEFAULT_MAX_RANGE_M,
         help="Maximum valid range in metres.",
     )
     parser.add_argument(
         "--expected-rate",
         type=float,
-        default=5.5,
+        default=DEFAULT_SCAN_RATE_HZ,
         help="Expected scan rate in Hz.",
     )
     parser.add_argument(
@@ -71,27 +82,35 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Print JSON output.",
     )
+    parser.add_argument(
+        "--details",
+        action="store_true",
+        help="Print detailed text output.",
+    )
     return parser
 
 
 def main() -> int:
     args = build_parser().parse_args()
 
-    if args.samples <= 0:
-        print("samples must be > 0", file=sys.stderr)
+    try:
+        _validate_args(args)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
         return 2
 
     if args.backend == BACKEND_REAL:
         port_check = check_lidar_port(args.serial_port)
+
         if not port_check.ok:
-            _print_result(
-                {
-                    "ok": False,
-                    "stage": "port_check",
-                    "port_check": port_check.to_dict(),
-                },
-                json_enabled=args.json,
-            )
+            result = {
+                "ok": False,
+                "stage": "port_check",
+                "backend": args.backend,
+                "serial_port": args.serial_port,
+                "port_check": port_check.to_dict(),
+            }
+            _print_result(result, json_enabled=args.json, details=args.details)
             return 1
 
     config = LidarDriverConfig(
@@ -116,13 +135,13 @@ def main() -> int:
         for _ in range(args.samples):
             scan = driver.read_scan()
             scan_count += 1
+
             measured_rate_hz = rate.tick(time.monotonic())
 
             last_quality = check_range_quality(
-                ranges=list(scan.ranges),
+                list(scan.ranges),
                 min_range_m=args.min_range,
                 max_range_m=args.max_range,
-                scan_rate_hz=measured_rate_hz,
             )
 
         motor = check_motor_spin(
@@ -138,6 +157,7 @@ def main() -> int:
             "ok": ok,
             "backend": args.backend,
             "serial_port": args.serial_port if args.backend == BACKEND_REAL else None,
+            "baudrate": args.baudrate if args.backend == BACKEND_REAL else None,
             "samples": args.samples,
             "scan_count": scan_count,
             "scan_rate_hz": rate.rate_hz,
@@ -145,19 +165,19 @@ def main() -> int:
             "motor_spin": motor.to_dict(),
         }
 
-        _print_result(result, json_enabled=args.json)
+        _print_result(result, json_enabled=args.json, details=args.details)
         return 0 if ok else 1
 
     except Exception as exc:
-        _print_result(
-            {
-                "ok": False,
-                "backend": args.backend,
-                "error": str(exc),
-            },
-            json_enabled=args.json,
-        )
+        result = {
+            "ok": False,
+            "backend": args.backend,
+            "serial_port": args.serial_port if args.backend == BACKEND_REAL else None,
+            "error": str(exc),
+        }
+        _print_result(result, json_enabled=args.json, details=args.details)
         return 1
+
     finally:
         try:
             driver.stop()
@@ -165,17 +185,44 @@ def main() -> int:
             pass
 
 
-def _print_result(result: dict[str, object], *, json_enabled: bool) -> None:
+def _validate_args(args: argparse.Namespace) -> None:
+    if args.samples <= 0:
+        raise ValueError("samples must be > 0")
+
+    if args.baudrate <= 0:
+        raise ValueError("baudrate must be > 0")
+
+    if args.min_range <= 0.0:
+        raise ValueError("min-range must be > 0.0")
+
+    if args.max_range <= args.min_range:
+        raise ValueError("max-range must be greater than min-range")
+
+    if args.expected_rate <= 0.0:
+        raise ValueError("expected-rate must be > 0.0")
+
+
+def _print_result(
+    result: dict[str, Any],
+    *,
+    json_enabled: bool,
+    details: bool,
+) -> None:
     if json_enabled:
         print(format_json_report(result))
+        return
+
+    if details:
+        print(format_key_value_report("LiDAR smoke test", result))
         return
 
     print(
         compact_status_line(
             name="lidar_smoke_test",
             ok=bool(result.get("ok", False)),
-            message=str(result.get("error") or "completed"),
+            message=str(result.get("error") or result.get("stage") or "completed"),
             backend=result.get("backend"),
+            serial_port=result.get("serial_port"),
             scan_count=result.get("scan_count"),
             scan_rate_hz=result.get("scan_rate_hz"),
         )

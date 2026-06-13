@@ -1,50 +1,61 @@
 #!/usr/bin/env python3
-"""Print a compact summary of LaserScan messages."""
+# -*- coding: utf-8 -*-
+"""Echo LaserScan summaries from a ROS topic."""
 
 from __future__ import annotations
 
 import argparse
-import math
 import sys
+import time
+from typing import Any
 
 import rclpy
+from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
 from sensor_msgs.msg import LaserScan
 
-from savo_lidar.filters.range_filter import range_stats
-from savo_lidar.utils.qos import scan_qos
+from savo_lidar.constants import DEFAULT_SCAN_TOPIC
+from savo_lidar.diagnostics import (
+    compact_status_line,
+    format_json_report,
+    format_key_value_report,
+)
+from savo_lidar.filters import range_stats
+from savo_lidar.ros import sensor_qos
 
 
 class ScanEchoNode(Node):
     def __init__(
         self,
         *,
-        scan_topic: str,
-        samples: int,
-        min_range_m: float,
-        max_range_m: float,
+        topic: str,
+        count: int,
+        show_ranges: bool,
+        max_ranges: int,
     ) -> None:
         super().__init__("savo_lidar_scan_echo_cli")
 
-        self._scan_topic = scan_topic
-        self._samples = samples
-        self._min_range_m = min_range_m
-        self._max_range_m = max_range_m
-        self._received = 0
+        self.topic = str(topic)
+        self.target_count = max(1, int(count))
+        self.show_ranges = bool(show_ranges)
+        self.max_ranges = max(0, int(max_ranges))
+
+        self.received = 0
+        self.samples: list[dict[str, Any]] = []
 
         self._sub = self.create_subscription(
             LaserScan,
-            self._scan_topic,
+            self.topic,
             self._on_scan,
-            scan_qos(),
+            sensor_qos(),
         )
 
     @property
     def done(self) -> bool:
-        return self._received >= self._samples
+        return self.received >= self.target_count
 
     def _on_scan(self, scan: LaserScan) -> None:
-        self._received += 1
+        self.received += 1
 
         (
             total_points,
@@ -55,55 +66,83 @@ class ScanEchoNode(Node):
             mean_seen_m,
         ) = range_stats(
             scan.ranges,
-            min_range_m=self._min_range_m,
-            max_range_m=self._max_range_m,
+            min_range_m=scan.range_min,
+            max_range_m=scan.range_max,
         )
 
-        print(
-            "scan "
-            f"{self._received}/{self._samples} | "
-            f"frame={scan.header.frame_id} | "
-            f"points={total_points} | "
-            f"valid={valid_points} | "
-            f"valid_ratio={valid_ratio:.3f} | "
-            f"min={_fmt_float(min_seen_m)} m | "
-            f"max={_fmt_float(max_seen_m)} m | "
-            f"mean={_fmt_float(mean_seen_m)} m"
-        )
+        scan_rate_hz = 0.0
+        if scan.scan_time > 0.0:
+            scan_rate_hz = 1.0 / float(scan.scan_time)
+
+        sample: dict[str, Any] = {
+            "index": self.received,
+            "topic": self.topic,
+            "frame_id": scan.header.frame_id,
+            "stamp_sec": int(scan.header.stamp.sec),
+            "stamp_nanosec": int(scan.header.stamp.nanosec),
+            "angle_min": float(scan.angle_min),
+            "angle_max": float(scan.angle_max),
+            "angle_increment": float(scan.angle_increment),
+            "scan_time": float(scan.scan_time),
+            "scan_rate_hz": scan_rate_hz,
+            "range_min": float(scan.range_min),
+            "range_max": float(scan.range_max),
+            "total_points": total_points,
+            "valid_points": valid_points,
+            "valid_ratio": valid_ratio,
+            "min_seen_m": min_seen_m,
+            "max_seen_m": max_seen_m,
+            "mean_seen_m": mean_seen_m,
+        }
+
+        if self.show_ranges:
+            sample["ranges"] = list(scan.ranges[: self.max_ranges])
+
+        self.samples.append(sample)
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Echo compact LaserScan summaries from a topic.",
+        prog="scan_echo_cli.py",
+        description="Echo LaserScan summaries from a LiDAR topic.",
     )
     parser.add_argument(
         "--topic",
-        default="/scan",
-        help="LaserScan topic to read.",
+        default=DEFAULT_SCAN_TOPIC,
+        help="LaserScan topic to echo.",
     )
     parser.add_argument(
-        "--samples",
+        "--count",
         type=int,
-        default=5,
-        help="Number of scan messages to print.",
-    )
-    parser.add_argument(
-        "--min-range",
-        type=float,
-        default=0.15,
-        help="Minimum valid range in metres.",
-    )
-    parser.add_argument(
-        "--max-range",
-        type=float,
-        default=12.0,
-        help="Maximum valid range in metres.",
+        default=1,
+        help="Number of scan messages to read.",
     )
     parser.add_argument(
         "--timeout",
         type=float,
         default=5.0,
-        help="Maximum wait time in seconds.",
+        help="Timeout in seconds.",
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print JSON output.",
+    )
+    parser.add_argument(
+        "--details",
+        action="store_true",
+        help="Print detailed text output.",
+    )
+    parser.add_argument(
+        "--show-ranges",
+        action="store_true",
+        help="Include the first range values in output.",
+    )
+    parser.add_argument(
+        "--max-ranges",
+        type=int,
+        default=20,
+        help="Maximum number of ranges to print with --show-ranges.",
     )
     return parser
 
@@ -111,44 +150,81 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> int:
     args = build_parser().parse_args()
 
-    if args.samples <= 0:
-        print("samples must be > 0", file=sys.stderr)
+    if args.count <= 0:
+        print("count must be > 0", file=sys.stderr)
         return 2
 
-    if args.max_range <= args.min_range:
-        print("max-range must be greater than min-range", file=sys.stderr)
+    if args.timeout <= 0.0:
+        print("timeout must be > 0.0", file=sys.stderr)
         return 2
 
     rclpy.init()
     node = ScanEchoNode(
-        scan_topic=args.topic,
-        samples=args.samples,
-        min_range_m=args.min_range,
-        max_range_m=args.max_range,
+        topic=args.topic,
+        count=args.count,
+        show_ranges=args.show_ranges,
+        max_ranges=args.max_ranges,
     )
-
-    deadline = node.get_clock().now().nanoseconds / 1e9 + float(args.timeout)
+    executor = SingleThreadedExecutor()
+    executor.add_node(node)
 
     try:
+        deadline_s = time.monotonic() + float(args.timeout)
+
         while rclpy.ok() and not node.done:
-            rclpy.spin_once(node, timeout_sec=0.1)
+            if time.monotonic() >= deadline_s:
+                break
 
-            now_s = node.get_clock().now().nanoseconds / 1e9
-            if now_s > deadline:
-                print(f"timeout waiting for {args.topic}", file=sys.stderr)
-                return 1
+            executor.spin_once(timeout_sec=0.05)
 
-        return 0
+        result = {
+            "ok": node.done,
+            "topic": args.topic,
+            "requested_count": args.count,
+            "received_count": node.received,
+            "timeout_s": args.timeout,
+            "samples": node.samples,
+        }
+
+        _print_result(result, json_enabled=args.json, details=args.details)
+        return 0 if node.done else 1
+
     finally:
+        executor.remove_node(node)
         node.destroy_node()
         rclpy.shutdown()
 
 
-def _fmt_float(value: float | None) -> str:
-    if value is None or not math.isfinite(float(value)):
-        return "n/a"
+def _print_result(
+    result: dict[str, Any],
+    *,
+    json_enabled: bool,
+    details: bool,
+) -> None:
+    if json_enabled:
+        print(format_json_report(result))
+        return
 
-    return f"{float(value):.3f}"
+    if details:
+        print(format_key_value_report("LiDAR scan echo", result))
+        return
+
+    latest = result["samples"][-1] if result["samples"] else {}
+
+    print(
+        compact_status_line(
+            name="scan_echo",
+            ok=bool(result["ok"]),
+            message="received scan" if result["ok"] else "scan timeout",
+            topic=result["topic"],
+            received=result["received_count"],
+            frame_id=latest.get("frame_id"),
+            points=latest.get("total_points"),
+            valid_ratio=latest.get("valid_ratio"),
+            min_seen_m=latest.get("min_seen_m"),
+            scan_rate_hz=latest.get("scan_rate_hz"),
+        )
+    )
 
 
 if __name__ == "__main__":
