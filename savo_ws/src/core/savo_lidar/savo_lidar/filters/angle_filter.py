@@ -1,4 +1,5 @@
-"""Angle helpers for selecting parts of a LaserScan."""
+# -*- coding: utf-8 -*-
+"""Angle helpers for LaserScan sector selection."""
 
 from __future__ import annotations
 
@@ -29,7 +30,7 @@ def angle_in_sector(
     if sector_min <= sector_max:
         return sector_min <= angle <= sector_max
 
-    # Handles wrap-around sectors, for example 135° to -135° for the rear.
+    # rear sectors usually wrap across ±180°
     return angle >= sector_min or angle <= sector_max
 
 
@@ -63,7 +64,7 @@ def sector_indices(
         return []
 
     if angle_increment_rad == 0.0:
-        raise ValueError("angle_increment_rad cannot be zero.")
+        raise ValueError("angle_increment_rad cannot be zero")
 
     indices: list[int] = []
 
@@ -78,3 +79,13 @@ def sector_indices(
             indices.append(index)
 
     return indices
+
+
+__all__ = [
+    "angle_in_sector",
+    "degrees_to_radians",
+    "normalize_angle_deg",
+    "radians_to_degrees",
+    "scan_angle_deg",
+    "sector_indices",
+]

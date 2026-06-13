@@ -1,4 +1,7 @@
-"""ROS helpers and contracts for Robot Savo LiDAR nodes."""
+# -*- coding: utf-8 -*-
+"""ROS helpers for LiDAR nodes."""
+
+from __future__ import annotations
 
 from .adapters import (
     clamp_laser_ranges,

@@ -5,56 +5,33 @@
 
 from __future__ import annotations
 
-import math
 from dataclasses import asdict, dataclass, field
+from statistics import mean, pstdev
 from typing import Iterable
 
 from savo_localization.constants import (
-    DEFAULT_GRAVITY_ERROR_ERROR_MPS2,
-    DEFAULT_GRAVITY_ERROR_WARN_MPS2,
-    DEFAULT_GYRO_Z_BIAS_ERROR_DPS,
-    DEFAULT_GYRO_Z_BIAS_WARN_DPS,
-    DEFAULT_IMU_TEMP_MAX_C,
-    DEFAULT_IMU_TEMP_MIN_C,
-    DEFAULT_IMU_TEMP_WARN_HIGH_C,
-    DEFAULT_IMU_TEMP_WARN_LOW_C,
     GRAVITY_MPS2,
     IMU_HEALTH_GRADE_A,
     IMU_HEALTH_GRADE_B,
     IMU_HEALTH_GRADE_C,
+    IMU_HEALTH_GRADE_F,
     STATUS_ERROR,
     STATUS_OK,
     STATUS_WARN,
 )
-from savo_localization.models.imu_state import (
-    ImuCalibration,
-    ImuHealthState,
-    ImuRawSample,
-)
+from savo_localization.models.imu_state import ImuRawSample
 
 
-@dataclass(frozen=True)
+@dataclass
 class ImuStats:
     sample_count: int = 0
+    accel_norm_mean_mps2: float = 0.0
+    accel_norm_std_mps2: float = 0.0
+    gyro_norm_mean_dps: float = 0.0
+    gyro_norm_std_dps: float = 0.0
+    temperature_mean_c: float | None = None
 
-    gravity_mean_mps2: float | None = None
-    gravity_std_mps2: float | None = None
-
-    gyro_z_mean_dps: float | None = None
-    gyro_z_std_dps: float | None = None
-
-    accel_x_mean_mps2: float | None = None
-    accel_y_mean_mps2: float | None = None
-    accel_z_mean_mps2: float | None = None
-
-    temp_mean_c: float | None = None
-    temp_min_c: float | None = None
-    temp_max_c: float | None = None
-
-    moving_sample_count: int = 0
-    max_vibe_score: float = 0.0
-
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, float | int]:
         return asdict(self)
 
 
@@ -71,299 +48,157 @@ class ImuHealthCheckResult:
         return {
             "status": self.status,
             "grade": self.grade,
-            "ok": self.ok,
+            "ok": bool(self.ok),
             "message": self.message,
             "reasons": list(self.reasons),
             "stats": self.stats.to_dict(),
         }
 
-    def to_health_state(self) -> ImuHealthState:
-        health = ImuHealthState(
-            status=self.status,
-            grade=self.grade,
-            message=self.message,
-            reasons=list(self.reasons),
-        )
-
-        health.hardware_ok = self.status in (STATUS_OK, STATUS_WARN)
-        health.data_ok = self.status in (STATUS_OK, STATUS_WARN)
-        health.temperature_ok = not any("temperature" in reason.lower() for reason in self.reasons)
-
-        health.gravity_norm_mps2 = self.stats.gravity_mean_mps2
-        health.gyro_z_bias_dps = self.stats.gyro_z_mean_dps
-        health.temp_c = self.stats.temp_mean_c
-        health.moving = self.stats.moving_sample_count > 0
-        health.vibe_score = self.stats.max_vibe_score
-
-        return health
-
-
-def check_imu_sample(
-    sample: ImuRawSample,
-    *,
-    require_motion_ready: bool = True,
-    require_mag_ready: bool = False,
-) -> ImuHealthCheckResult:
-    return check_imu_samples(
-        [sample],
-        calibration=sample.calibration,
-        sys_status=sample.sys_status,
-        sys_error=sample.sys_error,
-        require_motion_ready=require_motion_ready,
-        require_mag_ready=require_mag_ready,
-    )
-
-
-def check_imu_samples(
-    samples: Iterable[ImuRawSample],
-    *,
-    calibration: ImuCalibration | None = None,
-    sys_status: int | None = None,
-    sys_error: int | None = None,
-    require_motion_ready: bool = True,
-    require_mag_ready: bool = False,
-) -> ImuHealthCheckResult:
-    sample_list = list(samples)
-
-    if not sample_list:
-        return ImuHealthCheckResult(
-            status=STATUS_ERROR,
-            grade=IMU_HEALTH_GRADE_C,
-            ok=False,
-            message="no IMU samples available",
-            reasons=["sample list is empty"],
-        )
-
-    stats = compute_imu_stats(sample_list)
-
-    last_sample = sample_list[-1]
-    calibration = calibration or last_sample.calibration
-    sys_status = last_sample.sys_status if sys_status is None else int(sys_status)
-    sys_error = last_sample.sys_error if sys_error is None else int(sys_error)
-
-    major: list[str] = []
-    minor: list[str] = []
-
-    if sys_status not in (0, 5):
-        minor.append(f"unexpected SYS_STATUS={sys_status}")
-
-    if sys_error != 0:
-        major.append(f"SYS_ERR={sys_error}")
-
-    _check_temperature(stats, major=major, minor=minor)
-    _check_gravity(stats, major=major, minor=minor)
-    _check_gyro_z_bias(stats, major=major, minor=minor)
-    _check_calibration(
-        calibration,
-        major=major,
-        minor=minor,
-        require_motion_ready=require_motion_ready,
-        require_mag_ready=require_mag_ready,
-    )
-
-    if major:
-        return ImuHealthCheckResult(
-            status=STATUS_ERROR,
-            grade=IMU_HEALTH_GRADE_C,
-            ok=False,
-            message="IMU health check failed",
-            reasons=[f"MAJOR: {reason}" for reason in major]
-            + [f"MINOR: {reason}" for reason in minor],
-            stats=stats,
-        )
-
-    if minor:
-        return ImuHealthCheckResult(
-            status=STATUS_WARN,
-            grade=IMU_HEALTH_GRADE_B,
-            ok=True,
-            message="IMU usable with health notes",
-            reasons=[f"MINOR: {reason}" for reason in minor],
-            stats=stats,
-        )
-
-    return ImuHealthCheckResult(
-        status=STATUS_OK,
-        grade=IMU_HEALTH_GRADE_A,
-        ok=True,
-        message="IMU healthy",
-        reasons=[],
-        stats=stats,
-    )
-
 
 def compute_imu_stats(samples: Iterable[ImuRawSample]) -> ImuStats:
     sample_list = list(samples)
 
-    gravity_values = [sample.gravity_norm_mps2 for sample in sample_list]
-    gyro_z_values = [sample.gyro_dps.z for sample in sample_list]
-    accel_x_values = [sample.accel_mps2.x for sample in sample_list]
-    accel_y_values = [sample.accel_mps2.y for sample in sample_list]
-    accel_z_values = [sample.accel_mps2.z for sample in sample_list]
-    temp_values = [
+    if not sample_list:
+        return ImuStats()
+
+    accel_norms = [float(sample.gravity_norm_mps2) for sample in sample_list]
+    gyro_norms = [float(sample.gyro_dps.norm) for sample in sample_list]
+    temperatures = [
         float(sample.temp_c)
         for sample in sample_list
-        if sample.temp_c is not None and math.isfinite(float(sample.temp_c))
+        if sample.temp_c is not None
     ]
-
-    moving_count = sum(1 for sample in sample_list if sample.moving)
-    max_vibe = max((float(sample.vibe_score) for sample in sample_list), default=0.0)
 
     return ImuStats(
         sample_count=len(sample_list),
-        gravity_mean_mps2=_mean_or_none(gravity_values),
-        gravity_std_mps2=_std_or_none(gravity_values),
-        gyro_z_mean_dps=_mean_or_none(gyro_z_values),
-        gyro_z_std_dps=_std_or_none(gyro_z_values),
-        accel_x_mean_mps2=_mean_or_none(accel_x_values),
-        accel_y_mean_mps2=_mean_or_none(accel_y_values),
-        accel_z_mean_mps2=_mean_or_none(accel_z_values),
-        temp_mean_c=_mean_or_none(temp_values),
-        temp_min_c=min(temp_values) if temp_values else None,
-        temp_max_c=max(temp_values) if temp_values else None,
-        moving_sample_count=moving_count,
-        max_vibe_score=max_vibe,
+        accel_norm_mean_mps2=mean(accel_norms),
+        accel_norm_std_mps2=pstdev(accel_norms) if len(accel_norms) > 1 else 0.0,
+        gyro_norm_mean_dps=mean(gyro_norms),
+        gyro_norm_std_dps=pstdev(gyro_norms) if len(gyro_norms) > 1 else 0.0,
+        temperature_mean_c=mean(temperatures) if temperatures else 0.0,
     )
 
 
 def grade_from_reasons(reasons: Iterable[str]) -> str:
     reason_list = list(reasons)
 
-    if any(reason.startswith("MAJOR:") for reason in reason_list):
+    if not reason_list:
+        return IMU_HEALTH_GRADE_A
+
+    reason_text = " ".join(reason.lower() for reason in reason_list)
+
+    if (
+        len(reason_list) >= 4
+        or "system error" in reason_text
+        or "chip check failed" in reason_text
+        or "no imu samples" in reason_text
+        or "no samples" in reason_text
+    ):
+        return IMU_HEALTH_GRADE_F
+
+    if len(reason_list) >= 2:
         return IMU_HEALTH_GRADE_C
 
-    if reason_list:
-        return IMU_HEALTH_GRADE_B
-
-    return IMU_HEALTH_GRADE_A
+    return IMU_HEALTH_GRADE_B
 
 
 def status_from_grade(grade: str) -> str:
     if grade == IMU_HEALTH_GRADE_A:
         return STATUS_OK
 
-    if grade == IMU_HEALTH_GRADE_B:
+    if grade in (IMU_HEALTH_GRADE_B, IMU_HEALTH_GRADE_C):
         return STATUS_WARN
 
     return STATUS_ERROR
 
 
-def _check_temperature(
-    stats: ImuStats,
-    *,
-    major: list[str],
-    minor: list[str],
-) -> None:
-    if stats.temp_mean_c is None:
-        minor.append("temperature not available")
-        return
-
-    temp = stats.temp_mean_c
-
-    if temp < DEFAULT_IMU_TEMP_MIN_C or temp > DEFAULT_IMU_TEMP_MAX_C:
-        major.append(f"temperature out of range: {temp:.1f}C")
-        return
-
-    if temp < DEFAULT_IMU_TEMP_WARN_LOW_C or temp > DEFAULT_IMU_TEMP_WARN_HIGH_C:
-        minor.append(f"temperature near limits: {temp:.1f}C")
+def check_imu_sample(sample: ImuRawSample) -> ImuHealthCheckResult:
+    return check_imu_samples([sample])
 
 
-def _check_gravity(
-    stats: ImuStats,
-    *,
-    major: list[str],
-    minor: list[str],
-) -> None:
-    if stats.gravity_mean_mps2 is None:
-        major.append("gravity norm not available")
-        return
+def check_imu_samples(samples: Iterable[ImuRawSample]) -> ImuHealthCheckResult:
+    sample_list = list(samples)
+    stats = compute_imu_stats(sample_list)
 
-    gravity_error = abs(float(stats.gravity_mean_mps2) - GRAVITY_MPS2)
-
-    if gravity_error > DEFAULT_GRAVITY_ERROR_ERROR_MPS2:
-        major.append(
-            f"|g| mean {stats.gravity_mean_mps2:.2f} far from {GRAVITY_MPS2:.2f}"
-        )
-        return
-
-    if gravity_error > DEFAULT_GRAVITY_ERROR_WARN_MPS2:
-        minor.append(
-            f"|g| mean {stats.gravity_mean_mps2:.2f} slightly off {GRAVITY_MPS2:.2f}"
+    if not sample_list:
+        return ImuHealthCheckResult(
+            status=STATUS_ERROR,
+            grade=IMU_HEALTH_GRADE_F,
+            ok=False,
+            message="IMU health check failed",
+            reasons=["no IMU samples available"],
+            stats=stats,
         )
 
+    reasons: list[str] = []
 
-def _check_gyro_z_bias(
-    stats: ImuStats,
-    *,
-    major: list[str],
-    minor: list[str],
-) -> None:
-    if stats.gyro_z_mean_dps is None:
-        major.append("gyro Z bias not available")
-        return
+    for sample in sample_list:
+        if int(sample.sys_error) != 0:
+            reasons.append(f"system error: sys_error={sample.sys_error}")
 
-    bias = abs(float(stats.gyro_z_mean_dps))
+        if not sample.calibration.motion_ready:
+            reasons.append("calibration not motion ready")
 
-    if bias > DEFAULT_GYRO_Z_BIAS_ERROR_DPS:
-        major.append(f"gyro Z bias {stats.gyro_z_mean_dps:.2f} dps high")
-        return
+        if sample.temp_c is not None and float(sample.temp_c) >= 85.0:
+            reasons.append(f"temperature high: {float(sample.temp_c):.1f}C")
 
-    if bias > DEFAULT_GYRO_Z_BIAS_WARN_DPS:
-        minor.append(f"gyro Z bias {stats.gyro_z_mean_dps:.2f} dps elevated")
+        gravity_error = abs(float(sample.gravity_norm_mps2) - GRAVITY_MPS2)
+        if gravity_error > 3.0:
+            reasons.append(
+                f"gravity norm outside expected range: {sample.gravity_norm_mps2:.2f}"
+            )
 
+    if stats.accel_norm_std_mps2 > 1.0:
+        reasons.append(
+            f"acceleration noise high: std={stats.accel_norm_std_mps2:.3f}"
+        )
 
-def _check_calibration(
-    calibration: ImuCalibration,
-    *,
-    major: list[str],
-    minor: list[str],
-    require_motion_ready: bool,
-    require_mag_ready: bool,
-) -> None:
-    try:
-        calibration.validate()
-    except ValueError as exc:
-        major.append(str(exc))
-        return
+    if stats.gyro_norm_std_dps > 5.0:
+        reasons.append(
+            f"gyro noise high: std={stats.gyro_norm_std_dps:.3f}"
+        )
 
-    if require_motion_ready:
-        if calibration.gyro < 2:
-            minor.append(f"gyro calibration low ({calibration.gyro}/3)")
+    grade = grade_from_reasons(reasons)
+    status = status_from_grade(grade)
+    ok = status != STATUS_ERROR
 
-        if calibration.accel < 2:
-            minor.append(f"accel calibration low ({calibration.accel}/3)")
+    if status == STATUS_OK:
+        message = "IMU healthy"
+    elif status == STATUS_WARN:
+        message = "IMU usable with health notes"
+    else:
+        message = "IMU health check failed"
 
-    if require_mag_ready and calibration.mag < 2:
-        minor.append(f"mag calibration low ({calibration.mag}/3)")
-
-
-def _mean_or_none(values: Iterable[float]) -> float | None:
-    cleaned = _finite_values(values)
-
-    if not cleaned:
-        return None
-
-    return sum(cleaned) / float(len(cleaned))
+    return ImuHealthCheckResult(
+        status=status,
+        grade=grade,
+        ok=ok,
+        message=message,
+        reasons=_unique_preserve_order(reasons),
+        stats=stats,
+    )
 
 
-def _std_or_none(values: Iterable[float]) -> float | None:
-    cleaned = _finite_values(values)
-
-    if len(cleaned) < 2:
-        return 0.0 if cleaned else None
-
-    mean = sum(cleaned) / float(len(cleaned))
-    variance = sum((value - mean) ** 2 for value in cleaned) / float(len(cleaned) - 1)
-
-    return math.sqrt(variance)
-
-
-def _finite_values(values: Iterable[float]) -> list[float]:
-    cleaned: list[float] = []
+def _unique_preserve_order(values: Iterable[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
 
     for value in values:
-        number = float(value)
-        if math.isfinite(number):
-            cleaned.append(number)
+        if value in seen:
+            continue
 
-    return cleaned
+        seen.add(value)
+        result.append(value)
+
+    return result
+
+
+__all__ = [
+    "ImuStats",
+    "ImuHealthCheckResult",
+    "compute_imu_stats",
+    "grade_from_reasons",
+    "status_from_grade",
+    "check_imu_sample",
+    "check_imu_samples",
+]

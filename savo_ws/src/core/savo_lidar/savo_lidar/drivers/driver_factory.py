@@ -1,4 +1,5 @@
-"""Factory for selecting the real or dryrun LiDAR driver."""
+# -*- coding: utf-8 -*-
+"""Driver factory for real and dryrun LiDAR backends."""
 
 from __future__ import annotations
 
@@ -45,3 +46,9 @@ def create_lidar_driver(config: LidarDriverConfig) -> LidarDriver:
         )
 
     raise LidarConfigurationError(f"Unsupported LiDAR backend: {config.backend}")
+
+
+__all__ = [
+    "LidarDriver",
+    "create_lidar_driver",
+]

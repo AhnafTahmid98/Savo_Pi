@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Parameter helpers shared by LiDAR ROS nodes."""
 
 from __future__ import annotations
@@ -77,3 +78,15 @@ def init_rclpy_if_needed(args: list[str] | None = None) -> bool:
 
     rclpy.init(args=args)
     return True
+
+
+__all__ = [
+    "declare_if_missing",
+    "get_bool_param",
+    "get_float_param",
+    "get_int_param",
+    "get_positive_float_param",
+    "get_range_param",
+    "get_string_param",
+    "init_rclpy_if_needed",
+]

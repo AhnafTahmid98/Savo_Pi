@@ -1,4 +1,5 @@
-"""Extract angle sectors from ROS LaserScan-style range data."""
+# -*- coding: utf-8 -*-
+"""Extract angle sectors from LaserScan-style range data."""
 
 from __future__ import annotations
 
@@ -31,7 +32,11 @@ def extract_sector_ranges(
     selected: list[float] = []
 
     for index in indices:
-        value = float(ranges[index])
+        try:
+            value = float(ranges[index])
+        except (TypeError, ValueError):
+            selected.append(float("inf"))
+            continue
 
         if is_valid_range(value, min_range_m, max_range_m):
             selected.append(value)
@@ -100,3 +105,10 @@ def extract_front_sector(
         max_range_m=max_range_m,
         blocked_distance_m=blocked_distance_m,
     )
+
+
+__all__ = [
+    "extract_front_sector",
+    "extract_sector_ranges",
+    "extract_sector_summary",
+]

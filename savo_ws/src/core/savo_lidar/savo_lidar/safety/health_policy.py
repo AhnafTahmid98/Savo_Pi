@@ -1,10 +1,15 @@
-"""Health policy for combining LiDAR hardware and scan-stream state."""
+# -*- coding: utf-8 -*-
+"""Health policy for LiDAR hardware and scan-stream state."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+from typing import Any
 
 from savo_lidar.constants import (
+    DEFAULT_QUALITY_ERROR_VALID_RATIO,
+    DEFAULT_QUALITY_WARN_VALID_RATIO,
+    SCAN_RATE_MIN_HZ,
     STATUS_ERROR,
     STATUS_OFFLINE,
     STATUS_OK,
@@ -20,36 +25,34 @@ class LidarHealthDecision:
     scan_ok: bool
     message: str
 
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
 
 @dataclass(frozen=True)
 class LidarHealthPolicy:
-    min_valid_ratio_warn: float = 0.60
-    min_valid_ratio_error: float = 0.30
-    min_scan_rate_hz: float = 2.0
+    min_valid_ratio_warn: float = DEFAULT_QUALITY_WARN_VALID_RATIO
+    min_valid_ratio_error: float = DEFAULT_QUALITY_ERROR_VALID_RATIO
+    min_scan_rate_hz: float = SCAN_RATE_MIN_HZ
 
     def __post_init__(self) -> None:
         if not 0.0 <= self.min_valid_ratio_error <= 1.0:
             raise ValueError(
-                f"min_valid_ratio_error must be between 0.0 and 1.0, "
+                "min_valid_ratio_error must be between 0.0 and 1.0, "
                 f"got {self.min_valid_ratio_error}"
             )
 
         if not 0.0 <= self.min_valid_ratio_warn <= 1.0:
             raise ValueError(
-                f"min_valid_ratio_warn must be between 0.0 and 1.0, "
+                "min_valid_ratio_warn must be between 0.0 and 1.0, "
                 f"got {self.min_valid_ratio_warn}"
             )
 
         if self.min_valid_ratio_error > self.min_valid_ratio_warn:
-            raise ValueError(
-                "min_valid_ratio_error cannot be greater than "
-                "min_valid_ratio_warn"
-            )
+            raise ValueError("min_valid_ratio_error cannot be greater than min_valid_ratio_warn")
 
         if self.min_scan_rate_hz < 0.0:
-            raise ValueError(
-                f"min_scan_rate_hz cannot be negative, got {self.min_scan_rate_hz}"
-            )
+            raise ValueError(f"min_scan_rate_hz cannot be negative, got {self.min_scan_rate_hz}")
 
     def evaluate(
         self,
@@ -70,7 +73,7 @@ class LidarHealthPolicy:
                 status=STATUS_ERROR,
                 hardware_ok=bool(hardware_ok),
                 scan_ok=False,
-                message=fault_reason or "LiDAR fault latched",
+                message=str(fault_reason).strip() or "LiDAR fault latched",
             )
 
         if not hardware_ok:
@@ -127,3 +130,9 @@ class LidarHealthPolicy:
             scan_ok=True,
             message="LiDAR healthy",
         )
+
+
+__all__ = [
+    "LidarHealthDecision",
+    "LidarHealthPolicy",
+]

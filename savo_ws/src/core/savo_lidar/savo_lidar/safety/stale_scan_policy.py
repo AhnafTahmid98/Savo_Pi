@@ -1,8 +1,10 @@
-"""Policy for turning stale LiDAR scans into clear health states."""
+# -*- coding: utf-8 -*-
+"""Policy for stale LiDAR scan detection."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+from typing import Any
 
 from savo_lidar.constants import STATUS_OK, STATUS_STALE, STATUS_WARN
 
@@ -13,6 +15,9 @@ class StaleScanDecision:
     status: str
     scan_ok: bool
     message: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
 
 
 @dataclass(frozen=True)
@@ -68,3 +73,9 @@ class StaleScanPolicy:
             scan_ok=True,
             message=f"LiDAR scan fresh | age_s={age_s:.3f}",
         )
+
+
+__all__ = [
+    "StaleScanDecision",
+    "StaleScanPolicy",
+]

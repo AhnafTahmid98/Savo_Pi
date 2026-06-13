@@ -41,88 +41,13 @@ class EkfHealthCheckResult:
         return asdict(self)
 
 
-def check_ekf_health(
-    health: EkfHealth,
-    *,
-    require_tf: bool = True,
-    require_output: bool = True,
-    min_healthy_inputs: int = 1,
-) -> EkfHealthCheckResult:
-    if min_healthy_inputs <= 0:
-        raise ValueError(f"min_healthy_inputs must be > 0, got {min_healthy_inputs}")
-
-    active_inputs = list(health.active_inputs)
-    healthy_inputs = [sensor for sensor in active_inputs if sensor.ok]
-
-    reasons: list[str] = []
-
-    if not active_inputs:
-        reasons.append("no EKF inputs are enabled")
-
-    if len(healthy_inputs) < min_healthy_inputs:
-        reasons.append(
-            "not enough healthy EKF inputs: "
-            f"{len(healthy_inputs)}/{min_healthy_inputs}"
-        )
-
-    for sensor in active_inputs:
-        input_result = check_ekf_input(sensor)
-        if not input_result.ok:
-            reasons.extend(f"{sensor.name}: {reason}" for reason in input_result.reasons)
-
-    output_result = check_ekf_output(health.output)
-    if require_output and not output_result.ok:
-        reasons.extend(f"output: {reason}" for reason in output_result.reasons)
-
-    tf_result = check_ekf_tf(health.tf)
-    if require_tf and not tf_result.ok:
-        reasons.extend(f"tf: {reason}" for reason in tf_result.reasons)
-
-    if not reasons:
-        return EkfHealthCheckResult(
-            status=STATUS_OK,
-            ok=True,
-            usable=True,
-            message="EKF healthy",
-            reasons=[],
-            active_input_count=len(active_inputs),
-            healthy_input_count=len(healthy_inputs),
-            output_ok=output_result.ok,
-            tf_ok=tf_result.ok,
-        )
-
-    if healthy_inputs and (not require_output or output_result.ok):
-        return EkfHealthCheckResult(
-            status=STATUS_WARN,
-            ok=True,
-            usable=True,
-            message="EKF usable with health notes",
-            reasons=_unique_preserve_order(reasons),
-            active_input_count=len(active_inputs),
-            healthy_input_count=len(healthy_inputs),
-            output_ok=output_result.ok,
-            tf_ok=tf_result.ok,
-        )
-
-    return EkfHealthCheckResult(
-        status=STATUS_ERROR,
-        ok=False,
-        usable=False,
-        message="EKF health check failed",
-        reasons=_unique_preserve_order(reasons),
-        active_input_count=len(active_inputs),
-        healthy_input_count=len(healthy_inputs),
-        output_ok=output_result.ok,
-        tf_ok=tf_result.ok,
-    )
-
-
 def check_ekf_input(
     sensor: EkfInputHealth,
     *,
     stale_timeout_s: float = DEFAULT_EKF_SENSOR_TIMEOUT_S,
 ) -> EkfHealthCheckResult:
-    reasons: list[str] = []
+    if stale_timeout_s <= 0.0:
+        raise ValueError("stale_timeout_s must be > 0.0")
 
     if not sensor.enabled:
         return EkfHealthCheckResult(
@@ -130,10 +55,11 @@ def check_ekf_input(
             ok=True,
             usable=True,
             message=f"{sensor.name} input disabled",
-            reasons=[],
             active_input_count=0,
             healthy_input_count=0,
         )
+
+    reasons: list[str] = []
 
     if not sensor.seen:
         reasons.append(f"no messages received on {sensor.topic}")
@@ -168,7 +94,6 @@ def check_ekf_input(
         ok=True,
         usable=True,
         message=f"{sensor.name} input healthy",
-        reasons=[],
         active_input_count=1,
         healthy_input_count=1,
     )
@@ -179,6 +104,9 @@ def check_ekf_output(
     *,
     stale_timeout_s: float = DEFAULT_EKF_SENSOR_TIMEOUT_S,
 ) -> EkfHealthCheckResult:
+    if stale_timeout_s <= 0.0:
+        raise ValueError("stale_timeout_s must be > 0.0")
+
     reasons: list[str] = []
 
     if not output.seen:
@@ -222,7 +150,6 @@ def check_ekf_output(
         ok=True,
         usable=True,
         message="EKF output healthy",
-        reasons=[],
         output_ok=True,
     )
 
@@ -232,6 +159,9 @@ def check_ekf_tf(
     *,
     stale_timeout_s: float = DEFAULT_EKF_SENSOR_TIMEOUT_S,
 ) -> EkfHealthCheckResult:
+    if stale_timeout_s <= 0.0:
+        raise ValueError("stale_timeout_s must be > 0.0")
+
     reasons: list[str] = []
 
     if not tf.available:
@@ -263,8 +193,89 @@ def check_ekf_tf(
         ok=True,
         usable=True,
         message="EKF TF healthy",
-        reasons=[],
         tf_ok=True,
+    )
+
+
+def check_ekf_health(
+    health: EkfHealth,
+    *,
+    require_tf: bool = True,
+    require_output: bool = True,
+    min_healthy_inputs: int = 1,
+) -> EkfHealthCheckResult:
+    if min_healthy_inputs <= 0:
+        raise ValueError(f"min_healthy_inputs must be > 0, got {min_healthy_inputs}")
+
+    active_inputs = list(health.active_inputs)
+    input_results = [check_ekf_input(sensor) for sensor in active_inputs]
+    healthy_input_count = sum(1 for result in input_results if result.ok)
+
+    output_result = check_ekf_output(health.output)
+    tf_result = check_ekf_tf(health.tf)
+
+    reasons: list[str] = []
+
+    if not active_inputs:
+        reasons.append("no EKF inputs are enabled")
+
+    if healthy_input_count < min_healthy_inputs:
+        reasons.append(
+            "not enough healthy EKF inputs: "
+            f"{healthy_input_count}/{min_healthy_inputs}"
+        )
+
+    for sensor, result in zip(active_inputs, input_results):
+        if not result.ok:
+            reasons.extend(f"{sensor.name}: {reason}" for reason in result.reasons)
+
+    if require_output and not output_result.ok:
+        reasons.extend(f"output: {reason}" for reason in output_result.reasons)
+
+    if require_tf and not tf_result.ok:
+        reasons.extend(f"tf: {reason}" for reason in tf_result.reasons)
+
+    hard_failed = (
+        healthy_input_count < min_healthy_inputs
+        or (require_output and not output_result.ok)
+        or (require_tf and not tf_result.ok)
+    )
+
+    if not reasons:
+        return EkfHealthCheckResult(
+            status=STATUS_OK,
+            ok=True,
+            usable=True,
+            message="EKF healthy",
+            active_input_count=len(active_inputs),
+            healthy_input_count=healthy_input_count,
+            output_ok=output_result.ok,
+            tf_ok=tf_result.ok,
+        )
+
+    if not hard_failed and healthy_input_count >= min_healthy_inputs:
+        return EkfHealthCheckResult(
+            status=STATUS_WARN,
+            ok=True,
+            usable=True,
+            message="EKF usable with health notes",
+            reasons=_unique_preserve_order(reasons),
+            active_input_count=len(active_inputs),
+            healthy_input_count=healthy_input_count,
+            output_ok=output_result.ok,
+            tf_ok=tf_result.ok,
+        )
+
+    return EkfHealthCheckResult(
+        status=STATUS_ERROR,
+        ok=False,
+        usable=False,
+        message="EKF health check failed",
+        reasons=_unique_preserve_order(reasons),
+        active_input_count=len(active_inputs),
+        healthy_input_count=healthy_input_count,
+        output_ok=output_result.ok,
+        tf_ok=tf_result.ok,
     )
 
 
@@ -275,34 +286,30 @@ def check_ekf_rate_health(
     tolerance_ratio: float = 0.50,
 ) -> EkfHealthCheckResult:
     if expected_hz <= 0.0:
-        raise ValueError(f"expected_hz must be > 0.0, got {expected_hz}")
+        raise ValueError("expected_hz must be > 0.0")
 
-    if not 0.0 <= tolerance_ratio < 1.0:
-        raise ValueError(
-            f"tolerance_ratio must be in range [0.0, 1.0), got {tolerance_ratio}"
-        )
+    if tolerance_ratio < 0.0 or tolerance_ratio >= 1.0:
+        raise ValueError("tolerance_ratio must be >= 0.0 and < 1.0")
 
-    measured = max(0.0, float(measured_hz))
-    expected = float(expected_hz)
-    min_allowed = expected * (1.0 - float(tolerance_ratio))
-
-    if measured <= 0.0:
+    if measured_hz <= 0.0:
         return EkfHealthCheckResult(
             status=STATUS_ERROR,
             ok=False,
             usable=False,
-            message="EKF output rate not measured",
-            reasons=["measured_hz is zero"],
+            message="EKF rate is zero",
+            reasons=["measured_hz <= 0.0"],
         )
 
-    if measured < min_allowed:
+    minimum_hz = expected_hz * (1.0 - tolerance_ratio)
+
+    if measured_hz < minimum_hz:
         return EkfHealthCheckResult(
             status=STATUS_WARN,
             ok=True,
             usable=True,
-            message="EKF output rate lower than expected",
+            message="EKF rate below expected range",
             reasons=[
-                f"measured_hz={measured:.3f} < min_allowed_hz={min_allowed:.3f}"
+                f"measured_hz={measured_hz:.3f} < minimum_hz={minimum_hz:.3f}"
             ],
         )
 
@@ -310,45 +317,36 @@ def check_ekf_rate_health(
         status=STATUS_OK,
         ok=True,
         usable=True,
-        message="EKF output rate healthy",
-        reasons=[],
+        message="EKF rate healthy",
     )
 
 
 def summarize_ekf_inputs(inputs: Iterable[EkfInputHealth]) -> dict[str, object]:
-    input_list = list(inputs)
+    sensors = list(inputs)
+    active = [sensor for sensor in sensors if sensor.enabled]
+    healthy = [sensor for sensor in active if sensor.ok]
 
     return {
-        "active_input_count": sum(1 for sensor in input_list if sensor.enabled),
-        "healthy_input_count": sum(1 for sensor in input_list if sensor.ok),
+        "active_input_count": len(active),
+        "healthy_input_count": len(healthy),
         "inputs": {
-            sensor.name: {
-                "topic": sensor.topic,
-                "enabled": sensor.enabled,
-                "seen": sensor.seen,
-                "fresh": sensor.fresh,
-                "ok": sensor.ok,
-                "last_age_s": sensor.last_age_s,
-                "message_count": sensor.message_count,
-                "rate_hz": sensor.rate_hz,
-                "status": sensor.status,
-                "message": sensor.message,
-                "reasons": list(sensor.reasons),
-            }
-            for sensor in input_list
+            sensor.name: sensor.to_dict()
+            for sensor in sensors
         },
     }
 
 
 def ekf_health_summary(health: EkfHealth) -> dict[str, object]:
-    health.evaluate()
+    result = check_ekf_health(health)
 
     return {
-        "status": health.status,
-        "message": health.message,
-        "ready": health.ready,
-        "usable": health.usable,
-        "reasons": list(health.reasons),
+        "status": result.status,
+        "message": result.message,
+        "ready": result.ok,
+        "usable": result.usable,
+        "reasons": list(result.reasons),
+        "active_input_count": result.active_input_count,
+        "healthy_input_count": result.healthy_input_count,
         "inputs": summarize_ekf_inputs(health.inputs),
         "output": health.output.to_dict(),
         "tf": health.tf.to_dict(),
@@ -367,3 +365,15 @@ def _unique_preserve_order(values: Iterable[str]) -> list[str]:
         result.append(value)
 
     return result
+
+
+__all__ = [
+    "EkfHealthCheckResult",
+    "check_ekf_health",
+    "check_ekf_input",
+    "check_ekf_output",
+    "check_ekf_tf",
+    "check_ekf_rate_health",
+    "summarize_ekf_inputs",
+    "ekf_health_summary",
+]

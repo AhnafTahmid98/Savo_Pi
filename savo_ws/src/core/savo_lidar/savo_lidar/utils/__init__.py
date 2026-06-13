@@ -1,4 +1,7 @@
-"""Utility helpers shared by Robot Savo LiDAR modules."""
+# -*- coding: utf-8 -*-
+"""Shared utility helpers for LiDAR modules."""
+
+from __future__ import annotations
 
 from .clamp import (
     clamp_float,

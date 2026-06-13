@@ -1,4 +1,5 @@
-"""ROS message adapters for the LiDAR package."""
+# -*- coding: utf-8 -*-
+"""ROS message adapters for LiDAR nodes."""
 
 from __future__ import annotations
 
@@ -33,13 +34,11 @@ def copy_laser_scan(scan: LaserScan) -> LaserScan:
 
 
 def valid_range_count(ranges: Sequence[float], range_min: float, range_max: float) -> int:
-    count = 0
-
-    for value in ranges:
-        if math.isfinite(value) and range_min <= value <= range_max:
-            count += 1
-
-    return count
+    return sum(
+        1
+        for value in ranges
+        if _is_valid_range(value, range_min=range_min, range_max=range_max)
+    )
 
 
 def valid_range_ratio(ranges: Sequence[float], range_min: float, range_max: float) -> float:
@@ -54,20 +53,11 @@ def clamp_laser_ranges(scan: LaserScan, range_min: float, range_max: float) -> L
     filtered.range_min = float(range_min)
     filtered.range_max = float(range_max)
 
-    cleaned: list[float] = []
-    for value in filtered.ranges:
-        value = float(value)
+    filtered.ranges = [
+        _range_or_inf(value, range_min=range_min, range_max=range_max)
+        for value in filtered.ranges
+    ]
 
-        if not math.isfinite(value):
-            cleaned.append(float("inf"))
-        elif value < range_min:
-            cleaned.append(float("inf"))
-        elif value > range_max:
-            cleaned.append(float("inf"))
-        else:
-            cleaned.append(value)
-
-    filtered.ranges = cleaned
     return filtered
 
 
@@ -78,9 +68,39 @@ def scan_angle_deg(scan: LaserScan, index: int) -> float:
 
 def scan_index_for_angle_deg(scan: LaserScan, angle_deg: float) -> int:
     if scan.angle_increment == 0.0:
-        raise ValueError("LaserScan angle_increment cannot be zero.")
+        raise ValueError("LaserScan angle_increment cannot be zero")
 
-    angle_rad = math.radians(angle_deg)
+    if not scan.ranges:
+        return 0
+
+    angle_rad = math.radians(float(angle_deg))
     index = round((angle_rad - scan.angle_min) / scan.angle_increment)
 
     return max(0, min(int(index), len(scan.ranges) - 1))
+
+
+def _range_or_inf(value: object, *, range_min: float, range_max: float) -> float:
+    if not _is_valid_range(value, range_min=range_min, range_max=range_max):
+        return float("inf")
+
+    return float(value)
+
+
+def _is_valid_range(value: object, *, range_min: float, range_max: float) -> bool:
+    try:
+        range_m = float(value)
+    except (TypeError, ValueError):
+        return False
+
+    return math.isfinite(range_m) and float(range_min) <= range_m <= float(range_max)
+
+
+__all__ = [
+    "clamp_laser_ranges",
+    "copy_laser_scan",
+    "make_string_msg",
+    "scan_angle_deg",
+    "scan_index_for_angle_deg",
+    "valid_range_count",
+    "valid_range_ratio",
+]

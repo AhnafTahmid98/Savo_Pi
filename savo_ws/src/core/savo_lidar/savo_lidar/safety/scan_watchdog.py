@@ -1,8 +1,10 @@
-"""Watchdog logic for detecting stale LiDAR scan streams."""
+# -*- coding: utf-8 -*-
+"""Watchdog for stale LiDAR scan streams."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from savo_lidar.utils.timing import elapsed_s, is_stale, monotonic_now_s
 
@@ -38,12 +40,29 @@ class ScanWatchdog:
         self.scan_count = 0
 
     def status_message(self, now_s: float | None = None) -> str:
-        if self.last_scan_s is None:
+        age = self.age_s(now_s=now_s)
+
+        if age is None:
             return "no scan received"
 
         if self.stale(now_s=now_s):
-            age = self.age_s(now_s=now_s)
             return f"scan stream stale | age_s={age:.3f}"
 
-        age = self.age_s(now_s=now_s)
         return f"scan stream healthy | age_s={age:.3f}"
+
+    def to_dict(self, now_s: float | None = None) -> dict[str, Any]:
+        age = self.age_s(now_s=now_s)
+
+        return {
+            "timeout_s": self.timeout_s,
+            "last_scan_s": self.last_scan_s,
+            "scan_count": self.scan_count,
+            "age_s": age,
+            "stale": self.stale(now_s=now_s),
+            "message": self.status_message(now_s=now_s),
+        }
+
+
+__all__ = [
+    "ScanWatchdog",
+]

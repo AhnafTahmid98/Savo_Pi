@@ -1,19 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""Mecanum kinematics helpers for Robot Savo localization. No ROS imports."""
+"""Mecanum kinematics helpers for Robot Savo localization."""
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 from savo_localization.constants import (
     DEFAULT_TRACK_M,
     DEFAULT_WHEELBASE_M,
-    WHEEL_FL,
-    WHEEL_FR,
-    WHEEL_RL,
-    WHEEL_RR,
 )
 
 
@@ -22,231 +19,205 @@ class MecanumGeometry:
     wheelbase_m: float = DEFAULT_WHEELBASE_M
     track_m: float = DEFAULT_TRACK_M
 
-    def validate(self) -> None:
+    def __post_init__(self) -> None:
         if self.wheelbase_m <= 0.0:
-            raise ValueError(f"wheelbase_m must be > 0.0, got {self.wheelbase_m}")
+            raise ValueError("wheelbase_m must be > 0.0")
 
         if self.track_m <= 0.0:
-            raise ValueError(f"track_m must be > 0.0, got {self.track_m}")
+            raise ValueError("track_m must be > 0.0")
 
     @property
     def radius_sum_m(self) -> float:
-        return radius_sum_m(
-            wheelbase_m=self.wheelbase_m,
-            track_m=self.track_m,
-        )
+        return radius_sum_m(self.wheelbase_m, self.track_m)
 
 
 @dataclass(frozen=True)
 class WheelSpeeds:
-    fl_mps: float
-    fr_mps: float
-    rl_mps: float
-    rr_mps: float
-
-    def to_dict(self) -> dict[str, float]:
-        return {
-            WHEEL_FL: self.fl_mps,
-            WHEEL_FR: self.fr_mps,
-            WHEEL_RL: self.rl_mps,
-            WHEEL_RR: self.rr_mps,
-        }
+    fl_mps: float = 0.0
+    fr_mps: float = 0.0
+    rl_mps: float = 0.0
+    rr_mps: float = 0.0
 
 
 @dataclass(frozen=True)
 class BodyVelocity:
-    vx_mps: float
-    vy_mps: float
-    omega_rad_s: float
-
-    def to_dict(self) -> dict[str, float]:
-        return {
-            "vx_mps": self.vx_mps,
-            "vy_mps": self.vy_mps,
-            "omega_rad_s": self.omega_rad_s,
-        }
+    vx_mps: float = 0.0
+    vy_mps: float = 0.0
+    omega_rad_s: float = 0.0
 
 
-def radius_sum_m(*, wheelbase_m: float, track_m: float) -> float:
-    wheelbase_m = float(wheelbase_m)
-    track_m = float(track_m)
+def radius_sum_m(wheelbase_m: float, track_m: float) -> float:
+    wheelbase = float(wheelbase_m)
+    track = float(track_m)
 
-    if wheelbase_m <= 0.0:
-        raise ValueError(f"wheelbase_m must be > 0.0, got {wheelbase_m}")
+    if wheelbase <= 0.0:
+        raise ValueError("wheelbase_m must be > 0.0")
 
-    if track_m <= 0.0:
-        raise ValueError(f"track_m must be > 0.0, got {track_m}")
+    if track <= 0.0:
+        raise ValueError("track_m must be > 0.0")
 
-    return wheelbase_m + track_m
+    return (wheelbase + track) / 2.0
+
+
+def body_velocity_from_wheel_speeds(
+    wheels: WheelSpeeds,
+    geometry: MecanumGeometry | None = None,
+) -> BodyVelocity:
+    geometry = geometry or MecanumGeometry()
+    r_sum = geometry.radius_sum_m
+
+    vx = (
+        wheels.fl_mps
+        + wheels.fr_mps
+        + wheels.rl_mps
+        + wheels.rr_mps
+    ) / 4.0
+
+    vy = (
+        -wheels.fl_mps
+        + wheels.fr_mps
+        + wheels.rl_mps
+        - wheels.rr_mps
+    ) / 4.0
+
+    omega = (
+        -wheels.fl_mps
+        + wheels.fr_mps
+        - wheels.rl_mps
+        + wheels.rr_mps
+    ) / (4.0 * r_sum)
+
+    return BodyVelocity(
+        vx_mps=vx,
+        vy_mps=vy,
+        omega_rad_s=omega,
+    )
 
 
 def forward_kinematics(
-    *,
-    fl_mps: float,
-    fr_mps: float,
-    rl_mps: float,
-    rr_mps: float,
-    wheelbase_m: float = DEFAULT_WHEELBASE_M,
-    track_m: float = DEFAULT_TRACK_M,
+    wheels: WheelSpeeds,
+    geometry: MecanumGeometry | None = None,
 ) -> BodyVelocity:
-    radius_sum = radius_sum_m(
-        wheelbase_m=wheelbase_m,
-        track_m=track_m,
-    )
+    return body_velocity_from_wheel_speeds(wheels, geometry)
 
-    fl = float(fl_mps)
-    fr = float(fr_mps)
-    rl = float(rl_mps)
-    rr = float(rr_mps)
 
-    vx_mps = (fl + fr + rl + rr) / 4.0
-    vy_mps = (-fl + fr + rl - rr) / 4.0
-    omega_rad_s = (-fl + fr - rl + rr) / (4.0 * radius_sum)
+def wheel_speeds_from_body_velocity(
+    velocity: BodyVelocity,
+    geometry: MecanumGeometry | None = None,
+) -> WheelSpeeds:
+    geometry = geometry or MecanumGeometry()
+    r_sum = geometry.radius_sum_m
+    rotation = r_sum * velocity.omega_rad_s
 
-    return BodyVelocity(
-        vx_mps=vx_mps,
-        vy_mps=vy_mps,
-        omega_rad_s=omega_rad_s,
+    return WheelSpeeds(
+        fl_mps=velocity.vx_mps - velocity.vy_mps - rotation,
+        fr_mps=velocity.vx_mps + velocity.vy_mps + rotation,
+        rl_mps=velocity.vx_mps + velocity.vy_mps - rotation,
+        rr_mps=velocity.vx_mps - velocity.vy_mps + rotation,
     )
 
 
 def inverse_kinematics(
-    *,
-    vx_mps: float,
-    vy_mps: float,
-    omega_rad_s: float,
-    wheelbase_m: float = DEFAULT_WHEELBASE_M,
-    track_m: float = DEFAULT_TRACK_M,
+    velocity: BodyVelocity,
+    geometry: MecanumGeometry | None = None,
 ) -> WheelSpeeds:
-    radius_sum = radius_sum_m(
-        wheelbase_m=wheelbase_m,
-        track_m=track_m,
-    )
-
-    vx = float(vx_mps)
-    vy = float(vy_mps)
-    omega = float(omega_rad_s)
-
-    rotation = radius_sum * omega
-
-    return WheelSpeeds(
-        fl_mps=vx - vy - rotation,
-        fr_mps=vx + vy + rotation,
-        rl_mps=vx + vy - rotation,
-        rr_mps=vx - vy + rotation,
-    )
+    return wheel_speeds_from_body_velocity(velocity, geometry)
 
 
 def forward_kinematics_from_dict(
-    wheel_speeds_mps: dict[str, float],
-    *,
-    wheelbase_m: float = DEFAULT_WHEELBASE_M,
-    track_m: float = DEFAULT_TRACK_M,
+    wheel_speeds: dict[str, float],
+    geometry: MecanumGeometry | None = None,
 ) -> BodyVelocity:
-    return forward_kinematics(
-        fl_mps=float(wheel_speeds_mps.get(WHEEL_FL, 0.0)),
-        fr_mps=float(wheel_speeds_mps.get(WHEEL_FR, 0.0)),
-        rl_mps=float(wheel_speeds_mps.get(WHEEL_RL, 0.0)),
-        rr_mps=float(wheel_speeds_mps.get(WHEEL_RR, 0.0)),
-        wheelbase_m=wheelbase_m,
-        track_m=track_m,
+    return body_velocity_from_wheel_speeds(
+        WheelSpeeds(
+            fl_mps=float(wheel_speeds.get("FL", wheel_speeds.get("fl", 0.0))),
+            fr_mps=float(wheel_speeds.get("FR", wheel_speeds.get("fr", 0.0))),
+            rl_mps=float(wheel_speeds.get("RL", wheel_speeds.get("rl", 0.0))),
+            rr_mps=float(wheel_speeds.get("RR", wheel_speeds.get("rr", 0.0))),
+        ),
+        geometry,
     )
 
 
-def wheel_speeds_from_body_velocity(
-    body_velocity: BodyVelocity,
-    *,
-    wheelbase_m: float = DEFAULT_WHEELBASE_M,
-    track_m: float = DEFAULT_TRACK_M,
+def wheel_speed_tuple(wheels: WheelSpeeds) -> tuple[float, float, float, float]:
+    return (
+        wheels.fl_mps,
+        wheels.fr_mps,
+        wheels.rl_mps,
+        wheels.rr_mps,
+    )
+
+
+def body_velocity_tuple(velocity: BodyVelocity) -> tuple[float, float, float]:
+    return (
+        velocity.vx_mps,
+        velocity.vy_mps,
+        velocity.omega_rad_s,
+    )
+
+
+def max_abs_wheel_speed(wheels: WheelSpeeds) -> float:
+    return max(abs(value) for value in wheel_speed_tuple(wheels))
+
+
+def scale_wheel_speeds(wheels: WheelSpeeds, scale: float) -> WheelSpeeds:
+    return WheelSpeeds(
+        fl_mps=wheels.fl_mps * scale,
+        fr_mps=wheels.fr_mps * scale,
+        rl_mps=wheels.rl_mps * scale,
+        rr_mps=wheels.rr_mps * scale,
+    )
+
+
+def normalize_wheel_speeds(
+    wheels: WheelSpeeds,
+    max_speed_mps: float,
 ) -> WheelSpeeds:
-    return inverse_kinematics(
-        vx_mps=body_velocity.vx_mps,
-        vy_mps=body_velocity.vy_mps,
-        omega_rad_s=body_velocity.omega_rad_s,
-        wheelbase_m=wheelbase_m,
-        track_m=track_m,
-    )
+    if max_speed_mps <= 0.0:
+        raise ValueError("max_speed_mps must be > 0.0")
+
+    current_max = max_abs_wheel_speed(wheels)
+
+    if current_max <= max_speed_mps:
+        return wheels
+
+    return scale_wheel_speeds(wheels, max_speed_mps / current_max)
 
 
 def body_velocity_is_near_zero(
-    body_velocity: BodyVelocity,
+    velocity: BodyVelocity,
     *,
     linear_tolerance_mps: float = 1e-6,
     angular_tolerance_rad_s: float = 1e-6,
 ) -> bool:
     if linear_tolerance_mps < 0.0:
-        raise ValueError(
-            f"linear_tolerance_mps must be >= 0.0, got {linear_tolerance_mps}"
-        )
+        raise ValueError("linear_tolerance_mps must be >= 0.0")
 
     if angular_tolerance_rad_s < 0.0:
-        raise ValueError(
-            f"angular_tolerance_rad_s must be >= 0.0, got {angular_tolerance_rad_s}"
-        )
+        raise ValueError("angular_tolerance_rad_s must be >= 0.0")
+
+    linear = math.hypot(velocity.vx_mps, velocity.vy_mps)
 
     return (
-        abs(body_velocity.vx_mps) <= linear_tolerance_mps
-        and abs(body_velocity.vy_mps) <= linear_tolerance_mps
-        and abs(body_velocity.omega_rad_s) <= angular_tolerance_rad_s
+        linear <= linear_tolerance_mps
+        and abs(velocity.omega_rad_s) <= angular_tolerance_rad_s
     )
 
 
-def scale_wheel_speeds(
-    wheel_speeds: WheelSpeeds,
-    scale: float,
-) -> WheelSpeeds:
-    scale = float(scale)
-
-    return WheelSpeeds(
-        fl_mps=wheel_speeds.fl_mps * scale,
-        fr_mps=wheel_speeds.fr_mps * scale,
-        rl_mps=wheel_speeds.rl_mps * scale,
-        rr_mps=wheel_speeds.rr_mps * scale,
-    )
-
-
-def max_abs_wheel_speed(wheel_speeds: WheelSpeeds) -> float:
-    return max(
-        abs(wheel_speeds.fl_mps),
-        abs(wheel_speeds.fr_mps),
-        abs(wheel_speeds.rl_mps),
-        abs(wheel_speeds.rr_mps),
-    )
-
-
-def normalize_wheel_speeds(
-    wheel_speeds: WheelSpeeds,
-    *,
-    max_allowed_mps: float,
-) -> WheelSpeeds:
-    max_allowed_mps = abs(float(max_allowed_mps))
-
-    if max_allowed_mps <= 0.0:
-        raise ValueError(f"max_allowed_mps must be > 0.0, got {max_allowed_mps}")
-
-    current_max = max_abs_wheel_speed(wheel_speeds)
-
-    if current_max <= max_allowed_mps or current_max <= 0.0:
-        return wheel_speeds
-
-    return scale_wheel_speeds(
-        wheel_speeds,
-        scale=max_allowed_mps / current_max,
-    )
-
-
-def wheel_speed_tuple(wheel_speeds: WheelSpeeds) -> tuple[float, float, float, float]:
-    return (
-        wheel_speeds.fl_mps,
-        wheel_speeds.fr_mps,
-        wheel_speeds.rl_mps,
-        wheel_speeds.rr_mps,
-    )
-
-
-def body_velocity_tuple(body_velocity: BodyVelocity) -> tuple[float, float, float]:
-    return (
-        body_velocity.vx_mps,
-        body_velocity.vy_mps,
-        body_velocity.omega_rad_s,
-    )
+__all__ = [
+    "BodyVelocity",
+    "MecanumGeometry",
+    "WheelSpeeds",
+    "radius_sum_m",
+    "body_velocity_from_wheel_speeds",
+    "forward_kinematics",
+    "forward_kinematics_from_dict",
+    "wheel_speeds_from_body_velocity",
+    "inverse_kinematics",
+    "wheel_speed_tuple",
+    "body_velocity_tuple",
+    "max_abs_wheel_speed",
+    "scale_wheel_speeds",
+    "normalize_wheel_speeds",
+    "body_velocity_is_near_zero",
+]

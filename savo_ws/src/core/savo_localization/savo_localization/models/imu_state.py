@@ -6,102 +6,103 @@
 from __future__ import annotations
 
 import math
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from typing import Any
 
 from savo_localization.constants import (
-    BNO055_CHIP_ID,
-    BNO055_DEFAULT_ADDRESS,
-    BNO055_DEFAULT_I2C_BUS,
-    BNO055_DEFAULT_MODE,
-    DEFAULT_IMU_ACCEL_STD_MOVING_MPS2,
-    DEFAULT_IMU_GYRO_RMS_MOVING_DPS,
-    FRAME_IMU,
     GRAVITY_MPS2,
     IMU_HEALTH_GRADE_A,
-    IMU_HEALTH_GRADE_B,
-    IMU_HEALTH_GRADE_C,
     IMU_MODEL_BNO055,
     STATUS_ERROR,
     STATUS_OK,
+    STATUS_STALE,
     STATUS_UNKNOWN,
     STATUS_WARN,
 )
 
 
-@dataclass(frozen=True)
+@dataclass
 class ImuVector3:
-    x: float
-    y: float
-    z: float
+    x: float = 0.0
+    y: float = 0.0
+    z: float = 0.0
 
     @property
-    def magnitude(self) -> float:
+    def norm(self) -> float:
         return math.sqrt(
             float(self.x) * float(self.x)
             + float(self.y) * float(self.y)
             + float(self.z) * float(self.z)
         )
 
+    @property
+    def magnitude(self) -> float:
+        return self.norm
+
     def to_dict(self) -> dict[str, float]:
         return {
             "x": float(self.x),
             "y": float(self.y),
             "z": float(self.z),
-            "magnitude": self.magnitude,
+            "norm": self.norm,
         }
 
 
-@dataclass(frozen=True)
+@dataclass
 class ImuEuler:
-    yaw_deg: float | None = None
-    roll_deg: float | None = None
-    pitch_deg: float | None = None
+    yaw_deg: float = 0.0
+    roll_deg: float = 0.0
+    pitch_deg: float = 0.0
+    available: bool = False
 
-    @property
-    def available(self) -> bool:
-        return (
-            self.yaw_deg is not None
-            and self.roll_deg is not None
-            and self.pitch_deg is not None
-        )
-
-    def to_dict(self) -> dict[str, float | bool | None]:
+    def to_dict(self) -> dict[str, object]:
         return {
-            "available": self.available,
-            "yaw_deg": self.yaw_deg,
-            "roll_deg": self.roll_deg,
-            "pitch_deg": self.pitch_deg,
+            "yaw_deg": float(self.yaw_deg),
+            "roll_deg": float(self.roll_deg),
+            "pitch_deg": float(self.pitch_deg),
+            "available": bool(self.available),
         }
 
 
-@dataclass(frozen=True)
+@dataclass
 class ImuCalibration:
     system: int = 0
     gyro: int = 0
     accel: int = 0
     mag: int = 0
 
-    def validate(self) -> None:
-        for name, value in self.to_tuple_named().items():
-            if not 0 <= int(value) <= 3:
-                raise ValueError(f"{name} calibration must be 0..3, got {value}")
 
     @property
-    def fully_calibrated(self) -> bool:
-        return all(value >= 3 for value in self.to_tuple())
+    def valid(self) -> bool:
+        return all(0 <= int(value) <= 3 for value in (self.system, self.gyro, self.accel, self.mag))
+
+    def validate(self) -> None:
+        for name, value in self.to_tuple_named().items():
+            if int(value) < 0 or int(value) > 3:
+                raise ValueError(f"{name} calibration must be between 0 and 3")
 
     @property
     def motion_ready(self) -> bool:
-        return self.gyro >= 2 and self.accel >= 2
+        return self.valid and self.gyro >= 2 and self.accel >= 2
 
-    def to_tuple(self) -> tuple[int, int, int, int]:
-        return (
-            int(self.system),
-            int(self.gyro),
-            int(self.accel),
-            int(self.mag),
+    @property
+    def fully_calibrated(self) -> bool:
+        return self.valid and (
+            self.system == 3
+            and self.gyro == 3
+            and self.accel == 3
+            and self.mag == 3
         )
+
+    def to_dict(self) -> dict[str, int]:
+        return {
+            "system": int(self.system),
+            "gyro": int(self.gyro),
+            "accel": int(self.accel),
+            "mag": int(self.mag),
+            "motion_ready": self.motion_ready,
+            "fully_calibrated": self.fully_calibrated,
+        }
 
     def to_tuple_named(self) -> dict[str, int]:
         return {
@@ -111,81 +112,31 @@ class ImuCalibration:
             "mag": int(self.mag),
         }
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            **self.to_tuple_named(),
-            "fully_calibrated": self.fully_calibrated,
-            "motion_ready": self.motion_ready,
-        }
-
-
-@dataclass(frozen=True)
-class ImuRawSample:
-    stamp_s: float
-    accel_mps2: ImuVector3
-    gyro_dps: ImuVector3
-    euler_deg: ImuEuler = field(default_factory=ImuEuler)
-    mag_ut: ImuVector3 | None = None
-    temp_c: float | None = None
-    calibration: ImuCalibration = field(default_factory=ImuCalibration)
-    sys_status: int = 0
-    sys_error: int = 0
-    moving: bool = False
-    vibe_score: float = 0.0
-
-    @property
-    def gravity_norm_mps2(self) -> float:
-        return self.accel_mps2.magnitude
-
-    @property
-    def gyro_norm_dps(self) -> float:
-        return self.gyro_dps.magnitude
-
-    @property
-    def mag_norm_ut(self) -> float | None:
-        if self.mag_ut is None:
-            return None
-
-        return self.mag_ut.magnitude
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "stamp_s": float(self.stamp_s),
-            "accel_mps2": self.accel_mps2.to_dict(),
-            "gyro_dps": self.gyro_dps.to_dict(),
-            "euler_deg": self.euler_deg.to_dict(),
-            "mag_ut": self.mag_ut.to_dict() if self.mag_ut else None,
-            "temp_c": self.temp_c,
-            "calibration": self.calibration.to_dict(),
-            "sys_status": int(self.sys_status),
-            "sys_error": int(self.sys_error),
-            "moving": bool(self.moving),
-            "vibe_score": float(self.vibe_score),
-            "gravity_norm_mps2": self.gravity_norm_mps2,
-            "gyro_norm_dps": self.gyro_norm_dps,
-            "mag_norm_ut": self.mag_norm_ut,
-        }
-
 
 @dataclass
 class ImuHealthState:
     status: str = STATUS_UNKNOWN
-    grade: str = IMU_HEALTH_GRADE_C
+    grade: str = IMU_HEALTH_GRADE_A
     message: str = "IMU state unknown"
     reasons: list[str] = field(default_factory=list)
 
-    chip_ok: bool = False
     hardware_ok: bool = False
-    calibration_ok: bool = False
-    motion_ready: bool = False
     data_ok: bool = False
     temperature_ok: bool = False
+    calibration_ok: bool = False
 
-    gravity_norm_mps2: float | None = None
-    gyro_z_bias_dps: float | None = None
-    temp_c: float | None = None
-    moving: bool = False
-    vibe_score: float = 0.0
+    @property
+    def ready(self) -> bool:
+        return (
+            self.status == STATUS_OK
+            and self.hardware_ok
+            and self.data_ok
+            and self.temperature_ok
+        )
+
+    @property
+    def ok(self) -> bool:
+        return self.ready
 
     def mark_ok(self, message: str = "IMU healthy") -> None:
         self.status = STATUS_OK
@@ -194,36 +145,113 @@ class ImuHealthState:
         self.reasons.clear()
         self.hardware_ok = True
         self.data_ok = True
+        self.temperature_ok = True
+        self.calibration_ok = True
 
     def mark_warn(self, message: str, reasons: list[str] | None = None) -> None:
         self.status = STATUS_WARN
-        self.grade = IMU_HEALTH_GRADE_B
         self.message = message
         self.reasons = list(reasons or [])
+        self.hardware_ok = True
+        self.data_ok = True
 
     def mark_error(self, message: str, reasons: list[str] | None = None) -> None:
         self.status = STATUS_ERROR
-        self.grade = IMU_HEALTH_GRADE_C
         self.message = message
         self.reasons = list(reasons or [])
+        self.hardware_ok = False
+        self.data_ok = False
+
+    def mark_stale(self, message: str, reasons: list[str] | None = None) -> None:
+        self.status = STATUS_STALE
+        self.message = message
+        self.reasons = list(reasons or [])
+        self.data_ok = False
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        return {
+            "status": self.status,
+            "grade": self.grade,
+            "message": self.message,
+            "reasons": list(self.reasons),
+            "hardware_ok": self.hardware_ok,
+            "data_ok": self.data_ok,
+            "temperature_ok": self.temperature_ok,
+            "calibration_ok": self.calibration_ok,
+            "ready": self.ready,
+            "ok": self.ok,
+        }
+
+
+@dataclass
+class ImuRawSample:
+    stamp_s: float = 0.0
+    accel_mps2: ImuVector3 = field(default_factory=ImuVector3)
+    gyro_dps: ImuVector3 = field(default_factory=ImuVector3)
+    mag_ut: ImuVector3 = field(default_factory=ImuVector3)
+    euler_deg: ImuEuler = field(default_factory=ImuEuler)
+    calibration: ImuCalibration = field(default_factory=ImuCalibration)
+
+    temp_c: float | None = None
+    sys_status: int = 0
+    sys_error: int = 0
+    moving: bool | None = None
+
+    def __post_init__(self) -> None:
+        if self.moving is None:
+            self.moving = imu_is_moving(
+                gyro_dps=self.gyro_dps,
+                accel_mps2=self.accel_mps2,
+            )
+
+    @property
+    def accel_norm_mps2(self) -> float:
+        return self.accel_mps2.norm
+
+    @property
+    def gravity_norm_mps2(self) -> float:
+        return self.accel_norm_mps2
+
+    @property
+    def gyro_norm_dps(self) -> float:
+        return self.gyro_dps.norm
+
+    @property
+    def gravity_error_mps2(self) -> float:
+        return abs(self.accel_norm_mps2 - GRAVITY_MPS2)
+
+    @property
+    def healthy_system(self) -> bool:
+        return int(self.sys_error) == 0
+
+    @property
+    def vibe_score(self) -> float:
+        return float(self.gyro_norm_dps) + float(self.gravity_error_mps2)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "stamp_s": float(self.stamp_s),
+            "accel_mps2": self.accel_mps2.to_dict(),
+            "gyro_dps": self.gyro_dps.to_dict(),
+            "mag_ut": self.mag_ut.to_dict(),
+            "euler_deg": self.euler_deg.to_dict(),
+            "calibration": self.calibration.to_dict(),
+            "temp_c": self.temp_c,
+            "sys_status": int(self.sys_status),
+            "sys_error": int(self.sys_error),
+            "moving": bool(self.moving),
+            "accel_norm_mps2": self.accel_norm_mps2,
+            "gravity_norm_mps2": self.gravity_norm_mps2,
+            "gyro_norm_dps": self.gyro_norm_dps,
+            "gravity_error_mps2": self.gravity_error_mps2,
+            "healthy_system": self.healthy_system,
+            "vibe_score": self.vibe_score,
+        }
 
 
 @dataclass
 class ImuState:
     model: str = IMU_MODEL_BNO055
-    frame_id: str = FRAME_IMU
-
-    i2c_bus: int = BNO055_DEFAULT_I2C_BUS
-    i2c_address: int = BNO055_DEFAULT_ADDRESS
-    mode: str = BNO055_DEFAULT_MODE
-
-    chip_id: int | None = None
-    sys_status: int = 0
-    sys_error: int = 0
-    calibration: ImuCalibration = field(default_factory=ImuCalibration)
 
     sample_count: int = 0
     last_sample: ImuRawSample | None = None
@@ -231,168 +259,183 @@ class ImuState:
 
     health: ImuHealthState = field(default_factory=ImuHealthState)
 
-    def mark_chip(self, chip_id: int) -> None:
-        self.chip_id = int(chip_id)
-        self.health.chip_ok = self.chip_id == BNO055_CHIP_ID
-        self.health.hardware_ok = self.health.chip_ok
+    @property
+    def chip_ok(self) -> bool:
+        return self.last_sample is not None and self.last_sample.healthy_system
 
-        if not self.health.chip_ok:
-            self.health.mark_error(
-                f"Unexpected IMU chip id: 0x{self.chip_id:02X}",
-                reasons=[f"expected 0x{BNO055_CHIP_ID:02X}"],
-            )
+    @property
+    def sys_status(self) -> int:
+        return int(self.last_sample.sys_status) if self.last_sample is not None else 0
 
-    def mark_sample(self, sample: ImuRawSample) -> None:
-        self.last_sample = sample
-        self.sample_count += 1
+    @property
+    def sys_error(self) -> int:
+        return int(self.last_sample.sys_error) if self.last_sample is not None else 0
 
-        self.sys_status = sample.sys_status
-        self.sys_error = sample.sys_error
-        self.calibration = sample.calibration
+    @property
+    def temp_c(self) -> float | None:
+        return self.last_sample.temp_c if self.last_sample is not None else None
 
-        self.health.data_ok = True
-        self.health.motion_ready = sample.calibration.motion_ready
-        self.health.gravity_norm_mps2 = sample.gravity_norm_mps2
-        self.health.temp_c = sample.temp_c
-        self.health.moving = sample.moving
-        self.health.vibe_score = sample.vibe_score
-
-        if sample.sys_error != 0:
-            self.health.mark_error(
-                f"IMU system error: {sample.sys_error}",
-                reasons=[f"SYS_ERR={sample.sys_error}"],
-            )
-            return
-
-        gravity_error = abs(sample.gravity_norm_mps2 - GRAVITY_MPS2)
-
-        if gravity_error > 0.8:
-            self.health.mark_error(
-                "IMU gravity norm is far from expected value",
-                reasons=[f"|g|={sample.gravity_norm_mps2:.3f} m/s²"],
-            )
-            return
-
-        reasons: list[str] = []
-
-        if gravity_error > 0.4:
-            reasons.append(f"|g| slightly off: {sample.gravity_norm_mps2:.3f} m/s²")
-
-        if sample.calibration.gyro < 2:
-            reasons.append(f"gyro calibration low: {sample.calibration.gyro}/3")
-
-        if sample.calibration.accel < 2:
-            reasons.append(f"accel calibration low: {sample.calibration.accel}/3")
-
-        if reasons:
-            self.health.mark_warn("IMU usable with calibration notes", reasons=reasons)
-            self.health.hardware_ok = True
-            self.health.data_ok = True
-            return
-
-        self.health.mark_ok()
-
-    def mark_stale(self, age_s: float | None) -> None:
-        self.last_sample_age_s = age_s
-        self.health.mark_warn(
-            "IMU sample stale",
-            reasons=[
-                "no sample age available" if age_s is None else f"age_s={age_s:.3f}"
-            ],
+    @property
+    def calibration(self) -> ImuCalibration:
+        return (
+            self.last_sample.calibration
+            if self.last_sample is not None
+            else ImuCalibration()
         )
 
     @property
-    def i2c_address_hex(self) -> str:
-        return hex(int(self.i2c_address))
-
-    @property
-    def chip_ok(self) -> bool:
-        return self.chip_id == BNO055_CHIP_ID
-
-    @property
     def ready(self) -> bool:
-        return self.health.hardware_ok and self.health.data_ok
+        return self.health.ready
+
+    def mark_sample(
+        self,
+        sample: ImuRawSample,
+        *,
+        now_s: float | None = None,
+    ) -> None:
+        self.last_sample = sample
+        self.sample_count += 1
+
+        if now_s is None:
+            self.last_sample_age_s = 0.0
+        else:
+            self.last_sample_age_s = max(0.0, float(now_s) - float(sample.stamp_s))
+
+        self.health.hardware_ok = sample.healthy_system
+        self.health.data_ok = True
+        self.health.temperature_ok = (
+            sample.temp_c is None
+            or (-40.0 <= float(sample.temp_c) <= 85.0)
+        )
+        self.health.calibration_ok = sample.calibration.motion_ready
+
+        if (
+            sample.healthy_system
+            and self.health.temperature_ok
+            and sample.calibration.motion_ready
+        ):
+            self.health.mark_ok()
+        elif not sample.healthy_system:
+            self.health.mark_error(
+                "IMU system error",
+                [f"sys_error={sample.sys_error}"],
+            )
+        else:
+            reasons: list[str] = []
+            if not sample.calibration.motion_ready:
+                reasons.append("IMU calibration not motion ready")
+            if not self.health.temperature_ok:
+                reasons.append("IMU temperature outside expected range")
+            self.health.mark_warn("IMU usable with health notes", reasons)
+
+    def mark_stale(self, age_s: float) -> None:
+        self.last_sample_age_s = float(age_s)
+        self.health.mark_stale(
+            "IMU state stale",
+            [f"last sample age_s={float(age_s):.3f}"],
+        )
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "model": self.model,
-            "frame_id": self.frame_id,
-            "i2c_bus": int(self.i2c_bus),
-            "i2c_address": int(self.i2c_address),
-            "i2c_address_hex": self.i2c_address_hex,
-            "mode": self.mode,
-            "chip_id": self.chip_id,
+            "ready": self.ready,
             "chip_ok": self.chip_ok,
-            "sys_status": int(self.sys_status),
-            "sys_error": int(self.sys_error),
+            "sys_status": self.sys_status,
+            "sys_error": self.sys_error,
+            "temp_c": self.temp_c,
             "calibration": self.calibration.to_dict(),
             "sample_count": int(self.sample_count),
             "last_sample_age_s": self.last_sample_age_s,
-            "last_sample": self.last_sample.to_dict() if self.last_sample else None,
             "health": self.health.to_dict(),
-            "ready": self.ready,
+            "last_sample": (
+                self.last_sample.to_dict()
+                if self.last_sample is not None
+                else None
+            ),
         }
 
 
-def make_imu_vector3(x: float, y: float, z: float) -> ImuVector3:
-    return ImuVector3(float(x), float(y), float(z))
+def make_imu_vector3(
+    x: float = 0.0,
+    y: float = 0.0,
+    z: float = 0.0,
+) -> ImuVector3:
+    return ImuVector3(x=x, y=y, z=z)
 
 
 def make_imu_calibration(
-    system: int,
-    gyro: int,
-    accel: int,
-    mag: int,
+    *,
+    system: int = 0,
+    gyro: int = 0,
+    accel: int = 0,
+    mag: int = 0,
 ) -> ImuCalibration:
-    calibration = ImuCalibration(
-        system=int(system),
-        gyro=int(gyro),
-        accel=int(accel),
-        mag=int(mag),
+    return ImuCalibration(
+        system=system,
+        gyro=gyro,
+        accel=accel,
+        mag=mag,
     )
-    calibration.validate()
-    return calibration
 
 
 def make_imu_sample(
     *,
-    stamp_s: float,
-    accel_xyz: tuple[float, float, float],
-    gyro_xyz: tuple[float, float, float],
-    euler_ypr: tuple[float | None, float | None, float | None] = (None, None, None),
-    mag_xyz: tuple[float, float, float] | None = None,
-    temp_c: float | None = None,
+    stamp_s: float = 0.0,
+    accel_mps2: ImuVector3 | None = None,
+    gyro_dps: ImuVector3 | None = None,
+    mag_ut: ImuVector3 | None = None,
+    euler_deg: ImuEuler | None = None,
     calibration: ImuCalibration | None = None,
+    temp_c: float | None = None,
     sys_status: int = 0,
     sys_error: int = 0,
-    moving: bool = False,
-    vibe_score: float = 0.0,
+    moving: bool | None = None,
 ) -> ImuRawSample:
-    yaw, roll, pitch = euler_ypr
-
     return ImuRawSample(
-        stamp_s=float(stamp_s),
-        accel_mps2=make_imu_vector3(*accel_xyz),
-        gyro_dps=make_imu_vector3(*gyro_xyz),
-        euler_deg=ImuEuler(yaw_deg=yaw, roll_deg=roll, pitch_deg=pitch),
-        mag_ut=make_imu_vector3(*mag_xyz) if mag_xyz is not None else None,
-        temp_c=temp_c,
+        stamp_s=stamp_s,
+        accel_mps2=accel_mps2 or ImuVector3(),
+        gyro_dps=gyro_dps or ImuVector3(),
+        mag_ut=mag_ut or ImuVector3(),
+        euler_deg=euler_deg or ImuEuler(),
         calibration=calibration or ImuCalibration(),
-        sys_status=int(sys_status),
-        sys_error=int(sys_error),
-        moving=bool(moving),
-        vibe_score=float(vibe_score),
+        temp_c=temp_c,
+        sys_status=sys_status,
+        sys_error=sys_error,
+        moving=moving,
     )
 
 
 def imu_is_moving(
     *,
-    gyro_rms_dps: float,
-    accel_std_mps2: float,
-    gyro_threshold_dps: float = DEFAULT_IMU_GYRO_RMS_MOVING_DPS,
-    accel_threshold_mps2: float = DEFAULT_IMU_ACCEL_STD_MOVING_MPS2,
+    gyro_dps: ImuVector3,
+    accel_mps2: ImuVector3,
+    gyro_threshold_dps: float = 5.0,
+    accel_delta_threshold_mps2: float = 1.0,
 ) -> bool:
-    return (
-        float(gyro_rms_dps) > float(gyro_threshold_dps)
-        or float(accel_std_mps2) > float(accel_threshold_mps2)
+    if gyro_dps.norm < gyro_threshold_dps and accel_mps2.norm == 0.0:
+        return False
+
+    accel_delta = math.sqrt(
+        accel_mps2.x * accel_mps2.x
+        + accel_mps2.y * accel_mps2.y
+        + (accel_mps2.z - GRAVITY_MPS2) * (accel_mps2.z - GRAVITY_MPS2)
     )
+
+    return (
+        gyro_dps.norm >= gyro_threshold_dps
+        or accel_delta >= accel_delta_threshold_mps2
+    )
+
+
+__all__ = [
+    "ImuVector3",
+    "ImuEuler",
+    "ImuCalibration",
+    "ImuHealthState",
+    "ImuRawSample",
+    "ImuState",
+    "make_imu_vector3",
+    "make_imu_calibration",
+    "make_imu_sample",
+    "imu_is_moving",
+]

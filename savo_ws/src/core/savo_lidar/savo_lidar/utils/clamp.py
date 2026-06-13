@@ -1,4 +1,5 @@
-"""Small numeric guards used by LiDAR filters and diagnostics."""
+# -*- coding: utf-8 -*-
+"""Small numeric clamp helpers."""
 
 from __future__ import annotations
 
@@ -6,53 +7,57 @@ import math
 
 
 def clamp_float(value: float, minimum: float, maximum: float) -> float:
+    minimum = float(minimum)
+    maximum = float(maximum)
+
     if minimum > maximum:
-        raise ValueError(f"Invalid clamp range: minimum={minimum}, maximum={maximum}")
+        raise ValueError(f"minimum cannot be greater than maximum: {minimum} > {maximum}")
 
     value = float(value)
-
-    if value < minimum:
-        return float(minimum)
-
-    if value > maximum:
-        return float(maximum)
-
-    return value
+    return max(minimum, min(maximum, value))
 
 
 def clamp_int(value: int, minimum: int, maximum: int) -> int:
+    minimum = int(minimum)
+    maximum = int(maximum)
+
     if minimum > maximum:
-        raise ValueError(f"Invalid clamp range: minimum={minimum}, maximum={maximum}")
+        raise ValueError(f"minimum cannot be greater than maximum: {minimum} > {maximum}")
 
     value = int(value)
-
-    if value < minimum:
-        return int(minimum)
-
-    if value > maximum:
-        return int(maximum)
-
-    return value
+    return max(minimum, min(maximum, value))
 
 
 def finite_or_default(value: float, default: float) -> float:
-    value = float(value)
+    try:
+        value_f = float(value)
+    except (TypeError, ValueError):
+        return float(default)
 
-    if math.isfinite(value):
-        return value
+    if not math.isfinite(value_f):
+        return float(default)
 
-    return float(default)
+    return value_f
 
 
 def positive_or_default(value: float, default: float) -> float:
-    value = float(value)
+    value_f = finite_or_default(value, default)
 
-    if value > 0.0 and math.isfinite(value):
-        return value
+    if value_f <= 0.0:
+        return float(default)
 
-    return float(default)
+    return value_f
 
 
 def ratio_or_default(value: float, default: float = 0.0) -> float:
-    value = finite_or_default(value, default)
-    return clamp_float(value, 0.0, 1.0)
+    value_f = finite_or_default(value, default)
+    return clamp_float(value_f, 0.0, 1.0)
+
+
+__all__ = [
+    "clamp_float",
+    "clamp_int",
+    "finite_or_default",
+    "positive_or_default",
+    "ratio_or_default",
+]

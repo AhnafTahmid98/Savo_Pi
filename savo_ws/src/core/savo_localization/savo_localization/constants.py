@@ -1,198 +1,338 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""Constants for Robot Savo localization. No ROS imports — safe to import anywhere."""
+"""Shared constants for Robot Savo localization."""
 
 from __future__ import annotations
 
-from typing import Final, Tuple
 
+PACKAGE_NAME = "savo_localization"
 
-# =============================================================================
-# Package identity
-# =============================================================================
-PACKAGE_NAME: Final[str] = "savo_localization"
-ROBOT_NAME: Final[str] = "Robot Savo"
-SUPPORTED_ROS_DISTRO: Final[str] = "jazzy"
+# Node names
+DEFAULT_IMU_NODE_NAME = "imu_node"
+DEFAULT_WHEEL_ODOM_NODE_NAME = "wheel_odom_node"
+DEFAULT_EKF_NODE_NAME = "ekf_filter_node"
+DEFAULT_LOCALIZATION_HEALTH_NODE_NAME = "localization_health_node"
+DEFAULT_EKF_STATE_PUBLISHER_NODE_NAME = "ekf_state_publisher_node"
+DEFAULT_LOCALIZATION_DASHBOARD_NODE_NAME = "localization_dashboard"
 
-
-# =============================================================================
 # Frames
-# =============================================================================
-FRAME_ODOM: Final[str] = "odom"
-FRAME_BASE_LINK: Final[str] = "base_link"
-FRAME_IMU: Final[str] = "imu_link"
-FRAME_WHEEL_ODOM: Final[str] = "wheel_odom"
+FRAME_MAP = "map"
+FRAME_ODOM = "odom"
+FRAME_BASE_LINK = "base_link"
+FRAME_IMU = "imu_link"
 
+# Compatibility frame aliases
+FRAME_WHEEL_ODOM = FRAME_ODOM
+FRAME_FILTERED_ODOM = FRAME_ODOM
+FRAME_VO_ODOM = "vo_odom"
 
-# =============================================================================
-# ROS topic contract
-# =============================================================================
-DEFAULT_IMU_TOPIC: Final[str] = "/imu/data"
-DEFAULT_WHEEL_ODOM_TOPIC: Final[str] = "/wheel/odom"
-DEFAULT_FILTERED_ODOM_TOPIC: Final[str] = "/odometry/filtered"
+# Topics
+DEFAULT_IMU_TOPIC = "/imu/data"
+DEFAULT_IMU_STATE_TOPIC = "/savo_localization/imu_state"
 
-DEFAULT_IMU_STATE_TOPIC: Final[str] = "/savo_localization/imu_state"
-DEFAULT_ENCODER_STATE_TOPIC: Final[str] = "/savo_localization/encoder_state"
-DEFAULT_WHEEL_ODOM_STATE_TOPIC: Final[str] = "/savo_localization/wheel_odom_state"
-DEFAULT_EKF_HEALTH_TOPIC: Final[str] = "/savo_localization/ekf_health"
-DEFAULT_STATE_SUMMARY_TOPIC: Final[str] = "/savo_localization/state_summary"
+DEFAULT_WHEEL_ODOM_TOPIC = "/wheel/odom"
+DEFAULT_WHEEL_ODOM_STATE_TOPIC = "/savo_localization/wheel_odom_state"
+DEFAULT_ENCODER_STATE_TOPIC = "/savo_localization/encoder_state"
 
+DEFAULT_FILTERED_ODOM_TOPIC = "/odometry/filtered"
+DEFAULT_EKF_STATE_TOPIC = "/savo_localization/ekf_state"
+DEFAULT_EKF_HEALTH_TOPIC = "/savo_localization/health"
+DEFAULT_STATE_SUMMARY_TOPIC = "/savo_localization/state_summary"
 
-# =============================================================================
-# Hardware identity
-# =============================================================================
-IMU_MODEL_BNO055: Final[str] = "bno055"
-ENCODER_MODEL_QUADRATURE: Final[str] = "quadrature_gpio"
-ODOM_MODEL_MECANUM_4ENC: Final[str] = "mecanum_4enc"
+DEFAULT_DIAGNOSTICS_TOPIC = "/diagnostics"
 
+# Wheels
+WHEEL_FL = "FL"
+WHEEL_FR = "FR"
+WHEEL_RL = "RL"
+WHEEL_RR = "RR"
 
-# =============================================================================
-# BNO055 defaults
-# =============================================================================
-BNO055_DEFAULT_I2C_BUS: Final[int] = 1
-BNO055_DEFAULT_ADDRESS: Final[int] = 0x28
-BNO055_CHIP_ID: Final[int] = 0xA0
-
-BNO055_MODE_IMU: Final[str] = "imu"
-BNO055_MODE_NDOF: Final[str] = "ndof"
-BNO055_DEFAULT_MODE: Final[str] = BNO055_MODE_NDOF
-
-DEFAULT_IMU_RATE_HZ: Final[float] = 25.0
-DEFAULT_IMU_SAMPLE_COUNT: Final[int] = 200
-
-GRAVITY_MPS2: Final[float] = 9.80665
-
-IMU_HEALTH_GRADE_A: Final[str] = "A"
-IMU_HEALTH_GRADE_B: Final[str] = "B"
-IMU_HEALTH_GRADE_C: Final[str] = "C"
-
-DEFAULT_IMU_GYRO_RMS_MOVING_DPS: Final[float] = 2.0
-DEFAULT_IMU_ACCEL_STD_MOVING_MPS2: Final[float] = 0.15
-DEFAULT_IMU_MOTION_WINDOW_SAMPLES: Final[int] = 20
-
-
-# =============================================================================
-# Four-wheel encoder GPIO defaults
-# =============================================================================
-WHEEL_FL: Final[str] = "FL"
-WHEEL_FR: Final[str] = "FR"
-WHEEL_RL: Final[str] = "RL"
-WHEEL_RR: Final[str] = "RR"
-
-WHEEL_ORDER: Final[Tuple[str, str, str, str]] = (
+WHEEL_ORDER = (
     WHEEL_FL,
     WHEEL_FR,
     WHEEL_RL,
     WHEEL_RR,
 )
 
-DEFAULT_FL_A_GPIO: Final[int] = 25
-DEFAULT_FL_B_GPIO: Final[int] = 13
+# Hardware/model names
+IMU_MODEL_BNO055 = "bno055"
+ENCODER_MODEL_QUADRATURE = "quadrature"
+ODOM_MODEL_MECANUM_4ENC = "mecanum_4enc"
 
-DEFAULT_FR_A_GPIO: Final[int] = 20
-DEFAULT_FR_B_GPIO: Final[int] = 21
+# BNO055 defaults
+BNO055_CHIP_ID = 0xA0
+BNO055_DEFAULT_I2C_BUS = 1
+BNO055_DEFAULT_ADDRESS = 0x28
 
-DEFAULT_RL_A_GPIO: Final[int] = 23
-DEFAULT_RL_B_GPIO: Final[int] = 24
+BNO055_MODE_IMU = "imu"
+BNO055_MODE_NDOF = "ndof"
+BNO055_DEFAULT_MODE = BNO055_MODE_NDOF
 
-DEFAULT_RR_A_GPIO: Final[int] = 12
-DEFAULT_RR_B_GPIO: Final[int] = 26
+# Robot Savo geometry / encoder defaults
+DEFAULT_WHEEL_DIAMETER_M = 0.065
+DEFAULT_WHEEL_RADIUS_M = DEFAULT_WHEEL_DIAMETER_M / 2.0
+DEFAULT_WHEELBASE_M = 0.165
+DEFAULT_WHEEL_BASE_M = DEFAULT_WHEELBASE_M
+DEFAULT_TRACK_M = 0.165
+DEFAULT_TRACK_WIDTH_M = DEFAULT_TRACK_M
 
-DEFAULT_ENCODER_GPIO_MAP: Final[dict[str, tuple[int, int]]] = {
-    WHEEL_FL: (DEFAULT_FL_A_GPIO, DEFAULT_FL_B_GPIO),
-    WHEEL_FR: (DEFAULT_FR_A_GPIO, DEFAULT_FR_B_GPIO),
-    WHEEL_RL: (DEFAULT_RL_A_GPIO, DEFAULT_RL_B_GPIO),
-    WHEEL_RR: (DEFAULT_RR_A_GPIO, DEFAULT_RR_B_GPIO),
+DEFAULT_ENCODER_CPR = 20
+DEFAULT_ENCODER_DECODING = 4
+DEFAULT_ENCODER_GEAR_RATIO = 1.0
+DEFAULT_COUNTS_PER_WHEEL_REV = (
+    DEFAULT_ENCODER_CPR * DEFAULT_ENCODER_DECODING
+)
+
+# Compatibility encoder aliases
+DEFAULT_CPR = DEFAULT_ENCODER_CPR
+DEFAULT_DECODING = DEFAULT_ENCODER_DECODING
+DEFAULT_DECODING_FACTOR = DEFAULT_ENCODER_DECODING
+DEFAULT_GEAR_RATIO = DEFAULT_ENCODER_GEAR_RATIO
+DEFAULT_COUNTS_PER_REV = DEFAULT_COUNTS_PER_WHEEL_REV
+DEFAULT_ENCODER_COUNTS_PER_REV = DEFAULT_COUNTS_PER_WHEEL_REV
+
+# Real Robot Savo GPIO wiring
+DEFAULT_FL_A_GPIO = 25
+DEFAULT_FL_B_GPIO = 13
+
+DEFAULT_FR_A_GPIO = 20
+DEFAULT_FR_B_GPIO = 21
+
+DEFAULT_RL_A_GPIO = 23
+DEFAULT_RL_B_GPIO = 24
+
+DEFAULT_RR_A_GPIO = 26
+DEFAULT_RR_B_GPIO = 12
+
+class _GpioPair(tuple):
+    def __new__(cls, a_gpio: int, b_gpio: int):
+        return tuple.__new__(cls, (int(a_gpio), int(b_gpio)))
+
+    @property
+    def a_gpio(self) -> int:
+        return self[0]
+
+    @property
+    def b_gpio(self) -> int:
+        return self[1]
+
+    def __getitem__(self, key):
+        if key in ("a", "a_gpio"):
+            return tuple.__getitem__(self, 0)
+
+        if key in ("b", "b_gpio"):
+            return tuple.__getitem__(self, 1)
+
+        return tuple.__getitem__(self, key)
+
+    def to_dict(self) -> dict[str, int]:
+        return {
+            "a_gpio": self.a_gpio,
+            "b_gpio": self.b_gpio,
+        }
+
+
+DEFAULT_ENCODER_GPIO_MAP = {
+    WHEEL_FL: _GpioPair(DEFAULT_FL_A_GPIO, DEFAULT_FL_B_GPIO),
+    WHEEL_FR: _GpioPair(DEFAULT_FR_A_GPIO, DEFAULT_FR_B_GPIO),
+    WHEEL_RL: _GpioPair(DEFAULT_RL_A_GPIO, DEFAULT_RL_B_GPIO),
+    WHEEL_RR: _GpioPair(DEFAULT_RR_A_GPIO, DEFAULT_RR_B_GPIO),
 }
 
-DEFAULT_ENCODER_INVERT_FL: Final[bool] = True
-DEFAULT_ENCODER_INVERT_FR: Final[bool] = True
-DEFAULT_ENCODER_INVERT_RL: Final[bool] = True
-DEFAULT_ENCODER_INVERT_RR: Final[bool] = True
-
-DEFAULT_ENCODER_INVERT_MAP: Final[dict[str, bool]] = {
-    WHEEL_FL: DEFAULT_ENCODER_INVERT_FL,
-    WHEEL_FR: DEFAULT_ENCODER_INVERT_FR,
-    WHEEL_RL: DEFAULT_ENCODER_INVERT_RL,
-    WHEEL_RR: DEFAULT_ENCODER_INVERT_RR,
+DEFAULT_ENCODER_INVERT_MAP = {
+    WHEEL_FL: True,
+    WHEEL_FR: True,
+    WHEEL_RL: True,
+    WHEEL_RR: True,
 }
 
-DEFAULT_ENCODER_POLL_S: Final[float] = 0.001
-DEFAULT_ENCODER_DEBOUNCE_S: Final[float] = 0.0003
-DEFAULT_ENCODER_REPORT_INTERVAL_S: Final[float] = 0.5
+# Encoder timing / diagnostics
+DEFAULT_ENCODER_POLL_S = 0.001
+DEFAULT_ENCODER_DEBOUNCE_S = 0.0003
+DEFAULT_ENCODER_REPORT_INTERVAL_S = 0.5
 
-DEFAULT_USE_INTERNAL_PULLUP: Final[bool] = False
-DEFAULT_USE_HW_DEBOUNCE: Final[bool] = True
+DEFAULT_USE_INTERNAL_PULLUP = False
+DEFAULT_USE_HW_DEBOUNCE = True
 
+DEFAULT_MIN_VALID_WHEEL_COUNT = 4
+DEFAULT_MAX_ILLEGAL_TRANSITIONS = 20
+DEFAULT_MIN_ENCODER_RATE_CPS = 1.0
 
-# =============================================================================
-# Wheel and odometry defaults
-# =============================================================================
-DEFAULT_WHEEL_DIAMETER_M: Final[float] = 0.065
-DEFAULT_ENCODER_CPR: Final[int] = 20
-DEFAULT_ENCODER_DECODING: Final[int] = 4
-DEFAULT_GEAR_RATIO: Final[float] = 1.0
+# Status values
+STATUS_OK = "OK"
+STATUS_WARN = "WARN"
+STATUS_ERROR = "ERROR"
+STATUS_STALE = "STALE"
+STATUS_UNKNOWN = "UNKNOWN"
 
-DEFAULT_WHEELBASE_M: Final[float] = 0.165
-DEFAULT_TRACK_M: Final[float] = 0.165
+# Health grades
+IMU_HEALTH_GRADE_A = "A"
+IMU_HEALTH_GRADE_B = "B"
+IMU_HEALTH_GRADE_C = "C"
+IMU_HEALTH_GRADE_F = "F"
 
-DEFAULT_WHEEL_ODOM_RATE_HZ: Final[float] = 30.0
-DEFAULT_WHEEL_ODOM_TIMEOUT_S: Final[float] = 0.5
-DEFAULT_ODOM_COVARIANCE_SCALE: Final[float] = 1.0
+# Physics
+GRAVITY_MPS2 = 9.80665
 
+# IMU health defaults
+DEFAULT_IMU_RATE_HZ = 25.0
+DEFAULT_IMU_SAMPLE_COUNT = 25
+DEFAULT_IMU_MOTION_WINDOW_SAMPLES = 30
 
-# =============================================================================
+DEFAULT_GRAVITY_ERROR_WARN_MPS2 = 2.0
+DEFAULT_GRAVITY_ERROR_ERROR_MPS2 = 4.0
+
+DEFAULT_GYRO_Z_BIAS_WARN_DPS = 5.0
+DEFAULT_GYRO_Z_BIAS_ERROR_DPS = 20.0
+
+DEFAULT_IMU_ACCEL_STD_MOVING_MPS2 = 1.0
+DEFAULT_IMU_GYRO_RMS_MOVING_DPS = 10.0
+
+DEFAULT_IMU_TEMP_MIN_C = -20.0
+DEFAULT_IMU_TEMP_MAX_C = 85.0
+DEFAULT_IMU_TEMP_WARN_LOW_C = 0.0
+DEFAULT_IMU_TEMP_WARN_HIGH_C = 70.0
+
+# Wheel odometry defaults
+DEFAULT_WHEEL_ODOM_RATE_HZ = 30.0
+DEFAULT_WHEEL_ODOM_TIMEOUT_S = 0.5
+DEFAULT_PUBLISH_TF = False
+DEFAULT_TWO_D_MODE = True
+DEFAULT_ODOM_COVARIANCE_SCALE = 1.0
+
+DEFAULT_MAX_ODOM_LINEAR_SPEED_MPS = 1.5
+DEFAULT_MAX_ODOM_ANGULAR_SPEED_RAD_S = 4.0
+
 # EKF defaults
-# =============================================================================
-DEFAULT_EKF_NODE_NAME: Final[str] = "ekf_filter_node"
-DEFAULT_EKF_RATE_HZ: Final[float] = 30.0
-DEFAULT_EKF_SENSOR_TIMEOUT_S: Final[float] = 0.2
+DEFAULT_EKF_RATE_HZ = 30.0
+DEFAULT_EKF_SENSOR_TIMEOUT_S = 0.2
+DEFAULT_EKF_MIN_HEALTHY_INPUTS = 2
+DEFAULT_EKF_REQUIRE_OUTPUT = True
+DEFAULT_EKF_REQUIRE_TF = True
 
-DEFAULT_PUBLISH_TF: Final[bool] = True
-DEFAULT_TWO_D_MODE: Final[bool] = True
+# VO defaults
+DEFAULT_VO_RATE_HZ = 15.0
 
+# Generic runtime / diagnostic defaults
+DEFAULT_STALE_TIMEOUT_S = 0.5
+DEFAULT_RATE_TOLERANCE_RATIO = 0.50
+DEFAULT_RATE_WINDOW_SIZE = 30
+DEFAULT_TF_TIMEOUT_S = 2.0
+DEFAULT_TF_MAX_AGE_S = 0.5
 
-# =============================================================================
-# Health/status values
-# =============================================================================
-STATUS_OK: Final[str] = "OK"
-STATUS_WARN: Final[str] = "WARN"
-STATUS_ERROR: Final[str] = "ERROR"
-STATUS_STALE: Final[str] = "STALE"
-STATUS_OFFLINE: Final[str] = "OFFLINE"
-STATUS_UNKNOWN: Final[str] = "UNKNOWN"
-
-HEALTH_LEVEL_OK: Final[int] = 0
-HEALTH_LEVEL_WARN: Final[int] = 1
-HEALTH_LEVEL_ERROR: Final[int] = 2
-HEALTH_LEVEL_STALE: Final[int] = 3
-
-
-# =============================================================================
-# Diagnostic thresholds
-# =============================================================================
-DEFAULT_MIN_ENCODER_RATE_CPS: Final[float] = 0.0
-DEFAULT_MAX_ILLEGAL_TRANSITIONS: Final[int] = 5
-
-DEFAULT_MIN_VALID_WHEEL_COUNT: Final[int] = 4
-DEFAULT_MAX_ODOM_LINEAR_SPEED_MPS: Final[float] = 1.0
-DEFAULT_MAX_ODOM_ANGULAR_SPEED_RAD_S: Final[float] = 3.0
-
-DEFAULT_IMU_TEMP_MIN_C: Final[float] = 0.0
-DEFAULT_IMU_TEMP_MAX_C: Final[float] = 60.0
-DEFAULT_IMU_TEMP_WARN_LOW_C: Final[float] = 5.0
-DEFAULT_IMU_TEMP_WARN_HIGH_C: Final[float] = 55.0
-
-DEFAULT_GRAVITY_ERROR_WARN_MPS2: Final[float] = 0.4
-DEFAULT_GRAVITY_ERROR_ERROR_MPS2: Final[float] = 0.8
-
-DEFAULT_GYRO_Z_BIAS_WARN_DPS: Final[float] = 0.8
-DEFAULT_GYRO_Z_BIAS_ERROR_DPS: Final[float] = 1.5
-
-
-# =============================================================================
-# Logging/reporting
-# =============================================================================
-DEFAULT_JSON_SORT_KEYS: Final[bool] = True
-DEFAULT_JSON_COMPACT: Final[bool] = True
+__all__ = [
+    "PACKAGE_NAME",
+    "DEFAULT_IMU_NODE_NAME",
+    "DEFAULT_WHEEL_ODOM_NODE_NAME",
+    "DEFAULT_EKF_NODE_NAME",
+    "DEFAULT_LOCALIZATION_HEALTH_NODE_NAME",
+    "DEFAULT_EKF_STATE_PUBLISHER_NODE_NAME",
+    "DEFAULT_LOCALIZATION_DASHBOARD_NODE_NAME",
+    "FRAME_MAP",
+    "FRAME_ODOM",
+    "FRAME_BASE_LINK",
+    "FRAME_IMU",
+    "FRAME_WHEEL_ODOM",
+    "FRAME_FILTERED_ODOM",
+    "FRAME_VO_ODOM",
+    "DEFAULT_IMU_TOPIC",
+    "DEFAULT_IMU_STATE_TOPIC",
+    "DEFAULT_WHEEL_ODOM_TOPIC",
+    "DEFAULT_WHEEL_ODOM_STATE_TOPIC",
+    "DEFAULT_ENCODER_STATE_TOPIC",
+    "DEFAULT_FILTERED_ODOM_TOPIC",
+    "DEFAULT_EKF_STATE_TOPIC",
+    "DEFAULT_EKF_HEALTH_TOPIC",
+    "DEFAULT_STATE_SUMMARY_TOPIC",
+    "DEFAULT_DIAGNOSTICS_TOPIC",
+    "WHEEL_FL",
+    "WHEEL_FR",
+    "WHEEL_RL",
+    "WHEEL_RR",
+    "WHEEL_ORDER",
+    "IMU_MODEL_BNO055",
+    "ENCODER_MODEL_QUADRATURE",
+    "ODOM_MODEL_MECANUM_4ENC",
+    "BNO055_CHIP_ID",
+    "BNO055_DEFAULT_I2C_BUS",
+    "BNO055_DEFAULT_ADDRESS",
+    "BNO055_MODE_IMU",
+    "BNO055_MODE_NDOF",
+    "BNO055_DEFAULT_MODE",
+    "DEFAULT_WHEEL_DIAMETER_M",
+    "DEFAULT_WHEEL_RADIUS_M",
+    "DEFAULT_WHEELBASE_M",
+    "DEFAULT_WHEEL_BASE_M",
+    "DEFAULT_TRACK_M",
+    "DEFAULT_TRACK_WIDTH_M",
+    "DEFAULT_ENCODER_CPR",
+    "DEFAULT_ENCODER_DECODING",
+    "DEFAULT_ENCODER_GEAR_RATIO",
+    "DEFAULT_COUNTS_PER_WHEEL_REV",
+    "DEFAULT_CPR",
+    "DEFAULT_DECODING",
+    "DEFAULT_DECODING_FACTOR",
+    "DEFAULT_GEAR_RATIO",
+    "DEFAULT_COUNTS_PER_REV",
+    "DEFAULT_ENCODER_COUNTS_PER_REV",
+    "DEFAULT_FL_A_GPIO",
+    "DEFAULT_FL_B_GPIO",
+    "DEFAULT_FR_A_GPIO",
+    "DEFAULT_FR_B_GPIO",
+    "DEFAULT_RL_A_GPIO",
+    "DEFAULT_RL_B_GPIO",
+    "DEFAULT_RR_A_GPIO",
+    "DEFAULT_RR_B_GPIO",
+    "DEFAULT_ENCODER_GPIO_MAP",
+    "DEFAULT_ENCODER_INVERT_MAP",
+    "DEFAULT_ENCODER_POLL_S",
+    "DEFAULT_ENCODER_DEBOUNCE_S",
+    "DEFAULT_ENCODER_REPORT_INTERVAL_S",
+    "DEFAULT_USE_INTERNAL_PULLUP",
+    "DEFAULT_USE_HW_DEBOUNCE",
+    "DEFAULT_MIN_VALID_WHEEL_COUNT",
+    "DEFAULT_MAX_ILLEGAL_TRANSITIONS",
+    "DEFAULT_MIN_ENCODER_RATE_CPS",
+    "STATUS_OK",
+    "STATUS_WARN",
+    "STATUS_ERROR",
+    "STATUS_STALE",
+    "STATUS_UNKNOWN",
+    "IMU_HEALTH_GRADE_A",
+    "IMU_HEALTH_GRADE_B",
+    "IMU_HEALTH_GRADE_C",
+    "IMU_HEALTH_GRADE_F",
+    "GRAVITY_MPS2",
+    "DEFAULT_IMU_RATE_HZ",
+    "DEFAULT_IMU_SAMPLE_COUNT",
+    "DEFAULT_IMU_MOTION_WINDOW_SAMPLES",
+    "DEFAULT_GRAVITY_ERROR_WARN_MPS2",
+    "DEFAULT_GRAVITY_ERROR_ERROR_MPS2",
+    "DEFAULT_GYRO_Z_BIAS_WARN_DPS",
+    "DEFAULT_GYRO_Z_BIAS_ERROR_DPS",
+    "DEFAULT_IMU_ACCEL_STD_MOVING_MPS2",
+    "DEFAULT_IMU_GYRO_RMS_MOVING_DPS",
+    "DEFAULT_IMU_TEMP_MIN_C",
+    "DEFAULT_IMU_TEMP_MAX_C",
+    "DEFAULT_IMU_TEMP_WARN_LOW_C",
+    "DEFAULT_IMU_TEMP_WARN_HIGH_C",
+    "DEFAULT_WHEEL_ODOM_RATE_HZ",
+    "DEFAULT_WHEEL_ODOM_TIMEOUT_S",
+    "DEFAULT_PUBLISH_TF",
+    "DEFAULT_TWO_D_MODE",
+    "DEFAULT_ODOM_COVARIANCE_SCALE",
+    "DEFAULT_MAX_ODOM_LINEAR_SPEED_MPS",
+    "DEFAULT_MAX_ODOM_ANGULAR_SPEED_RAD_S",
+    "DEFAULT_EKF_RATE_HZ",
+    "DEFAULT_EKF_SENSOR_TIMEOUT_S",
+    "DEFAULT_EKF_MIN_HEALTHY_INPUTS",
+    "DEFAULT_EKF_REQUIRE_OUTPUT",
+    "DEFAULT_EKF_REQUIRE_TF",
+    "DEFAULT_VO_RATE_HZ",
+    "DEFAULT_STALE_TIMEOUT_S",
+    "DEFAULT_RATE_TOLERANCE_RATIO",
+    "DEFAULT_RATE_WINDOW_SIZE",
+    "DEFAULT_TF_TIMEOUT_S",
+    "DEFAULT_TF_MAX_AGE_S",
+]

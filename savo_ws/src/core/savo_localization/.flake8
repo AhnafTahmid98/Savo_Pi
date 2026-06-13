@@ -1,0 +1,9 @@
+[flake8]
+max-line-length = 120
+extend-ignore =
+    Q000,
+    Q001,
+    Q002,
+    I100,
+    I101,
+    D401

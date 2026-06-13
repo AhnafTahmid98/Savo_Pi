@@ -1,65 +1,68 @@
-"""Helpers for small JSON-friendly diagnostic payloads."""
+# -*- coding: utf-8 -*-
+"""JSON payload helpers for LiDAR status and health output."""
 
 from __future__ import annotations
 
 import json
-from typing import Any
+import time
+from typing import Any, Mapping
+
+from savo_lidar.constants import PACKAGE_NAME, ROBOT_NAME
 
 
 def make_status_payload(
     *,
-    node: str,
+    component: str,
     status: str,
     message: str = "",
     **items: Any,
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {
-        "node": str(node),
+        "robot": ROBOT_NAME,
+        "package": PACKAGE_NAME,
+        "component": str(component),
         "status": str(status),
         "message": str(message),
+        "stamp_s": time.time(),
     }
 
-    for key, value in items.items():
-        if value is None:
-            continue
-        payload[str(key)] = value
-
+    payload.update({key: value for key, value in items.items() if value is not None})
     return payload
 
 
 def make_health_payload(
     *,
-    node: str,
+    component: str,
+    ok: bool,
     status: str,
-    hardware_ok: bool,
-    scan_ok: bool,
     message: str = "",
     **items: Any,
 ) -> dict[str, Any]:
-    return make_status_payload(
-        node=node,
+    payload = make_status_payload(
+        component=component,
         status=status,
         message=message,
-        hardware_ok=bool(hardware_ok),
-        scan_ok=bool(scan_ok),
-        **items,
+        ok=bool(ok),
     )
 
+    payload.update({key: value for key, value in items.items() if value is not None})
+    return payload
 
-def payload_to_json(payload: dict[str, Any]) -> str:
-    return json.dumps(payload, separators=(",", ":"), sort_keys=True)
+
+def payload_to_json(payload: Mapping[str, Any]) -> str:
+    return json.dumps(_json_safe(dict(payload)), sort_keys=True)
 
 
 def json_status(
     *,
-    node: str,
+    component: str,
     status: str,
     message: str = "",
     **items: Any,
 ) -> str:
     return payload_to_json(
         make_status_payload(
-            node=node,
+            component=component,
             status=status,
             message=message,
             **items,
@@ -69,20 +72,40 @@ def json_status(
 
 def json_health(
     *,
-    node: str,
+    component: str,
+    ok: bool,
     status: str,
-    hardware_ok: bool,
-    scan_ok: bool,
     message: str = "",
     **items: Any,
 ) -> str:
     return payload_to_json(
         make_health_payload(
-            node=node,
+            component=component,
+            ok=ok,
             status=status,
-            hardware_ok=hardware_ok,
-            scan_ok=scan_ok,
             message=message,
             **items,
         )
     )
+
+
+def _json_safe(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+
+    if isinstance(value, (list, tuple, set)):
+        return [_json_safe(item) for item in value]
+
+    if hasattr(value, "to_dict") and callable(value.to_dict):
+        return _json_safe(value.to_dict())
+
+    return value
+
+
+__all__ = [
+    "json_health",
+    "json_status",
+    "make_health_payload",
+    "make_status_payload",
+    "payload_to_json",
+]

@@ -1,8 +1,10 @@
-"""Fault latch for LiDAR errors that should stay visible until cleared."""
+# -*- coding: utf-8 -*-
+"""Latched LiDAR fault state."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from savo_lidar.constants import STATUS_ERROR, STATUS_OK
 
@@ -30,10 +32,15 @@ class LidarFaultLatch:
 
         return STATUS_OK
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "latched": self.latched,
             "reason": self.reason,
             "fault_count": self.fault_count,
             "status": self.status(),
         }
+
+
+__all__ = [
+    "LidarFaultLatch",
+]

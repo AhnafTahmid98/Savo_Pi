@@ -1,4 +1,7 @@
-"""LaserScan filtering helpers for Robot Savo LiDAR."""
+# -*- coding: utf-8 -*-
+"""LaserScan filtering helpers."""
+
+from __future__ import annotations
 
 from .angle_filter import (
     angle_in_sector,

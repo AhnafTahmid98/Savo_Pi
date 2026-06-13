@@ -30,7 +30,6 @@ def generate_launch_description() -> LaunchDescription:
 
     use_imu = LaunchConfiguration("use_imu")
     use_wheel_odom = LaunchConfiguration("use_wheel_odom")
-    use_ekf = LaunchConfiguration("use_ekf")
     use_vo = LaunchConfiguration("use_vo")
     use_health = LaunchConfiguration("use_health")
     use_dashboard = LaunchConfiguration("use_dashboard")

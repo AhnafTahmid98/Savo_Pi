@@ -1,8 +1,12 @@
+# -*- coding: utf-8 -*-
 """Scan-rate checks for LiDAR diagnostics and watchdog logic."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+from typing import Any
+
+from savo_lidar.constants import DEFAULT_SCAN_RATE_HZ
 
 
 @dataclass(frozen=True)
@@ -13,8 +17,14 @@ class ScanRateStatus:
     ok: bool
     message: str
 
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
 
-def minimum_allowed_rate(expected_hz: float, tolerance_ratio: float = 0.50) -> float:
+
+def minimum_allowed_rate(
+    expected_hz: float = DEFAULT_SCAN_RATE_HZ,
+    tolerance_ratio: float = 0.50,
+) -> float:
     expected_hz = float(expected_hz)
     tolerance_ratio = float(tolerance_ratio)
 
@@ -22,7 +32,9 @@ def minimum_allowed_rate(expected_hz: float, tolerance_ratio: float = 0.50) -> f
         raise ValueError(f"expected_hz must be > 0.0, got {expected_hz}")
 
     if not 0.0 <= tolerance_ratio <= 1.0:
-        raise ValueError(f"tolerance_ratio must be between 0.0 and 1.0, got {tolerance_ratio}")
+        raise ValueError(
+            f"tolerance_ratio must be between 0.0 and 1.0, got {tolerance_ratio}"
+        )
 
     return expected_hz * tolerance_ratio
 
@@ -30,7 +42,7 @@ def minimum_allowed_rate(expected_hz: float, tolerance_ratio: float = 0.50) -> f
 def check_scan_rate(
     *,
     rate_hz: float,
-    expected_hz: float,
+    expected_hz: float = DEFAULT_SCAN_RATE_HZ,
     tolerance_ratio: float = 0.50,
 ) -> ScanRateStatus:
     rate_hz = max(0.0, float(rate_hz))
@@ -71,3 +83,11 @@ def rate_to_period_s(rate_hz: float) -> float:
         raise ValueError(f"rate_hz must be > 0.0, got {rate_hz}")
 
     return 1.0 / rate_hz
+
+
+__all__ = [
+    "ScanRateStatus",
+    "check_scan_rate",
+    "minimum_allowed_rate",
+    "rate_to_period_s",
+]

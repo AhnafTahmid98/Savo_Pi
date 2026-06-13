@@ -1,4 +1,5 @@
-"""Timing helpers for watchdogs, rate checks, and diagnostics."""
+# -*- coding: utf-8 -*-
+"""Timing helpers for watchdogs and rate checks."""
 
 from __future__ import annotations
 
@@ -21,7 +22,11 @@ def elapsed_s(start_s: float, now_s: float | None = None) -> float:
     return max(0.0, float(now_s) - float(start_s))
 
 
-def is_stale(last_update_s: float | None, timeout_s: float, now_s: float | None = None) -> bool:
+def is_stale(
+    last_update_s: float | None,
+    timeout_s: float,
+    now_s: float | None = None,
+) -> bool:
     if last_update_s is None:
         return True
 
@@ -55,6 +60,10 @@ class RateTracker:
 
         return self._rate_hz
 
+    def reset(self) -> None:
+        self._last_stamp_s = None
+        self._rate_hz = 0.0
+
     @property
     def rate_hz(self) -> float:
         return self._rate_hz
@@ -62,3 +71,12 @@ class RateTracker:
     @property
     def last_stamp_s(self) -> float | None:
         return self._last_stamp_s
+
+
+__all__ = [
+    "RateTracker",
+    "elapsed_s",
+    "is_stale",
+    "monotonic_now_s",
+    "wall_time_s",
+]

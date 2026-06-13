@@ -123,7 +123,7 @@ def get_package_version_info() -> PackageVersionInfo:
 # CLI entry
 # =============================================================================
 def main() -> None:
-    """Simple CLI output for quick checks: `python -m savo_localization.version`."""
+    """Print simple CLI output for quick checks."""
     info = get_package_version_info()
     print(info.banner())
 

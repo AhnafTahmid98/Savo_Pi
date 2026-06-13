@@ -12,8 +12,11 @@ from typing import Iterable
 from savo_localization.constants import (
     DEFAULT_MAX_ODOM_ANGULAR_SPEED_RAD_S,
     DEFAULT_MAX_ODOM_LINEAR_SPEED_MPS,
+    FRAME_BASE_LINK,
+    FRAME_ODOM,
     STATUS_ERROR,
     STATUS_OK,
+    STATUS_STALE,
     STATUS_WARN,
 )
 from savo_localization.math.angle_math import shortest_angle_delta_rad
@@ -23,12 +26,12 @@ from savo_localization.math.odom_math import (
     distance_2d_m,
     pose_is_finite,
     twist_is_finite,
-    twist_magnitude,
 )
 from savo_localization.models.wheel_odom_state import (
     WheelOdomSample,
     WheelOdomState,
 )
+from savo_localization.utils.frames import require_frame_pair
 
 
 @dataclass(frozen=True)
@@ -60,76 +63,57 @@ class OdomJumpCheckResult:
     yaw_jump_rad: float = 0.0
     dt_s: float = 0.0
 
-    max_distance_jump_m: float = 0.50
-    max_yaw_jump_rad: float = 1.00
-
     def to_dict(self) -> dict[str, object]:
         return asdict(self)
 
 
-def check_wheel_odom_sample(
-    sample: WheelOdomSample,
+def check_pose_twist(
+    pose: Pose2D,
+    twist: Twist2D,
     *,
+    dt_s: float,
+    odom_frame_id: str = FRAME_ODOM,
+    base_frame_id: str = FRAME_BASE_LINK,
+    require_frame_ids: bool = True,
+    require_frames: bool | None = None,
     max_linear_mps: float = DEFAULT_MAX_ODOM_LINEAR_SPEED_MPS,
     max_angular_rad_s: float = DEFAULT_MAX_ODOM_ANGULAR_SPEED_RAD_S,
-    require_frame_ids: bool = True,
+    max_linear_speed_mps: float | None = None,
+    max_angular_speed_rad_s: float | None = None,
 ) -> OdomSanityCheckResult:
-    return check_pose_twist(
-        pose=sample.pose,
-        twist=sample.twist,
-        dt_s=sample.dt_s,
-        odom_frame_id=sample.odom_frame_id,
-        base_frame_id=sample.base_frame_id,
-        max_linear_mps=max_linear_mps,
-        max_angular_rad_s=max_angular_rad_s,
-        require_frame_ids=require_frame_ids,
-    )
+    if require_frames is not None:
+        require_frame_ids = require_frames
 
+    if max_linear_speed_mps is not None:
+        max_linear_mps = max_linear_speed_mps
 
-def check_wheel_odom_state(
-    state: WheelOdomState,
-    *,
-    max_linear_mps: float = DEFAULT_MAX_ODOM_LINEAR_SPEED_MPS,
-    max_angular_rad_s: float = DEFAULT_MAX_ODOM_ANGULAR_SPEED_RAD_S,
-    require_frame_ids: bool = True,
-) -> OdomSanityCheckResult:
-    if state.last_sample is None:
+    if max_angular_speed_rad_s is not None:
+        max_angular_rad_s = max_angular_speed_rad_s
+
+    if max_linear_mps <= 0.0:
+        raise ValueError("max_linear_mps must be > 0.0")
+
+    if max_angular_rad_s <= 0.0:
+        raise ValueError("max_angular_rad_s must be > 0.0")
+
+    linear_speed = math.hypot(float(twist.vx_mps), float(twist.vy_mps))
+    angular_speed = abs(float(twist.omega_rad_s))
+
+    if dt_s <= 0.0:
         return OdomSanityCheckResult(
             status=STATUS_ERROR,
             ok=False,
-            message="wheel odometry has no sample",
-            reasons=["WheelOdomState.last_sample is None"],
-        )
-
-    return check_wheel_odom_sample(
-        state.last_sample,
-        max_linear_mps=max_linear_mps,
-        max_angular_rad_s=max_angular_rad_s,
-        require_frame_ids=require_frame_ids,
-    )
-
-
-def check_pose_twist(
-    *,
-    pose: Pose2D,
-    twist: Twist2D,
-    dt_s: float,
-    odom_frame_id: str,
-    base_frame_id: str,
-    max_linear_mps: float = DEFAULT_MAX_ODOM_LINEAR_SPEED_MPS,
-    max_angular_rad_s: float = DEFAULT_MAX_ODOM_ANGULAR_SPEED_RAD_S,
-    require_frame_ids: bool = True,
-) -> OdomSanityCheckResult:
-    if max_linear_mps <= 0.0:
-        raise ValueError(f"max_linear_mps must be > 0.0, got {max_linear_mps}")
-
-    if max_angular_rad_s <= 0.0:
-        raise ValueError(
-            f"max_angular_rad_s must be > 0.0, got {max_angular_rad_s}"
+            message="odometry dt invalid",
+            reasons=["dt_s must be > 0.0"],
+            linear_speed_mps=linear_speed,
+            angular_speed_rad_s=angular_speed,
+            pose_finite=pose_is_finite(pose),
+            twist_finite=twist_is_finite(twist),
+            frame_ok=True,
+            dt_ok=False,
         )
 
     reasons: list[str] = []
-
     pose_finite = pose_is_finite(pose)
     twist_finite = twist_is_finite(twist)
 
@@ -139,167 +123,206 @@ def check_pose_twist(
     if not twist_finite:
         reasons.append("twist contains non-finite values")
 
-    dt_ok = math.isfinite(float(dt_s)) and float(dt_s) >= 0.0
-    if not dt_ok:
-        reasons.append(f"invalid dt_s={dt_s}")
-
     frame_ok = True
     if require_frame_ids:
-        frame_ok = _frame_ids_valid(odom_frame_id, base_frame_id)
-        if not frame_ok:
-            reasons.append(
-                f"invalid odom frames: odom_frame_id={odom_frame_id!r}, "
-                f"base_frame_id={base_frame_id!r}"
-            )
-
-    linear_speed, angular_speed = twist_magnitude(twist)
+        try:
+            require_frame_pair(odom_frame_id, base_frame_id)
+        except ValueError:
+            frame_ok = False
+            reasons.append("odom/base frame ids are invalid")
 
     if linear_speed > max_linear_mps:
         reasons.append(
-            f"linear speed too high: {linear_speed:.3f} m/s > {max_linear_mps:.3f} m/s"
+            f"linear speed too high: {linear_speed:.3f} > {max_linear_mps:.3f}"
         )
 
     if angular_speed > max_angular_rad_s:
         reasons.append(
-            "angular speed too high: "
-            f"{angular_speed:.3f} rad/s > {max_angular_rad_s:.3f} rad/s"
+            f"angular speed too high: {angular_speed:.3f} > {max_angular_rad_s:.3f}"
         )
 
-    if not pose_finite or not twist_finite or not dt_ok:
+    hard_error = (
+        not pose_finite
+        or not twist_finite
+    )
+
+    if hard_error:
         return OdomSanityCheckResult(
             status=STATUS_ERROR,
             ok=False,
-            message="odometry sanity check failed",
-            reasons=reasons,
+            message="odometry pose/twist invalid",
+            reasons=_unique_preserve_order(reasons),
             linear_speed_mps=linear_speed,
             angular_speed_rad_s=angular_speed,
             pose_finite=pose_finite,
             twist_finite=twist_finite,
             frame_ok=frame_ok,
-            dt_ok=dt_ok,
+            dt_ok=True,
         )
 
     if reasons:
         return OdomSanityCheckResult(
             status=STATUS_WARN,
             ok=True,
-            message="odometry usable with sanity notes",
-            reasons=reasons,
+            message="odometry pose/twist usable with notes",
+            reasons=_unique_preserve_order(reasons),
             linear_speed_mps=linear_speed,
             angular_speed_rad_s=angular_speed,
             pose_finite=pose_finite,
             twist_finite=twist_finite,
             frame_ok=frame_ok,
-            dt_ok=dt_ok,
+            dt_ok=True,
         )
 
     return OdomSanityCheckResult(
         status=STATUS_OK,
         ok=True,
-        message="odometry sanity check healthy",
+        message="odometry pose/twist healthy",
         reasons=[],
         linear_speed_mps=linear_speed,
         angular_speed_rad_s=angular_speed,
         pose_finite=pose_finite,
         twist_finite=twist_finite,
         frame_ok=frame_ok,
-        dt_ok=dt_ok,
+        dt_ok=True,
     )
+
+
+def check_wheel_odom_sample(
+    sample: WheelOdomSample,
+    **kwargs,
+) -> OdomSanityCheckResult:
+    pose_kwargs = _pose_twist_kwargs(kwargs)
+
+    return check_pose_twist(
+        sample.pose,
+        sample.twist,
+        dt_s=sample.dt_s,
+        odom_frame_id=sample.odom_frame_id,
+        base_frame_id=sample.base_frame_id,
+        **pose_kwargs,
+    )
+
+
+def check_wheel_odom_state(
+    state: WheelOdomState,
+    *,
+    stale_timeout_s: float = 0.5,
+    **kwargs,
+) -> OdomSanityCheckResult:
+    if state.last_sample is None:
+        return OdomSanityCheckResult(
+            status=STATUS_ERROR,
+            ok=False,
+            message="wheel odometry state has no sample",
+            reasons=["no sample available"],
+        )
+
+    if state.last_sample_age_s is not None and state.last_sample_age_s > stale_timeout_s:
+        return OdomSanityCheckResult(
+            status=STATUS_STALE,
+            ok=False,
+            message="wheel odometry sample stale",
+            reasons=[
+                f"sample stale: age_s={state.last_sample_age_s:.3f} "
+                f"> timeout_s={stale_timeout_s:.3f}"
+            ],
+        )
+
+    return check_wheel_odom_sample(state.last_sample, **kwargs)
 
 
 def check_odom_jump(
+    previous: WheelOdomSample | None = None,
+    current: WheelOdomSample | None = None,
     *,
-    previous_pose: Pose2D,
-    current_pose: Pose2D,
-    dt_s: float,
+    previous_pose: Pose2D | None = None,
+    current_pose: Pose2D | None = None,
+    dt_s: float | None = None,
     max_distance_jump_m: float = 0.50,
     max_yaw_jump_rad: float = 1.00,
 ) -> OdomJumpCheckResult:
-    if max_distance_jump_m < 0.0:
-        raise ValueError(
-            f"max_distance_jump_m must be >= 0.0, got {max_distance_jump_m}"
+    if max_distance_jump_m <= 0.0:
+        raise ValueError("max_distance_jump_m must be > 0.0")
+
+    if max_yaw_jump_rad <= 0.0:
+        raise ValueError("max_yaw_jump_rad must be > 0.0")
+
+    if previous is not None:
+        previous_pose = previous.pose
+
+    if current is not None:
+        current_pose = current.pose
+
+    if previous is not None and current is not None and dt_s is None:
+        dt_s = float(current.stamp_s) - float(previous.stamp_s)
+
+    if previous_pose is None or current_pose is None:
+        raise ValueError("previous/current sample or pose must be provided")
+
+    if dt_s is None:
+        raise ValueError("dt_s must be provided")
+
+    dt_s = float(dt_s)
+
+    if dt_s <= 0.0:
+        return OdomJumpCheckResult(
+            status=STATUS_ERROR,
+            ok=False,
+            message="odometry jump dt invalid",
+            reasons=["invalid dt_s: dt_s must be > 0.0"],
+            dt_s=dt_s,
         )
 
-    if max_yaw_jump_rad < 0.0:
-        raise ValueError(f"max_yaw_jump_rad must be >= 0.0, got {max_yaw_jump_rad}")
+    if not pose_is_finite(previous_pose) or not pose_is_finite(current_pose):
+        return OdomJumpCheckResult(
+            status=STATUS_ERROR,
+            ok=False,
+            message="odometry jump pose invalid",
+            reasons=["pose contains non-finite values"],
+            dt_s=dt_s,
+        )
+
+    distance_jump = distance_2d_m(previous_pose, current_pose)
+    yaw_jump = abs(shortest_angle_delta_rad(previous_pose.yaw_rad, current_pose.yaw_rad))
 
     reasons: list[str] = []
 
-    if not pose_is_finite(previous_pose):
-        reasons.append("previous pose contains non-finite values")
-
-    if not pose_is_finite(current_pose):
-        reasons.append("current pose contains non-finite values")
-
-    dt = float(dt_s)
-    if not math.isfinite(dt) or dt < 0.0:
-        reasons.append(f"invalid dt_s={dt_s}")
-
-    distance_jump = distance_2d_m(previous_pose, current_pose)
-    yaw_jump = abs(
-        shortest_angle_delta_rad(
-            previous_pose.yaw_rad,
-            current_pose.yaw_rad,
-        )
-    )
-
     if distance_jump > max_distance_jump_m:
         reasons.append(
-            f"distance jump too large: {distance_jump:.3f} m > "
-            f"{max_distance_jump_m:.3f} m"
+            f"distance jump too large: {distance_jump:.3f} > {max_distance_jump_m:.3f}"
         )
 
     if yaw_jump > max_yaw_jump_rad:
         reasons.append(
-            f"yaw jump too large: {yaw_jump:.3f} rad > {max_yaw_jump_rad:.3f} rad"
-        )
-
-    if any("non-finite" in reason or "invalid dt" in reason for reason in reasons):
-        return OdomJumpCheckResult(
-            status=STATUS_ERROR,
-            ok=False,
-            message="odometry jump check failed",
-            reasons=reasons,
-            distance_jump_m=distance_jump,
-            yaw_jump_rad=yaw_jump,
-            dt_s=dt,
-            max_distance_jump_m=max_distance_jump_m,
-            max_yaw_jump_rad=max_yaw_jump_rad,
+            f"yaw jump too large: {yaw_jump:.3f} > {max_yaw_jump_rad:.3f}"
         )
 
     if reasons:
         return OdomJumpCheckResult(
             status=STATUS_WARN,
             ok=True,
-            message="odometry jump detected",
-            reasons=reasons,
+            message="odometry jump usable with notes",
+            reasons=_unique_preserve_order(reasons),
             distance_jump_m=distance_jump,
             yaw_jump_rad=yaw_jump,
-            dt_s=dt,
-            max_distance_jump_m=max_distance_jump_m,
-            max_yaw_jump_rad=max_yaw_jump_rad,
+            dt_s=dt_s,
         )
 
     return OdomJumpCheckResult(
         status=STATUS_OK,
         ok=True,
-        message="odometry jump check healthy",
+        message="odometry jump healthy",
         reasons=[],
         distance_jump_m=distance_jump,
         yaw_jump_rad=yaw_jump,
-        dt_s=dt,
-        max_distance_jump_m=max_distance_jump_m,
-        max_yaw_jump_rad=max_yaw_jump_rad,
+        dt_s=dt_s,
     )
 
 
 def check_odom_sample_window(
     samples: Iterable[WheelOdomSample],
-    *,
-    max_linear_mps: float = DEFAULT_MAX_ODOM_LINEAR_SPEED_MPS,
-    max_angular_rad_s: float = DEFAULT_MAX_ODOM_ANGULAR_SPEED_RAD_S,
-    max_distance_jump_m: float = 0.50,
-    max_yaw_jump_rad: float = 1.00,
+    **kwargs,
 ) -> OdomSanityCheckResult:
     sample_list = list(samples)
 
@@ -311,54 +334,27 @@ def check_odom_sample_window(
             reasons=["sample list is empty"],
         )
 
+    pose_kwargs = _pose_twist_kwargs(kwargs)
+    jump_kwargs = _jump_kwargs(kwargs)
+
+    latest = check_wheel_odom_sample(sample_list[-1], **pose_kwargs)
+
+    if not latest.ok:
+        return latest
+
     reasons: list[str] = []
-    latest_result: OdomSanityCheckResult | None = None
 
     for sample in sample_list:
-        result = check_wheel_odom_sample(
-            sample,
-            max_linear_mps=max_linear_mps,
-            max_angular_rad_s=max_angular_rad_s,
-        )
-        latest_result = result
+        result = check_wheel_odom_sample(sample, **pose_kwargs)
+        if not result.ok:
+            return result
         reasons.extend(result.reasons)
 
-    for previous, current in zip(sample_list[:-1], sample_list[1:]):
-        jump_result = check_odom_jump(
-            previous_pose=previous.pose,
-            current_pose=current.pose,
-            dt_s=current.dt_s,
-            max_distance_jump_m=max_distance_jump_m,
-            max_yaw_jump_rad=max_yaw_jump_rad,
-        )
-        reasons.extend(jump_result.reasons)
-
-    if latest_result is None:
-        return OdomSanityCheckResult(
-            status=STATUS_ERROR,
-            ok=False,
-            message="no odometry samples evaluated",
-            reasons=["internal evaluation produced no result"],
-        )
+    for previous, current in zip(sample_list, sample_list[1:]):
+        jump = check_odom_jump(previous, current, **jump_kwargs)
+        reasons.extend(jump.reasons)
 
     unique_reasons = _unique_preserve_order(reasons)
-
-    if any(
-        "non-finite" in reason or "invalid dt" in reason
-        for reason in unique_reasons
-    ):
-        return OdomSanityCheckResult(
-            status=STATUS_ERROR,
-            ok=False,
-            message="odometry sample window failed",
-            reasons=unique_reasons,
-            linear_speed_mps=latest_result.linear_speed_mps,
-            angular_speed_rad_s=latest_result.angular_speed_rad_s,
-            pose_finite=latest_result.pose_finite,
-            twist_finite=latest_result.twist_finite,
-            frame_ok=latest_result.frame_ok,
-            dt_ok=latest_result.dt_ok,
-        )
 
     if unique_reasons:
         return OdomSanityCheckResult(
@@ -366,12 +362,12 @@ def check_odom_sample_window(
             ok=True,
             message="odometry sample window usable with notes",
             reasons=unique_reasons,
-            linear_speed_mps=latest_result.linear_speed_mps,
-            angular_speed_rad_s=latest_result.angular_speed_rad_s,
-            pose_finite=latest_result.pose_finite,
-            twist_finite=latest_result.twist_finite,
-            frame_ok=latest_result.frame_ok,
-            dt_ok=latest_result.dt_ok,
+            linear_speed_mps=latest.linear_speed_mps,
+            angular_speed_rad_s=latest.angular_speed_rad_s,
+            pose_finite=latest.pose_finite,
+            twist_finite=latest.twist_finite,
+            frame_ok=latest.frame_ok,
+            dt_ok=latest.dt_ok,
         )
 
     return OdomSanityCheckResult(
@@ -379,16 +375,16 @@ def check_odom_sample_window(
         ok=True,
         message="odometry sample window healthy",
         reasons=[],
-        linear_speed_mps=latest_result.linear_speed_mps,
-        angular_speed_rad_s=latest_result.angular_speed_rad_s,
-        pose_finite=latest_result.pose_finite,
-        twist_finite=latest_result.twist_finite,
-        frame_ok=latest_result.frame_ok,
-        dt_ok=latest_result.dt_ok,
+        linear_speed_mps=latest.linear_speed_mps,
+        angular_speed_rad_s=latest.angular_speed_rad_s,
+        pose_finite=latest.pose_finite,
+        twist_finite=latest.twist_finite,
+        frame_ok=latest.frame_ok,
+        dt_ok=latest.dt_ok,
     )
 
 
-def odom_pose_summary(pose: Pose2D) -> dict[str, float | bool]:
+def odom_pose_summary(pose: Pose2D) -> dict[str, object]:
     return {
         "x_m": float(pose.x_m),
         "y_m": float(pose.y_m),
@@ -397,15 +393,13 @@ def odom_pose_summary(pose: Pose2D) -> dict[str, float | bool]:
     }
 
 
-def odom_twist_summary(twist: Twist2D) -> dict[str, float | bool]:
-    linear_speed, angular_speed = twist_magnitude(twist)
-
+def odom_twist_summary(twist: Twist2D) -> dict[str, object]:
     return {
         "vx_mps": float(twist.vx_mps),
         "vy_mps": float(twist.vy_mps),
         "omega_rad_s": float(twist.omega_rad_s),
-        "linear_speed_mps": linear_speed,
-        "angular_speed_rad_s": angular_speed,
+        "linear_speed_mps": math.hypot(float(twist.vx_mps), float(twist.vy_mps)),
+        "angular_speed_rad_s": abs(float(twist.omega_rad_s)),
         "finite": twist_is_finite(twist),
     }
 
@@ -425,11 +419,34 @@ def odom_sample_summary(sample: WheelOdomSample) -> dict[str, object]:
     }
 
 
-def _frame_ids_valid(odom_frame_id: str, base_frame_id: str) -> bool:
-    odom = str(odom_frame_id).strip()
-    base = str(base_frame_id).strip()
+def _pose_twist_kwargs(kwargs: dict[str, object]) -> dict[str, object]:
+    allowed = {
+        "require_frame_ids",
+        "require_frames",
+        "max_linear_mps",
+        "max_angular_rad_s",
+        "max_linear_speed_mps",
+        "max_angular_speed_rad_s",
+    }
 
-    return bool(odom) and bool(base) and odom != base
+    return {
+        key: value
+        for key, value in kwargs.items()
+        if key in allowed
+    }
+
+
+def _jump_kwargs(kwargs: dict[str, object]) -> dict[str, object]:
+    allowed = {
+        "max_distance_jump_m",
+        "max_yaw_jump_rad",
+    }
+
+    return {
+        key: value
+        for key, value in kwargs.items()
+        if key in allowed
+    }
 
 
 def _unique_preserve_order(values: Iterable[str]) -> list[str]:
@@ -444,3 +461,17 @@ def _unique_preserve_order(values: Iterable[str]) -> list[str]:
         result.append(value)
 
     return result
+
+
+__all__ = [
+    "OdomSanityCheckResult",
+    "OdomJumpCheckResult",
+    "check_pose_twist",
+    "check_wheel_odom_sample",
+    "check_wheel_odom_state",
+    "check_odom_jump",
+    "check_odom_sample_window",
+    "odom_pose_summary",
+    "odom_twist_summary",
+    "odom_sample_summary",
+]

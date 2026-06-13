@@ -1,18 +1,15 @@
-"""Process wrapper for external RPLIDAR driver bringup.
-
-This is useful when we want `savo_lidar` to own the hardware launch while still
-using a proven ROS driver as the scan publisher.
-"""
+# -*- coding: utf-8 -*-
+"""External RPLIDAR process wrapper."""
 
 from __future__ import annotations
 
 import subprocess
 import time
-from dataclasses import dataclass
-from typing import Sequence
+from dataclasses import asdict, dataclass
+from typing import Any, Sequence
 
 
-@dataclass
+@dataclass(frozen=True)
 class RplidarProcessState:
     running: bool
     returncode: int | None
@@ -20,20 +17,16 @@ class RplidarProcessState:
     uptime_s: float
     command: tuple[str, ...]
 
-    def to_dict(self) -> dict[str, object]:
-        return {
-            "running": self.running,
-            "returncode": self.returncode,
-            "pid": self.pid,
-            "uptime_s": self.uptime_s,
-            "command": list(self.command),
-        }
+    def to_dict(self) -> dict[str, Any]:
+        data = asdict(self)
+        data["command"] = list(self.command)
+        return data
 
 
 class RplidarProcess:
     def __init__(self, command: Sequence[str]) -> None:
         if not command:
-            raise ValueError("RPLIDAR process command cannot be empty.")
+            raise ValueError("RPLIDAR process command cannot be empty")
 
         self.command = tuple(str(part) for part in command)
         self._process: subprocess.Popen[str] | None = None
@@ -49,6 +42,13 @@ class RplidarProcess:
             return None
 
         return self._process.pid
+
+    @property
+    def returncode(self) -> int | None:
+        if self._process is None:
+            return None
+
+        return self._process.poll()
 
     def start(self) -> None:
         if self.running:
@@ -66,6 +66,8 @@ class RplidarProcess:
         if self._process is None:
             return
 
+        timeout_s = max(0.1, float(timeout_s))
+
         if self.running:
             self._process.terminate()
 
@@ -79,20 +81,20 @@ class RplidarProcess:
         self._started_s = None
 
     def state(self) -> RplidarProcessState:
-        now_s = time.monotonic()
-
         uptime_s = 0.0
         if self._started_s is not None:
-            uptime_s = max(0.0, now_s - self._started_s)
-
-        returncode = None
-        if self._process is not None:
-            returncode = self._process.poll()
+            uptime_s = max(0.0, time.monotonic() - self._started_s)
 
         return RplidarProcessState(
             running=self.running,
-            returncode=returncode,
+            returncode=self.returncode,
             pid=self.pid,
             uptime_s=uptime_s,
             command=self.command,
         )
+
+
+__all__ = [
+    "RplidarProcess",
+    "RplidarProcessState",
+]

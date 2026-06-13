@@ -1,8 +1,5 @@
-"""RPLIDAR A1 driver wrapper.
-
-This module keeps direct hardware access behind a small interface so ROS nodes
-do not depend on the third-party driver API.
-"""
+# -*- coding: utf-8 -*-
+"""RPLIDAR A1 Python driver wrapper."""
 
 from __future__ import annotations
 
@@ -11,7 +8,12 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
-from savo_lidar.constants import DEFAULT_BAUDRATE, DEFAULT_SERIAL_PORT
+from savo_lidar.constants import (
+    DEFAULT_BAUDRATE,
+    DEFAULT_MAX_RANGE_M,
+    DEFAULT_MIN_RANGE_M,
+    DEFAULT_SERIAL_PORT,
+)
 from savo_lidar.drivers.lidar_exceptions import (
     LidarConnectionError,
     LidarNotReadyError,
@@ -38,8 +40,8 @@ class RplidarA1Driver:
         *,
         serial_port: str = DEFAULT_SERIAL_PORT,
         baudrate: int = DEFAULT_BAUDRATE,
-        min_range_m: float = 0.15,
-        max_range_m: float = 12.0,
+        min_range_m: float = DEFAULT_MIN_RANGE_M,
+        max_range_m: float = DEFAULT_MAX_RANGE_M,
         angle_compensate: bool = True,
         allow_port_fallback: bool = True,
     ) -> None:
@@ -75,12 +77,15 @@ class RplidarA1Driver:
             from rplidar import RPLidar
         except ImportError as exc:
             raise LidarConnectionError(
-                "Python package 'rplidar' is not installed. "
-                "Install the RPLIDAR driver dependency on the Pi before using backend=real."
+                "Python package 'rplidar' is not installed. Install it on the Pi for backend=real."
             ) from exc
 
         try:
             self._lidar = RPLidar(port, baudrate=self.baudrate)
+
+            if hasattr(self._lidar, "start_motor"):
+                self._lidar.start_motor()
+
             self._scan_iter = self._lidar.iter_scans()
             self.serial_port = port
             self._running = True
@@ -118,12 +123,12 @@ class RplidarA1Driver:
 
     def read_scan(self) -> RplidarScan:
         if not self._running or self._scan_iter is None:
-            raise LidarNotReadyError("RPLIDAR driver is not running.")
+            raise LidarNotReadyError("RPLIDAR driver is not running")
 
         try:
             raw_scan = next(self._scan_iter)
         except StopIteration as exc:
-            raise LidarReadError("RPLIDAR scan iterator stopped unexpectedly.") from exc
+            raise LidarReadError("RPLIDAR scan iterator stopped") from exc
         except Exception as exc:
             raise LidarReadError(f"Failed to read RPLIDAR scan: {exc}") from exc
 
@@ -167,17 +172,16 @@ class RplidarA1Driver:
                 min_range_m=self.min_range_m,
                 max_range_m=self.max_range_m,
             )
-            point_count = len(ranges)
         else:
             ranges, intensities = _ordered_scan_points(
                 raw_scan,
                 min_range_m=self.min_range_m,
                 max_range_m=self.max_range_m,
             )
-            point_count = len(ranges)
 
+        point_count = len(ranges)
         if point_count <= 0:
-            raise LidarReadError("RPLIDAR returned an empty scan.")
+            raise LidarReadError("RPLIDAR returned an empty scan")
 
         angle_min_rad = -math.pi
         angle_max_rad = math.pi
@@ -209,11 +213,13 @@ def _angle_compensated_scan(
         index = int(round(float(angle_deg))) % point_count
         distance_m = float(distance_mm) / 1000.0
 
-        if _valid_distance(distance_m, min_range_m, max_range_m):
-            current = ranges[index]
-            if not math.isfinite(current) or distance_m < current:
-                ranges[index] = distance_m
-                intensities[index] = float(quality)
+        if not _valid_distance(distance_m, min_range_m, max_range_m):
+            continue
+
+        current = ranges[index]
+        if not math.isfinite(current) or distance_m < current:
+            ranges[index] = distance_m
+            intensities[index] = float(quality)
 
     return ranges, intensities
 
@@ -244,3 +250,9 @@ def _ordered_scan_points(
 
 def _valid_distance(distance_m: float, min_range_m: float, max_range_m: float) -> bool:
     return math.isfinite(distance_m) and min_range_m <= distance_m <= max_range_m
+
+
+__all__ = [
+    "RplidarA1Driver",
+    "RplidarScan",
+]
