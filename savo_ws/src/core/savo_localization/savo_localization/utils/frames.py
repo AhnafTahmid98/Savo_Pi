@@ -1,100 +1,122 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""Frame-id helpers for localization nodes."""
+"""Frame-name helpers for Robot Savo localization. No ROS imports."""
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
-from typing import Optional
 
-
-MAP: str = "map"
-ODOM: str = "odom"
-BASE_LINK: str = "base_link"
-BASE_FOOTPRINT: str = "base_footprint"
-
-IMU_LINK: str = "imu_link"
-
-WHEEL_ODOM_CHILD: str = "wheel_odom"
+from savo_localization.constants import (
+    FRAME_BASE_LINK,
+    FRAME_IMU,
+    FRAME_ODOM,
+    FRAME_WHEEL_ODOM,
+)
 
 
 @dataclass(frozen=True)
-class FrameIds:
-    """Frame IDs used by a localization node."""
-    map: str = MAP
-    odom: str = ODOM
-    base: str = BASE_LINK
-    base_footprint: str = BASE_FOOTPRINT
-    imu: str = IMU_LINK
+class LocalizationFrames:
+    odom: str = FRAME_ODOM
+    base_link: str = FRAME_BASE_LINK
+    imu: str = FRAME_IMU
+    wheel_odom: str = FRAME_WHEEL_ODOM
 
-
-# Practical ROS frame-id subset: no slash prefix, whitespace, or punctuation.
-_FRAME_RE = re.compile(r"^[A-Za-z0-9_]+$")
+    def to_dict(self) -> dict[str, str]:
+        return {
+            "odom": self.odom,
+            "base_link": self.base_link,
+            "imu": self.imu,
+            "wheel_odom": self.wheel_odom,
+        }
 
 
 def normalize_frame_id(frame_id: str) -> str:
-    """Normalize whitespace and a leading slash from a frame id."""
-    if frame_id is None:
-        return ""
-    fid = str(frame_id).strip()
-    if fid.startswith("/"):
-        fid = fid[1:]
-    return fid
+    frame_id = str(frame_id).strip().lstrip("/")
+
+    if not frame_id:
+        raise ValueError("Frame id cannot be empty.")
+
+    if " " in frame_id:
+        raise ValueError(f"Frame id cannot contain spaces: {frame_id!r}")
+
+    return frame_id
 
 
-def is_valid_frame_id(frame_id: str) -> bool:
-    """Return True when a frame id fits the project TF naming rules."""
-    fid = normalize_frame_id(frame_id)
-    if not fid:
-        return False
-    if " " in fid or "\t" in fid or "\n" in fid:
-        return False
-    return _FRAME_RE.match(fid) is not None
-
-
-def require_valid_frame_id(frame_id: str, name: str = "frame_id") -> str:
-    """Validate and return a normalized frame id."""
-    fid = normalize_frame_id(frame_id)
-    if not is_valid_frame_id(fid):
-        raise ValueError(f"Invalid {name}: '{frame_id}' (normalized: '{fid}')")
-    return fid
-
-
-def validate_frames(frames: FrameIds) -> FrameIds:
-    """
-    Validate all fields in a FrameIds object and return a normalized copy.
-    """
-    return FrameIds(
-        map=require_valid_frame_id(frames.map, "map frame"),
-        odom=require_valid_frame_id(frames.odom, "odom frame"),
-        base=require_valid_frame_id(frames.base, "base frame"),
-        base_footprint=require_valid_frame_id(frames.base_footprint, "base_footprint frame"),
-        imu=require_valid_frame_id(frames.imu, "imu frame"),
+def make_localization_frames(
+    *,
+    odom: str = FRAME_ODOM,
+    base_link: str = FRAME_BASE_LINK,
+    imu: str = FRAME_IMU,
+    wheel_odom: str = FRAME_WHEEL_ODOM,
+) -> LocalizationFrames:
+    frames = LocalizationFrames(
+        odom=normalize_frame_id(odom),
+        base_link=normalize_frame_id(base_link),
+        imu=normalize_frame_id(imu),
+        wheel_odom=normalize_frame_id(wheel_odom),
     )
 
-
-# ---------------------------
-# Convenience setters
-# ---------------------------
-
-def set_header_frame(msg: object, frame_id: str) -> None:
-    """
-    Set msg.header.frame_id safely (normalized + validated).
-    """
-    fid = require_valid_frame_id(frame_id, "header.frame_id")
-    header = getattr(msg, "header", None)
-    if header is None:
-        raise AttributeError("Message has no 'header' attribute")
-    setattr(header, "frame_id", fid)
+    validate_localization_frames(frames)
+    return frames
 
 
-def set_child_frame(odom_msg: object, child_frame_id: str) -> None:
-    """
-    Set nav_msgs/Odometry.child_frame_id safely (normalized + validated).
-    """
-    fid = require_valid_frame_id(child_frame_id, "child_frame_id")
-    if not hasattr(odom_msg, "child_frame_id"):
-        raise AttributeError("Object has no 'child_frame_id' attribute")
-    setattr(odom_msg, "child_frame_id", fid)
+def validate_localization_frames(frames: LocalizationFrames) -> None:
+    values = [
+        frames.odom,
+        frames.base_link,
+        frames.imu,
+        frames.wheel_odom,
+    ]
+
+    normalized = [normalize_frame_id(value) for value in values]
+
+    if len(set(normalized)) != len(normalized):
+        raise ValueError("Localization frame contract contains duplicate frame ids.")
+
+
+def is_expected_imu_frame(frame_id: str, *, expected: str = FRAME_IMU) -> bool:
+    return normalize_frame_id(frame_id) == normalize_frame_id(expected)
+
+
+def is_expected_odom_frame(frame_id: str, *, expected: str = FRAME_ODOM) -> bool:
+    return normalize_frame_id(frame_id) == normalize_frame_id(expected)
+
+
+def is_expected_base_frame(frame_id: str, *, expected: str = FRAME_BASE_LINK) -> bool:
+    return normalize_frame_id(frame_id) == normalize_frame_id(expected)
+
+
+def frame_pair(parent: str, child: str) -> tuple[str, str]:
+    return normalize_frame_id(parent), normalize_frame_id(child)
+
+
+def odom_to_base_pair(
+    *,
+    odom: str = FRAME_ODOM,
+    base_link: str = FRAME_BASE_LINK,
+) -> tuple[str, str]:
+    return frame_pair(odom, base_link)
+
+
+def base_to_imu_pair(
+    *,
+    base_link: str = FRAME_BASE_LINK,
+    imu: str = FRAME_IMU,
+) -> tuple[str, str]:
+    return frame_pair(base_link, imu)
+
+
+def require_expected_frame(
+    actual: str,
+    expected: str,
+    *,
+    label: str = "frame_id",
+) -> None:
+    actual_norm = normalize_frame_id(actual)
+    expected_norm = normalize_frame_id(expected)
+
+    if actual_norm != expected_norm:
+        raise ValueError(
+            f"{label} mismatch: expected {expected_norm!r}, got {actual_norm!r}"
+        )

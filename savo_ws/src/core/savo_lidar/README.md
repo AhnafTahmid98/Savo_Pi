@@ -30,8 +30,7 @@ It does not own SLAM, Nav2, robot movement, or final safety-stop decisions. Mapp
 ## Hardware ownership
 
 | Hardware | Owner |
-
-|---|---|
+| --- | --- |
 | RPLIDAR A1 | `savo_lidar` |
 | Freenove motor board | `savo_base` |
 | Intel RealSense | `savo_realsense` |
@@ -43,8 +42,7 @@ It does not own SLAM, Nav2, robot movement, or final safety-stop decisions. Mapp
 Published by this package:
 
 | Topic | Type | Purpose |
-
-|---|---|---|
+| --- | --- | --- |
 | `/scan` | `sensor_msgs/msg/LaserScan` | Main LiDAR scan output |
 | `/scan/filtered` | `sensor_msgs/msg/LaserScan` | Optional filtered scan output |
 | `/savo_lidar/state` | `std_msgs/msg/String` | Driver state as compact JSON |
@@ -56,8 +54,7 @@ Published by this package:
 Consumed by downstream packages:
 
 | Package | Uses |
-
-|---|---|
+| --- | --- |
 | `savo_mapping` | `/scan` for SLAM and map creation |
 | `savo_nav` | `/scan` for Nav2 costmaps and obstacle awareness |
 | `savo_perception` | Optional LiDAR diagnostics or sector awareness |
@@ -96,8 +93,7 @@ config/profiles/
 Available profiles:
 
 | Profile | Purpose |
-
-|---|---|
+| --- | --- |
 | `dryrun_sim.yaml` | Safe PC test with synthetic scan data |
 | `bench_test.yaml` | Real RPLIDAR hardware bench test |
 | `real_rplidar_a1.yaml` | Normal robot runtime profile |
