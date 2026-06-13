@@ -91,40 +91,24 @@ install(FILES
 # Testing / Lint
 # -----------------------------------------------------------------------------
 if(BUILD_TESTING)
-  find_package(ament_lint_auto REQUIRED)
-  ament_lint_auto_find_test_dependencies()
-
-  # Python tests via pytest (works with ament_cmake + ament_python hybrid)
+  find_package(ament_cmake_flake8 REQUIRED)
   find_package(ament_cmake_pytest REQUIRED)
 
-  # Add tests only if files exist (safe while scaffolding)
-  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test/test_mecanum_mix.py")
-    ament_add_pytest_test(test_mecanum_mix test/test_mecanum_mix.py)
-  endif()
+  ament_flake8(CONFIG_FILE ${CMAKE_CURRENT_SOURCE_DIR}/setup.cfg)
 
-  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test/test_wheel_command.py")
-    ament_add_pytest_test(test_wheel_command test/test_wheel_command.py)
-  endif()
+  function(add_pytest_if_exists test_name test_path)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${test_path}")
+      ament_add_pytest_test(${test_name} ${test_path})
+    endif()
+  endfunction()
 
-  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test/test_clamp_and_scaling.py")
-    ament_add_pytest_test(test_clamp_and_scaling test/test_clamp_and_scaling.py)
-  endif()
-
-  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test/test_timeout_watchdog_logic.py")
-    ament_add_pytest_test(test_timeout_watchdog_logic test/test_timeout_watchdog_logic.py)
-  endif()
-
-  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test/test_topic_names.py")
-    ament_add_pytest_test(test_topic_names test/test_topic_names.py)
-  endif()
-
-  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test/test_param_loader.py")
-    ament_add_pytest_test(test_param_loader test/test_param_loader.py)
-  endif()
-
-  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test/test_driver_dryrun.py")
-    ament_add_pytest_test(test_driver_dryrun test/test_driver_dryrun.py)
-  endif()
+  add_pytest_if_exists(test_mecanum_mix test/test_mecanum_mix.py)
+  add_pytest_if_exists(test_wheel_command test/test_wheel_command.py)
+  add_pytest_if_exists(test_clamp_and_scaling test/test_clamp_and_scaling.py)
+  add_pytest_if_exists(test_timeout_watchdog_logic test/test_timeout_watchdog_logic.py)
+  add_pytest_if_exists(test_topic_names test/test_topic_names.py)
+  add_pytest_if_exists(test_param_loader test/test_param_loader.py)
+  add_pytest_if_exists(test_driver_dryrun test/test_driver_dryrun.py)
 endif()
 
 # -----------------------------------------------------------------------------

@@ -9,7 +9,7 @@ import json
 import math
 import time
 import traceback
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 import rclpy

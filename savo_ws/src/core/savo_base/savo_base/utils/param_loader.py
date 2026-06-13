@@ -5,8 +5,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, asdict
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple, Union
+from dataclasses import dataclass, field
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Union
 
 
 # =============================================================================

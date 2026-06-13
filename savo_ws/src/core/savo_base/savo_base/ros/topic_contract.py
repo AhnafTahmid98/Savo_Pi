@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, asdict
-from typing import Dict, Iterable, List, Optional, Tuple, Type
+from typing import Dict, List, Tuple, Type
 
 from geometry_msgs.msg import Twist
 from std_msgs.msg import Bool, String

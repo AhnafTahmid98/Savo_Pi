@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from typing import Iterable, Sequence, Tuple, TypeVar
+from typing import Iterable, Tuple, TypeVar
 
 Number = TypeVar("Number", int, float)
 

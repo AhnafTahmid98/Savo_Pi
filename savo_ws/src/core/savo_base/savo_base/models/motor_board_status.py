@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, Any, Tuple, Optional
+from typing import Any, Dict, Tuple
 import math
 import time
 

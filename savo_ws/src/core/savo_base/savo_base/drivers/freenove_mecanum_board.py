@@ -21,7 +21,7 @@ import time
 from dataclasses import dataclass
 from typing import Dict, Tuple
 
-from .pca9685_driver import PCA9685Config, PCA9685Driver, create_from_config
+from .pca9685_driver import PCA9685Config, create_from_config
 
 
 # =============================================================================

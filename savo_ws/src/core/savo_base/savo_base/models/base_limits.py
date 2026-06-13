@@ -5,8 +5,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict
-from typing import Dict, Tuple, Optional
+from dataclasses import dataclass
+from typing import Dict, Tuple
 import math
 
 

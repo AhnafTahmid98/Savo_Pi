@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, asdict
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from rclpy.node import Node
 

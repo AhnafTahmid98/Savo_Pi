@@ -329,7 +329,7 @@ def print_bus_report(
         hit = result.hits.get(addr)
         method = hit.method if hit else "unknown"
         tag = "REQUIRED" if addr in required_set else ("OPTIONAL" if addr in optional_set else "INFO")
-        print(f"  [OK] { _fmt_addr(addr) }  {expected.get(addr, 'Unknown')}  ({tag}, via {method})")
+        print(f"  [OK] {_fmt_addr(addr)}  {expected.get(addr, 'Unknown')}  ({tag}, via {method})")
     if not any_found:
         print("  (none of the expected addresses were detected)")
 
@@ -337,7 +337,7 @@ def print_bus_report(
     if missing:
         for addr in _sorted_addrs(missing):
             tag = "REQUIRED" if addr in required_set else ("OPTIONAL" if addr in optional_set else "INFO")
-            print(f"  [MISS] { _fmt_addr(addr) }  {expected.get(addr, 'Unknown')}  ({tag})")
+            print(f"  [MISS] {_fmt_addr(addr)}  {expected.get(addr, 'Unknown')}  ({tag})")
     else:
         print("  none")
 
@@ -471,7 +471,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     print("Robot SAVO — I2C Board Check")
     print("----------------------------")
     print(f"Primary bus: {primary_bus}")
-    print(f"SMBus probe: smbus2 -> smbus -> i2cdetect fallback")
+    print("SMBus probe: smbus2 -> smbus -> i2cdetect fallback")
     if include_bus0:
         print("Bus 0 check: enabled (Robot Savo FL ToF default)")
 

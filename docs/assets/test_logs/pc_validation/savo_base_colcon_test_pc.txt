@@ -1,0 +1,278 @@
+Robot Savo - savo_base PC validation
+Date: Sat Jun 13 11:19:47 AM EEST 2026
+Host: ahnaf-tahmid-B760M-PG-SONIC-WiFi
+Command: colcon test --packages-select savo_base --event-handlers console_direct+
+------------------------------------------------------------
+Starting >>> savo_base
+UpdateCTestConfiguration  from :/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/CTestConfiguration.ini
+Parse Config file:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/CTestConfiguration.ini
+   Site: ahnaf-tahmid-B760M-PG-SONIC-WiFi
+   Build name: (empty)
+ Add coverage exclude regular expressions.
+Create new tag: 20260613-0819 - Experimental
+UpdateCTestConfiguration  from :/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/CTestConfiguration.ini
+Parse Config file:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/CTestConfiguration.ini
+Test project /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base
+Constructing a list of tests
+Done constructing a list of tests
+Updating test list for fixtures
+Added 0 tests to meet fixture requirements
+Checking test dependency graph...
+Checking test dependency graph end
+test 1
+    Start 1: flake8
+
+1: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/flake8.xunit.xml" "--package-name" "savo_base" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/ament_flake8/flake8.txt" "--command" "/opt/ros/jazzy/bin/ament_flake8" "--xunit-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/flake8.xunit.xml" "--config" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_base/setup.cfg"
+1: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_base
+1: Test timeout computed to be: 60
+1: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_base':
+1:  - /opt/ros/jazzy/bin/ament_flake8 --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/flake8.xunit.xml --config /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_base/setup.cfg
+1: 
+1: 70 files checked
+1: No problems found
+1: 
+1: Checked files:
+1: 
+1: * ./setup.py
+1: * ./savo_base/constants.py
+1: * ./savo_base/__init__.py
+1: * ./savo_base/version.py
+1: * ./savo_base/nodes/base_watchdog_node.py
+1: * ./savo_base/nodes/base_diag_runner_node.py
+1: * ./savo_base/nodes/base_driver_node.py
+1: * ./savo_base/nodes/__init__.py
+1: * ./savo_base/nodes/base_heartbeat_node.py
+1: * ./savo_base/nodes/base_state_publisher_node.py
+1: * ./savo_base/diagnostics/board_i2c_check.py
+1: * ./savo_base/diagnostics/report_formatter.py
+1: * ./savo_base/diagnostics/emergency_stop_check.py
+1: * ./savo_base/diagnostics/pwm_sweep_check.py
+1: * ./savo_base/diagnostics/__init__.py
+1: * ./savo_base/diagnostics/wheel_direction_check.py
+1: * ./savo_base/safety/watchdog_policy.py
+1: * ./savo_base/safety/timeout_watchdog.py
+1: * ./savo_base/safety/estop_latch.py
+1: * ./savo_base/safety/command_guard.py
+1: * ./savo_base/safety/stale_command_policy.py
+1: * ./savo_base/safety/__init__.py
+1: * ./savo_base/models/base_limits.py
+1: * ./savo_base/models/wheel_command.py
+1: * ./savo_base/models/__init__.py
+1: * ./savo_base/models/watchdog_state.py
+1: * ./savo_base/models/base_state.py
+1: * ./savo_base/models/motor_board_status.py
+1: * ./savo_base/kinematics/scaling.py
+1: * ./savo_base/kinematics/conventions.py
+1: * ./savo_base/kinematics/mecanum.py
+1: * ./savo_base/kinematics/__init__.py
+1: * ./savo_base/ros/adapters.py
+1: * ./savo_base/ros/qos_profiles.py
+1: * ./savo_base/ros/topic_contract.py
+1: * ./savo_base/ros/params.py
+1: * ./savo_base/ros/__init__.py
+1: * ./savo_base/utils/topic_names.py
+1: * ./savo_base/utils/param_loader.py
+1: * ./savo_base/utils/ratekeeper.py
+1: * ./savo_base/utils/logging.py
+1: * ./savo_base/utils/__init__.py
+1: * ./savo_base/utils/timing.py
+1: * ./savo_base/utils/diagnostics.py
+1: * ./savo_base/utils/qos.py
+1: * ./savo_base/utils/clamp.py
+1: * ./savo_base/drivers/freenove_mecanum_board.py
+1: * ./savo_base/drivers/board_exceptions.py
+1: * ./savo_base/drivers/dryrun_motor_board.py
+1: * ./savo_base/drivers/pca9685_driver.py
+1: * ./savo_base/drivers/__init__.py
+1: * ./savo_base/drivers/board_factory.py
+1: * ./test/test_mecanum_mix.py
+1: * ./test/test_wheel_command.py
+1: * ./test/test_topic_names.py
+1: * ./test/test_param_loader.py
+1: * ./test/test_driver_dryrun.py
+1: * ./test/test_clamp_and_scaling.py
+1: * ./test/test_timeout_watchdog_logic.py
+1: * ./scripts/base_smoke_test_cli.py
+1: * ./scripts/dump_effective_params.py
+1: * ./scripts/poke_test_cli.py
+1: * ./scripts/teleop_letters_cli.py
+1: * ./launch/base_safe_idle.launch.py
+1: * ./launch/base_diag_wheels.launch.py
+1: * ./launch/base_diag_board.launch.py
+1: * ./launch/base_teleop_test.launch.py
+1: * ./launch/base_bringup.launch.py
+1: * ./launch/base_hw_only.launch.py
+1: * ./launch/base_dryrun_test.launch.py
+1: -- run_test.py: return code 0
+1: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/flake8.xunit.xml'
+1/8 Test #1: flake8 ...........................   Passed    0.73 sec
+test 2
+    Start 2: test_mecanum_mix
+
+2: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_mecanum_mix.xunit.xml" "--package-name" "savo_base" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/ament_cmake_pytest/test_mecanum_mix.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_base/test/test_mecanum_mix.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/ament_cmake_pytest/test_mecanum_mix/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_mecanum_mix.xunit.xml" "--junit-prefix=savo_base"
+2: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base
+2: Test timeout computed to be: 60
+2: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base':
+2:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_base/test/test_mecanum_mix.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/ament_cmake_pytest/test_mecanum_mix/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_mecanum_mix.xunit.xml --junit-prefix=savo_base
+2: ============================= test session starts ==============================
+2: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+2: cachedir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/ament_cmake_pytest/test_mecanum_mix/.cache
+2: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_base
+2: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.10, ament-copyright-0.17.5, launch-testing-ros-0.26.11, colcon-core-0.20.1, cov-4.1.0
+2: collected 2 items
+2: 
+2: ../../src/core/savo_base/test/test_mecanum_mix.py ..                     [100%]
+2: 
+2: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_mecanum_mix.xunit.xml -
+2: ============================== 2 passed in 0.02s ===============================
+2: -- run_test.py: return code 0
+2: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_mecanum_mix.xunit.xml'
+2/8 Test #2: test_mecanum_mix .................   Passed    0.29 sec
+test 3
+    Start 3: test_wheel_command
+
+3: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_wheel_command.xunit.xml" "--package-name" "savo_base" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/ament_cmake_pytest/test_wheel_command.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_base/test/test_wheel_command.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/ament_cmake_pytest/test_wheel_command/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_wheel_command.xunit.xml" "--junit-prefix=savo_base"
+3: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base
+3: Test timeout computed to be: 60
+3: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base':
+3:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_base/test/test_wheel_command.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/ament_cmake_pytest/test_wheel_command/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_wheel_command.xunit.xml --junit-prefix=savo_base
+3: ============================= test session starts ==============================
+3: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+3: cachedir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/ament_cmake_pytest/test_wheel_command/.cache
+3: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_base
+3: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.10, ament-copyright-0.17.5, launch-testing-ros-0.26.11, colcon-core-0.20.1, cov-4.1.0
+3: collected 1 item
+3: 
+3: ../../src/core/savo_base/test/test_wheel_command.py .                    [100%]
+3: 
+3: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_wheel_command.xunit.xml -
+3: ============================== 1 passed in 0.02s ===============================
+3: -- run_test.py: return code 0
+3: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_wheel_command.xunit.xml'
+3/8 Test #3: test_wheel_command ...............   Passed    0.29 sec
+test 4
+    Start 4: test_clamp_and_scaling
+
+4: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_clamp_and_scaling.xunit.xml" "--package-name" "savo_base" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/ament_cmake_pytest/test_clamp_and_scaling.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_base/test/test_clamp_and_scaling.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/ament_cmake_pytest/test_clamp_and_scaling/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_clamp_and_scaling.xunit.xml" "--junit-prefix=savo_base"
+4: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base
+4: Test timeout computed to be: 60
+4: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base':
+4:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_base/test/test_clamp_and_scaling.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/ament_cmake_pytest/test_clamp_and_scaling/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_clamp_and_scaling.xunit.xml --junit-prefix=savo_base
+4: ============================= test session starts ==============================
+4: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+4: cachedir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/ament_cmake_pytest/test_clamp_and_scaling/.cache
+4: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_base
+4: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.10, ament-copyright-0.17.5, launch-testing-ros-0.26.11, colcon-core-0.20.1, cov-4.1.0
+4: collected 2 items
+4: 
+4: ../../src/core/savo_base/test/test_clamp_and_scaling.py ..               [100%]
+4: 
+4: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_clamp_and_scaling.xunit.xml -
+4: ============================== 2 passed in 0.02s ===============================
+4: -- run_test.py: return code 0
+4: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_clamp_and_scaling.xunit.xml'
+4/8 Test #4: test_clamp_and_scaling ...........   Passed    0.29 sec
+test 5
+    Start 5: test_timeout_watchdog_logic
+
+5: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_timeout_watchdog_logic.xunit.xml" "--package-name" "savo_base" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/ament_cmake_pytest/test_timeout_watchdog_logic.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_base/test/test_timeout_watchdog_logic.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/ament_cmake_pytest/test_timeout_watchdog_logic/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_timeout_watchdog_logic.xunit.xml" "--junit-prefix=savo_base"
+5: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base
+5: Test timeout computed to be: 60
+5: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base':
+5:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_base/test/test_timeout_watchdog_logic.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/ament_cmake_pytest/test_timeout_watchdog_logic/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_timeout_watchdog_logic.xunit.xml --junit-prefix=savo_base
+5: ============================= test session starts ==============================
+5: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+5: cachedir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/ament_cmake_pytest/test_timeout_watchdog_logic/.cache
+5: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_base
+5: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.10, ament-copyright-0.17.5, launch-testing-ros-0.26.11, colcon-core-0.20.1, cov-4.1.0
+5: collected 1 item
+5: 
+5: ../../src/core/savo_base/test/test_timeout_watchdog_logic.py .           [100%]
+5: 
+5: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_timeout_watchdog_logic.xunit.xml -
+5: ============================== 1 passed in 0.01s ===============================
+5: -- run_test.py: return code 0
+5: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_timeout_watchdog_logic.xunit.xml'
+5/8 Test #5: test_timeout_watchdog_logic ......   Passed    0.28 sec
+test 6
+    Start 6: test_topic_names
+
+6: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_topic_names.xunit.xml" "--package-name" "savo_base" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/ament_cmake_pytest/test_topic_names.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_base/test/test_topic_names.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/ament_cmake_pytest/test_topic_names/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_topic_names.xunit.xml" "--junit-prefix=savo_base"
+6: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base
+6: Test timeout computed to be: 60
+6: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base':
+6:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_base/test/test_topic_names.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/ament_cmake_pytest/test_topic_names/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_topic_names.xunit.xml --junit-prefix=savo_base
+6: ============================= test session starts ==============================
+6: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+6: cachedir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/ament_cmake_pytest/test_topic_names/.cache
+6: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_base
+6: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.10, ament-copyright-0.17.5, launch-testing-ros-0.26.11, colcon-core-0.20.1, cov-4.1.0
+6: collected 1 item
+6: 
+6: ../../src/core/savo_base/test/test_topic_names.py .                      [100%]
+6: 
+6: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_topic_names.xunit.xml -
+6: ============================== 1 passed in 0.01s ===============================
+6: -- run_test.py: return code 0
+6: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_topic_names.xunit.xml'
+6/8 Test #6: test_topic_names .................   Passed    0.27 sec
+test 7
+    Start 7: test_param_loader
+
+7: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_param_loader.xunit.xml" "--package-name" "savo_base" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/ament_cmake_pytest/test_param_loader.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_base/test/test_param_loader.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/ament_cmake_pytest/test_param_loader/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_param_loader.xunit.xml" "--junit-prefix=savo_base"
+7: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base
+7: Test timeout computed to be: 60
+7: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base':
+7:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_base/test/test_param_loader.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/ament_cmake_pytest/test_param_loader/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_param_loader.xunit.xml --junit-prefix=savo_base
+7: ============================= test session starts ==============================
+7: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+7: cachedir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/ament_cmake_pytest/test_param_loader/.cache
+7: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_base
+7: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.10, ament-copyright-0.17.5, launch-testing-ros-0.26.11, colcon-core-0.20.1, cov-4.1.0
+7: collected 1 item
+7: 
+7: ../../src/core/savo_base/test/test_param_loader.py .                     [100%]
+7: 
+7: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_param_loader.xunit.xml -
+7: ============================== 1 passed in 0.01s ===============================
+7: -- run_test.py: return code 0
+7: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_param_loader.xunit.xml'
+7/8 Test #7: test_param_loader ................   Passed    0.28 sec
+test 8
+    Start 8: test_driver_dryrun
+
+8: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_driver_dryrun.xunit.xml" "--package-name" "savo_base" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/ament_cmake_pytest/test_driver_dryrun.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_base/test/test_driver_dryrun.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/ament_cmake_pytest/test_driver_dryrun/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_driver_dryrun.xunit.xml" "--junit-prefix=savo_base"
+8: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base
+8: Test timeout computed to be: 60
+8: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base':
+8:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_base/test/test_driver_dryrun.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/ament_cmake_pytest/test_driver_dryrun/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_driver_dryrun.xunit.xml --junit-prefix=savo_base
+8: ============================= test session starts ==============================
+8: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+8: cachedir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/ament_cmake_pytest/test_driver_dryrun/.cache
+8: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_base
+8: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.10, ament-copyright-0.17.5, launch-testing-ros-0.26.11, colcon-core-0.20.1, cov-4.1.0
+8: collected 1 item
+8: 
+8: ../../src/core/savo_base/test/test_driver_dryrun.py .                    [100%]
+8: 
+8: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_driver_dryrun.xunit.xml -
+8: ============================== 1 passed in 0.02s ===============================
+8: -- run_test.py: return code 0
+8: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_driver_dryrun.xunit.xml'
+8/8 Test #8: test_driver_dryrun ...............   Passed    0.29 sec
+
+100% tests passed, 0 tests failed out of 8
+
+Label Time Summary:
+flake8    =   0.73 sec*proc (1 test)
+linter    =   0.73 sec*proc (1 test)
+pytest    =   1.98 sec*proc (7 tests)
+
+Total Test time (real) =   2.71 sec
+Finished <<< savo_base [2.73s]
+
+Summary: 1 package finished [2.85s]
+
+Command: colcon test-result --verbose
+------------------------------------------------------------
+Summary: 403 tests, 0 errors, 0 failures, 0 skipped

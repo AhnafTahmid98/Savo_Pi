@@ -461,7 +461,7 @@ def make_motor_board(**kwargs):
     data = dict(kwargs)
 
     backend = str(data.pop("backend", data.pop("board_backend", "auto"))).strip().lower()
-    _name = data.pop("name", data.pop("board_name", None))  # kept for compatibility/logging only
+    data.pop("name", data.pop("board_name", None))
     dryrun_flag = bool(data.pop("dryrun", False))
 
     # Strip node metadata that must never reach constructors

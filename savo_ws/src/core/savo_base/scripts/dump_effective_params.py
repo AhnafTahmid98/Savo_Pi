@@ -17,7 +17,7 @@ import json
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, Optional, Sequence
 
 import rclpy
 from rclpy.node import Node

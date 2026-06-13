@@ -16,7 +16,7 @@ from __future__ import annotations
 import argparse
 import sys
 import time
-from typing import Iterable, List, Optional, Sequence, Tuple
+from typing import List, Optional, Sequence, Tuple
 
 import rclpy
 from rclpy.node import Node
