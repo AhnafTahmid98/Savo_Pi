@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Scan-rate diagnostics for LiDAR data streams."""
 
 from __future__ import annotations
@@ -5,6 +6,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Any
 
+from savo_lidar.constants import DEFAULT_SCAN_RATE_HZ
 from savo_lidar.filters.scan_rate_filter import (
     ScanRateStatus,
     check_scan_rate,
@@ -26,7 +28,7 @@ class ScanRateCheckResult:
 def run_scan_rate_check(
     *,
     measured_rate_hz: float,
-    expected_rate_hz: float,
+    expected_rate_hz: float = DEFAULT_SCAN_RATE_HZ,
     tolerance_ratio: float = 0.50,
 ) -> ScanRateCheckResult:
     status: ScanRateStatus = check_scan_rate(
@@ -42,3 +44,9 @@ def run_scan_rate_check(
         ok=status.ok,
         message=status.message,
     )
+
+
+__all__ = [
+    "ScanRateCheckResult",
+    "run_scan_rate_check",
+]

@@ -4,31 +4,42 @@
   <version>0.0.1</version>
 
   <description>
-    Robot Savo LiDAR hardware ownership package for RPLIDAR A1 bringup,
-    scan publishing, filtering, health monitoring, and diagnostics. Mapping
-    packages consume its scan output instead of owning the LiDAR hardware.
+    Robot SAVO — LiDAR hardware ownership package for RPLIDAR A1 bringup,
+    production LaserScan publishing, scan filtering, health monitoring,
+    watchdogs, diagnostics, and mapping/navigation-ready scan output.
+    - C++ path: production LiDAR driver and /scan publisher
+    - Python path: fallback driver, filters, health checks, watchdogs, CLI tools, and diagnostics
   </description>
 
   <maintainer email="tahmidahnaf998@gmail.com">Ahnaf Tahmid</maintainer>
   <license>Proprietary</license>
 
+  <!-- Hybrid build: C++ capable (ament_cmake) + Python package/nodes (ament_python) -->
   <buildtool_depend>ament_cmake</buildtool_depend>
   <buildtool_depend>ament_cmake_python</buildtool_depend>
   <buildtool_depend>ament_python</buildtool_depend>
 
+  <!-- Core ROS dependencies -->
+  <depend>rclcpp</depend>
   <depend>rclpy</depend>
+
+  <!-- Message types for scan / state / diagnostics -->
   <depend>sensor_msgs</depend>
   <depend>std_msgs</depend>
   <depend>diagnostic_msgs</depend>
 
+  <!-- Launch support -->
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
+
+  <!-- Python runtime helpers -->
   <exec_depend>ament_index_python</exec_depend>
   <exec_depend>python3-yaml</exec_depend>
 
-  <!-- Native RPLIDAR access uses USB serial when not launching an external driver. -->
+  <!-- Python fallback/dryrun RPLIDAR access via USB serial -->
   <exec_depend>python3-serial</exec_depend>
 
+  <!-- Tests / lint -->
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
   <test_depend>ament_cmake_pytest</test_depend>

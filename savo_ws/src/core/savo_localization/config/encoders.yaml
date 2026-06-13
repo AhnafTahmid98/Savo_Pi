@@ -1,0 +1,64 @@
+wheel_odom_node:
+  ros__parameters:
+    odom_frame_id: odom
+    base_frame_id: base_link
+
+    wheel_odom_topic: /wheel/odom
+    wheel_odom_state_topic: /savo_localization/wheel_odom_state
+
+    publish_rate_hz: 30.0
+    timeout_s: 0.5
+    publish_tf: false
+
+    wheel_diameter_m: 0.065
+    wheelbase_m: 0.165
+    track_m: 0.165
+
+    cpr: 20
+    decoding: 4
+    gear_ratio: 1.0
+
+    gpiochip: -1
+    poll_s: 0.001
+    debounce_s: 0.0003
+
+    use_internal_pullup: false
+    use_hw_debounce: true
+
+    fl_a_gpio: 25
+    fl_b_gpio: 13
+
+    fr_a_gpio: 20
+    fr_b_gpio: 21
+
+    rl_a_gpio: 23
+    rl_b_gpio: 24
+
+    rr_a_gpio: 26
+    rr_b_gpio: 12
+
+    invert_fl: true
+    invert_fr: true
+    invert_rl: true
+    invert_rr: true
+
+    reset_pose_on_start: true
+    start_x_m: 0.0
+    start_y_m: 0.0
+    start_yaw_rad: 0.0
+
+    odom_covariance_scale: 1.0
+
+    pose_x_covariance: 0.05
+    pose_y_covariance: 0.10
+    pose_z_covariance: 999.0
+    pose_roll_covariance: 999.0
+    pose_pitch_covariance: 999.0
+    pose_yaw_covariance: 0.10
+
+    twist_vx_covariance: 0.05
+    twist_vy_covariance: 0.10
+    twist_vz_covariance: 999.0
+    twist_wx_covariance: 999.0
+    twist_wy_covariance: 999.0
+    twist_wz_covariance: 0.10

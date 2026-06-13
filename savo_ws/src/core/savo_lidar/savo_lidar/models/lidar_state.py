@@ -1,70 +1,98 @@
-"""Runtime state model for the Robot Savo LiDAR stack."""
+# -*- coding: utf-8 -*-
+"""Runtime state reported by the LiDAR driver."""
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Dict, Optional
 
 from savo_lidar.constants import (
     BACKEND_DRYRUN,
     DEFAULT_FRAME_ID,
-    DEFAULT_LIDAR_MODEL,
     DEFAULT_SCAN_TOPIC,
+    DEFAULT_STATE_TOPIC,
+    STATUS_ERROR,
     STATUS_OFFLINE,
+    STATUS_OK,
+    STATUS_STALE,
+    STATUS_WARN,
 )
 
 
-@dataclass
+@dataclass(frozen=True)
 class LidarState:
-    node: str
+    node: str = "lidar_driver_node"
     status: str = STATUS_OFFLINE
-    model: str = DEFAULT_LIDAR_MODEL
     backend: str = BACKEND_DRYRUN
-    frame_id: str = DEFAULT_FRAME_ID
-    scan_topic: str = DEFAULT_SCAN_TOPIC
 
-    hardware_ok: bool = False
-    scan_ok: bool = False
-    driver_running: bool = False
+    scan_topic: str = DEFAULT_SCAN_TOPIC
+    state_topic: str = DEFAULT_STATE_TOPIC
+    frame_id: str = DEFAULT_FRAME_ID
+
+    connected: bool = False
+    motor_running: bool = False
+    publishing_scan: bool = False
 
     scan_count: int = 0
-    last_scan_age_s: float | None = None
+    last_scan_age_s: Optional[float] = None
     scan_rate_hz: float = 0.0
+
+    valid_points: int = 0
+    total_points: int = 0
     valid_ratio: float = 0.0
 
-    message: str = ""
-    extra: dict[str, Any] = field(default_factory=dict)
+    min_range_m: Optional[float] = None
+    max_range_m: Optional[float] = None
+    front_min_m: Optional[float] = None
 
-    def mark_scan(
-        self,
-        *,
-        scan_rate_hz: float,
-        valid_ratio: float,
-        last_scan_age_s: float = 0.0,
-    ) -> None:
-        self.scan_count += 1
-        self.scan_ok = True
-        self.last_scan_age_s = float(last_scan_age_s)
-        self.scan_rate_hz = float(scan_rate_hz)
-        self.valid_ratio = float(valid_ratio)
+    error: str = ""
+    detail: str = ""
 
-    def mark_stale(self, message: str = "scan stream stale") -> None:
-        self.scan_ok = False
-        self.message = str(message)
+    def is_ok(self) -> bool:
+        return self.status == STATUS_OK
 
-    def mark_hardware(self, ok: bool, message: str = "") -> None:
-        self.hardware_ok = bool(ok)
+    def is_warn(self) -> bool:
+        return self.status == STATUS_WARN
 
-        if message:
-            self.message = str(message)
+    def is_error(self) -> bool:
+        return self.status == STATUS_ERROR
 
-    def mark_driver_running(self, running: bool) -> None:
-        self.driver_running = bool(running)
+    def is_stale(self) -> bool:
+        return self.status == STATUS_STALE
 
-    def to_dict(self) -> dict[str, Any]:
-        data = asdict(self)
+    def has_scan(self) -> bool:
+        return self.scan_count > 0 and self.publishing_scan
 
-        if not self.extra:
-            data.pop("extra", None)
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "node": self.node,
+            "status": self.status,
+            "backend": self.backend,
+            "scan_topic": self.scan_topic,
+            "state_topic": self.state_topic,
+            "frame_id": self.frame_id,
+            "connected": self.connected,
+            "motor_running": self.motor_running,
+            "publishing_scan": self.publishing_scan,
+            "scan_count": self.scan_count,
+            "last_scan_age_s": self.last_scan_age_s,
+            "scan_rate_hz": self.scan_rate_hz,
+            "valid_points": self.valid_points,
+            "total_points": self.total_points,
+            "valid_ratio": self.valid_ratio,
+            "min_range_m": self.min_range_m,
+            "max_range_m": self.max_range_m,
+            "front_min_m": self.front_min_m,
+            "error": self.error,
+            "detail": self.detail,
+        }
 
-        return data
+
+def make_lidar_state(**overrides: object) -> LidarState:
+    return LidarState(**overrides)
+
+
+__all__ = [
+    "LidarState",
+    "make_lidar_state",
+]

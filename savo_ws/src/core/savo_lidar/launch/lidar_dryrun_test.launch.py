@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Launch the LiDAR stack with a synthetic scan source for safe PC testing."""
+"""Dryrun LiDAR stack for PC testing without RPLIDAR hardware."""
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, LogInfo

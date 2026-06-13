@@ -1,0 +1,118 @@
+# Dry-run profile for PC testing, rosbag replay, or fake topic publishers.
+# Do not use this as the normal hardware profile on savo-core.
+
+ekf_filter_node:
+  ros__parameters:
+    frequency: 20.0
+    sensor_timeout: 1.0
+    two_d_mode: true
+
+    publish_tf: false
+    publish_acceleration: false
+
+    print_diagnostics: false
+    debug: false
+
+    world_frame: odom
+
+
+localization_health_node:
+  ros__parameters:
+    publish_rate_hz: 1.0
+    stale_timeout_s: 2.0
+
+    use_imu: true
+    use_encoders: true
+    use_wheel_odom: true
+    use_ekf: true
+    use_vo: false
+
+    require_odom_to_base_tf: false
+    require_base_to_imu_tf: false
+
+    expected_imu_rate_hz: 10.0
+    expected_wheel_odom_rate_hz: 10.0
+    expected_ekf_rate_hz: 20.0
+
+    rate_tolerance_ratio: 0.70
+    rate_window_size: 20
+
+    max_imu_age_s: 2.0
+    max_wheel_odom_age_s: 2.0
+    max_filtered_odom_age_s: 2.0
+    max_tf_age_s: 2.0
+
+    max_odom_linear_speed_mps: 2.0
+    max_odom_angular_speed_rad_s: 5.0
+
+    max_pose_jump_m: 1.00
+    max_yaw_jump_rad: 1.50
+
+    min_valid_encoder_wheels: 1
+    max_encoder_illegal_transitions: 100
+
+    imu_require_motion_ready: false
+    imu_require_mag_ready: false
+
+    publish_full_state: true
+    publish_compact_summary: true
+    log_warnings: true
+    log_errors: true
+
+
+localization_dashboard:
+  ros__parameters:
+    refresh_rate_hz: 2.0
+    stale_timeout_s: 2.0
+
+    show_imu: true
+    show_encoders: true
+    show_wheel_odom: true
+    show_ekf: true
+    show_vo: false
+    show_tf: false
+    show_diagnostics: true
+
+    show_raw_json: false
+    show_rates: true
+    show_reasons: true
+    show_wheel_table: true
+    show_covariance: false
+
+    expected_imu_rate_hz: 10.0
+    expected_wheel_odom_rate_hz: 10.0
+    expected_ekf_rate_hz: 20.0
+
+    max_imu_age_s: 2.0
+    max_wheel_odom_age_s: 2.0
+    max_filtered_odom_age_s: 2.0
+    max_tf_age_s: 2.0
+
+    max_odom_linear_speed_mps: 2.0
+    max_odom_angular_speed_rad_s: 5.0
+
+    compact_mode: false
+    color_enabled: true
+    clear_screen: true
+    print_header: true
+    print_footer: true
+
+    warn_on_stale: true
+    warn_on_missing_topic: true
+    warn_on_bad_tf: false
+
+
+ekf_state_publisher_node:
+  ros__parameters:
+    publish_rate_hz: 1.0
+    stale_timeout_s: 2.0
+
+    include_pose: true
+    include_twist: true
+    include_rates: true
+    include_tf_status: false
+
+    max_filtered_odom_age_s: 2.0
+    max_tf_age_s: 2.0
+
+    log_warnings: true

@@ -1,9 +1,12 @@
-"""Frame-id diagnostics for LiDAR TF integration."""
+# -*- coding: utf-8 -*-
+"""Frame ID check for LiDAR TF integration."""
 
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from typing import Any
+
+from savo_lidar.constants import DEFAULT_FRAME_ID
 
 
 @dataclass(frozen=True)
@@ -24,7 +27,7 @@ def normalize_frame_id(frame_id: str) -> str:
 def check_frame_id(
     *,
     frame_id: str,
-    expected_frame_id: str = "laser",
+    expected_frame_id: str = DEFAULT_FRAME_ID,
 ) -> FrameIdCheckResult:
     normalized = normalize_frame_id(frame_id)
     expected = normalize_frame_id(expected_frame_id)
@@ -51,3 +54,10 @@ def check_frame_id(
         ok=True,
         message="LiDAR frame_id matches expected TF frame",
     )
+
+
+__all__ = [
+    "FrameIdCheckResult",
+    "check_frame_id",
+    "normalize_frame_id",
+]

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""Launch the Robot Savo localization dashboard only."""
+"""Shortcut launch for Robot Savo four-wheel encoder odometry."""
 
 from __future__ import annotations
 
@@ -15,14 +15,28 @@ from launch_ros.substitutions import FindPackageShare
 def generate_launch_description() -> LaunchDescription:
     package_share = FindPackageShare("savo_localization")
 
+    encoders_config = LaunchConfiguration("encoders_config")
+    wheel_odom_config = LaunchConfiguration("wheel_odom_config")
     topics_config = LaunchConfiguration("topics_config")
     frames_config = LaunchConfiguration("frames_config")
-    diagnostics_config = LaunchConfiguration("diagnostics_config")
-    dashboard_config = LaunchConfiguration("dashboard_config")
     profile_config = LaunchConfiguration("profile_config")
 
     return LaunchDescription(
         [
+            DeclareLaunchArgument(
+                "encoders_config",
+                default_value=PathJoinSubstitution(
+                    [package_share, "config", "encoders.yaml"]
+                ),
+                description="Four-wheel encoder GPIO configuration.",
+            ),
+            DeclareLaunchArgument(
+                "wheel_odom_config",
+                default_value=PathJoinSubstitution(
+                    [package_share, "config", "wheel_odom.yaml"]
+                ),
+                description="Wheel odometry configuration.",
+            ),
             DeclareLaunchArgument(
                 "topics_config",
                 default_value=PathJoinSubstitution(
@@ -38,42 +52,27 @@ def generate_launch_description() -> LaunchDescription:
                 description="Shared localization frame contract.",
             ),
             DeclareLaunchArgument(
-                "diagnostics_config",
-                default_value=PathJoinSubstitution(
-                    [package_share, "config", "diagnostics.yaml"]
-                ),
-                description="Localization diagnostic behavior config.",
-            ),
-            DeclareLaunchArgument(
-                "dashboard_config",
-                default_value=PathJoinSubstitution(
-                    [package_share, "config", "localization_dashboard.yaml"]
-                ),
-                description="Localization dashboard display config.",
-            ),
-            DeclareLaunchArgument(
                 "profile_config",
                 default_value=PathJoinSubstitution(
                     [
                         package_share,
                         "config",
                         "profiles",
-                        "robot_savo_4enc_imu_ekf.yaml",
+                        "wheel_odom_4enc.yaml",
                     ]
                 ),
-                description="Dashboard profile overlay.",
+                description="Four-encoder wheel odometry profile.",
             ),
             Node(
                 package="savo_localization",
-                executable="localization_dashboard.py",
-                name="localization_dashboard",
+                executable="wheel_odom_node",
+                name="wheel_odom_node",
                 output="screen",
-                emulate_tty=True,
                 parameters=[
                     topics_config,
                     frames_config,
-                    diagnostics_config,
-                    dashboard_config,
+                    encoders_config,
+                    wheel_odom_config,
                     profile_config,
                 ],
             ),

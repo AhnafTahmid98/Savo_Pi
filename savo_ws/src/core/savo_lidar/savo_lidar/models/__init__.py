@@ -1,4 +1,7 @@
-"""Data models used by the Robot Savo LiDAR package."""
+# -*- coding: utf-8 -*-
+"""LiDAR data models used by drivers, filters, health checks, and dashboards."""
+
+from __future__ import annotations
 
 from .lidar_config import LidarDriverConfig, make_driver_config
 from .lidar_health import LidarHealth

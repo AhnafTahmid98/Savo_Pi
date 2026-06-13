@@ -1,8 +1,7 @@
 diagnostics:
   ros__parameters:
-    preferred_serial_port: /dev/ttyUSB0
-
-    expected_frame_id: laser
+    preferred_serial_port: "/dev/ttyUSB0"
+    expected_frame_id: "laser"
 
     expected_scan_rate_hz: 5.5
     scan_rate_tolerance_ratio: 0.50
@@ -17,4 +16,4 @@ diagnostics:
     port_check_timeout_s: 2.0
     command_timeout_s: 5.0
 
-    report_format: text
+    report_format: "text"

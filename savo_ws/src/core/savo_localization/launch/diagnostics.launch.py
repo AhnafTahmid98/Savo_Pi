@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""Bench launch for testing the Robot Savo BNO055 IMU."""
+"""Launch Robot Savo localization diagnostics."""
 
 from __future__ import annotations
 
@@ -16,25 +16,17 @@ from launch_ros.substitutions import FindPackageShare
 def generate_launch_description() -> LaunchDescription:
     package_share = FindPackageShare("savo_localization")
 
-    imu_config = LaunchConfiguration("imu_config")
     topics_config = LaunchConfiguration("topics_config")
     frames_config = LaunchConfiguration("frames_config")
     diagnostics_config = LaunchConfiguration("diagnostics_config")
     profile_config = LaunchConfiguration("profile_config")
 
-    use_imu = LaunchConfiguration("use_imu")
     use_health = LaunchConfiguration("use_health")
     use_dashboard = LaunchConfiguration("use_dashboard")
+    use_state_publisher = LaunchConfiguration("use_state_publisher")
 
     return LaunchDescription(
         [
-            DeclareLaunchArgument(
-                "imu_config",
-                default_value=PathJoinSubstitution(
-                    [package_share, "config", "imu.yaml"]
-                ),
-                description="BNO055 IMU configuration.",
-            ),
             DeclareLaunchArgument(
                 "topics_config",
                 default_value=PathJoinSubstitution(
@@ -54,42 +46,34 @@ def generate_launch_description() -> LaunchDescription:
                 default_value=PathJoinSubstitution(
                     [package_share, "config", "diagnostics.yaml"]
                 ),
-                description="Localization diagnostic behavior config.",
+                description="Diagnostic behavior configuration.",
             ),
             DeclareLaunchArgument(
                 "profile_config",
                 default_value=PathJoinSubstitution(
-                    [package_share, "config", "profiles", "bench_imu.yaml"]
+                    [
+                        package_share,
+                        "config",
+                        "profiles",
+                        "robot_savo_4enc_imu_ekf.yaml",
+                    ]
                 ),
-                description="IMU bench profile overlay.",
-            ),
-            DeclareLaunchArgument(
-                "use_imu",
-                default_value="true",
-                description="Start the C++ IMU node.",
+                description="Diagnostic launch profile overlay.",
             ),
             DeclareLaunchArgument(
                 "use_health",
-                default_value="false",
-                description="Start localization_health_node for IMU checks.",
+                default_value="true",
+                description="Start localization_health_node.",
             ),
             DeclareLaunchArgument(
                 "use_dashboard",
-                default_value="false",
-                description="Start localization_dashboard for terminal monitoring.",
+                default_value="true",
+                description="Start localization_dashboard.",
             ),
-            Node(
-                package="savo_localization",
-                executable="imu_node",
-                name="imu_node",
-                output="screen",
-                condition=IfCondition(use_imu),
-                parameters=[
-                    topics_config,
-                    frames_config,
-                    imu_config,
-                    profile_config,
-                ],
+            DeclareLaunchArgument(
+                "use_state_publisher",
+                default_value="true",
+                description="Start ekf_state_publisher_node.",
             ),
             Node(
                 package="savo_localization",
@@ -97,6 +81,19 @@ def generate_launch_description() -> LaunchDescription:
                 name="localization_health_node",
                 output="screen",
                 condition=IfCondition(use_health),
+                parameters=[
+                    topics_config,
+                    frames_config,
+                    diagnostics_config,
+                    profile_config,
+                ],
+            ),
+            Node(
+                package="savo_localization",
+                executable="ekf_state_publisher_node.py",
+                name="ekf_state_publisher_node",
+                output="screen",
+                condition=IfCondition(use_state_publisher),
                 parameters=[
                     topics_config,
                     frames_config,

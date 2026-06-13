@@ -1,4 +1,5 @@
-"""Driver exceptions for Robot Savo LiDAR hardware access."""
+# -*- coding: utf-8 -*-
+"""Driver exceptions for LiDAR hardware access."""
 
 from __future__ import annotations
 
@@ -8,20 +9,30 @@ class LidarDriverError(RuntimeError):
 
 
 class LidarConnectionError(LidarDriverError):
-    """Raised when the LiDAR serial connection cannot be opened."""
+    """LiDAR serial connection failed."""
 
 
 class LidarReadError(LidarDriverError):
-    """Raised when scan data cannot be read reliably."""
+    """LiDAR scan read failed."""
 
 
 class LidarConfigurationError(LidarDriverError):
-    """Raised when driver configuration is invalid."""
+    """LiDAR driver configuration is invalid."""
 
 
 class LidarTimeoutError(LidarDriverError):
-    """Raised when the LiDAR does not respond within the expected time."""
+    """LiDAR response timed out."""
 
 
 class LidarNotReadyError(LidarDriverError):
-    """Raised when a scan is requested before the driver is ready."""
+    """LiDAR driver is not ready to provide scans."""
+
+
+__all__ = [
+    "LidarConfigurationError",
+    "LidarConnectionError",
+    "LidarDriverError",
+    "LidarNotReadyError",
+    "LidarReadError",
+    "LidarTimeoutError",
+]

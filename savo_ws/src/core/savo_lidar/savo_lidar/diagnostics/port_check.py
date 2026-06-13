@@ -1,10 +1,12 @@
-"""Serial-port diagnostics for the RPLIDAR A1 connection."""
+# -*- coding: utf-8 -*-
+"""Serial-port check for the RPLIDAR A1 connection."""
 
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from typing import Any
 
+from savo_lidar.constants import DEFAULT_SERIAL_PORT
 from savo_lidar.drivers.serial_port import (
     available_serial_ports,
     inspect_serial_port,
@@ -27,8 +29,9 @@ class PortCheckResult:
         return asdict(self)
 
 
-def check_lidar_port(preferred_port: str) -> PortCheckResult:
-    preferred_port = str(preferred_port).strip()
+def check_lidar_port(preferred_port: str = DEFAULT_SERIAL_PORT) -> PortCheckResult:
+    preferred_port = str(preferred_port).strip() or DEFAULT_SERIAL_PORT
+
     ports = available_serial_ports()
     preferred_info = inspect_serial_port(preferred_port)
     in_dialout = user_in_group("dialout")
@@ -85,3 +88,9 @@ def check_lidar_port(preferred_port: str) -> PortCheckResult:
         ok=True,
         message="preferred port not usable, fallback serial port available",
     )
+
+
+__all__ = [
+    "PortCheckResult",
+    "check_lidar_port",
+]

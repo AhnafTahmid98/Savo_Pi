@@ -1,4 +1,7 @@
-"""Driver interfaces and implementations for Robot Savo LiDAR."""
+# -*- coding: utf-8 -*-
+"""LiDAR driver implementations and serial helpers."""
+
+from __future__ import annotations
 
 from .driver_factory import LidarDriver, create_lidar_driver
 from .dryrun_lidar_driver import DryrunLidarDriver, DryrunScan

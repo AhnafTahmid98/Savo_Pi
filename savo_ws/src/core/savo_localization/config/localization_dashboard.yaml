@@ -1,6 +1,6 @@
-localization_health_node:
+localization_dashboard:
   ros__parameters:
-    publish_rate_hz: 2.0
+    refresh_rate_hz: 5.0
     stale_timeout_s: 0.5
 
     imu_topic: /imu/data
@@ -10,30 +10,31 @@ localization_health_node:
     wheel_odom_state_topic: /savo_localization/wheel_odom_state
 
     filtered_odom_topic: /odometry/filtered
-    diagnostics_topic: /diagnostics
-
     health_topic: /savo_localization/health
     state_summary_topic: /savo_localization/state_summary
+
+    diagnostics_topic: /diagnostics
 
     map_frame_id: map
     odom_frame_id: odom
     base_frame_id: base_link
     imu_frame_id: imu_link
 
-    use_imu: true
-    use_encoders: true
-    use_wheel_odom: true
-    use_ekf: true
-    use_vo: false
+    show_imu: true
+    show_encoders: true
+    show_wheel_odom: true
+    show_ekf: true
+    show_tf: true
+    show_diagnostics: true
 
-    require_odom_to_base_tf: true
-    require_base_to_imu_tf: true
+    show_raw_json: false
+    show_rates: true
+    show_reasons: true
+    show_wheel_table: true
 
     expected_imu_rate_hz: 25.0
     expected_wheel_odom_rate_hz: 30.0
     expected_ekf_rate_hz: 30.0
-
-    rate_tolerance_ratio: 0.50
 
     max_imu_age_s: 0.5
     max_wheel_odom_age_s: 0.5
@@ -43,6 +44,12 @@ localization_health_node:
     max_odom_linear_speed_mps: 1.5
     max_odom_angular_speed_rad_s: 4.0
 
-    publish_full_state: true
-    publish_compact_summary: true
-    log_warnings: true
+    compact_mode: false
+    color_enabled: true
+    clear_screen: true
+    print_header: true
+    print_footer: true
+
+    warn_on_stale: true
+    warn_on_missing_topic: true
+    warn_on_bad_tf: true

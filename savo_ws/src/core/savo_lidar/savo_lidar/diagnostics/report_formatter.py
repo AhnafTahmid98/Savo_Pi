@@ -1,4 +1,5 @@
-"""Formatting utilities for LiDAR diagnostic output."""
+# -*- coding: utf-8 -*-
+"""Formatting helpers for LiDAR diagnostic output."""
 
 from __future__ import annotations
 
@@ -19,7 +20,8 @@ def format_optional_float(value: float | None, *, digits: int = 3, suffix: str =
 
 
 def format_key_value_report(title: str, values: Mapping[str, Any]) -> str:
-    lines = [str(title), "-" * len(str(title))]
+    title = str(title)
+    lines = [title, "-" * len(title)]
 
     for key, value in values.items():
         lines.append(f"{key}: {_format_value(value)}")
@@ -28,7 +30,7 @@ def format_key_value_report(title: str, values: Mapping[str, Any]) -> str:
 
 
 def format_json_report(values: Mapping[str, Any]) -> str:
-    return json.dumps(dict(values), indent=2, sort_keys=True)
+    return json.dumps(_json_safe(dict(values)), indent=2, sort_keys=True)
 
 
 def compact_status_line(
@@ -44,6 +46,7 @@ def compact_status_line(
     for key, value in items.items():
         if value is None:
             continue
+
         parts.append(f"{key}={_format_value(value)}")
 
     return " | ".join(parts)
@@ -56,10 +59,35 @@ def _format_value(value: Any) -> str:
     if isinstance(value, float):
         return f"{value:.3f}"
 
-    if isinstance(value, (list, tuple)):
+    if isinstance(value, Mapping):
+        return json.dumps(_json_safe(dict(value)), sort_keys=True)
+
+    if isinstance(value, (list, tuple, set)):
         return ", ".join(str(item) for item in value) if value else "none"
 
     if value is None:
         return "n/a"
 
     return str(value)
+
+
+def _json_safe(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+
+    if isinstance(value, (list, tuple, set)):
+        return [_json_safe(item) for item in value]
+
+    if hasattr(value, "to_dict") and callable(value.to_dict):
+        return _json_safe(value.to_dict())
+
+    return value
+
+
+__all__ = [
+    "compact_status_line",
+    "format_bool",
+    "format_json_report",
+    "format_key_value_report",
+    "format_optional_float",
+]

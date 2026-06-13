@@ -1,0 +1,35 @@
+imu_node:
+  ros__parameters:
+    frame_id: imu_link
+
+wheel_odom_node:
+  ros__parameters:
+    odom_frame_id: odom
+    base_frame_id: base_link
+
+ekf_filter_node:
+  ros__parameters:
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_link
+    world_frame: odom
+
+localization_health_node:
+  ros__parameters:
+    map_frame_id: map
+    odom_frame_id: odom
+    base_frame_id: base_link
+    imu_frame_id: imu_link
+
+localization_dashboard:
+  ros__parameters:
+    map_frame_id: map
+    odom_frame_id: odom
+    base_frame_id: base_link
+    imu_frame_id: imu_link
+
+ekf_state_publisher_node:
+  ros__parameters:
+    map_frame_id: map
+    odom_frame_id: odom
+    base_frame_id: base_link

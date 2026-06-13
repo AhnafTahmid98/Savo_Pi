@@ -1,10 +1,12 @@
+# PC-safe profile — no LiDAR hardware required.
+
 lidar_driver_node:
   ros__parameters:
-    backend: dryrun
-    model: rplidar_a1
+    backend: "dryrun"
+    model: "rplidar_a1"
 
-    scan_topic: /scan
-    frame_id: laser
+    scan_topic: "/scan"
+    frame_id: "laser"
 
     min_range_m: 0.15
     max_range_m: 12.0
@@ -18,9 +20,9 @@ lidar_driver_node:
 
 lidar_filter_node:
   ros__parameters:
-    input_scan_topic: /scan
-    output_scan_topic: /scan/filtered
-    scan_quality_topic: /savo_lidar/scan_quality
+    input_scan_topic: "/scan"
+    output_scan_topic: "/scan_filtered"
+    scan_quality_topic: "/savo_lidar/scan_quality"
 
     min_range_m: 0.15
     max_range_m: 12.0
@@ -30,8 +32,8 @@ lidar_filter_node:
 
 lidar_watchdog_node:
   ros__parameters:
-    scan_topic: /scan
-    watchdog_state_topic: /savo_lidar/watchdog_state
+    scan_topic: "/scan"
+    watchdog_state_topic: "/savo_lidar/watchdog_state"
 
     stale_timeout_s: 1.0
     publish_hz: 2.0
@@ -39,10 +41,10 @@ lidar_watchdog_node:
 
 lidar_health_node:
   ros__parameters:
-    state_topic: /savo_lidar/state
-    watchdog_state_topic: /savo_lidar/watchdog_state
-    scan_quality_topic: /savo_lidar/scan_quality
-    health_topic: /savo_lidar/health
+    state_topic: "/savo_lidar/state"
+    watchdog_state_topic: "/savo_lidar/watchdog_state"
+    scan_quality_topic: "/savo_lidar/scan_quality"
+    health_topic: "/savo_lidar/health"
 
     publish_hz: 1.0
 
@@ -52,9 +54,9 @@ lidar_health_node:
 
 lidar_state_publisher_node:
   ros__parameters:
-    driver_state_topic: /savo_lidar/state
-    health_topic: /savo_lidar/health
-    watchdog_state_topic: /savo_lidar/watchdog_state
-    summary_topic: /savo_lidar/state_summary
+    driver_state_topic: "/savo_lidar/state"
+    health_topic: "/savo_lidar/health"
+    watchdog_state_topic: "/savo_lidar/watchdog_state"
+    summary_topic: "/savo_lidar/state_summary"
 
     publish_hz: 1.0

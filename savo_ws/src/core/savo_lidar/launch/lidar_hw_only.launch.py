@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Launch only the LiDAR driver node for direct hardware bringup."""
+"""Hardware-only LiDAR bringup for direct RPLIDAR testing."""
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, LogInfo
@@ -41,7 +41,7 @@ def generate_launch_description() -> LaunchDescription:
                 msg=[
                     "Starting Robot Savo LiDAR hardware-only bringup | profile=",
                     profile,
-                    " | output=/scan",
+                    " | scan=/scan",
                 ]
             ),
             driver_node,

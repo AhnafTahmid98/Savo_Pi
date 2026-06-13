@@ -75,8 +75,8 @@ struct EncoderHardwareConfig
   WheelEncoderConfig rr{
     WheelId::RR,
     WHEEL_RR,
-    12,
     26,
+    12,
     true,
   };
 

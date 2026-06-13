@@ -1,0 +1,109 @@
+# Normal Robot Savo core profile: 4 encoders + IMU + EKF.
+# VO is not fused in this baseline.
+
+imu_node:
+  ros__parameters:
+    mode: ndof
+    publish_rate_hz: 25.0
+    reset_on_start: true
+
+    publish_orientation: true
+    publish_magnetic_field: true
+    publish_temperature: true
+    publish_diagnostics: true
+
+
+wheel_odom_node:
+  ros__parameters:
+    publish_rate_hz: 30.0
+    timeout_s: 0.5
+
+    publish_tf: false
+    reset_pose_on_start: true
+
+    gpiochip: -1
+    poll_s: 0.001
+    debounce_s: 0.0003
+
+    use_internal_pullup: false
+    use_hw_debounce: true
+
+
+ekf_filter_node:
+  ros__parameters:
+    frequency: 30.0
+    sensor_timeout: 0.2
+    two_d_mode: true
+
+    publish_tf: true
+    publish_acceleration: false
+
+    print_diagnostics: true
+    debug: false
+
+    world_frame: odom
+
+
+localization_health_node:
+  ros__parameters:
+    publish_rate_hz: 2.0
+    stale_timeout_s: 0.5
+
+    use_imu: true
+    use_encoders: true
+    use_wheel_odom: true
+    use_ekf: true
+    use_vo: false
+
+    require_odom_to_base_tf: true
+    require_base_to_imu_tf: true
+
+    expected_imu_rate_hz: 25.0
+    expected_wheel_odom_rate_hz: 30.0
+    expected_ekf_rate_hz: 30.0
+
+    max_imu_age_s: 0.5
+    max_wheel_odom_age_s: 0.5
+    max_filtered_odom_age_s: 0.5
+    max_tf_age_s: 0.5
+
+    publish_full_state: true
+    publish_compact_summary: true
+    log_warnings: true
+    log_errors: true
+
+
+localization_dashboard:
+  ros__parameters:
+    refresh_rate_hz: 5.0
+    stale_timeout_s: 0.5
+
+    show_imu: true
+    show_encoders: true
+    show_wheel_odom: true
+    show_ekf: true
+    show_vo: false
+    show_tf: true
+    show_diagnostics: true
+
+    show_raw_json: false
+    show_rates: true
+    show_reasons: true
+    show_wheel_table: true
+
+    compact_mode: false
+    color_enabled: true
+    clear_screen: true
+
+
+ekf_state_publisher_node:
+  ros__parameters:
+    publish_rate_hz: 2.0
+    stale_timeout_s: 0.5
+
+    include_pose: true
+    include_twist: true
+    include_rates: true
+    include_tf_status: true
+
+    log_warnings: true

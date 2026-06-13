@@ -1,4 +1,7 @@
-"""Diagnostic helpers for Robot Savo LiDAR bringup and health checks."""
+# -*- coding: utf-8 -*-
+"""LiDAR diagnostic helpers."""
+
+from __future__ import annotations
 
 from .frame_id_check import FrameIdCheckResult, check_frame_id, normalize_frame_id
 from .motor_spin_check import MotorSpinCheckResult, check_motor_spin

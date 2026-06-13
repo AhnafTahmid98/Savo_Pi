@@ -5,6 +5,9 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 
@@ -22,6 +25,8 @@ find_package(tf2_geometry_msgs REQUIRED)
 ament_python_install_package(${PROJECT_NAME})
 
 include_directories(include)
+
+find_library(LGPIO_LIBRARY lgpio)
 
 set(IMU_NODE_SOURCES
   src/i2c_bus.cpp
@@ -53,6 +58,7 @@ if(IMU_NODE_READY)
 endif()
 
 set(WHEEL_ODOM_SOURCES
+  src/encoder_state.cpp
   src/encoder_reader.cpp
   src/mecanum_odom.cpp
   src/gpio_encoder_backend.cpp
@@ -78,6 +84,11 @@ if(WHEEL_ODOM_READY)
     tf2
     tf2_ros
   )
+
+  if(LGPIO_LIBRARY)
+    target_link_libraries(wheel_odom_node ${LGPIO_LIBRARY})
+    target_compile_definitions(wheel_odom_node PRIVATE SAVO_LOCALIZATION_LINKED_LGPIO=1)
+  endif()
 
   install(TARGETS
     wheel_odom_node
@@ -106,6 +117,13 @@ install_program_if_exists(scripts/wheel_odom_echo_cli.py)
 install_program_if_exists(scripts/ekf_echo_cli.py)
 install_program_if_exists(scripts/tf_check_cli.py)
 install_program_if_exists(scripts/dump_effective_params.py)
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/include")
+  install(DIRECTORY
+    include/
+    DESTINATION include
+  )
+endif()
 
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/launch")
   install(DIRECTORY

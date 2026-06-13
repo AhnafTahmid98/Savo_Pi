@@ -1,10 +1,17 @@
-"""Synthetic LiDAR driver used for PC tests and safe bringup."""
+# -*- coding: utf-8 -*-
+"""Synthetic LiDAR driver for PC tests and dryrun bringup."""
 
 from __future__ import annotations
 
 import math
 import time
 from dataclasses import dataclass, field
+
+from savo_lidar.constants import (
+    DEFAULT_FRAME_ID,
+    DEFAULT_MAX_RANGE_M,
+    DEFAULT_MIN_RANGE_M,
+)
 
 
 @dataclass
@@ -23,9 +30,9 @@ class DryrunLidarDriver:
     def __init__(
         self,
         *,
-        frame_id: str = "laser",
-        min_range_m: float = 0.15,
-        max_range_m: float = 12.0,
+        frame_id: str = DEFAULT_FRAME_ID,
+        min_range_m: float = DEFAULT_MIN_RANGE_M,
+        max_range_m: float = DEFAULT_MAX_RANGE_M,
         point_count: int = 360,
         base_distance_m: float = 2.0,
         obstacle_distance_m: float = 0.7,
@@ -113,7 +120,7 @@ class DryrunLidarDriver:
                 self.max_range_m,
             )
 
-        # Small wave makes the dryrun scan look less artificial in RViz.
+        # small wave makes the dryrun scan easier to recognize in RViz
         wave_m = 0.15 * math.sin(math.radians(angle_deg * 3.0))
         return _clamp_range(
             self.base_distance_m + wave_m,
@@ -128,3 +135,9 @@ def _shortest_angle_delta_deg(angle_a: float, angle_b: float) -> float:
 
 def _clamp_range(value: float, minimum: float, maximum: float) -> float:
     return max(float(minimum), min(float(maximum), float(value)))
+
+
+__all__ = [
+    "DryrunLidarDriver",
+    "DryrunScan",
+]

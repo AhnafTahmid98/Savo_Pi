@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""Bench launch for testing the Robot Savo BNO055 IMU."""
+"""Launch the Robot Savo four-encoder wheel odometry pipeline."""
 
 from __future__ import annotations
 
@@ -16,24 +16,31 @@ from launch_ros.substitutions import FindPackageShare
 def generate_launch_description() -> LaunchDescription:
     package_share = FindPackageShare("savo_localization")
 
-    imu_config = LaunchConfiguration("imu_config")
+    encoders_config = LaunchConfiguration("encoders_config")
+    wheel_odom_config = LaunchConfiguration("wheel_odom_config")
     topics_config = LaunchConfiguration("topics_config")
     frames_config = LaunchConfiguration("frames_config")
     diagnostics_config = LaunchConfiguration("diagnostics_config")
     profile_config = LaunchConfiguration("profile_config")
 
-    use_imu = LaunchConfiguration("use_imu")
     use_health = LaunchConfiguration("use_health")
     use_dashboard = LaunchConfiguration("use_dashboard")
 
     return LaunchDescription(
         [
             DeclareLaunchArgument(
-                "imu_config",
+                "encoders_config",
                 default_value=PathJoinSubstitution(
-                    [package_share, "config", "imu.yaml"]
+                    [package_share, "config", "encoders.yaml"]
                 ),
-                description="BNO055 IMU configuration.",
+                description="Four-wheel encoder GPIO configuration.",
+            ),
+            DeclareLaunchArgument(
+                "wheel_odom_config",
+                default_value=PathJoinSubstitution(
+                    [package_share, "config", "wheel_odom.yaml"]
+                ),
+                description="Wheel odometry geometry, frame, and covariance configuration.",
             ),
             DeclareLaunchArgument(
                 "topics_config",
@@ -54,24 +61,24 @@ def generate_launch_description() -> LaunchDescription:
                 default_value=PathJoinSubstitution(
                     [package_share, "config", "diagnostics.yaml"]
                 ),
-                description="Localization diagnostic behavior config.",
+                description="Diagnostic behavior profile.",
             ),
             DeclareLaunchArgument(
                 "profile_config",
                 default_value=PathJoinSubstitution(
-                    [package_share, "config", "profiles", "bench_imu.yaml"]
+                    [
+                        package_share,
+                        "config",
+                        "profiles",
+                        "wheel_odom_4enc.yaml",
+                    ]
                 ),
-                description="IMU bench profile overlay.",
-            ),
-            DeclareLaunchArgument(
-                "use_imu",
-                default_value="true",
-                description="Start the C++ IMU node.",
+                description="Wheel odometry launch profile overlay.",
             ),
             DeclareLaunchArgument(
                 "use_health",
                 default_value="false",
-                description="Start localization_health_node for IMU checks.",
+                description="Start localization_health_node with wheel-odom checks.",
             ),
             DeclareLaunchArgument(
                 "use_dashboard",
@@ -80,14 +87,14 @@ def generate_launch_description() -> LaunchDescription:
             ),
             Node(
                 package="savo_localization",
-                executable="imu_node",
-                name="imu_node",
+                executable="wheel_odom_node",
+                name="wheel_odom_node",
                 output="screen",
-                condition=IfCondition(use_imu),
                 parameters=[
                     topics_config,
                     frames_config,
-                    imu_config,
+                    encoders_config,
+                    wheel_odom_config,
                     profile_config,
                 ],
             ),

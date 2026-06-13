@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""Bench launch for testing the Robot Savo BNO055 IMU."""
+"""Launch the Robot Savo IMU pipeline."""
 
 from __future__ import annotations
 
@@ -22,7 +22,6 @@ def generate_launch_description() -> LaunchDescription:
     diagnostics_config = LaunchConfiguration("diagnostics_config")
     profile_config = LaunchConfiguration("profile_config")
 
-    use_imu = LaunchConfiguration("use_imu")
     use_health = LaunchConfiguration("use_health")
     use_dashboard = LaunchConfiguration("use_dashboard")
 
@@ -33,7 +32,7 @@ def generate_launch_description() -> LaunchDescription:
                 default_value=PathJoinSubstitution(
                     [package_share, "config", "imu.yaml"]
                 ),
-                description="BNO055 IMU configuration.",
+                description="IMU node configuration.",
             ),
             DeclareLaunchArgument(
                 "topics_config",
@@ -54,24 +53,19 @@ def generate_launch_description() -> LaunchDescription:
                 default_value=PathJoinSubstitution(
                     [package_share, "config", "diagnostics.yaml"]
                 ),
-                description="Localization diagnostic behavior config.",
+                description="Diagnostic behavior profile.",
             ),
             DeclareLaunchArgument(
                 "profile_config",
                 default_value=PathJoinSubstitution(
                     [package_share, "config", "profiles", "bench_imu.yaml"]
                 ),
-                description="IMU bench profile overlay.",
-            ),
-            DeclareLaunchArgument(
-                "use_imu",
-                default_value="true",
-                description="Start the C++ IMU node.",
+                description="IMU launch profile overlay.",
             ),
             DeclareLaunchArgument(
                 "use_health",
                 default_value="false",
-                description="Start localization_health_node for IMU checks.",
+                description="Start localization_health_node with IMU-only checks.",
             ),
             DeclareLaunchArgument(
                 "use_dashboard",
@@ -83,11 +77,10 @@ def generate_launch_description() -> LaunchDescription:
                 executable="imu_node",
                 name="imu_node",
                 output="screen",
-                condition=IfCondition(use_imu),
                 parameters=[
+                    imu_config,
                     topics_config,
                     frames_config,
-                    imu_config,
                     profile_config,
                 ],
             ),

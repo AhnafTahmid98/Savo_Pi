@@ -1,0 +1,57 @@
+imu_node:
+  ros__parameters:
+    imu_topic: /imu/data
+    imu_state_topic: /savo_localization/imu_state
+    diagnostics_topic: /diagnostics
+
+wheel_odom_node:
+  ros__parameters:
+    wheel_odom_topic: /wheel/odom
+    wheel_odom_state_topic: /savo_localization/wheel_odom_state
+
+ekf_filter_node:
+  ros__parameters:
+    output_topic: /odometry/filtered
+
+localization_health_node:
+  ros__parameters:
+    imu_topic: /imu/data
+    imu_state_topic: /savo_localization/imu_state
+
+    wheel_odom_topic: /wheel/odom
+    wheel_odom_state_topic: /savo_localization/wheel_odom_state
+
+    filtered_odom_topic: /odometry/filtered
+    diagnostics_topic: /diagnostics
+
+    health_topic: /savo_localization/health
+    state_summary_topic: /savo_localization/state_summary
+
+    odom_frame_id: odom
+    base_frame_id: base_link
+    imu_frame_id: imu_link
+
+localization_dashboard:
+  ros__parameters:
+    imu_topic: /imu/data
+    imu_state_topic: /savo_localization/imu_state
+
+    wheel_odom_topic: /wheel/odom
+    wheel_odom_state_topic: /savo_localization/wheel_odom_state
+
+    filtered_odom_topic: /odometry/filtered
+    health_topic: /savo_localization/health
+    state_summary_topic: /savo_localization/state_summary
+
+    odom_frame_id: odom
+    base_frame_id: base_link
+    imu_frame_id: imu_link
+
+ekf_state_publisher_node:
+  ros__parameters:
+    filtered_odom_topic: /odometry/filtered
+    ekf_state_topic: /savo_localization/ekf_state
+    state_summary_topic: /savo_localization/state_summary
+
+    odom_frame_id: odom
+    base_frame_id: base_link

@@ -1,4 +1,5 @@
-"""Health model for Robot Savo's LiDAR hardware and scan stream."""
+# -*- coding: utf-8 -*-
+"""Health state for the LiDAR hardware and scan stream."""
 
 from __future__ import annotations
 
@@ -17,6 +18,7 @@ from savo_lidar.constants import (
 @dataclass
 class LidarHealth:
     status: str = STATUS_OFFLINE
+
     hardware_ok: bool = False
     scan_ok: bool = False
     stale: bool = True
@@ -39,11 +41,12 @@ class LidarHealth:
         last_scan_age_s: float | None = 0.0,
     ) -> None:
         self.hardware_ok = bool(hardware_ok)
-        self.scan_ok = not bool(stale) and valid_ratio > 0.0
         self.stale = bool(stale)
-        self.scan_rate_hz = float(scan_rate_hz)
-        self.valid_ratio = float(valid_ratio)
+        self.scan_rate_hz = max(0.0, float(scan_rate_hz))
+        self.valid_ratio = _clamp_ratio(valid_ratio)
         self.last_scan_age_s = last_scan_age_s
+
+        self.scan_ok = self.hardware_ok and not self.stale and self.valid_ratio > 0.0
         self._refresh_status()
 
     def latch_fault(self, reason: str) -> None:
@@ -63,6 +66,24 @@ class LidarHealth:
         self.stale = True
         self.message = str(message)
         self.status = STATUS_OFFLINE
+
+    def is_ok(self) -> bool:
+        return self.status == STATUS_OK
+
+    def is_warn(self) -> bool:
+        return self.status == STATUS_WARN
+
+    def is_error(self) -> bool:
+        return self.status == STATUS_ERROR
+
+    def is_stale(self) -> bool:
+        return self.status == STATUS_STALE
+
+    def is_offline(self) -> bool:
+        return self.status == STATUS_OFFLINE
+
+    def needs_attention(self) -> bool:
+        return self.status in (STATUS_WARN, STATUS_ERROR, STATUS_STALE, STATUS_OFFLINE)
 
     def _refresh_status(self) -> None:
         if self.fault_latched:
@@ -85,3 +106,12 @@ class LidarHealth:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+def _clamp_ratio(value: float) -> float:
+    return max(0.0, min(1.0, float(value)))
+
+
+__all__ = [
+    "LidarHealth",
+]

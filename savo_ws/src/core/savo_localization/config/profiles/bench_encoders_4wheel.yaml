@@ -1,0 +1,137 @@
+# Bench profile for testing the four wheel encoders and wheel odometry only.
+# Use before full EKF bringup to validate GPIO wiring, direction signs, rates, and /wheel/odom.
+
+wheel_odom_node:
+  ros__parameters:
+    odom_frame_id: odom
+    base_frame_id: base_link
+
+    wheel_odom_topic: /wheel/odom
+    wheel_odom_state_topic: /savo_localization/wheel_odom_state
+
+    publish_rate_hz: 30.0
+    timeout_s: 0.5
+    publish_tf: false
+
+    wheel_diameter_m: 0.065
+    wheelbase_m: 0.165
+    track_m: 0.165
+
+    cpr: 20
+    decoding: 4
+    gear_ratio: 1.0
+
+    gpiochip: -1
+    poll_s: 0.001
+    debounce_s: 0.0003
+
+    use_internal_pullup: false
+    use_hw_debounce: true
+
+    fl_a_gpio: 25
+    fl_b_gpio: 13
+
+    fr_a_gpio: 20
+    fr_b_gpio: 21
+
+    rl_a_gpio: 23
+    rl_b_gpio: 24
+
+    rr_a_gpio: 26
+    rr_b_gpio: 12
+
+    invert_fl: true
+    invert_fr: true
+    invert_rl: true
+    invert_rr: true
+
+    reset_pose_on_start: true
+    start_x_m: 0.0
+    start_y_m: 0.0
+    start_yaw_rad: 0.0
+
+    odom_covariance_scale: 1.0
+
+    pose_x_covariance: 0.05
+    pose_y_covariance: 0.10
+    pose_z_covariance: 999.0
+    pose_roll_covariance: 999.0
+    pose_pitch_covariance: 999.0
+    pose_yaw_covariance: 0.10
+
+    twist_vx_covariance: 0.05
+    twist_vy_covariance: 0.10
+    twist_vz_covariance: 999.0
+    twist_wx_covariance: 999.0
+    twist_wy_covariance: 999.0
+    twist_wz_covariance: 0.10
+
+
+localization_health_node:
+  ros__parameters:
+    publish_rate_hz: 2.0
+    stale_timeout_s: 0.5
+
+    use_imu: false
+    use_encoders: true
+    use_wheel_odom: true
+    use_ekf: false
+    use_vo: false
+
+    require_odom_to_base_tf: false
+    require_base_to_imu_tf: false
+
+    expected_wheel_odom_rate_hz: 30.0
+    rate_tolerance_ratio: 0.50
+    rate_window_size: 30
+
+    max_wheel_odom_age_s: 0.5
+    max_odom_linear_speed_mps: 1.5
+    max_odom_angular_speed_rad_s: 4.0
+
+    max_pose_jump_m: 0.50
+    max_yaw_jump_rad: 1.00
+
+    min_valid_encoder_wheels: 4
+    max_encoder_illegal_transitions: 20
+
+    publish_full_state: true
+    publish_compact_summary: true
+    log_warnings: true
+    log_errors: true
+
+
+localization_dashboard:
+  ros__parameters:
+    refresh_rate_hz: 5.0
+    stale_timeout_s: 0.5
+
+    show_imu: false
+    show_encoders: true
+    show_wheel_odom: true
+    show_ekf: false
+    show_vo: false
+    show_tf: false
+    show_diagnostics: true
+
+    show_raw_json: false
+    show_rates: true
+    show_reasons: true
+    show_wheel_table: true
+    show_covariance: false
+
+    expected_wheel_odom_rate_hz: 30.0
+
+    max_wheel_odom_age_s: 0.5
+    max_odom_linear_speed_mps: 1.5
+    max_odom_angular_speed_rad_s: 4.0
+
+    compact_mode: false
+    color_enabled: true
+    clear_screen: true
+    print_header: true
+    print_footer: true
+
+    warn_on_stale: true
+    warn_on_missing_topic: true
+    warn_on_bad_tf: false

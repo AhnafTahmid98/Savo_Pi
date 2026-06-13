@@ -1,18 +1,20 @@
 lidar_watchdog_node:
   ros__parameters:
-    scan_topic: /scan
-    watchdog_state_topic: /savo_lidar/watchdog_state
+    scan_topic: "/scan"
+    watchdog_state_topic: "/savo_lidar/watchdog_state"
 
     stale_timeout_s: 1.0
     publish_hz: 2.0
+
+    # warn when the scan age reaches 75% of the stale timeout
     warn_before_stale_ratio: 0.75
 
 lidar_health_node:
   ros__parameters:
-    state_topic: /savo_lidar/state
-    watchdog_state_topic: /savo_lidar/watchdog_state
-    scan_quality_topic: /savo_lidar/scan_quality
-    health_topic: /savo_lidar/health
+    state_topic: "/savo_lidar/state"
+    watchdog_state_topic: "/savo_lidar/watchdog_state"
+    scan_quality_topic: "/savo_lidar/scan_quality"
+    health_topic: "/savo_lidar/health"
 
     publish_hz: 1.0
 
@@ -22,9 +24,9 @@ lidar_health_node:
 
 lidar_state_publisher_node:
   ros__parameters:
-    driver_state_topic: /savo_lidar/state
-    health_topic: /savo_lidar/health
-    watchdog_state_topic: /savo_lidar/watchdog_state
-    summary_topic: /savo_lidar/state_summary
+    driver_state_topic: "/savo_lidar/state"
+    health_topic: "/savo_lidar/health"
+    watchdog_state_topic: "/savo_lidar/watchdog_state"
+    summary_topic: "/savo_lidar/state_summary"
 
     publish_hz: 1.0

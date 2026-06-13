@@ -1,0 +1,25 @@
+ekf_filter_node:
+  ros__parameters:
+    odom1: /vo/odom
+    odom1_config:
+      - true   # x
+      - true   # y
+      - false  # z
+      - false  # roll
+      - false  # pitch
+      - true   # yaw
+      - false  # vx
+      - false  # vy
+      - false  # vz
+      - false  # vroll
+      - false  # vpitch
+      - false  # vyaw
+      - false  # ax
+      - false  # ay
+      - false  # az
+
+    odom1_queue_size: 10
+    odom1_nodelay: false
+    odom1_differential: false
+    odom1_relative: true
+    odom1_pose_rejection_threshold: 2.0

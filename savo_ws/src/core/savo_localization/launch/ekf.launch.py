@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""Bench launch for testing the Robot Savo BNO055 IMU."""
+"""Launch Robot Savo EKF localization."""
 
 from __future__ import annotations
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
-from launch.conditions import IfCondition
+from launch.conditions import IfCondition, UnlessCondition
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
@@ -16,24 +16,33 @@ from launch_ros.substitutions import FindPackageShare
 def generate_launch_description() -> LaunchDescription:
     package_share = FindPackageShare("savo_localization")
 
-    imu_config = LaunchConfiguration("imu_config")
+    ekf_config = LaunchConfiguration("ekf_config")
+    vo_config = LaunchConfiguration("vo_config")
     topics_config = LaunchConfiguration("topics_config")
     frames_config = LaunchConfiguration("frames_config")
     diagnostics_config = LaunchConfiguration("diagnostics_config")
     profile_config = LaunchConfiguration("profile_config")
 
-    use_imu = LaunchConfiguration("use_imu")
+    use_vo = LaunchConfiguration("use_vo")
     use_health = LaunchConfiguration("use_health")
     use_dashboard = LaunchConfiguration("use_dashboard")
+    use_state_publisher = LaunchConfiguration("use_state_publisher")
 
     return LaunchDescription(
         [
             DeclareLaunchArgument(
-                "imu_config",
+                "ekf_config",
                 default_value=PathJoinSubstitution(
-                    [package_share, "config", "imu.yaml"]
+                    [package_share, "config", "ekf_odom.yaml"]
                 ),
-                description="BNO055 IMU configuration.",
+                description="Base robot_localization EKF configuration.",
+            ),
+            DeclareLaunchArgument(
+                "vo_config",
+                default_value=PathJoinSubstitution(
+                    [package_share, "config", "vo_fusion_optional.yaml"]
+                ),
+                description="Optional EKF overlay for /vo/odom from savo-edge.",
             ),
             DeclareLaunchArgument(
                 "topics_config",
@@ -54,41 +63,71 @@ def generate_launch_description() -> LaunchDescription:
                 default_value=PathJoinSubstitution(
                     [package_share, "config", "diagnostics.yaml"]
                 ),
-                description="Localization diagnostic behavior config.",
+                description="Diagnostic behavior profile.",
             ),
             DeclareLaunchArgument(
                 "profile_config",
                 default_value=PathJoinSubstitution(
-                    [package_share, "config", "profiles", "bench_imu.yaml"]
+                    [
+                        package_share,
+                        "config",
+                        "profiles",
+                        "robot_savo_4enc_imu_ekf.yaml",
+                    ]
                 ),
-                description="IMU bench profile overlay.",
+                description="EKF launch profile overlay.",
             ),
             DeclareLaunchArgument(
-                "use_imu",
-                default_value="true",
-                description="Start the C++ IMU node.",
+                "use_vo",
+                default_value="false",
+                description="Fuse /vo/odom from savo-edge.",
             ),
             DeclareLaunchArgument(
                 "use_health",
                 default_value="false",
-                description="Start localization_health_node for IMU checks.",
+                description="Start localization_health_node.",
             ),
             DeclareLaunchArgument(
                 "use_dashboard",
                 default_value="false",
-                description="Start localization_dashboard for terminal monitoring.",
+                description="Start localization_dashboard.",
+            ),
+            DeclareLaunchArgument(
+                "use_state_publisher",
+                default_value="false",
+                description="Start ekf_state_publisher_node.",
             ),
             Node(
-                package="savo_localization",
-                executable="imu_node",
-                name="imu_node",
+                package="robot_localization",
+                executable="ekf_node",
+                name="ekf_filter_node",
                 output="screen",
-                condition=IfCondition(use_imu),
+                condition=UnlessCondition(use_vo),
                 parameters=[
                     topics_config,
                     frames_config,
-                    imu_config,
+                    ekf_config,
                     profile_config,
+                ],
+                remappings=[
+                    ("odometry/filtered", "/odometry/filtered"),
+                ],
+            ),
+            Node(
+                package="robot_localization",
+                executable="ekf_node",
+                name="ekf_filter_node",
+                output="screen",
+                condition=IfCondition(use_vo),
+                parameters=[
+                    topics_config,
+                    frames_config,
+                    ekf_config,
+                    vo_config,
+                    profile_config,
+                ],
+                remappings=[
+                    ("odometry/filtered", "/odometry/filtered"),
                 ],
             ),
             Node(
@@ -97,6 +136,19 @@ def generate_launch_description() -> LaunchDescription:
                 name="localization_health_node",
                 output="screen",
                 condition=IfCondition(use_health),
+                parameters=[
+                    topics_config,
+                    frames_config,
+                    diagnostics_config,
+                    profile_config,
+                ],
+            ),
+            Node(
+                package="savo_localization",
+                executable="ekf_state_publisher_node.py",
+                name="ekf_state_publisher_node",
+                output="screen",
+                condition=IfCondition(use_state_publisher),
                 parameters=[
                     topics_config,
                     frames_config,

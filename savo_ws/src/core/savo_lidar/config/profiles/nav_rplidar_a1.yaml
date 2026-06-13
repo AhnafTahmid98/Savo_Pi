@@ -1,3 +1,5 @@
+# Navigation profile — lower latency watchdog for Nav2/local planning.
+
 lidar_driver_node:
   ros__parameters:
     backend: "real"
@@ -15,7 +17,7 @@ lidar_driver_node:
 
     expected_scan_rate_hz: 5.5
     publish_rate_hz: 10.0
-    stale_timeout_s: 1.0
+    stale_timeout_s: 0.50
 
     inverted: false
     angle_compensate: true
@@ -37,8 +39,9 @@ lidar_watchdog_node:
     scan_topic: "/scan"
     watchdog_state_topic: "/savo_lidar/watchdog_state"
 
-    stale_timeout_s: 1.0
-    publish_hz: 2.0
+    # 0.50s catches scan loss quickly without tripping on one missed A1 scan.
+    stale_timeout_s: 0.50
+    publish_hz: 5.0
     warn_before_stale_ratio: 0.75
 
 lidar_health_node:
@@ -48,11 +51,11 @@ lidar_health_node:
     scan_quality_topic: "/savo_lidar/scan_quality"
     health_topic: "/savo_lidar/health"
 
-    publish_hz: 1.0
+    publish_hz: 2.0
 
     min_valid_ratio_warn: 0.60
     min_valid_ratio_error: 0.30
-    min_scan_rate_hz: 2.0
+    min_scan_rate_hz: 3.0
 
 lidar_state_publisher_node:
   ros__parameters:
@@ -61,4 +64,4 @@ lidar_state_publisher_node:
     watchdog_state_topic: "/savo_lidar/watchdog_state"
     summary_topic: "/savo_lidar/state_summary"
 
-    publish_hz: 1.0
+    publish_hz: 2.0

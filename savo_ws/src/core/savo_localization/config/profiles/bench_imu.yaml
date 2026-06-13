@@ -1,0 +1,73 @@
+# Bench profile for testing only the BNO055 IMU.
+# Use before full localization bringup to validate IMU hardware, topic rate, and calibration.
+
+imu_node:
+  ros__parameters:
+    mode: ndof
+    publish_rate_hz: 25.0
+    reset_on_start: true
+
+    publish_orientation: true
+    publish_magnetic_field: true
+    publish_temperature: true
+    publish_diagnostics: true
+
+
+localization_health_node:
+  ros__parameters:
+    publish_rate_hz: 2.0
+    stale_timeout_s: 0.5
+
+    use_imu: true
+    use_encoders: false
+    use_wheel_odom: false
+    use_ekf: false
+    use_vo: false
+
+    require_odom_to_base_tf: false
+    require_base_to_imu_tf: true
+
+    expected_imu_rate_hz: 25.0
+    rate_tolerance_ratio: 0.50
+
+    max_imu_age_s: 0.5
+    max_tf_age_s: 0.5
+
+    imu_require_motion_ready: true
+    imu_require_mag_ready: false
+
+    publish_full_state: true
+    publish_compact_summary: true
+    log_warnings: true
+    log_errors: true
+
+
+localization_dashboard:
+  ros__parameters:
+    refresh_rate_hz: 5.0
+    stale_timeout_s: 0.5
+
+    show_imu: true
+    show_encoders: false
+    show_wheel_odom: false
+    show_ekf: false
+    show_vo: false
+    show_tf: true
+    show_diagnostics: true
+
+    show_raw_json: false
+    show_rates: true
+    show_reasons: true
+    show_wheel_table: false
+
+    expected_imu_rate_hz: 25.0
+    max_imu_age_s: 0.5
+    max_tf_age_s: 0.5
+
+    compact_mode: false
+    color_enabled: true
+    clear_screen: true
+
+    warn_on_stale: true
+    warn_on_missing_topic: true
+    warn_on_bad_tf: true

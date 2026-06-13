@@ -8,6 +8,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 
+find_package(rclcpp REQUIRED)
 find_package(rclpy REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
@@ -15,7 +16,8 @@ find_package(diagnostic_msgs REQUIRED)
 
 ament_python_install_package(${PROJECT_NAME})
 
-# Keep installed executables explicit so robot deployments are easy to audit.
+# Python tools and fallback/runtime nodes.
+# The production C++ driver will later use the executable name: lidar_driver_node.
 install(PROGRAMS
   scripts/lidar_smoke_test_cli.py
   scripts/dump_effective_params.py
@@ -47,6 +49,13 @@ install(FILES
   package.xml
   DESTINATION share/${PROJECT_NAME}
 )
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/include")
+  install(DIRECTORY
+    include/
+    DESTINATION include
+  )
+endif()
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
