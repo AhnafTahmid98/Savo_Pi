@@ -1,9 +1,8 @@
 # Copyright 2026 Ahnaf Tahmid
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument
 from launch.conditions import IfCondition
-from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
@@ -14,18 +13,13 @@ def generate_launch_description() -> LaunchDescription:
     nodes_config_file = LaunchConfiguration("nodes_config_file")
     use_depth_front_min = LaunchConfiguration("use_depth_front_min")
 
-    realsense_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            PathJoinSubstitution([
-                FindPackageShare("realsense2_camera"),
-                "launch",
-                "rs_launch.py",
-            ])
-        ),
-        launch_arguments={
-            "config_file": camera_config_file,
-        }.items(),
-        scoped=True,
+    realsense_node = Node(
+        package="realsense2_camera",
+        executable="realsense2_camera_node",
+        namespace="camera",
+        name="camera",
+        output="screen",
+        parameters=[camera_config_file],
     )
 
     topic_monitor = Node(
@@ -74,7 +68,7 @@ def generate_launch_description() -> LaunchDescription:
             "use_depth_front_min",
             default_value="true",
         ),
-        realsense_launch,
+        realsense_node,
         topic_monitor,
         health_node,
         depth_front_min_node,
