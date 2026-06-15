@@ -3,6 +3,7 @@ import json
 
 import rclpy
 from diagnostic_msgs.msg import DiagnosticArray
+from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from sensor_msgs.msg import CameraInfo, Image, PointCloud2
 from std_msgs.msg import String
@@ -177,9 +178,12 @@ def main(args: list[str] | None = None) -> None:
     node = CameraHealthNode()
     try:
         rclpy.spin(node)
+    except (KeyboardInterrupt, ExternalShutdownException):
+        pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@ import math
 import cv2
 import rclpy
 from cv_bridge import CvBridge, CvBridgeError
+from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from sensor_msgs.msg import Image
 from std_msgs.msg import Float32
@@ -115,9 +116,12 @@ def main(args: list[str] | None = None) -> None:
     node = DepthFrontMinNode()
     try:
         rclpy.spin(node)
+    except (KeyboardInterrupt, ExternalShutdownException):
+        pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == "__main__":
