@@ -119,7 +119,7 @@ def get_package_version_info() -> PackageVersionInfo:
 # CLI entry
 # =============================================================================
 def main() -> None:
-    """Simple CLI output for quick checks: `python -m savo_lidar.version`."""
+    """Return CLI output for quick checks: `python -m savo_lidar.version`."""
     info = get_package_version_info()
     print(info.banner())
 

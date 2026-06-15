@@ -1,3 +1,4 @@
+# Copyright 2026 Ahnaf Tahmid
 from collections.abc import Iterable
 
 from savo_realsense.ros.topic_contract import (

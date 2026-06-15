@@ -1,3 +1,4 @@
+# Copyright 2026 Ahnaf Tahmid
 from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus, KeyValue
 from rclpy.clock import Clock
 

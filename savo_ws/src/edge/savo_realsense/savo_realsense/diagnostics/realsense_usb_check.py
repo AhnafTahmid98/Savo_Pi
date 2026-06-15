@@ -1,3 +1,4 @@
+# Copyright 2026 Ahnaf Tahmid
 import subprocess
 
 from savo_realsense.constants import DEFAULT_USB_PRODUCT_HINT, DEFAULT_USB_VENDOR_ID

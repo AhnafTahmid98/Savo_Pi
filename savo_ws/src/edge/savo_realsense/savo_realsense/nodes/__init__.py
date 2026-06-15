@@ -1,3 +1,4 @@
+# Copyright 2026 Ahnaf Tahmid
 from savo_realsense.nodes.camera_health_node import CameraHealthNode
 from savo_realsense.nodes.camera_topic_monitor_node import CameraTopicMonitorNode
 from savo_realsense.nodes.depth_front_min_node import DepthFrontMinNode

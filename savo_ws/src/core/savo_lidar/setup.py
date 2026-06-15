@@ -36,7 +36,7 @@ setup(
         "console_scripts": [
             # Optional in this hybrid package.
             # CMake installs .py node executables directly for ros2 run.
-            "lidar_driver_node = savo_lidar.nodes.lidar_driver_node:main",
+            "lidar_driver_node = savo_lidar.nodes.lidar_py_driver_node:main",
             "lidar_health_node = savo_lidar.nodes.lidar_health_node:main",
             "lidar_filter_node = savo_lidar.nodes.lidar_filter_node:main",
             "lidar_watchdog_node = savo_lidar.nodes.lidar_watchdog_node:main",

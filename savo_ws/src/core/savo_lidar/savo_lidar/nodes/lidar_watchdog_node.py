@@ -4,10 +4,7 @@
 
 from __future__ import annotations
 
-import rclpy
-from rclpy.node import Node
-from sensor_msgs.msg import LaserScan
-from std_msgs.msg import String
+from ._ros_compat import LaserScan, Node, String, rclpy
 
 from savo_lidar.constants import (
     DEFAULT_SCAN_TOPIC,

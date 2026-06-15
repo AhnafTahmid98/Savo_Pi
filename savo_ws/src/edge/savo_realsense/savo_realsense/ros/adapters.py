@@ -1,3 +1,4 @@
+# Copyright 2026 Ahnaf Tahmid
 from diagnostic_msgs.msg import DiagnosticStatus, KeyValue
 
 from savo_realsense.models.camera_status import CameraStatus

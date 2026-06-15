@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Copyright 2026 Ahnaf Tahmid
 
 import json
 import sys

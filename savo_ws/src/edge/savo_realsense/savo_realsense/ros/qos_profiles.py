@@ -1,3 +1,4 @@
+# Copyright 2026 Ahnaf Tahmid
 from rclpy.qos import (
     DurabilityPolicy,
     HistoryPolicy,

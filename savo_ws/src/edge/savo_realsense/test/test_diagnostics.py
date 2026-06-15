@@ -1,3 +1,4 @@
+# Copyright 2026 Ahnaf Tahmid
 from diagnostic_msgs.msg import DiagnosticStatus
 
 from savo_realsense.diagnostics.realsense_frame_check import (

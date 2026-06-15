@@ -1,3 +1,4 @@
+# Copyright 2026 Ahnaf Tahmid
 def normalize_topic_name(topic: str) -> str:
     cleaned = topic.strip()
     if not cleaned:

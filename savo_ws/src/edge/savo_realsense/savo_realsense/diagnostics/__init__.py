@@ -1,3 +1,4 @@
+# Copyright 2026 Ahnaf Tahmid
 from savo_realsense.diagnostics.realsense_frame_check import (
     format_missing_frames_report,
     frames_available,

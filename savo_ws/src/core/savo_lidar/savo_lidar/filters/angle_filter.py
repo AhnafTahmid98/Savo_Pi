@@ -49,13 +49,7 @@ def scan_angle_deg(
     index: int,
 ) -> float:
     angle_rad = float(angle_min_rad) + float(index) * float(angle_increment_rad)
-    angle_deg = radians_to_degrees(angle_rad)
-    normalized = normalize_angle_deg(angle_deg)
-
-    if math.isclose(normalized, 180.0, abs_tol=1e-12) and angle_deg > 0.0:
-        return 0.0
-
-    return normalized
+    return normalize_angle_deg(radians_to_degrees(angle_rad))
 
 
 def sector_indices(

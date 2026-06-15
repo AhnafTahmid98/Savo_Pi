@@ -1,3 +1,4 @@
+# Copyright 2026 Ahnaf Tahmid
 import math
 
 import numpy as np

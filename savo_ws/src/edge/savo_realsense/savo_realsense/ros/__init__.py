@@ -1,3 +1,4 @@
+# Copyright 2026 Ahnaf Tahmid
 from savo_realsense.ros.frame_contract import (
     CAMERA_OPTICAL_FRAMES,
     DEFAULT_FRAMES,

@@ -1,3 +1,4 @@
+# Copyright 2026 Ahnaf Tahmid
 from __future__ import annotations
 
 from dataclasses import dataclass

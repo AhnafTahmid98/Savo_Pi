@@ -1,3 +1,4 @@
+# Copyright 2026 Ahnaf Tahmid
 PACKAGE_NAME = "savo_realsense"
 
 # RealSense ROS 2 wrapper uses a nested namespace by default.

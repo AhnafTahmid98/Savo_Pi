@@ -7,9 +7,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-import rclpy
-from rclpy.node import Node
-from std_msgs.msg import String
+from ._ros_compat import Node, String, rclpy
 
 from savo_lidar.constants import (
     DEFAULT_HEALTH_TOPIC,

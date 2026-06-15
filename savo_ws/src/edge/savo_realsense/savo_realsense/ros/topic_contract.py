@@ -1,3 +1,4 @@
+# Copyright 2026 Ahnaf Tahmid
 from dataclasses import dataclass
 
 from savo_realsense.constants import (

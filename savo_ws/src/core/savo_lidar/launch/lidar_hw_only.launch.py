@@ -28,7 +28,7 @@ def generate_launch_description() -> LaunchDescription:
 
     driver_node = Node(
         package="savo_lidar",
-        executable="lidar_driver_node.py",
+        executable="lidar_py_driver_node.py",
         name="lidar_driver_node",
         output="screen",
         parameters=[profile_path],

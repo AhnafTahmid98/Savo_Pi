@@ -1,3 +1,4 @@
+# Copyright 2026 Ahnaf Tahmid
 from savo_realsense.utils.camera_checks import (
     all_required_streams_healthy,
     build_stream_status,

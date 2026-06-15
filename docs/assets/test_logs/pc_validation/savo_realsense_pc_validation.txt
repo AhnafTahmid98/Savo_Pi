@@ -1,0 +1,47 @@
+Robot Savo - savo_realsense PC Validation
+
+Package:
+- savo_realsense
+
+Role:
+- Intel RealSense D435 ownership package for Robot Savo.
+- Provides RealSense launch/config ownership, camera health checks, topic/frame contracts, depth front-min logic, and diagnostics.
+
+Validation machine:
+- Development PC
+
+Validation type:
+- PC validation only.
+- This does not prove real RealSense hardware performance yet.
+- Real hardware validation will be done later on savo-edge.
+
+Commands used:
+- colcon build --packages-select savo_realsense --symlink-install
+- colcon test --packages-select savo_realsense --event-handlers console_direct+
+- colcon test-result --verbose --test-result-base build/savo_realsense
+
+Validation checks included:
+- pytest unit tests
+- flake8 lint
+- copyright check
+- pep257/docstring check
+- xmllint XML check
+
+Result:
+- Build: PASSED
+- Tests: PASSED
+- Total tests: 86
+- Errors: 0
+- Failures: 0
+- Skipped: 0
+
+Result file:
+- build/savo_realsense/pytest.xml
+
+Note:
+- savo_realsense is an ament_python package.
+- Therefore the result file is build/savo_realsense/pytest.xml.
+- The test-result base for verbose checking is build/savo_realsense, not build/savo_realsense/test_results.
+
+Status:
+- savo_realsense PC validation PASSED.

@@ -1,3 +1,4 @@
+# Copyright 2026 Ahnaf Tahmid
 import json
 
 import rclpy

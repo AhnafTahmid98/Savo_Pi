@@ -1,3 +1,4 @@
+# Copyright 2026 Ahnaf Tahmid
 def normalize_frame_name(frame: str) -> str:
     cleaned = frame.strip()
     if not cleaned:

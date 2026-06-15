@@ -94,7 +94,7 @@ def test_scan_angle_deg_wraps_output():
         index=360,
     )
 
-    assert angle == pytest.approx(0.0)
+    assert angle == pytest.approx(180.0)
 
 
 def test_sector_indices_returns_empty_for_zero_points():

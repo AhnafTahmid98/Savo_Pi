@@ -1,3 +1,4 @@
+# Copyright 2026 Ahnaf Tahmid
 from savo_realsense.models.stream_status import StreamStatus
 from savo_realsense.utils.timing import is_stale
 

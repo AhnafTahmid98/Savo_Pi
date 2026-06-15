@@ -1,3 +1,4 @@
+# Copyright 2026 Ahnaf Tahmid
 def test_import_package() -> None:
     import savo_realsense
 

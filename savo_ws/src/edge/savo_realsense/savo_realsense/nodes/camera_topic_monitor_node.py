@@ -1,3 +1,4 @@
+# Copyright 2026 Ahnaf Tahmid
 import rclpy
 from diagnostic_msgs.msg import DiagnosticArray
 from rclpy.node import Node
