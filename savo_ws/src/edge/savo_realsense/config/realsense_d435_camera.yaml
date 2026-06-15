@@ -1,0 +1,41 @@
+realsense2_camera:
+  ros__parameters:
+    camera_name: camera
+    camera_namespace: camera
+
+    serial_no: ""
+    usb_port_id: ""
+    device_type: ""
+
+    enable_color: true
+    enable_depth: true
+    enable_infra1: false
+    enable_infra2: false
+    enable_gyro: false
+    enable_accel: false
+
+    color_width: 640
+    color_height: 480
+    color_fps: 30
+
+    depth_width: 848
+    depth_height: 480
+    depth_fps: 30
+
+    depth_module.depth_profile: "848x480x30"
+    rgb_camera.color_profile: "640x480x30"
+
+    align_depth.enable: true
+    pointcloud.enable: false
+    pointcloud__neon_.enable: false
+    pointcloud.stream_filter: 2
+    pointcloud.stream_index_filter: 0
+    pointcloud.ordered_pc: false
+
+    enable_sync: true
+    publish_tf: true
+    tf_publish_rate: 0.0
+
+    initial_reset: false
+    reconnect_timeout: 6.0
+    wait_for_device_timeout: -1.0

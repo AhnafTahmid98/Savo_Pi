@@ -8,7 +8,8 @@ from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description() -> LaunchDescription:
-    config_file = LaunchConfiguration("config_file")
+    camera_config_file = LaunchConfiguration("camera_config_file")
+    nodes_config_file = LaunchConfiguration("nodes_config_file")
     use_depth_front_min = LaunchConfiguration("use_depth_front_min")
 
     realsense_launch = IncludeLaunchDescription(
@@ -20,7 +21,7 @@ def generate_launch_description() -> LaunchDescription:
             ])
         ),
         launch_arguments={
-            "config_file": config_file,
+            "config_file": camera_config_file,
         }.items(),
     )
 
@@ -29,7 +30,7 @@ def generate_launch_description() -> LaunchDescription:
         executable="camera_topic_monitor_node",
         name="camera_topic_monitor_node",
         output="screen",
-        parameters=[config_file],
+        parameters=[nodes_config_file],
     )
 
     health_node = Node(
@@ -37,7 +38,7 @@ def generate_launch_description() -> LaunchDescription:
         executable="camera_health_node",
         name="camera_health_node",
         output="screen",
-        parameters=[config_file],
+        parameters=[nodes_config_file],
     )
 
     depth_front_min_node = Node(
@@ -45,17 +46,25 @@ def generate_launch_description() -> LaunchDescription:
         executable="depth_front_min_node",
         name="depth_front_min_node",
         output="screen",
-        parameters=[config_file],
+        parameters=[nodes_config_file],
         condition=_if_true(use_depth_front_min),
     )
 
     return LaunchDescription([
         DeclareLaunchArgument(
-            "config_file",
+            "camera_config_file",
             default_value=PathJoinSubstitution([
                 FindPackageShare("savo_realsense"),
                 "config",
-                "realsense_d435.yaml",
+                "realsense_d435_camera.yaml",
+            ]),
+        ),
+        DeclareLaunchArgument(
+            "nodes_config_file",
+            default_value=PathJoinSubstitution([
+                FindPackageShare("savo_realsense"),
+                "config",
+                "realsense_d435_nodes.yaml",
             ]),
         ),
         DeclareLaunchArgument(

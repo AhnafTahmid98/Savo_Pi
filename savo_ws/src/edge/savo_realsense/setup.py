@@ -11,7 +11,8 @@ setup(
         ("share/ament_index/resource_index/packages", [f"resource/{package_name}"]),
         (f"share/{package_name}", ["package.xml"]),
         (f"share/{package_name}/config", [
-            "config/realsense_d435.yaml",
+            "config/realsense_d435_camera.yaml",
+            "config/realsense_d435_nodes.yaml",
             "config/realsense_minimal.yaml",
             "config/realsense_vo_profile.yaml",
             "config/realsense_nav_profile.yaml",
