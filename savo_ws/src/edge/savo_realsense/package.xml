@@ -2,27 +2,37 @@
 <package format="3">
   <name>savo_realsense</name>
   <version>0.1.0</version>
-  <description>RealSense camera bringup, stream monitoring, and diagnostics for Robot Savo edge perception.</description>
+
+  <description>
+    RealSense D435 ownership package for Robot Savo edge perception, including
+    camera bringup, stream monitoring, C++ front-depth extraction, health
+    reporting, and diagnostic tools.
+  </description>
 
   <maintainer email="tahmidahnaf998@gmail.com">Ahnaf Tahmid</maintainer>
   <license>Proprietary</license>
 
-  <buildtool_depend>ament_python</buildtool_depend>
+  <buildtool_depend>ament_cmake</buildtool_depend>
 
+  <build_depend>ament_cmake_python</build_depend>
+
+  <depend>rclcpp</depend>
   <depend>rclpy</depend>
-  <depend>std_msgs</depend>
   <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
   <depend>diagnostic_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>tf2_ros</depend>
   <depend>cv_bridge</depend>
 
+  <exec_depend>ament_index_python</exec_depend>
   <exec_depend>realsense2_camera</exec_depend>
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
   <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
 
-
+  <test_depend>ament_cmake_pytest</test_depend>
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
   <test_depend>ament_pep257</test_depend>
@@ -30,6 +40,6 @@
   <test_depend>pytest</test_depend>
 
   <export>
-    <build_type>ament_python</build_type>
+    <build_type>ament_cmake</build_type>
   </export>
 </package>

@@ -1,0 +1,5 @@
+#!/usr/bin/env python3
+from savo_realsense.tools.realsense_smoke_test_cli import main
+
+if __name__ == "__main__":
+    main()
