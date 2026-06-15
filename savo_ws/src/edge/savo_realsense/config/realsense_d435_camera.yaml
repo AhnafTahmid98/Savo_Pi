@@ -1,4 +1,4 @@
-realsense2_camera:
+/camera/camera:
   ros__parameters:
     camera_name: camera
     camera_namespace: camera
@@ -14,25 +14,17 @@ realsense2_camera:
     enable_gyro: false
     enable_accel: false
 
-    color_width: 640
-    color_height: 480
-    color_fps: 30
-
-    depth_width: 848
-    depth_height: 480
-    depth_fps: 30
-
     depth_module.depth_profile: "848x480x30"
     rgb_camera.color_profile: "640x480x30"
 
-    align_depth.enable: true
+    align_depth.enable: false
+    enable_sync: false
+
     pointcloud.enable: false
-    pointcloud__neon_.enable: false
     pointcloud.stream_filter: 2
     pointcloud.stream_index_filter: 0
     pointcloud.ordered_pc: false
 
-    enable_sync: true
     publish_tf: true
     tf_publish_rate: 0.0
 

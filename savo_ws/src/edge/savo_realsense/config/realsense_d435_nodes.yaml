@@ -2,36 +2,30 @@ camera_topic_monitor_node:
   ros__parameters:
     publish_hz: 2.0
     stale_timeout_s: 0.50
-
     expected_color_hz: 20.0
     expected_depth_hz: 20.0
     expected_camera_info_hz: 20.0
     expected_pointcloud_hz: 10.0
-
     require_pointcloud: false
 
 camera_health_node:
   ros__parameters:
     status_hz: 2.0
     stale_timeout_s: 0.50
-
     expected_color_hz: 20.0
     expected_depth_hz: 20.0
     expected_camera_info_hz: 20.0
     expected_pointcloud_hz: 10.0
-
     require_pointcloud: false
 
 depth_front_min_node:
   ros__parameters:
     input_topic: /camera/camera/depth/image_rect_raw
     output_topic: /depth/min_front_m
-
     depth_scale: 0.001
     min_valid_m: 0.02
     max_valid_m: 3.00
     percentile: 10.0
-
     x_min_ratio: 0.35
     x_max_ratio: 0.65
     y_min_ratio: 0.35

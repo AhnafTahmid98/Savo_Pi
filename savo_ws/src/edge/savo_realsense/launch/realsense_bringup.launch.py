@@ -1,6 +1,8 @@
 # Copyright 2026 Ahnaf Tahmid
+
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
@@ -23,6 +25,7 @@ def generate_launch_description() -> LaunchDescription:
         launch_arguments={
             "config_file": camera_config_file,
         }.items(),
+        scoped=True,
     )
 
     topic_monitor = Node(
@@ -47,7 +50,7 @@ def generate_launch_description() -> LaunchDescription:
         name="depth_front_min_node",
         output="screen",
         parameters=[nodes_config_file],
-        condition=_if_true(use_depth_front_min),
+        condition=IfCondition(use_depth_front_min),
     )
 
     return LaunchDescription([
@@ -76,9 +79,3 @@ def generate_launch_description() -> LaunchDescription:
         health_node,
         depth_front_min_node,
     ])
-
-
-def _if_true(value: LaunchConfiguration):
-    from launch.conditions import IfCondition
-
-    return IfCondition(value)
