@@ -22,8 +22,12 @@ realsense2_camera:
     depth_height: 480
     depth_fps: 30
 
+    depth_module.depth_profile: "640x480x30"
+    rgb_camera.color_profile: "640x480x30"
+
     align_depth.enable: true
-    pointcloud.enable: true
+    pointcloud.enable: false
+    pointcloud__neon_.enable: false
     pointcloud.stream_filter: 2
     pointcloud.stream_index_filter: 0
     pointcloud.ordered_pc: false
@@ -46,7 +50,7 @@ camera_topic_monitor_node:
     expected_camera_info_hz: 30.0
     expected_pointcloud_hz: 10.0
 
-    require_pointcloud: true
+    require_pointcloud: false
 
 camera_health_node:
   ros__parameters:
@@ -58,7 +62,7 @@ camera_health_node:
     expected_camera_info_hz: 30.0
     expected_pointcloud_hz: 10.0
 
-    require_pointcloud: true
+    require_pointcloud: false
 
 depth_front_min_node:
   ros__parameters:

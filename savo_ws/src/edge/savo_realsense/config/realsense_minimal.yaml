@@ -22,10 +22,14 @@ realsense2_camera:
     depth_height: 480
     depth_fps: 30
 
+    depth_module.depth_profile: "640x480x30"
+    rgb_camera.color_profile: "640x480x30"
+
     align_depth.enable: false
     pointcloud.enable: false
+    pointcloud__neon_.enable: false
 
-    enable_sync: true
+    enable_sync: false
     publish_tf: true
 
     initial_reset: false

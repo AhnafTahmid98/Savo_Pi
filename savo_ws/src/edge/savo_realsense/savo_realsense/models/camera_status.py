@@ -33,8 +33,10 @@ class CameraStatus:
 
     @property
     def pointcloud_ok(self) -> bool:
+        if not self.require_pointcloud:
+            return True
         if self.pointcloud is None:
-            return not self.require_pointcloud
+            return False
         return self.pointcloud.ok
 
     @property
@@ -70,7 +72,7 @@ class CameraStatus:
             missing.append("depth")
         if not self.depth_info_ok:
             missing.append("depth_info")
-        if not self.pointcloud_ok:
+        if self.require_pointcloud and not self.pointcloud_ok:
             missing.append("pointcloud")
 
         return "Unhealthy streams: " + ", ".join(missing)

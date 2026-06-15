@@ -107,6 +107,24 @@ def test_camera_status_reports_multiple_unhealthy_streams() -> None:
     assert status.message == "Unhealthy streams: color_info, depth"
 
 
+def test_camera_status_ignores_unhealthy_pointcloud_when_not_required() -> None:
+    stream = make_stream()
+    bad_pointcloud = make_stream(seen=False, rate_hz=0.0, expected_hz=10.0)
+
+    status = CameraStatus(
+        color=stream,
+        color_info=stream,
+        depth=stream,
+        depth_info=stream,
+        pointcloud=bad_pointcloud,
+        require_pointcloud=False,
+    )
+
+    assert status.ok
+    assert status.pointcloud_ok
+    assert status.message == "RealSense streams OK"
+
+
 def test_camera_status_accepts_healthy_pointcloud_when_required() -> None:
     stream = make_stream()
     pointcloud = make_stream(rate_hz=10.0, expected_hz=10.0)

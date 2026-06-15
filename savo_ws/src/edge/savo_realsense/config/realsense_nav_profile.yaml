@@ -22,6 +22,9 @@ realsense2_camera:
     depth_height: 480
     depth_fps: 30
 
+    depth_module.depth_profile: "640x480x30"
+    rgb_camera.color_profile: "640x480x30"
+
     align_depth.enable: true
     pointcloud.enable: true
     pointcloud.stream_filter: 2
