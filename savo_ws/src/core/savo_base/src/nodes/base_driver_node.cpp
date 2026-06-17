@@ -279,7 +279,7 @@ void BaseDriverNode::publish_state(
   const WheelDuty & duty)
 {
   BaseRuntimeState state{};
-  state.node_name = "base_driver_node_cpp";
+  state.node_name = "base_driver_node";
   state.last_board_error = last_board_error_;
   state.connected = board_ && board_->connected();
   state.safety_stop = safety_stop_;
@@ -343,7 +343,7 @@ int main(int argc, char ** argv)
   try {
     rclcpp::spin(std::make_shared<savo_base::BaseDriverNode>());
   } catch (const std::exception & exc) {
-    RCLCPP_FATAL(rclcpp::get_logger("base_driver_node_cpp"), "%s", exc.what());
+    RCLCPP_FATAL(rclcpp::get_logger("base_driver_node"), "%s", exc.what());
   }
 
   rclcpp::shutdown();

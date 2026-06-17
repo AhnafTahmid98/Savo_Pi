@@ -11,7 +11,8 @@ base_driver_node only — no helper nodes. Useful for isolated hardware testing.
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, LogInfo
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.conditions import IfCondition
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
@@ -22,6 +23,7 @@ def generate_launch_description() -> LaunchDescription:
     profile = LaunchConfiguration("profile")
     output = LaunchConfiguration("output")
     log_level = LaunchConfiguration("log_level")
+    driver_impl = LaunchConfiguration("driver_impl")
 
     topics_yaml = PathJoinSubstitution([pkg_share, "config", "topics.yaml"])
     safety_yaml = PathJoinSubstitution([pkg_share, "config", "safety_timeouts.yaml"])
@@ -31,9 +33,9 @@ def generate_launch_description() -> LaunchDescription:
 
     # profile must include the filename, e.g. "bench_test.yaml"
 
-    base_driver = Node(
+    base_driver_cpp = Node(
         package="savo_base",
-        executable="base_driver_node.py",
+        executable="base_driver_node",
         name="base_driver_node",
         output=output,
         parameters=[
@@ -44,6 +46,23 @@ def generate_launch_description() -> LaunchDescription:
             profile_yaml,   # profile overrides last
         ],
         arguments=["--ros-args", "--log-level", log_level],
+        condition=IfCondition(PythonExpression(["'", driver_impl, "' == 'cpp'"])),
+    )
+
+    base_driver_py = Node(
+        package="savo_base",
+        executable="base_driver_node_py",
+        name="base_driver_node",
+        output=output,
+        parameters=[
+            topics_yaml,
+            safety_yaml,
+            board_yaml,
+            mecanum_yaml,
+            profile_yaml,   # profile overrides last
+        ],
+        arguments=["--ros-args", "--log-level", log_level],
+        condition=IfCondition(PythonExpression(["'", driver_impl, "' == 'py'"])),
     )
 
     return LaunchDescription(
@@ -57,6 +76,11 @@ def generate_launch_description() -> LaunchDescription:
                 ),
             ),
             DeclareLaunchArgument(
+                "driver_impl",
+                default_value="cpp",
+                description="Base driver implementation: cpp or py",
+            ),
+            DeclareLaunchArgument(
                 "output",
                 default_value="screen",
                 description="Node output mode (screen|log).",
@@ -68,6 +92,8 @@ def generate_launch_description() -> LaunchDescription:
             ),
             LogInfo(msg="[savo_base] Starting base_hw_only.launch.py"),
             LogInfo(msg=["[savo_base] Profile: ", profile]),
-            base_driver,
+            LogInfo(msg=["[savo_base] Driver implementation: ", driver_impl]),
+            base_driver_cpp,
+            base_driver_py,
         ]
     )

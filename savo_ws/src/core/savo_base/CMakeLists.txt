@@ -37,7 +37,7 @@ ament_python_install_package(${PROJECT_NAME})
 # -----------------------------------------------------------------------------
 # C++ executables
 # -----------------------------------------------------------------------------
-add_executable(base_driver_node_cpp
+add_executable(base_driver_node
   src/nodes/base_driver_node.cpp
   src/kinematics/mecanum_mixer.cpp
   src/drivers/freenove_motor_board.cpp
@@ -47,24 +47,24 @@ add_executable(base_driver_node_cpp
   src/state/base_state.cpp
 )
 
-target_include_directories(base_driver_node_cpp
+target_include_directories(base_driver_node
   PRIVATE
     include
 )
 
-target_compile_features(base_driver_node_cpp
+target_compile_features(base_driver_node
   PRIVATE
     cxx_std_17
 )
 
-ament_target_dependencies(base_driver_node_cpp
+ament_target_dependencies(base_driver_node
   rclcpp
   geometry_msgs
   std_msgs
 )
 
 install(TARGETS
-  base_driver_node_cpp
+  base_driver_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -85,13 +85,18 @@ install(PROGRAMS
   scripts/dump_effective_params.py
 
   # ROS nodes (savo_base/nodes/)
-  savo_base/nodes/base_driver_node.py
   savo_base/nodes/base_watchdog_node.py
   savo_base/nodes/base_state_publisher_node.py
   savo_base/nodes/base_diag_runner_node.py
   savo_base/nodes/base_heartbeat_node.py
 
   DESTINATION lib/${PROJECT_NAME}
+)
+
+install(PROGRAMS
+  savo_base/nodes/base_driver_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME base_driver_node_py
 )
 
 # -----------------------------------------------------------------------------

@@ -30,7 +30,7 @@ struct BaseCommandState
 
 struct BaseRuntimeState
 {
-  std::string node_name{"base_driver_node_cpp"};
+  std::string node_name{"base_driver_node"};
   std::string last_board_error{};
 
   bool connected{false};
