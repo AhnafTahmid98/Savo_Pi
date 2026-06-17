@@ -27,6 +27,8 @@
 
     # 3000 = proven safe cap; PCA9685 max is 4095
     max_duty: 3000
+    enable_breakaway_compensation: true
+    min_motion_duty: 700
     turn_gain: 1.0
 
     forward_sign: -1

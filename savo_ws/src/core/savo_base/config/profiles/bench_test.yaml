@@ -28,6 +28,8 @@
 
     # 1200 = conservative bench cap; PCA9685 max is 4095
     max_duty: 1200
+    enable_breakaway_compensation: false
+    min_motion_duty: 0
     turn_gain: 1.0
 
     forward_sign: -1

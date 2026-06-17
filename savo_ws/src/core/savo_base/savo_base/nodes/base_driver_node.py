@@ -239,6 +239,8 @@ class BaseDriverNode(Node):
         self.declare_parameter("wz_limit", 1.0)
 
         self.declare_parameter("max_duty", 3000)
+        self.declare_parameter("enable_breakaway_compensation", True)
+        self.declare_parameter("min_motion_duty", 700)
         self.declare_parameter("turn_gain", 1.0)
 
         # Conventions / signs (match proven teleop defaults)
@@ -290,6 +292,15 @@ class BaseDriverNode(Node):
         self.wz_limit = max(0.0, float(self.get_parameter("wz_limit").value))
 
         self.max_duty = int(max(0, min(4095, int(self.get_parameter("max_duty").value))))
+
+        self.enable_breakaway_compensation = bool(
+            self.get_parameter("enable_breakaway_compensation").value
+        )
+
+        self.min_motion_duty = int(
+            max(0, min(self.max_duty, int(self.get_parameter("min_motion_duty").value)))
+        )
+
         self.turn_gain = float(self.get_parameter("turn_gain").value)
 
         self.forward_sign = int(self.get_parameter("forward_sign").value)
@@ -580,6 +591,31 @@ class BaseDriverNode(Node):
             "Failed to initialize motor board. "
             f"Factory signature mismatch or runtime error: {last_err}"
         )
+
+    def _apply_breakaway_compensation(
+        self, dfl: int, drl: int, dfr: int, drr: int
+    ) -> Tuple[int, int, int, int]:
+        """
+        Lift small non-zero wheel duties above motor breakaway torque.
+
+        Real brushed DC motors often hum but do not spin below a minimum PWM duty.
+        This keeps zero as zero, but ensures intentional non-zero wheel commands
+        receive enough duty to overcome static friction.
+        """
+        if not self.enable_breakaway_compensation or self.min_motion_duty <= 0:
+            return int(dfl), int(drl), int(dfr), int(drr)
+
+        threshold = min(int(self.min_motion_duty), int(self.max_duty))
+
+        def one(value: int) -> int:
+            v = int(value)
+            if v == 0:
+                return 0
+            if abs(v) < threshold:
+                return threshold if v > 0 else -threshold
+            return v
+
+        return one(dfl), one(drl), one(dfr), one(drr)
 
     def _board_stop(self) -> None:
         if self.board is None:
@@ -892,6 +928,10 @@ class BaseDriverNode(Node):
             except Exception as e:
                 # Telemetry/model failure must not block motion
                 self.get_logger().warn(f"WheelCommand model path failed, using direct duty values: {e}")
+
+        # Real motor breakaway compensation must happen after all duty paths
+        # so telemetry/model fallbacks cannot overwrite it.
+        dfl, drl, dfr, drr = self._apply_breakaway_compensation(dfl, drl, dfr, drr)
 
         # Write to board
         self._board_write(dfl, drl, dfr, drr)
