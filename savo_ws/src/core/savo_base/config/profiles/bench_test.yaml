@@ -34,8 +34,8 @@
     turn_gain: 1.0
 
     forward_sign: -1
-    strafe_sign: 1
-    rotate_sign: 1
+    strafe_sign: -1
+    rotate_sign: -1
 
     # "auto" uses real backend; "dryrun" for no-hardware execution
     board_backend: "auto"

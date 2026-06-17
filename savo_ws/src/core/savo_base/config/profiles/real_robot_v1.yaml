@@ -37,8 +37,8 @@
     turn_gain: 1.0
 
     forward_sign: -1
-    strafe_sign: 1
-    rotate_sign: 1
+    strafe_sign: -1
+    rotate_sign: -1
 
     board_backend: "freenove"
     board_name: "robot_savo_freenove_mecanum"
