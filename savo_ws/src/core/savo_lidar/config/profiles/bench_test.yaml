@@ -7,7 +7,7 @@ lidar_driver_node:
     baudrate: 115200
     serial_timeout_s: 1.0
 
-    reconnect_on_error: true
+    reconnect_on_error: false
     reconnect_delay_s: 0.5
     max_reconnect_delay_s: 5.0
 
@@ -20,9 +20,9 @@ lidar_driver_node:
 
     expected_scan_rate_hz: 7.0
     publish_rate_hz: 7.0
-    read_timeout_s: 2.0
+    read_timeout_s: 5.0
 
-    motor_start_settle_s: 1.0
+    motor_start_settle_s: 2.0
     motor_stop_timeout_s: 1.0
 
     min_range_m: 0.15
