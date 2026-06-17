@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Launch the LiDAR stack with mapping-oriented scan checks."""
+"""Launch the real LiDAR stack with mapping-oriented scan checks."""
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, LogInfo
@@ -14,7 +14,7 @@ def generate_launch_description() -> LaunchDescription:
     profile_arg = DeclareLaunchArgument(
         "profile",
         default_value="mapping_rplidar_a1.yaml",
-        description="Profile file under config/profiles.",
+        description="Mapping profile file under config/profiles.",
     )
 
     profile_path = PathJoinSubstitution(
@@ -28,7 +28,7 @@ def generate_launch_description() -> LaunchDescription:
 
     driver_node = Node(
         package="savo_lidar",
-        executable="lidar_py_driver_node.py",
+        executable="lidar_driver_node",
         name="lidar_driver_node",
         output="screen",
         parameters=[profile_path],
@@ -73,7 +73,8 @@ def generate_launch_description() -> LaunchDescription:
                 msg=[
                     "Starting Robot Savo LiDAR mapping-ready stack | profile=",
                     profile,
-                    " | scan=/scan | filtered=/scan/filtered",
+                    " | driver=lidar_driver_node",
+                    " | scan=/scan | filtered=/scan_filtered",
                 ]
             ),
             driver_node,

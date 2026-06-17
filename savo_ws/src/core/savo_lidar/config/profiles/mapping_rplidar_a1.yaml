@@ -1,26 +1,35 @@
-# Mapping profile — stricter scan quality for SLAM.
+# Mapping profile — real RPLIDAR A1 with stricter scan quality for SLAM.
 
 lidar_driver_node:
   ros__parameters:
-    backend: "real"
-    model: "rplidar_a1"
-
-    scan_topic: "/scan"
-    frame_id: "laser"
-
     serial_port: "/dev/ttyUSB0"
     baudrate: 115200
+    serial_timeout_s: 1.0
+
+    reconnect_on_error: true
+    reconnect_delay_s: 0.5
+    max_reconnect_delay_s: 5.0
+
+    frame_id: "laser"
+    scan_topic: "/scan"
     scan_mode: "standard"
+
+    driver_state_topic: "/savo_lidar/state"
+    heartbeat_topic: "/savo_lidar/heartbeat"
+
+    expected_scan_rate_hz: 7.0
+    publish_rate_hz: 7.0
+    read_timeout_s: 1.5
+
+    motor_start_settle_s: 1.0
+    motor_stop_timeout_s: 1.0
 
     min_range_m: 0.15
     max_range_m: 12.0
 
-    expected_scan_rate_hz: 5.5
-    publish_rate_hz: 10.0
-    stale_timeout_s: 1.0
-
     inverted: false
-    angle_compensate: true
+    angle_offset_rad: 0.0
+    auto_start: true
 
 lidar_filter_node:
   ros__parameters:
@@ -31,7 +40,7 @@ lidar_filter_node:
     min_range_m: 0.15
     max_range_m: 12.0
 
-    # mapping needs cleaner scans than bench testing
+    # Mapping needs cleaner scans than bench testing.
     warn_valid_ratio: 0.70
     error_valid_ratio: 0.40
 

@@ -3,6 +3,7 @@
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, ExecuteProcess, LogInfo
+from launch.conditions import IfCondition, UnlessCondition
 from launch.substitutions import LaunchConfiguration
 
 
@@ -22,7 +23,20 @@ def generate_launch_description() -> LaunchDescription:
         description="Print diagnostic result as JSON.",
     )
 
-    port_check = ExecuteProcess(
+    port_check_text = ExecuteProcess(
+        cmd=[
+            "ros2",
+            "run",
+            "savo_lidar",
+            "find_lidar_port_cli.py",
+            "--serial-port",
+            serial_port,
+        ],
+        output="screen",
+        condition=UnlessCondition(json_output),
+    )
+
+    port_check_json = ExecuteProcess(
         cmd=[
             "ros2",
             "run",
@@ -31,9 +45,9 @@ def generate_launch_description() -> LaunchDescription:
             "--serial-port",
             serial_port,
             "--json",
-            json_output,
         ],
         output="screen",
+        condition=IfCondition(json_output),
     )
 
     return LaunchDescription(
@@ -44,8 +58,11 @@ def generate_launch_description() -> LaunchDescription:
                 msg=[
                     "Starting Robot Savo LiDAR port diagnostic | serial_port=",
                     serial_port,
+                    " | json=",
+                    json_output,
                 ]
             ),
-            port_check,
+            port_check_text,
+            port_check_json,
         ]
     )

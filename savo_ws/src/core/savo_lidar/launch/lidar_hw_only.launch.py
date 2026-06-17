@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Hardware-only LiDAR bringup for direct RPLIDAR testing."""
+"""Launch only the real RPLIDAR hardware driver."""
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, LogInfo
@@ -14,7 +14,11 @@ def generate_launch_description() -> LaunchDescription:
     profile_arg = DeclareLaunchArgument(
         "profile",
         default_value="bench_test.yaml",
-        description="Profile file under config/profiles.",
+        description=(
+            "Hardware profile file under config/profiles. "
+            "Use bench_test.yaml, real_rplidar_a1.yaml, "
+            "mapping_rplidar_a1.yaml, or nav_rplidar_a1.yaml."
+        ),
     )
 
     profile_path = PathJoinSubstitution(
@@ -28,7 +32,7 @@ def generate_launch_description() -> LaunchDescription:
 
     driver_node = Node(
         package="savo_lidar",
-        executable="lidar_py_driver_node.py",
+        executable="lidar_driver_node",
         name="lidar_driver_node",
         output="screen",
         parameters=[profile_path],
@@ -41,7 +45,7 @@ def generate_launch_description() -> LaunchDescription:
                 msg=[
                     "Starting Robot Savo LiDAR hardware-only bringup | profile=",
                     profile,
-                    " | scan=/scan",
+                    " | driver=lidar_driver_node | scan=/scan",
                 ]
             ),
             driver_node,

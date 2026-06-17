@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Launch the LiDAR driver and filter nodes for scan-filter validation."""
+"""Launch the dryrun LiDAR driver and filter node for scan-filter validation."""
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, LogInfo
@@ -14,7 +14,7 @@ def generate_launch_description() -> LaunchDescription:
     profile_arg = DeclareLaunchArgument(
         "profile",
         default_value="dryrun_sim.yaml",
-        description="Profile file under config/profiles.",
+        description="Dryrun profile file under config/profiles.",
     )
 
     profile_path = PathJoinSubstitution(
@@ -29,7 +29,7 @@ def generate_launch_description() -> LaunchDescription:
     driver_node = Node(
         package="savo_lidar",
         executable="lidar_py_driver_node.py",
-        name="lidar_driver_node",
+        name="lidar_py_driver_node",
         output="screen",
         parameters=[profile_path],
     )
@@ -49,7 +49,7 @@ def generate_launch_description() -> LaunchDescription:
                 msg=[
                     "Starting Robot Savo LiDAR filter test | profile=",
                     profile,
-                    " | /scan -> /scan/filtered",
+                    " | /scan -> /scan_filtered",
                 ]
             ),
             driver_node,

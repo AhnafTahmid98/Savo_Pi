@@ -141,10 +141,10 @@ RplidarMeasurement parse_scan_node(const std::uint8_t * bytes, std::size_t size)
   measurement.angle_rad = q6_angle_to_rad(angle_q6);
   measurement.distance_m = q2_distance_to_m(distance_q2);
   measurement.valid = start_flags_valid &&
-                      check_bit &&
-                      distance_q2 > 0U &&
-                      std::isfinite(measurement.angle_rad) &&
-                      std::isfinite(measurement.distance_m);
+    check_bit &&
+    distance_q2 > 0U &&
+    std::isfinite(measurement.angle_rad) &&
+    std::isfinite(measurement.distance_m);
 
   return measurement;
 }

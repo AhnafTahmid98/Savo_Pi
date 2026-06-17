@@ -1,6 +1,7 @@
 # PC-safe profile — no LiDAR hardware required.
+# Uses the Python dryrun/fallback driver, not the C++ serial hardware driver.
 
-lidar_driver_node:
+lidar_py_driver_node:
   ros__parameters:
     backend: "dryrun"
     model: "rplidar_a1"
@@ -8,12 +9,16 @@ lidar_driver_node:
     scan_topic: "/scan"
     frame_id: "laser"
 
+    driver_state_topic: "/savo_lidar/state"
+    heartbeat_topic: "/savo_lidar/heartbeat"
+
     min_range_m: 0.15
     max_range_m: 12.0
 
-    expected_scan_rate_hz: 5.5
+    expected_scan_rate_hz: 10.0
     publish_rate_hz: 10.0
     stale_timeout_s: 1.0
+    heartbeat_hz: 1.0
 
     inverted: false
     angle_compensate: true

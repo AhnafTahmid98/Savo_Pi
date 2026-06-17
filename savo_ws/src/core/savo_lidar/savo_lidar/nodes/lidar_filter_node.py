@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ._ros_compat import LaserScan, Node, String, rclpy
+from savo_lidar.nodes._ros_compat import LaserScan, Node, String, rclpy
 
 from savo_lidar.constants import (
     DEFAULT_FILTERED_SCAN_TOPIC,

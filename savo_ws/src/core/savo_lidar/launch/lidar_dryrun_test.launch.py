@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Dryrun LiDAR stack for PC testing without RPLIDAR hardware."""
+"""Launch the PC-safe dryrun LiDAR stack."""
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, LogInfo
+from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
@@ -17,18 +18,21 @@ def generate_launch_description() -> LaunchDescription:
     profile_arg = DeclareLaunchArgument(
         "profile",
         default_value="dryrun_sim.yaml",
-        description="Profile file under config/profiles.",
+        description="Dryrun profile file under config/profiles.",
     )
+
     use_filter_arg = DeclareLaunchArgument(
         "use_filter",
         default_value="true",
         description="Start lidar_filter_node.",
     )
+
     use_health_arg = DeclareLaunchArgument(
         "use_health",
         default_value="true",
-        description="Start watchdog and health nodes.",
+        description="Start lidar_watchdog_node and lidar_health_node.",
     )
+
     use_state_summary_arg = DeclareLaunchArgument(
         "use_state_summary",
         default_value="true",
@@ -47,7 +51,7 @@ def generate_launch_description() -> LaunchDescription:
     driver_node = Node(
         package="savo_lidar",
         executable="lidar_py_driver_node.py",
-        name="lidar_driver_node",
+        name="lidar_py_driver_node",
         output="screen",
         parameters=[profile_path],
     )
@@ -58,7 +62,7 @@ def generate_launch_description() -> LaunchDescription:
         name="lidar_filter_node",
         output="screen",
         parameters=[profile_path],
-        condition=_if_arg(use_filter),
+        condition=IfCondition(use_filter),
     )
 
     watchdog_node = Node(
@@ -67,7 +71,7 @@ def generate_launch_description() -> LaunchDescription:
         name="lidar_watchdog_node",
         output="screen",
         parameters=[profile_path],
-        condition=_if_arg(use_health),
+        condition=IfCondition(use_health),
     )
 
     health_node = Node(
@@ -76,7 +80,7 @@ def generate_launch_description() -> LaunchDescription:
         name="lidar_health_node",
         output="screen",
         parameters=[profile_path],
-        condition=_if_arg(use_health),
+        condition=IfCondition(use_health),
     )
 
     state_summary_node = Node(
@@ -85,7 +89,7 @@ def generate_launch_description() -> LaunchDescription:
         name="lidar_state_publisher_node",
         output="screen",
         parameters=[profile_path],
-        condition=_if_arg(use_state_summary),
+        condition=IfCondition(use_state_summary),
     )
 
     return LaunchDescription(
@@ -98,7 +102,7 @@ def generate_launch_description() -> LaunchDescription:
                 msg=[
                     "Starting Robot Savo LiDAR dryrun stack | profile=",
                     profile,
-                    " | scan=/scan",
+                    " | driver=lidar_py_driver_node.py | scan=/scan",
                 ]
             ),
             driver_node,
@@ -108,9 +112,3 @@ def generate_launch_description() -> LaunchDescription:
             state_summary_node,
         ]
     )
-
-
-def _if_arg(arg: LaunchConfiguration):
-    from launch.conditions import IfCondition
-
-    return IfCondition(arg)

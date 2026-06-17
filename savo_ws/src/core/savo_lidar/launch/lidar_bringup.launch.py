@@ -4,13 +4,14 @@
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, LogInfo
 from launch.conditions import IfCondition
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description() -> LaunchDescription:
     profile = LaunchConfiguration("profile")
+    driver = LaunchConfiguration("driver")
     use_filter = LaunchConfiguration("use_filter")
     use_watchdog = LaunchConfiguration("use_watchdog")
     use_health = LaunchConfiguration("use_health")
@@ -21,21 +22,31 @@ def generate_launch_description() -> LaunchDescription:
         default_value="real_rplidar_a1.yaml",
         description="Profile file under config/profiles.",
     )
+
+    driver_arg = DeclareLaunchArgument(
+        "driver",
+        default_value="real",
+        description="Driver backend to launch: real or dryrun.",
+    )
+
     use_filter_arg = DeclareLaunchArgument(
         "use_filter",
         default_value="true",
         description="Start lidar_filter_node.",
     )
+
     use_watchdog_arg = DeclareLaunchArgument(
         "use_watchdog",
         default_value="true",
         description="Start lidar_watchdog_node.",
     )
+
     use_health_arg = DeclareLaunchArgument(
         "use_health",
         default_value="true",
         description="Start lidar_health_node.",
     )
+
     use_state_summary_arg = DeclareLaunchArgument(
         "use_state_summary",
         default_value="true",
@@ -51,12 +62,26 @@ def generate_launch_description() -> LaunchDescription:
         ]
     )
 
-    driver_node = Node(
+    real_driver_node = Node(
         package="savo_lidar",
-        executable="lidar_py_driver_node.py",
+        executable="lidar_driver_node",
         name="lidar_driver_node",
         output="screen",
         parameters=[profile_path],
+        condition=IfCondition(
+            PythonExpression(["'", driver, "' == 'real'"])
+        ),
+    )
+
+    dryrun_driver_node = Node(
+        package="savo_lidar",
+        executable="lidar_py_driver_node.py",
+        name="lidar_py_driver_node",
+        output="screen",
+        parameters=[profile_path],
+        condition=IfCondition(
+            PythonExpression(["'", driver, "' == 'dryrun'"])
+        ),
     )
 
     filter_node = Node(
@@ -98,6 +123,7 @@ def generate_launch_description() -> LaunchDescription:
     return LaunchDescription(
         [
             profile_arg,
+            driver_arg,
             use_filter_arg,
             use_watchdog_arg,
             use_health_arg,
@@ -106,10 +132,13 @@ def generate_launch_description() -> LaunchDescription:
                 msg=[
                     "Starting Robot Savo LiDAR bringup | profile=",
                     profile,
-                    " | output=/scan",
+                    " | driver=",
+                    driver,
+                    " | scan=/scan",
                 ]
             ),
-            driver_node,
+            real_driver_node,
+            dryrun_driver_node,
             filter_node,
             watchdog_node,
             health_node,
