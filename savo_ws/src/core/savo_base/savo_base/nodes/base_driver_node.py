@@ -138,9 +138,9 @@ def _fallback_mix_mecanum(
     vy: float,
     wz: float,
     *,
-    forward_sign: int = -1,
-    strafe_sign: int = -1,
-    rotate_sign: int = -1,
+    forward_sign: int = 1,
+    strafe_sign: int = 1,
+    rotate_sign: int = 1,
     turn_gain: float = 1.0,
 ) -> Tuple[float, float, float, float]:
     """
@@ -245,9 +245,9 @@ class BaseDriverNode(Node):
         self.declare_parameter("turn_gain", 1.0)
 
         # Conventions / signs (match proven teleop defaults)
-        self.declare_parameter("forward_sign", -1)
-        self.declare_parameter("strafe_sign", -1)
-        self.declare_parameter("rotate_sign", -1)
+        self.declare_parameter("forward_sign", 1)
+        self.declare_parameter("strafe_sign", 1)
+        self.declare_parameter("rotate_sign", 1)
 
         # Board backend
         self.declare_parameter("board_backend", "auto")  # auto | freenove | dryrun

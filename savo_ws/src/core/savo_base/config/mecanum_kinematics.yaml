@@ -19,9 +19,9 @@
     # -------------------------------------------------------------------------
     # Command conventions
     # -------------------------------------------------------------------------
-    forward_sign: -1
-    strafe_sign: -1
-    rotate_sign: -1
+    forward_sign: 1
+    strafe_sign: 1
+    rotate_sign: 1
 
     turn_gain: 1.0
 
