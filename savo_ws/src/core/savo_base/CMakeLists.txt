@@ -35,6 +35,44 @@ find_package(savo_msgs REQUIRED)
 ament_python_install_package(${PROJECT_NAME})
 
 # -----------------------------------------------------------------------------
+# C++ executables
+# -----------------------------------------------------------------------------
+add_executable(base_driver_node_cpp
+  src/nodes/base_driver_node.cpp
+  src/kinematics/mecanum_mixer.cpp
+  src/drivers/freenove_motor_board.cpp
+  src/safety/base_safety.cpp
+  src/safety/command_guard.cpp
+  src/safety/timeout_watchdog.cpp
+  src/state/base_state.cpp
+)
+
+target_include_directories(base_driver_node_cpp
+  PRIVATE
+    include
+)
+
+target_compile_features(base_driver_node_cpp
+  PRIVATE
+    cxx_std_17
+)
+
+ament_target_dependencies(base_driver_node_cpp
+  rclcpp
+  geometry_msgs
+  std_msgs
+)
+
+install(TARGETS
+  base_driver_node_cpp
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(DIRECTORY include/
+  DESTINATION include
+)
+
+# -----------------------------------------------------------------------------
 # Install Python executables (reliable for hybrid packages)
 # -----------------------------------------------------------------------------
 # explicit install for reliable ros2 run in this hybrid ament_cmake layout
