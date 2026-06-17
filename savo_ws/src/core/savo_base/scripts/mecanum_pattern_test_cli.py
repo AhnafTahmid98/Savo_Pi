@@ -203,10 +203,17 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--gap", type=float, default=0.80, help="Stop gap between patterns, default 0.80")
     parser.add_argument("--repeat", type=int, default=1, help="Repeat sequence count, default 1")
 
-    parser.add_argument("--invert-fl", action="store_true", help="Invert FL for diagnostic only")
-    parser.add_argument("--invert-rl", action="store_true", help="Invert RL for diagnostic only")
-    parser.add_argument("--invert-fr", action="store_true", help="Invert FR for diagnostic only")
-    parser.add_argument("--invert-rr", action="store_true", help="Invert RR for diagnostic only")
+    parser.add_argument("--no-invert-fl", dest="invert_fl", action="store_false")
+    parser.add_argument("--no-invert-rl", dest="invert_rl", action="store_false")
+    parser.add_argument("--no-invert-fr", dest="invert_fr", action="store_false")
+    parser.add_argument("--no-invert-rr", dest="invert_rr", action="store_false")
+
+    parser.set_defaults(
+        invert_fl=True,
+        invert_rl=True,
+        invert_fr=True,
+        invert_rr=True,
+    )
 
     parser.add_argument("--dry-run", action="store_true", help="Print patterns without touching hardware")
     parser.add_argument("--yes", action="store_true", help="Skip interactive safety confirmation")
