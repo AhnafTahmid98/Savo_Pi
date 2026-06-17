@@ -42,6 +42,7 @@ install(PROGRAMS
   # CLI tools (scripts/)
   scripts/teleop_letters_cli.py
   scripts/poke_test_cli.py
+  scripts/mecanum_pattern_test_cli.py
   scripts/base_smoke_test_cli.py
   scripts/dump_effective_params.py
 
