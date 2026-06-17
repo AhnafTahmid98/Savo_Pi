@@ -240,7 +240,8 @@ class BaseDriverNode(Node):
 
         self.declare_parameter("max_duty", 3000)
         self.declare_parameter("enable_breakaway_compensation", True)
-        self.declare_parameter("min_motion_duty", 700)
+        self.declare_parameter("min_motion_duty", 850)
+        self.declare_parameter("breakaway_trigger_duty", 120)
         self.declare_parameter("turn_gain", 1.0)
 
         # Conventions / signs (match proven teleop defaults)
@@ -299,6 +300,10 @@ class BaseDriverNode(Node):
 
         self.min_motion_duty = int(
             max(0, min(self.max_duty, int(self.get_parameter("min_motion_duty").value)))
+        )
+
+        self.breakaway_trigger_duty = int(
+            max(0, min(self.min_motion_duty, int(self.get_parameter("breakaway_trigger_duty").value)))
         )
 
         self.turn_gain = float(self.get_parameter("turn_gain").value)
@@ -595,24 +600,28 @@ class BaseDriverNode(Node):
     def _apply_breakaway_compensation(
         self, dfl: int, drl: int, dfr: int, drr: int
     ) -> Tuple[int, int, int, int]:
-        """
-        Lift small non-zero wheel duties above motor breakaway torque.
-
-        Real brushed DC motors often hum but do not spin below a minimum PWM duty.
-        This keeps zero as zero, but ensures intentional non-zero wheel commands
-        receive enough duty to overcome static friction.
-        """
+        """Apply Robot Savo motor breakaway compensation."""
         if not self.enable_breakaway_compensation or self.min_motion_duty <= 0:
             return int(dfl), int(drl), int(dfr), int(drr)
 
         threshold = min(int(self.min_motion_duty), int(self.max_duty))
+        trigger = min(int(self.breakaway_trigger_duty), threshold)
 
         def one(value: int) -> int:
             v = int(value)
-            if v == 0:
+            av = abs(v)
+
+            if av == 0:
                 return 0
-            if abs(v) < threshold:
+
+            # Ignore tiny non-zero command noise.
+            if av < trigger:
+                return 0
+
+            # Lift intentional small motion above motor breakaway duty.
+            if av < threshold:
                 return threshold if v > 0 else -threshold
+
             return v
 
         return one(dfl), one(drl), one(dfr), one(drr)
@@ -929,8 +938,8 @@ class BaseDriverNode(Node):
                 # Telemetry/model failure must not block motion
                 self.get_logger().warn(f"WheelCommand model path failed, using direct duty values: {e}")
 
-        # Real motor breakaway compensation must happen after all duty paths
-        # so telemetry/model fallbacks cannot overwrite it.
+        # Real-motor breakaway compensation must happen after safety,
+        # slowdown, command limiting, and mecanum mixing.
         dfl, drl, dfr, drr = self._apply_breakaway_compensation(dfl, drl, dfr, drr)
 
         # Write to board
@@ -1070,6 +1079,9 @@ class BaseDriverNode(Node):
                 "vy_limit": self.vy_limit,
                 "wz_limit": self.wz_limit,
                 "max_duty": self.max_duty,
+                "enable_breakaway_compensation": self.enable_breakaway_compensation,
+                "min_motion_duty": self.min_motion_duty,
+                "breakaway_trigger_duty": self.breakaway_trigger_duty,
                 "turn_gain": self.turn_gain,
             },
             "conventions": {

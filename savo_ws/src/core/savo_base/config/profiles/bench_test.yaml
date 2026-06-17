@@ -30,6 +30,7 @@
     max_duty: 1200
     enable_breakaway_compensation: false
     min_motion_duty: 0
+    breakaway_trigger_duty: 0
     turn_gain: 1.0
 
     forward_sign: -1
