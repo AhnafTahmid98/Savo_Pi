@@ -139,8 +139,8 @@ def _fallback_mix_mecanum(
     wz: float,
     *,
     forward_sign: int = -1,
-    strafe_sign: int = +1,
-    rotate_sign: int = +1,
+    strafe_sign: int = -1,
+    rotate_sign: int = -1,
     turn_gain: float = 1.0,
 ) -> Tuple[float, float, float, float]:
     """
@@ -238,7 +238,7 @@ class BaseDriverNode(Node):
         self.declare_parameter("vy_limit", 1.0)
         self.declare_parameter("wz_limit", 1.0)
 
-        self.declare_parameter("max_duty", 3000)
+        self.declare_parameter("max_duty", 3500)
         self.declare_parameter("enable_breakaway_compensation", True)
         self.declare_parameter("min_motion_duty", 850)
         self.declare_parameter("breakaway_trigger_duty", 120)
@@ -246,8 +246,8 @@ class BaseDriverNode(Node):
 
         # Conventions / signs (match proven teleop defaults)
         self.declare_parameter("forward_sign", -1)
-        self.declare_parameter("strafe_sign", 1)
-        self.declare_parameter("rotate_sign", 1)
+        self.declare_parameter("strafe_sign", -1)
+        self.declare_parameter("rotate_sign", -1)
 
         # Board backend
         self.declare_parameter("board_backend", "auto")  # auto | freenove | dryrun
@@ -261,10 +261,10 @@ class BaseDriverNode(Node):
         self.declare_parameter("quench_ms", 18)
 
         # Per-wheel invert flags
-        self.declare_parameter("invert_fl", False)
-        self.declare_parameter("invert_rl", False)
-        self.declare_parameter("invert_fr", False)
-        self.declare_parameter("invert_rr", False)
+        self.declare_parameter("invert_fl", True)
+        self.declare_parameter("invert_rl", True)
+        self.declare_parameter("invert_fr", True)
+        self.declare_parameter("invert_rr", True)
 
         # Optional diagnostics topic names
         self.declare_parameter("watchdog_state_topic", TOPIC_WATCHDOG_STATE)

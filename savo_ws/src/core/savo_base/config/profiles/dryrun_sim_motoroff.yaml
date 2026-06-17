@@ -27,11 +27,14 @@
 
     # motor-off guarantee — see file header
     max_duty: 0
+    enable_breakaway_compensation: false
+    min_motion_duty: 0
+    breakaway_trigger_duty: 0
     turn_gain: 1.0
 
     forward_sign: -1
-    strafe_sign: 1
-    rotate_sign: 1
+    strafe_sign: -1
+    rotate_sign: -1
 
     board_backend: "dryrun"
     board_name: "robot_savo_freenove_mecanum_dryrun_motoroff"
@@ -43,7 +46,7 @@
     pwm_freq_hz: 50.0
     quench_ms: 18
 
-    invert_fl: false
-    invert_rl: false
-    invert_fr: false
-    invert_rr: false
+    invert_fl: true
+    invert_rl: true
+    invert_fr: true
+    invert_rr: true

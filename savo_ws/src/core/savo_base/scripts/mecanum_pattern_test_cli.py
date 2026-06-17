@@ -240,6 +240,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     print("=" * 78)
     print("Mapping: Data1=FL(0,1), Data2=RL(3,2), Data3=FR(6,7), Data4=RR(4,5)")
     print(f"I2C: bus={args.i2c_bus}, addr=0x{args.addr:02X}, pwm={args.pwm_freq:.1f} Hz")
+    print(
+        "Inverts: "
+        f"FL={args.invert_fl} RL={args.invert_rl} "
+        f"FR={args.invert_fr} RR={args.invert_rr}"
+    )
     print(f"Duty: {duty} / 4095")
     print(f"Timing: pulse={pulse_s:.2f}s gap={gap_s:.2f}s repeat={repeat}")
     print(f"Dry run: {bool(args.dry_run)}")

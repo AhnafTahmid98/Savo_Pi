@@ -66,9 +66,9 @@ class FreenoveMecanumFactoryConfig:
     i2c_bus: int = 1
     address: int = 0x40
     pwm_freq_hz: float = 50.0
-    wheel_inverts: Tuple[int, int, int, int] = (+1, +1, +1, +1)  # (FL, RL, FR, RR)
+    wheel_inverts: Tuple[int, int, int, int] = (-1, -1, -1, -1)  # (FL, RL, FR, RR)
     quench_ms: int = 18
-    max_duty: int = 3000
+    max_duty: int = 3500
     debug: bool = False
     extra: Dict[str, Any] = field(default_factory=dict)
 
@@ -304,7 +304,7 @@ def create_freenove_mecanum_board(cfg: FreenoveMecanumFactoryConfig):
     #
     # Typical current constructor:
     #   __init__(*, i2c_bus=1, addr=0x40, pwm_freq_hz=50.0,
-    #            invert_fl=False, invert_rl=False, invert_fr=False, invert_rr=False,
+    #            invert_fl=True, invert_rl=True, invert_fr=True, invert_rr=True,
     #            quench_ms=18, debug=False)
     extra = dict(cfg.extra)
 
@@ -414,9 +414,9 @@ def create_board(board_type: str, config: Optional[Mapping[str, Any]] = None):
         i2c_bus_raw = extra.pop("i2c_bus", extra.pop("bus", 1))
         addr_raw = extra.pop("address", extra.pop("addr", 0x40))
         pwm_freq_raw = extra.pop("pwm_freq_hz", extra.pop("pwm_freq", 50.0))
-        inv_raw = extra.pop("wheel_inverts", extra.pop("inv", (+1, +1, +1, +1)))
+        inv_raw = extra.pop("wheel_inverts", extra.pop("inv", (-1, -1, -1, -1)))
         quench_raw = extra.pop("quench_ms", 18)
-        max_duty_raw = extra.pop("max_duty", 3000)
+        max_duty_raw = extra.pop("max_duty", 3500)
         debug_raw = extra.pop("debug", False)
 
         # Remove metadata / compatibility keys that are not constructor params
@@ -475,14 +475,14 @@ def make_motor_board(**kwargs):
     address = data.pop("address", data.pop("addr", data.pop("pca9685_addr", 0x40)))
     pwm_freq_hz = data.pop("pwm_freq_hz", data.pop("pwm_freq", 50.0))
     quench_ms = data.pop("quench_ms", 18)
-    max_duty = data.pop("max_duty", 3000)
+    max_duty = data.pop("max_duty", 3500)
     debug = bool(data.pop("debug", False))
 
     # per-wheel bool invert flags -> wheel_inverts tuple (+1/-1)
-    invert_fl = bool(data.pop("invert_fl", False))
-    invert_rl = bool(data.pop("invert_rl", False))
-    invert_fr = bool(data.pop("invert_fr", False))
-    invert_rr = bool(data.pop("invert_rr", False))
+    invert_fl = bool(data.pop("invert_fl", True))
+    invert_rl = bool(data.pop("invert_rl", True))
+    invert_fr = bool(data.pop("invert_fr", True))
+    invert_rr = bool(data.pop("invert_rr", True))
     wheel_inverts = (
         -1 if invert_fl else +1,
         -1 if invert_rl else +1,
@@ -542,9 +542,9 @@ def create_robot_savo_default_mecanum_board(
     i2c_bus: int = 1,
     address: int = 0x40,
     pwm_freq_hz: float = 50.0,
-    wheel_inverts: Tuple[int, int, int, int] = (+1, +1, +1, +1),
+    wheel_inverts: Tuple[int, int, int, int] = (-1, -1, -1, -1),
     quench_ms: int = 18,
-    max_duty: int = 3000,
+    max_duty: int = 3500,
     debug: bool = False,
 ):
     """Convenience builder using Robot Savo's current proven hardware defaults."""
@@ -592,9 +592,9 @@ def describe_supported_boards() -> Dict[str, Dict[str, Any]]:
                 "i2c_bus": 1,
                 "address": "0x40",
                 "pwm_freq_hz": 50.0,
-                "wheel_inverts": [1, 1, 1, 1],
+                "wheel_inverts": [-1, -1, -1, -1],
                 "quench_ms": 18,
-                "max_duty": 3000,
+                "max_duty": 3500,
                 "debug": False,
             },
             "robot_savo_notes": {

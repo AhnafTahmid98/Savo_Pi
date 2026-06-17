@@ -22,9 +22,8 @@
     # -------------------------------------------------------------------------
     # PWM / output range
     # -------------------------------------------------------------------------
-    # PCA9685 raw range is 0..4095; Robot Savo uses conservative 3000 default
-    # for safer testing and stable bringup.
-    max_duty: 3000
+    # PCA9685 raw range is 0..4095; Robot Savo uses 3500 with safety margin.
+    max_duty: 3500
 
     # -------------------------------------------------------------------------
     # Freenove board motor channel mapping
@@ -45,11 +44,11 @@
     # -------------------------------------------------------------------------
     # Per-wheel inversion flags
     # -------------------------------------------------------------------------
-    # if a wheel is wired reversed physically, set that wheel true
-    invert_fl: false
-    invert_rl: false
-    invert_fr: false
-    invert_rr: false
+    # Robot Savo locked motor polarity.
+    invert_fl: true
+    invert_rl: true
+    invert_fr: true
+    invert_rr: true
 
     # -------------------------------------------------------------------------
     # Backend diagnostics / init behavior

@@ -28,11 +28,11 @@ class MecanumMixConfig:
     """
     Configuration for Robot Savo mecanum mixing.
 
-    Defaults match your proven teleop script.
+    Defaults match Robot Savo ROS/Nav2 convention.
     """
     forward_sign: int = -1
-    strafe_sign: int = +1
-    rotate_sign: int = +1
+    strafe_sign: int = -1
+    rotate_sign: int = -1
     turn_gain: float = 1.0
 
 
@@ -95,8 +95,8 @@ def mix_mecanum(
     wz: float,
     *,
     forward_sign: int = -1,
-    strafe_sign: int = +1,
-    rotate_sign: int = +1,
+    strafe_sign: int = -1,
+    rotate_sign: int = -1,
     turn_gain: float = 1.0,
 ) -> Tuple[float, float, float, float]:
     """
@@ -238,8 +238,8 @@ def body_to_duties(
     *,
     max_duty: int,
     forward_sign: int = -1,
-    strafe_sign: int = +1,
-    rotate_sign: int = +1,
+    strafe_sign: int = -1,
+    rotate_sign: int = -1,
     turn_gain: float = 1.0,
 ) -> Tuple[int, int, int, int]:
     """

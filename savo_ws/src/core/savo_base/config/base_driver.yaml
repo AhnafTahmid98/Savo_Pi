@@ -31,17 +31,17 @@ base_driver_node:
 
     # -------------------------------------------------------------------------
     # Motor output scaling
-    # 3000 = conservative safe default; PCA9685 absolute max is 4095
+    # 3500 = Robot Savo real-hardware cap; PCA9685 absolute max is 4095
     # -------------------------------------------------------------------------
-    max_duty: 3000
+    max_duty: 3500
     turn_gain: 1.0
 
     # -------------------------------------------------------------------------
     # Mecanum conventions
     # -------------------------------------------------------------------------
     forward_sign: -1
-    strafe_sign: 1
-    rotate_sign: 1
+    strafe_sign: -1
+    rotate_sign: -1
 
     # -------------------------------------------------------------------------
     # Board backend
@@ -62,10 +62,10 @@ base_driver_node:
     # -------------------------------------------------------------------------
     # Per-wheel invert flags — change only after wheel direction test
     # -------------------------------------------------------------------------
-    invert_fl: false
-    invert_rl: false
-    invert_fr: false
-    invert_rr: false
+    invert_fl: true
+    invert_rl: true
+    invert_fr: true
+    invert_rr: true
 
     # -------------------------------------------------------------------------
     # Status output topics

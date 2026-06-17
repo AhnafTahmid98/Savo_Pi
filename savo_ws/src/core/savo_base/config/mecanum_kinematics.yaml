@@ -20,8 +20,8 @@
     # Command conventions
     # -------------------------------------------------------------------------
     forward_sign: -1
-    strafe_sign: 1
-    rotate_sign: 1
+    strafe_sign: -1
+    rotate_sign: -1
 
     turn_gain: 1.0
 
@@ -41,10 +41,10 @@
     wheel_order: ["FL", "RL", "FR", "RR"]
 
     # change only after wheel direction test confirms a wiring reversal
-    invert_fl: false
-    invert_rl: false
-    invert_fr: false
-    invert_rr: false
+    invert_fl: true
+    invert_rl: true
+    invert_fr: true
+    invert_rr: true
 
     # -------------------------------------------------------------------------
     # Physical limits (not used by current normalized execution)
