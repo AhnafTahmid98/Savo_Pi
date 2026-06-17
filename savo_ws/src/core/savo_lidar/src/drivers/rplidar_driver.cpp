@@ -334,7 +334,10 @@ void RplidarDriver::append_measurement_to_scan(
   LidarScan & scan,
   const RplidarMeasurement & measurement)
 {
-  if (measurement.valid) {
+  if (
+    measurement.valid &&
+    is_valid_range(measurement.distance_m, scan.range_min_m, scan.range_max_m))
+  {
     scan.ranges_m.push_back(measurement.distance_m);
     scan.intensities.push_back(static_cast<float>(measurement.quality));
     return;
