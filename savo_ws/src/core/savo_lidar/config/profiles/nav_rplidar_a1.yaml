@@ -5,6 +5,8 @@ lidar_driver_node:
     serial_port: "/dev/ttyUSB0"
     baudrate: 115200
     serial_timeout_s: 1.0
+    dtr_enable: false
+    rts_enable: false
 
     reconnect_on_error: true
     reconnect_delay_s: 0.5

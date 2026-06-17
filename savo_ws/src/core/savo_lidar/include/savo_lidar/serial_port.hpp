@@ -34,6 +34,10 @@ public:
 
   void flush();
 
+  void set_dtr(bool enabled);
+  void set_rts(bool enabled);
+  void set_modem_lines(bool dtr_enabled, bool rts_enabled);
+
   std::size_t write_bytes(const std::uint8_t * data, std::size_t size);
   std::size_t write_bytes(const std::vector<std::uint8_t> & data);
 

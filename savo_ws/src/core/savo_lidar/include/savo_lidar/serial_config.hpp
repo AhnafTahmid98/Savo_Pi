@@ -15,6 +15,9 @@ struct SAVO_LIDAR_PUBLIC SerialConfig
   int baudrate{115200};
   double timeout_s{1.0};
 
+  bool dtr_enable{false};
+  bool rts_enable{false};
+
   bool reconnect_on_error{true};
   double reconnect_delay_s{0.5};
   double max_reconnect_delay_s{5.0};

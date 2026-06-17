@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <poll.h>
 #include <string.h>
+#include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <termios.h>
 #include <unistd.h>
@@ -114,6 +115,7 @@ void SerialPort::open(const SerialConfig & config)
 
   try {
     configure_port();
+    set_modem_lines(config_.dtr_enable, config_.rts_enable);
     flush();
   } catch (...) {
     close();
@@ -150,6 +152,72 @@ void SerialPort::flush()
 
   if (::tcflush(fd_, TCIOFLUSH) != 0) {
     throw std::runtime_error(errno_message("failed to flush serial port"));
+  }
+}
+
+void SerialPort::set_dtr(bool enabled)
+{
+  ensure_open();
+
+  int status = 0;
+  if (::ioctl(fd_, TIOCMGET, &status) != 0) {
+    throw std::runtime_error(errno_message("failed to read serial modem lines"));
+  }
+
+  if (enabled) {
+    status |= TIOCM_DTR;
+  } else {
+    status &= ~TIOCM_DTR;
+  }
+
+  if (::ioctl(fd_, TIOCMSET, &status) != 0) {
+    throw std::runtime_error(errno_message("failed to set DTR line"));
+  }
+}
+
+void SerialPort::set_rts(bool enabled)
+{
+  ensure_open();
+
+  int status = 0;
+  if (::ioctl(fd_, TIOCMGET, &status) != 0) {
+    throw std::runtime_error(errno_message("failed to read serial modem lines"));
+  }
+
+  if (enabled) {
+    status |= TIOCM_RTS;
+  } else {
+    status &= ~TIOCM_RTS;
+  }
+
+  if (::ioctl(fd_, TIOCMSET, &status) != 0) {
+    throw std::runtime_error(errno_message("failed to set RTS line"));
+  }
+}
+
+void SerialPort::set_modem_lines(bool dtr_enabled, bool rts_enabled)
+{
+  ensure_open();
+
+  int status = 0;
+  if (::ioctl(fd_, TIOCMGET, &status) != 0) {
+    throw std::runtime_error(errno_message("failed to read serial modem lines"));
+  }
+
+  if (dtr_enabled) {
+    status |= TIOCM_DTR;
+  } else {
+    status &= ~TIOCM_DTR;
+  }
+
+  if (rts_enabled) {
+    status |= TIOCM_RTS;
+  } else {
+    status &= ~TIOCM_RTS;
+  }
+
+  if (::ioctl(fd_, TIOCMSET, &status) != 0) {
+    throw std::runtime_error(errno_message("failed to set serial modem lines"));
   }
 }
 

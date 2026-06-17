@@ -87,6 +87,8 @@ private:
     config_.serial.port = declare_parameter<std::string>("serial_port", "/dev/ttyUSB0");
     config_.serial.baudrate = declare_parameter<int>("baudrate", 115200);
     config_.serial.timeout_s = declare_parameter<double>("serial_timeout_s", 1.0);
+    config_.serial.dtr_enable = declare_parameter<bool>("dtr_enable", false);
+    config_.serial.rts_enable = declare_parameter<bool>("rts_enable", false);
     config_.serial.reconnect_on_error = declare_parameter<bool>("reconnect_on_error", true);
     config_.serial.reconnect_delay_s = declare_parameter<double>("reconnect_delay_s", 0.5);
     config_.serial.max_reconnect_delay_s =
