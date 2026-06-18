@@ -51,7 +51,7 @@ def _build_base_driver_node(context, *args, **kwargs):
         LogInfo(msg=f"[savo_base] base_driver_node using {profile_source}: {selected_profile}"),
         Node(
             package="savo_base",
-            executable="base_driver_node.py",
+            executable="base_driver_node_py",
             name="base_driver_node",
             output=output,
             parameters=params,
