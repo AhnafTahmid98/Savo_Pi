@@ -256,7 +256,7 @@ class BaseDriverNode(Node):
 
         # Freenove/PCA9685 hardware params
         self.declare_parameter("i2c_bus", 1)
-        self.declare_parameter("pca9685_addr", "0x40")
+        self.declare_parameter("pca9685_addr", 64)
         self.declare_parameter("pwm_freq_hz", 50.0)
         self.declare_parameter("quench_ms", 18)
 
@@ -317,7 +317,11 @@ class BaseDriverNode(Node):
         self.dryrun = bool(self.get_parameter("dryrun").value)
 
         self.i2c_bus = int(self.get_parameter("i2c_bus").value)
-        self.pca9685_addr = self._parse_int_param(str(self.get_parameter("pca9685_addr").value), default=0x40)
+        pca9685_addr_value = self.get_parameter("pca9685_addr").value
+        if isinstance(pca9685_addr_value, str):
+            self.pca9685_addr = int(pca9685_addr_value, 0)
+        else:
+            self.pca9685_addr = int(pca9685_addr_value)
         self.pwm_freq_hz = float(self.get_parameter("pwm_freq_hz").value)
         self.quench_ms = int(self.get_parameter("quench_ms").value)
 
