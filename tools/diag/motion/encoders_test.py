@@ -467,8 +467,9 @@ def run(args):
     print("  RL: A=GPIO23, B=GPIO24")
     print("  RR: A=GPIO12, B=GPIO26")
     print()
-    print("Expected documentation target:")
-    print("  Forward wheel rotation should count positive on all four wheels.")
+    print("Expected:")
+    print("  Forward wheel rotation should count positive.")
+    print("  Reverse wheel rotation should count negative.")
     print("  External pull-up resistors are expected by default.")
     print("  Use --invert-fl/fr/rl/rr only for temporary diagnostics.")
 
@@ -479,8 +480,17 @@ def parse_args():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 
-    # Robot Savo final diagnostic GPIO map.
-    # Desired target: forward wheel rotation counts positive on all wheels.
+    # Robot Savo tested encoder GPIO map.
+    #
+    # Goal:
+    # - Forward wheel rotation should count positive for each wheel.
+    # - External pull-up resistors are used, so --internal-pullup is NOT used by default.
+    #
+    # Confirmed mapping from hardware tests:
+    # FL physical wheel -> GPIO21/GPIO20
+    # FR physical wheel -> GPIO13/GPIO25
+    # RL physical wheel -> GPIO23/GPIO24
+    # RR physical wheel -> GPIO12/GPIO26
     parser.add_argument("--fl-a", type=int, default=21, help="Front-left encoder A BCM GPIO")
     parser.add_argument("--fl-b", type=int, default=20, help="Front-left encoder B BCM GPIO")
 
@@ -493,17 +503,59 @@ def parse_args():
     parser.add_argument("--rr-a", type=int, default=12, help="Rear-right encoder A BCM GPIO")
     parser.add_argument("--rr-b", type=int, default=26, help="Rear-right encoder B BCM GPIO")
 
-    parser.add_argument("--invert-fl", action="store_true", help="Invert front-left encoder sign")
-    parser.add_argument("--invert-fr", action="store_true", help="Invert front-right encoder sign")
-    parser.add_argument("--invert-rl", action="store_true", help="Invert rear-left encoder sign")
-    parser.add_argument("--invert-rr", action="store_true", help="Invert rear-right encoder sign")
+    # Keep old working flag style:
+    # default = no inversion.
+    # --invert-* can be used only for temporary diagnostics.
+    # --no-invert-* is accepted for backward compatibility.
+    parser.add_argument(
+        "--invert-fl",
+        dest="invert_fl",
+        action="store_true",
+        help="Invert front-left encoder sign",
+    )
+    parser.add_argument(
+        "--invert-fr",
+        dest="invert_fr",
+        action="store_true",
+        help="Invert front-right encoder sign",
+    )
+    parser.add_argument(
+        "--invert-rl",
+        dest="invert_rl",
+        action="store_true",
+        help="Invert rear-left encoder sign",
+    )
+    parser.add_argument(
+        "--invert-rr",
+        dest="invert_rr",
+        action="store_true",
+        help="Invert rear-right encoder sign",
+    )
 
-    # Backward-compatible aliases from the older script.
-    # Defaults are already non-inverted, so these flags are accepted but do not change behavior.
-    parser.add_argument("--no-invert-fl", dest="invert_fl", action="store_false", help=argparse.SUPPRESS)
-    parser.add_argument("--no-invert-fr", dest="invert_fr", action="store_false", help=argparse.SUPPRESS)
-    parser.add_argument("--no-invert-rl", dest="invert_rl", action="store_false", help=argparse.SUPPRESS)
-    parser.add_argument("--no-invert-rr", dest="invert_rr", action="store_false", help=argparse.SUPPRESS)
+    parser.add_argument(
+        "--no-invert-fl",
+        dest="invert_fl",
+        action="store_false",
+        help="Disable front-left encoder inversion",
+    )
+    parser.add_argument(
+        "--no-invert-fr",
+        dest="invert_fr",
+        action="store_false",
+        help="Disable front-right encoder inversion",
+    )
+    parser.add_argument(
+        "--no-invert-rl",
+        dest="invert_rl",
+        action="store_false",
+        help="Disable rear-left encoder inversion",
+    )
+    parser.add_argument(
+        "--no-invert-rr",
+        dest="invert_rr",
+        action="store_false",
+        help="Disable rear-right encoder inversion",
+    )
 
     parser.set_defaults(
         invert_fl=False,
