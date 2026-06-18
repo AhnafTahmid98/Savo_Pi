@@ -26,6 +26,7 @@ constexpr int kLed0OnL = 0x06;
 constexpr int kMode1Restart = 0x80;
 constexpr int kMode1Sleep = 0x10;
 constexpr int kMode1AllCall = 0x01;
+constexpr int kMode1AutoIncrement = 0x20;
 constexpr int kMode2OutDrv = 0x04;
 
 constexpr double kOscillatorHz = 25000000.0;
@@ -164,7 +165,7 @@ void FreenoveMotorBoard::open_bus()
 void FreenoveMotorBoard::configure_pwm()
 {
   write_register(kPcaMode2, kMode2OutDrv);
-  write_register(kPcaMode1, kMode1AllCall);
+  write_register(kPcaMode1, kMode1AllCall | kMode1AutoIncrement);
   std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
   set_pwm_frequency(board_config_.pwm_freq_hz);
@@ -176,7 +177,7 @@ void FreenoveMotorBoard::set_pwm_frequency(const double frequency_hz)
   const double prescale_value = (kOscillatorHz / (kPwmSteps * safe_frequency)) - 1.0;
   const int prescale = static_cast<int>(std::lround(prescale_value));
 
-  const int old_mode = read_register(kPcaMode1);
+  const int old_mode = read_register(kPcaMode1) | kMode1AutoIncrement | kMode1AllCall;
   const int sleep_mode = (old_mode & 0x7F) | kMode1Sleep;
 
   write_register(kPcaMode1, sleep_mode);
