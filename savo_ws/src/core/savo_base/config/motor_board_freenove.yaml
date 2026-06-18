@@ -13,7 +13,7 @@
     # PCA9685 / I2C (Robot Savo locked hardware defaults)
     # -------------------------------------------------------------------------
     i2c_bus: 1
-    pca9685_addr: "0x40"
+    pca9685_addr: 64
     pwm_freq_hz: 50.0
 
     # Direction-change protection delay (matches your proven teleop behavior)
