@@ -1118,7 +1118,6 @@ class BaseDriverNode(Node):
     # =========================================================================
     def destroy_node(self) -> bool:
         try:
-            self.get_logger().info("Shutting down base_driver_node: stopping motors...")
             self._board_stop()
             if self.board is not None and hasattr(self.board, "close"):
                 try:
