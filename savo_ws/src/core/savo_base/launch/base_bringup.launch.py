@@ -255,6 +255,7 @@ def generate_launch_description() -> LaunchDescription:
 
         # informational logs
         LogInfo(msg="[savo_base] Starting base_bringup.launch.py"),
+        LogInfo(msg=["[savo_base] Driver implementation: ", LaunchConfiguration("driver_impl")]),
         LogInfo(msg=["[savo_base] use_watchdog: ", use_watchdog]),
         LogInfo(msg=["[savo_base] use_state_publisher: ", use_state_publisher]),
         LogInfo(msg=["[savo_base] use_heartbeat: ", use_heartbeat]),
