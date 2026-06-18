@@ -1151,7 +1151,6 @@ def main(args=None) -> None:
     finally:
         if node is not None:
             try:
-                node.get_logger().info("Shutting down base_driver_node: stopping motors...")
                 node._board_stop()
             except Exception:
                 pass
