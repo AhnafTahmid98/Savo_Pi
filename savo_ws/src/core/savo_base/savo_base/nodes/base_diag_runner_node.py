@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import shlex
 import subprocess
+import sys
 import threading
 import time
 import traceback
@@ -732,8 +733,6 @@ class BaseDiagRunnerNode(Node):
     # Shutdown
     # =========================================================================
     def destroy_node(self) -> bool:
-        self.get_logger().info("Shutting down base_diag_runner_node...")
-
         # Best-effort cancel active process on shutdown
         with self._lock:
             job = self._active_job
@@ -757,22 +756,32 @@ class BaseDiagRunnerNode(Node):
 # =============================================================================
 def main(args=None) -> None:
     rclpy.init(args=args)
-    node: Optional[BaseDiagRunnerNode] = None
+
+    node = None
+
     try:
         node = BaseDiagRunnerNode()
         rclpy.spin(node)
+
     except KeyboardInterrupt:
         pass
-    except Exception as e:
-        print(f"[base_diag_runner_node] Fatal error: {e}")
+
+    except Exception as exc:
+        print(f"[base_diag_runner_node] Fatal error: {exc}", file=sys.stderr)
         traceback.print_exc()
+
     finally:
         if node is not None:
             try:
                 node.destroy_node()
             except Exception:
                 pass
-        rclpy.shutdown()
+
+        if rclpy.ok():
+            try:
+                rclpy.shutdown()
+            except Exception:
+                pass
 
 
 if __name__ == "__main__":

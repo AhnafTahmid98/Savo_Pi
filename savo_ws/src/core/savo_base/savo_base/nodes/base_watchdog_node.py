@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import math
+import sys
 import time
 import traceback
 from dataclasses import dataclass
@@ -396,7 +397,6 @@ class BaseWatchdogNode(Node):
             # Publish a final stop request if enabled (defensive safety)
             if self.publish_stop_request:
                 self._publish_stop_request_if_enabled(True)
-            self.get_logger().info("Shutting down base_watchdog_node.")
         finally:
             return super().destroy_node()
 
@@ -406,22 +406,32 @@ class BaseWatchdogNode(Node):
 # =============================================================================
 def main(args=None) -> None:
     rclpy.init(args=args)
-    node: Optional[BaseWatchdogNode] = None
+
+    node = None
+
     try:
         node = BaseWatchdogNode()
         rclpy.spin(node)
+
     except KeyboardInterrupt:
         pass
-    except Exception as e:
-        print(f"[base_watchdog_node] Fatal error: {e}")
+
+    except Exception as exc:
+        print(f"[base_watchdog_node] Fatal error: {exc}", file=sys.stderr)
         traceback.print_exc()
+
     finally:
         if node is not None:
             try:
                 node.destroy_node()
             except Exception:
                 pass
-        rclpy.shutdown()
+
+        if rclpy.ok():
+            try:
+                rclpy.shutdown()
+            except Exception:
+                pass
 
 
 if __name__ == "__main__":
