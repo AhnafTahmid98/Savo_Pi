@@ -29,17 +29,17 @@
     # Freenove board motor channel mapping
     # FL:(0,1)  RL:(3,2)  FR:(6,7)  RR:(4,5)
     # -------------------------------------------------------------------------
-    fl_ch_a: 0
-    fl_ch_b: 1
+    fl_channel_a: 0
+    fl_channel_b: 1
 
-    rl_ch_a: 3
-    rl_ch_b: 2
+    rl_channel_a: 3
+    rl_channel_b: 2
 
-    fr_ch_a: 6
-    fr_ch_b: 7
+    fr_channel_a: 6
+    fr_channel_b: 7
 
-    rr_ch_a: 4
-    rr_ch_b: 5
+    rr_channel_a: 4
+    rr_channel_b: 5
 
     # -------------------------------------------------------------------------
     # Per-wheel inversion flags

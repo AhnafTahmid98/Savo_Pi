@@ -33,13 +33,6 @@ setup(
     license="Proprietary",
     tests_require=["pytest"],
     entry_points={
-        "console_scripts": [
-            # Optional in this hybrid package (CMake installs .py node executables directly)
-            "base_driver_node_py = savo_base.nodes.base_driver_node:main",
-            "base_watchdog_node = savo_base.nodes.base_watchdog_node:main",
-            "base_state_publisher_node = savo_base.nodes.base_state_publisher_node:main",
-            "base_diag_runner_node = savo_base.nodes.base_diag_runner_node:main",
-            "base_heartbeat_node = savo_base.nodes.base_heartbeat_node:main",
-        ],
+        "console_scripts": [],
     },
 )

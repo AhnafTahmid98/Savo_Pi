@@ -172,14 +172,18 @@ void BaseDriverNode::configure_runtime()
     rclcpp::QoS(10),
     std::bind(&BaseDriverNode::cmd_callback, this, std::placeholders::_1));
 
+  const auto safety_qos = rclcpp::QoS(rclcpp::KeepLast(10))
+    .best_effort()
+    .durability_volatile();
+
   safety_stop_sub_ = create_subscription<std_msgs::msg::Bool>(
     config_.safety_stop_topic,
-    rclcpp::QoS(10),
+    safety_qos,
     std::bind(&BaseDriverNode::safety_stop_callback, this, std::placeholders::_1));
 
   slowdown_sub_ = create_subscription<std_msgs::msg::Float32>(
     config_.slowdown_topic,
-    rclcpp::QoS(10),
+    safety_qos,
     std::bind(&BaseDriverNode::slowdown_callback, this, std::placeholders::_1));
 
   state_pub_ = create_publisher<std_msgs::msg::String>(

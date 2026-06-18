@@ -20,6 +20,7 @@ def generate_launch_description() -> LaunchDescription:
     pkg_share = FindPackageShare("savo_base")
 
     profile = LaunchConfiguration("profile")
+    driver_impl = LaunchConfiguration("driver_impl")
     output = LaunchConfiguration("output")
     log_level = LaunchConfiguration("log_level")
 
@@ -37,6 +38,7 @@ def generate_launch_description() -> LaunchDescription:
         launch_arguments={
             "profile": profile,
             "profile_path": profile_path,
+            "driver_impl": driver_impl,
             "use_watchdog": use_watchdog,
             "use_state_publisher": use_state_publisher,
             "use_heartbeat": use_heartbeat,
@@ -63,6 +65,11 @@ def generate_launch_description() -> LaunchDescription:
             description=(
                 "Optional absolute profile YAML path. If non-empty, overrides 'profile'."
             ),
+        ),
+        DeclareLaunchArgument(
+            "driver_impl",
+            default_value="cpp",
+            description="Base driver implementation: cpp or py.",
         ),
 
         # helper nodes

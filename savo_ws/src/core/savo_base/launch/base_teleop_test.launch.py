@@ -112,6 +112,7 @@ def generate_launch_description() -> LaunchDescription:
 
     profile = LaunchConfiguration("profile")
     profile_path = LaunchConfiguration("profile_path")
+    driver_impl = LaunchConfiguration("driver_impl")
 
     use_watchdog = LaunchConfiguration("use_watchdog")
     use_state_publisher = LaunchConfiguration("use_state_publisher")
@@ -131,6 +132,7 @@ def generate_launch_description() -> LaunchDescription:
         launch_arguments={
             "profile": profile,
             "profile_path": profile_path,
+            "driver_impl": driver_impl,
             "use_watchdog": use_watchdog,
             "use_state_publisher": use_state_publisher,
             "use_heartbeat": use_heartbeat,
@@ -155,6 +157,11 @@ def generate_launch_description() -> LaunchDescription:
             "profile_path",
             default_value="",
             description="Optional absolute profile YAML path (overrides profile if non-empty).",
+        ),
+        DeclareLaunchArgument(
+            "driver_impl",
+            default_value="cpp",
+            description="Base driver implementation: cpp or py.",
         ),
 
         DeclareLaunchArgument("use_watchdog", default_value="true"),

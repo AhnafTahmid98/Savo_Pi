@@ -217,19 +217,19 @@ void FreenoveMotorBoard::set_motor_pair(
   const int duty = clamp_duty(value);
 
   if (duty > 0) {
-    set_pwm_channel(channel_a, duty);
-    set_pwm_channel(channel_b, 0);
+    set_pwm_channel(channel_a, 0);
+    set_pwm_channel(channel_b, duty);
     return;
   }
 
   if (duty < 0) {
-    set_pwm_channel(channel_a, 0);
-    set_pwm_channel(channel_b, -duty);
+    set_pwm_channel(channel_a, -duty);
+    set_pwm_channel(channel_b, 0);
     return;
   }
 
-  set_pwm_channel(channel_a, 0);
-  set_pwm_channel(channel_b, 0);
+  set_pwm_channel(channel_a, 4095);
+  set_pwm_channel(channel_b, 4095);
 }
 
 void FreenoveMotorBoard::set_pwm_channel(const int channel, const int duty)

@@ -28,6 +28,11 @@ def _build_base_driver_node(context, *args, **kwargs):
     profile_path = LaunchConfiguration("profile_path").perform(context)
     output = LaunchConfiguration("output").perform(context)
     log_level = LaunchConfiguration("log_level").perform(context)
+    driver_impl = LaunchConfiguration("driver_impl").perform(context)
+
+    driver_executable = "base_driver_node"
+    if driver_impl == "py":
+        driver_executable = "base_driver_node_py"
 
     pkg_share = get_package_share_directory("savo_base")
 
@@ -51,7 +56,7 @@ def _build_base_driver_node(context, *args, **kwargs):
         LogInfo(msg=f"[savo_base] base_driver_node using {profile_source}: {selected_profile}"),
         Node(
             package="savo_base",
-            executable="base_driver_node_py",
+            executable=driver_executable,
             name="base_driver_node",
             output=output,
             parameters=params,
@@ -204,6 +209,11 @@ def generate_launch_description() -> LaunchDescription:
                 "Optional absolute path to a profile YAML file. "
                 "If non-empty, overrides profile."
             ),
+        ),
+        DeclareLaunchArgument(
+            "driver_impl",
+            default_value="cpp",
+            description="Base driver implementation: cpp or py.",
         ),
 
         # helper node toggles

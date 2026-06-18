@@ -135,6 +135,7 @@ def generate_launch_description() -> LaunchDescription:
     use_state_publisher = LaunchConfiguration("use_state_publisher")
     use_heartbeat = LaunchConfiguration("use_heartbeat")
     use_diag_runner = LaunchConfiguration("use_diag_runner")
+    driver_impl = LaunchConfiguration("driver_impl")
     log_level = LaunchConfiguration("log_level")
     output = LaunchConfiguration("output")
 
@@ -156,6 +157,7 @@ def generate_launch_description() -> LaunchDescription:
             "use_state_publisher": use_state_publisher,
             "use_heartbeat": use_heartbeat,
             "use_diag_runner": use_diag_runner,
+            "driver_impl": driver_impl,
             "log_level": log_level,
             "output": output,
         }.items(),
@@ -167,6 +169,11 @@ def generate_launch_description() -> LaunchDescription:
         DeclareLaunchArgument("use_state_publisher", default_value="true"),
         DeclareLaunchArgument("use_heartbeat", default_value="true"),
         DeclareLaunchArgument("use_diag_runner", default_value="false"),
+        DeclareLaunchArgument(
+            "driver_impl",
+            default_value="cpp",
+            description="Base driver implementation: cpp or py.",
+        ),
         DeclareLaunchArgument("log_level", default_value="info"),
         DeclareLaunchArgument("output", default_value="screen"),
 
