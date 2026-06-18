@@ -2,12 +2,15 @@
 # -*- coding: utf-8 -*-
 """Robot Savo four-wheel encoder diagnostic for Raspberry Pi 5."""
 
+from __future__ import annotations
+
 import argparse
 import csv
 import math
 import signal
 import sys
 import time
+from typing import Dict, List, Tuple
 
 try:
     import lgpio
@@ -19,7 +22,8 @@ except Exception:
     raise
 
 
-# Valid Gray-code transitions. A is bit 1, B is bit 0.
+# Valid Gray-code transitions.
+# A is bit 1, B is bit 0.
 DELTA = {
     (0b00, 0b01): +1,
     (0b01, 0b11): +1,
@@ -36,6 +40,17 @@ def maybe_pullup_flags(use_internal_pullup: bool) -> int:
     if not use_internal_pullup:
         return 0
     return getattr(lgpio, "SET_PULL_UP", 0)
+
+
+def validate_unique_pins(pin_pairs: Dict[str, Tuple[int, int]]) -> None:
+    all_pins: List[int] = [pin for pair in pin_pairs.values() for pin in pair]
+    duplicates = sorted({pin for pin in all_pins if all_pins.count(pin) > 1})
+
+    if duplicates:
+        raise ValueError(
+            f"Duplicate GPIO pin assignment detected: {duplicates}. "
+            "Each encoder channel must use a unique BCM GPIO pin."
+        )
 
 
 def autodetect_chip(pins, start=0, end=7, use_internal_pullup=False):
@@ -198,6 +213,8 @@ def run(args):
         "RR": (args.rr_a, args.rr_b),
     }
 
+    validate_unique_pins(pin_pairs)
+
     all_pins = [pin for pair in pin_pairs.values() for pin in pair]
 
     if args.chip is not None:
@@ -237,6 +254,7 @@ def run(args):
     )
 
     encoders = {}
+    csv_file = None
 
     try:
         encoders["FL"] = QuadEncoder(
@@ -280,7 +298,6 @@ def run(args):
             use_internal_pullup=args.internal_pullup,
         )
 
-        csv_file = None
         writer = None
 
         if args.csv:
@@ -425,7 +442,7 @@ def run(args):
         except Exception:
             pass
 
-        if "csv_file" in locals() and csv_file:
+        if csv_file:
             csv_file.close()
 
     elapsed = time.monotonic() - t0
@@ -444,8 +461,16 @@ def run(args):
         )
 
     print()
-    print("Robot Savo default mapping expects forward wheel rotation to count positive.")
-    print("Use --invert-fl/fr/rl/rr only for temporary diagnostics.")
+    print("Robot Savo encoder diagnostic defaults:")
+    print("  FL: A=GPIO21, B=GPIO20")
+    print("  FR: A=GPIO13, B=GPIO25")
+    print("  RL: A=GPIO23, B=GPIO24")
+    print("  RR: A=GPIO12, B=GPIO26")
+    print()
+    print("Expected documentation target:")
+    print("  Forward wheel rotation should count positive on all four wheels.")
+    print("  External pull-up resistors are expected by default.")
+    print("  Use --invert-fl/fr/rl/rr only for temporary diagnostics.")
 
 
 def parse_args():
@@ -454,8 +479,8 @@ def parse_args():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 
-    # Final Robot Savo tested GPIO map.
-    # Forward wheel rotation is positive with no software inversion.
+    # Robot Savo final diagnostic GPIO map.
+    # Desired target: forward wheel rotation counts positive on all wheels.
     parser.add_argument("--fl-a", type=int, default=21, help="Front-left encoder A BCM GPIO")
     parser.add_argument("--fl-b", type=int, default=20, help="Front-left encoder B BCM GPIO")
 
@@ -472,6 +497,20 @@ def parse_args():
     parser.add_argument("--invert-fr", action="store_true", help="Invert front-right encoder sign")
     parser.add_argument("--invert-rl", action="store_true", help="Invert rear-left encoder sign")
     parser.add_argument("--invert-rr", action="store_true", help="Invert rear-right encoder sign")
+
+    # Backward-compatible aliases from the older script.
+    # Defaults are already non-inverted, so these flags are accepted but do not change behavior.
+    parser.add_argument("--no-invert-fl", dest="invert_fl", action="store_false", help=argparse.SUPPRESS)
+    parser.add_argument("--no-invert-fr", dest="invert_fr", action="store_false", help=argparse.SUPPRESS)
+    parser.add_argument("--no-invert-rl", dest="invert_rl", action="store_false", help=argparse.SUPPRESS)
+    parser.add_argument("--no-invert-rr", dest="invert_rr", action="store_false", help=argparse.SUPPRESS)
+
+    parser.set_defaults(
+        invert_fl=False,
+        invert_fr=False,
+        invert_rl=False,
+        invert_rr=False,
+    )
 
     parser.add_argument("--poll-s", type=float, default=0.001, help="Polling period in seconds")
     parser.add_argument("--debounce-s", type=float, default=0.0003, help="Per-line debounce in seconds")
