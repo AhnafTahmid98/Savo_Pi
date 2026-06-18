@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 
 """
-Base stack + teleop_letters_cli. Defaults to dryrun motor-off; teleop starts delayed.
+Base stack + optional teleop_letters_cli. Defaults to dryrun motor-off; interactive
+teleop should usually be run from a separate terminal with a real TTY.
 
   ros2 launch savo_base base_teleop_test.launch.py
   ros2 launch savo_base base_teleop_test.launch.py profile:=bench_test.yaml
@@ -123,7 +124,7 @@ def generate_launch_description() -> LaunchDescription:
     log_level = LaunchConfiguration("log_level")
 
     run_dump_params = LaunchConfiguration("run_dump_params")
-    run_teleop = LaunchConfiguration("run_teleop")
+    start_teleop = LaunchConfiguration("start_teleop")
     dump_delay_s = LaunchConfiguration("dump_delay_s")
     teleop_delay_s = LaunchConfiguration("teleop_delay_s")
 
@@ -174,9 +175,12 @@ def generate_launch_description() -> LaunchDescription:
 
         # teleop controls
         DeclareLaunchArgument(
-            "run_teleop",
-            default_value="true",
-            description="Start teleop_letters_cli after base stack startup.",
+            "start_teleop",
+            default_value="false",
+            description=(
+                "Start interactive teleop inside launch. Usually false because "
+                "keyboard teleop needs a real TTY."
+            ),
         ),
         DeclareLaunchArgument(
             "teleop_delay_s",
@@ -209,6 +213,16 @@ def generate_launch_description() -> LaunchDescription:
         DeclareLaunchArgument("dump_out", default_value=""),
 
         LogInfo(msg="[savo_base] Starting base_teleop_test.launch.py"),
+        LogInfo(
+            msg=[
+                "[savo_base] Manual teleop command: ",
+                "ros2 run savo_base teleop_letters_cli.py ",
+                "--cmd-topic /cmd_vel_safe ",
+                "--safety-stop-topic /safety/stop ",
+                "--slowdown-topic /safety/slowdown_factor ",
+                "--vx 0.12 --vy 0.12 --wz 0.20",
+            ]
+        ),
         include_base_safe_idle,
 
         # optional post-start actions
@@ -227,7 +241,7 @@ def generate_launch_description() -> LaunchDescription:
             actions=[
                 OpaqueFunction(
                     function=_build_teleop_process,
-                    condition=IfCondition(run_teleop),
+                    condition=IfCondition(start_teleop),
                 )
             ],
         ),
