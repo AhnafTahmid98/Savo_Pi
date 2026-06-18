@@ -30,9 +30,12 @@ def _build_base_driver_node(context, *args, **kwargs):
     log_level = LaunchConfiguration("log_level").perform(context)
     driver_impl = LaunchConfiguration("driver_impl").perform(context)
 
-    driver_executable = "base_driver_node"
-    if driver_impl == "py":
+    if driver_impl == "cpp":
+        driver_executable = "base_driver_node"
+    elif driver_impl == "py":
         driver_executable = "base_driver_node_py"
+    else:
+        raise RuntimeError("driver_impl must be 'cpp' or 'py'")
 
     pkg_share = get_package_share_directory("savo_base")
 

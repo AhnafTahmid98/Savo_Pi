@@ -158,7 +158,7 @@ void FreenoveMotorBoard::open_bus()
 
   if (::ioctl(fd_, I2C_SLAVE, board_config_.address) < 0) {
     close();
-    throw std::runtime_error("Failed to select I2C address 0x" + std::to_string(board_config_.address));
+    throw std::runtime_error("Failed to select I2C address");
   }
 }
 

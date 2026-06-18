@@ -1,7 +1,7 @@
 # Software-only validation — no I2C hardware, no motor output.
 # max_duty=0 is intentional: motor-off guarantee even if dryrun path is bypassed.
 
- /base_driver_node:
+/base_driver_node:
   ros__parameters:
 
     cmd_topic: "/cmd_vel_safe"
