@@ -464,7 +464,7 @@ def run(args):
     print("Robot Savo encoder diagnostic defaults:")
     print("  FL: A=GPIO21, B=GPIO20")
     print("  FR: A=GPIO13, B=GPIO25")
-    print("  RL: A=GPIO24, B=GPIO23")
+    print("  RL: A=GPIO23, B=GPIO24")
     print("  RR: A=GPIO12, B=GPIO26")
     print()
     print("Expected documentation target:")
@@ -487,8 +487,8 @@ def parse_args():
     parser.add_argument("--fr-a", type=int, default=13, help="Front-right encoder A BCM GPIO")
     parser.add_argument("--fr-b", type=int, default=25, help="Front-right encoder B BCM GPIO")
 
-    parser.add_argument("--rl-a", type=int, default=24, help="Rear-left encoder A BCM GPIO")
-    parser.add_argument("--rl-b", type=int, default=23, help="Rear-left encoder B BCM GPIO")
+    parser.add_argument("--rl-a", type=int, default=23, help="Rear-left encoder A BCM GPIO")
+    parser.add_argument("--rl-b", type=int, default=24, help="Rear-left encoder B BCM GPIO")
 
     parser.add_argument("--rr-a", type=int, default=12, help="Rear-right encoder A BCM GPIO")
     parser.add_argument("--rr-b", type=int, default=26, help="Rear-right encoder B BCM GPIO")
