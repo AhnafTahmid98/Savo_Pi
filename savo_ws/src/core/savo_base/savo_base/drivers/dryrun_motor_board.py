@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 try:
     from .board_exceptions import (
@@ -96,15 +96,26 @@ class DryRunMotorBoard:
     def __init__(
         self,
         *,
-        max_abs_duty: int = 4095,
+        max_abs_duty: Optional[int] = None,
+        max_duty: Optional[int] = None,
         max_history: int = 1000,
         debug: bool = False,
         name: str = "DryRunMotorBoard",
+        board_name: Optional[str] = None,
+        pwm_freq_hz: float = 50.0,
+        **_: object,
     ) -> None:
-        self.name = str(name)
+        self.name = str(board_name if board_name is not None else name)
+        self.board_name = self.name
+        self.pwm_freq_hz = float(pwm_freq_hz)
         self.debug = bool(debug)
 
-        self.max_abs_duty = self._validate_max_abs_duty(max_abs_duty)
+        effective_max_duty = max_abs_duty if max_abs_duty is not None else max_duty
+        if effective_max_duty is None:
+            effective_max_duty = 4095
+
+        self.max_abs_duty = self._validate_max_abs_duty(effective_max_duty)
+        self.max_duty = self.max_abs_duty
         self.max_history = self._validate_max_history(max_history)
 
         self._state = DryRunMotorBoardState()
