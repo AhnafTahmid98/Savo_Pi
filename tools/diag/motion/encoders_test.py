@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Four-wheel encoder diagnostic for Pi 5 lgpio wiring."""
+"""Robot Savo four-wheel encoder diagnostic for Raspberry Pi 5."""
 
 import argparse
 import csv
@@ -35,7 +35,6 @@ DELTA = {
 def maybe_pullup_flags(use_internal_pullup: bool) -> int:
     if not use_internal_pullup:
         return 0
-
     return getattr(lgpio, "SET_PULL_UP", 0)
 
 
@@ -181,7 +180,7 @@ def wheel_speed_mps(delta_count, dt, counts_per_wheel_rev, wheel_dia_m):
 
 
 def estimate_mecanum_body_velocity(fl_v, fr_v, rl_v, rr_v, wheelbase_m, track_m):
-    """Rough mecanum estimate; signs depend on motor/encoder calibration."""
+    """Rough mecanum estimate; signs depend on final ROS calibration."""
     radius_sum = max(1e-9, wheelbase_m + track_m)
 
     vx = (fl_v + fr_v + rl_v + rr_v) / 4.0
@@ -349,10 +348,7 @@ def run(args):
                 last_print = now
 
                 counts = {name: encoder.count for name, encoder in encoders.items()}
-                deltas = {
-                    name: counts[name] - last_counts[name]
-                    for name in encoders
-                }
+                deltas = {name: counts[name] - last_counts[name] for name in encoders}
                 last_counts = counts
 
                 speeds = {
@@ -448,7 +444,8 @@ def run(args):
         )
 
     print()
-    print("Tip: All encoders default to inverted. Use --no-invert-fl/fr/rl/rr to disable inversion per wheel.")
+    print("Robot Savo default mapping expects forward wheel rotation to count positive.")
+    print("Use --invert-fl/fr/rl/rr only for temporary diagnostics.")
 
 
 def parse_args():
@@ -457,12 +454,13 @@ def parse_args():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 
-    # Final Robot Savo GPIO map.
-    parser.add_argument("--fl-a", type=int, default=25, help="Front-left encoder A BCM GPIO")
-    parser.add_argument("--fl-b", type=int, default=13, help="Front-left encoder B BCM GPIO")
+    # Final Robot Savo tested GPIO map.
+    # Forward wheel rotation is positive with no software inversion.
+    parser.add_argument("--fl-a", type=int, default=21, help="Front-left encoder A BCM GPIO")
+    parser.add_argument("--fl-b", type=int, default=20, help="Front-left encoder B BCM GPIO")
 
-    parser.add_argument("--fr-a", type=int, default=20, help="Front-right encoder A BCM GPIO")
-    parser.add_argument("--fr-b", type=int, default=21, help="Front-right encoder B BCM GPIO")
+    parser.add_argument("--fr-a", type=int, default=13, help="Front-right encoder A BCM GPIO")
+    parser.add_argument("--fr-b", type=int, default=25, help="Front-right encoder B BCM GPIO")
 
     parser.add_argument("--rl-a", type=int, default=23, help="Rear-left encoder A BCM GPIO")
     parser.add_argument("--rl-b", type=int, default=24, help="Rear-left encoder B BCM GPIO")
@@ -470,42 +468,15 @@ def parse_args():
     parser.add_argument("--rr-a", type=int, default=12, help="Rear-right encoder A BCM GPIO")
     parser.add_argument("--rr-b", type=int, default=26, help="Rear-right encoder B BCM GPIO")
 
-    parser.add_argument(
-        "--no-invert-fl",
-        dest="invert_fl",
-        action="store_false",
-        help="Disable front-left encoder inversion",
-    )
-    parser.add_argument(
-        "--no-invert-fr",
-        dest="invert_fr",
-        action="store_false",
-        help="Disable front-right encoder inversion",
-    )
-    parser.add_argument(
-        "--no-invert-rl",
-        dest="invert_rl",
-        action="store_false",
-        help="Disable rear-left encoder inversion",
-    )
-    parser.add_argument(
-        "--no-invert-rr",
-        dest="invert_rr",
-        action="store_false",
-        help="Disable rear-right encoder inversion",
-    )
-
-    parser.set_defaults(
-        invert_fl=True,
-        invert_fr=True,
-        invert_rl=True,
-        invert_rr=True,
-    )
+    parser.add_argument("--invert-fl", action="store_true", help="Invert front-left encoder sign")
+    parser.add_argument("--invert-fr", action="store_true", help="Invert front-right encoder sign")
+    parser.add_argument("--invert-rl", action="store_true", help="Invert rear-left encoder sign")
+    parser.add_argument("--invert-rr", action="store_true", help="Invert rear-right encoder sign")
 
     parser.add_argument("--poll-s", type=float, default=0.001, help="Polling period in seconds")
     parser.add_argument("--debounce-s", type=float, default=0.0003, help="Per-line debounce in seconds")
     parser.add_argument("--interval", type=float, default=0.5, help="Print interval in seconds")
-    parser.add_argument("--duration", type=float, default=20.0, help="Duration in seconds; 0 means until Ctrl+C")
+    parser.add_argument("--duration", type=float, default=40.0, help="Duration in seconds; 0 means until Ctrl+C")
 
     parser.add_argument("--wheel-dia", type=float, default=0.065, help="Wheel diameter in meters")
     parser.add_argument("--cpr", type=int, default=20, help="Encoder counts per revolution per channel")
