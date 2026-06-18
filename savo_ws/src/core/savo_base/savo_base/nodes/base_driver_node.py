@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import math
+import sys
 import traceback
 from dataclasses import dataclass
 from typing import Optional, Any, Dict, Tuple
@@ -1133,22 +1134,38 @@ class BaseDriverNode(Node):
 # =============================================================================
 def main(args=None) -> None:
     rclpy.init(args=args)
-    node: Optional[BaseDriverNode] = None
+
+    node = None
+
     try:
         node = BaseDriverNode()
         rclpy.spin(node)
+
     except KeyboardInterrupt:
         pass
-    except Exception as e:
-        print(f"[base_driver_node] Fatal error: {e}")
+
+    except Exception as exc:
+        print(f"[base_driver_node] Fatal error: {exc}", file=sys.stderr)
         traceback.print_exc()
+
     finally:
         if node is not None:
+            try:
+                node.get_logger().info("Shutting down base_driver_node: stopping motors...")
+                node._board_stop()
+            except Exception:
+                pass
+
             try:
                 node.destroy_node()
             except Exception:
                 pass
-        rclpy.shutdown()
+
+        if rclpy.ok():
+            try:
+                rclpy.shutdown()
+            except Exception:
+                pass
 
 
 if __name__ == "__main__":
