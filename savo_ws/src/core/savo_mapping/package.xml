@@ -2,9 +2,59 @@
 <package format="3">
   <name>savo_mapping</name>
   <version>0.0.1</version>
-  <description>SLAM, map saving, exploration setup</description>
-  <maintainer email="todo@example.com">TODO_NAME</maintainer>
-  <license>MIT</license>
+
+  <description>
+    Robot Savo mapping ownership package for manual LiDAR mapping,
+    autonomous frontier mapping, slam_toolbox bringup, map quality checks,
+    RealSense pointcloud monitoring, mapping-mode voxel obstacle support,
+    and future AprilTag semantic landmark bridge integration.
+  </description>
+
+  <maintainer email="tahmidahnaf998@gmail.com">Ahnaf Tahmid</maintainer>
+  <license>Proprietary</license>
+
   <buildtool_depend>ament_cmake</buildtool_depend>
-  <exec_depend>rclpy</exec_depend>
+  <buildtool_depend>ament_cmake_python</buildtool_depend>
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>rclpy</depend>
+
+  <depend>std_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>diagnostic_msgs</depend>
+  <depend>visualization_msgs</depend>
+
+  <depend>tf2</depend>
+  <depend>tf2_ros</depend>
+  <depend>tf2_geometry_msgs</depend>
+
+  <depend>nav2_msgs</depend>
+  <depend>action_msgs</depend>
+  <depend>lifecycle_msgs</depend>
+
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+
+  <exec_depend>slam_toolbox</exec_depend>
+  <exec_depend>nav2_map_server</exec_depend>
+  <exec_depend>nav2_lifecycle_manager</exec_depend>
+  <exec_depend>nav2_costmap_2d</exec_depend>
+  <exec_depend>nav2_controller</exec_depend>
+  <exec_depend>nav2_planner</exec_depend>
+  <exec_depend>nav2_bt_navigator</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+  <test_depend>ament_cmake_flake8</test_depend>
+  <test_depend>ament_cmake_pytest</test_depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
 </package>

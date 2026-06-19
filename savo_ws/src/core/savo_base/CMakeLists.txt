@@ -25,10 +25,6 @@ find_package(diagnostic_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(savo_msgs REQUIRED)
 
-# NOTE:
-# ament_index_python is a Python runtime package, not a CMake package.
-# Keep it in package.xml / Python imports, but DO NOT find_package() it here.
-
 # -----------------------------------------------------------------------------
 # Python package install (modules/imports)
 # -----------------------------------------------------------------------------
@@ -75,7 +71,6 @@ install(DIRECTORY include/
 # -----------------------------------------------------------------------------
 # Install Python executables (reliable for hybrid packages)
 # -----------------------------------------------------------------------------
-# explicit install for reliable ros2 run in this hybrid ament_cmake layout
 install(PROGRAMS
   # CLI tools (scripts/)
   scripts/teleop_letters_cli.py
