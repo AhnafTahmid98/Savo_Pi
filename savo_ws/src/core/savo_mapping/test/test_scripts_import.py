@@ -108,3 +108,22 @@ def test_script_main_functions_accept_empty_argument_list() -> None:
         result = module.main([])
 
         assert isinstance(result, int), module_name
+
+
+def test_semantic_modules_import_without_side_effects() -> None:
+    modules = [
+        "savo_mapping.semantic",
+        "savo_mapping.semantic.apriltag_mapper",
+        "savo_mapping.semantic.apriltag_observation",
+        "savo_mapping.semantic.human_label_session",
+        "savo_mapping.semantic.location_bridge",
+        "savo_mapping.semantic.location_candidate",
+        "savo_mapping.semantic.location_confirmation",
+        "savo_mapping.semantic.location_record",
+        "savo_mapping.semantic.semantic_landmark_store",
+        "savo_mapping.semantic.tag_database",
+    ]
+
+    for module_name in modules:
+        module = importlib.import_module(module_name)
+        assert module is not None

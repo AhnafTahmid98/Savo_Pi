@@ -149,6 +149,7 @@ def test_expected_source_directories_exist() -> None:
         "savo_mapping/utils",
         "savo_mapping/ros",
         "savo_mapping/diagnostics",
+        "savo_mapping/semantic",
         "scripts",
         "test",
     )
@@ -167,6 +168,7 @@ def test_expected_init_files_exist() -> None:
         "savo_mapping/utils/__init__.py",
         "savo_mapping/ros/__init__.py",
         "savo_mapping/diagnostics/__init__.py",
+        "savo_mapping/semantic/__init__.py",
         "scripts/__init__.py",
     )
 
@@ -175,6 +177,35 @@ def test_expected_init_files_exist() -> None:
 
         assert path.exists(), relative_path
         assert path.is_file(), relative_path
+
+
+def test_expected_semantic_files_exist() -> None:
+    expected_files = [
+        "savo_mapping/semantic/__init__.py",
+        "savo_mapping/semantic/apriltag_mapper.py",
+        "savo_mapping/semantic/apriltag_observation.py",
+        "savo_mapping/semantic/human_label_session.py",
+        "savo_mapping/semantic/location_bridge.py",
+        "savo_mapping/semantic/location_candidate.py",
+        "savo_mapping/semantic/location_confirmation.py",
+        "savo_mapping/semantic/location_record.py",
+        "savo_mapping/semantic/semantic_landmark_store.py",
+        "savo_mapping/semantic/tag_database.py",
+    ]
+
+    for relative_path in expected_files:
+        assert (PACKAGE_ROOT / relative_path).exists()
+
+
+def test_semantic_package_imports() -> None:
+    import savo_mapping.semantic as semantic
+
+    assert semantic.LocationCandidate.__name__ == "LocationCandidate"
+    assert semantic.SemanticLandmarkStore.__name__ == "SemanticLandmarkStore"
+    assert semantic.TagDatabase.__name__ == "TagDatabase"
+    assert callable(semantic.make_apriltag_location_candidate)
+    assert callable(semantic.make_apriltag_observation)
+    assert callable(semantic.make_tag_record)
 
 
 # =============================================================================

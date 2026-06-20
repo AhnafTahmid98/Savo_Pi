@@ -5,7 +5,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Optional
 
 import rclpy
@@ -45,11 +46,21 @@ from savo_mapping.diagnostics import (
     scan_result_to_diagnostic,
     tf_result_to_diagnostic,
 )
+from savo_mapping.exploration.exploration_strategy import (
+    STRATEGY_FRONTIER,
+    SUPPORTED_STRATEGIES,
+    validate_strategy_name,
+)
 from savo_mapping.models.mapping_mode import MappingMode, require_valid_mapping_mode
 from savo_mapping.models.mapping_status import make_mapping_status
 from savo_mapping.models.readiness_state import build_readiness_state, make_check
 from savo_mapping.ros.adapters import json_msg
 from savo_mapping.ros.qos_profiles import get_topic_qos_profile, status_qos, tf_static_qos
+from savo_mapping.semantic.location_bridge import (
+    bridge_locations_from_known_locations,
+    load_known_locations,
+)
+from savo_mapping.semantic.semantic_landmark_store import load_semantic_landmark_store
 from savo_mapping.utils.diagnostics import DiagnosticItem, build_diagnostic_report
 from savo_mapping.utils.timing import RateTracker, age_s, now_s
 
@@ -104,6 +115,62 @@ class TfEdgeRuntime:
         self.available = True
         self.static = self.static or bool(static)
         self.last_wall_s = now_s()
+
+
+@dataclass(frozen=True)
+class SemanticRuntimeStatus:
+    enabled: bool
+    ok: bool
+    message: str
+    store_path: str = ""
+    known_locations_path: str = ""
+    landmark_count: int = 0
+    candidate_count: int = 0
+    pending_candidate_count: int = 0
+    confirmed_candidate_count: int = 0
+    rejected_candidate_count: int = 0
+    known_location_count: int = 0
+    known_location_keys: tuple[str, ...] = ()
+    error: str = ""
+    timestamp_s: float = field(default_factory=now_s)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "enabled": self.enabled,
+            "ok": self.ok,
+            "message": self.message,
+            "store_path": self.store_path,
+            "known_locations_path": self.known_locations_path,
+            "landmark_count": self.landmark_count,
+            "candidate_count": self.candidate_count,
+            "pending_candidate_count": self.pending_candidate_count,
+            "confirmed_candidate_count": self.confirmed_candidate_count,
+            "rejected_candidate_count": self.rejected_candidate_count,
+            "known_location_count": self.known_location_count,
+            "known_location_keys": list(self.known_location_keys),
+            "error": self.error,
+            "timestamp_s": self.timestamp_s,
+        }
+
+
+@dataclass(frozen=True)
+class ExplorationRuntimeStatus:
+    enabled: bool
+    ok: bool
+    strategy: str
+    supported_strategies: tuple[str, ...]
+    message: str
+    timestamp_s: float = field(default_factory=now_s)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "enabled": self.enabled,
+            "ok": self.ok,
+            "strategy": self.strategy,
+            "supported_strategies": list(self.supported_strategies),
+            "message": self.message,
+            "timestamp_s": self.timestamp_s,
+        }
 
 
 class MappingSupervisorNode(Node):
@@ -184,6 +251,13 @@ class MappingSupervisorNode(Node):
         self.declare_parameter("publish_map_quality", True)
         self.declare_parameter("verbose_status_log", False)
 
+        self.declare_parameter("publish_semantic_status", True)
+        self.declare_parameter("semantic_store_path", "")
+        self.declare_parameter("known_locations_path", "")
+
+        self.declare_parameter("publish_exploration_status", True)
+        self.declare_parameter("exploration_strategy", STRATEGY_FRONTIER)
+
     def _load_parameters(self) -> None:
         self.mode = require_valid_mapping_mode(self.get_parameter("mode").value)
 
@@ -258,6 +332,24 @@ class MappingSupervisorNode(Node):
             self.get_parameter("verbose_status_log").value
         )
 
+        self.publish_semantic_status = bool(
+            self.get_parameter("publish_semantic_status").value
+        )
+        self.semantic_store_path = str(
+            self.get_parameter("semantic_store_path").value or ""
+        )
+        self.known_locations_path = str(
+            self.get_parameter("known_locations_path").value or ""
+        )
+
+        self.publish_exploration_status = bool(
+            self.get_parameter("publish_exploration_status").value
+        )
+        self.exploration_strategy = self._load_strategy_parameter(
+            "exploration_strategy",
+            STRATEGY_FRONTIER,
+        )
+
     def _positive_float_parameter(self, name: str, default: float) -> float:
         value = float(self.get_parameter(name).value)
 
@@ -280,6 +372,17 @@ class MappingSupervisorNode(Node):
 
         return value
 
+    def _load_strategy_parameter(self, name: str, default: str) -> str:
+        raw_value = str(self.get_parameter(name).value or default)
+
+        try:
+            return validate_strategy_name(raw_value)
+        except ValueError:
+            self.get_logger().warning(
+                f"Unsupported exploration strategy '{raw_value}'. Using {default}."
+            )
+            return default
+
     def _create_publishers(self) -> None:
         self.ready_pub = self.create_publisher(
             Bool,
@@ -299,6 +402,16 @@ class MappingSupervisorNode(Node):
         self.map_quality_pub = self.create_publisher(
             String,
             "/savo_mapping/map_quality",
+            status_qos(),
+        )
+        self.semantic_status_pub = self.create_publisher(
+            String,
+            "/savo_mapping/semantic_status",
+            status_qos(),
+        )
+        self.exploration_status_pub = self.create_publisher(
+            String,
+            "/savo_mapping/exploration_status",
             status_qos(),
         )
 
@@ -383,6 +496,14 @@ class MappingSupervisorNode(Node):
         if self.publish_map_quality and self._map.latest_msg is not None:
             map_result = self._evaluate_map()
             self.map_quality_pub.publish(json_msg(map_result.quality.to_dict()))
+
+        if self.publish_semantic_status:
+            semantic_status = self._build_semantic_status()
+            self.semantic_status_pub.publish(json_msg(semantic_status.to_dict()))
+
+        if self.publish_exploration_status:
+            exploration_status = self._build_exploration_status()
+            self.exploration_status_pub.publish(json_msg(exploration_status.to_dict()))
 
         log_state = (
             bool(status.ready),
@@ -508,6 +629,81 @@ class MappingSupervisorNode(Node):
             stale_timeout_s=self.pointcloud_stale_timeout_s,
         )
 
+    def _build_semantic_status(self) -> SemanticRuntimeStatus:
+        if not self.semantic_store_path and not self.known_locations_path:
+            return SemanticRuntimeStatus(
+                enabled=False,
+                ok=True,
+                message="Semantic status disabled: no semantic paths configured.",
+            )
+
+        landmark_count = 0
+        candidate_count = 0
+        pending_count = 0
+        confirmed_count = 0
+        rejected_count = 0
+        known_location_count = 0
+        known_location_keys: tuple[str, ...] = ()
+
+        try:
+            if self.semantic_store_path:
+                store = load_semantic_landmark_store(
+                    Path(self.semantic_store_path).expanduser()
+                )
+                landmark_count = store.landmark_count
+                candidate_count = store.candidate_count
+                pending_count = store.pending_candidate_count
+                confirmed_count = store.confirmed_candidate_count
+                rejected_count = store.rejected_candidate_count
+
+            if self.known_locations_path:
+                known = load_known_locations(
+                    Path(self.known_locations_path).expanduser()
+                )
+                locations = bridge_locations_from_known_locations(known)
+                known_location_count = len(locations)
+                known_location_keys = tuple(location.key for location in locations)
+
+        except Exception as exc:
+            return SemanticRuntimeStatus(
+                enabled=True,
+                ok=False,
+                message="Semantic status failed.",
+                store_path=self.semantic_store_path,
+                known_locations_path=self.known_locations_path,
+                error=str(exc),
+            )
+
+        return SemanticRuntimeStatus(
+            enabled=True,
+            ok=True,
+            message="Semantic status ready.",
+            store_path=self.semantic_store_path,
+            known_locations_path=self.known_locations_path,
+            landmark_count=landmark_count,
+            candidate_count=candidate_count,
+            pending_candidate_count=pending_count,
+            confirmed_candidate_count=confirmed_count,
+            rejected_candidate_count=rejected_count,
+            known_location_count=known_location_count,
+            known_location_keys=known_location_keys,
+        )
+
+    def _build_exploration_status(self) -> ExplorationRuntimeStatus:
+        enabled = self.mode == MappingMode.AUTONOMOUS_MAPPING.value
+
+        return ExplorationRuntimeStatus(
+            enabled=enabled,
+            ok=True,
+            strategy=self.exploration_strategy,
+            supported_strategies=SUPPORTED_STRATEGIES,
+            message=(
+                "Exploration strategy ready."
+                if enabled
+                else "Exploration strategy idle outside autonomous mapping mode."
+            ),
+        )
+
     def _build_status(self):
         scan_result = self._evaluate_scan()
         odom_result = self._evaluate_odom()
@@ -548,6 +744,9 @@ class MappingSupervisorNode(Node):
             failed = ", ".join(readiness.failed_required_checks)
             message = f"Mapping supervisor waiting: {failed}."
 
+        semantic_status = self._build_semantic_status()
+        exploration_status = self._build_exploration_status()
+
         status = make_mapping_status(
             mode=self.mode,
             readiness=readiness,
@@ -557,11 +756,15 @@ class MappingSupervisorNode(Node):
             session_id=self.session_id,
             extra={
                 "report": report.to_dict(),
+                "semantic": semantic_status.to_dict(),
+                "exploration": exploration_status.to_dict(),
                 "topics": {
                     "scan": self.scan_topic,
                     "odom": self.odom_topic,
                     "map": self.map_topic,
                     "pointcloud": self.pointcloud_topic,
+                    "semantic_status": "/savo_mapping/semantic_status",
+                    "exploration_status": "/savo_mapping/exploration_status",
                 },
                 "requirements": {
                     "scan": self.require_scan,
