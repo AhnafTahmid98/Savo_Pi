@@ -40,6 +40,17 @@ class TopicSpec:
     required: bool = True
     description: str = ""
 
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "key", str(self.key).strip())
+        object.__setattr__(self, "topic", normalize_topic(self.topic))
+        object.__setattr__(self, "msg_type", str(self.msg_type).strip())
+
+        if not self.key:
+            raise ValueError("TopicSpec key cannot be empty.")
+
+        if not self.msg_type:
+            raise ValueError("TopicSpec msg_type cannot be empty.")
+
     def normalized(self) -> "TopicSpec":
         return TopicSpec(
             key=self.key,
@@ -320,12 +331,19 @@ def get_publication_topic_names() -> Dict[str, str]:
     }
 
 
-def get_subscription_topic_names() -> Dict[str, str]:
-    """Return subscription topic names keyed by contract key."""
-    return {
-        key: spec.topic
-        for key, spec in DEFAULT_TOPIC_CONTRACT.subscriptions.items()
-    }
+def get_subscription_topic_names() -> dict[str, str]:
+    """Return required and optional subscription topic names by contract key."""
+    contract = get_mapping_topic_contract()
+
+    topics: dict[str, str] = {}
+
+    for key, spec in contract.subscriptions.items():
+        topics[key] = spec.topic
+
+    for key, spec in contract.optional_subscriptions.items():
+        topics[key] = spec.topic
+
+    return topics
 
 
 def validate_contract_topics() -> None:

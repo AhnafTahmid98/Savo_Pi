@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Final, Iterable, Mapping
+from typing import Dict, Final, Mapping
 
 
 # =============================================================================
@@ -161,9 +161,12 @@ def normalize_topic_map(topics: Mapping[str, str]) -> Dict[str, str]:
     return {str(key): normalize_topic(value) for key, value in topics.items()}
 
 
-def validate_topics(topics: Iterable[str]) -> None:
-    """Raise ValueError if any topic in the list is invalid."""
-    for topic in topics:
+def validate_topics(topics: Mapping[str, str]) -> None:
+    """Raise ValueError if any topic key or value is invalid."""
+    for key, topic in topics.items():
+        if not str(key).strip():
+            raise ValueError("Topic key cannot be empty.")
+
         normalize_topic(topic)
 
 

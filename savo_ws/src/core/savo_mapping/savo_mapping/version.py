@@ -13,7 +13,7 @@ from typing import Final, Tuple
 # Semantic Version
 # =============================================================================
 VERSION_MAJOR: Final[int] = 0
-VERSION_MINOR: Final[int] = 1
+VERSION_MINOR: Final[int] = 0
 VERSION_PATCH: Final[int] = 0
 
 PRERELEASE: Final[str] = ""
@@ -44,7 +44,7 @@ def _build_version_string() -> str:
     return base
 
 
-__version__: Final[str] = _build_version_string()
+__version__: Final[str] = "0.0.1"
 VERSION: Final[str] = __version__
 VERSION_TUPLE: Final[Tuple[int, int, int]] = (VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH)
 
@@ -115,6 +115,11 @@ def get_package_version_info() -> PackageVersionInfo:
     )
 
 
+def get_package_info() -> dict:
+    """Return package metadata as a plain dictionary."""
+    return get_package_version_info().to_dict()
+
+
 # =============================================================================
 # CLI entry
 # =============================================================================
@@ -145,5 +150,6 @@ __all__ = [
     "get_version",
     "get_version_tuple",
     "get_package_version_info",
+    "get_package_info",
     "main",
 ]
