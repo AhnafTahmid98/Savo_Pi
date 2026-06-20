@@ -94,6 +94,15 @@ TOPIC_APRILTAG_OBSERVATION: Final[str] = "/savo_mapping/apriltag_observation"
 TOPIC_APRILTAG_MAPPER_STATUS: Final[str] = "/savo_mapping/apriltag_mapper/status"
 TOPIC_APRILTAG_MAPPER_RESULT: Final[str] = "/savo_mapping/apriltag_mapper/result"
 TOPIC_LOCATION_CANDIDATE: Final[str] = "/savo_mapping/location_candidate"
+TOPIC_SEMANTIC_LANDMARK_RECORD: Final[str] = "/savo_mapping/semantic_landmark_record"
+TOPIC_SEMANTIC_LANDMARK_RECORDER_STATUS: Final[str] = (
+    "/savo_mapping/semantic_landmark_recorder/status"
+)
+TOPIC_SEMANTIC_LANDMARK_RECORDER_RESULT: Final[str] = (
+    "/savo_mapping/semantic_landmark_recorder/result"
+)
+TOPIC_MAP_EVENT_LOGGER_STATUS: Final[str] = "/savo_mapping/map_event_logger/status"
+TOPIC_MAP_EVENT_LOGGER_EVENT: Final[str] = "/savo_mapping/map_event_logger/event"
 
 
 # =============================================================================
@@ -268,6 +277,11 @@ __all__ = [
     "TOPIC_APRILTAG_MAPPER_STATUS",
     "TOPIC_APRILTAG_MAPPER_RESULT",
     "TOPIC_LOCATION_CANDIDATE",
+    "TOPIC_SEMANTIC_LANDMARK_RECORD",
+    "TOPIC_SEMANTIC_LANDMARK_RECORDER_STATUS",
+    "TOPIC_SEMANTIC_LANDMARK_RECORDER_RESULT",
+    "TOPIC_MAP_EVENT_LOGGER_STATUS",
+    "TOPIC_MAP_EVENT_LOGGER_EVENT",
     "FRAME_MAP",
     "FRAME_ODOM",
     "FRAME_BASE_LINK",

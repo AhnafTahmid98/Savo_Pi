@@ -64,6 +64,11 @@ try:
         TOPIC_APRILTAG_MAPPER_STATUS,
         TOPIC_APRILTAG_MAPPER_RESULT,
         TOPIC_LOCATION_CANDIDATE,
+        TOPIC_SEMANTIC_LANDMARK_RECORD,
+        TOPIC_SEMANTIC_LANDMARK_RECORDER_STATUS,
+        TOPIC_SEMANTIC_LANDMARK_RECORDER_RESULT,
+        TOPIC_MAP_EVENT_LOGGER_STATUS,
+        TOPIC_MAP_EVENT_LOGGER_EVENT,
         TOPIC_POINTCLOUD_STATUS,
     )
 except Exception:
@@ -108,6 +113,15 @@ except Exception:
     TOPIC_APRILTAG_MAPPER_STATUS = "/savo_mapping/apriltag_mapper/status"
     TOPIC_APRILTAG_MAPPER_RESULT = "/savo_mapping/apriltag_mapper/result"
     TOPIC_LOCATION_CANDIDATE = "/savo_mapping/location_candidate"
+    TOPIC_SEMANTIC_LANDMARK_RECORD = "/savo_mapping/semantic_landmark_record"
+    TOPIC_SEMANTIC_LANDMARK_RECORDER_STATUS = (
+        "/savo_mapping/semantic_landmark_recorder/status"
+    )
+    TOPIC_SEMANTIC_LANDMARK_RECORDER_RESULT = (
+        "/savo_mapping/semantic_landmark_recorder/result"
+    )
+    TOPIC_MAP_EVENT_LOGGER_STATUS = "/savo_mapping/map_event_logger/status"
+    TOPIC_MAP_EVENT_LOGGER_EVENT = "/savo_mapping/map_event_logger/event"
     TOPIC_POINTCLOUD_STATUS = "/savo_mapping/pointcloud_status"
 
 
@@ -150,6 +164,15 @@ def get_package_info() -> dict:
             "apriltag_mapper_status": TOPIC_APRILTAG_MAPPER_STATUS,
             "apriltag_mapper_result": TOPIC_APRILTAG_MAPPER_RESULT,
             "location_candidate": TOPIC_LOCATION_CANDIDATE,
+            "semantic_landmark_record": TOPIC_SEMANTIC_LANDMARK_RECORD,
+            "semantic_landmark_recorder_status": (
+                TOPIC_SEMANTIC_LANDMARK_RECORDER_STATUS
+            ),
+            "semantic_landmark_recorder_result": (
+                TOPIC_SEMANTIC_LANDMARK_RECORDER_RESULT
+            ),
+            "map_event_logger_status": TOPIC_MAP_EVENT_LOGGER_STATUS,
+            "map_event_logger_event": TOPIC_MAP_EVENT_LOGGER_EVENT,
             "pointcloud_status": TOPIC_POINTCLOUD_STATUS,
         },
         "has_structured_defaults": DEFAULTS is not None,
@@ -198,6 +221,11 @@ __all__ = [
     "TOPIC_APRILTAG_MAPPER_STATUS",
     "TOPIC_APRILTAG_MAPPER_RESULT",
     "TOPIC_LOCATION_CANDIDATE",
+    "TOPIC_SEMANTIC_LANDMARK_RECORD",
+    "TOPIC_SEMANTIC_LANDMARK_RECORDER_STATUS",
+    "TOPIC_SEMANTIC_LANDMARK_RECORDER_RESULT",
+    "TOPIC_MAP_EVENT_LOGGER_STATUS",
+    "TOPIC_MAP_EVENT_LOGGER_EVENT",
     "TOPIC_POINTCLOUD_STATUS",
     # metadata helper
     "get_package_info",

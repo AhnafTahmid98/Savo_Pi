@@ -131,6 +131,7 @@ def test_semantic_modules_import_without_side_effects() -> None:
 
 def test_mapping_node_modules_import_without_side_effects() -> None:
     modules = [
+        "savo_mapping.nodes",
         "savo_mapping.nodes.mapping_supervisor_node",
         "savo_mapping.nodes.mapping_mode_manager_node",
         "savo_mapping.nodes.mapping_dashboard_node",
@@ -138,6 +139,8 @@ def test_mapping_node_modules_import_without_side_effects() -> None:
         "savo_mapping.nodes.location_bridge_node",
         "savo_mapping.nodes.location_confirmation_node",
         "savo_mapping.nodes.apriltag_mapper_node",
+        "savo_mapping.nodes.semantic_landmark_recorder_node",
+        "savo_mapping.nodes.map_event_logger_node",
         "savo_mapping.nodes.pointcloud_monitor_node",
     ]
 

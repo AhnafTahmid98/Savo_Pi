@@ -31,6 +31,8 @@ setup(
             "location_bridge_node = savo_mapping.nodes.location_bridge_node:main",
             "location_confirmation_node = savo_mapping.nodes.location_confirmation_node:main",
             "apriltag_mapper_node = savo_mapping.nodes.apriltag_mapper_node:main",
+            "semantic_landmark_recorder_node = savo_mapping.nodes.semantic_landmark_recorder_node:main",
+            "map_event_logger_node = savo_mapping.nodes.map_event_logger_node:main",
             "mapping_readiness_cli = scripts.mapping_readiness_cli:main",
             "mapping_smoke_test_cli = scripts.mapping_smoke_test_cli:main",
             "dump_effective_params = scripts.dump_effective_params:main",

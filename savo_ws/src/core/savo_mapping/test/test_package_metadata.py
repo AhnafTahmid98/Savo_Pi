@@ -115,6 +115,11 @@ def test_get_package_info_topics() -> None:
     assert topics["apriltag_mapper_status"] == "/savo_mapping/apriltag_mapper/status"
     assert topics["apriltag_mapper_result"] == "/savo_mapping/apriltag_mapper/result"
     assert topics["location_candidate"] == "/savo_mapping/location_candidate"
+    assert topics["semantic_landmark_record"] == "/savo_mapping/semantic_landmark_record"
+    assert topics["semantic_landmark_recorder_status"] == "/savo_mapping/semantic_landmark_recorder/status"
+    assert topics["semantic_landmark_recorder_result"] == "/savo_mapping/semantic_landmark_recorder/result"
+    assert topics["map_event_logger_status"] == "/savo_mapping/map_event_logger/status"
+    assert topics["map_event_logger_event"] == "/savo_mapping/map_event_logger/event"
     assert topics["map_quality"] == "/savo_mapping/map_quality"
 
 
@@ -228,6 +233,8 @@ def test_expected_node_files_exist() -> None:
         "savo_mapping/nodes/location_bridge_node.py",
         "savo_mapping/nodes/location_confirmation_node.py",
         "savo_mapping/nodes/apriltag_mapper_node.py",
+        "savo_mapping/nodes/semantic_landmark_recorder_node.py",
+        "savo_mapping/nodes/map_event_logger_node.py",
         "savo_mapping/nodes/pointcloud_monitor_node.py",
     ]
 
@@ -259,6 +266,10 @@ def test_mapping_node_modules_import() -> None:
     from savo_mapping.nodes.location_confirmation_node import (
         LocationConfirmationNodeStatus,
     )
+    from savo_mapping.nodes.map_event_logger_node import (
+        MapEventLoggerStatus,
+        MapEventRecord,
+    )
     from savo_mapping.nodes.mapping_mode_manager_node import (
         COMMAND_SEMANTIC_REVIEW,
         PHASE_SEMANTIC_REVIEW,
@@ -269,6 +280,9 @@ def test_mapping_node_modules_import() -> None:
         SemanticRuntimeStatus,
     )
     from savo_mapping.nodes.pointcloud_monitor_node import PointcloudMonitorSnapshot
+    from savo_mapping.nodes.semantic_landmark_recorder_node import (
+        SemanticLandmarkRecorderStatus,
+    )
 
     assert COMMAND_SEMANTIC_REVIEW == "semantic_review"
     assert PHASE_SEMANTIC_REVIEW == "semantic_review"
@@ -355,6 +369,30 @@ def test_mapping_node_modules_import() -> None:
     )
 
     assert apriltag_status.to_dict()["decision"] == "disabled"
+
+    semantic_recorder_status = SemanticLandmarkRecorderStatus(
+        enabled=False,
+        ok=True,
+        decision="disabled",
+        message="ok",
+    )
+
+    assert semantic_recorder_status.to_dict()["decision"] == "disabled"
+
+    map_event_status = MapEventLoggerStatus(
+        enabled=False,
+        ok=True,
+        decision="disabled",
+        message="ok",
+    )
+    map_event_record = MapEventRecord(
+        topic="/savo_mapping/mode_command",
+        payload_raw='{"mode":"manual_mapping"}',
+        payload={"mode": "manual_mapping"},
+    )
+
+    assert map_event_status.to_dict()["decision"] == "disabled"
+    assert map_event_record.to_dict()["topic"] == "/savo_mapping/mode_command"
 
     pointcloud_snapshot = PointcloudMonitorSnapshot(
         enabled=False,
@@ -488,6 +526,8 @@ def test_setup_py_contains_expected_package_data() -> None:
     assert "location_bridge_node" in text
     assert "location_confirmation_node" in text
     assert "apriltag_mapper_node" in text
+    assert "semantic_landmark_recorder_node" in text
+    assert "map_event_logger_node" in text
 
 
 def test_setup_cfg_contains_script_paths() -> None:
