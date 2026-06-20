@@ -127,3 +127,20 @@ def test_semantic_modules_import_without_side_effects() -> None:
     for module_name in modules:
         module = importlib.import_module(module_name)
         assert module is not None
+
+
+def test_mapping_node_modules_import_without_side_effects() -> None:
+    modules = [
+        "savo_mapping.nodes.mapping_supervisor_node",
+        "savo_mapping.nodes.mapping_mode_manager_node",
+        "savo_mapping.nodes.mapping_dashboard_node",
+        "savo_mapping.nodes.frontier_explorer_node",
+        "savo_mapping.nodes.location_bridge_node",
+        "savo_mapping.nodes.location_confirmation_node",
+        "savo_mapping.nodes.apriltag_mapper_node",
+        "savo_mapping.nodes.pointcloud_monitor_node",
+    ]
+
+    for module_name in modules:
+        module = importlib.import_module(module_name)
+        assert module is not None

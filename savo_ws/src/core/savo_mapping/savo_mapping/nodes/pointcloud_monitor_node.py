@@ -5,7 +5,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import json
+from dataclasses import dataclass, field
 from typing import Any, Optional
 
 import rclpy
@@ -29,6 +30,12 @@ from savo_mapping.ros.qos_profiles import get_topic_qos_profile, status_qos
 from savo_mapping.utils.timing import RateTracker, age_s, now_s
 
 
+DECISION_DISABLED = "disabled"
+DECISION_WAITING = "waiting"
+DECISION_READY = "ready"
+DECISION_DEGRADED = "degraded"
+
+
 @dataclass
 class PointcloudRuntime:
     latest_msg: Optional[PointCloud2] = None
@@ -46,6 +53,13 @@ class PointcloudRuntime:
     def sample_age_s(self) -> Optional[float]:
         return age_s(self.last_wall_s)
 
+    @property
+    def frame_id(self) -> str:
+        if self.latest_msg is None:
+            return ""
+
+        return str(self.latest_msg.header.frame_id)
+
     def update(self, msg: PointCloud2) -> None:
         stamp = now_s()
 
@@ -53,6 +67,45 @@ class PointcloudRuntime:
         self.msg_count += 1
         self.last_wall_s = stamp
         self.rate_tracker.tick(stamp)
+
+
+@dataclass(frozen=True)
+class PointcloudMonitorSnapshot:
+    enabled: bool
+    ok: bool
+    decision: str
+    message: str
+    topic: str
+    expected_frame: str
+    received_frame: str = ""
+    point_count: int = 0
+    msg_count: int = 0
+    rate_hz: float = 0.0
+    age_s: Optional[float] = None
+    stale: bool = False
+    diagnostic: dict[str, Any] = field(default_factory=dict)
+    timestamp_s: float = field(default_factory=now_s)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "enabled": self.enabled,
+            "ok": self.ok,
+            "decision": self.decision,
+            "message": self.message,
+            "topic": self.topic,
+            "expected_frame": self.expected_frame,
+            "received_frame": self.received_frame,
+            "point_count": self.point_count,
+            "msg_count": self.msg_count,
+            "rate_hz": self.rate_hz,
+            "age_s": self.age_s,
+            "stale": self.stale,
+            "diagnostic": dict(self.diagnostic),
+            "timestamp_s": self.timestamp_s,
+        }
+
+    def to_json(self) -> str:
+        return json.dumps(self.to_dict(), sort_keys=True)
 
 
 class PointcloudMonitorNode(Node):
@@ -63,7 +116,7 @@ class PointcloudMonitorNode(Node):
         self._load_parameters()
 
         self._runtime = PointcloudRuntime()
-        self._last_log_state: Optional[tuple[bool, bool, int]] = None
+        self._last_log_state: Optional[tuple[bool, str, bool, int]] = None
 
         self.status_pub = self.create_publisher(
             String,
@@ -148,29 +201,46 @@ class PointcloudMonitorNode(Node):
         self._runtime.update(msg)
 
     def _on_timer(self) -> None:
-        result = self._evaluate()
-        diagnostic = pointcloud_result_to_diagnostic(result, required=self.enabled)
+        snapshot = self._build_snapshot()
 
-        payload = result.to_dict()
-        payload["diagnostic"] = diagnostic.to_dict()
-
-        self.status_pub.publish(json_msg(payload))
+        self.status_pub.publish(json_msg(snapshot.to_dict()))
 
         log_state = (
-            bool(result.ok),
-            bool(result.stale),
-            int(result.msg_count),
+            bool(snapshot.ok),
+            str(snapshot.decision),
+            bool(snapshot.stale),
+            int(snapshot.msg_count),
         )
 
         if self.verbose_status_log or log_state != self._last_log_state:
             self.get_logger().info(
                 "Pointcloud status: "
-                f"enabled={result.enabled} ok={result.ok} "
-                f"stale={result.stale} count={result.msg_count} "
-                f"points={result.point_count}"
+                f"enabled={snapshot.enabled} ok={snapshot.ok} "
+                f"decision={snapshot.decision} stale={snapshot.stale} "
+                f"count={snapshot.msg_count} points={snapshot.point_count}"
             )
 
         self._last_log_state = log_state
+
+    def _build_snapshot(self) -> PointcloudMonitorSnapshot:
+        result = self._evaluate()
+        diagnostic = pointcloud_result_to_diagnostic(result, required=self.enabled)
+
+        return PointcloudMonitorSnapshot(
+            enabled=bool(result.enabled),
+            ok=bool(result.ok),
+            decision=_decision_from_result(result),
+            message=_message_from_result(result),
+            topic=self.pointcloud_topic,
+            expected_frame=self.expected_frame,
+            received_frame=self._runtime.frame_id,
+            point_count=int(result.point_count),
+            msg_count=int(result.msg_count),
+            rate_hz=float(result.rate_hz),
+            age_s=result.age_s,
+            stale=bool(result.stale),
+            diagnostic=diagnostic.to_dict(),
+        )
 
     def _evaluate(self):
         if self._runtime.latest_msg is None:
@@ -197,6 +267,35 @@ class PointcloudMonitorNode(Node):
             min_points=self.min_points,
             stale_timeout_s=self.stale_timeout_s,
         )
+
+
+def _decision_from_result(result: Any) -> str:
+    if not bool(result.enabled):
+        return DECISION_DISABLED
+
+    if int(result.msg_count) <= 0:
+        return DECISION_WAITING
+
+    if bool(result.ok):
+        return DECISION_READY
+
+    return DECISION_DEGRADED
+
+
+def _message_from_result(result: Any) -> str:
+    if not bool(result.enabled):
+        return "Pointcloud monitor disabled."
+
+    if int(result.msg_count) <= 0:
+        return "Waiting for pointcloud messages."
+
+    if bool(result.ok):
+        return "Pointcloud stream ready."
+
+    if bool(result.stale):
+        return "Pointcloud stream is stale."
+
+    return "Pointcloud stream is degraded."
 
 
 def _empty_pointcloud_msg(frame_id: str) -> PointCloud2:

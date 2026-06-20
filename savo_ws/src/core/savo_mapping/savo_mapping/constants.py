@@ -57,9 +57,18 @@ TOPIC_DEPTH_FRONT: Final[str] = "/depth/min_front_m"
 TOPIC_MAPPING_READY: Final[str] = "/savo_mapping/ready"
 TOPIC_MAPPING_STATUS: Final[str] = "/savo_mapping/status"
 TOPIC_MAPPING_MODE: Final[str] = "/savo_mapping/mode"
+TOPIC_MAPPING_WORKFLOW_PHASE: Final[str] = "/savo_mapping/workflow_phase"
 TOPIC_SESSION_STATE: Final[str] = "/savo_mapping/session_state"
 TOPIC_MAP_QUALITY: Final[str] = "/savo_mapping/map_quality"
 TOPIC_EXPLORATION_STATUS: Final[str] = "/savo_mapping/exploration_status"
+TOPIC_SEMANTIC_STATUS: Final[str] = "/savo_mapping/semantic_status"
+TOPIC_MAPPING_DASHBOARD: Final[str] = "/savo_mapping/dashboard"
+TOPIC_MAPPING_DASHBOARD_TEXT: Final[str] = "/savo_mapping/dashboard_text"
+TOPIC_FRONTIER_EXPLORER_STATUS: Final[str] = "/savo_mapping/frontier_explorer/status"
+TOPIC_FRONTIER_EXPLORER_GOAL: Final[str] = "/savo_mapping/frontier_explorer/goal"
+TOPIC_FRONTIER_EXPLORER_GOAL_POSE: Final[str] = (
+    "/savo_mapping/frontier_explorer/goal_pose"
+)
 TOPIC_NEXT_GOAL: Final[str] = "/savo_mapping/next_goal"
 TOPIC_POINTCLOUD_STATUS: Final[str] = "/savo_mapping/pointcloud_status"
 
@@ -70,7 +79,21 @@ TOPIC_POINTCLOUD_STATUS: Final[str] = "/savo_mapping/pointcloud_status"
 TOPIC_APRILTAG_DETECTIONS: Final[str] = "/apriltag/detections"
 TOPIC_APRILTAG_STATUS: Final[str] = "/savo_mapping/apriltag_status"
 TOPIC_SEMANTIC_LANDMARKS: Final[str] = "/savo_mapping/semantic_landmarks"
-TOPIC_LOCATION_BRIDGE_STATUS: Final[str] = "/savo_mapping/location_bridge_status"
+TOPIC_LOCATION_BRIDGE_STATUS: Final[str] = "/savo_mapping/location_bridge/status"
+TOPIC_KNOWN_LOCATIONS: Final[str] = "/savo_mapping/known_locations"
+TOPIC_LOCATION_CONFIRMATION_COMMAND: Final[str] = (
+    "/savo_mapping/location_confirmation_command"
+)
+TOPIC_LOCATION_CONFIRMATION_STATUS: Final[str] = (
+    "/savo_mapping/location_confirmation/status"
+)
+TOPIC_LOCATION_CONFIRMATION_RESULT: Final[str] = (
+    "/savo_mapping/location_confirmation/result"
+)
+TOPIC_APRILTAG_OBSERVATION: Final[str] = "/savo_mapping/apriltag_observation"
+TOPIC_APRILTAG_MAPPER_STATUS: Final[str] = "/savo_mapping/apriltag_mapper/status"
+TOPIC_APRILTAG_MAPPER_RESULT: Final[str] = "/savo_mapping/apriltag_mapper/result"
+TOPIC_LOCATION_CANDIDATE: Final[str] = "/savo_mapping/location_candidate"
 
 
 # =============================================================================
@@ -221,15 +244,30 @@ __all__ = [
     "TOPIC_MAPPING_READY",
     "TOPIC_MAPPING_STATUS",
     "TOPIC_MAPPING_MODE",
+    "TOPIC_MAPPING_WORKFLOW_PHASE",
     "TOPIC_SESSION_STATE",
     "TOPIC_MAP_QUALITY",
     "TOPIC_EXPLORATION_STATUS",
+    "TOPIC_SEMANTIC_STATUS",
+    "TOPIC_MAPPING_DASHBOARD",
+    "TOPIC_MAPPING_DASHBOARD_TEXT",
+    "TOPIC_FRONTIER_EXPLORER_STATUS",
+    "TOPIC_FRONTIER_EXPLORER_GOAL",
+    "TOPIC_FRONTIER_EXPLORER_GOAL_POSE",
     "TOPIC_NEXT_GOAL",
     "TOPIC_POINTCLOUD_STATUS",
     "TOPIC_APRILTAG_DETECTIONS",
     "TOPIC_APRILTAG_STATUS",
     "TOPIC_SEMANTIC_LANDMARKS",
     "TOPIC_LOCATION_BRIDGE_STATUS",
+    "TOPIC_KNOWN_LOCATIONS",
+    "TOPIC_LOCATION_CONFIRMATION_COMMAND",
+    "TOPIC_LOCATION_CONFIRMATION_STATUS",
+    "TOPIC_LOCATION_CONFIRMATION_RESULT",
+    "TOPIC_APRILTAG_OBSERVATION",
+    "TOPIC_APRILTAG_MAPPER_STATUS",
+    "TOPIC_APRILTAG_MAPPER_RESULT",
+    "TOPIC_LOCATION_CANDIDATE",
     "FRAME_MAP",
     "FRAME_ODOM",
     "FRAME_BASE_LINK",
