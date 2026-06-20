@@ -1,0 +1,32 @@
+semantic_landmarks:
+  ros__parameters:
+    map_name: robot_savo_default
+
+    semantic_store_path: maps/semantic/semantic_landmarks.json
+    known_locations_path: maps/semantic/known_locations.json
+    tag_database_path: maps/semantic/tag_database.json
+
+    default_frame_id: map
+    default_source: human
+    default_area_type: manual_location
+
+    allow_pending_candidates: true
+    require_operator_confirmation: true
+    auto_confirm_apriltags: false
+    auto_confirm_manual_records: false
+
+    candidate_defaults:
+      confidence: 1.0
+      pending: true
+      confirmed: false
+      rejected: false
+
+    location_defaults:
+      enabled: true
+      aliases: []
+      metadata: {}
+
+    cleanup:
+      keep_rejected_candidates: true
+      keep_pending_candidates: true
+      max_candidate_age_s: 0.0

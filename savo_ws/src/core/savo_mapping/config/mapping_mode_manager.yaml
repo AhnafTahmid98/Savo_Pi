@@ -1,0 +1,24 @@
+mapping_mode_manager_node:
+  ros__parameters:
+    default_mode: idle
+    map_name: robot_savo_default
+    session_id: ""
+
+    command_topic: /savo_mapping/mode_command
+    mode_topic: /savo_mapping/mode
+    workflow_phase_topic: /savo_mapping/workflow_phase
+    session_state_topic: /savo_mapping/session_state
+    status_topic: /savo_mapping/status
+
+    publish_rate_hz: 5.0
+
+    allow_idle: true
+    allow_manual_mapping: true
+    allow_autonomous_mapping: false
+    allow_map_saving: true
+    allow_semantic_review: true
+
+    default_semantic_actor: operator
+    default_semantic_source: cli
+
+    verbose_status_log: false

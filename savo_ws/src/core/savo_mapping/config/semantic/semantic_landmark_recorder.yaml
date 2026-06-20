@@ -1,0 +1,21 @@
+semantic_landmark_recorder_node:
+  ros__parameters:
+    enabled: false
+
+    semantic_store_path: maps/semantic/semantic_landmarks.json
+
+    command_topic: /savo_mapping/semantic_landmark_record
+    status_topic: /savo_mapping/semantic_landmark_recorder/status
+    result_topic: /savo_mapping/semantic_landmark_recorder/result
+    candidate_topic: /savo_mapping/location_candidate
+
+    publish_rate_hz: 5.0
+
+    require_semantic_store_path: false
+
+    default_source: human
+    default_area_type: manual_location
+    default_actor: operator
+    default_confirm: false
+
+    verbose_status_log: false

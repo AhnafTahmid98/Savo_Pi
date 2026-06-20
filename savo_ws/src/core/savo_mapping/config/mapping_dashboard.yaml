@@ -1,0 +1,15 @@
+mapping_dashboard_node:
+  ros__parameters:
+    status_topic: /savo_mapping/status
+    mode_topic: /savo_mapping/mode
+    workflow_phase_topic: /savo_mapping/workflow_phase
+    session_state_topic: /savo_mapping/session_state
+    semantic_status_topic: /savo_mapping/semantic_status
+    exploration_status_topic: /savo_mapping/exploration_status
+    map_quality_topic: /savo_mapping/map_quality
+
+    dashboard_topic: /savo_mapping/dashboard
+    dashboard_text_topic: /savo_mapping/dashboard_text
+
+    publish_rate_hz: 5.0
+    verbose_status_log: false

@@ -1,0 +1,44 @@
+mapping_supervisor_node:
+  ros__parameters:
+    mode: manual_mapping
+    map_name: robot_savo_default
+    session_id: ""
+
+    scan_topic: /scan
+    odom_topic: /odometry/filtered
+    map_topic: /map
+    pointcloud_topic: /savo_edge/realsense/points
+
+    map_frame: map
+    odom_frame: odom
+    base_frame: base_link
+    laser_frame: laser
+
+    publish_rate_hz: 5.0
+
+    require_scan: true
+    require_odom: true
+    require_tf: true
+    require_map: false
+    require_pointcloud: false
+
+    min_scan_rate_hz: 3.0
+    min_odom_rate_hz: 5.0
+    min_pointcloud_rate_hz: 3.0
+    min_pointcloud_points: 100
+
+    scan_stale_timeout_s: 1.0
+    odom_stale_timeout_s: 1.0
+    tf_timeout_s: 1.0
+    map_stale_timeout_s: 2.0
+    pointcloud_stale_timeout_s: 1.0
+
+    publish_map_quality: true
+    verbose_status_log: false
+
+    publish_semantic_status: true
+    semantic_store_path: maps/semantic/semantic_landmarks.json
+    known_locations_path: maps/semantic/known_locations.json
+
+    publish_exploration_status: true
+    exploration_strategy: frontier

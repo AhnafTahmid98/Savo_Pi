@@ -1,0 +1,44 @@
+mapping_common:
+  ros__parameters:
+    map_name: savonia_campus_heart
+    session_id: ""
+
+    map_frame: map
+    odom_frame: odom
+    base_frame: base_link
+    laser_frame: laser
+    camera_depth_frame: camera_depth_optical_frame
+
+    scan_topic: /scan
+    odom_topic: /odometry/filtered
+    map_topic: /map
+    map_metadata_topic: /map_metadata
+    pointcloud_topic: /savo_edge/realsense/points
+    safety_stop_topic: /safety/stop
+
+    publish_rate_hz: 5.0
+    verbose_status_log: false
+
+    scan_stale_timeout_s: 1.0
+    odom_stale_timeout_s: 1.0
+    tf_timeout_s: 1.0
+    map_stale_timeout_s: 2.0
+    pointcloud_stale_timeout_s: 1.0
+
+    min_scan_rate_hz: 3.0
+    min_odom_rate_hz: 5.0
+    min_pointcloud_rate_hz: 3.0
+    min_pointcloud_points: 100
+
+    require_scan: true
+    require_odom: true
+    require_tf: true
+    require_map: false
+    require_pointcloud: false
+
+    semantic_store_path: maps/semantic/semantic_landmarks.json
+    known_locations_path: maps/semantic/known_locations.json
+    map_event_log_path: maps/events/map_events.jsonl
+
+    saved_maps_dir: maps/saved
+    mapping_sessions_dir: maps/sessions

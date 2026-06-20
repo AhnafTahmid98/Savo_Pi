@@ -1,0 +1,16 @@
+location_bridge_node:
+  ros__parameters:
+    enabled: false
+
+    semantic_store_path: maps/semantic/semantic_landmarks.json
+    known_locations_path: maps/semantic/known_locations.json
+
+    status_topic: /savo_mapping/location_bridge/status
+    known_locations_topic: /savo_mapping/known_locations
+
+    publish_rate_hz: 5.0
+
+    write_known_locations: true
+    require_semantic_store: false
+
+    verbose_status_log: false
