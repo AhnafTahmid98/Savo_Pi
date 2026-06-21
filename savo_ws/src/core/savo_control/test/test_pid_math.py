@@ -1,17 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Unit tests for the Python PID/controller helpers used by Robot Savo.
-
-These tests intentionally check the current production API names:
-- Pid
-- HeadingController
-- DistancePid
-
-The goal is not to test ROS here. The goal is to verify the pure math/control
-behavior before these controllers are used by ROS nodes.
-"""
+" Unit tests for the Python PID/controller helpers used by Robot Savo."
 
 from __future__ import annotations
 
@@ -242,13 +232,13 @@ def test_distance_pid_zero_error_outputs_zero() -> None:
 
 def test_distance_pid_too_far_uses_current_convention() -> None:
     """
-    Check the current sign convention.
+    Check the current production sign convention.
 
     With the current implementation:
-    error = target_distance - current_distance
+    error = current_distance - target_distance
 
-    If current distance is larger than target distance, error is negative.
-    The controller therefore produces negative vx.
+    If current distance is larger than target distance, error is positive.
+    The controller therefore produces positive vx for approach motion.
     """
     controller = DistancePid(
         DistanceControllerConfig(
@@ -263,16 +253,16 @@ def test_distance_pid_too_far_uses_current_convention() -> None:
     )
 
     assert result.valid is True
-    assert result.error_distance_m == pytest.approx(-0.40)
-    assert result.vx_cmd_m_s < 0.0
+    assert result.error_distance_m == pytest.approx(0.40)
+    assert result.vx_cmd_m_s > 0.0
 
 
 def test_distance_pid_too_close_uses_current_convention() -> None:
     """
-    Check the current sign convention for being too close.
+    Check the current production sign convention for being too close.
 
-    If current distance is smaller than target distance, error is positive.
-    The controller therefore produces positive vx.
+    If current distance is smaller than target distance, error is negative.
+    The controller therefore produces negative vx before policy limiting.
     """
     controller = DistancePid(
         DistanceControllerConfig(
@@ -287,8 +277,8 @@ def test_distance_pid_too_close_uses_current_convention() -> None:
     )
 
     assert result.valid is True
-    assert result.error_distance_m == pytest.approx(0.20)
-    assert result.vx_cmd_m_s > 0.0
+    assert result.error_distance_m == pytest.approx(-0.20)
+    assert result.vx_cmd_m_s < 0.0
 
 
 def test_distance_pid_output_limit() -> None:

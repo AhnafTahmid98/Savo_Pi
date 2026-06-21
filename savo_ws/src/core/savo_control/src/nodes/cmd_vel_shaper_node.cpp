@@ -1,19 +1,57 @@
-// Applies clamp + deadband + slew-rate to /cmd_vel_mux and publishes to /cmd_vel.
-
 #include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <memory>
+#include <sstream>
 #include <string>
 
 #include "geometry_msgs/msg/twist.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/bool.hpp"
+#include "std_msgs/msg/float32.hpp"
+#include "std_msgs/msg/string.hpp"
 
-#include "savo_control/command_limiter.hpp"
 #include "savo_control/topic_names.hpp"
+#include "savo_control/velocity_smoother.hpp"
 
-using namespace std::chrono_literals;
+namespace
+{
+
+double now_seconds(const rclcpp::Node & node)
+{
+  return node.get_clock()->now().seconds();
+}
+
+std_msgs::msg::String string_msg(const std::string & value)
+{
+  std_msgs::msg::String msg;
+  msg.data = value;
+  return msg;
+}
+
+savo_control::TwistCommand twist_to_command(const geometry_msgs::msg::Twist & msg)
+{
+  return savo_control::make_twist_command(
+    msg.linear.x,
+    msg.linear.y,
+    msg.angular.z);
+}
+
+geometry_msgs::msg::Twist command_to_twist(const savo_control::TwistCommand & cmd)
+{
+  geometry_msgs::msg::Twist msg;
+  msg.linear.x = cmd.vx;
+  msg.linear.y = cmd.vy;
+  msg.angular.z = cmd.wz;
+  return msg;
+}
+
+const char * bool_text(const bool value)
+{
+  return value ? "true" : "false";
+}
+
+}  // namespace
 
 namespace savo_control
 {
@@ -24,406 +62,391 @@ public:
   CmdVelShaperNode()
   : Node("cmd_vel_shaper_node")
   {
-    // -------------------------------------------------------------------------
-    // Parameters: loop + timeouts
-    // -------------------------------------------------------------------------
-    publish_rate_hz_ = this->declare_parameter<double>("publish_rate_hz", 30.0);
-    input_timeout_sec_ = this->declare_parameter<double>("input_timeout_sec", 0.30);
-    zero_on_stale_input_ = this->declare_parameter<bool>("zero_on_stale_input", true);
+    declare_parameters();
+    load_parameters();
 
-    // Optional local hard gate (main safety is still /cmd_vel_safe downstream)
-    use_safety_stop_gate_ = this->declare_parameter<bool>("use_safety_stop_gate", false);
-    safety_stop_hold_sec_ = this->declare_parameter<double>("safety_stop_hold_sec", 0.50);
+    smoother_.set_config(make_smoother_config());
 
-    // -------------------------------------------------------------------------
-    // Parameters: command limits (vx, vy, wz)
-    // -------------------------------------------------------------------------
-    // Absolute bounds
-    vx_max_abs_ = this->declare_parameter<double>("limits.vx.max_abs", 0.30);
-    vy_max_abs_ = this->declare_parameter<double>("limits.vy.max_abs", 0.20);
-    wz_max_abs_ = this->declare_parameter<double>("limits.wz.max_abs", 1.20);
+    cmd_pub_ = create_publisher<geometry_msgs::msg::Twist>(output_topic_, 10);
+    status_pub_ = create_publisher<std_msgs::msg::String>(status_topic_, 10);
 
-    // Deadbands
-    vx_deadband_ = this->declare_parameter<double>("limits.vx.deadband", 0.00);
-    vy_deadband_ = this->declare_parameter<double>("limits.vy.deadband", 0.00);
-    wz_deadband_ = this->declare_parameter<double>("limits.wz.deadband", 0.00);
+    cmd_sub_ = create_subscription<geometry_msgs::msg::Twist>(
+      input_topic_,
+      10,
+      [this](const geometry_msgs::msg::Twist::SharedPtr msg) {
+        last_cmd_ = *msg;
+        last_cmd_stamp_s_ = now_seconds(*this);
+        have_cmd_ = true;
+      });
 
-    // Slew rates (units/s)
-    vx_rise_rate_ = this->declare_parameter<double>("limits.vx.max_rise_rate", 0.60);
-    vx_fall_rate_ = this->declare_parameter<double>("limits.vx.max_fall_rate", 0.80);
-    vy_rise_rate_ = this->declare_parameter<double>("limits.vy.max_rise_rate", 0.60);
-    vy_fall_rate_ = this->declare_parameter<double>("limits.vy.max_fall_rate", 0.80);
-    wz_rise_rate_ = this->declare_parameter<double>("limits.wz.max_rise_rate", 2.50);
-    wz_fall_rate_ = this->declare_parameter<double>("limits.wz.max_fall_rate", 3.00);
+    safety_stop_sub_ = create_subscription<std_msgs::msg::Bool>(
+      safety_stop_topic_,
+      10,
+      [this](const std_msgs::msg::Bool::SharedPtr msg) {
+        safety_stop_ = msg->data;
+        safety_stop_seen_ = true;
+        safety_stop_stamp_s_ = now_seconds(*this);
 
-    // Internal dt guards for limiter calls
-    limiter_min_dt_sec_ = this->declare_parameter<double>("limiter.min_dt_sec", 1e-6);
-    limiter_max_dt_sec_ = this->declare_parameter<double>("limiter.max_dt_sec", 0.50);
+        if (safety_stop_) {
+          smoother_.reset_to_zero(safety_stop_stamp_s_);
+        }
+      });
 
-    // Logging behavior
-    log_stale_warn_throttle_ms_ =
-      this->declare_parameter<int>("log.stale_warn_throttle_ms", 2000);
-    log_debug_throttle_ms_ =
-      this->declare_parameter<int>("log.debug_throttle_ms", 1000);
+    slowdown_sub_ = create_subscription<std_msgs::msg::Float32>(
+      slowdown_topic_,
+      10,
+      [this](const std_msgs::msg::Float32::SharedPtr msg) {
+        slowdown_factor_ = sanitize_slowdown_factor(msg->data);
+        slowdown_seen_ = true;
+        slowdown_stamp_s_ = now_seconds(*this);
+      });
 
-    sanitize_params_();
-    build_limiter_config_();
-
-    // -------------------------------------------------------------------------
-    // Publishers / Subscribers
-    // -------------------------------------------------------------------------
-    pub_cmd_vel_ = this->create_publisher<geometry_msgs::msg::Twist>(
-      topic_names::kCmdVelShaped, rclcpp::QoS(10));
-
-    sub_cmd_vel_mux_ = this->create_subscription<geometry_msgs::msg::Twist>(
-      topic_names::kCmdVelMuxSelected, rclcpp::QoS(10),
-      std::bind(&CmdVelShaperNode::on_cmd_vel_mux_, this, std::placeholders::_1));
-
-    sub_safety_stop_ = this->create_subscription<std_msgs::msg::Bool>(
-      topic_names::kSafetyStop, rclcpp::QoS(10),
-      std::bind(&CmdVelShaperNode::on_safety_stop_, this, std::placeholders::_1));
-
-    // -------------------------------------------------------------------------
-    // Timer loop
-    // -------------------------------------------------------------------------
-    const auto period = std::chrono::duration<double>(1.0 / publish_rate_hz_);
-    timer_ = this->create_wall_timer(
-      std::chrono::duration_cast<std::chrono::milliseconds>(period),
-      std::bind(&CmdVelShaperNode::on_timer_, this));
+    timer_ = create_wall_timer(
+      std::chrono::duration<double>(1.0 / publish_hz_),
+      [this]() {
+        on_timer();
+      });
 
     RCLCPP_INFO(
-      this->get_logger(),
-      "cmd_vel_shaper_node started | pub=%.1f Hz | timeout=%.2fs | safety_gate=%s | "
-      "vx<=%.2f vy<=%.2f wz<=%.2f",
-      publish_rate_hz_,
-      input_timeout_sec_,
-      use_safety_stop_gate_ ? "true" : "false",
-      vx_max_abs_, vy_max_abs_, wz_max_abs_);
+      get_logger(),
+      "cmd_vel_shaper_node started | input=%s | output=%s | safety=%s",
+      input_topic_.c_str(),
+      output_topic_.c_str(),
+      safety_stop_topic_.c_str());
   }
 
 private:
-  // ---------------------------------------------------------------------------
-  // Input channel state
-  // ---------------------------------------------------------------------------
-  struct TwistInputState
+  void declare_parameters()
   {
-    geometry_msgs::msg::Twist msg{};
-    rclcpp::Time stamp{0, 0, RCL_ROS_TIME};
-    bool has_msg{false};
-  };
+    declare_parameter<double>("publish_hz", 30.0);
+    declare_parameter<double>("command_timeout_s", 0.50);
 
-  // ---------------------------------------------------------------------------
-  // Subscribers callbacks
-  // ---------------------------------------------------------------------------
-  void on_cmd_vel_mux_(const geometry_msgs::msg::Twist::SharedPtr msg)
-  {
-    if (!msg) {
-      return;
-    }
-    in_cmd_mux_.msg = sanitize_twist_(*msg);
-    in_cmd_mux_.stamp = this->now();
-    in_cmd_mux_.has_msg = true;
+    declare_parameter<double>("max_vx", 0.25);
+    declare_parameter<double>("max_vy", 0.25);
+    declare_parameter<double>("max_wz", 0.60);
+
+    declare_parameter<double>("deadband_vx", 0.0);
+    declare_parameter<double>("deadband_vy", 0.0);
+    declare_parameter<double>("deadband_wz", 0.0);
+
+    declare_parameter<double>("max_accel_vx", 0.40);
+    declare_parameter<double>("max_accel_vy", 0.40);
+    declare_parameter<double>("max_accel_wz", 1.20);
+
+    declare_parameter<double>("max_decel_vx", 0.60);
+    declare_parameter<double>("max_decel_vy", 0.60);
+    declare_parameter<double>("max_decel_wz", 1.80);
+
+    declare_parameter<double>("min_dt_s", 1.0e-4);
+    declare_parameter<double>("max_dt_s", 0.20);
+
+    declare_parameter<bool>("reset_on_timeout", true);
+    declare_parameter<bool>("use_decel_when_slowing", true);
+    declare_parameter<bool>("safety_stop_forces_zero", true);
+
+    declare_parameter<bool>("use_slowdown_factor", true);
+    declare_parameter<double>("slowdown_timeout_s", 0.50);
+    declare_parameter<double>("default_slowdown_factor", 1.0);
+    declare_parameter<double>("min_slowdown_factor", 0.0);
+    declare_parameter<double>("max_slowdown_factor", 1.0);
+
+    declare_parameter<std::string>("input_topic", topics::CMD_VEL_MUX);
+    declare_parameter<std::string>("output_topic", topics::CMD_VEL);
+    declare_parameter<std::string>("safety_stop_topic", topics::SAFETY_STOP);
+    declare_parameter<std::string>("slowdown_topic", topics::SAFETY_SLOWDOWN_FACTOR);
+    declare_parameter<std::string>("status_topic", "/savo_control/cmd_vel_shaper/status");
   }
 
-  void on_safety_stop_(const std_msgs::msg::Bool::SharedPtr msg)
+  void load_parameters()
   {
-    if (!msg) {
-      return;
+    publish_hz_ = get_parameter("publish_hz").as_double();
+    if (!std::isfinite(publish_hz_) || publish_hz_ <= 0.0) {
+      publish_hz_ = 30.0;
     }
-    safety_stop_active_ = msg->data;
-    safety_stop_stamp_ = this->now();
+
+    command_timeout_s_ = get_parameter("command_timeout_s").as_double();
+    if (!std::isfinite(command_timeout_s_) || command_timeout_s_ < 0.0) {
+      command_timeout_s_ = 0.50;
+    }
+
+    max_vx_ = nonnegative_param("max_vx", 0.25);
+    max_vy_ = nonnegative_param("max_vy", 0.25);
+    max_wz_ = nonnegative_param("max_wz", 0.60);
+
+    deadband_vx_ = nonnegative_param("deadband_vx", 0.0);
+    deadband_vy_ = nonnegative_param("deadband_vy", 0.0);
+    deadband_wz_ = nonnegative_param("deadband_wz", 0.0);
+
+    max_accel_vx_ = nonnegative_param("max_accel_vx", 0.40);
+    max_accel_vy_ = nonnegative_param("max_accel_vy", 0.40);
+    max_accel_wz_ = nonnegative_param("max_accel_wz", 1.20);
+
+    max_decel_vx_ = nonnegative_param("max_decel_vx", 0.60);
+    max_decel_vy_ = nonnegative_param("max_decel_vy", 0.60);
+    max_decel_wz_ = nonnegative_param("max_decel_wz", 1.80);
+
+    min_dt_s_ = positive_param("min_dt_s", 1.0e-4);
+    max_dt_s_ = positive_param("max_dt_s", 0.20);
+    if (max_dt_s_ < min_dt_s_) {
+      max_dt_s_ = min_dt_s_;
+    }
+
+    reset_on_timeout_ = get_parameter("reset_on_timeout").as_bool();
+    use_decel_when_slowing_ = get_parameter("use_decel_when_slowing").as_bool();
+    safety_stop_forces_zero_ = get_parameter("safety_stop_forces_zero").as_bool();
+
+    use_slowdown_factor_ = get_parameter("use_slowdown_factor").as_bool();
+    slowdown_timeout_s_ = nonnegative_param("slowdown_timeout_s", 0.50);
+
+    default_slowdown_factor_ = sanitize_slowdown_factor(
+      get_parameter("default_slowdown_factor").as_double());
+    min_slowdown_factor_ = sanitize_slowdown_factor(
+      get_parameter("min_slowdown_factor").as_double());
+    max_slowdown_factor_ = sanitize_slowdown_factor(
+      get_parameter("max_slowdown_factor").as_double());
+
+    if (min_slowdown_factor_ > max_slowdown_factor_) {
+      std::swap(min_slowdown_factor_, max_slowdown_factor_);
+    }
+
+    input_topic_ = get_parameter("input_topic").as_string();
+    output_topic_ = get_parameter("output_topic").as_string();
+    safety_stop_topic_ = get_parameter("safety_stop_topic").as_string();
+    slowdown_topic_ = get_parameter("slowdown_topic").as_string();
+    status_topic_ = get_parameter("status_topic").as_string();
   }
 
-  // ---------------------------------------------------------------------------
-  // Main timer loop
-  // ---------------------------------------------------------------------------
-  void on_timer_()
+  VelocitySmootherConfig make_smoother_config() const
   {
-    const rclcpp::Time now = this->now();
+    VelocitySmootherConfig config;
 
-    // Compute dt from loop timing
-    double dt_sec = 0.0;
-    bool dt_valid = false;
-    if (has_prev_loop_time_) {
-      dt_sec = (now - prev_loop_time_).seconds();
-      dt_valid = std::isfinite(dt_sec) &&
-                 dt_sec >= limiter_min_dt_sec_ &&
-                 dt_sec <= limiter_max_dt_sec_;
-    }
-    prev_loop_time_ = now;
-    has_prev_loop_time_ = true;
+    config.max_accel_vx = max_accel_vx_;
+    config.max_accel_vy = max_accel_vy_;
+    config.max_accel_wz = max_accel_wz_;
 
-    // Decide target command
-    geometry_msgs::msg::Twist target_twist{};
-    bool input_fresh = is_input_fresh_(in_cmd_mux_, now, input_timeout_sec_);
+    config.max_decel_vx = max_decel_vx_;
+    config.max_decel_vy = max_decel_vy_;
+    config.max_decel_wz = max_decel_wz_;
 
-    if (input_fresh) {
-      target_twist = in_cmd_mux_.msg;
+    config.command_timeout_s = command_timeout_s_;
+    config.min_dt_s = min_dt_s_;
+    config.max_dt_s = max_dt_s_;
+
+    config.reset_on_timeout = reset_on_timeout_;
+    config.use_decel_when_slowing = use_decel_when_slowing_;
+
+    config.output_limits.max_vx = max_vx_;
+    config.output_limits.max_vy = max_vy_;
+    config.output_limits.max_wz = max_wz_;
+
+    config.output_limits.deadband_vx = deadband_vx_;
+    config.output_limits.deadband_vy = deadband_vy_;
+    config.output_limits.deadband_wz = deadband_wz_;
+
+    config.output_limits.use_symmetric_limits = true;
+
+    return config.sanitized();
+  }
+
+  void on_timer()
+  {
+    const double now_s = now_seconds(*this);
+
+    TwistCommand target{};
+    std::string reason = "no_command";
+    bool stale = true;
+
+    const bool safety_active = safety_stop_active(now_s);
+    if (safety_stop_forces_zero_ && safety_active) {
+      target = TwistCommand{};
+      smoother_.reset_to_zero(now_s);
+      reason = "safety_stop";
+      stale = false;
+    } else if (command_fresh(now_s)) {
+      target = twist_to_command(last_cmd_);
+      target = apply_slowdown(target, slowdown_factor_for_now(now_s));
+      reason = "tracking";
+      stale = false;
     } else {
-      if (zero_on_stale_input_) {
-        target_twist = zero_twist_();
-      } else if (in_cmd_mux_.has_msg) {
-        // hold-last (not generally recommended for mobile robot motion)
-        target_twist = in_cmd_mux_.msg;
-      } else {
-        target_twist = zero_twist_();
-      }
-
-      RCLCPP_WARN_THROTTLE(
-        this->get_logger(), *this->get_clock(),
-        std::max(0, log_stale_warn_throttle_ms_),
-        "cmd_vel_shaper: input %s (timeout=%.2fs), publishing %s",
-        in_cmd_mux_.has_msg ? "stale" : "missing",
-        input_timeout_sec_,
-        zero_on_stale_input_ ? "zero" : "hold-last/zero");
+      target = TwistCommand{};
+      reason = "command_stale";
+      stale = true;
     }
 
-    // Optional local hard stop gate (defensive; authoritative safety remains downstream)
-    if (use_safety_stop_gate_ && is_recent_safety_stop_(now) && safety_stop_active_) {
-      target_twist = zero_twist_();
+    const TwistCommand shaped = smoother_.update(target, now_s);
+    cmd_pub_->publish(command_to_twist(shaped));
 
-      // Important safety behavior:
-      // reset limiter state so release does not resume from stale nonzero history.
-      limiter_.reset();
-    }
-
-    // Shape target command
-    const MotionCommand target_cmd = twist_to_motion_(target_twist);
-
-    MotionCommand shaped_cmd{};
-    if (dt_valid) {
-      shaped_cmd = limiter_.limit(target_cmd, dt_sec);
-    } else {
-      // First cycle or timing glitch:
-      // publish clamp-only for safe deterministic behavior, then sync limiter state.
-      shaped_cmd = CommandLimiter::clamp_only(target_cmd, limiter_cfg_);
-      limiter_.reset_to(shaped_cmd);
-    }
-
-    // Publish
-    const geometry_msgs::msg::Twist out = motion_to_twist_(shaped_cmd);
-    pub_cmd_vel_->publish(out);
-
-    RCLCPP_DEBUG_THROTTLE(
-      this->get_logger(), *this->get_clock(),
-      std::max(0, log_debug_throttle_ms_),
-      "cmd_vel_shaper: in[vx=%.3f vy=%.3f wz=%.3f] -> out[vx=%.3f vy=%.3f wz=%.3f], dt=%.4f valid=%s fresh=%s",
-      target_twist.linear.x, target_twist.linear.y, target_twist.angular.z,
-      out.linear.x, out.linear.y, out.angular.z,
-      dt_sec,
-      dt_valid ? "true" : "false",
-      input_fresh ? "true" : "false");
+    publish_status(now_s, target, shaped, reason, stale, safety_active);
   }
 
-  // ---------------------------------------------------------------------------
-  // Limiter config
-  // ---------------------------------------------------------------------------
-  void build_limiter_config_()
+  bool command_fresh(const double now_s) const
   {
-    CommandLimiterConfig cfg{};
-
-    // vx
-    cfg.vx.set_symmetric_bounds(vx_max_abs_);
-    cfg.vx.deadband = std::abs(vx_deadband_);
-    cfg.vx.max_rise_rate = std::abs(vx_rise_rate_);
-    cfg.vx.max_fall_rate = std::abs(vx_fall_rate_);
-
-    // vy
-    cfg.vy.set_symmetric_bounds(vy_max_abs_);
-    cfg.vy.deadband = std::abs(vy_deadband_);
-    cfg.vy.max_rise_rate = std::abs(vy_rise_rate_);
-    cfg.vy.max_fall_rate = std::abs(vy_fall_rate_);
-
-    // wz
-    cfg.wz.set_symmetric_bounds(wz_max_abs_);
-    cfg.wz.deadband = std::abs(wz_deadband_);
-    cfg.wz.max_rise_rate = std::abs(wz_rise_rate_);
-    cfg.wz.max_fall_rate = std::abs(wz_fall_rate_);
-
-    limiter_cfg_ = cfg;
-    limiter_.set_config(limiter_cfg_);
-    limiter_.reset();
-  }
-
-  // ---------------------------------------------------------------------------
-  // Helpers
-  // ---------------------------------------------------------------------------
-  void sanitize_params_()
-  {
-    if (!(publish_rate_hz_ > 0.0) || !std::isfinite(publish_rate_hz_)) {
-      publish_rate_hz_ = 30.0;
-    }
-    if (!(input_timeout_sec_ > 0.0) || !std::isfinite(input_timeout_sec_)) {
-      input_timeout_sec_ = 0.30;
-    }
-    if (!(safety_stop_hold_sec_ > 0.0) || !std::isfinite(safety_stop_hold_sec_)) {
-      safety_stop_hold_sec_ = 0.50;
-    }
-
-    // limits / deadbands / rates
-    vx_max_abs_ = finite_nonneg_or_(vx_max_abs_, 0.30);
-    vy_max_abs_ = finite_nonneg_or_(vy_max_abs_, 0.20);
-    wz_max_abs_ = finite_nonneg_or_(wz_max_abs_, 1.20);
-
-    vx_deadband_ = finite_nonneg_or_(vx_deadband_, 0.0);
-    vy_deadband_ = finite_nonneg_or_(vy_deadband_, 0.0);
-    wz_deadband_ = finite_nonneg_or_(wz_deadband_, 0.0);
-
-    vx_rise_rate_ = finite_nonneg_or_(vx_rise_rate_, 0.60);
-    vx_fall_rate_ = finite_nonneg_or_(vx_fall_rate_, 0.80);
-    vy_rise_rate_ = finite_nonneg_or_(vy_rise_rate_, 0.60);
-    vy_fall_rate_ = finite_nonneg_or_(vy_fall_rate_, 0.80);
-    wz_rise_rate_ = finite_nonneg_or_(wz_rise_rate_, 2.50);
-    wz_fall_rate_ = finite_nonneg_or_(wz_fall_rate_, 3.00);
-
-    limiter_min_dt_sec_ = finite_positive_or_(limiter_min_dt_sec_, 1e-6);
-    limiter_max_dt_sec_ = finite_positive_or_(limiter_max_dt_sec_, 0.50);
-    if (limiter_max_dt_sec_ < limiter_min_dt_sec_) {
-      limiter_max_dt_sec_ = std::max(0.50, limiter_min_dt_sec_);
-    }
-
-    if (log_stale_warn_throttle_ms_ < 0) {
-      log_stale_warn_throttle_ms_ = 2000;
-    }
-    if (log_debug_throttle_ms_ < 0) {
-      log_debug_throttle_ms_ = 1000;
-    }
-  }
-
-  static double finite_nonneg_or_(double v, double fallback)
-  {
-    return (std::isfinite(v) && v >= 0.0) ? v : fallback;
-  }
-
-  static double finite_positive_or_(double v, double fallback)
-  {
-    return (std::isfinite(v) && v > 0.0) ? v : fallback;
-  }
-
-  static bool finite_(double v)
-  {
-    return std::isfinite(v);
-  }
-
-  static geometry_msgs::msg::Twist zero_twist_()
-  {
-    return geometry_msgs::msg::Twist{};
-  }
-
-  geometry_msgs::msg::Twist sanitize_twist_(const geometry_msgs::msg::Twist & in) const
-  {
-    geometry_msgs::msg::Twist out{};
-
-    // Keep only the fields used in Robot SAVO cmd_vel path.
-    out.linear.x  = finite_(in.linear.x)  ? in.linear.x  : 0.0;
-    out.linear.y  = finite_(in.linear.y)  ? in.linear.y  : 0.0;
-    out.angular.z = finite_(in.angular.z) ? in.angular.z : 0.0;
-
-    // Zero unused components
-    out.linear.z  = 0.0;
-    out.angular.x = 0.0;
-    out.angular.y = 0.0;
-
-    return out;
-  }
-
-  static MotionCommand twist_to_motion_(const geometry_msgs::msg::Twist & t)
-  {
-    MotionCommand m;
-    m.vx = t.linear.x;
-    m.vy = t.linear.y;
-    m.wz = t.angular.z;
-    return m;
-  }
-
-  static geometry_msgs::msg::Twist motion_to_twist_(const MotionCommand & m)
-  {
-    geometry_msgs::msg::Twist t;
-    t.linear.x = m.vx;
-    t.linear.y = m.vy;
-    t.linear.z = 0.0;
-    t.angular.x = 0.0;
-    t.angular.y = 0.0;
-    t.angular.z = m.wz;
-    return t;
-  }
-
-  bool is_input_fresh_(
-    const TwistInputState & st,
-    const rclcpp::Time & now,
-    double timeout_sec) const
-  {
-    if (!st.has_msg) {
+    if (!have_cmd_) {
       return false;
     }
-    if (!(timeout_sec > 0.0) || !std::isfinite(timeout_sec)) {
+
+    if (command_timeout_s_ <= 0.0) {
       return true;
     }
-    const double age = (now - st.stamp).seconds();
-    return std::isfinite(age) && age >= 0.0 && age <= timeout_sec;
+
+    return (now_s - last_cmd_stamp_s_) <= command_timeout_s_;
   }
 
-  bool is_recent_safety_stop_(const rclcpp::Time & now) const
+  bool safety_stop_active(const double now_s) const
   {
-    if (safety_stop_stamp_.nanoseconds() == 0) {
+    if (!safety_stop_seen_) {
       return false;
     }
-    const double age = (now - safety_stop_stamp_).seconds();
-    return std::isfinite(age) && age >= 0.0 && age <= safety_stop_hold_sec_;
+
+    if (command_timeout_s_ > 0.0 && (now_s - safety_stop_stamp_s_) > command_timeout_s_) {
+      return false;
+    }
+
+    return safety_stop_;
   }
 
-private:
-  // Publishers/Subscribers
-  rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr pub_cmd_vel_;
-  rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr sub_cmd_vel_mux_;
-  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_safety_stop_;
+  double slowdown_factor_for_now(const double now_s) const
+  {
+    if (!use_slowdown_factor_) {
+      return 1.0;
+    }
+
+    if (!slowdown_seen_) {
+      return default_slowdown_factor_;
+    }
+
+    if (slowdown_timeout_s_ > 0.0 && (now_s - slowdown_stamp_s_) > slowdown_timeout_s_) {
+      return default_slowdown_factor_;
+    }
+
+    return sanitize_slowdown_factor(slowdown_factor_);
+  }
+
+  TwistCommand apply_slowdown(const TwistCommand & input, const double factor) const
+  {
+    const double scale = std::clamp(
+      sanitize_slowdown_factor(factor),
+      min_slowdown_factor_,
+      max_slowdown_factor_);
+
+    return make_twist_command(
+      input.vx * scale,
+      input.vy * scale,
+      input.wz * scale);
+  }
+
+  double sanitize_slowdown_factor(const double value) const
+  {
+    if (!std::isfinite(value)) {
+      return 1.0;
+    }
+
+    return std::clamp(value, 0.0, 1.0);
+  }
+
+  double nonnegative_param(const std::string & name, const double fallback) const
+  {
+    const double value = get_parameter(name).as_double();
+    if (!std::isfinite(value) || value < 0.0) {
+      return fallback;
+    }
+    return value;
+  }
+
+  double positive_param(const std::string & name, const double fallback) const
+  {
+    const double value = get_parameter(name).as_double();
+    if (!std::isfinite(value) || value <= 0.0) {
+      return fallback;
+    }
+    return value;
+  }
+
+  void publish_status(
+    const double now_s,
+    const TwistCommand & target,
+    const TwistCommand & shaped,
+    const std::string & reason,
+    const bool stale,
+    const bool safety_active)
+  {
+    std::ostringstream ss;
+    ss << "reason=" << reason
+       << "; stale=" << bool_text(stale)
+       << "; safety_stop=" << bool_text(safety_active)
+       << "; slowdown=" << slowdown_factor_for_now(now_s)
+       << "; target_vx=" << target.vx
+       << "; target_vy=" << target.vy
+       << "; target_wz=" << target.wz
+       << "; shaped_vx=" << shaped.vx
+       << "; shaped_vy=" << shaped.vy
+       << "; shaped_wz=" << shaped.wz
+       << "; timed_out=" << bool_text(smoother_.timed_out())
+       << "; now_s=" << now_s;
+
+    status_pub_->publish(string_msg(ss.str()));
+  }
+
+  double publish_hz_{30.0};
+  double command_timeout_s_{0.50};
+
+  double max_vx_{0.25};
+  double max_vy_{0.25};
+  double max_wz_{0.60};
+
+  double deadband_vx_{0.0};
+  double deadband_vy_{0.0};
+  double deadband_wz_{0.0};
+
+  double max_accel_vx_{0.40};
+  double max_accel_vy_{0.40};
+  double max_accel_wz_{1.20};
+
+  double max_decel_vx_{0.60};
+  double max_decel_vy_{0.60};
+  double max_decel_wz_{1.80};
+
+  double min_dt_s_{1.0e-4};
+  double max_dt_s_{0.20};
+
+  bool reset_on_timeout_{true};
+  bool use_decel_when_slowing_{true};
+  bool safety_stop_forces_zero_{true};
+
+  bool use_slowdown_factor_{true};
+  double slowdown_timeout_s_{0.50};
+  double default_slowdown_factor_{1.0};
+  double min_slowdown_factor_{0.0};
+  double max_slowdown_factor_{1.0};
+
+  std::string input_topic_{topics::CMD_VEL_MUX};
+  std::string output_topic_{topics::CMD_VEL};
+  std::string safety_stop_topic_{topics::SAFETY_STOP};
+  std::string slowdown_topic_{topics::SAFETY_SLOWDOWN_FACTOR};
+  std::string status_topic_{"/savo_control/cmd_vel_shaper/status"};
+
+  geometry_msgs::msg::Twist last_cmd_{};
+  bool have_cmd_{false};
+  double last_cmd_stamp_s_{0.0};
+
+  bool safety_stop_{false};
+  bool safety_stop_seen_{false};
+  double safety_stop_stamp_s_{0.0};
+
+  double slowdown_factor_{1.0};
+  bool slowdown_seen_{false};
+  double slowdown_stamp_s_{0.0};
+
+  VelocitySmoother smoother_{};
+
+  rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_pub_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr status_pub_;
+
+  rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_sub_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr safety_stop_sub_;
+  rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr slowdown_sub_;
+
   rclcpp::TimerBase::SharedPtr timer_;
-
-  // Input state
-  TwistInputState in_cmd_mux_;
-  bool safety_stop_active_{false};
-  rclcpp::Time safety_stop_stamp_{0, 0, RCL_ROS_TIME};
-
-  // Loop timing
-  rclcpp::Time prev_loop_time_{0, 0, RCL_ROS_TIME};
-  bool has_prev_loop_time_{false};
-
-  // Limiter
-  CommandLimiter limiter_{};
-  CommandLimiterConfig limiter_cfg_{};
-
-  // Params: general
-  double publish_rate_hz_{30.0};
-  double input_timeout_sec_{0.30};
-  bool zero_on_stale_input_{true};
-
-  // Params: optional local safety gate
-  bool use_safety_stop_gate_{false};
-  double safety_stop_hold_sec_{0.50};
-
-  // Params: limits
-  double vx_max_abs_{0.30};
-  double vy_max_abs_{0.20};
-  double wz_max_abs_{1.20};
-
-  double vx_deadband_{0.00};
-  double vy_deadband_{0.00};
-  double wz_deadband_{0.00};
-
-  double vx_rise_rate_{0.60};
-  double vx_fall_rate_{0.80};
-  double vy_rise_rate_{0.60};
-  double vy_fall_rate_{0.80};
-  double wz_rise_rate_{2.50};
-  double wz_fall_rate_{3.00};
-
-  // Params: dt guard for limiter
-  double limiter_min_dt_sec_{1e-6};
-  double limiter_max_dt_sec_{0.50};
-
-  // Params: logging
-  int log_stale_warn_throttle_ms_{2000};
-  int log_debug_throttle_ms_{1000};
 };
 
 }  // namespace savo_control
@@ -431,8 +454,7 @@ private:
 int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
-  auto node = std::make_shared<savo_control::CmdVelShaperNode>();
-  rclcpp::spin(node);
+  rclcpp::spin(std::make_shared<savo_control::CmdVelShaperNode>());
   rclcpp::shutdown();
   return 0;
 }

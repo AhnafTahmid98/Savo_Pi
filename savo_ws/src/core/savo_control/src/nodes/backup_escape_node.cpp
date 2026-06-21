@@ -1,6 +1,4 @@
-// Backup/escape recovery primitive. State: IDLE -> BACKUP -> SETTLE -> TURN -> DONE.
-// Aborts immediately on /safety/stop. Publishes to /cmd_vel_recovery.
-
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <memory>
@@ -13,9 +11,46 @@
 #include "std_msgs/msg/float32.hpp"
 #include "std_msgs/msg/string.hpp"
 
+#include "savo_control/recovery_manager.hpp"
 #include "savo_control/topic_names.hpp"
 
-using namespace std::chrono_literals;
+namespace
+{
+
+double now_seconds(const rclcpp::Node & node)
+{
+  return node.get_clock()->now().seconds();
+}
+
+std_msgs::msg::String string_msg(const std::string & value)
+{
+  std_msgs::msg::String msg;
+  msg.data = value;
+  return msg;
+}
+
+std_msgs::msg::Bool bool_msg(const bool value)
+{
+  std_msgs::msg::Bool msg;
+  msg.data = value;
+  return msg;
+}
+
+geometry_msgs::msg::Twist command_to_twist(const savo_control::TwistCommand & command)
+{
+  geometry_msgs::msg::Twist msg;
+  msg.linear.x = command.vx;
+  msg.linear.y = command.vy;
+  msg.angular.z = command.wz;
+  return msg;
+}
+
+const char * bool_text(const bool value)
+{
+  return value ? "true" : "false";
+}
+
+}  // namespace
 
 namespace savo_control
 {
@@ -26,533 +61,393 @@ public:
   BackupEscapeNode()
   : Node("backup_escape_node")
   {
-    // -------------------------------------------------------------------------
-    // Parameters: topics
-    // -------------------------------------------------------------------------
-    topic_trigger_ = declare_parameter<std::string>(
-      "topics.trigger", topic_names::kRecoveryRequest);        // Bool (manual trigger / request)
-    topic_cancel_ = declare_parameter<std::string>(
-      "topics.cancel", "");                                    // optional Bool
-    topic_safety_stop_ = declare_parameter<std::string>(
-      "topics.safety_stop", topic_names::kSafetyStop);
-    topic_slowdown_factor_ = declare_parameter<std::string>(
-      "topics.slowdown_factor", topic_names::kSafetySlowdownFactor);  // optional Float32
-    topic_cmd_out_ = declare_parameter<std::string>(
-      "topics.cmd_out", topic_names::kCmdVelRecovery);
-    topic_state_ = declare_parameter<std::string>(
-      "topics.state", topic_names::kRecoveryState);
-    topic_status_ = declare_parameter<std::string>(
-      "topics.status", topic_names::kRecoveryStatus);
+    declare_parameters();
+    load_parameters();
 
-    // Optional completion feedback topics (useful if recovery_manager_node consumes them later)
-    topic_backup_done_ = declare_parameter<std::string>(
-      "topics.backup_completed", "/savo_control/backup_completed");
-    topic_turn_done_ = declare_parameter<std::string>(
-      "topics.turn_completed", "/savo_control/turn_completed");
+    manager_.set_config(make_config());
 
-    // -------------------------------------------------------------------------
-    // Parameters: loop + state durations
-    // -------------------------------------------------------------------------
-    loop_rate_hz_ = declare_parameter<double>("loop_rate_hz", 30.0);
+    cmd_pub_ = create_publisher<geometry_msgs::msg::Twist>(cmd_out_topic_, 10);
+    active_pub_ = create_publisher<std_msgs::msg::Bool>(active_topic_, 10);
+    state_pub_ = create_publisher<std_msgs::msg::String>(state_topic_, 10);
+    status_pub_ = create_publisher<std_msgs::msg::String>(status_topic_, 10);
 
-    backup_duration_sec_ = declare_parameter<double>("behavior.backup_duration_sec", 0.50);
-    settle_duration_sec_ = declare_parameter<double>("behavior.settle_duration_sec", 0.20);
-    turn_duration_sec_   = declare_parameter<double>("behavior.turn_duration_sec", 0.35);
+    trigger_sub_ = create_subscription<std_msgs::msg::Bool>(
+      trigger_topic_,
+      10,
+      [this](const std_msgs::msg::Bool::SharedPtr msg) {
+        const double now_s = now_seconds(*this);
 
-    enable_turn_phase_ = declare_parameter<bool>("behavior.enable_turn_phase", true);
-    auto_reset_after_done_ = declare_parameter<bool>("behavior.auto_reset_after_done", true);
-    done_hold_sec_ = declare_parameter<double>("behavior.done_hold_sec", 0.20);
+        previous_trigger_ = trigger_;
+        trigger_ = msg->data;
+        trigger_seen_ = true;
+        trigger_stamp_s_ = now_s;
 
-    // -------------------------------------------------------------------------
-    // Parameters: command magnitudes
-    // -------------------------------------------------------------------------
-    backup_speed_m_s_ = declare_parameter<double>("command.backup_speed_m_s", 0.05);
-    turn_speed_rad_s_ = declare_parameter<double>("command.turn_speed_rad_s", 0.30);
-    turn_sign_ = declare_parameter<int>("command.turn_sign", +1);  // +1 CCW, -1 CW
-    respect_slowdown_factor_ = declare_parameter<bool>("command.respect_slowdown_factor", false);
-    min_slowdown_factor_ = declare_parameter<double>("command.min_slowdown_factor", 0.20);
+        if (trigger_ && !previous_trigger_) {
+          request_escape(now_s, RecoveryTrigger::MANUAL_REQUEST);
+        }
+      });
 
-    publish_zero_when_idle_ = declare_parameter<bool>("publish_zero_when_idle", true);
+    safety_stop_sub_ = create_subscription<std_msgs::msg::Bool>(
+      safety_stop_topic_,
+      10,
+      [this](const std_msgs::msg::Bool::SharedPtr msg) {
+        safety_stop_ = msg->data;
+        safety_stop_seen_ = true;
+        safety_stop_stamp_s_ = now_seconds(*this);
+      });
 
-    // Trigger behavior
-    rising_edge_trigger_only_ = declare_parameter<bool>("trigger.rising_edge_only", true);
-    allow_retrigger_in_active_ = declare_parameter<bool>("trigger.allow_retrigger_in_active", false);
+    slowdown_sub_ = create_subscription<std_msgs::msg::Float32>(
+      slowdown_topic_,
+      10,
+      [this](const std_msgs::msg::Float32::SharedPtr msg) {
+        slowdown_factor_ = sanitize_slowdown_factor(msg->data);
+        slowdown_seen_ = true;
+        slowdown_stamp_s_ = now_seconds(*this);
+      });
 
-    // Input stale handling
-    input_timeout_sec_ = declare_parameter<double>("input_timeout_sec", 0.50);
-    stale_safety_stop_as_true_ = declare_parameter<bool>("stale.safety_stop_as_true", false);
-    stale_slowdown_as_one_ = declare_parameter<bool>("stale.slowdown_as_one", true);
-
-    sanitize_params_();
-
-    // -------------------------------------------------------------------------
-    // Publishers
-    // -------------------------------------------------------------------------
-    pub_cmd_out_ = create_publisher<geometry_msgs::msg::Twist>(topic_cmd_out_, rclcpp::QoS(10));
-    pub_state_   = create_publisher<std_msgs::msg::String>(topic_state_, rclcpp::QoS(10).transient_local());
-    pub_status_  = create_publisher<std_msgs::msg::String>(topic_status_, rclcpp::QoS(10));
-    pub_backup_done_ = create_publisher<std_msgs::msg::Bool>(topic_backup_done_, rclcpp::QoS(10));
-    pub_turn_done_   = create_publisher<std_msgs::msg::Bool>(topic_turn_done_, rclcpp::QoS(10));
-
-    // -------------------------------------------------------------------------
-    // Subscribers
-    // -------------------------------------------------------------------------
-    sub_trigger_ = create_subscription<std_msgs::msg::Bool>(
-      topic_trigger_, rclcpp::QoS(10),
-      std::bind(&BackupEscapeNode::on_trigger_, this, std::placeholders::_1));
-
-    if (!topic_cancel_.empty()) {
-      sub_cancel_ = create_subscription<std_msgs::msg::Bool>(
-        topic_cancel_, rclcpp::QoS(10),
-        std::bind(&BackupEscapeNode::on_cancel_, this, std::placeholders::_1));
-    }
-
-    sub_safety_stop_ = create_subscription<std_msgs::msg::Bool>(
-      topic_safety_stop_, rclcpp::QoS(10),
-      std::bind(&BackupEscapeNode::on_safety_stop_, this, std::placeholders::_1));
-
-    if (!topic_slowdown_factor_.empty()) {
-      sub_slowdown_factor_ = create_subscription<std_msgs::msg::Float32>(
-        topic_slowdown_factor_, rclcpp::QoS(10),
-        std::bind(&BackupEscapeNode::on_slowdown_factor_, this, std::placeholders::_1));
-      has_slowdown_topic_ = true;
-    }
-
-    // -------------------------------------------------------------------------
-    // Timer
-    // -------------------------------------------------------------------------
-    const auto period = std::chrono::duration<double>(1.0 / loop_rate_hz_);
     timer_ = create_wall_timer(
-      std::chrono::duration_cast<std::chrono::milliseconds>(period),
-      std::bind(&BackupEscapeNode::on_timer_, this));
-
-    publish_state_("startup");
-    publish_status_("idle");
-    publish_done_edges_(false, false);
+      std::chrono::duration<double>(1.0 / publish_hz_),
+      [this]() {
+        on_timer();
+      });
 
     RCLCPP_INFO(
       get_logger(),
-      "backup_escape_node started | trigger=%s safety=%s out=%s | loop=%.1fHz",
-      topic_trigger_.c_str(), topic_safety_stop_.c_str(), topic_cmd_out_.c_str(), loop_rate_hz_);
+      "backup_escape_node started | trigger=%s | cmd_out=%s | safety=%s",
+      trigger_topic_.c_str(),
+      cmd_out_topic_.c_str(),
+      safety_stop_topic_.c_str());
   }
 
 private:
-  // ---------------------------------------------------------------------------
-  // Internal state machine
-  // ---------------------------------------------------------------------------
-  enum class Phase : uint8_t
+  void declare_parameters()
   {
-    kIdle = 0,
-    kBackingUp,
-    kSettling,
-    kTurning,
-    kDone,
-    kAborted
-  };
+    declare_parameter<double>("publish_hz", 20.0);
+    declare_parameter<double>("input_timeout_s", 0.50);
 
-  struct TimedBool
-  {
-    bool value{false};
-    bool has_msg{false};
-    rclcpp::Time stamp{0, 0, RCL_ROS_TIME};
-  };
+    declare_parameter<bool>("enabled", true);
+    declare_parameter<bool>("safety_stop_blocks_escape", true);
+    declare_parameter<bool>("publish_zero_when_inactive", true);
+    declare_parameter<bool>("auto_start_on_trigger_level", false);
 
-  struct TimedFloat
-  {
-    float value{1.0F};
-    bool has_msg{false};
-    rclcpp::Time stamp{0, 0, RCL_ROS_TIME};
-  };
+    declare_parameter<std::string>("action", "BACKUP");
+    declare_parameter<double>("backup_vx", -0.06);
+    declare_parameter<double>("rotate_wz", 0.25);
+    declare_parameter<double>("backup_duration_s", 1.0);
+    declare_parameter<double>("rotate_duration_s", 0.8);
+    declare_parameter<double>("stop_hold_s", 0.20);
+    declare_parameter<double>("max_recovery_duration_s", 6.0);
 
-  // ---------------------------------------------------------------------------
-  // Callbacks
-  // ---------------------------------------------------------------------------
-  void on_trigger_(const std_msgs::msg::Bool::SharedPtr msg)
-  {
-    if (!msg) return;
-    trigger_in_.value = msg->data;
-    trigger_in_.has_msg = true;
-    trigger_in_.stamp = now();
+    declare_parameter<double>("max_vx", 0.10);
+    declare_parameter<double>("max_vy", 0.10);
+    declare_parameter<double>("max_wz", 0.35);
+
+    declare_parameter<bool>("stop_before_motion", true);
+    declare_parameter<bool>("stop_after_motion", true);
+    declare_parameter<bool>("allow_rotate_left", true);
+    declare_parameter<bool>("allow_rotate_right", true);
+
+    declare_parameter<bool>("use_slowdown_factor", true);
+    declare_parameter<double>("slowdown_timeout_s", 0.50);
+    declare_parameter<double>("default_slowdown_factor", 1.0);
+
+    declare_parameter<std::string>("trigger_topic", topics::RECOVERY_REQUEST);
+    declare_parameter<std::string>("safety_stop_topic", topics::SAFETY_STOP);
+    declare_parameter<std::string>("slowdown_topic", topics::SAFETY_SLOWDOWN_FACTOR);
+    declare_parameter<std::string>("cmd_out_topic", topics::CMD_VEL_RECOVERY);
+    declare_parameter<std::string>("active_topic", "/savo_control/backup_escape_active");
+    declare_parameter<std::string>("state_topic", "/savo_control/backup_escape_state");
+    declare_parameter<std::string>("status_topic", topics::BACKUP_ESCAPE_STATUS);
   }
 
-  void on_cancel_(const std_msgs::msg::Bool::SharedPtr msg)
+  void load_parameters()
   {
-    if (!msg) return;
-    cancel_in_.value = msg->data;
-    cancel_in_.has_msg = true;
-    cancel_in_.stamp = now();
+    publish_hz_ = positive_param("publish_hz", 20.0);
+    input_timeout_s_ = nonnegative_param("input_timeout_s", 0.50);
+
+    enabled_ = get_parameter("enabled").as_bool();
+    safety_stop_blocks_escape_ = get_parameter("safety_stop_blocks_escape").as_bool();
+    publish_zero_when_inactive_ = get_parameter("publish_zero_when_inactive").as_bool();
+    auto_start_on_trigger_level_ = get_parameter("auto_start_on_trigger_level").as_bool();
+
+    action_text_ = get_parameter("action").as_string();
+
+    backup_vx_ = get_parameter("backup_vx").as_double();
+    rotate_wz_ = get_parameter("rotate_wz").as_double();
+
+    backup_duration_s_ = nonnegative_param("backup_duration_s", 1.0);
+    rotate_duration_s_ = nonnegative_param("rotate_duration_s", 0.8);
+    stop_hold_s_ = nonnegative_param("stop_hold_s", 0.20);
+    max_recovery_duration_s_ = positive_param("max_recovery_duration_s", 6.0);
+
+    max_vx_ = nonnegative_param("max_vx", 0.10);
+    max_vy_ = nonnegative_param("max_vy", 0.10);
+    max_wz_ = nonnegative_param("max_wz", 0.35);
+
+    stop_before_motion_ = get_parameter("stop_before_motion").as_bool();
+    stop_after_motion_ = get_parameter("stop_after_motion").as_bool();
+    allow_rotate_left_ = get_parameter("allow_rotate_left").as_bool();
+    allow_rotate_right_ = get_parameter("allow_rotate_right").as_bool();
+
+    use_slowdown_factor_ = get_parameter("use_slowdown_factor").as_bool();
+    slowdown_timeout_s_ = nonnegative_param("slowdown_timeout_s", 0.50);
+    default_slowdown_factor_ =
+      sanitize_slowdown_factor(get_parameter("default_slowdown_factor").as_double());
+
+    trigger_topic_ = get_parameter("trigger_topic").as_string();
+    safety_stop_topic_ = get_parameter("safety_stop_topic").as_string();
+    slowdown_topic_ = get_parameter("slowdown_topic").as_string();
+    cmd_out_topic_ = get_parameter("cmd_out_topic").as_string();
+    active_topic_ = get_parameter("active_topic").as_string();
+    state_topic_ = get_parameter("state_topic").as_string();
+    status_topic_ = get_parameter("status_topic").as_string();
   }
 
-  void on_safety_stop_(const std_msgs::msg::Bool::SharedPtr msg)
+  RecoveryManagerConfig make_config() const
   {
-    if (!msg) return;
-    safety_stop_in_.value = msg->data;
-    safety_stop_in_.has_msg = true;
-    safety_stop_in_.stamp = now();
+    RecoveryManagerConfig config;
+
+    config.backup_vx = backup_vx_;
+    config.rotate_wz = rotate_wz_;
+
+    config.backup_duration_s = backup_duration_s_;
+    config.rotate_duration_s = rotate_duration_s_;
+    config.stop_hold_s = stop_hold_s_;
+    config.max_recovery_duration_s = max_recovery_duration_s_;
+
+    config.default_action = parse_recovery_action(action_text_, RecoveryAction::BACKUP);
+
+    config.output_limits.max_vx = max_vx_;
+    config.output_limits.max_vy = max_vy_;
+    config.output_limits.max_wz = max_wz_;
+    config.output_limits.use_symmetric_limits = true;
+
+    config.enabled = enabled_;
+    config.stop_before_motion = stop_before_motion_;
+    config.stop_after_motion = stop_after_motion_;
+    config.allow_rotate_left = allow_rotate_left_;
+    config.allow_rotate_right = allow_rotate_right_;
+
+    return config.sanitized();
   }
 
-  void on_slowdown_factor_(const std_msgs::msg::Float32::SharedPtr msg)
+  void request_escape(const double now_s, const RecoveryTrigger trigger)
   {
-    if (!msg) return;
-    slowdown_in_.value = msg->data;
-    slowdown_in_.has_msg = true;
-    slowdown_in_.stamp = now();
-  }
-
-  // ---------------------------------------------------------------------------
-  // Main loop
-  // ---------------------------------------------------------------------------
-  void on_timer_()
-  {
-    const rclcpp::Time now_ros = now();
-    const double now_sec = now_ros.seconds();
-
-    // Inputs (stale-aware)
-    const bool trigger_level = read_bool_(trigger_in_, false);
-    const bool cancel_level = (!topic_cancel_.empty()) ? read_bool_(cancel_in_, false) : false;
-    const bool safety_stop = read_bool_(safety_stop_in_, stale_safety_stop_as_true_ ? true : false);
-    const double slowdown = read_slowdown_();
-
-    // Trigger edge logic
-    bool trigger_fire = false;
-    if (rising_edge_trigger_only_) {
-      trigger_fire = (trigger_level && !prev_trigger_level_);
-    } else {
-      trigger_fire = trigger_level;
-    }
-    prev_trigger_level_ = trigger_level;
-
-    // Safety has top priority
-    if (safety_stop && is_active_phase_(phase_)) {
-      transition_to_(Phase::kAborted, now_sec, "safety_stop");
-    }
-
-    // Cancel
-    if (cancel_level && is_active_phase_(phase_)) {
-      transition_to_(Phase::kAborted, now_sec, "cancel");
-    }
-
-    // Trigger start
-    if (trigger_fire) {
-      if (phase_ == Phase::kIdle || phase_ == Phase::kDone || phase_ == Phase::kAborted) {
-        start_sequence_(now_sec);
-      } else if (allow_retrigger_in_active_) {
-        start_sequence_(now_sec);  // restart behavior
-      }
-    }
-
-    // Phase progression
-    const double phase_elapsed = now_sec - phase_start_sec_;
-    bool backup_done_edge = false;
-    bool turn_done_edge = false;
-
-    switch (phase_) {
-      case Phase::kIdle:
-        break;
-
-      case Phase::kBackingUp:
-        if (phase_elapsed >= backup_duration_sec_) {
-          backup_done_edge = true;
-          transition_to_(Phase::kSettling, now_sec, "backup_done");
-        }
-        break;
-
-      case Phase::kSettling:
-        if (phase_elapsed >= settle_duration_sec_) {
-          if (enable_turn_phase_) {
-            transition_to_(Phase::kTurning, now_sec, "settle_done");
-          } else {
-            transition_to_(Phase::kDone, now_sec, "settle_done_no_turn");
-          }
-        }
-        break;
-
-      case Phase::kTurning:
-        if (phase_elapsed >= turn_duration_sec_) {
-          turn_done_edge = true;
-          transition_to_(Phase::kDone, now_sec, "turn_done");
-        }
-        break;
-
-      case Phase::kDone:
-        if (auto_reset_after_done_ && phase_elapsed >= done_hold_sec_) {
-          transition_to_(Phase::kIdle, now_sec, "auto_reset");
-        }
-        break;
-
-      case Phase::kAborted:
-        // Stay aborted briefly, then idle
-        if (phase_elapsed >= done_hold_sec_) {
-          transition_to_(Phase::kIdle, now_sec, "abort_reset");
-        }
-        break;
-
-      default:
-        transition_to_(Phase::kIdle, now_sec, "invalid_phase");
-        break;
-    }
-
-    // Publish command
-    geometry_msgs::msg::Twist cmd;
-    if (is_active_phase_(phase_) && !safety_stop) {
-      const double scale = respect_slowdown_factor_ ? slowdown : 1.0;
-
-      if (phase_ == Phase::kBackingUp) {
-        cmd.linear.x = -std::abs(backup_speed_m_s_) * scale;
-        cmd.linear.y = 0.0;
-        cmd.angular.z = 0.0;
-      } else if (phase_ == Phase::kSettling) {
-        // zero twist
-      } else if (phase_ == Phase::kTurning) {
-        cmd.linear.x = 0.0;
-        cmd.linear.y = 0.0;
-        cmd.angular.z = static_cast<double>(normalized_turn_sign_()) *
-                        std::abs(turn_speed_rad_s_) * scale;
-      }
-      pub_cmd_out_->publish(cmd);
-    } else if (publish_zero_when_idle_) {
-      pub_cmd_out_->publish(cmd);  // zero
-    }
-
-    // Publish done edges (one loop pulse)
-    publish_done_edges_(backup_done_edge, turn_done_edge);
-
-    // Publish state/status (change-driven + periodic)
-    publish_state_and_status_maybe_(now_ros, phase_elapsed, safety_stop, trigger_level, slowdown);
-  }
-
-  // ---------------------------------------------------------------------------
-  // Helpers
-  // ---------------------------------------------------------------------------
-  void start_sequence_(double now_sec)
-  {
-    transition_to_(Phase::kBackingUp, now_sec, "triggered");
-  }
-
-  void transition_to_(Phase next, double now_sec, const std::string & reason)
-  {
-    if (phase_ != next) {
-      last_transition_reason_ = reason;
-      phase_ = next;
-      phase_start_sec_ = now_sec;
-      state_changed_ = true;
-    }
-  }
-
-  bool is_active_phase_(Phase p) const
-  {
-    return p == Phase::kBackingUp || p == Phase::kSettling || p == Phase::kTurning;
-  }
-
-  bool read_bool_(const TimedBool & in, bool stale_default) const
-  {
-    if (!in.has_msg) {
-      return stale_default;
-    }
-    const double age = (now() - in.stamp).seconds();
-    if (!std::isfinite(age) || age < 0.0 || age > input_timeout_sec_) {
-      return stale_default;
-    }
-    return in.value;
-  }
-
-  double read_slowdown_() const
-  {
-    if (!has_slowdown_topic_) {
-      return 1.0;
-    }
-    if (!slowdown_in_.has_msg) {
-      return stale_slowdown_as_one_ ? 1.0 : min_slowdown_factor_;
-    }
-    const double age = (now() - slowdown_in_.stamp).seconds();
-    if (!std::isfinite(age) || age < 0.0 || age > input_timeout_sec_) {
-      return stale_slowdown_as_one_ ? 1.0 : min_slowdown_factor_;
-    }
-
-    double x = static_cast<double>(slowdown_in_.value);
-    if (!std::isfinite(x)) {
-      x = stale_slowdown_as_one_ ? 1.0 : min_slowdown_factor_;
-    }
-    if (x < min_slowdown_factor_) x = min_slowdown_factor_;
-    if (x > 1.0) x = 1.0;
-    return x;
-  }
-
-  int normalized_turn_sign_() const
-  {
-    return (turn_sign_ >= 0) ? +1 : -1;
-  }
-
-  static const char * phase_to_cstr_(Phase p)
-  {
-    switch (p) {
-      case Phase::kIdle: return "idle";
-      case Phase::kBackingUp: return "backing_up";
-      case Phase::kSettling: return "settling";
-      case Phase::kTurning: return "turning";
-      case Phase::kDone: return "done";
-      case Phase::kAborted: return "aborted";
-      default: return "unknown";
-    }
-  }
-
-  void publish_done_edges_(bool backup_done, bool turn_done)
-  {
-    std_msgs::msg::Bool bmsg;
-    bmsg.data = backup_done;
-    pub_backup_done_->publish(bmsg);
-
-    std_msgs::msg::Bool tmsg;
-    tmsg.data = turn_done;
-    pub_turn_done_->publish(tmsg);
-  }
-
-  void publish_state_(const std::string & text)
-  {
-    std_msgs::msg::String msg;
-    msg.data = text;
-    pub_state_->publish(msg);
-    last_state_text_ = text;
-    last_state_pub_time_ = now();
-  }
-
-  void publish_status_(const std::string & text)
-  {
-    if (text == last_status_text_) {
+    if (!enabled_) {
       return;
     }
-    std_msgs::msg::String msg;
-    msg.data = text;
-    pub_status_->publish(msg);
-    last_status_text_ = text;
-  }
 
-  void publish_state_and_status_maybe_(
-    const rclcpp::Time & now_ros,
-    double phase_elapsed,
-    bool safety_stop,
-    bool trigger_level,
-    double slowdown)
-  {
-    std::ostringstream oss;
-    oss.setf(std::ios::fixed);
-    oss.precision(3);
-
-    oss << "phase=" << phase_to_cstr_(phase_)
-        << " active=" << (is_active_phase_(phase_) ? "true" : "false")
-        << " t=" << phase_elapsed
-        << " trigger=" << (trigger_level ? "1" : "0")
-        << " safety_stop=" << (safety_stop ? "1" : "0")
-        << " slowdown=" << slowdown
-        << " reason=" << last_transition_reason_;
-
-    const std::string state = oss.str();
-    const bool changed = state_changed_ || (state != last_state_text_);
-    const bool periodic = (!last_state_pub_time_.nanoseconds()) ||
-                          ((now_ros - last_state_pub_time_).seconds() >= 0.5);
-
-    if (changed || periodic) {
-      publish_state_(state);
-      state_changed_ = false;
+    if (safety_stop_blocks_escape_ && safety_stop_active(now_s)) {
+      return;
     }
 
-    std::ostringstream s;
-    s << phase_to_cstr_(phase_) << ":" << last_transition_reason_;
-    publish_status_(s.str());
+    manager_.request(
+      now_s,
+      trigger,
+      parse_recovery_action(action_text_, RecoveryAction::BACKUP));
   }
 
-  void sanitize_params_()
+  void on_timer()
   {
-    if (!std::isfinite(loop_rate_hz_) || loop_rate_hz_ <= 0.0) loop_rate_hz_ = 30.0;
-    if (!std::isfinite(input_timeout_sec_) || input_timeout_sec_ <= 0.0) input_timeout_sec_ = 0.5;
+    const double now_s = now_seconds(*this);
 
-    if (!std::isfinite(backup_duration_sec_) || backup_duration_sec_ < 0.0) backup_duration_sec_ = 0.50;
-    if (!std::isfinite(settle_duration_sec_) || settle_duration_sec_ < 0.0) settle_duration_sec_ = 0.20;
-    if (!std::isfinite(turn_duration_sec_) || turn_duration_sec_ < 0.0) turn_duration_sec_ = 0.35;
-    if (!std::isfinite(done_hold_sec_) || done_hold_sec_ < 0.0) done_hold_sec_ = 0.20;
+    if (
+      auto_start_on_trigger_level_ &&
+      trigger_active(now_s) &&
+      !manager_.active() &&
+      !(safety_stop_blocks_escape_ && safety_stop_active(now_s)))
+    {
+      request_escape(now_s, RecoveryTrigger::MANUAL_REQUEST);
+    }
 
-    if (!std::isfinite(backup_speed_m_s_) || backup_speed_m_s_ < 0.0) backup_speed_m_s_ = 0.05;
-    if (!std::isfinite(turn_speed_rad_s_) || turn_speed_rad_s_ < 0.0) turn_speed_rad_s_ = 0.30;
+    const bool blocked = safety_stop_blocks_escape_ && safety_stop_active(now_s);
+    const RecoveryManagerResult result = manager_.update_blocked(now_s, blocked);
 
-    if (!std::isfinite(min_slowdown_factor_) || min_slowdown_factor_ < 0.0) min_slowdown_factor_ = 0.20;
-    if (min_slowdown_factor_ > 1.0) min_slowdown_factor_ = 1.0;
-
-    if (topic_trigger_.empty()) topic_trigger_ = topic_names::kRecoveryRequest;
-    if (topic_safety_stop_.empty()) topic_safety_stop_ = topic_names::kSafetyStop;
-    if (topic_cmd_out_.empty()) topic_cmd_out_ = topic_names::kCmdVelRecovery;
-    if (topic_state_.empty()) topic_state_ = topic_names::kRecoveryState;
-    if (topic_status_.empty()) topic_status_ = topic_names::kRecoveryStatus;
-    if (topic_backup_done_.empty()) topic_backup_done_ = "/savo_control/backup_completed";
-    if (topic_turn_done_.empty()) topic_turn_done_ = "/savo_control/turn_completed";
+    publish_result(result, now_s);
   }
 
-private:
-  // ROS pub/sub
-  rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr pub_cmd_out_;
-  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr pub_state_;
-  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr pub_status_;
-  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr pub_backup_done_;
-  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr pub_turn_done_;
+  bool trigger_active(const double now_s) const
+  {
+    if (!trigger_seen_) {
+      return false;
+    }
 
-  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_trigger_;
-  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_cancel_;
-  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_safety_stop_;
-  rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_slowdown_factor_;
+    if (input_timeout_s_ > 0.0 && (now_s - trigger_stamp_s_) > input_timeout_s_) {
+      return false;
+    }
+
+    return trigger_;
+  }
+
+  bool safety_stop_active(const double now_s) const
+  {
+    if (!safety_stop_seen_) {
+      return false;
+    }
+
+    if (input_timeout_s_ > 0.0 && (now_s - safety_stop_stamp_s_) > input_timeout_s_) {
+      return false;
+    }
+
+    return safety_stop_;
+  }
+
+  double slowdown_factor_for_now(const double now_s) const
+  {
+    if (!use_slowdown_factor_) {
+      return 1.0;
+    }
+
+    if (!slowdown_seen_) {
+      return default_slowdown_factor_;
+    }
+
+    if (slowdown_timeout_s_ > 0.0 && (now_s - slowdown_stamp_s_) > slowdown_timeout_s_) {
+      return default_slowdown_factor_;
+    }
+
+    return sanitize_slowdown_factor(slowdown_factor_);
+  }
+
+  TwistCommand apply_slowdown(const TwistCommand & command, const double factor) const
+  {
+    const double scale = sanitize_slowdown_factor(factor);
+
+    return make_twist_command(
+      command.vx * scale,
+      command.vy * scale,
+      command.wz * scale);
+  }
+
+  void publish_result(const RecoveryManagerResult & result, const double now_s)
+  {
+    TwistCommand command = result.command;
+
+    if (result.active && !safety_stop_active(now_s)) {
+      command = apply_slowdown(command, slowdown_factor_for_now(now_s));
+    } else {
+      command = TwistCommand{};
+    }
+
+    if (result.active || publish_zero_when_inactive_) {
+      cmd_pub_->publish(command_to_twist(command));
+    }
+
+    active_pub_->publish(bool_msg(result.active));
+    state_pub_->publish(string_msg(to_string(result.state)));
+
+    std::ostringstream ss;
+    ss << "state=" << to_string(result.state)
+       << "; trigger=" << to_string(result.trigger)
+       << "; action=" << to_string(result.action)
+       << "; active=" << bool_text(result.active)
+       << "; finished=" << bool_text(result.finished)
+       << "; safety_stop=" << bool_text(safety_stop_active(now_s))
+       << "; trigger_active=" << bool_text(trigger_active(now_s))
+       << "; reason=" << result.reason
+       << "; elapsed_s=" << result.elapsed_s
+       << "; phase_elapsed_s=" << result.phase_elapsed_s
+       << "; slowdown=" << slowdown_factor_for_now(now_s)
+       << "; vx=" << command.vx
+       << "; vy=" << command.vy
+       << "; wz=" << command.wz
+       << "; manager=[" << manager_.status_string() << "]";
+
+    status_pub_->publish(string_msg(ss.str()));
+  }
+
+  double sanitize_slowdown_factor(const double value) const
+  {
+    if (!std::isfinite(value)) {
+      return 1.0;
+    }
+
+    return std::clamp(value, 0.0, 1.0);
+  }
+
+  double positive_param(const std::string & name, const double fallback) const
+  {
+    const double value = get_parameter(name).as_double();
+    if (!std::isfinite(value) || value <= 0.0) {
+      return fallback;
+    }
+
+    return value;
+  }
+
+  double nonnegative_param(const std::string & name, const double fallback) const
+  {
+    const double value = get_parameter(name).as_double();
+    if (!std::isfinite(value) || value < 0.0) {
+      return fallback;
+    }
+
+    return value;
+  }
+
+  double publish_hz_{20.0};
+  double input_timeout_s_{0.50};
+
+  bool enabled_{true};
+  bool safety_stop_blocks_escape_{true};
+  bool publish_zero_when_inactive_{true};
+  bool auto_start_on_trigger_level_{false};
+
+  std::string action_text_{"BACKUP"};
+
+  double backup_vx_{-0.06};
+  double rotate_wz_{0.25};
+  double backup_duration_s_{1.0};
+  double rotate_duration_s_{0.8};
+  double stop_hold_s_{0.20};
+  double max_recovery_duration_s_{6.0};
+
+  double max_vx_{0.10};
+  double max_vy_{0.10};
+  double max_wz_{0.35};
+
+  bool stop_before_motion_{true};
+  bool stop_after_motion_{true};
+  bool allow_rotate_left_{true};
+  bool allow_rotate_right_{true};
+
+  bool use_slowdown_factor_{true};
+  double slowdown_timeout_s_{0.50};
+  double default_slowdown_factor_{1.0};
+
+  std::string trigger_topic_{topics::RECOVERY_REQUEST};
+  std::string safety_stop_topic_{topics::SAFETY_STOP};
+  std::string slowdown_topic_{topics::SAFETY_SLOWDOWN_FACTOR};
+  std::string cmd_out_topic_{topics::CMD_VEL_RECOVERY};
+  std::string active_topic_{"/savo_control/backup_escape_active"};
+  std::string state_topic_{"/savo_control/backup_escape_state"};
+  std::string status_topic_{topics::BACKUP_ESCAPE_STATUS};
+
+  bool trigger_{false};
+  bool previous_trigger_{false};
+  bool trigger_seen_{false};
+  double trigger_stamp_s_{0.0};
+
+  bool safety_stop_{false};
+  bool safety_stop_seen_{false};
+  double safety_stop_stamp_s_{0.0};
+
+  double slowdown_factor_{1.0};
+  bool slowdown_seen_{false};
+  double slowdown_stamp_s_{0.0};
+
+  RecoveryManager manager_{};
+
+  rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_pub_;
+  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr active_pub_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr state_pub_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr status_pub_;
+
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr trigger_sub_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr safety_stop_sub_;
+  rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr slowdown_sub_;
 
   rclcpp::TimerBase::SharedPtr timer_;
-
-  // Topics
-  std::string topic_trigger_;
-  std::string topic_cancel_;
-  std::string topic_safety_stop_;
-  std::string topic_slowdown_factor_;
-  std::string topic_cmd_out_;
-  std::string topic_state_;
-  std::string topic_status_;
-  std::string topic_backup_done_;
-  std::string topic_turn_done_;
-
-  // Params
-  double loop_rate_hz_{30.0};
-  double input_timeout_sec_{0.5};
-
-  double backup_duration_sec_{0.50};
-  double settle_duration_sec_{0.20};
-  double turn_duration_sec_{0.35};
-  bool enable_turn_phase_{true};
-  bool auto_reset_after_done_{true};
-  double done_hold_sec_{0.20};
-
-  double backup_speed_m_s_{0.05};
-  double turn_speed_rad_s_{0.30};
-  int turn_sign_{+1};
-  bool respect_slowdown_factor_{false};
-  double min_slowdown_factor_{0.20};
-
-  bool publish_zero_when_idle_{true};
-  bool rising_edge_trigger_only_{true};
-  bool allow_retrigger_in_active_{false};
-
-  bool stale_safety_stop_as_true_{false};
-  bool stale_slowdown_as_one_{true};
-
-  // Runtime inputs
-  TimedBool trigger_in_{};
-  TimedBool cancel_in_{};
-  TimedBool safety_stop_in_{};
-  TimedFloat slowdown_in_{};
-  bool has_slowdown_topic_{false};
-
-  // Runtime state
-  Phase phase_{Phase::kIdle};
-  double phase_start_sec_{0.0};
-  bool prev_trigger_level_{false};
-  bool state_changed_{false};
-  std::string last_transition_reason_{"init"};
-
-  std::string last_state_text_;
-  std::string last_status_text_;
-  rclcpp::Time last_state_pub_time_{0, 0, RCL_ROS_TIME};
 };
 
 }  // namespace savo_control
@@ -560,8 +455,7 @@ private:
 int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
-  auto node = std::make_shared<savo_control::BackupEscapeNode>();
-  rclcpp::spin(node);
+  rclcpp::spin(std::make_shared<savo_control::BackupEscapeNode>());
   rclcpp::shutdown();
   return 0;
 }

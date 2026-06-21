@@ -331,9 +331,9 @@ public:
       result.stuck = true;
       result.recovery_requested = recovery_requested_;
 
-      state_ = recovery_requested_
-        ? StuckState::RECOVERY_REQUESTED
-        : StuckState::STUCK_DETECTED;
+      state_ = recovery_requested_ ?
+        StuckState::RECOVERY_REQUESTED :
+        StuckState::STUCK_DETECTED;
 
       result.state = state_;
       result.reason = recovery_requested_ ? "recovery_requested" : "stuck_detected";

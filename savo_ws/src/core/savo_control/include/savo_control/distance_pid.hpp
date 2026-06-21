@@ -49,9 +49,9 @@ struct DistanceControllerConfig
       ControlMath::finite_or_zero(out.max_valid_distance_m));
 
     out.distance_timeout_s = (
-      std::isfinite(out.distance_timeout_s) && out.distance_timeout_s > 0.0)
-      ? out.distance_timeout_s
-      : 0.40;
+      std::isfinite(out.distance_timeout_s) && out.distance_timeout_s > 0.0) ?
+      out.distance_timeout_s :
+      0.40;
 
     out.kp = ControlMath::finite_or_zero(out.kp);
     out.ki = ControlMath::finite_or_zero(out.ki);

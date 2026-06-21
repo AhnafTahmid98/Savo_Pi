@@ -1,21 +1,81 @@
-// Selects one of /cmd_vel_manual/auto/nav/recovery and publishes to /cmd_vel_mux.
-
-#include <algorithm>
-#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <memory>
+#include <sstream>
 #include <string>
-#include <utility>
 
 #include "geometry_msgs/msg/twist.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/string.hpp"
 
+#include "savo_control/control_mode.hpp"
 #include "savo_control/topic_names.hpp"
 
-using namespace std::chrono_literals;
+namespace
+{
+
+double now_seconds(const rclcpp::Node & node)
+{
+  return node.get_clock()->now().seconds();
+}
+
+geometry_msgs::msg::Twist zero_twist()
+{
+  geometry_msgs::msg::Twist msg;
+  return msg;
+}
+
+std_msgs::msg::String make_string_msg(const std::string & value)
+{
+  std_msgs::msg::String msg;
+  msg.data = value;
+  return msg;
+}
+
+bool finite_twist(const geometry_msgs::msg::Twist & msg)
+{
+  return
+    std::isfinite(msg.linear.x) &&
+    std::isfinite(msg.linear.y) &&
+    std::isfinite(msg.linear.z) &&
+    std::isfinite(msg.angular.x) &&
+    std::isfinite(msg.angular.y) &&
+    std::isfinite(msg.angular.z);
+}
+
+geometry_msgs::msg::Twist sanitize_twist(const geometry_msgs::msg::Twist & msg)
+{
+  geometry_msgs::msg::Twist out = msg;
+
+  if (!std::isfinite(out.linear.x)) {
+    out.linear.x = 0.0;
+  }
+  if (!std::isfinite(out.linear.y)) {
+    out.linear.y = 0.0;
+  }
+  if (!std::isfinite(out.linear.z)) {
+    out.linear.z = 0.0;
+  }
+  if (!std::isfinite(out.angular.x)) {
+    out.angular.x = 0.0;
+  }
+  if (!std::isfinite(out.angular.y)) {
+    out.angular.y = 0.0;
+  }
+  if (!std::isfinite(out.angular.z)) {
+    out.angular.z = 0.0;
+  }
+
+  return out;
+}
+
+const char * bool_text(const bool value)
+{
+  return value ? "true" : "false";
+}
+
+}  // namespace
 
 namespace savo_control
 {
@@ -26,466 +86,354 @@ public:
   TwistMuxNode()
   : Node("twist_mux_node")
   {
-    // -------------------------------------------------------------------------
-    // Parameters
-    // -------------------------------------------------------------------------
-    publish_rate_hz_ = this->declare_parameter<double>("publish_rate_hz", 20.0);
-    cmd_timeout_sec_ = this->declare_parameter<double>("cmd_timeout_sec", 0.30);
-    recovery_cmd_timeout_sec_ =
-      this->declare_parameter<double>("recovery_cmd_timeout_sec", 0.50);
+    declare_parameters();
+    load_parameters();
 
-    default_mode_ = to_upper_copy_(
-      this->declare_parameter<std::string>("default_mode", "MANUAL"));
+    cmd_pub_ = create_publisher<geometry_msgs::msg::Twist>(cmd_out_topic_, 10);
+    selected_source_pub_ = create_publisher<std_msgs::msg::String>(selected_source_topic_, 10);
+    status_pub_ = create_publisher<std_msgs::msg::String>(status_topic_, 10);
 
-    zero_on_unknown_mode_ =
-      this->declare_parameter<bool>("zero_on_unknown_mode", true);
-
-    recovery_override_enabled_ =
-      this->declare_parameter<bool>("recovery_override_enabled", true);
-
-    latch_recovery_active_ =
-      this->declare_parameter<bool>("latch_recovery_active", true);
-
-    recovery_active_timeout_sec_ =
-      this->declare_parameter<double>("recovery_active_timeout_sec", 3.0);
-
-    use_safety_stop_gate_ =
-      this->declare_parameter<bool>("use_safety_stop_gate", false);
-
-    mode_state_publish_on_change_only_ =
-      this->declare_parameter<bool>("mode_state_publish_on_change_only", false);
-
-    // Sanitize parameters
-    sanitize_params_();
-
-    active_mode_ = normalize_mode_(default_mode_);
-    if (active_mode_.empty()) {
-      active_mode_ = "MANUAL";
-    }
-
-    // -------------------------------------------------------------------------
-    // Publishers
-    // -------------------------------------------------------------------------
-    pub_cmd_mux_ = this->create_publisher<geometry_msgs::msg::Twist>(
-      topic_names::kCmdVelMuxSelected, rclcpp::QoS(10));
-
-    pub_mode_state_ = this->create_publisher<std_msgs::msg::String>(
-      topic_names::kControlModeState, rclcpp::QoS(10).transient_local());
-
-    // -------------------------------------------------------------------------
-    // Subscribers: command sources
-    // -------------------------------------------------------------------------
-    sub_cmd_manual_ = this->create_subscription<geometry_msgs::msg::Twist>(
-      topic_names::kCmdVelManual, rclcpp::QoS(10),
+    manual_sub_ = create_subscription<geometry_msgs::msg::Twist>(
+      manual_topic_,
+      10,
       [this](const geometry_msgs::msg::Twist::SharedPtr msg) {
-        on_cmd_(manual_, *msg);
+        update_sample(manual_, *msg);
       });
 
-    sub_cmd_auto_ = this->create_subscription<geometry_msgs::msg::Twist>(
-      topic_names::kCmdVelAuto, rclcpp::QoS(10),
+    auto_sub_ = create_subscription<geometry_msgs::msg::Twist>(
+      auto_topic_,
+      10,
       [this](const geometry_msgs::msg::Twist::SharedPtr msg) {
-        on_cmd_(auto_, *msg);
+        update_sample(auto_, *msg);
       });
 
-    sub_cmd_nav_ = this->create_subscription<geometry_msgs::msg::Twist>(
-      topic_names::kCmdVelNav, rclcpp::QoS(10),
+    nav_sub_ = create_subscription<geometry_msgs::msg::Twist>(
+      nav_topic_,
+      10,
       [this](const geometry_msgs::msg::Twist::SharedPtr msg) {
-        on_cmd_(nav_, *msg);
+        update_sample(nav_, *msg);
       });
 
-    sub_cmd_recovery_ = this->create_subscription<geometry_msgs::msg::Twist>(
-      topic_names::kCmdVelRecovery, rclcpp::QoS(10),
+    recovery_sub_ = create_subscription<geometry_msgs::msg::Twist>(
+      recovery_topic_,
+      10,
       [this](const geometry_msgs::msg::Twist::SharedPtr msg) {
-        on_cmd_(recovery_, *msg);
+        update_sample(recovery_, *msg);
       });
 
-    // -------------------------------------------------------------------------
-    // Subscribers: mode / recovery / optional safety-stop
-    // -------------------------------------------------------------------------
-    sub_mode_cmd_ = this->create_subscription<std_msgs::msg::String>(
-      topic_names::kControlModeState, rclcpp::QoS(10),
-      std::bind(&TwistMuxNode::on_mode_cmd_, this, std::placeholders::_1));
+    mode_sub_ = create_subscription<std_msgs::msg::String>(
+      mode_topic_,
+      rclcpp::QoS(10).transient_local(),
+      [this](const std_msgs::msg::String::SharedPtr msg) {
+        current_mode_ = parse_control_mode(msg->data, ControlMode::STOP);
+        last_mode_text_ = msg->data;
+      });
 
-    sub_recovery_active_ = this->create_subscription<std_msgs::msg::Bool>(
-      topic_names::kRecoveryActive, rclcpp::QoS(10),
-      std::bind(&TwistMuxNode::on_recovery_active_, this, std::placeholders::_1));
+    recovery_active_sub_ = create_subscription<std_msgs::msg::Bool>(
+      recovery_active_topic_,
+      10,
+      [this](const std_msgs::msg::Bool::SharedPtr msg) {
+        recovery_active_ = msg->data;
+        recovery_active_seen_ = true;
+        recovery_active_stamp_s_ = now_seconds(*this);
+      });
 
-    sub_safety_stop_ = this->create_subscription<std_msgs::msg::Bool>(
-      topic_names::kSafetyStop, rclcpp::QoS(10),
-      std::bind(&TwistMuxNode::on_safety_stop_, this, std::placeholders::_1));
+    safety_stop_sub_ = create_subscription<std_msgs::msg::Bool>(
+      safety_stop_topic_,
+      10,
+      [this](const std_msgs::msg::Bool::SharedPtr msg) {
+        safety_stop_ = msg->data;
+        safety_stop_seen_ = true;
+        safety_stop_stamp_s_ = now_seconds(*this);
+      });
 
-    // -------------------------------------------------------------------------
-    // Timer loop
-    // -------------------------------------------------------------------------
-    const auto period = std::chrono::duration<double>(1.0 / publish_rate_hz_);
-    timer_ = this->create_wall_timer(
-      std::chrono::duration_cast<std::chrono::milliseconds>(period),
-      std::bind(&TwistMuxNode::on_timer_, this));
-
-    publish_mode_state_(true);
+    timer_ = create_wall_timer(
+      std::chrono::duration<double>(1.0 / publish_hz_),
+      [this]() {
+        on_timer();
+      });
 
     RCLCPP_INFO(
-      this->get_logger(),
-      "twist_mux_node started | mode=%s | pub=%.1f Hz | cmd_timeout=%.2fs | "
-      "recovery_cmd_timeout=%.2fs | recovery_override=%s | safety_gate=%s",
-      active_mode_.c_str(),
-      publish_rate_hz_,
-      cmd_timeout_sec_,
-      recovery_cmd_timeout_sec_,
-      recovery_override_enabled_ ? "true" : "false",
-      use_safety_stop_gate_ ? "true" : "false");
+      get_logger(),
+      "twist_mux_node started | manual=%s auto=%s nav=%s recovery=%s out=%s",
+      manual_topic_.c_str(),
+      auto_topic_.c_str(),
+      nav_topic_.c_str(),
+      recovery_topic_.c_str(),
+      cmd_out_topic_.c_str());
   }
 
 private:
-  struct CmdChannel
+  struct CommandSample
   {
-    geometry_msgs::msg::Twist last_msg{};
-    rclcpp::Time last_stamp{0, 0, RCL_ROS_TIME};
-    bool has_msg{false};
+    geometry_msgs::msg::Twist msg{};
+    double stamp_s{0.0};
+    bool seen{false};
   };
 
-  // ---------------------------------------------------------------------------
-  // Callbacks
-  // ---------------------------------------------------------------------------
-  void on_cmd_(CmdChannel & ch, const geometry_msgs::msg::Twist & msg)
+  void declare_parameters()
   {
-    ch.last_msg = sanitize_twist_(msg);
-    ch.last_stamp = this->now();
-    ch.has_msg = true;
+    declare_parameter<double>("publish_hz", 30.0);
+    declare_parameter<double>("command_timeout_s", 0.35);
+    declare_parameter<bool>("zero_on_stale", true);
+    declare_parameter<bool>("safety_stop_forces_zero", true);
+    declare_parameter<bool>("require_recovery_active_for_recovery_cmd", true);
+
+    declare_parameter<std::string>("manual_topic", topics::CMD_VEL_MANUAL);
+    declare_parameter<std::string>("auto_topic", topics::CMD_VEL_AUTO);
+    declare_parameter<std::string>("nav_topic", topics::CMD_VEL_NAV);
+    declare_parameter<std::string>("recovery_topic", topics::CMD_VEL_RECOVERY);
+    declare_parameter<std::string>("cmd_out_topic", topics::CMD_VEL_MUX);
+
+    declare_parameter<std::string>("mode_topic", topics::CONTROL_MODE_STATE);
+    declare_parameter<std::string>("recovery_active_topic", topics::RECOVERY_ACTIVE);
+    declare_parameter<std::string>("safety_stop_topic", topics::SAFETY_STOP);
+
+    declare_parameter<std::string>("selected_source_topic", "/savo_control/twist_mux/source");
+    declare_parameter<std::string>("status_topic", "/savo_control/twist_mux/status");
   }
 
-  void on_mode_cmd_(const std_msgs::msg::String::SharedPtr msg)
+  void load_parameters()
   {
-    const std::string requested = normalize_mode_(msg ? msg->data : "");
-    if (requested.empty()) {
-      RCLCPP_WARN_THROTTLE(
-        this->get_logger(), *this->get_clock(), 2000,
-        "Received empty/invalid mode command");
-      return;
+    publish_hz_ = get_parameter("publish_hz").as_double();
+    if (!std::isfinite(publish_hz_) || publish_hz_ <= 0.0) {
+      publish_hz_ = 30.0;
     }
 
-    if (requested != active_mode_) {
-      RCLCPP_INFO(
-        this->get_logger(),
-        "Mode changed: %s -> %s",
-        active_mode_.c_str(), requested.c_str());
-      active_mode_ = requested;
-      publish_mode_state_(true);
+    command_timeout_s_ = get_parameter("command_timeout_s").as_double();
+    if (!std::isfinite(command_timeout_s_) || command_timeout_s_ < 0.0) {
+      command_timeout_s_ = 0.35;
     }
+
+    zero_on_stale_ = get_parameter("zero_on_stale").as_bool();
+    safety_stop_forces_zero_ = get_parameter("safety_stop_forces_zero").as_bool();
+    require_recovery_active_for_recovery_cmd_ =
+      get_parameter("require_recovery_active_for_recovery_cmd").as_bool();
+
+    manual_topic_ = get_parameter("manual_topic").as_string();
+    auto_topic_ = get_parameter("auto_topic").as_string();
+    nav_topic_ = get_parameter("nav_topic").as_string();
+    recovery_topic_ = get_parameter("recovery_topic").as_string();
+    cmd_out_topic_ = get_parameter("cmd_out_topic").as_string();
+
+    mode_topic_ = get_parameter("mode_topic").as_string();
+    recovery_active_topic_ = get_parameter("recovery_active_topic").as_string();
+    safety_stop_topic_ = get_parameter("safety_stop_topic").as_string();
+
+    selected_source_topic_ = get_parameter("selected_source_topic").as_string();
+    status_topic_ = get_parameter("status_topic").as_string();
   }
 
-  void on_recovery_active_(const std_msgs::msg::Bool::SharedPtr msg)
+  void update_sample(CommandSample & sample, const geometry_msgs::msg::Twist & msg)
   {
-    if (!msg) {
-      return;
-    }
-
-    recovery_active_ = msg->data;
-    recovery_active_stamp_ = this->now();
-
-    if (!latch_recovery_active_ && !recovery_active_) {
-      // Non-latching mode: explicit false immediately clears.
-      recovery_active_ = false;
-    }
+    sample.msg = sanitize_twist(msg);
+    sample.stamp_s = now_seconds(*this);
+    sample.seen = true;
   }
 
-  void on_safety_stop_(const std_msgs::msg::Bool::SharedPtr msg)
+  bool sample_fresh(const CommandSample & sample, const double now_s) const
   {
-    if (!msg) {
-      return;
-    }
-    safety_stop_active_ = msg->data;
-    safety_stop_stamp_ = this->now();
-  }
-
-  void on_timer_()
-  {
-    const rclcpp::Time now = this->now();
-
-    geometry_msgs::msg::Twist selected{};
-    std::string selected_source = "NONE";
-    bool selected_valid = false;
-
-    // 1) Recovery override (highest priority when enabled + active)
-    if (should_use_recovery_override_(now)) {
-      if (is_fresh_(recovery_, now, recovery_cmd_timeout_sec_)) {
-        selected = recovery_.last_msg;
-        selected_source = "RECOVERY";
-        selected_valid = true;
-      } else {
-        // Recovery requested but stale command -> safe zero
-        selected = zero_twist_();
-        selected_source = "RECOVERY_STALE_ZERO";
-        selected_valid = true;
-      }
-    } else {
-      // 2) Mode-selected source
-      if (active_mode_ == "MANUAL") {
-        selected_valid = select_from_channel_(
-          manual_, "MANUAL", now, cmd_timeout_sec_, selected, selected_source);
-      } else if (active_mode_ == "AUTO") {
-        selected_valid = select_from_channel_(
-          auto_, "AUTO", now, cmd_timeout_sec_, selected, selected_source);
-      } else if (active_mode_ == "NAV") {
-        selected_valid = select_from_channel_(
-          nav_, "NAV", now, cmd_timeout_sec_, selected, selected_source);
-      } else if (active_mode_ == "STOP" || active_mode_ == "IDLE") {
-        selected = zero_twist_();
-        selected_source = active_mode_;
-        selected_valid = true;
-      } else {
-        // Defensive fallback
-        if (zero_on_unknown_mode_) {
-          selected = zero_twist_();
-          selected_source = "UNKNOWN_MODE_ZERO";
-          selected_valid = true;
-        } else {
-          selected_valid = false;
-          selected_source = "UNKNOWN_MODE_NOOP";
-        }
-      }
-    }
-
-    // 3) Optional safety-stop hard gate
-    // Main safety gate remains in savo_perception (/cmd_vel -> /cmd_vel_safe),
-    // but this optional local gate can help during bringup/testing.
-    if (use_safety_stop_gate_ && is_recent_safety_stop_(now) && safety_stop_active_) {
-      selected = zero_twist_();
-      selected_source += "+SAFETY_STOP";
-      selected_valid = true;
-    }
-
-    // 4) Publish selected (or zero if nothing valid)
-    if (!selected_valid) {
-      selected = zero_twist_();
-      selected_source = "NO_VALID_INPUT_ZERO";
-    }
-
-    pub_cmd_mux_->publish(selected);
-
-    // 5) Mode state periodic/conditional publish
-    publish_mode_state_(false);
-
-    // 6) Diagnostics
-    RCLCPP_DEBUG_THROTTLE(
-      this->get_logger(), *this->get_clock(), 1000,
-      "Mux mode=%s src=%s out[vx=%.3f vy=%.3f wz=%.3f]",
-      active_mode_.c_str(), selected_source.c_str(),
-      selected.linear.x, selected.linear.y, selected.angular.z);
-  }
-
-  // ---------------------------------------------------------------------------
-  // Selection helpers
-  // ---------------------------------------------------------------------------
-  bool select_from_channel_(
-    const CmdChannel & ch,
-    const std::string & label,
-    const rclcpp::Time & now,
-    double timeout_sec,
-    geometry_msgs::msg::Twist & out_twist,
-    std::string & out_source) const
-  {
-    if (!is_fresh_(ch, now, timeout_sec)) {
-      out_twist = zero_twist_();
-      out_source = label + "_STALE_ZERO";
-      return true;  // explicit safe output for selected mode
-    }
-
-    out_twist = ch.last_msg;
-    out_source = label;
-    return true;
-  }
-
-  bool is_fresh_(const CmdChannel & ch, const rclcpp::Time & now, double timeout_sec) const
-  {
-    if (!ch.has_msg) {
+    if (!sample.seen) {
       return false;
     }
-    if (!(timeout_sec > 0.0) || !std::isfinite(timeout_sec)) {
+
+    if (command_timeout_s_ <= 0.0) {
       return true;
     }
 
-    const double age = (now - ch.last_stamp).seconds();
-    return std::isfinite(age) && age >= 0.0 && age <= timeout_sec;
+    return (now_s - sample.stamp_s) <= command_timeout_s_;
   }
 
-  bool should_use_recovery_override_(const rclcpp::Time & now)
+  bool bool_sample_fresh(const bool seen, const double stamp_s, const double now_s) const
   {
-    if (!recovery_override_enabled_) {
+    if (!seen) {
       return false;
     }
 
-    if (!recovery_active_) {
-      return false;
+    if (command_timeout_s_ <= 0.0) {
+      return true;
     }
 
-    // Latching behavior: auto-clear after timeout
-    if (latch_recovery_active_ && (recovery_active_timeout_sec_ > 0.0)) {
-      const double age = (now - recovery_active_stamp_).seconds();
-      if (!std::isfinite(age) || age < 0.0 || age > recovery_active_timeout_sec_) {
-        recovery_active_ = false;
-        return false;
-      }
-    }
-
-    return true;
+    return (now_s - stamp_s) <= command_timeout_s_;
   }
 
-  bool is_recent_safety_stop_(const rclcpp::Time & now) const
+  void on_timer()
   {
-    if (safety_stop_stamp_.nanoseconds() == 0) {
-      return false;
-    }
-    const double age = (now - safety_stop_stamp_).seconds();
-    return std::isfinite(age) && age >= 0.0 && age <= 1.0;
-  }
+    const double now_s = now_seconds(*this);
 
-  // ---------------------------------------------------------------------------
-  // Data sanitation / formatting helpers
-  // ---------------------------------------------------------------------------
-  static geometry_msgs::msg::Twist zero_twist_()
-  {
-    return geometry_msgs::msg::Twist{};
-  }
+    geometry_msgs::msg::Twist selected = zero_twist();
+    std::string source = "STOP";
+    std::string reason = "stop_mode";
+    bool stale = false;
 
-  static bool finite_(double v)
-  {
-    return std::isfinite(v);
-  }
+    const bool safety_fresh = bool_sample_fresh(safety_stop_seen_, safety_stop_stamp_s_, now_s);
+    const bool safety_active = safety_fresh && safety_stop_;
 
-  geometry_msgs::msg::Twist sanitize_twist_(const geometry_msgs::msg::Twist & in) const
-  {
-    geometry_msgs::msg::Twist out = in;
-
-    // Keep only the fields used by cmd_vel in Robot Savo control path
-    out.linear.x  = finite_(out.linear.x)  ? out.linear.x  : 0.0;
-    out.linear.y  = finite_(out.linear.y)  ? out.linear.y  : 0.0;
-    out.angular.z = finite_(out.angular.z) ? out.angular.z : 0.0;
-
-    // Zero unused fields defensively
-    out.linear.z  = 0.0;
-    out.angular.x = 0.0;
-    out.angular.y = 0.0;
-
-    return out;
-  }
-
-  static std::string to_upper_copy_(std::string s)
-  {
-    std::transform(
-      s.begin(), s.end(), s.begin(),
-      [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
-    return s;
-  }
-
-  static std::string trim_copy_(std::string s)
-  {
-    auto not_space = [](unsigned char c) { return !std::isspace(c); };
-
-    s.erase(s.begin(), std::find_if(s.begin(), s.end(), not_space));
-    s.erase(std::find_if(s.rbegin(), s.rend(), not_space).base(), s.end());
-    return s;
-  }
-
-  static std::string normalize_mode_(const std::string & raw)
-  {
-    std::string s = to_upper_copy_(trim_copy_(raw));
-
-    // Friendly aliases
-    if (s == "TELEOP")      s = "MANUAL";
-    if (s == "MAN")         s = "MANUAL";
-    if (s == "AUTONOMOUS")  s = "AUTO";
-    if (s == "AUTON")       s = "AUTO";
-    if (s == "NAV2")        s = "NAV";
-
-    if (s == "MANUAL" || s == "AUTO" || s == "NAV" || s == "STOP" || s == "IDLE") {
-      return s;
-    }
-    return {};
-  }
-
-  void publish_mode_state_(bool force)
-  {
-    if (mode_state_publish_on_change_only_ && !force) {
+    if (safety_stop_forces_zero_ && safety_active) {
+      selected = zero_twist();
+      source = "SAFETY_STOP";
+      reason = "safety_stop";
+      publish(selected, source, reason, stale, now_s);
       return;
     }
 
-    if (!force && active_mode_ == last_published_mode_) {
+    switch (current_mode_) {
+      case ControlMode::MANUAL:
+        select_sample(manual_, "MANUAL", now_s, selected, source, reason, stale);
+        break;
+
+      case ControlMode::AUTO:
+        select_sample(auto_, "AUTO", now_s, selected, source, reason, stale);
+        break;
+
+      case ControlMode::NAV:
+        select_sample(nav_, "NAV", now_s, selected, source, reason, stale);
+        break;
+
+      case ControlMode::RECOVERY:
+        select_recovery(now_s, selected, source, reason, stale);
+        break;
+
+      case ControlMode::STOP:
+      default:
+        selected = zero_twist();
+        source = "STOP";
+        reason = "stop_mode";
+        stale = false;
+        break;
+    }
+
+    publish(selected, source, reason, stale, now_s);
+  }
+
+  void select_sample(
+    const CommandSample & sample,
+    const std::string & requested_source,
+    const double now_s,
+    geometry_msgs::msg::Twist & selected,
+    std::string & source,
+    std::string & reason,
+    bool & stale) const
+  {
+    const bool fresh = sample_fresh(sample, now_s);
+
+    if (fresh && finite_twist(sample.msg)) {
+      selected = sample.msg;
+      source = requested_source;
+      reason = "selected";
+      stale = false;
       return;
     }
 
-    std_msgs::msg::String msg;
-    msg.data = active_mode_;
-    pub_mode_state_->publish(msg);
-    last_published_mode_ = active_mode_;
+    selected = zero_twist();
+    source = requested_source;
+    stale = true;
+    reason = zero_on_stale_ ? "stale_zero" : "stale";
   }
 
-  void sanitize_params_()
+  void select_recovery(
+    const double now_s,
+    geometry_msgs::msg::Twist & selected,
+    std::string & source,
+    std::string & reason,
+    bool & stale) const
   {
-    if (!(publish_rate_hz_ > 0.0) || !std::isfinite(publish_rate_hz_)) {
-      publish_rate_hz_ = 20.0;
-    }
-    if (!(cmd_timeout_sec_ > 0.0) || !std::isfinite(cmd_timeout_sec_)) {
-      cmd_timeout_sec_ = 0.30;
-    }
-    if (!(recovery_cmd_timeout_sec_ > 0.0) || !std::isfinite(recovery_cmd_timeout_sec_)) {
-      recovery_cmd_timeout_sec_ = 0.50;
-    }
-    if (!(recovery_active_timeout_sec_ > 0.0) || !std::isfinite(recovery_active_timeout_sec_)) {
-      recovery_active_timeout_sec_ = 3.0;
+    const bool recovery_active_fresh = bool_sample_fresh(
+      recovery_active_seen_,
+      recovery_active_stamp_s_,
+      now_s);
+
+    const bool recovery_allowed =
+      !require_recovery_active_for_recovery_cmd_ ||
+      (recovery_active_fresh && recovery_active_);
+
+    if (!recovery_allowed) {
+      selected = zero_twist();
+      source = "RECOVERY";
+      reason = "recovery_not_active";
+      stale = true;
+      return;
     }
 
-    default_mode_ = normalize_mode_(default_mode_);
-    if (default_mode_.empty()) {
-      default_mode_ = "MANUAL";
-    }
+    select_sample(recovery_, "RECOVERY", now_s, selected, source, reason, stale);
   }
 
-private:
-  // Publishers
-  rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr pub_cmd_mux_;
-  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr pub_mode_state_;
+  void publish(
+    const geometry_msgs::msg::Twist & selected,
+    const std::string & source,
+    const std::string & reason,
+    const bool stale,
+    const double now_s)
+  {
+    cmd_pub_->publish(selected);
+    selected_source_pub_->publish(make_string_msg(source));
 
-  // Subscribers
-  rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr sub_cmd_manual_;
-  rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr sub_cmd_auto_;
-  rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr sub_cmd_nav_;
-  rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr sub_cmd_recovery_;
+    std::ostringstream ss;
+    ss << "mode=" << to_string(current_mode_)
+       << "; source=" << source
+       << "; reason=" << reason
+       << "; stale=" << bool_text(stale)
+       << "; safety_stop=" << bool_text(safety_stop_)
+       << "; recovery_active=" << bool_text(recovery_active_)
+       << "; last_mode_text=" << last_mode_text_
+       << "; now_s=" << now_s
+       << "; vx=" << selected.linear.x
+       << "; vy=" << selected.linear.y
+       << "; wz=" << selected.angular.z;
 
-  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr sub_mode_cmd_;
-  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_recovery_active_;
-  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_safety_stop_;
+    status_pub_->publish(make_string_msg(ss.str()));
+  }
 
-  rclcpp::TimerBase::SharedPtr timer_;
+  double publish_hz_{30.0};
+  double command_timeout_s_{0.35};
 
-  // Command channels
-  CmdChannel manual_;
-  CmdChannel auto_;
-  CmdChannel nav_;
-  CmdChannel recovery_;
+  bool zero_on_stale_{true};
+  bool safety_stop_forces_zero_{true};
+  bool require_recovery_active_for_recovery_cmd_{true};
 
-  // Mode / recovery state
-  std::string active_mode_{"MANUAL"};
-  std::string default_mode_{"MANUAL"};
-  std::string last_published_mode_;
+  std::string manual_topic_{topics::CMD_VEL_MANUAL};
+  std::string auto_topic_{topics::CMD_VEL_AUTO};
+  std::string nav_topic_{topics::CMD_VEL_NAV};
+  std::string recovery_topic_{topics::CMD_VEL_RECOVERY};
+  std::string cmd_out_topic_{topics::CMD_VEL_MUX};
+
+  std::string mode_topic_{topics::CONTROL_MODE_STATE};
+  std::string recovery_active_topic_{topics::RECOVERY_ACTIVE};
+  std::string safety_stop_topic_{topics::SAFETY_STOP};
+
+  std::string selected_source_topic_{"/savo_control/twist_mux/source"};
+  std::string status_topic_{"/savo_control/twist_mux/status"};
+
+  ControlMode current_mode_{ControlMode::STOP};
+  std::string last_mode_text_{"STOP"};
+
+  CommandSample manual_{};
+  CommandSample auto_{};
+  CommandSample nav_{};
+  CommandSample recovery_{};
 
   bool recovery_active_{false};
-  rclcpp::Time recovery_active_stamp_{0, 0, RCL_ROS_TIME};
+  bool recovery_active_seen_{false};
+  double recovery_active_stamp_s_{0.0};
 
-  bool safety_stop_active_{false};
-  rclcpp::Time safety_stop_stamp_{0, 0, RCL_ROS_TIME};
+  bool safety_stop_{false};
+  bool safety_stop_seen_{false};
+  double safety_stop_stamp_s_{0.0};
 
-  // Parameters
-  double publish_rate_hz_{20.0};
-  double cmd_timeout_sec_{0.30};
-  double recovery_cmd_timeout_sec_{0.50};
-  double recovery_active_timeout_sec_{3.0};
+  rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_pub_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr selected_source_pub_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr status_pub_;
 
-  bool zero_on_unknown_mode_{true};
-  bool recovery_override_enabled_{true};
-  bool latch_recovery_active_{true};
-  bool use_safety_stop_gate_{false};
-  bool mode_state_publish_on_change_only_{false};
+  rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr manual_sub_;
+  rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr auto_sub_;
+  rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr nav_sub_;
+  rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr recovery_sub_;
+
+  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr mode_sub_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr recovery_active_sub_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr safety_stop_sub_;
+
+  rclcpp::TimerBase::SharedPtr timer_;
 };
 
 }  // namespace savo_control
@@ -493,8 +441,7 @@ private:
 int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
-  auto node = std::make_shared<savo_control::TwistMuxNode>();
-  rclcpp::spin(node);
+  rclcpp::spin(std::make_shared<savo_control::TwistMuxNode>());
   rclcpp::shutdown();
   return 0;
 }

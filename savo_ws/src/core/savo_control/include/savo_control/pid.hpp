@@ -28,9 +28,9 @@ struct PidConfig
 
   void set_output_symmetric(const double abs_limit)
   {
-    const double limit = std::isfinite(abs_limit)
-      ? std::abs(abs_limit)
-      : std::numeric_limits<double>::infinity();
+    const double limit = std::isfinite(abs_limit) ?
+      std::abs(abs_limit) :
+      std::numeric_limits<double>::infinity();
 
     output_min = -limit;
     output_max = limit;
@@ -38,9 +38,9 @@ struct PidConfig
 
   void set_integral_clamp_symmetric(const double abs_limit)
   {
-    integral_clamp = std::isfinite(abs_limit)
-      ? std::abs(abs_limit)
-      : std::numeric_limits<double>::infinity();
+    integral_clamp = std::isfinite(abs_limit) ?
+      std::abs(abs_limit) :
+      std::numeric_limits<double>::infinity();
   }
 
   PidConfig sanitized() const
@@ -57,13 +57,13 @@ struct PidConfig
       out.output_max = tmp;
     }
 
-    out.integral_clamp = std::isfinite(out.integral_clamp)
-      ? std::abs(out.integral_clamp)
-      : std::numeric_limits<double>::infinity();
+    out.integral_clamp = std::isfinite(out.integral_clamp) ?
+      std::abs(out.integral_clamp) :
+      std::numeric_limits<double>::infinity();
 
-    out.d_filter_alpha = std::isfinite(out.d_filter_alpha)
-      ? ControlMath::clamp(out.d_filter_alpha, 0.0, 1.0)
-      : 0.0;
+    out.d_filter_alpha = std::isfinite(out.d_filter_alpha) ?
+      ControlMath::clamp(out.d_filter_alpha, 0.0, 1.0) :
+      0.0;
 
     if (!std::isfinite(out.min_dt_sec) || out.min_dt_sec <= 0.0) {
       out.min_dt_sec = 1.0e-6;

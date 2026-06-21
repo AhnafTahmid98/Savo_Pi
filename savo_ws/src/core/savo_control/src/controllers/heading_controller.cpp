@@ -1,7 +1,6 @@
-// header-only — implementation in heading_controller.hpp.
-
 #include "savo_control/heading_controller.hpp"
 
-namespace savo_control
-{
-}  // namespace savo_control
+// HeadingController is a compatibility alias for HeadingPid.
+//
+// The real implementation is inline in heading_pid.hpp. This translation unit
+// is kept so existing CMake targets and library layout stay stable.

@@ -1,7 +1,6 @@
-// header-only — implementation in control_math.hpp.
-
 #include "savo_control/control_math.hpp"
 
-namespace savo_control
-{
-}  // namespace savo_control
+// ControlMath is implemented inline in the public header.
+//
+// This translation unit is intentionally kept so existing CMake targets and
+// library layout stay stable while avoiding a second math implementation.

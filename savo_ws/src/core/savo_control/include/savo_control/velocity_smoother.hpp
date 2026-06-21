@@ -241,7 +241,6 @@ private:
     const double safe_current = ControlMath::finite_or_zero(current);
     const double safe_target = ControlMath::finite_or_zero(target);
 
-    const double delta = safe_target - safe_current;
 
     double rate_limit = std::abs(accel_limit);
     if (config_.use_decel_when_slowing && is_slowing_down(safe_current, safe_target)) {

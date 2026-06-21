@@ -1,9 +1,8 @@
-// Closed-loop yaw controller using HeadingController. Controls angular.z; passes through linear x/y.
-
 #include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <memory>
+#include <sstream>
 #include <string>
 
 #include "geometry_msgs/msg/twist.hpp"
@@ -13,13 +12,72 @@
 #include "std_msgs/msg/float64.hpp"
 #include "std_msgs/msg/string.hpp"
 
-#include "tf2/LinearMath/Matrix3x3.h"
-#include "tf2/LinearMath/Quaternion.h"
-
-#include "savo_control/heading_controller.hpp"
+#include "savo_control/heading_pid.hpp"
 #include "savo_control/topic_names.hpp"
 
-using namespace std::chrono_literals;
+namespace
+{
+
+double now_seconds(const rclcpp::Node & node)
+{
+  return node.get_clock()->now().seconds();
+}
+
+double yaw_from_odom(const nav_msgs::msg::Odometry & msg)
+{
+  const auto & q = msg.pose.pose.orientation;
+
+  const double siny_cosp = 2.0 * (q.w * q.z + q.x * q.y);
+  const double cosy_cosp = 1.0 - 2.0 * (q.y * q.y + q.z * q.z);
+
+  return std::atan2(siny_cosp, cosy_cosp);
+}
+
+std_msgs::msg::String string_msg(const std::string & value)
+{
+  std_msgs::msg::String msg;
+  msg.data = value;
+  return msg;
+}
+
+geometry_msgs::msg::Twist zero_twist()
+{
+  geometry_msgs::msg::Twist msg;
+  return msg;
+}
+
+geometry_msgs::msg::Twist sanitized_twist(const geometry_msgs::msg::Twist & input)
+{
+  geometry_msgs::msg::Twist out = input;
+
+  if (!std::isfinite(out.linear.x)) {
+    out.linear.x = 0.0;
+  }
+  if (!std::isfinite(out.linear.y)) {
+    out.linear.y = 0.0;
+  }
+  if (!std::isfinite(out.linear.z)) {
+    out.linear.z = 0.0;
+  }
+  if (!std::isfinite(out.angular.x)) {
+    out.angular.x = 0.0;
+  }
+  if (!std::isfinite(out.angular.y)) {
+    out.angular.y = 0.0;
+  }
+  if (!std::isfinite(out.angular.z)) {
+    out.angular.z = 0.0;
+  }
+
+  return out;
+}
+
+const char * bool_text(const bool value)
+{
+  return value ? "true" : "false";
+}
+
+}  // namespace
 
 namespace savo_control
 {
@@ -30,511 +88,453 @@ public:
   HeadingPidNode()
   : Node("heading_pid_node")
   {
-    // -------------------------------------------------------------------------
-    // Parameters: topics
-    // -------------------------------------------------------------------------
-    odom_topic_ = this->declare_parameter<std::string>(
-      "odom_topic", topic_names::kOdomFiltered);
+    declare_parameters();
+    load_parameters();
 
-    base_cmd_topic_ = this->declare_parameter<std::string>(
-      "base_cmd_topic", topic_names::kCmdVelRaw);
+    controller_.set_config(make_config());
 
-    output_topic_ = this->declare_parameter<std::string>(
-      "output_topic", topic_names::kCmdVelAuto);
+    cmd_pub_ = create_publisher<geometry_msgs::msg::Twist>(output_topic_, 10);
+    state_pub_ = create_publisher<std_msgs::msg::String>(state_topic_, 10);
+    status_pub_ = create_publisher<std_msgs::msg::String>(status_topic_, 10);
 
-    heading_target_topic_ = this->declare_parameter<std::string>(
-      "heading_target_topic", topic_names::kHeadingTarget);
+    odom_sub_ = create_subscription<nav_msgs::msg::Odometry>(
+      odom_topic_,
+      10,
+      [this](const nav_msgs::msg::Odometry::SharedPtr msg) {
+        current_yaw_rad_ = yaw_from_odom(*msg);
+        odom_stamp_s_ = now_seconds(*this);
+        have_odom_ = true;
+      });
 
-    heading_hold_enable_topic_ = this->declare_parameter<std::string>(
-      "heading_hold_enable_topic", topic_names::kHeadingHoldEnable);
+    base_cmd_sub_ = create_subscription<geometry_msgs::msg::Twist>(
+      base_cmd_topic_,
+      10,
+      [this](const geometry_msgs::msg::Twist::SharedPtr msg) {
+        base_cmd_ = sanitized_twist(*msg);
+        base_cmd_stamp_s_ = now_seconds(*this);
+        have_base_cmd_ = true;
+      });
 
-    state_topic_ = this->declare_parameter<std::string>(
-      "state_topic", topic_names::kRotateState);
+    target_sub_ = create_subscription<std_msgs::msg::Float64>(
+      heading_target_topic_,
+      10,
+      [this](const std_msgs::msg::Float64::SharedPtr msg) {
+        set_target(msg->data, now_seconds(*this));
+        heading_hold_enabled_ = true;
+        controller_.reset();
+      });
 
-    // -------------------------------------------------------------------------
-    // Parameters: loop + freshness
-    // -------------------------------------------------------------------------
-    publish_rate_hz_ = this->declare_parameter<double>("publish_rate_hz", 30.0);
-    odom_timeout_sec_ = this->declare_parameter<double>("odom_timeout_sec", 0.30);
-    base_cmd_timeout_sec_ = this->declare_parameter<double>("base_cmd_timeout_sec", 0.30);
-    zero_on_stale_odom_ = this->declare_parameter<bool>("zero_on_stale_odom", true);
-    zero_linear_on_stale_base_cmd_ = this->declare_parameter<bool>("zero_linear_on_stale_base_cmd", true);
+    hold_enable_sub_ = create_subscription<std_msgs::msg::Bool>(
+      heading_hold_enable_topic_,
+      10,
+      [this](const std_msgs::msg::Bool::SharedPtr msg) {
+        const double now_s = now_seconds(*this);
+        heading_hold_enabled_ = msg->data;
 
-    // -------------------------------------------------------------------------
-    // Parameters: behavior
-    // -------------------------------------------------------------------------
-    enable_linear_passthrough_ = this->declare_parameter<bool>("enable_linear_passthrough", true);
-    passthrough_wz_when_disabled_ = this->declare_parameter<bool>("passthrough_wz_when_disabled", false);
-    capture_hold_target_on_enable_ = this->declare_parameter<bool>("capture_hold_target_on_enable", true);
-    require_target_or_hold_ = this->declare_parameter<bool>("require_target_or_hold", true);
-    zero_wz_when_within_tolerance_ = this->declare_parameter<bool>("zero_wz_when_within_tolerance", true);
+        if (heading_hold_enabled_ && !has_target_ && have_odom_) {
+          set_target(current_yaw_rad_, now_s);
+        }
 
-    // Optional fixed linear command mode (for simple heading tests)
-    use_fixed_linear_cmd_ = this->declare_parameter<bool>("use_fixed_linear_cmd", false);
-    fixed_vx_m_s_ = this->declare_parameter<double>("fixed_vx_m_s", 0.0);
-    fixed_vy_m_s_ = this->declare_parameter<double>("fixed_vy_m_s", 0.0);
+        if (!heading_hold_enabled_) {
+          controller_.reset();
+        }
+      });
 
-    // Output clamps (extra node-level safety clamps)
-    out_vx_max_abs_ = this->declare_parameter<double>("output.vx_max_abs", 0.30);
-    out_vy_max_abs_ = this->declare_parameter<double>("output.vy_max_abs", 0.20);
-    out_wz_max_abs_ = this->declare_parameter<double>("output.wz_max_abs", 1.20);
+    safety_stop_sub_ = create_subscription<std_msgs::msg::Bool>(
+      safety_stop_topic_,
+      10,
+      [this](const std_msgs::msg::Bool::SharedPtr msg) {
+        safety_stop_ = msg->data;
+        safety_stop_seen_ = true;
+        safety_stop_stamp_s_ = now_seconds(*this);
 
-    // -------------------------------------------------------------------------
-    // Parameters: Heading controller config (PID + shaping)
-    // -------------------------------------------------------------------------
-    HeadingControllerConfig cfg{};
+        if (safety_stop_) {
+          controller_.reset();
+        }
+      });
 
-    cfg.pid.kp = this->declare_parameter<double>("pid.kp", 2.2);
-    cfg.pid.ki = this->declare_parameter<double>("pid.ki", 0.0);
-    cfg.pid.kd = this->declare_parameter<double>("pid.kd", 0.05);
-
-    cfg.pid.output_min = this->declare_parameter<double>("pid.output_min", -1.0);
-    cfg.pid.output_max = this->declare_parameter<double>("pid.output_max",  1.0);
-    cfg.pid.integral_clamp = this->declare_parameter<double>("pid.integral_clamp", 0.5);
-    cfg.pid.d_filter_alpha = this->declare_parameter<double>("pid.d_filter_alpha", 0.15);
-    cfg.pid.min_dt_sec = this->declare_parameter<double>("pid.min_dt_sec", 1e-6);
-    cfg.pid.max_dt_sec = this->declare_parameter<double>("pid.max_dt_sec", 0.5);
-    cfg.pid.freeze_integral_on_invalid_dt =
-      this->declare_parameter<bool>("pid.freeze_integral_on_invalid_dt", true);
-
-    cfg.heading_tolerance_rad =
-      this->declare_parameter<double>("heading_tolerance_rad", 0.03);
-    cfg.output_deadband_rad_s =
-      this->declare_parameter<double>("output_deadband_rad_s", 0.00);
-    cfg.min_effective_wz_rad_s =
-      this->declare_parameter<double>("min_effective_wz_rad_s", 0.00);
-    cfg.max_wz_rad_s =
-      this->declare_parameter<double>("max_wz_rad_s", 1.00);
-
-    cfg.reset_pid_on_hold_capture =
-      this->declare_parameter<bool>("reset_pid_on_hold_capture", true);
-    cfg.reset_pid_on_target_change =
-      this->declare_parameter<bool>("reset_pid_on_target_change", true);
-    cfg.target_change_reset_threshold_rad =
-      this->declare_parameter<double>("target_change_reset_threshold_rad", 0.02);
-
-    cfg.min_dt_sec = this->declare_parameter<double>("ctrl.min_dt_sec", 1e-6);
-    cfg.max_dt_sec = this->declare_parameter<double>("ctrl.max_dt_sec", 0.5);
-
-    sanitize_params_();
-    heading_ctrl_.set_config(cfg);
-
-    // -------------------------------------------------------------------------
-    // Publishers
-    // -------------------------------------------------------------------------
-    pub_cmd_out_ = this->create_publisher<geometry_msgs::msg::Twist>(
-      output_topic_, rclcpp::QoS(10));
-
-    pub_state_ = this->create_publisher<std_msgs::msg::String>(
-      state_topic_, rclcpp::QoS(10).transient_local());
-
-    // -------------------------------------------------------------------------
-    // Subscribers
-    // -------------------------------------------------------------------------
-    sub_odom_ = this->create_subscription<nav_msgs::msg::Odometry>(
-      odom_topic_, rclcpp::QoS(20),
-      std::bind(&HeadingPidNode::on_odom_, this, std::placeholders::_1));
-
-    sub_base_cmd_ = this->create_subscription<geometry_msgs::msg::Twist>(
-      base_cmd_topic_, rclcpp::QoS(10),
-      std::bind(&HeadingPidNode::on_base_cmd_, this, std::placeholders::_1));
-
-    sub_heading_target_ = this->create_subscription<std_msgs::msg::Float64>(
-      heading_target_topic_, rclcpp::QoS(10),
-      std::bind(&HeadingPidNode::on_heading_target_, this, std::placeholders::_1));
-
-    sub_heading_hold_enable_ = this->create_subscription<std_msgs::msg::Bool>(
-      heading_hold_enable_topic_, rclcpp::QoS(10),
-      std::bind(&HeadingPidNode::on_heading_hold_enable_, this, std::placeholders::_1));
-
-    // -------------------------------------------------------------------------
-    // Timer loop
-    // -------------------------------------------------------------------------
-    const auto period = std::chrono::duration<double>(1.0 / publish_rate_hz_);
-    timer_ = this->create_wall_timer(
-      std::chrono::duration_cast<std::chrono::milliseconds>(period),
-      std::bind(&HeadingPidNode::on_timer_, this));
-
-    publish_state_(true);
+    timer_ = create_wall_timer(
+      std::chrono::duration<double>(1.0 / publish_hz_),
+      [this]() {
+        on_timer();
+      });
 
     RCLCPP_INFO(
-      this->get_logger(),
-      "heading_pid_node started | odom=%s | base_cmd=%s | out=%s | rate=%.1fHz",
-      odom_topic_.c_str(), base_cmd_topic_.c_str(), output_topic_.c_str(), publish_rate_hz_);
+      get_logger(),
+      "heading_pid_node started | odom=%s base_cmd=%s output=%s",
+      odom_topic_.c_str(),
+      base_cmd_topic_.c_str(),
+      output_topic_.c_str());
   }
 
 private:
-  struct OdomState
+  void declare_parameters()
   {
-    rclcpp::Time stamp{0, 0, RCL_ROS_TIME};
-    bool has_msg{false};
-    double yaw_rad{0.0};
-  };
+    declare_parameter<double>("publish_hz", 20.0);
+    declare_parameter<double>("input_timeout_s", 0.50);
 
-  struct TwistState
-  {
-    rclcpp::Time stamp{0, 0, RCL_ROS_TIME};
-    bool has_msg{false};
-    geometry_msgs::msg::Twist msg{};
-  };
+    declare_parameter<bool>("enabled", true);
+    declare_parameter<bool>("publish_zero_when_inactive", true);
+    declare_parameter<bool>("safety_stop_blocks_motion", true);
+    declare_parameter<bool>("capture_current_heading_on_start", true);
+    declare_parameter<bool>("preserve_base_linear_velocity", true);
 
-  // ---------------------------------------------------------------------------
-  // Callbacks
-  // ---------------------------------------------------------------------------
-  void on_odom_(const nav_msgs::msg::Odometry::SharedPtr msg)
+    declare_parameter<double>("kp", 1.20);
+    declare_parameter<double>("ki", 0.0);
+    declare_parameter<double>("kd", 0.05);
+
+    declare_parameter<double>("tolerance_rad", 0.035);
+    declare_parameter<double>("max_wz_rad_s", 0.45);
+    declare_parameter<double>("min_wz_when_active", 0.08);
+    declare_parameter<double>("disable_min_wz_below_error_rad", 0.08);
+    declare_parameter<double>("output_deadband_rad_s", 0.0);
+
+    declare_parameter<double>("min_dt_sec", 1.0e-4);
+    declare_parameter<double>("max_dt_sec", 0.50);
+
+    declare_parameter<std::string>("odom_topic", topics::ODOM_FILTERED);
+    declare_parameter<std::string>("base_cmd_topic", "/cmd_vel_raw");
+    declare_parameter<std::string>("output_topic", topics::CMD_VEL_AUTO);
+    declare_parameter<std::string>("heading_target_topic", "/savo_control/heading_target_rad");
+    declare_parameter<std::string>("heading_hold_enable_topic",
+        "/savo_control/heading_hold_enable");
+    declare_parameter<std::string>("safety_stop_topic", topics::SAFETY_STOP);
+    declare_parameter<std::string>("state_topic", "/savo_control/heading_pid_state");
+    declare_parameter<std::string>("status_topic", "/savo_control/heading_pid_status");
+  }
+
+  void load_parameters()
   {
-    if (!msg) {
+    publish_hz_ = positive_param("publish_hz", 20.0);
+    input_timeout_s_ = nonnegative_param("input_timeout_s", 0.50);
+
+    enabled_ = get_parameter("enabled").as_bool();
+    publish_zero_when_inactive_ = get_parameter("publish_zero_when_inactive").as_bool();
+    safety_stop_blocks_motion_ = get_parameter("safety_stop_blocks_motion").as_bool();
+    capture_current_heading_on_start_ =
+      get_parameter("capture_current_heading_on_start").as_bool();
+    preserve_base_linear_velocity_ =
+      get_parameter("preserve_base_linear_velocity").as_bool();
+
+    kp_ = finite_param("kp", 1.20);
+    ki_ = finite_param("ki", 0.0);
+    kd_ = finite_param("kd", 0.05);
+
+    tolerance_rad_ = nonnegative_param("tolerance_rad", 0.035);
+    max_wz_rad_s_ = nonnegative_param("max_wz_rad_s", 0.45);
+    min_wz_when_active_ = nonnegative_param("min_wz_when_active", 0.08);
+    disable_min_wz_below_error_rad_ =
+      nonnegative_param("disable_min_wz_below_error_rad", 0.08);
+    output_deadband_rad_s_ = nonnegative_param("output_deadband_rad_s", 0.0);
+
+    min_dt_sec_ = positive_param("min_dt_sec", 1.0e-4);
+    max_dt_sec_ = positive_param("max_dt_sec", 0.50);
+    if (max_dt_sec_ < min_dt_sec_) {
+      max_dt_sec_ = min_dt_sec_;
+    }
+
+    odom_topic_ = get_parameter("odom_topic").as_string();
+    base_cmd_topic_ = get_parameter("base_cmd_topic").as_string();
+    output_topic_ = get_parameter("output_topic").as_string();
+    heading_target_topic_ = get_parameter("heading_target_topic").as_string();
+    heading_hold_enable_topic_ = get_parameter("heading_hold_enable_topic").as_string();
+    safety_stop_topic_ = get_parameter("safety_stop_topic").as_string();
+    state_topic_ = get_parameter("state_topic").as_string();
+    status_topic_ = get_parameter("status_topic").as_string();
+  }
+
+  HeadingControllerConfig make_config() const
+  {
+    HeadingControllerConfig config;
+
+    config.target_yaw_rad = target_yaw_rad_;
+    config.tolerance_rad = tolerance_rad_;
+
+    config.kp = kp_;
+    config.ki = ki_;
+    config.kd = kd_;
+
+    config.max_wz_rad_s = max_wz_rad_s_;
+    config.min_wz_when_active = min_wz_when_active_;
+    config.disable_min_wz_below_error_rad = disable_min_wz_below_error_rad_;
+    config.output_deadband_rad_s = output_deadband_rad_s_;
+
+    config.min_dt_sec = min_dt_sec_;
+    config.max_dt_sec = max_dt_sec_;
+
+    return config.sanitized();
+  }
+
+  void set_target(const double yaw_rad, const double now_s)
+  {
+    target_yaw_rad_ = ControlMath::wrap_angle_rad(ControlMath::finite_or_zero(yaw_rad));
+    target_stamp_s_ = now_s;
+    has_target_ = true;
+
+    controller_.set_target_yaw(target_yaw_rad_);
+  }
+
+  void on_timer()
+  {
+    const double now_s = now_seconds(*this);
+
+    if (!enabled_) {
+      publish_zero("disabled", now_s);
       return;
     }
 
-    double yaw = 0.0;
-    if (!quat_to_yaw_(msg->pose.pose.orientation, yaw)) {
-      RCLCPP_WARN_THROTTLE(
-        this->get_logger(), *this->get_clock(), 2000,
-        "Invalid odometry orientation quaternion");
+    if (safety_stop_blocks_motion_ && safety_stop_active(now_s)) {
+      publish_zero("safety_stop", now_s);
       return;
     }
 
-    odom_.yaw_rad = yaw;
-    odom_.stamp = this->now();
-    odom_.has_msg = true;
-  }
-
-  void on_base_cmd_(const geometry_msgs::msg::Twist::SharedPtr msg)
-  {
-    if (!msg) {
+    if (!heading_hold_enabled_) {
+      publish_inactive(now_s);
       return;
     }
 
-    base_cmd_.msg = sanitize_twist_(*msg);
-    base_cmd_.stamp = this->now();
-    base_cmd_.has_msg = true;
-  }
-
-  void on_heading_target_(const std_msgs::msg::Float64::SharedPtr msg)
-  {
-    if (!msg || !std::isfinite(msg->data)) {
+    if (!have_odom_ || !odom_fresh(now_s)) {
+      controller_.reset();
+      publish_zero("odom_stale", now_s);
       return;
     }
 
-    last_heading_target_rad_ = msg->data;
-    has_heading_target_cmd_ = true;
-    heading_target_stamp_ = this->now();
+    if (!has_target_ && capture_current_heading_on_start_) {
+      set_target(current_yaw_rad_, now_s);
+    }
 
-    heading_ctrl_.set_target_yaw(last_heading_target_rad_);
-
-    RCLCPP_INFO(
-      this->get_logger(),
-      "Heading target set: %.3f rad (%.1f deg)",
-      heading_ctrl_.target_yaw_rad(),
-      heading_ctrl_.target_yaw_rad() * (180.0 / 3.14159265358979323846));
-  }
-
-  void on_heading_hold_enable_(const std_msgs::msg::Bool::SharedPtr msg)
-  {
-    if (!msg) {
+    if (!has_target_) {
+      publish_zero("no_target", now_s);
       return;
     }
 
-    const bool prev = heading_hold_enabled_;
-    heading_hold_enabled_ = msg->data;
+    double dt_s = now_s - last_update_s_;
+    if (!std::isfinite(dt_s) || dt_s <= 0.0) {
+      dt_s = min_dt_sec_;
+    }
+    dt_s = std::clamp(dt_s, min_dt_sec_, max_dt_sec_);
+    last_update_s_ = now_s;
 
-    if (!prev && heading_hold_enabled_) {
-      // Rising edge: capture current heading (if requested and odom is fresh)
-      if (capture_hold_target_on_enable_ && is_odom_fresh_(this->now())) {
-        heading_ctrl_.capture_hold_target(odom_.yaw_rad);
-        has_heading_target_cmd_ = true;  // controller now has a valid target
-        heading_target_stamp_ = this->now();
-      }
-      RCLCPP_INFO(this->get_logger(), "Heading hold ENABLED");
-    } else if (prev && !heading_hold_enabled_) {
-      RCLCPP_INFO(this->get_logger(), "Heading hold DISABLED");
-      heading_ctrl_.reset();
+    controller_.set_config(make_config());
+
+    const HeadingControllerResult result =
+      controller_.update(current_yaw_rad_, target_yaw_rad_, dt_s);
+
+    geometry_msgs::msg::Twist cmd = zero_twist();
+
+    if (preserve_base_linear_velocity_ && base_cmd_fresh(now_s)) {
+      cmd.linear.x = base_cmd_.linear.x;
+      cmd.linear.y = base_cmd_.linear.y;
     }
 
-    publish_state_(true);
+    if (result.valid && !result.within_tolerance) {
+      cmd.angular.z = result.wz_cmd_rad_s;
+    }
+
+    cmd_pub_->publish(cmd);
+    publish_state_and_status(result, cmd, "tracking", now_s);
   }
 
-  // ---------------------------------------------------------------------------
-  // Main loop
-  // ---------------------------------------------------------------------------
-  void on_timer_()
+  void publish_inactive(const double now_s)
   {
-    const rclcpp::Time now = this->now();
-
-    double dt_sec = 0.0;
-    bool dt_valid = false;
-    if (has_prev_loop_time_) {
-      dt_sec = (now - prev_loop_time_).seconds();
-      dt_valid = std::isfinite(dt_sec) &&
-                 dt_sec >= heading_ctrl_.config().min_dt_sec &&
-                 dt_sec <= heading_ctrl_.config().max_dt_sec;
-    }
-    prev_loop_time_ = now;
-    has_prev_loop_time_ = true;
-
-    geometry_msgs::msg::Twist out = zero_twist_();
-
-    // Linear passthrough / fixed test command
-    if (use_fixed_linear_cmd_) {
-      out.linear.x = clamp_abs_(fixed_vx_m_s_, out_vx_max_abs_);
-      out.linear.y = clamp_abs_(fixed_vy_m_s_, out_vy_max_abs_);
-    } else if (enable_linear_passthrough_) {
-      if (is_base_cmd_fresh_(now)) {
-        out.linear.x = clamp_abs_(base_cmd_.msg.linear.x, out_vx_max_abs_);
-        out.linear.y = clamp_abs_(base_cmd_.msg.linear.y, out_vy_max_abs_);
-      } else if (!zero_linear_on_stale_base_cmd_ && base_cmd_.has_msg) {
-        out.linear.x = clamp_abs_(base_cmd_.msg.linear.x, out_vx_max_abs_);
-        out.linear.y = clamp_abs_(base_cmd_.msg.linear.y, out_vy_max_abs_);
-      } else {
-        out.linear.x = 0.0;
-        out.linear.y = 0.0;
-      }
-    }
-
-    // If no fresh odom, fail-safe behavior
-    if (!is_odom_fresh_(now)) {
-      if (zero_on_stale_odom_) {
-        out.angular.z = 0.0;
-        out = sanitize_twist_(out);
-        pub_cmd_out_->publish(out);
-
-        RCLCPP_WARN_THROTTLE(
-          this->get_logger(), *this->get_clock(), 1500,
-          "Stale/missing odom -> zero angular.z (and continuing linear policy)");
-        publish_state_(false);
-        return;
-      }
-    }
-
-    const bool can_control = odom_.has_msg && std::isfinite(odom_.yaw_rad);
-    const bool has_target = heading_ctrl_.has_target();
-    const bool control_active = heading_hold_enabled_ || has_target;
-
-    if (!can_control || (require_target_or_hold_ && !control_active)) {
-      if (passthrough_wz_when_disabled_ && is_base_cmd_fresh_(now)) {
-        out.angular.z = clamp_abs_(base_cmd_.msg.angular.z, out_wz_max_abs_);
-      } else {
-        out.angular.z = 0.0;
-      }
-
-      out = sanitize_twist_(out);
-      pub_cmd_out_->publish(out);
-      publish_state_(false);
+    if (publish_zero_when_inactive_) {
+      publish_zero("inactive", now_s);
       return;
     }
 
-    // If hold is enabled and there is no target yet, capture current heading
-    if (heading_hold_enabled_ && !heading_ctrl_.has_target() && can_control) {
-      heading_ctrl_.capture_hold_target(odom_.yaw_rad);
-    }
+    HeadingControllerResult result;
+    result.valid = false;
+    result.current_yaw_rad = current_yaw_rad_;
+    result.target_yaw_rad = target_yaw_rad_;
+    result.error_rad = has_target_ ?
+      ControlMath::shortest_angular_distance_rad(current_yaw_rad_, target_yaw_rad_) :
+      0.0;
+    result.reason = "inactive";
 
-    // Run heading controller
-    HeadingControllerResult res{};
-    if (dt_valid) {
-      res = heading_ctrl_.update(odom_.yaw_rad, dt_sec);
-    } else {
-      // First loop / timing glitch -> safe zero angular command
-      res.wz_cmd_rad_s = 0.0;
-      res.valid = false;
-    }
-
-    double wz = (res.valid ? res.wz_cmd_rad_s : 0.0);
-
-    if (!zero_wz_when_within_tolerance_ && res.valid && res.within_tolerance) {
-      // If user wants no forced zero inside tolerance, use controller output (already computed)
-      wz = res.wz_cmd_rad_s;
-    }
-
-    out.angular.z = clamp_abs_(wz, out_wz_max_abs_);
-    out = sanitize_twist_(out);
-    pub_cmd_out_->publish(out);
-
-    // Debug logs
-    RCLCPP_DEBUG_THROTTLE(
-      this->get_logger(), *this->get_clock(), 1000,
-      "heading_pid: yaw=%.3f target=%s%.3f err=%.3f wz=%.3f dt=%.4f hold=%s",
-      odom_.yaw_rad,
-      heading_ctrl_.has_target() ? "" : "(none) ",
-      heading_ctrl_.has_target() ? heading_ctrl_.target_yaw_rad() : 0.0,
-      res.error_yaw_rad,
-      out.angular.z,
-      dt_sec,
-      heading_hold_enabled_ ? "true" : "false");
-
-    publish_state_(false);
+    publish_state_and_status(result, zero_twist(), "inactive", now_s);
   }
 
-  // ---------------------------------------------------------------------------
-  // Helpers
-  // ---------------------------------------------------------------------------
-  void sanitize_params_()
+  void publish_zero(const std::string & reason, const double now_s)
   {
-    if (!std::isfinite(publish_rate_hz_) || publish_rate_hz_ <= 0.0) {
-      publish_rate_hz_ = 30.0;
-    }
-    if (!std::isfinite(odom_timeout_sec_) || odom_timeout_sec_ <= 0.0) {
-      odom_timeout_sec_ = 0.30;
-    }
-    if (!std::isfinite(base_cmd_timeout_sec_) || base_cmd_timeout_sec_ <= 0.0) {
-      base_cmd_timeout_sec_ = 0.30;
-    }
+    const geometry_msgs::msg::Twist cmd = zero_twist();
+    cmd_pub_->publish(cmd);
 
-    out_vx_max_abs_ = std::isfinite(out_vx_max_abs_) ? std::abs(out_vx_max_abs_) : 0.30;
-    out_vy_max_abs_ = std::isfinite(out_vy_max_abs_) ? std::abs(out_vy_max_abs_) : 0.20;
-    out_wz_max_abs_ = std::isfinite(out_wz_max_abs_) ? std::abs(out_wz_max_abs_) : 1.20;
+    HeadingControllerResult result;
+    result.valid = false;
+    result.current_yaw_rad = current_yaw_rad_;
+    result.target_yaw_rad = target_yaw_rad_;
+    result.error_rad = has_target_ ?
+      ControlMath::shortest_angular_distance_rad(current_yaw_rad_, target_yaw_rad_) :
+      0.0;
+    result.reason = reason;
 
-    fixed_vx_m_s_ = std::isfinite(fixed_vx_m_s_) ? fixed_vx_m_s_ : 0.0;
-    fixed_vy_m_s_ = std::isfinite(fixed_vy_m_s_) ? fixed_vy_m_s_ : 0.0;
-
-    if (odom_topic_.empty()) odom_topic_ = topic_names::kOdomFiltered;
-    if (base_cmd_topic_.empty()) base_cmd_topic_ = topic_names::kCmdVelRaw;
-    if (output_topic_.empty()) output_topic_ = topic_names::kCmdVelAuto;
-    if (heading_target_topic_.empty()) heading_target_topic_ = topic_names::kHeadingTarget;
-    if (heading_hold_enable_topic_.empty()) heading_hold_enable_topic_ = topic_names::kHeadingHoldEnable;
-    if (state_topic_.empty()) state_topic_ = topic_names::kRotateState;
+    publish_state_and_status(result, cmd, reason, now_s);
   }
 
-  bool is_odom_fresh_(const rclcpp::Time & now) const
+  void publish_state_and_status(
+    const HeadingControllerResult & result,
+    const geometry_msgs::msg::Twist & cmd,
+    const std::string & reason,
+    const double now_s)
   {
-    if (!odom_.has_msg) {
-      return false;
-    }
-    const double age = (now - odom_.stamp).seconds();
-    return std::isfinite(age) && age >= 0.0 && age <= odom_timeout_sec_;
+    std::ostringstream state;
+    state << "enabled=" << bool_text(enabled_)
+          << "; hold=" << bool_text(heading_hold_enabled_)
+          << "; target=" << bool_text(has_target_)
+          << "; reason=" << reason;
+
+    state_pub_->publish(string_msg(state.str()));
+
+    std::ostringstream status;
+    status << "enabled=" << bool_text(enabled_)
+           << "; hold=" << bool_text(heading_hold_enabled_)
+           << "; has_target=" << bool_text(has_target_)
+           << "; have_odom=" << bool_text(have_odom_)
+           << "; odom_fresh=" << bool_text(odom_fresh(now_s))
+           << "; base_cmd_fresh=" << bool_text(base_cmd_fresh(now_s))
+           << "; safety_stop=" << bool_text(safety_stop_active(now_s))
+           << "; valid=" << bool_text(result.valid)
+           << "; within_tolerance=" << bool_text(result.within_tolerance)
+           << "; reason=" << reason
+           << "; current_yaw_rad=" << current_yaw_rad_
+           << "; target_yaw_rad=" << target_yaw_rad_
+           << "; error_rad=" << result.error_rad
+           << "; vx=" << cmd.linear.x
+           << "; vy=" << cmd.linear.y
+           << "; wz=" << cmd.angular.z
+           << "; now_s=" << now_s;
+
+    status_pub_->publish(string_msg(status.str()));
   }
 
-  bool is_base_cmd_fresh_(const rclcpp::Time & now) const
+  bool odom_fresh(const double now_s) const
   {
-    if (!base_cmd_.has_msg) {
-      return false;
-    }
-    const double age = (now - base_cmd_.stamp).seconds();
-    return std::isfinite(age) && age >= 0.0 && age <= base_cmd_timeout_sec_;
-  }
-
-  static double clamp_abs_(double v, double abs_max)
-  {
-    const double m = std::abs(abs_max);
-    if (!(m > 0.0) || !std::isfinite(m) || !std::isfinite(v)) {
-      return 0.0;
-    }
-    return std::max(-m, std::min(v, m));
-  }
-
-  static bool quat_to_yaw_(const geometry_msgs::msg::Quaternion & q_msg, double & yaw_rad)
-  {
-    if (!std::isfinite(q_msg.x) || !std::isfinite(q_msg.y) ||
-        !std::isfinite(q_msg.z) || !std::isfinite(q_msg.w))
-    {
+    if (!have_odom_) {
       return false;
     }
 
-    tf2::Quaternion q(q_msg.x, q_msg.y, q_msg.z, q_msg.w);
-    if (q.length2() <= 0.0 || !std::isfinite(q.length2())) {
+    if (input_timeout_s_ <= 0.0) {
+      return true;
+    }
+
+    return (now_s - odom_stamp_s_) <= input_timeout_s_;
+  }
+
+  bool base_cmd_fresh(const double now_s) const
+  {
+    if (!have_base_cmd_) {
       return false;
     }
-    q.normalize();
 
-    double roll = 0.0, pitch = 0.0, yaw = 0.0;
-    tf2::Matrix3x3(q).getRPY(roll, pitch, yaw);
-    yaw_rad = yaw;
-    return std::isfinite(yaw_rad);
-  }
-
-  static geometry_msgs::msg::Twist sanitize_twist_(const geometry_msgs::msg::Twist & in)
-  {
-    geometry_msgs::msg::Twist out{};
-    out.linear.x  = std::isfinite(in.linear.x)  ? in.linear.x  : 0.0;
-    out.linear.y  = std::isfinite(in.linear.y)  ? in.linear.y  : 0.0;
-    out.linear.z  = 0.0;
-    out.angular.x = 0.0;
-    out.angular.y = 0.0;
-    out.angular.z = std::isfinite(in.angular.z) ? in.angular.z : 0.0;
-    return out;
-  }
-
-  static geometry_msgs::msg::Twist zero_twist_()
-  {
-    return geometry_msgs::msg::Twist{};
-  }
-
-  void publish_state_(bool force)
-  {
-    std::string s = "hold=" + std::string(heading_hold_enabled_ ? "true" : "false");
-    s += " odom=" + std::string(odom_.has_msg ? "yes" : "no");
-    s += " target=" + std::string(heading_ctrl_.has_target() ? "yes" : "no");
-    if (heading_ctrl_.has_target()) {
-      s += " target_rad=" + std::to_string(heading_ctrl_.target_yaw_rad());
-    }
-    s += " out_topic=" + output_topic_;
-
-    if (!force && s == last_state_str_) {
-      return;
+    if (input_timeout_s_ <= 0.0) {
+      return true;
     }
 
-    std_msgs::msg::String msg;
-    msg.data = s;
-    pub_state_->publish(msg);
-    last_state_str_ = std::move(s);
+    return (now_s - base_cmd_stamp_s_) <= input_timeout_s_;
   }
 
-private:
-  // Publishers/subscribers
-  rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr pub_cmd_out_;
-  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr pub_state_;
+  bool safety_stop_active(const double now_s) const
+  {
+    if (!safety_stop_seen_) {
+      return false;
+    }
 
-  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr sub_odom_;
-  rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr sub_base_cmd_;
-  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr sub_heading_target_;
-  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_heading_hold_enable_;
+    if (input_timeout_s_ > 0.0 && (now_s - safety_stop_stamp_s_) > input_timeout_s_) {
+      return false;
+    }
+
+    return safety_stop_;
+  }
+
+  double finite_param(const std::string & name, const double fallback) const
+  {
+    const double value = get_parameter(name).as_double();
+    return std::isfinite(value) ? value : fallback;
+  }
+
+  double positive_param(const std::string & name, const double fallback) const
+  {
+    const double value = get_parameter(name).as_double();
+    if (!std::isfinite(value) || value <= 0.0) {
+      return fallback;
+    }
+
+    return value;
+  }
+
+  double nonnegative_param(const std::string & name, const double fallback) const
+  {
+    const double value = get_parameter(name).as_double();
+    if (!std::isfinite(value) || value < 0.0) {
+      return fallback;
+    }
+
+    return value;
+  }
+
+  double publish_hz_{20.0};
+  double input_timeout_s_{0.50};
+
+  bool enabled_{true};
+  bool publish_zero_when_inactive_{true};
+  bool safety_stop_blocks_motion_{true};
+  bool capture_current_heading_on_start_{true};
+  bool preserve_base_linear_velocity_{true};
+
+  double kp_{1.20};
+  double ki_{0.0};
+  double kd_{0.05};
+
+  double tolerance_rad_{0.035};
+  double max_wz_rad_s_{0.45};
+  double min_wz_when_active_{0.08};
+  double disable_min_wz_below_error_rad_{0.08};
+  double output_deadband_rad_s_{0.0};
+
+  double min_dt_sec_{1.0e-4};
+  double max_dt_sec_{0.50};
+
+  std::string odom_topic_{topics::ODOM_FILTERED};
+  std::string base_cmd_topic_{"/cmd_vel_raw"};
+  std::string output_topic_{topics::CMD_VEL_AUTO};
+  std::string heading_target_topic_{"/savo_control/heading_target_rad"};
+  std::string heading_hold_enable_topic_{"/savo_control/heading_hold_enable"};
+  std::string safety_stop_topic_{topics::SAFETY_STOP};
+  std::string state_topic_{"/savo_control/heading_pid_state"};
+  std::string status_topic_{"/savo_control/heading_pid_status"};
+
+  double current_yaw_rad_{0.0};
+  double target_yaw_rad_{0.0};
+
+  bool heading_hold_enabled_{false};
+  bool has_target_{false};
+  bool have_odom_{false};
+  bool have_base_cmd_{false};
+
+  double odom_stamp_s_{0.0};
+  double base_cmd_stamp_s_{0.0};
+  double target_stamp_s_{0.0};
+  double last_update_s_{0.0};
+
+  geometry_msgs::msg::Twist base_cmd_{};
+
+  bool safety_stop_{false};
+  bool safety_stop_seen_{false};
+  double safety_stop_stamp_s_{0.0};
+
+  HeadingPid controller_{};
+
+  rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_pub_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr state_pub_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr status_pub_;
+
+  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
+  rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr base_cmd_sub_;
+  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr target_sub_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr hold_enable_sub_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr safety_stop_sub_;
 
   rclcpp::TimerBase::SharedPtr timer_;
-
-  // Topics
-  std::string odom_topic_;
-  std::string base_cmd_topic_;
-  std::string output_topic_;
-  std::string heading_target_topic_;
-  std::string heading_hold_enable_topic_;
-  std::string state_topic_;
-
-  // Params
-  double publish_rate_hz_{30.0};
-  double odom_timeout_sec_{0.30};
-  double base_cmd_timeout_sec_{0.30};
-  bool zero_on_stale_odom_{true};
-  bool zero_linear_on_stale_base_cmd_{true};
-
-  bool enable_linear_passthrough_{true};
-  bool passthrough_wz_when_disabled_{false};
-  bool capture_hold_target_on_enable_{true};
-  bool require_target_or_hold_{true};
-  bool zero_wz_when_within_tolerance_{true};
-
-  bool use_fixed_linear_cmd_{false};
-  double fixed_vx_m_s_{0.0};
-  double fixed_vy_m_s_{0.0};
-
-  double out_vx_max_abs_{0.30};
-  double out_vy_max_abs_{0.20};
-  double out_wz_max_abs_{1.20};
-
-  // Runtime state
-  OdomState odom_{};
-  TwistState base_cmd_{};
-
-  HeadingController heading_ctrl_{};
-  bool heading_hold_enabled_{false};
-
-  bool has_heading_target_cmd_{false};
-  double last_heading_target_rad_{0.0};
-  rclcpp::Time heading_target_stamp_{0, 0, RCL_ROS_TIME};
-
-  rclcpp::Time prev_loop_time_{0, 0, RCL_ROS_TIME};
-  bool has_prev_loop_time_{false};
-
-  std::string last_state_str_;
 };
 
 }  // namespace savo_control
@@ -542,8 +542,7 @@ private:
 int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
-  auto node = std::make_shared<savo_control::HeadingPidNode>();
-  rclcpp::spin(node);
+  rclcpp::spin(std::make_shared<savo_control::HeadingPidNode>());
   rclcpp::shutdown();
   return 0;
 }

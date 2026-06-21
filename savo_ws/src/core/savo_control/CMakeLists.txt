@@ -158,14 +158,19 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/scripts")
 endif()
 
 if(BUILD_TESTING)
-  find_package(ament_lint_auto REQUIRED)
-  ament_lint_auto_find_test_dependencies()
-
   find_package(ament_cmake_pytest REQUIRED)
+  find_package(ament_cmake_cppcheck REQUIRED)
+  find_package(ament_cmake_lint_cmake REQUIRED)
+  find_package(ament_cmake_uncrustify REQUIRED)
+  find_package(ament_cmake_xmllint REQUIRED)
 
-  function(add_pytest_if_exists test_name test_path)
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${test_path}")
-      ament_add_pytest_test(${test_name} ${test_path})
+  function(add_pytest_if_exists test_name test_file)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${test_file}")
+      ament_add_pytest_test(${test_name}
+        "${CMAKE_CURRENT_SOURCE_DIR}/${test_file}"
+        APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}
+        TIMEOUT 60
+      )
     endif()
   endfunction()
 
@@ -214,6 +219,11 @@ if(BUILD_TESTING)
   add_pytest_if_exists(test_health_helpers test/test_health_helpers.py)
   add_pytest_if_exists(test_topic_probe test/test_topic_probe.py)
   add_pytest_if_exists(test_file_utils test/test_file_utils.py)
+
+  ament_cppcheck()
+  ament_lint_cmake()
+  ament_uncrustify()
+  ament_xmllint()
 endif()
 
 ament_package()

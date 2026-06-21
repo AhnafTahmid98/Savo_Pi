@@ -212,7 +212,9 @@ public:
     return request_mode(request);
   }
 
-  bool request_mode(const std::string & mode_text, const double now_s, const std::string & source = "request")
+  bool request_mode(
+    const std::string & mode_text, const double now_s,
+    const std::string & source = "request")
   {
     ControlMode parsed = config_.fallback_mode;
     const bool parsed_ok = try_parse_control_mode(mode_text, parsed);
@@ -302,7 +304,9 @@ public:
       return state_.mode;
     }
 
-    if (state_.recovery_active && config_.recovery_active_forces_recovery && config_.allow_recovery) {
+    if (state_.recovery_active && config_.recovery_active_forces_recovery &&
+      config_.allow_recovery)
+    {
       set_mode(ControlMode::RECOVERY, ControlModeReason::RECOVERY_ACTIVE, "recovery");
       return state_.mode;
     }

@@ -1,7 +1,6 @@
-// header-only — implementation in command_limiter.hpp.
-
 #include "savo_control/command_limiter.hpp"
 
-namespace savo_control
-{
-}  // namespace savo_control
+// CommandLimiter is implemented inline in the public header.
+//
+// This translation unit is intentionally kept so existing CMake targets and
+// library layout stay stable while avoiding a second command-limiter implementation.

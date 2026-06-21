@@ -1,10 +1,6 @@
-// Production front-distance approach controller.
-
 #include <algorithm>
 #include <chrono>
 #include <cmath>
-#include <iomanip>
-#include <limits>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -16,7 +12,36 @@
 #include "std_msgs/msg/float64.hpp"
 #include "std_msgs/msg/string.hpp"
 
+#include "savo_control/distance_pid.hpp"
 #include "savo_control/topic_names.hpp"
+
+namespace
+{
+
+double now_seconds(const rclcpp::Node & node)
+{
+  return node.get_clock()->now().seconds();
+}
+
+std_msgs::msg::String string_msg(const std::string & value)
+{
+  std_msgs::msg::String msg;
+  msg.data = value;
+  return msg;
+}
+
+geometry_msgs::msg::Twist zero_twist()
+{
+  geometry_msgs::msg::Twist msg;
+  return msg;
+}
+
+const char * bool_text(const bool value)
+{
+  return value ? "true" : "false";
+}
+
+}  // namespace
 
 namespace savo_control
 {
@@ -27,620 +52,465 @@ public:
   DistanceApproachNode()
   : Node("distance_approach_node")
   {
-    load_parameters_();
-    sanitize_parameters_();
+    declare_parameters();
+    load_parameters();
 
-    cmd_pub_ = this->create_publisher<geometry_msgs::msg::Twist>(
-      cmd_vel_out_topic_, rclcpp::QoS(10));
+    controller_.set_config(make_config());
 
-    mode_pub_ = this->create_publisher<std_msgs::msg::String>(
-      mode_cmd_topic_, rclcpp::QoS(10));
+    cmd_pub_ = create_publisher<geometry_msgs::msg::Twist>(cmd_vel_out_topic_, 10);
+    mode_cmd_pub_ = create_publisher<std_msgs::msg::String>(mode_cmd_topic_, 10);
+    state_pub_ = create_publisher<std_msgs::msg::String>(state_topic_, 10);
+    status_pub_ = create_publisher<std_msgs::msg::String>(status_topic_, 10);
 
-    status_pub_ = this->create_publisher<std_msgs::msg::String>(
-      status_topic_, rclcpp::QoS(10));
+    distance_sub_ = create_subscription<std_msgs::msg::Float32>(
+      distance_topic_,
+      10,
+      [this](const std_msgs::msg::Float32::SharedPtr msg) {
+        latest_distance_m_ = static_cast<double>(msg->data);
+        distance_stamp_s_ = now_seconds(*this);
+        have_distance_ = true;
+      });
 
-    distance_sub_f32_ = this->create_subscription<std_msgs::msg::Float32>(
-      distance_topic_, rclcpp::QoS(10),
-      std::bind(&DistanceApproachNode::on_distance_f32_, this, std::placeholders::_1));
+    enable_sub_ = create_subscription<std_msgs::msg::Bool>(
+      enable_topic_,
+      10,
+      [this](const std_msgs::msg::Bool::SharedPtr msg) {
+        const bool was_enabled = active_;
+        active_ = msg->data;
 
-    distance_sub_f64_ = this->create_subscription<std_msgs::msg::Float64>(
-      distance_topic_, rclcpp::QoS(10),
-      std::bind(&DistanceApproachNode::on_distance_f64_, this, std::placeholders::_1));
+        if (active_ && !was_enabled) {
+          active_start_s_ = now_seconds(*this);
+          last_update_s_ = active_start_s_;
+          controller_.reset();
 
-    safety_stop_sub_ = this->create_subscription<std_msgs::msg::Bool>(
-      safety_stop_topic_, rclcpp::QoS(10),
-      std::bind(&DistanceApproachNode::on_safety_stop_, this, std::placeholders::_1));
+          if (request_auto_mode_on_enable_) {
+            mode_cmd_pub_->publish(string_msg("AUTO"));
+          }
+        }
 
-    enable_sub_ = this->create_subscription<std_msgs::msg::Bool>(
-      enable_topic_, rclcpp::QoS(10),
-      std::bind(&DistanceApproachNode::on_enable_, this, std::placeholders::_1));
+        if (!active_) {
+          controller_.reset();
+          publish_zero("disabled_by_command", now_seconds(*this));
+        }
+      });
 
-    target_sub_ = this->create_subscription<std_msgs::msg::Float64>(
-      target_topic_, rclcpp::QoS(10),
-      std::bind(&DistanceApproachNode::on_target_, this, std::placeholders::_1));
+    target_sub_ = create_subscription<std_msgs::msg::Float64>(
+      target_topic_,
+      10,
+      [this](const std_msgs::msg::Float64::SharedPtr msg) {
+        target_distance_m_ = std::max(0.0, ControlMath::finite_or_zero(msg->data));
+        controller_.set_target_distance(target_distance_m_);
 
-    if (!enabled_) {
-      state_ = "DISABLED";
-    } else if (auto_start_) {
-      start_approach_();
-    }
+        if (auto_enable_on_target_) {
+          active_ = true;
+          active_start_s_ = now_seconds(*this);
+          last_update_s_ = active_start_s_;
 
-    const auto period = std::chrono::duration_cast<std::chrono::nanoseconds>(
-      std::chrono::duration<double>(1.0 / loop_hz_));
+          if (request_auto_mode_on_enable_) {
+            mode_cmd_pub_->publish(string_msg("AUTO"));
+          }
+        }
+      });
 
-    timer_ = this->create_wall_timer(
-      period,
-      std::bind(&DistanceApproachNode::on_timer_, this));
+    safety_stop_sub_ = create_subscription<std_msgs::msg::Bool>(
+      safety_stop_topic_,
+      10,
+      [this](const std_msgs::msg::Bool::SharedPtr msg) {
+        safety_stop_ = msg->data;
+        safety_stop_seen_ = true;
+        safety_stop_stamp_s_ = now_seconds(*this);
+
+        if (safety_stop_) {
+          controller_.reset();
+        }
+      });
+
+    timer_ = create_wall_timer(
+      std::chrono::duration<double>(1.0 / publish_hz_),
+      [this]() {
+        on_timer();
+      });
 
     RCLCPP_INFO(
-      this->get_logger(),
-      "distance_approach_node started | distance=%s | output=%s | target=%.2f m",
+      get_logger(),
+      "distance_approach_node started | distance=%s cmd_out=%s target=%.3f",
       distance_topic_.c_str(),
       cmd_vel_out_topic_.c_str(),
       target_distance_m_);
   }
 
-  ~DistanceApproachNode() override
-  {
-    publish_zero_();
-  }
-
 private:
-  struct PidState
+  void declare_parameters()
   {
-    double integral{0.0};
-    double previous_error{0.0};
-    double derivative_filtered{0.0};
-    rclcpp::Time previous_time{};
-    bool has_previous{false};
-  };
+    declare_parameter<double>("publish_hz", 20.0);
+    declare_parameter<double>("input_timeout_s", 0.50);
 
-  void load_parameters_()
-  {
-    enabled_ = this->declare_parameter<bool>("enabled", true);
-    auto_start_ = this->declare_parameter<bool>("auto_start", false);
+    declare_parameter<bool>("enabled", true);
+    declare_parameter<bool>("start_active", false);
+    declare_parameter<bool>("auto_enable_on_target", false);
+    declare_parameter<bool>("auto_disable_when_goal_reached", false);
+    declare_parameter<bool>("safety_stop_blocks_motion", true);
+    declare_parameter<bool>("publish_zero_when_inactive", true);
+    declare_parameter<bool>("request_auto_mode_on_enable", true);
 
-    distance_topic_ = this->declare_parameter<std::string>(
-      "distance_topic", topic_names::kDepthMinFront);
-    cmd_vel_out_topic_ = this->declare_parameter<std::string>(
-      "cmd_vel_out_topic", topic_names::kCmdVelAuto);
-    mode_cmd_topic_ = this->declare_parameter<std::string>(
-      "mode_cmd_topic", topic_names::kControlModeCmd);
-    safety_stop_topic_ = this->declare_parameter<std::string>(
-      "safety_stop_topic", topic_names::kSafetyStop);
-    status_topic_ = this->declare_parameter<std::string>(
-      "status_topic", "/savo_control/distance_approach_status");
+    declare_parameter<double>("target_distance_m", 0.60);
+    declare_parameter<double>("tolerance_m", 0.04);
+    declare_parameter<double>("hard_min_distance_m", 0.35);
+    declare_parameter<double>("min_valid_distance_m", 0.05);
+    declare_parameter<double>("max_valid_distance_m", 3.00);
 
-    enable_topic_ = this->declare_parameter<std::string>(
-      "enable_topic", "/savo_control/distance_approach_enable");
-    target_topic_ = this->declare_parameter<std::string>(
-      "target_topic", "/savo_control/distance_approach_target");
+    declare_parameter<double>("kp", 0.45);
+    declare_parameter<double>("ki", 0.0);
+    declare_parameter<double>("kd", 0.03);
 
-    request_auto_mode_on_start_ = this->declare_parameter<bool>(
-      "request_auto_mode_on_start", true);
-    required_mode_ = this->declare_parameter<std::string>("required_mode", "AUTO");
+    declare_parameter<double>("max_forward_vx", 0.10);
+    declare_parameter<bool>("allow_reverse", false);
+    declare_parameter<double>("max_reverse_vx", 0.05);
 
-    stop_on_goal_ = this->declare_parameter<bool>("stop_on_goal", true);
-    stop_if_too_close_ = this->declare_parameter<bool>("stop_if_too_close", true);
-    start_on_target_update_ = this->declare_parameter<bool>(
-      "start_on_target_update", false);
+    declare_parameter<double>("min_vx_when_active", 0.04);
+    declare_parameter<double>("disable_min_vx_below_error_m", 0.08);
+    declare_parameter<double>("output_deadband_m_s", 0.0);
 
-    target_distance_m_ = this->declare_parameter<double>("target_distance_m", 0.60);
-    tolerance_m_ = this->declare_parameter<double>("tolerance_m", 0.04);
-    hold_time_s_ = this->declare_parameter<double>("hold_time_s", 0.40);
-    hard_min_distance_m_ = this->declare_parameter<double>("hard_min_distance_m", 0.35);
+    declare_parameter<double>("min_dt_sec", 1.0e-4);
+    declare_parameter<double>("max_dt_sec", 0.50);
+    declare_parameter<double>("max_duration_s", 10.0);
 
-    min_valid_distance_m_ = this->declare_parameter<double>("min_valid_distance_m", 0.05);
-    max_valid_distance_m_ = this->declare_parameter<double>("max_valid_distance_m", 3.00);
-    distance_timeout_s_ = this->declare_parameter<double>("distance_timeout_s", 0.40);
-
-    smoothing_enabled_ = this->declare_parameter<bool>("smoothing_enabled", true);
-    smoothing_alpha_ = this->declare_parameter<double>("smoothing_alpha", 0.45);
-
-    kp_ = this->declare_parameter<double>("kp", 0.45);
-    ki_ = this->declare_parameter<double>("ki", 0.00);
-    kd_ = this->declare_parameter<double>("kd", 0.03);
-
-    integral_limit_ = this->declare_parameter<double>("integral_limit", 0.15);
-    integral_active_error_m_ = this->declare_parameter<double>(
-      "integral_active_error_m", 0.20);
-    derivative_filter_alpha_ = this->declare_parameter<double>(
-      "derivative_filter_alpha", 0.35);
-
-    max_forward_vx_ = this->declare_parameter<double>("max_forward_vx", 0.10);
-    allow_reverse_ = this->declare_parameter<bool>("allow_reverse", false);
-    max_reverse_vx_ = this->declare_parameter<double>("max_reverse_vx", 0.05);
-
-    min_vx_when_active_ = this->declare_parameter<double>("min_vx_when_active", 0.04);
-    disable_min_vx_below_error_m_ = this->declare_parameter<double>(
-      "disable_min_vx_below_error_m", 0.08);
-
-    loop_hz_ = this->declare_parameter<double>("loop_hz", 30.0);
-    timeout_s_ = this->declare_parameter<double>("timeout_s", 10.0);
-    stop_hold_s_ = this->declare_parameter<double>("stop_hold_s", 0.50);
-    shutdown_zero_count_ = this->declare_parameter<int>("shutdown_zero_count", 5);
-
-    respect_safety_stop_ = this->declare_parameter<bool>("respect_safety_stop", true);
-    zero_on_invalid_distance_ = this->declare_parameter<bool>(
-      "zero_on_invalid_distance", true);
-    zero_on_distance_timeout_ = this->declare_parameter<bool>(
-      "zero_on_distance_timeout", true);
-
-    publish_status_ = this->declare_parameter<bool>("publish_status", true);
-    status_hz_ = this->declare_parameter<double>("status_hz", 5.0);
-    log_throttle_s_ = this->declare_parameter<double>("log_throttle_s", 2.0);
+    declare_parameter<std::string>("distance_topic", topics::DEPTH_MIN_FRONT);
+    declare_parameter<std::string>("enable_topic", topics::DISTANCE_TEST_ENABLE);
+    declare_parameter<std::string>("target_topic", topics::DISTANCE_TEST_TARGET);
+    declare_parameter<std::string>("cmd_vel_out_topic", topics::CMD_VEL_AUTO);
+    declare_parameter<std::string>("mode_cmd_topic", topics::CONTROL_MODE_CMD);
+    declare_parameter<std::string>("safety_stop_topic", topics::SAFETY_STOP);
+    declare_parameter<std::string>("state_topic", topics::DISTANCE_TEST_STATE);
+    declare_parameter<std::string>("status_topic", "/savo_control/distance_approach_status");
   }
 
-  void sanitize_parameters_()
+  void load_parameters()
   {
-    loop_hz_ = std::clamp(loop_hz_, 1.0, 100.0);
-    status_hz_ = std::clamp(status_hz_, 0.2, 30.0);
+    publish_hz_ = positive_param("publish_hz", 20.0);
+    input_timeout_s_ = nonnegative_param("input_timeout_s", 0.50);
 
-    target_distance_m_ = std::max(0.05, target_distance_m_);
-    tolerance_m_ = std::max(0.005, tolerance_m_);
-    hold_time_s_ = std::max(0.0, hold_time_s_);
-    hard_min_distance_m_ = std::max(0.01, hard_min_distance_m_);
+    enabled_ = get_parameter("enabled").as_bool();
+    active_ = get_parameter("start_active").as_bool();
+    auto_enable_on_target_ = get_parameter("auto_enable_on_target").as_bool();
+    auto_disable_when_goal_reached_ =
+      get_parameter("auto_disable_when_goal_reached").as_bool();
+    safety_stop_blocks_motion_ = get_parameter("safety_stop_blocks_motion").as_bool();
+    publish_zero_when_inactive_ = get_parameter("publish_zero_when_inactive").as_bool();
+    request_auto_mode_on_enable_ = get_parameter("request_auto_mode_on_enable").as_bool();
 
-    min_valid_distance_m_ = std::max(0.01, min_valid_distance_m_);
-    max_valid_distance_m_ = std::max(min_valid_distance_m_ + 0.01, max_valid_distance_m_);
-    distance_timeout_s_ = std::max(0.05, distance_timeout_s_);
+    target_distance_m_ = nonnegative_param("target_distance_m", 0.60);
+    tolerance_m_ = nonnegative_param("tolerance_m", 0.04);
+    hard_min_distance_m_ = nonnegative_param("hard_min_distance_m", 0.35);
+    min_valid_distance_m_ = nonnegative_param("min_valid_distance_m", 0.05);
+    max_valid_distance_m_ = nonnegative_param("max_valid_distance_m", 3.00);
+    if (max_valid_distance_m_ < min_valid_distance_m_) {
+      max_valid_distance_m_ = min_valid_distance_m_;
+    }
 
-    smoothing_alpha_ = std::clamp(smoothing_alpha_, 0.0, 1.0);
-    derivative_filter_alpha_ = std::clamp(derivative_filter_alpha_, 0.0, 1.0);
+    kp_ = finite_param("kp", 0.45);
+    ki_ = finite_param("ki", 0.0);
+    kd_ = finite_param("kd", 0.03);
 
-    integral_limit_ = std::abs(integral_limit_);
-    integral_active_error_m_ = std::abs(integral_active_error_m_);
+    max_forward_vx_ = nonnegative_param("max_forward_vx", 0.10);
+    allow_reverse_ = get_parameter("allow_reverse").as_bool();
+    max_reverse_vx_ = nonnegative_param("max_reverse_vx", 0.05);
 
-    max_forward_vx_ = std::abs(max_forward_vx_);
-    max_reverse_vx_ = std::abs(max_reverse_vx_);
-    min_vx_when_active_ = std::abs(min_vx_when_active_);
-    disable_min_vx_below_error_m_ = std::abs(disable_min_vx_below_error_m_);
+    min_vx_when_active_ = nonnegative_param("min_vx_when_active", 0.04);
+    disable_min_vx_below_error_m_ =
+      nonnegative_param("disable_min_vx_below_error_m", 0.08);
+    output_deadband_m_s_ = nonnegative_param("output_deadband_m_s", 0.0);
 
-    timeout_s_ = std::max(0.1, timeout_s_);
-    stop_hold_s_ = std::max(0.0, stop_hold_s_);
-    shutdown_zero_count_ = std::max(1, shutdown_zero_count_);
-    log_throttle_s_ = std::max(0.1, log_throttle_s_);
+    min_dt_sec_ = positive_param("min_dt_sec", 1.0e-4);
+    max_dt_sec_ = positive_param("max_dt_sec", 0.50);
+    if (max_dt_sec_ < min_dt_sec_) {
+      max_dt_sec_ = min_dt_sec_;
+    }
+
+    max_duration_s_ = positive_param("max_duration_s", 10.0);
+
+    distance_topic_ = get_parameter("distance_topic").as_string();
+    enable_topic_ = get_parameter("enable_topic").as_string();
+    target_topic_ = get_parameter("target_topic").as_string();
+    cmd_vel_out_topic_ = get_parameter("cmd_vel_out_topic").as_string();
+    mode_cmd_topic_ = get_parameter("mode_cmd_topic").as_string();
+    safety_stop_topic_ = get_parameter("safety_stop_topic").as_string();
+    state_topic_ = get_parameter("state_topic").as_string();
+    status_topic_ = get_parameter("status_topic").as_string();
+
+    active_start_s_ = 0.0;
+    last_update_s_ = 0.0;
   }
 
-  void on_distance_f32_(const std_msgs::msg::Float32::SharedPtr msg)
+  DistanceControllerConfig make_config() const
   {
-    if (msg) {
-      update_distance_(static_cast<double>(msg->data));
-    }
+    DistanceControllerConfig config;
+
+    config.target_distance_m = target_distance_m_;
+    config.tolerance_m = tolerance_m_;
+    config.hard_min_distance_m = hard_min_distance_m_;
+
+    config.min_valid_distance_m = min_valid_distance_m_;
+    config.max_valid_distance_m = max_valid_distance_m_;
+    config.distance_timeout_s = input_timeout_s_;
+
+    config.kp = kp_;
+    config.ki = ki_;
+    config.kd = kd_;
+
+    config.max_forward_vx = max_forward_vx_;
+    config.allow_reverse = allow_reverse_;
+    config.max_reverse_vx = max_reverse_vx_;
+
+    config.min_vx_when_active = min_vx_when_active_;
+    config.disable_min_vx_below_error_m = disable_min_vx_below_error_m_;
+    config.output_deadband_m_s = output_deadband_m_s_;
+
+    config.min_dt_sec = min_dt_sec_;
+    config.max_dt_sec = max_dt_sec_;
+
+    return config.sanitized();
   }
 
-  void on_distance_f64_(const std_msgs::msg::Float64::SharedPtr msg)
+  void on_timer()
   {
-    if (msg) {
-      update_distance_(msg->data);
-    }
-  }
+    const double now_s = now_seconds(*this);
 
-  void on_safety_stop_(const std_msgs::msg::Bool::SharedPtr msg)
-  {
-    if (msg) {
-      safety_stop_active_ = msg->data;
-    }
-  }
-
-  void on_enable_(const std_msgs::msg::Bool::SharedPtr msg)
-  {
-    if (!msg) {
-      return;
-    }
-
-    if (msg->data) {
-      start_approach_();
-      return;
-    }
-
-    state_ = "IDLE";
-    pid_ = PidState{};
-    publish_zero_();
-    publish_status_(true);
-  }
-
-  void on_target_(const std_msgs::msg::Float64::SharedPtr msg)
-  {
-    if (!msg || !std::isfinite(msg->data) || msg->data <= 0.0) {
-      throttled_warn_("Ignored invalid distance target");
-      return;
-    }
-
-    target_distance_m_ = msg->data;
-    pid_ = PidState{};
-    goal_entered_ = false;
-
-    if (start_on_target_update_) {
-      start_approach_();
-    }
-  }
-
-  void update_distance_(double distance_m)
-  {
-    const auto now = this->now();
-    last_distance_stamp_ = now;
-    have_distance_msg_ = true;
-
-    if (!is_valid_distance_(distance_m)) {
-      distance_valid_ = false;
-      latest_distance_m_ = std::numeric_limits<double>::quiet_NaN();
-      state_ = "SENSOR_INVALID";
-      throttled_warn_("Invalid distance reading");
-      return;
-    }
-
-    distance_valid_ = true;
-    latest_distance_m_ = distance_m;
-
-    if (!have_filtered_distance_ || !smoothing_enabled_) {
-      filtered_distance_m_ = distance_m;
-      have_filtered_distance_ = true;
-      return;
-    }
-
-    filtered_distance_m_ =
-      smoothing_alpha_ * distance_m + (1.0 - smoothing_alpha_) * filtered_distance_m_;
-  }
-
-  void on_timer_()
-  {
     if (!enabled_) {
-      state_ = "DISABLED";
-      publish_zero_();
-      publish_status_(false);
+      active_ = false;
+      publish_zero("disabled", now_s);
       return;
     }
 
-    if (state_ == "IDLE") {
-      publish_zero_();
-      publish_status_(false);
-      return;
-    }
-
-    if (respect_safety_stop_ && safety_stop_active_) {
-      state_ = "SAFETY_STOP";
-      publish_zero_();
-      publish_status_(false);
-      return;
-    }
-
-    double distance_m = 0.0;
-    if (!get_current_distance_(distance_m)) {
-      publish_status_(false);
-      return;
-    }
-
-    if (has_timed_out_()) {
-      state_ = "TIMEOUT";
-      publish_zero_();
-      publish_status_(false);
-      throttled_warn_("Distance approach timed out");
-      return;
-    }
-
-    if (stop_if_too_close_ && distance_m < hard_min_distance_m_) {
-      state_ = "STOPPED_TOO_CLOSE";
-      publish_zero_();
-      publish_status_(false);
-      throttled_warn_("Distance below hard minimum");
-      return;
-    }
-
-    const double error_m = distance_m - target_distance_m_;
-
-    if (stop_on_goal_ && std::abs(error_m) <= tolerance_m_) {
-      if (!goal_entered_) {
-        goal_entered_ = true;
-        goal_enter_stamp_ = this->now();
+    if (!active_) {
+      if (publish_zero_when_inactive_) {
+        publish_zero("inactive", now_s);
       }
-
-      if ((this->now() - goal_enter_stamp_).seconds() >= hold_time_s_) {
-        state_ = "GOAL_REACHED";
-        publish_zero_();
-        publish_status_(false);
-        return;
-      }
-    } else {
-      goal_entered_ = false;
+      return;
     }
 
-    state_ = "RUNNING";
-    last_cmd_vx_ = compute_pid_vx_(error_m);
-    publish_cmd_(last_cmd_vx_);
-    publish_status_(false);
+    if (active_start_s_ <= 0.0) {
+      active_start_s_ = now_s;
+      last_update_s_ = now_s;
+    }
+
+    if ((now_s - active_start_s_) > max_duration_s_) {
+      active_ = false;
+      controller_.reset();
+      publish_zero("timeout", now_s);
+      return;
+    }
+
+    if (safety_stop_blocks_motion_ && safety_stop_active(now_s)) {
+      controller_.reset();
+      publish_zero("safety_stop", now_s);
+      return;
+    }
+
+    if (!distance_fresh(now_s)) {
+      controller_.reset();
+      publish_zero("distance_stale", now_s);
+      return;
+    }
+
+    double dt_s = now_s - last_update_s_;
+    if (!std::isfinite(dt_s) || dt_s <= 0.0) {
+      dt_s = min_dt_sec_;
+    }
+    dt_s = std::clamp(dt_s, min_dt_sec_, max_dt_sec_);
+    last_update_s_ = now_s;
+
+    controller_.set_config(make_config());
+
+    const DistanceControllerResult result =
+      controller_.update(latest_distance_m_, dt_s);
+
+    geometry_msgs::msg::Twist cmd = zero_twist();
+
+    if (result.valid && !result.within_tolerance && !result.hard_min_stop) {
+      cmd.linear.x = result.vx_cmd_m_s;
+    }
+
+    if (result.within_tolerance && auto_disable_when_goal_reached_) {
+      active_ = false;
+      controller_.reset();
+    }
+
+    cmd_pub_->publish(cmd);
+    publish_state_and_status(result, cmd, "tracking", now_s);
   }
 
-  void start_approach_()
+  void publish_zero(const std::string & reason, const double now_s)
   {
-    if (!enabled_) {
-      state_ = "DISABLED";
+    const geometry_msgs::msg::Twist cmd = zero_twist();
+    cmd_pub_->publish(cmd);
+
+    DistanceControllerResult result;
+    result.valid = false;
+    result.distance_valid = distance_fresh(now_s);
+    result.distance_m = latest_distance_m_;
+    result.target_distance_m = target_distance_m_;
+    result.error_m = latest_distance_m_ - target_distance_m_;
+    result.reason = reason;
+
+    publish_state_and_status(result, cmd, reason, now_s);
+  }
+
+  void publish_state_and_status(
+    const DistanceControllerResult & result,
+    const geometry_msgs::msg::Twist & cmd,
+    const std::string & reason,
+    const double now_s)
+  {
+    std::ostringstream state;
+    state << "active=" << bool_text(active_)
+          << "; reason=" << reason
+          << "; target_m=" << target_distance_m_;
+
+    state_pub_->publish(string_msg(state.str()));
+
+    if (!publish_status_enabled_) {
       return;
     }
 
-    pid_ = PidState{};
-    started_stamp_ = this->now();
-    have_started_stamp_ = true;
-    goal_entered_ = false;
-    state_ = "RUNNING";
+    std::ostringstream status;
+    status << "active=" << bool_text(active_)
+           << "; enabled=" << bool_text(enabled_)
+           << "; have_distance=" << bool_text(have_distance_)
+           << "; distance_fresh=" << bool_text(distance_fresh(now_s))
+           << "; safety_stop=" << bool_text(safety_stop_active(now_s))
+           << "; valid=" << bool_text(result.valid)
+           << "; distance_valid=" << bool_text(result.distance_valid)
+           << "; within_tolerance=" << bool_text(result.within_tolerance)
+           << "; hard_min_stop=" << bool_text(result.hard_min_stop)
+           << "; reverse_blocked=" << bool_text(result.reverse_blocked)
+           << "; reason=" << reason
+           << "; distance_m=" << latest_distance_m_
+           << "; target_m=" << target_distance_m_
+           << "; error_m=" << result.error_m
+           << "; vx_cmd=" << cmd.linear.x
+           << "; now_s=" << now_s;
 
-    if (request_auto_mode_on_start_) {
-      std_msgs::msg::String msg;
-      msg.data = required_mode_;
-      mode_pub_->publish(msg);
-    }
-
-    publish_status_(true);
+    status_pub_->publish(string_msg(status.str()));
   }
 
-  bool get_current_distance_(double & distance_m)
+  bool distance_fresh(const double now_s) const
   {
-    if (!have_distance_msg_) {
-      state_ = "SENSOR_STALE";
-      if (zero_on_distance_timeout_) {
-        publish_zero_();
-      }
-      throttled_warn_("No distance data received");
+    if (!have_distance_) {
       return false;
     }
 
-    if ((this->now() - last_distance_stamp_).seconds() > distance_timeout_s_) {
-      state_ = "SENSOR_STALE";
-      if (zero_on_distance_timeout_) {
-        publish_zero_();
-      }
-      throttled_warn_("Distance data stale");
+    if (input_timeout_s_ <= 0.0) {
+      return true;
+    }
+
+    return (now_s - distance_stamp_s_) <= input_timeout_s_;
+  }
+
+  bool safety_stop_active(const double now_s) const
+  {
+    if (!safety_stop_seen_) {
       return false;
     }
 
-    if (!distance_valid_ || !have_filtered_distance_) {
-      state_ = "SENSOR_INVALID";
-      if (zero_on_invalid_distance_) {
-        publish_zero_();
-      }
+    if (input_timeout_s_ > 0.0 && (now_s - safety_stop_stamp_s_) > input_timeout_s_) {
       return false;
     }
 
-    if (!is_valid_distance_(filtered_distance_m_)) {
-      state_ = "SENSOR_INVALID";
-      if (zero_on_invalid_distance_) {
-        publish_zero_();
-      }
-      return false;
-    }
-
-    distance_m = filtered_distance_m_;
-    return true;
+    return safety_stop_;
   }
 
-  bool has_timed_out_() const
+  double finite_param(const std::string & name, const double fallback) const
   {
-    if (!have_started_stamp_) {
-      return false;
-    }
-
-    return (this->now() - started_stamp_).seconds() > timeout_s_;
+    const double value = get_parameter(name).as_double();
+    return std::isfinite(value) ? value : fallback;
   }
 
-  double compute_pid_vx_(double error_m)
+  double positive_param(const std::string & name, const double fallback) const
   {
-    const auto now = this->now();
-    double dt = 1.0 / loop_hz_;
-
-    if (pid_.has_previous) {
-      dt = std::max(1.0e-4, (now - pid_.previous_time).seconds());
+    const double value = get_parameter(name).as_double();
+    if (!std::isfinite(value) || value <= 0.0) {
+      return fallback;
     }
 
-    if (std::abs(error_m) <= integral_active_error_m_) {
-      pid_.integral += error_m * dt;
-      pid_.integral = std::clamp(pid_.integral, -integral_limit_, integral_limit_);
-    } else {
-      pid_.integral = 0.0;
-    }
-
-    double derivative = 0.0;
-    if (pid_.has_previous) {
-      derivative = (error_m - pid_.previous_error) / dt;
-    }
-
-    pid_.derivative_filtered =
-      derivative_filter_alpha_ * derivative +
-      (1.0 - derivative_filter_alpha_) * pid_.derivative_filtered;
-
-    const double raw =
-      kp_ * error_m +
-      ki_ * pid_.integral +
-      kd_ * pid_.derivative_filtered;
-
-    pid_.previous_error = error_m;
-    pid_.previous_time = now;
-    pid_.has_previous = true;
-
-    double vx = 0.0;
-    if (raw >= 0.0) {
-      vx = std::min(raw, max_forward_vx_);
-    } else if (allow_reverse_) {
-      vx = std::max(raw, -max_reverse_vx_);
-    }
-
-    if (
-      vx > 0.0 &&
-      std::abs(error_m) > disable_min_vx_below_error_m_ &&
-      vx < min_vx_when_active_)
-    {
-      vx = min_vx_when_active_;
-    }
-
-    return safe_float_(vx);
-  }
-
-  void publish_cmd_(double vx)
-  {
-    geometry_msgs::msg::Twist msg;
-    msg.linear.x = safe_float_(vx);
-    cmd_pub_->publish(msg);
-  }
-
-  void publish_zero_()
-  {
-    publish_cmd_(0.0);
-    last_cmd_vx_ = 0.0;
-  }
-
-  void publish_status_(bool force)
-  {
-    if (!publish_status_) {
-      return;
-    }
-
-    const auto now = this->now();
-    const double period_s = 1.0 / status_hz_;
-
-    if (
-      !force &&
-      have_last_status_stamp_ &&
-      (now - last_status_stamp_).seconds() < period_s)
-    {
-      return;
-    }
-
-    have_last_status_stamp_ = true;
-    last_status_stamp_ = now;
-
-    std_msgs::msg::String msg;
-    std::ostringstream out;
-    out << std::fixed << std::setprecision(3);
-    out << "state=" << state_;
-    out << "; distance_m=";
-
-    if (have_filtered_distance_ && distance_valid_) {
-      out << filtered_distance_m_;
-    } else {
-      out << "nan";
-    }
-
-    out << "; target_m=" << target_distance_m_;
-    out << "; vx=" << last_cmd_vx_;
-    out << "; safety_stop=" << (safety_stop_active_ ? "true" : "false");
-
-    msg.data = out.str();
-    status_pub_->publish(msg);
-  }
-
-  bool is_valid_distance_(double distance_m) const
-  {
-    return (
-      std::isfinite(distance_m) &&
-      distance_m >= min_valid_distance_m_ &&
-      distance_m <= max_valid_distance_m_);
-  }
-
-  double safe_float_(double value) const
-  {
-    if (!std::isfinite(value)) {
-      return 0.0;
-    }
     return value;
   }
 
-  void throttled_warn_(const std::string & text)
+  double nonnegative_param(const std::string & name, const double fallback) const
   {
-    const auto now = this->now();
-    if (
-      !have_last_log_stamp_ ||
-      (now - last_log_stamp_).seconds() >= log_throttle_s_)
-    {
-      have_last_log_stamp_ = true;
-      last_log_stamp_ = now;
-      RCLCPP_WARN(this->get_logger(), "%s", text.c_str());
+    const double value = get_parameter(name).as_double();
+    if (!std::isfinite(value) || value < 0.0) {
+      return fallback;
     }
+
+    return value;
   }
 
-  bool enabled_{true};
-  bool auto_start_{false};
-  bool request_auto_mode_on_start_{true};
-  bool stop_on_goal_{true};
-  bool stop_if_too_close_{true};
-  bool start_on_target_update_{false};
-  bool smoothing_enabled_{true};
-  bool allow_reverse_{false};
-  bool respect_safety_stop_{true};
-  bool zero_on_invalid_distance_{true};
-  bool zero_on_distance_timeout_{true};
-  bool publish_status_{true};
+  double publish_hz_{20.0};
+  double input_timeout_s_{0.50};
 
-  std::string distance_topic_{topic_names::kDepthMinFront};
-  std::string cmd_vel_out_topic_{topic_names::kCmdVelAuto};
-  std::string mode_cmd_topic_{topic_names::kControlModeCmd};
-  std::string safety_stop_topic_{topic_names::kSafetyStop};
-  std::string status_topic_{"/savo_control/distance_approach_status"};
-  std::string enable_topic_{"/savo_control/distance_approach_enable"};
-  std::string target_topic_{"/savo_control/distance_approach_target"};
-  std::string required_mode_{"AUTO"};
+  bool enabled_{true};
+  bool active_{false};
+  bool auto_enable_on_target_{false};
+  bool auto_disable_when_goal_reached_{false};
+  bool safety_stop_blocks_motion_{true};
+  bool publish_zero_when_inactive_{true};
+  bool request_auto_mode_on_enable_{true};
+  bool publish_status_enabled_{true};
 
   double target_distance_m_{0.60};
   double tolerance_m_{0.04};
-  double hold_time_s_{0.40};
   double hard_min_distance_m_{0.35};
-
   double min_valid_distance_m_{0.05};
   double max_valid_distance_m_{3.00};
-  double distance_timeout_s_{0.40};
-  double smoothing_alpha_{0.45};
 
   double kp_{0.45};
   double ki_{0.0};
   double kd_{0.03};
-  double integral_limit_{0.15};
-  double integral_active_error_m_{0.20};
-  double derivative_filter_alpha_{0.35};
 
   double max_forward_vx_{0.10};
+  bool allow_reverse_{false};
   double max_reverse_vx_{0.05};
+
   double min_vx_when_active_{0.04};
   double disable_min_vx_below_error_m_{0.08};
+  double output_deadband_m_s_{0.0};
 
-  double loop_hz_{30.0};
-  double timeout_s_{10.0};
-  double stop_hold_s_{0.50};
-  double status_hz_{5.0};
-  double log_throttle_s_{2.0};
+  double min_dt_sec_{1.0e-4};
+  double max_dt_sec_{0.50};
+  double max_duration_s_{10.0};
 
-  int shutdown_zero_count_{5};
+  std::string distance_topic_{topics::DEPTH_MIN_FRONT};
+  std::string enable_topic_{topics::DISTANCE_TEST_ENABLE};
+  std::string target_topic_{topics::DISTANCE_TEST_TARGET};
+  std::string cmd_vel_out_topic_{topics::CMD_VEL_AUTO};
+  std::string mode_cmd_topic_{topics::CONTROL_MODE_CMD};
+  std::string safety_stop_topic_{topics::SAFETY_STOP};
+  std::string state_topic_{topics::DISTANCE_TEST_STATE};
+  std::string status_topic_{"/savo_control/distance_approach_status"};
 
-  std::string state_{"IDLE"};
-  bool safety_stop_active_{false};
+  double latest_distance_m_{0.0};
+  bool have_distance_{false};
+  double distance_stamp_s_{0.0};
 
-  bool have_distance_msg_{false};
-  bool distance_valid_{false};
-  bool have_filtered_distance_{false};
-  double latest_distance_m_{std::numeric_limits<double>::quiet_NaN()};
-  double filtered_distance_m_{std::numeric_limits<double>::quiet_NaN()};
+  bool safety_stop_{false};
+  bool safety_stop_seen_{false};
+  double safety_stop_stamp_s_{0.0};
 
-  bool have_started_stamp_{false};
-  bool goal_entered_{false};
-  bool have_last_status_stamp_{false};
-  bool have_last_log_stamp_{false};
+  double active_start_s_{0.0};
+  double last_update_s_{0.0};
 
-  double last_cmd_vx_{0.0};
-
-  rclcpp::Time last_distance_stamp_{};
-  rclcpp::Time started_stamp_{};
-  rclcpp::Time goal_enter_stamp_{};
-  rclcpp::Time last_status_stamp_{};
-  rclcpp::Time last_log_stamp_{};
-
-  PidState pid_{};
+  DistancePid controller_{};
 
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_pub_;
-  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr mode_pub_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr mode_cmd_pub_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr state_pub_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr status_pub_;
 
-  rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr distance_sub_f32_;
-  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr distance_sub_f64_;
-  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr safety_stop_sub_;
+  rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr distance_sub_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr enable_sub_;
   rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr target_sub_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr safety_stop_sub_;
 
   rclcpp::TimerBase::SharedPtr timer_;
 };

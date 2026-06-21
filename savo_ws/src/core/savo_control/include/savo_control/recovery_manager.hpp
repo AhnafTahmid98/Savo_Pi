@@ -156,7 +156,8 @@ public:
     selected_action = sanitize_action(selected_action);
 
     state_ = RecoveryManagerState{};
-    state_.state = config_.stop_before_motion ? RecoveryState::REQUESTED : state_for_action(selected_action);
+    state_.state =
+      config_.stop_before_motion ? RecoveryState::REQUESTED : state_for_action(selected_action);
     state_.trigger = trigger;
     state_.action = selected_action;
     state_.start_s = ControlMath::finite_or_zero(now_s);
@@ -335,7 +336,8 @@ private:
     }
 
     if (action == RecoveryAction::BACKUP_THEN_LEFT && !config_.allow_rotate_left) {
-      return config_.allow_rotate_right ? RecoveryAction::BACKUP_THEN_RIGHT : RecoveryAction::BACKUP;
+      return config_.allow_rotate_right ? RecoveryAction::BACKUP_THEN_RIGHT :
+             RecoveryAction::BACKUP;
     }
 
     if (action == RecoveryAction::BACKUP_THEN_RIGHT && !config_.allow_rotate_right) {

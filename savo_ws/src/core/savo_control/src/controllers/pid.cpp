@@ -1,7 +1,6 @@
-// header-only — implementation in pid.hpp.
-
 #include "savo_control/pid.hpp"
 
-namespace savo_control
-{
-}  // namespace savo_control
+// Pid is implemented inline in the public header.
+//
+// This translation unit is intentionally kept so existing CMake targets and
+// library layout stay stable while avoiding a second PID implementation.
