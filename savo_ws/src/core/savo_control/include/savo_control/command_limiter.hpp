@@ -1,240 +1,168 @@
 #pragma once
 
-// Axis-wise clamp, deadband, and slew-rate limiter for motion commands.
-
-#include <algorithm>
 #include <cmath>
-#include <limits>
+
+#include "savo_control/control_math.hpp"
 
 namespace savo_control
 {
 
-// -----------------------------------------------------------------------------
-// Basic axis configuration
-// -----------------------------------------------------------------------------
-struct AxisLimitConfig
+struct TwistCommand
 {
-  // Absolute output bounds (final command clamp)
-  double min_value { -1.0 };
-  double max_value {  1.0 };
+  double vx{0.0};
+  double vy{0.0};
+  double wz{0.0};
 
-  // Deadband around zero (|x| < deadband -> 0)
-  double deadband { 0.0 };
-
-  // Slew-rate limits (units per second)
-  // Example:
-  //   linear x/y  -> m/s^2 equivalent (change in m/s per second)
-  //   angular z   -> rad/s^2 equivalent (change in rad/s per second)
-  //
-  // "rise" = increasing magnitude in positive direction (or from smaller to larger)
-  // "fall" = decreasing in negative direction (or from larger to smaller)
-  //
-  // If <= 0, rate limiting for that direction is effectively disabled.
-  double max_rise_rate { 0.0 };
-  double max_fall_rate { 0.0 };
-
-  // Optional symmetric helper (not required to use)
-  void set_symmetric_bounds(double abs_max)
+  bool empty() const
   {
-    const double a = std::abs(abs_max);
-    min_value = -a;
-    max_value =  a;
+    return ControlMath::near_zero(vx) &&
+           ControlMath::near_zero(vy) &&
+           ControlMath::near_zero(wz);
   }
 
-  void set_symmetric_rate(double rate)
+  bool moving(const double epsilon = 1.0e-4) const
   {
-    const double r = std::abs(rate);
-    max_rise_rate = r;
-    max_fall_rate = r;
+    const double eps = std::abs(epsilon);
+
+    return std::abs(vx) > eps ||
+           std::abs(vy) > eps ||
+           std::abs(wz) > eps;
   }
 };
 
-// -----------------------------------------------------------------------------
-// 3-axis command configuration (vx, vy, omega)
-// -----------------------------------------------------------------------------
-struct CommandLimiterConfig
+struct CommandLimits
 {
-  AxisLimitConfig vx {};
-  AxisLimitConfig vy {};
-  AxisLimitConfig wz {};
-};
+  double max_vx{0.25};
+  double max_vy{0.25};
+  double max_wz{0.60};
 
-// -----------------------------------------------------------------------------
-// Command container (ROS-independent)
-// -----------------------------------------------------------------------------
-struct MotionCommand
-{
-  double vx {0.0};   // linear.x  [m/s]
-  double vy {0.0};   // linear.y  [m/s] (mecanum/holonomic)
-  double wz {0.0};   // angular.z [rad/s]
-};
+  double min_vx{-0.25};
+  double min_vy{-0.25};
+  double min_wz{-0.60};
 
-// -----------------------------------------------------------------------------
-// Utility helpers (stateless)
-// -----------------------------------------------------------------------------
-class CommandLimiterMath
-{
-public:
-  static inline double clamp(double value, double min_value, double max_value)
+  double deadband_vx{0.0};
+  double deadband_vy{0.0};
+  double deadband_wz{0.0};
+
+  bool use_symmetric_limits{true};
+
+  CommandLimits sanitized() const
   {
-    if (min_value > max_value) {
-      std::swap(min_value, max_value);
-    }
-    return std::clamp(value, min_value, max_value);
-  }
+    CommandLimits out;
 
-  static inline double apply_deadband(double value, double deadband)
-  {
-    const double db = std::abs(deadband);
-    if (db <= 0.0) {
-      return value;
-    }
-    return (std::abs(value) < db) ? 0.0 : value;
-  }
+    out.max_vx = std::abs(ControlMath::finite_or_zero(max_vx));
+    out.max_vy = std::abs(ControlMath::finite_or_zero(max_vy));
+    out.max_wz = std::abs(ControlMath::finite_or_zero(max_wz));
 
-  // Slew-rate limit one scalar using previous output and dt.
-  // If rate <= 0 or dt <= 0, returns target (no rate limiting).
-  static inline double slew_limit(
-    double target,
-    double previous_output,
-    double max_rise_rate,
-    double max_fall_rate,
-    double dt_sec)
-  {
-    if (!(dt_sec > 0.0) || !std::isfinite(dt_sec)) {
-      return target;
+    out.min_vx = ControlMath::finite_or_zero(min_vx);
+    out.min_vy = ControlMath::finite_or_zero(min_vy);
+    out.min_wz = ControlMath::finite_or_zero(min_wz);
+
+    out.deadband_vx = std::abs(ControlMath::finite_or_zero(deadband_vx));
+    out.deadband_vy = std::abs(ControlMath::finite_or_zero(deadband_vy));
+    out.deadband_wz = std::abs(ControlMath::finite_or_zero(deadband_wz));
+
+    out.use_symmetric_limits = use_symmetric_limits;
+
+    if (out.use_symmetric_limits) {
+      out.min_vx = -out.max_vx;
+      out.min_vy = -out.max_vy;
+      out.min_wz = -out.max_wz;
+      return out;
     }
 
-    const double delta = target - previous_output;
-
-    // Select rate by delta direction
-    if (delta > 0.0) {
-      const double r = std::abs(max_rise_rate);
-      if (r <= 0.0 || !std::isfinite(r)) {
-        return target;
-      }
-      const double max_step = r * dt_sec;
-      return previous_output + std::min(delta, max_step);
-    } else if (delta < 0.0) {
-      const double r = std::abs(max_fall_rate);
-      if (r <= 0.0 || !std::isfinite(r)) {
-        return target;
-      }
-      const double max_step = r * dt_sec;
-      return previous_output + std::max(delta, -max_step);
+    if (out.min_vx > out.max_vx) {
+      const double tmp = out.min_vx;
+      out.min_vx = out.max_vx;
+      out.max_vx = tmp;
     }
 
-    return target;
-  }
+    if (out.min_vy > out.max_vy) {
+      const double tmp = out.min_vy;
+      out.min_vy = out.max_vy;
+      out.max_vy = tmp;
+    }
 
-  // Convenience one-axis full pipeline:
-  // clamp -> deadband -> slew limit -> clamp again
-  static inline double limit_axis(
-    double target,
-    double previous_output,
-    const AxisLimitConfig & cfg,
-    double dt_sec)
-  {
-    double out = target;
-
-    // First clamp target
-    out = clamp(out, cfg.min_value, cfg.max_value);
-
-    // Deadband before slew (prevents tiny command chatter)
-    out = apply_deadband(out, cfg.deadband);
-
-    // Slew limit against previous shaped output
-    out = slew_limit(out, previous_output, cfg.max_rise_rate, cfg.max_fall_rate, dt_sec);
-
-    // Final clamp for safety
-    out = clamp(out, cfg.min_value, cfg.max_value);
-
-    // Final deadband cleanup
-    out = apply_deadband(out, cfg.deadband);
+    if (out.min_wz > out.max_wz) {
+      const double tmp = out.min_wz;
+      out.min_wz = out.max_wz;
+      out.max_wz = tmp;
+    }
 
     return out;
   }
 };
 
-// -----------------------------------------------------------------------------
-// Stateful command limiter (stores previous output command)
-// -----------------------------------------------------------------------------
 class CommandLimiter
 {
 public:
   CommandLimiter() = default;
-  explicit CommandLimiter(const CommandLimiterConfig & cfg)
-  : config_(cfg)
-  {}
 
-  void set_config(const CommandLimiterConfig & cfg)
+  explicit CommandLimiter(const CommandLimits & limits)
+  : limits_(limits.sanitized())
   {
-    config_ = cfg;
   }
 
-  const CommandLimiterConfig & config() const
+  void set_limits(const CommandLimits & limits)
   {
-    return config_;
+    limits_ = limits.sanitized();
   }
 
-  // Reset internal state (e.g., on mode switch, timeout, emergency stop, startup)
-  void reset()
+  const CommandLimits & limits() const
   {
-    prev_output_ = MotionCommand{};
-    has_prev_output_ = false;
+    return limits_;
   }
 
-  // Reset to a known command state
-  void reset_to(const MotionCommand & cmd)
+  TwistCommand limit(const TwistCommand & input) const
   {
-    prev_output_ = cmd;
-    has_prev_output_ = true;
-  }
+    const CommandLimits safe = limits_.sanitized();
 
-  bool has_previous_output() const
-  {
-    return has_prev_output_;
-  }
+    TwistCommand out;
+    out.vx = ControlMath::finite_or_zero(input.vx);
+    out.vy = ControlMath::finite_or_zero(input.vy);
+    out.wz = ControlMath::finite_or_zero(input.wz);
 
-  const MotionCommand & previous_output() const
-  {
-    return prev_output_;
-  }
+    out.vx = ControlMath::clamp(out.vx, safe.min_vx, safe.max_vx);
+    out.vy = ControlMath::clamp(out.vy, safe.min_vy, safe.max_vy);
+    out.wz = ControlMath::clamp(out.wz, safe.min_wz, safe.max_wz);
 
-  // Main limiter call
-  // If there is no previous output yet, it uses zero as previous baseline.
-  MotionCommand limit(const MotionCommand & target, double dt_sec)
-  {
-    const MotionCommand baseline = has_prev_output_ ? prev_output_ : MotionCommand{};
+    out.vx = ControlMath::apply_deadband(out.vx, safe.deadband_vx);
+    out.vy = ControlMath::apply_deadband(out.vy, safe.deadband_vy);
+    out.wz = ControlMath::apply_deadband(out.wz, safe.deadband_wz);
 
-    MotionCommand out;
-    out.vx = CommandLimiterMath::limit_axis(target.vx, baseline.vx, config_.vx, dt_sec);
-    out.vy = CommandLimiterMath::limit_axis(target.vy, baseline.vy, config_.vy, dt_sec);
-    out.wz = CommandLimiterMath::limit_axis(target.wz, baseline.wz, config_.wz, dt_sec);
-
-    prev_output_ = out;
-    has_prev_output_ = true;
     return out;
   }
 
-  // Stateless-style helpers exposed through the class for convenience
-  static MotionCommand clamp_only(const MotionCommand & in, const CommandLimiterConfig & cfg)
+  TwistCommand operator()(const TwistCommand & input) const
   {
-    MotionCommand out;
-    out.vx = CommandLimiterMath::clamp(in.vx, cfg.vx.min_value, cfg.vx.max_value);
-    out.vy = CommandLimiterMath::clamp(in.vy, cfg.vy.min_value, cfg.vy.max_value);
-    out.wz = CommandLimiterMath::clamp(in.wz, cfg.wz.min_value, cfg.wz.max_value);
+    return limit(input);
+  }
 
-    out.vx = CommandLimiterMath::apply_deadband(out.vx, cfg.vx.deadband);
-    out.vy = CommandLimiterMath::apply_deadband(out.vy, cfg.vy.deadband);
-    out.wz = CommandLimiterMath::apply_deadband(out.wz, cfg.wz.deadband);
-    return out;
+  static TwistCommand zero()
+  {
+    return TwistCommand{};
   }
 
 private:
-  CommandLimiterConfig config_ {};
-  MotionCommand prev_output_ {};
-  bool has_prev_output_ {false};
+  CommandLimits limits_{};
 };
+
+inline TwistCommand make_twist_command(
+  const double vx,
+  const double vy,
+  const double wz)
+{
+  return TwistCommand{
+    ControlMath::finite_or_zero(vx),
+    ControlMath::finite_or_zero(vy),
+    ControlMath::finite_or_zero(wz)};
+}
+
+inline TwistCommand limit_command(
+  const TwistCommand & command,
+  const CommandLimits & limits)
+{
+  return CommandLimiter(limits).limit(command);
+}
 
 }  // namespace savo_control

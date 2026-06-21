@@ -1,190 +1,231 @@
 #pragma once
 
-// ROS-independent stuck detector. Feed commanded and measured motion into update(),
-// read StuckDetectorStatus.stuck to trigger recovery.
-
 #include <algorithm>
 #include <cmath>
-#include <cstdint>
-#include <limits>
+#include <ostream>
+#include <string>
+
+#include "savo_control/command_limiter.hpp"
+#include "savo_control/control_math.hpp"
 
 namespace savo_control
 {
 
-// -----------------------------------------------------------------------------
-// Basic motion containers (ROS-independent)
-// -----------------------------------------------------------------------------
-struct Twist2D
+enum class StuckState
 {
-  double vx {0.0};  // m/s
-  double vy {0.0};  // m/s
-  double wz {0.0};  // rad/s
+  CLEAR,
+  SUPPRESSED,
+  STALE,
+  COMMAND_ACTIVE,
+  STUCK_DETECTED,
+  RECOVERY_REQUESTED
 };
 
-struct Pose2D
+inline std::string to_string(const StuckState state)
 {
-  double x {0.0};     // m
-  double y {0.0};     // m
-  double yaw {0.0};   // rad
+  switch (state) {
+    case StuckState::CLEAR:
+      return "CLEAR";
+    case StuckState::SUPPRESSED:
+      return "SUPPRESSED";
+    case StuckState::STALE:
+      return "STALE";
+    case StuckState::COMMAND_ACTIVE:
+      return "COMMAND_ACTIVE";
+    case StuckState::STUCK_DETECTED:
+      return "STUCK_DETECTED";
+    case StuckState::RECOVERY_REQUESTED:
+      return "RECOVERY_REQUESTED";
+  }
+
+  return "CLEAR";
+}
+
+inline std::string stuck_state_to_string(const StuckState state)
+{
+  return to_string(state);
+}
+
+inline bool is_stuck_state_active(const StuckState state)
+{
+  return state == StuckState::COMMAND_ACTIVE ||
+         state == StuckState::STUCK_DETECTED ||
+         state == StuckState::RECOVERY_REQUESTED;
+}
+
+inline bool is_stuck_detected_state(const StuckState state)
+{
+  return state == StuckState::STUCK_DETECTED ||
+         state == StuckState::RECOVERY_REQUESTED;
+}
+
+inline bool can_request_recovery(const StuckState state)
+{
+  return state == StuckState::STUCK_DETECTED;
+}
+
+struct ObservedMotion
+{
+  double vx{0.0};
+  double vy{0.0};
+  double wz{0.0};
+
+  ObservedMotion sanitized() const
+  {
+    return ObservedMotion{
+      ControlMath::finite_or_zero(vx),
+      ControlMath::finite_or_zero(vy),
+      ControlMath::finite_or_zero(wz)};
+  }
+
+  double linear_speed() const
+  {
+    const auto safe = sanitized();
+    return ControlMath::hypot2(safe.vx, safe.vy);
+  }
 };
 
-// -----------------------------------------------------------------------------
-// Configuration
-// -----------------------------------------------------------------------------
 struct StuckDetectorConfig
 {
-  // ---------- Time validity ----------
-  double min_time_sec {0.0};
-  double max_time_jump_sec {2.0};  // fail-safe reset on bad time jump if > 0
+  double command_linear_threshold{0.04};
+  double command_angular_threshold{0.10};
 
-  // ---------- Command activity gating ----------
-  // Robot is considered "commanded to move" if ANY axis exceeds threshold.
-  double cmd_lin_active_mps {0.03};      // |vx| or |vy|
-  double cmd_ang_active_radps {0.15};    // |wz|
+  double observed_linear_threshold{0.015};
+  double observed_angular_threshold{0.04};
 
-  // Optional weighted command magnitude gate (additional criterion)
-  // cmd_mag = hypot(vx, vy) + wz_weight * |wz|
-  double cmd_mag_active_threshold {0.04};
-  double wz_weight_for_mag {0.20};
+  double stuck_duration_s{1.00};
+  double stale_timeout_s{0.50};
 
-  // ---------- Measured motion thresholds (odom / fused state) ----------
-  // Robot is considered "actually moving" if any measured axis exceeds these.
-  double meas_lin_moving_mps {0.015};
-  double meas_ang_moving_radps {0.08};
+  bool enabled{true};
+  bool detect_vx{true};
+  bool detect_vy{true};
+  bool detect_wz{true};
+  bool require_all_requested_axes_stopped{false};
 
-  // Optional weighted measured magnitude gate
-  double meas_mag_moving_threshold {0.02};
+  StuckDetectorConfig sanitized() const
+  {
+    StuckDetectorConfig out = *this;
 
-  // ---------- Persistence / debounce ----------
-  // Command must be active for at least this long before we evaluate stuck.
-  double command_grace_sec {0.25};
+    out.command_linear_threshold = std::abs(
+      ControlMath::finite_or_zero(out.command_linear_threshold));
+    out.command_angular_threshold = std::abs(
+      ControlMath::finite_or_zero(out.command_angular_threshold));
 
-  // If commanded active and measured motion remains below thresholds for this
-  // duration, flag no-progress/stuck.
-  double no_motion_confirm_sec {0.70};
+    out.observed_linear_threshold = std::abs(
+      ControlMath::finite_or_zero(out.observed_linear_threshold));
+    out.observed_angular_threshold = std::abs(
+      ControlMath::finite_or_zero(out.observed_angular_threshold));
 
-  // Clear stuck only after measured motion is healthy for this duration
-  // (or command becomes inactive).
-  double clear_confirm_sec {0.25};
+    if (!std::isfinite(out.stuck_duration_s) || out.stuck_duration_s < 0.0) {
+      out.stuck_duration_s = 1.00;
+    }
 
-  // ---------- Pose-window progress check (optional but useful) ----------
-  // If enabled, detector also checks whether pose moved enough while commanded.
-  bool enable_pose_progress_check {true};
+    if (!std::isfinite(out.stale_timeout_s) || out.stale_timeout_s < 0.0) {
+      out.stale_timeout_s = 0.50;
+    }
 
-  // Window length over which progress is evaluated (seconds)
-  double pose_window_sec {0.80};
-
-  // Minimum required XY translation over the pose window while commanded active
-  double min_progress_dist_m {0.015};
-
-  // Minimum required yaw change over the pose window for rotate-only commands
-  double min_progress_yaw_rad {0.05};
-
-  // Consider command "rotation-dominant" if angular dominates and linear small.
-  double rotate_only_lin_max_mps {0.03};
-  double rotate_only_ang_min_radps {0.18};
-
-  // ---------- Safety context ----------
-  // If true, when safety stop is active, detector will not assert "stuck"
-  // (because the robot is intentionally prevented from moving), but it still
-  // reports no_progress_context for diagnostics.
-  bool suppress_stuck_while_safety_stop {true};
-
-  // ---------- Startup behavior ----------
-  double startup_grace_sec {0.30};
+    return out;
+  }
 };
 
-// -----------------------------------------------------------------------------
-// Inputs per update
-// -----------------------------------------------------------------------------
-struct StuckDetectorInputs
+struct StuckDetectorResult
 {
-  double now_sec {0.0};
+  StuckState state{StuckState::CLEAR};
 
-  // Commanded motion (e.g., cmd_vel_safe preferred, or cmd_vel if you want to
-  // detect pre-safety behavior depending on node role)
-  Twist2D cmd {};
+  bool stuck{false};
+  bool recovery_requested{false};
+  bool command_active{false};
+  bool observed_moving{false};
+  bool stale{false};
+  bool enabled{true};
 
-  // Measured motion from odom / EKF (recommended: /odometry/filtered twist)
-  Twist2D meas {};
+  double duration_s{0.0};
+  double command_age_s{0.0};
+  double odom_age_s{0.0};
 
-  // Optional pose for window-based progress check
-  bool has_pose {false};
-  Pose2D pose {};
-
-  // Optional context
-  bool safety_stop_active {false};
+  std::string reason{"clear"};
 };
 
-// -----------------------------------------------------------------------------
-// Status / result snapshot
-// -----------------------------------------------------------------------------
-struct StuckDetectorStatus
+inline bool axis_requested(const double command_value, const double threshold)
 {
-  // Core outputs
-  bool command_active {false};      // command says robot should be moving
-  bool measured_moving {false};     // odom says robot is moving
-  bool no_progress {false};         // command active but no sufficient movement
-  bool stuck {false};               // debounced decision for recovery manager
+  return std::abs(ControlMath::finite_or_zero(command_value)) >
+         std::abs(ControlMath::finite_or_zero(threshold));
+}
 
-  // Context
-  bool safety_stop_active {false};
-  bool suppressed_by_safety {false};
+inline bool axis_observed(const double observed_value, const double threshold)
+{
+  return std::abs(ControlMath::finite_or_zero(observed_value)) >
+         std::abs(ControlMath::finite_or_zero(threshold));
+}
 
-  // State / validity
-  bool initialized {false};
-  bool time_valid {false};
-  bool in_startup_grace {false};
+inline bool should_detect_stuck(
+  const TwistCommand & cmd_vel_safe,
+  const ObservedMotion & observed,
+  const StuckDetectorConfig & config = StuckDetectorConfig{})
+{
+  const auto cfg = config.sanitized();
+  if (!cfg.enabled) {
+    return false;
+  }
 
-  // Edges (true only on transition update)
-  bool became_stuck {false};
-  bool cleared_stuck {false};
+  const auto cmd = make_twist_command(
+    cmd_vel_safe.vx,
+    cmd_vel_safe.vy,
+    cmd_vel_safe.wz);
+  const auto obs = observed.sanitized();
 
-  // Timers / ages
-  double now_sec {0.0};
-  double command_active_elapsed_sec {0.0};
-  double no_motion_elapsed_sec {0.0};
-  double moving_elapsed_sec {0.0};
-  double since_start_sec {0.0};
+  bool any_requested = false;
+  bool any_requested_axis_stopped = false;
+  bool all_requested_axes_stopped = true;
 
-  // Progress window diagnostics
-  bool pose_progress_check_used {false};
-  double pose_window_elapsed_sec {0.0};
-  double pose_progress_dist_m {0.0};
-  double pose_progress_yaw_rad {0.0};
-  bool rotate_only_command {false};
+  if (cfg.detect_vx && axis_requested(cmd.vx, cfg.command_linear_threshold)) {
+    any_requested = true;
+    const bool stopped = !axis_observed(obs.vx, cfg.observed_linear_threshold);
+    any_requested_axis_stopped = any_requested_axis_stopped || stopped;
+    all_requested_axes_stopped = all_requested_axes_stopped && stopped;
+  }
 
-  // Magnitudes for debugging/tuning
-  double cmd_lin_mag_mps {0.0};
-  double cmd_ang_abs_radps {0.0};
-  double cmd_weighted_mag {0.0};
+  if (cfg.detect_vy && axis_requested(cmd.vy, cfg.command_linear_threshold)) {
+    any_requested = true;
+    const bool stopped = !axis_observed(obs.vy, cfg.observed_linear_threshold);
+    any_requested_axis_stopped = any_requested_axis_stopped || stopped;
+    all_requested_axes_stopped = all_requested_axes_stopped && stopped;
+  }
 
-  double meas_lin_mag_mps {0.0};
-  double meas_ang_abs_radps {0.0};
-  double meas_weighted_mag {0.0};
-};
+  if (cfg.detect_wz && axis_requested(cmd.wz, cfg.command_angular_threshold)) {
+    any_requested = true;
+    const bool stopped = !axis_observed(obs.wz, cfg.observed_angular_threshold);
+    any_requested_axis_stopped = any_requested_axis_stopped || stopped;
+    all_requested_axes_stopped = all_requested_axes_stopped && stopped;
+  }
 
-// -----------------------------------------------------------------------------
-// Detector
-// -----------------------------------------------------------------------------
+  if (!any_requested) {
+    return false;
+  }
+
+  if (cfg.require_all_requested_axes_stopped) {
+    return all_requested_axes_stopped;
+  }
+
+  return any_requested_axis_stopped;
+}
+
 class StuckDetector
 {
 public:
-  StuckDetector() = default;
-
-  explicit StuckDetector(const StuckDetectorConfig & cfg)
-  : config_(cfg)
+  StuckDetector()
+  : config_(StuckDetectorConfig{}.sanitized())
   {
-    normalize_config_();
   }
 
-  // -------------------------
-  // Configuration
-  // -------------------------
-  void set_config(const StuckDetectorConfig & cfg)
+  explicit StuckDetector(const StuckDetectorConfig & config)
+  : config_(config.sanitized())
   {
-    config_ = cfg;
-    normalize_config_();
+  }
+
+  void set_config(const StuckDetectorConfig & config)
+  {
+    config_ = config.sanitized();
   }
 
   const StuckDetectorConfig & config() const
@@ -192,363 +233,176 @@ public:
     return config_;
   }
 
-  // -------------------------
-  // Lifecycle
-  // -------------------------
   void reset()
   {
-    initialized_ = false;
-    start_time_sec_ = 0.0;
-    last_now_sec_ = 0.0;
-
-    command_active_ = false;
-    command_active_start_sec_ = 0.0;
-
-    no_motion_active_ = false;
-    no_motion_start_sec_ = 0.0;
-
-    moving_active_ = false;
-    moving_start_sec_ = 0.0;
-
-    stuck_ = false;
-
-    pose_window_has_start_ = false;
-    pose_window_start_sec_ = 0.0;
-    pose_window_start_pose_ = Pose2D{};
+    state_ = StuckState::CLEAR;
+    stuck_start_s_ = 0.0;
+    has_stuck_start_ = false;
+    recovery_requested_ = false;
   }
 
-  void initialize(double now_sec)
+  void clear_recovery_request()
   {
-    if (!valid_time_(now_sec)) {
-      return;
+    recovery_requested_ = false;
+    if (state_ == StuckState::RECOVERY_REQUESTED) {
+      state_ = StuckState::STUCK_DETECTED;
     }
-
-    initialized_ = true;
-    start_time_sec_ = now_sec;
-    last_now_sec_ = now_sec;
-
-    // Baseline timers
-    command_active_ = false;
-    no_motion_active_ = false;
-    moving_active_ = false;
-    stuck_ = false;
-
-    pose_window_has_start_ = false;
   }
 
-  // -------------------------
-  // Main update
-  // -------------------------
-  StuckDetectorStatus update(const StuckDetectorInputs & in)
+  void request_recovery()
   {
-    StuckDetectorStatus s{};
-    s.now_sec = in.now_sec;
-    s.safety_stop_active = in.safety_stop_active;
-    s.time_valid = valid_time_(in.now_sec);
+    if (state_ == StuckState::STUCK_DETECTED) {
+      recovery_requested_ = true;
+      state_ = StuckState::RECOVERY_REQUESTED;
+    }
+  }
 
-    if (!s.time_valid) {
-      // Invalid time -> fail-safe status snapshot (do not mutate)
-      s.initialized = initialized_;
-      s.stuck = stuck_;
-      return s;
+  StuckDetectorResult update(
+    const TwistCommand & cmd_vel_safe,
+    const ObservedMotion & observed,
+    const double now_s,
+    const double last_command_s,
+    const double last_odom_s,
+    const bool suppress = false)
+  {
+    const double safe_now = ControlMath::finite_or_zero(now_s);
+    const auto cfg = config_.sanitized();
+
+    StuckDetectorResult result;
+    result.enabled = cfg.enabled;
+
+    if (!cfg.enabled) {
+      reset();
+      result.state = StuckState::SUPPRESSED;
+      result.reason = "disabled";
+      result.enabled = false;
+      return result;
     }
 
-    if (!initialized_) {
-      initialize(in.now_sec);
+    if (suppress) {
+      reset();
+      result.state = StuckState::SUPPRESSED;
+      result.reason = "suppressed";
+      return result;
     }
 
-    // Time jump guard
-    if (config_.max_time_jump_sec > 0.0) {
-      const double jump = in.now_sec - last_now_sec_;
-      if (jump < 0.0 || jump > config_.max_time_jump_sec) {
-        // Reset timing state but preserve initialization at current time
-        reset();
-        initialize(in.now_sec);
-      }
-    }
-    last_now_sec_ = in.now_sec;
+    result.command_age_s = std::max(0.0, safe_now - ControlMath::finite_or_zero(last_command_s));
+    result.odom_age_s = std::max(0.0, safe_now - ControlMath::finite_or_zero(last_odom_s));
 
-    s.initialized = initialized_;
-    s.since_start_sec = in.now_sec - start_time_sec_;
-    s.in_startup_grace = (config_.startup_grace_sec > 0.0) &&
-                         (s.since_start_sec >= 0.0) &&
-                         (s.since_start_sec < config_.startup_grace_sec);
-
-    // Compute magnitudes
-    s.cmd_lin_mag_mps = hypot2_(in.cmd.vx, in.cmd.vy);
-    s.cmd_ang_abs_radps = std::abs(in.cmd.wz);
-    s.cmd_weighted_mag =
-      s.cmd_lin_mag_mps + std::abs(config_.wz_weight_for_mag) * s.cmd_ang_abs_radps;
-
-    s.meas_lin_mag_mps = hypot2_(in.meas.vx, in.meas.vy);
-    s.meas_ang_abs_radps = std::abs(in.meas.wz);
-    s.meas_weighted_mag =
-      s.meas_lin_mag_mps + std::abs(config_.wz_weight_for_mag) * s.meas_ang_abs_radps;
-
-    // Command active gate (axis thresholds OR weighted magnitude)
-    const bool cmd_axis_active =
-      (s.cmd_lin_mag_mps >= config_.cmd_lin_active_mps) ||
-      (s.cmd_ang_abs_radps >= config_.cmd_ang_active_radps);
-
-    const bool cmd_mag_active =
-      (s.cmd_weighted_mag >= config_.cmd_mag_active_threshold);
-
-    s.command_active = (cmd_axis_active || cmd_mag_active);
-
-    // Measured moving gate (axis thresholds OR weighted magnitude)
-    const bool meas_axis_moving =
-      (s.meas_lin_mag_mps >= config_.meas_lin_moving_mps) ||
-      (s.meas_ang_abs_radps >= config_.meas_ang_moving_radps);
-
-    const bool meas_mag_moving =
-      (s.meas_weighted_mag >= config_.meas_mag_moving_threshold);
-
-    s.measured_moving = (meas_axis_moving || meas_mag_moving);
-
-    // Rotation-only command classification (for pose progress check)
-    s.rotate_only_command =
-      (s.cmd_lin_mag_mps <= config_.rotate_only_lin_max_mps) &&
-      (s.cmd_ang_abs_radps >= config_.rotate_only_ang_min_radps);
-
-    // Update command-active timer state
-    update_boolean_timer_(s.command_active, in.now_sec, command_active_, command_active_start_sec_);
-    s.command_active_elapsed_sec = command_active_ ? (in.now_sec - command_active_start_sec_) : 0.0;
-
-    // Update moving timer state
-    update_boolean_timer_(s.measured_moving, in.now_sec, moving_active_, moving_start_sec_);
-    s.moving_elapsed_sec = moving_active_ ? (in.now_sec - moving_start_sec_) : 0.0;
-
-    // Pose progress window (optional)
-    bool pose_progress_ok = true;  // neutral if disabled/not available
-    if (config_.enable_pose_progress_check && in.has_pose) {
-      s.pose_progress_check_used = true;
-      update_pose_window_(in.now_sec, in.pose, s.command_active);
-
-      if (pose_window_has_start_) {
-        s.pose_window_elapsed_sec = in.now_sec - pose_window_start_sec_;
-        s.pose_progress_dist_m = hypot2_(
-          in.pose.x - pose_window_start_pose_.x,
-          in.pose.y - pose_window_start_pose_.y);
-        s.pose_progress_yaw_rad = std::abs(wrap_angle_rad_(in.pose.yaw - pose_window_start_pose_.yaw));
-
-        // Evaluate progress only after window matured
-        if (s.pose_window_elapsed_sec >= config_.pose_window_sec) {
-          if (s.rotate_only_command) {
-            pose_progress_ok = (s.pose_progress_yaw_rad >= config_.min_progress_yaw_rad);
-          } else {
-            pose_progress_ok = (s.pose_progress_dist_m >= config_.min_progress_dist_m);
-          }
-        } else {
-          // Window not mature yet -> do not force failure
-          pose_progress_ok = true;
-        }
-      }
-    } else {
-      // If pose progress check is enabled but no pose available, degrade gracefully:
-      // rely on measured twist only.
-      s.pose_progress_check_used = false;
-      pose_progress_ok = true;
-      if (!s.command_active) {
-        pose_window_has_start_ = false;
-      }
+    if (result.command_age_s > cfg.stale_timeout_s || result.odom_age_s > cfg.stale_timeout_s) {
+      reset();
+      result.state = StuckState::STALE;
+      result.stale = true;
+      result.reason = "stale";
+      state_ = result.state;
+      return result;
     }
 
-    // "No progress" condition (raw, before safety suppression)
-    bool no_progress_raw = false;
+    const bool requested = command_requested(cmd_vel_safe, cfg);
+    result.command_active = requested;
 
-    const bool command_grace_done =
-      s.command_active && (s.command_active_elapsed_sec >= config_.command_grace_sec);
-
-    if (!s.in_startup_grace && command_grace_done) {
-      // If measured is not moving OR pose progress window says insufficient progress,
-      // accumulate no-motion persistence.
-      no_progress_raw = (!s.measured_moving) || (!pose_progress_ok);
+    if (!requested) {
+      reset();
+      result.state = StuckState::CLEAR;
+      result.reason = "no_command";
+      return result;
     }
 
-    // Update no-motion timer state
-    update_boolean_timer_(no_progress_raw, in.now_sec, no_motion_active_, no_motion_start_sec_);
-    s.no_motion_elapsed_sec = no_motion_active_ ? (in.now_sec - no_motion_start_sec_) : 0.0;
+    result.observed_moving = observed_moving_for_requested_axes(cmd_vel_safe, observed, cfg);
 
-    // Debounced no_progress
-    s.no_progress = no_progress_raw &&
-                    (s.no_motion_elapsed_sec >= config_.no_motion_confirm_sec);
+    const bool stuck_condition = should_detect_stuck(cmd_vel_safe, observed, cfg);
 
-    // Safety suppression behavior
-    s.suppressed_by_safety = false;
-    bool candidate_stuck = s.no_progress;
-
-    if (config_.suppress_stuck_while_safety_stop && in.safety_stop_active) {
-      if (candidate_stuck) {
-        s.suppressed_by_safety = true;
-      }
-      candidate_stuck = false;
+    if (!stuck_condition) {
+      reset();
+      result.state = StuckState::COMMAND_ACTIVE;
+      result.reason = "motion_observed";
+      state_ = result.state;
+      return result;
     }
 
-    // Stuck latch/debounce with clear hysteresis
-    const bool prev_stuck = stuck_;
-
-    if (!s.command_active) {
-      // If no command, clear immediately (robot is not expected to move)
-      stuck_ = false;
-    } else if (candidate_stuck) {
-      stuck_ = true;
-    } else {
-      // Clear only after healthy movement persists OR command becomes inactive
-      const bool healthy_motion = s.measured_moving && (s.moving_elapsed_sec >= config_.clear_confirm_sec);
-      if (healthy_motion) {
-        stuck_ = false;
-      }
+    if (!has_stuck_start_) {
+      stuck_start_s_ = safe_now;
+      has_stuck_start_ = true;
     }
 
-    s.stuck = stuck_;
-    s.became_stuck = (!prev_stuck && s.stuck);
-    s.cleared_stuck = (prev_stuck && !s.stuck);
+    result.duration_s = std::max(0.0, safe_now - stuck_start_s_);
 
-    return s;
+    if (result.duration_s >= cfg.stuck_duration_s) {
+      result.stuck = true;
+      result.recovery_requested = recovery_requested_;
+
+      state_ = recovery_requested_
+        ? StuckState::RECOVERY_REQUESTED
+        : StuckState::STUCK_DETECTED;
+
+      result.state = state_;
+      result.reason = recovery_requested_ ? "recovery_requested" : "stuck_detected";
+      return result;
+    }
+
+    state_ = StuckState::COMMAND_ACTIVE;
+    result.state = state_;
+    result.reason = "waiting_duration";
+    return result;
+  }
+
+  StuckState state() const
+  {
+    return state_;
+  }
+
+  bool recovery_requested() const
+  {
+    return recovery_requested_;
   }
 
 private:
-  // -------------------------
-  // Helpers
-  // -------------------------
-  void normalize_config_()
+  static bool command_requested(
+    const TwistCommand & cmd,
+    const StuckDetectorConfig & cfg)
   {
-    auto sane_nonneg = [](double v, double fallback) -> double {
-      return (std::isfinite(v) && v >= 0.0) ? v : fallback;
-    };
-
-    config_.min_time_sec = sane_nonneg(config_.min_time_sec, 0.0);
-    config_.max_time_jump_sec = sane_nonneg(config_.max_time_jump_sec, 2.0);
-
-    config_.cmd_lin_active_mps = sane_nonneg(config_.cmd_lin_active_mps, 0.03);
-    config_.cmd_ang_active_radps = sane_nonneg(config_.cmd_ang_active_radps, 0.15);
-    config_.cmd_mag_active_threshold = sane_nonneg(config_.cmd_mag_active_threshold, 0.04);
-
-    if (!std::isfinite(config_.wz_weight_for_mag)) {
-      config_.wz_weight_for_mag = 0.20;
-    } else {
-      config_.wz_weight_for_mag = std::abs(config_.wz_weight_for_mag);
-    }
-
-    config_.meas_lin_moving_mps = sane_nonneg(config_.meas_lin_moving_mps, 0.015);
-    config_.meas_ang_moving_radps = sane_nonneg(config_.meas_ang_moving_radps, 0.08);
-    config_.meas_mag_moving_threshold = sane_nonneg(config_.meas_mag_moving_threshold, 0.02);
-
-    config_.command_grace_sec = sane_nonneg(config_.command_grace_sec, 0.25);
-    config_.no_motion_confirm_sec = sane_nonneg(config_.no_motion_confirm_sec, 0.70);
-    config_.clear_confirm_sec = sane_nonneg(config_.clear_confirm_sec, 0.25);
-
-    config_.pose_window_sec = sane_nonneg(config_.pose_window_sec, 0.80);
-    config_.min_progress_dist_m = sane_nonneg(config_.min_progress_dist_m, 0.015);
-    config_.min_progress_yaw_rad = sane_nonneg(config_.min_progress_yaw_rad, 0.05);
-
-    config_.rotate_only_lin_max_mps = sane_nonneg(config_.rotate_only_lin_max_mps, 0.03);
-    config_.rotate_only_ang_min_radps = sane_nonneg(config_.rotate_only_ang_min_radps, 0.18);
-
-    config_.startup_grace_sec = sane_nonneg(config_.startup_grace_sec, 0.30);
-
-    if (config_.pose_window_sec <= 0.0) {
-      config_.enable_pose_progress_check = false;
-    }
-
-    // Keep clear debounce <= no_motion confirm in typical tuning
-    if (config_.clear_confirm_sec > config_.no_motion_confirm_sec && config_.no_motion_confirm_sec > 0.0) {
-      config_.clear_confirm_sec = config_.no_motion_confirm_sec;
-    }
+    return
+      (cfg.detect_vx && axis_requested(cmd.vx, cfg.command_linear_threshold)) ||
+      (cfg.detect_vy && axis_requested(cmd.vy, cfg.command_linear_threshold)) ||
+      (cfg.detect_wz && axis_requested(cmd.wz, cfg.command_angular_threshold));
   }
 
-  bool valid_time_(double t) const
+  static bool observed_moving_for_requested_axes(
+    const TwistCommand & cmd,
+    const ObservedMotion & observed,
+    const StuckDetectorConfig & cfg)
   {
-    return std::isfinite(t) && (t >= config_.min_time_sec);
+    const auto obs = observed.sanitized();
+
+    bool moving = false;
+
+    if (cfg.detect_vx && axis_requested(cmd.vx, cfg.command_linear_threshold)) {
+      moving = moving || axis_observed(obs.vx, cfg.observed_linear_threshold);
+    }
+
+    if (cfg.detect_vy && axis_requested(cmd.vy, cfg.command_linear_threshold)) {
+      moving = moving || axis_observed(obs.vy, cfg.observed_linear_threshold);
+    }
+
+    if (cfg.detect_wz && axis_requested(cmd.wz, cfg.command_angular_threshold)) {
+      moving = moving || axis_observed(obs.wz, cfg.observed_angular_threshold);
+    }
+
+    return moving;
   }
 
-  static double hypot2_(double a, double b)
-  {
-    if (!std::isfinite(a) || !std::isfinite(b)) {
-      return 0.0;
-    }
-    return std::hypot(a, b);
-  }
+  StuckDetectorConfig config_{};
+  StuckState state_{StuckState::CLEAR};
 
-  static double wrap_angle_rad_(double a)
-  {
-    if (!std::isfinite(a)) {
-      return 0.0;
-    }
-    constexpr double kPi = 3.1415926535897932384626433832795;
-    constexpr double kTwoPi = 2.0 * kPi;
-    a = std::fmod(a + kPi, kTwoPi);
-    if (a < 0.0) {
-      a += kTwoPi;
-    }
-    return a - kPi;
-  }
-
-  static void update_boolean_timer_(
-    bool state_now,
-    double now_sec,
-    bool & state_latched,
-    double & state_start_sec)
-  {
-    if (state_now) {
-      if (!state_latched) {
-        state_latched = true;
-        state_start_sec = now_sec;
-      }
-    } else {
-      state_latched = false;
-      state_start_sec = 0.0;
-    }
-  }
-
-  void update_pose_window_(double now_sec, const Pose2D & pose, bool command_active_now)
-  {
-    if (!command_active_now) {
-      pose_window_has_start_ = false;
-      return;
-    }
-
-    if (!pose_window_has_start_) {
-      pose_window_has_start_ = true;
-      pose_window_start_sec_ = now_sec;
-      pose_window_start_pose_ = pose;
-      return;
-    }
-
-    // Slide window anchor when window exceeds configured duration.
-    // This keeps the window bounded and responsive.
-    const double elapsed = now_sec - pose_window_start_sec_;
-    if (elapsed > config_.pose_window_sec) {
-      pose_window_start_sec_ = now_sec;
-      pose_window_start_pose_ = pose;
-    }
-  }
-
-private:
-  StuckDetectorConfig config_ {};
-
-  // Lifecycle / time
-  bool initialized_ {false};
-  double start_time_sec_ {0.0};
-  double last_now_sec_ {0.0};
-
-  // Boolean timers / latches
-  bool command_active_ {false};
-  double command_active_start_sec_ {0.0};
-
-  bool no_motion_active_ {false};
-  double no_motion_start_sec_ {0.0};
-
-  bool moving_active_ {false};
-  double moving_start_sec_ {0.0};
-
-  // Stuck latched state
-  bool stuck_ {false};
-
-  // Pose progress window
-  bool pose_window_has_start_ {false};
-  double pose_window_start_sec_ {0.0};
-  Pose2D pose_window_start_pose_ {};
+  double stuck_start_s_{0.0};
+  bool has_stuck_start_{false};
+  bool recovery_requested_{false};
 };
+
+inline std::ostream & operator<<(std::ostream & os, const StuckState state)
+{
+  os << to_string(state);
+  return os;
+}
 
 }  // namespace savo_control

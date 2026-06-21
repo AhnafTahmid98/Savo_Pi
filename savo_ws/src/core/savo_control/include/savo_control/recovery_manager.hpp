@@ -1,171 +1,123 @@
 #pragma once
 
-// ROS-independent recovery state machine. Feed inputs into update(),
-// read RecoveryAction to drive /cmd_vel_recovery publishing.
-
 #include <algorithm>
 #include <cmath>
-#include <cstdint>
+#include <sstream>
+#include <string>
+
+#include "savo_control/command_limiter.hpp"
+#include "savo_control/control_math.hpp"
+#include "savo_control/recovery_types.hpp"
 
 namespace savo_control
 {
 
-// -----------------------------------------------------------------------------
-// Recovery state machine phases
-// -----------------------------------------------------------------------------
-enum class RecoveryPhase : std::uint8_t
-{
-  kIdle = 0,
-  kArmed,
-  kBackingUp,
-  kSettling,
-  kTurning,
-  kComplete,
-  kAborted,
-  kCooldown
-};
-
-// -----------------------------------------------------------------------------
-// Reason codes for status/debugging
-// -----------------------------------------------------------------------------
-enum class RecoveryReason : std::uint8_t
-{
-  kNone = 0,
-  kStuckDetected,
-  kNoProgress,
-  kSafetyStopActive,
-  kTooManyAttempts,
-  kCooldownActive,
-  kInvalidTime,
-  kExternalCancel,
-  kManualMode,
-  kTimeout
-};
-
-// -----------------------------------------------------------------------------
-// Inputs supplied by ROS node on each update
-// -----------------------------------------------------------------------------
-struct RecoveryInputs
-{
-  bool stuck_detected {false};
-  bool no_progress {false};
-  bool safety_stop_active {false};
-  bool manual_override {false};
-  bool external_cancel {false};
-
-  // Whether the recovery node is allowed to command motion.
-  // Example: false if safety layer says motion is blocked.
-  bool motion_allowed {true};
-
-  // Optional external completion hints.
-  bool backup_completed {false};
-  bool turn_completed {false};
-};
-
-// -----------------------------------------------------------------------------
-// Tunable recovery policy config
-// -----------------------------------------------------------------------------
 struct RecoveryManagerConfig
 {
-  // Trigger debounce time before recovery starts.
-  double trigger_confirm_sec {0.20};
+  double backup_vx{-0.06};
+  double rotate_wz{0.25};
 
-  // Active action durations.
-  double backup_duration_sec {0.60};
-  double settle_duration_sec {0.20};
-  double turn_duration_sec {0.40};
+  double backup_duration_s{1.0};
+  double rotate_duration_s{1.0};
+  double stop_hold_s{0.20};
+  double max_recovery_duration_s{8.0};
 
-  // Enable optional turn after backup and settle.
-  bool enable_turn_phase {true};
+  RecoveryAction default_action{RecoveryAction::BACKUP_THEN_LEFT};
 
-  // Max duration for active recovery sequence only:
-  // BackingUp + Settling + Turning.
-  // kArmed is intentionally NOT counted as active recovery.
-  double max_recovery_duration_sec {3.0};
+  CommandLimits output_limits{};
 
-  // Cooldown before next recovery attempt.
-  double cooldown_sec {1.0};
+  bool enabled{true};
+  bool stop_before_motion{true};
+  bool stop_after_motion{true};
+  bool allow_rotate_left{true};
+  bool allow_rotate_right{true};
 
-  // Max attempts in one stuck streak.
-  std::uint32_t max_attempts_per_streak {3};
+  RecoveryManagerConfig sanitized() const
+  {
+    RecoveryManagerConfig out = *this;
 
-  // If true, note_progress() clears attempt streak.
-  bool reset_attempts_on_progress {true};
+    out.backup_vx = -std::abs(ControlMath::finite_or_zero(out.backup_vx));
+    out.rotate_wz = std::abs(ControlMath::finite_or_zero(out.rotate_wz));
 
-  // Time sanity.
-  double min_time_sec {0.0};
-  double max_time_jump_sec {5.0};
+    if (!std::isfinite(out.backup_duration_s) || out.backup_duration_s < 0.0) {
+      out.backup_duration_s = 1.0;
+    }
+
+    if (!std::isfinite(out.rotate_duration_s) || out.rotate_duration_s < 0.0) {
+      out.rotate_duration_s = 1.0;
+    }
+
+    if (!std::isfinite(out.stop_hold_s) || out.stop_hold_s < 0.0) {
+      out.stop_hold_s = 0.20;
+    }
+
+    if (!std::isfinite(out.max_recovery_duration_s) || out.max_recovery_duration_s < 0.1) {
+      out.max_recovery_duration_s = 8.0;
+    }
+
+    out.output_limits = out.output_limits.sanitized();
+
+    return out;
+  }
 };
 
-// -----------------------------------------------------------------------------
-// Recovery action hints for ROS node command generation
-// -----------------------------------------------------------------------------
-struct RecoveryAction
+struct RecoveryManagerState
 {
-  bool active {false};
+  RecoveryState state{RecoveryState::IDLE};
+  RecoveryTrigger trigger{RecoveryTrigger::NONE};
+  RecoveryAction action{RecoveryAction::NONE};
 
-  bool command_backup {false};
-  bool command_turn {false};
-  bool command_stop {false};
+  double start_s{0.0};
+  double phase_start_s{0.0};
+  double last_update_s{0.0};
 
-  // +1 = CCW, -1 = CW.
-  int turn_sign {+1};
+  int phase_index{0};
 
-  RecoveryPhase phase {RecoveryPhase::kIdle};
-  RecoveryReason reason {RecoveryReason::kNone};
+  bool requested{false};
+  bool active{false};
+  bool completed{false};
+  bool failed{false};
+  bool blocked{false};
 };
 
-// -----------------------------------------------------------------------------
-// Status snapshot for diagnostics / ROS status publishing
-// -----------------------------------------------------------------------------
-struct RecoveryManagerStatus
+struct RecoveryManagerResult
 {
-  RecoveryPhase phase {RecoveryPhase::kIdle};
-  RecoveryReason reason {RecoveryReason::kNone};
+  RecoveryState state{RecoveryState::IDLE};
+  RecoveryTrigger trigger{RecoveryTrigger::NONE};
+  RecoveryAction action{RecoveryAction::NONE};
 
-  // active = actual recovery sequence is active.
-  // This excludes kArmed.
-  bool active {false};
+  TwistCommand command{};
 
-  bool in_cooldown {false};
-  bool trigger_pending {false};
+  bool active{false};
+  bool finished{false};
+  bool recovery_request_active{false};
+  bool command_valid{true};
 
-  std::uint32_t attempts_in_streak {0};
+  double elapsed_s{0.0};
+  double phase_elapsed_s{0.0};
 
-  double now_sec {0.0};
-  double phase_elapsed_sec {0.0};
-  double active_elapsed_sec {0.0};
-  double cooldown_remaining_sec {0.0};
-
-  bool started {false};
-  bool completed {false};
-  bool aborted {false};
-  bool phase_changed {false};
-
-  RecoveryAction action {};
+  std::string reason{"idle"};
 };
 
-// -----------------------------------------------------------------------------
-// Recovery manager
-// -----------------------------------------------------------------------------
 class RecoveryManager
 {
 public:
-  RecoveryManager() = default;
-
-  explicit RecoveryManager(const RecoveryManagerConfig & cfg)
-  : config_(cfg)
+  RecoveryManager()
+  : config_(RecoveryManagerConfig{}.sanitized()),
+    limiter_(config_.output_limits)
   {
-    normalize_config_();
   }
 
-  // ---------------------------------------------------------------------------
-  // Config
-  // ---------------------------------------------------------------------------
-  void set_config(const RecoveryManagerConfig & cfg)
+  explicit RecoveryManager(const RecoveryManagerConfig & config)
+  : config_(config.sanitized()),
+    limiter_(config_.output_limits)
   {
-    config_ = cfg;
-    normalize_config_();
+  }
+
+  void set_config(const RecoveryManagerConfig & config)
+  {
+    config_ = config.sanitized();
+    limiter_.set_limits(config_.output_limits);
   }
 
   const RecoveryManagerConfig & config() const
@@ -173,469 +125,478 @@ public:
     return config_;
   }
 
-  // ---------------------------------------------------------------------------
-  // Lifecycle
-  // ---------------------------------------------------------------------------
+  const RecoveryManagerState & state() const
+  {
+    return state_;
+  }
+
   void reset()
   {
-    phase_ = RecoveryPhase::kIdle;
-    reason_ = RecoveryReason::kNone;
-
-    initialized_ = false;
-    last_now_sec_ = 0.0;
-
-    trigger_start_sec_ = 0.0;
-    phase_start_sec_ = 0.0;
-    active_start_sec_ = 0.0;
-    cooldown_until_sec_ = 0.0;
-
-    attempts_in_streak_ = 0;
-    turn_sign_ = +1;
-
-    has_trigger_pending_ = false;
-    pending_trigger_reason_ = RecoveryReason::kNone;
+    state_ = RecoveryManagerState{};
   }
 
-  void initialize(double now_sec)
+  bool request(
+    const double now_s,
+    const RecoveryTrigger trigger = RecoveryTrigger::MANUAL_REQUEST,
+    const RecoveryAction action = RecoveryAction::NONE)
   {
-    if (!valid_time_(now_sec)) {
-      return;
+    if (!config_.enabled) {
+      state_.state = RecoveryState::FAILED;
+      state_.trigger = trigger;
+      state_.action = action;
+      state_.failed = true;
+      return false;
     }
 
-    initialized_ = true;
-    last_now_sec_ = now_sec;
-    phase_start_sec_ = now_sec;
-  }
-
-  void note_progress()
-  {
-    if (config_.reset_attempts_on_progress) {
-      attempts_in_streak_ = 0;
-    }
-  }
-
-  void cancel(double now_sec, bool enter_cooldown = true)
-  {
-    if (!valid_time_(now_sec)) {
-      return;
+    RecoveryAction selected_action = action;
+    if (selected_action == RecoveryAction::NONE) {
+      selected_action = config_.default_action;
     }
 
-    has_trigger_pending_ = false;
+    selected_action = sanitize_action(selected_action);
 
-    if (enter_cooldown) {
-      enter_cooldown_(RecoveryReason::kExternalCancel, now_sec);
-    } else {
-      set_phase_(RecoveryPhase::kIdle, RecoveryReason::kNone, now_sec);
-      active_start_sec_ = 0.0;
+    state_ = RecoveryManagerState{};
+    state_.state = config_.stop_before_motion ? RecoveryState::REQUESTED : state_for_action(selected_action);
+    state_.trigger = trigger;
+    state_.action = selected_action;
+    state_.start_s = ControlMath::finite_or_zero(now_s);
+    state_.phase_start_s = state_.start_s;
+    state_.last_update_s = state_.start_s;
+    state_.phase_index = 0;
+    state_.requested = true;
+    state_.active = true;
+
+    return true;
+  }
+
+  bool request_from_string(
+    const double now_s,
+    const std::string & trigger_text,
+    const std::string & action_text)
+  {
+    const RecoveryTrigger trigger = parse_recovery_trigger(
+      trigger_text,
+      RecoveryTrigger::MANUAL_REQUEST);
+    const RecoveryAction action = parse_recovery_action(
+      action_text,
+      RecoveryAction::NONE);
+
+    return request(now_s, trigger, action);
+  }
+
+  void cancel()
+  {
+    state_.state = RecoveryState::CANCELLED;
+    state_.active = false;
+    state_.completed = false;
+    state_.failed = false;
+    state_.blocked = false;
+    state_.requested = false;
+  }
+
+  void block()
+  {
+    state_.state = RecoveryState::BLOCKED;
+    state_.active = false;
+    state_.completed = false;
+    state_.failed = false;
+    state_.blocked = true;
+    state_.requested = false;
+  }
+
+  RecoveryManagerResult update(const double now_s)
+  {
+    const double now = ControlMath::finite_or_zero(now_s);
+    state_.last_update_s = now;
+
+    RecoveryManagerResult result;
+    result.state = state_.state;
+    result.trigger = state_.trigger;
+    result.action = state_.action;
+    result.elapsed_s = elapsed(now);
+    result.phase_elapsed_s = phase_elapsed(now);
+
+    if (!config_.enabled) {
+      finish_as(RecoveryState::FAILED);
+      result.state = state_.state;
+      result.finished = true;
+      result.reason = "disabled";
+      result.command = TwistCommand{};
+      return result;
     }
-  }
 
-  // ---------------------------------------------------------------------------
-  // Accessors
-  // ---------------------------------------------------------------------------
-  RecoveryPhase phase() const
-  {
-    return phase_;
-  }
-
-  RecoveryReason reason() const
-  {
-    return reason_;
-  }
-
-  // True only for actual recovery sequence phases.
-  // kArmed is not active motion recovery.
-  bool is_active() const
-  {
-    return phase_ == RecoveryPhase::kBackingUp ||
-           phase_ == RecoveryPhase::kSettling ||
-           phase_ == RecoveryPhase::kTurning;
-  }
-
-  bool is_trigger_pending() const
-  {
-    return phase_ == RecoveryPhase::kArmed || has_trigger_pending_;
-  }
-
-  bool is_in_cooldown() const
-  {
-    return phase_ == RecoveryPhase::kCooldown;
-  }
-
-  std::uint32_t attempts_in_streak() const
-  {
-    return attempts_in_streak_;
-  }
-
-  // ---------------------------------------------------------------------------
-  // Main update
-  // ---------------------------------------------------------------------------
-  RecoveryManagerStatus update(double now_sec, const RecoveryInputs & in)
-  {
-    RecoveryManagerStatus s{};
-    s.now_sec = now_sec;
-
-    if (!valid_time_(now_sec)) {
-      s.phase = phase_;
-      s.reason = RecoveryReason::kInvalidTime;
-      s.active = is_active();
-      s.in_cooldown = is_in_cooldown();
-      s.trigger_pending = is_trigger_pending();
-      s.attempts_in_streak = attempts_in_streak_;
-      s.action = make_action_(s.phase, s.reason, s.active);
-      return s;
+    if (!state_.active) {
+      result.state = state_.state;
+      result.command = TwistCommand{};
+      result.active = false;
+      result.finished = is_recovery_terminal(state_.state);
+      result.reason = result.finished ? "terminal" : "idle";
+      return result;
     }
 
-    if (!initialized_) {
-      initialize(now_sec);
+    if (result.elapsed_s > config_.max_recovery_duration_s) {
+      finish_as(RecoveryState::TIMEOUT);
+      result.state = state_.state;
+      result.finished = true;
+      result.active = false;
+      result.reason = "timeout";
+      result.command = TwistCommand{};
+      return result;
     }
 
-    const RecoveryPhase prev_phase = phase_;
-    const RecoveryReason prev_reason = reason_;
-    const bool was_active = is_active();
-
-    // -----------------------------------------------------------------------
-    // Time jump guard
-    // -----------------------------------------------------------------------
-    if (config_.max_time_jump_sec > 0.0 && std::isfinite(last_now_sec_)) {
-      const double jump = now_sec - last_now_sec_;
-      if (jump < 0.0 || jump > config_.max_time_jump_sec) {
-        enter_cooldown_(RecoveryReason::kInvalidTime, now_sec);
+    if (state_.state == RecoveryState::REQUESTED) {
+      if (config_.stop_before_motion && result.phase_elapsed_s < config_.stop_hold_s) {
+        result.state = RecoveryState::REQUESTED;
+        result.active = true;
+        result.recovery_request_active = true;
+        result.command = TwistCommand{};
+        result.reason = "pre_stop";
+        return result;
       }
-    }
-    last_now_sec_ = now_sec;
 
-    // -----------------------------------------------------------------------
-    // Highest-priority cancellation conditions
-    // -----------------------------------------------------------------------
-    if (in.external_cancel) {
-      enter_cooldown_(RecoveryReason::kExternalCancel, now_sec);
-    } else if (in.manual_override) {
-      if (is_active() || phase_ == RecoveryPhase::kArmed) {
-        enter_cooldown_(RecoveryReason::kManualMode, now_sec);
-      }
+      start_motion_phase(now);
     }
 
-    // -----------------------------------------------------------------------
-    // Cooldown handling
-    // -----------------------------------------------------------------------
-    if (phase_ == RecoveryPhase::kCooldown) {
-      if (now_sec >= cooldown_until_sec_) {
-        set_phase_(RecoveryPhase::kIdle, RecoveryReason::kNone, now_sec);
-        active_start_sec_ = 0.0;
-        has_trigger_pending_ = false;
-      }
+    result = run_motion_phase(now);
+    return result;
+  }
+
+  RecoveryManagerResult update_blocked(const double now_s, const bool blocked)
+  {
+    if (blocked && state_.active) {
+      block();
+
+      RecoveryManagerResult result;
+      result.state = state_.state;
+      result.trigger = state_.trigger;
+      result.action = state_.action;
+      result.command = TwistCommand{};
+      result.finished = true;
+      result.active = false;
+      result.reason = "blocked";
+      result.elapsed_s = elapsed(ControlMath::finite_or_zero(now_s));
+      result.phase_elapsed_s = phase_elapsed(ControlMath::finite_or_zero(now_s));
+      return result;
     }
 
-    // -----------------------------------------------------------------------
-    // Trigger handling
-    // -----------------------------------------------------------------------
-    const bool trigger = in.stuck_detected || in.no_progress;
-    const RecoveryReason trigger_reason =
-      in.stuck_detected ? RecoveryReason::kStuckDetected :
-      (in.no_progress ? RecoveryReason::kNoProgress : RecoveryReason::kNone);
+    return update(now_s);
+  }
 
-    if (phase_ == RecoveryPhase::kIdle) {
-      if (trigger) {
-        start_or_continue_trigger_(now_sec, trigger_reason);
-        maybe_start_recovery_(now_sec, in);
-      } else {
-        clear_trigger_();
-      }
-    } else if (phase_ == RecoveryPhase::kArmed) {
-      if (!trigger) {
-        clear_trigger_();
-        set_phase_(RecoveryPhase::kIdle, RecoveryReason::kNone, now_sec);
-      } else {
-        maybe_start_recovery_(now_sec, in);
-      }
-    }
+  bool active() const
+  {
+    return state_.active;
+  }
 
-    // -----------------------------------------------------------------------
-    // Safety stop during active recovery
-    // -----------------------------------------------------------------------
-    if (is_active() && (in.safety_stop_active || !in.motion_allowed)) {
-      enter_cooldown_(RecoveryReason::kSafetyStopActive, now_sec);
-    }
+  bool requested() const
+  {
+    return state_.requested;
+  }
 
-    // -----------------------------------------------------------------------
-    // Active recovery timeout
-    //
-    // Important:
-    //   This applies only to kBackingUp/kSettling/kTurning.
-    //   It does NOT apply to kArmed.
-    // -----------------------------------------------------------------------
-    if (is_active() && config_.max_recovery_duration_sec > 0.0) {
-      const double active_elapsed =
-        active_start_sec_ > 0.0 ? (now_sec - active_start_sec_) : 0.0;
+  bool finished() const
+  {
+    return is_recovery_terminal(state_.state);
+  }
 
-      if (active_elapsed > config_.max_recovery_duration_sec) {
-        enter_cooldown_(RecoveryReason::kTimeout, now_sec);
-      }
-    }
+  RecoveryState current_state() const
+  {
+    return state_.state;
+  }
 
-    // -----------------------------------------------------------------------
-    // Active phase progression
-    // -----------------------------------------------------------------------
-    if (phase_ == RecoveryPhase::kBackingUp) {
-      const double elapsed = now_sec - phase_start_sec_;
-      if (in.backup_completed || elapsed >= config_.backup_duration_sec) {
-        set_phase_(RecoveryPhase::kSettling, reason_, now_sec);
-      }
-    } else if (phase_ == RecoveryPhase::kSettling) {
-      const double elapsed = now_sec - phase_start_sec_;
-      if (elapsed >= config_.settle_duration_sec) {
-        if (config_.enable_turn_phase) {
-          set_phase_(RecoveryPhase::kTurning, reason_, now_sec);
-        } else {
-          set_phase_(RecoveryPhase::kComplete, reason_, now_sec);
-        }
-      }
-    } else if (phase_ == RecoveryPhase::kTurning) {
-      const double elapsed = now_sec - phase_start_sec_;
-      if (in.turn_completed || elapsed >= config_.turn_duration_sec) {
-        set_phase_(RecoveryPhase::kComplete, reason_, now_sec);
-      }
-    }
+  RecoveryAction current_action() const
+  {
+    return state_.action;
+  }
 
-    // -----------------------------------------------------------------------
-    // Complete is a one-update transition marker.
-    // Immediately enter cooldown, but completed=true below preserves the edge.
-    // -----------------------------------------------------------------------
-    const bool reached_complete = (phase_ == RecoveryPhase::kComplete);
-    if (reached_complete) {
-      enter_cooldown_(reason_, now_sec);
-    }
+  std::string status_string() const
+  {
+    std::ostringstream ss;
+    ss << "state=" << to_string(state_.state)
+       << "; trigger=" << to_string(state_.trigger)
+       << "; action=" << to_string(state_.action)
+       << "; active=" << bool_text(state_.active)
+       << "; requested=" << bool_text(state_.requested)
+       << "; completed=" << bool_text(state_.completed)
+       << "; failed=" << bool_text(state_.failed)
+       << "; blocked=" << bool_text(state_.blocked)
+       << "; phase=" << state_.phase_index;
 
-    // -----------------------------------------------------------------------
-    // Build status
-    // -----------------------------------------------------------------------
-    s.phase = phase_;
-    s.reason = reason_;
-    s.active = is_active();
-    s.in_cooldown = is_in_cooldown();
-    s.trigger_pending = is_trigger_pending();
-    s.attempts_in_streak = attempts_in_streak_;
-
-    s.phase_elapsed_sec = now_sec - phase_start_sec_;
-    s.active_elapsed_sec =
-      active_start_sec_ > 0.0 ? std::max(0.0, now_sec - active_start_sec_) : 0.0;
-
-    s.cooldown_remaining_sec =
-      phase_ == RecoveryPhase::kCooldown ?
-      std::max(0.0, cooldown_until_sec_ - now_sec) : 0.0;
-
-    s.phase_changed = (prev_phase != phase_);
-    s.started = (!was_active && s.active);
-
-    s.completed =
-      reached_complete ||
-      (prev_phase == RecoveryPhase::kComplete &&
-       phase_ == RecoveryPhase::kCooldown);
-
-    s.aborted =
-      phase_ == RecoveryPhase::kCooldown &&
-      (reason_ == RecoveryReason::kSafetyStopActive ||
-       reason_ == RecoveryReason::kExternalCancel ||
-       reason_ == RecoveryReason::kManualMode ||
-       reason_ == RecoveryReason::kTimeout ||
-       reason_ == RecoveryReason::kInvalidTime);
-
-    // If we changed from an active phase to cooldown because of an abort reason,
-    // mark it aborted.
-    if (was_active && phase_ == RecoveryPhase::kCooldown &&
-        reason_ != RecoveryReason::kStuckDetected &&
-        reason_ != RecoveryReason::kNoProgress &&
-        prev_reason != RecoveryReason::kStuckDetected &&
-        prev_reason != RecoveryReason::kNoProgress) {
-      s.aborted = true;
-    }
-
-    s.action = make_action_(phase_, reason_, s.active);
-    return s;
+    return ss.str();
   }
 
 private:
-  // ---------------------------------------------------------------------------
-  // Internal transition helpers
-  // ---------------------------------------------------------------------------
-  void set_phase_(RecoveryPhase new_phase, RecoveryReason new_reason, double now_sec)
+  RecoveryAction sanitize_action(const RecoveryAction action) const
   {
-    phase_ = new_phase;
-    reason_ = new_reason;
-    phase_start_sec_ = now_sec;
-  }
-
-  void enter_cooldown_(RecoveryReason reason, double now_sec)
-  {
-    set_phase_(RecoveryPhase::kCooldown, reason, now_sec);
-    cooldown_until_sec_ = now_sec + config_.cooldown_sec;
-    active_start_sec_ = 0.0;
-    clear_trigger_();
-  }
-
-  void start_or_continue_trigger_(double now_sec, RecoveryReason reason)
-  {
-    if (!has_trigger_pending_) {
-      has_trigger_pending_ = true;
-      trigger_start_sec_ = now_sec;
-      pending_trigger_reason_ = reason;
+    if (action == RecoveryAction::ROTATE_LEFT && !config_.allow_rotate_left) {
+      return config_.allow_rotate_right ? RecoveryAction::ROTATE_RIGHT : RecoveryAction::BACKUP;
     }
 
-    if (phase_ != RecoveryPhase::kArmed) {
-      set_phase_(RecoveryPhase::kArmed, reason, now_sec);
+    if (action == RecoveryAction::ROTATE_RIGHT && !config_.allow_rotate_right) {
+      return config_.allow_rotate_left ? RecoveryAction::ROTATE_LEFT : RecoveryAction::BACKUP;
     }
+
+    if (action == RecoveryAction::BACKUP_THEN_LEFT && !config_.allow_rotate_left) {
+      return config_.allow_rotate_right ? RecoveryAction::BACKUP_THEN_RIGHT : RecoveryAction::BACKUP;
+    }
+
+    if (action == RecoveryAction::BACKUP_THEN_RIGHT && !config_.allow_rotate_right) {
+      return config_.allow_rotate_left ? RecoveryAction::BACKUP_THEN_LEFT : RecoveryAction::BACKUP;
+    }
+
+    return action;
   }
 
-  void clear_trigger_()
+  RecoveryState state_for_action(const RecoveryAction action) const
   {
-    has_trigger_pending_ = false;
-    trigger_start_sec_ = 0.0;
-    pending_trigger_reason_ = RecoveryReason::kNone;
+    switch (action) {
+      case RecoveryAction::BACKUP:
+      case RecoveryAction::BACKUP_THEN_LEFT:
+      case RecoveryAction::BACKUP_THEN_RIGHT:
+      case RecoveryAction::ESCAPE_SEQUENCE:
+        return RecoveryState::BACKING_UP;
+
+      case RecoveryAction::ROTATE_LEFT:
+      case RecoveryAction::ROTATE_RIGHT:
+        return RecoveryState::ROTATING;
+
+      case RecoveryAction::STOP:
+      case RecoveryAction::NONE:
+        return RecoveryState::ACTIVE;
+    }
+
+    return RecoveryState::ACTIVE;
   }
 
-  void maybe_start_recovery_(double now_sec, const RecoveryInputs & in)
+  void start_motion_phase(const double now_s)
   {
-    if (!has_trigger_pending_) {
+    state_.phase_start_s = now_s;
+    state_.phase_index = 0;
+    state_.state = state_for_action(state_.action);
+  }
+
+  RecoveryManagerResult run_motion_phase(const double now_s)
+  {
+    RecoveryManagerResult result;
+    result.state = state_.state;
+    result.trigger = state_.trigger;
+    result.action = state_.action;
+    result.active = true;
+    result.recovery_request_active = true;
+    result.elapsed_s = elapsed(now_s);
+    result.phase_elapsed_s = phase_elapsed(now_s);
+
+    if (state_.phase_index >= 100) {
+      complete_or_stop_after(now_s, result, "post_stop_done");
+      return result;
+    }
+
+    switch (state_.action) {
+      case RecoveryAction::NONE:
+      case RecoveryAction::STOP:
+        complete_or_stop_after(now_s, result, "stop");
+        return result;
+
+      case RecoveryAction::BACKUP:
+        run_backup_only(now_s, result);
+        return result;
+
+      case RecoveryAction::ROTATE_LEFT:
+        run_rotate_only(now_s, result, true);
+        return result;
+
+      case RecoveryAction::ROTATE_RIGHT:
+        run_rotate_only(now_s, result, false);
+        return result;
+
+      case RecoveryAction::BACKUP_THEN_LEFT:
+        run_backup_then_rotate(now_s, result, true);
+        return result;
+
+      case RecoveryAction::BACKUP_THEN_RIGHT:
+        run_backup_then_rotate(now_s, result, false);
+        return result;
+
+      case RecoveryAction::ESCAPE_SEQUENCE:
+        run_escape_sequence(now_s, result);
+        return result;
+    }
+
+    complete(result, "unknown_action");
+    return result;
+  }
+
+  void run_backup_only(const double now_s, RecoveryManagerResult & result)
+  {
+    if (phase_elapsed(now_s) >= config_.backup_duration_s) {
+      complete_or_stop_after(now_s, result, "backup_done");
       return;
     }
 
-    const double pending_elapsed = now_sec - trigger_start_sec_;
-    if (pending_elapsed < config_.trigger_confirm_sec) {
+    state_.state = RecoveryState::BACKING_UP;
+    result.state = state_.state;
+    result.command = limited_command(config_.backup_vx, 0.0, 0.0);
+    result.reason = "backup";
+  }
+
+  void run_rotate_only(
+    const double now_s,
+    RecoveryManagerResult & result,
+    const bool left)
+  {
+    if (phase_elapsed(now_s) >= config_.rotate_duration_s) {
+      complete_or_stop_after(now_s, result, "rotate_done");
       return;
     }
 
-    if (attempts_in_streak_ >= config_.max_attempts_per_streak) {
-      enter_cooldown_(RecoveryReason::kTooManyAttempts, now_sec);
+    state_.state = RecoveryState::ROTATING;
+    result.state = state_.state;
+    result.command = limited_command(0.0, 0.0, left ? config_.rotate_wz : -config_.rotate_wz);
+    result.reason = left ? "rotate_left" : "rotate_right";
+  }
+
+  void run_backup_then_rotate(
+    const double now_s,
+    RecoveryManagerResult & result,
+    const bool left)
+  {
+    if (state_.phase_index == 0) {
+      if (phase_elapsed(now_s) < config_.backup_duration_s) {
+        state_.state = RecoveryState::BACKING_UP;
+        result.state = state_.state;
+        result.command = limited_command(config_.backup_vx, 0.0, 0.0);
+        result.reason = "backup";
+        return;
+      }
+
+      state_.phase_index = 1;
+      state_.phase_start_s = now_s;
+      state_.state = RecoveryState::ROTATING;
+    }
+
+    if (phase_elapsed(now_s) < config_.rotate_duration_s) {
+      state_.state = RecoveryState::ROTATING;
+      result.state = state_.state;
+      result.command = limited_command(0.0, 0.0, left ? config_.rotate_wz : -config_.rotate_wz);
+      result.reason = left ? "rotate_left" : "rotate_right";
       return;
     }
 
-    if (!in.motion_allowed || in.safety_stop_active) {
-      enter_cooldown_(RecoveryReason::kSafetyStopActive, now_sec);
+    complete_or_stop_after(now_s, result, "backup_then_rotate_done");
+  }
+
+  void run_escape_sequence(const double now_s, RecoveryManagerResult & result)
+  {
+    if (state_.phase_index == 0) {
+      if (phase_elapsed(now_s) < config_.backup_duration_s) {
+        state_.state = RecoveryState::BACKING_UP;
+        result.state = state_.state;
+        result.command = limited_command(config_.backup_vx, 0.0, 0.0);
+        result.reason = "escape_backup";
+        return;
+      }
+
+      state_.phase_index = 1;
+      state_.phase_start_s = now_s;
+      state_.state = RecoveryState::ROTATING;
+    }
+
+    if (state_.phase_index == 1) {
+      if (phase_elapsed(now_s) < config_.rotate_duration_s) {
+        state_.state = RecoveryState::ROTATING;
+        result.state = state_.state;
+        result.command = limited_command(0.0, 0.0, config_.rotate_wz);
+        result.reason = "escape_rotate_left";
+        return;
+      }
+
+      state_.phase_index = 2;
+      state_.phase_start_s = now_s;
+      state_.state = RecoveryState::ESCAPING;
+    }
+
+    if (phase_elapsed(now_s) < config_.backup_duration_s) {
+      state_.state = RecoveryState::ESCAPING;
+      result.state = state_.state;
+      result.command = limited_command(config_.backup_vx, 0.0, -config_.rotate_wz);
+      result.reason = "escape_arc";
       return;
     }
 
-    attempts_in_streak_++;
-    choose_next_turn_sign_();
-    active_start_sec_ = now_sec;
-    clear_trigger_();
-
-    set_phase_(RecoveryPhase::kBackingUp, pending_trigger_reason_, now_sec);
+    complete_or_stop_after(now_s, result, "escape_done");
   }
 
-  bool valid_time_(double now_sec) const
+  void complete_or_stop_after(
+    const double now_s,
+    RecoveryManagerResult & result,
+    const std::string & reason)
   {
-    return std::isfinite(now_sec) && now_sec >= config_.min_time_sec;
-  }
+    if (config_.stop_after_motion && state_.state != RecoveryState::COMPLETED) {
+      if (state_.phase_index < 100) {
+        state_.phase_index = 100;
+        state_.phase_start_s = now_s;
+        state_.state = RecoveryState::ACTIVE;
+      }
 
-  void choose_next_turn_sign_()
-  {
-    // Alternate turn direction between attempts.
-    turn_sign_ = (turn_sign_ >= 0) ? -1 : +1;
-  }
-
-  RecoveryAction make_action_(
-    RecoveryPhase phase,
-    RecoveryReason reason,
-    bool active) const
-  {
-    RecoveryAction a{};
-    a.active = active;
-    a.phase = phase;
-    a.reason = reason;
-    a.turn_sign = turn_sign_;
-
-    switch (phase) {
-      case RecoveryPhase::kBackingUp:
-        a.command_backup = true;
-        a.command_turn = false;
-        a.command_stop = false;
-        break;
-
-      case RecoveryPhase::kTurning:
-        a.command_backup = false;
-        a.command_turn = true;
-        a.command_stop = false;
-        break;
-
-      case RecoveryPhase::kArmed:
-      case RecoveryPhase::kSettling:
-      case RecoveryPhase::kComplete:
-      case RecoveryPhase::kAborted:
-      case RecoveryPhase::kCooldown:
-        a.command_backup = false;
-        a.command_turn = false;
-        a.command_stop = true;
-        break;
-
-      case RecoveryPhase::kIdle:
-      default:
-        a.command_backup = false;
-        a.command_turn = false;
-        a.command_stop = false;
-        break;
+      if (phase_elapsed(now_s) < config_.stop_hold_s) {
+        result.state = state_.state;
+        result.active = true;
+        result.recovery_request_active = true;
+        result.command = TwistCommand{};
+        result.reason = "post_stop";
+        return;
+      }
     }
 
-    return a;
+    complete(result, reason);
   }
 
-  void normalize_config_()
+  void complete(RecoveryManagerResult & result, const std::string & reason)
   {
-    auto sane_nonneg = [](double value, double fallback) {
-      return std::isfinite(value) && value >= 0.0 ? value : fallback;
-    };
+    finish_as(RecoveryState::COMPLETED);
 
-    config_.trigger_confirm_sec =
-      sane_nonneg(config_.trigger_confirm_sec, 0.20);
-    config_.backup_duration_sec =
-      sane_nonneg(config_.backup_duration_sec, 0.60);
-    config_.settle_duration_sec =
-      sane_nonneg(config_.settle_duration_sec, 0.20);
-    config_.turn_duration_sec =
-      sane_nonneg(config_.turn_duration_sec, 0.40);
-    config_.max_recovery_duration_sec =
-      sane_nonneg(config_.max_recovery_duration_sec, 3.0);
-    config_.cooldown_sec =
-      sane_nonneg(config_.cooldown_sec, 1.0);
-    config_.min_time_sec =
-      sane_nonneg(config_.min_time_sec, 0.0);
-    config_.max_time_jump_sec =
-      sane_nonneg(config_.max_time_jump_sec, 5.0);
-
-    if (config_.max_attempts_per_streak == 0) {
-      config_.max_attempts_per_streak = 1;
-    }
-
-    const double min_active_duration =
-      config_.backup_duration_sec +
-      config_.settle_duration_sec +
-      (config_.enable_turn_phase ? config_.turn_duration_sec : 0.0);
-
-    if (config_.max_recovery_duration_sec > 0.0) {
-      config_.max_recovery_duration_sec =
-        std::max(config_.max_recovery_duration_sec, min_active_duration + 0.05);
-    }
+    result.state = state_.state;
+    result.command = TwistCommand{};
+    result.finished = true;
+    result.active = false;
+    result.recovery_request_active = false;
+    result.reason = reason;
   }
 
-private:
-  RecoveryManagerConfig config_ {};
+  void finish_as(const RecoveryState state)
+  {
+    state_.state = state;
+    state_.active = false;
+    state_.requested = false;
+    state_.completed = state == RecoveryState::COMPLETED;
+    state_.failed = state == RecoveryState::FAILED || state == RecoveryState::TIMEOUT;
+    state_.blocked = state == RecoveryState::BLOCKED;
+  }
 
-  RecoveryPhase phase_ {RecoveryPhase::kIdle};
-  RecoveryReason reason_ {RecoveryReason::kNone};
+  TwistCommand limited_command(
+    const double vx,
+    const double vy,
+    const double wz) const
+  {
+    return limiter_.limit(make_twist_command(vx, vy, wz));
+  }
 
-  bool initialized_ {false};
-  double last_now_sec_ {0.0};
+  double elapsed(const double now_s) const
+  {
+    return std::max(0.0, ControlMath::finite_or_zero(now_s) - state_.start_s);
+  }
 
-  bool has_trigger_pending_ {false};
-  double trigger_start_sec_ {0.0};
-  RecoveryReason pending_trigger_reason_ {RecoveryReason::kNone};
+  double phase_elapsed(const double now_s) const
+  {
+    return std::max(0.0, ControlMath::finite_or_zero(now_s) - state_.phase_start_s);
+  }
 
-  double phase_start_sec_ {0.0};
-  double active_start_sec_ {0.0};
-  double cooldown_until_sec_ {0.0};
+  static const char * bool_text(const bool value)
+  {
+    return value ? "true" : "false";
+  }
 
-  std::uint32_t attempts_in_streak_ {0};
-  int turn_sign_ {+1};
+  RecoveryManagerConfig config_{};
+  RecoveryManagerState state_{};
+  CommandLimiter limiter_{};
 };
 
 }  // namespace savo_control

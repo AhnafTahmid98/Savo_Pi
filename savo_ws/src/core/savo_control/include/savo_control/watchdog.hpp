@@ -1,89 +1,143 @@
 #pragma once
 
-// Lightweight freshness watchdog. kick() marks a source seen; check() returns fresh/stale state.
-
+#include <algorithm>
 #include <cmath>
-#include <cstdint>
+#include <sstream>
+#include <string>
+
+#include "savo_control/control_math.hpp"
 
 namespace savo_control
 {
 
-// -----------------------------------------------------------------------------
-// Watchdog configuration
-// -----------------------------------------------------------------------------
+enum class WatchdogState
+{
+  OK,
+  STALE,
+  TIMEOUT,
+  DISABLED
+};
+
+inline std::string to_string(const WatchdogState state)
+{
+  switch (state) {
+    case WatchdogState::OK:
+      return "OK";
+    case WatchdogState::STALE:
+      return "STALE";
+    case WatchdogState::TIMEOUT:
+      return "TIMEOUT";
+    case WatchdogState::DISABLED:
+      return "DISABLED";
+  }
+
+  return "TIMEOUT";
+}
+
+inline std::string watchdog_state_to_string(const WatchdogState state)
+{
+  return to_string(state);
+}
+
+inline bool watchdog_is_ok(const WatchdogState state)
+{
+  return state == WatchdogState::OK;
+}
+
+inline bool watchdog_is_faulted(const WatchdogState state)
+{
+  return state == WatchdogState::STALE ||
+         state == WatchdogState::TIMEOUT ||
+         state == WatchdogState::DISABLED;
+}
+
 struct WatchdogConfig
 {
-  // Timeout threshold in seconds.
-  // If <= 0, timeout checks are effectively disabled (always fresh after first update).
-  double timeout_sec {0.5};
+  double stale_timeout_s{0.50};
+  double hard_timeout_s{1.00};
 
-  // Optional startup grace period in seconds, measured from initialize()/reset(now).
-  // During grace, "never updated" state may be treated as not stale.
-  double startup_grace_sec {0.0};
+  bool enabled{true};
+  bool fail_safe_on_never_seen{true};
+  bool timeout_is_fault{true};
 
-  // If true, a watchdog with no updates yet is considered stale (after grace).
-  // If false, "never seen" remains not stale until first update.
-  bool stale_if_never_seen {true};
+  WatchdogConfig sanitized() const
+  {
+    WatchdogConfig out = *this;
 
-  // Minimum valid time delta accepted between updates/checks.
-  // Helps guard against invalid/non-finite time values.
-  double min_time_sec {0.0};
+    if (!std::isfinite(out.stale_timeout_s) || out.stale_timeout_s < 0.0) {
+      out.stale_timeout_s = 0.50;
+    }
 
-  // Maximum valid time jump (optional sanity guard).
-  // If <= 0, disabled. If enabled and exceeded, callers may decide to reset.
-  double max_time_jump_sec {0.0};
+    if (!std::isfinite(out.hard_timeout_s) || out.hard_timeout_s < out.stale_timeout_s) {
+      out.hard_timeout_s = std::max(1.00, out.stale_timeout_s);
+    }
+
+    return out;
+  }
 };
 
-// -----------------------------------------------------------------------------
-// Status/result snapshot
-// -----------------------------------------------------------------------------
 struct WatchdogStatus
 {
-  bool initialized {false};
-  bool has_seen_update {false};
+  WatchdogState state{WatchdogState::TIMEOUT};
 
-  bool fresh {false};
-  bool stale {false};
-  bool in_startup_grace {false};
+  bool ok{false};
+  bool stale{true};
+  bool timeout{true};
+  bool enabled{true};
+  bool seen{false};
 
-  // Edge indicators compared to previous check() call
-  bool became_fresh {false};
-  bool became_stale {false};
+  double age_s{0.0};
+  double last_seen_s{0.0};
+  double now_s{0.0};
 
-  // Timing diagnostics
-  double now_sec {0.0};
-  double start_time_sec {0.0};
-  double last_update_sec {0.0};
+  std::string name{"watchdog"};
+  std::string reason{"never_seen"};
 
-  // Ages
-  double age_since_update_sec {0.0};   // valid if has_seen_update=true
-  double age_since_start_sec {0.0};    // valid if initialized=true
+  std::string to_status_text() const
+  {
+    std::ostringstream ss;
+    ss << "name=" << name
+       << "; state=" << to_string(state)
+       << "; ok=" << bool_text(ok)
+       << "; stale=" << bool_text(stale)
+       << "; timeout=" << bool_text(timeout)
+       << "; enabled=" << bool_text(enabled)
+       << "; seen=" << bool_text(seen)
+       << "; age_s=" << age_s
+       << "; reason=" << reason;
 
-  // Whether the check input looked valid
-  bool time_valid {false};
+    return ss.str();
+  }
+
+private:
+  static const char * bool_text(const bool value)
+  {
+    return value ? "true" : "false";
+  }
 };
 
-// -----------------------------------------------------------------------------
-// Generic watchdog
-// -----------------------------------------------------------------------------
 class Watchdog
 {
 public:
-  Watchdog() = default;
-
-  explicit Watchdog(const WatchdogConfig & cfg)
-  : config_(cfg)
+  Watchdog()
+  : config_(WatchdogConfig{}.sanitized())
   {
-    normalize_config_();
   }
 
-  // -------------------------
-  // Configuration
-  // -------------------------
-  void set_config(const WatchdogConfig & cfg)
+  explicit Watchdog(const WatchdogConfig & config)
+  : config_(config.sanitized())
   {
-    config_ = cfg;
-    normalize_config_();
+  }
+
+  Watchdog(const std::string & name, const WatchdogConfig & config = WatchdogConfig{})
+  : name_(name.empty() ? "watchdog" : name),
+    config_(config.sanitized())
+  {
+  }
+
+  void set_config(const WatchdogConfig & config)
+  {
+    config_ = config.sanitized();
   }
 
   const WatchdogConfig & config() const
@@ -91,242 +145,143 @@ public:
     return config_;
   }
 
-  // -------------------------
-  // Lifecycle / state
-  // -------------------------
+  void set_name(const std::string & name)
+  {
+    name_ = name.empty() ? "watchdog" : name;
+  }
+
+  const std::string & name() const
+  {
+    return name_;
+  }
+
   void reset()
   {
-    initialized_ = false;
-    has_seen_update_ = false;
-    start_time_sec_ = 0.0;
-    last_update_sec_ = 0.0;
-
-    prev_fresh_ = false;
-    prev_stale_ = false;
-    has_prev_check_state_ = false;
+    last_seen_s_ = 0.0;
+    has_seen_ = false;
   }
 
-  // Initialize watchdog start time (useful for startup grace logic)
-  void initialize(double now_sec)
+  void tick(const double now_s)
   {
-    if (!is_valid_time_(now_sec)) {
-      return;
-    }
-    initialized_ = true;
-    start_time_sec_ = now_sec;
-
-    // Reset edge tracking baseline on explicit init
-    prev_fresh_ = false;
-    prev_stale_ = false;
-    has_prev_check_state_ = false;
+    last_seen_s_ = ControlMath::finite_or_zero(now_s);
+    has_seen_ = true;
   }
 
-  // Reset and initialize in one call
-  void reset(double now_sec)
+  void observe(const double now_s)
   {
-    reset();
-    initialize(now_sec);
+    tick(now_s);
   }
 
-  bool initialized() const
+  bool seen() const
   {
-    return initialized_;
+    return has_seen_;
   }
 
-  bool has_seen_update() const
+  double last_seen_s() const
   {
-    return has_seen_update_;
+    return last_seen_s_;
   }
 
-  double start_time_sec() const
+  double age_s(const double now_s) const
   {
-    return start_time_sec_;
-  }
-
-  double last_update_sec() const
-  {
-    return last_update_sec_;
-  }
-
-  // -------------------------
-  // Update ("kick"/heartbeat)
-  // -------------------------
-  // Marks the source as seen at now_sec.
-  // Returns false only if time is invalid.
-  bool update(double now_sec)
-  {
-    if (!is_valid_time_(now_sec)) {
-      return false;
+    if (!has_seen_) {
+      return 0.0;
     }
 
-    if (!initialized_) {
-      initialize(now_sec);
+    return std::max(0.0, ControlMath::finite_or_zero(now_s) - last_seen_s_);
+  }
+
+  bool fresh(const double now_s) const
+  {
+    return status(now_s).ok;
+  }
+
+  bool stale(const double now_s) const
+  {
+    return status(now_s).stale;
+  }
+
+  bool timed_out(const double now_s) const
+  {
+    return status(now_s).timeout;
+  }
+
+  WatchdogStatus status(const double now_s) const
+  {
+    const auto cfg = config_.sanitized();
+    const double safe_now = ControlMath::finite_or_zero(now_s);
+
+    WatchdogStatus out;
+    out.name = name_;
+    out.enabled = cfg.enabled;
+    out.seen = has_seen_;
+    out.last_seen_s = last_seen_s_;
+    out.now_s = safe_now;
+    out.age_s = age_s(safe_now);
+
+    if (!cfg.enabled) {
+      out.state = WatchdogState::DISABLED;
+      out.ok = false;
+      out.stale = true;
+      out.timeout = true;
+      out.reason = "disabled";
+      return out;
     }
 
-    // Optional sanity guard for large backwards/forwards jumps can be handled by caller.
-    last_update_sec_ = now_sec;
-    has_seen_update_ = true;
-    return true;
-  }
+    if (!has_seen_) {
+      if (cfg.fail_safe_on_never_seen) {
+        out.state = WatchdogState::TIMEOUT;
+        out.ok = false;
+        out.stale = true;
+        out.timeout = true;
+        out.reason = "never_seen";
+      } else {
+        out.state = WatchdogState::OK;
+        out.ok = true;
+        out.stale = false;
+        out.timeout = false;
+        out.reason = "never_seen_allowed";
+      }
 
-  // Alias often used in watchdog semantics
-  bool kick(double now_sec)
-  {
-    return update(now_sec);
-  }
-
-  // -------------------------
-  // Queries
-  // -------------------------
-  // Age since last update. Returns fallback if unavailable/invalid.
-  double age_since_update(double now_sec, double fallback = 0.0) const
-  {
-    if (!has_seen_update_ || !is_valid_time_(now_sec)) {
-      return fallback;
-    }
-    return now_sec - last_update_sec_;
-  }
-
-  // Fresh means "not stale" and source considered present.
-  bool is_fresh(double now_sec) const
-  {
-    return compute_state_(now_sec).fresh;
-  }
-
-  bool is_stale(double now_sec) const
-  {
-    return compute_state_(now_sec).stale;
-  }
-
-  // Full status with edge detection (updates internal edge baseline)
-  WatchdogStatus check(double now_sec)
-  {
-    WatchdogStatus s = compute_state_(now_sec);
-
-    if (has_prev_check_state_) {
-      s.became_fresh = (!prev_fresh_ && s.fresh);
-      s.became_stale = (!prev_stale_ && s.stale);
-    } else {
-      s.became_fresh = false;
-      s.became_stale = false;
+      return out;
     }
 
-    prev_fresh_ = s.fresh;
-    prev_stale_ = s.stale;
-    has_prev_check_state_ = s.time_valid;  // only lock baseline on valid checks
-    return s;
+    if (out.age_s > cfg.hard_timeout_s) {
+      out.state = WatchdogState::TIMEOUT;
+      out.ok = false;
+      out.stale = true;
+      out.timeout = cfg.timeout_is_fault;
+      out.reason = "hard_timeout";
+      return out;
+    }
+
+    if (out.age_s > cfg.stale_timeout_s) {
+      out.state = WatchdogState::STALE;
+      out.ok = false;
+      out.stale = true;
+      out.timeout = false;
+      out.reason = "stale";
+      return out;
+    }
+
+    out.state = WatchdogState::OK;
+    out.ok = true;
+    out.stale = false;
+    out.timeout = false;
+    out.reason = "fresh";
+    return out;
+  }
+
+  std::string status_string(const double now_s) const
+  {
+    return status(now_s).to_status_text();
   }
 
 private:
-  // Internal, non-mutating state computation
-  WatchdogStatus compute_state_(double now_sec) const
-  {
-    WatchdogStatus s{};
-    s.initialized = initialized_;
-    s.has_seen_update = has_seen_update_;
-    s.now_sec = now_sec;
-    s.start_time_sec = start_time_sec_;
-    s.last_update_sec = last_update_sec_;
-    s.time_valid = is_valid_time_(now_sec);
-
-    if (!s.time_valid) {
-      // Safe default: invalid time -> treat as stale only if strict never-seen policy + no grace not applicable.
-      s.fresh = false;
-      s.stale = true;
-      return s;
-    }
-
-    if (initialized_) {
-      s.age_since_start_sec = now_sec - start_time_sec_;
-      s.in_startup_grace =
-        (config_.startup_grace_sec > 0.0) &&
-        (s.age_since_start_sec >= 0.0) &&
-        (s.age_since_start_sec < config_.startup_grace_sec);
-    }
-
-    if (has_seen_update_) {
-      s.age_since_update_sec = now_sec - last_update_sec_;
-
-      // If time appears to go backwards, fail safe to stale.
-      if (s.age_since_update_sec < 0.0) {
-        s.fresh = false;
-        s.stale = true;
-        return s;
-      }
-
-      // timeout <= 0 means no timeout after first valid update
-      if (config_.timeout_sec <= 0.0) {
-        s.fresh = true;
-        s.stale = false;
-        return s;
-      }
-
-      s.stale = (s.age_since_update_sec > config_.timeout_sec);
-      s.fresh = !s.stale;
-      return s;
-    }
-
-    // Never seen update yet
-    if (s.in_startup_grace) {
-      s.fresh = false;
-      s.stale = false;  // grace period suppresses stale state
-      return s;
-    }
-
-    if (config_.stale_if_never_seen) {
-      s.fresh = false;
-      s.stale = true;
-    } else {
-      s.fresh = false;
-      s.stale = false;
-    }
-
-    return s;
-  }
-
-  bool is_valid_time_(double t) const
-  {
-    if (!std::isfinite(t)) {
-      return false;
-    }
-    if (t < config_.min_time_sec) {
-      return false;
-    }
-    return true;
-  }
-
-  void normalize_config_()
-  {
-    if (!std::isfinite(config_.timeout_sec)) {
-      config_.timeout_sec = 0.5;
-    }
-    if (!std::isfinite(config_.startup_grace_sec) || config_.startup_grace_sec < 0.0) {
-      config_.startup_grace_sec = 0.0;
-    }
-    if (!std::isfinite(config_.min_time_sec)) {
-      config_.min_time_sec = 0.0;
-    }
-    if (!std::isfinite(config_.max_time_jump_sec)) {
-      config_.max_time_jump_sec = 0.0;
-    }
-    if (config_.max_time_jump_sec < 0.0) {
-      config_.max_time_jump_sec = 0.0;
-    }
-  }
-
-private:
-  WatchdogConfig config_ {};
-
-  // Core timestamps/state
-  bool initialized_ {false};
-  bool has_seen_update_ {false};
-  double start_time_sec_ {0.0};
-  double last_update_sec_ {0.0};
-
-  // Edge detection memory (updated by check())
-  bool prev_fresh_ {false};
-  bool prev_stale_ {false};
-  bool has_prev_check_state_ {false};
+  std::string name_{"watchdog"};
+  WatchdogConfig config_{};
+  double last_seen_s_{0.0};
+  bool has_seen_{false};
 };
 
 }  // namespace savo_control

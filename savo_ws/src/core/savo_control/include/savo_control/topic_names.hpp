@@ -1,79 +1,122 @@
 #pragma once
 
-namespace savo_control
+#include <string>
+
+namespace savo_control::topics
 {
-namespace topic_names
+
+// Command chain
+inline constexpr const char * CMD_VEL_MANUAL = "/cmd_vel_manual";
+inline constexpr const char * CMD_VEL_AUTO = "/cmd_vel_auto";
+inline constexpr const char * CMD_VEL_NAV = "/cmd_vel_nav";
+inline constexpr const char * CMD_VEL_RECOVERY = "/cmd_vel_recovery";
+inline constexpr const char * CMD_VEL_MUX = "/cmd_vel_mux";
+inline constexpr const char * CMD_VEL = "/cmd_vel";
+inline constexpr const char * CMD_VEL_SAFE = "/cmd_vel_safe";
+
+// Control mode
+inline constexpr const char * CONTROL_MODE_CMD = "/savo_control/mode_cmd";
+inline constexpr const char * CONTROL_MODE_STATE = "/savo_control/mode_state";
+inline constexpr const char * CONTROL_MODE_REASON = "/savo_control/mode_reason";
+inline constexpr const char * CONTROL_STATUS = "/savo_control/control_status";
+
+// Safety
+inline constexpr const char * SAFETY_STOP = "/safety/stop";
+inline constexpr const char * SAFETY_SLOWDOWN_FACTOR = "/safety/slowdown_factor";
+
+// Recovery
+inline constexpr const char * RECOVERY_REQUEST = "/savo_control/recovery_request";
+inline constexpr const char * RECOVERY_ACTIVE = "/savo_control/recovery_active";
+inline constexpr const char * RECOVERY_STATUS = "/savo_control/recovery_status";
+inline constexpr const char * STUCK_DETECTED = "/savo_control/stuck_detected";
+inline constexpr const char * STUCK_STATE = "/savo_control/stuck_state";
+
+// Auto / test
+inline constexpr const char * AUTO_TEST_ENABLE = "/savo_control/auto_test_enable";
+inline constexpr const char * AUTO_TEST_STATE = "/savo_control/auto_test_state";
+inline constexpr const char * AUTO_TEST_CMD = "/savo_control/auto_test_cmd";
+
+inline constexpr const char * RECOVERY_TEST_ENABLE = "/savo_control/recovery_test_enable";
+inline constexpr const char * RECOVERY_TEST_STATUS = "/savo_control/recovery_test_status";
+inline constexpr const char * RECOVERY_TEST_CMD = "/savo_control/recovery_test_cmd";
+
+inline constexpr const char * STRAIGHT_LINE_ENABLE = "/savo_control/straight_line_enable";
+inline constexpr const char * STRAIGHT_LINE_TARGET = "/savo_control/straight_line_target_m";
+inline constexpr const char * STRAIGHT_LINE_STATE = "/savo_control/straight_line_state";
+
+inline constexpr const char * DISTANCE_TEST_ENABLE = "/savo_control/distance_approach_enable";
+inline constexpr const char * DISTANCE_TEST_TARGET = "/savo_control/distance_test_target_m";
+inline constexpr const char * DISTANCE_TEST_STATE = "/savo_control/distance_test_state";
+
+// Perception / odom inputs used by control
+inline constexpr const char * ODOM_FILTERED = "/odometry/filtered";
+inline constexpr const char * WHEEL_ODOM = "/wheel/odom";
+inline constexpr const char * DEPTH_MIN_FRONT = "/depth/min_front_m";
+inline constexpr const char * FRONT_ULTRASONIC = "/savo_perception/range/front_ultrasonic_m";
+inline constexpr const char * RANGE_LEFT = "/savo_perception/range/left_m";
+inline constexpr const char * RANGE_RIGHT = "/savo_perception/range/right_m";
+
+// Dashboard / diagnostics
+inline constexpr const char * CONTROL_DASHBOARD = "/savo_control/dashboard";
+inline constexpr const char * CONTROL_DASHBOARD_TEXT = "/savo_control/dashboard_text";
+inline constexpr const char * RECOVERY_MONITOR_STATUS = "/savo_control/recovery_monitor_status";
+inline constexpr const char * BACKUP_ESCAPE_STATUS = "/savo_control/backup_escape_status";
+
+inline std::string join_topic(const std::string & prefix, const std::string & suffix)
 {
+  if (prefix.empty()) {
+    return suffix;
+  }
 
-// command sources
-inline constexpr const char * kCmdVelManual = "/cmd_vel_manual";
-inline constexpr const char * kCmdVelAuto   = "/cmd_vel_auto";
-inline constexpr const char * kCmdVelNav    = "/cmd_vel_nav";      // Nav2 controller output (remapped)
-inline constexpr const char * kCmdVelRecovery = "/cmd_vel_recovery";
+  if (suffix.empty()) {
+    return prefix;
+  }
 
-inline constexpr const char * kCmdVelMuxSelected = "/cmd_vel_mux";   // output of twist_mux_node
-inline constexpr const char * kCmdVelShaped      = "/cmd_vel";       // output of cmd_vel_shaper_node
-inline constexpr const char * kCmdVelSafe        = "/cmd_vel_safe";  // output of safety gate (savo_perception)
+  if (prefix.back() == '/' && suffix.front() == '/') {
+    return prefix + suffix.substr(1);
+  }
 
-inline constexpr const char * kCmdVelRaw = "/cmd_vel_raw";
-inline constexpr const char * kCmdVelTestPattern = "/cmd_vel_test_pattern";
+  if (prefix.back() != '/' && suffix.front() != '/') {
+    return prefix + "/" + suffix;
+  }
 
-// localization / state feedback
-// Stable name regardless of encoder count.
-inline constexpr const char * kWheelOdom     = "/wheel/odom";
-inline constexpr const char * kOdomFiltered  = "/odometry/filtered";
+  return prefix + suffix;
+}
 
-inline constexpr const char * kImuData       = "/imu/data";
-inline constexpr const char * kImuDataRaw    = "/imu/data_raw";
+inline bool is_command_topic(const std::string & topic)
+{
+  return topic == CMD_VEL_MANUAL ||
+         topic == CMD_VEL_AUTO ||
+         topic == CMD_VEL_NAV ||
+         topic == CMD_VEL_RECOVERY ||
+         topic == CMD_VEL_MUX ||
+         topic == CMD_VEL ||
+         topic == CMD_VEL_SAFE;
+}
 
-// perception safety interfaces
-inline constexpr const char * kSafetyStop           = "/safety/stop";
-inline constexpr const char * kSafetySlowdownFactor = "/safety/slowdown_factor";
+inline bool is_status_topic(const std::string & topic)
+{
+  return topic == CONTROL_STATUS ||
+         topic == CONTROL_MODE_STATE ||
+         topic == CONTROL_MODE_REASON ||
+         topic == RECOVERY_STATUS ||
+         topic == RECOVERY_MONITOR_STATUS ||
+         topic == CONTROL_DASHBOARD ||
+         topic == CONTROL_DASHBOARD_TEXT ||
+         topic == AUTO_TEST_STATE ||
+         topic == RECOVERY_TEST_STATUS ||
+         topic == STRAIGHT_LINE_STATE ||
+         topic == DISTANCE_TEST_STATE;
+}
 
-inline constexpr const char * kDepthMinFront        = "/depth/min_front_m";
-inline constexpr const char * kRangeFrontUltrasonic = "/savo_perception/range/front_ultrasonic_m";
-inline constexpr const char * kRangeLeft            = "/savo_perception/range/left_m";
-inline constexpr const char * kRangeRight           = "/savo_perception/range/right_m";
+inline bool is_sensor_topic(const std::string & topic)
+{
+  return topic == ODOM_FILTERED ||
+         topic == WHEEL_ODOM ||
+         topic == DEPTH_MIN_FRONT ||
+         topic == FRONT_ULTRASONIC ||
+         topic == RANGE_LEFT ||
+         topic == RANGE_RIGHT;
+}
 
-// control package internal topics
-inline constexpr const char * kControlModeCmd       = "/savo_control/mode_cmd";
-inline constexpr const char * kControlModeState     = "/savo_control/mode_state";
-
-inline constexpr const char * kHeadingTarget        = "/savo_control/heading_target";
-inline constexpr const char * kHeadingHoldEnable    = "/savo_control/heading_hold_enable";
-inline constexpr const char * kRotateTarget         = "/savo_control/rotate_target";
-inline constexpr const char * kRotateState          = "/savo_control/rotate_state";
-
-inline constexpr const char * kAutoTestEnable       = "/savo_control/auto_test_enable";
-inline constexpr const char * kAutoTestState        = "/savo_control/auto_test_state";
-inline constexpr const char * kDistanceTestTarget   = "/savo_control/distance_test_target";
-inline constexpr const char * kDistanceTestState    = "/savo_control/distance_test_state";
-inline constexpr const char * kStraightTestEnable   = "/savo_control/straight_test_enable";
-inline constexpr const char * kStraightTestState    = "/savo_control/straight_test_state";
-
-// recovery topics
-inline constexpr const char * kStuckDetected        = "/savo_control/stuck_detected";
-inline constexpr const char * kRecoveryRequest      = "/savo_control/recovery_request";
-inline constexpr const char * kRecoveryActive       = "/savo_control/recovery_active";
-// deprecated — use kRecoveryRequest
-inline constexpr const char * kRecoveryTrigger      = "/savo_control/recovery_trigger";
-inline constexpr const char * kRecoveryState        = "/savo_control/recovery_state";
-inline constexpr const char * kRecoveryStatus       = "/savo_control/recovery_status";
-
-inline constexpr const char * kControlStatus        = "/savo_control/control_status";
-inline constexpr const char * kControlDebug         = "/savo_control/control_debug";
-
-inline constexpr const char * kFrameMap      = "map";
-inline constexpr const char * kFrameOdom     = "odom";
-inline constexpr const char * kFrameBaseLink = "base_link";
-
-inline constexpr const char * kFrameBaseFootprint = "base_footprint";
-inline constexpr const char * kFrameImuLink       = "imu_link";
-inline constexpr const char * kFrameLaser         = "laser";
-inline constexpr const char * kFrameCameraLink    = "camera_link";
-
-inline constexpr const char * kNamespaceControl = "/savo_control";
-inline constexpr const char * kNamespaceSafety  = "/safety";
-
-}  // namespace topic_names
-}  // namespace savo_control
+}  // namespace savo_control::topics
