@@ -101,6 +101,8 @@ def test_get_package_info_topics() -> None:
     assert topics["mapping_workflow_phase"] == "/savo_mapping/workflow_phase"
     assert topics["semantic_status"] == "/savo_mapping/semantic_status"
     assert topics["exploration_status"] == "/savo_mapping/exploration_status"
+    assert topics["exploration_goal"] == "/savo_mapping/exploration/goal"
+    assert topics["exploration_goal_pose"] == "/savo_mapping/exploration/goal_pose"
     assert topics["mapping_dashboard"] == "/savo_mapping/dashboard"
     assert topics["mapping_dashboard_text"] == "/savo_mapping/dashboard_text"
     assert topics["frontier_explorer_status"] == "/savo_mapping/frontier_explorer/status"

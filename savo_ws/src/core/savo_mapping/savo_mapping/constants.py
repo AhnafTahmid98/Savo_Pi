@@ -61,6 +61,8 @@ TOPIC_MAPPING_WORKFLOW_PHASE: Final[str] = "/savo_mapping/workflow_phase"
 TOPIC_SESSION_STATE: Final[str] = "/savo_mapping/session_state"
 TOPIC_MAP_QUALITY: Final[str] = "/savo_mapping/map_quality"
 TOPIC_EXPLORATION_STATUS: Final[str] = "/savo_mapping/exploration_status"
+TOPIC_EXPLORATION_GOAL: Final[str] = "/savo_mapping/exploration/goal"
+TOPIC_EXPLORATION_GOAL_POSE: Final[str] = "/savo_mapping/exploration/goal_pose"
 TOPIC_SEMANTIC_STATUS: Final[str] = "/savo_mapping/semantic_status"
 TOPIC_MAPPING_DASHBOARD: Final[str] = "/savo_mapping/dashboard"
 TOPIC_MAPPING_DASHBOARD_TEXT: Final[str] = "/savo_mapping/dashboard_text"
@@ -257,6 +259,8 @@ __all__ = [
     "TOPIC_SESSION_STATE",
     "TOPIC_MAP_QUALITY",
     "TOPIC_EXPLORATION_STATUS",
+    "TOPIC_EXPLORATION_GOAL",
+    "TOPIC_EXPLORATION_GOAL_POSE",
     "TOPIC_SEMANTIC_STATUS",
     "TOPIC_MAPPING_DASHBOARD",
     "TOPIC_MAPPING_DASHBOARD_TEXT",

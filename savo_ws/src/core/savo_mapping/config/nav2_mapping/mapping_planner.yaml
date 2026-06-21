@@ -1,0 +1,44 @@
+planner_server:
+  ros__parameters:
+    use_sim_time: false
+
+    expected_planner_frequency: 5.0
+
+    planner_plugins:
+      - GridBased
+
+    GridBased:
+      plugin: nav2_navfn_planner::NavfnPlanner
+      tolerance: 0.30
+      use_astar: false
+      allow_unknown: true
+
+robot_savo_planner_policy:
+  ros__parameters:
+    use_for_mapping: true
+    use_for_autonomous_exploration: true
+
+    global_frame: map
+    robot_base_frame: base_link
+    odom_topic: /odometry/filtered
+    map_topic: /map
+
+    allow_unknown_space: true
+    prefer_safe_known_space: true
+
+    min_goal_distance_m: 0.30
+    max_goal_distance_m: 8.00
+    goal_tolerance_xy_m: 0.25
+    goal_tolerance_yaw_rad: 0.35
+
+    exploration_strategies:
+      - frontier
+      - coverage
+      - waypoint
+      - area
+      - semantic
+
+    mapping_selects_goals_only: true
+    movement_authority_package: savo_nav
+    movement_must_pass_safety_gate: true
+    never_bypass_cmd_vel_safe: true

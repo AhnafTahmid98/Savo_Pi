@@ -1,0 +1,127 @@
+profile:
+  name: manual_mapping_real_robot_v1
+  description: Manual real-robot mapping profile for Robot Savo.
+
+mapping_supervisor_node:
+  ros__parameters:
+    mode: manual_mapping
+    map_name: robot_savo_manual_map
+
+    scan_topic: /scan
+    odom_topic: /odometry/filtered
+    map_topic: /map
+    pointcloud_topic: /savo_edge/realsense/points
+
+    require_scan: true
+    require_odom: true
+    require_tf: true
+    require_map: false
+    require_pointcloud: false
+
+    min_scan_rate_hz: 3.0
+    min_odom_rate_hz: 5.0
+
+    scan_stale_timeout_s: 1.0
+    odom_stale_timeout_s: 1.0
+    tf_timeout_s: 1.0
+    map_stale_timeout_s: 2.0
+
+    publish_semantic_status: true
+    semantic_store_path: maps/semantic/semantic_landmarks.json
+    known_locations_path: maps/semantic/known_locations.json
+
+    publish_exploration_status: true
+    exploration_strategy: frontier
+
+    verbose_status_log: false
+
+mapping_mode_manager_node:
+  ros__parameters:
+    default_mode: manual_mapping
+    map_name: robot_savo_manual_map
+
+    allow_idle: true
+    allow_manual_mapping: true
+    allow_autonomous_mapping: false
+    allow_map_saving: true
+    allow_semantic_review: true
+
+    default_semantic_actor: operator
+    default_semantic_source: app
+
+    verbose_status_log: false
+
+mapping_dashboard_node:
+  ros__parameters:
+    verbose_status_log: false
+
+frontier_explorer_node:
+  ros__parameters:
+    enabled: false
+    require_odom: true
+    publish_repeated_goal: false
+    verbose_status_log: false
+
+pointcloud_monitor_node:
+  ros__parameters:
+    enabled: false
+    pointcloud_topic: /savo_edge/realsense/points
+    min_rate_hz: 3.0
+    min_points: 100
+    verbose_status_log: false
+
+apriltag_mapper_node:
+  ros__parameters:
+    enabled: true
+    observation_topic: /savo_mapping/apriltag_observation
+    tag_database_path: maps/semantic/tag_database.json
+    semantic_store_path: maps/semantic/semantic_landmarks.json
+
+    min_confidence: 0.30
+    allow_unknown_tags: false
+    write_semantic_store: true
+    require_tag_database: false
+    require_semantic_store_path: false
+
+    verbose_status_log: false
+
+location_bridge_node:
+  ros__parameters:
+    enabled: true
+    semantic_store_path: maps/semantic/semantic_landmarks.json
+    known_locations_path: maps/semantic/known_locations.json
+
+    write_known_locations: true
+    require_semantic_store: false
+
+    verbose_status_log: false
+
+location_confirmation_node:
+  ros__parameters:
+    enabled: true
+    semantic_store_path: maps/semantic/semantic_landmarks.json
+
+    require_semantic_store: false
+
+    verbose_status_log: false
+
+semantic_landmark_recorder_node:
+  ros__parameters:
+    enabled: true
+    semantic_store_path: maps/semantic/semantic_landmarks.json
+
+    default_source: human
+    default_area_type: manual_location
+    default_actor: operator
+    default_confirm: false
+    require_semantic_store_path: false
+
+    verbose_status_log: false
+
+map_event_logger_node:
+  ros__parameters:
+    enabled: true
+    log_path: maps/events/manual_mapping_real_robot_v1_events.jsonl
+
+    publish_logged_event: true
+    verbose_status_log: false

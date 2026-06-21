@@ -1,0 +1,25 @@
+pointcloud_filters:
+  ros__parameters:
+    enabled: true
+
+    input_topic: /savo_edge/realsense/points
+    output_topic: /savo_mapping/realsense/points_filtered
+    frame_id: camera_depth_optical_frame
+
+    min_x_m: 0.05
+    max_x_m: 2.50
+
+    min_y_m: -1.50
+    max_y_m: 1.50
+
+    min_z_m: 0.05
+    max_z_m: 1.50
+
+    voxel_leaf_size_m: 0.05
+    max_points: 30000
+
+    remove_nan: true
+    publish_rate_hz: 10.0
+
+    stale_timeout_s: 1.0
+    verbose_status_log: false

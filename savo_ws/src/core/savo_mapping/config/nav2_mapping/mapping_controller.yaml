@@ -1,0 +1,109 @@
+controller_server:
+  ros__parameters:
+    use_sim_time: false
+
+    controller_frequency: 20.0
+
+    min_x_velocity_threshold: 0.001
+    min_y_velocity_threshold: 0.001
+    min_theta_velocity_threshold: 0.001
+
+    failure_tolerance: 0.30
+
+    odom_topic: /odometry/filtered
+
+    progress_checker_plugin: progress_checker
+    goal_checker_plugins:
+      - general_goal_checker
+    controller_plugins:
+      - FollowPath
+
+    progress_checker:
+      plugin: nav2_controller::SimpleProgressChecker
+      required_movement_radius: 0.20
+      movement_time_allowance: 10.0
+
+    general_goal_checker:
+      plugin: nav2_controller::SimpleGoalChecker
+      stateful: true
+      xy_goal_tolerance: 0.20
+      yaw_goal_tolerance: 0.25
+
+    FollowPath:
+      plugin: dwb_core::DWBLocalPlanner
+      debug_trajectory_details: false
+
+      min_vel_x: -0.12
+      min_vel_y: -0.12
+      max_vel_x: 0.18
+      max_vel_y: 0.18
+      max_vel_theta: 0.45
+
+      min_speed_xy: 0.0
+      max_speed_xy: 0.20
+      min_speed_theta: 0.0
+
+      acc_lim_x: 0.35
+      acc_lim_y: 0.35
+      acc_lim_theta: 0.80
+
+      decel_lim_x: -0.45
+      decel_lim_y: -0.45
+      decel_lim_theta: -1.00
+
+      vx_samples: 12
+      vy_samples: 12
+      vtheta_samples: 20
+
+      sim_time: 1.7
+      linear_granularity: 0.05
+      angular_granularity: 0.025
+      transform_tolerance: 0.20
+
+      xy_goal_tolerance: 0.20
+      trans_stopped_velocity: 0.03
+
+      short_circuit_trajectory_evaluation: true
+      stateful: true
+
+      critics:
+        - RotateToGoal
+        - Oscillation
+        - BaseObstacle
+        - GoalAlign
+        - PathAlign
+        - PathDist
+        - GoalDist
+
+      BaseObstacle.scale: 0.02
+
+      PathAlign.scale: 24.0
+      PathAlign.forward_point_distance: 0.10
+
+      GoalAlign.scale: 18.0
+      GoalAlign.forward_point_distance: 0.10
+
+      PathDist.scale: 24.0
+      GoalDist.scale: 18.0
+
+      RotateToGoal.scale: 24.0
+      RotateToGoal.slowing_factor: 4.0
+      RotateToGoal.lookahead_time: -1.0
+
+robot_savo_controller_policy:
+  ros__parameters:
+    holonomic_base: true
+    mecanum_drive: true
+
+    nav2_cmd_vel_topic: /cmd_vel
+    safe_cmd_vel_topic: /cmd_vel_safe
+
+    movement_must_pass_safety_gate: true
+    never_bypass_cmd_vel_safe: true
+
+    mapping_speed_limit_mps: 0.18
+    mapping_strafe_limit_mps: 0.18
+    mapping_yaw_limit_radps: 0.45
+
+    autonomous_mapping_requires_safety_ok: true
+    stop_if_safety_stop_true: true

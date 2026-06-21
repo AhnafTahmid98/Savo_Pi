@@ -24,6 +24,8 @@ topics:
 
   exploration:
     exploration_status: /savo_mapping/exploration_status
+    exploration_goal: /savo_mapping/exploration/goal
+    exploration_goal_pose: /savo_mapping/exploration/goal_pose
     frontier_status: /savo_mapping/frontier_explorer/status
     frontier_goal: /savo_mapping/frontier_explorer/goal
     frontier_goal_pose: /savo_mapping/frontier_explorer/goal_pose

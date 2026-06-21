@@ -1,6 +1,6 @@
 slam_toolbox:
   ros__parameters:
-    mode: localization
+    mode: mapping
     use_sim_time: false
 
     odom_frame: odom
@@ -8,7 +8,8 @@ slam_toolbox:
     base_frame: base_link
     scan_topic: /scan
 
-    map_file_name: maps/saved/robot_savo_default
+    map_name: robot_savo_online_async
+    map_file_name: maps/saved/robot_savo_online_async
 
     debug_logging: false
     throttle_scans: 1
@@ -21,7 +22,7 @@ slam_toolbox:
     tf_buffer_duration: 30.0
     stack_size_to_use: 40000000
 
-    enable_interactive_mode: false
+    enable_interactive_mode: true
 
     use_scan_matching: true
     use_scan_barycenter: true
@@ -32,11 +33,20 @@ slam_toolbox:
     link_match_minimum_response_fine: 0.10
     link_scan_maximum_distance: 1.5
 
-    do_loop_closing: false
+    loop_search_maximum_distance: 3.0
+    do_loop_closing: true
+    loop_match_minimum_chain_size: 10
+    loop_match_maximum_variance_coarse: 3.0
+    loop_match_minimum_response_coarse: 0.35
+    loop_match_minimum_response_fine: 0.45
 
     correlation_search_space_dimension: 0.50
     correlation_search_space_resolution: 0.01
     correlation_search_space_smear_deviation: 0.10
+
+    loop_search_space_dimension: 8.0
+    loop_search_space_resolution: 0.05
+    loop_search_space_smear_deviation: 0.03
 
     distance_variance_penalty: 0.50
     angle_variance_penalty: 1.0

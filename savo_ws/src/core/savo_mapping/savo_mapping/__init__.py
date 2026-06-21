@@ -49,6 +49,8 @@ try:
         TOPIC_MAPPING_WORKFLOW_PHASE,
         TOPIC_MAP_QUALITY,
         TOPIC_EXPLORATION_STATUS,
+        TOPIC_EXPLORATION_GOAL,
+        TOPIC_EXPLORATION_GOAL_POSE,
         TOPIC_SEMANTIC_STATUS,
         TOPIC_MAPPING_DASHBOARD,
         TOPIC_MAPPING_DASHBOARD_TEXT,
@@ -98,6 +100,8 @@ except Exception:
     TOPIC_MAPPING_WORKFLOW_PHASE = "/savo_mapping/workflow_phase"
     TOPIC_MAP_QUALITY = "/savo_mapping/map_quality"
     TOPIC_EXPLORATION_STATUS = "/savo_mapping/exploration_status"
+    TOPIC_EXPLORATION_GOAL = "/savo_mapping/exploration/goal"
+    TOPIC_EXPLORATION_GOAL_POSE = "/savo_mapping/exploration/goal_pose"
     TOPIC_SEMANTIC_STATUS = "/savo_mapping/semantic_status"
     TOPIC_MAPPING_DASHBOARD = "/savo_mapping/dashboard"
     TOPIC_MAPPING_DASHBOARD_TEXT = "/savo_mapping/dashboard_text"
@@ -149,6 +153,8 @@ def get_package_info() -> dict:
             "mapping_workflow_phase": TOPIC_MAPPING_WORKFLOW_PHASE,
             "map_quality": TOPIC_MAP_QUALITY,
             "exploration_status": TOPIC_EXPLORATION_STATUS,
+            "exploration_goal": TOPIC_EXPLORATION_GOAL,
+            "exploration_goal_pose": TOPIC_EXPLORATION_GOAL_POSE,
             "semantic_status": TOPIC_SEMANTIC_STATUS,
             "mapping_dashboard": TOPIC_MAPPING_DASHBOARD,
             "mapping_dashboard_text": TOPIC_MAPPING_DASHBOARD_TEXT,
@@ -206,6 +212,8 @@ __all__ = [
     "TOPIC_MAPPING_WORKFLOW_PHASE",
     "TOPIC_MAP_QUALITY",
     "TOPIC_EXPLORATION_STATUS",
+    "TOPIC_EXPLORATION_GOAL",
+    "TOPIC_EXPLORATION_GOAL_POSE",
     "TOPIC_SEMANTIC_STATUS",
     "TOPIC_MAPPING_DASHBOARD",
     "TOPIC_MAPPING_DASHBOARD_TEXT",
