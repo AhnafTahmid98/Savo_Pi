@@ -1,40 +1,43 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""Python controller helpers for testing and diagnostics. C++ remains the runtime path."""
+"""Python fallback controllers for savo_control."""
 
-# Generic PID core
-from .pid_py import PidConfig, PidResult, Pid
-
-# Heading/yaw controller
-from .heading_pid_py import (
-    HeadingControllerConfig,
-    HeadingControllerResult,
-    HeadingController,
-    HeadingPid,
-)
-
-# Distance/approach controller
 from .distance_pid_py import (
+    DistanceController,
     DistanceControllerConfig,
     DistanceControllerResult,
     DistancePid,
-    DistanceController,
+)
+from .heading_pid_py import (
+    HeadingController,
+    HeadingControllerConfig,
+    HeadingControllerResult,
+    HeadingPid,
+    copy_sign,
+    saturate_abs,
+    shortest_angular_distance_rad,
+    wrap_angle_rad,
+)
+from .pid_py import (
+    Pid,
+    PidConfig,
+    PidResult,
 )
 
 __all__ = [
-    # Generic PID core
-    "PidConfig",
-    "PidResult",
-    "Pid",
-    # Heading controller
-    "HeadingControllerConfig",
-    "HeadingControllerResult",
-    "HeadingController",
-    "HeadingPid",
-    # Distance controller
+    "DistanceController",
     "DistanceControllerConfig",
     "DistanceControllerResult",
     "DistancePid",
-    "DistanceController",
+    "HeadingController",
+    "HeadingControllerConfig",
+    "HeadingControllerResult",
+    "HeadingPid",
+    "Pid",
+    "PidConfig",
+    "PidResult",
+    "copy_sign",
+    "saturate_abs",
+    "shortest_angular_distance_rad",
+    "wrap_angle_rad",
 ]

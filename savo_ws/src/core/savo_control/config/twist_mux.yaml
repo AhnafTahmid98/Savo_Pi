@@ -1,105 +1,59 @@
-
 twist_mux_node:
   ros__parameters:
+    # Runtime command authority node:
+    # /cmd_vel_manual, /cmd_vel_auto, /cmd_vel_nav, /cmd_vel_recovery
+    #                         -> /cmd_vel_mux
+    #
+    # Topic names are currently owned by:
+    # include/savo_control/topic_names.hpp
+    #
+    # This YAML only contains parameters that the current C++ node actually
+    # declares and reads.
 
     # -------------------------------------------------------------------------
-    # Topic configuration
+    # Timing
     # -------------------------------------------------------------------------
+    publish_rate_hz: 30.0
 
-    # Input command sources
-    topics:
-      manual: "/cmd_vel_manual"
-      auto: "/cmd_vel_auto"
-      nav: "/cmd_vel_nav"
-      recovery: "/cmd_vel_recovery"
+    # Normal command source timeout.
+    # Slightly softer than the base watchdog so control goes safe first.
+    cmd_timeout_sec: 0.35
 
-      # Selected output from this node
-      output: "/cmd_vel_mux"
-
-      # future: switch to /savo_control/mode_state once mode_manager is wired up
-      mode: "/savo_control/mode_cmd"
-
-      # Optional status output from mux
-      status: "/savo_control/twist_mux_status"
+    # Recovery command timeout can be a little longer because recovery commands
+    # may be published by a recovery sequence instead of continuous teleop.
+    recovery_cmd_timeout_sec: 0.50
 
     # -------------------------------------------------------------------------
-    # Default control mode
+    # Startup / mode behavior
     # -------------------------------------------------------------------------
+    # Safe boot default. The control_mode_manager_node can later publish MANUAL,
+    # AUTO, NAV, or STOP on /savo_control/mode_state.
     default_mode: "STOP"
 
-    # If true, publish zero Twist when mode is STOP or when active source is stale.
-    publish_zero_on_stop: true
+    # If an invalid mode appears, publish zero Twist instead of passing motion.
+    zero_on_unknown_mode: true
 
-    # Publish zero Twist immediately when switching mode.
-    stop_on_mode_change: true
-
-    # How long to hold zero after a mode change before accepting new commands.
-    mode_change_stop_hold_s: 0.20
+    # Publish mode state only when it changes.
+    # This keeps logs/topics cleaner when control_mode_manager_node is active.
+    mode_state_publish_on_change_only: true
 
     # -------------------------------------------------------------------------
-    # Input timeout / stale protection
+    # Recovery override
     # -------------------------------------------------------------------------
-    #
-    # 0.35s — slightly softer than savo_base watchdog so base trips last
-    source_timeout_s: 0.35
-
-    # Timer loop rate for checking stale commands and publishing output.
-    loop_hz: 30.0
-
-    # -------------------------------------------------------------------------
-    # priority: recovery > manual > nav > auto
-    # -------------------------------------------------------------------------
-    priority:
-      recovery: 100
-      manual: 80
-      nav: 60
-      auto: 40
-
-    # recovery can interrupt any mode — handled before priority check
+    # Recovery has highest authority when /savo_control/recovery_active is true.
     recovery_override_enabled: true
 
-    manual_override_enabled: true
+    # Keep recovery active until it clears or timeout expires.
+    latch_recovery_active: true
+
+    # Auto-clear stale recovery-active state.
+    recovery_active_timeout_sec: 3.0
 
     # -------------------------------------------------------------------------
-    # per-source limits (extra clamp before cmd_vel_shaper)
+    # Optional local safety stop gate
     # -------------------------------------------------------------------------
-    source_limits:
-      manual:
-        max_vx: 0.25
-        max_vy: 0.25
-        max_wz: 0.60
-
-      nav:
-        max_vx: 0.22
-        max_vy: 0.18
-        max_wz: 0.50
-
-      auto:
-        max_vx: 0.18
-        max_vy: 0.18
-        max_wz: 0.45
-
-      recovery:
-        max_vx: 0.12
-        max_vy: 0.00
-        max_wz: 0.35
-
-    # -------------------------------------------------------------------------
-    # Manual mapping profile
-    # -------------------------------------------------------------------------
+    # Main safety architecture is still:
+    # /cmd_vel -> safety gate -> /cmd_vel_safe -> savo_base
     #
-    # Used by teleop_control.launch.py or manual_mapping bringup.
-    manual_mapping:
-      recommended_mode: "MANUAL"
-      recommended_input_topic: "/cmd_vel_manual"
-      recommended_output_topic: "/cmd_vel_mux"
-
-      # Conservative speed for mapping corridors.
-      slow_vx: 0.12
-      slow_vy: 0.12
-      slow_wz: 0.35
-
-      # Slightly faster but still safe on open floor.
-      normal_vx: 0.20
-      normal_vy: 0.18
-      normal_wz: 0.50
+    # Keep this false unless we are doing special bringup/debug testing.
+    use_safety_stop_gate: false

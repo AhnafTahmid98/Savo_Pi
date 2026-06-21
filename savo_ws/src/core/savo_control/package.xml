@@ -1,69 +1,37 @@
 <?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>savo_control</name>
   <version>0.1.0</version>
-
-  <description>
-    Robot Savo control layer for command arbitration, velocity shaping,
-    mode management, PID-based motion helpers, stuck detection, and local
-    recovery primitives before full Nav2 integration.
-  </description>
+  <description>Robot Savo control layer with C++ runtime nodes and Python fallback diagnostics.</description>
 
   <maintainer email="tahmidahnaf998@gmail.com">Ahnaf Tahmid</maintainer>
   <license>Proprietary</license>
 
-  <!--
-    Build tools.
-
-    This is a hybrid ROS 2 package:
-    - C++ nodes are built with ament_cmake.
-    - Python modules are installed from CMake using ament_cmake_python.
-
-    ament_python is intentionally kept because the Robot Savo Pi/Jazzy
-    workspace previously had colcon build issues without it.
-    Do not remove unless the full workspace builds cleanly without it.
-  -->
   <buildtool_depend>ament_cmake</buildtool_depend>
   <buildtool_depend>ament_cmake_python</buildtool_depend>
-  <buildtool_depend>ament_python</buildtool_depend>
 
-  <!-- Core ROS 2 client libraries -->
   <depend>rclcpp</depend>
   <depend>rclpy</depend>
-
-  <!-- Standard ROS messages used by control nodes -->
   <depend>std_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>nav_msgs</depend>
   <depend>builtin_interfaces</depend>
-
-  <!-- Robot Savo custom messages -->
   <depend>savo_msgs</depend>
-
-  <!-- TF / transform support for heading and future control integration -->
   <depend>tf2</depend>
   <depend>tf2_ros</depend>
   <depend>tf2_geometry_msgs</depend>
 
-  <!-- Launch support -->
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
 
-  <!-- Python runtime packaging support -->
-  <exec_depend>python3-setuptools</exec_depend>
-
-  <!-- Testing and linting -->
+  <test_depend>ament_cmake_pytest</test_depend>
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
-  <test_depend>ament_cmake_gtest</test_depend>
-  <test_depend>ament_cmake_pytest</test_depend>
   <test_depend>python3-pytest</test_depend>
 
   <export>
-    <!--
-      Main build system is ament_cmake because this package builds C++ nodes.
-      Python installation is handled from CMakeLists.txt.
-    -->
     <build_type>ament_cmake</build_type>
   </export>
 </package>

@@ -1,208 +1,91 @@
-
 /**:
   ros__parameters:
+    publish_rate_hz: 30.0
+    update_rate_hz: 20.0
+    loop_rate_hz: 20.0
 
-    # -------------------------------------------------------------------------
-    # Robot identity / frame naming
-    # -------------------------------------------------------------------------
-    robot:
-      name: "robot_savo"
-      base_frame: "base_link"
-      odom_frame: "odom"
-      map_frame: "map"
+    input_timeout_sec: 0.35
+    cmd_timeout_sec: 0.35
+    recovery_cmd_timeout_sec: 0.50
+    odom_timeout_sec: 0.50
+    base_cmd_timeout_sec: 0.35
 
-    # -------------------------------------------------------------------------
-    # Common topic contract
-    # -------------------------------------------------------------------------
-    topics:
-      # Raw command sources into savo_control
-      cmd_vel_manual: "/cmd_vel_manual"
-      cmd_vel_auto: "/cmd_vel_auto"
-      cmd_vel_nav: "/cmd_vel_nav"
-      cmd_vel_recovery: "/cmd_vel_recovery"
+    # Fail safe when command or odom data becomes stale.
+    zero_on_stale_input: true
+    zero_on_stale_odom: true
+    zero_linear_on_stale_base_cmd: true
+    zero_on_unknown_mode: true
 
-      # Internal selected command from twist_mux_node
-      cmd_vel_mux: "/cmd_vel_mux"
+    # Main safety remains downstream: /cmd_vel -> safety gate -> /cmd_vel_safe.
+    use_safety_stop_gate: false
+    safety_stop_hold_sec: 0.10
 
-      # Shaped command leaving savo_control
-      cmd_vel: "/cmd_vel"
+    default_mode: "STOP"
+    startup_mode: "STOP"
 
-      # Safety-gated command, produced outside this package
-      cmd_vel_safe: "/cmd_vel_safe"
+    manual_override_preempts_all: true
+    recovery_preempts_auto_nav: true
+    recovery_preempts_manual: false
+    latch_recovery_mode: true
+    safety_stop_forces_stop_mode: true
+    external_stop_forces_stop_mode: true
+    prefer_nav_over_auto: false
+    fallback_to_stop_when_source_unavailable: true
 
-      # Safety signals from savo_perception
-      safety_stop: "/safety/stop"
-      safety_slowdown_factor: "/safety/slowdown_factor"
+    min_time_sec: 0.0
+    max_time_jump_sec: 5.0
 
-      # Control mode command/status
-      mode_cmd: "/savo_control/mode_cmd"
-      mode_state: "/savo_control/mode_state"
-      control_status: "/savo_control/status"
+    manual_source_available_default: true
+    auto_source_available_default: true
+    nav_source_available_default: true
+    recovery_source_available_default: true
 
-      # Recovery flow topics
-      recovery_request: "/savo_control/recovery_request"
-      recovery_active: "/savo_control/recovery_active"
+    publish_selected_route_topic: true
+    selected_route_topic: "/savo_control/selected_cmd_source"
 
-      # Optional diagnostics/status topics
-      twist_mux_status: "/savo_control/twist_mux_status"
-      cmd_vel_shaper_status: "/savo_control/cmd_vel_shaper_status"
-      recovery_status: "/savo_control/recovery_status"
+    log_mode_changes: true
+    log_request_changes: true
 
-    # -------------------------------------------------------------------------
-    # Control modes
-    # -------------------------------------------------------------------------
-    #
-    # Meaning:
-    #   STOP      = publish zero command
-    #   MANUAL    = keyboard / joystick / operator command
-    #   NAV       = Nav2 navigation command
-    #   AUTO      = test motion or autonomous mapping/exploration command
-    #   RECOVERY  = recovery behavior command
-    #
-    control_modes:
-      valid_modes:
-        - "STOP"
-        - "MANUAL"
-        - "NAV"
-        - "AUTO"
-        - "RECOVERY"
+    output:
+      vx_max_abs: 0.25
+      vy_max_abs: 0.22
+      wz_max_abs: 0.60
 
-      startup_mode: "STOP"
-      fallback_mode: "STOP"
+    limits:
+      vx:
+        max_abs: 0.25
+        deadband: 0.005
+        max_rise_rate: 0.35
+        max_fall_rate: 0.55
 
-      # Manual mapping launch may override startup mode to MANUAL.
-      manual_mapping_mode: "MANUAL"
+      vy:
+        max_abs: 0.22
+        deadband: 0.005
+        max_rise_rate: 0.30
+        max_fall_rate: 0.45
 
-      # Autonomous mapping/exploration may override mode to AUTO.
-      autonomous_mapping_mode: "AUTO"
+      wz:
+        max_abs: 0.60
+        deadband: 0.005
+        max_rise_rate: 0.90
+        max_fall_rate: 1.20
 
-    # -------------------------------------------------------------------------
-    # Common timing
-    # -------------------------------------------------------------------------
+    limiter:
+      min_dt_sec: 0.001
+      max_dt_sec: 0.20
+
     timing:
-      loop_hz: 30.0
+      loop_hz: 20.0
+      cmd_safe_timeout_s: 0.40
+      odom_timeout_s: 0.50
+      safety_timeout_s: 0.50
+      stuck_time_s: 2.0
+      clear_time_s: 1.0
+      retrigger_cooldown_s: 3.0
 
-      # Maximum time without a fresh selected command before output should stop.
-      command_timeout_s: 0.35
-
-      # Used by status/control manager nodes.
-      status_publish_hz: 5.0
-
-      # Hold zero briefly when switching modes.
-      mode_switch_stop_hold_s: 0.20
-
-      # Startup zero hold prevents motion immediately after launch.
-      startup_zero_hold_s: 1.00
-
-    # -------------------------------------------------------------------------
-    # Common conservative command limits
-    # -------------------------------------------------------------------------
-    #
-    # These are package-wide conservative defaults.
-    # Individual nodes may have stricter limits in their own YAML files.
-    common_limits:
-      max_vx: 0.25
-      max_vy: 0.22
-      max_wz: 0.60
-
-      max_reverse_vx: 0.18
-
-      # Used for manual mapping in corridors.
-      manual_mapping_max_vx: 0.20
-      manual_mapping_max_vy: 0.18
-      manual_mapping_max_wz: 0.50
-
-      # Used for auto tests and autonomous exploration before final calibration.
-      auto_max_vx: 0.18
-      auto_max_vy: 0.18
-      auto_max_wz: 0.45
-
-      # Recovery should be slower than normal driving.
-      recovery_max_vx: 0.12
-      recovery_max_vy: 0.00
-      recovery_max_wz: 0.35
-
-    # -------------------------------------------------------------------------
-    # Common acceleration limits
-    # -------------------------------------------------------------------------
-    acceleration_limits:
-      max_accel_vx: 0.35
-      max_accel_vy: 0.30
-      max_accel_wz: 0.90
-
-      max_decel_vx: 0.55
-      max_decel_vy: 0.45
-      max_decel_wz: 1.20
-
-    # -------------------------------------------------------------------------
-    # Safety assumptions
-    # -------------------------------------------------------------------------
-    #
-    # These are assumptions used by control nodes.
-    # The final enforcement happens in savo_perception and savo_base.
-    safety:
-      require_safety_gate: true
-
-      # The control package should never publish directly to /cmd_vel_safe.
-      allow_direct_cmd_vel_safe_publish: false
-
-      # If safety stop is true, control-side helper nodes should prefer STOP.
-      respect_safety_stop_topic: true
-
-      # If slowdown is available, control can optionally reduce commands before
-      # they reach the safety gate. Final slowdown still belongs to safety gate.
-      respect_slowdown_factor: false
-
-      # Invalid Twist values should become zero command.
-      zero_on_nan_or_inf: true
-
-      # Always send zero on shutdown when supported by the node.
-      publish_zero_on_shutdown: true
-
-    # -------------------------------------------------------------------------
-    # Manual mapping defaults
-    # -------------------------------------------------------------------------
-    manual_mapping:
-      enabled: true
-      command_source_topic: "/cmd_vel_manual"
-      expected_mode: "MANUAL"
-
-      # Keyboard behavior hint.
-      key_forward: "w"
-      key_backward: "s"
-      key_left: "a"
-      key_right: "d"
-      key_rotate_left: "q"
-      key_rotate_right: "e"
-      key_stop: "space"
-
-      # Safe low-speed mapping defaults.
-      default_vx: 0.12
-      default_vy: 0.12
-      default_wz: 0.35
-
-    # -------------------------------------------------------------------------
-    # Autonomous mapping / exploration defaults
-    # -------------------------------------------------------------------------
-    autonomous_mapping:
-      enabled: true
-      command_source_topic: "/cmd_vel_auto"
-      expected_mode: "AUTO"
-
-      # Conservative exploration limits.
-      default_vx: 0.12
-      default_vy: 0.00
-      default_wz: 0.30
-
-      # Exploration should still go through safety gate and base watchdog.
-      require_cmd_vel_safe_chain: true
-
-    # -------------------------------------------------------------------------
-    # Diagnostics / logging
-    # -------------------------------------------------------------------------
     diagnostics:
-      enable_status_logs: true
-      warn_on_stale_command: true
-      warn_on_unknown_mode: true
-      warn_on_direct_safe_command_attempt: true
       log_throttle_s: 2.0
+
+    log:
+      stale_warn_throttle_ms: 2000
+      debug_throttle_ms: 2000

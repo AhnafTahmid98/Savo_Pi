@@ -1,572 +1,460 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Controlled recovery test sequences publishing to /cmd_vel_recovery.
-
-Commands via /savo_control/recovery_test_cmd (std_msgs/String):
-  BACKUP_ONLY, ROTATE_LEFT, ROTATE_RIGHT,
-  BACKUP_THEN_ROTATE_LEFT, BACKUP_THEN_ROTATE_RIGHT, STOP
-
-  ros2 topic pub /savo_control/recovery_test_cmd std_msgs/msg/String "{data: 'BACKUP_ONLY'}" --once
-
-First test: wheels lifted, low speeds.
-"""
+"""Run predefined recovery diagnostic tests."""
 
 from __future__ import annotations
 
-import math
 import time
-from dataclasses import dataclass
-from enum import Enum
-from typing import List, Optional
 
 import rclpy
 from geometry_msgs.msg import Twist
 from rclpy.node import Node
 from std_msgs.msg import Bool, String
 
+from savo_control.adapters import twist_to_ros_msg
+from savo_control.nodes.recovery_test_helpers import (
+    RecoveryTestLimits,
+    RecoveryTestState,
+    default_recovery_tests,
+    profile_from_mapping,
+    start_active_test,
+    status_text,
+    step_active_test,
+    stop_command,
+)
+from savo_control.ros import (
+    CMD_VEL_RECOVERY,
+    CONTROL_MODE_CMD,
+    RECOVERY_REQUEST,
+    SAFETY_STOP,
+    bool_msg_value,
+    make_string_msg,
+    string_msg_value,
+)
+from savo_control.utils import validate_rate, validate_timeout
 
-class RecoveryTestState(str, Enum):
-    IDLE = "IDLE"
-    PRE_STOP = "PRE_STOP"
-    RUNNING = "RUNNING"
-    POST_STOP = "POST_STOP"
-    FINISHED = "FINISHED"
-    SAFETY_STOP = "SAFETY_STOP"
-    UNKNOWN_TEST = "UNKNOWN_TEST"
-    TIMEOUT = "TIMEOUT"
-    DISABLED = "DISABLED"
 
-
-@dataclass
-class RecoveryStage:
-    name: str
-    duration_s: float
-    vx: float
-    vy: float
-    wz: float
-
-
-@dataclass
-class ActiveRecoveryTest:
-    name: str
-    stages: List[RecoveryStage]
-    start_time: float
-    stage_start_time: float
-    current_stage_index: int = 0
+RECOVERY_TEST_CMD_TOPIC = "/savo_control/recovery_test_cmd"
+RECOVERY_TEST_ENABLE_TOPIC = "/savo_control/recovery_test_enable"
+RECOVERY_TEST_STATUS_TOPIC = "/savo_control/recovery_test_status"
 
 
 class RecoveryTestManagerNode(Node):
-    """Controlled recovery test sequence manager."""
+    """Runs safe recovery diagnostic test profiles."""
 
     def __init__(self) -> None:
         super().__init__("recovery_test_manager_node")
 
-        # ------------------------------------------------------------------
-        # Parameters
-        # ------------------------------------------------------------------
         self.declare_parameter("enabled", True)
         self.declare_parameter("auto_start", False)
-        self.declare_parameter("default_test_name", "BACKUP_ONLY")
 
-        # Topics
-        self.declare_parameter("cmd_vel_out_topic", "/cmd_vel_recovery")
-        self.declare_parameter("test_cmd_topic", "/savo_control/recovery_test_cmd")
-        self.declare_parameter("mode_cmd_topic", "/savo_control/mode_cmd")
-        self.declare_parameter("safety_stop_topic", "/safety/stop")
-        self.declare_parameter("status_topic", "/savo_control/recovery_test_status")
+        self.declare_parameter("output_topic", CMD_VEL_RECOVERY)
+        self.declare_parameter("mode_cmd_topic", CONTROL_MODE_CMD)
+        self.declare_parameter("recovery_request_topic", RECOVERY_REQUEST)
+        self.declare_parameter("test_cmd_topic", RECOVERY_TEST_CMD_TOPIC)
+        self.declare_parameter("enable_topic", RECOVERY_TEST_ENABLE_TOPIC)
+        self.declare_parameter("status_topic", RECOVERY_TEST_STATUS_TOPIC)
+        self.declare_parameter("safety_stop_topic", SAFETY_STOP)
 
-        # Mode behavior
         self.declare_parameter("request_recovery_mode_on_start", True)
         self.declare_parameter("required_mode", "RECOVERY")
-        self.declare_parameter("return_to_stop_on_finish", True)
 
-        # Timing
+        self.declare_parameter("send_stop_before_test", True)
+        self.declare_parameter("send_stop_after_test", True)
+        self.declare_parameter("stop_hold_s", 0.5)
+
         self.declare_parameter("publish_hz", 20.0)
-        self.declare_parameter("pre_stop_hold_s", 0.50)
-        self.declare_parameter("post_stop_hold_s", 0.80)
-        self.declare_parameter("max_test_duration_s", 4.0)
-        self.declare_parameter("shutdown_zero_count", 5)
+        self.declare_parameter("max_test_duration_s", 8.0)
+        self.declare_parameter("default_test_name", "backup_short")
 
-        # Recovery command values
-        self.declare_parameter("backup_vx", -0.08)
-        self.declare_parameter("rotate_wz", 0.25)
-        self.declare_parameter("backup_duration_s", 0.80)
-        self.declare_parameter("rotate_duration_s", 0.70)
-        self.declare_parameter("between_stage_stop_s", 0.40)
-
-        # Hard command limits
-        self.declare_parameter("max_abs_vx", 0.10)
-        self.declare_parameter("max_abs_vy", 0.00)
-        self.declare_parameter("max_abs_wz", 0.28)
-
-        # Safety
         self.declare_parameter("respect_safety_stop", True)
-        self.declare_parameter("block_start_if_safety_stop_true", True)
-        self.declare_parameter("zero_on_safety_stop", True)
-        self.declare_parameter("allow_direct_cmd_vel_safe_publish", False)
-
-        # Diagnostics
         self.declare_parameter("publish_status", True)
         self.declare_parameter("status_hz", 5.0)
         self.declare_parameter("log_throttle_s", 2.0)
+        self.declare_parameter("shutdown_zero_count", 5)
 
+        self.declare_parameter("limits.max_backup_vx", 0.10)
+        self.declare_parameter("limits.max_turn_wz", 0.35)
+        self.declare_parameter("limits.max_duration_s", 8.0)
+
+        self._declare_default_test_parameters()
         self._load_parameters()
-        self._validate_parameters()
 
-        # ------------------------------------------------------------------
-        # ROS interfaces
-        # ------------------------------------------------------------------
-        self._cmd_pub = self.create_publisher(Twist, self._cmd_vel_out_topic, 10)
+        self._cmd_pub = self.create_publisher(Twist, self._output_topic, 10)
         self._mode_pub = self.create_publisher(String, self._mode_cmd_topic, 10)
-
-        self._status_pub = None
-        if self._publish_status:
-            self._status_pub = self.create_publisher(String, self._status_topic, 10)
+        self._request_pub = self.create_publisher(Bool, self._recovery_request_topic, 10)
+        self._status_pub = self.create_publisher(String, self._status_topic, 10)
 
         self.create_subscription(String, self._test_cmd_topic, self._on_test_cmd, 10)
+        self.create_subscription(Bool, self._enable_topic, self._on_enable, 10)
         self.create_subscription(Bool, self._safety_stop_topic, self._on_safety_stop, 10)
 
-        self._timer = self.create_timer(1.0 / self._publish_hz, self._on_timer)
-
-        # ------------------------------------------------------------------
-        # Runtime state
-        # ------------------------------------------------------------------
         self._state = RecoveryTestState.IDLE if self._enabled else RecoveryTestState.DISABLED
-        self._active_test: Optional[ActiveRecoveryTest] = None
-        self._pending_test_name: Optional[str] = None
-
+        self._active_test = None
         self._safety_stop = False
-        self._pre_stop_until: Optional[float] = None
-        self._post_stop_until: Optional[float] = None
+        self._stop_until_s = 0.0
+        self._pending_test_name = ""
+        self._last_status_s = 0.0
+        self._last_log_s = 0.0
 
-        self._last_status_time = 0.0
-        self._last_log_time = 0.0
+        self._timer = self.create_timer(1.0 / self._publish_hz, self._on_timer)
 
         if self._auto_start and self._enabled:
             self._request_start_test(self._default_test_name)
 
         self.get_logger().info(
             "RecoveryTestManagerNode started | "
-            f"output={self._cmd_vel_out_topic} | cmd_topic={self._test_cmd_topic} | "
-            f"default={self._default_test_name} | auto_start={self._auto_start}"
+            f"output={self._output_topic} | cmd={self._test_cmd_topic} | "
+            f"default_test={self._default_test_name} | auto_start={self._auto_start}"
         )
 
-    # ----------------------------------------------------------------------
-    # Parameter loading
-    # ----------------------------------------------------------------------
+    def _declare_default_test_parameters(self) -> None:
+        defaults = {
+            "request_only": {"type": "request_only"},
+            "backup_short": {
+                "type": "backup",
+                "duration_s": 1.0,
+                "vx": -0.06,
+            },
+            "backup_long": {
+                "type": "backup",
+                "duration_s": 2.0,
+                "vx": -0.06,
+            },
+            "rotate_left": {
+                "type": "rotate",
+                "duration_s": 1.2,
+                "wz": 0.25,
+            },
+            "rotate_right": {
+                "type": "rotate",
+                "duration_s": 1.2,
+                "wz": -0.25,
+            },
+            "backup_then_left": {
+                "type": "backup_then_rotate",
+                "backup_s": 1.0,
+                "rotate_s": 1.0,
+                "vx": -0.06,
+                "wz": 0.25,
+            },
+            "backup_then_right": {
+                "type": "backup_then_rotate",
+                "backup_s": 1.0,
+                "rotate_s": 1.0,
+                "vx": -0.06,
+                "wz": -0.25,
+            },
+        }
+
+        for name, values in defaults.items():
+            for key, value in values.items():
+                self.declare_parameter(f"tests.{name}.{key}", value)
+
     def _load_parameters(self) -> None:
         self._enabled = bool(self.get_parameter("enabled").value)
         self._auto_start = bool(self.get_parameter("auto_start").value)
-        self._default_test_name = str(self.get_parameter("default_test_name").value).upper()
 
-        self._cmd_vel_out_topic = str(self.get_parameter("cmd_vel_out_topic").value)
-        self._test_cmd_topic = str(self.get_parameter("test_cmd_topic").value)
+        self._output_topic = str(self.get_parameter("output_topic").value)
         self._mode_cmd_topic = str(self.get_parameter("mode_cmd_topic").value)
-        self._safety_stop_topic = str(self.get_parameter("safety_stop_topic").value)
+        self._recovery_request_topic = str(
+            self.get_parameter("recovery_request_topic").value
+        )
+        self._test_cmd_topic = str(self.get_parameter("test_cmd_topic").value)
+        self._enable_topic = str(self.get_parameter("enable_topic").value)
         self._status_topic = str(self.get_parameter("status_topic").value)
+        self._safety_stop_topic = str(self.get_parameter("safety_stop_topic").value)
 
         self._request_recovery_mode_on_start = bool(
             self.get_parameter("request_recovery_mode_on_start").value
         )
         self._required_mode = str(self.get_parameter("required_mode").value)
-        self._return_to_stop_on_finish = bool(
-            self.get_parameter("return_to_stop_on_finish").value
+
+        self._send_stop_before_test = bool(self.get_parameter("send_stop_before_test").value)
+        self._send_stop_after_test = bool(self.get_parameter("send_stop_after_test").value)
+        self._stop_hold_s = validate_timeout(
+            self.get_parameter("stop_hold_s").value,
+            name="stop_hold_s",
         )
 
-        self._publish_hz = float(self.get_parameter("publish_hz").value)
-        self._pre_stop_hold_s = float(self.get_parameter("pre_stop_hold_s").value)
-        self._post_stop_hold_s = float(self.get_parameter("post_stop_hold_s").value)
-        self._max_test_duration_s = float(self.get_parameter("max_test_duration_s").value)
-        self._shutdown_zero_count = int(self.get_parameter("shutdown_zero_count").value)
-
-        self._backup_vx = float(self.get_parameter("backup_vx").value)
-        self._rotate_wz = float(self.get_parameter("rotate_wz").value)
-        self._backup_duration_s = float(self.get_parameter("backup_duration_s").value)
-        self._rotate_duration_s = float(self.get_parameter("rotate_duration_s").value)
-        self._between_stage_stop_s = float(self.get_parameter("between_stage_stop_s").value)
-
-        self._max_abs_vx = abs(float(self.get_parameter("max_abs_vx").value))
-        self._max_abs_vy = abs(float(self.get_parameter("max_abs_vy").value))
-        self._max_abs_wz = abs(float(self.get_parameter("max_abs_wz").value))
+        self._publish_hz = validate_rate(
+            self.get_parameter("publish_hz").value,
+            name="publish_hz",
+        )
+        self._max_test_duration_s = validate_timeout(
+            self.get_parameter("max_test_duration_s").value,
+            name="max_test_duration_s",
+        )
+        self._default_test_name = str(self.get_parameter("default_test_name").value)
 
         self._respect_safety_stop = bool(self.get_parameter("respect_safety_stop").value)
-        self._block_start_if_safety_stop_true = bool(
-            self.get_parameter("block_start_if_safety_stop_true").value
-        )
-        self._zero_on_safety_stop = bool(self.get_parameter("zero_on_safety_stop").value)
-        self._allow_direct_cmd_vel_safe_publish = bool(
-            self.get_parameter("allow_direct_cmd_vel_safe_publish").value
-        )
-
         self._publish_status = bool(self.get_parameter("publish_status").value)
         self._status_hz = float(self.get_parameter("status_hz").value)
         self._log_throttle_s = float(self.get_parameter("log_throttle_s").value)
+        self._shutdown_zero_count = int(self.get_parameter("shutdown_zero_count").value)
 
-    def _validate_parameters(self) -> None:
-        if self._publish_hz <= 0.0:
-            raise ValueError("publish_hz must be > 0")
+        if self._status_hz < 0.0:
+            raise ValueError("status_hz must be >= 0.0")
+        if self._log_throttle_s < 0.0:
+            raise ValueError("log_throttle_s must be >= 0.0")
+        if self._shutdown_zero_count < 1:
+            self._shutdown_zero_count = 1
 
-        if self._max_test_duration_s <= 0.0:
-            raise ValueError("max_test_duration_s must be > 0")
+        self._limits = RecoveryTestLimits(
+            max_backup_vx=float(self.get_parameter("limits.max_backup_vx").value),
+            max_turn_wz=float(self.get_parameter("limits.max_turn_wz").value),
+            max_duration_s=float(self.get_parameter("limits.max_duration_s").value),
+        ).sanitized()
 
-        if self._pre_stop_hold_s < 0.0:
-            raise ValueError("pre_stop_hold_s must be >= 0")
+        self._known_tests = self._load_known_tests()
 
-        if self._post_stop_hold_s < 0.0:
-            raise ValueError("post_stop_hold_s must be >= 0")
+    def _load_known_tests(self) -> dict:
+        known = default_recovery_tests(self._limits)
 
-        if self._backup_duration_s <= 0.0:
-            raise ValueError("backup_duration_s must be > 0")
+        for name in list(known):
+            data = {
+                "type": self.get_parameter(f"tests.{name}.type").value,
+                "duration_s": self._param_or_none(f"tests.{name}.duration_s"),
+                "backup_s": self._param_or_none(f"tests.{name}.backup_s"),
+                "rotate_s": self._param_or_none(f"tests.{name}.rotate_s"),
+                "vx": self._param_or_none(f"tests.{name}.vx"),
+                "wz": self._param_or_none(f"tests.{name}.wz"),
+            }
+            data = {key: value for key, value in data.items() if value is not None}
+            known[name] = profile_from_mapping(name, data, limits=self._limits)
 
-        if self._rotate_duration_s <= 0.0:
-            raise ValueError("rotate_duration_s must be > 0")
+        return known
 
-        if self._between_stage_stop_s < 0.0:
-            raise ValueError("between_stage_stop_s must be >= 0")
+    def _param_or_none(self, name: str):
+        if not self.has_parameter(name):
+            return None
+        return self.get_parameter(name).value
 
-        if self._max_abs_vx <= 0.0:
-            raise ValueError("max_abs_vx must be > 0")
-
-        if self._max_abs_wz <= 0.0:
-            raise ValueError("max_abs_wz must be > 0")
-
-        if self._allow_direct_cmd_vel_safe_publish:
-            raise ValueError(
-                "allow_direct_cmd_vel_safe_publish must remain false in savo_control"
-            )
-
-        # Recovery test must publish only to the recovery command source.
-        if self._cmd_vel_out_topic == "/cmd_vel_safe":
-            raise ValueError("recovery_test_manager_node must not publish to /cmd_vel_safe")
-
-    # ----------------------------------------------------------------------
-    # Subscribers
-    # ----------------------------------------------------------------------
     def _on_test_cmd(self, msg: String) -> None:
-        name = str(msg.data).strip().upper()
+        command = string_msg_value(msg).strip()
 
-        if not name:
+        if command.upper() in {"STOP", "CANCEL", "IDLE"}:
+            self._stop_test(reason="command_stop")
             return
 
-        if name in ("STOP", "CANCEL", "ABORT"):
-            self._stop_test(reason="operator_stop")
-            return
+        self._request_start_test(command)
 
-        self._request_start_test(name)
+    def _on_enable(self, msg: Bool) -> None:
+        self._enabled = bool_msg_value(msg)
+
+        if not self._enabled:
+            self._stop_test(reason="disabled")
+            self._state = RecoveryTestState.DISABLED
+        elif self._state == RecoveryTestState.DISABLED:
+            self._state = RecoveryTestState.IDLE
+
+        self.get_logger().info(f"Recovery test enabled={self._enabled}")
 
     def _on_safety_stop(self, msg: Bool) -> None:
-        self._safety_stop = bool(msg.data)
+        self._safety_stop = bool_msg_value(msg)
 
-    # ----------------------------------------------------------------------
-    # Test lifecycle
-    # ----------------------------------------------------------------------
     def _request_start_test(self, name: str) -> None:
         if not self._enabled:
             self._state = RecoveryTestState.DISABLED
-            self._publish_zero()
-            self._publish_status()
+            self._publish_status_now(reason="disabled", request_recovery=False)
             return
 
-        if self._block_start_if_safety_stop_true and self._safety_stop:
-            self._state = RecoveryTestState.SAFETY_STOP
-            self._publish_zero()
-            self._publish_status()
-            self.get_logger().warning("Refusing recovery test because safety_stop=True")
-            return
-
-        stages = self._build_test_stages(name)
-        if not stages:
+        test_name = str(name).strip()
+        if test_name not in self._known_tests:
             self._state = RecoveryTestState.UNKNOWN_TEST
+            self._publish_request(False)
             self._publish_zero()
-            self._publish_status()
-            self.get_logger().error(f"Unknown recovery test: {name}")
-            return
-
-        self._pending_test_name = name
-
-        if self._pre_stop_hold_s > 0.0:
-            self._state = RecoveryTestState.PRE_STOP
-            self._pre_stop_until = time.monotonic() + self._pre_stop_hold_s
-            self._publish_zero()
-        else:
-            self._start_test_now(name)
-
-    def _start_test_now(self, name: str) -> None:
-        stages = self._build_test_stages(name)
-        if not stages:
-            self._state = RecoveryTestState.UNKNOWN_TEST
-            self._publish_zero()
+            self._publish_status_now(
+                reason=f"unknown_test:{test_name}",
+                request_recovery=False,
+            )
+            self.get_logger().warning(f"Unknown recovery test: {test_name}")
             return
 
         if self._request_recovery_mode_on_start:
-            mode_msg = String()
-            mode_msg.data = self._required_mode
-            self._mode_pub.publish(mode_msg)
+            self._mode_pub.publish(make_string_msg(self._required_mode, msg_type=String))
 
-        now = time.monotonic()
-        self._active_test = ActiveRecoveryTest(
-            name=name,
-            stages=stages,
-            start_time=now,
-            stage_start_time=now,
-            current_stage_index=0,
-        )
+        self._pending_test_name = test_name
 
-        self._state = RecoveryTestState.RUNNING
-        self.get_logger().info(f"Started recovery test: {name}")
-
-    def _stop_test(self, reason: str = "stop") -> None:
-        self._active_test = None
-        self._pending_test_name = None
-        self._pre_stop_until = None
-        self._post_stop_until = None
-        self._state = RecoveryTestState.FINISHED
-        self._publish_zero()
-
-        if self._return_to_stop_on_finish:
-            self._publish_mode("STOP")
-
-        self.get_logger().info(f"Recovery test stopped: {reason}")
-
-    def _finish_test(self) -> None:
-        name = self._active_test.name if self._active_test else "unknown"
-        self._active_test = None
-        self._publish_zero()
-
-        if self._post_stop_hold_s > 0.0:
-            self._state = RecoveryTestState.POST_STOP
-            self._post_stop_until = time.monotonic() + self._post_stop_hold_s
+        if self._send_stop_before_test and self._stop_hold_s > 0.0:
+            self._state = RecoveryTestState.STOPPING
+            self._stop_until_s = time.monotonic() + self._stop_hold_s
+            self._publish_request(False)
+            self._publish_zero()
         else:
-            self._state = RecoveryTestState.FINISHED
-            if self._return_to_stop_on_finish:
-                self._publish_mode("STOP")
+            self._start_pending_test()
 
-        self.get_logger().info(f"Recovery test finished: {name}")
+    def _start_pending_test(self) -> None:
+        if not self._pending_test_name:
+            return
 
-    # ----------------------------------------------------------------------
-    # Stage construction
-    # ----------------------------------------------------------------------
-    def _build_test_stages(self, name: str) -> List[RecoveryStage]:
-        backup = RecoveryStage(
-            name="backup",
-            duration_s=self._backup_duration_s,
-            vx=self._limit_vx(self._backup_vx),
-            vy=0.0,
-            wz=0.0,
-        )
+        profile = self._known_tests[self._pending_test_name]
+        self._active_test = start_active_test(profile, now_s=time.monotonic())
+        self._state = RecoveryTestState.RUNNING
+        self._pending_test_name = ""
+        self.get_logger().info(f"Starting recovery test: {profile.name}")
 
-        stop_between = RecoveryStage(
-            name="stop",
-            duration_s=self._between_stage_stop_s,
-            vx=0.0,
-            vy=0.0,
-            wz=0.0,
-        )
+    def _stop_test(self, *, reason: str) -> None:
+        self._active_test = None
+        self._pending_test_name = ""
+        self._state = RecoveryTestState.IDLE if self._enabled else RecoveryTestState.DISABLED
+        self._publish_request(False)
+        self._publish_zero()
+        self._publish_status_now(reason=reason, request_recovery=False)
 
-        rotate_left = RecoveryStage(
-            name="rotate_left",
-            duration_s=self._rotate_duration_s,
-            vx=0.0,
-            vy=0.0,
-            wz=self._limit_wz(abs(self._rotate_wz)),
-        )
-
-        rotate_right = RecoveryStage(
-            name="rotate_right",
-            duration_s=self._rotate_duration_s,
-            vx=0.0,
-            vy=0.0,
-            wz=self._limit_wz(-abs(self._rotate_wz)),
-        )
-
-        if name == "BACKUP_ONLY":
-            return [backup]
-
-        if name == "ROTATE_LEFT":
-            return [rotate_left]
-
-        if name == "ROTATE_RIGHT":
-            return [rotate_right]
-
-        if name == "BACKUP_THEN_ROTATE_LEFT":
-            return [backup, stop_between, rotate_left]
-
-        if name == "BACKUP_THEN_ROTATE_RIGHT":
-            return [backup, stop_between, rotate_right]
-
-        if name == "STOP_ONLY":
-            return [stop_between]
-
-        return []
-
-    # ----------------------------------------------------------------------
-    # Timer
-    # ----------------------------------------------------------------------
     def _on_timer(self) -> None:
+        now_s = time.monotonic()
+
         if not self._enabled:
             self._state = RecoveryTestState.DISABLED
+            self._publish_request(False)
             self._publish_zero()
-            self._publish_status_if_needed()
+            self._publish_status_throttled(
+                now_s=now_s,
+                reason="disabled",
+                request_recovery=False,
+            )
             return
 
         if self._respect_safety_stop and self._safety_stop:
-            if self._zero_on_safety_stop:
-                self._publish_zero()
             self._state = RecoveryTestState.SAFETY_STOP
             self._active_test = None
-            self._pending_test_name = None
-            self._publish_status_if_needed()
+            self._pending_test_name = ""
+            self._publish_request(False)
+            self._publish_zero()
+            self._publish_status_throttled(
+                now_s=now_s,
+                reason="safety_stop",
+                request_recovery=False,
+            )
             return
 
-        if self._state == RecoveryTestState.PRE_STOP:
+        if self._state == RecoveryTestState.STOPPING:
+            self._publish_request(False)
             self._publish_zero()
-            if self._pre_stop_until is not None and time.monotonic() >= self._pre_stop_until:
-                pending = self._pending_test_name
-                self._pending_test_name = None
-                self._pre_stop_until = None
-                if pending:
-                    self._start_test_now(pending)
-                else:
-                    self._state = RecoveryTestState.IDLE
-            self._publish_status_if_needed()
-            return
-
-        if self._state == RecoveryTestState.POST_STOP:
-            self._publish_zero()
-            if self._post_stop_until is not None and time.monotonic() >= self._post_stop_until:
-                self._post_stop_until = None
-                self._state = RecoveryTestState.FINISHED
-                if self._return_to_stop_on_finish:
-                    self._publish_mode("STOP")
-            self._publish_status_if_needed()
+            if now_s >= self._stop_until_s:
+                self._start_pending_test()
+            self._publish_status_throttled(
+                now_s=now_s,
+                reason="pre_stop",
+                request_recovery=False,
+            )
             return
 
         if self._active_test is None:
+            self._state = RecoveryTestState.IDLE
+            self._publish_request(False)
             self._publish_zero()
-            self._publish_status_if_needed()
+            self._publish_status_throttled(
+                now_s=now_s,
+                reason="idle",
+                request_recovery=False,
+            )
             return
 
-        total_elapsed = time.monotonic() - self._active_test.start_time
-        if total_elapsed > self._max_test_duration_s:
-            self._state = RecoveryTestState.TIMEOUT
-            self._active_test = None
-            self._publish_zero()
-            if self._return_to_stop_on_finish:
-                self._publish_mode("STOP")
-            self._publish_status_if_needed()
-            self._throttled_warn("Recovery test timeout. Publishing zero.")
-            return
-
-        self._run_active_stage()
-        self._publish_status_if_needed()
-
-    def _run_active_stage(self) -> None:
-        assert self._active_test is not None
-
-        now = time.monotonic()
-        stage = self._active_test.stages[self._active_test.current_stage_index]
-
-        if (now - self._active_test.stage_start_time) <= stage.duration_s:
-            self._publish_cmd(stage.vx, stage.vy, stage.wz)
-            return
-
-        self._active_test.current_stage_index += 1
-
-        if self._active_test.current_stage_index >= len(self._active_test.stages):
-            self._finish_test()
-            return
-
-        self._active_test.stage_start_time = now
-        next_stage = self._active_test.stages[self._active_test.current_stage_index]
-        self.get_logger().info(
-            f"Recovery test '{self._active_test.name}' stage -> {next_stage.name}"
+        result = step_active_test(
+            self._active_test,
+            now_s=now_s,
+            max_duration_s=self._limits.max_duration_s,
         )
-        self._publish_cmd(next_stage.vx, next_stage.vy, next_stage.wz)
 
-    # ----------------------------------------------------------------------
-    # Publishing
-    # ----------------------------------------------------------------------
-    def _publish_cmd(self, vx: float, vy: float, wz: float) -> None:
-        msg = Twist()
-        msg.linear.x = self._safe_float(self._limit_vx(vx))
-        msg.linear.y = self._safe_float(self._limit_vy(vy))
-        msg.linear.z = 0.0
-        msg.angular.x = 0.0
-        msg.angular.y = 0.0
-        msg.angular.z = self._safe_float(self._limit_wz(wz))
-        self._cmd_pub.publish(msg)
+        self._state = result.state
+        self._active_test = result.active_test
+
+        self._publish_request(result.request_recovery)
+        self._cmd_pub.publish(twist_to_ros_msg(result.command, msg_type=Twist))
+
+        if result.finished:
+            self._publish_request(False)
+            if self._send_stop_after_test:
+                self._publish_zero()
+            self._active_test = None
+            if result.state == RecoveryTestState.TIMEOUT:
+                self.get_logger().warning("Recovery test timed out")
+            self._state = RecoveryTestState.IDLE
+
+        self._publish_status_throttled(
+            now_s=now_s,
+            reason=result.reason,
+            request_recovery=result.request_recovery,
+        )
+
+    def _publish_request(self, value: bool) -> None:
+        msg = Bool()
+        msg.data = bool(value)
+        self._request_pub.publish(msg)
 
     def _publish_zero(self) -> None:
-        self._publish_cmd(0.0, 0.0, 0.0)
-
-    def _publish_mode(self, mode: str) -> None:
-        msg = String()
-        msg.data = mode
-        self._mode_pub.publish(msg)
-
-    def _publish_status_if_needed(self) -> None:
-        if not self._publish_status or self._status_pub is None:
-            return
-
-        now = time.monotonic()
-        period = 1.0 / max(0.1, self._status_hz)
-        if (now - self._last_status_time) < period:
-            return
-
-        self._last_status_time = now
-        self._publish_status()
-
-    def _publish_status(self) -> None:
-        if self._active_test is not None:
-            active = self._active_test.name
-            stage = self._active_test.current_stage_index
-            stage_name = self._active_test.stages[stage].name
-        else:
-            active = "none"
-            stage = -1
-            stage_name = "none"
-
-        msg = String()
-        msg.data = (
-            f"state={self._state.value}; "
-            f"active_test={active}; "
-            f"stage_index={stage}; "
-            f"stage_name={stage_name}; "
-            f"safety_stop={self._safety_stop}; "
-            f"output={self._cmd_vel_out_topic}"
+        self._cmd_pub.publish(
+            twist_to_ros_msg(stop_command(stamp_sec=time.monotonic()), msg_type=Twist)
         )
-        self._status_pub.publish(msg)
 
-    # ----------------------------------------------------------------------
-    # Limits / helpers
-    # ----------------------------------------------------------------------
-    def _limit_vx(self, value: float) -> float:
-        return self._clamp(self._safe_float(value), -self._max_abs_vx, self._max_abs_vx)
+    def _publish_status_now(self, *, reason: str, request_recovery: bool) -> None:
+        if not self._publish_status:
+            return
 
-    def _limit_vy(self, value: float) -> float:
-        return self._clamp(self._safe_float(value), -self._max_abs_vy, self._max_abs_vy)
+        self._status_pub.publish(
+            make_string_msg(
+                self._status_string(
+                    reason=reason,
+                    request_recovery=request_recovery,
+                ),
+                msg_type=String,
+            )
+        )
 
-    def _limit_wz(self, value: float) -> float:
-        return self._clamp(self._safe_float(value), -self._max_abs_wz, self._max_abs_wz)
+    def _publish_status_throttled(
+        self,
+        *,
+        now_s: float,
+        reason: str,
+        request_recovery: bool,
+    ) -> None:
+        if not self._publish_status or self._status_hz <= 0.0:
+            return
 
-    @staticmethod
-    def _safe_float(value: float) -> float:
-        value = float(value)
-        if not math.isfinite(value):
-            return 0.0
-        return value
+        period_s = 1.0 / self._status_hz
+        if (now_s - self._last_status_s) < period_s:
+            return
 
-    @staticmethod
-    def _clamp(value: float, low: float, high: float) -> float:
-        return max(low, min(high, value))
+        self._last_status_s = now_s
+        text = self._status_string(
+            reason=reason,
+            request_recovery=request_recovery,
+        )
+        self._status_pub.publish(make_string_msg(text, msg_type=String))
 
-    def _throttled_warn(self, text: str) -> None:
-        now = time.monotonic()
-        if (now - self._last_log_time) >= self._log_throttle_s:
-            self._last_log_time = now
-            self.get_logger().warning(text)
+        if self._log_throttle_s > 0.0 and (now_s - self._last_log_s) >= self._log_throttle_s:
+            self._last_log_s = now_s
+            self.get_logger().info(text)
+
+    def _status_string(self, *, reason: str, request_recovery: bool) -> str:
+        active_name = ""
+        command = stop_command()
+
+        if self._active_test is not None:
+            active_name = self._active_test.profile.name
+            if self._active_test.profile.stages:
+                command = self._active_test.profile.stages[
+                    min(self._active_test.stage_index, len(self._active_test.profile.stages) - 1)
+                ].command
+
+        return status_text(
+            state=self._state,
+            active_name=active_name,
+            reason=reason,
+            enabled=self._enabled,
+            safety_stop=self._safety_stop,
+            request_recovery=request_recovery,
+            command=command,
+        )
+
+    def publish_shutdown_zero(self) -> None:
+        self._publish_request(False)
+        for _ in range(max(1, self._shutdown_zero_count)):
+            self._publish_zero()
+            time.sleep(0.05)
 
 
 def main(args=None) -> None:
@@ -577,13 +465,11 @@ def main(args=None) -> None:
         rclpy.spin(node)
 
     except KeyboardInterrupt:
-        node.get_logger().info("Keyboard interrupt received. Sending zero recovery command.")
+        node.get_logger().info("Keyboard interrupt received. Stopping recovery test manager.")
 
     finally:
         try:
-            for _ in range(max(1, node._shutdown_zero_count)):
-                node._publish_zero()
-                time.sleep(0.05)
+            node.publish_shutdown_zero()
         finally:
             node.destroy_node()
             rclpy.shutdown()

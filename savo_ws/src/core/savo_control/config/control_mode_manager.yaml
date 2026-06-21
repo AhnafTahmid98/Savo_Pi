@@ -1,0 +1,36 @@
+control_mode_manager_node:
+  ros__parameters:
+    update_rate_hz: 20.0
+    startup_mode: "STOP"
+
+    manual_override_preempts_all: true
+    recovery_preempts_auto_nav: true
+    recovery_preempts_manual: false
+    latch_recovery_mode: true
+
+    safety_stop_forces_stop_mode: true
+    external_stop_forces_stop_mode: true
+    prefer_nav_over_auto: false
+    fallback_to_stop_when_source_unavailable: true
+
+    min_time_sec: 0.0
+    max_time_jump_sec: 5.0
+
+    manual_override_topic: ""
+    external_stop_topic: ""
+
+    manual_available_topic: ""
+    auto_available_topic: ""
+    nav_available_topic: ""
+    recovery_available_topic: ""
+
+    manual_source_available_default: true
+    auto_source_available_default: true
+    nav_source_available_default: true
+    recovery_source_available_default: true
+
+    publish_selected_route_topic: true
+    selected_route_topic: "/savo_control/selected_cmd_source"
+
+    log_mode_changes: true
+    log_request_changes: false
