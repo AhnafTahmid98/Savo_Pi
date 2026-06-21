@@ -1,4 +1,4 @@
-savo_supervisor
+# savo_supervisor
 
 savo_supervisor will be the high-level readiness, mode, and confidence manager for Robot Savo.
 
@@ -59,15 +59,15 @@ Planned Robot Modes
 
 The supervisor will manage high-level modes such as:
 
-Mode	Meaning
-BOOTING	Robot backend is starting
-IDLE	Backend is ready, robot is not moving
-INTERACT	Robot is talking/listening, movement blocked
-NAVIGATE	Navigation command is active
-FOLLOW	Follow mode is active
-MAPPING	Mapping/SLAM mode is active
-ERROR	Required system is unhealthy
-ESTOP	Emergency stop or hard safety stop is active
+Mode Meaning
+BOOTING Robot backend is starting
+IDLE Backend is ready, robot is not moving
+INTERACT Robot is talking/listening, movement blocked
+NAVIGATE Navigation command is active
+FOLLOW Follow mode is active
+MAPPING Mapping/SLAM mode is active
+ERROR Required system is unhealthy
+ESTOP Emergency stop or hard safety stop is active
 
 Important rule:
 
