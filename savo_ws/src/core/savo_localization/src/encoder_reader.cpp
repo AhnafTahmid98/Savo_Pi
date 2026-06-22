@@ -144,7 +144,7 @@ EncoderSample EncoderReader::sample(
   const double rl = result.rl.speed_mps;
   const double rr = result.rr.speed_mps;
 
-  const double radius_sum_m = wheelbase_m + track_m;
+  const double radius_sum_m = (wheelbase_m + track_m) / 2.0;
 
   result.vx_mps = (fl + fr + rl + rr) / 4.0;
   result.vy_mps = (-fl + fr + rl - rr) / 4.0;

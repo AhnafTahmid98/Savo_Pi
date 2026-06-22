@@ -28,6 +28,10 @@ include_directories(include)
 
 find_library(LGPIO_LIBRARY lgpio)
 
+if(NOT LGPIO_LIBRARY)
+  message(FATAL_ERROR "lgpio library not found. Install it with: sudo apt install -y liblgpio-dev")
+endif()
+
 set(IMU_NODE_SOURCES
   src/i2c_bus.cpp
   src/bno055_driver.cpp
@@ -85,10 +89,8 @@ if(WHEEL_ODOM_READY)
     tf2_ros
   )
 
-  if(LGPIO_LIBRARY)
-    target_link_libraries(wheel_odom_node ${LGPIO_LIBRARY})
-    target_compile_definitions(wheel_odom_node PRIVATE SAVO_LOCALIZATION_LINKED_LGPIO=1)
-  endif()
+  target_link_libraries(wheel_odom_node ${LGPIO_LIBRARY})
+  target_compile_definitions(wheel_odom_node PRIVATE SAVO_LOCALIZATION_LINKED_LGPIO=1)
 
   install(TARGETS
     wheel_odom_node

@@ -53,7 +53,7 @@ struct EncoderHardwareConfig
     WHEEL_FL,
     21,
     20,
-    true,
+    false,
   };
 
   WheelEncoderConfig fr{
@@ -61,7 +61,7 @@ struct EncoderHardwareConfig
     WHEEL_FR,
     13,
     25,
-    true,
+    false,
   };
 
   WheelEncoderConfig rl{
@@ -69,7 +69,7 @@ struct EncoderHardwareConfig
     WHEEL_RL,
     23,
     24,
-    true,
+    false,
   };
 
   WheelEncoderConfig rr{
@@ -77,7 +77,7 @@ struct EncoderHardwareConfig
     WHEEL_RR,
     12,
     26,
-    true,
+    false,
   };
 
   int gpiochip{-1};

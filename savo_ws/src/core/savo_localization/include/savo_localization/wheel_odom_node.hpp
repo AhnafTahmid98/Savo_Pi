@@ -111,10 +111,10 @@ private:
   int rr_a_gpio_{12};
   int rr_b_gpio_{26};
 
-  bool invert_fl_{true};
-  bool invert_fr_{true};
-  bool invert_rl_{true};
-  bool invert_rr_{true};
+  bool invert_fl_{false};
+  bool invert_fr_{false};
+  bool invert_rl_{false};
+  bool invert_rr_{false};
 
   bool reset_pose_on_start_{true};
   double start_x_m_{0.0};

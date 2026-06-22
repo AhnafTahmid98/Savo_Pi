@@ -17,7 +17,7 @@ bool MecanumGeometry::valid() const
 
 double MecanumGeometry::radius_sum_m() const
 {
-  return wheelbase_m + track_m;
+  return (wheelbase_m + track_m) / 2.0;
 }
 
 double MecanumGeometry::wheel_circumference_m() const

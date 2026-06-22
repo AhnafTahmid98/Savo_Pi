@@ -42,10 +42,10 @@ wheel_odom_node:
     rr_a_gpio: 12
     rr_b_gpio: 26
 
-    invert_fl: true
-    invert_fr: true
-    invert_rl: true
-    invert_rr: true
+    invert_fl: false
+    invert_fr: false
+    invert_rl: false
+    invert_rr: false
 
     reset_pose_on_start: true
     start_x_m: 0.0

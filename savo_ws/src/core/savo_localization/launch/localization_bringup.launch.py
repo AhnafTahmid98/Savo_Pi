@@ -7,8 +7,8 @@ from __future__ import annotations
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
-from launch.conditions import IfCondition, UnlessCondition
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.conditions import IfCondition
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
@@ -30,6 +30,7 @@ def generate_launch_description() -> LaunchDescription:
 
     use_imu = LaunchConfiguration("use_imu")
     use_wheel_odom = LaunchConfiguration("use_wheel_odom")
+    use_ekf = LaunchConfiguration("use_ekf")
     use_vo = LaunchConfiguration("use_vo")
     use_health = LaunchConfiguration("use_health")
     use_dashboard = LaunchConfiguration("use_dashboard")
@@ -187,7 +188,11 @@ def generate_launch_description() -> LaunchDescription:
                 executable="ekf_node",
                 name="ekf_filter_node",
                 output="screen",
-                condition=UnlessCondition(use_vo),
+                condition=IfCondition(
+                    PythonExpression(
+                        ["'", use_ekf, "' == 'true' and '", use_vo, "' == 'false'"]
+                    )
+                ),
                 parameters=[
                     topics_config,
                     frames_config,
@@ -204,7 +209,11 @@ def generate_launch_description() -> LaunchDescription:
                 executable="ekf_node",
                 name="ekf_filter_node",
                 output="screen",
-                condition=IfCondition(use_vo),
+                condition=IfCondition(
+                    PythonExpression(
+                        ["'", use_ekf, "' == 'true' and '", use_vo, "' == 'true'"]
+                    )
+                ),
                 parameters=[
                     topics_config,
                     frames_config,
