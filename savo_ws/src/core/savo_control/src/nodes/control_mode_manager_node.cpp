@@ -79,7 +79,9 @@ public:
         publish_now();
       });
 
-    mode_state_pub_ = create_publisher<std_msgs::msg::String>(mode_state_topic_, 10);
+    mode_state_pub_ = create_publisher<std_msgs::msg::String>(
+      mode_state_topic_,
+      rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local());
     mode_reason_pub_ = create_publisher<std_msgs::msg::String>(mode_reason_topic_, 10);
     control_status_pub_ = create_publisher<std_msgs::msg::String>(control_status_topic_, 10);
 

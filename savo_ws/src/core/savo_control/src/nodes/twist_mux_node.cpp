@@ -123,7 +123,7 @@ public:
 
     mode_sub_ = create_subscription<std_msgs::msg::String>(
       mode_topic_,
-      rclcpp::QoS(10).transient_local(),
+      rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local(),
       [this](const std_msgs::msg::String::SharedPtr msg) {
         current_mode_ = parse_control_mode(msg->data, ControlMode::STOP);
         last_mode_text_ = msg->data;
