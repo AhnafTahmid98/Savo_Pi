@@ -16,13 +16,9 @@ control_mode_manager_node:
     min_time_sec: 0.0
     max_time_jump_sec: 5.0
 
-    manual_override_topic: ""
-    external_stop_topic: ""
-
-    manual_available_topic: ""
-    auto_available_topic: ""
-    nav_available_topic: ""
-    recovery_available_topic: ""
+    # These override the node defaults, so they must be valid ROS topic names.
+    manual_override_topic: "/savo_control/manual_override"
+    external_stop_topic: "/savo_control/external_stop"
 
     manual_source_available_default: true
     auto_source_available_default: true

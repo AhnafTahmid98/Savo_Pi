@@ -11,7 +11,7 @@ import rclpy
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
-from std_msgs.msg import Bool, Float32, Float64, String
+from std_msgs.msg import Bool, Float32, String
 
 from savo_control.models import TwistCommand
 from savo_control.nodes.control_status_helpers import (
@@ -207,12 +207,6 @@ class RecoveryStatusNode(Node):
                 self._on_slowdown,
                 10,
             )
-            self.create_subscription(
-                Float64,
-                self._slowdown_factor_topic,
-                self._on_slowdown,
-                10,
-            )
 
         if self._watch_odom:
             self.create_subscription(Odometry, self._odom_topic, self._on_odom, 10)
@@ -303,7 +297,7 @@ class RecoveryStatusNode(Node):
             stamp_s=time.monotonic(),
         )
 
-    def _on_slowdown(self, msg: Float32 | Float64) -> None:
+    def _on_slowdown(self, msg: Float32) -> None:
         self._slowdown_factor = ScalarSample(
             value=finite_or_zero(float_msg_value(msg)),
             stamp_s=time.monotonic(),
