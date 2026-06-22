@@ -25,17 +25,17 @@ wheel_odom_node:
     use_internal_pullup: false
     use_hw_debounce: true
 
-    fl_a_gpio: 25
-    fl_b_gpio: 13
+    fl_a_gpio: 21
+    fl_b_gpio: 20
 
-    fr_a_gpio: 20
-    fr_b_gpio: 21
+    fr_a_gpio: 13
+    fr_b_gpio: 25
 
     rl_a_gpio: 23
     rl_b_gpio: 24
 
-    rr_a_gpio: 26
-    rr_b_gpio: 12
+    rr_a_gpio: 12
+    rr_b_gpio: 26
 
     invert_fl: true
     invert_fr: true

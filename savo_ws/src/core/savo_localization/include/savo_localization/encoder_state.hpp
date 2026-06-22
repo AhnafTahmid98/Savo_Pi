@@ -51,16 +51,16 @@ struct EncoderHardwareConfig
   WheelEncoderConfig fl{
     WheelId::FL,
     WHEEL_FL,
-    25,
-    13,
+    21,
+    20,
     true,
   };
 
   WheelEncoderConfig fr{
     WheelId::FR,
     WHEEL_FR,
-    20,
-    21,
+    13,
+    25,
     true,
   };
 
@@ -75,8 +75,8 @@ struct EncoderHardwareConfig
   WheelEncoderConfig rr{
     WheelId::RR,
     WHEEL_RR,
-    26,
     12,
+    26,
     true,
   };
 
