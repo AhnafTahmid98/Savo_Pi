@@ -155,7 +155,7 @@ def print_help() -> None:
 def run_pantilt(args: argparse.Namespace) -> None:
     servo = Servo(addr=0x40, debug=True)
 
-    pan_center = clamp(args.pan_center, 0, 180)
+    pan_center = clamp(args.pan_center, 0, 170)
     tilt_center = clamp(args.tilt_center, 0, 180)
 
     auto_pan_min = args.auto_pan_min
@@ -247,13 +247,13 @@ def run_pantilt(args: argparse.Namespace) -> None:
 
                     if key == "A":
                         mode = "manual"
-                        pan_angle = clamp(pan_angle - args.step, -180, 180)
+                        pan_angle = clamp(pan_angle - args.step, 0, 170)
                         servo.set_servo_angle(args.pan_chan, servo_safe_angle(pan_angle))
                         print(f"[PAN] Left  → pan={pan_angle}°, tilt={tilt_angle}°")
 
                     elif key == "D":
                         mode = "manual"
-                        pan_angle = clamp(pan_angle + args.step, -180, 180)
+                        pan_angle = clamp(pan_angle + args.step, 0, 170)
                         servo.set_servo_angle(args.pan_chan, servo_safe_angle(pan_angle))
                         print(f"[PAN] Right → pan={pan_angle}°, tilt={tilt_angle}°")
 
@@ -416,8 +416,8 @@ def main() -> None:
     ap.add_argument(
         "--auto-pan-min",
         type=int,
-        default=-180,
-        help="Automatic pan minimum angle. Default: -180.",
+        default=0,
+        help="Automatic pan minimum angle. Default: 0.",
     )
     ap.add_argument(
         "--auto-pan-max",
