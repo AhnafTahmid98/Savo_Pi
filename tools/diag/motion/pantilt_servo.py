@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 """Interactive and automatic PCA9685 pan-tilt servo diagnostic for Robot Savo."""
 
-import math
 import argparse
+import math
 import select
 import sys
 import termios
@@ -42,6 +42,7 @@ class PCA9685:
 
         oldmode = self.read(self.__MODE1)
         newmode = (oldmode & 0x7F) | 0x10
+
         self.write(self.__MODE1, newmode)
         self.write(self.__PRESCALE, int(prescale))
         self.write(self.__MODE1, oldmode)
@@ -65,7 +66,11 @@ class PCA9685:
 class Servo:
     def __init__(self, addr: int = 0x40, debug: bool = True):
         self.pwm_frequency = 50
+
         # Freenove logical servo ports -> real PCA9685 channels.
+        # Robot Savo validated mapping:
+        #   logical 7 = pan  / left-right
+        #   logical 6 = tilt / up-down
         self.pwm_channel_map = {
             "0": 8,
             "1": 9,
@@ -76,6 +81,7 @@ class Servo:
             "6": 14,
             "7": 15,
         }
+
         self.pwm_servo = PCA9685(addr, debug=debug)
         self.pwm_servo.set_pwm_freq(self.pwm_frequency)
 
@@ -94,7 +100,10 @@ class Servo:
             raise ValueError(
                 f"Invalid channel: {channel}. Valid: {list(self.pwm_channel_map.keys())}"
             )
+
+        # Standard hobby servo command safety limit.
         angle = max(0, min(180, int(angle)))
+
         pulse = self.angle_to_pulse(channel, angle, error)
         pca_channel = self.pwm_channel_map[channel]
         self.pwm_servo.set_servo_pulse(pca_channel, pulse)
@@ -128,12 +137,29 @@ def clamp(value: int, low: int, high: int) -> int:
     return max(low, min(high, int(value)))
 
 
+def bounce(value: int, direction: int, step: int, low: int, high: int):
+    value += direction * step
+
+    if value >= high:
+        value = high
+        direction = -1
+    elif value <= low:
+        value = low
+        direction = 1
+
+    return value, direction
+
+
+def servo_safe_angle(angle: int) -> int:
+    return clamp(angle, 0, 180)
+
+
 def print_help() -> None:
     print("\nControls:")
     print("  W / S     : tilt up / tilt down")
     print("  A / D     : pan left / pan right")
-    print("  O         : toggle auto/manual sweep")
-    print("  SPACE     : pause/resume auto sweep")
+    print("  O         : toggle auto/manual")
+    print("  SPACE     : pause/resume auto")
     print("  C         : calibrated center")
     print("  H         : show help")
     print("  Q or ESC  : quit\n")
@@ -142,35 +168,42 @@ def print_help() -> None:
 def run_pantilt(args: argparse.Namespace) -> None:
     servo = Servo(addr=0x40, debug=True)
 
-    pan_center = clamp(args.pan_center, args.pan_min, args.pan_max)
-    tilt_center = clamp(args.tilt_center, args.tilt_min, args.tilt_max)
+    pan_center = clamp(args.pan_center, 0, 180)
+    tilt_center = clamp(args.tilt_center, 0, 180)
 
-    auto_pan_min = clamp(args.auto_pan_min, args.pan_min, args.pan_max)
-    auto_pan_max = clamp(args.auto_pan_max, args.pan_min, args.pan_max)
+    auto_pan_min = args.auto_pan_min
+    auto_pan_max = args.auto_pan_max
+    auto_tilt_min = args.auto_tilt_min
+    auto_tilt_max = args.auto_tilt_max
 
     if auto_pan_min > auto_pan_max:
         auto_pan_min, auto_pan_max = auto_pan_max, auto_pan_min
 
+    if auto_tilt_min > auto_tilt_max:
+        auto_tilt_min, auto_tilt_max = auto_tilt_max, auto_tilt_min
+
     pan_angle = pan_center
     tilt_angle = tilt_center
-    auto_direction = 1
+
+    pan_direction = 1
+    tilt_direction = 1
+
     auto_paused = False
     mode = args.mode
 
-    servo.set_servo_angle(args.pan_chan, pan_angle)
-    servo.set_servo_angle(args.tilt_chan, tilt_angle)
+    servo.set_servo_angle(args.pan_chan, servo_safe_angle(pan_angle))
+    servo.set_servo_angle(args.tilt_chan, servo_safe_angle(tilt_angle))
 
     print("\nRobot Savo — Pan-Tilt Servo Test")
     print("---------------------------------")
     print(f"Pan channel : '{args.pan_chan}' (PCA9685 ch {servo.pwm_channel_map[args.pan_chan]})")
     print(f"Tilt channel: '{args.tilt_chan}' (PCA9685 ch {servo.pwm_channel_map[args.tilt_chan]})")
-    print(f"Pan range   : {args.pan_min} .. {args.pan_max} deg")
-    print(f"Tilt range  : {args.tilt_min} .. {args.tilt_max} deg")
     print(f"Pan center  : {pan_center} deg")
     print(f"Tilt center : {tilt_center} deg")
     print(f"Manual step : {args.step} deg")
-    print(f"Auto sweep  : pan {auto_pan_min} .. {auto_pan_max} deg")
-    print(f"Auto step   : {args.auto_step} deg")
+    print(f"Auto axis   : {args.auto_axis}")
+    print(f"Auto pan    : {auto_pan_min} .. {auto_pan_max} deg, step={args.auto_pan_step}")
+    print(f"Auto tilt   : {auto_tilt_min} .. {auto_tilt_max} deg, step={args.auto_tilt_step}")
     print(f"Auto delay  : {args.auto_delay:.3f} s")
     print(f"Start mode  : {mode}")
 
@@ -210,33 +243,33 @@ def run_pantilt(args: argparse.Namespace) -> None:
                     if key == "C":
                         pan_angle = pan_center
                         tilt_angle = tilt_center
-                        servo.set_servo_angle(args.pan_chan, pan_angle)
-                        servo.set_servo_angle(args.tilt_chan, tilt_angle)
+                        servo.set_servo_angle(args.pan_chan, servo_safe_angle(pan_angle))
+                        servo.set_servo_angle(args.tilt_chan, servo_safe_angle(tilt_angle))
                         print(f"[CENTER] pan={pan_angle}°, tilt={tilt_angle}°")
                         continue
 
                     if key == "A":
                         mode = "manual"
-                        pan_angle = clamp(pan_angle - args.step, args.pan_min, args.pan_max)
-                        servo.set_servo_angle(args.pan_chan, pan_angle)
+                        pan_angle = clamp(pan_angle - args.step, -180, 180)
+                        servo.set_servo_angle(args.pan_chan, servo_safe_angle(pan_angle))
                         print(f"[PAN] Left  → pan={pan_angle}°, tilt={tilt_angle}°")
 
                     elif key == "D":
                         mode = "manual"
-                        pan_angle = clamp(pan_angle + args.step, args.pan_min, args.pan_max)
-                        servo.set_servo_angle(args.pan_chan, pan_angle)
+                        pan_angle = clamp(pan_angle + args.step, -180, 180)
+                        servo.set_servo_angle(args.pan_chan, servo_safe_angle(pan_angle))
                         print(f"[PAN] Right → pan={pan_angle}°, tilt={tilt_angle}°")
 
                     elif key == "W":
                         mode = "manual"
-                        tilt_angle = clamp(tilt_angle + args.step, args.tilt_min, args.tilt_max)
-                        servo.set_servo_angle(args.tilt_chan, tilt_angle)
+                        tilt_angle = clamp(tilt_angle + args.step, 0, 180)
+                        servo.set_servo_angle(args.tilt_chan, servo_safe_angle(tilt_angle))
                         print(f"[TILT] Up   → pan={pan_angle}°, tilt={tilt_angle}°")
 
                     elif key == "S":
                         mode = "manual"
-                        tilt_angle = clamp(tilt_angle - args.step, args.tilt_min, args.tilt_max)
-                        servo.set_servo_angle(args.tilt_chan, tilt_angle)
+                        tilt_angle = clamp(tilt_angle - args.step, 0, 180)
+                        servo.set_servo_angle(args.tilt_chan, servo_safe_angle(tilt_angle))
                         print(f"[TILT] Down → pan={pan_angle}°, tilt={tilt_angle}°")
 
                 now = time.monotonic()
@@ -245,19 +278,27 @@ def run_pantilt(args: argparse.Namespace) -> None:
                     if now - last_auto_time >= args.auto_delay:
                         last_auto_time = now
 
-                        pan_angle += auto_direction * args.auto_step
+                        if args.auto_axis in ("pan", "both"):
+                            pan_angle, pan_direction = bounce(
+                                pan_angle,
+                                pan_direction,
+                                args.auto_pan_step,
+                                auto_pan_min,
+                                auto_pan_max,
+                            )
+                            servo.set_servo_angle(args.pan_chan, servo_safe_angle(pan_angle))
 
-                        if pan_angle >= auto_pan_max:
-                            pan_angle = auto_pan_max
-                            auto_direction = -1
+                        if args.auto_axis in ("tilt", "both"):
+                            tilt_angle, tilt_direction = bounce(
+                                tilt_angle,
+                                tilt_direction,
+                                args.auto_tilt_step,
+                                auto_tilt_min,
+                                auto_tilt_max,
+                            )
+                            servo.set_servo_angle(args.tilt_chan, servo_safe_angle(tilt_angle))
 
-                        elif pan_angle <= auto_pan_min:
-                            pan_angle = auto_pan_min
-                            auto_direction = 1
-
-                        servo.set_servo_angle(args.pan_chan, pan_angle)
-                        servo.set_servo_angle(args.tilt_chan, tilt_angle)
-                        print(f"[AUTO] Sweep → pan={pan_angle}°, tilt={tilt_angle}°")
+                        print(f"[AUTO] {args.auto_axis} → pan={pan_angle}°, tilt={tilt_angle}°")
 
     except KeyboardInterrupt:
         print("\n[INFO] Ctrl+C caught, exiting...")
@@ -269,6 +310,7 @@ def run_pantilt(args: argparse.Namespace) -> None:
             print(f"[INFO] On exit: recentered to pan={pan_center}°, tilt={tilt_center}°")
         except Exception as e:
             print(f"[WARN] Could not recenter on exit: {e}")
+
         servo.close()
 
 
@@ -276,34 +318,96 @@ def main() -> None:
     ap = argparse.ArgumentParser(
         description="Robot Savo — Pan-Tilt Servo Test with manual and auto modes"
     )
-    ap.add_argument("--mode", choices=["manual", "auto"], default="manual",
-                    help="Start mode. Default: manual.")
-    ap.add_argument("--pan-chan", default="7",
-                    help="Logical pan servo channel. Default: 7.")
-    ap.add_argument("--tilt-chan", default="6",
-                    help="Logical tilt servo channel. Default: 6.")
-    ap.add_argument("--pan-min", type=int, default=0,
-                    help="Pan minimum angle. Default: 0.")
-    ap.add_argument("--pan-max", type=int, default=180,
-                    help="Pan maximum angle. Default: 180.")
-    ap.add_argument("--tilt-min", type=int, default=45,
-                    help="Tilt minimum angle. Default: 45.")
-    ap.add_argument("--tilt-max", type=int, default=120,
-                    help="Tilt maximum angle. Default: 120.")
-    ap.add_argument("--pan-center", type=int, default=72,
-                    help="Calibrated pan center angle. Default: 72.")
-    ap.add_argument("--tilt-center", type=int, default=55,
-                    help="Calibrated tilt center angle. Default: 55.")
-    ap.add_argument("--step", type=int, default=3,
-                    help="Manual angle step per key press. Default: 3 degrees.")
-    ap.add_argument("--auto-pan-min", type=int, default=45,
-                    help="Automatic sweep minimum pan angle. Default: 45.")
-    ap.add_argument("--auto-pan-max", type=int, default=105,
-                    help="Automatic sweep maximum pan angle. Default: 105.")
-    ap.add_argument("--auto-step", type=int, default=1,
-                    help="Automatic sweep step size. Default: 1 degree.")
-    ap.add_argument("--auto-delay", type=float, default=0.08,
-                    help="Delay between automatic sweep steps. Default: 0.08 seconds.")
+
+    ap.add_argument(
+        "--mode",
+        choices=["manual", "auto"],
+        default="manual",
+        help="Start mode. Default: manual.",
+    )
+
+    ap.add_argument(
+        "--pan-chan",
+        default="7",
+        help="Logical pan servo channel. Default: 7.",
+    )
+    ap.add_argument(
+        "--tilt-chan",
+        default="6",
+        help="Logical tilt servo channel. Default: 6.",
+    )
+
+    ap.add_argument(
+        "--pan-center",
+        type=int,
+        default=72,
+        help="Calibrated pan center angle. Default: 72.",
+    )
+    ap.add_argument(
+        "--tilt-center",
+        type=int,
+        default=55,
+        help="Calibrated tilt center angle. Default: 55.",
+    )
+
+    ap.add_argument(
+        "--step",
+        type=int,
+        default=5,
+        help="Manual angle step per key press. Default: 5 degrees.",
+    )
+
+    ap.add_argument(
+        "--auto-axis",
+        choices=["pan", "tilt", "both"],
+        default="both",
+        help="Automatic sweep axis. Default: both.",
+    )
+
+    ap.add_argument(
+        "--auto-pan-min",
+        type=int,
+        default=-180,
+        help="Automatic pan minimum angle. Default: -180.",
+    )
+    ap.add_argument(
+        "--auto-pan-max",
+        type=int,
+        default=170,
+        help="Automatic pan maximum angle. Default: 170.",
+    )
+    ap.add_argument(
+        "--auto-pan-step",
+        type=int,
+        default=5,
+        help="Automatic pan step. Default: 5 degrees.",
+    )
+
+    ap.add_argument(
+        "--auto-tilt-min",
+        type=int,
+        default=45,
+        help="Automatic tilt minimum angle. Default: 45.",
+    )
+    ap.add_argument(
+        "--auto-tilt-max",
+        type=int,
+        default=170,
+        help="Automatic tilt maximum angle. Default: 170.",
+    )
+    ap.add_argument(
+        "--auto-tilt-step",
+        type=int,
+        default=5,
+        help="Automatic tilt step. Default: 5 degrees.",
+    )
+
+    ap.add_argument(
+        "--auto-delay",
+        type=float,
+        default=0.12,
+        help="Delay between automatic steps. Default: 0.12 seconds.",
+    )
 
     args = ap.parse_args()
     run_pantilt(args)
