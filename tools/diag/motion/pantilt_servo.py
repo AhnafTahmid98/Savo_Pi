@@ -137,19 +137,6 @@ def clamp(value: int, low: int, high: int) -> int:
     return max(low, min(high, int(value)))
 
 
-def bounce(value: int, direction: int, step: int, low: int, high: int):
-    value += direction * step
-
-    if value >= high:
-        value = high
-        direction = -1
-    elif value <= low:
-        value = low
-        direction = 1
-
-    return value, direction
-
-
 def servo_safe_angle(angle: int) -> int:
     return clamp(angle, 0, 180)
 
@@ -182,10 +169,21 @@ def run_pantilt(args: argparse.Namespace) -> None:
     if auto_tilt_min > auto_tilt_max:
         auto_tilt_min, auto_tilt_max = auto_tilt_max, auto_tilt_min
 
-    pan_angle = pan_center
-    tilt_angle = tilt_center
+    pan_angle = args.auto_pan_min if args.mode == "auto" else pan_center
+    tilt_angle = args.auto_tilt_min if args.mode == "auto" else tilt_center
 
-    pan_direction = 1
+    # Staged scan:
+    # -180 -> 72 -> tilt sweep -> 170 -> 72 -> tilt sweep -> -180 -> repeat
+    pan_targets = [
+        pan_center,
+        args.auto_pan_max,
+        pan_center,
+        args.auto_pan_min,
+    ]
+    pan_target_index = 0
+    current_pan_target = pan_targets[pan_target_index]
+
+    tilt_phase = "idle"
     tilt_direction = 1
 
     auto_paused = False
@@ -201,7 +199,6 @@ def run_pantilt(args: argparse.Namespace) -> None:
     print(f"Pan center  : {pan_center} deg")
     print(f"Tilt center : {tilt_center} deg")
     print(f"Manual step : {args.step} deg")
-    print(f"Auto axis   : {args.auto_axis}")
     print(f"Auto pan    : {auto_pan_min} .. {auto_pan_max} deg, step={args.auto_pan_step}")
     print(f"Auto tilt   : {auto_tilt_min} .. {auto_tilt_max} deg, step={args.auto_tilt_step}")
     print(f"Auto delay  : {args.auto_delay:.3f} s")
@@ -278,27 +275,86 @@ def run_pantilt(args: argparse.Namespace) -> None:
                     if now - last_auto_time >= args.auto_delay:
                         last_auto_time = now
 
-                        if args.auto_axis in ("pan", "both"):
-                            pan_angle, pan_direction = bounce(
-                                pan_angle,
-                                pan_direction,
-                                args.auto_pan_step,
-                                auto_pan_min,
-                                auto_pan_max,
-                            )
-                            servo.set_servo_angle(args.pan_chan, servo_safe_angle(pan_angle))
+                        if tilt_phase == "idle":
+                            # Move pan toward the current target.
+                            if pan_angle < current_pan_target:
+                                pan_angle = min(
+                                    pan_angle + args.auto_pan_step,
+                                    current_pan_target,
+                                )
+                            elif pan_angle > current_pan_target:
+                                pan_angle = max(
+                                    pan_angle - args.auto_pan_step,
+                                    current_pan_target,
+                                )
 
-                        if args.auto_axis in ("tilt", "both"):
-                            tilt_angle, tilt_direction = bounce(
-                                tilt_angle,
-                                tilt_direction,
-                                args.auto_tilt_step,
-                                auto_tilt_min,
-                                auto_tilt_max,
+                            servo.set_servo_angle(
+                                args.pan_chan,
+                                servo_safe_angle(pan_angle),
                             )
-                            servo.set_servo_angle(args.tilt_chan, servo_safe_angle(tilt_angle))
+                            servo.set_servo_angle(
+                                args.tilt_chan,
+                                servo_safe_angle(tilt_angle),
+                            )
 
-                        print(f"[AUTO] {args.auto_axis} → pan={pan_angle}°, tilt={tilt_angle}°")
+                            print(
+                                f"[AUTO-PAN] pan={pan_angle}°, "
+                                f"tilt={tilt_angle}°, target={current_pan_target}°"
+                            )
+
+                            if pan_angle == current_pan_target:
+                                # Tilt sweep only at calibrated center pan.
+                                if current_pan_target == pan_center:
+                                    tilt_angle = args.auto_tilt_min
+                                    tilt_direction = 1
+                                    tilt_phase = "sweep"
+                                    servo.set_servo_angle(
+                                        args.tilt_chan,
+                                        servo_safe_angle(tilt_angle),
+                                    )
+                                    print(
+                                        f"[AUTO-TILT-START] pan={pan_angle}°, "
+                                        f"tilt={tilt_angle}°"
+                                    )
+                                else:
+                                    pan_target_index = (
+                                        pan_target_index + 1
+                                    ) % len(pan_targets)
+                                    current_pan_target = pan_targets[pan_target_index]
+                                    print(
+                                        f"[AUTO-NEXT] next pan target="
+                                        f"{current_pan_target}°"
+                                    )
+
+                        elif tilt_phase == "sweep":
+                            # Tilt sweep: 45 -> 150 -> 45.
+                            tilt_angle += tilt_direction * args.auto_tilt_step
+
+                            if tilt_angle >= args.auto_tilt_max:
+                                tilt_angle = args.auto_tilt_max
+                                tilt_direction = -1
+
+                            elif tilt_angle <= args.auto_tilt_min:
+                                tilt_angle = args.auto_tilt_min
+                                tilt_phase = "idle"
+
+                                pan_target_index = (
+                                    pan_target_index + 1
+                                ) % len(pan_targets)
+                                current_pan_target = pan_targets[pan_target_index]
+
+                                print(
+                                    f"[AUTO-TILT-DONE] next pan target="
+                                    f"{current_pan_target}°"
+                                )
+
+                            servo.set_servo_angle(
+                                args.tilt_chan,
+                                servo_safe_angle(tilt_angle),
+                            )
+                            print(
+                                f"[AUTO-TILT] pan={pan_angle}°, tilt={tilt_angle}°"
+                            )
 
     except KeyboardInterrupt:
         print("\n[INFO] Ctrl+C caught, exiting...")
@@ -358,13 +414,6 @@ def main() -> None:
     )
 
     ap.add_argument(
-        "--auto-axis",
-        choices=["pan", "tilt", "both"],
-        default="both",
-        help="Automatic sweep axis. Default: both.",
-    )
-
-    ap.add_argument(
         "--auto-pan-min",
         type=int,
         default=-180,
@@ -392,8 +441,8 @@ def main() -> None:
     ap.add_argument(
         "--auto-tilt-max",
         type=int,
-        default=170,
-        help="Automatic tilt maximum angle. Default: 170.",
+        default=150,
+        help="Automatic tilt maximum angle. Default: 150.",
     )
     ap.add_argument(
         "--auto-tilt-step",
