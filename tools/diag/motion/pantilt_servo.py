@@ -353,8 +353,8 @@ def main() -> None:
     ap.add_argument(
         "--step",
         type=int,
-        default=5,
-        help="Manual angle step per key press. Default: 5 degrees.",
+        default=3,
+        help="Manual angle step per key press. Default: 3 degrees.",
     )
 
     ap.add_argument(
@@ -379,8 +379,8 @@ def main() -> None:
     ap.add_argument(
         "--auto-pan-step",
         type=int,
-        default=5,
-        help="Automatic pan step. Default: 5 degrees.",
+        default=3,
+        help="Automatic pan step. Default: 3 degrees.",
     )
 
     ap.add_argument(
@@ -398,8 +398,8 @@ def main() -> None:
     ap.add_argument(
         "--auto-tilt-step",
         type=int,
-        default=5,
-        help="Automatic tilt step. Default: 5 degrees.",
+        default=3,
+        help="Automatic tilt step. Default: 3 degrees.",
     )
 
     ap.add_argument(
