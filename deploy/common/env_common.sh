@@ -1,11 +1,6 @@
 #!/usr/bin/env bash
 # Shared Robot Savo deploy environment.
 
-if [[ "${SAVO_ENV_COMMON_LOADED:-0}" == "1" ]]; then
-  return 0 2>/dev/null || exit 0
-fi
-export SAVO_ENV_COMMON_LOADED=1
-
 export SAVO_ROOT="${SAVO_ROOT:-$HOME/Savo_Pi}"
 export SAVO_WS="${SAVO_WS:-$SAVO_ROOT/savo_ws}"
 export ROS_DISTRO="${ROS_DISTRO:-jazzy}"
