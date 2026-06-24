@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Robot Savo Ethernet recovery reset.
-# Use when core-edge eth0 link is UP but ping/ARP fails.
+# Matches the validated manual recovery sequence.
 
 set -Eeuo pipefail
 
@@ -9,25 +9,37 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/env_common.sh"
 
 AUTO_YES=0
+CHECK_PEER=0
 
 for arg in "$@"; do
   case "$arg" in
     -y|--yes)
       AUTO_YES=1
       ;;
+    --check)
+      CHECK_PEER=1
+      ;;
     -h|--help)
       cat <<HELP
 Usage:
-  robot_savo_network_reset.sh [--yes]
+  robot_savo_network_reset.sh [--yes] [--check]
 
-This resets the Robot Savo eth0 direct Ethernet link:
-  - eth0 down/up
-  - flush neighbor/ARP table
-  - flush route cache
-  - restart NetworkManager
-  - test peer ping
+Validated recovery sequence:
+  1. eth0 down
+  2. wait
+  3. eth0 up
+  4. wait
+  5. flush all neighbor/ARP entries
+  6. flush route cache
+  7. restart NetworkManager
+  8. optional peer ping with --check
 
-Run on both Pis if the core-edge link becomes stale.
+Recommended:
+  Run this on both Pis:
+    ~/Savo_Pi/deploy/common/robot_savo_network_reset.sh --yes
+
+Then validate:
+    ~/Savo_Pi/deploy/common/robot_savo_health_check.sh
 HELP
       exit 0
       ;;
@@ -70,8 +82,7 @@ confirm_reset() {
 
   cat <<WARN
 [SavoDeploy] This will reset ${SAVO_ETH_IFACE} and restart NetworkManager.
-[SavoDeploy] If you are connected through Ethernet SSH, your session may disconnect.
-[SavoDeploy] Recommended: run over Wi-Fi SSH or local terminal.
+[SavoDeploy] Use Wi-Fi SSH or local terminal, not Ethernet SSH.
 
 Type RESET to continue:
 WARN
@@ -90,47 +101,38 @@ show_status() {
   ip route | grep -E "default|192.168.50" || true
 }
 
-reset_eth_link() {
+reset_network_state() {
   savo_log "Bringing ${SAVO_ETH_IFACE} down..."
   ${SUDO} ip link set "${SAVO_ETH_IFACE}" down
-
   sleep 3
 
   savo_log "Bringing ${SAVO_ETH_IFACE} up..."
   ${SUDO} ip link set "${SAVO_ETH_IFACE}" up
-
   sleep 3
-}
 
-flush_kernel_network_state() {
-  savo_log "Flushing neighbor/ARP state..."
+  savo_log "Flushing all neighbor/ARP entries..."
   ${SUDO} ip neigh flush all || true
 
   savo_log "Flushing route cache..."
   ${SUDO} ip route flush cache || true
-}
 
-restart_network_manager() {
   savo_log "Restarting NetworkManager..."
-  ${SUDO} systemctl restart NetworkManager.service
+  ${SUDO} systemctl restart NetworkManager
   sleep 5
 }
 
-reconnect_eth() {
-  if command -v nmcli >/dev/null 2>&1; then
-    savo_log "Reconnecting ${SAVO_ETH_IFACE} with NetworkManager..."
-    ${SUDO} nmcli device connect "${SAVO_ETH_IFACE}" >/dev/null 2>&1 || true
-    sleep 2
+check_peer_optional() {
+  if [[ "$CHECK_PEER" != "1" ]]; then
+    savo_log "Skipping peer ping. Run health check after resetting both Pis."
+    return 0
   fi
-}
 
-test_peer() {
   savo_log "Testing peer ping: ${SAVO_PEER_IP}"
 
-  if ping -c 5 -W 2 "${SAVO_PEER_IP}"; then
+  if ping -c 5 "${SAVO_PEER_IP}"; then
     savo_log "Peer ping passed"
   else
-    savo_die "Peer ping failed after reset"
+    savo_log "Peer ping failed. Run this reset on the other Pi too, then run health check."
   fi
 
   savo_log "Neighbor table:"
@@ -142,15 +144,12 @@ main() {
   show_status
   confirm_reset
 
-  reset_eth_link
-  flush_kernel_network_state
-  restart_network_manager
-  reconnect_eth
+  reset_network_state
 
   show_status
-  test_peer
+  check_peer_optional
 
-  savo_log "Robot Savo Ethernet reset completed successfully"
+  savo_log "Robot Savo local Ethernet reset completed"
 }
 
 main "$@"
