@@ -30,8 +30,8 @@ wheel_odom_node:
     use_internal_pullup: false
     use_hw_debounce: true
 
-    fl_a_gpio: 21
-    fl_b_gpio: 20
+    fl_a_gpio: 20
+    fl_b_gpio: 21
 
     fr_a_gpio: 13
     fr_b_gpio: 25
