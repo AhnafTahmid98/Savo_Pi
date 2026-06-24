@@ -13,6 +13,8 @@ setup(
         (f"share/{package_name}/config", [
             "config/realsense_d435_camera.yaml",
             "config/realsense_d435_nodes.yaml",
+            "config/realsense_pointcloud_camera.yaml",
+            "config/realsense_pointcloud_nodes.yaml",
             "config/realsense_minimal.yaml",
             "config/realsense_vo_profile.yaml",
             "config/realsense_nav_profile.yaml",
@@ -21,6 +23,7 @@ setup(
         ]),
         (f"share/{package_name}/launch", [
             "launch/realsense_bringup.launch.py",
+            "launch/realsense_pointcloud.launch.py",
             "launch/realsense_minimal.launch.py",
             "launch/realsense_vo.launch.py",
             "launch/realsense_diagnostics.launch.py",

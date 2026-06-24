@@ -1,0 +1,34 @@
+/camera/camera:
+  ros__parameters:
+    camera_name: camera
+    camera_namespace: camera
+
+    serial_no: ""
+    usb_port_id: ""
+    device_type: ""
+
+    enable_color: true
+    enable_depth: true
+    enable_infra1: false
+    enable_infra2: false
+    enable_gyro: false
+    enable_accel: false
+
+    depth_module.depth_profile: "848x480x30"
+    rgb_camera.color_profile: "640x480x30"
+
+    align_depth.enable: true
+    enable_sync: true
+
+    pointcloud.enable: true
+    pointcloud.stream_filter: 2
+    pointcloud.stream_index_filter: 0
+    pointcloud.allow_no_texture_points: true
+    pointcloud.ordered_pc: false
+
+    publish_tf: true
+    tf_publish_rate: 0.0
+
+    initial_reset: false
+    reconnect_timeout: 6.0
+    wait_for_device_timeout: -1.0
