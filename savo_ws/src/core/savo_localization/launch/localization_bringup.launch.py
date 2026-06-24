@@ -69,7 +69,7 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument(
                 "vo_config",
                 default_value=PathJoinSubstitution(
-                    [package_share, "config", "vo_fusion_optional.yaml"]
+                    [package_share, "config", "ekf_vo_input_optional.yaml"]
                 ),
                 description="Optional EKF overlay for /vo/odom from savo-edge.",
             ),

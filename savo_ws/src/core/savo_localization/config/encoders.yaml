@@ -25,6 +25,11 @@ wheel_odom_node:
     use_internal_pullup: false
     use_hw_debounce: true
 
+    velocity_filter_enabled: true
+    velocity_ema_alpha: 0.25
+    wheel_speed_deadband_mps: 0.02
+    min_active_wheels_for_twist: 2
+
     fl_a_gpio: 20
     fl_b_gpio: 21
 

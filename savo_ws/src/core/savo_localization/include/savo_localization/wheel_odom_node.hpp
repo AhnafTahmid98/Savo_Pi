@@ -57,6 +57,11 @@ private:
 
   EncoderHardwareConfig make_encoder_config_from_params() const;
   MecanumGeometry make_mecanum_geometry_from_params() const;
+  WheelSpeeds filter_wheel_speeds(const WheelSpeeds & raw_wheel_speeds);
+  static double apply_deadband(double value, double deadband);
+  static int active_wheel_count_from_speeds(
+    const WheelSpeeds & wheel_speeds,
+    double deadband);
 
   std::array<double, 36> pose_covariance() const;
   std::array<double, 36> twist_covariance() const;
@@ -102,8 +107,8 @@ private:
   bool use_internal_pullup_{false};
   bool use_hw_debounce_{true};
 
-  int fl_a_gpio_{21};
-  int fl_b_gpio_{20};
+  int fl_a_gpio_{20};
+  int fl_b_gpio_{21};
   int fr_a_gpio_{13};
   int fr_b_gpio_{25};
   int rl_a_gpio_{23};
@@ -115,6 +120,14 @@ private:
   bool invert_fr_{false};
   bool invert_rl_{false};
   bool invert_rr_{false};
+
+  bool velocity_filter_enabled_{true};
+  double velocity_ema_alpha_{0.25};
+  double wheel_speed_deadband_mps_{0.02};
+  int min_active_wheels_for_twist_{2};
+
+  WheelSpeeds filtered_wheel_speeds_{};
+  bool have_filtered_wheel_speeds_{false};
 
   bool reset_pose_on_start_{true};
   double start_x_m_{0.0};

@@ -51,8 +51,8 @@ struct EncoderHardwareConfig
   WheelEncoderConfig fl{
     WheelId::FL,
     WHEEL_FL,
-    21,
     20,
+    21,
     false,
   };
 

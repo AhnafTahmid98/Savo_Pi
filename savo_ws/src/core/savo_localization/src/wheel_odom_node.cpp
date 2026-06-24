@@ -1,5 +1,6 @@
 #include "savo_localization/wheel_odom_node.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <iomanip>
@@ -133,6 +134,11 @@ void WheelOdomNode::declare_parameters()
   declare_parameter<bool>("invert_rl", invert_rl_);
   declare_parameter<bool>("invert_rr", invert_rr_);
 
+  declare_parameter<bool>("velocity_filter_enabled", velocity_filter_enabled_);
+  declare_parameter<double>("velocity_ema_alpha", velocity_ema_alpha_);
+  declare_parameter<double>("wheel_speed_deadband_mps", wheel_speed_deadband_mps_);
+  declare_parameter<int>("min_active_wheels_for_twist", min_active_wheels_for_twist_);
+
   declare_parameter<bool>("reset_pose_on_start", reset_pose_on_start_);
   declare_parameter<double>("start_x_m", start_x_m_);
   declare_parameter<double>("start_y_m", start_y_m_);
@@ -195,6 +201,12 @@ void WheelOdomNode::load_parameters()
   invert_rl_ = get_parameter("invert_rl").as_bool();
   invert_rr_ = get_parameter("invert_rr").as_bool();
 
+  velocity_filter_enabled_ = get_parameter("velocity_filter_enabled").as_bool();
+  velocity_ema_alpha_ = get_parameter("velocity_ema_alpha").as_double();
+  wheel_speed_deadband_mps_ = get_parameter("wheel_speed_deadband_mps").as_double();
+  min_active_wheels_for_twist_ =
+    static_cast<int>(get_parameter("min_active_wheels_for_twist").as_int());
+
   reset_pose_on_start_ = get_parameter("reset_pose_on_start").as_bool();
   start_x_m_ = get_parameter("start_x_m").as_double();
   start_y_m_ = get_parameter("start_y_m").as_double();
@@ -251,6 +263,18 @@ void WheelOdomNode::load_parameters()
   if (cpr_ <= 0 || decoding_ <= 0 || gear_ratio_ <= 0.0) {
     throw std::runtime_error("encoder CPR, decoding, and gear_ratio must be positive");
   }
+
+  if (velocity_ema_alpha_ < 0.0 || velocity_ema_alpha_ > 1.0) {
+    throw std::runtime_error("velocity_ema_alpha must be between 0.0 and 1.0");
+  }
+
+  if (wheel_speed_deadband_mps_ < 0.0) {
+    throw std::runtime_error("wheel_speed_deadband_mps must be >= 0.0");
+  }
+
+  if (min_active_wheels_for_twist_ < 0 || min_active_wheels_for_twist_ > 4) {
+    throw std::runtime_error("min_active_wheels_for_twist must be between 0 and 4");
+  }
 }
 
 void WheelOdomNode::configure_encoder_reader()
@@ -305,8 +329,24 @@ void WheelOdomNode::timer_callback()
       wheelbase_m_,
       track_m_);
 
-    const WheelOdomSample odom_sample = odom_->update_from_encoder_sample(
-      encoder_sample);
+    WheelSpeeds wheel_speeds = filter_wheel_speeds(
+      wheel_speeds_from_encoder_sample(encoder_sample));
+
+    int active_wheel_count = active_wheel_count_from_speeds(
+      wheel_speeds,
+      wheel_speed_deadband_mps_);
+
+    if (active_wheel_count < min_active_wheels_for_twist_) {
+      wheel_speeds = WheelSpeeds{};
+      active_wheel_count = 0;
+    }
+
+    const WheelOdomSample odom_sample = odom_->update_from_wheel_speeds(
+      wheel_speeds,
+      encoder_sample.dt_s,
+      encoder_sample.stamp_s,
+      active_wheel_count,
+      encoder_sample.total_illegal_transitions());
 
     publish_odometry(odom_sample, encoder_sample);
     publish_state(odom_sample, encoder_sample);
@@ -496,6 +536,65 @@ std::string WheelOdomNode::make_state_json(
   oss << "}";
 
   return oss.str();
+}
+
+WheelSpeeds WheelOdomNode::filter_wheel_speeds(
+  const WheelSpeeds & raw_wheel_speeds)
+{
+  const WheelSpeeds deadbanded{
+    apply_deadband(raw_wheel_speeds.fl_mps, wheel_speed_deadband_mps_),
+    apply_deadband(raw_wheel_speeds.fr_mps, wheel_speed_deadband_mps_),
+    apply_deadband(raw_wheel_speeds.rl_mps, wheel_speed_deadband_mps_),
+    apply_deadband(raw_wheel_speeds.rr_mps, wheel_speed_deadband_mps_),
+  };
+
+  if (!velocity_filter_enabled_) {
+    return deadbanded;
+  }
+
+  if (!have_filtered_wheel_speeds_) {
+    filtered_wheel_speeds_ = deadbanded;
+    have_filtered_wheel_speeds_ = true;
+    return filtered_wheel_speeds_;
+  }
+
+  const double alpha = std::clamp(velocity_ema_alpha_, 0.0, 1.0);
+  const auto ema = [alpha](double previous, double current) {
+    return previous + alpha * (current - previous);
+  };
+
+  filtered_wheel_speeds_.fl_mps = apply_deadband(
+    ema(filtered_wheel_speeds_.fl_mps, deadbanded.fl_mps), wheel_speed_deadband_mps_);
+  filtered_wheel_speeds_.fr_mps = apply_deadband(
+    ema(filtered_wheel_speeds_.fr_mps, deadbanded.fr_mps), wheel_speed_deadband_mps_);
+  filtered_wheel_speeds_.rl_mps = apply_deadband(
+    ema(filtered_wheel_speeds_.rl_mps, deadbanded.rl_mps), wheel_speed_deadband_mps_);
+  filtered_wheel_speeds_.rr_mps = apply_deadband(
+    ema(filtered_wheel_speeds_.rr_mps, deadbanded.rr_mps), wheel_speed_deadband_mps_);
+
+  return filtered_wheel_speeds_;
+}
+
+double WheelOdomNode::apply_deadband(double value, double deadband)
+{
+  if (deadband <= 0.0) {
+    return value;
+  }
+
+  return std::abs(value) < deadband ? 0.0 : value;
+}
+
+int WheelOdomNode::active_wheel_count_from_speeds(
+  const WheelSpeeds & wheel_speeds,
+  double deadband)
+{
+  int count = 0;
+  for (const double speed : wheel_speeds.as_array()) {
+    if (std::abs(speed) > deadband) {
+      ++count;
+    }
+  }
+  return count;
 }
 
 EncoderHardwareConfig WheelOdomNode::make_encoder_config_from_params() const
