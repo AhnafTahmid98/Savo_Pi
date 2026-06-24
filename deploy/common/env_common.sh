@@ -35,15 +35,22 @@ savo_require_dir() {
 savo_source_ros() {
   local setup_file="/opt/ros/${ROS_DISTRO}/setup.bash"
   [[ -f "$setup_file" ]] || savo_die "ROS setup not found: $setup_file"
+
+  # ROS setup scripts may read unset variables, so disable nounset only while sourcing.
+  set +u
   # shellcheck disable=SC1090
   source "$setup_file"
+  set -u
 }
 
 savo_source_ws() {
   local setup_file="${SAVO_WS}/install/setup.bash"
   if [[ -f "$setup_file" ]]; then
+    # Workspace setup can also touch unset ROS variables.
+    set +u
     # shellcheck disable=SC1090
     source "$setup_file"
+    set -u
   else
     savo_log "Workspace setup not found yet: $setup_file"
   fi
