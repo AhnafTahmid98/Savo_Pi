@@ -111,13 +111,9 @@ flush_kernel_network_state() {
 }
 
 restart_network_manager() {
-  if systemctl list-unit-files | grep -q "^NetworkManager.service"; then
-    savo_log "Restarting NetworkManager..."
-    ${SUDO} systemctl restart NetworkManager
-    sleep 5
-  else
-    savo_die "NetworkManager service not found"
-  fi
+  savo_log "Restarting NetworkManager..."
+  ${SUDO} systemctl restart NetworkManager.service
+  sleep 5
 }
 
 reconnect_eth() {
