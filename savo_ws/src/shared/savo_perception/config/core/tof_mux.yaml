@@ -1,0 +1,52 @@
+# Robot Savo VL53L1X mux configuration.
+# C++ node is default. Python node uses the same parameter contract as fallback.
+
+vl53_mux_node:
+  ros__parameters:
+    bus: 1
+
+    tca_addr: 0x70
+    vl53_addr: 0x29
+
+    right_channel: 2
+    left_channel: 3
+
+    rate_hz: 10.0
+    median_window: 5
+
+    settle_s: 0.002
+    init_settle_s: 0.05
+
+    valid_min_m: 0.02
+    valid_max_m: 4.00
+
+    left_topic: /savo_perception/range/left_m
+    right_topic: /savo_perception/range/right_m
+
+    publish_nan_on_error: true
+    startup_fail_is_fatal: false
+
+vl53_mux_node_py:
+  ros__parameters:
+    bus: 1
+
+    tca_addr: 0x70
+    vl53_addr: 0x29
+
+    right_channel: 2
+    left_channel: 3
+
+    rate_hz: 10.0
+    median_window: 5
+
+    settle_s: 0.002
+    init_settle_s: 0.05
+
+    valid_min_m: 0.02
+    valid_max_m: 4.00
+
+    left_topic: /savo_perception/range/left_m
+    right_topic: /savo_perception/range/right_m
+
+    publish_nan_on_error: true
+    startup_fail_is_fatal: false

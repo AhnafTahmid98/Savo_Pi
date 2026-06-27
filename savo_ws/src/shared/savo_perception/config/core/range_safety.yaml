@@ -1,56 +1,92 @@
-# Front sensors are RealSense depth plus ultrasonic backup; sides are VL53L1X ToF.
+# Robot Savo range safety fusion configuration.
+# C++ node is default. Python node uses the same parameter contract as fallback.
 
 safety_stop_node:
   ros__parameters:
-    depth_topic: "/depth/min_front_m"
-    ultrasonic_topic: "/savo_perception/range/front_ultrasonic_m"
-    left_topic: "/savo_perception/range/left_m"
-    right_topic: "/savo_perception/range/right_m"
+    depth_front_topic: /depth/min_front_m
+    tof_left_topic: /savo_perception/range/left_m
+    tof_right_topic: /savo_perception/range/right_m
+    ultrasonic_front_topic: /savo_perception/range/front_ultrasonic_m
 
-    stop_topic: "/safety/stop"
-    slowdown_topic: "/safety/slowdown_factor"
+    safety_stop_topic: /safety/stop
+    slowdown_topic: /safety/slowdown_factor
+    safety_state_topic: /savo_perception/safety_state
 
-    # Missing or stale required sensor data forces stop.
-    fail_safe_on_stale: true
-    stale_timeout_s: 1.0
-
-
-    min_valid_m: 0.02
-    max_valid_m: 3.00
-
-    enable_depth_front: true
-    enable_ultrasonic_front: true
-    enable_tof_left: true
-    enable_tof_right: true
+    loop_hz: 20.0
+    stale_timeout_s: 0.30
 
     front_stop_m: 0.28
     front_slow_m: 0.60
-    front_hysteresis_m: 0.06
-    front_stop_debounce_count: 2
-    front_clear_debounce_count: 4
-
-    # Depth is the primary front signal; ultrasonic is a backup.
-    depth_weight: 1.00
-    ultrasonic_weight: 0.50
-
     side_stop_m: 0.20
     side_slow_m: 0.45
-    side_hysteresis_m: 0.05
-    side_stop_debounce_count: 2
-    side_clear_debounce_count: 4
 
-    # Mecanum should not global-stop on side proximity until directional scaling is wired.
-    global_stop_on_side: false
+    front_clear_hysteresis_m: 0.06
+    side_clear_hysteresis_m: 0.05
 
-    publish_global_factor: true
-    min_global_scale: 0.20
-    ema_alpha: 0.35
+    stop_debounce_count: 2
+    clear_debounce_count: 4
 
-    publish_directional: false
-    slowdown_vx_topic: "/safety/slowdown_vx"
-    slowdown_vy_topic: "/safety/slowdown_vy"
+    slowdown_min: 0.20
+    slowdown_max: 1.0
+    slowdown_ema_alpha: 0.35
 
-    tof_publish_hz: 25.0
-    ultrasonic_publish_hz: 15.0
-    tof_filter_window: 5
-    ultrasonic_filter_window: 3
+    fail_safe_on_stale: true
+
+    required_sensors:
+      - tof_left
+      - tof_right
+      - ultrasonic_front
+
+    optional_sensors:
+      - depth_front
+
+    use_depth_front: true
+    depth_front_required: false
+
+    publish_state_json: true
+    startup_fail_is_fatal: false
+
+safety_stop_node_py:
+  ros__parameters:
+    depth_front_topic: /depth/min_front_m
+    tof_left_topic: /savo_perception/range/left_m
+    tof_right_topic: /savo_perception/range/right_m
+    ultrasonic_front_topic: /savo_perception/range/front_ultrasonic_m
+
+    safety_stop_topic: /safety/stop
+    slowdown_topic: /safety/slowdown_factor
+    safety_state_topic: /savo_perception/safety_state
+
+    loop_hz: 20.0
+    stale_timeout_s: 0.30
+
+    front_stop_m: 0.28
+    front_slow_m: 0.60
+    side_stop_m: 0.20
+    side_slow_m: 0.45
+
+    front_clear_hysteresis_m: 0.06
+    side_clear_hysteresis_m: 0.05
+
+    stop_debounce_count: 2
+    clear_debounce_count: 4
+
+    slowdown_min: 0.20
+    slowdown_max: 1.0
+    slowdown_ema_alpha: 0.35
+
+    fail_safe_on_stale: true
+
+    required_sensors:
+      - tof_left
+      - tof_right
+      - ultrasonic_front
+
+    optional_sensors:
+      - depth_front
+
+    use_depth_front: true
+    depth_front_required: false
+
+    publish_state_json: true
+    startup_fail_is_fatal: false

@@ -1,0 +1,67 @@
+# Robot Savo perception topic contract.
+
+topics:
+  command:
+    cmd_vel_in: /cmd_vel
+    cmd_vel_safe: /cmd_vel_safe
+
+  range:
+    depth_front_m: /depth/min_front_m
+    tof_left_m: /savo_perception/range/left_m
+    tof_right_m: /savo_perception/range/right_m
+    ultrasonic_front_m: /savo_perception/range/front_ultrasonic_m
+
+  safety:
+    stop: /safety/stop
+    slowdown_factor: /safety/slowdown_factor
+    state: /savo_perception/safety_state
+
+  health:
+    range_health: /savo_perception/range_health
+    sensor_status: /savo_perception/sensor_status
+    heartbeat: /savo_perception/heartbeat
+
+  dashboard:
+    dashboard: /savo_perception/dashboard
+    dashboard_text: /savo_perception/dashboard_text
+
+  diagnostics:
+    run_request: /savo_perception/diag/run_request
+    cancel_request: /savo_perception/diag/cancel_request
+    state: /savo_perception/diag/state
+    event: /savo_perception/diag/event
+    busy: /savo_perception/diag/busy
+
+ownership:
+  depth_front_m:
+    producer: savo_realsense
+    host: savo-edge
+    consumer: savo_perception
+    note: RealSense D435 front minimum depth input.
+
+  vo_odom:
+    producer: savo_vo
+    host: savo-edge
+    consumer: savo_localization
+    note: VO does not belong to savo_perception.
+
+  range_core:
+    producer: savo_perception
+    host: savo-core
+    topics:
+      - /savo_perception/range/left_m
+      - /savo_perception/range/right_m
+      - /savo_perception/range/front_ultrasonic_m
+
+  safety_outputs:
+    producer: savo_perception
+    host: savo-core
+    consumers:
+      - savo_control
+      - savo_base
+      - savo_supervisor
+      - savo_dashboard
+    topics:
+      - /safety/stop
+      - /safety/slowdown_factor
+      - /cmd_vel_safe

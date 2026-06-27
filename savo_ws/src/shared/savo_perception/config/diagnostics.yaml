@@ -1,0 +1,72 @@
+# Robot Savo perception diagnostic defaults.
+
+diagnostics:
+  common:
+    stale_timeout_s: 0.50
+    print_hz: 2.0
+    csv_enabled: false
+    csv_dir: ~/Savo_Pi/logs/perception
+
+  tof_mux_check:
+    bus: 1
+    tca_addr: 0x70
+    vl53_addr: 0x29
+    right_channel: 2
+    left_channel: 3
+    rate_hz: 10.0
+    median_window: 5
+    threshold_m: 0.20
+    valid_min_m: 0.02
+    valid_max_m: 4.00
+    duration_s: 10.0
+
+  ultrasonic_check:
+    trig_pin: 27
+    echo_pin: 22
+    max_distance_m: 3.00
+    valid_min_m: 0.02
+    valid_max_m: 3.00
+    rate_hz: 5.0
+    samples: 40
+    threshold_m: 0.28
+
+  safety_fusion_check:
+    front_stop_m: 0.28
+    front_slow_m: 0.60
+    side_stop_m: 0.20
+    side_slow_m: 0.45
+    stale_timeout_s: 0.30
+    stop_debounce_count: 1
+    clear_debounce_count: 1
+    fail_safe_on_stale: true
+
+  range_health_check:
+    stale_timeout_s: 0.30
+    include_depth_in_overall_ok: false
+
+  range_echo_cli:
+    stale_timeout_s: 0.50
+    print_hz: 2.0
+
+  safety_inject_cli:
+    rate_hz: 10.0
+    duration_s: 5.0
+    default_scenario: clear
+
+  perception_smoke_test_cli:
+    publish_rate_hz: 10.0
+    settle_s: 1.0
+    timeout_s: 2.0
+    default_scenario: all
+
+required_core_sensors:
+  - tof_left
+  - tof_right
+  - ultrasonic_front
+
+optional_edge_sensors:
+  - depth_front
+
+notes:
+  depth_front_m: /depth/min_front_m comes from savo-edge / savo_realsense.
+  vo_odom: /vo/odom belongs to savo_vo and is fused in savo_localization.

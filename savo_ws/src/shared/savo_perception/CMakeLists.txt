@@ -21,7 +21,7 @@ find_package(geometry_msgs REQUIRED)
 # C++: cmd_vel_safety_gate node
 # -----------------------------
 add_executable(cmd_vel_safety_gate
-  src/cmd_vel_safety_gate.cpp
+  src/nodes/cmd_vel_safety_gate.cpp
 )
 
 target_include_directories(cmd_vel_safety_gate PUBLIC
@@ -52,13 +52,13 @@ ament_python_install_package(${PROJECT_NAME})
 # NOTE: We "RENAME" to remove .py so the command is clean:
 #   ros2 run savo_perception vl53_node
 install(PROGRAMS
-  savo_perception/nodes/vl53_node.py
+  savo_perception/nodes/vl53_mux_node_py.py
   DESTINATION lib/${PROJECT_NAME}
   RENAME vl53_node
 )
 
 install(PROGRAMS
-  savo_perception/nodes/ultrasonic_node.py
+  savo_perception/nodes/ultrasonic_node_py.py
   DESTINATION lib/${PROJECT_NAME}
   RENAME ultrasonic_node
 )
@@ -70,7 +70,7 @@ install(PROGRAMS
 )
 
 install(PROGRAMS
-  savo_perception/nodes/safety_stop_node.py
+  savo_perception/nodes/safety_stop_node_py.py
   DESTINATION lib/${PROJECT_NAME}
   RENAME safety_stop_node
 )

@@ -1,0 +1,74 @@
+# Robot Savo cmd_vel safety gate configuration.
+# C++ node is default. Python fallback should use the same parameter contract if enabled later.
+
+cmd_vel_safety_gate:
+  ros__parameters:
+    cmd_vel_topic: /cmd_vel
+    cmd_vel_safe_topic: /cmd_vel_safe
+
+    safety_stop_topic: /safety/stop
+    slowdown_topic: /safety/slowdown_factor
+    safety_state_topic: /savo_perception/safety_state
+
+    loop_hz: 50.0
+    stale_timeout_s: 0.30
+    cmd_timeout_s: 0.50
+
+    fail_safe_on_stale: true
+    publish_zero_on_stop: true
+    publish_zero_on_stale: true
+
+    apply_slowdown_to_linear: true
+    apply_slowdown_to_angular: true
+
+    slowdown_min: 0.0
+    slowdown_max: 1.0
+
+    max_linear_x_mps: 0.35
+    max_linear_y_mps: 0.35
+    max_angular_z_radps: 0.80
+
+    allow_recovery_when_stopped: false
+    recovery_command_topic: /savo_control/recovery_cmd_vel
+    recovery_cmd_vel_safe_topic: /cmd_vel_safe
+
+    publish_gate_state: true
+    gate_state_topic: /savo_perception/cmd_vel_gate_state
+
+    startup_fail_is_fatal: false
+
+cmd_vel_safety_gate_py:
+  ros__parameters:
+    cmd_vel_topic: /cmd_vel
+    cmd_vel_safe_topic: /cmd_vel_safe
+
+    safety_stop_topic: /safety/stop
+    slowdown_topic: /safety/slowdown_factor
+    safety_state_topic: /savo_perception/safety_state
+
+    loop_hz: 50.0
+    stale_timeout_s: 0.30
+    cmd_timeout_s: 0.50
+
+    fail_safe_on_stale: true
+    publish_zero_on_stop: true
+    publish_zero_on_stale: true
+
+    apply_slowdown_to_linear: true
+    apply_slowdown_to_angular: true
+
+    slowdown_min: 0.0
+    slowdown_max: 1.0
+
+    max_linear_x_mps: 0.35
+    max_linear_y_mps: 0.35
+    max_angular_z_radps: 0.80
+
+    allow_recovery_when_stopped: false
+    recovery_command_topic: /savo_control/recovery_cmd_vel
+    recovery_cmd_vel_safe_topic: /cmd_vel_safe
+
+    publish_gate_state: true
+    gate_state_topic: /savo_perception/cmd_vel_gate_state
+
+    startup_fail_is_fatal: false

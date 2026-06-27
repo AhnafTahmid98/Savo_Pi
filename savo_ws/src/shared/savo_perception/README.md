@@ -105,7 +105,7 @@ Low-level sensor APIs live under: `savo_perception/sensors_api/`
 
 ---
 
-### 2.5 cmd_vel_safety_gate (C++) — `src/cmd_vel_safety_gate.cpp`
+### 2.5 cmd_vel_safety_gate (C++) — `src/nodes/cmd_vel_safety_gate.cpp`
 **Purpose:** enforce safety on velocity commands with stable timing.
 
 **Subscribes**

@@ -1,0 +1,62 @@
+# Robot Savo range health configuration.
+# C++ node is default. Python node uses the same parameter contract as fallback.
+
+range_health_node:
+  ros__parameters:
+    depth_front_topic: /depth/min_front_m
+    tof_left_topic: /savo_perception/range/left_m
+    tof_right_topic: /savo_perception/range/right_m
+    ultrasonic_front_topic: /savo_perception/range/front_ultrasonic_m
+
+    range_health_topic: /savo_perception/range_health
+    sensor_status_topic: /savo_perception/sensor_status
+    heartbeat_topic: /savo_perception/heartbeat
+
+    publish_hz: 2.0
+    stale_timeout_s: 0.30
+    heartbeat_hz: 1.0
+
+    include_depth_in_overall_ok: false
+    depth_front_required: false
+
+    required_sensors:
+      - tof_left
+      - tof_right
+      - ultrasonic_front
+
+    optional_sensors:
+      - depth_front
+
+    publish_json: true
+    publish_compact_status: true
+    startup_fail_is_fatal: false
+
+range_health_node_py:
+  ros__parameters:
+    depth_front_topic: /depth/min_front_m
+    tof_left_topic: /savo_perception/range/left_m
+    tof_right_topic: /savo_perception/range/right_m
+    ultrasonic_front_topic: /savo_perception/range/front_ultrasonic_m
+
+    range_health_topic: /savo_perception/range_health
+    sensor_status_topic: /savo_perception/sensor_status
+    heartbeat_topic: /savo_perception/heartbeat
+
+    publish_hz: 2.0
+    stale_timeout_s: 0.30
+    heartbeat_hz: 1.0
+
+    include_depth_in_overall_ok: false
+    depth_front_required: false
+
+    required_sensors:
+      - tof_left
+      - tof_right
+      - ultrasonic_front
+
+    optional_sensors:
+      - depth_front
+
+    publish_json: true
+    publish_compact_status: true
+    startup_fail_is_fatal: false

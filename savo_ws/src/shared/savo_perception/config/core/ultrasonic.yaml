@@ -1,0 +1,38 @@
+# Robot Savo HC-SR04 ultrasonic configuration.
+# C++ node is default. Python node uses the same parameter contract as fallback.
+
+ultrasonic_node:
+  ros__parameters:
+    trig_pin: 27
+    echo_pin: 22
+
+    max_distance_m: 3.00
+    valid_min_m: 0.02
+    valid_max_m: 3.00
+
+    rate_hz: 10.0
+    queue_len: 1
+    pin_factory: lgpio
+
+    output_topic: /savo_perception/range/front_ultrasonic_m
+
+    publish_nan_on_error: true
+    startup_fail_is_fatal: false
+
+ultrasonic_node_py:
+  ros__parameters:
+    trig_pin: 27
+    echo_pin: 22
+
+    max_distance_m: 3.00
+    valid_min_m: 0.02
+    valid_max_m: 3.00
+
+    rate_hz: 10.0
+    queue_len: 1
+    pin_factory: lgpio
+
+    output_topic: /savo_perception/range/front_ultrasonic_m
+
+    publish_nan_on_error: true
+    startup_fail_is_fatal: false

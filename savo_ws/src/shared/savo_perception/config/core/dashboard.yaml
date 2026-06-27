@@ -1,0 +1,30 @@
+# Robot Savo perception dashboard configuration.
+# Debug/operator visibility node. Not required for hard safety.
+
+sensor_dashboard_node:
+  ros__parameters:
+    depth_front_topic: /depth/min_front_m
+    tof_left_topic: /savo_perception/range/left_m
+    tof_right_topic: /savo_perception/range/right_m
+    ultrasonic_front_topic: /savo_perception/range/front_ultrasonic_m
+
+    safety_stop_topic: /safety/stop
+    slowdown_topic: /safety/slowdown_factor
+
+    range_health_topic: /savo_perception/range_health
+    safety_state_topic: /savo_perception/safety_state
+
+    dashboard_topic: /savo_perception/dashboard
+    dashboard_text_topic: /savo_perception/dashboard_text
+
+    publish_hz: 2.0
+    stale_timeout_s: 0.50
+
+    include_depth_front: true
+    include_range_health: true
+    include_safety_state: true
+
+    publish_json: true
+    publish_text: true
+
+    startup_fail_is_fatal: false
