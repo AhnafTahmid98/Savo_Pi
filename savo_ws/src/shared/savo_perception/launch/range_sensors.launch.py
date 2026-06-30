@@ -15,8 +15,8 @@ def _build_nodes(context, *args, **kwargs):
     package_name = "savo_perception"
 
     driver_impl = LaunchConfiguration("driver_impl").perform(context).strip().lower()
-    use_safety_stop = _as_bool(LaunchConfiguration("use_safety_stop").perform(context))
-    use_cmd_vel_gate = _as_bool(LaunchConfiguration("use_cmd_vel_gate").perform(context))
+    use_tof = _as_bool(LaunchConfiguration("use_tof").perform(context))
+    use_ultrasonic = _as_bool(LaunchConfiguration("use_ultrasonic").perform(context))
     use_range_health = _as_bool(LaunchConfiguration("use_range_health").perform(context))
     use_dashboard = _as_bool(LaunchConfiguration("use_dashboard").perform(context))
     config_file = LaunchConfiguration("config_file")
@@ -25,37 +25,43 @@ def _build_nodes(context, *args, **kwargs):
         raise RuntimeError("driver_impl must be either 'cpp' or 'py'")
 
     if driver_impl == "cpp":
-        safety_executable = "safety_stop_node"
-        safety_node_name = "safety_stop_node"
+        vl53_executable = "vl53_mux_node"
+        vl53_node_name = "vl53_mux_node"
+
+        ultrasonic_executable = "ultrasonic_node"
+        ultrasonic_node_name = "ultrasonic_node"
 
         range_health_executable = "range_health_node"
         range_health_node_name = "range_health_node"
     else:
-        safety_executable = "safety_stop_node_py"
-        safety_node_name = "safety_stop_node_py"
+        vl53_executable = "vl53_mux_node_py"
+        vl53_node_name = "vl53_mux_node_py"
+
+        ultrasonic_executable = "ultrasonic_node_py"
+        ultrasonic_node_name = "ultrasonic_node_py"
 
         range_health_executable = "range_health_node_py"
         range_health_node_name = "range_health_node_py"
 
     nodes = []
 
-    if use_safety_stop:
+    if use_tof:
         nodes.append(
             Node(
                 package=package_name,
-                executable=safety_executable,
-                name=safety_node_name,
+                executable=vl53_executable,
+                name=vl53_node_name,
                 output="screen",
                 parameters=[config_file],
             )
         )
 
-    if use_cmd_vel_gate:
+    if use_ultrasonic:
         nodes.append(
             Node(
                 package=package_name,
-                executable="cmd_vel_safety_gate",
-                name="cmd_vel_safety_gate",
+                executable=ultrasonic_executable,
+                name=ultrasonic_node_name,
                 output="screen",
                 parameters=[config_file],
             )
@@ -101,22 +107,22 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "driver_impl",
                 default_value="cpp",
-                description="Safety implementation: cpp or py. C++ is production default.",
+                description="Range sensor implementation: cpp or py. C++ is production default.",
             ),
             DeclareLaunchArgument(
                 "config_file",
                 default_value=default_config,
-                description="YAML parameter file for safety nodes.",
+                description="YAML parameter file for range sensor nodes.",
             ),
             DeclareLaunchArgument(
-                "use_safety_stop",
+                "use_tof",
                 default_value="true",
-                description="Start range safety stop fusion node.",
+                description="Start VL53L1X ToF mux node.",
             ),
             DeclareLaunchArgument(
-                "use_cmd_vel_gate",
+                "use_ultrasonic",
                 default_value="true",
-                description="Start /cmd_vel to /cmd_vel_safe safety gate.",
+                description="Start front ultrasonic range node.",
             ),
             DeclareLaunchArgument(
                 "use_range_health",
@@ -126,7 +132,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "use_dashboard",
                 default_value="false",
-                description="Start Python dashboard node.",
+                description="Start Python sensor dashboard node.",
             ),
             OpaqueFunction(function=_build_nodes),
         ]

@@ -37,6 +37,21 @@ ament_target_dependencies(savo_realsense_depth_front_min
   std_msgs
 )
 
+add_library(savo_realsense_camera_monitor_common
+  src/camera_monitor_common.cpp
+)
+
+target_include_directories(savo_realsense_camera_monitor_common
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+
+ament_target_dependencies(savo_realsense_camera_monitor_common
+  rclcpp
+  diagnostic_msgs
+)
+
 add_executable(depth_front_min_node
   src/depth_front_min_main.cpp
 )
@@ -54,8 +69,48 @@ ament_target_dependencies(depth_front_min_node
   rclcpp
 )
 
+add_executable(camera_health_node
+  src/camera_health_main.cpp
+)
+
+target_include_directories(camera_health_node
+  PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+target_link_libraries(camera_health_node
+  savo_realsense_camera_monitor_common
+)
+
+ament_target_dependencies(camera_health_node
+  rclcpp
+  sensor_msgs
+  std_msgs
+  diagnostic_msgs
+)
+
+add_executable(camera_topic_monitor_node
+  src/camera_topic_monitor_main.cpp
+)
+
+target_include_directories(camera_topic_monitor_node
+  PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+target_link_libraries(camera_topic_monitor_node
+  savo_realsense_camera_monitor_common
+)
+
+ament_target_dependencies(camera_topic_monitor_node
+  rclcpp
+  sensor_msgs
+  diagnostic_msgs
+)
+
 install(TARGETS
   savo_realsense_depth_front_min
+  savo_realsense_camera_monitor_common
   EXPORT export_${PROJECT_NAME}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
@@ -64,6 +119,8 @@ install(TARGETS
 
 install(TARGETS
   depth_front_min_node
+  camera_health_node
+  camera_topic_monitor_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -72,8 +129,8 @@ install(DIRECTORY include/
 )
 
 install(PROGRAMS
-  scripts/camera_health_node
-  scripts/camera_topic_monitor_node
+  scripts/camera_health_node_py
+  scripts/camera_topic_monitor_node_py
   scripts/depth_front_min_node_py
   scripts/realsense_smoke_test_cli
   scripts/dump_effective_realsense_params
@@ -116,7 +173,10 @@ if(BUILD_TESTING)
 endif()
 
 ament_export_include_directories(include)
-ament_export_libraries(savo_realsense_depth_front_min)
+ament_export_libraries(
+  savo_realsense_depth_front_min
+  savo_realsense_camera_monitor_common
+)
 ament_export_targets(export_${PROJECT_NAME})
 
 ament_package()

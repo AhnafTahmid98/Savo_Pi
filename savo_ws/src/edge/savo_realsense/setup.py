@@ -38,9 +38,9 @@ setup(
     tests_require=["pytest"],
     entry_points={
         "console_scripts": [
-            "camera_health_node = savo_realsense.nodes.camera_health_node:main",
-            "camera_topic_monitor_node = savo_realsense.nodes.camera_topic_monitor_node:main",
-            "depth_front_min_node = savo_realsense.nodes.depth_front_min_node:main",
+            "camera_health_node_py = savo_realsense.nodes.camera_health_node:main",
+            "camera_topic_monitor_node_py = savo_realsense.nodes.camera_topic_monitor_node:main",
+            "depth_front_min_node_py = savo_realsense.nodes.depth_front_min_node:main",
             "realsense_smoke_test_cli = savo_realsense.tools.realsense_smoke_test_cli:main",
             "dump_effective_realsense_params = savo_realsense.tools.dump_effective_realsense_params:main",
         ],

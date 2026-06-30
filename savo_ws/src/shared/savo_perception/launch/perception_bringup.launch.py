@@ -1,213 +1,179 @@
-# File: Savo_Pi/src/savo_perception/launch/perception_bringup.launch.py
-#
-# Robot Savo — Perception Bringup (professional, one-command)
-#
-# What it starts (optional flags):
-#   - RealSense driver (realsense2_camera)  [optional]
-#   - depth_front_min_node                  [optional, depends on RealSense topics]
-#   - vl53_node
-#   - ultrasonic_node
-#   - safety_stop_node
-#   - cmd_vel_safety_gate (C++ node)
-#   - sensor_dashboard (terminal UI)        [optional]
-#
-# Run:
-#   source /opt/ros/jazzy/setup.bash
-#   source ~/Savo_Pi/install/setup.bash
-#   ros2 launch savo_perception perception_bringup.launch.py
-#
-# Common variants:
-#   # run everything (recommended)
-#   ros2 launch savo_perception perception_bringup.launch.py use_realsense:=true
-#
-#   # run without RealSense (ToF + ultrasonic + safety still work, depth node disabled)
-#   ros2 launch savo_perception perception_bringup.launch.py use_realsense:=false use_depth_node:=false
-#
-#   # include dashboard
-#   ros2 launch savo_perception perception_bringup.launch.py use_dashboard:=true
-#
-# Notes:
-#   - Your depth node subscribes to: /camera/camera/depth/image_rect_raw
-#   - Those topics only exist while realsense2_camera is running.
+#!/usr/bin/env python3
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, GroupAction, IncludeLaunchDescription
-from launch.conditions import IfCondition
-from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 
-def generate_launch_description() -> LaunchDescription:
-    pkg_share = FindPackageShare("savo_perception")
+def _as_bool(value: str) -> bool:
+    return value.strip().lower() in {"1", "true", "yes", "on"}
 
-    # ---------------------------
-    # Launch arguments
-    # ---------------------------
-    use_realsense = LaunchConfiguration("use_realsense")
-    use_depth_node = LaunchConfiguration("use_depth_node")
-    use_vl53 = LaunchConfiguration("use_vl53")
-    use_ultrasonic = LaunchConfiguration("use_ultrasonic")
-    use_safety_stop = LaunchConfiguration("use_safety_stop")
-    use_cmd_gate = LaunchConfiguration("use_cmd_gate")
-    use_dashboard = LaunchConfiguration("use_dashboard")
 
-    # RealSense profile switches (keep safe defaults for Pi)
-    rs_enable_depth = LaunchConfiguration("rs_enable_depth")
-    rs_enable_color = LaunchConfiguration("rs_enable_color")
-    rs_enable_infra1 = LaunchConfiguration("rs_enable_infra1")
-    rs_enable_infra2 = LaunchConfiguration("rs_enable_infra2")
-    rs_pointcloud = LaunchConfiguration("rs_pointcloud")
-    rs_align_depth = LaunchConfiguration("rs_align_depth")
+def _build_nodes(context, *args, **kwargs):
+    package_name = "savo_perception"
 
-    # Config files (your locked baselines)
-    depth_yaml = PathJoinSubstitution([pkg_share, "config", "depth_front.yaml"])
-    safety_yaml = PathJoinSubstitution([pkg_share, "config", "range_safety.yaml"])
+    driver_impl = LaunchConfiguration("driver_impl").perform(context).strip().lower()
+    use_dashboard = _as_bool(LaunchConfiguration("use_dashboard").perform(context))
+    use_tof = _as_bool(LaunchConfiguration("use_tof").perform(context))
+    use_ultrasonic = _as_bool(LaunchConfiguration("use_ultrasonic").perform(context))
+    use_safety_stop = _as_bool(LaunchConfiguration("use_safety_stop").perform(context))
+    use_cmd_vel_gate = _as_bool(LaunchConfiguration("use_cmd_vel_gate").perform(context))
+    use_range_health = _as_bool(LaunchConfiguration("use_range_health").perform(context))
+    config_file = LaunchConfiguration("config_file")
 
-    # RealSense launch file path
-    realsense_launch = PathJoinSubstitution(
-        [FindPackageShare("realsense2_camera"), "launch", "rs_launch.py"]
-    )
+    if driver_impl not in {"cpp", "py"}:
+        raise RuntimeError("driver_impl must be either 'cpp' or 'py'")
 
-    # ---------------------------
-    # RealSense driver (optional)
-    # ---------------------------
-    realsense_group = GroupAction(
-        actions=[
-            IncludeLaunchDescription(
-                PythonLaunchDescriptionSource(realsense_launch),
-                launch_arguments={
-                    # Keep resource usage sane on Pi 5
-                    "enable_depth": rs_enable_depth,
-                    "enable_color": rs_enable_color,
-                    "enable_infra1": rs_enable_infra1,
-                    "enable_infra2": rs_enable_infra2,
-                    "pointcloud.enable": rs_pointcloud,
-                    "align_depth.enable": rs_align_depth,
-                }.items(),
+    if driver_impl == "cpp":
+        vl53_executable = "vl53_mux_node"
+        vl53_node_name = "vl53_mux_node"
+
+        ultrasonic_executable = "ultrasonic_node"
+        ultrasonic_node_name = "ultrasonic_node"
+
+        safety_executable = "safety_stop_node"
+        safety_node_name = "safety_stop_node"
+
+        range_health_executable = "range_health_node"
+        range_health_node_name = "range_health_node"
+    else:
+        vl53_executable = "vl53_mux_node_py"
+        vl53_node_name = "vl53_mux_node_py"
+
+        ultrasonic_executable = "ultrasonic_node_py"
+        ultrasonic_node_name = "ultrasonic_node_py"
+
+        safety_executable = "safety_stop_node_py"
+        safety_node_name = "safety_stop_node_py"
+
+        range_health_executable = "range_health_node_py"
+        range_health_node_name = "range_health_node_py"
+
+    nodes = []
+
+    if use_tof:
+        nodes.append(
+            Node(
+                package=package_name,
+                executable=vl53_executable,
+                name=vl53_node_name,
+                output="screen",
+                parameters=[config_file],
             )
-        ],
-        condition=IfCondition(use_realsense),
+        )
+
+    if use_ultrasonic:
+        nodes.append(
+            Node(
+                package=package_name,
+                executable=ultrasonic_executable,
+                name=ultrasonic_node_name,
+                output="screen",
+                parameters=[config_file],
+            )
+        )
+
+    if use_safety_stop:
+        nodes.append(
+            Node(
+                package=package_name,
+                executable=safety_executable,
+                name=safety_node_name,
+                output="screen",
+                parameters=[config_file],
+            )
+        )
+
+    if use_cmd_vel_gate:
+        nodes.append(
+            Node(
+                package=package_name,
+                executable="cmd_vel_safety_gate",
+                name="cmd_vel_safety_gate",
+                output="screen",
+                parameters=[config_file],
+            )
+        )
+
+    if use_range_health:
+        nodes.append(
+            Node(
+                package=package_name,
+                executable=range_health_executable,
+                name=range_health_node_name,
+                output="screen",
+                parameters=[config_file],
+            )
+        )
+
+    if use_dashboard:
+        nodes.append(
+            Node(
+                package=package_name,
+                executable="sensor_dashboard_node",
+                name="sensor_dashboard_node",
+                output="screen",
+                parameters=[config_file],
+            )
+        )
+
+    return nodes
+
+
+def generate_launch_description():
+    default_config = PathJoinSubstitution(
+        [
+            FindPackageShare("savo_perception"),
+            "config",
+            "core",
+            "perception_core.yaml",
+        ]
     )
 
-    # ---------------------------
-    # Nodes (all optional toggles)
-    # ---------------------------
-    depth_front_min_node = Node(
-        package="savo_perception",
-        executable="depth_front_min_node",
-        name="depth_front_min_node",
-        output="screen",
-        parameters=[depth_yaml],
-        condition=IfCondition(use_depth_node),
-    )
-
-    vl53_node = Node(
-        package="savo_perception",
-        executable="vl53_node",
-        name="vl53_node",
-        output="screen",
-        # uses node defaults; override here if needed
-        # parameters=[{"rate_hz": 25.0, "median_n": 5}],
-        condition=IfCondition(use_vl53),
-    )
-
-    ultrasonic_node = Node(
-        package="savo_perception",
-        executable="ultrasonic_node",
-        name="ultrasonic_node",
-        output="screen",
-        # parameters=[{"rate_hz": 15.0}],
-        condition=IfCondition(use_ultrasonic),
-    )
-
-    safety_stop_node = Node(
-        package="savo_perception",
-        executable="safety_stop_node",
-        name="safety_stop_node",
-        output="screen",
-        parameters=[safety_yaml],
-        condition=IfCondition(use_safety_stop),
-    )
-
-    cmd_vel_safety_gate = Node(
-        package="savo_perception",
-        executable="cmd_vel_safety_gate",
-        name="cmd_vel_safety_gate",
-        output="screen",
-        # You can override topics here if you later add a mux:
-        # parameters=[{"cmd_in_topic": "/cmd_vel", "cmd_out_topic": "/cmd_vel_safe"}],
-        condition=IfCondition(use_cmd_gate),
-    )
-
-    # Terminal dashboard (optional)
-    # NOTE: executable name must match setup.py console_script:
-    #   "sensor_dashboard = savo_perception.nodes.sensor_dashboard_node:main"
-    sensor_dashboard_node = Node(
-        package="savo_perception",
-        executable="sensor_dashboard",
-        name="sensor_dashboard",
-        output="screen",
-        # parameters=[{"refresh_hz": 10.0, "stale_timeout_s": 0.30}],
-        condition=IfCondition(use_dashboard),
-    )
-
-    # ---------------------------
-    # LaunchDescription
-    # ---------------------------
     return LaunchDescription(
         [
-            # Primary toggles
             DeclareLaunchArgument(
-                "use_realsense",
-                default_value="true",
-                description="Start realsense2_camera driver (publishes /camera/camera/depth/image_rect_raw).",
+                "driver_impl",
+                default_value="cpp",
+                description="Perception implementation: cpp or py. C++ is production default.",
             ),
             DeclareLaunchArgument(
-                "use_depth_node",
-                default_value="true",
-                description="Start depth_front_min_node (requires RealSense depth topic).",
+                "config_file",
+                default_value=default_config,
+                description="YAML parameter file for perception core nodes.",
             ),
             DeclareLaunchArgument(
-                "use_vl53",
+                "use_tof",
                 default_value="true",
-                description="Start vl53_node (publishes /savo_perception/range/left_m and right_m).",
+                description="Start VL53L1X ToF mux node.",
             ),
             DeclareLaunchArgument(
                 "use_ultrasonic",
                 default_value="true",
-                description="Start ultrasonic_node (publishes /savo_perception/range/front_ultrasonic_m).",
+                description="Start ultrasonic front range node.",
             ),
             DeclareLaunchArgument(
                 "use_safety_stop",
                 default_value="true",
-                description="Start safety_stop_node (publishes /safety/stop and /safety/slowdown_factor).",
+                description="Start range safety stop fusion node.",
             ),
             DeclareLaunchArgument(
-                "use_cmd_gate",
+                "use_cmd_vel_gate",
                 default_value="true",
-                description="Start cmd_vel_safety_gate (sub /cmd_vel, pub /cmd_vel_safe).",
+                description="Start /cmd_vel to /cmd_vel_safe safety gate.",
+            ),
+            DeclareLaunchArgument(
+                "use_range_health",
+                default_value="true",
+                description="Start range health monitor node.",
             ),
             DeclareLaunchArgument(
                 "use_dashboard",
                 default_value="false",
-                description="Start terminal sensor dashboard (curses UI).",
+                description="Start Python dashboard node.",
             ),
-            # RealSense fine controls (defaults match your working command)
-            DeclareLaunchArgument("rs_enable_depth", default_value="true"),
-            DeclareLaunchArgument("rs_enable_color", default_value="false"),
-            DeclareLaunchArgument("rs_enable_infra1", default_value="false"),
-            DeclareLaunchArgument("rs_enable_infra2", default_value="false"),
-            DeclareLaunchArgument("rs_pointcloud", default_value="false"),
-            DeclareLaunchArgument("rs_align_depth", default_value="false"),
-            # Actions
-            realsense_group,
-            depth_front_min_node,
-            vl53_node,
-            ultrasonic_node,
-            safety_stop_node,
-            cmd_vel_safety_gate,
-            sensor_dashboard_node,
+            OpaqueFunction(function=_build_nodes),
         ]
     )

@@ -21,10 +21,12 @@ namespace savo_perception
 namespace
 {
 
+#if SAVO_PERCEPTION_HAS_VL53L1X_ULD
 std::uint16_t api_address(const std::uint8_t address_7bit)
 {
   return static_cast<std::uint16_t>(address_7bit << 1U);
 }
+#endif
 
 void sleep_seconds(const double seconds)
 {

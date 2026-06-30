@@ -9,6 +9,7 @@
 
     enable_color: true
     enable_depth: true
+    enable_infra: false
     enable_infra1: false
     enable_infra2: false
     enable_gyro: false
@@ -20,11 +21,12 @@
     align_depth.enable: true
     enable_sync: true
 
-    pointcloud.enable: true
-    pointcloud.stream_filter: 2
-    pointcloud.stream_index_filter: 0
-    pointcloud.allow_no_texture_points: true
-    pointcloud.ordered_pc: false
+    pointcloud__neon_.enable: true
+    pointcloud__neon_.stream_filter: 2
+    pointcloud__neon_.stream_index_filter: 0
+    pointcloud__neon_.allow_no_texture_points: true
+    pointcloud__neon_.ordered_pc: false
+    pointcloud__neon_.pointcloud_qos: SENSOR_DATA
 
     publish_tf: true
     tf_publish_rate: 0.0

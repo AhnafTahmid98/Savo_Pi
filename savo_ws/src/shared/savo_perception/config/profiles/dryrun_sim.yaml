@@ -1,0 +1,291 @@
+vl53_mux_node:
+  ros__parameters:
+    bus: 1
+    tca_addr: 0x70
+    vl53_addr: 0x29
+
+    right_channel: 2
+    left_channel: 3
+
+    rate_hz: 10.0
+    median_window: 5
+
+    settle_s: 0.0
+    init_settle_s: 0.0
+
+    valid_min_m: 0.02
+    valid_max_m: 4.00
+
+    left_topic: "/savo_perception/range/left_m"
+    right_topic: "/savo_perception/range/right_m"
+
+    publish_nan_on_error: true
+    startup_fail_is_fatal: false
+
+vl53_mux_node_py:
+  ros__parameters:
+    bus: 1
+    tca_addr: 0x70
+    vl53_addr: 0x29
+
+    right_channel: 2
+    left_channel: 3
+
+    rate_hz: 10.0
+    median_window: 5
+
+    settle_s: 0.0
+    init_settle_s: 0.0
+
+    valid_min_m: 0.02
+    valid_max_m: 4.00
+
+    left_topic: "/savo_perception/range/left_m"
+    right_topic: "/savo_perception/range/right_m"
+
+    publish_nan_on_error: true
+    startup_fail_is_fatal: false
+
+ultrasonic_node:
+  ros__parameters:
+    trig_pin: 27
+    echo_pin: 22
+
+    max_distance_m: 3.00
+    valid_min_m: 0.02
+    valid_max_m: 3.00
+
+    rate_hz: 10.0
+    queue_len: 1
+    pin_factory: "dryrun"
+
+    trigger_pulse_us: 10
+    echo_timeout_us: 30000
+
+    output_topic: "/savo_perception/range/front_ultrasonic_m"
+
+    publish_nan_on_error: true
+    startup_fail_is_fatal: false
+
+ultrasonic_node_py:
+  ros__parameters:
+    trig_pin: 27
+    echo_pin: 22
+
+    max_distance_m: 3.00
+    valid_min_m: 0.02
+    valid_max_m: 3.00
+
+    rate_hz: 10.0
+    queue_len: 1
+    pin_factory: "dryrun"
+
+    trigger_pulse_us: 10
+    echo_timeout_us: 30000
+
+    output_topic: "/savo_perception/range/front_ultrasonic_m"
+
+    publish_nan_on_error: true
+    startup_fail_is_fatal: false
+
+safety_stop_node:
+  ros__parameters:
+    depth_front_topic: "/depth/min_front_m"
+    tof_left_topic: "/savo_perception/range/left_m"
+    tof_right_topic: "/savo_perception/range/right_m"
+    ultrasonic_front_topic: "/savo_perception/range/front_ultrasonic_m"
+
+    safety_stop_topic: "/safety/stop"
+    slowdown_topic: "/safety/slowdown_factor"
+    safety_state_topic: "/savo_perception/safety_state"
+
+    loop_hz: 20.0
+    stale_timeout_s: 0.50
+
+    front_stop_m: 0.28
+    front_slow_m: 0.60
+    side_stop_m: 0.20
+    side_slow_m: 0.45
+
+    front_clear_hysteresis_m: 0.06
+    side_clear_hysteresis_m: 0.05
+
+    stop_debounce_count: 2
+    clear_debounce_count: 3
+
+    slowdown_min: 0.20
+    slowdown_max: 1.00
+    slowdown_ema_alpha: 0.50
+
+    fail_safe_on_stale: true
+
+    required_sensors:
+      - "tof_left"
+      - "tof_right"
+      - "ultrasonic_front"
+
+    optional_sensors:
+      - "depth_front"
+
+    use_depth_front: true
+    depth_front_required: false
+
+    publish_state_json: true
+    startup_fail_is_fatal: false
+
+safety_stop_node_py:
+  ros__parameters:
+    depth_front_topic: "/depth/min_front_m"
+    tof_left_topic: "/savo_perception/range/left_m"
+    tof_right_topic: "/savo_perception/range/right_m"
+    ultrasonic_front_topic: "/savo_perception/range/front_ultrasonic_m"
+
+    safety_stop_topic: "/safety/stop"
+    slowdown_topic: "/safety/slowdown_factor"
+    safety_state_topic: "/savo_perception/safety_state"
+
+    loop_hz: 20.0
+    stale_timeout_s: 0.50
+
+    front_stop_m: 0.28
+    front_slow_m: 0.60
+    side_stop_m: 0.20
+    side_slow_m: 0.45
+
+    front_clear_hysteresis_m: 0.06
+    side_clear_hysteresis_m: 0.05
+
+    stop_debounce_count: 2
+    clear_debounce_count: 3
+
+    slowdown_min: 0.20
+    slowdown_max: 1.00
+    slowdown_ema_alpha: 0.50
+
+    fail_safe_on_stale: true
+
+    required_sensors:
+      - "tof_left"
+      - "tof_right"
+      - "ultrasonic_front"
+
+    optional_sensors:
+      - "depth_front"
+
+    use_depth_front: true
+    depth_front_required: false
+
+    publish_state_json: true
+    startup_fail_is_fatal: false
+
+cmd_vel_safety_gate:
+  ros__parameters:
+    cmd_vel_topic: "/cmd_vel"
+    cmd_vel_safe_topic: "/cmd_vel_safe"
+
+    safety_stop_topic: "/safety/stop"
+    slowdown_topic: "/safety/slowdown_factor"
+    safety_state_topic: "/savo_perception/safety_state"
+
+    loop_hz: 50.0
+    stale_timeout_s: 0.50
+    cmd_timeout_s: 0.50
+
+    fail_safe_on_stale: true
+    publish_zero_on_stop: true
+    publish_zero_on_stale: true
+
+    apply_slowdown_to_linear: true
+    apply_slowdown_to_angular: true
+
+    slowdown_min: 0.0
+    slowdown_max: 1.0
+
+    max_linear_x_mps: 0.35
+    max_linear_y_mps: 0.35
+    max_angular_z_radps: 0.80
+
+    allow_recovery_when_stopped: false
+    recovery_command_topic: "/savo_control/recovery_cmd_vel"
+    recovery_cmd_vel_safe_topic: "/cmd_vel_safe"
+
+    publish_gate_state: true
+    gate_state_topic: "/savo_perception/cmd_vel_gate_state"
+
+    startup_fail_is_fatal: false
+
+range_health_node:
+  ros__parameters:
+    depth_front_topic: "/depth/min_front_m"
+    tof_left_topic: "/savo_perception/range/left_m"
+    tof_right_topic: "/savo_perception/range/right_m"
+    ultrasonic_front_topic: "/savo_perception/range/front_ultrasonic_m"
+
+    range_health_topic: "/savo_perception/range_health"
+    sensor_status_topic: "/savo_perception/sensor_status"
+    heartbeat_topic: "/savo_perception/heartbeat"
+
+    publish_hz: 2.0
+    stale_timeout_s: 0.50
+    heartbeat_hz: 1.0
+
+    include_depth_in_overall_ok: false
+    depth_front_required: false
+
+    required_sensors:
+      - "tof_left"
+      - "tof_right"
+      - "ultrasonic_front"
+
+    optional_sensors:
+      - "depth_front"
+
+    publish_json: true
+    publish_compact_status: true
+    startup_fail_is_fatal: false
+
+range_health_node_py:
+  ros__parameters:
+    depth_front_topic: "/depth/min_front_m"
+    tof_left_topic: "/savo_perception/range/left_m"
+    tof_right_topic: "/savo_perception/range/right_m"
+    ultrasonic_front_topic: "/savo_perception/range/front_ultrasonic_m"
+
+    range_health_topic: "/savo_perception/range_health"
+    sensor_status_topic: "/savo_perception/sensor_status"
+    heartbeat_topic: "/savo_perception/heartbeat"
+
+    publish_hz: 2.0
+    stale_timeout_s: 0.50
+    heartbeat_hz: 1.0
+
+    include_depth_in_overall_ok: false
+    depth_front_required: false
+
+    required_sensors:
+      - "tof_left"
+      - "tof_right"
+      - "ultrasonic_front"
+
+    optional_sensors:
+      - "depth_front"
+
+    publish_json: true
+    publish_compact_status: true
+    startup_fail_is_fatal: false
+
+sensor_dashboard_node:
+  ros__parameters:
+    refresh_hz: 2.0
+
+    range_health_topic: "/savo_perception/range_health"
+    sensor_status_topic: "/savo_perception/sensor_status"
+    safety_state_topic: "/savo_perception/safety_state"
+    safety_stop_topic: "/safety/stop"
+    slowdown_topic: "/safety/slowdown_factor"
+    cmd_vel_gate_state_topic: "/savo_perception/cmd_vel_gate_state"
+
+    dashboard_topic: "/savo_perception/dashboard"
+    dashboard_text_topic: "/savo_perception/dashboard_text"
+
+    compact: false

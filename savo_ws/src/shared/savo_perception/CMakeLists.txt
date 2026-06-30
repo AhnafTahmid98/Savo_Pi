@@ -154,7 +154,21 @@ ament_export_dependencies(
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
+
+  # Skip noisy style-only linters for this hybrid production package.
+  set(ament_cmake_copyright_FOUND TRUE)
+  set(ament_cmake_cpplint_FOUND TRUE)
+  set(ament_cmake_uncrustify_FOUND TRUE)
+  set(ament_cmake_pep257_FOUND TRUE)
+  set(ament_cmake_flake8_FOUND TRUE)
+
   ament_lint_auto_find_test_dependencies()
+
+  find_package(ament_cmake_flake8 REQUIRED)
+  list(APPEND AMENT_LINT_AUTO_EXCLUDE ament_cmake_flake8)
+  ament_flake8(
+    CONFIG_FILE "${CMAKE_CURRENT_SOURCE_DIR}/setup.cfg"
+  )
 endif()
 
 ament_package()
