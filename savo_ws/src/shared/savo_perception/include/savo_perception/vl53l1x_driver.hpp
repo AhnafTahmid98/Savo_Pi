@@ -39,9 +39,7 @@ struct SAVO_PERCEPTION_PUBLIC Vl53l1xReading
   std::string sensor_name;
   std::optional<double> raw_m;
   std::optional<double> filtered_m;
-
   int mux_channel{-1};
-
   bool valid{false};
   std::string error;
 
@@ -174,7 +172,6 @@ private:
 
 SAVO_PERCEPTION_PUBLIC bool valid_vl53_median_window(int median_window);
 SAVO_PERCEPTION_PUBLIC bool valid_vl53_distance_mm(int distance_mm);
-
 SAVO_PERCEPTION_PUBLIC std::optional<double> vl53_mm_to_m(
   int distance_mm,
   double valid_min_m,

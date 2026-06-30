@@ -18,24 +18,30 @@ struct SAVO_PERCEPTION_PUBLIC UltrasonicConfig
   int trig_pin{constants::kUltrasonicTrigPinDefault};
   int echo_pin{constants::kUltrasonicEchoPinDefault};
 
+  double max_distance_m{constants::kUltrasonicMaxDistanceMDefault};
   double valid_min_m{constants::kUltrasonicValidMinMDefault};
   double valid_max_m{constants::kUltrasonicValidMaxMDefault};
-  double speed_of_sound_mps{343.0};
 
   int queue_len{1};
+  std::string pin_factory{"lgpio"};
+
   int trigger_pulse_us{10};
   int echo_timeout_us{30000};
 
+  double speed_of_sound_mps{343.0};
   std::string sensor_name{"ultrasonic_front"};
+  std::string source{"ultrasonic"};
 };
 
 struct SAVO_PERCEPTION_PUBLIC UltrasonicReading
 {
-  std::string sensor_name;
+  std::string sensor_name{"ultrasonic_front"};
   std::optional<double> raw_m;
   std::optional<double> filtered_m;
+
   int trig_pin{-1};
   int echo_pin{-1};
+
   bool valid{false};
   std::string error;
 
@@ -44,7 +50,7 @@ struct SAVO_PERCEPTION_PUBLIC UltrasonicReading
     if (!valid || !filtered_m.has_value()) {
       return make_invalid_range_sample(
         sensor_name,
-        error.empty() ? "invalid_distance" : error,
+        error.empty() ? "invalid_or_no_echo" : error,
         "ultrasonic");
     }
 
@@ -103,7 +109,7 @@ SAVO_PERCEPTION_PUBLIC bool valid_ultrasonic_distance(
 
 SAVO_PERCEPTION_PUBLIC std::optional<double> ultrasonic_echo_us_to_distance_m(
   int echo_duration_us,
-  double speed_of_sound_mps);
+  double speed_of_sound_mps = 343.0);
 
 }  // namespace savo_perception
 
