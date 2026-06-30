@@ -1,40 +1,31 @@
 <?xml version="1.0"?>
 <package format="3">
   <name>savo_perception</name>
-  <version>0.0.1</version>
+  <version>0.1.0</version>
+
   <description>
-    Robot Savo perception and safety package (hybrid Python + C++).
-    Provides range sensing (ToF, ultrasonic), depth front-min (RealSense),
-    safety stop decision, and a C++ cmd_vel safety gate (/cmd_vel -> /cmd_vel_safe).
+    Robot Savo perception package for ToF, ultrasonic, near-field safety fusion,
+    range health monitoring, slowdown, and cmd_vel safety gating.
+    C++ nodes are the production default; Python nodes are fallback and diagnostics.
   </description>
 
   <maintainer email="tahmidahnaf998@gmail.com">Ahnaf Tahmid</maintainer>
   <license>Proprietary</license>
 
-  <!-- Build tools (HYBRID: Python + C++) -->
   <buildtool_depend>ament_cmake</buildtool_depend>
   <buildtool_depend>ament_cmake_python</buildtool_depend>
-  <buildtool_depend>ament_python</buildtool_depend>
 
-  <!-- C++ runtime/build deps -->
   <depend>rclcpp</depend>
-
-  <!-- Python runtime deps -->
   <depend>rclpy</depend>
 
-  <!-- Common ROS interfaces -->
   <depend>std_msgs</depend>
   <depend>geometry_msgs</depend>
-  <depend>sensor_msgs</depend>
 
-  <!-- Launch -->
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
-
-  <!-- Optional, but common for parameterized nodes -->
   <exec_depend>rcl_interfaces</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
 
-  <!-- Testing (optional) -->
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 

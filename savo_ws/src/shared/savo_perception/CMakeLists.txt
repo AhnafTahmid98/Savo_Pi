@@ -1,97 +1,157 @@
 cmake_minimum_required(VERSION 3.8)
 project(savo_perception)
 
-# -----------------------------
-# Compiler settings
-# -----------------------------
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# -----------------------------
-# Dependencies
-# -----------------------------
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
+
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 
-# -----------------------------
-# C++: cmd_vel_safety_gate node
-# -----------------------------
+include_directories(include)
+
+function(configure_savo_cpp_target target_name)
+  target_include_directories(${target_name} PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+  )
+
+  ament_target_dependencies(${target_name}
+    rclcpp
+    std_msgs
+    geometry_msgs
+  )
+
+  install(TARGETS ${target_name}
+    DESTINATION lib/${PROJECT_NAME}
+  )
+endfunction()
+
+add_executable(vl53_mux_node
+  src/drivers/tca9548a.cpp
+  src/drivers/vl53l1x_driver.cpp
+  src/nodes/vl53_mux_node.cpp
+)
+configure_savo_cpp_target(vl53_mux_node)
+
+add_executable(ultrasonic_node
+  src/drivers/ultrasonic_reader.cpp
+  src/nodes/ultrasonic_node.cpp
+)
+configure_savo_cpp_target(ultrasonic_node)
+
+add_executable(safety_stop_node
+  src/fusion/range_fusion.cpp
+  src/safety/safety_policy.cpp
+  src/safety/safety_state.cpp
+  src/nodes/safety_stop_node.cpp
+)
+configure_savo_cpp_target(safety_stop_node)
+
 add_executable(cmd_vel_safety_gate
+  src/safety/safety_gate.cpp
   src/nodes/cmd_vel_safety_gate.cpp
 )
+configure_savo_cpp_target(cmd_vel_safety_gate)
 
-target_include_directories(cmd_vel_safety_gate PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>
+add_executable(range_health_node
+  src/nodes/range_health_node.cpp
 )
-
-ament_target_dependencies(cmd_vel_safety_gate
-  rclcpp
-  std_msgs
-  geometry_msgs
-)
-
-install(TARGETS cmd_vel_safety_gate
-  DESTINATION lib/${PROJECT_NAME}
-)
+configure_savo_cpp_target(range_health_node)
 
 install(DIRECTORY include/
   DESTINATION include
 )
 
-# -----------------------------
-# Python package (rclpy nodes + sensors_api)
-# -----------------------------
 ament_python_install_package(${PROJECT_NAME})
 
-# Install Python node scripts as ROS executables for `ros2 run`
-# NOTE: We "RENAME" to remove .py so the command is clean:
-#   ros2 run savo_perception vl53_node
-install(PROGRAMS
-  savo_perception/nodes/vl53_mux_node_py.py
-  DESTINATION lib/${PROJECT_NAME}
-  RENAME vl53_node
+function(install_program_if_exists source_path installed_name)
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${source_path}")
+    install(PROGRAMS
+      ${source_path}
+      DESTINATION lib/${PROJECT_NAME}
+      RENAME ${installed_name}
+    )
+  endif()
+endfunction()
+
+install_program_if_exists(
+  "savo_perception/nodes/vl53_mux_node_py.py"
+  "vl53_mux_node_py"
 )
 
-install(PROGRAMS
-  savo_perception/nodes/ultrasonic_node_py.py
-  DESTINATION lib/${PROJECT_NAME}
-  RENAME ultrasonic_node
+install_program_if_exists(
+  "savo_perception/nodes/ultrasonic_node_py.py"
+  "ultrasonic_node_py"
 )
 
-install(PROGRAMS
-  savo_perception/nodes/depth_front_min_node.py
-  DESTINATION lib/${PROJECT_NAME}
-  RENAME depth_front_min_node
+install_program_if_exists(
+  "savo_perception/nodes/safety_stop_node_py.py"
+  "safety_stop_node_py"
 )
 
-install(PROGRAMS
-  savo_perception/nodes/safety_stop_node_py.py
-  DESTINATION lib/${PROJECT_NAME}
-  RENAME safety_stop_node
+install_program_if_exists(
+  "savo_perception/nodes/range_health_node_py.py"
+  "range_health_node_py"
 )
 
-# NEW: terminal dashboard (curses)
-install(PROGRAMS
-  savo_perception/nodes/sensor_dashboard_node.py
-  DESTINATION lib/${PROJECT_NAME}
-  RENAME sensor_dashboard
+install_program_if_exists(
+  "savo_perception/nodes/sensor_dashboard_node.py"
+  "sensor_dashboard_node"
 )
 
-# Install launch + config
-install(DIRECTORY
-  launch
-  config
-  DESTINATION share/${PROJECT_NAME}
+install_program_if_exists(
+  "scripts/range_echo_cli.py"
+  "range_echo_cli"
 )
 
-# -----------------------------
-# Tests / lint
-# -----------------------------
+install_program_if_exists(
+  "scripts/safety_inject_cli.py"
+  "safety_inject_cli"
+)
+
+install_program_if_exists(
+  "scripts/perception_smoke_test_cli.py"
+  "perception_smoke_test_cli"
+)
+
+install_program_if_exists(
+  "scripts/dump_effective_params.py"
+  "dump_effective_params"
+)
+
+install_program_if_exists(
+  "scripts/tof_mux_scan_cli.py"
+  "tof_mux_scan_cli"
+)
+
+install_program_if_exists(
+  "scripts/ultrasonic_sample_cli.py"
+  "ultrasonic_sample_cli"
+)
+
+foreach(dir config launch)
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${dir}")
+    install(DIRECTORY ${dir}
+      DESTINATION share/${PROJECT_NAME}
+    )
+  endif()
+endforeach()
+
+ament_export_include_directories(include)
+ament_export_dependencies(
+  rclcpp
+  std_msgs
+  geometry_msgs
+)
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   ament_lint_auto_find_test_dependencies()

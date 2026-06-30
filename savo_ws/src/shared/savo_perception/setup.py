@@ -7,22 +7,20 @@ package_name = "savo_perception"
 
 setup(
     name=package_name,
-    version="0.0.1",
+    version="0.1.0",
     packages=find_packages(exclude=("test", "test.*")),
     include_package_data=True,
     data_files=[
         ("share/ament_index/resource_index/packages", [f"resource/{package_name}"]),
         (f"share/{package_name}", ["package.xml"]),
     ],
-    install_requires=[
-        "setuptools",
-    ],
+    install_requires=["setuptools"],
     zip_safe=False,
     maintainer="Ahnaf Tahmid",
     maintainer_email="tahmidahnaf998@gmail.com",
     description=(
-        "Robot SAVO perception and safety package for range sensors, "
-        "near-field safety fusion, slowdown, and cmd_vel safety gating."
+        "Robot Savo perception package for ToF, ultrasonic, near-field safety, "
+        "range health, slowdown, and cmd_vel safety gating."
     ),
     license="Proprietary",
     tests_require=["pytest"],
