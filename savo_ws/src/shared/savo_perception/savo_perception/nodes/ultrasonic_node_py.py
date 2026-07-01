@@ -38,6 +38,10 @@ class UltrasonicNodePy(Node):
         self.declare_parameter("rate_hz", 10.0)
         self.declare_parameter("queue_len", 1)
         self.declare_parameter("pin_factory", "lgpio")
+        self.declare_parameter("gpiochip", 4)
+        self.declare_parameter("trigger_pulse_us", 10)
+        self.declare_parameter("echo_timeout_us", 30000)
+        self.declare_parameter("echo_idle_timeout_us", 30000)
         self.declare_parameter("output_topic", "/savo_perception/range/front_ultrasonic_m")
         self.declare_parameter("publish_nan_on_error", True)
 
@@ -50,6 +54,10 @@ class UltrasonicNodePy(Node):
             "rate_hz": self.get_parameter("rate_hz").value,
             "queue_len": self.get_parameter("queue_len").value,
             "pin_factory": self.get_parameter("pin_factory").value,
+            "gpiochip": self.get_parameter("gpiochip").value,
+            "trigger_pulse_us": self.get_parameter("trigger_pulse_us").value,
+            "echo_timeout_us": self.get_parameter("echo_timeout_us").value,
+            "echo_idle_timeout_us": self.get_parameter("echo_idle_timeout_us").value,
             "output_topic": self.get_parameter("output_topic").value,
         }
 
@@ -64,6 +72,10 @@ class UltrasonicNodePy(Node):
             valid_max_m=self.params.valid_max_m,
             queue_len=self.params.queue_len,
             pin_factory=self.params.pin_factory,
+            gpiochip=self.params.gpiochip,
+            trigger_pulse_us=self.params.trigger_pulse_us,
+            echo_timeout_us=self.params.echo_timeout_us,
+            echo_idle_timeout_us=self.params.echo_idle_timeout_us,
         )
 
         self.driver = UltrasonicDriver(driver_cfg)
@@ -83,6 +95,7 @@ class UltrasonicNodePy(Node):
         self.get_logger().info(
             "Ultrasonic fallback node started: "
             f"TRIG={self.params.trig_pin}, ECHO={self.params.echo_pin}, "
+            f"gpiochip={self.params.gpiochip}, "
             f"max={self.params.max_distance_m:.2f}m, "
             f"valid=[{self.params.valid_min_m:.2f}, {self.params.valid_max_m:.2f}]m, "
             f"queue={self.params.queue_len}, "
