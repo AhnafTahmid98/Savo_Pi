@@ -14,6 +14,13 @@ ultrasonic_node:
     queue_len: 1
     pin_factory: lgpio
 
+    # Raspberry Pi 5 usually exposes the 40-pin GPIO header on gpiochip4.
+    # Use -1 only for auto-detect.
+    gpiochip: 4
+    trigger_pulse_us: 10
+    echo_timeout_us: 30000
+    echo_idle_timeout_us: 30000
+
     output_topic: /savo_perception/range/front_ultrasonic_m
 
     publish_nan_on_error: true
@@ -31,6 +38,12 @@ ultrasonic_node_py:
     rate_hz: 10.0
     queue_len: 1
     pin_factory: lgpio
+
+    # Kept for parity with C++; Python fallback may ignore gpiochip internally.
+    gpiochip: 4
+    trigger_pulse_us: 10
+    echo_timeout_us: 30000
+    echo_idle_timeout_us: 30000
 
     output_topic: /savo_perception/range/front_ultrasonic_m
 
