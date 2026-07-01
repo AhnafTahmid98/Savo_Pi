@@ -36,7 +36,7 @@ class UltrasonicNodePy(Node):
         self.declare_parameter("valid_min_m", 0.02)
         self.declare_parameter("valid_max_m", 3.0)
         self.declare_parameter("rate_hz", 10.0)
-        self.declare_parameter("queue_len", 3)
+        self.declare_parameter("queue_len", 1)
         self.declare_parameter("pin_factory", "lgpio")
         self.declare_parameter("output_topic", "/savo_perception/range/front_ultrasonic_m")
         self.declare_parameter("publish_nan_on_error", True)
@@ -84,6 +84,9 @@ class UltrasonicNodePy(Node):
             "Ultrasonic fallback node started: "
             f"TRIG={self.params.trig_pin}, ECHO={self.params.echo_pin}, "
             f"max={self.params.max_distance_m:.2f}m, "
+            f"valid=[{self.params.valid_min_m:.2f}, {self.params.valid_max_m:.2f}]m, "
+            f"queue={self.params.queue_len}, "
+            f"pin_factory={self.params.pin_factory}, "
             f"rate={self.params.rate_hz:.2f}Hz"
         )
 
