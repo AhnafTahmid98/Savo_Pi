@@ -153,8 +153,13 @@ std::string VOHealthNode::build_health_message(const double now_s) const
     return "error: " + last_status_;
   }
 
+  if (last_status_.find("waiting") != std::string::npos) {
+    return "waiting: " + last_status_;
+  }
+
   if (last_status_.find("lost") != std::string::npos ||
-      last_status_.find("rejected") != std::string::npos) {
+      last_status_.find("rejected") != std::string::npos ||
+      last_status_.find("degraded") != std::string::npos) {
     return "degraded: " + last_status_;
   }
 

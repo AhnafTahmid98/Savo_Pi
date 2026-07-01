@@ -1,84 +1,82 @@
-"""Launch the complete visual odometry stack for Robot Savo."""
+from pathlib import Path
 
+from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
-from launch.conditions import IfCondition
-from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.actions import DeclareLaunchArgument, OpaqueFunction
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-from launch_ros.substitutions import FindPackageShare
 
 
-def generate_launch_description() -> LaunchDescription:
-    use_realsense = LaunchConfiguration("use_realsense")
-    rgbd_config_file = LaunchConfiguration("rgbd_config_file")
-    health_config_file = LaunchConfiguration("health_config_file")
+def _select_executable(base_name: str, implementation: str) -> str:
+    if implementation == "cpp":
+        return base_name
 
-    default_rgbd_config_file = PathJoinSubstitution(
-        [
-            FindPackageShare("savo_vo"),
-            "config",
-            "rgbd_odometry.yaml",
-        ]
+    if implementation == "py":
+        return f"{base_name}_py"
+
+    raise RuntimeError(
+        f"Unsupported implementation '{implementation}'. Use 'cpp' or 'py'."
     )
 
-    default_health_config_file = PathJoinSubstitution(
-        [
-            FindPackageShare("savo_vo"),
-            "config",
-            "vo_health.yaml",
-        ]
-    )
 
-    realsense_launch_file = PathJoinSubstitution(
-        [
-            FindPackageShare("savo_realsense"),
-            "launch",
-            "realsense_vo.launch.py",
-        ]
-    )
+def _make_vo_nodes(context):
+    implementation = LaunchConfiguration("implementation").perform(context).strip().lower()
+    profile = LaunchConfiguration("profile").perform(context).strip()
+    log_level = LaunchConfiguration("log_level").perform(context).strip()
 
-    return LaunchDescription(
-        [
-            DeclareLaunchArgument(
-                "use_realsense",
-                default_value="false",
-                description="Start the RealSense VO camera profile before VO nodes.",
-            ),
-            DeclareLaunchArgument(
-                "rgbd_config_file",
-                default_value=default_rgbd_config_file,
-                description="Path to the RGB-D visual odometry config file.",
-            ),
-            DeclareLaunchArgument(
-                "health_config_file",
-                default_value=default_health_config_file,
-                description="Path to the VO health config file.",
-            ),
-            IncludeLaunchDescription(
-                PythonLaunchDescriptionSource(realsense_launch_file),
-                condition=IfCondition(use_realsense),
-            ),
-            Node(
-                package="savo_vo",
-                executable="rgbd_odometry_node",
-                name="rgbd_odometry_node",
-                output="screen",
-                parameters=[rgbd_config_file],
-            ),
-            Node(
-                package="savo_vo",
-                executable="vo_health_node",
-                name="vo_health_node",
-                output="screen",
-                parameters=[health_config_file],
-            ),
-            Node(
-                package="savo_vo",
-                executable="vo_diagnostics_node",
-                name="vo_diagnostics_node",
-                output="screen",
-                parameters=[health_config_file],
-            ),
-        ]
-    )
+    package_share = Path(get_package_share_directory("savo_vo"))
+    profile_file = package_share / "config" / "profiles" / f"{profile}.yaml"
+
+    if not profile_file.exists():
+        raise RuntimeError(f"savo_vo profile file not found: {profile_file}")
+
+    common_kwargs = {
+        "package": "savo_vo",
+        "output": "screen",
+        "parameters": [str(profile_file)],
+        "arguments": ["--ros-args", "--log-level", log_level],
+    }
+
+    return [
+        Node(
+            executable=_select_executable("rgbd_odometry_node", implementation),
+            name="rgbd_odometry_node",
+            **common_kwargs,
+        ),
+        Node(
+            executable=_select_executable("vo_republisher_node", implementation),
+            name="vo_republisher_node",
+            **common_kwargs,
+        ),
+        Node(
+            executable=_select_executable("vo_health_node", implementation),
+            name="vo_health_node",
+            **common_kwargs,
+        ),
+        Node(
+            executable=_select_executable("vo_diagnostics_node", implementation),
+            name="vo_diagnostics_node",
+            **common_kwargs,
+        ),
+    ]
+
+
+def generate_launch_description():
+    return LaunchDescription([
+        DeclareLaunchArgument(
+            "implementation",
+            default_value="cpp",
+            description="Node implementation: cpp or py.",
+        ),
+        DeclareLaunchArgument(
+            "profile",
+            default_value="real_robot_v1",
+            description="Config profile from config/profiles without .yaml.",
+        ),
+        DeclareLaunchArgument(
+            "log_level",
+            default_value="info",
+            description="ROS log level.",
+        ),
+        OpaqueFunction(function=_make_vo_nodes),
+    ])

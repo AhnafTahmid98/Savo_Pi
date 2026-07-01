@@ -8,7 +8,6 @@ rgbd_odometry_node:
 
     odom_topic: "/vo/odom/raw"
     status_topic: "/vo/status"
-    health_topic: "/vo/health"
     tracking_quality_topic: "/vo/tracking_quality"
 
     odom_frame: "odom"

@@ -1,15 +1,18 @@
 #pragma once
 
-#include <memory>
 #include <string>
+#include <vector>
 
 #include "nav_msgs/msg/odometry.hpp"
+#include "opencv2/core.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/camera_info.hpp"
 #include "sensor_msgs/msg/image.hpp"
 #include "std_msgs/msg/float32.hpp"
 #include "std_msgs/msg/string.hpp"
 
+#include "savo_vo/covariance_builder.hpp"
+#include "savo_vo/tracking_quality.hpp"
 #include "savo_vo/vo_types.hpp"
 
 namespace savo_vo
@@ -36,19 +39,43 @@ private:
   void load_parameters();
   void create_publishers();
   void create_subscribers();
+  void create_timers();
 
   void on_color_image(const Image::SharedPtr msg);
   void on_depth_image(const Image::SharedPtr msg);
   void on_camera_info(const CameraInfo::SharedPtr msg);
 
   void try_process_frame();
+  void publish_waiting_status();
 
   bool has_required_inputs() const;
   CameraIntrinsics camera_intrinsics_from_info(const CameraInfo & info) const;
 
+  bool convert_latest_images(
+    cv::Mat & gray_image,
+    cv::Mat & depth_image) const;
+
+  TrackingQuality estimate_visual_motion(
+    const cv::Mat & gray_image,
+    const cv::Mat & depth_image,
+    const CameraIntrinsics & intrinsics,
+    Odometry & odometry);
+
+  std::vector<cv::Point2f> detect_reference_features(
+    const cv::Mat & gray_image) const;
+
+  double estimate_median_depth_m(
+    const cv::Mat & depth_image,
+    const std::vector<cv::Point2f> & points) const;
+
+  Odometry build_odometry_message(
+    double vx,
+    double vy,
+    double wz,
+    const rclcpp::Time & stamp);
+
   void publish_odometry(const Odometry & odometry);
   void publish_status(const std::string & message);
-  void publish_health(const std::string & message);
   void publish_tracking_quality(double score);
 
   std::string color_image_topic_;
@@ -58,7 +85,6 @@ private:
 
   std::string odom_topic_;
   std::string status_topic_;
-  std::string health_topic_;
   std::string tracking_quality_topic_;
 
   std::string odom_frame_;
@@ -79,18 +105,31 @@ private:
   bool publish_tf_{false};
   bool publish_diagnostics_{true};
 
+  double pose_x_m_{0.0};
+  double pose_y_m_{0.0};
+  double yaw_rad_{0.0};
+  double previous_stamp_s_{0.0};
+
+  bool has_previous_frame_{false};
+
+  cv::Mat previous_gray_image_;
+  std::vector<cv::Point2f> previous_features_;
+
+  VOCovarianceConfig covariance_config_;
+
   Image::SharedPtr latest_color_;
   Image::SharedPtr latest_depth_;
   CameraInfo::SharedPtr latest_camera_info_;
 
   rclcpp::Publisher<Odometry>::SharedPtr odom_pub_;
   rclcpp::Publisher<String>::SharedPtr status_pub_;
-  rclcpp::Publisher<String>::SharedPtr health_pub_;
   rclcpp::Publisher<Float32>::SharedPtr tracking_quality_pub_;
 
   rclcpp::Subscription<Image>::SharedPtr color_sub_;
   rclcpp::Subscription<Image>::SharedPtr depth_sub_;
   rclcpp::Subscription<CameraInfo>::SharedPtr camera_info_sub_;
+
+  rclcpp::TimerBase::SharedPtr status_timer_;
 };
 
 }  // namespace savo_vo

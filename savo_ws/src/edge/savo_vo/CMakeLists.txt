@@ -20,6 +20,8 @@ find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
 find_package(builtin_interfaces REQUIRED)
+find_package(cv_bridge REQUIRED)
+find_package(OpenCV REQUIRED COMPONENTS core imgproc video calib3d)
 
 ament_python_install_package(${PROJECT_NAME})
 
@@ -54,6 +56,11 @@ ament_target_dependencies(savo_vo_core
   nav_msgs
   diagnostic_msgs
   builtin_interfaces
+  cv_bridge
+)
+
+target_link_libraries(savo_vo_core
+  ${OpenCV_LIBS}
 )
 
 add_executable(rgbd_odometry_node
