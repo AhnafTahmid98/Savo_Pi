@@ -1,7 +1,6 @@
+
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-
-"""HC-SR04 ultrasonic driver for Python fallback and diagnostics."""
 
 from __future__ import annotations
 
@@ -34,11 +33,37 @@ def import_gpiozero():
 class UltrasonicConfig:
     trig_pin: int = ULTRASONIC_TRIG_PIN_DEFAULT
     echo_pin: int = ULTRASONIC_ECHO_PIN_DEFAULT
+
     max_distance_m: float = ULTRASONIC_MAX_DISTANCE_M_DEFAULT
     valid_min_m: float = 0.02
     valid_max_m: float = ULTRASONIC_MAX_DISTANCE_M_DEFAULT
+
     queue_len: int = 1
     pin_factory: str = "lgpio"
+
+    # Kept in parity with C++ config. LGPIOFactory supports explicit chip selection.
+    # Use -1 to let gpiozero/lgpio auto-select.
+    gpiochip: int = 4
+
+    # gpiozero handles HC-SR04 timing internally. These are kept for config parity.
+    trigger_pulse_us: int = 10
+    echo_timeout_us: int = 30000
+    echo_idle_timeout_us: int = 30000
+
+    def __post_init__(self) -> None:
+        self.trig_pin = int(self.trig_pin)
+        self.echo_pin = int(self.echo_pin)
+        self.max_distance_m = float(self.max_distance_m)
+        self.valid_min_m = float(self.valid_min_m)
+        self.valid_max_m = float(self.valid_max_m)
+        self.queue_len = max(1, int(self.queue_len))
+        self.gpiochip = int(self.gpiochip)
+        self.trigger_pulse_us = max(1, int(self.trigger_pulse_us))
+        self.echo_timeout_us = max(1000, int(self.echo_timeout_us))
+        self.echo_idle_timeout_us = max(1000, int(self.echo_idle_timeout_us))
+
+        if self.valid_max_m < self.valid_min_m:
+            self.valid_min_m, self.valid_max_m = self.valid_max_m, self.valid_min_m
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -76,10 +101,15 @@ class UltrasonicDriver:
         self.config = config or UltrasonicConfig()
         self._sensor = None
         self._started = False
+        self._last_error = ""
 
     @property
     def started(self) -> bool:
         return self._started
+
+    @property
+    def last_error(self) -> str:
+        return self._last_error
 
     def start(self) -> None:
         if self._started:
@@ -89,16 +119,21 @@ class UltrasonicDriver:
             raise ValueError("Only lgpio pin_factory is supported in production fallback driver")
 
         Device, DistanceSensor, LGPIOFactory = import_gpiozero()
-        Device.pin_factory = LGPIOFactory()
+
+        if self.config.gpiochip >= 0:
+            Device.pin_factory = LGPIOFactory(chip=self.config.gpiochip)
+        else:
+            Device.pin_factory = LGPIOFactory()
 
         self._sensor = DistanceSensor(
-            echo=int(self.config.echo_pin),
-            trigger=int(self.config.trig_pin),
-            max_distance=float(self.config.max_distance_m),
-            queue_len=int(self.config.queue_len),
+            echo=self.config.echo_pin,
+            trigger=self.config.trig_pin,
+            max_distance=self.config.max_distance_m,
+            queue_len=self.config.queue_len,
         )
 
         self._started = True
+        self._last_error = ""
 
     def stop(self) -> None:
         if self._sensor is not None:
@@ -125,15 +160,14 @@ class UltrasonicDriver:
 
         stamp = time.monotonic()
         distance_m = self._read_distance_m()
-        error = "" if distance_m is not None else "invalid_or_no_echo"
 
         return UltrasonicReading(
             sensor_name="ultrasonic_front",
             distance_m=distance_m,
             stamp_mono_s=stamp,
-            trig_pin=int(self.config.trig_pin),
-            echo_pin=int(self.config.echo_pin),
-            error=error,
+            trig_pin=self.config.trig_pin,
+            echo_pin=self.config.echo_pin,
+            error="" if distance_m is not None else self._last_error or "invalid_or_no_echo",
         )
 
     def read_sample(self) -> RangeSample:
@@ -141,19 +175,28 @@ class UltrasonicDriver:
 
     def _read_distance_m(self) -> Optional[float]:
         if self._sensor is None:
+            self._last_error = "not_started"
             return None
 
         try:
             distance_m = float(self._sensor.distance)
-        except Exception:
+        except Exception as exc:
+            self._last_error = f"read_failed:{type(exc).__name__}"
             return None
 
         if not math.isfinite(distance_m):
+            self._last_error = "non_finite_distance"
             return None
 
-        if distance_m < self.config.valid_min_m or distance_m > self.config.valid_max_m:
+        if distance_m < self.config.valid_min_m:
+            self._last_error = "distance_below_valid_min"
             return None
 
+        if distance_m > self.config.valid_max_m:
+            self._last_error = "distance_above_valid_max"
+            return None
+
+        self._last_error = ""
         return distance_m
 
     def _require_started(self) -> None:
