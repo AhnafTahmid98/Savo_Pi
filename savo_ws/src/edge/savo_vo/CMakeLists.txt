@@ -1,40 +1,175 @@
 cmake_minimum_required(VERSION 3.8)
 project(savo_vo)
 
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 
+find_package(rclcpp REQUIRED)
+find_package(rclpy REQUIRED)
+
+find_package(std_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(diagnostic_msgs REQUIRED)
+find_package(builtin_interfaces REQUIRED)
+
 ament_python_install_package(${PROJECT_NAME})
 
+add_library(savo_vo_core
+  src/vo_types.cpp
+  src/tracking_quality.cpp
+  src/timestamp_sync.cpp
+  src/covariance_builder.cpp
+  src/geometry_utils.cpp
+  src/rgbd_odometry_node.cpp
+  src/vo_health_node.cpp
+  src/vo_diagnostics_node.cpp
+  src/vo_republisher_node.cpp
+)
+
+target_include_directories(savo_vo_core
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+
+target_compile_features(savo_vo_core
+  PUBLIC
+    cxx_std_17
+)
+
+ament_target_dependencies(savo_vo_core
+  rclcpp
+  std_msgs
+  sensor_msgs
+  geometry_msgs
+  nav_msgs
+  diagnostic_msgs
+  builtin_interfaces
+)
+
+add_executable(rgbd_odometry_node
+  src/rgbd_odometry_main.cpp
+)
+
+target_link_libraries(rgbd_odometry_node
+  savo_vo_core
+)
+
+ament_target_dependencies(rgbd_odometry_node
+  rclcpp
+)
+
+add_executable(vo_health_node
+  src/vo_health_main.cpp
+)
+
+target_link_libraries(vo_health_node
+  savo_vo_core
+)
+
+ament_target_dependencies(vo_health_node
+  rclcpp
+)
+
+add_executable(vo_diagnostics_node
+  src/vo_diagnostics_main.cpp
+)
+
+target_link_libraries(vo_diagnostics_node
+  savo_vo_core
+)
+
+ament_target_dependencies(vo_diagnostics_node
+  rclcpp
+)
+
+add_executable(vo_republisher_node
+  src/vo_republisher_main.cpp
+)
+
+target_link_libraries(vo_republisher_node
+  savo_vo_core
+)
+
+ament_target_dependencies(vo_republisher_node
+  rclcpp
+)
+
 install(
-  DIRECTORY config launch
-  DESTINATION share/${PROJECT_NAME}
+  TARGETS
+    savo_vo_core
+  EXPORT export_${PROJECT_NAME}
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
+
+install(
+  TARGETS
+    rgbd_odometry_node
+    vo_health_node
+    vo_diagnostics_node
+    vo_republisher_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(
+  DIRECTORY include/
+  DESTINATION include
 )
 
 install(
   PROGRAMS
-    scripts/rgbd_odometry_node
-    scripts/vo_health_node
-    scripts/vo_diagnostics_node
-    scripts/vo_republisher_node
+    scripts/rgbd_odometry_node_py
+    scripts/vo_health_node_py
+    scripts/vo_diagnostics_node_py
+    scripts/vo_republisher_node_py
   DESTINATION lib/${PROJECT_NAME}
 )
+
+install(
+  DIRECTORY config launch
+  DESTINATION share/${PROJECT_NAME}
+  PATTERN "__pycache__" EXCLUDE
+)
+
+install(
+  FILES package.xml
+  DESTINATION share/${PROJECT_NAME}
+)
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
+  install(
+    FILES README.md
+    DESTINATION share/${PROJECT_NAME}
+  )
+endif()
 
 if(BUILD_TESTING)
   find_package(ament_cmake_pytest REQUIRED)
 
-  ament_add_pytest_test(test_imports test/test_imports.py)
-  ament_add_pytest_test(test_topic_names test/test_topic_names.py)
-  ament_add_pytest_test(test_frame_names test/test_frame_names.py)
-  ament_add_pytest_test(test_parameter_names test/test_parameter_names.py)
-  ament_add_pytest_test(test_vo_status test/test_vo_status.py)
-  ament_add_pytest_test(test_tracking_report test/test_tracking_report.py)
-  ament_add_pytest_test(test_timestamp_sync test/test_timestamp_sync.py)
-  ament_add_pytest_test(test_tracking_quality test/test_tracking_quality.py)
-  ament_add_pytest_test(test_motion_quality test/test_motion_quality.py)
-  ament_add_pytest_test(test_odom_checks test/test_odom_checks.py)
-  ament_add_pytest_test(test_covariance_builder test/test_covariance_builder.py)
-  ament_add_pytest_test(test_geometry test/test_geometry.py)
+  file(GLOB PYTEST_FILES
+    RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}"
+    "test/test_*.py"
+  )
+
+  foreach(test_path ${PYTEST_FILES})
+    get_filename_component(test_name "${test_path}" NAME_WE)
+    ament_add_pytest_test(${test_name} "${test_path}")
+  endforeach()
 endif()
+
+ament_export_include_directories(include)
+ament_export_libraries(savo_vo_core)
+ament_export_targets(export_${PROJECT_NAME})
 
 ament_package()

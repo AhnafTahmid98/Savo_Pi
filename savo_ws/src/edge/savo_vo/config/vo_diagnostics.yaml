@@ -1,0 +1,7 @@
+vo_diagnostics_node:
+  ros__parameters:
+    status_topic: "/vo/status"
+    health_topic: "/vo/health"
+    diagnostics_topic: "/diagnostics"
+
+    diagnostics_rate_hz: 2.0

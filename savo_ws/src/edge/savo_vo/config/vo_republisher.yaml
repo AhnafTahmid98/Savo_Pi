@@ -1,0 +1,7 @@
+vo_republisher_node:
+  ros__parameters:
+    odom_raw_topic: "/vo/odom/raw"
+    odom_topic: "/vo/odom"
+
+    odom_frame: "odom"
+    base_frame: "base_link"

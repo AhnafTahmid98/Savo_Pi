@@ -6,8 +6,7 @@ rgbd_odometry_node:
     depth_image_topic: "/camera/camera/depth/image_rect_raw"
     depth_camera_info_topic: "/camera/camera/depth/camera_info"
 
-    odom_topic: "/vo/odom"
-    odom_raw_topic: "/vo/odom/raw"
+    odom_topic: "/vo/odom/raw"
     status_topic: "/vo/status"
     health_topic: "/vo/health"
     tracking_quality_topic: "/vo/tracking_quality"
