@@ -76,6 +76,10 @@ class UltrasonicParams:
     rate_hz: float = ULTRASONIC_RATE_HZ_DEFAULT
     queue_len: int = 1
     pin_factory: str = "lgpio"
+    gpiochip: int = 4
+    trigger_pulse_us: int = 10
+    echo_timeout_us: int = 30000
+    echo_idle_timeout_us: int = 30000
     output_topic: str = ULTRASONIC_FRONT_M
 
     def to_dict(self) -> Dict[str, Any]:
@@ -244,6 +248,13 @@ def load_ultrasonic_params(values: Mapping[str, Any]) -> UltrasonicParams:
         rate_hz=to_float(get_param(values, "rate_hz", ULTRASONIC_RATE_HZ_DEFAULT), min_value=0.1),
         queue_len=to_int(get_param(values, "queue_len", 1), min_value=1),
         pin_factory=to_str(get_param(values, "pin_factory", "lgpio")),
+        gpiochip=to_int(get_param(values, "gpiochip", 4), min_value=-1),
+        trigger_pulse_us=to_int(get_param(values, "trigger_pulse_us", 10), min_value=1),
+        echo_timeout_us=to_int(get_param(values, "echo_timeout_us", 30000), min_value=1000),
+        echo_idle_timeout_us=to_int(
+            get_param(values, "echo_idle_timeout_us", 30000),
+            min_value=1000,
+        ),
         output_topic=to_str(get_param(values, "output_topic", ULTRASONIC_FRONT_M)),
     )
 
