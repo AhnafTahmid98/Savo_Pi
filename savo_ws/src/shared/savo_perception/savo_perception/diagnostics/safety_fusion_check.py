@@ -188,8 +188,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
     parser.add_argument("--stop-debounce", type=int, default=1)
     parser.add_argument("--clear-debounce", type=int, default=1)
-    parser.add_argument("--front-hysteresis", type=float, default=0.06)
-    parser.add_argument("--side-hysteresis", type=float, default=0.05)
+    parser.add_argument("--front-hysteresis", type=float, default=0.010)
+    parser.add_argument("--side-hysteresis", type=float, default=0.010)
 
     parser.add_argument("--no-fail-safe", action="store_true")
     parser.add_argument("--json", action="store_true")
