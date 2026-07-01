@@ -1,104 +1,32 @@
 #include "savo_perception/ultrasonic_reader.hpp"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <deque>
-#include <fstream>
 #include <optional>
 #include <string>
 #include <thread>
 #include <utility>
 #include <vector>
 
+#ifndef SAVO_PERCEPTION_HAVE_LGPIO
+#define SAVO_PERCEPTION_HAVE_LGPIO 0
+#endif
+
+#if SAVO_PERCEPTION_HAVE_LGPIO
+#include <lgpio.h>
+#endif
+
 namespace savo_perception
 {
 namespace
 {
 
-constexpr const char * kGpioRoot = "/sys/class/gpio";
-
-std::string gpio_path(const int pin, const std::string & file)
-{
-  return std::string(kGpioRoot) + "/gpio" + std::to_string(pin) + "/" + file;
-}
-
-bool write_text_file(const std::string & path, const std::string & value)
-{
-  std::ofstream out(path);
-
-  if (!out) {
-    return false;
-  }
-
-  out << value;
-  return static_cast<bool>(out);
-}
-
-std::optional<std::string> read_text_file(const std::string & path)
-{
-  std::ifstream in(path);
-
-  if (!in) {
-    return std::nullopt;
-  }
-
-  std::string value;
-  in >> value;
-
-  if (value.empty()) {
-    return std::nullopt;
-  }
-
-  return value;
-}
-
-bool gpio_exported(const int pin)
-{
-  return read_text_file(gpio_path(pin, "direction")).has_value();
-}
-
-bool export_gpio(const int pin)
-{
-  if (gpio_exported(pin)) {
-    return true;
-  }
-
-  if (!write_text_file(std::string(kGpioRoot) + "/export", std::to_string(pin))) {
-    return false;
-  }
-
-  for (int i = 0; i < 20; ++i) {
-    if (gpio_exported(pin)) {
-      return true;
-    }
-
-    std::this_thread::sleep_for(std::chrono::milliseconds(5));
-  }
-
-  return gpio_exported(pin);
-}
-
-bool set_direction(const int pin, const std::string & direction)
-{
-  return write_text_file(gpio_path(pin, "direction"), direction);
-}
-
-bool write_gpio_value(const int pin, const int value)
-{
-  return write_text_file(gpio_path(pin, "value"), value ? "1" : "0");
-}
-
-std::optional<int> read_gpio_value(const int pin)
-{
-  const auto value = read_text_file(gpio_path(pin, "value"));
-
-  if (!value.has_value()) {
-    return std::nullopt;
-  }
-
-  return (*value == "1") ? 1 : 0;
-}
+#if SAVO_PERCEPTION_HAVE_LGPIO
+constexpr std::array<int, 6> kGpiochipCandidates = {4, 0, 1, 2, 3, 5};
+#endif
 
 std::optional<double> median_from_history(const std::deque<double> & history)
 {
@@ -193,6 +121,11 @@ bool UltrasonicReader::start()
     return false;
   }
 
+  if (config_.pin_factory != "lgpio") {
+    set_error("unsupported_gpio_backend:" + config_.pin_factory);
+    return false;
+  }
+
   if (!configure_gpio()) {
     return false;
   }
@@ -204,9 +137,15 @@ bool UltrasonicReader::start()
 
 void UltrasonicReader::stop()
 {
-  if (started_) {
-    write_gpio_value(config_.trig_pin, 0);
+#if SAVO_PERCEPTION_HAVE_LGPIO
+  if (gpiochip_handle_ >= 0) {
+    (void)lgGpioWrite(gpiochip_handle_, config_.trig_pin, 0);
+    (void)lgGpioFree(gpiochip_handle_, config_.trig_pin);
+    (void)lgGpioFree(gpiochip_handle_, config_.echo_pin);
+    (void)lgGpiochipClose(gpiochip_handle_);
+    gpiochip_handle_ = -1;
   }
+#endif
 
   started_ = false;
 }
@@ -255,28 +194,32 @@ RangeSample UltrasonicReader::read_sample()
 
 bool UltrasonicReader::configure_gpio()
 {
-  if (!export_gpio(config_.trig_pin)) {
-    set_error("trig_export_failed");
-    return false;
+#if SAVO_PERCEPTION_HAVE_LGPIO
+  for (const int candidate : kGpiochipCandidates) {
+    const int handle = lgGpiochipOpen(candidate);
+    if (handle < 0) {
+      continue;
+    }
+
+    const int trig_result = lgGpioClaimOutput(handle, 0, config_.trig_pin, 0);
+    if (trig_result < 0) {
+      (void)lgGpiochipClose(handle);
+      continue;
+    }
+
+    const int echo_result = lgGpioClaimInput(handle, 0, config_.echo_pin);
+    if (echo_result < 0) {
+      (void)lgGpioFree(handle, config_.trig_pin);
+      (void)lgGpiochipClose(handle);
+      continue;
+    }
+
+    gpiochip_handle_ = handle;
+    break;
   }
 
-  if (!export_gpio(config_.echo_pin)) {
-    set_error("echo_export_failed");
-    return false;
-  }
-
-  if (!set_direction(config_.trig_pin, "out")) {
-    set_error("trig_direction_failed");
-    return false;
-  }
-
-  if (!set_direction(config_.echo_pin, "in")) {
-    set_error("echo_direction_failed");
-    return false;
-  }
-
-  if (!write_gpio_value(config_.trig_pin, 0)) {
-    set_error("trig_initial_low_failed");
+  if (gpiochip_handle_ < 0) {
+    set_error("gpiochip_claim_failed");
     return false;
   }
 
@@ -284,30 +227,44 @@ bool UltrasonicReader::configure_gpio()
 
   last_error_.clear();
   return true;
+#else
+  set_error("lgpio_not_available_at_build_time");
+  return false;
+#endif
 }
 
 bool UltrasonicReader::trigger_pulse()
 {
-  if (!write_gpio_value(config_.trig_pin, 0)) {
+#if SAVO_PERCEPTION_HAVE_LGPIO
+  if (gpiochip_handle_ < 0) {
+    set_error("gpiochip_not_open");
+    return false;
+  }
+
+  if (lgGpioWrite(gpiochip_handle_, config_.trig_pin, 0) < 0) {
     set_error("trig_low_failed");
     return false;
   }
 
   std::this_thread::sleep_for(std::chrono::microseconds(2));
 
-  if (!write_gpio_value(config_.trig_pin, 1)) {
+  if (lgGpioWrite(gpiochip_handle_, config_.trig_pin, 1) < 0) {
     set_error("trig_high_failed");
     return false;
   }
 
   std::this_thread::sleep_for(std::chrono::microseconds(config_.trigger_pulse_us));
 
-  if (!write_gpio_value(config_.trig_pin, 0)) {
+  if (lgGpioWrite(gpiochip_handle_, config_.trig_pin, 0) < 0) {
     set_error("trig_final_low_failed");
     return false;
   }
 
   return true;
+#else
+  set_error("lgpio_not_available_at_build_time");
+  return false;
+#endif
 }
 
 std::optional<double> UltrasonicReader::read_echo_distance_m()
@@ -322,17 +279,19 @@ std::optional<double> UltrasonicReader::read_echo_distance_m()
   std::optional<std::chrono::steady_clock::time_point> echo_start;
 
   while (std::chrono::steady_clock::now() - wait_start < timeout) {
-    const auto value = read_gpio_value(config_.echo_pin);
+#if SAVO_PERCEPTION_HAVE_LGPIO
+    const int value = lgGpioRead(gpiochip_handle_, config_.echo_pin);
 
-    if (!value.has_value()) {
+    if (value < 0) {
       set_error("echo_read_failed");
       return std::nullopt;
     }
 
-    if (*value == 1) {
+    if (value == 1) {
       echo_start = std::chrono::steady_clock::now();
       break;
     }
+#endif
   }
 
   if (!echo_start.has_value()) {
@@ -341,20 +300,22 @@ std::optional<double> UltrasonicReader::read_echo_distance_m()
   }
 
   while (std::chrono::steady_clock::now() - *echo_start < timeout) {
-    const auto value = read_gpio_value(config_.echo_pin);
+#if SAVO_PERCEPTION_HAVE_LGPIO
+    const int value = lgGpioRead(gpiochip_handle_, config_.echo_pin);
 
-    if (!value.has_value()) {
+    if (value < 0) {
       set_error("echo_read_failed");
       return std::nullopt;
     }
 
-    if (*value == 0) {
+    if (value == 0) {
       const auto echo_end = std::chrono::steady_clock::now();
       const auto duration = std::chrono::duration_cast<std::chrono::microseconds>(
         echo_end - *echo_start);
 
       return pulse_duration_to_distance_m(duration);
     }
+#endif
   }
 
   set_error("echo_end_timeout");
@@ -406,10 +367,12 @@ void UltrasonicReader::set_error(std::string error)
 void UltrasonicReader::move_from(UltrasonicReader && other) noexcept
 {
   config_ = std::move(other.config_);
+  gpiochip_handle_ = other.gpiochip_handle_;
   started_ = other.started_;
   history_ = std::move(other.history_);
   last_error_ = std::move(other.last_error_);
 
+  other.gpiochip_handle_ = -1;
   other.started_ = false;
 }
 

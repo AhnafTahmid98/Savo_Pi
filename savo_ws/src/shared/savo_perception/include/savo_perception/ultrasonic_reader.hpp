@@ -95,6 +95,7 @@ private:
   void move_from(UltrasonicReader && other) noexcept;
 
   UltrasonicConfig config_{};
+  int gpiochip_handle_{-1};
   bool started_{false};
   std::deque<double> history_;
   std::string last_error_;

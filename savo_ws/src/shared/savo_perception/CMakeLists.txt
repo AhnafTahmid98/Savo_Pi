@@ -47,6 +47,18 @@ add_executable(ultrasonic_node
 )
 configure_savo_cpp_target(ultrasonic_node)
 
+find_path(LGPIO_INCLUDE_DIR lgpio.h)
+find_library(LGPIO_LIBRARY lgpio)
+
+if(LGPIO_INCLUDE_DIR AND LGPIO_LIBRARY)
+  target_include_directories(ultrasonic_node PRIVATE ${LGPIO_INCLUDE_DIR})
+  target_link_libraries(ultrasonic_node ${LGPIO_LIBRARY})
+  target_compile_definitions(ultrasonic_node PRIVATE SAVO_PERCEPTION_HAVE_LGPIO=1)
+else()
+  message(WARNING
+    "lgpio development files were not found; ultrasonic_node will build without hardware support")
+endif()
+
 add_executable(safety_stop_node
   src/fusion/range_fusion.cpp
   src/safety/safety_policy.cpp
