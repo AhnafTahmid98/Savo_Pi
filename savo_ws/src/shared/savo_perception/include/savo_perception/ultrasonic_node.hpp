@@ -29,8 +29,10 @@ struct SAVO_PERCEPTION_PUBLIC UltrasonicNodeConfig
   int queue_len{1};
   std::string pin_factory{"lgpio"};
 
+  int gpiochip{4};
   int trigger_pulse_us{10};
   int echo_timeout_us{30000};
+  int echo_idle_timeout_us{30000};
 
   std::string output_topic{topics::kUltrasonicFrontM};
 
