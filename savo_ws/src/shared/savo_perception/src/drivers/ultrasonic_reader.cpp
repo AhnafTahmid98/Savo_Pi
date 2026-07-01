@@ -73,6 +73,9 @@ UltrasonicReader::UltrasonicReader(UltrasonicConfig config)
 : config_(std::move(config))
 {
   config_.queue_len = std::max(1, config_.queue_len);
+  config_.trigger_pulse_us = std::max(1, config_.trigger_pulse_us);
+  config_.echo_timeout_us = std::max(1000, config_.echo_timeout_us);
+  config_.echo_idle_timeout_us = std::max(1000, config_.echo_idle_timeout_us);
 }
 
 UltrasonicReader::~UltrasonicReader()
@@ -103,6 +106,11 @@ const UltrasonicConfig & UltrasonicReader::config() const
 bool UltrasonicReader::started() const
 {
   return started_;
+}
+
+int UltrasonicReader::gpiochip_number() const
+{
+  return gpiochip_number_;
 }
 
 std::string UltrasonicReader::last_error() const
@@ -144,6 +152,7 @@ void UltrasonicReader::stop()
     (void)lgGpioFree(gpiochip_handle_, config_.echo_pin);
     (void)lgGpiochipClose(gpiochip_handle_);
     gpiochip_handle_ = -1;
+    gpiochip_number_ = -1;
   }
 #endif
 
@@ -195,38 +204,98 @@ RangeSample UltrasonicReader::read_sample()
 bool UltrasonicReader::configure_gpio()
 {
 #if SAVO_PERCEPTION_HAVE_LGPIO
-  for (const int candidate : kGpiochipCandidates) {
-    const int handle = lgGpiochipOpen(candidate);
-    if (handle < 0) {
-      continue;
+  if (config_.gpiochip >= 0) {
+    if (!try_configure_gpiochip(config_.gpiochip)) {
+      set_error("gpiochip_claim_failed:" + std::to_string(config_.gpiochip));
+      return false;
+    }
+  } else {
+    for (const int candidate : kGpiochipCandidates) {
+      if (try_configure_gpiochip(candidate)) {
+        break;
+      }
     }
 
-    const int trig_result = lgGpioClaimOutput(handle, 0, config_.trig_pin, 0);
-    if (trig_result < 0) {
-      (void)lgGpiochipClose(handle);
-      continue;
+    if (gpiochip_handle_ < 0) {
+      set_error("gpiochip_claim_failed");
+      return false;
     }
-
-    const int echo_result = lgGpioClaimInput(handle, 0, config_.echo_pin);
-    if (echo_result < 0) {
-      (void)lgGpioFree(handle, config_.trig_pin);
-      (void)lgGpiochipClose(handle);
-      continue;
-    }
-
-    gpiochip_handle_ = handle;
-    break;
-  }
-
-  if (gpiochip_handle_ < 0) {
-    set_error("gpiochip_claim_failed");
-    return false;
   }
 
   std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
+  if (lgGpioWrite(gpiochip_handle_, config_.trig_pin, 0) < 0) {
+    set_error("trig_initial_low_failed");
+    return false;
+  }
+
   last_error_.clear();
   return true;
+#else
+  set_error("lgpio_not_available_at_build_time");
+  return false;
+#endif
+}
+
+bool UltrasonicReader::try_configure_gpiochip(const int gpiochip)
+{
+#if SAVO_PERCEPTION_HAVE_LGPIO
+  const int handle = lgGpiochipOpen(gpiochip);
+  if (handle < 0) {
+    return false;
+  }
+
+  const int trig_result = lgGpioClaimOutput(handle, 0, config_.trig_pin, 0);
+  if (trig_result < 0) {
+    (void)lgGpiochipClose(handle);
+    return false;
+  }
+
+  const int echo_result = lgGpioClaimInput(handle, 0, config_.echo_pin);
+  if (echo_result < 0) {
+    (void)lgGpioFree(handle, config_.trig_pin);
+    (void)lgGpiochipClose(handle);
+    return false;
+  }
+
+  gpiochip_handle_ = handle;
+  gpiochip_number_ = gpiochip;
+  return true;
+#else
+  (void)gpiochip;
+  set_error("lgpio_not_available_at_build_time");
+  return false;
+#endif
+}
+
+bool UltrasonicReader::wait_for_echo_idle()
+{
+#if SAVO_PERCEPTION_HAVE_LGPIO
+  if (gpiochip_handle_ < 0) {
+    set_error("gpiochip_not_open");
+    return false;
+  }
+
+  const auto timeout = std::chrono::microseconds(config_.echo_idle_timeout_us);
+  const auto wait_start = std::chrono::steady_clock::now();
+
+  while (std::chrono::steady_clock::now() - wait_start < timeout) {
+    const int value = lgGpioRead(gpiochip_handle_, config_.echo_pin);
+
+    if (value < 0) {
+      set_error("echo_read_failed");
+      return false;
+    }
+
+    if (value == 0) {
+      return true;
+    }
+
+    std::this_thread::sleep_for(std::chrono::microseconds(20));
+  }
+
+  set_error("echo_idle_timeout");
+  return false;
 #else
   set_error("lgpio_not_available_at_build_time");
   return false;
@@ -247,6 +316,10 @@ bool UltrasonicReader::trigger_pulse()
   }
 
   std::this_thread::sleep_for(std::chrono::microseconds(2));
+
+  if (!wait_for_echo_idle()) {
+    return false;
+  }
 
   if (lgGpioWrite(gpiochip_handle_, config_.trig_pin, 1) < 0) {
     set_error("trig_high_failed");
@@ -368,11 +441,13 @@ void UltrasonicReader::move_from(UltrasonicReader && other) noexcept
 {
   config_ = std::move(other.config_);
   gpiochip_handle_ = other.gpiochip_handle_;
+  gpiochip_number_ = other.gpiochip_number_;
   started_ = other.started_;
   history_ = std::move(other.history_);
   last_error_ = std::move(other.last_error_);
 
   other.gpiochip_handle_ = -1;
+  other.gpiochip_number_ = -1;
   other.started_ = false;
 }
 
