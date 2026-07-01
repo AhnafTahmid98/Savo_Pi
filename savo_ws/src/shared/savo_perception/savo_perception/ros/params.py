@@ -71,7 +71,11 @@ class UltrasonicParams:
     trig_pin: int = ULTRASONIC_TRIG_PIN_DEFAULT
     echo_pin: int = ULTRASONIC_ECHO_PIN_DEFAULT
     max_distance_m: float = ULTRASONIC_MAX_DISTANCE_M_DEFAULT
+    valid_min_m: float = 0.02
+    valid_max_m: float = ULTRASONIC_MAX_DISTANCE_M_DEFAULT
     rate_hz: float = ULTRASONIC_RATE_HZ_DEFAULT
+    queue_len: int = 3
+    pin_factory: str = "lgpio"
     output_topic: str = ULTRASONIC_FRONT_M
 
     def to_dict(self) -> Dict[str, Any]:
@@ -227,7 +231,14 @@ def load_ultrasonic_params(values: Mapping[str, Any]) -> UltrasonicParams:
             get_param(values, "max_distance_m", ULTRASONIC_MAX_DISTANCE_M_DEFAULT),
             min_value=0.1,
         ),
+        valid_min_m=to_float(get_param(values, "valid_min_m", 0.02), min_value=0.0),
+        valid_max_m=to_float(
+            get_param(values, "valid_max_m", ULTRASONIC_MAX_DISTANCE_M_DEFAULT),
+            min_value=0.1,
+        ),
         rate_hz=to_float(get_param(values, "rate_hz", ULTRASONIC_RATE_HZ_DEFAULT), min_value=0.1),
+        queue_len=to_int(get_param(values, "queue_len", 3), min_value=1),
+        pin_factory=to_str(get_param(values, "pin_factory", "lgpio")),
         output_topic=to_str(get_param(values, "output_topic", ULTRASONIC_FRONT_M)),
     )
 

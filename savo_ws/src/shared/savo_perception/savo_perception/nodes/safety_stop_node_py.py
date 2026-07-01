@@ -56,13 +56,13 @@ class SafetyStopNodePy(Node):
         self.declare_parameter("loop_hz", 20.0)
         self.declare_parameter("stale_timeout_s", 0.30)
 
-        self.declare_parameter("front_stop_m", 0.28)
-        self.declare_parameter("front_slow_m", 0.60)
-        self.declare_parameter("side_stop_m", 0.20)
-        self.declare_parameter("side_slow_m", 0.45)
+        self.declare_parameter("front_stop_m", 0.035)
+        self.declare_parameter("front_slow_m", 0.080)
+        self.declare_parameter("side_stop_m", 0.035)
+        self.declare_parameter("side_slow_m", 0.080)
 
-        self.declare_parameter("front_clear_hysteresis_m", 0.06)
-        self.declare_parameter("side_clear_hysteresis_m", 0.05)
+        self.declare_parameter("front_clear_hysteresis_m", 0.010)
+        self.declare_parameter("side_clear_hysteresis_m", 0.010)
 
         self.declare_parameter("stop_debounce_count", 2)
         self.declare_parameter("clear_debounce_count", 4)

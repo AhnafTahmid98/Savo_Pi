@@ -41,11 +41,47 @@ add_executable(vl53_mux_node
 )
 configure_savo_cpp_target(vl53_mux_node)
 
+option(SAVO_PERCEPTION_REQUIRE_VL53L1X_ULD
+  "Require VL53L1X ULD files for real robot ToF C++ hardware"
+  OFF
+)
+
+set(VL53L1X_ULD_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/vl53l1x_uld")
+set(VL53L1X_ULD_INCLUDE_DIR "${VL53L1X_ULD_DIR}/include")
+set(VL53L1X_ULD_PLATFORM_DIR "${VL53L1X_ULD_DIR}/platform")
+
+set(VL53L1X_ULD_SOURCES
+  "${VL53L1X_ULD_DIR}/src/VL53L1X_api.c"
+  "${VL53L1X_ULD_DIR}/src/VL53L1X_calibration.c"
+  "${VL53L1X_ULD_PLATFORM_DIR}/VL53L1X_platform.c"
+)
+
+if(EXISTS "${VL53L1X_ULD_INCLUDE_DIR}/VL53L1X_api.h")
+  target_sources(vl53_mux_node PRIVATE ${VL53L1X_ULD_SOURCES})
+  target_include_directories(vl53_mux_node PRIVATE
+    "${VL53L1X_ULD_INCLUDE_DIR}"
+    "${VL53L1X_ULD_PLATFORM_DIR}"
+  )
+else()
+  if(SAVO_PERCEPTION_REQUIRE_VL53L1X_ULD)
+    message(FATAL_ERROR
+      "VL53L1X ULD files are missing. Add third_party/vl53l1x_uld before real robot C++ ToF build.")
+  else()
+    message(WARNING
+      "VL53L1X ULD files are missing; vl53_mux_node will build but real ToF hardware will not start.")
+  endif()
+endif()
+
 add_executable(ultrasonic_node
   src/drivers/ultrasonic_reader.cpp
   src/nodes/ultrasonic_node.cpp
 )
 configure_savo_cpp_target(ultrasonic_node)
+
+option(SAVO_PERCEPTION_REQUIRE_LGPIO
+  "Require lgpio development files for real robot ultrasonic C++ hardware"
+  OFF
+)
 
 find_path(LGPIO_INCLUDE_DIR lgpio.h)
 find_library(LGPIO_LIBRARY lgpio)
@@ -55,8 +91,13 @@ if(LGPIO_INCLUDE_DIR AND LGPIO_LIBRARY)
   target_link_libraries(ultrasonic_node ${LGPIO_LIBRARY})
   target_compile_definitions(ultrasonic_node PRIVATE SAVO_PERCEPTION_HAVE_LGPIO=1)
 else()
-  message(WARNING
-    "lgpio development files were not found; ultrasonic_node will build without hardware support")
+  if(SAVO_PERCEPTION_REQUIRE_LGPIO)
+    message(FATAL_ERROR
+      "lgpio development files were not found. Install lgpio headers/library before real robot build.")
+  else()
+    message(WARNING
+      "lgpio development files were not found; ultrasonic_node will build without hardware support")
+  endif()
 endif()
 
 add_executable(safety_stop_node

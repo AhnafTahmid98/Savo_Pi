@@ -86,14 +86,14 @@ RANGE_HEALTH_HZ_MIN: Final[float] = 0.2
 # =============================================================================
 # Safety Threshold Defaults
 # =============================================================================
-FRONT_STOP_M_DEFAULT: Final[float] = 0.28
-FRONT_SLOW_M_DEFAULT: Final[float] = 0.60
+FRONT_STOP_M_DEFAULT: Final[float] = 0.035
+FRONT_SLOW_M_DEFAULT: Final[float] = 0.080
 
-SIDE_STOP_M_DEFAULT: Final[float] = 0.20
-SIDE_SLOW_M_DEFAULT: Final[float] = 0.45
+SIDE_STOP_M_DEFAULT: Final[float] = 0.035
+SIDE_SLOW_M_DEFAULT: Final[float] = 0.080
 
-FRONT_CLEAR_HYSTERESIS_M_DEFAULT: Final[float] = 0.06
-SIDE_CLEAR_HYSTERESIS_M_DEFAULT: Final[float] = 0.05
+FRONT_CLEAR_HYSTERESIS_M_DEFAULT: Final[float] = 0.010
+SIDE_CLEAR_HYSTERESIS_M_DEFAULT: Final[float] = 0.010
 
 STOP_DEBOUNCE_COUNT_DEFAULT: Final[int] = 2
 CLEAR_DEBOUNCE_COUNT_DEFAULT: Final[int] = 4

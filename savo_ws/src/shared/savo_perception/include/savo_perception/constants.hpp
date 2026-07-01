@@ -44,13 +44,13 @@ inline constexpr double kRangeHealthPublishHzDefault = 2.0;
 inline constexpr double kSensorStaleTimeoutSDefault = 0.30;
 inline constexpr double kCmdTimeoutSDefault = 0.50;
 
-inline constexpr double kFrontStopMDefault = 0.28;
-inline constexpr double kFrontSlowMDefault = 0.60;
-inline constexpr double kSideStopMDefault = 0.20;
-inline constexpr double kSideSlowMDefault = 0.45;
+inline constexpr double kFrontStopMDefault = 0.035;
+inline constexpr double kFrontSlowMDefault = 0.080;
+inline constexpr double kSideStopMDefault = 0.035;
+inline constexpr double kSideSlowMDefault = 0.080;
 
-inline constexpr double kFrontClearHysteresisMDefault = 0.06;
-inline constexpr double kSideClearHysteresisMDefault = 0.05;
+inline constexpr double kFrontClearHysteresisMDefault = 0.010;
+inline constexpr double kSideClearHysteresisMDefault = 0.010;
 
 inline constexpr int kStopDebounceCountDefault = 2;
 inline constexpr int kClearDebounceCountDefault = 4;

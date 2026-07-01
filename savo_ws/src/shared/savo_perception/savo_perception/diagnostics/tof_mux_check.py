@@ -113,7 +113,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
     parser.add_argument("--rate", type=float, default=10.0)
     parser.add_argument("--median", type=int, default=VL53_MEDIAN_WINDOW_DEFAULT)
-    parser.add_argument("--threshold", type=float, default=0.20)
+    parser.add_argument("--threshold", type=float, default=0.035)
     parser.add_argument("--duration", type=float, default=0.0, help="0 = run until Ctrl+C")
 
     parser.add_argument("--valid-min", type=float, default=0.02)

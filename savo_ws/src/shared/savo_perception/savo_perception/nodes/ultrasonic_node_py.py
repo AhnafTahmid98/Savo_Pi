@@ -33,7 +33,11 @@ class UltrasonicNodePy(Node):
         self.declare_parameter("trig_pin", 27)
         self.declare_parameter("echo_pin", 22)
         self.declare_parameter("max_distance_m", 3.0)
+        self.declare_parameter("valid_min_m", 0.02)
+        self.declare_parameter("valid_max_m", 3.0)
         self.declare_parameter("rate_hz", 10.0)
+        self.declare_parameter("queue_len", 3)
+        self.declare_parameter("pin_factory", "lgpio")
         self.declare_parameter("output_topic", "/savo_perception/range/front_ultrasonic_m")
         self.declare_parameter("publish_nan_on_error", True)
 
@@ -41,7 +45,11 @@ class UltrasonicNodePy(Node):
             "trig_pin": self.get_parameter("trig_pin").value,
             "echo_pin": self.get_parameter("echo_pin").value,
             "max_distance_m": self.get_parameter("max_distance_m").value,
+            "valid_min_m": self.get_parameter("valid_min_m").value,
+            "valid_max_m": self.get_parameter("valid_max_m").value,
             "rate_hz": self.get_parameter("rate_hz").value,
+            "queue_len": self.get_parameter("queue_len").value,
+            "pin_factory": self.get_parameter("pin_factory").value,
             "output_topic": self.get_parameter("output_topic").value,
         }
 
@@ -52,6 +60,10 @@ class UltrasonicNodePy(Node):
             trig_pin=self.params.trig_pin,
             echo_pin=self.params.echo_pin,
             max_distance_m=self.params.max_distance_m,
+            valid_min_m=self.params.valid_min_m,
+            valid_max_m=self.params.valid_max_m,
+            queue_len=self.params.queue_len,
+            pin_factory=self.params.pin_factory,
         )
 
         self.driver = UltrasonicDriver(driver_cfg)

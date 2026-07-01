@@ -102,13 +102,13 @@ safety_stop_node:
     loop_hz: 20.0
     stale_timeout_s: 0.50
 
-    front_stop_m: 0.28
-    front_slow_m: 0.60
-    side_stop_m: 0.20
-    side_slow_m: 0.45
+    front_stop_m: 0.035
+    front_slow_m: 0.080
+    side_stop_m: 0.035
+    side_slow_m: 0.080
 
-    front_clear_hysteresis_m: 0.06
-    side_clear_hysteresis_m: 0.05
+    front_clear_hysteresis_m: 0.010
+    side_clear_hysteresis_m: 0.010
 
     stop_debounce_count: 2
     clear_debounce_count: 3
@@ -147,13 +147,13 @@ safety_stop_node_py:
     loop_hz: 20.0
     stale_timeout_s: 0.50
 
-    front_stop_m: 0.28
-    front_slow_m: 0.60
-    side_stop_m: 0.20
-    side_slow_m: 0.45
+    front_stop_m: 0.035
+    front_slow_m: 0.080
+    side_stop_m: 0.035
+    side_slow_m: 0.080
 
-    front_clear_hysteresis_m: 0.06
-    side_clear_hysteresis_m: 0.05
+    front_clear_hysteresis_m: 0.010
+    side_clear_hysteresis_m: 0.010
 
     stop_debounce_count: 2
     clear_debounce_count: 3
