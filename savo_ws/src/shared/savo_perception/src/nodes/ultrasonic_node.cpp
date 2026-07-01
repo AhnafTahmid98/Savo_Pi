@@ -4,15 +4,19 @@
 #include <chrono>
 #include <cmath>
 #include <limits>
-#include <stdexcept>
+#include <memory>
+#include <optional>
 #include <string>
+
+#include "rclcpp/rclcpp.hpp"
+#include "std_msgs/msg/float32.hpp"
 
 namespace savo_perception
 {
 namespace
 {
 
-double safe_rate_hz(const double value, const double fallback)
+double positive_or_default(const double value, const double fallback)
 {
   if (!std::isfinite(value) || value <= 0.0) {
     return fallback;
@@ -21,25 +25,19 @@ double safe_rate_hz(const double value, const double fallback)
   return value;
 }
 
-float distance_to_msg_value(
-  const std::optional<double> & distance_m,
-  const bool publish_nan_on_error)
+int positive_int_or_default(const int value, const int fallback)
 {
-  if (distance_m.has_value() && std::isfinite(*distance_m)) {
-    return static_cast<float>(*distance_m);
+  if (value <= 0) {
+    return fallback;
   }
 
-  if (publish_nan_on_error) {
-    return std::numeric_limits<float>::quiet_NaN();
-  }
-
-  return 0.0F;
+  return value;
 }
 
 }  // namespace
 
 UltrasonicNode::UltrasonicNode(const rclcpp::NodeOptions & options)
-: rclcpp::Node(constants::kUltrasonicNodeName, options)
+: rclcpp::Node("ultrasonic_node", options)
 {
   declare_parameters();
   load_parameters();
@@ -49,85 +47,86 @@ UltrasonicNode::UltrasonicNode(const rclcpp::NodeOptions & options)
 
 void UltrasonicNode::declare_parameters()
 {
-  declare_parameter<int>("trig_pin", constants::kUltrasonicTrigPinDefault);
-  declare_parameter<int>("echo_pin", constants::kUltrasonicEchoPinDefault);
+  this->declare_parameter<int>("trig_pin", config_.trig_pin);
+  this->declare_parameter<int>("echo_pin", config_.echo_pin);
 
-  declare_parameter<double>("max_distance_m", constants::kUltrasonicMaxDistanceMDefault);
-  declare_parameter<double>("valid_min_m", constants::kUltrasonicValidMinMDefault);
-  declare_parameter<double>("valid_max_m", constants::kUltrasonicValidMaxMDefault);
+  this->declare_parameter<double>("max_distance_m", config_.max_distance_m);
+  this->declare_parameter<double>("valid_min_m", config_.valid_min_m);
+  this->declare_parameter<double>("valid_max_m", config_.valid_max_m);
 
-  declare_parameter<double>("rate_hz", constants::kUltrasonicRateHzDefault);
-  declare_parameter<int>("queue_len", 1);
-  declare_parameter<std::string>("pin_factory", "lgpio");
+  this->declare_parameter<double>("rate_hz", config_.rate_hz);
+  this->declare_parameter<int>("queue_len", config_.queue_len);
+  this->declare_parameter<std::string>("pin_factory", config_.pin_factory);
 
-  declare_parameter<int>("trigger_pulse_us", 10);
-  declare_parameter<int>("echo_timeout_us", 30000);
+  this->declare_parameter<int>("gpiochip", config_.gpiochip);
+  this->declare_parameter<int>("trigger_pulse_us", config_.trigger_pulse_us);
+  this->declare_parameter<int>("echo_timeout_us", config_.echo_timeout_us);
+  this->declare_parameter<int>("echo_idle_timeout_us", config_.echo_idle_timeout_us);
 
-  declare_parameter<std::string>("output_topic", topics::kUltrasonicFrontM);
+  this->declare_parameter<std::string>("output_topic", config_.output_topic);
 
-  declare_parameter<bool>("publish_nan_on_error", constants::kPublishNanOnErrorDefault);
-  declare_parameter<bool>("startup_fail_is_fatal", constants::kStartupFailIsFatalDefault);
+  this->declare_parameter<bool>("publish_nan_on_error", config_.publish_nan_on_error);
+  this->declare_parameter<bool>("startup_fail_is_fatal", config_.startup_fail_is_fatal);
 }
 
 void UltrasonicNode::load_parameters()
 {
-  config_.trig_pin = static_cast<int>(get_parameter("trig_pin").as_int());
-  config_.echo_pin = static_cast<int>(get_parameter("echo_pin").as_int());
+  config_.trig_pin = this->get_parameter("trig_pin").as_int();
+  config_.echo_pin = this->get_parameter("echo_pin").as_int();
 
-  config_.max_distance_m = get_parameter("max_distance_m").as_double();
-  config_.valid_min_m = get_parameter("valid_min_m").as_double();
-  config_.valid_max_m = get_parameter("valid_max_m").as_double();
+  config_.max_distance_m = positive_or_default(
+    this->get_parameter("max_distance_m").as_double(),
+    constants::kUltrasonicMaxDistanceMDefault);
+
+  config_.valid_min_m = std::max(0.0, this->get_parameter("valid_min_m").as_double());
+  config_.valid_max_m = positive_or_default(
+    this->get_parameter("valid_max_m").as_double(),
+    config_.max_distance_m);
 
   if (config_.valid_max_m < config_.valid_min_m) {
     std::swap(config_.valid_min_m, config_.valid_max_m);
   }
 
-  config_.rate_hz = safe_rate_hz(
-    get_parameter("rate_hz").as_double(),
+  config_.rate_hz = positive_or_default(
+    this->get_parameter("rate_hz").as_double(),
     constants::kUltrasonicRateHzDefault);
 
-  config_.queue_len = std::max(1, static_cast<int>(get_parameter("queue_len").as_int()));
-  config_.pin_factory = get_parameter("pin_factory").as_string();
+  config_.queue_len = positive_int_or_default(
+    this->get_parameter("queue_len").as_int(),
+    1);
 
-  config_.trigger_pulse_us = std::max(
-    1,
-    static_cast<int>(get_parameter("trigger_pulse_us").as_int()));
+  config_.pin_factory = this->get_parameter("pin_factory").as_string();
 
-  config_.echo_timeout_us = std::max(
-    1000,
-    static_cast<int>(get_parameter("echo_timeout_us").as_int()));
+  config_.gpiochip = static_cast<int>(this->get_parameter("gpiochip").as_int());
+  config_.trigger_pulse_us = positive_int_or_default(
+    this->get_parameter("trigger_pulse_us").as_int(),
+    10);
+  config_.echo_timeout_us = positive_int_or_default(
+    this->get_parameter("echo_timeout_us").as_int(),
+    30000);
+  config_.echo_idle_timeout_us = positive_int_or_default(
+    this->get_parameter("echo_idle_timeout_us").as_int(),
+    30000);
 
-  config_.output_topic = get_parameter("output_topic").as_string();
+  config_.output_topic = this->get_parameter("output_topic").as_string();
 
-  config_.publish_nan_on_error = get_parameter("publish_nan_on_error").as_bool();
-  config_.startup_fail_is_fatal = get_parameter("startup_fail_is_fatal").as_bool();
-
-  if (!valid_ultrasonic_pins(config_.trig_pin, config_.echo_pin)) {
-    RCLCPP_WARN(
-      get_logger(),
-      "Invalid ultrasonic GPIO pins trig=%d echo=%d. Using defaults trig=%d echo=%d.",
-      config_.trig_pin,
-      config_.echo_pin,
-      constants::kUltrasonicTrigPinDefault,
-      constants::kUltrasonicEchoPinDefault);
-
-    config_.trig_pin = constants::kUltrasonicTrigPinDefault;
-    config_.echo_pin = constants::kUltrasonicEchoPinDefault;
-  }
+  config_.publish_nan_on_error = this->get_parameter("publish_nan_on_error").as_bool();
+  config_.startup_fail_is_fatal = this->get_parameter("startup_fail_is_fatal").as_bool();
 }
 
 void UltrasonicNode::setup_interfaces()
 {
-  publisher_ = create_publisher<std_msgs::msg::Float32>(
+  publisher_ = this->create_publisher<std_msgs::msg::Float32>(
     config_.output_topic,
     rclcpp::SensorDataQoS());
 
-  const auto period = std::chrono::duration<double>(1.0 / config_.rate_hz);
+  const auto period = std::chrono::duration_cast<std::chrono::nanoseconds>(
+    std::chrono::duration<double>(1.0 / config_.rate_hz));
 
-  timer_ = create_wall_timer(
-    std::chrono::duration_cast<std::chrono::nanoseconds>(period),
+  timer_ = this->create_wall_timer(
+    period,
     [this]() {
-      on_timer();
+      this->on_timer();
     });
 }
 
@@ -135,30 +134,32 @@ void UltrasonicNode::start_reader()
 {
   reader_ = std::make_unique<UltrasonicReader>(make_reader_config());
 
-  if (reader_->start()) {
-    reader_error_.clear();
+  if (!reader_->start()) {
+    reader_error_ = reader_->last_error();
 
-    RCLCPP_INFO(
-      get_logger(),
-      "Ultrasonic node started: trig=%d echo=%d topic=%s rate=%.2fHz",
-      config_.trig_pin,
-      config_.echo_pin,
-      config_.output_topic.c_str(),
-      config_.rate_hz);
+    const std::string message = "Ultrasonic reader failed to start: " + reader_error_;
+    if (config_.startup_fail_is_fatal) {
+      RCLCPP_ERROR(this->get_logger(), "%s", message.c_str());
+      throw std::runtime_error(message);
+    }
 
+    RCLCPP_WARN(this->get_logger(), "%s", message.c_str());
     return;
   }
 
-  reader_error_ = reader_->last_error();
-
-  RCLCPP_ERROR(
-    get_logger(),
-    "Ultrasonic reader failed to start: %s",
-    reader_error_.c_str());
-
-  if (config_.startup_fail_is_fatal) {
-    throw std::runtime_error("Ultrasonic reader startup failed: " + reader_error_);
-  }
+  RCLCPP_INFO(
+    this->get_logger(),
+    "Ultrasonic node started: trig=%d echo=%d gpiochip=%d topic=%s rate=%.2fHz "
+    "valid=[%.3f, %.3f]m timeout=%dus idle_timeout=%dus",
+    config_.trig_pin,
+    config_.echo_pin,
+    reader_->gpiochip_number(),
+    config_.output_topic.c_str(),
+    config_.rate_hz,
+    config_.valid_min_m,
+    config_.valid_max_m,
+    config_.echo_timeout_us,
+    config_.echo_idle_timeout_us);
 }
 
 void UltrasonicNode::stop_reader()
@@ -171,60 +172,73 @@ void UltrasonicNode::stop_reader()
 void UltrasonicNode::on_timer()
 {
   if (!reader_ || !reader_->started()) {
-    publish_distance(std::nullopt);
+    if (config_.publish_nan_on_error) {
+      publish_distance(std::nullopt);
+    }
     return;
   }
 
   const auto reading = reader_->read_once();
   publish_reading(reading);
-
-  if (!reading.valid) {
-    RCLCPP_WARN_THROTTLE(
-      get_logger(),
-      *get_clock(),
-      2000,
-      "Ultrasonic read warning: %s",
-      reading.error.c_str());
-  }
 }
 
 void UltrasonicNode::publish_reading(const UltrasonicReading & reading)
 {
+  if (!reading.valid) {
+    if (!reading.error.empty()) {
+      RCLCPP_WARN_THROTTLE(
+        this->get_logger(),
+        *this->get_clock(),
+        2000,
+        "Ultrasonic read warning: %s",
+        reading.error.c_str());
+    }
+
+    if (config_.publish_nan_on_error) {
+      publish_distance(std::nullopt);
+    }
+    return;
+  }
+
   publish_distance(reading.filtered_m);
 }
 
 void UltrasonicNode::publish_distance(const std::optional<double> & distance_m)
 {
-  if (!publisher_) {
-    return;
+  std_msgs::msg::Float32 msg;
+
+  if (distance_m.has_value() && std::isfinite(*distance_m)) {
+    msg.data = static_cast<float>(*distance_m);
+  } else {
+    msg.data = std::numeric_limits<float>::quiet_NaN();
   }
 
-  std_msgs::msg::Float32 msg;
-  msg.data = distance_to_msg_value(distance_m, config_.publish_nan_on_error);
   publisher_->publish(msg);
 }
 
 UltrasonicConfig UltrasonicNode::make_reader_config() const
 {
-  UltrasonicConfig cfg;
+  UltrasonicConfig reader_config;
 
-  cfg.trig_pin = config_.trig_pin;
-  cfg.echo_pin = config_.echo_pin;
+  reader_config.trig_pin = config_.trig_pin;
+  reader_config.echo_pin = config_.echo_pin;
 
-  cfg.max_distance_m = config_.max_distance_m;
-  cfg.valid_min_m = config_.valid_min_m;
-  cfg.valid_max_m = config_.valid_max_m;
+  reader_config.max_distance_m = config_.max_distance_m;
+  reader_config.valid_min_m = config_.valid_min_m;
+  reader_config.valid_max_m = config_.valid_max_m;
 
-  cfg.queue_len = config_.queue_len;
-  cfg.pin_factory = config_.pin_factory;
+  reader_config.queue_len = config_.queue_len;
+  reader_config.pin_factory = config_.pin_factory;
 
-  cfg.trigger_pulse_us = config_.trigger_pulse_us;
-  cfg.echo_timeout_us = config_.echo_timeout_us;
+  reader_config.gpiochip = config_.gpiochip;
+  reader_config.trigger_pulse_us = config_.trigger_pulse_us;
+  reader_config.echo_timeout_us = config_.echo_timeout_us;
+  reader_config.echo_idle_timeout_us = config_.echo_idle_timeout_us;
 
-  cfg.sensor_name = "ultrasonic_front";
-  cfg.source = "ultrasonic";
+  reader_config.sensor_name = "ultrasonic_front";
+  reader_config.source = "ultrasonic";
 
-  return cfg;
+  return reader_config;
 }
 
 }  // namespace savo_perception
@@ -233,9 +247,14 @@ int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
 
-  const auto node = std::make_shared<savo_perception::UltrasonicNode>();
-
-  rclcpp::spin(node);
+  try {
+    auto node = std::make_shared<savo_perception::UltrasonicNode>();
+    rclcpp::spin(node);
+  } catch (const std::exception & exc) {
+    RCLCPP_ERROR(rclcpp::get_logger("ultrasonic_node"), "%s", exc.what());
+    rclcpp::shutdown();
+    return 1;
+  }
 
   rclcpp::shutdown();
   return 0;
