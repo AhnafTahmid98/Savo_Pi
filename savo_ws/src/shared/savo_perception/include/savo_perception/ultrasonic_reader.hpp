@@ -25,8 +25,13 @@ struct SAVO_PERCEPTION_PUBLIC UltrasonicConfig
   int queue_len{1};
   std::string pin_factory{"lgpio"};
 
+  // Raspberry Pi 5 usually exposes the 40-pin GPIO header on gpiochip4.
+  // Use -1 for auto-detect.
+  int gpiochip{4};
+
   int trigger_pulse_us{10};
   int echo_timeout_us{30000};
+  int echo_idle_timeout_us{30000};
 
   double speed_of_sound_mps{343.0};
   std::string sensor_name{"ultrasonic_front"};
@@ -72,6 +77,7 @@ public:
 
   [[nodiscard]] const UltrasonicConfig & config() const;
   [[nodiscard]] bool started() const;
+  [[nodiscard]] int gpiochip_number() const;
   [[nodiscard]] std::string last_error() const;
 
   bool start();
@@ -82,6 +88,8 @@ public:
 
 private:
   bool configure_gpio();
+  bool try_configure_gpiochip(int gpiochip);
+  bool wait_for_echo_idle();
   bool trigger_pulse();
 
   [[nodiscard]] std::optional<double> read_echo_distance_m();
@@ -96,6 +104,7 @@ private:
 
   UltrasonicConfig config_{};
   int gpiochip_handle_{-1};
+  int gpiochip_number_{-1};
   bool started_{false};
   std::deque<double> history_;
   std::string last_error_;
