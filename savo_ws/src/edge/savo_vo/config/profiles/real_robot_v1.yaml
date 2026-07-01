@@ -1,0 +1,57 @@
+# Robot Savo real hardware profile.
+# RealSense data is consumed only through ROS topics from savo_realsense.
+
+rgbd_odometry_node:
+  ros__parameters:
+    color_image_topic: "/camera/camera/color/image_raw"
+    color_camera_info_topic: "/camera/camera/color/camera_info"
+
+    depth_image_topic: "/camera/camera/depth/image_rect_raw"
+    depth_camera_info_topic: "/camera/camera/depth/camera_info"
+
+    odom_topic: "/vo/odom/raw"
+    status_topic: "/vo/status"
+    health_topic: "/vo/health"
+    tracking_quality_topic: "/vo/tracking_quality"
+
+    odom_frame: "odom"
+    base_frame: "base_link"
+    camera_frame: "camera_color_optical_frame"
+
+    max_image_delay_s: 0.15
+    max_depth_delay_s: 0.15
+
+    min_features: 80
+    good_features_target: 300
+    max_features: 800
+
+    min_tracking_quality: 0.35
+    max_translation_jump_m: 0.30
+    max_rotation_jump_rad: 0.35
+
+    publish_tf: false
+    publish_diagnostics: true
+
+vo_republisher_node:
+  ros__parameters:
+    odom_raw_topic: "/vo/odom/raw"
+    odom_topic: "/vo/odom"
+
+    odom_frame: "odom"
+    base_frame: "base_link"
+
+vo_health_node:
+  ros__parameters:
+    odom_topic: "/vo/odom"
+    status_topic: "/vo/status"
+    health_topic: "/vo/health"
+
+    stale_timeout_s: 0.50
+
+vo_diagnostics_node:
+  ros__parameters:
+    status_topic: "/vo/status"
+    health_topic: "/vo/health"
+    diagnostics_topic: "/diagnostics"
+
+    diagnostics_rate_hz: 2.0

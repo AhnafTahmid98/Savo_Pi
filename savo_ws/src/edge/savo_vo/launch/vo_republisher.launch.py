@@ -7,7 +7,7 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 
-def _make_health_node(context):
+def _make_republisher_node(context):
     implementation = LaunchConfiguration("implementation").perform(context).strip().lower()
     profile = LaunchConfiguration("profile").perform(context).strip()
     log_level = LaunchConfiguration("log_level").perform(context).strip()
@@ -15,9 +15,9 @@ def _make_health_node(context):
     package_share = Path(get_package_share_directory("savo_vo"))
     profile_file = package_share / "config" / "profiles" / f"{profile}.yaml"
 
-    executable = "vo_health_node"
+    executable = "vo_republisher_node"
     if implementation == "py":
-        executable = "vo_health_node_py"
+        executable = "vo_republisher_node_py"
     elif implementation != "cpp":
         raise RuntimeError(
             f"Unsupported implementation '{implementation}'. Use 'cpp' or 'py'."
@@ -30,7 +30,7 @@ def _make_health_node(context):
         Node(
             package="savo_vo",
             executable=executable,
-            name="vo_health_node",
+            name="vo_republisher_node",
             output="screen",
             parameters=[str(profile_file)],
             arguments=["--ros-args", "--log-level", log_level],
@@ -55,5 +55,5 @@ def generate_launch_description():
             default_value="info",
             description="ROS log level.",
         ),
-        OpaqueFunction(function=_make_health_node),
+        OpaqueFunction(function=_make_republisher_node),
     ])
