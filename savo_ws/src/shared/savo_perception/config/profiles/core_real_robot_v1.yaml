@@ -59,8 +59,10 @@ ultrasonic_node:
     queue_len: 1
     pin_factory: "lgpio"
 
+    gpiochip: 4
     trigger_pulse_us: 10
     echo_timeout_us: 30000
+    echo_idle_timeout_us: 30000
 
     output_topic: "/savo_perception/range/front_ultrasonic_m"
 
@@ -80,8 +82,10 @@ ultrasonic_node_py:
     queue_len: 1
     pin_factory: "lgpio"
 
+    gpiochip: 4
     trigger_pulse_us: 10
     echo_timeout_us: 30000
+    echo_idle_timeout_us: 30000
 
     output_topic: "/savo_perception/range/front_ultrasonic_m"
 
