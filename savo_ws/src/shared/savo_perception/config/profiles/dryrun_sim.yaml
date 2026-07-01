@@ -57,10 +57,12 @@ ultrasonic_node:
 
     rate_hz: 10.0
     queue_len: 1
-    pin_factory: "dryrun"
+    pin_factory: "lgpio"
 
+    gpiochip: 4
     trigger_pulse_us: 10
     echo_timeout_us: 30000
+    echo_idle_timeout_us: 30000
 
     output_topic: "/savo_perception/range/front_ultrasonic_m"
 
@@ -78,10 +80,12 @@ ultrasonic_node_py:
 
     rate_hz: 10.0
     queue_len: 1
-    pin_factory: "dryrun"
+    pin_factory: "lgpio"
 
+    gpiochip: 4
     trigger_pulse_us: 10
     echo_timeout_us: 30000
+    echo_idle_timeout_us: 30000
 
     output_topic: "/savo_perception/range/front_ultrasonic_m"
 
