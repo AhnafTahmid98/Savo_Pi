@@ -7,13 +7,21 @@
 #include <utility>
 #include <vector>
 
-#if __has_include("VL53L1X_api.h")
-  extern "C" {
-    #include "VL53L1X_api.h"
-  }
-  #define SAVO_PERCEPTION_HAS_VL53L1X_ULD 1
+#ifndef SAVO_PERCEPTION_HAVE_VL53L1X_ULD
+#define SAVO_PERCEPTION_HAVE_VL53L1X_ULD 0
+#endif
+
+#if SAVO_PERCEPTION_HAVE_VL53L1X_ULD && __has_include("VL53L1X_api.h")
+extern "C" {
+#include "VL53L1X_api.h"
+
+#if __has_include("VL53L1X_platform.h")
+#include "VL53L1X_platform.h"
+#endif
+}
+#define SAVO_PERCEPTION_HAS_VL53L1X_ULD 1
 #else
-  #define SAVO_PERCEPTION_HAS_VL53L1X_ULD 0
+#define SAVO_PERCEPTION_HAS_VL53L1X_ULD 0
 #endif
 
 namespace savo_perception
@@ -221,6 +229,10 @@ bool Vl53l1xDriver::select_mux_channel()
 bool Vl53l1xDriver::initialize_sensor()
 {
 #if SAVO_PERCEPTION_HAS_VL53L1X_ULD
+#if __has_include("VL53L1X_platform.h")
+  VL53L1X_SetI2CBus(config_.bus);
+#endif
+
   const auto dev = api_address(config_.sensor_address);
 
   auto status = VL53L1X_SensorInit(dev);
