@@ -15,7 +15,19 @@ static int g_i2c_bus = 1;
 
 static uint8_t to_linux_i2c_addr(uint16_t dev)
 {
-  if (dev > 0x7F) {
+  /*
+   * ST VL53L1X ULD normally uses the 8-bit I2C address.
+   * Linux i2c-dev needs the 7-bit address.
+   *
+   * VL53L1X default:
+   *   Linux 7-bit address: 0x29
+   *   ST API 8-bit address: 0x52
+   */
+  if (dev == 0x52U) {
+    return 0x29U;
+  }
+
+  if (dev > 0x7FU) {
     return (uint8_t)(dev >> 1);
   }
 
