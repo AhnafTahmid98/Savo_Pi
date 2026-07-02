@@ -4,6 +4,8 @@
 #include <chrono>
 #include <cmath>
 #include <limits>
+#include <optional>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 
@@ -48,6 +50,28 @@ float distance_to_msg_value(
   }
 
   return 0.0F;
+}
+
+std::string optional_distance_text(const std::optional<double> & value)
+{
+  if (!value.has_value()) {
+    return "none";
+  }
+
+  std::ostringstream stream;
+  stream << *value;
+  return stream.str();
+}
+
+std::string reading_text(const Vl53l1xReading & reading)
+{
+  std::ostringstream stream;
+  stream
+    << "valid=" << (reading.valid ? "true" : "false")
+    << " raw=" << optional_distance_text(reading.raw_m)
+    << " filtered=" << optional_distance_text(reading.filtered_m)
+    << " error='" << reading.error << "'";
+  return stream.str();
 }
 
 }  // namespace
@@ -201,25 +225,52 @@ void Vl53MuxNode::stop_driver()
 
 void Vl53MuxNode::on_timer()
 {
+  publish_distance(left_pub_, std::nullopt);
+  publish_distance(right_pub_, std::nullopt);
+
   if (!driver_ || !driver_->started()) {
-    publish_distance(left_pub_, std::nullopt);
-    publish_distance(right_pub_, std::nullopt);
-    return;
-  }
-
-  const auto reading = driver_->read_once();
-
-  publish_reading(left_pub_, reading.left);
-  publish_reading(right_pub_, reading.right);
-
-  if (!reading.left.valid || !reading.right.valid) {
     RCLCPP_WARN_THROTTLE(
       get_logger(),
       *get_clock(),
       2000,
-      "VL53 read warning: left='%s' right='%s'",
-      reading.left.error.c_str(),
-      reading.right.error.c_str());
+      "VL53 driver not started: %s",
+      driver_error_.c_str());
+    return;
+  }
+
+  Vl53MuxPairReading reading;
+
+  try {
+    reading = driver_->read_once();
+  } catch (const std::exception & exc) {
+    RCLCPP_ERROR_THROTTLE(
+      get_logger(),
+      *get_clock(),
+      2000,
+      "VL53 read exception: %s",
+      exc.what());
+    return;
+  }
+
+  if (reading.left.valid) {
+    publish_reading(left_pub_, reading.left);
+  }
+
+  if (reading.right.valid) {
+    publish_reading(right_pub_, reading.right);
+  }
+
+  if (!reading.left.valid || !reading.right.valid) {
+    const auto left_text = reading_text(reading.left);
+    const auto right_text = reading_text(reading.right);
+
+    RCLCPP_WARN_THROTTLE(
+      get_logger(),
+      *get_clock(),
+      2000,
+      "VL53 read warning: left={%s} right={%s}",
+      left_text.c_str(),
+      right_text.c_str());
   }
 }
 
@@ -271,9 +322,14 @@ int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
 
-  const auto node = std::make_shared<savo_perception::Vl53MuxNode>();
-
-  rclcpp::spin(node);
+  try {
+    const auto node = std::make_shared<savo_perception::Vl53MuxNode>();
+    rclcpp::spin(node);
+  } catch (const std::exception & exc) {
+    RCLCPP_ERROR(rclcpp::get_logger("vl53_mux_node"), "%s", exc.what());
+    rclcpp::shutdown();
+    return 1;
+  }
 
   rclcpp::shutdown();
   return 0;
