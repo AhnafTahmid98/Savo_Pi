@@ -76,16 +76,19 @@ private:
   void load_parameters();
   void setup_interfaces();
 
-  void start_driver();
-  void stop_driver();
-
   void start_worker();
   void request_worker_stop();
 
   static void worker_loop(
     std::shared_ptr<Vl53WorkerState> state,
-    std::shared_ptr<Vl53MuxPairDriver> driver,
     Vl53MuxNodeConfig config);
+
+  static Vl53MuxPairConfig make_driver_config_from_node_config(
+    const Vl53MuxNodeConfig & config);
+
+  static void set_worker_error(
+    const std::shared_ptr<Vl53WorkerState> & state,
+    const std::string & error);
 
   void on_timer();
 
@@ -99,12 +102,8 @@ private:
     const std::optional<double> & distance_m);
 
   [[nodiscard]] bool latest_is_stale(const Vl53LatestState & latest) const;
-  [[nodiscard]] Vl53MuxPairConfig make_driver_config() const;
 
   Vl53MuxNodeConfig config_{};
-
-  std::shared_ptr<Vl53MuxPairDriver> driver_;
-  std::string driver_error_;
 
   rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr left_pub_;
   rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr right_pub_;

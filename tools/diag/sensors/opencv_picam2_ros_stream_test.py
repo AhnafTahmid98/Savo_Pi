@@ -94,11 +94,11 @@ class PiCamPublisher(Node):
             self.timer.cancel()
 
         if self.cap is not None:
-            self.get_logger().info("Releasing Pi Camera...")
+            print("Releasing Pi Camera...", flush=True)
             self.cap.release()
             self.cap = None
 
-        self.get_logger().info("Pi Camera publisher stopped.")
+        print("Pi Camera publisher stopped.", flush=True)
 
     def destroy_node(self) -> None:
         self.close()
@@ -165,7 +165,7 @@ class StreamViewer(Node):
 
         self.closed = True
         cv2.destroyAllWindows()
-        self.get_logger().info("Viewer stopped.")
+        print("Viewer stopped.", flush=True)
 
     def destroy_node(self) -> None:
         self.close()
