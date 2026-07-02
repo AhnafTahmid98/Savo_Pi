@@ -1,0 +1,41 @@
+savo_head:
+  ros__parameters:
+    diagnostics_enabled: true
+    diagnostics_topic: "/diagnostics"
+    status_topic: "/savo_head/status"
+    dashboard_text_topic: "/savo_head/dashboard_text"
+
+    hardware_status_name: "savo_head.hardware"
+    scan_status_name: "savo_head.scan"
+    tf_status_name: "savo_head.tf"
+    camera_status_name: "savo_head.camera"
+    apriltag_status_name: "savo_head.apriltag"
+
+    status_publish_hz: 2.0
+    dashboard_publish_hz: 1.0
+
+    command_stale_timeout_s: 0.50
+    state_stale_timeout_s: 0.50
+    tf_stale_timeout_s: 0.50
+    camera_stream_stale_timeout_s: 2.0
+    apriltag_detection_stale_timeout_s: 1.0
+
+    warn_servo_error_deg: 6.0
+    error_servo_error_deg: 12.0
+
+    warn_i2c_failure_count: 1
+    error_i2c_failure_count: 3
+
+    warn_camera_restart_count: 1
+    error_camera_restart_count: 3
+
+    warn_tf_drop_count: 1
+    error_tf_drop_count: 5
+
+    require_hardware_for_ok: true
+    require_tf_for_ok: true
+    require_camera_for_ok: false
+    require_apriltag_for_ok: false
+
+    dryrun_is_warning: true
+    publish_ok_when_idle: true

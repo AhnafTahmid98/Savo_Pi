@@ -1,0 +1,30 @@
+savo_head:
+  ros__parameters:
+    default_scan_profile: "semantic_scan"
+
+    semantic_scan_enabled: true
+    semantic_scan_mode: "staged"
+
+    semantic_scan_pan_min_deg: 0
+    semantic_scan_pan_center_deg: 72
+    semantic_scan_pan_max_deg: 170
+
+    semantic_scan_tilt_min_deg: 45
+    semantic_scan_tilt_max_deg: 130
+
+    semantic_scan_pan_step_deg: 2
+    semantic_scan_tilt_step_deg: 2
+    semantic_scan_step_delay_s: 0.12
+
+    semantic_scan_start_pan_deg: 0
+    semantic_scan_start_tilt_deg: 45
+
+    semantic_scan_pan_targets_deg: [72, 170, 72, 0]
+    semantic_scan_tilt_sweep_pan_targets_deg: [72]
+
+    semantic_scan_hold_at_pan_target_s: 0.10
+    semantic_scan_hold_after_tilt_sweep_s: 0.15
+
+    semantic_scan_pause_on_manual_command: true
+    semantic_scan_resume_after_manual_s: 0.0
+    semantic_scan_center_on_stop: true

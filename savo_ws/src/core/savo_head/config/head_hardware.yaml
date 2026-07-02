@@ -1,0 +1,40 @@
+savo_head:
+  ros__parameters:
+    hardware_profile: "robot_savo_core_v1"
+
+    backend: "pca9685"
+    i2c_bus: 1
+    pca9685_address: 0x40
+    pwm_frequency_hz: 50.0
+
+    # Robot Savo fixed wiring: Freenove logical 7=pan, 6=tilt.
+    pan_logical_channel: "7"
+    tilt_logical_channel: "6"
+    pan_pca9685_channel: 15
+    tilt_pca9685_channel: 14
+    allow_channel_override: false
+
+    servo_pulse_min_us: 500.0
+    servo_pulse_max_us: 2500.0
+    servo_period_us: 20000.0
+    pca9685_ticks_per_cycle: 4096
+    servo_error_deg: 10
+
+    pan_min_deg: 0
+    pan_center_deg: 72
+    pan_max_deg: 170
+
+    tilt_min_deg: 45
+    tilt_center_deg: 55
+    tilt_max_deg: 130
+
+    manual_step_deg: 2
+
+    control_hz: 30.0
+    status_hz: 2.0
+    tf_hz: 30.0
+    watchdog_timeout_s: 0.50
+
+    center_on_start: true
+    center_on_shutdown: true
+    stop_on_watchdog_timeout: true

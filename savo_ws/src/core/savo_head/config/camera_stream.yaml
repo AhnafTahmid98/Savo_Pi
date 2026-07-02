@@ -1,0 +1,43 @@
+savo_head:
+  ros__parameters:
+    camera_backend: "gstreamer_libcamerasrc"
+
+    stream_enabled_on_start: false
+    require_udp_host: true
+
+    udp_host: ""
+    udp_port: 5000
+
+    width: 640
+    height: 480
+    fps: 30
+    format: "I420"
+    bitrate_kbps: 2000
+
+    # Validated Ubuntu Pi Camera 2 NoIR path.
+    gst_binary: "gst-launch-1.0"
+    gst_verbose: false
+    gst_source: "libcamerasrc"
+    gst_caps_template: "video/x-raw,format={format},width={width},height={height},framerate={fps}/1"
+
+    gst_use_videoconvert: true
+
+    gst_encoder: "x264enc"
+    gst_encoder_tune: "zerolatency"
+    gst_encoder_speed_preset: "superfast"
+    gst_encoder_key_int_max: 60
+
+    gst_payloader: "rtph264pay"
+    gst_payloader_config_interval: 1
+    gst_payloader_pt: 96
+
+    gst_sink: "udpsink"
+    gst_sink_sync: false
+    gst_sink_async: false
+
+    receiver_caps: "application/x-rtp, media=video, encoding-name=H264, payload=96"
+    receiver_pipeline_hint: "udpsrc port={port} caps=\"application/x-rtp, media=video, encoding-name=H264, payload=96\" ! rtph264depay ! h264parse ! avdec_h264 ! videoconvert ! autovideosink sync=false"
+
+    process_start_timeout_s: 1.0
+    process_stop_timeout_s: 3.0
+    restart_on_failure: false

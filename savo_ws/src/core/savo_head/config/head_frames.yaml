@@ -1,0 +1,38 @@
+savo_head:
+  ros__parameters:
+    publish_tf: true
+    publish_joint_state: true
+    tf_rate_hz: 30.0
+
+    base_frame: "base_link"
+    pan_frame: "pantilt_pan_link"
+    tilt_frame: "pantilt_tilt_link"
+    camera_frame: "pi_camera_link"
+    camera_optical_frame: "pi_camera_optical_frame"
+
+    pan_joint_name: "head_pan_joint"
+    tilt_joint_name: "head_tilt_joint"
+
+    pan_axis: "z"
+    tilt_axis: "y"
+
+    pan_sign: 1.0
+    tilt_sign: 1.0
+
+    pan_zero_deg: 72.0
+    tilt_zero_deg: 55.0
+
+    base_to_pan_xyz_m: [0.0, 0.0, 0.0]
+    base_to_pan_rpy_rad: [0.0, 0.0, 0.0]
+
+    pan_to_tilt_xyz_m: [0.0, 0.0, 0.0]
+    pan_to_tilt_rpy_rad: [0.0, 0.0, 0.0]
+
+    tilt_to_camera_xyz_m: [0.0, 0.0, 0.0]
+    tilt_to_camera_rpy_rad: [0.0, 0.0, 0.0]
+
+    camera_to_optical_xyz_m: [0.0, 0.0, 0.0]
+    camera_to_optical_rpy_rad: [-1.57079632679, 0.0, -1.57079632679]
+
+    require_valid_pan_tilt_state: true
+    stale_state_timeout_s: 0.50

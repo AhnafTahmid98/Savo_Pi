@@ -1,0 +1,43 @@
+savo_head:
+  ros__parameters:
+    apriltag_enabled: true
+    apriltag_family: "tag36h11"
+
+    apriltag_detections_topic: "/savo_head/apriltag_detections"
+    semantic_confirmations_topic: "/savo_head/semantic_confirmations"
+
+    camera_optical_frame: "pi_camera_optical_frame"
+    robot_base_frame: "base_link"
+    map_frame: "map"
+
+    confirmation_source: "savo_head_apriltag"
+    default_confirmation_type: "known_location"
+
+    allow_unknown_tags: false
+    registered_tag_ids_csv: ""
+
+    min_stable_frames: 5
+    min_detection_confidence: 0.70
+    max_detection_distance_m: 3.0
+    max_detection_age_s: 0.50
+
+    require_tf_available: true
+    tf_timeout_s: 0.25
+
+    require_robot_stationary: true
+    max_robot_linear_speed_mps: 0.03
+    max_robot_angular_speed_radps: 0.05
+
+    require_localization_ok: true
+    max_pose_covariance_xy: 0.25
+    max_yaw_covariance: 0.20
+
+    require_lidar_map_pose: true
+    require_semantic_label: true
+    save_as_summon_point_by_default: false
+
+    duplicate_confirm_distance_m: 0.40
+    duplicate_confirm_yaw_rad: 0.35
+    cooldown_after_confirmation_s: 3.0
+
+    tag_param_prefix: "tag_"
