@@ -1,0 +1,60 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>savo_head</name>
+  <version>0.1.0</version>
+
+  <description>
+    Robot Savo active head package for Pi Camera 2 NoIR pan-tilt control,
+    GStreamer/libcamerasrc camera streaming, dynamic head TF, AprilTag semantic
+    confirmation, and human-facing visual scan behavior.
+
+    Production runtime is C++ by default. Python is kept for fallback,
+    diagnostics, manual tools, and hardware validation.
+  </description>
+
+  <maintainer email="tahmidahnaf998@gmail.com">Ahnaf Tahmid</maintainer>
+  <license>Proprietary</license>
+
+  <!-- Hybrid package: C++ production nodes + Python fallback/tools -->
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_cmake_python</buildtool_depend>
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <!-- Core ROS 2 runtime -->
+  <depend>rclcpp</depend>
+  <depend>rclpy</depend>
+
+  <!-- Standard message types used by head state, camera, TF, diagnostics, and commands -->
+  <depend>std_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>diagnostic_msgs</depend>
+  <depend>std_srvs</depend>
+  <depend>tf2_ros</depend>
+
+  <!-- Launch support -->
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+
+  <!-- Python runtime helpers -->
+  <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+  <exec_depend>python3-smbus</exec_depend>
+
+  <!-- Camera diagnostic path: validated Pi Camera 2 NoIR backend on Ubuntu -->
+  <exec_depend>gstreamer1.0-tools</exec_depend>
+
+  <!-- Tests / lint -->
+  <test_depend>ament_cmake_pytest</test_depend>
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>ament_xmllint</test_depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
