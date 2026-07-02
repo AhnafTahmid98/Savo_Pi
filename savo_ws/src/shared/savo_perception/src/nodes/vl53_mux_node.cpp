@@ -360,7 +360,7 @@ void Vl53MuxNode::publish_latest()
     publish_distance(left_pub_, std::nullopt);
     publish_distance(right_pub_, std::nullopt);
 
-    RCLCPP_WARN_THROTTLE(
+    RCLCPP_DEBUG_THROTTLE(
       get_logger(),
       *get_clock(),
       2000,
@@ -384,19 +384,36 @@ void Vl53MuxNode::publish_latest()
   publish_reading(left_pub_, latest.left);
   publish_reading(right_pub_, latest.right);
 
-  if (!latest.left.valid || !latest.right.valid) {
-    const auto left_text = reading_text(latest.left);
-    const auto right_text = reading_text(latest.right);
+  const bool left_valid = latest.left.valid;
+  const bool right_valid = latest.right.valid;
 
+  if (left_valid && right_valid) {
+    return;
+  }
+
+  const auto left_text = reading_text(latest.left);
+  const auto right_text = reading_text(latest.right);
+
+  if (!left_valid && !right_valid) {
     RCLCPP_WARN_THROTTLE(
       get_logger(),
       *get_clock(),
       2000,
-      "VL53 read warning: left={%s} right={%s} driver_error='%s'",
+      "VL53 both sensors invalid: left={%s} right={%s} driver_error='%s'",
       left_text.c_str(),
       right_text.c_str(),
       latest.driver_error.c_str());
+    return;
   }
+
+  RCLCPP_DEBUG_THROTTLE(
+    get_logger(),
+    *get_clock(),
+    5000,
+    "VL53 single sensor invalid: left={%s} right={%s} driver_error='%s'",
+    left_text.c_str(),
+    right_text.c_str(),
+    latest.driver_error.c_str());
 }
 
 void Vl53MuxNode::publish_reading(
