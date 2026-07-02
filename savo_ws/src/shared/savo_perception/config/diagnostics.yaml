@@ -11,8 +11,8 @@ diagnostics:
     bus: 1
     tca_addr: 0x70
     vl53_addr: 0x29
-    right_channel: 2
-    left_channel: 3
+    right_channel: 3
+    left_channel: 2
     rate_hz: 10.0
     median_window: 5
     threshold_m: 0.20

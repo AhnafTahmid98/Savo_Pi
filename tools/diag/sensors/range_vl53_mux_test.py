@@ -19,8 +19,8 @@ TCA_ADDR = 0x70
 VL53_ADDR = 0x29
 
 # Current detected Robot Savo mux mapping.
-RIGHT_CH = 2
-LEFT_CH = 3
+RIGHT_CH = 3
+LEFT_CH = 2
 
 
 @dataclass
