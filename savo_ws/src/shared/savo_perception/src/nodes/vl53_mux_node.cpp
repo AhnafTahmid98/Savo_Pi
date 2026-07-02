@@ -7,7 +7,6 @@
 #include <limits>
 #include <optional>
 #include <sstream>
-#include <stdexcept>
 #include <string>
 #include <thread>
 
@@ -16,7 +15,7 @@ namespace savo_perception
 namespace
 {
 
-double safe_rate_hz(const double value, const double fallback)
+double safe_positive_double(const double value, const double fallback)
 {
   if (!std::isfinite(value) || value <= 0.0) {
     return fallback;
@@ -84,7 +83,6 @@ Vl53MuxNode::Vl53MuxNode(const rclcpp::NodeOptions & options)
   declare_parameters();
   load_parameters();
   setup_interfaces();
-  start_driver();
   start_worker();
 }
 
@@ -94,8 +92,6 @@ Vl53MuxNode::~Vl53MuxNode()
 
   if (worker_thread_.joinable()) {
     worker_thread_.detach();
-  } else {
-    stop_driver();
   }
 }
 
@@ -137,7 +133,7 @@ void Vl53MuxNode::load_parameters()
   config_.right_channel = static_cast<int>(get_parameter("right_channel").as_int());
   config_.left_channel = static_cast<int>(get_parameter("left_channel").as_int());
 
-  config_.rate_hz = safe_rate_hz(
+  config_.rate_hz = safe_positive_double(
     get_parameter("rate_hz").as_double(),
     constants::kVl53RateHzDefault);
 
@@ -160,7 +156,7 @@ void Vl53MuxNode::load_parameters()
   config_.publish_nan_on_error = get_parameter("publish_nan_on_error").as_bool();
   config_.startup_fail_is_fatal = get_parameter("startup_fail_is_fatal").as_bool();
 
-  config_.stale_timeout_s = safe_rate_hz(
+  config_.stale_timeout_s = safe_positive_double(
     get_parameter("stale_timeout_s").as_double(),
     0.50);
 
@@ -204,63 +200,22 @@ void Vl53MuxNode::setup_interfaces()
     });
 }
 
-void Vl53MuxNode::start_driver()
-{
-  driver_ = std::make_shared<Vl53MuxPairDriver>(make_driver_config());
-
-  if (driver_->start()) {
-    driver_error_.clear();
-
-    RCLCPP_INFO(
-      get_logger(),
-      "VL53 mux started: bus=%d tca=0x%02X vl53=0x%02X right_ch=%d left_ch=%d rate=%.2fHz",
-      config_.bus,
-      static_cast<int>(config_.tca_addr),
-      static_cast<int>(config_.vl53_addr),
-      config_.right_channel,
-      config_.left_channel,
-      config_.rate_hz);
-
-    return;
-  }
-
-  driver_error_ = driver_->last_error();
-
-  RCLCPP_ERROR(
-    get_logger(),
-    "VL53 mux driver failed to start: %s",
-    driver_error_.c_str());
-
-  if (config_.startup_fail_is_fatal) {
-    throw std::runtime_error("VL53 mux driver startup failed: " + driver_error_);
-  }
-}
-
-void Vl53MuxNode::stop_driver()
-{
-  if (driver_) {
-    driver_->stop();
-  }
-}
-
 void Vl53MuxNode::start_worker()
 {
-  if (!driver_ || !driver_->started()) {
-    RCLCPP_WARN(
-      get_logger(),
-      "VL53 worker not started because driver is not ready: %s",
-      driver_error_.c_str());
-    return;
-  }
-
   worker_state_ = std::make_shared<Vl53WorkerState>();
   worker_state_->stop_requested.store(false);
 
   worker_thread_ = std::thread(
     &Vl53MuxNode::worker_loop,
     worker_state_,
-    driver_,
     config_);
+
+  RCLCPP_INFO(
+    get_logger(),
+    "VL53 ROS publishers started: left=%s right=%s rate=%.2fHz",
+    config_.left_topic.c_str(),
+    config_.right_topic.c_str(),
+    config_.rate_hz);
 
   RCLCPP_INFO(get_logger(), "VL53 worker thread started");
 }
@@ -274,13 +229,27 @@ void Vl53MuxNode::request_worker_stop()
 
 void Vl53MuxNode::worker_loop(
   std::shared_ptr<Vl53WorkerState> state,
-  std::shared_ptr<Vl53MuxPairDriver> driver,
   Vl53MuxNodeConfig config)
 {
-  const auto period = std::chrono::duration<double>(
-    1.0 / safe_rate_hz(config.rate_hz, constants::kVl53RateHzDefault));
+  auto driver = std::make_unique<Vl53MuxPairDriver>(
+    make_driver_config_from_node_config(config));
 
-  while (state && driver && !state->stop_requested.load()) {
+  if (!driver->start()) {
+    set_worker_error(state, "driver_start_failed:" + driver->last_error());
+    return;
+  }
+
+  {
+    std::lock_guard<std::mutex> lock(state->mutex);
+    state->latest.driver_error.clear();
+    state->latest.has_update = false;
+    state->latest.stamp = std::chrono::steady_clock::now();
+  }
+
+  const auto period = std::chrono::duration<double>(
+    1.0 / safe_positive_double(config.rate_hz, constants::kVl53RateHzDefault));
+
+  while (state && !state->stop_requested.load()) {
     const auto loop_start = std::chrono::steady_clock::now();
 
     Vl53MuxPairReading reading;
@@ -318,9 +287,54 @@ void Vl53MuxNode::worker_loop(
     }
   }
 
-  if (driver) {
-    driver->stop();
+  driver->stop();
+}
+
+Vl53MuxPairConfig Vl53MuxNode::make_driver_config_from_node_config(
+  const Vl53MuxNodeConfig & config)
+{
+  Vl53MuxPairConfig cfg;
+
+  cfg.bus = config.bus;
+  cfg.tca_address = config.tca_addr;
+  cfg.sensor_address = config.vl53_addr;
+
+  cfg.right_channel = config.right_channel;
+  cfg.left_channel = config.left_channel;
+
+  cfg.settle_s = config.settle_s;
+  cfg.init_settle_s = config.init_settle_s;
+
+  cfg.valid_min_m = config.valid_min_m;
+  cfg.valid_max_m = config.valid_max_m;
+
+  cfg.median_window = config.median_window;
+
+  return cfg;
+}
+
+void Vl53MuxNode::set_worker_error(
+  const std::shared_ptr<Vl53WorkerState> & state,
+  const std::string & error)
+{
+  if (!state) {
+    return;
   }
+
+  Vl53l1xReading left;
+  left.sensor_name = "tof_left";
+  left.error = error;
+
+  Vl53l1xReading right;
+  right.sensor_name = "tof_right";
+  right.error = error;
+
+  std::lock_guard<std::mutex> lock(state->mutex);
+  state->latest.left = left;
+  state->latest.right = right;
+  state->latest.stamp = std::chrono::steady_clock::now();
+  state->latest.driver_error = error;
+  state->latest.has_update = true;
 }
 
 void Vl53MuxNode::on_timer()
@@ -414,28 +428,6 @@ bool Vl53MuxNode::latest_is_stale(const Vl53LatestState & latest) const
 {
   const auto age = std::chrono::steady_clock::now() - latest.stamp;
   return age > std::chrono::duration<double>(config_.stale_timeout_s);
-}
-
-Vl53MuxPairConfig Vl53MuxNode::make_driver_config() const
-{
-  Vl53MuxPairConfig cfg;
-
-  cfg.bus = config_.bus;
-  cfg.tca_address = config_.tca_addr;
-  cfg.sensor_address = config_.vl53_addr;
-
-  cfg.right_channel = config_.right_channel;
-  cfg.left_channel = config_.left_channel;
-
-  cfg.settle_s = config_.settle_s;
-  cfg.init_settle_s = config_.init_settle_s;
-
-  cfg.valid_min_m = config_.valid_min_m;
-  cfg.valid_max_m = config_.valid_max_m;
-
-  cfg.median_window = config_.median_window;
-
-  return cfg;
 }
 
 }  // namespace savo_perception

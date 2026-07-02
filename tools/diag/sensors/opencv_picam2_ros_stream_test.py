@@ -213,8 +213,9 @@ def main() -> int:
         pass
 
     except Exception as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
-        return 1
+        if not STOP_REQUESTED:
+            print(f"ERROR: {type(exc).__name__}: {exc}", file=sys.stderr)
+            return 1
 
     finally:
         if node is not None:
