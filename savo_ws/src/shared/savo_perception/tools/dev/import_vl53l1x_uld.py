@@ -7,13 +7,23 @@ import shutil
 from pathlib import Path
 
 
-REQUIRED_FILES = {
+COPY_FILES = {
     "VL53L1X_api.h": "third_party/vl53l1x_uld/include/VL53L1X_api.h",
     "VL53L1X_calibration.h": "third_party/vl53l1x_uld/include/VL53L1X_calibration.h",
-    "VL53L1X_types.h": "third_party/vl53l1x_uld/include/VL53L1X_types.h",
-    "VL53L1X_api.c": "third_party/vl53l1x_uld/src/VL53L1X_api.c",
-    "VL53L1X_calibration.c": "third_party/vl53l1x_uld/src/VL53L1X_calibration.c",
+    "vl53l1_types.h": "third_party/vl53l1x_uld/include/vl53l1_types.h",
+    "vl53l1_error_codes.h": "third_party/vl53l1x_uld/include/vl53l1_error_codes.h",
+    "VL53L1X_api.cpp": "third_party/vl53l1x_uld/src/VL53L1X_api.cpp",
+    "VL53L1X_calibration.cpp": "third_party/vl53l1x_uld/src/VL53L1X_calibration.cpp",
 }
+
+
+COMPAT_TYPES_HEADER = """#ifndef SAVO_PERCEPTION_THIRD_PARTY_VL53L1X_ULD_INCLUDE_VL53L1X_TYPES_H_
+#define SAVO_PERCEPTION_THIRD_PARTY_VL53L1X_ULD_INCLUDE_VL53L1X_TYPES_H_
+
+#include "vl53l1_types.h"
+
+#endif  // SAVO_PERCEPTION_THIRD_PARTY_VL53L1X_ULD_INCLUDE_VL53L1X_TYPES_H_
+"""
 
 
 def find_file(source_root: Path, filename: str) -> Path | None:
@@ -25,12 +35,12 @@ def find_file(source_root: Path, filename: str) -> Path | None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Import ST VL53L1X ULD core files into savo_perception."
+        description="Import VL53L1X ULD core files into savo_perception."
     )
     parser.add_argument(
         "--source",
         required=True,
-        help="Path to extracted STSW-IMG009 / VL53L1X ULD source folder.",
+        help="Path to extracted/cloned VL53L1X ULD source folder.",
     )
     parser.add_argument(
         "--package-root",
@@ -51,7 +61,7 @@ def main() -> int:
     missing: list[str] = []
     copied: list[tuple[Path, Path]] = []
 
-    for filename, relative_dest in REQUIRED_FILES.items():
+    for filename, relative_dest in COPY_FILES.items():
         source_file = find_file(source_root, filename)
         if source_file is None:
             missing.append(filename)
@@ -62,9 +72,15 @@ def main() -> int:
         shutil.copy2(source_file, dest_file)
         copied.append((source_file, dest_file))
 
+    compat_header = package_root / "third_party/vl53l1x_uld/include/VL53L1X_types.h"
+    compat_header.parent.mkdir(parents=True, exist_ok=True)
+    compat_header.write_text(COMPAT_TYPES_HEADER, encoding="utf-8")
+
     print("Copied files:")
     for source_file, dest_file in copied:
         print(f"  {source_file} -> {dest_file}")
+
+    print(f"  generated -> {compat_header}")
 
     if missing:
         print()
