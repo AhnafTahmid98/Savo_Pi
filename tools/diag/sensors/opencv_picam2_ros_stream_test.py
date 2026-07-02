@@ -1,13 +1,25 @@
 #!/usr/bin/env python3
 
 import argparse
+import signal
+import sys
 import time
+from typing import Optional
 
 import cv2
 import rclpy
 from cv_bridge import CvBridge
 from rclpy.node import Node
 from sensor_msgs.msg import Image
+
+
+STOP_REQUESTED = False
+
+
+def handle_signal(signum, frame) -> None:
+    global STOP_REQUESTED
+    STOP_REQUESTED = True
+    print("\nShutdown requested. Closing camera stream...", flush=True)
 
 
 def build_picam_pipeline(width: int, height: int, fps: int) -> str:
@@ -28,6 +40,8 @@ class PiCamPublisher(Node):
         self.height = height
         self.fps = fps
         self.bridge = CvBridge()
+        self.cap: Optional[cv2.VideoCapture] = None
+        self.closed = False
 
         self.publisher = self.create_publisher(Image, "/savo_head/picam/image_raw", 10)
 
@@ -46,6 +60,9 @@ class PiCamPublisher(Node):
         self.timer = self.create_timer(timer_period, self.publish_frame)
 
     def publish_frame(self) -> None:
+        if self.closed or self.cap is None:
+            return
+
         ok, frame = self.cap.read()
 
         if not ok or frame is None:
@@ -67,9 +84,24 @@ class PiCamPublisher(Node):
             self.frame_count = 0
             self.last_log_time = now
 
-    def destroy_node(self) -> None:
-        if hasattr(self, "cap"):
+    def close(self) -> None:
+        if self.closed:
+            return
+
+        self.closed = True
+
+        if hasattr(self, "timer"):
+            self.timer.cancel()
+
+        if self.cap is not None:
+            self.get_logger().info("Releasing Pi Camera...")
             self.cap.release()
+            self.cap = None
+
+        self.get_logger().info("Pi Camera publisher stopped.")
+
+    def destroy_node(self) -> None:
+        self.close()
         super().destroy_node()
 
 
@@ -80,6 +112,7 @@ class StreamViewer(Node):
         self.bridge = CvBridge()
         self.fullscreen = fullscreen
         self.window_name = "Robot Savo Pi Camera 2 NoIR"
+        self.closed = False
 
         cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
 
@@ -103,14 +136,18 @@ class StreamViewer(Node):
         self.get_logger().info("Waiting for /savo_head/picam/image_raw")
 
     def image_callback(self, msg: Image) -> None:
+        global STOP_REQUESTED
+
+        if self.closed:
+            return
+
         frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
 
         cv2.imshow(self.window_name, frame)
         key = cv2.waitKey(1)
 
         if key == ord("q") or key == 27:
-            self.get_logger().info("Viewer closed by user")
-            rclpy.shutdown()
+            STOP_REQUESTED = True
             return
 
         self.frame_count += 1
@@ -122,18 +159,36 @@ class StreamViewer(Node):
             self.frame_count = 0
             self.last_log_time = now
 
-    def destroy_node(self) -> None:
+    def close(self) -> None:
+        if self.closed:
+            return
+
+        self.closed = True
         cv2.destroyAllWindows()
+        self.get_logger().info("Viewer stopped.")
+
+    def destroy_node(self) -> None:
+        self.close()
         super().destroy_node()
 
 
+def spin_until_stopped(node: Node) -> None:
+    global STOP_REQUESTED
+
+    while rclpy.ok() and not STOP_REQUESTED:
+        rclpy.spin_once(node, timeout_sec=0.1)
+
+
 def main() -> int:
+    signal.signal(signal.SIGINT, handle_signal)
+    signal.signal(signal.SIGTERM, handle_signal)
+
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--mode",
         choices=["publish", "view"],
         required=True,
-        help="publish on savo-core, view on savo-edge",
+        help="publish on savo-core, view on GUI desktop",
     )
     parser.add_argument("--width", type=int, default=640)
     parser.add_argument("--height", type=int, default=480)
@@ -142,9 +197,9 @@ def main() -> int:
 
     args = parser.parse_args()
 
-    rclpy.init()
+    rclpy.init(args=None)
 
-    node = None
+    node: Optional[Node] = None
 
     try:
         if args.mode == "publish":
@@ -152,10 +207,14 @@ def main() -> int:
         else:
             node = StreamViewer(args.fullscreen)
 
-        rclpy.spin(node)
+        spin_until_stopped(node)
 
     except KeyboardInterrupt:
         pass
+
+    except Exception as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
 
     finally:
         if node is not None:
@@ -163,6 +222,9 @@ def main() -> int:
 
         if rclpy.ok():
             rclpy.shutdown()
+
+        cv2.destroyAllWindows()
+        print("Shutdown complete.", flush=True)
 
     return 0
 
