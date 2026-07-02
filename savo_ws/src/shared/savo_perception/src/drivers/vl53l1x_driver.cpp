@@ -3,6 +3,11 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdint>
+#include <deque>
+#include <memory>
+#include <optional>
+#include <string>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -11,17 +16,9 @@
 #define SAVO_PERCEPTION_HAVE_VL53L1X_ULD 0
 #endif
 
-#if SAVO_PERCEPTION_HAVE_VL53L1X_ULD && __has_include("VL53L1X_api.h")
-extern "C" {
+#if SAVO_PERCEPTION_HAVE_VL53L1X_ULD
 #include "VL53L1X_api.h"
-
-#if __has_include("VL53L1X_platform.h")
 #include "VL53L1X_platform.h"
-#endif
-}
-#define SAVO_PERCEPTION_HAS_VL53L1X_ULD 1
-#else
-#define SAVO_PERCEPTION_HAS_VL53L1X_ULD 0
 #endif
 
 namespace savo_perception
@@ -29,32 +26,33 @@ namespace savo_perception
 namespace
 {
 
-#if SAVO_PERCEPTION_HAS_VL53L1X_ULD
 std::uint16_t api_address(const std::uint8_t address_7bit)
 {
-  return static_cast<std::uint16_t>(address_7bit << 1U);
+  return static_cast<std::uint16_t>(address_7bit << 1);
 }
-#endif
 
-void sleep_seconds(const double seconds)
+std::optional<double> median_from_history(const std::deque<double> & history)
 {
-  if (seconds <= 0.0) {
-    return;
+  if (history.empty()) {
+    return std::nullopt;
   }
 
-  std::this_thread::sleep_for(std::chrono::duration<double>(seconds));
+  std::vector<double> values(history.begin(), history.end());
+  std::sort(values.begin(), values.end());
+
+  return values[values.size() / 2];
 }
 
 }  // namespace
 
 bool valid_vl53_median_window(const int median_window)
 {
-  return median_window >= 1 && (median_window % 2) == 1;
+  return median_window > 0 && median_window <= 25;
 }
 
 bool valid_vl53_distance_mm(const int distance_mm)
 {
-  return distance_mm > 0 && distance_mm < 4000;
+  return distance_mm > 0 && distance_mm < 8000;
 }
 
 std::optional<double> vl53_mm_to_m(
@@ -68,7 +66,7 @@ std::optional<double> vl53_mm_to_m(
 
   const auto distance_m = static_cast<double>(distance_mm) / 1000.0;
 
-  if (!is_valid_distance(distance_m, valid_min_m, valid_max_m)) {
+  if (!std::isfinite(distance_m) || distance_m < valid_min_m || distance_m > valid_max_m) {
     return std::nullopt;
   }
 
@@ -127,21 +125,16 @@ bool Vl53l1xDriver::start()
     return true;
   }
 
-  if (!mux_) {
-    set_error("mux_not_set");
-    return false;
-  }
-
-  if (!mux_->open()) {
-    set_error("mux_open_failed:" + mux_->last_error());
-    return false;
-  }
-
+#if SAVO_PERCEPTION_HAVE_VL53L1X_ULD
   if (!select_mux_channel()) {
     return false;
   }
 
-  sleep_seconds(config_.init_settle_s);
+  VL53L1X_SetI2CBus(config_.bus);
+
+  if (config_.init_settle_s > 0.0) {
+    std::this_thread::sleep_for(std::chrono::duration<double>(config_.init_settle_s));
+  }
 
   if (!initialize_sensor()) {
     return false;
@@ -154,13 +147,20 @@ bool Vl53l1xDriver::start()
   started_ = true;
   last_error_.clear();
   return true;
+#else
+  set_error("vl53l1x_uld_header_not_available");
+  return false;
+#endif
 }
 
 void Vl53l1xDriver::stop()
 {
+#if SAVO_PERCEPTION_HAVE_VL53L1X_ULD
   if (started_) {
-    stop_ranging();
+    (void)select_mux_channel();
+    (void)stop_ranging();
   }
+#endif
 
   started_ = false;
 }
@@ -176,23 +176,16 @@ Vl53l1xReading Vl53l1xDriver::read_once()
     return reading;
   }
 
-  if (!select_mux_channel()) {
-    reading.error = last_error_;
-    return reading;
-  }
+  const auto distance_m = read_distance_m();
+  reading.raw_m = distance_m;
 
-  sleep_seconds(config_.settle_s);
-
-  const auto raw_m = read_distance_m();
-  reading.raw_m = raw_m;
-
-  if (!raw_m.has_value()) {
+  if (!distance_m.has_value()) {
     reading.error = last_error_.empty() ? "read_failed" : last_error_;
     return reading;
   }
 
-  if (!append_valid_reading(*raw_m)) {
-    reading.error = last_error_;
+  if (!append_valid_reading(*distance_m)) {
+    reading.error = last_error_.empty() ? "distance_out_of_valid_range" : last_error_;
     return reading;
   }
 
@@ -200,7 +193,7 @@ Vl53l1xReading Vl53l1xDriver::read_once()
   reading.valid = reading.filtered_m.has_value();
 
   if (!reading.valid) {
-    reading.error = "filter_failed";
+    reading.error = "median_filter_empty";
   }
 
   return reading;
@@ -214,7 +207,12 @@ RangeSample Vl53l1xDriver::read_sample()
 bool Vl53l1xDriver::select_mux_channel()
 {
   if (!mux_) {
-    set_error("mux_not_set");
+    set_error("mux_not_configured");
+    return false;
+  }
+
+  if (!mux_->is_open() && !mux_->open()) {
+    set_error("mux_open_failed:" + mux_->last_error());
     return false;
   }
 
@@ -223,43 +221,24 @@ bool Vl53l1xDriver::select_mux_channel()
     return false;
   }
 
+  if (config_.settle_s > 0.0) {
+    std::this_thread::sleep_for(std::chrono::duration<double>(config_.settle_s));
+  }
+
   return true;
 }
 
 bool Vl53l1xDriver::initialize_sensor()
 {
-#if SAVO_PERCEPTION_HAS_VL53L1X_ULD
-#if __has_include("VL53L1X_platform.h")
-  VL53L1X_SetI2CBus(config_.bus);
-#endif
-
+#if SAVO_PERCEPTION_HAVE_VL53L1X_ULD
   const auto dev = api_address(config_.sensor_address);
 
-  auto status = VL53L1X_SensorInit(dev);
+  const auto status = VL53L1X_SensorInit(dev);
   if (status != 0) {
-    set_error("sensor_init_failed");
+    set_error("sensor_init_failed:" + std::to_string(static_cast<int>(status)));
     return false;
   }
 
-  status = VL53L1X_SetDistanceMode(dev, 1);
-  if (status != 0) {
-    set_error("set_distance_mode_failed");
-    return false;
-  }
-
-  status = VL53L1X_SetTimingBudgetInMs(dev, 50);
-  if (status != 0) {
-    set_error("set_timing_budget_failed");
-    return false;
-  }
-
-  status = VL53L1X_SetInterMeasurementInMs(dev, 70);
-  if (status != 0) {
-    set_error("set_inter_measurement_failed");
-    return false;
-  }
-
-  last_error_.clear();
   return true;
 #else
   set_error("vl53l1x_uld_header_not_available");
@@ -269,16 +248,15 @@ bool Vl53l1xDriver::initialize_sensor()
 
 bool Vl53l1xDriver::start_ranging()
 {
-#if SAVO_PERCEPTION_HAS_VL53L1X_ULD
+#if SAVO_PERCEPTION_HAVE_VL53L1X_ULD
   const auto dev = api_address(config_.sensor_address);
   const auto status = VL53L1X_StartRanging(dev);
 
   if (status != 0) {
-    set_error("start_ranging_failed");
+    set_error("start_ranging_failed:" + std::to_string(static_cast<int>(status)));
     return false;
   }
 
-  last_error_.clear();
   return true;
 #else
   set_error("vl53l1x_uld_header_not_available");
@@ -288,16 +266,15 @@ bool Vl53l1xDriver::start_ranging()
 
 bool Vl53l1xDriver::stop_ranging()
 {
-#if SAVO_PERCEPTION_HAS_VL53L1X_ULD
+#if SAVO_PERCEPTION_HAVE_VL53L1X_ULD
   const auto dev = api_address(config_.sensor_address);
   const auto status = VL53L1X_StopRanging(dev);
 
   if (status != 0) {
-    set_error("stop_ranging_failed");
+    set_error("stop_ranging_failed:" + std::to_string(static_cast<int>(status)));
     return false;
   }
 
-  last_error_.clear();
   return true;
 #else
   return true;
@@ -306,46 +283,49 @@ bool Vl53l1xDriver::stop_ranging()
 
 std::optional<int> Vl53l1xDriver::read_distance_mm()
 {
-#if SAVO_PERCEPTION_HAS_VL53L1X_ULD
+#if SAVO_PERCEPTION_HAVE_VL53L1X_ULD
+  if (!select_mux_channel()) {
+    return std::nullopt;
+  }
+
   const auto dev = api_address(config_.sensor_address);
 
-  std::uint8_t ready = 0;
+  std::uint8_t data_ready = 0;
+  bool ready = false;
 
-  for (int attempt = 0; attempt < 10; ++attempt) {
-    const auto status = VL53L1X_CheckForDataReady(dev, &ready);
-
-    if (status != 0) {
-      set_error("check_data_ready_failed");
+  for (int attempt = 0; attempt < 30; ++attempt) {
+    const auto ready_status = VL53L1X_CheckForDataReady(dev, &data_ready);
+    if (ready_status != 0) {
+      set_error("data_ready_check_failed:" + std::to_string(static_cast<int>(ready_status)));
       return std::nullopt;
     }
 
-    if (ready != 0) {
+    if (data_ready != 0U) {
+      ready = true;
       break;
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(2));
   }
 
-  if (ready == 0) {
+  if (!ready) {
     set_error("data_not_ready");
     return std::nullopt;
   }
 
   std::uint16_t distance_mm = 0;
   const auto distance_status = VL53L1X_GetDistance(dev, &distance_mm);
-
   if (distance_status != 0) {
-    set_error("get_distance_failed");
+    set_error("get_distance_failed:" + std::to_string(static_cast<int>(distance_status)));
     return std::nullopt;
   }
 
   const auto clear_status = VL53L1X_ClearInterrupt(dev);
   if (clear_status != 0) {
-    set_error("clear_interrupt_failed");
+    set_error("clear_interrupt_failed:" + std::to_string(static_cast<int>(clear_status)));
     return std::nullopt;
   }
 
-  last_error_.clear();
   return static_cast<int>(distance_mm);
 #else
   set_error("vl53l1x_uld_header_not_available");
@@ -376,19 +356,15 @@ std::optional<double> Vl53l1xDriver::read_distance_m()
 
 std::optional<double> Vl53l1xDriver::median_distance_m() const
 {
-  if (history_.empty()) {
-    return std::nullopt;
-  }
-
-  std::vector<double> sorted(history_.begin(), history_.end());
-  std::sort(sorted.begin(), sorted.end());
-
-  return sorted[sorted.size() / 2];
+  return median_from_history(history_);
 }
 
 bool Vl53l1xDriver::append_valid_reading(const double distance_m)
 {
-  if (!is_valid_distance(distance_m, config_.valid_min_m, config_.valid_max_m)) {
+  if (!std::isfinite(distance_m) ||
+    distance_m < config_.valid_min_m ||
+    distance_m > config_.valid_max_m)
+  {
     set_error("distance_out_of_valid_range");
     return false;
   }
@@ -420,7 +396,7 @@ void Vl53l1xDriver::move_from(Vl53l1xDriver && other) noexcept
 }
 
 Vl53MuxPairDriver::Vl53MuxPairDriver(Vl53MuxPairConfig config)
-: config_(config)
+: config_(std::move(config))
 {
 }
 
@@ -465,20 +441,11 @@ bool Vl53MuxPairDriver::start()
     return true;
   }
 
-  if (!valid_tca_channel(config_.right_channel)) {
-    set_error("invalid_right_channel");
-    return false;
-  }
-
-  if (!valid_tca_channel(config_.left_channel)) {
-    set_error("invalid_left_channel");
-    return false;
-  }
-
   mux_ = std::make_shared<Tca9548a>(
     Tca9548aConfig{
       config_.bus,
-      config_.tca_address});
+      config_.tca_address,
+    });
 
   if (!mux_->open()) {
     set_error("mux_open_failed:" + mux_->last_error());
@@ -532,9 +499,13 @@ void Vl53MuxPairDriver::stop()
   }
 
   if (mux_) {
-    mux_->disable_all();
+    (void)mux_->disable_all();
     mux_->close();
   }
+
+  left_.reset();
+  right_.reset();
+  mux_.reset();
 
   started_ = false;
 }
@@ -545,10 +516,8 @@ Vl53MuxPairReading Vl53MuxPairDriver::read_once()
 
   if (!started_ || !left_ || !right_) {
     reading.left.sensor_name = "tof_left";
-    reading.right.sensor_name = "tof_right";
-    reading.left.mux_channel = config_.left_channel;
-    reading.right.mux_channel = config_.right_channel;
     reading.left.error = "not_started";
+    reading.right.sensor_name = "tof_right";
     reading.right.error = "not_started";
     return reading;
   }
@@ -556,10 +525,8 @@ Vl53MuxPairReading Vl53MuxPairDriver::read_once()
   reading.right = right_->read_once();
   reading.left = left_->read_once();
 
-  if (!reading.right.valid && !reading.right.error.empty()) {
-    set_error("right_read_failed:" + reading.right.error);
-  } else if (!reading.left.valid && !reading.left.error.empty()) {
-    set_error("left_read_failed:" + reading.left.error);
+  if (!reading.right.valid && !reading.left.valid) {
+    set_error("both_tof_reads_failed:" + reading.right.error + "," + reading.left.error);
   } else {
     last_error_.clear();
   }
@@ -571,11 +538,10 @@ Vl53MuxPairSamples Vl53MuxPairDriver::read_samples()
 {
   const auto reading = read_once();
 
-  Vl53MuxPairSamples samples;
-  samples.left = reading.left.to_sample();
-  samples.right = reading.right.to_sample();
-
-  return samples;
+  return Vl53MuxPairSamples{
+    reading.left.to_sample(),
+    reading.right.to_sample(),
+  };
 }
 
 void Vl53MuxPairDriver::set_error(std::string error)
@@ -585,7 +551,7 @@ void Vl53MuxPairDriver::set_error(std::string error)
 
 void Vl53MuxPairDriver::move_from(Vl53MuxPairDriver && other) noexcept
 {
-  config_ = other.config_;
+  config_ = std::move(other.config_);
   mux_ = std::move(other.mux_);
   left_ = std::move(other.left_);
   right_ = std::move(other.right_);
