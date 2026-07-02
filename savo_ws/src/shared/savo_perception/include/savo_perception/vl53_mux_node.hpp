@@ -7,6 +7,7 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <thread>
 
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/float32.hpp"
@@ -57,6 +58,13 @@ struct SAVO_PERCEPTION_PUBLIC Vl53LatestState
   bool has_update{false};
 };
 
+struct SAVO_PERCEPTION_PUBLIC Vl53WorkerState
+{
+  std::atomic_bool stop_requested{false};
+  std::mutex mutex;
+  Vl53LatestState latest;
+};
+
 class SAVO_PERCEPTION_PUBLIC Vl53MuxNode : public rclcpp::Node
 {
 public:
@@ -73,7 +81,11 @@ private:
 
   void start_worker();
   void request_worker_stop();
-  void worker_loop();
+
+  static void worker_loop(
+    std::shared_ptr<Vl53WorkerState> state,
+    std::shared_ptr<Vl53MuxPairDriver> driver,
+    Vl53MuxNodeConfig config);
 
   void on_timer();
 
@@ -99,11 +111,8 @@ private:
 
   rclcpp::TimerBase::SharedPtr timer_;
 
-  std::atomic_bool worker_stop_requested_{false};
-  std::atomic_bool worker_running_{false};
-
-  mutable std::mutex latest_mutex_;
-  Vl53LatestState latest_;
+  std::shared_ptr<Vl53WorkerState> worker_state_;
+  std::thread worker_thread_;
 };
 
 }  // namespace savo_perception
