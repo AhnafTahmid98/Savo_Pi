@@ -231,12 +231,38 @@ VL53L1X_ERROR VL53L1X_SensorInit(uint16_t dev)
 		status = VL53L1_WrByte(dev, Addr, VL51L1X_DEFAULT_CONFIGURATION[Addr - 0x2D]);
 	}
 	status = VL53L1X_StartRanging(dev);
-	tmp  = 0;
-	while(tmp==0){
-			status = VL53L1X_CheckForDataReady(dev, &tmp);
+	if (status != 0) {
+		return status;
 	}
+
+	tmp = 0;
+	for (uint16_t attempt = 0; attempt < 250 && tmp == 0; ++attempt) {
+		status = VL53L1X_CheckForDataReady(dev, &tmp);
+		if (status != 0) {
+			(void)VL53L1X_StopRanging(dev);
+			return status;
+		}
+
+		if (tmp == 0) {
+			(void)VL53L1_WaitMs(dev, 2);
+		}
+	}
+
+	if (tmp == 0) {
+		(void)VL53L1X_StopRanging(dev);
+		return VL53L1_ERROR_TIME_OUT;
+	}
+
 	status = VL53L1X_ClearInterrupt(dev);
+	if (status != 0) {
+		(void)VL53L1X_StopRanging(dev);
+		return status;
+	}
+
 	status = VL53L1X_StopRanging(dev);
+	if (status != 0) {
+		return status;
+	}
 	status = VL53L1_WrByte(dev, VL53L1_VHV_CONFIG__TIMEOUT_MACROP_LOOP_BOUND, 0x09); /* two bounds VHV */
 	status = VL53L1_WrByte(dev, 0x0B, 0); /* start VHV from the previous temperature */
 	return status;
