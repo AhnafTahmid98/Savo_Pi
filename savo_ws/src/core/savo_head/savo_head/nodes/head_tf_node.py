@@ -8,6 +8,7 @@ import math
 from typing import Optional
 
 import rclpy
+from rclpy.executors import ExternalShutdownException
 from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus, KeyValue
 from geometry_msgs.msg import TransformStamped
 from rclpy.node import Node
@@ -368,11 +369,12 @@ def main(args: Optional[list[str]] = None) -> int:
 
     try:
         rclpy.spin(node)
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
     return 0
 
