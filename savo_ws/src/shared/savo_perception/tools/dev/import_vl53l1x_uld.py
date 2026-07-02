@@ -25,6 +25,14 @@ COMPAT_TYPES_HEADER = """#ifndef SAVO_PERCEPTION_THIRD_PARTY_VL53L1X_ULD_INCLUDE
 #endif  // SAVO_PERCEPTION_THIRD_PARTY_VL53L1X_ULD_INCLUDE_VL53L1X_TYPES_H_
 """
 
+PLATFORM_TYPES_HEADER = """#ifndef SAVO_PERCEPTION_THIRD_PARTY_VL53L1X_ULD_PLATFORM_VL53L1_TYPES_H_
+#define SAVO_PERCEPTION_THIRD_PARTY_VL53L1X_ULD_PLATFORM_VL53L1_TYPES_H_
+
+#include "../include/vl53l1_types.h"
+
+#endif  // SAVO_PERCEPTION_THIRD_PARTY_VL53L1X_ULD_PLATFORM_VL53L1_TYPES_H_
+"""
+
 
 def find_file(source_root: Path, filename: str) -> Path | None:
     matches = sorted(source_root.rglob(filename))
@@ -76,11 +84,16 @@ def main() -> int:
     compat_header.parent.mkdir(parents=True, exist_ok=True)
     compat_header.write_text(COMPAT_TYPES_HEADER, encoding="utf-8")
 
+    platform_types_header = package_root / "third_party/vl53l1x_uld/platform/vl53l1_types.h"
+    platform_types_header.parent.mkdir(parents=True, exist_ok=True)
+    platform_types_header.write_text(PLATFORM_TYPES_HEADER, encoding="utf-8")
+
     print("Copied files:")
     for source_file, dest_file in copied:
         print(f"  {source_file} -> {dest_file}")
 
     print(f"  generated -> {compat_header}")
+    print(f"  generated -> {platform_types_header}")
 
     if missing:
         print()
