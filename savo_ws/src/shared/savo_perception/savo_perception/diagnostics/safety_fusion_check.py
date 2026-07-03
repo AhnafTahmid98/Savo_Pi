@@ -70,7 +70,7 @@ def default_scenarios() -> list[Scenario]:
         ),
         Scenario(
             name="front_slow_depth",
-            depth_front_m=0.060,
+            depth_front_m=0.60,
             tof_left_m=0.90,
             tof_right_m=0.90,
             ultrasonic_front_m=0.80,
@@ -79,7 +79,7 @@ def default_scenarios() -> list[Scenario]:
         ),
         Scenario(
             name="front_stop_depth",
-            depth_front_m=0.030,
+            depth_front_m=0.30,
             tof_left_m=0.90,
             tof_right_m=0.90,
             ultrasonic_front_m=0.80,
@@ -91,14 +91,14 @@ def default_scenarios() -> list[Scenario]:
             depth_front_m=1.00,
             tof_left_m=0.90,
             tof_right_m=0.90,
-            ultrasonic_front_m=0.030,
+            ultrasonic_front_m=0.30,
             expected_stop=True,
             expected_status="SAFETY_STOP",
         ),
         Scenario(
             name="side_stop_left_tof",
             depth_front_m=1.00,
-            tof_left_m=0.030,
+            tof_left_m=0.10,
             tof_right_m=0.90,
             ultrasonic_front_m=0.90,
             expected_stop=True,
@@ -180,10 +180,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
         description="Offline diagnostic for savo_perception safety fusion"
     )
 
-    parser.add_argument("--front-stop", type=float, default=0.035)
-    parser.add_argument("--front-slow", type=float, default=0.080)
-    parser.add_argument("--side-stop", type=float, default=0.035)
-    parser.add_argument("--side-slow", type=float, default=0.080)
+    parser.add_argument("--front-stop", type=float, default=0.35)
+    parser.add_argument("--front-slow", type=float, default=0.80)
+    parser.add_argument("--side-stop", type=float, default=0.12)
+    parser.add_argument("--side-slow", type=float, default=0.25)
     parser.add_argument("--stale-timeout", type=float, default=0.30)
 
     parser.add_argument("--stop-debounce", type=int, default=1)
