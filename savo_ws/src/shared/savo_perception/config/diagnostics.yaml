@@ -31,9 +31,9 @@ diagnostics:
     threshold_m: 0.28
 
   safety_fusion_check:
-    front_stop_m: 0.35
+    front_stop_m: 0.25
     front_slow_m: 0.80
-    side_stop_m: 0.12
+    side_stop_m: 0.08
     side_slow_m: 0.25
     stale_timeout_s: 0.30
     stop_debounce_count: 1

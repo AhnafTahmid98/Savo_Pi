@@ -96,7 +96,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--valid-max", type=float, default=ULTRASONIC_MAX_DISTANCE_M_DEFAULT)
     parser.add_argument("--rate", type=float, default=5.0)
     parser.add_argument("--samples", type=int, default=40, help="0 = run until Ctrl+C")
-    parser.add_argument("--threshold", type=float, default=0.35)
+    parser.add_argument("--threshold", type=float, default=0.25)
     parser.add_argument("--csv", type=str, default=None)
 
     return parser

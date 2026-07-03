@@ -51,15 +51,15 @@ SCENARIOS = {
     ),
     "front_stop": InjectScenario(
         name="front_stop",
-        depth_front_m=0.30,
+        depth_front_m=0.20,
         tof_left_m=0.90,
         tof_right_m=0.90,
-        ultrasonic_front_m=0.30,
+        ultrasonic_front_m=0.20,
     ),
     "side_stop_left": InjectScenario(
         name="side_stop_left",
         depth_front_m=1.00,
-        tof_left_m=0.10,
+        tof_left_m=0.06,
         tof_right_m=0.90,
         ultrasonic_front_m=0.90,
     ),
@@ -67,7 +67,7 @@ SCENARIOS = {
         name="side_stop_right",
         depth_front_m=1.00,
         tof_left_m=0.90,
-        tof_right_m=0.10,
+        tof_right_m=0.06,
         ultrasonic_front_m=0.90,
     ),
     "missing_required": InjectScenario(

@@ -15,10 +15,10 @@ namespace savo_perception
 
 struct SAVO_PERCEPTION_PUBLIC RangeFusionConfig
 {
-  double front_stop_m{0.35};
+  double front_stop_m{0.25};
   double front_slow_m{0.80};
 
-  double side_stop_m{0.12};
+  double side_stop_m{0.08};
   double side_slow_m{0.25};
 
   double stale_timeout_s{0.30};

@@ -181,9 +181,9 @@ Important:
 ---
 
 ## 6) Notes / engineering rules (Robot Savo)
-- **Front stop threshold** target: 0.35 m (Depth + Ultrasonic safety).
+- **Front stop threshold** target: 0.25 m / 25 cm (Depth + Ultrasonic safety).
 - **Front slowdown threshold** target: 0.80 m.
-- **Side stop threshold** target: 0.12 m (ToF side protection).
+- **Side stop threshold** target: 0.08 m / 8 cm (both left and right ToF).
 - **Side slowdown threshold** target: 0.25 m.
 - If STOP triggers: robot halts immediately; higher-level logic (Nav2 recoveries in `savo_nav`) may later reverse + re-plan.
 - C++ safety gate is used for determinism and reduced jitter (prevents “late stop” collisions).
