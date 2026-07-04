@@ -1,45 +1,36 @@
 savo_head:
   ros__parameters:
-    namespace: "/savo_head"
-
-    pan_tilt_cmd_topic: "/savo_head/pan_tilt_cmd"
-    pan_tilt_state_topic: "/savo_head/pan_tilt_state"
-
-    scan_cmd_topic: "/savo_head/scan_cmd"
-    scan_state_topic: "/savo_head/scan_state"
-
-    status_topic: "/savo_head/status"
-    dashboard_text_topic: "/savo_head/dashboard_text"
-    diagnostics_topic: "/diagnostics"
-
-    camera_stream_cmd_topic: "/savo_head/camera_stream_cmd"
-    camera_stream_state_topic: "/savo_head/camera_stream_state"
-    camera_status_topic: "/savo_head/camera_status"
-
-    image_raw_topic: "/savo_head/image_raw"
-    camera_info_topic: "/savo_head/camera_info"
-
-    apriltag_detections_topic: "/savo_head/apriltag_detections"
-    semantic_confirmations_topic: "/savo_head/semantic_confirmations"
-
-    emergency_center_topic: "/savo_head/emergency_center"
-    health_check_service: "/savo_head/health_check"
-    center_service: "/savo_head/center"
-    set_scan_mode_service: "/savo_head/set_scan_mode"
-
-    pan_tilt_cmd_type: "geometry_msgs/msg/Vector3"
-    pan_tilt_state_type: "sensor_msgs/msg/JointState"
-    scan_cmd_type: "std_msgs/msg/String"
-    scan_state_type: "std_msgs/msg/String"
-    status_type: "diagnostic_msgs/msg/DiagnosticArray"
-    dashboard_text_type: "std_msgs/msg/String"
-
+    namespace: /savo_head
+    pan_tilt_cmd_topic: /savo_head/pan_tilt_cmd
+    pan_tilt_state_topic: /savo_head/pan_tilt_state
+    scan_cmd_topic: /savo_head/scan_cmd
+    scan_state_topic: /savo_head/scan_state
+    status_topic: /savo_head/status
+    dashboard_text_topic: /savo_head/dashboard_text
+    diagnostics_topic: /diagnostics
+    camera_stream_cmd_topic: /savo_head/camera_stream_cmd
+    camera_stream_state_topic: /savo_head/camera_stream_state
+    camera_status_topic: /savo_head/camera_status
+    image_raw_topic: /savo_head/image_raw
+    camera_info_topic: /savo_head/camera_info
+    apriltag_detections_topic: /savo_head/apriltag_detections
+    semantic_confirmations_topic: /savo_head/semantic_confirmations
+    emergency_center_topic: /savo_head/emergency_center
+    health_check_service: /savo_head/health_check
+    center_service: /savo_head/center
+    set_scan_mode_service: /savo_head/set_scan_mode
+    pan_tilt_cmd_type: geometry_msgs/msg/Vector3
+    pan_tilt_state_type: sensor_msgs/msg/JointState
+    scan_cmd_type: std_msgs/msg/String
+    scan_state_type: std_msgs/msg/String
+    status_type: diagnostic_msgs/msg/DiagnosticArray
+    dashboard_text_type: std_msgs/msg/String
     command_qos_depth: 10
     state_qos_depth: 10
     sensor_qos_depth: 10
     status_qos_depth: 10
-
-    command_reliability: "reliable"
-    state_reliability: "reliable"
-    sensor_reliability: "best_effort"
-    status_reliability: "reliable"
+    command_reliability: reliable
+    state_reliability: reliable
+    sensor_reliability: best_effort
+    status_reliability: reliable
+robot_pose_snapshot: /savo_head/robot_pose_snapshot

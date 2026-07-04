@@ -506,3 +506,22 @@ __all__ = [
     "get_parameter_names",
     "is_known_parameter",
 ]
+
+# AprilTag semantic confirmation policy additions.
+# These config keys are used by config/apriltag_semantics.yaml.
+REQUIRE_ROBOT_POSE: Final[str] = "require_robot_pose"
+PUBLISH_REJECTIONS: Final[str] = "publish_rejections"
+
+_ADDITIONAL_APRILTAG_PARAMETERS = frozenset(
+    {
+        REQUIRE_ROBOT_POSE,
+        PUBLISH_REJECTIONS,
+    }
+)
+
+_ORIGINAL_IS_KNOWN_PARAMETER = is_known_parameter
+
+
+def is_known_parameter(name: str) -> bool:
+    return _ORIGINAL_IS_KNOWN_PARAMETER(name) or name in _ADDITIONAL_APRILTAG_PARAMETERS
+

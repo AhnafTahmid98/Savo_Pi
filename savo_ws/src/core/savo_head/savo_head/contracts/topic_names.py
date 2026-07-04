@@ -144,3 +144,7 @@ __all__ = [
     "get_topic_names",
     "is_savo_head_topic",
 ]
+
+# Robot pose evidence used by AprilTag semantic confirmation.
+ROBOT_POSE_SNAPSHOT_TOPIC = "/savo_head/robot_pose_snapshot"
+
