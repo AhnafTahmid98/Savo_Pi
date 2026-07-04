@@ -191,7 +191,7 @@ diagnostic_msgs::msg::KeyValue kv(const std::string & key, int value)
 
 diagnostic_msgs::msg::KeyValue kv(const std::string & key, bool value)
 {
-  return kv(key, value ? "true" : "false");
+  return kv(key, std::string(value ? "true" : "false"));
 }
 
 std::uint8_t ros_level(DiagnosticLevel level)
@@ -281,7 +281,7 @@ std::string json_array(const std::vector<int> & values)
 
 std::optional<std::string> json_string_value(const std::string & text, const std::string & key)
 {
-  const std::regex pattern("\"" + key + R"("\s*:\s*"([^"]*)")");
+  const std::regex pattern("\\\"" + key + "\\\"\\s*:\\s*\\\"([^\\\"]*)\\\"");
   std::smatch match;
 
   if (std::regex_search(text, match, pattern) && match.size() >= 2U) {
@@ -293,45 +293,57 @@ std::optional<std::string> json_string_value(const std::string & text, const std
 
 std::optional<double> json_number_value(const std::string & text, const std::string & key)
 {
-  const std::regex pattern("\"" + key + R"("\s*:\s*(-?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?))");
+  const std::regex pattern(
+    "\\\"" + key + "\\\"\\s*:\\s*(-?[0-9]+(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)");
   std::smatch match;
 
-  if (std::regex_search(text, match, pattern) && match.size() >= 2U) {
-    return std::stod(match[1].str());
+  if (!std::regex_search(text, match, pattern) || match.size() < 2U) {
+    return std::nullopt;
   }
 
-  return std::nullopt;
+  try {
+    return std::stod(match[1].str());
+  } catch (const std::exception &) {
+    return std::nullopt;
+  }
 }
 
 std::optional<bool> json_bool_value(const std::string & text, const std::string & key)
 {
-  const std::regex pattern("\"" + key + R"("\s*:\s*(true|false))");
+  const std::regex pattern("\\\"" + key + "\\\"\\s*:\\s*(true|false|1|0)");
   std::smatch match;
 
-  if (std::regex_search(text, match, pattern) && match.size() >= 2U) {
-    return match[1].str() == "true";
+  if (!std::regex_search(text, match, pattern) || match.size() < 2U) {
+    return std::nullopt;
   }
 
-  return std::nullopt;
+  const auto value = match[1].str();
+  return value == "true" || value == "1";
 }
 
 std::optional<Vec3> json_vec3_value(const std::string & text, const std::string & key)
 {
   const std::regex pattern(
-    "\"" + key +
-    R"("\s*:\s*\[\s*(-?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)\s*,\s*(-?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)\s*,\s*(-?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)\s*\])");
-
+    "\\\"" + key +
+    "\\\"\\s*:\\s*\\[\\s*"
+    "(-?[0-9]+(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)\\s*,\\s*"
+    "(-?[0-9]+(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)\\s*,\\s*"
+    "(-?[0-9]+(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)\\s*\\]");
   std::smatch match;
 
-  if (std::regex_search(text, match, pattern) && match.size() >= 4U) {
+  if (!std::regex_search(text, match, pattern) || match.size() < 4U) {
+    return std::nullopt;
+  }
+
+  try {
     return Vec3{
       std::stod(match[1].str()),
       std::stod(match[2].str()),
       std::stod(match[3].str())
     };
+  } catch (const std::exception &) {
+    return std::nullopt;
   }
-
-  return std::nullopt;
 }
 
 std::string join_csv(const std::vector<std::string> & values)

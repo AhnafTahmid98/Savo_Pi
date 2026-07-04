@@ -52,7 +52,7 @@ diagnostic_msgs::msg::KeyValue kv(const std::string & key, int value)
 
 diagnostic_msgs::msg::KeyValue kv(const std::string & key, bool value)
 {
-  return kv(key, value ? "true" : "false");
+  return kv(key, std::string(value ? "true" : "false"));
 }
 
 std::uint8_t ros_level(DiagnosticLevel level)

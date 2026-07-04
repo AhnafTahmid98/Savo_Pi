@@ -71,11 +71,6 @@ diagnostic_msgs::msg::KeyValue kv(const std::string & key, const std::string & v
   return item;
 }
 
-diagnostic_msgs::msg::KeyValue kv(const std::string & key, int value)
-{
-  return kv(key, std::to_string(value));
-}
-
 diagnostic_msgs::msg::KeyValue kv(const std::string & key, double value)
 {
   return kv(key, std::to_string(value));
@@ -83,7 +78,7 @@ diagnostic_msgs::msg::KeyValue kv(const std::string & key, double value)
 
 diagnostic_msgs::msg::KeyValue kv(const std::string & key, bool value)
 {
-  return kv(key, value ? "true" : "false");
+  return kv(key, std::string(value ? "true" : "false"));
 }
 
 std::uint8_t ros_level(DiagnosticLevel level)

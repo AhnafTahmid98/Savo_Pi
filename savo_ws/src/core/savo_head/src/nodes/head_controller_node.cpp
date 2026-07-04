@@ -24,6 +24,12 @@ namespace savo_head
 namespace
 {
 
+bool close_mode(double value, double target)
+{
+  return std::isfinite(value) && std::abs(value - target) < 1e-6;
+}
+
+
 constexpr double kCmdAbsolute = 0.0;
 constexpr double kCmdDelta = 1.0;
 constexpr double kCmdCenter = 2.0;
@@ -45,7 +51,7 @@ diagnostic_msgs::msg::KeyValue kv(const std::string & key, int value)
 
 diagnostic_msgs::msg::KeyValue kv(const std::string & key, bool value)
 {
-  return kv(key, value ? "true" : "false");
+  return kv(key, std::string(value ? "true" : "false"));
 }
 
 std::uint8_t ros_level(DiagnosticLevel level)
@@ -312,7 +318,7 @@ private:
 
   PanTiltCommand vector_to_command(const geometry_msgs::msg::Vector3 & msg, double stamp_s) const
   {
-    if (std::isclose(msg.z, kCmdDelta)) {
+    if (close_mode(msg.z, kCmdDelta)) {
       return delta_command(
         static_cast<int>(std::llround(msg.x)),
         static_cast<int>(std::llround(msg.y)),
@@ -321,15 +327,15 @@ private:
         "vector_delta");
     }
 
-    if (std::isclose(msg.z, kCmdCenter)) {
+    if (close_mode(msg.z, kCmdCenter)) {
       return center_command(stamp_s, CommandSource::kTopic, "vector_center");
     }
 
-    if (std::isclose(msg.z, kCmdHold)) {
+    if (close_mode(msg.z, kCmdHold)) {
       return hold_command(stamp_s, CommandSource::kTopic, "vector_hold");
     }
 
-    if (std::isclose(msg.z, kCmdStop)) {
+    if (close_mode(msg.z, kCmdStop)) {
       return stop_command(stamp_s, CommandSource::kTopic, "vector_stop");
     }
 

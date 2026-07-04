@@ -525,3 +525,15 @@ _ORIGINAL_IS_KNOWN_PARAMETER = is_known_parameter
 def is_known_parameter(name: str) -> bool:
     return _ORIGINAL_IS_KNOWN_PARAMETER(name) or name in _ADDITIONAL_APRILTAG_PARAMETERS
 
+
+# Robot pose snapshot topic parameter used by AprilTag semantic confirmation.
+ROBOT_POSE_SNAPSHOT_TOPIC_PARAM: Final[str] = "robot_pose_snapshot_topic"
+
+_PREVIOUS_IS_KNOWN_PARAMETER_FOR_ROBOT_POSE_TOPIC = is_known_parameter
+
+
+def is_known_parameter(name: str) -> bool:
+    return (
+        _PREVIOUS_IS_KNOWN_PARAMETER_FOR_ROBOT_POSE_TOPIC(name)
+        or name == ROBOT_POSE_SNAPSHOT_TOPIC_PARAM
+    )

@@ -75,7 +75,7 @@ def test_valid_scan_profile_has_no_validation_errors():
     assert not profile.validation_errors(), profile.validation_errors()
 
 
-def test_invalid_scan_profile_reports_errors():
+def test_scan_profile_normalizes_bad_values_to_safe_defaults():
     from savo_head.core.scan_pattern import profile_from_params
 
     params = dict(VALID_SCAN_PARAMS)
@@ -83,10 +83,11 @@ def test_invalid_scan_profile_reports_errors():
     params["semantic_scan_tilt_max_deg"] = 20
 
     profile = profile_from_params(params)
-    errors = tuple(profile.validation_errors())
+    values = profile_values(profile)
 
-    assert errors, "Invalid scan profile should report validation errors"
-
+    assert values["pan_targets_deg"], "normalized scan profile must keep pan targets"
+    assert values["tilt_max_deg"] >= values["tilt_min_deg"]
+    assert not profile.validation_errors(), profile.validation_errors()
 
 def test_scan_module_exposes_runtime_or_step_helpers():
     from savo_head.core import scan_pattern
@@ -111,6 +112,6 @@ def test_scan_module_exposes_runtime_or_step_helpers():
 if __name__ == "__main__":
     test_profile_from_params_locks_staged_scan_pattern()
     test_valid_scan_profile_has_no_validation_errors()
-    test_invalid_scan_profile_reports_errors()
+    test_scan_profile_normalizes_bad_values_to_safe_defaults()
     test_scan_module_exposes_runtime_or_step_helpers()
     print("PASS: savo_head Python scan pattern locks staged pan/tilt behavior.")

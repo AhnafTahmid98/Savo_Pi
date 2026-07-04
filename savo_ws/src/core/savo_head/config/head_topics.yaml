@@ -33,4 +33,5 @@ savo_head:
     state_reliability: reliable
     sensor_reliability: best_effort
     status_reliability: reliable
+    robot_pose_snapshot_topic: /savo_head/robot_pose_snapshot
 robot_pose_snapshot: /savo_head/robot_pose_snapshot

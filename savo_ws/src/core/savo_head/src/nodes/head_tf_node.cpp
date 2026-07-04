@@ -43,7 +43,7 @@ diagnostic_msgs::msg::KeyValue kv(const std::string & key, const std::string & v
 
 diagnostic_msgs::msg::KeyValue kv(const std::string & key, bool value)
 {
-  return kv(key, value ? "true" : "false");
+  return kv(key, std::string(value ? "true" : "false"));
 }
 
 diagnostic_msgs::msg::KeyValue kv(const std::string & key, double value)
