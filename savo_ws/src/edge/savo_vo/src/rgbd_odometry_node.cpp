@@ -523,9 +523,25 @@ TrackingQuality RGBDOdometryNode::estimate_visual_motion(
   const double cos_yaw = std::cos(yaw_rad_);
   const double sin_yaw = std::sin(yaw_rad_);
 
-  pose_x_m_ += cos_yaw * delta_x_m - sin_yaw * delta_y_m;
-  pose_y_m_ += sin_yaw * delta_x_m + cos_yaw * delta_y_m;
-  yaw_rad_ = normalize_angle(yaw_rad_ + delta_yaw_rad);
+  const double raw_world_dx_m = cos_yaw * delta_x_m - sin_yaw * delta_y_m;
+  const double raw_world_dy_m = sin_yaw * delta_x_m + cos_yaw * delta_y_m;
+  const double raw_dyaw_rad = delta_yaw_rad;
+
+  constexpr double kVibrationTranslationDeadbandM = 0.003;
+  constexpr double kVibrationYawDeadbandRad = 0.003;
+
+  const double raw_translation_m = std::hypot(raw_world_dx_m, raw_world_dy_m);
+  const bool suppress_vibration_motion =
+    raw_translation_m < kVibrationTranslationDeadbandM &&
+    std::abs(raw_dyaw_rad) < kVibrationYawDeadbandRad;
+
+  const double filtered_world_dx_m = suppress_vibration_motion ? 0.0 : raw_world_dx_m;
+  const double filtered_world_dy_m = suppress_vibration_motion ? 0.0 : raw_world_dy_m;
+  const double filtered_dyaw_rad = suppress_vibration_motion ? 0.0 : raw_dyaw_rad;
+
+  pose_x_m_ += filtered_world_dx_m;
+  pose_y_m_ += filtered_world_dy_m;
+  yaw_rad_ = normalize_angle(yaw_rad_ + filtered_dyaw_rad);
 
   const double vx = delta_x_m / dt_s;
   const double vy = delta_y_m / dt_s;
