@@ -6,6 +6,7 @@
 #include <string>
 
 #include "geometry_msgs/msg/twist.hpp"
+#include "rclcpp/qos.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/float32.hpp"
@@ -106,7 +107,7 @@ public:
 
     left_range_sub_ = create_subscription<std_msgs::msg::Float32>(
       left_range_topic_,
-      10,
+      rclcpp::SensorDataQoS(),
       [this](const std_msgs::msg::Float32::SharedPtr msg) {
         if (std::isfinite(static_cast<double>(msg->data))) {
           left_range_m_ = static_cast<double>(msg->data);
@@ -117,7 +118,7 @@ public:
 
     right_range_sub_ = create_subscription<std_msgs::msg::Float32>(
       right_range_topic_,
-      10,
+      rclcpp::SensorDataQoS(),
       [this](const std_msgs::msg::Float32::SharedPtr msg) {
         if (std::isfinite(static_cast<double>(msg->data))) {
           right_range_m_ = static_cast<double>(msg->data);
