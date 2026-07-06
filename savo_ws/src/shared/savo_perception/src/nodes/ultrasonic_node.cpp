@@ -34,6 +34,11 @@ int positive_int_or_default(const int value, const int fallback)
   return value;
 }
 
+bool clear_no_echo_error(const std::string & error)
+{
+  return error == "no_echo" || error == "echo_start_timeout";
+}
+
 }  // namespace
 
 UltrasonicNode::UltrasonicNode(const rclcpp::NodeOptions & options)
@@ -185,6 +190,11 @@ void UltrasonicNode::on_timer()
 void UltrasonicNode::publish_reading(const UltrasonicReading & reading)
 {
   if (!reading.valid) {
+    if (clear_no_echo_error(reading.error)) {
+      publish_distance(std::numeric_limits<double>::infinity());
+      return;
+    }
+
     if (!reading.error.empty()) {
       RCLCPP_WARN_THROTTLE(
         this->get_logger(),
@@ -207,8 +217,13 @@ void UltrasonicNode::publish_distance(const std::optional<double> & distance_m)
 {
   std_msgs::msg::Float32 msg;
 
-  if (distance_m.has_value() && std::isfinite(*distance_m)) {
-    msg.data = static_cast<float>(*distance_m);
+  if (distance_m.has_value()) {
+    const double value = *distance_m;
+    if (std::isfinite(value) || value == std::numeric_limits<double>::infinity()) {
+      msg.data = static_cast<float>(value);
+    } else {
+      msg.data = std::numeric_limits<float>::quiet_NaN();
+    }
   } else {
     msg.data = std::numeric_limits<float>::quiet_NaN();
   }
