@@ -1,5 +1,41 @@
 recovery_manager_node:
   ros__parameters:
+    # Direction-aware real robot recovery.
+    enabled: true
+    auto_start_on_stuck: true
+    auto_start_on_safety_stop: true
+    manual_request_starts_recovery: true
+    safety_stop_blocks_recovery: false
+    publish_zero_when_inactive: true
+
+    dynamic_action_enabled: true
+    prefer_larger_free_side: true
+    side_block_m: 0.12
+    side_clear_m: 0.20
+    range_timeout_s: 0.60
+
+    default_action: "BACKUP_THEN_LEFT"
+    backup_vx: -0.16
+    rotate_wz: 0.55
+    backup_duration_s: 0.45
+    rotate_duration_s: 0.70
+    stop_hold_s: 0.10
+    max_recovery_duration_s: 4.0
+
+    max_vx: 0.20
+    max_vy: 0.18
+    max_wz: 0.60
+
+    stop_before_motion: true
+    stop_after_motion: true
+    allow_rotate_left: true
+    allow_rotate_right: true
+
+    left_range_topic: "/savo_perception/range/left_m"
+    right_range_topic: "/savo_perception/range/right_m"
+    safety_stop_topic: "/safety/stop"
+    cmd_vel_recovery_topic: "/cmd_vel_recovery"
+
     topics:
       stuck_detected: "/savo_control/stuck_detected"
       recovery_request: "/savo_control/recovery_request"

@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <memory>
@@ -7,6 +8,7 @@
 #include "geometry_msgs/msg/twist.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/bool.hpp"
+#include "std_msgs/msg/float32.hpp"
 #include "std_msgs/msg/string.hpp"
 
 #include "savo_control/recovery_manager.hpp"
@@ -102,6 +104,28 @@ public:
         safety_stop_stamp_s_ = now_seconds(*this);
       });
 
+    left_range_sub_ = create_subscription<std_msgs::msg::Float32>(
+      left_range_topic_,
+      10,
+      [this](const std_msgs::msg::Float32::SharedPtr msg) {
+        if (std::isfinite(static_cast<double>(msg->data))) {
+          left_range_m_ = static_cast<double>(msg->data);
+          left_range_seen_ = true;
+          left_range_stamp_s_ = now_seconds(*this);
+        }
+      });
+
+    right_range_sub_ = create_subscription<std_msgs::msg::Float32>(
+      right_range_topic_,
+      10,
+      [this](const std_msgs::msg::Float32::SharedPtr msg) {
+        if (std::isfinite(static_cast<double>(msg->data))) {
+          right_range_m_ = static_cast<double>(msg->data);
+          right_range_seen_ = true;
+          right_range_stamp_s_ = now_seconds(*this);
+        }
+      });
+
     timer_ = create_wall_timer(
       std::chrono::duration<double>(1.0 / publish_hz_),
       [this]() {
@@ -125,9 +149,16 @@ private:
 
     declare_parameter<bool>("enabled", true);
     declare_parameter<bool>("auto_start_on_stuck", true);
+    declare_parameter<bool>("auto_start_on_safety_stop", true);
     declare_parameter<bool>("manual_request_starts_recovery", true);
-    declare_parameter<bool>("safety_stop_blocks_recovery", true);
+    declare_parameter<bool>("safety_stop_blocks_recovery", false);
     declare_parameter<bool>("publish_zero_when_inactive", true);
+
+    declare_parameter<bool>("dynamic_action_enabled", true);
+    declare_parameter<bool>("prefer_larger_free_side", true);
+    declare_parameter<double>("side_block_m", 0.12);
+    declare_parameter<double>("side_clear_m", 0.20);
+    declare_parameter<double>("range_timeout_s", 0.60);
 
     declare_parameter<std::string>("default_action", "BACKUP_THEN_LEFT");
 
@@ -151,6 +182,8 @@ private:
     declare_parameter<std::string>("recovery_request_topic", topics::RECOVERY_REQUEST);
     declare_parameter<std::string>("recovery_active_topic", topics::RECOVERY_ACTIVE);
     declare_parameter<std::string>("safety_stop_topic", topics::SAFETY_STOP);
+    declare_parameter<std::string>("left_range_topic", topics::RANGE_LEFT);
+    declare_parameter<std::string>("right_range_topic", topics::RANGE_RIGHT);
     declare_parameter<std::string>("cmd_vel_recovery_topic", topics::CMD_VEL_RECOVERY);
     declare_parameter<std::string>("recovery_state_topic", "/savo_control/recovery_state");
     declare_parameter<std::string>("recovery_status_topic", topics::RECOVERY_STATUS);
@@ -163,10 +196,21 @@ private:
 
     enabled_ = get_parameter("enabled").as_bool();
     auto_start_on_stuck_ = get_parameter("auto_start_on_stuck").as_bool();
+    auto_start_on_safety_stop_ = get_parameter("auto_start_on_safety_stop").as_bool();
     manual_request_starts_recovery_ =
       get_parameter("manual_request_starts_recovery").as_bool();
     safety_stop_blocks_recovery_ = get_parameter("safety_stop_blocks_recovery").as_bool();
     publish_zero_when_inactive_ = get_parameter("publish_zero_when_inactive").as_bool();
+
+    dynamic_action_enabled_ = get_parameter("dynamic_action_enabled").as_bool();
+    prefer_larger_free_side_ = get_parameter("prefer_larger_free_side").as_bool();
+    side_block_m_ = nonnegative_param("side_block_m", 0.12);
+    side_clear_m_ = nonnegative_param("side_clear_m", 0.20);
+    range_timeout_s_ = nonnegative_param("range_timeout_s", 0.60);
+
+    if (side_clear_m_ < side_block_m_) {
+      std::swap(side_clear_m_, side_block_m_);
+    }
 
     default_action_text_ = get_parameter("default_action").as_string();
 
@@ -191,6 +235,8 @@ private:
     recovery_request_topic_ = get_parameter("recovery_request_topic").as_string();
     recovery_active_topic_ = get_parameter("recovery_active_topic").as_string();
     safety_stop_topic_ = get_parameter("safety_stop_topic").as_string();
+    left_range_topic_ = get_parameter("left_range_topic").as_string();
+    right_range_topic_ = get_parameter("right_range_topic").as_string();
     cmd_vel_recovery_topic_ = get_parameter("cmd_vel_recovery_topic").as_string();
     recovery_state_topic_ = get_parameter("recovery_state_topic").as_string();
     recovery_status_topic_ = get_parameter("recovery_status_topic").as_string();
@@ -244,11 +290,19 @@ private:
       return;
     }
 
+    if (auto_start_on_safety_stop_ && safety_stop_active(now_s)) {
+      manager_.request(
+        now_s,
+        RecoveryTrigger::SAFETY_STOP,
+        choose_recovery_action(now_s));
+      return;
+    }
+
     if (auto_start_on_stuck_ && stuck_active(now_s)) {
       manager_.request(
         now_s,
         RecoveryTrigger::STUCK_DETECTED,
-        parse_recovery_action(default_action_text_, RecoveryAction::BACKUP_THEN_LEFT));
+        choose_recovery_action(now_s));
       return;
     }
 
@@ -256,7 +310,7 @@ private:
       manager_.request(
         now_s,
         RecoveryTrigger::MANUAL_REQUEST,
-        parse_recovery_action(default_action_text_, RecoveryAction::BACKUP_THEN_LEFT));
+        choose_recovery_action(now_s));
     }
   }
 
@@ -286,6 +340,68 @@ private:
     return recovery_request_;
   }
 
+  bool range_fresh(
+    const bool seen,
+    const double stamp_s,
+    const double now_s) const
+  {
+    if (!seen) {
+      return false;
+    }
+
+    if (range_timeout_s_ <= 0.0) {
+      return true;
+    }
+
+    return (now_s - stamp_s) <= range_timeout_s_;
+  }
+
+  RecoveryAction choose_recovery_action(const double now_s) const
+  {
+    if (!dynamic_action_enabled_) {
+      return parse_recovery_action(default_action_text_, RecoveryAction::BACKUP_THEN_LEFT);
+    }
+
+    const bool left_fresh = range_fresh(left_range_seen_, left_range_stamp_s_, now_s);
+    const bool right_fresh = range_fresh(right_range_seen_, right_range_stamp_s_, now_s);
+
+    const bool left_blocked = left_fresh && left_range_m_ <= side_block_m_;
+    const bool right_blocked = right_fresh && right_range_m_ <= side_block_m_;
+
+    const bool left_free = left_fresh && left_range_m_ >= side_clear_m_;
+    const bool right_free = right_fresh && right_range_m_ >= side_clear_m_;
+
+    if (left_blocked && right_blocked) {
+      return RecoveryAction::BACKUP;
+    }
+
+    if (left_blocked && !right_blocked) {
+      return RecoveryAction::BACKUP_THEN_RIGHT;
+    }
+
+    if (right_blocked && !left_blocked) {
+      return RecoveryAction::BACKUP_THEN_LEFT;
+    }
+
+    if (left_free && !right_free) {
+      return RecoveryAction::BACKUP_THEN_LEFT;
+    }
+
+    if (right_free && !left_free) {
+      return RecoveryAction::BACKUP_THEN_RIGHT;
+    }
+
+    if (left_free && right_free) {
+      if (prefer_larger_free_side_ && right_range_m_ > left_range_m_) {
+        return RecoveryAction::BACKUP_THEN_RIGHT;
+      }
+
+      return RecoveryAction::BACKUP_THEN_LEFT;
+    }
+
+    return RecoveryAction::BACKUP;
+  }
+
   bool safety_stop_active(const double now_s) const
   {
     if (!safety_stop_seen_) {
@@ -303,7 +419,7 @@ private:
   {
     geometry_msgs::msg::Twist cmd = zero_twist();
 
-    if (result.active && !safety_stop_active(now_s)) {
+    if (result.active) {
       cmd = command_to_twist(result.command);
     } else if (!publish_zero_when_inactive_ && !result.finished) {
       cmd = command_to_twist(result.command);
@@ -358,9 +474,16 @@ private:
 
   bool enabled_{true};
   bool auto_start_on_stuck_{true};
+  bool auto_start_on_safety_stop_{true};
   bool manual_request_starts_recovery_{true};
-  bool safety_stop_blocks_recovery_{true};
+  bool safety_stop_blocks_recovery_{false};
   bool publish_zero_when_inactive_{true};
+
+  bool dynamic_action_enabled_{true};
+  bool prefer_larger_free_side_{true};
+  double side_block_m_{0.12};
+  double side_clear_m_{0.20};
+  double range_timeout_s_{0.60};
 
   std::string default_action_text_{"BACKUP_THEN_LEFT"};
 
@@ -385,6 +508,8 @@ private:
   std::string recovery_request_topic_{topics::RECOVERY_REQUEST};
   std::string recovery_active_topic_{topics::RECOVERY_ACTIVE};
   std::string safety_stop_topic_{topics::SAFETY_STOP};
+  std::string left_range_topic_{topics::RANGE_LEFT};
+  std::string right_range_topic_{topics::RANGE_RIGHT};
   std::string cmd_vel_recovery_topic_{topics::CMD_VEL_RECOVERY};
   std::string recovery_state_topic_{"/savo_control/recovery_state"};
   std::string recovery_status_topic_{topics::RECOVERY_STATUS};
@@ -401,6 +526,14 @@ private:
   bool safety_stop_seen_{false};
   double safety_stop_stamp_s_{0.0};
 
+  double left_range_m_{0.0};
+  bool left_range_seen_{false};
+  double left_range_stamp_s_{0.0};
+
+  double right_range_m_{0.0};
+  bool right_range_seen_{false};
+  double right_range_stamp_s_{0.0};
+
   RecoveryManager manager_{};
 
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_pub_;
@@ -411,6 +544,8 @@ private:
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr stuck_sub_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr recovery_request_sub_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr safety_stop_sub_;
+  rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr left_range_sub_;
+  rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr right_range_sub_;
 
   rclcpp::TimerBase::SharedPtr timer_;
 };
