@@ -21,6 +21,8 @@ struct SAVO_PERCEPTION_PUBLIC RangeFusionConfig
   double side_stop_m{0.08};
   double side_slow_m{0.25};
 
+  double ultrasonic_stop_m{0.10};
+
   double stale_timeout_s{0.30};
   bool fail_safe_on_stale{true};
 
@@ -32,8 +34,7 @@ struct SAVO_PERCEPTION_PUBLIC RangeFusionConfig
 
   std::vector<std::string> required_sensors{
     "tof_left",
-    "tof_right",
-    "ultrasonic_front"};
+    "tof_right"};
 };
 
 struct SAVO_PERCEPTION_PUBLIC RangeFusionResult
@@ -42,6 +43,7 @@ struct SAVO_PERCEPTION_PUBLIC RangeFusionResult
 
   std::optional<double> front_distance_m;
   std::optional<double> side_distance_m;
+  std::optional<double> ultrasonic_front_distance_m;
 
   std::map<std::string, double> front_sources;
   std::map<std::string, double> side_sources;

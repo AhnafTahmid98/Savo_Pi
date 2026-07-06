@@ -151,9 +151,24 @@ std::map<std::string, double> front_candidates(
   const RangeSnapshot & snapshot,
   const RangeFusionConfig & config)
 {
-  return snapshot.front_candidates(
-    config.stale_timeout_s,
-    config.use_depth_front);
+  std::map<std::string, double> out;
+
+  if (config.use_depth_front && snapshot.depth_front.usable(config.stale_timeout_s)) {
+    out[snapshot.depth_front.sensor_name] = *snapshot.depth_front.distance_m;
+  }
+
+  return out;
+}
+
+std::optional<double> ultrasonic_front_distance(
+  const RangeSnapshot & snapshot,
+  const RangeFusionConfig & config)
+{
+  if (snapshot.ultrasonic_front.usable(config.stale_timeout_s)) {
+    return snapshot.ultrasonic_front.distance_m;
+  }
+
+  return std::nullopt;
 }
 
 std::map<std::string, double> side_candidates(
@@ -174,6 +189,7 @@ RangeFusionResult fuse_range_snapshot(
 
   result.front_distance_m = min_from_map(result.front_sources);
   result.side_distance_m = min_from_map(result.side_sources);
+  result.ultrasonic_front_distance_m = ultrasonic_front_distance(snapshot, config);
 
   result.stale_sensors = collect_stale_sensors(snapshot, config.stale_timeout_s);
   result.invalid_sensors = collect_invalid_sensors(snapshot);
@@ -199,6 +215,13 @@ RangeFusionResult fuse_range_snapshot(
   } else if (in_stop_zone(result.front_distance_m, config.front_stop_m)) {
     result.decision = make_stop_decision(
       "front_stop_zone",
+      result.front_distance_m,
+      result.side_distance_m,
+      result.stale_sensors,
+      result.invalid_sensors);
+  } else if (in_stop_zone(result.ultrasonic_front_distance_m, config.ultrasonic_stop_m)) {
+    result.decision = make_stop_decision(
+      "ultrasonic_close_stop",
       result.front_distance_m,
       result.side_distance_m,
       result.stale_sensors,
