@@ -1,59 +1,27 @@
 twist_mux_node:
   ros__parameters:
-    # Runtime command authority node:
     # /cmd_vel_manual, /cmd_vel_auto, /cmd_vel_nav, /cmd_vel_recovery
-    #                         -> /cmd_vel_mux
-    #
-    # Topic names are currently owned by:
-    # include/savo_control/topic_names.hpp
-    #
-    # This YAML only contains parameters that the current C++ node actually
-    # declares and reads.
+    #   -> /cmd_vel_mux
+    publish_hz: 30.0
+    command_timeout_s: 0.35
 
-    # -------------------------------------------------------------------------
-    # Timing
-    # -------------------------------------------------------------------------
-    publish_rate_hz: 30.0
+    zero_on_stale: true
 
-    # Normal command source timeout.
-    # Slightly softer than the base watchdog so control goes safe first.
-    cmd_timeout_sec: 0.35
+    # Keep local safety gating off here; the main safety path remains downstream:
+    # /cmd_vel -> safety gate -> /cmd_vel_safe -> savo_base.
+    safety_stop_forces_zero: false
 
-    # Recovery command timeout can be a little longer because recovery commands
-    # may be published by a recovery sequence instead of continuous teleop.
-    recovery_cmd_timeout_sec: 0.50
+    require_recovery_active_for_recovery_cmd: true
 
-    # -------------------------------------------------------------------------
-    # Startup / mode behavior
-    # -------------------------------------------------------------------------
-    # Safe boot default. The control_mode_manager_node can later publish MANUAL,
-    # AUTO, NAV, or STOP on /savo_control/mode_state.
-    default_mode: "STOP"
+    manual_topic: "/cmd_vel_manual"
+    auto_topic: "/cmd_vel_auto"
+    nav_topic: "/cmd_vel_nav"
+    recovery_topic: "/cmd_vel_recovery"
+    cmd_out_topic: "/cmd_vel_mux"
 
-    # If an invalid mode appears, publish zero Twist instead of passing motion.
-    zero_on_unknown_mode: true
+    mode_topic: "/savo_control/mode_state"
+    recovery_active_topic: "/savo_control/recovery_active"
+    safety_stop_topic: "/safety/stop"
 
-    # Publish mode state only when it changes.
-    # This keeps logs/topics cleaner when control_mode_manager_node is active.
-    mode_state_publish_on_change_only: true
-
-    # -------------------------------------------------------------------------
-    # Recovery override
-    # -------------------------------------------------------------------------
-    # Recovery has highest authority when /savo_control/recovery_active is true.
-    recovery_override_enabled: true
-
-    # Keep recovery active until it clears or timeout expires.
-    latch_recovery_active: true
-
-    # Auto-clear stale recovery-active state.
-    recovery_active_timeout_sec: 3.0
-
-    # -------------------------------------------------------------------------
-    # Optional local safety stop gate
-    # -------------------------------------------------------------------------
-    # Main safety architecture is still:
-    # /cmd_vel -> safety gate -> /cmd_vel_safe -> savo_base
-    #
-    # Keep this false unless we are doing special bringup/debug testing.
-    use_safety_stop_gate: false
+    selected_source_topic: "/savo_control/twist_mux/source"
+    status_topic: "/savo_control/twist_mux/status"

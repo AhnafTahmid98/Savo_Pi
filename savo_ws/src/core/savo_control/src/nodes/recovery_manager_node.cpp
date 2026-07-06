@@ -52,6 +52,23 @@ geometry_msgs::msg::Twist zero_twist()
   return msg;
 }
 
+bool twist_has_motion(
+  const geometry_msgs::msg::Twist & msg,
+  const double vx_threshold,
+  const double vy_threshold,
+  const double wz_threshold)
+{
+  return
+    std::isfinite(msg.linear.x) &&
+    std::isfinite(msg.linear.y) &&
+    std::isfinite(msg.angular.z) &&
+    (
+      std::abs(msg.linear.x) >= vx_threshold ||
+      std::abs(msg.linear.y) >= vy_threshold ||
+      std::abs(msg.angular.z) >= wz_threshold
+    );
+}
+
 const char * bool_text(const bool value)
 {
   return value ? "true" : "false";
@@ -127,6 +144,27 @@ public:
         }
       });
 
+    manual_motion_sub_ = create_subscription<geometry_msgs::msg::Twist>(
+      manual_motion_topic_,
+      10,
+      [this](const geometry_msgs::msg::Twist::SharedPtr msg) {
+        observe_motion_command(*msg);
+      });
+
+    auto_motion_sub_ = create_subscription<geometry_msgs::msg::Twist>(
+      auto_motion_topic_,
+      10,
+      [this](const geometry_msgs::msg::Twist::SharedPtr msg) {
+        observe_motion_command(*msg);
+      });
+
+    nav_motion_sub_ = create_subscription<geometry_msgs::msg::Twist>(
+      nav_motion_topic_,
+      10,
+      [this](const geometry_msgs::msg::Twist::SharedPtr msg) {
+        observe_motion_command(*msg);
+      });
+
     timer_ = create_wall_timer(
       std::chrono::duration<double>(1.0 / publish_hz_),
       [this]() {
@@ -161,6 +199,12 @@ private:
     declare_parameter<double>("side_clear_m", 0.20);
     declare_parameter<double>("range_timeout_s", 0.60);
 
+    declare_parameter<bool>("safety_stop_requires_recent_motion", true);
+    declare_parameter<double>("recent_motion_timeout_s", 1.25);
+    declare_parameter<double>("motion_vx_threshold", 0.03);
+    declare_parameter<double>("motion_vy_threshold", 0.03);
+    declare_parameter<double>("motion_wz_threshold", 0.10);
+
     declare_parameter<std::string>("default_action", "BACKUP_THEN_LEFT");
 
     declare_parameter<double>("backup_vx", -0.06);
@@ -185,6 +229,9 @@ private:
     declare_parameter<std::string>("safety_stop_topic", topics::SAFETY_STOP);
     declare_parameter<std::string>("left_range_topic", topics::RANGE_LEFT);
     declare_parameter<std::string>("right_range_topic", topics::RANGE_RIGHT);
+    declare_parameter<std::string>("manual_motion_topic", topics::CMD_VEL_MANUAL);
+    declare_parameter<std::string>("auto_motion_topic", topics::CMD_VEL_AUTO);
+    declare_parameter<std::string>("nav_motion_topic", topics::CMD_VEL_NAV);
     declare_parameter<std::string>("cmd_vel_recovery_topic", topics::CMD_VEL_RECOVERY);
     declare_parameter<std::string>("recovery_state_topic", "/savo_control/recovery_state");
     declare_parameter<std::string>("recovery_status_topic", topics::RECOVERY_STATUS);
@@ -208,6 +255,13 @@ private:
     side_block_m_ = nonnegative_param("side_block_m", 0.12);
     side_clear_m_ = nonnegative_param("side_clear_m", 0.20);
     range_timeout_s_ = nonnegative_param("range_timeout_s", 0.60);
+
+    safety_stop_requires_recent_motion_ =
+      get_parameter("safety_stop_requires_recent_motion").as_bool();
+    recent_motion_timeout_s_ = nonnegative_param("recent_motion_timeout_s", 1.25);
+    motion_vx_threshold_ = nonnegative_param("motion_vx_threshold", 0.03);
+    motion_vy_threshold_ = nonnegative_param("motion_vy_threshold", 0.03);
+    motion_wz_threshold_ = nonnegative_param("motion_wz_threshold", 0.10);
 
     if (side_clear_m_ < side_block_m_) {
       std::swap(side_clear_m_, side_block_m_);
@@ -238,6 +292,9 @@ private:
     safety_stop_topic_ = get_parameter("safety_stop_topic").as_string();
     left_range_topic_ = get_parameter("left_range_topic").as_string();
     right_range_topic_ = get_parameter("right_range_topic").as_string();
+    manual_motion_topic_ = get_parameter("manual_motion_topic").as_string();
+    auto_motion_topic_ = get_parameter("auto_motion_topic").as_string();
+    nav_motion_topic_ = get_parameter("nav_motion_topic").as_string();
     cmd_vel_recovery_topic_ = get_parameter("cmd_vel_recovery_topic").as_string();
     recovery_state_topic_ = get_parameter("recovery_state_topic").as_string();
     recovery_status_topic_ = get_parameter("recovery_status_topic").as_string();
@@ -291,7 +348,11 @@ private:
       return;
     }
 
-    if (auto_start_on_safety_stop_ && safety_stop_active(now_s)) {
+    if (
+      auto_start_on_safety_stop_ &&
+      safety_stop_active(now_s) &&
+      safety_stop_recovery_allowed(now_s))
+    {
       manager_.request(
         now_s,
         RecoveryTrigger::SAFETY_STOP,
@@ -326,6 +387,42 @@ private:
     }
 
     return stuck_detected_;
+  }
+
+  void observe_motion_command(const geometry_msgs::msg::Twist & msg)
+  {
+    if (
+      twist_has_motion(
+        msg,
+        motion_vx_threshold_,
+        motion_vy_threshold_,
+        motion_wz_threshold_))
+    {
+      command_motion_seen_ = true;
+      command_motion_stamp_s_ = now_seconds(*this);
+    }
+  }
+
+  bool recent_command_motion_active(const double now_s) const
+  {
+    if (!command_motion_seen_) {
+      return false;
+    }
+
+    if (recent_motion_timeout_s_ <= 0.0) {
+      return true;
+    }
+
+    return (now_s - command_motion_stamp_s_) <= recent_motion_timeout_s_;
+  }
+
+  bool safety_stop_recovery_allowed(const double now_s) const
+  {
+    if (!safety_stop_requires_recent_motion_) {
+      return true;
+    }
+
+    return recent_command_motion_active(now_s);
   }
 
   bool recovery_request_active(const double now_s) const
@@ -438,6 +535,7 @@ private:
        << "; finished=" << bool_text(result.finished)
        << "; request_active=" << bool_text(result.recovery_request_active)
        << "; safety_stop=" << bool_text(safety_stop_active(now_s))
+       << "; recent_command_motion=" << bool_text(recent_command_motion_active(now_s))
        << "; stuck=" << bool_text(stuck_active(now_s))
        << "; reason=" << result.reason
        << "; elapsed_s=" << result.elapsed_s
@@ -486,6 +584,12 @@ private:
   double side_clear_m_{0.20};
   double range_timeout_s_{0.60};
 
+  bool safety_stop_requires_recent_motion_{true};
+  double recent_motion_timeout_s_{1.25};
+  double motion_vx_threshold_{0.03};
+  double motion_vy_threshold_{0.03};
+  double motion_wz_threshold_{0.10};
+
   std::string default_action_text_{"BACKUP_THEN_LEFT"};
 
   double backup_vx_{-0.06};
@@ -511,6 +615,9 @@ private:
   std::string safety_stop_topic_{topics::SAFETY_STOP};
   std::string left_range_topic_{topics::RANGE_LEFT};
   std::string right_range_topic_{topics::RANGE_RIGHT};
+  std::string manual_motion_topic_{topics::CMD_VEL_MANUAL};
+  std::string auto_motion_topic_{topics::CMD_VEL_AUTO};
+  std::string nav_motion_topic_{topics::CMD_VEL_NAV};
   std::string cmd_vel_recovery_topic_{topics::CMD_VEL_RECOVERY};
   std::string recovery_state_topic_{"/savo_control/recovery_state"};
   std::string recovery_status_topic_{topics::RECOVERY_STATUS};
@@ -535,6 +642,9 @@ private:
   bool right_range_seen_{false};
   double right_range_stamp_s_{0.0};
 
+  bool command_motion_seen_{false};
+  double command_motion_stamp_s_{0.0};
+
   RecoveryManager manager_{};
 
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_pub_;
@@ -547,6 +657,9 @@ private:
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr safety_stop_sub_;
   rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr left_range_sub_;
   rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr right_range_sub_;
+  rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr manual_motion_sub_;
+  rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr auto_motion_sub_;
+  rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr nav_motion_sub_;
 
   rclcpp::TimerBase::SharedPtr timer_;
 };

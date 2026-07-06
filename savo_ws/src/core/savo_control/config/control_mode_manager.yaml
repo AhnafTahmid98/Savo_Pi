@@ -1,32 +1,30 @@
 control_mode_manager_node:
   ros__parameters:
-    update_rate_hz: 20.0
+    # Runtime command authority state machine.
+    publish_hz: 20.0
+
     startup_mode: "STOP"
+    fallback_mode: "STOP"
 
-    manual_override_preempts_all: true
-    recovery_preempts_auto_nav: true
-    recovery_preempts_manual: false
-    latch_recovery_mode: true
+    request_timeout_s: 1.0
+    recovery_latch_timeout_s: 2.0
+    manual_override_timeout_s: 1.5
 
-    safety_stop_forces_stop_mode: true
-    external_stop_forces_stop_mode: true
-    prefer_nav_over_auto: false
-    fallback_to_stop_when_source_unavailable: true
+    allow_manual: true
+    allow_auto: true
+    allow_nav: true
+    allow_recovery: true
 
-    min_time_sec: 0.0
-    max_time_jump_sec: 5.0
+    safety_stop_forces_stop: true
+    external_stop_forces_stop: true
+    recovery_active_forces_recovery: true
 
-    # These override the node defaults, so they must be valid ROS topic names.
-    manual_override_topic: "/savo_control/manual_override"
+    mode_cmd_topic: "/savo_control/mode_cmd"
+    mode_state_topic: "/savo_control/mode_state"
+    mode_reason_topic: "/savo_control/mode_reason"
+    control_status_topic: "/savo_control/control_status"
+
+    safety_stop_topic: "/safety/stop"
     external_stop_topic: "/savo_control/external_stop"
-
-    manual_source_available_default: true
-    auto_source_available_default: true
-    nav_source_available_default: true
-    recovery_source_available_default: true
-
-    publish_selected_route_topic: true
-    selected_route_topic: "/savo_control/selected_cmd_source"
-
-    log_mode_changes: true
-    log_request_changes: false
+    recovery_active_topic: "/savo_control/recovery_active"
+    manual_override_topic: "/savo_control/manual_override"

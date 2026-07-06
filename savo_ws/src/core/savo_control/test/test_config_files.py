@@ -72,25 +72,42 @@ def test_cmd_vel_shaper_contract():
     cfg = params(data, "cmd_vel_shaper_node")
 
     required = [
-        "publish_rate_hz",
-        "input_timeout_sec",
-        "zero_on_stale_input",
-        "use_safety_stop_gate",
-        "safety_stop_hold_sec",
-        "limits",
-        "limiter",
-        "log",
+        "publish_hz",
+        "command_timeout_s",
+        "reset_on_timeout",
+        "use_decel_when_slowing",
+        "safety_stop_forces_zero",
+        "max_vx",
+        "max_vy",
+        "max_wz",
+        "deadband_vx",
+        "deadband_vy",
+        "deadband_wz",
+        "max_accel_vx",
+        "max_accel_vy",
+        "max_accel_wz",
+        "max_decel_vx",
+        "max_decel_vy",
+        "max_decel_wz",
+        "min_dt_s",
+        "max_dt_s",
+        "input_topic",
+        "output_topic",
+        "safety_stop_topic",
+        "slowdown_topic",
     ]
 
     for key in required:
         assert key in cfg
 
-    for axis in ["vx", "vy", "wz"]:
-        assert axis in cfg["limits"]
-        assert cfg["limits"][axis]["max_abs"] > 0.0
-        assert cfg["limits"][axis]["deadband"] >= 0.0
-        assert cfg["limits"][axis]["max_rise_rate"] > 0.0
-        assert cfg["limits"][axis]["max_fall_rate"] > 0.0
+    assert cfg["publish_hz"] > 0.0
+    assert cfg["command_timeout_s"] >= 0.0
+    assert cfg["max_vx"] > 0.0
+    assert cfg["max_vy"] > 0.0
+    assert cfg["max_wz"] > 0.0
+    assert cfg["deadband_vx"] >= 0.0
+    assert cfg["deadband_vy"] >= 0.0
+    assert cfg["deadband_wz"] >= 0.0
 
 
 def test_twist_mux_contract():
@@ -98,21 +115,26 @@ def test_twist_mux_contract():
     cfg = params(data, "twist_mux_node")
 
     required = [
-        "publish_rate_hz",
-        "cmd_timeout_sec",
-        "recovery_cmd_timeout_sec",
-        "default_mode",
-        "zero_on_unknown_mode",
-        "recovery_override_enabled",
-        "latch_recovery_active",
-        "recovery_active_timeout_sec",
-        "use_safety_stop_gate",
+        "publish_hz",
+        "command_timeout_s",
+        "zero_on_stale",
+        "safety_stop_forces_zero",
+        "require_recovery_active_for_recovery_cmd",
+        "manual_topic",
+        "auto_topic",
+        "nav_topic",
+        "recovery_topic",
+        "cmd_out_topic",
+        "mode_topic",
+        "recovery_active_topic",
+        "safety_stop_topic",
     ]
 
     for key in required:
         assert key in cfg
 
-    assert cfg["default_mode"] in ["STOP", "MANUAL", "AUTO", "NAV", "RECOVERY"]
+    assert cfg["publish_hz"] > 0.0
+    assert cfg["command_timeout_s"] >= 0.0
 
 
 def test_control_mode_manager_contract():
@@ -120,25 +142,34 @@ def test_control_mode_manager_contract():
     cfg = params(data, "control_mode_manager_node")
 
     required = [
-        "update_rate_hz",
+        "publish_hz",
         "startup_mode",
-        "manual_override_preempts_all",
-        "recovery_preempts_auto_nav",
-        "recovery_preempts_manual",
-        "latch_recovery_mode",
-        "safety_stop_forces_stop_mode",
-        "external_stop_forces_stop_mode",
-        "fallback_to_stop_when_source_unavailable",
-        "manual_source_available_default",
-        "auto_source_available_default",
-        "nav_source_available_default",
-        "recovery_source_available_default",
+        "fallback_mode",
+        "request_timeout_s",
+        "recovery_latch_timeout_s",
+        "manual_override_timeout_s",
+        "allow_manual",
+        "allow_auto",
+        "allow_nav",
+        "allow_recovery",
+        "safety_stop_forces_stop",
+        "external_stop_forces_stop",
+        "recovery_active_forces_recovery",
+        "mode_cmd_topic",
+        "mode_state_topic",
+        "mode_reason_topic",
+        "control_status_topic",
+        "safety_stop_topic",
+        "external_stop_topic",
+        "recovery_active_topic",
+        "manual_override_topic",
     ]
 
     for key in required:
         assert key in cfg
 
     assert cfg["startup_mode"] == "STOP"
+    assert cfg["publish_hz"] > 0.0
 
 
 def test_heading_pid_contract():

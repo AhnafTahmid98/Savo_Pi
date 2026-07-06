@@ -1,61 +1,43 @@
 cmd_vel_shaper_node:
   ros__parameters:
-    # Runtime command shaping node:
     # /cmd_vel_mux -> /cmd_vel
-    #
-    # Topic names are owned by the C++ topic contract for now:
-    # include/savo_control/topic_names.hpp
+    publish_hz: 30.0
+    command_timeout_s: 0.35
 
-    # -------------------------------------------------------------------------
-    # Timing
-    # -------------------------------------------------------------------------
-    publish_rate_hz: 30.0
-    input_timeout_sec: 0.35
-    zero_on_stale_input: true
+    reset_on_timeout: true
+    use_decel_when_slowing: true
 
-    # Optional defensive local stop gate.
-    # Main robot safety still happens downstream:
-    # /cmd_vel -> safety gate -> /cmd_vel_safe -> savo_base
-    use_safety_stop_gate: false
-    safety_stop_hold_sec: 0.10
+    # Keep local safety gating off here; the main safety path remains downstream:
+    # /cmd_vel -> safety gate -> /cmd_vel_safe -> savo_base.
+    safety_stop_forces_zero: false
 
-    # -------------------------------------------------------------------------
-    # Command limits
-    # -------------------------------------------------------------------------
-    # vx = linear.x
-    # vy = linear.y
-    # wz = angular.z
-    #
-    # Conservative indoor/manual-mapping values for Robot Savo.
-    limits:
-      vx:
-        max_abs: 0.20
-        deadband: 0.005
-        max_rise_rate: 0.30
-        max_fall_rate: 0.55
+    max_vx: 0.20
+    max_vy: 0.18
+    max_wz: 0.50
 
-      vy:
-        max_abs: 0.18
-        deadband: 0.005
-        max_rise_rate: 0.25
-        max_fall_rate: 0.45
+    deadband_vx: 0.005
+    deadband_vy: 0.005
+    deadband_wz: 0.005
 
-      wz:
-        max_abs: 0.50
-        deadband: 0.005
-        max_rise_rate: 0.80
-        max_fall_rate: 1.20
+    max_accel_vx: 0.30
+    max_accel_vy: 0.25
+    max_accel_wz: 0.80
 
-    # -------------------------------------------------------------------------
-    # Limiter timing guard
-    # -------------------------------------------------------------------------
-    limiter:
-      min_dt_sec: 0.001
-      max_dt_sec: 0.20
+    max_decel_vx: 0.55
+    max_decel_vy: 0.45
+    max_decel_wz: 1.20
 
-    # -------------------------------------------------------------------------
-    # Logging
-    # -------------------------------------------------------------------------
-    log:
-      stale_warn_throttle_ms: 2000
-      debug_throttle_ms: 2000
+    min_dt_s: 0.001
+    max_dt_s: 0.20
+
+    use_slowdown_factor: true
+    slowdown_timeout_s: 0.50
+    default_slowdown_factor: 1.0
+    min_slowdown_factor: 0.0
+    max_slowdown_factor: 1.0
+
+    input_topic: "/cmd_vel_mux"
+    output_topic: "/cmd_vel"
+    safety_stop_topic: "/safety/stop"
+    slowdown_topic: "/safety/slowdown_factor"
+    status_topic: "/savo_control/cmd_vel_shaper/status"
