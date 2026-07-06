@@ -133,13 +133,15 @@ SafetyGateOutput gate_velocity_command(
     input.safety_stop ||
     (input.has_safety_decision && input.safety_decision.stop_required);
 
-  if (safety_stop_active && !recovery_command_usable(input, config)) {
+  const auto recovery_active = safety_stop_active && recovery_command_usable(input, config);
+
+  if (safety_stop_active && !recovery_active) {
     return stopped_output("safety_stop");
   }
 
   auto selected_command = input.command;
 
-  if (safety_stop_active && recovery_command_usable(input, config)) {
+  if (recovery_active) {
     selected_command = *input.recovery_command;
   }
 
@@ -162,11 +164,13 @@ SafetyGateOutput gate_velocity_command(
     return output;
   }
 
-  const auto slowdown = effective_slowdown(input, config);
+  // During safety stop, slowdown_factor is normally 0.0.
+  // Recovery command must not be multiplied by 0.0, or escape is impossible.
+  const auto slowdown = recovery_active ? 1.0 : effective_slowdown(input, config);
   auto safe_command = clamp_velocity_command(selected_command, config);
   safe_command = apply_slowdown(safe_command, slowdown, config);
   safe_command = clamp_velocity_command(safe_command, config);
-  safe_command.source = safety_stop_active ? "safety_gate_recovery" : "safety_gate";
+  safe_command.source = recovery_active ? "safety_gate_recovery" : "safety_gate";
 
   SafetyGateOutput output;
   output.output_command = safe_command;
@@ -174,7 +178,7 @@ SafetyGateOutput gate_velocity_command(
   output.stopped = command_is_zero(safe_command);
   output.stale = false;
   output.applied_slowdown = slowdown;
-  output.reason = safety_stop_active ? "recovery_allowed" : "command_allowed";
+  output.reason = recovery_active ? "recovery_allowed" : "command_allowed";
 
   if (output.stopped && slowdown <= 0.0) {
     output.reason = "slowdown_zero";

@@ -28,8 +28,8 @@ cmd_vel_safety_gate:
     max_linear_y_mps: 0.35
     max_angular_z_radps: 0.80
 
-    allow_recovery_when_stopped: false
-    recovery_command_topic: /savo_control/recovery_cmd_vel
+    allow_recovery_when_stopped: true
+    recovery_command_topic: /cmd_vel_recovery
     recovery_cmd_vel_safe_topic: /cmd_vel_safe
 
     publish_gate_state: true
@@ -64,8 +64,8 @@ cmd_vel_safety_gate_py:
     max_linear_y_mps: 0.35
     max_angular_z_radps: 0.80
 
-    allow_recovery_when_stopped: false
-    recovery_command_topic: /savo_control/recovery_cmd_vel
+    allow_recovery_when_stopped: true
+    recovery_command_topic: /cmd_vel_recovery
     recovery_cmd_vel_safe_topic: /cmd_vel_safe
 
     publish_gate_state: true
