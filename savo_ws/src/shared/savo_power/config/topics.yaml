@@ -1,0 +1,14 @@
+"/**":
+  ros__parameters:
+    core_ups_topic: "/savo_power/core/ups"
+    edge_ups_topic: "/savo_power/edge/ups"
+    base_battery_topic: "/savo_power/base/battery"
+
+    status_topic: "/savo_power/status"
+    health_topic: "/savo_power/health"
+
+    dashboard_topic: "/savo_power/dashboard"
+    dashboard_text_topic: "/savo_power/dashboard_text"
+
+    # Keep this topic passive unless automatic shutdown is explicitly enabled.
+    shutdown_request_topic: "/savo_power/shutdown_request"

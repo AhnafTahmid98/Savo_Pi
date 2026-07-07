@@ -1,0 +1,43 @@
+/base_battery_node:
+  ros__parameters:
+    source: "base_battery"
+
+    i2c_bus: 1
+    i2c_address: 72
+    ads7830_address: 72
+    ads7830_channel: 2
+    ads7830_pcb_version: "v2"
+
+    sample_rate_hz: 1.0
+    publish_rate_hz: 1.0
+    stale_timeout_s: 5.0
+
+    empty_voltage_v: 6.40
+    low_voltage_v: 7.20
+    full_voltage_v: 8.40
+    low_soc_pct: 20.0
+    full_soc_pct: 95.0
+
+    topic: "/savo_power/base/battery"
+
+/base_battery_node_py:
+  ros__parameters:
+    source: "base_battery"
+
+    i2c_bus: 1
+    i2c_address: 72
+    ads7830_address: 72
+    ads7830_channel: 2
+    ads7830_pcb_version: "v2"
+
+    sample_rate_hz: 1.0
+    publish_rate_hz: 1.0
+    stale_timeout_s: 5.0
+
+    empty_voltage_v: 6.40
+    low_voltage_v: 7.20
+    full_voltage_v: 8.40
+    low_soc_pct: 20.0
+    full_soc_pct: 95.0
+
+    topic: "/savo_power/base/battery"

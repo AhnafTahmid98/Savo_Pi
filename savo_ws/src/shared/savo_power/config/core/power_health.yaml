@@ -1,0 +1,21 @@
+/power_health_node:
+  ros__parameters:
+    publish_rate_hz: 1.0
+    stale_timeout_s: 5.0
+
+    automatic_shutdown_enabled: false
+
+    status_topic: "/savo_power/status"
+    health_topic: "/savo_power/health"
+    shutdown_request_topic: "/savo_power/shutdown_request"
+
+/power_health_node_py:
+  ros__parameters:
+    publish_rate_hz: 1.0
+    stale_timeout_s: 5.0
+
+    automatic_shutdown_enabled: false
+
+    status_topic: "/savo_power/status"
+    health_topic: "/savo_power/health"
+    shutdown_request_topic: "/savo_power/shutdown_request"

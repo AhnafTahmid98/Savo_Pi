@@ -1,0 +1,6 @@
+#!/usr/bin/env python3
+from savo_power.nodes.ups_hat_node_py import main_edge
+
+
+if __name__ == "__main__":
+    main_edge()

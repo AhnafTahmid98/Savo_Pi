@@ -1,0 +1,33 @@
+"/**":
+  ros__parameters:
+    profile_name: "dryrun_sim"
+    runtime_host: "development"
+    runtime_backend: "cpp"
+
+    use_python_fallback: false
+    dryrun_mode: true
+    hardware_enabled: false
+
+    enable_core_ups: true
+    enable_edge_ups: true
+    enable_base_battery: true
+    enable_power_aggregator: true
+    enable_power_health: true
+    enable_power_dashboard: true
+
+    core_ups_expected: true
+    edge_ups_expected: true
+    base_battery_expected: true
+
+    sample_rate_hz: 1.0
+    publish_rate_hz: 1.0
+    stale_timeout_s: 5.0
+
+    fake_core_ups_voltage_v: 4.10
+    fake_core_ups_capacity_pct: 85.0
+    fake_edge_ups_voltage_v: 4.08
+    fake_edge_ups_capacity_pct: 82.0
+    fake_base_battery_voltage_v: 8.10
+    fake_base_battery_soc_pct: 80.0
+
+    automatic_shutdown_enabled: false

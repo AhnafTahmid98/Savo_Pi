@@ -1,0 +1,25 @@
+"/**":
+  ros__parameters:
+    i2c_bus: 1
+
+    ups_address: 54
+    ads7830_address: 72
+    ads7830_channel: 2
+    ads7830_pcb_version: "v2"
+
+    expected_i2c_addresses: [54, 72]
+
+    read_attempts: 3
+    sample_count: 5
+    sample_interval_s: 0.20
+
+    ups_low_voltage_v: 3.40
+    ups_critical_voltage_v: 3.20
+
+    base_empty_voltage_v: 6.40
+    base_low_voltage_v: 7.20
+    base_full_voltage_v: 8.40
+    base_low_soc_pct: 20.0
+
+    # Diagnostics may touch real hardware; never request shutdown from here.
+    automatic_shutdown_enabled: false

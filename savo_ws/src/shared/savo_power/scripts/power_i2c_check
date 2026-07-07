@@ -1,0 +1,6 @@
+#!/usr/bin/env python3
+from savo_power.diagnostics.i2c_power_check import main
+
+
+if __name__ == "__main__":
+    main()

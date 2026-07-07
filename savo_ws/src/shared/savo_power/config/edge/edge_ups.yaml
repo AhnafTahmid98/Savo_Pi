@@ -1,0 +1,35 @@
+/edge_ups_node:
+  ros__parameters:
+    source: "edge_ups"
+
+    i2c_bus: 1
+    i2c_address: 54
+    ups_address: 54
+
+    sample_rate_hz: 1.0
+    publish_rate_hz: 1.0
+    stale_timeout_s: 5.0
+
+    low_voltage_v: 3.40
+    critical_voltage_v: 3.20
+    full_capacity_pct: 95.0
+
+    topic: "/savo_power/edge/ups"
+
+/edge_ups_node_py:
+  ros__parameters:
+    source: "edge_ups"
+
+    i2c_bus: 1
+    i2c_address: 54
+    ups_address: 54
+
+    sample_rate_hz: 1.0
+    publish_rate_hz: 1.0
+    stale_timeout_s: 5.0
+
+    low_voltage_v: 3.40
+    critical_voltage_v: 3.20
+    full_capacity_pct: 95.0
+
+    topic: "/savo_power/edge/ups"

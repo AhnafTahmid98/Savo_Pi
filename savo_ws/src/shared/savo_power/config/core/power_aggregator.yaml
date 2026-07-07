@@ -1,0 +1,29 @@
+/power_aggregator_node:
+  ros__parameters:
+    publish_rate_hz: 1.0
+    stale_timeout_s: 5.0
+
+    core_ups_expected: true
+    edge_ups_expected: true
+    base_battery_expected: true
+
+    core_ups_topic: "/savo_power/core/ups"
+    edge_ups_topic: "/savo_power/edge/ups"
+    base_battery_topic: "/savo_power/base/battery"
+
+    status_topic: "/savo_power/status"
+
+/power_aggregator_node_py:
+  ros__parameters:
+    publish_rate_hz: 1.0
+    stale_timeout_s: 5.0
+
+    core_ups_expected: true
+    edge_ups_expected: true
+    base_battery_expected: true
+
+    core_ups_topic: "/savo_power/core/ups"
+    edge_ups_topic: "/savo_power/edge/ups"
+    base_battery_topic: "/savo_power/base/battery"
+
+    status_topic: "/savo_power/status"

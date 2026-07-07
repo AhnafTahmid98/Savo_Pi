@@ -1,0 +1,25 @@
+"/**":
+  ros__parameters:
+    profile_name: "core_real_robot_v1"
+    runtime_host: "savo-core"
+    runtime_backend: "cpp"
+
+    use_python_fallback: false
+
+    enable_core_ups: true
+    enable_edge_ups: false
+    enable_base_battery: true
+    enable_power_aggregator: true
+    enable_power_health: true
+    enable_power_dashboard: true
+
+    core_ups_expected: true
+    edge_ups_expected: true
+    base_battery_expected: true
+
+    sample_rate_hz: 1.0
+    publish_rate_hz: 1.0
+    stale_timeout_s: 5.0
+
+    # Keep false until shutdown behavior is validated on hardware.
+    automatic_shutdown_enabled: false
