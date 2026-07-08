@@ -6,7 +6,7 @@ control_mode_manager_node:
     startup_mode: "STOP"
     fallback_mode: "STOP"
 
-    request_timeout_s: 1.0
+    request_timeout_s: 0.0
     recovery_latch_timeout_s: 2.0
     manual_override_timeout_s: 1.5
 
@@ -15,7 +15,7 @@ control_mode_manager_node:
     allow_nav: true
     allow_recovery: true
 
-    safety_stop_forces_stop: true
+    safety_stop_forces_stop: false
     external_stop_forces_stop: true
     recovery_active_forces_recovery: true
 
