@@ -40,10 +40,6 @@ add_library(${PROJECT_NAME} SHARED
   ${SAVO_POWER_LIBRARY_SOURCES}
 )
 
-target_compile_definitions(${PROJECT_NAME}
-  PRIVATE SAVO_POWER_BUILDING_LIBRARY
-)
-
 target_compile_features(${PROJECT_NAME}
   PUBLIC cxx_std_17
 )
@@ -86,19 +82,14 @@ savo_power_add_node(power_aggregator_node src/nodes/power_aggregator_node.cpp)
 savo_power_add_node(power_health_node src/nodes/power_health_node.cpp)
 savo_power_add_node(power_dashboard_node src/nodes/power_dashboard_node.cpp)
 
-# Install Python package for fallback nodes, diagnostics, and helper modules.
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/savo_power/__init__.py")
-  ament_python_install_package(${PROJECT_NAME})
-endif()
+ament_python_install_package(${PROJECT_NAME})
 
-# Install public headers.
 install(
   DIRECTORY include/
   DESTINATION include
 )
 
-# Install config, launch, and script directories when present.
-foreach(dir config launch scripts)
+foreach(dir config launch)
   if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${dir}")
     install(
       DIRECTORY ${dir}/
@@ -107,24 +98,17 @@ foreach(dir config launch scripts)
   endif()
 endforeach()
 
-# Install executable Python wrapper scripts if scripts/bin-style files are added.
-# setup.py entry_points are useful for Python packaging, but this ament_cmake
-# package should also install wrapper scripts explicitly for reliable ros2 run.
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/scripts")
-  file(GLOB SAVO_POWER_PYTHON_SCRIPTS
-    RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}"
-    "scripts/*"
-  )
+file(GLOB SAVO_POWER_SCRIPTS
+  "${CMAKE_CURRENT_SOURCE_DIR}/scripts/*"
+)
 
-  if(SAVO_POWER_PYTHON_SCRIPTS)
-    install(
-      PROGRAMS ${SAVO_POWER_PYTHON_SCRIPTS}
-      DESTINATION lib/${PROJECT_NAME}
-    )
-  endif()
+if(SAVO_POWER_SCRIPTS)
+  install(
+    PROGRAMS ${SAVO_POWER_SCRIPTS}
+    DESTINATION lib/${PROJECT_NAME}
+  )
 endif()
 
-# Install C++ library.
 install(
   TARGETS ${PROJECT_NAME}
   EXPORT export_${PROJECT_NAME}
@@ -133,14 +117,12 @@ install(
   RUNTIME DESTINATION bin
 )
 
-# Install C++ production nodes.
 install(
   TARGETS ${SAVO_POWER_NODE_TARGETS}
   DESTINATION lib/${PROJECT_NAME}
 )
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
-
 ament_export_include_directories(include)
 
 ament_export_dependencies(
@@ -148,8 +130,18 @@ ament_export_dependencies(
 )
 
 if(BUILD_TESTING)
-  find_package(ament_lint_auto REQUIRED)
-  ament_lint_auto_find_test_dependencies()
+  find_package(ament_cmake_pytest REQUIRED)
+
+  file(GLOB SAVO_POWER_PYTEST_FILES test/test_*.py)
+
+  foreach(test_file ${SAVO_POWER_PYTEST_FILES})
+    get_filename_component(test_name ${test_file} NAME_WE)
+    ament_add_pytest_test(${test_name} ${test_file}
+      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+      APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}
+      TIMEOUT 90
+    )
+  endforeach()
 endif()
 
 ament_package()

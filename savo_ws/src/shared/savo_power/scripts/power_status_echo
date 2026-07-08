@@ -1,0 +1,58 @@
+#!/usr/bin/env python3
+import argparse
+import subprocess
+import sys
+
+from savo_power import constants as c
+
+
+TOPIC_ALIASES = {
+    "status": c.STATUS_TOPIC,
+    "health": c.HEALTH_TOPIC,
+    "dashboard": c.DASHBOARD_TOPIC,
+    "dashboard_text": c.DASHBOARD_TEXT_TOPIC,
+    "core_ups": c.CORE_UPS_TOPIC,
+    "edge_ups": c.EDGE_UPS_TOPIC,
+    "base_battery": c.BASE_BATTERY_TOPIC,
+}
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Echo Robot Savo power topics."
+    )
+    parser.add_argument(
+        "topic",
+        nargs="?",
+        default="status",
+        help="Topic alias or full ROS topic. Default: status.",
+    )
+    parser.add_argument(
+        "--once",
+        action="store_true",
+        help="Exit after one message.",
+    )
+    return parser.parse_args()
+
+
+def resolve_topic(value):
+    if value.startswith("/"):
+        return value
+
+    return TOPIC_ALIASES.get(value, value)
+
+
+def main():
+    args = parse_args()
+    topic = resolve_topic(args.topic)
+
+    cmd = ["ros2", "topic", "echo", topic]
+
+    if args.once:
+        cmd.append("--once")
+
+    return subprocess.call(cmd)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

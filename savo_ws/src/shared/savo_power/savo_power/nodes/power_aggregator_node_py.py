@@ -547,62 +547,37 @@ def build_source_statuses(
     return tuple(statuses)
 
 
-def compute_overall_state(
-    statuses: Iterable[PowerSourceStatus],
-) -> PowerState:
-    """Compute overall power state.
+def compute_overall_state(statuses: Iterable[object]) -> PowerState:
+    """Compute aggregate state from expected source statuses."""
 
-    Not-expected sources must not degrade the overall state.
-    Example: if only core_ups is expected, edge_ups/base_battery are still listed
-    for visibility, but they are ignored for overall severity.
-    """
+    states: list[PowerState] = []
 
-    status_tuple = tuple(statuses)
+    for status in statuses:
+        if isinstance(status, Mapping):
+            expected = bool(status.get("expected", True))
+            state_value = status.get("state", status.get("overall_state"))
+        else:
+            expected = bool(getattr(status, "expected", True))
+            state_value = getattr(
+                status,
+                "state",
+                getattr(status, "overall_state", None),
+            )
 
-    expected_statuses = tuple(
-        status
-        for status in status_tuple
-        if getattr(status, "expected", True) is not False
-    )
+        if not expected:
+            continue
 
-    if not expected_statuses:
+        states.append(normalize_power_state(state_value))
+
+    if not states:
         return PowerState.OK
 
-    try:
-        return normalize_power_state(aggregate_overall_state(expected_statuses))
-    except Exception:
-        pass
-
-    try:
-        return normalize_power_state(
-            aggregate_overall_state(
-                tuple(status.state for status in expected_statuses)
-            )
-        )
-    except Exception:
-        pass
-
-    severity_order = (
-        PowerState.CRITICAL,
-        PowerState.ERROR,
-        PowerState.STALE,
-        PowerState.LOW,
-        PowerState.UNKNOWN,
-        PowerState.CHARGING,
-        PowerState.FULL,
-        PowerState.OK,
-    )
-
-    states = {
-        normalize_power_state(getattr(status, "state", PowerState.UNKNOWN))
-        for status in expected_statuses
-    }
-
-    for state in severity_order:
-        if state in states:
+    for state_name in ("ERROR", "CRITICAL", "LOW", "STALE", "UNKNOWN"):
+        state = getattr(PowerState, state_name, None)
+        if state is not None and state in states:
             return state
 
-    return PowerState.UNKNOWN
+    return PowerState.OK
 
 
 def summary_source_statuses(

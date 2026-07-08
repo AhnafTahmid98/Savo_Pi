@@ -1,0 +1,54 @@
+#!/usr/bin/env python3
+import argparse
+import subprocess
+import sys
+
+from savo_power import constants as c
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Echo Robot Savo power dashboard output."
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Echo JSON dashboard instead of dashboard text.",
+    )
+    parser.add_argument(
+        "--topic",
+        default="",
+        help="Override dashboard topic.",
+    )
+    parser.add_argument(
+        "--once",
+        action="store_true",
+        help="Exit after one message.",
+    )
+    return parser.parse_args()
+
+
+def selected_topic(args):
+    if args.topic:
+        return args.topic
+
+    if args.json:
+        return c.DASHBOARD_TOPIC
+
+    return c.DASHBOARD_TEXT_TOPIC
+
+
+def main():
+    args = parse_args()
+    topic = selected_topic(args)
+
+    cmd = ["ros2", "topic", "echo", topic]
+
+    if args.once:
+        cmd.append("--once")
+
+    return subprocess.call(cmd)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
