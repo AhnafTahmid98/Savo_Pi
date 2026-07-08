@@ -149,7 +149,7 @@ def generate_launch_description() -> LaunchDescription:
                     control_common_yaml,
                     control_mode_manager_yaml,
                     {
-                        "startup_mode": ParameterValue(startup_mode, value_type=str),
+                        "startup_mode": startup_mode,
                     },
                 ],
             ),
@@ -163,7 +163,7 @@ def generate_launch_description() -> LaunchDescription:
                     control_common_yaml,
                     twist_mux_yaml,
                     {
-                        "default_mode": ParameterValue(startup_mode, value_type=str),
+                        "default_mode": startup_mode,
                     },
                 ],
             ),
