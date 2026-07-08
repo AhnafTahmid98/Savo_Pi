@@ -8,6 +8,16 @@ recovery_manager_node:
     safety_stop_blocks_recovery: false
     publish_zero_when_inactive: true
 
+    safety_stop_requires_recent_motion: true
+    recent_motion_timeout_s: 1.25
+    motion_vx_threshold: 0.03
+    motion_vy_threshold: 0.03
+    motion_wz_threshold: 0.10
+
+    manual_motion_topic: "/cmd_vel_manual"
+    auto_motion_topic: "/cmd_vel_auto"
+    nav_motion_topic: "/cmd_vel_nav"
+
     dynamic_action_enabled: true
     prefer_larger_free_side: true
     side_block_m: 0.12

@@ -86,7 +86,7 @@ def generate_launch_description() -> LaunchDescription:
             ),
             DeclareLaunchArgument(
                 "use_backup_escape",
-                default_value="true",
+                default_value="false",
                 description="Start backup_escape_node.",
             ),
             DeclareLaunchArgument(

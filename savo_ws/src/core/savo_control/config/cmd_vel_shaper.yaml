@@ -31,6 +31,7 @@ cmd_vel_shaper_node:
     max_dt_s: 0.20
 
     use_slowdown_factor: true
+    ignore_slowdown_in_recovery: true
     slowdown_timeout_s: 0.50
     default_slowdown_factor: 1.0
     min_slowdown_factor: 0.0
@@ -38,6 +39,7 @@ cmd_vel_shaper_node:
 
     input_topic: "/cmd_vel_mux"
     output_topic: "/cmd_vel"
+    mode_topic: "/savo_control/mode_state"
     safety_stop_topic: "/safety/stop"
     slowdown_topic: "/safety/slowdown_factor"
     status_topic: "/savo_control/cmd_vel_shaper/status"

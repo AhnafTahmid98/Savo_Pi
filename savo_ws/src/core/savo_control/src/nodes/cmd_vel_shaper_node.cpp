@@ -11,6 +11,7 @@
 #include "std_msgs/msg/float32.hpp"
 #include "std_msgs/msg/string.hpp"
 
+#include "savo_control/control_mode.hpp"
 #include "savo_control/topic_names.hpp"
 #include "savo_control/velocity_smoother.hpp"
 
@@ -101,6 +102,14 @@ public:
         slowdown_stamp_s_ = now_seconds(*this);
       });
 
+    mode_sub_ = create_subscription<std_msgs::msg::String>(
+      mode_topic_,
+      rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local(),
+      [this](const std_msgs::msg::String::SharedPtr msg) {
+        current_mode_ = parse_control_mode(msg->data, ControlMode::STOP);
+        last_mode_text_ = msg->data;
+      });
+
     timer_ = create_wall_timer(
       std::chrono::duration<double>(1.0 / publish_hz_),
       [this]() {
@@ -145,6 +154,7 @@ private:
     declare_parameter<bool>("safety_stop_forces_zero", true);
 
     declare_parameter<bool>("use_slowdown_factor", true);
+    declare_parameter<bool>("ignore_slowdown_in_recovery", true);
     declare_parameter<double>("slowdown_timeout_s", 0.50);
     declare_parameter<double>("default_slowdown_factor", 1.0);
     declare_parameter<double>("min_slowdown_factor", 0.0);
@@ -152,6 +162,7 @@ private:
 
     declare_parameter<std::string>("input_topic", topics::CMD_VEL_MUX);
     declare_parameter<std::string>("output_topic", topics::CMD_VEL);
+    declare_parameter<std::string>("mode_topic", topics::CONTROL_MODE_STATE);
     declare_parameter<std::string>("safety_stop_topic", topics::SAFETY_STOP);
     declare_parameter<std::string>("slowdown_topic", topics::SAFETY_SLOWDOWN_FACTOR);
     declare_parameter<std::string>("status_topic", "/savo_control/cmd_vel_shaper/status");
@@ -196,6 +207,8 @@ private:
     safety_stop_forces_zero_ = get_parameter("safety_stop_forces_zero").as_bool();
 
     use_slowdown_factor_ = get_parameter("use_slowdown_factor").as_bool();
+    ignore_slowdown_in_recovery_ =
+      get_parameter("ignore_slowdown_in_recovery").as_bool();
     slowdown_timeout_s_ = nonnegative_param("slowdown_timeout_s", 0.50);
 
     default_slowdown_factor_ = sanitize_slowdown_factor(
@@ -211,6 +224,7 @@ private:
 
     input_topic_ = get_parameter("input_topic").as_string();
     output_topic_ = get_parameter("output_topic").as_string();
+    mode_topic_ = get_parameter("mode_topic").as_string();
     safety_stop_topic_ = get_parameter("safety_stop_topic").as_string();
     slowdown_topic_ = get_parameter("slowdown_topic").as_string();
     status_topic_ = get_parameter("status_topic").as_string();
@@ -264,7 +278,9 @@ private:
       stale = false;
     } else if (command_fresh(now_s)) {
       target = twist_to_command(last_cmd_);
-      target = apply_slowdown(target, slowdown_factor_for_now(now_s));
+      if (!(ignore_slowdown_in_recovery_ && current_mode_ == ControlMode::RECOVERY)) {
+        target = apply_slowdown(target, slowdown_factor_for_now(now_s));
+      }
       reason = "tracking";
       stale = false;
     } else {
@@ -374,7 +390,9 @@ private:
     ss << "reason=" << reason
        << "; stale=" << bool_text(stale)
        << "; safety_stop=" << bool_text(safety_active)
+       << "; mode=" << last_mode_text_
        << "; slowdown=" << slowdown_factor_for_now(now_s)
+       << "; ignore_slowdown_in_recovery=" << bool_text(ignore_slowdown_in_recovery_)
        << "; target_vx=" << target.vx
        << "; target_vy=" << target.vy
        << "; target_wz=" << target.wz
@@ -414,6 +432,7 @@ private:
   bool safety_stop_forces_zero_{true};
 
   bool use_slowdown_factor_{true};
+  bool ignore_slowdown_in_recovery_{true};
   double slowdown_timeout_s_{0.50};
   double default_slowdown_factor_{1.0};
   double min_slowdown_factor_{0.0};
@@ -421,6 +440,7 @@ private:
 
   std::string input_topic_{topics::CMD_VEL_MUX};
   std::string output_topic_{topics::CMD_VEL};
+  std::string mode_topic_{topics::CONTROL_MODE_STATE};
   std::string safety_stop_topic_{topics::SAFETY_STOP};
   std::string slowdown_topic_{topics::SAFETY_SLOWDOWN_FACTOR};
   std::string status_topic_{"/savo_control/cmd_vel_shaper/status"};
@@ -437,6 +457,9 @@ private:
   bool slowdown_seen_{false};
   double slowdown_stamp_s_{0.0};
 
+  ControlMode current_mode_{ControlMode::STOP};
+  std::string last_mode_text_{"STOP"};
+
   VelocitySmoother smoother_{};
 
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_pub_;
@@ -445,6 +468,7 @@ private:
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_sub_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr safety_stop_sub_;
   rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr slowdown_sub_;
+  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr mode_sub_;
 
   rclcpp::TimerBase::SharedPtr timer_;
 };
