@@ -74,7 +74,7 @@ class SafetyStopNodePy(Node):
         self.declare_parameter("fail_safe_on_stale", True)
         self.declare_parameter(
             "required_sensors",
-            ["tof_left", "tof_right", "ultrasonic_front"],
+            ["tof_left", "tof_right"],
         )
 
         values = {
@@ -128,7 +128,7 @@ class SafetyStopNodePy(Node):
         self.depth_front = self._missing_sample("depth_front", required=False)
         self.tof_left = self._missing_sample("tof_left", required=True)
         self.tof_right = self._missing_sample("tof_right", required=True)
-        self.ultrasonic_front = self._missing_sample("ultrasonic_front", required=True)
+        self.ultrasonic_front = self._missing_sample("ultrasonic_front", required=False)
 
         self.create_subscription(
             Float32,
@@ -151,7 +151,7 @@ class SafetyStopNodePy(Node):
         self.create_subscription(
             Float32,
             self.params.ultrasonic_front_topic,
-            lambda msg: self._on_range_msg("ultrasonic_front", msg, required=True),
+            lambda msg: self._on_range_msg("ultrasonic_front", msg, required=False),
             qos_range_sensor(),
         )
 
@@ -224,7 +224,7 @@ class SafetyStopNodePy(Node):
         except Exception:
             distance_m = math.nan
 
-        if not math.isfinite(distance_m):
+        if math.isnan(distance_m):
             return self._missing_sample(sensor_name, required=required, reason="nan_or_invalid")
 
         if distance_m <= 0.0:

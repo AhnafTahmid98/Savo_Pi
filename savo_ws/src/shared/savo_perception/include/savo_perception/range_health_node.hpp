@@ -89,8 +89,7 @@ private:
 
   std::vector<std::string> required_sensors_{
     "tof_left",
-    "tof_right",
-    "ultrasonic_front"};
+    "tof_right"};
 
   std::vector<std::string> optional_sensors_{
     "depth_front"};

@@ -117,9 +117,8 @@ class RangeSnapshot:
     def front_candidates(self, stale_timeout_s: Optional[float] = None) -> Dict[str, float]:
         out: Dict[str, float] = {}
 
-        for sample in (self.depth_front, self.ultrasonic_front):
-            if sample.usable(stale_timeout_s):
-                out[sample.sensor_name] = float(sample.distance_m)
+        if self.depth_front.usable(stale_timeout_s):
+            out[self.depth_front.sensor_name] = float(self.depth_front.distance_m)
 
         return out
 
@@ -187,8 +186,11 @@ def is_valid_distance(
     except Exception:
         return False
 
-    if not math.isfinite(value):
+    if math.isnan(value):
         return False
+
+    if math.isinf(value):
+        return value > 0.0
 
     return float(min_m) <= value <= float(max_m)
 

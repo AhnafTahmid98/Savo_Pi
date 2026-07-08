@@ -126,7 +126,6 @@ safety_stop_node:
     required_sensors:
       - "tof_left"
       - "tof_right"
-      - "ultrasonic_front"
 
     optional_sensors:
       - "depth_front"
@@ -171,7 +170,6 @@ safety_stop_node_py:
     required_sensors:
       - "tof_left"
       - "tof_right"
-      - "ultrasonic_front"
 
     optional_sensors:
       - "depth_front"
@@ -239,7 +237,6 @@ range_health_node:
     required_sensors:
       - "tof_left"
       - "tof_right"
-      - "ultrasonic_front"
 
     optional_sensors:
       - "depth_front"
@@ -269,7 +266,6 @@ range_health_node_py:
     required_sensors:
       - "tof_left"
       - "tof_right"
-      - "ultrasonic_front"
 
     optional_sensors:
       - "depth_front"

@@ -62,7 +62,6 @@ diagnostics:
 required_core_sensors:
   - tof_left
   - tof_right
-  - ultrasonic_front
 
 optional_edge_sensors:
   - depth_front

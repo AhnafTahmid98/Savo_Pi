@@ -110,7 +110,7 @@ void SafetyStopNode::declare_parameters()
 
   declare_parameter<std::vector<std::string>>(
     "required_sensors",
-    std::vector<std::string>{"tof_left", "tof_right", "ultrasonic_front"});
+    std::vector<std::string>{"tof_left", "tof_right"});
 
   declare_parameter<std::vector<std::string>>(
     "optional_sensors",
@@ -296,7 +296,7 @@ RangeSample SafetyStopNode::sample_from_value(
 {
   const auto distance_m = static_cast<double>(value);
 
-  if (!std::isfinite(distance_m) || distance_m <= 0.0) {
+  if (std::isnan(distance_m) || distance_m <= 0.0) {
     return make_invalid_range_sample(sensor_name, "invalid_distance", source);
   }
 

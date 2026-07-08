@@ -65,7 +65,7 @@ class RangeHealthNodePy(Node):
             "depth_front": self._missing_sample("depth_front", required=False),
             "tof_left": self._missing_sample("tof_left", required=True),
             "tof_right": self._missing_sample("tof_right", required=True),
-            "ultrasonic_front": self._missing_sample("ultrasonic_front", required=True),
+            "ultrasonic_front": self._missing_sample("ultrasonic_front", required=False),
         }
 
         self.create_subscription(
@@ -89,7 +89,7 @@ class RangeHealthNodePy(Node):
         self.create_subscription(
             Float32,
             self.params.ultrasonic_front_topic,
-            lambda msg: self._on_range_msg("ultrasonic_front", msg, required=True),
+            lambda msg: self._on_range_msg("ultrasonic_front", msg, required=False),
             qos_range_sensor(),
         )
 
@@ -125,7 +125,7 @@ class RangeHealthNodePy(Node):
             for name, sample in self.samples.items()
         }
 
-        required_sensors = ["tof_left", "tof_right", "ultrasonic_front"]
+        required_sensors = ["tof_left", "tof_right"]
         if self.include_depth_in_overall_ok:
             required_sensors.append("depth_front")
 
@@ -168,7 +168,7 @@ class RangeHealthNodePy(Node):
         except Exception:
             distance_m = math.nan
 
-        if not math.isfinite(distance_m):
+        if math.isnan(distance_m):
             return self._missing_sample(sensor_name, required=required, reason="nan_or_invalid")
 
         if distance_m <= 0.0:

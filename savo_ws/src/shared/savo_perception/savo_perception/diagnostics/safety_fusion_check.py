@@ -133,7 +133,7 @@ def build_policy(args: argparse.Namespace) -> SafetyPolicy:
         side_slow_m=args.side_slow,
         stale_timeout_s=args.stale_timeout,
         fail_safe_on_stale=not args.no_fail_safe,
-        required_sensors=("tof_left", "tof_right", "ultrasonic_front"),
+        required_sensors=("tof_left", "tof_right"),
     )
 
     return SafetyPolicy(

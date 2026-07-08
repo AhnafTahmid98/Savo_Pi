@@ -188,6 +188,13 @@ RangeFusionResult fuse_range_snapshot(
   result.side_sources = side_candidates(snapshot, config);
 
   result.front_distance_m = min_from_map(result.front_sources);
+
+  // Depth/RealSense may slow the robot, but front hard-stop authority stays with ultrasonic.
+  std::optional<double> front_hard_stop_distance_m;
+  if (snapshot.ultrasonic_front.usable(config.stale_timeout_s)) {
+    front_hard_stop_distance_m = snapshot.ultrasonic_front.distance_m;
+  }
+
   result.side_distance_m = min_from_map(result.side_sources);
   result.ultrasonic_front_distance_m = ultrasonic_front_distance(snapshot, config);
 
@@ -212,7 +219,7 @@ RangeFusionResult fuse_range_snapshot(
       result.side_distance_m,
       result.stale_sensors,
       required_invalid);
-  } else if (in_stop_zone(result.front_distance_m, config.front_stop_m)) {
+  } else if (in_stop_zone(front_hard_stop_distance_m, config.front_stop_m)) {
     result.decision = make_stop_decision(
       "front_stop_zone",
       result.front_distance_m,

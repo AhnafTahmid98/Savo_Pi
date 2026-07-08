@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, Optional, Sequence
 
@@ -28,10 +29,11 @@ class RangeFusionConfig:
     front_slow_m: float = FRONT_SLOW_M_DEFAULT
     side_stop_m: float = SIDE_STOP_M_DEFAULT
     side_slow_m: float = SIDE_SLOW_M_DEFAULT
+    ultrasonic_stop_m: float = 0.10
     stale_timeout_s: float = SENSOR_STALE_TIMEOUT_S_DEFAULT
     fail_safe_on_stale: bool = FAIL_SAFE_ON_STALE_DEFAULT
     required_sensors: tuple[str, ...] = field(
-        default_factory=lambda: ("tof_left", "tof_right", "ultrasonic_front")
+        default_factory=lambda: ("tof_left", "tof_right")
     )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -108,6 +110,11 @@ def fuse_range_snapshot(
 
     front_distance_m = snapshot.min_front_m(cfg.stale_timeout_s)
     side_distance_m = snapshot.min_side_m(cfg.stale_timeout_s)
+    ultrasonic_front_distance_m = (
+        float(snapshot.ultrasonic_front.distance_m)
+        if snapshot.ultrasonic_front.usable(cfg.stale_timeout_s)
+        else None
+    )
 
     stale = snapshot.stale_sensors(cfg.stale_timeout_s)
     invalid = snapshot.invalid_sensors()
@@ -131,9 +138,13 @@ def fuse_range_snapshot(
             invalid_sensors=invalid,
         )
 
-    if front_distance_m is not None and front_distance_m <= cfg.front_stop_m:
+    if (
+        ultrasonic_front_distance_m is not None
+        and math.isfinite(ultrasonic_front_distance_m)
+        and ultrasonic_front_distance_m <= cfg.ultrasonic_stop_m
+    ):
         decision = SafetyDecision.stop(
-            reason="front_stop_zone",
+            reason="ultrasonic_close_stop",
             front_distance_m=front_distance_m,
             side_distance_m=side_distance_m,
             stale_sensors=stale,

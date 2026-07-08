@@ -163,7 +163,7 @@ def build_health(
         for name, sample in samples.items()
     }
 
-    required = ["tof_left", "tof_right", "ultrasonic_front"]
+    required = ["tof_left", "tof_right"]
     if include_depth:
         required.append("depth_front")
 
