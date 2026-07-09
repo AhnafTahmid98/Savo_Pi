@@ -43,6 +43,14 @@ public:
     int thickness,
     ColorRgb color,
     float alpha);
+  void draw_spinner(int cx, int cy, int radius, float phase, ColorRgb color);
+  void draw_glow_wave(
+    int x0,
+    int x1,
+    int base_y,
+    int amplitude,
+    float phase,
+    ColorRgb color);
 
   bool draw_image(const ImageAsset & image, int dst_x, int dst_y);
   bool draw_image_fit(const ImageAsset & image);

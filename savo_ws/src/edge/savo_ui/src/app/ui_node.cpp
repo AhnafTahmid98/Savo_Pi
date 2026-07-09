@@ -503,41 +503,50 @@ void UiNode::render_intro()
 
 void UiNode::render_intro_overlay(const float progress)
 {
-  const double wave = 0.5 + 0.5 * std::sin(intro_elapsed_seconds_ * 3.4);
+  const float phase =
+    std::fmod(static_cast<float>(intro_elapsed_seconds_) * 0.42F, 1.0F);
+
+  const double wave = 0.5 + 0.5 * std::sin(intro_elapsed_seconds_ * 2.2);
+
   const int center_x = config_.screen_width / 2;
-  const int center_y = 246;
 
-  const int pulse_radius = 164 + static_cast<int>(wave * 10.0);
-  const float pulse_alpha = static_cast<float>(0.14 + wave * 0.10);
-
+  // Soft glow behind/around the robot. This should be subtle, not a line over the body.
   canvas_.draw_circle_ring(
     center_x,
-    center_y,
-    pulse_radius,
+    247,
+    126 + static_cast<int>(wave * 5.0),
+    3,
+    ColorRgb{35U, 150U, 255U},
+    static_cast<float>(0.07 + wave * 0.05));
+
+  // Animate the lower floor ring area only. This matches the correct area you marked.
+  canvas_.draw_circle_ring(
+    center_x,
+    310,
+    118 + static_cast<int>(wave * 8.0),
     4,
-    ColorRgb{60U, 210U, 255U},
-    pulse_alpha);
+    ColorRgb{45U, 190U, 255U},
+    static_cast<float>(0.18 + wave * 0.10));
 
   canvas_.draw_circle_ring(
     center_x,
-    center_y,
-    pulse_radius + 22,
-    7,
-    ColorRgb{0U, 95U, 210U},
-    0.12F);
+    310,
+    146 + static_cast<int>(wave * 5.0),
+    3,
+    ColorRgb{0U, 95U, 220U},
+    static_cast<float>(0.10 + wave * 0.06));
 
-  canvas_.draw_progress_bar(
-    250,
-    410,
-    300,
-    8,
-    progress,
-    ColorRgb{8U, 24U, 48U},
-    ColorRgb{50U, 190U, 255U},
-    ColorRgb{120U, 230U, 255U});
+  // Small circular loading spinner only. No progress bar.
+  canvas_.draw_spinner(
+    center_x,
+    388,
+    11,
+    phase,
+    ColorRgb{110U, 220U, 255U});
 
-  if (progress < 0.18F) {
-    const float fade_alpha = 1.0F - progress / 0.18F;
+  // Fade in
+  if (progress < 0.12F) {
+    const float fade_alpha = 1.0F - (progress / 0.12F);
     canvas_.blend_rect(
       0,
       0,
@@ -547,8 +556,9 @@ void UiNode::render_intro_overlay(const float progress)
       fade_alpha);
   }
 
-  if (progress > 0.88F) {
-    const float fade_alpha = (progress - 0.88F) / 0.12F;
+  // Fade out
+  if (progress > 0.90F) {
+    const float fade_alpha = (progress - 0.90F) / 0.10F;
     canvas_.blend_rect(
       0,
       0,

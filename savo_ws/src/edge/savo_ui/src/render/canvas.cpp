@@ -223,6 +223,80 @@ void Canvas::draw_circle_ring(
   }
 }
 
+void Canvas::draw_spinner(
+  const int cx,
+  const int cy,
+  const int radius,
+  const float phase,
+  const ColorRgb color)
+{
+  if (!valid()) {
+    return;
+  }
+
+  constexpr int kDots = 12;
+  constexpr float kPi = 3.1415926535F;
+
+  const float head = std::fmod(std::max(phase, 0.0F), 1.0F) * static_cast<float>(kDots);
+
+  for (int i = 0; i < kDots; ++i) {
+    const float angle = (2.0F * kPi * static_cast<float>(i)) / static_cast<float>(kDots);
+    const int px = cx + static_cast<int>(std::cos(angle) * static_cast<float>(radius));
+    const int py = cy + static_cast<int>(std::sin(angle) * static_cast<float>(radius));
+
+    float dist = head - static_cast<float>(i);
+    if (dist < 0.0F) {
+      dist += static_cast<float>(kDots);
+    }
+
+    const float alpha = 0.08F + (1.0F - dist / static_cast<float>(kDots)) * 0.85F;
+    const int dot_r = (dist < 1.5F) ? 3 : 2;
+
+    for (int dy = -dot_r; dy <= dot_r; ++dy) {
+      for (int dx = -dot_r; dx <= dot_r; ++dx) {
+        if ((dx * dx + dy * dy) <= (dot_r * dot_r)) {
+          blend_pixel(px + dx, py + dy, color, alpha);
+        }
+      }
+    }
+  }
+}
+
+void Canvas::draw_glow_wave(
+  const int x0,
+  const int x1,
+  const int base_y,
+  const int amplitude,
+  const float phase,
+  const ColorRgb color)
+{
+  if (!valid() || x1 <= x0) {
+    return;
+  }
+
+  constexpr float kPi = 3.1415926535F;
+  const float phase_rad = phase * 2.0F * kPi;
+  const int span = std::max(1, x1 - x0);
+
+  for (int x = x0; x <= x1; ++x) {
+    const float t = static_cast<float>(x - x0) / static_cast<float>(span);
+    const float y =
+      static_cast<float>(base_y) +
+      std::sin(t * 2.8F * kPi - phase_rad) * static_cast<float>(amplitude);
+
+    const int yi = static_cast<int>(y);
+
+    for (int dy = -8; dy <= 8; ++dy) {
+      const float falloff = std::exp(-0.08F * static_cast<float>(dy * dy));
+      blend_pixel(x, yi + dy, color, 0.16F * falloff);
+    }
+
+    for (int dy = -2; dy <= 2; ++dy) {
+      blend_pixel(x, yi + dy, color, 0.55F);
+    }
+  }
+}
+
 bool Canvas::draw_image(const ImageAsset & image, const int dst_x, const int dst_y)
 {
   if (!valid() || !image.valid()) {
