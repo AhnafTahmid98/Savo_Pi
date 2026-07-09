@@ -28,6 +28,7 @@ add_executable(ui_node
   src/render/image_asset.cpp
   src/render/canvas.cpp
   src/render/preview_writer.cpp
+  src/render/font.cpp
   src/platform/framebuffer_display.cpp
 )
 

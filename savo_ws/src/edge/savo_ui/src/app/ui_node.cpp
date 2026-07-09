@@ -1,5 +1,6 @@
 #include "savo_ui/app/ui_node.hpp"
 #include "savo_ui/render/preview_writer.hpp"
+#include "savo_ui/render/font.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -99,7 +100,7 @@ UiNode::UiNode(const rclcpp::NodeOptions & options)
 
   RCLCPP_INFO(
     get_logger(),
-    "initial screen=%s intro_seconds=%.2f robot360_frame_s=%.2f",
+    "initial screen=%s intro_seconds=%.2f home_idle_frame_s=%.2f",
     to_string(active_screen_).c_str(),
     config_.intro_seconds,
     config_.robot360_seconds_per_frame);
@@ -185,7 +186,7 @@ void UiNode::load_assets()
 
   RCLCPP_INFO(
     get_logger(),
-    "loaded robot360 frames | count=%zu",
+    "loaded generated home frames | count=%zu",
     robot360_frames_.size());
 }
 
@@ -193,19 +194,21 @@ bool UiNode::load_robot360_frames()
 {
   robot360_frames_.clear();
 
+  // Runtime homepage frames are generated ahead of time by:
+  //   scripts/generate_home_assets.py
+  //
+  // They are full 800x480 PPM frames, ready for direct framebuffer display.
+  // This keeps the Pi runtime C++ only and avoids live PNG/Pillow rendering.
   const std::vector<std::string> frame_names{
-    "robot_000.ppm",
-    "robot_045.ppm",
-    "robot_090.ppm",
-    "robot_135.ppm",
-    "robot_180.ppm",
-    "robot_225.ppm",
-    "robot_270.ppm",
-    "robot_315.ppm"
+    "home_idle_000.ppm",
+    "home_idle_001.ppm",
+    "home_idle_002.ppm",
+    "home_idle_003.ppm",
+    "home_idle_004.ppm"
   };
 
   for (const auto & frame_name : frame_names) {
-    const auto frame_path = join_path(config_.asset_root, "images/robot360/" + frame_name);
+    const auto frame_path = join_path(config_.asset_root, "images/generated/" + frame_name);
 
     ImageAsset frame;
     std::string error_message;
@@ -215,9 +218,21 @@ bool UiNode::load_robot360_frames()
       return false;
     }
 
+    if (frame.width() != config_.screen_width || frame.height() != config_.screen_height) {
+      RCLCPP_ERROR(
+        get_logger(),
+        "generated home frame has wrong size | %s size=%dx%d expected=%dx%d",
+        frame_name.c_str(),
+        frame.width(),
+        frame.height(),
+        config_.screen_width,
+        config_.screen_height);
+      return false;
+    }
+
     RCLCPP_INFO(
       get_logger(),
-      "loaded robot360 frame | %s size=%dx%d",
+      "loaded generated home frame | %s size=%dx%d",
       frame_name.c_str(),
       frame.width(),
       frame.height());
@@ -228,34 +243,27 @@ bool UiNode::load_robot360_frames()
   return robot360_frames_.size() == frame_names.size();
 }
 
+
 void UiNode::configure_home_idle_sequence()
 {
   home_idle_sequence_.clear();
 
-  if (robot360_frames_.size() < 8U) {
-    RCLCPP_WARN(
-      get_logger(),
-      "robot360 frame count is lower than expected; using available front frame only");
-
-    if (!robot360_frames_.empty()) {
-      home_idle_sequence_.push_back(0U);
-    }
-
+  if (robot360_frames_.empty()) {
+    RCLCPP_WARN(get_logger(), "generated home frame count is zero");
     return;
   }
 
-  // Premium idle sway:
-  // front-left -> front -> front-right -> front -> repeat
-  home_idle_sequence_.push_back(7U);  // robot_315.ppm
-  home_idle_sequence_.push_back(0U);  // robot_000.ppm
-  home_idle_sequence_.push_back(1U);  // robot_045.ppm
-  home_idle_sequence_.push_back(0U);  // robot_000.ppm
+  for (std::size_t i = 0; i < robot360_frames_.size(); ++i) {
+    home_idle_sequence_.push_back(i);
+  }
 
   RCLCPP_INFO(
     get_logger(),
-    "home idle sway configured | sequence=7,0,1,0 frame_seconds=%.2f",
+    "home idle generated-frame sequence configured | frames=%zu frame_seconds=%.2f",
+    home_idle_sequence_.size(),
     config_.robot360_seconds_per_frame);
 }
+
 
 void UiNode::export_preview_frames()
 {
@@ -463,7 +471,7 @@ void UiNode::update_runtime(const double dt_seconds)
 
       RCLCPP_DEBUG(
         get_logger(),
-        "home idle sway frame | sequence_index=%zu frame_index=%zu",
+        "home generated idle frame | sequence_index=%zu frame_index=%zu",
         home_idle_sequence_index_,
         frame_index);
     }
@@ -571,14 +579,14 @@ void UiNode::render_intro_overlay(const float progress)
 
 void UiNode::render_home()
 {
-  canvas_.clear(ColorRgb{3U, 8U, 20U});
+  canvas_.clear(ColorRgb{2U, 8U, 22U});
 
   if (robot360_frames_.empty()) {
     RCLCPP_WARN_THROTTLE(
       get_logger(),
       *get_clock(),
       3000,
-      "cannot render home: robot360 frames missing");
+      "cannot render home: generated home frames missing");
     return;
   }
 
@@ -593,30 +601,32 @@ void UiNode::render_home()
 
   const auto frame_index = home_idle_sequence_[home_idle_sequence_index_];
   const auto & frame = robot360_frames_[frame_index];
+
+  // Draw the pre-rendered 800x480 homepage frame directly.
+  // No C++ dashboard overlay here; design is generated offline.
   const bool ok = canvas_.draw_image_fit(frame);
 
   if (!ok) {
-    RCLCPP_WARN(get_logger(), "failed to draw robot360 frame");
+    RCLCPP_WARN(get_logger(), "failed to draw generated home frame");
   }
-
-  render_home_glow();
 }
+
 
 void UiNode::render_home_glow()
 {
-  const double wave = 0.5 + 0.5 * std::sin(home_glow_elapsed_seconds_ * 2.2);
-  const int pulse_radius = 154 + static_cast<int>(wave * 10.0);
-  const float soft_alpha = static_cast<float>(0.16 + wave * 0.08);
-  const float sharp_alpha = static_cast<float>(0.28 + wave * 0.12);
+  const double wave = 0.5 + 0.5 * std::sin(home_glow_elapsed_seconds_ * 0.7);
+  const int pulse_radius = 198 + static_cast<int>(wave * 10.0);
+  const float soft_alpha = static_cast<float>(0.10 + wave * 0.05);
+  const float sharp_alpha = static_cast<float>(0.16 + wave * 0.06);
 
   const int center_x = config_.screen_width / 2;
-  const int center_y = 255;
+  const int center_y = 350;
 
   canvas_.draw_circle_ring(
     center_x,
     center_y,
-    pulse_radius + 18,
-    9,
+    pulse_radius + 24,
+    8,
     ColorRgb{0U, 95U, 190U},
     soft_alpha);
 
@@ -627,15 +637,82 @@ void UiNode::render_home_glow()
     3,
     ColorRgb{70U, 210U, 255U},
     sharp_alpha);
-
-  canvas_.draw_circle_ring(
-    center_x,
-    center_y,
-    pulse_radius - 26,
-    2,
-    ColorRgb{20U, 120U, 255U},
-    0.18F);
 }
+
+void UiNode::render_home_dashboard()
+{
+  render_home_top_bar();
+  render_home_left_menu();
+  render_home_status_panel();
+
+  Font::draw_text(canvas_, 126, 96, "SAVO", ColorRgb{190U, 230U, 255U}, 7, 0.95F);
+  Font::draw_text(canvas_, 128, 152, "AUTONOMOUS GUIDE ROBOT", ColorRgb{230U, 240U, 250U}, 2, 0.80F);
+  Font::draw_text(canvas_, 156, 198, "READY TO ASSIST", ColorRgb{70U, 235U, 255U}, 3, 0.92F);
+}
+
+void UiNode::render_home_top_bar()
+{
+  canvas_.blend_rect(0, 0, config_.screen_width, 50, ColorRgb{0U, 6U, 18U}, 0.82F);
+  canvas_.blend_rect(0, 49, config_.screen_width, 1, ColorRgb{0U, 180U, 230U}, 0.60F);
+
+  Font::draw_text(canvas_, 26, 17, "SAVO", ColorRgb{230U, 245U, 255U}, 3, 0.95F);
+  Font::draw_text(canvas_, 126, 17, "HOME", ColorRgb{70U, 235U, 255U}, 3, 0.95F);
+
+  Font::draw_text(canvas_, 610, 17, "10.0.0.15", ColorRgb{230U, 245U, 255U}, 2, 0.88F);
+  Font::draw_text(canvas_, 724, 17, "09:42", ColorRgb{230U, 245U, 255U}, 2, 0.88F);
+}
+
+void UiNode::render_home_left_menu()
+{
+  const int x = 14;
+  const int y = 70;
+  const int w = 74;
+  const int h = 380;
+
+  canvas_.blend_rect(x, y, w, h, ColorRgb{0U, 12U, 30U}, 0.72F);
+
+  canvas_.draw_circle_ring(x + w / 2, y + 42, 31, 2, ColorRgb{50U, 210U, 255U}, 0.50F);
+  canvas_.blend_rect(x + 8, y + 8, w - 16, 68, ColorRgb{0U, 55U, 95U}, 0.42F);
+  Font::draw_text(canvas_, x + 19, y + 90, "HOME", ColorRgb{240U, 250U, 255U}, 2, 0.90F);
+
+  Font::draw_text(canvas_, x + 15, y + 150, "VOICE", ColorRgb{220U, 235U, 245U}, 2, 0.78F);
+  Font::draw_text(canvas_, x + 7, y + 220, "NAV", ColorRgb{220U, 235U, 245U}, 2, 0.78F);
+  Font::draw_text(canvas_, x + 9, y + 290, "STATUS", ColorRgb{220U, 235U, 245U}, 2, 0.78F);
+  Font::draw_text(canvas_, x + 15, y + 360, "POWER", ColorRgb{220U, 235U, 245U}, 2, 0.78F);
+
+  for (int yy : {145, 215, 285, 355}) {
+    canvas_.blend_rect(x + 12, y + yy - 18, w - 24, 1, ColorRgb{30U, 120U, 160U}, 0.45F);
+  }
+}
+
+void UiNode::render_home_status_panel()
+{
+  const int x = 604;
+  const int y = 104;
+  const int w = 176;
+  const int h = 240;
+
+  canvas_.blend_rect(x, y, w, h, ColorRgb{0U, 12U, 32U}, 0.74F);
+  canvas_.draw_circle_ring(x + w / 2, y + h / 2, 132, 2, ColorRgb{30U, 180U, 230U}, 0.35F);
+
+  Font::draw_text(canvas_, x + 34, y + 22, "SYSTEM STATUS", ColorRgb{70U, 235U, 255U}, 2, 0.95F);
+
+  const int row_x = x + 18;
+  int row_y = y + 58;
+
+  auto status_row = [&](const std::string & label, const std::string & value) {
+    canvas_.blend_rect(row_x, row_y, w - 36, 42, ColorRgb{0U, 22U, 48U}, 0.62F);
+    Font::draw_text(canvas_, row_x + 12, row_y + 14, label, ColorRgb{240U, 250U, 255U}, 2, 0.84F);
+    Font::draw_text(canvas_, row_x + 96, row_y + 14, value, ColorRgb{50U, 235U, 255U}, 2, 0.95F);
+    row_y += 48;
+  };
+
+  status_row("MODE", "IDLE");
+  status_row("VOICE", "READY");
+  status_row("NAV", "STANDBY");
+  status_row("BATTERY", "GOOD");
+}
+
 
 void UiNode::present_if_enabled()
 {
@@ -681,7 +758,7 @@ void UiNode::loop_callback()
   if (!first_tick_logged_) {
     RCLCPP_INFO(
       get_logger(),
-      "savo_ui runtime tick ok | active_screen=%s loaded_robot360_frames=%zu",
+      "savo_ui runtime tick ok | active_screen=%s loaded_home_frames=%zu",
       to_string(active_screen_).c_str(),
       robot360_frames_.size());
     first_tick_logged_ = true;

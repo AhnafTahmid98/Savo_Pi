@@ -79,6 +79,10 @@ private:
   void render_intro_overlay(float progress);
   void render_home();
   void render_home_glow();
+  void render_home_dashboard();
+  void render_home_top_bar();
+  void render_home_left_menu();
+  void render_home_status_panel();
 
   void present_if_enabled();
 
