@@ -4,12 +4,8 @@
   <version>0.1.0</version>
 
   <description>
-    Robot SAVO — Low-level drivetrain hardware execution stack (PCA9685/Freenove motor board
-    + mecanum kinematics + command safety/watchdog + base state/diagnostics) for ROS 2 Jazzy.
-    - Python drivers: PCA9685 and Freenove mecanum board motor execution (real + dryrun paths)
-    - Python kinematics: mecanum wheel mixing and scaling helpers
-    - Python ROS nodes: base_driver_node, watchdog/state/heartbeat/diagnostics runners
-    - Launch/config profiles for dryrun, bench testing, and real robot bringup
+    Robot SAVO base package with C++ production drivetrain and motor hardware execution,
+    plus Python fallback, diagnostics, and development tools.
   </description>
 
   <maintainer email="tahmidahnaf998@gmail.com">Ahnaf Tahmid</maintainer>

@@ -121,7 +121,7 @@ def declare_common_topic_params(node: Node) -> None:
     declare_if_missing(node, "base_command_text_topic", "/savo_base/command_text")
 
     # State / status
-    declare_if_missing(node, "base_state_topic", "/savo_base/state")
+    declare_if_missing(node, "base_state_topic", "/savo_base/base_state")
     declare_if_missing(node, "motor_board_status_topic", "/savo_base/motor_board_status")
     declare_if_missing(node, "watchdog_state_topic", "/savo_base/watchdog_state")
     declare_if_missing(node, "heartbeat_topic", "/savo_base/heartbeat")
@@ -267,7 +267,7 @@ class CommonTopicParams:
     cmd_vel_raw_topic: str = "/cmd_vel"
     base_command_text_topic: str = "/savo_base/command_text"
 
-    base_state_topic: str = "/savo_base/state"
+    base_state_topic: str = "/savo_base/base_state"
     motor_board_status_topic: str = "/savo_base/motor_board_status"
     watchdog_state_topic: str = "/savo_base/watchdog_state"
     heartbeat_topic: str = "/savo_base/heartbeat"
@@ -382,7 +382,7 @@ def read_common_topic_params(node: Node) -> CommonTopicParams:
         cmd_vel_raw_topic=get_str(node, "cmd_vel_raw_topic", "/cmd_vel"),
         base_command_text_topic=get_str(node, "base_command_text_topic", "/savo_base/command_text"),
 
-        base_state_topic=get_str(node, "base_state_topic", "/savo_base/state"),
+        base_state_topic=get_str(node, "base_state_topic", "/savo_base/base_state"),
         motor_board_status_topic=get_str(node, "motor_board_status_topic", "/savo_base/motor_board_status"),
         watchdog_state_topic=get_str(node, "watchdog_state_topic", "/savo_base/watchdog_state"),
         heartbeat_topic=get_str(node, "heartbeat_topic", "/savo_base/heartbeat"),

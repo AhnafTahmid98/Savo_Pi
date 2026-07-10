@@ -82,7 +82,7 @@ CMD_VEL_SAFE_TOPIC = "/cmd_vel_safe"
 BASE_COMMAND_TEXT_TOPIC = "/savo_base/command_text"
 
 # Base state/status outputs
-BASE_STATE_TOPIC = "/savo_base/state"
+BASE_STATE_TOPIC = "/savo_base/base_state"
 MOTOR_BOARD_STATUS_TOPIC = "/savo_base/motor_board_status"
 WATCHDOG_STATE_TOPIC = "/savo_base/watchdog_state"
 HEARTBEAT_TOPIC = "/savo_base/heartbeat"
