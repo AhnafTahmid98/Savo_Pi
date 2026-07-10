@@ -3,7 +3,7 @@ recovery_manager_node:
     # Direction-aware real robot recovery.
     enabled: true
     auto_start_on_stuck: true
-    auto_start_on_safety_stop: true
+    auto_start_on_safety_stop: false
     manual_request_starts_recovery: true
     safety_stop_blocks_recovery: false
     publish_zero_when_inactive: true

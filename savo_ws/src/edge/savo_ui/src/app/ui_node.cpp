@@ -602,7 +602,7 @@ bool UiNode::screen_from_touch(const int x, const int y, UiScreen * screen) cons
     {133, 196, UiScreen::VoiceIdle},
     {197, 260, UiScreen::Navigation},
     {261, 324, UiScreen::Status},
-    {325, 392, UiScreen::Power},
+    {325, 430, UiScreen::Power},
   };
 
   for (const auto & zone : zones) {
