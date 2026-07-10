@@ -4,7 +4,7 @@ package_name = 'savo_nav'
 
 setup(
     name=package_name,
-    version='0.0.1',
+    version='0.1.0',
     packages=[package_name],
     data_files=[('share/' + package_name + '/config', ['config/safety.yaml'])],
     install_requires=['setuptools'],

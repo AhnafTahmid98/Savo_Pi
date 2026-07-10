@@ -48,6 +48,13 @@ void BaseDriverNode::declare_parameters()
   declare_parameter<std::string>("slowdown_topic", config_.slowdown_topic);
   declare_parameter<std::string>("base_state_topic", config_.base_state_topic);
 
+  declare_parameter<bool>(
+    "use_safety_stop",
+    config_.use_safety_stop);
+  declare_parameter<bool>(
+    "use_slowdown_factor",
+    config_.use_slowdown_factor);
+
   declare_parameter<double>("loop_hz", config_.loop_hz);
   declare_parameter<double>("watchdog_timeout_s", config_.watchdog_timeout_s);
   declare_parameter<double>("turn_gain", config_.turn_gain);
@@ -98,6 +105,11 @@ void BaseDriverNode::load_parameters()
   config_.safety_stop_topic = get_parameter("safety_stop_topic").as_string();
   config_.slowdown_topic = get_parameter("slowdown_topic").as_string();
   config_.base_state_topic = get_parameter("base_state_topic").as_string();
+
+  config_.use_safety_stop =
+    get_parameter("use_safety_stop").as_bool();
+  config_.use_slowdown_factor =
+    get_parameter("use_slowdown_factor").as_bool();
 
   config_.loop_hz = clamp_double(get_parameter("loop_hz").as_double(), 1.0, 200.0);
   config_.watchdog_timeout_s =
@@ -225,8 +237,10 @@ void BaseDriverNode::loop_callback()
   snapshot.has_command = has_command_;
   snapshot.command_age_s = age_s;
   snapshot.command_stale = watchdog.stale;
-  snapshot.safety_stop = safety_stop_;
-  snapshot.slowdown_factor = slowdown_factor_;
+  snapshot.safety_stop =
+    config_.use_safety_stop ? safety_stop_ : false;
+  snapshot.slowdown_factor =
+    config_.use_slowdown_factor ? slowdown_factor_ : 1.0;
 
   SafetyDecision decision = safety_->evaluate(snapshot);
   WheelDuty duty{0, 0, 0, 0};

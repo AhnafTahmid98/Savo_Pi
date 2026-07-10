@@ -13,7 +13,7 @@ cmd_vel_shaper_node:
 
     max_vx: 0.20
     max_vy: 0.18
-    max_wz: 0.50
+    max_wz: 0.55
 
     deadband_vx: 0.005
     deadband_vy: 0.005
@@ -30,7 +30,7 @@ cmd_vel_shaper_node:
     min_dt_s: 0.001
     max_dt_s: 0.20
 
-    use_slowdown_factor: true
+    use_slowdown_factor: false
     ignore_slowdown_in_recovery: true
     slowdown_timeout_s: 0.50
     default_slowdown_factor: 1.0

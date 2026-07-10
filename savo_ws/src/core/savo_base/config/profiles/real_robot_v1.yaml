@@ -9,8 +9,8 @@
     watchdog_state_topic: "/savo_base/watchdog_state"
     base_state_topic: "/savo_base/base_state"
 
-    use_safety_stop: true
-    use_slowdown_factor: true
+    use_safety_stop: false
+    use_slowdown_factor: false
 
     slowdown_default: 1.0
     slowdown_min: 0.0

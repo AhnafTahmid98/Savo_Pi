@@ -73,6 +73,9 @@ struct BaseDriverConfig
   std::string slowdown_topic{"/safety/slowdown_factor"};
   std::string base_state_topic{"/savo_base/base_state"};
 
+  bool use_safety_stop{false};
+  bool use_slowdown_factor{false};
+
   double loop_hz{30.0};
   double watchdog_timeout_s{0.30};
   double turn_gain{1.0};

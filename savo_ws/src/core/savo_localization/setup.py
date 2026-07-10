@@ -7,7 +7,7 @@ package_name = "savo_localization"
 
 setup(
     name=package_name,
-    version="0.0.1",
+    version="0.1.0",
     packages=find_packages(exclude=("test", "test.*")),
     include_package_data=True,
     data_files=[
