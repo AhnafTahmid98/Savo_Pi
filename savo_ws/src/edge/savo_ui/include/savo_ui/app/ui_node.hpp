@@ -35,6 +35,7 @@ struct UiNodeConfig
 {
   std::string robot_name{"SAVO"};
   std::string framebuffer_device{"/dev/fb0"};
+  std::string touch_device{"/dev/input/event1"};
   std::string asset_root{""};
   std::string preview_output_dir{"/tmp/savo_ui_preview"};
 
@@ -56,7 +57,7 @@ class UiNode final : public rclcpp::Node
 {
 public:
   explicit UiNode(const rclcpp::NodeOptions & options = rclcpp::NodeOptions());
-  ~UiNode() override = default;
+  ~UiNode() override;
 
   UiNode(const UiNode &) = delete;
   UiNode & operator=(const UiNode &) = delete;
@@ -67,6 +68,8 @@ private:
   void load_assets();
   bool load_robot360_frames();
   void configure_display();
+  void configure_touch();
+  void close_touch();
   void configure_runtime();
 
   void configure_home_idle_sequence();
@@ -74,6 +77,9 @@ private:
   void export_home_animation_preview();
 
   void update_runtime(double dt_seconds);
+  void poll_touch_input();
+  void handle_touch_tap(int x, int y);
+  bool screen_from_touch(int x, int y, UiScreen * screen) const;
   void render_current_screen();
   void render_intro();
   void render_intro_overlay(float progress);
@@ -83,6 +89,7 @@ private:
   void render_home_top_bar();
   void render_home_left_menu();
   void render_home_status_panel();
+  void render_placeholder_screen(const std::string & title, const std::string & subtitle);
 
   void present_if_enabled();
 
@@ -107,6 +114,13 @@ private:
 
   Canvas canvas_;
   FramebufferDisplay framebuffer_;
+
+  int touch_fd_{-1};
+  bool touch_down_{false};
+  int touch_x_{0};
+  int touch_y_{0};
+  int touch_down_x_{0};
+  int touch_down_y_{0};
 
   std::chrono::steady_clock::time_point start_time_{};
   std::chrono::steady_clock::time_point last_loop_time_{};

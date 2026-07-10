@@ -23,7 +23,7 @@ def launch_setup(context, *args, **kwargs):
 
     if profile == 'pi':
         enable_framebuffer = True
-        enable_touch = False
+        enable_touch = True
         export_preview_frames = False
     else:
         enable_framebuffer = False

@@ -3,14 +3,20 @@
 #include "savo_ui/render/font.hpp"
 
 #include <algorithm>
+#include <cerrno>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <filesystem>
 #include <functional>
 #include <stdexcept>
 #include <string>
 #include <vector>
+
+#include <fcntl.h>
+#include <linux/input.h>
+#include <unistd.h>
 
 namespace savo_ui
 {
@@ -83,6 +89,7 @@ UiNode::UiNode(const rclcpp::NodeOptions & options)
   export_preview_frames();
 
   configure_display();
+  configure_touch();
   present_if_enabled();
 
   configure_runtime();
@@ -106,10 +113,16 @@ UiNode::UiNode(const rclcpp::NodeOptions & options)
     config_.robot360_seconds_per_frame);
 }
 
+UiNode::~UiNode()
+{
+  close_touch();
+}
+
 void UiNode::declare_parameters()
 {
   declare_parameter<std::string>("robot_name", config_.robot_name);
   declare_parameter<std::string>("framebuffer_device", config_.framebuffer_device);
+  declare_parameter<std::string>("touch_device", config_.touch_device);
   declare_parameter<std::string>("asset_root", config_.asset_root);
   declare_parameter<std::string>("preview_output_dir", config_.preview_output_dir);
 
@@ -133,6 +146,7 @@ void UiNode::load_parameters()
 {
   config_.robot_name = get_parameter("robot_name").as_string();
   config_.framebuffer_device = get_parameter("framebuffer_device").as_string();
+  config_.touch_device = get_parameter("touch_device").as_string();
   config_.asset_root = get_parameter("asset_root").as_string();
   config_.preview_output_dir = get_parameter("preview_output_dir").as_string();
 
@@ -153,6 +167,10 @@ void UiNode::load_parameters()
 
   if (config_.framebuffer_device.empty()) {
     throw std::runtime_error("framebuffer_device parameter cannot be empty");
+  }
+
+  if (config_.touch_device.empty()) {
+    throw std::runtime_error("touch_device parameter cannot be empty");
   }
 
   if (config_.asset_root.empty()) {
@@ -437,6 +455,166 @@ void UiNode::configure_display()
     framebuffer_.bits_per_pixel());
 }
 
+void UiNode::configure_touch()
+{
+  if (!config_.enable_touch) {
+    RCLCPP_INFO(get_logger(), "touch disabled by config");
+    return;
+  }
+
+  touch_fd_ = ::open(config_.touch_device.c_str(), O_RDONLY | O_NONBLOCK);
+  if (touch_fd_ < 0) {
+    RCLCPP_ERROR(
+      get_logger(),
+      "failed to open touch input | device=%s error=%s",
+      config_.touch_device.c_str(),
+      std::strerror(errno));
+    return;
+  }
+
+  RCLCPP_INFO(
+    get_logger(),
+    "touch input opened | device=%s",
+    config_.touch_device.c_str());
+}
+
+void UiNode::close_touch()
+{
+  if (touch_fd_ >= 0) {
+    ::close(touch_fd_);
+    touch_fd_ = -1;
+  }
+}
+
+void UiNode::poll_touch_input()
+{
+  if (!config_.enable_touch || touch_fd_ < 0) {
+    return;
+  }
+
+  input_event ev{};
+
+  while (true) {
+    const auto n = ::read(touch_fd_, &ev, sizeof(ev));
+
+    if (n == static_cast<ssize_t>(sizeof(ev))) {
+      if (ev.type == EV_ABS) {
+        if (ev.code == ABS_X || ev.code == ABS_MT_POSITION_X) {
+          touch_x_ = ev.value;
+        } else if (ev.code == ABS_Y || ev.code == ABS_MT_POSITION_Y) {
+          touch_y_ = ev.value;
+        }
+      } else if (ev.type == EV_KEY && ev.code == BTN_TOUCH) {
+        if (ev.value == 1) {
+          touch_down_ = true;
+          touch_down_x_ = touch_x_;
+          touch_down_y_ = touch_y_;
+
+          RCLCPP_DEBUG(
+            get_logger(),
+            "touch down | x=%d y=%d",
+            touch_down_x_,
+            touch_down_y_);
+        } else if (ev.value == 0 && touch_down_) {
+          touch_down_ = false;
+
+          const int dx = std::abs(touch_x_ - touch_down_x_);
+          const int dy = std::abs(touch_y_ - touch_down_y_);
+
+          // Treat as tap, not swipe.
+          if (dx <= 35 && dy <= 35) {
+            handle_touch_tap(touch_x_, touch_y_);
+          }
+        }
+      }
+
+      continue;
+    }
+
+    if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+      break;
+    }
+
+    if (n < 0) {
+      RCLCPP_WARN_THROTTLE(
+        get_logger(),
+        *get_clock(),
+        3000,
+        "touch read failed | error=%s",
+        std::strerror(errno));
+      break;
+    }
+
+    break;
+  }
+}
+
+void UiNode::handle_touch_tap(const int x, const int y)
+{
+  UiScreen next_screen{UiScreen::Home};
+
+  if (active_screen_ == UiScreen::Intro) {
+    RCLCPP_INFO(get_logger(), "touch tap during intro | skipping to home x=%d y=%d", x, y);
+    intro_elapsed_seconds_ = config_.intro_seconds;
+    transition_to(UiScreen::Home);
+    return;
+  }
+
+  if (!screen_from_touch(x, y, &next_screen)) {
+    RCLCPP_INFO(get_logger(), "touch tap outside active menu | x=%d y=%d", x, y);
+    return;
+  }
+
+  RCLCPP_INFO(
+    get_logger(),
+    "touch menu tap | x=%d y=%d screen=%s",
+    x,
+    y,
+    to_string(next_screen).c_str());
+
+  transition_to(next_screen);
+}
+
+bool UiNode::screen_from_touch(const int x, const int y, UiScreen * screen) const
+{
+  if (screen == nullptr) {
+    return false;
+  }
+
+  // Left vertical menu hit zones.
+  // Coordinates match the current 800x480 generated UI layout.
+  const int menu_x0 = 10;
+  const int menu_x1 = 96;
+
+  if (x < menu_x0 || x > menu_x1) {
+    return false;
+  }
+
+  struct Zone
+  {
+    int y0;
+    int y1;
+    UiScreen screen;
+  };
+
+  const std::vector<Zone> zones{
+    {70, 132, UiScreen::Home},
+    {133, 196, UiScreen::VoiceIdle},
+    {197, 260, UiScreen::Navigation},
+    {261, 324, UiScreen::Status},
+    {325, 392, UiScreen::Power},
+  };
+
+  for (const auto & zone : zones) {
+    if (y >= zone.y0 && y <= zone.y1) {
+      *screen = zone.screen;
+      return true;
+    }
+  }
+
+  return false;
+}
+
 void UiNode::configure_runtime()
 {
   const auto period = std::chrono::duration<double>(1.0 / config_.loop_hz);
@@ -449,6 +627,8 @@ void UiNode::configure_runtime()
 
 void UiNode::update_runtime(const double dt_seconds)
 {
+  poll_touch_input();
+
   home_glow_elapsed_seconds_ += dt_seconds;
 
   if (active_screen_ == UiScreen::Intro) {
@@ -486,6 +666,18 @@ void UiNode::render_current_screen()
       break;
     case UiScreen::Home:
       render_home();
+      break;
+    case UiScreen::VoiceIdle:
+      render_placeholder_screen("VOICE", "Voice page selected");
+      break;
+    case UiScreen::Navigation:
+      render_placeholder_screen("NAVIGATE", "Navigation page selected");
+      break;
+    case UiScreen::Status:
+      render_placeholder_screen("STATUS", "Status page selected");
+      break;
+    case UiScreen::Power:
+      render_placeholder_screen("POWER", "Power page selected");
       break;
     default:
       render_home();
@@ -713,6 +905,25 @@ void UiNode::render_home_status_panel()
   status_row("BATTERY", "GOOD");
 }
 
+void UiNode::render_placeholder_screen(
+  const std::string & title,
+  const std::string & subtitle)
+{
+  render_home();
+
+  // Temporary touch-validation page overlay.
+  // Later this will be replaced by real Voice/Nav/Status/Power screens.
+  const int x = 132;
+  const int y = 318;
+  const int w = 360;
+  const int h = 92;
+
+  canvas_.blend_rect(x, y, w, h, ColorRgb{0U, 10U, 28U}, 0.82F);
+  canvas_.blend_rect(x, y, w, 2, ColorRgb{0U, 210U, 255U}, 0.80F);
+
+  Font::draw_text(canvas_, x + 24, y + 22, title, ColorRgb{90U, 230U, 255U}, 4, 0.95F);
+  Font::draw_text(canvas_, x + 24, y + 62, subtitle, ColorRgb{230U, 245U, 255U}, 2, 0.85F);
+}
 
 void UiNode::present_if_enabled()
 {
