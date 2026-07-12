@@ -183,6 +183,7 @@ CAMERA_STREAM_STATE_TOPIC: Final[str] = "camera_stream_state_topic"
 CAMERA_STATUS_TOPIC: Final[str] = "camera_status_topic"
 IMAGE_RAW_TOPIC: Final[str] = "image_raw_topic"
 CAMERA_INFO_TOPIC: Final[str] = "camera_info_topic"
+CAMERA_TOPIC_SECTION: Final[str] = "camera"
 EMERGENCY_CENTER_TOPIC: Final[str] = "emergency_center_topic"
 
 HEALTH_CHECK_SERVICE: Final[str] = "health_check_service"
@@ -255,6 +256,7 @@ class HeadParameterNames:
         CAMERA_STATUS_TOPIC,
         IMAGE_RAW_TOPIC,
         CAMERA_INFO_TOPIC,
+        CAMERA_TOPIC_SECTION,
         EMERGENCY_CENTER_TOPIC,
         HEALTH_CHECK_SERVICE,
         CENTER_SERVICE,

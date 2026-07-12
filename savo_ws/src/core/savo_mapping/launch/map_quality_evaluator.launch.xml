@@ -1,0 +1,33 @@
+<launch>
+  <arg
+    name="map_root"
+    default="~/Savo_Pi/runtime/maps"
+    description="Root containing saved map sessions"/>
+
+  <arg
+    name="map_id"
+    default=""
+    description="Stable saved-map identifier"/>
+
+  <arg
+    name="params_file"
+    default="$(find-pkg-share savo_mapping)/config/map_quality_evaluator.yaml"
+    description="Map quality policy parameters"/>
+
+  <node
+    pkg="savo_mapping"
+    exec="map_quality_evaluator_node"
+    name="map_quality_evaluator_node"
+    output="screen">
+
+    <param from="$(var params_file)"/>
+
+    <param
+      name="session.root"
+      value="$(var map_root)"/>
+
+    <param
+      name="session.map_id"
+      value="$(var map_id)"/>
+  </node>
+</launch>

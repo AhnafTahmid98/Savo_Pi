@@ -12,6 +12,14 @@ OUT_DIR = ROOT / "assets" / "images" / "generated"
 W, H = 800, 480
 TOP_BAR_H = 56
 
+# Fixed top-bar slots shared with draw_live_top_bar_overlay() in ui_node.cpp.
+# Dynamic IP/time strings are intentionally absent from the generated asset.
+TOP_WIFI_X = 580
+TOP_WIFI_Y = 21
+TOP_IP_X = 608
+TOP_SEPARATOR_X = 740
+TOP_TIME_RIGHT = 790
+
 # Final homepage robot placement standard.
 # Transparent robot PNGs should be prepared to fit this box.
 ROBOT_X = 150
@@ -59,6 +67,12 @@ FONT_MED = font(16)
 FONT_MED_BOLD = font(16, bold=True)
 FONT_BIG = font(25, bold=True)
 FONT_TITLE = font(56, bold=True)
+
+# Runtime C++ font atlases.
+# Each glyph cell stores its proportional advance in the first pixel.
+RUNTIME_FONT_COLUMNS = 16
+RUNTIME_FONT_PADDING = 2
+RUNTIME_FONT_CHARS = "".join(chr(code) for code in range(32, 127))
 
 
 CYAN = (40, 230, 255)
@@ -182,7 +196,7 @@ def panel_glow(base, box, radius=16, color=(0, 210, 255), alpha=90):
     base.alpha_composite(layer)
 
 
-def draw_top_bar(base):
+def draw_top_bar(base, page_title="HOME"):
     d = ImageDraw.Draw(base)
 
     bar_h = 56
@@ -194,7 +208,7 @@ def draw_top_bar(base):
     # Left brand/title.
     d.text((22, 20), "SAVO", font=FONT_MED_BOLD, fill=WHITE)
     d.line((82, 18, 82, 34), fill=(0, 170, 220, 120), width=1)
-    d.text((118, 18), "HOME", font=FONT_MED_BOLD, fill=CYAN)
+    d.text((118, 18), page_title.upper(), font=FONT_MED_BOLD, fill=CYAN)
 
     # Small aligned Wi-Fi icon.
     def tiny_wifi_icon(cx, cy):
@@ -203,35 +217,19 @@ def draw_top_bar(base):
         d.arc((cx - 3, cy, cx + 3, cy + 6), 215, 325, fill=CYAN, width=2)
         d.ellipse((cx - 2, cy + 12, cx + 2, cy + 16), fill=CYAN)
 
-    ip_text = "10.0.0.15"
-    time_text = "09:42 AM"
-
-    ip_w = d.textlength(ip_text, font=FONT_SMALL)
-    time_w = d.textlength(time_text, font=FONT_SMALL)
-
-    # Right-aligned layout:
-    # [wifi] [IP] | [time]
-    right_pad = 16
-    time_x = W - right_pad - time_w
-    sep_x = time_x - 18
-    ip_x = sep_x - 18 - ip_w
-    wifi_x = ip_x - 24
-
-    tiny_wifi_icon(wifi_x, 17)
-
-    d.text((ip_x, 17), ip_text, font=FONT_SMALL, fill=WHITE)
+    # Fixed layout: [Wi-Fi] [dynamic IP] | [dynamic time].
+    # The runtime C++ overlay owns both text slots.
+    tiny_wifi_icon(TOP_WIFI_X, TOP_WIFI_Y)
 
     d.line(
-        (sep_x, 16, sep_x, 38),
+        (TOP_SEPARATOR_X, 16, TOP_SEPARATOR_X, 38),
         fill=(0, 150, 190, 90),
         width=1,
     )
 
-    d.text((time_x, 17), time_text, font=FONT_SMALL, fill=WHITE)
 
 
-
-def draw_left_menu(base):
+def draw_left_menu(base, active_item="Home"):
     d = ImageDraw.Draw(base)
     x, y, w, h = LEFT_MENU_X, LEFT_MENU_Y, LEFT_MENU_W, LEFT_MENU_H
 
@@ -279,11 +277,11 @@ def draw_left_menu(base):
         d.line((cx, cy - 17, cx, cy - 2), fill=color, width=4)
 
     items = [
-        ("Home", left_home_icon, True),
-        ("Voice", left_mic_icon, False),
-        ("Navigate", left_nav_icon, False),
-        ("Status", left_status_icon, False),
-        ("Power", left_power_icon, False),
+        ("Home", left_home_icon),
+        ("Voice", left_mic_icon),
+        ("Navigate", left_nav_icon),
+        ("Status", left_status_icon),
+        ("Power", left_power_icon),
     ]
 
     # 5 equal boxes spread evenly inside the vertical rail.
@@ -297,7 +295,8 @@ def draw_left_menu(base):
     item_x0 = x + 6
     item_x1 = x + w - 6
 
-    for i, (label, icon_func, active) in enumerate(items):
+    for i, (label, icon_func) in enumerate(items):
+        active = label == active_item
         item_y0 = first_y + i * (item_h + item_gap)
         item_y1 = item_y0 + item_h
 
@@ -514,13 +513,157 @@ def compose_home(robot_frame_name: str) -> Image.Image:
     soft = soft.filter(ImageFilter.GaussianBlur(18))
     base.alpha_composite(soft)
 
-    draw_top_bar(base)
-    draw_left_menu(base)
+    draw_top_bar(base, "HOME")
+    draw_left_menu(base, "Home")
     draw_status_panel(base)
     draw_title_area(base)
     darken_edges(base)
 
     return base.convert("RGB")
+
+
+
+def compose_page_shell(page_title: str, active_item: str) -> Image.Image:
+    """Create the common shell used by Voice, Navigate, Status and Power."""
+
+    base = Image.new("RGBA", (W, H), (0, 6, 18, 255))
+    d = ImageDraw.Draw(base)
+
+    # Same dark-blue background family as the Home page.
+    for y in range(H):
+        t = y / max(1, H - 1)
+        r = int(0 + 2 * t)
+        g = int(7 + 12 * t)
+        b = int(20 + 34 * t)
+        d.line((0, y, W, y), fill=(r, g, b, 255))
+
+    # Subtle shared background glow.
+    glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    gd = ImageDraw.Draw(glow)
+
+    gd.ellipse((80, 210, 850, 650), outline=(0, 115, 255, 46), width=4)
+    gd.ellipse((145, 95, 790, 520), fill=(0, 80, 160, 18))
+
+    for x in range(120, 780, 60):
+        gd.line((x, 75, x - 90, 470), fill=(0, 120, 180, 11), width=1)
+
+    glow = glow.filter(ImageFilter.GaussianBlur(11))
+    base.alpha_composite(glow)
+
+    # Shared page content panel.
+    panel = (112, 72, 782, 458)
+
+    panel_glow(base, panel, radius=18, alpha=75)
+
+    d.rounded_rectangle(
+        panel,
+        radius=18,
+        fill=(0, 11, 29, 215),
+        outline=(0, 190, 235, 120),
+        width=1,
+    )
+
+    # Common content heading area.
+    d.text(
+        (138, 88),
+        page_title.upper(),
+        font=FONT_MED_BOLD,
+        fill=CYAN,
+    )
+
+    d.text(
+        (138, 111),
+        "ROBOT SAVO INTERFACE",
+        font=FONT_SMALL,
+        fill=(188, 220, 235),
+    )
+
+    d.line(
+        (138, 132, 758, 132),
+        fill=(0, 145, 190, 85),
+        width=1,
+    )
+
+    # The static shell owns layout only.
+    # Live page data will be drawn by the C++ runtime below this line.
+    draw_top_bar(base, page_title)
+    draw_left_menu(base, active_item)
+    darken_edges(base)
+
+    return base.convert("RGB")
+
+
+
+def generate_runtime_font_atlas(
+    file_name: str,
+    runtime_font,
+    cell_width: int,
+    cell_height: int,
+):
+    """Generate a proportional antialiased glyph atlas for C++ rendering."""
+
+    rows = math.ceil(len(RUNTIME_FONT_CHARS) / RUNTIME_FONT_COLUMNS)
+
+    atlas = Image.new(
+        "RGB",
+        (RUNTIME_FONT_COLUMNS * cell_width, rows * cell_height),
+        (0, 0, 0),
+    )
+
+    draw = ImageDraw.Draw(atlas)
+    ascent, _descent = runtime_font.getmetrics()
+    baseline = RUNTIME_FONT_PADDING + ascent
+
+    for index, character in enumerate(RUNTIME_FONT_CHARS):
+        column = index % RUNTIME_FONT_COLUMNS
+        row = index // RUNTIME_FONT_COLUMNS
+
+        cell_x = column * cell_width
+        cell_y = row * cell_height
+
+        # Store proportional advance in the first pixel:
+        # red = advance, green = metadata marker.
+        advance = max(
+            1,
+            min(
+                255,
+                int(round(draw.textlength(character, font=runtime_font))) + 1,
+            ),
+        )
+
+        atlas.putpixel(
+            (cell_x, cell_y),
+            (advance, 255, 0),
+        )
+
+        if character == " ":
+            continue
+
+        bbox = draw.textbbox(
+            (0, baseline),
+            character,
+            font=runtime_font,
+            anchor="ls",
+        )
+
+        draw_x = cell_x + RUNTIME_FONT_PADDING - bbox[0]
+        draw_y = cell_y + baseline
+
+        draw.text(
+            (draw_x, draw_y),
+            character,
+            font=runtime_font,
+            fill=(255, 255, 255),
+            anchor="ls",
+        )
+
+    output_path = OUT_DIR / file_name
+    atlas.save(output_path)
+
+    print(
+        f"generated {output_path} "
+        f"size={atlas.width}x{atlas.height}"
+    )
 
 
 def save_ppm(img: Image.Image, path: Path):
@@ -530,6 +673,27 @@ def save_ppm(img: Image.Image, path: Path):
 
 def main():
     OUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    generate_runtime_font_atlas(
+        "ui_font_small.ppm",
+        FONT_SMALL,
+        18,
+        22,
+    )
+
+    generate_runtime_font_atlas(
+        "ui_font_medium.ppm",
+        FONT_MED,
+        20,
+        24,
+    )
+
+    generate_runtime_font_atlas(
+        "ui_font_large_bold.ppm",
+        FONT_BIG,
+        32,
+        36,
+    )
 
     frames = [
         ("home_idle_000", "robot_045.ppm"),  # front-right default
@@ -544,6 +708,19 @@ def main():
         save_ppm(img, OUT_DIR / f"{stem}.ppm")
         img.save(OUT_DIR / f"{stem}.png")
         print(f"generated {OUT_DIR / f'{stem}.ppm'} from {robot_name}")
+
+    page_shells = [
+        ("voice_shell", "VOICE", "Voice"),
+        ("navigate_shell", "NAVIGATE", "Navigate"),
+        ("status_shell", "STATUS", "Status"),
+        ("power_shell", "POWER", "Power"),
+    ]
+
+    for stem, page_title, active_item in page_shells:
+        img = compose_page_shell(page_title, active_item)
+        save_ppm(img, OUT_DIR / f"{stem}.ppm")
+        img.save(OUT_DIR / f"{stem}.png")
+        print(f"generated {OUT_DIR / f'{stem}.ppm'}")
 
     (OUT_DIR / "README.txt").write_text(
         "Generated home UI assets. Runtime C++ should load home_idle_000/001/002.ppm.\n"

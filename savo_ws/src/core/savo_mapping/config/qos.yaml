@@ -1,0 +1,44 @@
+/**:
+  ros__parameters:
+    qos:
+      status:
+        history: "keep_last"
+        depth: 10
+        reliability: "reliable"
+        durability: "volatile"
+
+      state:
+        history: "keep_last"
+        depth: 1
+        reliability: "reliable"
+        durability: "transient_local"
+
+      command:
+        history: "keep_last"
+        depth: 10
+        reliability: "reliable"
+        durability: "volatile"
+
+      scan:
+        history: "keep_last"
+        depth: 5
+        reliability: "best_effort"
+        durability: "volatile"
+
+      pointcloud:
+        history: "keep_last"
+        depth: 5
+        reliability: "best_effort"
+        durability: "volatile"
+
+      map:
+        history: "keep_last"
+        depth: 1
+        reliability: "reliable"
+        durability: "transient_local"
+
+      event:
+        history: "keep_last"
+        depth: 20
+        reliability: "reliable"
+        durability: "volatile"

@@ -4,6 +4,7 @@
 #include "savo_ui/render/image_asset.hpp"
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace savo_ui
@@ -56,6 +57,7 @@ public:
   bool draw_image_fit(const ImageAsset & image);
 
   const std::vector<std::uint8_t> & pixels_rgb() const;
+  bool write_ppm(const std::string & path) const;
 
 private:
   int width_{0};

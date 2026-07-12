@@ -1,0 +1,24 @@
+/mapping_supervisor_node:
+  ros__parameters:
+    mapping:
+      default_mode: "manual"
+      default_exploration_mode: "idle"
+
+      require_scan: true
+      require_map: true
+      require_odom: true
+      require_tf: true
+
+      allow_direct_motor_control: false
+      allow_internal_package_calls: false
+
+    optional_features:
+      realsense_monitoring_enabled: false
+      voxel_obstacle_monitoring_enabled: false
+      semantic_mapping_enabled: false
+
+    navigation_handoff:
+      enabled: false
+      require_saved_map: true
+      require_quality_pass: true
+      require_named_map: true

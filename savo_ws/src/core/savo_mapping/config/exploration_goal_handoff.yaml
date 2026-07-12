@@ -1,0 +1,24 @@
+exploration_goal_handoff_node:
+  ros__parameters:
+    expected_frame: "map"
+
+    # Maximum time to wait for the savo_nav action server.
+    server_wait_timeout_sec: 3.0
+
+    # Maximum time for savo_nav to accept or reject a sent goal.
+    goal_response_timeout_sec: 3.0
+
+    # Absolute maximum duration of one accepted navigation goal.
+    execution_timeout_sec: 300.0
+
+    # Maximum allowed time without navigation feedback.
+    feedback_stale_timeout_sec: 10.0
+
+    # Maximum time for cancellation to reach a terminal result.
+    cancel_timeout_sec: 5.0
+
+    # Poll all handoff states without blocking the executor.
+    server_poll_period_ms: 100
+
+    # Refresh the selected map-frame goal timestamp.
+    restamp_goal: true

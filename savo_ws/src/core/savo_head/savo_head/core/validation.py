@@ -216,6 +216,9 @@ def validate_head_topics_params(params: dict[str, Any], source: str = "head_topi
         "scan_state_topic": TOPICS.scan_state,
         "status_topic": TOPICS.status,
         "dashboard_text_topic": TOPICS.dashboard_text,
+        "camera_status_topic": TOPICS.camera_status,
+        "image_raw_topic": TOPICS.image_raw,
+        "camera_info_topic": TOPICS.camera_info,
         "apriltag_detections_topic": TOPICS.apriltag_detections,
         "semantic_confirmations_topic": TOPICS.semantic_confirmations,
     }
@@ -225,6 +228,24 @@ def validate_head_topics_params(params: dict[str, Any], source: str = "head_topi
     for key, value in expected.items():
         if key in params and str(params[key]) != value:
             issues.append(_issue("error", source, f"expected {value}", key))
+
+    camera = params.get("camera")
+    if camera is not None:
+        if not isinstance(camera, dict):
+            issues.append(_issue("error", source, "camera must be a mapping", "camera"))
+        else:
+            expected_camera = {
+                "image_raw": TOPICS.image_raw,
+                "camera_info": TOPICS.camera_info,
+                "status": TOPICS.camera_status,
+                "stream_cmd": TOPICS.camera_stream_cmd,
+                "stream_state": TOPICS.camera_stream_state,
+            }
+            issues.extend(_require(camera, source, expected_camera.keys()))
+
+            for key, value in expected_camera.items():
+                if key in camera and str(camera[key]) != value:
+                    issues.append(_issue("error", source, f"expected {value}", f"camera.{key}"))
 
     return ValidationResult(tuple(issues))
 

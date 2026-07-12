@@ -1,0 +1,25 @@
+/savo_head/camera_driver:
+  ros__parameters:
+    camera_name: "savo_head_camera"
+    frame_id: "pi_camera_optical_frame"
+    camera_info_url: ""
+
+    # gscam converts the final GStreamer RGB frames into ROS rgb8 images.
+    image_encoding: "rgb8"
+
+    # Camera topics use the ROS sensor-data QoS profile.
+    use_sensor_data_qos: true
+
+    # Do not synchronize the appsink to the GStreamer clock.
+    # This normally avoids unnecessary frame dropping and latency.
+    sync_sink: false
+
+    # Not needed for a live Pi camera.
+    preroll: false
+
+    # Use the ROS node clock when the frame is received.
+    use_gst_timestamps: false
+
+    # Keep false during initial hardware validation.
+    # A failure should remain visible instead of silently reopening.
+    reopen_on_eof: false

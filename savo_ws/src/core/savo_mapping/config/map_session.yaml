@@ -1,0 +1,31 @@
+/**:
+  ros__parameters:
+    map_session:
+      default_map_name: "savo_map"
+      auto_start: false
+      auto_save: false
+      allow_overwrite: false
+      create_session_directory: true
+
+      save_timeout_s: 30.0
+      minimum_session_duration_s: 5.0
+
+    storage:
+      root_directory: "maps/saved"
+      path_base: "repository_root"
+
+      map_yaml_filename: "map.yaml"
+      map_image_filename: "map.pgm"
+      session_report_filename: "session_report.yaml"
+      quality_report_filename: "quality_report.yaml"
+      semantic_landmarks_filename: "semantic_landmarks.yaml"
+
+    map_output:
+      image_format: "pgm"
+      map_mode: "trinary"
+      free_threshold: 0.25
+      occupied_threshold: 0.65
+
+      save_session_report: true
+      save_quality_report: true
+      save_semantic_landmarks: true

@@ -1,0 +1,26 @@
+/**:
+  ros__parameters:
+    frames:
+      map: "map"
+      odom: "odom"
+      base: "base_link"
+      base_footprint: "base_footprint"
+      lidar: "laser_frame"
+
+      optional:
+        realsense_link: "camera_link"
+        realsense_depth_optical: "camera_depth_optical_frame"
+        head_camera: "head_camera_link"
+
+    frame_policy:
+      require_map_to_odom: true
+      require_odom_to_base: true
+      require_base_to_lidar: true
+      require_base_footprint: false
+
+      require_fresh_map_to_odom: false
+      require_fresh_odom_to_base: true
+      require_fresh_base_to_lidar: false
+
+      tf_lookup_timeout_s: 0.20
+      tf_stale_timeout_s: 1.00

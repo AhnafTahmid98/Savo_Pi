@@ -22,10 +22,14 @@ DIAGNOSTICS: Final[str] = "/diagnostics"
 
 CAMERA_STREAM_CMD: Final[str] = "/savo_head/camera_stream_cmd"
 CAMERA_STREAM_STATE: Final[str] = "/savo_head/camera_stream_state"
-CAMERA_STATUS: Final[str] = "/savo_head/camera_status"
 
-IMAGE_RAW: Final[str] = "/savo_head/image_raw"
-CAMERA_INFO: Final[str] = "/savo_head/camera_info"
+CAMERA_IMAGE_RAW_TOPIC: Final[str] = "/savo_head/camera/image_raw"
+CAMERA_INFO_TOPIC: Final[str] = "/savo_head/camera/camera_info"
+CAMERA_STATUS_TOPIC: Final[str] = "/savo_head/camera/status"
+
+IMAGE_RAW: Final[str] = CAMERA_IMAGE_RAW_TOPIC
+CAMERA_INFO: Final[str] = CAMERA_INFO_TOPIC
+CAMERA_STATUS: Final[str] = CAMERA_STATUS_TOPIC
 
 APRILTAG_DETECTIONS: Final[str] = "/savo_head/apriltag_detections"
 SEMANTIC_CONFIRMATIONS: Final[str] = "/savo_head/semantic_confirmations"
@@ -128,6 +132,9 @@ __all__ = [
     "DIAGNOSTICS",
     "CAMERA_STREAM_CMD",
     "CAMERA_STREAM_STATE",
+    "CAMERA_IMAGE_RAW_TOPIC",
+    "CAMERA_INFO_TOPIC",
+    "CAMERA_STATUS_TOPIC",
     "CAMERA_STATUS",
     "IMAGE_RAW",
     "CAMERA_INFO",
@@ -147,4 +154,3 @@ __all__ = [
 
 # Robot pose evidence used by AprilTag semantic confirmation.
 ROBOT_POSE_SNAPSHOT_TOPIC = "/savo_head/robot_pose_snapshot"
-

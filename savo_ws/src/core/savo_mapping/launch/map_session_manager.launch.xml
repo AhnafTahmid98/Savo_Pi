@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<launch>
+  <arg
+    name="map_id"
+    default=""
+    description="Stable lowercase map identifier"/>
+
+  <arg
+    name="map_output_root"
+    default="~/Savo_Pi/runtime/maps"
+    description="Root directory for saved map sessions"/>
+
+  <arg
+    name="allow_map_overwrite"
+    default="false"
+    description="Allow replacement of an existing map session"/>
+
+  <arg
+    name="use_sim_time"
+    default="false"/>
+
+  <node
+    pkg="savo_mapping"
+    exec="map_session_manager_node"
+    name="map_session_manager_node"
+    output="screen">
+
+    <param
+      from="$(find-pkg-share savo_mapping)/config/map_session_manager.yaml"/>
+
+    <param
+      name="session.map_id"
+      value="$(var map_id)"/>
+
+    <param
+      name="session.output_root"
+      value="$(var map_output_root)"/>
+
+    <param
+      name="session.allow_overwrite"
+      value="$(var allow_map_overwrite)"/>
+
+    <param
+      name="use_sim_time"
+      value="$(var use_sim_time)"/>
+  </node>
+</launch>

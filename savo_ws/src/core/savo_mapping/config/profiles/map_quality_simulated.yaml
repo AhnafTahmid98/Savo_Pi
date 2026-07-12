@@ -1,0 +1,23 @@
+map_quality_evaluator_node:
+  ros__parameters:
+    session:
+      root: "~/Savo_Pi/runtime/maps"
+      map_id: ""
+      expected_frame: "map"
+
+    policy:
+      min_width_cells: 20
+      min_height_cells: 20
+
+      min_known_cells: 500
+      min_free_cells: 400
+      min_occupied_cells: 10
+
+      min_resolution_m: 0.02
+      max_resolution_m: 0.10
+
+      min_known_ratio: 0.20
+
+      # Relaxed only for controlled simulated-map validation.
+      # Production map_quality_evaluator.yaml remains at 0.85.
+      min_largest_free_component_ratio: 0.75

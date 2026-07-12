@@ -1,0 +1,40 @@
+/**:
+  ros__parameters:
+    map_quality:
+      enabled: true
+
+      minimum_quality_score: 0.70
+      navigation_handoff_score: 0.80
+
+      minimum_map_area_m2: 4.0
+      minimum_free_ratio: 0.05
+      maximum_occupied_ratio: 0.60
+      maximum_unknown_ratio: 0.70
+
+      minimum_map_updates: 2
+      minimum_scan_updates: 10
+
+    freshness:
+      maximum_scan_age_s: 1.0
+      maximum_map_age_s: 5.0
+      maximum_odom_age_s: 1.0
+      maximum_tf_age_s: 1.0
+
+    required_inputs:
+      map: true
+      scan: true
+      tf: true
+      odom: true
+
+    validation:
+      reject_non_finite_values: true
+      reject_empty_map: true
+      reject_zero_resolution: true
+      reject_invalid_origin: true
+      reject_invalid_occupancy_values: true
+
+    navigation_handoff:
+      require_quality_score: true
+      require_saved_map_files: true
+      require_complete_session: true
+      require_semantic_landmarks: false

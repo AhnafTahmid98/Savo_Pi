@@ -5,8 +5,12 @@
 #include "savo_ui/render/image_asset.hpp"
 
 #include <rclcpp/rclcpp.hpp>
+#include <std_msgs/msg/string.hpp>
 
+#include <array>
 #include <chrono>
+#include <deque>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -29,6 +33,101 @@ enum class UiScreen
   SafetyStop
 };
 
+enum class VoicePhase
+{
+  Idle,
+  Listening,
+  Thinking,
+  Speaking,
+  Error
+};
+
+enum class ScreenRequestSource
+{
+  Touch,
+  Speech,
+  SavoMind,
+  Internal
+};
+
+struct PowerUiSourceState
+{
+  bool seen{false};
+  bool has_voltage{false};
+  bool has_percent{false};
+
+  double voltage_v{0.0};
+  double percent{0.0};
+
+  std::string state{"unknown"};
+  std::string percent_label{"PERCENT"};
+
+  std::chrono::steady_clock::time_point last_update{};
+  std::deque<double> voltage_history{};
+};
+
+struct ObstacleDistanceUiState
+{
+  std::string label;
+
+  bool seen{false};
+  bool valid{false};
+  bool clear_out_of_range{false};
+
+  double distance_m{0.0};
+  std::string state{"MISSING"};
+};
+
+struct StatusUiState
+{
+  std::string robot_state{"WAITING"};
+  std::string operating_mode{"UNKNOWN"};
+  int alert_count{0};
+  bool live{false};
+
+  std::string safety_state{"MISSING"};
+  std::string safety_gate{"--"};
+  std::string slowdown{"--"};
+
+  std::string control_state{"MISSING"};
+  std::string base_state{"--"};
+  std::string control_mode{"--"};
+  std::string watchdog_state{"--"};
+
+  std::string localization_state{"MISSING"};
+  std::string ekf_state{"--"};
+  std::string wheel_state{"--"};
+  std::string imu_state{"--"};
+  std::string vo_state{"--"};
+
+  std::string perception_state{"MISSING"};
+  std::string lidar_state{"--"};
+  std::string tof_state{"--"};
+  std::string ultrasonic_state{"--"};
+  std::string depth_state{"--"};
+
+  std::string navigation_state{"MISSING"};
+  std::string nav_state{"--"};
+  std::string mapping_state{"--"};
+  std::string recovery_state{"--"};
+  std::string navigation_goal{"None"};
+
+  std::string connectivity_state{"MISSING"};
+  std::string savomind_state{"--"};
+  std::string speech_state{"--"};
+  std::string link_state{"--"};
+
+  std::array<ObstacleDistanceUiState, 5> obstacle_distances{{
+    {"LiDAR Front", false, false, false, 0.0, "MISSING"},
+    {"ToF Left", false, false, false, 0.0, "MISSING"},
+    {"ToF Right", false, false, false, 0.0, "MISSING"},
+    {"Ultrasonic", false, false, false, 0.0, "MISSING"},
+    {"Depth Front", false, false, false, 0.0, "MISSING"},
+  }};
+
+  std::string active_alert{"None"};
+};
+
 std::string to_string(UiScreen screen);
 
 struct UiNodeConfig
@@ -39,14 +138,21 @@ struct UiNodeConfig
   std::string asset_root{""};
   std::string preview_output_dir{"/tmp/savo_ui_preview"};
 
+  std::string power_core_topic{"/savo_power/core/ups"};
+  std::string power_edge_topic{"/savo_power/edge/ups"};
+  std::string power_base_topic{"/savo_power/base/battery"};
+  std::string power_status_topic{"/savo_power/status"};
+
   int screen_width{800};
   int screen_height{480};
 
   double loop_hz{10.0};
   double intro_seconds{4.0};
   double robot360_seconds_per_frame{0.75};
+  double power_stale_timeout_s{5.0};
 
   int preview_animation_frames{24};
+  int power_history_samples{120};
 
   bool enable_framebuffer{false};
   bool enable_touch{false};
@@ -67,10 +173,23 @@ private:
   void load_parameters();
   void load_assets();
   bool load_robot360_frames();
+  bool load_page_shells();
+  bool load_runtime_font_atlases();
   void configure_display();
   void configure_touch();
   void close_touch();
   void configure_runtime();
+  void configure_power_subscriptions();
+
+  void update_power_source(
+    PowerUiSourceState & source,
+    const std::string & text,
+    const std::string & source_label,
+    const std::string & percent_token,
+    const std::string & percent_label);
+
+  void update_power_status(const std::string & text);
+  bool power_source_is_stale(const PowerUiSourceState & source) const;
 
   void configure_home_idle_sequence();
   void export_preview_frames();
@@ -80,10 +199,23 @@ private:
   void poll_touch_input();
   void handle_touch_tap(int x, int y);
   bool screen_from_touch(int x, int y, UiScreen * screen) const;
+
+  void request_screen(UiScreen screen, ScreenRequestSource source);
+  void queue_screen_after_tts(UiScreen screen);
+  void handle_tts_finished();
+
   void render_current_screen();
   void render_intro();
   void render_intro_overlay(float progress);
   void render_home();
+  void render_page_shell(
+    const ImageAsset & shell,
+    const std::string & page_name);
+  void render_status_page();
+  void seed_status_preview_data();
+  void render_power_page();
+  void seed_power_preview_data();
+  void maybe_export_power_live_preview();
   void render_home_glow();
   void render_home_dashboard();
   void render_home_top_bar();
@@ -104,10 +236,50 @@ private:
 
   rclcpp::TimerBase::SharedPtr loop_timer_;
 
+  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr
+    power_core_subscription_;
+  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr
+    power_edge_subscription_;
+  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr
+    power_base_subscription_;
+  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr
+    power_status_subscription_;
+
   UiScreen active_screen_{UiScreen::Intro};
+  VoicePhase voice_phase_{VoicePhase::Idle};
+  std::optional<UiScreen> pending_screen_;
+
+  std::string voice_input_source_;
+  std::string voice_transcript_;
+  std::string voice_response_;
+  std::string resolved_intent_;
+  std::string navigation_destination_;
+
+  StatusUiState status_ui_;
+
+  PowerUiSourceState core_power_;
+  PowerUiSourceState edge_power_;
+  PowerUiSourceState base_power_;
+
+  bool power_status_seen_{false};
+  std::string power_overall_state_{"unknown"};
+  std::string power_health_state_{"UNKNOWN"};
+
+  std::chrono::steady_clock::time_point power_status_last_update_{};
+  std::chrono::steady_clock::time_point last_power_preview_export_{};
+
   bool first_tick_logged_{false};
 
   ImageAsset boot_intro_;
+  ImageAsset voice_shell_;
+  ImageAsset navigate_shell_;
+  ImageAsset status_shell_;
+  ImageAsset power_shell_;
+
+  ImageAsset ui_font_small_;
+  ImageAsset ui_font_medium_;
+  ImageAsset ui_font_large_bold_;
+
   std::vector<ImageAsset> robot360_frames_;
 
   std::vector<std::size_t> home_idle_sequence_;

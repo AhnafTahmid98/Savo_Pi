@@ -1,0 +1,21 @@
+/simulated_slam_input_node:
+  ros__parameters:
+    simulation:
+      publish_rate_hz: 10.0
+
+      room_half_width_m: 2.50
+      room_half_height_m: 1.75
+
+      sample_count: 360
+
+      range_min_m: 0.15
+      range_max_m: 12.0
+
+    topics:
+      scan: "/scan"
+      odom: "/odometry/filtered"
+
+    frames:
+      odom: "odom"
+      base: "base_link"
+      lidar: "laser_frame"

@@ -1,0 +1,60 @@
+/**:
+  ros__parameters:
+    topics:
+      inputs:
+        scan: "/scan"
+        map: "/map"
+        map_metadata: "/map_metadata"
+        tf: "/tf"
+        tf_static: "/tf_static"
+        odom: "/odom"
+        odom_filtered: "/odometry/filtered"
+        wheel_odom: "/wheel/odom"
+
+      realsense:
+        status: "/savo_realsense/status"
+        depth_min_front: "/depth/min_front_m"
+        pointcloud: "/depth/color/points"
+
+      semantic:
+        head_confirmations: "/savo_head/semantic_confirmations"
+
+      outputs:
+        status: "/savo_mapping/status"
+        readiness: "/savo_mapping/readiness"
+        mode: "/savo_mapping/mode"
+        workflow_phase: "/savo_mapping/workflow_phase"
+        session_state: "/savo_mapping/session_state"
+        map_quality: "/savo_mapping/map_quality"
+        map_saved: "/savo_mapping/map_saved"
+        exploration_status: "/savo_mapping/exploration_status"
+        semantic_events: "/savo_mapping/semantic_events"
+        dashboard: "/savo_mapping/dashboard"
+
+      commands:
+        mode: "/savo_mapping/mode_cmd"
+        start_session: "/savo_mapping/start_session_cmd"
+        stop_session: "/savo_mapping/stop_session_cmd"
+        save_map: "/savo_mapping/save_map_cmd"
+        cancel_session: "/savo_mapping/cancel_session_cmd"
+        scan360: "/savo_mapping/scan360_cmd"
+
+      exploration_handoff:
+        selected_goal: "/savo_mapping/exploration/selected_goal"
+        state: "/savo_mapping/exploration_goal/state"
+        status: "/savo_mapping/exploration_goal/status"
+        feedback: "/savo_mapping/exploration_goal/feedback"
+
+      navigation_awareness:
+        status: "/savo_nav/status"
+
+      safety:
+        stop: "/safety/stop"
+        slowdown_factor: "/safety/slowdown_factor"
+        control_mode_state: "/savo_control/mode_state"
+
+    services:
+      exploration_goal_cancel: "/savo_mapping/exploration_goal/cancel"
+
+    actions:
+      exploration_navigate_to_pose: "/savo_nav/exploration/navigate_to_pose"

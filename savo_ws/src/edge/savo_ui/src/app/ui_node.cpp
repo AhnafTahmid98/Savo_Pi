@@ -18,6 +18,163 @@
 #include <linux/input.h>
 #include <unistd.h>
 
+#include <arpa/inet.h>
+#include <ifaddrs.h>
+#include <net/if.h>
+
+#include <chrono>
+#include <ctime>
+#include <iomanip>
+#include <sstream>
+
+
+
+namespace
+{
+
+std::string current_local_time_text()
+{
+  const auto now = std::chrono::system_clock::now();
+  const std::time_t now_time = std::chrono::system_clock::to_time_t(now);
+
+  std::tm local_tm{};
+  localtime_r(&now_time, &local_tm);
+
+  std::ostringstream out;
+  out << std::put_time(&local_tm, "%H:%M");
+  return out.str();
+}
+
+bool is_usable_ipv4(const std::string & ip)
+{
+  return !ip.empty() && ip != "127.0.0.1";
+}
+
+std::string get_ipv4_for_interface(const std::string & wanted_interface)
+{
+  ifaddrs * interfaces = nullptr;
+
+  if (getifaddrs(&interfaces) != 0 || interfaces == nullptr) {
+    return "--";
+  }
+
+  std::string result{"--"};
+
+  for (const ifaddrs * ifa = interfaces; ifa != nullptr; ifa = ifa->ifa_next) {
+    if (ifa->ifa_addr == nullptr || ifa->ifa_name == nullptr) {
+      continue;
+    }
+
+    if (wanted_interface != ifa->ifa_name) {
+      continue;
+    }
+
+    if (ifa->ifa_addr->sa_family != AF_INET) {
+      continue;
+    }
+
+    char buffer[INET_ADDRSTRLEN]{};
+    const auto * addr = reinterpret_cast<const sockaddr_in *>(ifa->ifa_addr);
+
+    if (inet_ntop(AF_INET, &addr->sin_addr, buffer, sizeof(buffer)) != nullptr) {
+      const std::string ip{buffer};
+      if (is_usable_ipv4(ip)) {
+        result = ip;
+        break;
+      }
+    }
+  }
+
+  freeifaddrs(interfaces);
+  return result;
+}
+
+std::string current_ip_text()
+{
+  // UI runs on savo-edge. Prefer the validated direct robot Ethernet IP.
+  const auto eth0 = get_ipv4_for_interface("eth0");
+
+  if (eth0.rfind("192.168.50.", 0) == 0) {
+    return eth0;
+  }
+
+  // PC dryrun or temporarily disconnected edge fallback.
+  return "192.168.50.2";
+}
+
+void draw_live_top_bar_overlay(savo_ui::Canvas & canvas)
+{
+  const std::string core_ip{"192.168.50.1"};
+  const std::string edge_ip = current_ip_text();
+  const std::string time_text = current_local_time_text();
+
+  constexpr int kScale = 1;
+
+  // Fixed two-row IP area between the generated Wi-Fi icon and separator.
+  constexpr int kLabelX = 620;
+  constexpr int kIpX = 650;
+  constexpr int kCoreY = 15;
+  constexpr int kEdgeY = 29;
+
+  // CORE row.
+  savo_ui::Font::draw_text(
+    canvas,
+    kLabelX,
+    kCoreY,
+    "CORE",
+    savo_ui::ColorRgb{0U, 220U, 255U},
+    kScale,
+    0.95F);
+
+  savo_ui::Font::draw_text(
+    canvas,
+    kIpX,
+    kCoreY,
+    core_ip,
+    savo_ui::ColorRgb{235U, 248U, 255U},
+    kScale,
+    0.95F);
+
+  // EDGE row.
+  savo_ui::Font::draw_text(
+    canvas,
+    kLabelX,
+    kEdgeY,
+    "EDGE",
+    savo_ui::ColorRgb{0U, 220U, 255U},
+    kScale,
+    0.95F);
+
+  savo_ui::Font::draw_text(
+    canvas,
+    kIpX,
+    kEdgeY,
+    edge_ip,
+    savo_ui::ColorRgb{235U, 248U, 255U},
+    kScale,
+    0.95F);
+
+  // Right-align time with clear space after the generated separator at x=740.
+  constexpr int kTimeRight = 790;
+  constexpr int kTimeY = 23;
+
+  const int time_x =
+    kTimeRight - savo_ui::Font::text_width(time_text, kScale);
+
+  savo_ui::Font::draw_text(
+    canvas,
+    time_x,
+    kTimeY,
+    time_text,
+    savo_ui::ColorRgb{235U, 248U, 255U},
+    kScale,
+    0.95F);
+}
+
+
+}  // namespace
+
+
 namespace savo_ui
 {
 namespace
@@ -26,6 +183,168 @@ namespace
 std::string join_path(const std::string & left, const std::string & right)
 {
   return (std::filesystem::path(left) / right).string();
+}
+
+std::string trim_copy(const std::string & text)
+{
+  const auto first = text.find_first_not_of(" \t\r\n");
+
+  if (first == std::string::npos) {
+    return "";
+  }
+
+  const auto last = text.find_last_not_of(" \t\r\n");
+  return text.substr(first, last - first + 1U);
+}
+
+std::string lowercase_copy(std::string text)
+{
+  std::transform(
+    text.begin(),
+    text.end(),
+    text.begin(),
+    [](const unsigned char value) {
+      return static_cast<char>(std::tolower(value));
+    });
+
+  return text;
+}
+
+std::string uppercase_copy(std::string text)
+{
+  std::transform(
+    text.begin(),
+    text.end(),
+    text.begin(),
+    [](const unsigned char value) {
+      return static_cast<char>(std::toupper(value));
+    });
+
+  return text;
+}
+
+bool extract_number_before(
+  const std::string & text,
+  const std::string & marker,
+  double * value)
+{
+  if (value == nullptr) {
+    return false;
+  }
+
+  const auto marker_position = text.find(marker);
+
+  if (marker_position == std::string::npos) {
+    return false;
+  }
+
+  std::size_t end = marker_position;
+
+  while (
+    end > 0U &&
+    std::isspace(static_cast<unsigned char>(text[end - 1U])) != 0)
+  {
+    --end;
+  }
+
+  std::size_t start = end;
+
+  while (start > 0U) {
+    const char character = text[start - 1U];
+
+    if (
+      std::isdigit(static_cast<unsigned char>(character)) == 0 &&
+      character != '.' &&
+      character != '-' &&
+      character != '+')
+    {
+      break;
+    }
+
+    --start;
+  }
+
+  if (start == end) {
+    return false;
+  }
+
+  try {
+    *value = std::stod(text.substr(start, end - start));
+    return std::isfinite(*value);
+  } catch (const std::exception &) {
+    return false;
+  }
+}
+
+bool extract_number_after(
+  const std::string & text,
+  const std::string & marker,
+  double * value)
+{
+  if (value == nullptr) {
+    return false;
+  }
+
+  const auto marker_position = text.find(marker);
+
+  if (marker_position == std::string::npos) {
+    return false;
+  }
+
+  std::size_t start = marker_position + marker.size();
+
+  while (
+    start < text.size() &&
+    std::isspace(static_cast<unsigned char>(text[start])) != 0)
+  {
+    ++start;
+  }
+
+  std::size_t end = start;
+
+  while (end < text.size()) {
+    const char character = text[end];
+
+    if (
+      std::isdigit(static_cast<unsigned char>(character)) == 0 &&
+      character != '.' &&
+      character != '-' &&
+      character != '+')
+    {
+      break;
+    }
+
+    ++end;
+  }
+
+  if (start == end) {
+    return false;
+  }
+
+  try {
+    *value = std::stod(text.substr(start, end - start));
+    return std::isfinite(*value);
+  } catch (const std::exception &) {
+    return false;
+  }
+}
+
+std::string extract_value_after_key(
+  const std::string & text,
+  const std::string & key)
+{
+  const auto key_position = text.find(key);
+
+  if (key_position == std::string::npos) {
+    return "";
+  }
+
+  const std::size_t start = key_position + key.size();
+  const auto end = text.find_first_of(" \t\r\n", start);
+
+  return text.substr(
+    start,
+    end == std::string::npos ? std::string::npos : end - start);
 }
 
 }  // namespace
@@ -90,6 +409,7 @@ UiNode::UiNode(const rclcpp::NodeOptions & options)
 
   configure_display();
   configure_touch();
+  configure_power_subscriptions();
   present_if_enabled();
 
   configure_runtime();
@@ -126,6 +446,19 @@ void UiNode::declare_parameters()
   declare_parameter<std::string>("asset_root", config_.asset_root);
   declare_parameter<std::string>("preview_output_dir", config_.preview_output_dir);
 
+  declare_parameter<std::string>(
+    "power_core_topic",
+    config_.power_core_topic);
+  declare_parameter<std::string>(
+    "power_edge_topic",
+    config_.power_edge_topic);
+  declare_parameter<std::string>(
+    "power_base_topic",
+    config_.power_base_topic);
+  declare_parameter<std::string>(
+    "power_status_topic",
+    config_.power_status_topic);
+
   declare_parameter<int>("screen_width", config_.screen_width);
   declare_parameter<int>("screen_height", config_.screen_height);
 
@@ -136,6 +469,11 @@ void UiNode::declare_parameters()
     config_.robot360_seconds_per_frame);
 
   declare_parameter<int>("preview_animation_frames", config_.preview_animation_frames);
+  declare_parameter<int>("power_history_samples", config_.power_history_samples);
+
+  declare_parameter<double>(
+    "power_stale_timeout_s",
+    config_.power_stale_timeout_s);
 
   declare_parameter<bool>("enable_framebuffer", config_.enable_framebuffer);
   declare_parameter<bool>("enable_touch", config_.enable_touch);
@@ -150,6 +488,15 @@ void UiNode::load_parameters()
   config_.asset_root = get_parameter("asset_root").as_string();
   config_.preview_output_dir = get_parameter("preview_output_dir").as_string();
 
+  config_.power_core_topic =
+    get_parameter("power_core_topic").as_string();
+  config_.power_edge_topic =
+    get_parameter("power_edge_topic").as_string();
+  config_.power_base_topic =
+    get_parameter("power_base_topic").as_string();
+  config_.power_status_topic =
+    get_parameter("power_status_topic").as_string();
+
   config_.screen_width = clamp_int(get_parameter("screen_width").as_int(), 320, 3840);
   config_.screen_height = clamp_int(get_parameter("screen_height").as_int(), 240, 2160);
 
@@ -160,6 +507,15 @@ void UiNode::load_parameters()
 
   config_.preview_animation_frames =
     clamp_int(get_parameter("preview_animation_frames").as_int(), 4, 120);
+
+  config_.power_history_samples =
+    clamp_int(get_parameter("power_history_samples").as_int(), 10, 600);
+
+  config_.power_stale_timeout_s =
+    clamp_double(
+      get_parameter("power_stale_timeout_s").as_double(),
+      1.0,
+      60.0);
 
   config_.enable_framebuffer = get_parameter("enable_framebuffer").as_bool();
   config_.enable_touch = get_parameter("enable_touch").as_bool();
@@ -179,6 +535,15 @@ void UiNode::load_parameters()
 
   if (config_.preview_output_dir.empty()) {
     throw std::runtime_error("preview_output_dir parameter cannot be empty");
+  }
+
+  if (
+    config_.power_core_topic.empty() ||
+    config_.power_edge_topic.empty() ||
+    config_.power_base_topic.empty() ||
+    config_.power_status_topic.empty())
+  {
+    throw std::runtime_error("power topic parameters cannot be empty");
   }
 }
 
@@ -206,6 +571,22 @@ void UiNode::load_assets()
     get_logger(),
     "loaded generated home frames | count=%zu",
     robot360_frames_.size());
+
+  if (!load_page_shells()) {
+    throw std::runtime_error("failed to load generated page shells");
+  }
+
+  RCLCPP_INFO(
+    get_logger(),
+    "loaded generated page shells | count=4");
+
+  if (!load_runtime_font_atlases()) {
+    throw std::runtime_error("failed to load runtime font atlases");
+  }
+
+  RCLCPP_INFO(
+    get_logger(),
+    "loaded runtime font atlases | count=3");
 }
 
 bool UiNode::load_robot360_frames()
@@ -262,6 +643,145 @@ bool UiNode::load_robot360_frames()
 }
 
 
+
+bool UiNode::load_page_shells()
+{
+  auto load_shell =
+    [this](
+      const std::string & file_name,
+      const std::string & page_name,
+      ImageAsset * shell) -> bool
+    {
+      if (shell == nullptr) {
+        RCLCPP_ERROR(
+          get_logger(),
+          "page shell destination is null | page=%s",
+          page_name.c_str());
+        return false;
+      }
+
+      const auto path =
+        join_path(config_.asset_root, "images/generated/" + file_name);
+
+      std::string error_message;
+      if (!shell->load_ppm(path, &error_message)) {
+        RCLCPP_ERROR(
+          get_logger(),
+          "failed to load page shell | page=%s error=%s",
+          page_name.c_str(),
+          error_message.c_str());
+        return false;
+      }
+
+      if (
+        shell->width() != config_.screen_width ||
+        shell->height() != config_.screen_height)
+      {
+        RCLCPP_ERROR(
+          get_logger(),
+          "page shell has wrong size | page=%s size=%dx%d expected=%dx%d",
+          page_name.c_str(),
+          shell->width(),
+          shell->height(),
+          config_.screen_width,
+          config_.screen_height);
+        return false;
+      }
+
+      RCLCPP_INFO(
+        get_logger(),
+        "loaded generated page shell | page=%s file=%s size=%dx%d",
+        page_name.c_str(),
+        file_name.c_str(),
+        shell->width(),
+        shell->height());
+
+      return true;
+    };
+
+  return
+    load_shell("voice_shell.ppm", "Voice", &voice_shell_) &&
+    load_shell("navigate_shell.ppm", "Navigate", &navigate_shell_) &&
+    load_shell("status_shell.ppm", "Status", &status_shell_) &&
+    load_shell("power_shell.ppm", "Power", &power_shell_);
+}
+
+
+
+bool UiNode::load_runtime_font_atlases()
+{
+  auto load_font =
+    [this](
+      const std::string & file_name,
+      const int expected_width,
+      const int expected_height,
+      ImageAsset * destination) -> bool
+    {
+      if (destination == nullptr) {
+        return false;
+      }
+
+      const std::string path =
+        join_path(
+        config_.asset_root,
+        "images/generated/" + file_name);
+
+      std::string error_message;
+
+      if (!destination->load_ppm(path, &error_message)) {
+        RCLCPP_ERROR(
+          get_logger(),
+          "failed to load runtime font atlas | file=%s error=%s",
+          file_name.c_str(),
+          error_message.c_str());
+        return false;
+      }
+
+      if (
+        destination->width() != expected_width ||
+        destination->height() != expected_height)
+      {
+        RCLCPP_ERROR(
+          get_logger(),
+          "runtime font atlas has wrong size | file=%s "
+          "size=%dx%d expected=%dx%d",
+          file_name.c_str(),
+          destination->width(),
+          destination->height(),
+          expected_width,
+          expected_height);
+        return false;
+      }
+
+      RCLCPP_INFO(
+        get_logger(),
+        "loaded runtime font atlas | file=%s size=%dx%d",
+        file_name.c_str(),
+        destination->width(),
+        destination->height());
+
+      return true;
+    };
+
+  return
+    load_font(
+      "ui_font_small.ppm",
+      288,
+      132,
+      &ui_font_small_) &&
+    load_font(
+      "ui_font_medium.ppm",
+      320,
+      144,
+      &ui_font_medium_) &&
+    load_font(
+      "ui_font_large_bold.ppm",
+      512,
+      216,
+      &ui_font_large_bold_);
+}
+
+
 void UiNode::configure_home_idle_sequence()
 {
   home_idle_sequence_.clear();
@@ -290,139 +810,146 @@ void UiNode::export_preview_frames()
     return;
   }
 
-  std::string error_message;
-
-  active_screen_ = UiScreen::Intro;
-
-  const double saved_intro_elapsed = intro_elapsed_seconds_;
-
-  for (int i = 0; i < 30; ++i) {
-    const double phase = static_cast<double>(i) / 29.0;
-    intro_elapsed_seconds_ = phase * config_.intro_seconds;
-    render_intro();
-
-    char filename[80];
-    std::snprintf(filename, sizeof(filename), "/intro_anim_%03d.ppm", i);
-
-    const auto intro_path = config_.preview_output_dir + filename;
-    error_message.clear();
-
-    if (PreviewWriter::write_canvas_ppm(canvas_, intro_path, &error_message)) {
-      RCLCPP_INFO(get_logger(), "saved intro animation preview | %s", intro_path.c_str());
-    } else {
-      RCLCPP_WARN(
-        get_logger(),
-        "failed to save intro animation preview | frame=%d error=%s",
-        i,
-        error_message.c_str());
-    }
-  }
-
-  intro_elapsed_seconds_ = saved_intro_elapsed;
-  render_intro();
-
-  active_screen_ = UiScreen::Home;
-
-  for (std::size_t i = 0; i < home_idle_sequence_.size(); ++i) {
-    home_idle_sequence_index_ = i;
-    render_home();
-
-    char filename[64];
-    std::snprintf(filename, sizeof(filename), "/home_idle_%03zu.ppm", i);
-
-    const auto frame_path = config_.preview_output_dir + filename;
-    error_message.clear();
-
-    if (PreviewWriter::write_canvas_ppm(canvas_, frame_path, &error_message)) {
-      RCLCPP_INFO(
-        get_logger(),
-        "saved preview frame | %s source_frame_index=%zu",
-        frame_path.c_str(),
-        home_idle_sequence_[i]);
-    } else {
-      RCLCPP_WARN(
-        get_logger(),
-        "failed to save home idle preview | sequence_index=%zu error=%s",
-        i,
-        error_message.c_str());
-    }
-  }
-
-  active_screen_ = UiScreen::Intro;
-  home_idle_sequence_index_ = 0U;
-  render_intro();
-
-  export_home_animation_preview();
-
-  RCLCPP_INFO(
-    get_logger(),
-    "preview animation export complete | dir=%s idle_frames=%zu smooth_frames=%d",
-    config_.preview_output_dir.c_str(),
-    home_idle_sequence_.size(),
-    config_.preview_animation_frames);
-}
-
-void UiNode::export_home_animation_preview()
-{
-  if (home_idle_sequence_.empty()) {
-    RCLCPP_WARN(get_logger(), "cannot export smooth home animation: idle sequence missing");
+  try {
+    std::filesystem::create_directories(config_.preview_output_dir);
+  } catch (const std::exception & error) {
+    RCLCPP_WARN(
+      get_logger(),
+      "failed to create preview directory | dir=%s error=%s",
+      config_.preview_output_dir.c_str(),
+      error.what());
     return;
   }
 
-  std::string error_message;
+  // Export the five generated Home frames with live network/time data.
+  for (std::size_t i = 0; i < robot360_frames_.size(); ++i) {
+    canvas_.clear(ColorRgb{2U, 8U, 22U});
 
-  const double saved_glow_time = home_glow_elapsed_seconds_;
-  const std::size_t saved_sequence_index = home_idle_sequence_index_;
-  const UiScreen saved_screen = active_screen_;
+    if (!canvas_.draw_image_fit(robot360_frames_[i])) {
+      RCLCPP_WARN(get_logger(), "failed to draw preview home frame %zu", i);
+      continue;
+    }
 
-  active_screen_ = UiScreen::Home;
+    draw_live_top_bar_overlay(canvas_);
 
-  const int frame_count = config_.preview_animation_frames;
-  const double simulated_dt = 1.0 / 12.0;
+    const std::string path =
+      config_.preview_output_dir + "/home_live_" +
+      std::to_string(static_cast<int>(i)) + ".ppm";
 
-  for (int i = 0; i < frame_count; ++i) {
-    home_glow_elapsed_seconds_ = static_cast<double>(i) * simulated_dt;
-
-    const double sway_phase =
-      static_cast<double>(i) / static_cast<double>(std::max(1, frame_count));
-
-    const auto sequence_size = home_idle_sequence_.size();
-    const auto sequence_index =
-      static_cast<std::size_t>(
-        std::floor(sway_phase * static_cast<double>(sequence_size) * 2.0)) %
-      sequence_size;
-
-    home_idle_sequence_index_ = sequence_index;
-
-    render_home();
-
-    char filename[80];
-    std::snprintf(filename, sizeof(filename), "/home_anim_%03d.ppm", i);
-
-    const auto frame_path = config_.preview_output_dir + filename;
-    error_message.clear();
-
-    if (PreviewWriter::write_canvas_ppm(canvas_, frame_path, &error_message)) {
-      RCLCPP_INFO(
-        get_logger(),
-        "saved smooth animation preview | %s sequence_index=%zu source_frame_index=%zu",
-        frame_path.c_str(),
-        home_idle_sequence_index_,
-        home_idle_sequence_[home_idle_sequence_index_]);
-    } else {
+    if (!canvas_.write_ppm(path)) {
       RCLCPP_WARN(
         get_logger(),
-        "failed to save smooth animation preview | frame=%d error=%s",
-        i,
-        error_message.c_str());
+        "failed to write live preview frame | %s",
+        path.c_str());
+      continue;
     }
+
+    RCLCPP_INFO(
+      get_logger(),
+      "saved live preview frame | %s",
+      path.c_str());
   }
 
-  active_screen_ = saved_screen;
-  home_idle_sequence_index_ = saved_sequence_index;
-  home_glow_elapsed_seconds_ = saved_glow_time;
+  auto export_page =
+    [this](
+      const ImageAsset & shell,
+      const std::string & page_name,
+      const std::string & file_name)
+    {
+      canvas_.clear(ColorRgb{2U, 8U, 22U});
+
+      if (!canvas_.draw_image_fit(shell)) {
+        RCLCPP_WARN(
+          get_logger(),
+          "failed to draw page preview | page=%s",
+          page_name.c_str());
+        return;
+      }
+
+      draw_live_top_bar_overlay(canvas_);
+
+      const std::string path =
+        config_.preview_output_dir + "/" + file_name;
+
+      if (!canvas_.write_ppm(path)) {
+        RCLCPP_WARN(
+          get_logger(),
+          "failed to write page preview | page=%s path=%s",
+          page_name.c_str(),
+          path.c_str());
+        return;
+      }
+
+      RCLCPP_INFO(
+        get_logger(),
+        "saved page preview | page=%s path=%s",
+        page_name.c_str(),
+        path.c_str());
+    };
+
+  export_page(voice_shell_, "Voice", "voice_preview.ppm");
+  export_page(navigate_shell_, "Navigate", "navigate_preview.ppm");
+  const auto saved_status_ui = status_ui_;
+
+  seed_status_preview_data();
+  render_status_page();
+
+  const std::string status_preview_path =
+    config_.preview_output_dir + "/status_preview.ppm";
+
+  if (!canvas_.write_ppm(status_preview_path)) {
+    RCLCPP_WARN(
+      get_logger(),
+      "failed to write status dashboard preview | %s",
+      status_preview_path.c_str());
+  } else {
+    RCLCPP_INFO(
+      get_logger(),
+      "saved status dashboard preview | %s",
+      status_preview_path.c_str());
+  }
+
+  status_ui_ = saved_status_ui;
+  const auto saved_core_power = core_power_;
+  const auto saved_edge_power = edge_power_;
+  const auto saved_base_power = base_power_;
+
+  const bool saved_status_seen = power_status_seen_;
+  const auto saved_overall_state = power_overall_state_;
+  const auto saved_health_state = power_health_state_;
+  const auto saved_status_update = power_status_last_update_;
+
+  seed_power_preview_data();
+  render_power_page();
+
+  const std::string power_preview_path =
+    config_.preview_output_dir + "/power_preview.ppm";
+
+  if (!canvas_.write_ppm(power_preview_path)) {
+    RCLCPP_WARN(
+      get_logger(),
+      "failed to write power dashboard preview | %s",
+      power_preview_path.c_str());
+  } else {
+    RCLCPP_INFO(
+      get_logger(),
+      "saved power dashboard preview | %s",
+      power_preview_path.c_str());
+  }
+
+  core_power_ = saved_core_power;
+  edge_power_ = saved_edge_power;
+  base_power_ = saved_base_power;
+
+  power_status_seen_ = saved_status_seen;
+  power_overall_state_ = saved_overall_state;
+  power_health_state_ = saved_health_state;
+  power_status_last_update_ = saved_status_update;
+
+  // Restore the real active screen after temporary preview rendering.
   render_current_screen();
 }
+
 
 void UiNode::configure_display()
 {
@@ -572,7 +1099,7 @@ void UiNode::handle_touch_tap(const int x, const int y)
     y,
     to_string(next_screen).c_str());
 
-  transition_to(next_screen);
+  request_screen(next_screen, ScreenRequestSource::Touch);
 }
 
 bool UiNode::screen_from_touch(const int x, const int y, UiScreen * screen) const
@@ -614,6 +1141,153 @@ bool UiNode::screen_from_touch(const int x, const int y, UiScreen * screen) cons
 
   return false;
 }
+
+
+void UiNode::configure_power_subscriptions()
+{
+  const auto qos = rclcpp::QoS(rclcpp::KeepLast(10)).reliable();
+
+  power_core_subscription_ =
+    create_subscription<std_msgs::msg::String>(
+    config_.power_core_topic,
+    qos,
+    [this](std_msgs::msg::String::ConstSharedPtr message) {
+      update_power_source(
+        core_power_,
+        message->data,
+        "Core UPS",
+        "capacity ",
+        "CAP");
+    });
+
+  power_edge_subscription_ =
+    create_subscription<std_msgs::msg::String>(
+    config_.power_edge_topic,
+    qos,
+    [this](std_msgs::msg::String::ConstSharedPtr message) {
+      update_power_source(
+        edge_power_,
+        message->data,
+        "Edge UPS",
+        "capacity ",
+        "CAP");
+    });
+
+  power_base_subscription_ =
+    create_subscription<std_msgs::msg::String>(
+    config_.power_base_topic,
+    qos,
+    [this](std_msgs::msg::String::ConstSharedPtr message) {
+      update_power_source(
+        base_power_,
+        message->data,
+        "Base battery",
+        "SoC ",
+        "SOC");
+    });
+
+  power_status_subscription_ =
+    create_subscription<std_msgs::msg::String>(
+    config_.power_status_topic,
+    qos,
+    [this](std_msgs::msg::String::ConstSharedPtr message) {
+      update_power_status(message->data);
+    });
+
+  RCLCPP_INFO(
+    get_logger(),
+    "power UI subscriptions configured | core=%s edge=%s base=%s status=%s",
+    config_.power_core_topic.c_str(),
+    config_.power_edge_topic.c_str(),
+    config_.power_base_topic.c_str(),
+    config_.power_status_topic.c_str());
+}
+
+void UiNode::update_power_source(
+  PowerUiSourceState & source,
+  const std::string & text,
+  const std::string & source_label,
+  const std::string & percent_token,
+  const std::string & percent_label)
+{
+  source.seen = true;
+  source.last_update = std::chrono::steady_clock::now();
+  source.percent_label = percent_label;
+
+  const auto colon = text.find(':');
+
+  if (
+    colon != std::string::npos &&
+    text.rfind(source_label, 0U) == 0U)
+  {
+    source.state = lowercase_copy(
+      trim_copy(
+        text.substr(
+          source_label.size(),
+          colon - source_label.size())));
+  } else {
+    source.state = "unknown";
+  }
+
+  double voltage = 0.0;
+  source.has_voltage = extract_number_before(text, " V", &voltage);
+
+  if (source.has_voltage) {
+    source.voltage_v = voltage;
+    source.voltage_history.push_back(voltage);
+
+    while (
+      source.voltage_history.size() >
+      static_cast<std::size_t>(config_.power_history_samples))
+    {
+      source.voltage_history.pop_front();
+    }
+  }
+
+  double percent = 0.0;
+  source.has_percent =
+    extract_number_after(text, percent_token, &percent);
+
+  if (source.has_percent) {
+    source.percent = std::clamp(percent, 0.0, 100.0);
+  }
+}
+
+void UiNode::update_power_status(const std::string & text)
+{
+  const std::string overall =
+    extract_value_after_key(text, "overall=");
+
+  const std::string health =
+    extract_value_after_key(text, "health=");
+
+  if (!overall.empty()) {
+    power_overall_state_ = lowercase_copy(overall);
+  }
+
+  if (!health.empty()) {
+    power_health_state_ = uppercase_copy(health);
+  }
+
+  power_status_seen_ = true;
+  power_status_last_update_ = std::chrono::steady_clock::now();
+}
+
+bool UiNode::power_source_is_stale(
+  const PowerUiSourceState & source) const
+{
+  if (!source.seen) {
+    return false;
+  }
+
+  const double age_seconds =
+    std::chrono::duration<double>(
+    std::chrono::steady_clock::now() -
+    source.last_update).count();
+
+  return age_seconds > config_.power_stale_timeout_s;
+}
+
 
 void UiNode::configure_runtime()
 {
@@ -668,16 +1342,16 @@ void UiNode::render_current_screen()
       render_home();
       break;
     case UiScreen::VoiceIdle:
-      render_placeholder_screen("VOICE", "Voice page selected");
+      render_page_shell(voice_shell_, "Voice");
       break;
     case UiScreen::Navigation:
-      render_placeholder_screen("NAVIGATE", "Navigation page selected");
+      render_page_shell(navigate_shell_, "Navigate");
       break;
     case UiScreen::Status:
-      render_placeholder_screen("STATUS", "Status page selected");
+      render_status_page();
       break;
     case UiScreen::Power:
-      render_placeholder_screen("POWER", "Power page selected");
+      render_power_page();
       break;
     default:
       render_home();
@@ -801,6 +1475,8 @@ void UiNode::render_home()
   if (!ok) {
     RCLCPP_WARN(get_logger(), "failed to draw generated home frame");
   }
+  draw_live_top_bar_overlay(canvas_);
+
 }
 
 
@@ -905,6 +1581,1336 @@ void UiNode::render_home_status_panel()
   status_row("BATTERY", "GOOD");
 }
 
+
+void UiNode::render_page_shell(
+  const ImageAsset & shell,
+  const std::string & page_name)
+{
+  canvas_.clear(ColorRgb{2U, 8U, 22U});
+
+  if (!canvas_.draw_image_fit(shell)) {
+    RCLCPP_WARN(
+      get_logger(),
+      "failed to draw generated page shell | page=%s",
+      page_name.c_str());
+    return;
+  }
+
+  // IP addresses and local time are deliberately runtime-owned.
+  // They are not baked into the generated static shell.
+  draw_live_top_bar_overlay(canvas_);
+}
+
+
+
+
+void UiNode::render_status_page()
+{
+  render_page_shell(status_shell_, "Status");
+
+  const ColorRgb cyan{70U, 235U, 255U};
+  const ColorRgb cyan_soft{145U, 210U, 230U};
+  const ColorRgb white{235U, 248U, 255U};
+  const ColorRgb good{75U, 235U, 175U};
+  const ColorRgb warning{255U, 190U, 70U};
+  const ColorRgb danger{255U, 90U, 95U};
+  const ColorRgb muted{135U, 165U, 185U};
+
+  auto draw_status_text =
+    [this](
+      const int x,
+      const int y,
+      const std::string & value,
+      const ColorRgb color,
+      const bool medium,
+      const float alpha = 1.0F)
+    {
+      if (medium) {
+        Font::draw_atlas_text(
+          canvas_,
+          ui_font_medium_,
+          20,
+          24,
+          16,
+          2,
+          x,
+          y,
+          value,
+          color,
+          alpha);
+        return;
+      }
+
+      Font::draw_atlas_text(
+        canvas_,
+        ui_font_small_,
+        18,
+        22,
+        16,
+        2,
+        x,
+        y,
+        value,
+        color,
+        alpha);
+    };
+
+  auto status_text_width =
+    [this](
+      const std::string & value,
+      const bool medium) -> int
+    {
+      if (medium) {
+        return Font::atlas_text_width(
+          ui_font_medium_,
+          20,
+          24,
+          16,
+          value);
+      }
+
+      return Font::atlas_text_width(
+        ui_font_small_,
+        18,
+        22,
+        16,
+        value);
+    };
+
+  auto status_severity =
+    [](const std::string & raw_state) -> int
+    {
+      const std::string state = uppercase_copy(raw_state);
+
+      if (
+        state == "FAULT" ||
+        state == "FAILED" ||
+        state == "ERROR" ||
+        state == "OFFLINE")
+      {
+        return 4;
+      }
+
+      if (
+        state == "STOP" ||
+        state == "STOPPED" ||
+        state == "BLOCKED")
+      {
+        return 3;
+      }
+
+      if (
+        state == "DEGRADED" ||
+        state == "STALE" ||
+        state == "SLOW" ||
+        state == "RECOVERY" ||
+        state == "WAITING")
+      {
+        return 2;
+      }
+
+      if (
+        state == "MISSING" ||
+        state == "UNKNOWN" ||
+        state == "--")
+      {
+        return 1;
+      }
+
+      return 0;
+    };
+
+  auto status_color =
+    [&](const std::string & raw_state) -> ColorRgb
+    {
+      const int severity = status_severity(raw_state);
+
+      if (severity >= 3) {
+        return danger;
+      }
+
+      if (severity == 2) {
+        return warning;
+      }
+
+      if (severity == 1) {
+        return muted;
+      }
+
+      return good;
+    };
+
+  auto combined_state =
+    [&](const std::string & first,
+      const std::string & second,
+      const std::string & healthy_text) -> std::string
+    {
+      const int first_severity = status_severity(first);
+      const int second_severity = status_severity(second);
+
+      if (first_severity == 0 && second_severity == 0) {
+        return healthy_text;
+      }
+
+      return first_severity >= second_severity ?
+             uppercase_copy(first) :
+             uppercase_copy(second);
+    };
+
+  // Remove the duplicated inner STATUS heading and reclaim the space.
+  canvas_.blend_rect(
+    132,
+    82,
+    618,
+    54,
+    ColorRgb{0U, 11U, 29U},
+    1.0F);
+
+  // ============================================================
+  // Robot-wide summary
+  // ============================================================
+  const int summary_x = 132;
+  const int summary_y = 88;
+  const int summary_w = 618;
+  const int summary_h = 32;
+
+  canvas_.blend_rect(
+    summary_x,
+    summary_y,
+    summary_w,
+    summary_h,
+    ColorRgb{0U, 25U, 52U},
+    0.92F);
+
+  // Fixed zones prevent labels and values from touching.
+  draw_status_text(
+    146,
+    summary_y + 9,
+    "ROBOT",
+    cyan_soft,
+    false);
+
+  draw_status_text(
+    204,
+    summary_y + 9,
+    status_ui_.robot_state,
+    status_color(status_ui_.robot_state),
+    false);
+
+  draw_status_text(
+    322,
+    summary_y + 9,
+    "MODE",
+    cyan_soft,
+    false);
+
+  draw_status_text(
+    378,
+    summary_y + 9,
+    status_ui_.operating_mode,
+    white,
+    false);
+
+  draw_status_text(
+    486,
+    summary_y + 9,
+    "ALERTS",
+    cyan_soft,
+    false);
+
+  draw_status_text(
+    558,
+    summary_y + 9,
+    std::to_string(status_ui_.alert_count),
+    status_ui_.alert_count == 0 ? good : warning,
+    false);
+
+  const std::string live_text =
+    status_ui_.live ? "LIVE" : "WAITING";
+
+  const int live_width =
+    status_text_width(live_text, false);
+
+  draw_status_text(
+    summary_x + summary_w - live_width - 14,
+    summary_y + 9,
+    live_text,
+    status_ui_.live ? cyan : warning,
+    false);
+
+  // ============================================================
+  // Four domain cards
+  // ============================================================
+  auto draw_domain_card =
+    [&](const int x,
+      const int y,
+      const std::string & title,
+      const std::string & state,
+      const std::string & line_one,
+      const std::string & line_two)
+    {
+      constexpr int width = 302;
+      constexpr int height = 58;
+
+      const ColorRgb card_color = status_color(state);
+
+      canvas_.blend_rect(
+        x,
+        y,
+        width,
+        height,
+        ColorRgb{0U, 18U, 40U},
+        0.94F);
+
+      canvas_.blend_rect(
+        x,
+        y,
+        width,
+        2,
+        card_color,
+        0.90F);
+
+      // Small font keeps long domain titles professional.
+      draw_status_text(
+        x + 11,
+        y + 7,
+        title,
+        cyan_soft,
+        false,
+        0.98F);
+
+      const int state_width =
+        status_text_width(state, false);
+
+      draw_status_text(
+        x + width - state_width - 11,
+        y + 7,
+        state,
+        card_color,
+        false,
+        1.0F);
+
+      draw_status_text(
+        x + 11,
+        y + 26,
+        line_one,
+        white,
+        false,
+        0.92F);
+
+      draw_status_text(
+        x + 11,
+        y + 42,
+        line_two,
+        muted,
+        false,
+        0.92F);
+    };
+
+  const int left_x = 132;
+  const int right_x = 448;
+
+  const std::string motion_state =
+    combined_state(
+    status_ui_.safety_state,
+    status_ui_.control_state,
+    "CLEAR");
+
+  const std::string localization_state =
+    combined_state(
+    status_ui_.localization_state,
+    status_ui_.perception_state,
+    "READY");
+
+  draw_domain_card(
+    left_x,
+    128,
+    "MOTION + SAFETY",
+    motion_state,
+    "Gate " + status_ui_.safety_gate +
+    " | Base " + status_ui_.base_state,
+    "Watchdog " + status_ui_.watchdog_state +
+    " | Slow " + status_ui_.slowdown);
+
+  draw_domain_card(
+    right_x,
+    128,
+    "LOCALIZATION + PERCEPTION",
+    localization_state,
+    "EKF / Wheel / IMU / VO OK",
+    "LiDAR / ToF / Ultra / Depth OK");
+
+  draw_domain_card(
+    left_x,
+    192,
+    "NAVIGATION + MAPPING",
+    status_ui_.navigation_state,
+    "Nav " + status_ui_.nav_state +
+    " | Map " + status_ui_.mapping_state,
+    "Recovery " + status_ui_.recovery_state);
+
+  draw_domain_card(
+    right_x,
+    192,
+    "AI + CONNECTIVITY",
+    status_ui_.connectivity_state,
+    "SavoMind " + status_ui_.savomind_state +
+    " | Speech " + status_ui_.speech_state,
+    "Core-Edge | ROS Link " + status_ui_.link_state);
+
+  // ============================================================
+  // Live obstacle-distance graph
+  // ============================================================
+  const int graph_x = 132;
+  const int graph_y = 256;
+  const int graph_w = 618;
+  const int graph_h = 150;
+
+  constexpr double graph_max_distance_m = 3.0;
+
+  canvas_.blend_rect(
+    graph_x,
+    graph_y,
+    graph_w,
+    graph_h,
+    ColorRgb{0U, 15U, 35U},
+    0.94F);
+
+  draw_status_text(
+    graph_x + 14,
+    graph_y + 9,
+    "LIVE OBSTACLE DISTANCE",
+    cyan,
+    true);
+
+  const std::string distance_graph_state =
+    status_ui_.live ? "LIVE" : "WAITING";
+
+  const int distance_graph_state_width =
+    status_text_width(distance_graph_state, true);
+
+  draw_status_text(
+    graph_x + graph_w - distance_graph_state_width - 14,
+    graph_y + 9,
+    distance_graph_state,
+    status_ui_.live ? cyan : warning,
+    true);
+
+  auto obstacle_state_color =
+    [&](const ObstacleDistanceUiState & source) -> ColorRgb
+    {
+      if (!source.seen || !source.valid) {
+        return muted;
+      }
+
+      const std::string state =
+        uppercase_copy(source.state);
+
+      if (
+        state == "STOP" ||
+        state == "BLOCKED" ||
+        state == "FAILED" ||
+        state == "ERROR")
+      {
+        return danger;
+      }
+
+      if (
+        state == "SLOW" ||
+        state == "DEGRADED" ||
+        state == "STALE")
+      {
+        return warning;
+      }
+
+      if (
+        state == "CLEAR" ||
+        state == "OK")
+      {
+        return good;
+      }
+
+      return muted;
+    };
+
+  auto obstacle_value_text =
+    [](const ObstacleDistanceUiState & source) -> std::string
+    {
+      if (!source.seen) {
+        return "--";
+      }
+
+      if (!source.valid) {
+        return "INVALID";
+      }
+
+      if (source.clear_out_of_range) {
+        return ">3.0 m";
+      }
+
+      std::ostringstream output;
+      output << std::fixed << std::setprecision(2)
+             << source.distance_m << " m";
+      return output.str();
+    };
+
+  auto draw_obstacle_distance =
+    [&](const ObstacleDistanceUiState & source,
+      const int y)
+    {
+      constexpr int label_x = 146;
+      constexpr int bar_x = 270;
+      constexpr int bar_width = 270;
+      constexpr int bar_height = 8;
+      constexpr int value_x = 555;
+
+      const ColorRgb row_color =
+        obstacle_state_color(source);
+
+      draw_status_text(
+        label_x,
+        y,
+        source.label,
+        cyan_soft,
+        false,
+        0.96F);
+
+      canvas_.blend_rect(
+        bar_x,
+        y + 6,
+        bar_width,
+        bar_height,
+        ColorRgb{20U, 55U, 72U},
+        0.94F);
+
+      if (source.seen && source.valid) {
+        const double displayed_distance =
+          source.clear_out_of_range ?
+          graph_max_distance_m :
+          std::clamp(
+            source.distance_m,
+            0.0,
+            graph_max_distance_m);
+
+        const int fill_width =
+          static_cast<int>(
+          std::lround(
+            static_cast<double>(bar_width) *
+            displayed_distance /
+            graph_max_distance_m));
+
+        canvas_.blend_rect(
+          bar_x,
+          y + 6,
+          std::clamp(fill_width, 0, bar_width),
+          bar_height,
+          row_color,
+          0.98F);
+      }
+
+      draw_status_text(
+        value_x,
+        y,
+        obstacle_value_text(source),
+        source.seen && source.valid ?
+        white :
+        muted,
+        false,
+        0.98F);
+
+      const std::string state_text =
+        source.seen ?
+        uppercase_copy(source.state) :
+        "MISSING";
+
+      const int state_width =
+        status_text_width(state_text, false);
+
+      draw_status_text(
+        graph_x + graph_w - state_width - 14,
+        y,
+        state_text,
+        row_color,
+        false,
+        0.98F);
+    };
+
+  const std::array<int, 5> obstacle_rows{
+    290,
+    312,
+    334,
+    356,
+    378
+  };
+
+  for (
+    std::size_t index = 0;
+    index < status_ui_.obstacle_distances.size();
+    ++index)
+  {
+    draw_obstacle_distance(
+      status_ui_.obstacle_distances[index],
+      obstacle_rows[index]);
+  }
+
+  // ============================================================
+  // Highest-priority alert
+  // ============================================================
+  const int alert_x = 132;
+  const int alert_y = 414;
+  const int alert_w = 618;
+  const int alert_h = 23;
+
+  canvas_.blend_rect(
+    alert_x,
+    alert_y,
+    alert_w,
+    alert_h,
+    ColorRgb{0U, 23U, 45U},
+    0.94F);
+
+  const std::string alert_label = "ACTIVE ALERT:";
+
+  draw_status_text(
+    alert_x + 12,
+    alert_y + 2,
+    alert_label,
+    cyan_soft,
+    false,
+    0.96F);
+
+  const int alert_value_x =
+    alert_x + 12 +
+    status_text_width(alert_label, false) + 14;
+
+  draw_status_text(
+    alert_value_x,
+    alert_y + 2,
+    status_ui_.active_alert,
+    status_ui_.alert_count == 0 ? good : warning,
+    false,
+    0.98F);
+}
+
+
+void UiNode::seed_status_preview_data()
+{
+  status_ui_ = StatusUiState{};
+
+  status_ui_.robot_state = "READY";
+  status_ui_.operating_mode = "IDLE";
+  status_ui_.alert_count = 0;
+  status_ui_.live = true;
+
+  status_ui_.safety_state = "CLEAR";
+  status_ui_.safety_gate = "Allowed";
+  status_ui_.slowdown = "100%";
+
+  status_ui_.control_state = "OK";
+  status_ui_.base_state = "OK";
+  status_ui_.control_mode = "Idle";
+  status_ui_.watchdog_state = "OK";
+
+  status_ui_.localization_state = "READY";
+  status_ui_.ekf_state = "Ready";
+  status_ui_.wheel_state = "OK";
+  status_ui_.imu_state = "OK";
+  status_ui_.vo_state = "OK";
+
+  status_ui_.perception_state = "OK";
+  status_ui_.lidar_state = "OK";
+  status_ui_.tof_state = "OK";
+  status_ui_.ultrasonic_state = "OK";
+  status_ui_.depth_state = "OK";
+
+  status_ui_.navigation_state = "STANDBY";
+  status_ui_.nav_state = "Standby";
+  status_ui_.mapping_state = "Idle";
+  status_ui_.recovery_state = "Ready";
+  status_ui_.navigation_goal = "None";
+
+  status_ui_.connectivity_state = "ONLINE";
+  status_ui_.savomind_state = "Online";
+  status_ui_.speech_state = "Ready";
+  status_ui_.link_state = "OK";
+
+  status_ui_.obstacle_distances = {{
+    {"LiDAR Front", true, true, false, 2.42, "CLEAR"},
+    {"ToF Left", true, true, false, 1.48, "CLEAR"},
+    {"ToF Right", true, true, false, 1.82, "CLEAR"},
+    {"Ultrasonic", true, true, false, 2.16, "CLEAR"},
+    {"Depth Front", true, true, false, 0.68, "SLOW"},
+  }};
+
+  status_ui_.active_alert = "None";
+}
+
+
+void UiNode::render_power_page()
+{
+  render_page_shell(power_shell_, "Power");
+
+  const ColorRgb cyan{70U, 235U, 255U};
+  const ColorRgb cyan_soft{135U, 205U, 225U};
+  const ColorRgb good{75U, 235U, 175U};
+  const ColorRgb warning{255U, 190U, 70U};
+  const ColorRgb danger{255U, 90U, 95U};
+  const ColorRgb muted{145U, 175U, 195U};
+  const ColorRgb white{235U, 248U, 255U};
+
+  auto draw_power_text =
+    [this](
+      const int x,
+      const int y,
+      const std::string & value,
+      const ColorRgb color,
+      const int scale,
+      const float alpha)
+    {
+      if (scale >= 3) {
+        Font::draw_atlas_text(
+          canvas_,
+          ui_font_large_bold_,
+          32,
+          36,
+          16,
+          2,
+          x,
+          y,
+          value,
+          color,
+          alpha);
+        return;
+      }
+
+      Font::draw_atlas_text(
+        canvas_,
+        ui_font_medium_,
+        20,
+        24,
+        16,
+        2,
+        x,
+        y,
+        value,
+        color,
+        alpha);
+    };
+
+  auto power_text_width =
+    [this](
+      const std::string & value,
+      const int scale) -> int
+    {
+      if (scale >= 3) {
+        return Font::atlas_text_width(
+          ui_font_large_bold_,
+          32,
+          36,
+          16,
+          value);
+      }
+
+      return Font::atlas_text_width(
+        ui_font_medium_,
+        20,
+        24,
+        16,
+        value);
+    };
+
+  auto state_color =
+    [&](const PowerUiSourceState & source) -> ColorRgb
+    {
+      if (!source.seen) {
+        return muted;
+      }
+
+      if (power_source_is_stale(source)) {
+        return warning;
+      }
+
+      const std::string state = lowercase_copy(source.state);
+
+      if (
+        state == "ok" ||
+        state == "full" ||
+        state == "charging")
+      {
+        return good;
+      }
+
+      if (state == "low") {
+        return warning;
+      }
+
+      return danger;
+    };
+
+  auto source_state_text =
+    [&](const PowerUiSourceState & source) -> std::string
+    {
+      if (!source.seen) {
+        return "MISSING";
+      }
+
+      if (power_source_is_stale(source)) {
+        return "STALE";
+      }
+
+      return uppercase_copy(source.state);
+    };
+
+  auto voltage_text =
+    [](const PowerUiSourceState & source) -> std::string
+    {
+      if (!source.has_voltage) {
+        return "--.-- V";
+      }
+
+      std::ostringstream output;
+      output << std::fixed << std::setprecision(2)
+             << source.voltage_v << " V";
+      return output.str();
+    };
+
+  auto percent_text =
+    [](const PowerUiSourceState & source) -> std::string
+    {
+      if (!source.has_percent) {
+        return source.percent_label + " --.-%";
+      }
+
+      std::ostringstream output;
+      output << source.percent_label << " "
+             << std::fixed << std::setprecision(1)
+             << source.percent << "%";
+      return output.str();
+    };
+
+  // --------------------------------------------------------------
+  // Overall status bar
+  // --------------------------------------------------------------
+  const int summary_x = 132;
+  const int summary_y = 145;
+  const int summary_w = 618;
+  const int summary_h = 30;
+
+  canvas_.blend_rect(
+    summary_x,
+    summary_y,
+    summary_w,
+    summary_h,
+    ColorRgb{0U, 25U, 52U},
+    0.88F);
+
+  bool status_stale = false;
+
+  if (power_status_seen_) {
+    const double age_seconds =
+      std::chrono::duration<double>(
+      std::chrono::steady_clock::now() -
+      power_status_last_update_).count();
+
+    status_stale =
+      age_seconds > config_.power_stale_timeout_s;
+  }
+
+  const std::string overall_text =
+    !power_status_seen_ ?
+    "WAITING" :
+    status_stale ?
+    "STALE" :
+    uppercase_copy(power_overall_state_);
+
+  const std::string health_text =
+    !power_status_seen_ ?
+    "--" :
+    status_stale ?
+    "STALE" :
+    uppercase_copy(power_health_state_);
+
+  ColorRgb overall_color = muted;
+
+  if (!power_status_seen_ || status_stale) {
+    overall_color = warning;
+  } else if (
+    power_overall_state_ == "ok" ||
+    power_overall_state_ == "full" ||
+    power_overall_state_ == "charging")
+  {
+    overall_color = good;
+  } else if (power_overall_state_ == "low") {
+    overall_color = warning;
+  } else {
+    overall_color = danger;
+  }
+
+  draw_power_text(
+    summary_x + 14,
+    summary_y + 6,
+    "SYSTEM POWER",
+    white,
+    2,
+    0.92F);
+
+  draw_power_text(
+    summary_x + 160,
+    summary_y + 6,
+    overall_text,
+    overall_color,
+    2,
+    1.0F);
+
+  draw_power_text(
+    summary_x + 350,
+    summary_y + 6,
+    "HEALTH",
+    cyan_soft,
+    2,
+    0.90F);
+
+  draw_power_text(
+    summary_x + 438,
+    summary_y + 6,
+    health_text,
+    overall_color,
+    2,
+    1.0F);
+
+  draw_power_text(
+    summary_x + 548,
+    summary_y + 6,
+    status_stale ? "STALE" : "LIVE",
+    status_stale ? warning : cyan,
+    2,
+    0.95F);
+
+  // --------------------------------------------------------------
+  // Three source cards
+  // --------------------------------------------------------------
+  auto draw_source_card =
+    [&](const int x,
+      const std::string & title,
+      const PowerUiSourceState & source)
+    {
+      const int y = 184;
+      const int w = 194;
+      const int h = 99;
+
+      const ColorRgb source_color = state_color(source);
+      const std::string state_text = source_state_text(source);
+
+      canvas_.blend_rect(
+        x,
+        y,
+        w,
+        h,
+        ColorRgb{0U, 19U, 42U},
+        0.92F);
+
+      canvas_.blend_rect(
+        x,
+        y,
+        w,
+        2,
+        source_color,
+        0.85F);
+
+      draw_power_text(
+        x + 12,
+        y + 11,
+        title,
+        cyan_soft,
+        2,
+        0.95F);
+
+      const int state_width = power_text_width(state_text, 2);
+
+      draw_power_text(
+        x + w - state_width - 10,
+        y + 11,
+        state_text,
+        source_color,
+        2,
+        1.0F);
+
+      draw_power_text(
+        x + 12,
+        y + 36,
+        voltage_text(source),
+        white,
+        3,
+        1.0F);
+
+      draw_power_text(
+        x + 12,
+        y + 68,
+        percent_text(source),
+        source.has_percent ? cyan : muted,
+        2,
+        0.95F);
+
+      const int bar_x = x + 12;
+      const int bar_y = y + 88;
+      const int bar_w = w - 24;
+
+      canvas_.blend_rect(
+        bar_x,
+        bar_y,
+        bar_w,
+        5,
+        ColorRgb{20U, 55U, 72U},
+        0.90F);
+
+      if (source.has_percent) {
+        const int fill_width =
+          static_cast<int>(
+          std::lround(
+            static_cast<double>(bar_w) *
+            source.percent / 100.0));
+
+        canvas_.blend_rect(
+          bar_x,
+          bar_y,
+          std::clamp(fill_width, 0, bar_w),
+          5,
+          source_color,
+          0.95F);
+      }
+    };
+
+  draw_source_card(132, "CORE UPS", core_power_);
+  draw_source_card(344, "EDGE UPS", edge_power_);
+  draw_source_card(556, "BASE", base_power_);
+
+  // --------------------------------------------------------------
+  // Voltage-history dashboard
+  // --------------------------------------------------------------
+  const int graph_panel_x = 132;
+  const int graph_panel_y = 294;
+  const int graph_panel_w = 618;
+  const int graph_panel_h = 150;
+
+  canvas_.blend_rect(
+    graph_panel_x,
+    graph_panel_y,
+    graph_panel_w,
+    graph_panel_h,
+    ColorRgb{0U, 15U, 35U},
+    0.90F);
+
+  draw_power_text(
+    graph_panel_x + 14,
+    graph_panel_y + 11,
+    "VOLTAGE HISTORY",
+    cyan,
+    2,
+    0.95F);
+
+  draw_power_text(
+    graph_panel_x + 476,
+    graph_panel_y + 11,
+    "ROLLING 120 S",
+    muted,
+    2,
+    0.85F);
+
+  auto draw_line =
+    [&](int x0,
+      int y0,
+      const int x1,
+      const int y1,
+      const ColorRgb color,
+      const float alpha)
+    {
+      const int dx = std::abs(x1 - x0);
+      const int sx = x0 < x1 ? 1 : -1;
+      const int dy = -std::abs(y1 - y0);
+      const int sy = y0 < y1 ? 1 : -1;
+
+      int error = dx + dy;
+
+      while (true) {
+        canvas_.blend_pixel(x0, y0, color, alpha);
+
+        if (x0 == x1 && y0 == y1) {
+          break;
+        }
+
+        const int doubled_error = 2 * error;
+
+        if (doubled_error >= dy) {
+          error += dy;
+          x0 += sx;
+        }
+
+        if (doubled_error <= dx) {
+          error += dx;
+          y0 += sy;
+        }
+      }
+    };
+
+  auto draw_voltage_series =
+    [&](const PowerUiSourceState & source,
+      const std::string & label,
+      const double min_voltage,
+      const double max_voltage,
+      const double low_voltage,
+      const int row_y,
+      const ColorRgb line_color)
+    {
+      const int label_x = graph_panel_x + 14;
+      const int value_x = graph_panel_x + 82;
+      const int plot_x = graph_panel_x + 158;
+      const int plot_y = row_y + 4;
+      const int plot_w = graph_panel_w - 172;
+      const int plot_h = 28;
+
+      draw_power_text(
+        label_x,
+        row_y + 8,
+        label,
+        cyan_soft,
+        2,
+        0.90F);
+
+      std::string current_value = "--.--V";
+
+      if (source.has_voltage) {
+        std::ostringstream output;
+        output << std::fixed << std::setprecision(2)
+               << source.voltage_v << "V";
+        current_value = output.str();
+      }
+
+      draw_power_text(
+        value_x,
+        row_y + 8,
+        current_value,
+        state_color(source),
+        2,
+        0.95F);
+
+      canvas_.blend_rect(
+        plot_x,
+        plot_y,
+        plot_w,
+        plot_h,
+        ColorRgb{0U, 8U, 22U},
+        0.70F);
+
+      const double low_normalized =
+        std::clamp(
+          (low_voltage - min_voltage) /
+          (max_voltage - min_voltage),
+          0.0,
+          1.0);
+
+      const int low_y =
+        plot_y + plot_h - 3 -
+        static_cast<int>(
+          std::lround(
+            low_normalized *
+            static_cast<double>(plot_h - 6)));
+
+      draw_line(
+        plot_x,
+        low_y,
+        plot_x + plot_w - 1,
+        low_y,
+        warning,
+        0.28F);
+
+      const auto & history = source.voltage_history;
+
+      if (history.empty()) {
+        draw_power_text(
+          plot_x + plot_w / 2 - 42,
+          plot_y + 8,
+          "NO DATA",
+          muted,
+          2,
+          0.65F);
+        return;
+      }
+
+      int previous_x = plot_x;
+      int previous_y = plot_y + plot_h / 2;
+
+      for (std::size_t i = 0; i < history.size(); ++i) {
+        const double normalized =
+          std::clamp(
+            (history[i] - min_voltage) /
+            (max_voltage - min_voltage),
+            0.0,
+            1.0);
+
+        const int x =
+          history.size() <= 1U ?
+          plot_x + plot_w - 2 :
+          plot_x +
+          static_cast<int>(
+            (static_cast<double>(i) /
+            static_cast<double>(history.size() - 1U)) *
+            static_cast<double>(plot_w - 2));
+
+        const int y =
+          plot_y + plot_h - 3 -
+          static_cast<int>(
+            std::lround(
+              normalized *
+              static_cast<double>(plot_h - 6)));
+
+        if (i == 0U) {
+          previous_x = x;
+          previous_y = y;
+          canvas_.blend_rect(
+            x - 1,
+            y - 1,
+            3,
+            3,
+            line_color,
+            0.95F);
+          continue;
+        }
+
+        draw_line(
+          previous_x,
+          previous_y,
+          x,
+          y,
+          line_color,
+          0.95F);
+
+        previous_x = x;
+        previous_y = y;
+      }
+    };
+
+  draw_voltage_series(
+    core_power_,
+    "CORE",
+    3.10,
+    4.25,
+    3.40,
+    326,
+    ColorRgb{60U, 225U, 255U});
+
+  draw_voltage_series(
+    edge_power_,
+    "EDGE",
+    3.10,
+    4.25,
+    3.40,
+    363,
+    ColorRgb{105U, 155U, 255U});
+
+  draw_voltage_series(
+    base_power_,
+    "BASE",
+    6.30,
+    8.50,
+    7.20,
+    400,
+    ColorRgb{75U, 235U, 175U});
+}
+
+void UiNode::seed_power_preview_data()
+{
+  core_power_ = PowerUiSourceState{};
+  edge_power_ = PowerUiSourceState{};
+  base_power_ = PowerUiSourceState{};
+
+  const auto now = std::chrono::steady_clock::now();
+
+  core_power_.seen = true;
+  core_power_.has_voltage = true;
+  core_power_.has_percent = true;
+  core_power_.percent_label = "CAP";
+  core_power_.percent = 99.2;
+  core_power_.state = "full";
+  core_power_.last_update = now;
+
+  edge_power_.seen = true;
+  edge_power_.has_voltage = true;
+  edge_power_.has_percent = true;
+  edge_power_.percent_label = "CAP";
+  edge_power_.percent = 86.4;
+  edge_power_.state = "ok";
+  edge_power_.last_update = now;
+
+  base_power_.seen = true;
+  base_power_.has_voltage = true;
+  base_power_.has_percent = true;
+  base_power_.percent_label = "SOC";
+  base_power_.percent = 83.8;
+  base_power_.state = "ok";
+  base_power_.last_update = now;
+
+  for (int i = 0; i < 60; ++i) {
+    core_power_.voltage_history.push_back(
+      4.18 + 0.018 * std::sin(static_cast<double>(i) * 0.24));
+
+    edge_power_.voltage_history.push_back(
+      4.08 + 0.024 * std::sin(
+        static_cast<double>(i) * 0.20 + 0.8));
+
+    base_power_.voltage_history.push_back(
+      8.07 + 0.045 * std::sin(
+        static_cast<double>(i) * 0.16 + 1.4));
+  }
+
+  core_power_.voltage_v = core_power_.voltage_history.back();
+  edge_power_.voltage_v = edge_power_.voltage_history.back();
+  base_power_.voltage_v = base_power_.voltage_history.back();
+
+  power_status_seen_ = true;
+  power_overall_state_ = "ok";
+  power_health_state_ = "OK";
+  power_status_last_update_ = now;
+}
+
+void UiNode::maybe_export_power_live_preview()
+{
+  if (
+    config_.enable_framebuffer ||
+    !config_.export_preview_frames)
+  {
+    return;
+  }
+
+  const auto now = std::chrono::steady_clock::now();
+
+  if (
+    last_power_preview_export_.time_since_epoch().count() != 0 &&
+    std::chrono::duration<double>(
+      now - last_power_preview_export_).count() < 1.0)
+  {
+    return;
+  }
+
+  last_power_preview_export_ = now;
+
+  render_power_page();
+
+  const std::string path =
+    config_.preview_output_dir + "/power_live.ppm";
+
+  if (!canvas_.write_ppm(path)) {
+    RCLCPP_WARN_THROTTLE(
+      get_logger(),
+      *get_clock(),
+      5000,
+      "failed to write live power preview | %s",
+      path.c_str());
+  }
+
+  render_current_screen();
+}
+
+
 void UiNode::render_placeholder_screen(
   const std::string & title,
   const std::string & subtitle)
@@ -940,6 +2946,92 @@ void UiNode::present_if_enabled()
   }
 }
 
+
+void UiNode::request_screen(
+  const UiScreen requested_screen,
+  const ScreenRequestSource source)
+{
+  const char * source_text = "internal";
+
+  switch (source) {
+    case ScreenRequestSource::Touch:
+      source_text = "touch";
+      break;
+    case ScreenRequestSource::Speech:
+      source_text = "speech";
+      break;
+    case ScreenRequestSource::SavoMind:
+      source_text = "savomind";
+      break;
+    case ScreenRequestSource::Internal:
+      source_text = "internal";
+      break;
+  }
+
+  // Touch commands always take effect immediately.
+  if (source == ScreenRequestSource::Touch) {
+    pending_screen_.reset();
+
+    RCLCPP_INFO(
+      get_logger(),
+      "screen request accepted immediately | source=%s screen=%s",
+      source_text,
+      to_string(requested_screen).c_str());
+
+    transition_to(requested_screen);
+    return;
+  }
+
+  // SavoMind may resolve an intent while Savo is still speaking.
+  // Keep Voice visible and delay the requested task page until playback ends.
+  if (
+    source == ScreenRequestSource::SavoMind &&
+    voice_phase_ == VoicePhase::Speaking)
+  {
+    queue_screen_after_tts(requested_screen);
+    return;
+  }
+
+  RCLCPP_INFO(
+    get_logger(),
+    "screen request accepted | source=%s screen=%s",
+    source_text,
+    to_string(requested_screen).c_str());
+
+  transition_to(requested_screen);
+}
+
+void UiNode::queue_screen_after_tts(const UiScreen requested_screen)
+{
+  pending_screen_ = requested_screen;
+
+  RCLCPP_INFO(
+    get_logger(),
+    "screen queued until TTS finishes | pending=%s",
+    to_string(requested_screen).c_str());
+}
+
+void UiNode::handle_tts_finished()
+{
+  voice_phase_ = VoicePhase::Idle;
+
+  if (!pending_screen_.has_value()) {
+    RCLCPP_INFO(get_logger(), "TTS finished | no pending screen");
+    return;
+  }
+
+  const UiScreen requested_screen = *pending_screen_;
+  pending_screen_.reset();
+
+  RCLCPP_INFO(
+    get_logger(),
+    "TTS finished | opening pending screen=%s",
+    to_string(requested_screen).c_str());
+
+  transition_to(requested_screen);
+}
+
+
 void UiNode::transition_to(const UiScreen next_screen)
 {
   if (active_screen_ == next_screen) {
@@ -964,6 +3056,7 @@ void UiNode::loop_callback()
 
   update_runtime(dt);
   render_current_screen();
+  maybe_export_power_live_preview();
   present_if_enabled();
 
   if (!first_tick_logged_) {

@@ -1,0 +1,28 @@
+/map_session_manager_node:
+  ros__parameters:
+    session:
+      map_id: ""
+      output_root: "~/Savo_Pi/runtime/maps"
+
+      allow_overwrite: false
+
+      require_mapping_ready: true
+      require_slam_active: true
+      require_structurally_valid_map: true
+
+      service_timeout_s: 15.0
+
+    services:
+      trigger_save: "/savo_mapping/map_session/save"
+
+      slam_save_map: "/slam_toolbox/save_map"
+      slam_serialize_map: "/slam_toolbox/serialize_map"
+
+    topics:
+      readiness: "/savo_mapping/readiness"
+      slam_lifecycle_state: "/savo_mapping/slam_lifecycle_state"
+      map_quality: "/savo_mapping/map_quality"
+
+      session_state: "/savo_mapping/map_session/state"
+      session_result: "/savo_mapping/map_session/result"
+      session_manifest: "/savo_mapping/map_session/manifest"

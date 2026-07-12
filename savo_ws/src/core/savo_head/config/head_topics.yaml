@@ -10,9 +10,15 @@ savo_head:
     diagnostics_topic: /diagnostics
     camera_stream_cmd_topic: /savo_head/camera_stream_cmd
     camera_stream_state_topic: /savo_head/camera_stream_state
-    camera_status_topic: /savo_head/camera_status
-    image_raw_topic: /savo_head/image_raw
-    camera_info_topic: /savo_head/camera_info
+    camera_status_topic: /savo_head/camera/status
+    image_raw_topic: /savo_head/camera/image_raw
+    camera_info_topic: /savo_head/camera/camera_info
+    camera:
+      image_raw: /savo_head/camera/image_raw
+      camera_info: /savo_head/camera/camera_info
+      status: /savo_head/camera/status
+      stream_cmd: /savo_head/camera_stream_cmd
+      stream_state: /savo_head/camera_stream_state
     apriltag_detections_topic: /savo_head/apriltag_detections
     semantic_confirmations_topic: /savo_head/semantic_confirmations
     emergency_center_topic: /savo_head/emergency_center

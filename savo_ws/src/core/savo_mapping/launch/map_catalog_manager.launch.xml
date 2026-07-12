@@ -1,0 +1,54 @@
+<launch>
+  <arg
+    name="source_map_root"
+    default="~/Savo_Pi/runtime/maps"/>
+
+  <arg
+    name="source_map_id"
+    default=""/>
+
+  <arg
+    name="production_root"
+    default="~/Savo_Pi/runtime/maps/production"/>
+
+  <arg
+    name="release_id"
+    default=""/>
+
+  <arg
+    name="make_read_only"
+    default="true"/>
+
+  <arg
+    name="params_file"
+    default="$(find-pkg-share savo_mapping)/config/map_catalog_manager.yaml"/>
+
+  <node
+    pkg="savo_mapping"
+    exec="map_catalog_manager_node"
+    name="map_catalog_manager_node"
+    output="screen">
+
+    <param from="$(var params_file)"/>
+
+    <param
+      name="source.root"
+      value="$(var source_map_root)"/>
+
+    <param
+      name="source.map_id"
+      value="$(var source_map_id)"/>
+
+    <param
+      name="production.root"
+      value="$(var production_root)"/>
+
+    <param
+      name="release.id"
+      value="$(var release_id)"/>
+
+    <param
+      name="release.make_read_only"
+      value="$(var make_read_only)"/>
+  </node>
+</launch>

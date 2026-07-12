@@ -66,6 +66,172 @@ void Font::draw_text(
   }
 }
 
+
+int Font::atlas_text_width(
+  const ImageAsset & atlas,
+  const int cell_width,
+  const int cell_height,
+  const int columns,
+  const std::string & text)
+{
+  if (
+    !atlas.valid() ||
+    cell_width <= 0 ||
+    cell_height <= 0 ||
+    columns <= 0)
+  {
+    return 0;
+  }
+
+  constexpr int first_character = 32;
+  constexpr int last_character = 126;
+
+  const auto & pixels = atlas.pixels_rgb();
+  int width = 0;
+
+  for (const unsigned char raw_character : text) {
+    int character = static_cast<int>(raw_character);
+
+    if (character < first_character || character > last_character) {
+      character = static_cast<int>('?');
+    }
+
+    const int glyph_index = character - first_character;
+    const int source_x =
+      (glyph_index % columns) * cell_width;
+    const int source_y =
+      (glyph_index / columns) * cell_height;
+
+    const std::size_t pixel_index =
+      (
+        static_cast<std::size_t>(source_y) *
+        static_cast<std::size_t>(atlas.width()) +
+        static_cast<std::size_t>(source_x)
+      ) * 3U;
+
+    if (pixel_index >= pixels.size()) {
+      continue;
+    }
+
+    width += std::max(1, static_cast<int>(pixels[pixel_index]));
+  }
+
+  return width;
+}
+
+void Font::draw_atlas_text(
+  Canvas & canvas,
+  const ImageAsset & atlas,
+  const int cell_width,
+  const int cell_height,
+  const int columns,
+  const int padding,
+  const int x,
+  const int y,
+  const std::string & text,
+  const ColorRgb color,
+  const float alpha)
+{
+  if (
+    !canvas.valid() ||
+    !atlas.valid() ||
+    cell_width <= 0 ||
+    cell_height <= 0 ||
+    columns <= 0)
+  {
+    return;
+  }
+
+  constexpr int first_character = 32;
+  constexpr int last_character = 126;
+
+  const auto & pixels = atlas.pixels_rgb();
+  int cursor_x = x;
+
+  for (const unsigned char raw_character : text) {
+    int character = static_cast<int>(raw_character);
+
+    if (character < first_character || character > last_character) {
+      character = static_cast<int>('?');
+    }
+
+    const int glyph_index = character - first_character;
+    const int source_x =
+      (glyph_index % columns) * cell_width;
+    const int source_y =
+      (glyph_index / columns) * cell_height;
+
+    const std::size_t metadata_index =
+      (
+        static_cast<std::size_t>(source_y) *
+        static_cast<std::size_t>(atlas.width()) +
+        static_cast<std::size_t>(source_x)
+      ) * 3U;
+
+    if (metadata_index >= pixels.size()) {
+      continue;
+    }
+
+    const int advance =
+      std::max(1, static_cast<int>(pixels[metadata_index]));
+
+    for (int local_y = 0; local_y < cell_height; ++local_y) {
+      for (int local_x = 0; local_x < cell_width; ++local_x) {
+        // The first pixel contains glyph metadata, not artwork.
+        if (local_x == 0 && local_y == 0) {
+          continue;
+        }
+
+        const int atlas_x = source_x + local_x;
+        const int atlas_y = source_y + local_y;
+
+        if (
+          atlas_x < 0 ||
+          atlas_y < 0 ||
+          atlas_x >= atlas.width() ||
+          atlas_y >= atlas.height())
+        {
+          continue;
+        }
+
+        const std::size_t source_index =
+          (
+            static_cast<std::size_t>(atlas_y) *
+            static_cast<std::size_t>(atlas.width()) +
+            static_cast<std::size_t>(atlas_x)
+          ) * 3U;
+
+        if (source_index + 2U >= pixels.size()) {
+          continue;
+        }
+
+        const std::uint8_t mask_value =
+          std::max({
+            pixels[source_index],
+            pixels[source_index + 1U],
+            pixels[source_index + 2U]
+          });
+
+        if (mask_value == 0U) {
+          continue;
+        }
+
+        const float mask_alpha =
+          static_cast<float>(mask_value) / 255.0F;
+
+        canvas.blend_pixel(
+          cursor_x + local_x - padding,
+          y + local_y,
+          color,
+          alpha * mask_alpha);
+      }
+    }
+
+    cursor_x += advance;
+  }
+}
+
+
 const char * Font::glyph(const char c)
 {
   switch (c) {

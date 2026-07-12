@@ -94,7 +94,7 @@ def test_topic_defaults():
         "scan_state_topic": "/savo_head/scan_state",
         "status_topic": "/savo_head/status",
         "dashboard_text_topic": "/savo_head/dashboard_text",
-        "camera_status_topic": "/savo_head/camera_status",
+        "camera_status_topic": "/savo_head/camera/status",
         "apriltag_detections_topic": "/savo_head/apriltag_detections",
         "semantic_confirmations_topic": "/savo_head/semantic_confirmations",
         "robot_pose_snapshot_topic": "/savo_head/robot_pose_snapshot",

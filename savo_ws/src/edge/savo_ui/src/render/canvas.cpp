@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <fstream>
 
 namespace savo_ui
 {
@@ -352,5 +353,26 @@ const std::vector<std::uint8_t> & Canvas::pixels_rgb() const
 {
   return pixels_rgb_;
 }
+
+
+bool Canvas::write_ppm(const std::string & path) const
+{
+  if (!valid()) {
+    return false;
+  }
+
+  std::ofstream out(path, std::ios::binary);
+  if (!out) {
+    return false;
+  }
+
+  out << "P6\n" << width_ << " " << height_ << "\n255\n";
+  out.write(
+    reinterpret_cast<const char *>(pixels_rgb_.data()),
+    static_cast<std::streamsize>(pixels_rgb_.size()));
+
+  return static_cast<bool>(out);
+}
+
 
 }  // namespace savo_ui

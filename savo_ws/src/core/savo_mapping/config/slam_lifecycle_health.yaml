@@ -1,0 +1,15 @@
+/slam_lifecycle_health_bridge_node:
+  ros__parameters:
+    lifecycle:
+      get_state_service: "/slam_toolbox/get_state"
+      query_period_s: 0.50
+      response_timeout_s: 1.50
+      startup_grace_s: 5.0
+
+    topics:
+      readiness: "/savo_mapping/readiness"
+      session_state: "/savo_mapping/map_session/state"
+
+      lifecycle_state: "/savo_mapping/slam_lifecycle_state"
+      health: "/savo_mapping/slam_health"
+      manual_workflow_state: "/savo_mapping/manual_workflow_state"

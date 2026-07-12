@@ -28,9 +28,10 @@ struct HeadTopicContract
 
   std::string camera_stream_cmd{"/savo_head/camera_stream_cmd"};
   std::string camera_stream_state{"/savo_head/camera_stream_state"};
-  std::string camera_status{"/savo_head/camera_status"};
-  std::string image_raw{"/savo_head/image_raw"};
-  std::string camera_info{"/savo_head/camera_info"};
+
+  std::string camera_status{kTopicCameraStatus};
+  std::string image_raw{kTopicCameraImageRaw};
+  std::string camera_info{kTopicCameraInfo};
 
   std::string apriltag_detections{kTopicAprilTagDetections};
   std::string semantic_confirmations{kTopicSemanticConfirmations};
@@ -202,9 +203,9 @@ private:
 
 [[nodiscard]] inline bool should_use_best_effort_for_topic(const std::string & topic)
 {
-  return topic == "/savo_head/image_raw" ||
-    topic == "/savo_head/camera_status" ||
-    topic == "/savo_head/apriltag_detections";
+  return topic == kTopicCameraImageRaw ||
+    topic == kTopicCameraInfo ||
+    topic == kTopicAprilTagDetections;
 }
 
 }  // namespace savo_head

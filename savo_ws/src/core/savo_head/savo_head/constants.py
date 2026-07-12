@@ -33,9 +33,9 @@ TOPIC_SCAN_STATE: Final[str] = "/savo_head/scan_state"
 TOPIC_STATUS: Final[str] = "/savo_head/status"
 TOPIC_DASHBOARD_TEXT: Final[str] = "/savo_head/dashboard_text"
 
-TOPIC_IMAGE_RAW: Final[str] = "/savo_head/image_raw"
-TOPIC_CAMERA_INFO: Final[str] = "/savo_head/camera_info"
-TOPIC_CAMERA_STATUS: Final[str] = "/savo_head/camera_status"
+TOPIC_IMAGE_RAW: Final[str] = "/savo_head/camera/image_raw"
+TOPIC_CAMERA_INFO: Final[str] = "/savo_head/camera/camera_info"
+TOPIC_CAMERA_STATUS: Final[str] = "/savo_head/camera/status"
 
 TOPIC_APRILTAG_DETECTIONS: Final[str] = "/savo_head/apriltag_detections"
 TOPIC_SEMANTIC_CONFIRMATIONS: Final[str] = "/savo_head/semantic_confirmations"

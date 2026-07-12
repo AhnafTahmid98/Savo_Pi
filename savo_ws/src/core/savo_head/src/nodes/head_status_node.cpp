@@ -189,7 +189,7 @@ private:
   {
     declare_parameter<std::string>("pan_tilt_state_topic", kTopicPanTiltState);
     declare_parameter<std::string>("scan_state_topic", kTopicScanState);
-    declare_parameter<std::string>("camera_status_topic", "/savo_head/camera_status");
+    declare_parameter<std::string>("camera_status_topic", kTopicCameraStatus);
     declare_parameter<std::string>("semantic_confirmations_topic", kTopicSemanticConfirmations);
 
     declare_parameter<std::string>("status_topic", kTopicStatus);

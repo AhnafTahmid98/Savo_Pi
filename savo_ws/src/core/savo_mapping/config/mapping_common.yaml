@@ -1,0 +1,41 @@
+/**:
+  ros__parameters:
+    mapping:
+      default_mode: "monitor_only"
+      default_exploration_mode: "idle"
+
+      publish_rate_hz: 5.0
+      heartbeat_rate_hz: 1.0
+      diagnostics_rate_hz: 1.0
+
+      use_filtered_odom: true
+      require_scan: true
+      require_tf: true
+      require_odom: true
+      require_map: true
+
+      allow_direct_motor_control: false
+      allow_internal_package_calls: false
+
+    input_timeouts:
+      scan_s: 1.0
+      map_s: 5.0
+      odom_s: 1.0
+      realsense_status_s: 5.0
+      semantic_confirmation_s: 10.0
+
+    optional_features:
+      realsense_monitoring_enabled: false
+      voxel_obstacle_monitoring_enabled: false
+      semantic_mapping_enabled: false
+
+    navigation_handoff:
+      enabled: false
+      require_saved_map: true
+      require_quality_pass: true
+      require_named_map: true
+
+    status:
+      publish_json_status: true
+      publish_dashboard: true
+      publish_transient_state: true

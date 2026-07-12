@@ -1,0 +1,13 @@
+map_catalog_manager_node:
+  ros__parameters:
+    source:
+      root: "~/Savo_Pi/runtime/maps"
+      map_id: ""
+      expected_frame: "map"
+
+    production:
+      root: "~/Savo_Pi/runtime/maps/production"
+
+    release:
+      id: ""
+      make_read_only: true

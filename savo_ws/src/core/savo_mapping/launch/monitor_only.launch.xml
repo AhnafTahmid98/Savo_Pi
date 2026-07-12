@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<launch>
+  <arg
+    name="use_sim_time"
+    default="false"
+    description="Use the ROS simulation clock"/>
+
+  <node
+    pkg="savo_mapping"
+    exec="mapping_supervisor_node"
+    name="mapping_supervisor_node"
+    output="screen">
+
+    <param
+      from="$(find-pkg-share savo_mapping)/config/topics.yaml"/>
+
+    <param
+      from="$(find-pkg-share savo_mapping)/config/frames.yaml"/>
+
+    <param
+      from="$(find-pkg-share savo_mapping)/config/mapping_common.yaml"/>
+
+    <param
+      from="$(find-pkg-share savo_mapping)/config/map_session.yaml"/>
+
+    <param
+      from="$(find-pkg-share savo_mapping)/config/profiles/monitor_only.yaml"/>
+
+    <param
+      name="use_sim_time"
+      value="$(var use_sim_time)"/>
+  </node>
+</launch>
