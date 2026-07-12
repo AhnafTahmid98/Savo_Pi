@@ -1,12 +1,12 @@
-"""Speech nodes for STT, TTS, and mouth animation."""
+# -*- coding: utf-8 -*-
 
-from importlib.metadata import version, PackageNotFoundError
+"""Robot Savo speech package."""
+
+from .version import VERSION, __version__, get_package_version_info
+
 
 __all__ = [
+    "VERSION",
     "__version__",
+    "get_package_version_info",
 ]
-
-try:
-    __version__ = version("savo_speech")
-except PackageNotFoundError:
-    __version__ = "0.0.0"

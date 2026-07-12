@@ -1,0 +1,18 @@
+local_tts_service:
+  ros__parameters:
+    enabled: false
+    backend: piper
+
+    executable: piper
+    model_root: runtime/models/tts/piper
+    voice_model: ""
+    voice_config: ""
+
+    speaker_id: -1
+    length_scale: 0.95
+    noise_scale: 0.667
+    noise_width: 0.8
+
+    output_sample_rate_hz: 0
+    worker_count: 1
+    preload_model: false

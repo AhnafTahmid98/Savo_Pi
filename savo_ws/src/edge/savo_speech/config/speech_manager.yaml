@@ -1,0 +1,26 @@
+speech_manager_node:
+  ros__parameters:
+    enabled: true
+    start_awake: false
+
+    session.idle_timeout_s: 30.0
+    session.wake_cooldown_s: 2.0
+
+    utterance.min_duration_s: 0.30
+    utterance.max_duration_s: 15.0
+    utterance.speech_start_ms: 160
+    utterance.silence_end_ms: 700
+    utterance.post_roll_ms: 150
+
+    timeout.stt_s: 20.0
+    timeout.thinking_s: 30.0
+    timeout.tts_s: 20.0
+    timeout.playback_s: 60.0
+
+    tts_gate.enabled: true
+    tts_gate.release_delay_ms: 800
+
+    barge_in.enabled: false
+
+    status.publish_period_s: 1.0
+    heartbeat.publish_period_s: 1.0

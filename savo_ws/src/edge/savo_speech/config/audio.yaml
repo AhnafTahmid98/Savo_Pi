@@ -1,0 +1,28 @@
+respeaker_audio_node:
+  ros__parameters:
+    enabled: false
+    backend: dryrun
+
+    sample_rate_hz: 16000
+    sample_format: S16_LE
+    frame_ms: 20
+
+    capture.device_hint: ReSpeaker
+    capture.alsa_device: ""
+    capture.device_channels: 0
+    capture.processed_channel: 0
+    capture.output_channels: 1
+
+    playback.device_hint: ReSpeaker
+    playback.alsa_device: ""
+    playback.channels: 2
+
+    buffering.ring_buffer_ms: 5000
+    buffering.pre_roll_ms: 400
+
+    reconnect.enabled: true
+    reconnect.interval_s: 2.0
+    reconnect.max_attempts: 0
+
+    dryrun.capture_enabled: true
+    dryrun.playback_enabled: true

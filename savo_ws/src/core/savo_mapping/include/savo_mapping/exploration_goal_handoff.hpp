@@ -89,7 +89,9 @@ public:
 
   GoalTransition mark_executing();
 
-  GoalTransition request_cancel();
+  GoalTransition request_cancel(
+    const std::string & reason =
+    "cancel_requested");
 
   GoalTransition mark_succeeded();
 

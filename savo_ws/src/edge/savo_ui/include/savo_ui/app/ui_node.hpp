@@ -50,6 +50,14 @@ enum class ScreenRequestSource
   Internal
 };
 
+enum class StatusView
+{
+  Overview,
+  Sensors,
+  AiLink,
+  AlertsSystem
+};
+
 struct PowerUiSourceState
 {
   bool seen{false};
@@ -116,6 +124,38 @@ struct StatusUiState
   std::string savomind_state{"--"};
   std::string speech_state{"--"};
   std::string link_state{"--"};
+
+  // Detailed AI / Link state.
+  std::string brain_service_state{"--"};
+  std::string intent_engine_state{"--"};
+  std::string llm_provider{"--"};
+  std::string llm_model{"--"};
+
+  std::string microphone_state{"--"};
+  std::string stt_route_state{"--"};
+  std::string tts_route_state{"--"};
+  std::string playback_state{"--"};
+
+  std::string core_edge_state{"--"};
+  std::string ros_discovery_state{"--"};
+  std::string internet_state{"--"};
+
+  // Detailed Alerts / System state.
+  std::string core_computer_state{"--"};
+  std::string edge_computer_state{"--"};
+  std::string critical_nodes_state{"--"};
+
+  int ros_nodes_ready{0};
+  int ros_nodes_total{0};
+  int stale_publishers{0};
+
+  double core_cpu_temp_c{0.0};
+  double edge_cpu_temp_c{0.0};
+
+  int core_memory_percent{0};
+  int edge_memory_percent{0};
+  int core_storage_percent{0};
+  int edge_storage_percent{0};
 
   std::array<ObstacleDistanceUiState, 5> obstacle_distances{{
     {"LiDAR Front", false, false, false, 0.0, "MISSING"},
@@ -199,6 +239,12 @@ private:
   void poll_touch_input();
   void handle_touch_tap(int x, int y);
   bool screen_from_touch(int x, int y, UiScreen * screen) const;
+  bool status_view_from_touch(int x, int y, StatusView * view) const;
+
+  void request_status_view(
+    StatusView view,
+    ScreenRequestSource source);
+  void queue_status_view_after_tts(StatusView view);
 
   void request_screen(UiScreen screen, ScreenRequestSource source);
   void queue_screen_after_tts(UiScreen screen);
@@ -248,6 +294,9 @@ private:
   UiScreen active_screen_{UiScreen::Intro};
   VoicePhase voice_phase_{VoicePhase::Idle};
   std::optional<UiScreen> pending_screen_;
+
+  StatusView status_view_{StatusView::Overview};
+  std::optional<StatusView> pending_status_view_;
 
   std::string voice_input_source_;
   std::string voice_transcript_;

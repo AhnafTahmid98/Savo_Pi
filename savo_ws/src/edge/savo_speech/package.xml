@@ -1,34 +1,50 @@
 <?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+
 <package format="3">
   <name>savo_speech</name>
   <version>0.1.0</version>
 
   <description>
-    Robot Savo speech stack: faster-whisper speech-to-text, Piper text-to-speech,
-    and mouth animation integration with the robot UI.
+    Robot Savo edge-side speech package with C++ production audio runtime and
+    Python AI speech services, diagnostics, and SavoMind integration.
   </description>
 
   <maintainer email="tahmidahnaf998@gmail.com">Ahnaf Tahmid</maintainer>
   <license>Proprietary</license>
 
-  <!-- Build type: Python-based ROS 2 package -->
-  <buildtool_depend>ament_python</buildtool_depend>
+  <!-- Hybrid package foundation -->
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_cmake_python</buildtool_depend>
 
-  <!-- Core ROS 2 runtime dependencies -->
-  <exec_depend>rclpy</exec_depend>
-  <exec_depend>std_msgs</exec_depend>
+  <!-- Core ROS 2 dependencies -->
+  <depend>rclcpp</depend>
+  <depend>rclpy</depend>
 
-  <!-- Launch system (for speech_bringup.launch.py etc.) -->
+  <!-- Runtime contracts -->
+  <depend>std_msgs</depend>
+  <depend>std_srvs</depend>
+  <depend>diagnostic_msgs</depend>
+  <depend>builtin_interfaces</depend>
+
+  <!-- Launch and Python configuration -->
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
+  <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
 
-  <!-- testing + linting tools -->
-  <test_depend>ament_pytest</test_depend>
-  <test_depend>ament_flake8</test_depend>
-  <test_depend>ament_pep257</test_depend>
+  <!-- Testing and source validation -->
+  <test_depend>ament_cmake_pytest</test_depend>
+  <test_depend>ament_cmake_gtest</test_depend>
+  <test_depend>ament_cmake_cppcheck</test_depend>
+  <test_depend>ament_cmake_lint_cmake</test_depend>
+  <test_depend>ament_cmake_uncrustify</test_depend>
+  <test_depend>ament_cmake_xmllint</test_depend>
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+  <test_depend>python3-pytest</test_depend>
 
   <export>
-    <!-- Tell colcon/ament that this is an ament_python package -->
-    <build_type>ament_python</build_type>
+    <build_type>ament_cmake</build_type>
   </export>
 </package>

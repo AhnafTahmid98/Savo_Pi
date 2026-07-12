@@ -890,26 +890,58 @@ void UiNode::export_preview_frames()
   export_page(voice_shell_, "Voice", "voice_preview.ppm");
   export_page(navigate_shell_, "Navigate", "navigate_preview.ppm");
   const auto saved_status_ui = status_ui_;
+  const auto saved_status_view = status_view_;
 
   seed_status_preview_data();
-  render_status_page();
 
-  const std::string status_preview_path =
-    config_.preview_output_dir + "/status_preview.ppm";
+  auto export_status_view =
+    [this](
+      const StatusView view,
+      const std::string & file_name)
+    {
+      status_view_ = view;
+      render_status_page();
 
-  if (!canvas_.write_ppm(status_preview_path)) {
-    RCLCPP_WARN(
-      get_logger(),
-      "failed to write status dashboard preview | %s",
-      status_preview_path.c_str());
-  } else {
-    RCLCPP_INFO(
-      get_logger(),
-      "saved status dashboard preview | %s",
-      status_preview_path.c_str());
-  }
+      const std::string path =
+        config_.preview_output_dir + "/" + file_name;
+
+      if (!canvas_.write_ppm(path)) {
+        RCLCPP_WARN(
+          get_logger(),
+          "failed to write Status state preview | %s",
+          path.c_str());
+        return;
+      }
+
+      RCLCPP_INFO(
+        get_logger(),
+        "saved Status state preview | %s",
+        path.c_str());
+    };
+
+  // Keep status_preview.ppm as the default Overview preview.
+  export_status_view(
+    StatusView::Overview,
+    "status_preview.ppm");
+
+  export_status_view(
+    StatusView::Overview,
+    "status_overview.ppm");
+
+  export_status_view(
+    StatusView::Sensors,
+    "status_sensors.ppm");
+
+  export_status_view(
+    StatusView::AiLink,
+    "status_ai_link.ppm");
+
+  export_status_view(
+    StatusView::AlertsSystem,
+    "status_alerts_system.ppm");
 
   status_ui_ = saved_status_ui;
+  status_view_ = saved_status_view;
   const auto saved_core_power = core_power_;
   const auto saved_edge_power = edge_power_;
   const auto saved_base_power = base_power_;
@@ -1081,14 +1113,35 @@ void UiNode::handle_touch_tap(const int x, const int y)
   UiScreen next_screen{UiScreen::Home};
 
   if (active_screen_ == UiScreen::Intro) {
-    RCLCPP_INFO(get_logger(), "touch tap during intro | skipping to home x=%d y=%d", x, y);
+    RCLCPP_INFO(
+      get_logger(),
+      "touch tap during intro | skipping to home x=%d y=%d",
+      x,
+      y);
+
     intro_elapsed_seconds_ = config_.intro_seconds;
     transition_to(UiScreen::Home);
     return;
   }
 
+  // Status tabs have priority while Status is visible.
+  if (active_screen_ == UiScreen::Status) {
+    StatusView requested_view{StatusView::Overview};
+
+    if (status_view_from_touch(x, y, &requested_view)) {
+      request_status_view(
+        requested_view,
+        ScreenRequestSource::Touch);
+      return;
+    }
+  }
+
   if (!screen_from_touch(x, y, &next_screen)) {
-    RCLCPP_INFO(get_logger(), "touch tap outside active menu | x=%d y=%d", x, y);
+    RCLCPP_INFO(
+      get_logger(),
+      "touch tap outside active menu | x=%d y=%d",
+      x,
+      y);
     return;
   }
 
@@ -1098,6 +1151,14 @@ void UiNode::handle_touch_tap(const int x, const int y)
     x,
     y,
     to_string(next_screen).c_str());
+
+  // Pressing the left Status button always opens Overview.
+  if (next_screen == UiScreen::Status) {
+    request_status_view(
+      StatusView::Overview,
+      ScreenRequestSource::Touch);
+    return;
+  }
 
   request_screen(next_screen, ScreenRequestSource::Touch);
 }
@@ -1135,6 +1196,44 @@ bool UiNode::screen_from_touch(const int x, const int y, UiScreen * screen) cons
   for (const auto & zone : zones) {
     if (y >= zone.y0 && y <= zone.y1) {
       *screen = zone.screen;
+      return true;
+    }
+  }
+
+  return false;
+}
+
+bool UiNode::status_view_from_touch(
+  const int x,
+  const int y,
+  StatusView * view) const
+{
+  if (view == nullptr) {
+    return false;
+  }
+
+  // Four tab hitboxes inside the Status content panel.
+  if (y < 84 || y > 113) {
+    return false;
+  }
+
+  struct StatusTabZone
+  {
+    int x0;
+    int x1;
+    StatusView view;
+  };
+
+  const std::array<StatusTabZone, 4> zones{{
+    {138, 282, StatusView::Overview},
+    {287, 431, StatusView::Sensors},
+    {436, 580, StatusView::AiLink},
+    {585, 730, StatusView::AlertsSystem},
+  }};
+
+  for (const auto & zone : zones) {
+    if (x >= zone.x0 && x <= zone.x1) {
+      *view = zone.view;
       return true;
     }
   }
@@ -1704,7 +1803,8 @@ void UiNode::render_status_page()
         state == "STALE" ||
         state == "SLOW" ||
         state == "RECOVERY" ||
-        state == "WAITING")
+        state == "WAITING" ||
+        state == "WARNING")
       {
         return 2;
       }
@@ -1721,9 +1821,9 @@ void UiNode::render_status_page()
     };
 
   auto status_color =
-    [&](const std::string & raw_state) -> ColorRgb
+    [&](const std::string & state) -> ColorRgb
     {
-      const int severity = status_severity(raw_state);
+      const int severity = status_severity(state);
 
       if (severity >= 3) {
         return danger;
@@ -1757,439 +1857,842 @@ void UiNode::render_status_page()
              uppercase_copy(second);
     };
 
-  // Remove the duplicated inner STATUS heading and reclaim the space.
+  // Remove the shell's duplicated internal heading.
   canvas_.blend_rect(
     132,
     82,
     618,
-    54,
+    356,
     ColorRgb{0U, 11U, 29U},
     1.0F);
 
   // ============================================================
-  // Robot-wide summary
+  // Shared Status tabs
   // ============================================================
-  const int summary_x = 132;
-  const int summary_y = 88;
-  const int summary_w = 618;
-  const int summary_h = 32;
+  struct TabVisual
+  {
+    int x;
+    int width;
+    StatusView view;
+    const char * label;
+  };
 
-  canvas_.blend_rect(
-    summary_x,
-    summary_y,
-    summary_w,
-    summary_h,
-    ColorRgb{0U, 25U, 52U},
-    0.92F);
+  const std::array<TabVisual, 4> tabs{{
+    {138, 145, StatusView::Overview, "OVERVIEW"},
+    {287, 145, StatusView::Sensors, "SENSORS"},
+    {436, 145, StatusView::AiLink, "AI / LINK"},
+    {585, 145, StatusView::AlertsSystem, "ALERTS"},
+  }};
 
-  // Fixed zones prevent labels and values from touching.
-  draw_status_text(
-    146,
-    summary_y + 9,
-    "ROBOT",
-    cyan_soft,
-    false);
+  for (const auto & tab : tabs) {
+    const bool selected = status_view_ == tab.view;
 
-  draw_status_text(
-    204,
-    summary_y + 9,
-    status_ui_.robot_state,
-    status_color(status_ui_.robot_state),
-    false);
+    canvas_.blend_rect(
+      tab.x,
+      84,
+      tab.width,
+      28,
+      selected ?
+      ColorRgb{0U, 78U, 105U} :
+      ColorRgb{0U, 20U, 43U},
+      selected ? 0.96F : 0.82F);
 
-  draw_status_text(
-    322,
-    summary_y + 9,
-    "MODE",
-    cyan_soft,
-    false);
+    if (selected) {
+      canvas_.blend_rect(
+        tab.x,
+        110,
+        tab.width,
+        2,
+        cyan,
+        0.98F);
+    }
 
-  draw_status_text(
-    378,
-    summary_y + 9,
-    status_ui_.operating_mode,
-    white,
-    false);
+    const std::string label{tab.label};
+    const int width =
+      status_text_width(label, false);
 
-  draw_status_text(
-    486,
-    summary_y + 9,
-    "ALERTS",
-    cyan_soft,
-    false);
+    draw_status_text(
+      tab.x + ((tab.width - width) / 2),
+      91,
+      label,
+      selected ? white : cyan_soft,
+      false,
+      selected ? 1.0F : 0.88F);
+  }
 
-  draw_status_text(
-    558,
-    summary_y + 9,
-    std::to_string(status_ui_.alert_count),
-    status_ui_.alert_count == 0 ? good : warning,
-    false);
-
-  const std::string live_text =
-    status_ui_.live ? "LIVE" : "WAITING";
-
-  const int live_width =
-    status_text_width(live_text, false);
-
-  draw_status_text(
-    summary_x + summary_w - live_width - 14,
-    summary_y + 9,
-    live_text,
-    status_ui_.live ? cyan : warning,
-    false);
-
-  // ============================================================
-  // Four domain cards
-  // ============================================================
-  auto draw_domain_card =
-    [&](const int x,
-      const int y,
-      const std::string & title,
-      const std::string & state,
-      const std::string & line_one,
-      const std::string & line_two)
+  auto draw_alert_strip =
+    [&]()
     {
-      constexpr int width = 302;
-      constexpr int height = 58;
-
-      const ColorRgb card_color = status_color(state);
+      constexpr int alert_x = 132;
+      constexpr int alert_y = 414;
+      constexpr int alert_w = 618;
+      constexpr int alert_h = 23;
 
       canvas_.blend_rect(
-        x,
-        y,
-        width,
-        height,
-        ColorRgb{0U, 18U, 40U},
+        alert_x,
+        alert_y,
+        alert_w,
+        alert_h,
+        ColorRgb{0U, 23U, 45U},
         0.94F);
 
-      canvas_.blend_rect(
-        x,
-        y,
-        width,
-        2,
-        card_color,
-        0.90F);
-
-      // Small font keeps long domain titles professional.
-      draw_status_text(
-        x + 11,
-        y + 7,
-        title,
-        cyan_soft,
-        false,
-        0.98F);
-
-      const int state_width =
-        status_text_width(state, false);
+      const std::string label = "ACTIVE ALERT:";
 
       draw_status_text(
-        x + width - state_width - 11,
-        y + 7,
-        state,
-        card_color,
-        false,
-        1.0F);
-
-      draw_status_text(
-        x + 11,
-        y + 26,
-        line_one,
-        white,
-        false,
-        0.92F);
-
-      draw_status_text(
-        x + 11,
-        y + 42,
-        line_two,
-        muted,
-        false,
-        0.92F);
-    };
-
-  const int left_x = 132;
-  const int right_x = 448;
-
-  const std::string motion_state =
-    combined_state(
-    status_ui_.safety_state,
-    status_ui_.control_state,
-    "CLEAR");
-
-  const std::string localization_state =
-    combined_state(
-    status_ui_.localization_state,
-    status_ui_.perception_state,
-    "READY");
-
-  draw_domain_card(
-    left_x,
-    128,
-    "MOTION + SAFETY",
-    motion_state,
-    "Gate " + status_ui_.safety_gate +
-    " | Base " + status_ui_.base_state,
-    "Watchdog " + status_ui_.watchdog_state +
-    " | Slow " + status_ui_.slowdown);
-
-  draw_domain_card(
-    right_x,
-    128,
-    "LOCALIZATION + PERCEPTION",
-    localization_state,
-    "EKF / Wheel / IMU / VO OK",
-    "LiDAR / ToF / Ultra / Depth OK");
-
-  draw_domain_card(
-    left_x,
-    192,
-    "NAVIGATION + MAPPING",
-    status_ui_.navigation_state,
-    "Nav " + status_ui_.nav_state +
-    " | Map " + status_ui_.mapping_state,
-    "Recovery " + status_ui_.recovery_state);
-
-  draw_domain_card(
-    right_x,
-    192,
-    "AI + CONNECTIVITY",
-    status_ui_.connectivity_state,
-    "SavoMind " + status_ui_.savomind_state +
-    " | Speech " + status_ui_.speech_state,
-    "Core-Edge | ROS Link " + status_ui_.link_state);
-
-  // ============================================================
-  // Live obstacle-distance graph
-  // ============================================================
-  const int graph_x = 132;
-  const int graph_y = 256;
-  const int graph_w = 618;
-  const int graph_h = 150;
-
-  constexpr double graph_max_distance_m = 3.0;
-
-  canvas_.blend_rect(
-    graph_x,
-    graph_y,
-    graph_w,
-    graph_h,
-    ColorRgb{0U, 15U, 35U},
-    0.94F);
-
-  draw_status_text(
-    graph_x + 14,
-    graph_y + 9,
-    "LIVE OBSTACLE DISTANCE",
-    cyan,
-    true);
-
-  const std::string distance_graph_state =
-    status_ui_.live ? "LIVE" : "WAITING";
-
-  const int distance_graph_state_width =
-    status_text_width(distance_graph_state, true);
-
-  draw_status_text(
-    graph_x + graph_w - distance_graph_state_width - 14,
-    graph_y + 9,
-    distance_graph_state,
-    status_ui_.live ? cyan : warning,
-    true);
-
-  auto obstacle_state_color =
-    [&](const ObstacleDistanceUiState & source) -> ColorRgb
-    {
-      if (!source.seen || !source.valid) {
-        return muted;
-      }
-
-      const std::string state =
-        uppercase_copy(source.state);
-
-      if (
-        state == "STOP" ||
-        state == "BLOCKED" ||
-        state == "FAILED" ||
-        state == "ERROR")
-      {
-        return danger;
-      }
-
-      if (
-        state == "SLOW" ||
-        state == "DEGRADED" ||
-        state == "STALE")
-      {
-        return warning;
-      }
-
-      if (
-        state == "CLEAR" ||
-        state == "OK")
-      {
-        return good;
-      }
-
-      return muted;
-    };
-
-  auto obstacle_value_text =
-    [](const ObstacleDistanceUiState & source) -> std::string
-    {
-      if (!source.seen) {
-        return "--";
-      }
-
-      if (!source.valid) {
-        return "INVALID";
-      }
-
-      if (source.clear_out_of_range) {
-        return ">3.0 m";
-      }
-
-      std::ostringstream output;
-      output << std::fixed << std::setprecision(2)
-             << source.distance_m << " m";
-      return output.str();
-    };
-
-  auto draw_obstacle_distance =
-    [&](const ObstacleDistanceUiState & source,
-      const int y)
-    {
-      constexpr int label_x = 146;
-      constexpr int bar_x = 270;
-      constexpr int bar_width = 270;
-      constexpr int bar_height = 8;
-      constexpr int value_x = 555;
-
-      const ColorRgb row_color =
-        obstacle_state_color(source);
-
-      draw_status_text(
-        label_x,
-        y,
-        source.label,
+        alert_x + 12,
+        alert_y + 2,
+        label,
         cyan_soft,
         false,
         0.96F);
 
+      const int value_x =
+        alert_x + 12 +
+        status_text_width(label, false) + 14;
+
+      draw_status_text(
+        value_x,
+        alert_y + 2,
+        status_ui_.active_alert,
+        status_ui_.alert_count == 0 ? good : warning,
+        false,
+        0.98F);
+    };
+
+  // ============================================================
+  // OVERVIEW
+  // ============================================================
+  if (status_view_ == StatusView::Overview) {
+    constexpr int summary_x = 132;
+    constexpr int summary_y = 122;
+    constexpr int summary_w = 618;
+    constexpr int summary_h = 30;
+
+    canvas_.blend_rect(
+      summary_x,
+      summary_y,
+      summary_w,
+      summary_h,
+      ColorRgb{0U, 25U, 52U},
+      0.92F);
+
+    draw_status_text(
+      146,
+      summary_y + 8,
+      "ROBOT",
+      cyan_soft,
+      false);
+
+    draw_status_text(
+      204,
+      summary_y + 8,
+      status_ui_.robot_state,
+      status_color(status_ui_.robot_state),
+      false);
+
+    draw_status_text(
+      322,
+      summary_y + 8,
+      "MODE",
+      cyan_soft,
+      false);
+
+    draw_status_text(
+      378,
+      summary_y + 8,
+      status_ui_.operating_mode,
+      white,
+      false);
+
+    draw_status_text(
+      486,
+      summary_y + 8,
+      "ALERTS",
+      cyan_soft,
+      false);
+
+    draw_status_text(
+      558,
+      summary_y + 8,
+      std::to_string(status_ui_.alert_count),
+      status_ui_.alert_count == 0 ? good : warning,
+      false);
+
+    const std::string live =
+      status_ui_.live ? "LIVE" : "WAITING";
+
+    draw_status_text(
+      summary_x + summary_w -
+      status_text_width(live, false) - 14,
+      summary_y + 8,
+      live,
+      status_ui_.live ? cyan : warning,
+      false);
+
+    auto draw_domain_card =
+      [&](const int x,
+        const int y,
+        const std::string & title,
+        const std::string & state,
+        const std::array<std::string, 5> & lines)
+      {
+        constexpr int width = 302;
+        constexpr int height = 118;
+
+        const ColorRgb card_color =
+          status_color(state);
+
+        canvas_.blend_rect(
+          x,
+          y,
+          width,
+          height,
+          ColorRgb{0U, 18U, 40U},
+          0.94F);
+
+        canvas_.blend_rect(
+          x,
+          y,
+          width,
+          2,
+          card_color,
+          0.92F);
+
+        draw_status_text(
+          x + 11,
+          y + 8,
+          title,
+          cyan_soft,
+          false);
+
+        const int state_width =
+          status_text_width(state, false);
+
+        draw_status_text(
+          x + width - state_width - 11,
+          y + 8,
+          state,
+          card_color,
+          false);
+
+        const std::array<int, 5> rows{
+          y + 34,
+          y + 51,
+          y + 68,
+          y + 85,
+          y + 102
+        };
+
+        for (std::size_t index = 0; index < lines.size(); ++index) {
+          draw_status_text(
+            x + 11,
+            rows[index],
+            lines[index],
+            index == 0 ? white : muted,
+            false,
+            0.94F);
+        }
+      };
+
+    const std::string motion_state =
+      combined_state(
+      status_ui_.safety_state,
+      status_ui_.control_state,
+      "CLEAR");
+
+    const std::string localization_state =
+      combined_state(
+      status_ui_.localization_state,
+      status_ui_.perception_state,
+      "READY");
+
+    draw_domain_card(
+      132,
+      160,
+      "MOTION + SAFETY",
+      motion_state,
+      {{
+        "Safety Gate   " + status_ui_.safety_gate,
+        "Base          " + status_ui_.base_state,
+        "Control       " + status_ui_.control_mode,
+        "Watchdog      " + status_ui_.watchdog_state,
+        "Slowdown      " + status_ui_.slowdown,
+      }});
+
+    draw_domain_card(
+      448,
+      160,
+      "LOCALIZATION + PERCEPTION",
+      localization_state,
+      {{
+        "EKF           " + status_ui_.ekf_state,
+        "Wheel         " + status_ui_.wheel_state,
+        "IMU           " + status_ui_.imu_state,
+        "VO            " + status_ui_.vo_state,
+        "Perception    " + status_ui_.perception_state,
+      }});
+
+    draw_domain_card(
+      132,
+      286,
+      "NAVIGATION + MAPPING",
+      status_ui_.navigation_state,
+      {{
+        "Navigation    " + status_ui_.nav_state,
+        "Mapping       " + status_ui_.mapping_state,
+        "Recovery      " + status_ui_.recovery_state,
+        "Goal          " + status_ui_.navigation_goal,
+        "State         " + status_ui_.navigation_state,
+      }});
+
+    draw_domain_card(
+      448,
+      286,
+      "AI + CONNECTIVITY",
+      status_ui_.connectivity_state,
+      {{
+        "SavoMind      " + status_ui_.savomind_state,
+        "Speech        " + status_ui_.speech_state,
+        "Core-Edge     " + status_ui_.core_edge_state,
+        "ROS Link      " + status_ui_.link_state,
+        "Internet      " + status_ui_.internet_state,
+      }});
+
+    draw_alert_strip();
+    return;
+  }
+
+  // ============================================================
+  // SENSORS
+  // ============================================================
+  if (status_view_ == StatusView::Sensors) {
+    bool nearest_seen = false;
+    double nearest_distance = 0.0;
+    std::string nearest_label{"None"};
+
+    for (const auto & sensor : status_ui_.obstacle_distances) {
+      if (
+        !sensor.seen ||
+        !sensor.valid ||
+        sensor.clear_out_of_range)
+      {
+        continue;
+      }
+
+      if (
+        !nearest_seen ||
+        sensor.distance_m < nearest_distance)
+      {
+        nearest_seen = true;
+        nearest_distance = sensor.distance_m;
+        nearest_label = sensor.label;
+      }
+    }
+
+    std::ostringstream nearest_value;
+
+    if (nearest_seen) {
+      nearest_value
+        << nearest_label
+        << "  "
+        << std::fixed
+        << std::setprecision(2)
+        << nearest_distance
+        << " m";
+    } else {
+      nearest_value << "No nearby obstacle";
+    }
+
+    canvas_.blend_rect(
+      132,
+      122,
+      618,
+      34,
+      ColorRgb{0U, 25U, 52U},
+      0.92F);
+
+    draw_status_text(
+      146,
+      131,
+      "NEAREST OBSTACLE",
+      cyan_soft,
+      false);
+
+    draw_status_text(
+      316,
+      131,
+      nearest_value.str(),
+      nearest_seen ? white : good,
+      false);
+
+    const std::string live =
+      status_ui_.live ? "LIVE" : "WAITING";
+
+    draw_status_text(
+      736 - status_text_width(live, false),
+      131,
+      live,
+      status_ui_.live ? cyan : warning,
+      false);
+
+    constexpr int graph_x = 132;
+    constexpr int graph_y = 164;
+    constexpr int graph_w = 618;
+    constexpr int graph_h = 240;
+    constexpr double graph_max_m = 3.0;
+
+    canvas_.blend_rect(
+      graph_x,
+      graph_y,
+      graph_w,
+      graph_h,
+      ColorRgb{0U, 15U, 35U},
+      0.94F);
+
+    draw_status_text(
+      graph_x + 14,
+      graph_y + 10,
+      "LIVE OBSTACLE DISTANCE",
+      cyan,
+      true);
+
+    auto sensor_color =
+      [&](const ObstacleDistanceUiState & sensor) -> ColorRgb
+      {
+        if (!sensor.seen || !sensor.valid) {
+          return muted;
+        }
+
+        return status_color(sensor.state);
+      };
+
+    auto value_text =
+      [](const ObstacleDistanceUiState & sensor) -> std::string
+      {
+        if (!sensor.seen) {
+          return "--";
+        }
+
+        if (!sensor.valid) {
+          return "INVALID";
+        }
+
+        if (sensor.clear_out_of_range) {
+          return ">3.0 m";
+        }
+
+        std::ostringstream output;
+        output
+          << std::fixed
+          << std::setprecision(2)
+          << sensor.distance_m
+          << " m";
+
+        return output.str();
+      };
+
+    const std::array<int, 5> rows{
+      211,
+      243,
+      275,
+      307,
+      339
+    };
+
+    for (
+      std::size_t index = 0;
+      index < status_ui_.obstacle_distances.size();
+      ++index)
+    {
+      const auto & sensor =
+        status_ui_.obstacle_distances[index];
+
+      const ColorRgb row_color =
+        sensor_color(sensor);
+
+      draw_status_text(
+        150,
+        rows[index],
+        sensor.label,
+        cyan_soft,
+        false);
+
       canvas_.blend_rect(
-        bar_x,
-        y + 6,
-        bar_width,
-        bar_height,
+        292,
+        rows[index] + 6,
+        250,
+        8,
         ColorRgb{20U, 55U, 72U},
         0.94F);
 
-      if (source.seen && source.valid) {
-        const double displayed_distance =
-          source.clear_out_of_range ?
-          graph_max_distance_m :
+      if (sensor.seen && sensor.valid) {
+        const double displayed =
+          sensor.clear_out_of_range ?
+          graph_max_m :
           std::clamp(
-            source.distance_m,
+            sensor.distance_m,
             0.0,
-            graph_max_distance_m);
+            graph_max_m);
 
-        const int fill_width =
+        const int width =
           static_cast<int>(
           std::lround(
-            static_cast<double>(bar_width) *
-            displayed_distance /
-            graph_max_distance_m));
+            250.0 *
+            displayed /
+            graph_max_m));
 
         canvas_.blend_rect(
-          bar_x,
-          y + 6,
-          std::clamp(fill_width, 0, bar_width),
-          bar_height,
+          292,
+          rows[index] + 6,
+          std::clamp(width, 0, 250),
+          8,
           row_color,
           0.98F);
       }
 
       draw_status_text(
-        value_x,
-        y,
-        obstacle_value_text(source),
-        source.seen && source.valid ?
+        556,
+        rows[index],
+        value_text(sensor),
+        sensor.seen && sensor.valid ?
         white :
         muted,
-        false,
-        0.98F);
+        false);
 
-      const std::string state_text =
-        source.seen ?
-        uppercase_copy(source.state) :
+      const std::string state =
+        sensor.seen ?
+        uppercase_copy(sensor.state) :
         "MISSING";
 
-      const int state_width =
-        status_text_width(state_text, false);
-
       draw_status_text(
-        graph_x + graph_w - state_width - 14,
-        y,
-        state_text,
+        736 - status_text_width(state, false),
+        rows[index],
+        state,
         row_color,
-        false,
-        0.98F);
+        false);
+    }
+
+    draw_status_text(
+      292,
+      378,
+      "0.0 m",
+      muted,
+      false);
+
+    const std::string max_label = "3.0 m";
+
+    draw_status_text(
+      542 - status_text_width(max_label, false),
+      378,
+      max_label,
+      muted,
+      false);
+
+    draw_alert_strip();
+    return;
+  }
+
+  // ============================================================
+  // AI / LINK
+  // ============================================================
+  if (status_view_ == StatusView::AiLink) {
+    auto draw_section =
+      [&](const int x,
+        const std::string & title,
+        const std::array<std::string, 4> & labels,
+        const std::array<std::string, 4> & values)
+      {
+        constexpr int y = 122;
+        constexpr int width = 202;
+        constexpr int height = 282;
+
+        canvas_.blend_rect(
+          x,
+          y,
+          width,
+          height,
+          ColorRgb{0U, 18U, 40U},
+          0.94F);
+
+        canvas_.blend_rect(
+          x,
+          y,
+          width,
+          2,
+          cyan,
+          0.90F);
+
+        draw_status_text(
+          x + 12,
+          y + 11,
+          title,
+          cyan,
+          true);
+
+        const std::array<int, 4> label_rows{
+          y + 45,
+          y + 99,
+          y + 153,
+          y + 207
+        };
+
+        for (std::size_t index = 0; index < labels.size(); ++index) {
+          draw_status_text(
+            x + 12,
+            label_rows[index],
+            labels[index],
+            muted,
+            false);
+
+          draw_status_text(
+            x + 12,
+            label_rows[index] + 18,
+            values[index],
+            status_color(values[index]),
+            false);
+        }
+      };
+
+    draw_section(
+      132,
+      "SAVOMIND",
+      {{
+        "BRAIN SERVICE",
+        "INTENT ENGINE",
+        "LLM PROVIDER",
+        "MODEL",
+      }},
+      {{
+        status_ui_.brain_service_state,
+        status_ui_.intent_engine_state,
+        status_ui_.llm_provider,
+        status_ui_.llm_model,
+      }});
+
+    draw_section(
+      340,
+      "SPEECH",
+      {{
+        "MICROPHONE",
+        "STT ROUTE",
+        "TTS ROUTE",
+        "PLAYBACK",
+      }},
+      {{
+        status_ui_.microphone_state,
+        status_ui_.stt_route_state,
+        status_ui_.tts_route_state,
+        status_ui_.playback_state,
+      }});
+
+    draw_section(
+      548,
+      "CONNECTIVITY",
+      {{
+        "CORE-EDGE",
+        "ROS DISCOVERY",
+        "INTERNET",
+        "LINK STATE",
+      }},
+      {{
+        status_ui_.core_edge_state,
+        status_ui_.ros_discovery_state,
+        status_ui_.internet_state,
+        status_ui_.link_state,
+      }});
+
+    draw_alert_strip();
+    return;
+  }
+
+  // ============================================================
+  // ALERTS / SYSTEM
+  // ============================================================
+  canvas_.blend_rect(
+    132,
+    122,
+    292,
+    282,
+    ColorRgb{0U, 18U, 40U},
+    0.94F);
+
+  canvas_.blend_rect(
+    432,
+    122,
+    318,
+    282,
+    ColorRgb{0U, 18U, 40U},
+    0.94F);
+
+  canvas_.blend_rect(
+    132,
+    122,
+    292,
+    2,
+    status_ui_.alert_count == 0 ? good : warning,
+    0.94F);
+
+  canvas_.blend_rect(
+    432,
+    122,
+    318,
+    2,
+    cyan,
+    0.94F);
+
+  draw_status_text(
+    145,
+    133,
+    "ACTIVE ALERTS",
+    cyan,
+    true);
+
+  const std::string alert_count =
+    std::to_string(status_ui_.alert_count);
+
+  draw_status_text(
+    407 - status_text_width(alert_count, true),
+    133,
+    alert_count,
+    status_ui_.alert_count == 0 ? good : warning,
+    true);
+
+  if (status_ui_.alert_count == 0) {
+    draw_status_text(
+      158,
+      196,
+      "NO ACTIVE ALERTS",
+      good,
+      true);
+
+    draw_status_text(
+      158,
+      232,
+      "Robot systems are stable.",
+      white,
+      false);
+
+    draw_status_text(
+      158,
+      256,
+      "No immediate operator action.",
+      muted,
+      false);
+  } else {
+    draw_status_text(
+      151,
+      188,
+      status_ui_.active_alert,
+      warning,
+      true);
+
+    draw_status_text(
+      151,
+      224,
+      "SEVERITY",
+      muted,
+      false);
+
+    draw_status_text(
+      151,
+      244,
+      "WARNING",
+      warning,
+      false);
+
+    draw_status_text(
+      151,
+      282,
+      "Operator review recommended.",
+      white,
+      false);
+  }
+
+  draw_status_text(
+    445,
+    133,
+    "SYSTEM HEALTH",
+    cyan,
+    true);
+
+  auto format_temperature =
+    [](const double temperature) -> std::string
+    {
+      std::ostringstream output;
+      output
+        << std::fixed
+        << std::setprecision(0)
+        << temperature
+        << " C";
+      return output.str();
     };
 
-  const std::array<int, 5> obstacle_rows{
-    290,
-    312,
-    334,
-    356,
-    378
+  const std::array<std::string, 8> system_labels{{
+    "Core Computer",
+    "Edge Computer",
+    "ROS Nodes",
+    "Critical Nodes",
+    "Stale Publishers",
+    "Core / Edge CPU",
+    "Core / Edge Memory",
+    "Core / Edge Storage",
+  }};
+
+  const std::array<std::string, 8> system_values{{
+    status_ui_.core_computer_state,
+    status_ui_.edge_computer_state,
+    std::to_string(status_ui_.ros_nodes_ready) +
+      " / " +
+      std::to_string(status_ui_.ros_nodes_total),
+    status_ui_.critical_nodes_state,
+    std::to_string(status_ui_.stale_publishers),
+    format_temperature(status_ui_.core_cpu_temp_c) +
+      " / " +
+      format_temperature(status_ui_.edge_cpu_temp_c),
+    std::to_string(status_ui_.core_memory_percent) +
+      "% / " +
+      std::to_string(status_ui_.edge_memory_percent) +
+      "%",
+    std::to_string(status_ui_.core_storage_percent) +
+      "% / " +
+      std::to_string(status_ui_.edge_storage_percent) +
+      "%",
+  }};
+
+  const std::array<int, 8> system_rows{
+    166,
+    193,
+    220,
+    247,
+    274,
+    301,
+    328,
+    355
   };
 
   for (
     std::size_t index = 0;
-    index < status_ui_.obstacle_distances.size();
+    index < system_labels.size();
     ++index)
   {
-    draw_obstacle_distance(
-      status_ui_.obstacle_distances[index],
-      obstacle_rows[index]);
+    draw_status_text(
+      447,
+      system_rows[index],
+      system_labels[index],
+      muted,
+      false);
+
+    draw_status_text(
+      625,
+      system_rows[index],
+      system_values[index],
+      index < 5 ?
+      status_color(system_values[index]) :
+      white,
+      false);
   }
 
-  // ============================================================
-  // Highest-priority alert
-  // ============================================================
-  const int alert_x = 132;
-  const int alert_y = 414;
-  const int alert_w = 618;
-  const int alert_h = 23;
-
-  canvas_.blend_rect(
-    alert_x,
-    alert_y,
-    alert_w,
-    alert_h,
-    ColorRgb{0U, 23U, 45U},
-    0.94F);
-
-  const std::string alert_label = "ACTIVE ALERT:";
-
-  draw_status_text(
-    alert_x + 12,
-    alert_y + 2,
-    alert_label,
-    cyan_soft,
-    false,
-    0.96F);
-
-  const int alert_value_x =
-    alert_x + 12 +
-    status_text_width(alert_label, false) + 14;
-
-  draw_status_text(
-    alert_value_x,
-    alert_y + 2,
-    status_ui_.active_alert,
-    status_ui_.alert_count == 0 ? good : warning,
-    false,
-    0.98F);
+  draw_alert_strip();
 }
 
 
@@ -2233,6 +2736,36 @@ void UiNode::seed_status_preview_data()
   status_ui_.savomind_state = "Online";
   status_ui_.speech_state = "Ready";
   status_ui_.link_state = "OK";
+
+  status_ui_.brain_service_state = "READY";
+  status_ui_.intent_engine_state = "READY";
+  status_ui_.llm_provider = "CEREBRAS";
+  status_ui_.llm_model = "GPT-OSS-120B";
+
+  status_ui_.microphone_state = "READY";
+  status_ui_.stt_route_state = "ONLINE";
+  status_ui_.tts_route_state = "ONLINE";
+  status_ui_.playback_state = "IDLE";
+
+  status_ui_.core_edge_state = "ONLINE";
+  status_ui_.ros_discovery_state = "OK";
+  status_ui_.internet_state = "ONLINE";
+
+  status_ui_.core_computer_state = "OK";
+  status_ui_.edge_computer_state = "OK";
+  status_ui_.critical_nodes_state = "OK";
+
+  status_ui_.ros_nodes_ready = 24;
+  status_ui_.ros_nodes_total = 24;
+  status_ui_.stale_publishers = 0;
+
+  status_ui_.core_cpu_temp_c = 51.0;
+  status_ui_.edge_cpu_temp_c = 49.0;
+
+  status_ui_.core_memory_percent = 38;
+  status_ui_.edge_memory_percent = 31;
+  status_ui_.core_storage_percent = 62;
+  status_ui_.edge_storage_percent = 58;
 
   status_ui_.obstacle_distances = {{
     {"LiDAR Front", true, true, false, 2.42, "CLEAR"},
@@ -2947,6 +3480,77 @@ void UiNode::present_if_enabled()
 }
 
 
+void UiNode::request_status_view(
+  const StatusView requested_view,
+  const ScreenRequestSource source)
+{
+  const char * view_text = "overview";
+
+  switch (requested_view) {
+    case StatusView::Overview:
+      view_text = "overview";
+      break;
+    case StatusView::Sensors:
+      view_text = "sensors";
+      break;
+    case StatusView::AiLink:
+      view_text = "ai_link";
+      break;
+    case StatusView::AlertsSystem:
+      view_text = "alerts_system";
+      break;
+  }
+
+  // Touch always changes the visible Status state immediately.
+  if (source == ScreenRequestSource::Touch) {
+    pending_screen_.reset();
+    pending_status_view_.reset();
+
+    status_view_ = requested_view;
+
+    RCLCPP_INFO(
+      get_logger(),
+      "Status view accepted immediately | source=touch view=%s",
+      view_text);
+
+    transition_to(UiScreen::Status);
+    return;
+  }
+
+  // SavoMind resolves the destination while Voice remains visible.
+  if (
+    source == ScreenRequestSource::SavoMind &&
+    voice_phase_ == VoicePhase::Speaking)
+  {
+    queue_status_view_after_tts(requested_view);
+    return;
+  }
+
+  pending_screen_.reset();
+  pending_status_view_.reset();
+
+  status_view_ = requested_view;
+
+  RCLCPP_INFO(
+    get_logger(),
+    "Status view accepted | view=%s",
+    view_text);
+
+  transition_to(UiScreen::Status);
+}
+
+
+void UiNode::queue_status_view_after_tts(
+  const StatusView requested_view)
+{
+  pending_screen_ = UiScreen::Status;
+  pending_status_view_ = requested_view;
+
+  RCLCPP_INFO(
+    get_logger(),
+    "Status view queued until TTS finishes");
+}
+
 void UiNode::request_screen(
   const UiScreen requested_screen,
   const ScreenRequestSource source)
@@ -2968,9 +3572,26 @@ void UiNode::request_screen(
       break;
   }
 
+  // A generic Status request means Status / Overview.
+  if (requested_screen == UiScreen::Status) {
+    if (
+      source == ScreenRequestSource::SavoMind &&
+      voice_phase_ == VoicePhase::Speaking)
+    {
+      queue_status_view_after_tts(StatusView::Overview);
+      return;
+    }
+
+    request_status_view(
+      StatusView::Overview,
+      source);
+    return;
+  }
+
   // Touch commands always take effect immediately.
   if (source == ScreenRequestSource::Touch) {
     pending_screen_.reset();
+    pending_status_view_.reset();
 
     RCLCPP_INFO(
       get_logger(),
@@ -2982,8 +3603,6 @@ void UiNode::request_screen(
     return;
   }
 
-  // SavoMind may resolve an intent while Savo is still speaking.
-  // Keep Voice visible and delay the requested task page until playback ends.
   if (
     source == ScreenRequestSource::SavoMind &&
     voice_phase_ == VoicePhase::Speaking)
@@ -2991,6 +3610,9 @@ void UiNode::request_screen(
     queue_screen_after_tts(requested_screen);
     return;
   }
+
+  pending_screen_.reset();
+  pending_status_view_.reset();
 
   RCLCPP_INFO(
     get_logger(),
@@ -3001,9 +3623,16 @@ void UiNode::request_screen(
   transition_to(requested_screen);
 }
 
-void UiNode::queue_screen_after_tts(const UiScreen requested_screen)
+void UiNode::queue_screen_after_tts(
+  const UiScreen requested_screen)
 {
   pending_screen_ = requested_screen;
+
+  if (requested_screen == UiScreen::Status) {
+    pending_status_view_ = StatusView::Overview;
+  } else {
+    pending_status_view_.reset();
+  }
 
   RCLCPP_INFO(
     get_logger(),
@@ -3016,12 +3645,28 @@ void UiNode::handle_tts_finished()
   voice_phase_ = VoicePhase::Idle;
 
   if (!pending_screen_.has_value()) {
-    RCLCPP_INFO(get_logger(), "TTS finished | no pending screen");
+    pending_status_view_.reset();
+    RCLCPP_INFO(
+      get_logger(),
+      "TTS finished | no pending screen");
     return;
   }
 
-  const UiScreen requested_screen = *pending_screen_;
+  const UiScreen requested_screen =
+    *pending_screen_;
+
+  const auto requested_status_view =
+    pending_status_view_;
+
   pending_screen_.reset();
+  pending_status_view_.reset();
+
+  if (
+    requested_screen == UiScreen::Status &&
+    requested_status_view.has_value())
+  {
+    status_view_ = *requested_status_view;
+  }
 
   RCLCPP_INFO(
     get_logger(),

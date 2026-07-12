@@ -230,7 +230,8 @@ GoalHandoffMachine::mark_executing()
 }
 
 GoalTransition
-GoalHandoffMachine::request_cancel()
+GoalHandoffMachine::request_cancel(
+  const std::string & reason)
 {
   if (state_ ==
       GoalHandoffState::kWaitingForServer ||
@@ -244,7 +245,9 @@ GoalHandoffMachine::request_cancel()
 
   return transition(
     GoalHandoffState::kCanceling,
-    "cancel_requested");
+    reason.empty() ?
+    "cancel_requested" :
+    reason);
 }
 
 GoalTransition

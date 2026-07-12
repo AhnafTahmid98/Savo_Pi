@@ -196,6 +196,114 @@ TEST(ExplorationGoalHandoff, CancellationTimeout)
     exploration::GoalHandoffState::kTimedOut);
 }
 
+TEST(
+  ExplorationGoalHandoff,
+  ExecutionTimeoutWaitsForTerminalResult)
+{
+  exploration::GoalHandoffMachine machine;
+
+  ASSERT_TRUE(
+    machine.begin(
+      "frontier-execution-timeout").accepted);
+
+  ASSERT_TRUE(
+    machine.mark_server_available().accepted);
+
+  ASSERT_TRUE(
+    machine.mark_accepted().accepted);
+
+  ASSERT_TRUE(
+    machine.mark_executing().accepted);
+
+  ASSERT_TRUE(
+    machine.request_cancel(
+      "savo_nav_execution_timeout").accepted);
+
+  EXPECT_EQ(
+    machine.state(),
+    exploration::GoalHandoffState::kCanceling);
+
+  EXPECT_EQ(
+    machine.reason(),
+    "savo_nav_execution_timeout");
+
+  EXPECT_TRUE(
+    exploration::is_active(
+      machine.state()));
+
+  EXPECT_FALSE(
+    exploration::is_terminal(
+      machine.state()));
+
+  ASSERT_TRUE(
+    machine.mark_timed_out(
+      "savo_nav_execution_timeout").accepted);
+
+  EXPECT_EQ(
+    machine.state(),
+    exploration::GoalHandoffState::kTimedOut);
+
+  EXPECT_FALSE(
+    exploration::is_active(
+      machine.state()));
+
+  EXPECT_TRUE(
+    exploration::is_terminal(
+      machine.state()));
+}
+
+TEST(
+  ExplorationGoalHandoff,
+  FeedbackTimeoutWaitsForTerminalResult)
+{
+  exploration::GoalHandoffMachine machine;
+
+  ASSERT_TRUE(
+    machine.begin(
+      "frontier-feedback-timeout").accepted);
+
+  ASSERT_TRUE(
+    machine.mark_server_available().accepted);
+
+  ASSERT_TRUE(
+    machine.mark_accepted().accepted);
+
+  ASSERT_TRUE(
+    machine.mark_executing().accepted);
+
+  ASSERT_TRUE(
+    machine.request_cancel(
+      "savo_nav_feedback_stale").accepted);
+
+  EXPECT_EQ(
+    machine.state(),
+    exploration::GoalHandoffState::kCanceling);
+
+  EXPECT_EQ(
+    machine.reason(),
+    "savo_nav_feedback_stale");
+
+  EXPECT_TRUE(
+    exploration::is_active(
+      machine.state()));
+
+  EXPECT_FALSE(
+    exploration::is_terminal(
+      machine.state()));
+
+  ASSERT_TRUE(
+    machine.mark_timed_out(
+      "savo_nav_feedback_stale").accepted);
+
+  EXPECT_EQ(
+    machine.state(),
+    exploration::GoalHandoffState::kTimedOut);
+
+  EXPECT_TRUE(
+    exploration::is_terminal(
+      machine.state()));
+}
+
 TEST(ExplorationGoalHandoff, GoalRejection)
 {
   exploration::GoalHandoffMachine machine;

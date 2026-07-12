@@ -566,37 +566,61 @@ private:
       }
     }
   }
-
   void timeout_active_goal(
     const std::string & reason,
     const double elapsed)
   {
-    const auto goal_handle =
-      current_goal_handle_;
-
-    publish_transition(
-      machine_.mark_timed_out(
-        reason));
-
-    if (goal_handle) {
-      try {
-        action_client_->
-        async_cancel_goal(
-          goal_handle);
-      } catch (const std::exception & exception) {
-        RCLCPP_ERROR(
-          get_logger(),
-          "failed to cancel timed-out goal: %s",
-          exception.what());
-      }
+    if (timeout_reason_.has_value()) {
+      return;
     }
 
-    clear_runtime_goal();
+    if (!current_goal_handle_) {
+      RCLCPP_ERROR(
+        get_logger(),
+        "cannot cancel timed-out exploration goal: "
+        "goal handle is missing");
+
+      return;
+    }
+
+    const auto transition =
+      machine_.request_cancel(
+      reason);
+
+    if (!transition.accepted) {
+      RCLCPP_ERROR(
+        get_logger(),
+        "timeout cancellation transition rejected: %s",
+        transition.reason.c_str());
+
+      return;
+    }
+
+    timeout_reason_ =
+      reason;
+
+    cancel_started_at_ =
+      now();
+
+    publish_transition(
+      transition);
+
+    try {
+      action_client_->async_cancel_goal(
+        current_goal_handle_);
+    } catch (const std::exception & exception) {
+      RCLCPP_ERROR(
+        get_logger(),
+        "failed to request cancellation for "
+        "timed-out exploration goal: %s",
+        exception.what());
+    }
 
     RCLCPP_WARN(
       get_logger(),
-      "exploration goal timed out: "
-      "reason=%s elapsed=%.2f",
+      "exploration goal timeout detected: "
+      "reason=%s elapsed=%.2f; "
+      "waiting for savo_nav terminal result",
       reason.c_str(),
       elapsed);
   }
@@ -851,6 +875,28 @@ private:
       return;
     }
 
+    if (timeout_reason_.has_value()) {
+      const std::string timeout_reason =
+        timeout_reason_.value();
+
+      publish_transition(
+        machine_.mark_timed_out(
+          timeout_reason));
+
+      RCLCPP_INFO(
+        get_logger(),
+        "timed-out exploration goal reached "
+        "terminal savo_nav result: "
+        "request_id=%s reason=%s result_code=%d",
+        request_id.c_str(),
+        timeout_reason.c_str(),
+        static_cast<int>(
+          wrapped_result.code));
+
+      clear_runtime_goal();
+      return;
+    }
+
     switch (wrapped_result.code) {
       case rclcpp_action::
         ResultCode::SUCCEEDED:
@@ -1029,7 +1075,6 @@ private:
       response->message = reason;
     }
   }
-
   void clear_runtime_goal()
   {
     pending_goal_.reset();
@@ -1039,6 +1084,7 @@ private:
     goal_accepted_at_.reset();
     last_feedback_at_.reset();
     cancel_started_at_.reset();
+    timeout_reason_.reset();
 
     current_goal_handle_.reset();
   }
@@ -1152,6 +1198,9 @@ private:
 
   std::optional<rclcpp::Time>
     cancel_started_at_;
+
+  std::optional<std::string>
+    timeout_reason_;
 
   GoalHandle::SharedPtr
     current_goal_handle_;

@@ -1,0 +1,169 @@
+schema_version: 1
+package: savo_speech
+namespace: /savo_speech
+owner: savo_speech
+
+# Public package contract only.
+# Internal PCM/audio transport is intentionally deferred.
+
+topics:
+  state:
+    name: /savo_speech/state
+    type: std_msgs/msg/String
+    direction: pub
+    required: true
+    qos: state
+
+  status:
+    name: /savo_speech/status
+    type: std_msgs/msg/String
+    direction: pub
+    required: true
+    qos: status
+
+  health:
+    name: /savo_speech/health
+    type: diagnostic_msgs/msg/DiagnosticArray
+    direction: pub
+    required: true
+    qos: health
+
+  heartbeat:
+    name: /savo_speech/heartbeat
+    type: std_msgs/msg/String
+    direction: pub
+    required: true
+    qos: heartbeat
+
+  wake_state:
+    name: /savo_speech/wake_state
+    type: std_msgs/msg/String
+    direction: pub
+    required: true
+    qos: state
+
+  wake_word_detected:
+    name: /savo_speech/wake_word/detected
+    type: std_msgs/msg/String
+    direction: pub
+    required: false
+    qos: event
+
+  listening:
+    name: /savo_speech/listening
+    type: std_msgs/msg/Bool
+    direction: pub
+    required: true
+    qos: state
+
+  input_muted:
+    name: /savo_speech/input_muted
+    type: std_msgs/msg/Bool
+    direction: pub
+    required: true
+    qos: state
+
+  output_muted:
+    name: /savo_speech/output_muted
+    type: std_msgs/msg/Bool
+    direction: pub
+    required: true
+    qos: state
+
+  transcript:
+    name: /savo_speech/transcript
+    type: std_msgs/msg/String
+    direction: pub
+    required: false
+    qos: event
+
+  tts_gate:
+    name: /savo_speech/tts_gate
+    type: std_msgs/msg/Bool
+    direction: pub
+    required: true
+    qos: state
+
+  tts_started:
+    name: /savo_speech/tts/started
+    type: std_msgs/msg/String
+    direction: pub
+    required: false
+    qos: event
+
+  tts_finished:
+    name: /savo_speech/tts/finished
+    type: std_msgs/msg/String
+    direction: pub
+    required: false
+    qos: event
+
+  tts_cancelled:
+    name: /savo_speech/tts/cancelled
+    type: std_msgs/msg/String
+    direction: pub
+    required: false
+    qos: event
+
+  face_state:
+    name: /savo_speech/face_state
+    type: std_msgs/msg/String
+    direction: pub
+    required: false
+    qos: state
+
+  last_error:
+    name: /savo_speech/last_error
+    type: std_msgs/msg/String
+    direction: pub
+    required: true
+    qos: state
+
+services:
+  wake:
+    name: /savo_speech/wake
+    type: std_srvs/srv/Trigger
+    required: true
+
+  sleep:
+    name: /savo_speech/sleep
+    type: std_srvs/srv/Trigger
+    required: true
+
+  start_listening:
+    name: /savo_speech/start_listening
+    type: std_srvs/srv/Trigger
+    required: true
+
+  stop_listening:
+    name: /savo_speech/stop_listening
+    type: std_srvs/srv/Trigger
+    required: true
+
+  cancel:
+    name: /savo_speech/cancel
+    type: std_srvs/srv/Trigger
+    required: true
+
+  mute_input:
+    name: /savo_speech/mute_input
+    type: std_srvs/srv/SetBool
+    required: true
+
+  mute_output:
+    name: /savo_speech/mute_output
+    type: std_srvs/srv/SetBool
+    required: true
+
+  reload_audio_device:
+    name: /savo_speech/reload_audio_device
+    type: std_srvs/srv/Trigger
+    required: true
+
+forbidden_motion_topics:
+  - /cmd_vel
+  - /cmd_vel_manual
+  - /cmd_vel_auto
+  - /cmd_vel_nav
+  - /cmd_vel_recovery
+  - /cmd_vel_safe
