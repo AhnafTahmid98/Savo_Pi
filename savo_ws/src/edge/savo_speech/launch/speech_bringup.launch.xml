@@ -1,0 +1,14 @@
+<launch>
+  <arg
+    name="params_file"
+    default="$(find-pkg-share savo_speech)/config/profiles/edge_real_robot_v1.yaml"/>
+
+  <node
+    pkg="savo_speech"
+    exec="savo_speech_node"
+    name="savo_speech_node"
+    output="screen">
+
+    <param from="$(var params_file)"/>
+  </node>
+</launch>

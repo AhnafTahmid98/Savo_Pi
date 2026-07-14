@@ -1,35 +1,36 @@
-#pragma once
+#ifndef SAVO_SPEECH__CONSTANTS_HPP_
+#define SAVO_SPEECH__CONSTANTS_HPP_
 
-#include <array>
 #include <string_view>
 
 namespace savo_speech::constants
 {
 
-inline constexpr std::string_view PACKAGE_NAME = "savo_speech";
-inline constexpr std::string_view ROBOT_NAME = "Robot Savo";
-inline constexpr std::string_view RUNTIME_HOST = "savo-edge";
-inline constexpr std::string_view PACKAGE_NAMESPACE = "/savo_speech";
+inline constexpr std::string_view kNodeName{
+  "savo_speech_node"};
 
-inline constexpr std::string_view NODE_RESPEAKER_AUDIO = "respeaker_audio_node";
-inline constexpr std::string_view NODE_SPEECH_MANAGER = "speech_manager_node";
-inline constexpr std::string_view NODE_SAVOMIND_BRIDGE = "savomind_bridge_node";
-inline constexpr std::string_view NODE_SPEECH_DASHBOARD = "speech_dashboard_node";
+inline constexpr std::string_view kDefaultProfile{
+  "edge_real_robot_v1"};
 
-inline constexpr std::array<std::string_view, 6> FORBIDDEN_MOTION_TOPICS = {
-  "/cmd_vel",
-  "/cmd_vel_manual",
-  "/cmd_vel_auto",
-  "/cmd_vel_nav",
-  "/cmd_vel_recovery",
-  "/cmd_vel_safe",
-};
+inline constexpr std::string_view kDefaultRobotId{
+  "robot-savo"};
 
-inline constexpr std::string_view STATUS_OK = "OK";
-inline constexpr std::string_view STATUS_WARN = "WARN";
-inline constexpr std::string_view STATUS_ERROR = "ERROR";
-inline constexpr std::string_view STATUS_STALE = "STALE";
-inline constexpr std::string_view STATUS_DISABLED = "DISABLED";
-inline constexpr std::string_view STATUS_UNKNOWN = "UNKNOWN";
+inline constexpr std::string_view kDefaultHostRole{
+  "edge"};
+
+inline constexpr std::string_view kDefaultDeviceId{
+  "savo-edge"};
+
+inline constexpr std::string_view kDefaultCaptureDevice{
+  "savo_respeaker"};
+
+inline constexpr std::string_view kDefaultPlaybackDevice{
+  "savo_respeaker"};
+
+inline constexpr double kDefaultStatusPublishRateHz{2.0};
+inline constexpr double kDefaultHeartbeatRateHz{1.0};
+inline constexpr double kMaximumTimerRateHz{100.0};
 
 }  // namespace savo_speech::constants
+
+#endif  // SAVO_SPEECH__CONSTANTS_HPP_

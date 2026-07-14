@@ -1,0 +1,23 @@
+savo_speech_node:
+  ros__parameters:
+    enabled: true
+
+    profile: "edge_real_robot_v1"
+    robot_id: "robot-savo"
+    host_role: "edge"
+    device_id: "savo-edge"
+
+    audio:
+      required: true
+
+      # Stable ALSA alias planned for the ReSpeaker.
+      # Phase 2 will discover the real hardware identifiers.
+      capture_device: "savo_respeaker"
+      playback_device: "savo_respeaker"
+
+      # USB audio card numbers may change between boots.
+      allow_numeric_device_fallback: false
+
+    diagnostics:
+      status_publish_rate_hz: 2.0
+      heartbeat_rate_hz: 1.0
