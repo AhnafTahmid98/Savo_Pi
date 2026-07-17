@@ -806,12 +806,15 @@ void UiNode::configure_home_idle_sequence()
 void UiNode::export_preview_frames()
 {
   if (!config_.export_preview_frames) {
-    RCLCPP_INFO(get_logger(), "preview frame export disabled by config");
+    RCLCPP_INFO(
+      get_logger(),
+      "preview frame export disabled by config");
     return;
   }
 
   try {
-    std::filesystem::create_directories(config_.preview_output_dir);
+    std::filesystem::create_directories(
+      config_.preview_output_dir);
   } catch (const std::exception & error) {
     RCLCPP_WARN(
       get_logger(),
@@ -821,76 +824,439 @@ void UiNode::export_preview_frames()
     return;
   }
 
-  // Export the five generated Home frames with live network/time data.
-  for (std::size_t i = 0; i < robot360_frames_.size(); ++i) {
+  // ============================================================
+  // Home previews
+  // ============================================================
+  for (
+    std::size_t index = 0;
+    index < robot360_frames_.size();
+    ++index)
+  {
     canvas_.clear(ColorRgb{2U, 8U, 22U});
 
-    if (!canvas_.draw_image_fit(robot360_frames_[i])) {
-      RCLCPP_WARN(get_logger(), "failed to draw preview home frame %zu", i);
+    if (!canvas_.draw_image_fit(robot360_frames_[index])) {
+      RCLCPP_WARN(
+        get_logger(),
+        "failed to draw preview Home frame %zu",
+        index);
       continue;
     }
 
     draw_live_top_bar_overlay(canvas_);
 
-    const std::string path =
-      config_.preview_output_dir + "/home_live_" +
-      std::to_string(static_cast<int>(i)) + ".ppm";
+    const std::string output_path =
+      config_.preview_output_dir +
+      "/home_live_" +
+      std::to_string(static_cast<int>(index)) +
+      ".ppm";
 
-    if (!canvas_.write_ppm(path)) {
+    if (!canvas_.write_ppm(output_path)) {
       RCLCPP_WARN(
         get_logger(),
-        "failed to write live preview frame | %s",
-        path.c_str());
+        "failed to write Home preview | %s",
+        output_path.c_str());
       continue;
     }
 
     RCLCPP_INFO(
       get_logger(),
-      "saved live preview frame | %s",
-      path.c_str());
+      "saved Home preview | %s",
+      output_path.c_str());
   }
 
-  auto export_page =
+  // ============================================================
+  // Voice static previews
+  // ============================================================
+  const auto saved_voice_ui =
+    voice_ui_;
+
+  const auto saved_voice_phase =
+    voice_phase_;
+
+  const double saved_voice_animation_time =
+    voice_animation_time_seconds_;
+
+  const double saved_voice_phase_elapsed =
+    voice_phase_elapsed_seconds_;
+
+  const auto saved_rendered_voice_phase =
+    rendered_voice_phase_;
+
+  auto export_voice_phase =
     [this](
-      const ImageAsset & shell,
-      const std::string & page_name,
+      const VoicePhase phase,
       const std::string & file_name)
     {
-      canvas_.clear(ColorRgb{2U, 8U, 22U});
+      seed_voice_preview_data(phase);
+      render_voice_page(phase);
 
-      if (!canvas_.draw_image_fit(shell)) {
+      const std::string output_path =
+        config_.preview_output_dir +
+        "/" +
+        file_name;
+
+      if (!canvas_.write_ppm(output_path)) {
         RCLCPP_WARN(
           get_logger(),
-          "failed to draw page preview | page=%s",
-          page_name.c_str());
-        return;
-      }
-
-      draw_live_top_bar_overlay(canvas_);
-
-      const std::string path =
-        config_.preview_output_dir + "/" + file_name;
-
-      if (!canvas_.write_ppm(path)) {
-        RCLCPP_WARN(
-          get_logger(),
-          "failed to write page preview | page=%s path=%s",
-          page_name.c_str(),
-          path.c_str());
+          "failed to write Voice state preview | %s",
+          output_path.c_str());
         return;
       }
 
       RCLCPP_INFO(
         get_logger(),
-        "saved page preview | page=%s path=%s",
-        page_name.c_str(),
-        path.c_str());
+        "saved Voice state preview | %s",
+        output_path.c_str());
     };
 
-  export_page(voice_shell_, "Voice", "voice_preview.ppm");
-  export_page(navigate_shell_, "Navigate", "navigate_preview.ppm");
-  const auto saved_status_ui = status_ui_;
-  const auto saved_status_view = status_view_;
+  export_voice_phase(
+    VoicePhase::Idle,
+    "voice_preview.ppm");
+
+  export_voice_phase(
+    VoicePhase::Idle,
+    "voice_idle.ppm");
+
+  export_voice_phase(
+    VoicePhase::Listening,
+    "voice_listening.ppm");
+
+  export_voice_phase(
+    VoicePhase::Thinking,
+    "voice_thinking.ppm");
+
+  export_voice_phase(
+    VoicePhase::Speaking,
+    "voice_speaking.ppm");
+
+  export_voice_phase(
+    VoicePhase::Error,
+    "voice_error.ppm");
+
+  // ============================================================
+  // Voice animated preview
+  // ============================================================
+  const std::string voice_animation_directory =
+    config_.preview_output_dir +
+    "/voice_animation";
+
+  try {
+    std::filesystem::create_directories(
+      voice_animation_directory);
+  } catch (const std::exception & error) {
+    RCLCPP_WARN(
+      get_logger(),
+      "failed to create Voice animation directory | %s",
+      error.what());
+  }
+
+  const std::array<VoicePhase, 5> voice_phases{{
+    VoicePhase::Idle,
+    VoicePhase::Listening,
+    VoicePhase::Thinking,
+    VoicePhase::Speaking,
+    VoicePhase::Error,
+  }};
+
+  constexpr int voice_frames_per_phase = 24;
+  constexpr double voice_preview_fps = 12.0;
+
+  int global_voice_frame = 0;
+
+  for (const auto phase : voice_phases) {
+    for (
+      int frame = 0;
+      frame < voice_frames_per_phase;
+      ++frame)
+    {
+      seed_voice_preview_data(phase);
+
+      voice_animation_time_seconds_ =
+        static_cast<double>(global_voice_frame) /
+        voice_preview_fps;
+
+      voice_phase_elapsed_seconds_ =
+        static_cast<double>(frame) /
+        voice_preview_fps;
+
+      rendered_voice_phase_ = phase;
+
+      if (phase == VoicePhase::Speaking) {
+        voice_ui_.playback_progress =
+          static_cast<double>(frame) /
+          static_cast<double>(
+            voice_frames_per_phase - 1);
+      }
+
+      render_voice_page(phase);
+
+      std::ostringstream frame_path;
+      frame_path
+        << voice_animation_directory
+        << "/frame_"
+        << std::setw(3)
+        << std::setfill('0')
+        << global_voice_frame
+        << ".ppm";
+
+      if (!canvas_.write_ppm(frame_path.str())) {
+        RCLCPP_WARN(
+          get_logger(),
+          "failed to write Voice animation frame | %s",
+          frame_path.str().c_str());
+      }
+
+      ++global_voice_frame;
+    }
+  }
+
+  RCLCPP_INFO(
+    get_logger(),
+    "saved Voice animation preview | dir=%s frames=%d",
+    voice_animation_directory.c_str(),
+    global_voice_frame);
+
+  voice_ui_ =
+    saved_voice_ui;
+
+  voice_phase_ =
+    saved_voice_phase;
+
+  voice_animation_time_seconds_ =
+    saved_voice_animation_time;
+
+  voice_phase_elapsed_seconds_ =
+    saved_voice_phase_elapsed;
+
+  rendered_voice_phase_ =
+    saved_rendered_voice_phase;
+
+  // ============================================================
+  // Navigation static previews
+  // ============================================================
+  const auto saved_navigation_ui =
+    navigation_ui_;
+
+  const auto saved_navigation_phase =
+    navigation_phase_;
+
+  const double saved_navigation_animation_time =
+    navigation_animation_time_seconds_;
+
+  const double saved_navigation_phase_elapsed =
+    navigation_phase_elapsed_seconds_;
+
+  const auto saved_rendered_navigation_phase =
+    rendered_navigation_phase_;
+
+  auto export_navigation_phase =
+    [this](
+      const NavigationPhase phase,
+      const std::string & file_name)
+    {
+      seed_navigation_preview_data(phase);
+      render_navigation_page(phase);
+
+      const std::string output_path =
+        config_.preview_output_dir +
+        "/" +
+        file_name;
+
+      if (!canvas_.write_ppm(output_path)) {
+        RCLCPP_WARN(
+          get_logger(),
+          "failed to write Navigation state preview | %s",
+          output_path.c_str());
+        return;
+      }
+
+      RCLCPP_INFO(
+        get_logger(),
+        "saved Navigation state preview | %s",
+        output_path.c_str());
+    };
+
+  export_navigation_phase(
+    NavigationPhase::Idle,
+    "navigate_preview.ppm");
+
+  export_navigation_phase(
+    NavigationPhase::Idle,
+    "navigation_idle.ppm");
+
+  export_navigation_phase(
+    NavigationPhase::Preparing,
+    "navigation_preparing.ppm");
+
+  export_navigation_phase(
+    NavigationPhase::Navigating,
+    "navigation_navigating.ppm");
+
+  export_navigation_phase(
+    NavigationPhase::Paused,
+    "navigation_paused.ppm");
+
+  export_navigation_phase(
+    NavigationPhase::Arrived,
+    "navigation_arrived.ppm");
+
+  export_navigation_phase(
+    NavigationPhase::Error,
+    "navigation_error.ppm");
+
+  // ============================================================
+  // Navigation animations for all six states
+  // ============================================================
+  const std::string navigation_animation_root =
+    config_.preview_output_dir +
+    "/navigation_animation";
+
+  struct NavigationAnimationSpec
+  {
+    NavigationPhase phase;
+    const char * directory;
+    double time_offset_seconds;
+  };
+
+  const std::array<NavigationAnimationSpec, 6>
+  navigation_animation_specs{{
+    {
+      NavigationPhase::Idle,
+      "idle",
+      3.0
+    },
+    {
+      NavigationPhase::Preparing,
+      "preparing",
+      0.0
+    },
+    {
+      NavigationPhase::Navigating,
+      "navigating",
+      2.3
+    },
+    {
+      NavigationPhase::Paused,
+      "paused",
+      0.0
+    },
+    {
+      NavigationPhase::Arrived,
+      "arrived",
+      0.0
+    },
+    {
+      NavigationPhase::Error,
+      "error",
+      0.0
+    },
+  }};
+
+  constexpr int navigation_frames_per_phase = 30;
+  constexpr double navigation_preview_fps = 15.0;
+
+  int total_navigation_frames = 0;
+
+  for (const auto & spec : navigation_animation_specs) {
+    const std::string phase_directory =
+      navigation_animation_root +
+      "/" +
+      spec.directory;
+
+    try {
+      std::filesystem::create_directories(
+        phase_directory);
+    } catch (const std::exception & error) {
+      RCLCPP_WARN(
+        get_logger(),
+        "failed to create Navigation animation directory | dir=%s error=%s",
+        phase_directory.c_str(),
+        error.what());
+      continue;
+    }
+
+    for (
+      int frame = 0;
+      frame < navigation_frames_per_phase;
+      ++frame)
+    {
+      seed_navigation_preview_data(spec.phase);
+
+      const double frame_seconds =
+        static_cast<double>(frame) /
+        navigation_preview_fps;
+
+      navigation_animation_time_seconds_ =
+        spec.time_offset_seconds +
+        frame_seconds;
+
+      navigation_phase_elapsed_seconds_ =
+        frame_seconds;
+
+      rendered_navigation_phase_ =
+        spec.phase;
+
+      render_navigation_page(spec.phase);
+
+      std::ostringstream frame_path;
+      frame_path
+        << phase_directory
+        << "/frame_"
+        << std::setw(3)
+        << std::setfill('0')
+        << frame
+        << ".ppm";
+
+      if (!canvas_.write_ppm(frame_path.str())) {
+        RCLCPP_WARN(
+          get_logger(),
+          "failed to write Navigation animation frame | %s",
+          frame_path.str().c_str());
+      }
+
+      ++total_navigation_frames;
+    }
+
+    RCLCPP_INFO(
+      get_logger(),
+      "saved Navigation phase animation | phase=%s dir=%s frames=%d",
+      spec.directory,
+      phase_directory.c_str(),
+      navigation_frames_per_phase);
+  }
+
+  RCLCPP_INFO(
+    get_logger(),
+    "saved all Navigation animations | root=%s total_frames=%d",
+    navigation_animation_root.c_str(),
+    total_navigation_frames);
+
+  navigation_ui_ =
+    saved_navigation_ui;
+
+  navigation_phase_ =
+    saved_navigation_phase;
+
+  navigation_animation_time_seconds_ =
+    saved_navigation_animation_time;
+
+  navigation_phase_elapsed_seconds_ =
+    saved_navigation_phase_elapsed;
+
+  rendered_navigation_phase_ =
+    saved_rendered_navigation_phase;
+
+  // ============================================================
+  // Status previews
+  // ============================================================
+  const auto saved_status_ui =
+    status_ui_;
+
+  const auto saved_status_view =
+    status_view_;
+
+  const double saved_status_animation_time =
+    status_animation_time_seconds_;
 
   seed_status_preview_data();
 
@@ -902,24 +1268,25 @@ void UiNode::export_preview_frames()
       status_view_ = view;
       render_status_page();
 
-      const std::string path =
-        config_.preview_output_dir + "/" + file_name;
+      const std::string output_path =
+        config_.preview_output_dir +
+        "/" +
+        file_name;
 
-      if (!canvas_.write_ppm(path)) {
+      if (!canvas_.write_ppm(output_path)) {
         RCLCPP_WARN(
           get_logger(),
           "failed to write Status state preview | %s",
-          path.c_str());
+          output_path.c_str());
         return;
       }
 
       RCLCPP_INFO(
         get_logger(),
         "saved Status state preview | %s",
-        path.c_str());
+        output_path.c_str());
     };
 
-  // Keep status_preview.ppm as the default Overview preview.
   export_status_view(
     StatusView::Overview,
     "status_preview.ppm");
@@ -940,45 +1307,259 @@ void UiNode::export_preview_frames()
     StatusView::AlertsSystem,
     "status_alerts_system.ppm");
 
-  status_ui_ = saved_status_ui;
-  status_view_ = saved_status_view;
-  const auto saved_core_power = core_power_;
-  const auto saved_edge_power = edge_power_;
-  const auto saved_base_power = base_power_;
+  // ============================================================
+  // Status animations for all four internal views
+  // ============================================================
+  const std::string status_animation_root =
+    config_.preview_output_dir +
+    "/status_animation";
 
-  const bool saved_status_seen = power_status_seen_;
-  const auto saved_overall_state = power_overall_state_;
-  const auto saved_health_state = power_health_state_;
-  const auto saved_status_update = power_status_last_update_;
+  struct StatusAnimationSpec
+  {
+    StatusView view;
+    const char * directory;
+  };
+
+  const std::array<StatusAnimationSpec, 4>
+  status_animation_specs{{
+    {
+      StatusView::Overview,
+      "overview"
+    },
+    {
+      StatusView::Sensors,
+      "sensors"
+    },
+    {
+      StatusView::AiLink,
+      "ai_link"
+    },
+    {
+      StatusView::AlertsSystem,
+      "alerts_system"
+    },
+  }};
+
+  constexpr int status_frames_per_view = 30;
+  constexpr double status_preview_fps = 15.0;
+
+  int total_status_animation_frames = 0;
+
+  for (const auto & spec : status_animation_specs) {
+    const std::string phase_directory =
+      status_animation_root +
+      "/" +
+      spec.directory;
+
+    try {
+      std::filesystem::create_directories(
+        phase_directory);
+    } catch (const std::exception & error) {
+      RCLCPP_WARN(
+        get_logger(),
+        "failed to create Status animation directory | dir=%s error=%s",
+        phase_directory.c_str(),
+        error.what());
+      continue;
+    }
+
+    for (
+      int frame = 0;
+      frame < status_frames_per_view;
+      ++frame)
+    {
+      seed_status_preview_data();
+
+      status_view_ =
+        spec.view;
+
+      status_animation_time_seconds_ =
+        static_cast<double>(frame) /
+        status_preview_fps;
+
+      // Dry-run only: demonstrate the conditional alert pulse.
+      if (spec.view == StatusView::AlertsSystem) {
+        status_ui_.alert_count = 1;
+        status_ui_.active_alert =
+          "Depth front slowdown";
+      }
+
+      render_status_page();
+
+      std::ostringstream frame_path;
+      frame_path
+        << phase_directory
+        << "/frame_"
+        << std::setw(3)
+        << std::setfill('0')
+        << frame
+        << ".ppm";
+
+      if (!canvas_.write_ppm(frame_path.str())) {
+        RCLCPP_WARN(
+          get_logger(),
+          "failed to write Status animation frame | %s",
+          frame_path.str().c_str());
+      }
+
+      ++total_status_animation_frames;
+    }
+
+    RCLCPP_INFO(
+      get_logger(),
+      "saved Status view animation | view=%s dir=%s frames=%d",
+      spec.directory,
+      phase_directory.c_str(),
+      status_frames_per_view);
+  }
+
+  RCLCPP_INFO(
+    get_logger(),
+    "saved all Status animations | root=%s total_frames=%d",
+    status_animation_root.c_str(),
+    total_status_animation_frames);
+
+  status_animation_time_seconds_ =
+    saved_status_animation_time;
+
+  status_ui_ =
+    saved_status_ui;
+
+  status_view_ =
+    saved_status_view;
+
+  // ============================================================
+  // Power preview
+  // ============================================================
+  const auto saved_core_power =
+    core_power_;
+
+  const auto saved_edge_power =
+    edge_power_;
+
+  const auto saved_base_power =
+    base_power_;
+
+  const bool saved_power_status_seen =
+    power_status_seen_;
+
+  const auto saved_power_overall_state =
+    power_overall_state_;
+
+  const auto saved_power_health_state =
+    power_health_state_;
+
+  const auto saved_power_status_update =
+    power_status_last_update_;
+
+  const double saved_power_animation_time =
+    power_animation_time_seconds_;
 
   seed_power_preview_data();
   render_power_page();
 
   const std::string power_preview_path =
-    config_.preview_output_dir + "/power_preview.ppm";
+    config_.preview_output_dir +
+    "/power_preview.ppm";
 
   if (!canvas_.write_ppm(power_preview_path)) {
     RCLCPP_WARN(
       get_logger(),
-      "failed to write power dashboard preview | %s",
+      "failed to write Power dashboard preview | %s",
       power_preview_path.c_str());
   } else {
     RCLCPP_INFO(
       get_logger(),
-      "saved power dashboard preview | %s",
+      "saved Power dashboard preview | %s",
       power_preview_path.c_str());
   }
 
-  core_power_ = saved_core_power;
-  edge_power_ = saved_edge_power;
-  base_power_ = saved_base_power;
+  // ============================================================
+  // Power animated preview
+  // ============================================================
+  const std::string power_animation_directory =
+    config_.preview_output_dir +
+    "/power_animation";
 
-  power_status_seen_ = saved_status_seen;
-  power_overall_state_ = saved_overall_state;
-  power_health_state_ = saved_health_state;
-  power_status_last_update_ = saved_status_update;
+  try {
+    std::filesystem::create_directories(
+      power_animation_directory);
+  } catch (const std::exception & error) {
+    RCLCPP_WARN(
+      get_logger(),
+      "failed to create Power animation directory | dir=%s error=%s",
+      power_animation_directory.c_str(),
+      error.what());
+  }
 
-  // Restore the real active screen after temporary preview rendering.
+  constexpr int power_animation_frames = 45;
+  constexpr double power_preview_fps = 15.0;
+
+  seed_power_preview_data();
+
+  // Dry-run only: demonstrate charging presentation.
+  edge_power_.state = "charging";
+  power_overall_state_ = "charging";
+
+  for (
+    int frame = 0;
+    frame < power_animation_frames;
+    ++frame)
+  {
+    power_animation_time_seconds_ =
+      static_cast<double>(frame) /
+      power_preview_fps;
+
+    render_power_page();
+
+    std::ostringstream frame_path;
+    frame_path
+      << power_animation_directory
+      << "/frame_"
+      << std::setw(3)
+      << std::setfill('0')
+      << frame
+      << ".ppm";
+
+    if (!canvas_.write_ppm(frame_path.str())) {
+      RCLCPP_WARN(
+        get_logger(),
+        "failed to write Power animation frame | %s",
+        frame_path.str().c_str());
+    }
+  }
+
+  RCLCPP_INFO(
+    get_logger(),
+    "saved Power animation preview | dir=%s frames=%d",
+    power_animation_directory.c_str(),
+    power_animation_frames);
+
+  power_animation_time_seconds_ =
+    saved_power_animation_time;
+
+  core_power_ =
+    saved_core_power;
+
+  edge_power_ =
+    saved_edge_power;
+
+  base_power_ =
+    saved_base_power;
+
+  power_status_seen_ =
+    saved_power_status_seen;
+
+  power_overall_state_ =
+    saved_power_overall_state;
+
+  power_health_state_ =
+    saved_power_health_state;
+
+  power_status_last_update_ =
+    saved_power_status_update;
+
+  // Return the canvas to the actual runtime screen.
   render_current_screen();
 }
 
@@ -1151,6 +1732,26 @@ void UiNode::handle_touch_tap(const int x, const int y)
     x,
     y,
     to_string(next_screen).c_str());
+
+  // Pressing the left Navigate button opens the calm Idle state.
+  if (next_screen == UiScreen::Navigation) {
+    navigation_phase_ = NavigationPhase::Idle;
+    navigation_ui_ = NavigationUiState{};
+
+    request_screen(
+      UiScreen::Navigation,
+      ScreenRequestSource::Touch);
+    return;
+  }
+
+  // Pressing the left Voice button always opens Voice Idle.
+  if (next_screen == UiScreen::VoiceIdle) {
+    voice_phase_ = VoicePhase::Idle;
+    request_screen(
+      UiScreen::VoiceIdle,
+      ScreenRequestSource::Touch);
+    return;
+  }
 
   // Pressing the left Status button always opens Overview.
   if (next_screen == UiScreen::Status) {
@@ -1400,6 +2001,20 @@ void UiNode::configure_runtime()
 
 void UiNode::update_runtime(const double dt_seconds)
 {
+  // Cap unusually large frame intervals so animations do not jump after
+  // debugging pauses or temporary scheduling delays.
+  const double animation_dt =
+    std::clamp(dt_seconds, 0.0, 0.25);
+
+  voice_animation_time_seconds_ += animation_dt;
+  voice_phase_elapsed_seconds_ += animation_dt;
+
+  navigation_animation_time_seconds_ += animation_dt;
+  navigation_phase_elapsed_seconds_ += animation_dt;
+
+  status_animation_time_seconds_ += animation_dt;
+  power_animation_time_seconds_ += animation_dt;
+
   poll_touch_input();
 
   home_glow_elapsed_seconds_ += dt_seconds;
@@ -1437,21 +2052,39 @@ void UiNode::render_current_screen()
     case UiScreen::Intro:
       render_intro();
       break;
+
     case UiScreen::Home:
       render_home();
       break;
+
+    case UiScreen::Listening:
+      render_voice_page(VoicePhase::Listening);
+      break;
+
+    case UiScreen::Thinking:
+      render_voice_page(VoicePhase::Thinking);
+      break;
+
+    case UiScreen::Speaking:
+      render_voice_page(VoicePhase::Speaking);
+      break;
+
     case UiScreen::VoiceIdle:
-      render_page_shell(voice_shell_, "Voice");
+      render_voice_page(voice_phase_);
       break;
+
     case UiScreen::Navigation:
-      render_page_shell(navigate_shell_, "Navigate");
+      render_navigation_page(navigation_phase_);
       break;
+
     case UiScreen::Status:
       render_status_page();
       break;
+
     case UiScreen::Power:
       render_power_page();
       break;
+
     default:
       render_home();
       break;
@@ -1703,6 +2336,1669 @@ void UiNode::render_page_shell(
 
 
 
+void UiNode::render_voice_page(const VoicePhase phase)
+{
+  if (phase != rendered_voice_phase_) {
+    rendered_voice_phase_ = phase;
+    voice_phase_elapsed_seconds_ = 0.0;
+  }
+
+  render_page_shell(voice_shell_, "Voice");
+
+  const ColorRgb cyan{70U, 235U, 255U};
+  const ColorRgb cyan_soft{145U, 210U, 230U};
+  const ColorRgb white{235U, 248U, 255U};
+  const ColorRgb good{75U, 235U, 175U};
+  const ColorRgb warning{255U, 190U, 70U};
+  const ColorRgb danger{255U, 90U, 95U};
+  const ColorRgb muted{135U, 165U, 185U};
+
+  auto draw_voice_text =
+    [this](
+      const int x,
+      const int y,
+      const std::string & value,
+      const ColorRgb color,
+      const bool medium,
+      const float alpha = 1.0F)
+    {
+      if (medium) {
+        Font::draw_atlas_text(
+          canvas_,
+          ui_font_medium_,
+          20,
+          24,
+          16,
+          2,
+          x,
+          y,
+          value,
+          color,
+          alpha);
+        return;
+      }
+
+      Font::draw_atlas_text(
+        canvas_,
+        ui_font_small_,
+        18,
+        22,
+        16,
+        2,
+        x,
+        y,
+        value,
+        color,
+        alpha);
+    };
+
+  auto voice_text_width =
+    [this](
+      const std::string & value,
+      const bool medium) -> int
+    {
+      if (medium) {
+        return Font::atlas_text_width(
+          ui_font_medium_,
+          20,
+          24,
+          16,
+          value);
+      }
+
+      return Font::atlas_text_width(
+        ui_font_small_,
+        18,
+        22,
+        16,
+        value);
+    };
+
+  auto fit_text =
+    [&](std::string value,
+      const int maximum_width,
+      const bool medium) -> std::string
+    {
+      if (voice_text_width(value, medium) <= maximum_width) {
+        return value;
+      }
+
+      const std::string suffix = "...";
+
+      while (
+        value.size() > 3U &&
+        voice_text_width(value + suffix, medium) > maximum_width)
+      {
+        value.pop_back();
+      }
+
+      return value + suffix;
+    };
+
+  auto centered_text =
+    [&](const int center_x,
+      const int y,
+      const std::string & value,
+      const ColorRgb color,
+      const bool medium,
+      const float alpha = 1.0F)
+    {
+      const int width =
+        voice_text_width(value, medium);
+
+      draw_voice_text(
+        center_x - (width / 2),
+        y,
+        value,
+        color,
+        medium,
+        alpha);
+    };
+
+  auto state_color =
+    [&](const std::string & raw_state) -> ColorRgb
+    {
+      const std::string state =
+        uppercase_copy(raw_state);
+
+      if (
+        state == "ERROR" ||
+        state == "FAILED" ||
+        state == "OFFLINE" ||
+        state == "BLOCKED")
+      {
+        return danger;
+      }
+
+      if (
+        state == "WARNING" ||
+        state == "STALE" ||
+        state == "DEGRADED")
+      {
+        return warning;
+      }
+
+      if (
+        state == "READY" ||
+        state == "ONLINE" ||
+        state == "OK" ||
+        state == "ACTIVE" ||
+        state == "PLAYING")
+      {
+        return good;
+      }
+
+      if (
+        state == "MISSING" ||
+        state == "UNKNOWN" ||
+        state == "--")
+      {
+        return muted;
+      }
+
+      return cyan;
+    };
+
+  std::string phase_title{"VOICE READY"};
+  std::string phase_state{"IDLE"};
+  ColorRgb phase_color = cyan;
+
+  switch (phase) {
+    case VoicePhase::Idle:
+      phase_title = "VOICE READY";
+      phase_state = "IDLE";
+      phase_color = cyan;
+      break;
+
+    case VoicePhase::Listening:
+      phase_title = "LISTENING";
+      phase_state = "LIVE";
+      phase_color = good;
+      break;
+
+    case VoicePhase::Thinking:
+      phase_title = "THINKING";
+      phase_state = "PROCESSING";
+      phase_color = cyan;
+      break;
+
+    case VoicePhase::Speaking:
+      phase_title = "SPEAKING";
+      phase_state = "PLAYING";
+      phase_color = good;
+      break;
+
+    case VoicePhase::Error:
+      phase_title = "VOICE ERROR";
+      phase_state = "ERROR";
+      phase_color = danger;
+      break;
+  }
+
+  // Decorative animation values. These do not represent robot state.
+  const double idle_pulse =
+    0.5 +
+    0.5 *
+    std::sin(
+      voice_animation_time_seconds_ * 2.4);
+
+  const int thinking_active_block =
+    static_cast<int>(
+      std::fmod(
+        voice_animation_time_seconds_ * 4.0,
+        5.0));
+
+  const bool preview_animation =
+    config_.export_preview_frames;
+
+  // Remove the generated shell's duplicated inner heading.
+  canvas_.blend_rect(
+    132,
+    82,
+    618,
+    356,
+    ColorRgb{0U, 11U, 29U},
+    1.0F);
+
+  // ============================================================
+  // Shared Voice header
+  // ============================================================
+  canvas_.blend_rect(
+    132,
+    88,
+    618,
+    34,
+    ColorRgb{0U, 25U, 52U},
+    0.94F);
+
+  const float heading_alpha =
+    phase == VoicePhase::Idle ?
+    static_cast<float>(0.78 + (0.22 * idle_pulse)) :
+    1.0F;
+
+  draw_voice_text(
+    148,
+    96,
+    phase_title,
+    phase_color,
+    true,
+    heading_alpha);
+
+  const int phase_state_width =
+    voice_text_width(phase_state, false);
+
+  draw_voice_text(
+    734 - phase_state_width,
+    99,
+    phase_state,
+    phase_color,
+    false);
+
+  canvas_.blend_rect(
+    132,
+    130,
+    618,
+    210,
+    ColorRgb{0U, 16U, 36U},
+    0.94F);
+
+  // ============================================================
+  // IDLE
+  // ============================================================
+  if (phase == VoicePhase::Idle) {
+    centered_text(
+      441,
+      157,
+      "HELLO, I AM SAVO",
+      white,
+      true);
+
+    centered_text(
+      441,
+      191,
+      "Wake me with any of these phrases",
+      cyan_soft,
+      false);
+
+    struct WakePhrase
+    {
+      int x;
+      const char * text;
+    };
+
+    const std::array<WakePhrase, 3> phrases{{
+      {154, "HEY SAVO"},
+      {339, "HI SAVO"},
+      {524, "SAVO"},
+    }};
+
+    for (
+      std::size_t index = 0;
+      index < phrases.size();
+      ++index)
+    {
+      const auto & phrase = phrases[index];
+
+      const double card_pulse =
+        0.5 +
+        0.5 *
+        std::sin(
+          voice_animation_time_seconds_ * 2.0 +
+          static_cast<double>(index) * 0.85);
+
+      canvas_.blend_rect(
+        phrase.x,
+        222,
+        160,
+        42,
+        ColorRgb{0U, 35U, 64U},
+        static_cast<float>(
+          0.78 +
+          0.18 * card_pulse));
+
+      canvas_.blend_rect(
+        phrase.x,
+        262,
+        160,
+        2,
+        cyan,
+        static_cast<float>(
+          0.30 +
+          0.65 * card_pulse));
+
+      centered_text(
+        phrase.x + 80,
+        234,
+        phrase.text,
+        cyan,
+        false,
+        static_cast<float>(
+          0.78 +
+          0.22 * card_pulse));
+    }
+
+    centered_text(
+      441,
+      292,
+      "I am ready when you are.",
+      muted,
+      false);
+  }
+
+  // ============================================================
+  // LISTENING
+  // ============================================================
+  if (phase == VoicePhase::Listening) {
+    centered_text(
+      441,
+      151,
+      "SPEAK NOW",
+      white,
+      true);
+
+    centered_text(
+      441,
+      181,
+      "I am listening to your command",
+      cyan_soft,
+      false);
+
+    constexpr int waveform_x = 164;
+    constexpr int waveform_y = 292;
+    constexpr int bar_width = 12;
+    constexpr int bar_gap = 10;
+    constexpr int maximum_height = 82;
+
+    canvas_.blend_rect(
+      waveform_x,
+      waveform_y,
+      546,
+      1,
+      ColorRgb{25U, 65U, 82U},
+      0.85F);
+
+    for (
+      std::size_t index = 0;
+      index < voice_ui_.waveform.size();
+      ++index)
+    {
+      double normalized =
+        std::clamp(
+          voice_ui_.waveform[index],
+          0.0,
+          1.0);
+
+      // Only dry-run preview adds synthetic movement. On the Pi,
+      // waveform values must come from real savo_speech audio levels.
+      if (
+        preview_animation &&
+        voice_ui_.live &&
+        uppercase_copy(voice_ui_.microphone_state) != "MISSING")
+      {
+        const double movement =
+          0.72 +
+          0.28 *
+          std::sin(
+            voice_animation_time_seconds_ * 7.0 +
+            static_cast<double>(index) * 0.58);
+
+        normalized =
+          std::clamp(
+            normalized * movement,
+            0.0,
+            1.0);
+      }
+
+      const int height =
+        std::max(
+          4,
+          static_cast<int>(
+            std::lround(
+              normalized *
+              static_cast<double>(maximum_height))));
+
+      const int x =
+        waveform_x +
+        static_cast<int>(index) *
+        (bar_width + bar_gap);
+
+      const double highlight =
+        0.5 +
+        0.5 *
+        std::sin(
+          voice_animation_time_seconds_ * 6.0 -
+          static_cast<double>(index) * 0.34);
+
+      canvas_.blend_rect(
+        x,
+        waveform_y - (height / 2),
+        bar_width,
+        height,
+        phase_color,
+        static_cast<float>(
+          0.58 +
+          0.40 * highlight));
+    }
+  }
+
+  // ============================================================
+  // THINKING
+  // ============================================================
+  if (phase == VoicePhase::Thinking) {
+    draw_voice_text(
+      152,
+      148,
+      "YOU SAID",
+      cyan_soft,
+      false);
+
+    canvas_.blend_rect(
+      150,
+      173,
+      582,
+      58,
+      ColorRgb{0U, 31U, 57U},
+      0.94F);
+
+    draw_voice_text(
+      168,
+      191,
+      fit_text(
+        voice_ui_.transcript,
+        546,
+        true),
+      white,
+      true);
+
+    centered_text(
+      441,
+      255,
+      "SAVOMIND IS PROCESSING",
+      cyan,
+      true);
+
+    const int block_width = 28;
+    const int block_gap = 12;
+    const int total_width =
+      (block_width * 5) +
+      (block_gap * 4);
+
+    const int start_x =
+      441 - (total_width / 2);
+
+    for (int index = 0; index < 5; ++index) {
+      const int distance =
+        (index - thinking_active_block + 5) % 5;
+
+      const bool active = distance == 0;
+      const bool trailing = distance == 4;
+
+      const ColorRgb block_color =
+        active || trailing ?
+        cyan :
+        ColorRgb{20U, 55U, 72U};
+
+      const float block_alpha =
+        active ?
+        1.0F :
+        trailing ?
+        0.62F :
+        0.34F;
+
+      canvas_.blend_rect(
+        start_x + index * (block_width + block_gap),
+        294,
+        block_width,
+        active ? 9 : 7,
+        block_color,
+        block_alpha);
+    }
+  }
+
+  // ============================================================
+  // SPEAKING
+  // ============================================================
+  if (phase == VoicePhase::Speaking) {
+    draw_voice_text(
+      152,
+      148,
+      "SAVO SAYS",
+      cyan_soft,
+      false);
+
+    canvas_.blend_rect(
+      150,
+      173,
+      582,
+      72,
+      ColorRgb{0U, 31U, 57U},
+      0.94F);
+
+    draw_voice_text(
+      168,
+      195,
+      fit_text(
+        voice_ui_.reply,
+        546,
+        true),
+      white,
+      true);
+
+    draw_voice_text(
+      152,
+      273,
+      "PLAYBACK",
+      cyan_soft,
+      false);
+
+    canvas_.blend_rect(
+      246,
+      281,
+      466,
+      8,
+      ColorRgb{20U, 55U, 72U},
+      0.94F);
+
+    const int progress_width =
+      static_cast<int>(
+      std::lround(
+        466.0 *
+        std::clamp(
+          voice_ui_.playback_progress,
+          0.0,
+          1.0)));
+
+    canvas_.blend_rect(
+      246,
+      281,
+      std::clamp(progress_width, 0, 466),
+      8,
+      good,
+      0.98F);
+
+    const std::string percentage =
+      std::to_string(
+      static_cast<int>(
+        std::lround(
+          std::clamp(
+            voice_ui_.playback_progress,
+            0.0,
+            1.0) *
+          100.0))) + "%";
+
+    draw_voice_text(
+      712 - voice_text_width(percentage, false),
+      301,
+      percentage,
+      good,
+      false);
+
+    // Decorative speaker activity. Playback progress remains real data.
+    const bool playback_active =
+      uppercase_copy(voice_ui_.playback_state) == "PLAYING";
+
+    for (int index = 0; index < 4; ++index) {
+      const double wave =
+        playback_active ?
+        0.5 +
+        0.5 *
+        std::sin(
+          voice_animation_time_seconds_ * 7.0 +
+          static_cast<double>(index) * 0.80) :
+        0.0;
+
+      const int height =
+        playback_active ?
+        5 +
+        static_cast<int>(
+          std::lround(
+            18.0 * wave)) :
+        4;
+
+      canvas_.blend_rect(
+        168 + index * 18,
+        316 - height,
+        8,
+        height,
+        playback_active ? good : muted,
+        playback_active ?
+        static_cast<float>(
+          0.60 +
+          0.38 * wave) :
+        0.35F);
+    }
+  }
+
+  // ============================================================
+  // ERROR
+  // ============================================================
+  if (phase == VoicePhase::Error) {
+    // Pulse strongly only during the first 1.2 seconds, then stay stable.
+    if (voice_phase_elapsed_seconds_ < 1.2) {
+      const double error_pulse =
+        0.5 +
+        0.5 *
+        std::sin(
+          voice_phase_elapsed_seconds_ * 12.0);
+
+      canvas_.blend_rect(
+        132,
+        130,
+        618,
+        3,
+        danger,
+        static_cast<float>(
+          0.30 +
+          0.65 * error_pulse));
+    }
+
+    centered_text(
+      441,
+      153,
+      "I COULD NOT HEAR YOU",
+      danger,
+      true);
+
+    canvas_.blend_rect(
+      150,
+      193,
+      582,
+      64,
+      ColorRgb{50U, 14U, 28U},
+      0.94F);
+
+    centered_text(
+      441,
+      214,
+      fit_text(
+        voice_ui_.error_message,
+        540,
+        true),
+      white,
+      true);
+
+    centered_text(
+      441,
+      282,
+      fit_text(
+        voice_ui_.error_detail,
+        540,
+        false),
+      warning,
+      false);
+
+    centered_text(
+      441,
+      311,
+      "Please try again.",
+      muted,
+      false);
+  }
+
+  // ============================================================
+  // Shared phase details
+  // ============================================================
+  canvas_.blend_rect(
+    132,
+    348,
+    618,
+    58,
+    ColorRgb{0U, 20U, 43U},
+    0.94F);
+
+  auto draw_metric =
+    [&](const int x,
+      const std::string & label,
+      const std::string & value,
+      const ColorRgb value_color)
+    {
+      draw_voice_text(
+        x,
+        357,
+        label,
+        muted,
+        false);
+
+      draw_voice_text(
+        x,
+        379,
+        fit_text(
+          value,
+          170,
+          false),
+        value_color,
+        false);
+    };
+
+  if (phase == VoicePhase::Idle) {
+    draw_metric(
+      150,
+      "WAKE WORD",
+      voice_ui_.wake_word_state,
+      state_color(voice_ui_.wake_word_state));
+
+    draw_metric(
+      350,
+      "MICROPHONE",
+      voice_ui_.microphone_state,
+      state_color(voice_ui_.microphone_state));
+
+    draw_metric(
+      550,
+      "SPEECH LINK",
+      voice_ui_.speech_link_state,
+      state_color(voice_ui_.speech_link_state));
+  }
+
+  if (phase == VoicePhase::Listening) {
+    std::ostringstream level;
+    level
+      << std::fixed
+      << std::setprecision(0)
+      << voice_ui_.input_level_percent
+      << "%";
+
+    std::ostringstream elapsed;
+    elapsed
+      << std::fixed
+      << std::setprecision(1)
+      << voice_ui_.elapsed_seconds
+      << " s";
+
+    draw_metric(
+      150,
+      "INPUT LEVEL",
+      level.str(),
+      good);
+
+    draw_metric(
+      350,
+      "ELAPSED",
+      elapsed.str(),
+      white);
+
+    draw_metric(
+      550,
+      "MICROPHONE",
+      voice_ui_.microphone_state,
+      state_color(voice_ui_.microphone_state));
+  }
+
+  if (phase == VoicePhase::Thinking) {
+    draw_metric(
+      150,
+      "PROVIDER",
+      voice_ui_.provider,
+      white);
+
+    draw_metric(
+      350,
+      "INTENT",
+      voice_ui_.intent,
+      cyan);
+
+    draw_metric(
+      550,
+      "STT ROUTE",
+      voice_ui_.stt_route,
+      state_color(voice_ui_.stt_route));
+  }
+
+  if (phase == VoicePhase::Speaking) {
+    draw_metric(
+      150,
+      "TTS ROUTE",
+      voice_ui_.tts_route,
+      state_color(voice_ui_.tts_route));
+
+    draw_metric(
+      350,
+      "SPEAKER",
+      voice_ui_.speaker_state,
+      state_color(voice_ui_.speaker_state));
+
+    draw_metric(
+      550,
+      "PLAYBACK",
+      voice_ui_.playback_state,
+      state_color(voice_ui_.playback_state));
+  }
+
+  if (phase == VoicePhase::Error) {
+    draw_metric(
+      150,
+      "MICROPHONE",
+      voice_ui_.microphone_state,
+      state_color(voice_ui_.microphone_state));
+
+    draw_metric(
+      350,
+      "SPEECH LINK",
+      voice_ui_.speech_link_state,
+      state_color(voice_ui_.speech_link_state));
+
+    draw_metric(
+      550,
+      "ERROR",
+      voice_ui_.error_detail,
+      warning);
+  }
+
+  // ============================================================
+  // Shared instruction strip
+  // ============================================================
+  canvas_.blend_rect(
+    132,
+    414,
+    618,
+    23,
+    ColorRgb{0U, 23U, 45U},
+    0.94F);
+
+  std::string instruction{"Say \"Hey Savo\" to begin."};
+  ColorRgb instruction_color = cyan_soft;
+
+  switch (phase) {
+    case VoicePhase::Idle:
+      instruction = "Say \"Hey Savo\" to begin.";
+      instruction_color = cyan_soft;
+      break;
+
+    case VoicePhase::Listening:
+      instruction = "Listening for your command...";
+      instruction_color = good;
+      break;
+
+    case VoicePhase::Thinking:
+      instruction = "Processing your request...";
+      instruction_color = cyan;
+      break;
+
+    case VoicePhase::Speaking:
+      instruction = "Savo is speaking...";
+      instruction_color = good;
+      break;
+
+    case VoicePhase::Error:
+      instruction = "Voice request failed. Please try again.";
+      instruction_color = warning;
+      break;
+  }
+
+  draw_voice_text(
+    148,
+    416,
+    instruction,
+    instruction_color,
+    false);
+}
+
+
+void UiNode::seed_voice_preview_data(const VoicePhase phase)
+{
+  voice_ui_ = VoiceUiState{};
+  voice_phase_ = phase;
+
+  voice_ui_.live = true;
+  voice_ui_.wake_word_state = "READY";
+  voice_ui_.microphone_state = "READY";
+  voice_ui_.speech_link_state = "ONLINE";
+
+  voice_ui_.stt_route = "ONLINE";
+  voice_ui_.tts_route = "ONLINE";
+  voice_ui_.provider = "CEREBRAS";
+  voice_ui_.intent = "NAVIGATION";
+
+  voice_ui_.playback_state = "PLAYING";
+  voice_ui_.speaker_state = "ACTIVE";
+
+  voice_ui_.transcript =
+    "Take me to room A201";
+
+  voice_ui_.reply =
+    "I can take you to room A201.";
+
+  voice_ui_.error_message =
+    "I could not hear you clearly.";
+
+  voice_ui_.error_detail =
+    "NO SPEECH DETECTED";
+
+  voice_ui_.input_level_percent = 72.0;
+  voice_ui_.elapsed_seconds = 2.4;
+  voice_ui_.playback_progress = 0.68;
+
+  voice_ui_.waveform = {{
+    0.12, 0.24, 0.36, 0.20, 0.52, 0.74,
+    0.42, 0.68, 0.92, 0.58, 0.36, 0.80,
+    0.64, 0.46, 0.88, 0.72, 0.40, 0.62,
+    0.34, 0.56, 0.78, 0.44, 0.28, 0.16,
+  }};
+
+  if (phase == VoicePhase::Idle) {
+    voice_ui_.playback_state = "IDLE";
+    voice_ui_.speaker_state = "READY";
+  }
+
+  if (phase == VoicePhase::Thinking) {
+    voice_ui_.playback_state = "IDLE";
+    voice_ui_.speaker_state = "READY";
+  }
+
+  if (phase == VoicePhase::Error) {
+    voice_ui_.live = false;
+    voice_ui_.playback_state = "IDLE";
+    voice_ui_.speaker_state = "READY";
+  }
+}
+
+void UiNode::render_navigation_page(
+  const NavigationPhase phase)
+{
+  if (phase != rendered_navigation_phase_) {
+    rendered_navigation_phase_ = phase;
+    navigation_phase_elapsed_seconds_ = 0.0;
+  }
+
+  render_page_shell(
+    navigate_shell_,
+    "Navigate");
+
+  const ColorRgb cyan{70U, 235U, 255U};
+  const ColorRgb cyan_soft{145U, 210U, 230U};
+  const ColorRgb white{235U, 248U, 255U};
+  const ColorRgb good{75U, 235U, 175U};
+  const ColorRgb warning{255U, 190U, 70U};
+  const ColorRgb danger{255U, 90U, 95U};
+  const ColorRgb face_fill{0U, 34U, 57U};
+
+  constexpr double pi =
+    3.14159265358979323846;
+
+  auto draw_navigation_text =
+    [this](
+      const int x,
+      const int y,
+      const std::string & value,
+      const ColorRgb color,
+      const bool medium,
+      const float alpha = 1.0F)
+    {
+      if (medium) {
+        Font::draw_atlas_text(
+          canvas_,
+          ui_font_medium_,
+          20,
+          24,
+          16,
+          2,
+          x,
+          y,
+          value,
+          color,
+          alpha);
+        return;
+      }
+
+      Font::draw_atlas_text(
+        canvas_,
+        ui_font_small_,
+        18,
+        22,
+        16,
+        2,
+        x,
+        y,
+        value,
+        color,
+        alpha);
+    };
+
+  auto navigation_text_width =
+    [this](
+      const std::string & value,
+      const bool medium) -> int
+    {
+      if (medium) {
+        return Font::atlas_text_width(
+          ui_font_medium_,
+          20,
+          24,
+          16,
+          value);
+      }
+
+      return Font::atlas_text_width(
+        ui_font_small_,
+        18,
+        22,
+        16,
+        value);
+    };
+
+  auto centered_text =
+    [&](const int center_x,
+      const int y,
+      const std::string & value,
+      const ColorRgb color,
+      const bool medium,
+      const float alpha = 1.0F)
+    {
+      draw_navigation_text(
+        center_x -
+        navigation_text_width(value, medium) / 2,
+        y,
+        value,
+        color,
+        medium,
+        alpha);
+    };
+
+  auto draw_filled_circle =
+    [&](const int center_x,
+      const int center_y,
+      const int radius,
+      const ColorRgb color,
+      const float alpha)
+    {
+      const int radius_squared =
+        radius * radius;
+
+      for (int dy = -radius; dy <= radius; ++dy) {
+        const int inside =
+          radius_squared - dy * dy;
+
+        if (inside < 0) {
+          continue;
+        }
+
+        const int half_width =
+          static_cast<int>(
+          std::floor(
+            std::sqrt(
+              static_cast<double>(inside))));
+
+        canvas_.blend_rect(
+          center_x - half_width,
+          center_y + dy,
+          half_width * 2 + 1,
+          1,
+          color,
+          alpha);
+      }
+    };
+
+  auto draw_arc =
+    [&](const int center_x,
+      const int center_y,
+      const int radius_x,
+      const int radius_y,
+      const double start_angle,
+      const double end_angle,
+      const ColorRgb color,
+      const float alpha,
+      const int thickness)
+    {
+      constexpr int segments = 72;
+
+      for (int segment = 0; segment <= segments; ++segment) {
+        const double progress =
+          static_cast<double>(segment) /
+          static_cast<double>(segments);
+
+        const double angle =
+          start_angle +
+          (end_angle - start_angle) *
+          progress;
+
+        const int x =
+          center_x +
+          static_cast<int>(
+            std::lround(
+              std::cos(angle) *
+              static_cast<double>(radius_x)));
+
+        const int y =
+          center_y +
+          static_cast<int>(
+            std::lround(
+              std::sin(angle) *
+              static_cast<double>(radius_y)));
+
+        canvas_.blend_rect(
+          x - thickness / 2,
+          y - thickness / 2,
+          thickness,
+          thickness,
+          color,
+          alpha);
+      }
+    };
+
+  const double pulse =
+    0.5 +
+    0.5 *
+    std::sin(
+      navigation_animation_time_seconds_ *
+      2.2);
+
+  int face_x_offset = 0;
+  int face_y_offset = 0;
+
+  if (phase == NavigationPhase::Idle) {
+    // Calm breathing movement.
+    face_y_offset =
+      static_cast<int>(
+      std::lround(
+        std::sin(
+          navigation_animation_time_seconds_ *
+          1.7) *
+        2.0));
+  }
+
+  if (phase == NavigationPhase::Preparing) {
+    // Small searching movement while preparing the route.
+    face_x_offset =
+      static_cast<int>(
+      std::lround(
+        std::sin(
+          navigation_animation_time_seconds_ *
+          2.2) *
+        3.0));
+
+    face_y_offset =
+      static_cast<int>(
+      std::lround(
+        std::sin(
+          navigation_animation_time_seconds_ *
+          1.8) *
+        2.0));
+  }
+
+  if (phase == NavigationPhase::Navigating) {
+    // Friendly walking-style bob.
+    face_y_offset =
+      static_cast<int>(
+      std::lround(
+        std::sin(
+          navigation_animation_time_seconds_ *
+          2.4) *
+        4.0));
+  }
+
+  if (phase == NavigationPhase::Paused) {
+    // Very slow breathing while waiting.
+    face_y_offset =
+      static_cast<int>(
+      std::lround(
+        std::sin(
+          navigation_animation_time_seconds_ *
+          1.2) *
+        1.0));
+  }
+
+  if (phase == NavigationPhase::Arrived) {
+    // Happy celebration bounce.
+    face_y_offset =
+      -static_cast<int>(
+      std::lround(
+        std::abs(
+          std::sin(
+            navigation_animation_time_seconds_ *
+            4.0)) *
+        6.0));
+  }
+
+  if (
+    phase == NavigationPhase::Error &&
+    navigation_phase_elapsed_seconds_ < 1.2)
+  {
+    // A brief concerned shake, then the face remains stable.
+    const double fade =
+      1.0 -
+      navigation_phase_elapsed_seconds_ /
+      1.2;
+
+    face_x_offset =
+      static_cast<int>(
+      std::lround(
+        std::sin(
+          navigation_phase_elapsed_seconds_ *
+          18.0) *
+        4.0 *
+        fade));
+  }
+
+  std::string title{"NAVIGATION"};
+  std::string state = navigation_ui_.state;
+  std::string message = navigation_ui_.message;
+  ColorRgb phase_color = cyan;
+
+  switch (phase) {
+    case NavigationPhase::Idle:
+      title = "NAVIGATION READY";
+      phase_color = cyan;
+      break;
+
+    case NavigationPhase::Preparing:
+      title = "GETTING READY";
+      phase_color = cyan;
+      break;
+
+    case NavigationPhase::Navigating:
+      title = "NAVIGATING";
+      phase_color = good;
+      break;
+
+    case NavigationPhase::Paused:
+      title = "NAVIGATION PAUSED";
+      phase_color = warning;
+      break;
+
+    case NavigationPhase::Arrived:
+      title = "ARRIVED";
+      phase_color = good;
+      break;
+
+    case NavigationPhase::Error:
+      title = "NAVIGATION ERROR";
+      phase_color = danger;
+      break;
+  }
+
+  // Remove duplicated inner shell heading.
+  canvas_.blend_rect(
+    132,
+    82,
+    618,
+    356,
+    ColorRgb{0U, 11U, 29U},
+    1.0F);
+
+  // Header.
+  canvas_.blend_rect(
+    132,
+    88,
+    618,
+    34,
+    ColorRgb{0U, 25U, 52U},
+    0.94F);
+
+  draw_navigation_text(
+    148,
+    96,
+    title,
+    phase_color,
+    true);
+
+  draw_navigation_text(
+    734 -
+    navigation_text_width(state, false),
+    99,
+    state,
+    phase_color,
+    false);
+
+  // Main face surface.
+  canvas_.blend_rect(
+    132,
+    130,
+    618,
+    276,
+    ColorRgb{0U, 16U, 36U},
+    0.94F);
+
+  const int face_center_x =
+    441 + face_x_offset;
+
+  const int face_center_y =
+    257 + face_y_offset;
+
+  const float glow_alpha =
+    static_cast<float>(
+      0.18 +
+      0.24 * pulse);
+
+  canvas_.draw_circle_ring(
+    face_center_x,
+    face_center_y,
+    116,
+    3,
+    phase_color,
+    glow_alpha);
+
+  if (phase == NavigationPhase::Arrived) {
+    const int celebration_radius =
+      122 +
+      static_cast<int>(
+      std::lround(
+        8.0 * pulse));
+
+    canvas_.draw_circle_ring(
+      face_center_x,
+      face_center_y,
+      celebration_radius,
+      2,
+      good,
+      static_cast<float>(
+        0.18 +
+        0.30 * (1.0 - pulse)));
+  }
+
+  canvas_.draw_circle_ring(
+    face_center_x,
+    face_center_y,
+    108,
+    2,
+    phase_color,
+    0.68F);
+
+  draw_filled_circle(
+    face_center_x,
+    face_center_y,
+    101,
+    face_fill,
+    0.98F);
+
+  canvas_.draw_circle_ring(
+    face_center_x,
+    face_center_y,
+    101,
+    2,
+    cyan_soft,
+    0.55F);
+
+  const double blink_position =
+    std::fmod(
+      navigation_animation_time_seconds_,
+      phase == NavigationPhase::Navigating ?
+      3.2 :
+      4.2);
+
+  const bool blinking =
+    blink_position >
+    (
+      phase == NavigationPhase::Navigating ?
+      3.02 :
+      4.02
+    );
+
+  int eye_offset_x = 0;
+
+  if (phase == NavigationPhase::Preparing) {
+    eye_offset_x =
+      static_cast<int>(
+      std::lround(
+        std::sin(
+          navigation_animation_time_seconds_ *
+          3.2) *
+        6.0));
+  }
+
+  const int left_eye_x =
+    face_center_x - 38 + eye_offset_x;
+
+  const int right_eye_x =
+    face_center_x + 38 + eye_offset_x;
+
+  const int eye_y =
+    face_center_y - 28;
+
+  // Eyes.
+  if (phase == NavigationPhase::Arrived) {
+    draw_arc(
+      left_eye_x,
+      eye_y,
+      17,
+      10,
+      1.15 * pi,
+      1.85 * pi,
+      good,
+      1.0F,
+      4);
+
+    draw_arc(
+      right_eye_x,
+      eye_y,
+      17,
+      10,
+      1.15 * pi,
+      1.85 * pi,
+      good,
+      1.0F,
+      4);
+  } else if (
+    (
+      phase == NavigationPhase::Paused &&
+      pulse > 0.32
+    ) ||
+    blinking)
+  {
+    canvas_.blend_rect(
+      left_eye_x - 15,
+      eye_y,
+      30,
+      4,
+      phase_color,
+      0.98F);
+
+    canvas_.blend_rect(
+      right_eye_x - 15,
+      eye_y,
+      30,
+      4,
+      phase_color,
+      0.98F);
+  } else {
+    draw_filled_circle(
+      left_eye_x,
+      eye_y,
+      12,
+      white,
+      0.98F);
+
+    draw_filled_circle(
+      right_eye_x,
+      eye_y,
+      12,
+      white,
+      0.98F);
+
+    draw_filled_circle(
+      left_eye_x + 2,
+      eye_y + 1,
+      6,
+      phase_color,
+      0.98F);
+
+    draw_filled_circle(
+      right_eye_x + 2,
+      eye_y + 1,
+      6,
+      phase_color,
+      0.98F);
+  }
+
+  // Cheeks.
+  if (
+    phase == NavigationPhase::Navigating ||
+    phase == NavigationPhase::Arrived)
+  {
+    draw_filled_circle(
+      face_center_x - 69,
+      face_center_y + 18,
+      9,
+      cyan,
+      0.20F);
+
+    draw_filled_circle(
+      face_center_x + 69,
+      face_center_y + 18,
+      9,
+      cyan,
+      0.20F);
+  }
+
+  // Mouth.
+  if (phase == NavigationPhase::Error) {
+    draw_arc(
+      face_center_x,
+      face_center_y + 60,
+      38,
+      21,
+      1.15 * pi,
+      1.85 * pi,
+      danger,
+      0.98F,
+      4);
+  } else if (phase == NavigationPhase::Paused) {
+    canvas_.blend_rect(
+      face_center_x - 27,
+      face_center_y + 48,
+      54,
+      4,
+      warning,
+      0.98F);
+  } else {
+    const int smile_height =
+      20 +
+      static_cast<int>(
+      std::lround(
+        phase == NavigationPhase::Navigating ?
+        3.0 *
+        std::sin(
+          navigation_animation_time_seconds_ *
+          2.8) :
+        0.0));
+
+    draw_arc(
+      face_center_x,
+      face_center_y + 27,
+      phase == NavigationPhase::Arrived ?
+      51 :
+      43,
+      phase == NavigationPhase::Arrived ?
+      32 :
+      smile_height,
+      0.15 * pi,
+      0.85 * pi,
+      phase_color,
+      1.0F,
+      4);
+  }
+
+  // Minimal message only—no map, route or camera data.
+  centered_text(
+    441,
+    375,
+    message,
+    phase_color,
+    true);
+
+  // Bottom instruction strip.
+  canvas_.blend_rect(
+    132,
+    414,
+    618,
+    23,
+    ColorRgb{0U, 23U, 45U},
+    0.94F);
+
+  std::string instruction{
+    "Ready for a destination."
+  };
+
+  switch (phase) {
+    case NavigationPhase::Idle:
+      instruction =
+        "Ready for a destination.";
+      break;
+
+    case NavigationPhase::Preparing:
+      instruction =
+        "Preparing navigation...";
+      break;
+
+    case NavigationPhase::Navigating:
+      instruction =
+        "Savo is guiding you.";
+      break;
+
+    case NavigationPhase::Paused:
+      instruction =
+        "Please wait a moment.";
+      break;
+
+    case NavigationPhase::Arrived:
+      instruction =
+        "Destination reached.";
+      break;
+
+    case NavigationPhase::Error:
+      instruction =
+        navigation_ui_.error_message;
+      break;
+  }
+
+  draw_navigation_text(
+    148,
+    416,
+    instruction,
+    phase == NavigationPhase::Error ?
+    danger :
+    cyan_soft,
+    false);
+}
+
+
+void UiNode::seed_navigation_preview_data(
+  const NavigationPhase phase)
+{
+  navigation_ui_ = NavigationUiState{};
+  navigation_phase_ = phase;
+  navigation_ui_.live = true;
+
+  switch (phase) {
+    case NavigationPhase::Idle:
+      navigation_ui_.state = "IDLE";
+      navigation_ui_.message =
+        "Where would you like to go?";
+      break;
+
+    case NavigationPhase::Preparing:
+      navigation_ui_.state = "PREPARING";
+      navigation_ui_.message =
+        "Getting ready...";
+      break;
+
+    case NavigationPhase::Navigating:
+      navigation_ui_.state = "NAVIGATING";
+      navigation_ui_.message =
+        "Taking you there...";
+      break;
+
+    case NavigationPhase::Paused:
+      navigation_ui_.state = "PAUSED";
+      navigation_ui_.message =
+        "Please wait...";
+      break;
+
+    case NavigationPhase::Arrived:
+      navigation_ui_.state = "ARRIVED";
+      navigation_ui_.message =
+        "We have arrived!";
+      break;
+
+    case NavigationPhase::Error:
+      navigation_ui_.state = "ERROR";
+      navigation_ui_.message =
+        "I need a moment.";
+      navigation_ui_.error_message =
+        "Navigation is temporarily unavailable.";
+      break;
+  }
+}
+
 void UiNode::render_status_page()
 {
   render_page_shell(status_shell_, "Status");
@@ -1710,6 +4006,34 @@ void UiNode::render_status_page()
   const ColorRgb cyan{70U, 235U, 255U};
   const ColorRgb cyan_soft{145U, 210U, 230U};
   const ColorRgb white{235U, 248U, 255U};
+
+  constexpr double status_tau =
+    6.28318530717958647692;
+
+  const double status_pulse =
+    0.5 +
+    0.5 *
+    std::sin(
+      status_animation_time_seconds_ *
+      status_tau /
+      1.60);
+
+  const float status_live_alpha =
+    static_cast<float>(
+      0.68 +
+      0.32 * status_pulse);
+
+  const float status_tab_alpha =
+    static_cast<float>(
+      0.84 +
+      0.12 * status_pulse);
+
+  const float status_alert_alpha =
+    status_ui_.alert_count > 0 ?
+    static_cast<float>(
+      0.58 +
+      0.42 * status_pulse) :
+    0.98F;
   const ColorRgb good{75U, 235U, 175U};
   const ColorRgb warning{255U, 190U, 70U};
   const ColorRgb danger{255U, 90U, 95U};
@@ -1895,7 +4219,7 @@ void UiNode::render_status_page()
       selected ?
       ColorRgb{0U, 78U, 105U} :
       ColorRgb{0U, 20U, 43U},
-      selected ? 0.96F : 0.82F);
+      selected ? status_tab_alpha : 0.82F);
 
     if (selected) {
       canvas_.blend_rect(
@@ -1904,7 +4228,29 @@ void UiNode::render_status_page()
         tab.width,
         2,
         cyan,
-        0.98F);
+        static_cast<float>(
+          0.72 +
+          0.26 * status_pulse));
+
+      const int glow_width =
+        34 +
+        static_cast<int>(
+        std::lround(
+          34.0 * status_pulse));
+
+      const int glow_x =
+        tab.x +
+        ((tab.width - glow_width) / 2);
+
+      canvas_.blend_rect(
+        glow_x,
+        109,
+        glow_width,
+        3,
+        white,
+        static_cast<float>(
+          0.10 +
+          0.18 * status_pulse));
     }
 
     const std::string label{tab.label};
@@ -1936,6 +4282,18 @@ void UiNode::render_status_page()
         ColorRgb{0U, 23U, 45U},
         0.94F);
 
+      if (status_ui_.alert_count > 0) {
+        canvas_.blend_rect(
+          alert_x,
+          alert_y,
+          alert_w,
+          2,
+          warning,
+          static_cast<float>(
+            0.24 +
+            0.50 * status_pulse));
+      }
+
       const std::string label = "ACTIVE ALERT:";
 
       draw_status_text(
@@ -1956,7 +4314,7 @@ void UiNode::render_status_page()
         status_ui_.active_alert,
         status_ui_.alert_count == 0 ? good : warning,
         false,
-        0.98F);
+        status_alert_alpha);
     };
 
   // ============================================================
@@ -2027,7 +4385,10 @@ void UiNode::render_status_page()
       summary_y + 8,
       live,
       status_ui_.live ? cyan : warning,
-      false);
+      false,
+      status_ui_.live ?
+      status_live_alpha :
+      0.95F);
 
     auto draw_domain_card =
       [&](const int x,
@@ -2233,7 +4594,10 @@ void UiNode::render_status_page()
       131,
       live,
       status_ui_.live ? cyan : warning,
-      false);
+      false,
+      status_ui_.live ?
+      status_live_alpha :
+      0.95F);
 
     constexpr int graph_x = 132;
     constexpr int graph_y = 164;
@@ -2341,13 +4705,50 @@ void UiNode::render_status_page()
             displayed /
             graph_max_m));
 
+        const int bounded_width =
+          std::clamp(width, 0, 250);
+
         canvas_.blend_rect(
           292,
           rows[index] + 6,
-          std::clamp(width, 0, 250),
+          bounded_width,
           8,
           row_color,
           0.98F);
+
+        if (
+          status_ui_.live &&
+          bounded_width > 14)
+        {
+          const double shimmer_phase =
+            std::fmod(
+            status_animation_time_seconds_ *
+            0.42 +
+            static_cast<double>(index) *
+            0.17,
+            1.0);
+
+          constexpr int shimmer_width = 7;
+
+          const int shimmer_x =
+            292 +
+            static_cast<int>(
+            std::lround(
+              shimmer_phase *
+              static_cast<double>(
+                bounded_width -
+                shimmer_width)));
+
+          canvas_.blend_rect(
+            shimmer_x,
+            rows[index] + 6,
+            shimmer_width,
+            8,
+            white,
+            static_cast<float>(
+              0.10 +
+              0.18 * status_pulse));
+        }
       }
 
       draw_status_text(
@@ -2791,6 +5192,22 @@ void UiNode::render_power_page()
   const ColorRgb muted{145U, 175U, 195U};
   const ColorRgb white{235U, 248U, 255U};
 
+  constexpr double power_tau =
+    6.28318530717958647692;
+
+  const double power_pulse =
+    0.5 +
+    0.5 *
+    std::sin(
+      power_animation_time_seconds_ *
+      power_tau /
+      1.55);
+
+  const float power_live_alpha =
+    static_cast<float>(
+      0.68 +
+      0.32 * power_pulse);
+
   auto draw_power_text =
     [this](
       const int x,
@@ -3017,7 +5434,9 @@ void UiNode::render_power_page()
     status_stale ? "STALE" : "LIVE",
     status_stale ? warning : cyan,
     2,
-    0.95F);
+    status_stale ?
+    0.95F :
+    power_live_alpha);
 
   // --------------------------------------------------------------
   // Three source cards
@@ -3034,6 +5453,21 @@ void UiNode::render_power_page()
       const ColorRgb source_color = state_color(source);
       const std::string state_text = source_state_text(source);
 
+      const bool source_live =
+        source.seen &&
+        !power_source_is_stale(source);
+
+      const bool source_charging =
+        source_live &&
+        lowercase_copy(source.state) == "charging";
+
+      const float source_activity_alpha =
+        source_live ?
+        static_cast<float>(
+          0.62 +
+          0.30 * power_pulse) :
+        0.85F;
+
       canvas_.blend_rect(
         x,
         y,
@@ -3048,7 +5482,25 @@ void UiNode::render_power_page()
         w,
         2,
         source_color,
-        0.85F);
+        source_activity_alpha);
+
+      if (source_live) {
+        const int activity_width =
+          36 +
+          static_cast<int>(
+          std::lround(
+            42.0 * power_pulse));
+
+        canvas_.blend_rect(
+          x + ((w - activity_width) / 2),
+          y,
+          activity_width,
+          2,
+          white,
+          static_cast<float>(
+            0.08 +
+            0.16 * power_pulse));
+      }
 
       draw_power_text(
         x + 12,
@@ -3103,13 +5555,48 @@ void UiNode::render_power_page()
             static_cast<double>(bar_w) *
             source.percent / 100.0));
 
+        const int bounded_fill_width =
+          std::clamp(fill_width, 0, bar_w);
+
         canvas_.blend_rect(
           bar_x,
           bar_y,
-          std::clamp(fill_width, 0, bar_w),
+          bounded_fill_width,
           5,
           source_color,
           0.95F);
+
+        if (
+          source_charging &&
+          bounded_fill_width > 12)
+        {
+          const double charge_phase =
+            std::fmod(
+            power_animation_time_seconds_ *
+            0.58,
+            1.0);
+
+          constexpr int charge_width = 8;
+
+          const int charge_x =
+            bar_x +
+            static_cast<int>(
+            std::lround(
+              charge_phase *
+              static_cast<double>(
+                bounded_fill_width -
+                charge_width)));
+
+          canvas_.blend_rect(
+            charge_x,
+            bar_y,
+            charge_width,
+            5,
+            white,
+            static_cast<float>(
+              0.18 +
+              0.30 * power_pulse));
+        }
       }
     };
 
@@ -3348,6 +5835,87 @@ void UiNode::render_power_page()
     7.20,
     400,
     ColorRgb{75U, 235U, 175U});
+
+  // Moving cursor is presentation-only. It appears only when at least
+  // one fresh real voltage source exists.
+  const bool voltage_graph_live =
+    (
+      core_power_.seen &&
+      core_power_.has_voltage &&
+      !power_source_is_stale(core_power_)
+    ) ||
+    (
+      edge_power_.seen &&
+      edge_power_.has_voltage &&
+      !power_source_is_stale(edge_power_)
+    ) ||
+    (
+      base_power_.seen &&
+      base_power_.has_voltage &&
+      !power_source_is_stale(base_power_)
+    );
+
+  if (voltage_graph_live) {
+    const int sweep_plot_x =
+      graph_panel_x + 158;
+
+    const int sweep_plot_w =
+      graph_panel_w - 172;
+
+    const double sweep_phase =
+      std::fmod(
+      power_animation_time_seconds_ *
+      0.30,
+      1.0);
+
+    const int sweep_x =
+      sweep_plot_x +
+      static_cast<int>(
+      std::lround(
+        sweep_phase *
+        static_cast<double>(
+          sweep_plot_w - 1)));
+
+    const int sweep_y =
+      graph_panel_y + 38;
+
+    const int sweep_h =
+      graph_panel_h - 50;
+
+    canvas_.blend_rect(
+      sweep_x - 3,
+      sweep_y,
+      1,
+      sweep_h,
+      cyan,
+      0.08F);
+
+    canvas_.blend_rect(
+      sweep_x - 1,
+      sweep_y,
+      1,
+      sweep_h,
+      cyan,
+      0.18F);
+
+    canvas_.blend_rect(
+      sweep_x,
+      sweep_y,
+      2,
+      sweep_h,
+      white,
+      static_cast<float>(
+        0.20 +
+        0.26 * power_pulse));
+
+    canvas_.blend_rect(
+      sweep_x + 2,
+      sweep_y,
+      1,
+      sweep_h,
+      cyan,
+      0.12F);
+  }
 }
 
 void UiNode::seed_power_preview_data()
@@ -3572,6 +6140,19 @@ void UiNode::request_screen(
       break;
   }
 
+  // A SavoMind Navigation request begins in Preparing.
+  // Real savo_nav feedback will later change this to Navigating,
+  // Paused, Arrived or Error.
+  if (
+    requested_screen == UiScreen::Navigation &&
+    source != ScreenRequestSource::Touch)
+  {
+    navigation_phase_ = NavigationPhase::Preparing;
+    navigation_ui_.live = true;
+    navigation_ui_.state = "PREPARING";
+    navigation_ui_.message = "Getting ready...";
+  }
+
   // A generic Status request means Status / Overview.
   if (requested_screen == UiScreen::Status) {
     if (
@@ -3646,9 +6227,12 @@ void UiNode::handle_tts_finished()
 
   if (!pending_screen_.has_value()) {
     pending_status_view_.reset();
+
     RCLCPP_INFO(
       get_logger(),
-      "TTS finished | no pending screen");
+      "TTS finished | returning to Voice Idle");
+
+    transition_to(UiScreen::VoiceIdle);
     return;
   }
 

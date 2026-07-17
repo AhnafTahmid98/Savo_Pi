@@ -29,9 +29,15 @@ public:
   using NavigateToPose =
     nav2_msgs::action::NavigateToPose;
 
-  using GoalHandle =
-    rclcpp_action::ClientGoalHandle<
+  using ActionClient =
+    rclcpp_action::Client<
       NavigateToPose>;
+
+  using GoalHandle =
+    ActionClient::GoalHandle;
+
+  using CancelResponse =
+    ActionClient::CancelResponse;
 
   ExplorationGoalHandoffNode()
   : Node("exploration_goal_handoff_node")
@@ -550,22 +556,188 @@ private:
         ).seconds();
 
       if (elapsed >=
-          cancel_timeout_sec_)
+          cancel_timeout_sec_ &&
+          !cancel_timeout_reported_)
       {
-        publish_transition(
-          machine_.mark_timed_out(
-            "savo_nav_cancel_timeout"));
+        cancel_timeout_reported_ = true;
 
-        clear_runtime_goal();
-
-        RCLCPP_WARN(
+        RCLCPP_ERROR(
           get_logger(),
-          "savo_nav cancellation timed out "
-          "after %.2f seconds",
-          elapsed);
+          "savo_nav cancellation has not reached "
+          "a terminal result after %.2f seconds; "
+          "keeping the exploration goal active "
+          "until terminal confirmation arrives; "
+          "cancel_acknowledged=%s",
+          elapsed,
+          cancel_acknowledged_ ?
+          "true" :
+          "false");
       }
     }
   }
+  static std::string cancel_response_reason(
+    const std::int8_t return_code,
+    const bool has_canceling_goal)
+  {
+    if (return_code ==
+        CancelResponse::ERROR_NONE)
+    {
+      return has_canceling_goal ?
+        "" :
+        "savo_nav_cancel_ack_missing_goal";
+    }
+
+    if (return_code ==
+        CancelResponse::ERROR_REJECTED)
+    {
+      return "savo_nav_cancel_rejected";
+    }
+
+    if (return_code ==
+        CancelResponse::ERROR_UNKNOWN_GOAL_ID)
+    {
+      return "savo_nav_cancel_unknown_goal";
+    }
+
+    if (return_code ==
+        CancelResponse::ERROR_GOAL_TERMINATED)
+    {
+      return "savo_nav_cancel_goal_already_terminal";
+    }
+
+    return
+      std::string{
+      "savo_nav_cancel_response_code_"} +
+      std::to_string(
+        static_cast<int>(
+          return_code));
+  }
+
+  void handle_active_cancel_response(
+    const std::string & request_id,
+    const CancelResponse::SharedPtr response)
+  {
+    if (request_id !=
+        machine_.request_id())
+    {
+      RCLCPP_WARN(
+        get_logger(),
+        "ignoring stale cancel acknowledgement: "
+        "request_id=%s current_request_id=%s",
+        request_id.c_str(),
+        machine_.request_id().c_str());
+
+      return;
+    }
+
+    if (exploration::is_terminal(
+        machine_.state()))
+    {
+      RCLCPP_INFO(
+        get_logger(),
+        "cancel acknowledgement arrived after "
+        "terminal result: request_id=%s",
+        request_id.c_str());
+
+      return;
+    }
+
+    if (machine_.state() !=
+        exploration::
+        GoalHandoffState::kCanceling)
+    {
+      RCLCPP_WARN(
+        get_logger(),
+        "cancel acknowledgement arrived in "
+        "unexpected state: request_id=%s state=%s",
+        request_id.c_str(),
+        exploration::to_string(
+          machine_.state()).c_str());
+
+      return;
+    }
+
+    if (!response) {
+      cancel_acknowledged_ = false;
+
+      publish_status(
+        false,
+        "savo_nav_cancel_response_missing");
+
+      RCLCPP_ERROR(
+        get_logger(),
+        "savo_nav returned no cancel response; "
+        "keeping exploration goal active: "
+        "request_id=%s",
+        request_id.c_str());
+
+      return;
+    }
+
+    const bool has_canceling_goal =
+      !response->goals_canceling.empty();
+
+    const std::string reason =
+      cancel_response_reason(
+        response->return_code,
+        has_canceling_goal);
+
+    if (!reason.empty()) {
+      cancel_acknowledged_ = false;
+
+      publish_status(
+        false,
+        reason);
+
+      RCLCPP_ERROR(
+        get_logger(),
+        "savo_nav did not acknowledge cancellation: "
+        "request_id=%s return_code=%d "
+        "goals_canceling=%zu reason=%s; "
+        "keeping exploration goal active",
+        request_id.c_str(),
+        static_cast<int>(
+          response->return_code),
+        response->goals_canceling.size(),
+        reason.c_str());
+
+      return;
+    }
+
+    cancel_acknowledged_ = true;
+
+    publish_status(true);
+
+    RCLCPP_INFO(
+      get_logger(),
+      "savo_nav acknowledged cancellation: "
+      "request_id=%s goals_canceling=%zu",
+      request_id.c_str(),
+      response->goals_canceling.size());
+  }
+
+  void send_active_cancel_request(
+    const std::string & request_id)
+  {
+    const auto goal_handle =
+      current_goal_handle_;
+
+    if (!goal_handle) {
+      throw std::runtime_error(
+              "accepted_goal_handle_missing");
+    }
+
+    action_client_->async_cancel_goal(
+      goal_handle,
+      [this, request_id](
+        const CancelResponse::SharedPtr response)
+      {
+        handle_active_cancel_response(
+          request_id,
+          response);
+      });
+  }
+
   void timeout_active_goal(
     const std::string & reason,
     const double elapsed)
@@ -602,17 +774,30 @@ private:
     cancel_started_at_ =
       now();
 
+    cancel_timeout_reported_ = false;
+    cancel_acknowledged_ = false;
+
     publish_transition(
       transition);
 
     try {
-      action_client_->async_cancel_goal(
-        current_goal_handle_);
+      send_active_cancel_request(
+        machine_.request_id());
     } catch (const std::exception & exception) {
+      const std::string cancel_reason =
+        std::string{
+        "savo_nav_cancel_request_exception:"} +
+        exception.what();
+
+      publish_status(
+        false,
+        cancel_reason);
+
       RCLCPP_ERROR(
         get_logger(),
         "failed to request cancellation for "
-        "timed-out exploration goal: %s",
+        "timed-out exploration goal: %s; "
+        "keeping exploration goal active",
         exception.what());
     }
 
@@ -952,6 +1137,55 @@ private:
       }
     }
 
+    if (!exploration::is_terminal(
+        machine_.state()))
+    {
+      const std::string failure_reason =
+        std::string{
+        "terminal_result_transition_failed:"} +
+        exploration::to_string(
+          machine_.state()) +
+        ":result_code_" +
+        std::to_string(
+          static_cast<int>(
+            wrapped_result.code));
+
+      const auto error_transition =
+        machine_.mark_error(
+        failure_reason);
+
+      if (error_transition.accepted) {
+        publish_transition(
+          error_transition);
+
+        RCLCPP_ERROR(
+          get_logger(),
+          "terminal savo_nav result could not be "
+          "applied to the handoff state machine: "
+          "request_id=%s reason=%s; "
+          "finalizing as error because the action "
+          "is confirmed terminal",
+          request_id.c_str(),
+          failure_reason.c_str());
+
+        clear_runtime_goal();
+      } else {
+        publish_rejection(
+          error_transition.reason);
+
+        RCLCPP_ERROR(
+          get_logger(),
+          "terminal savo_nav result could not be "
+          "applied and error finalization was "
+          "rejected: request_id=%s reason=%s; "
+          "retaining runtime tracking",
+          request_id.c_str(),
+          error_transition.reason.c_str());
+      }
+
+      return;
+    }
+
     RCLCPP_INFO(
       get_logger(),
       "exploration goal finished: "
@@ -1007,6 +1241,58 @@ private:
       return;
     }
 
+    if (machine_.state() ==
+        exploration::
+        GoalHandoffState::kCanceling)
+    {
+      if (!current_goal_handle_) {
+        response->success = false;
+        response->message =
+          "accepted_goal_handle_missing";
+
+        publish_status(
+          false,
+          response->message);
+
+        return;
+      }
+
+      cancel_started_at_ =
+        now();
+
+      cancel_timeout_reported_ = false;
+      cancel_acknowledged_ = false;
+
+      try {
+        send_active_cancel_request(
+          machine_.request_id());
+
+        response->success = true;
+        response->message =
+          "exploration_goal_cancel_request_retried";
+      } catch (const std::exception & exception) {
+        const std::string reason =
+          std::string{
+          "cancel_request_exception:"} +
+          exception.what();
+
+        publish_status(
+          false,
+          reason);
+
+        response->success = false;
+        response->message = reason;
+
+        RCLCPP_ERROR(
+          get_logger(),
+          "cancel retry failed: %s; "
+          "keeping exploration goal active",
+          exception.what());
+      }
+
+      return;
+    }
+
     const auto transition =
       machine_.request_cancel();
 
@@ -1038,13 +1324,18 @@ private:
     }
 
     if (!current_goal_handle_) {
-      publish_transition(
-        machine_.mark_error(
-          "accepted_goal_handle_missing"));
-
       response->success = false;
       response->message =
         "accepted_goal_handle_missing";
+
+      publish_status(
+        false,
+        response->message);
+
+      RCLCPP_ERROR(
+        get_logger(),
+        "manual cancellation cannot access the "
+        "accepted goal handle; keeping the goal active");
 
       return;
     }
@@ -1052,27 +1343,34 @@ private:
     cancel_started_at_ =
       now();
 
+    cancel_timeout_reported_ = false;
+    cancel_acknowledged_ = false;
+
     try {
-      action_client_->async_cancel_goal(
-        current_goal_handle_);
+      send_active_cancel_request(
+        machine_.request_id());
 
       response->success = true;
       response->message =
-        "exploration_goal_cancel_requested";
+        "exploration_goal_cancel_request_sent";
     } catch (const std::exception & exception) {
       const std::string reason =
         std::string{
         "cancel_request_exception:"} +
         exception.what();
 
-      publish_transition(
-        machine_.mark_error(
-          reason));
-
-      clear_runtime_goal();
+      publish_status(
+        false,
+        reason);
 
       response->success = false;
       response->message = reason;
+
+      RCLCPP_ERROR(
+        get_logger(),
+        "manual cancel request failed: %s; "
+        "keeping exploration goal active",
+        exception.what());
     }
   }
   void clear_runtime_goal()
@@ -1085,6 +1383,8 @@ private:
     last_feedback_at_.reset();
     cancel_started_at_.reset();
     timeout_reason_.reset();
+    cancel_timeout_reported_ = false;
+    cancel_acknowledged_ = false;
 
     current_goal_handle_.reset();
   }
@@ -1198,6 +1498,9 @@ private:
 
   std::optional<rclcpp::Time>
     cancel_started_at_;
+
+  bool cancel_timeout_reported_{false};
+  bool cancel_acknowledged_{false};
 
   std::optional<std::string>
     timeout_reason_;

@@ -1,0 +1,65 @@
+# ---------------------------------------------------------------------------
+# Canonical Savo phrases
+# ---------------------------------------------------------------------------
+
+hey savo /1e-25/
+hi savo /1e-25/
+hello savo /1e-30/
+okay savo /1e-30/
+ok savo /1e-30/
+yo savo /1e-25/
+wake up savo /1e-35/
+
+hei savo /1e-25/
+moi savo /1e-25/
+
+robot savo /1e-30/
+savo robot /1e-30/
+hey robot savo /1e-35/
+hello robot savo /1e-40/
+hei robot savo /1e-35/
+moi robot savo /1e-35/
+
+# ---------------------------------------------------------------------------
+# Sabo pronunciation aliases
+# ---------------------------------------------------------------------------
+
+hey sabo /1e-25/
+hi sabo /1e-25/
+hello sabo /1e-30/
+okay sabo /1e-30/
+ok sabo /1e-30/
+yo sabo /1e-25/
+wake up sabo /1e-35/
+
+hei sabo /1e-25/
+moi sabo /1e-25/
+
+robot sabo /1e-30/
+sabo robot /1e-30/
+hey robot sabo /1e-35/
+hello robot sabo /1e-40/
+hei robot sabo /1e-35/
+moi robot sabo /1e-35/
+
+# ---------------------------------------------------------------------------
+# Robo aliases
+# ---------------------------------------------------------------------------
+
+hey robo /1e-25/
+hi robo /1e-25/
+hello robo /1e-30/
+okay robo /1e-30/
+ok robo /1e-30/
+yo robo /1e-25/
+
+hei robo /1e-25/
+moi robo /1e-25/
+
+# ---------------------------------------------------------------------------
+# Short aliases: intentionally strict
+# ---------------------------------------------------------------------------
+
+savo /1e-10/
+sabo /1e-10/
+robo /1e-10/

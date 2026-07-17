@@ -54,6 +54,10 @@ public:
       3000);
 
     declare_parameter<std::int64_t>(
+      "cancel_completion_delay_ms",
+      5000);
+
+    declare_parameter<std::int64_t>(
       "abort_error_code",
       100);
 
@@ -95,7 +99,9 @@ public:
 
     RCLCPP_INFO(
       get_logger(),
-      "test modes: success, reject, abort, delayed_accept");
+      "test modes: success, reject, abort, "
+      "delayed_accept, delayed_cancel_completion, "
+      "reject_cancel");
   }
 
   ~FakeSavoNavExplorationServerNode() override
@@ -149,7 +155,9 @@ private:
 
     if (mode != "success" &&
         mode != "abort" &&
-        mode != "delayed_accept")
+        mode != "delayed_accept" &&
+        mode != "delayed_cancel_completion" &&
+        mode != "reject_cancel")
     {
       RCLCPP_ERROR(
         get_logger(),
@@ -191,6 +199,19 @@ private:
   handle_cancel(
     const std::shared_ptr<GoalHandle>)
   {
+    const std::string mode =
+      get_parameter("mode")
+      .as_string();
+
+    if (mode == "reject_cancel") {
+      RCLCPP_WARN(
+        get_logger(),
+        "fake savo_nav rejected cancel request");
+
+      return
+        rclcpp_action::CancelResponse::REJECT;
+    }
+
     RCLCPP_INFO(
       get_logger(),
       "fake savo_nav accepted cancel request");
@@ -251,6 +272,61 @@ private:
       fractional * 1.0e9);
   }
 
+  bool wait_for_cancel_completion_delay(
+    const std::string & mode)
+  {
+    if (mode !=
+        "delayed_cancel_completion")
+    {
+      return true;
+    }
+
+    const std::int64_t configured_delay =
+      get_parameter(
+        "cancel_completion_delay_ms")
+      .as_int();
+
+    const std::int64_t delay_ms =
+      std::clamp<std::int64_t>(
+        configured_delay,
+        20,
+        60000);
+
+    RCLCPP_WARN(
+      get_logger(),
+      "delaying terminal canceled result "
+      "by %ld ms",
+      static_cast<long>(delay_ms));
+
+    constexpr std::int64_t slice_ms = 50;
+
+    std::int64_t waited_ms = 0;
+
+    while (waited_ms < delay_ms) {
+      if (stopping_.load() ||
+          !rclcpp::ok())
+      {
+        return false;
+      }
+
+      const std::int64_t remaining_ms =
+        delay_ms - waited_ms;
+
+      const std::int64_t current_slice =
+        std::min(
+          slice_ms,
+          remaining_ms);
+
+      std::this_thread::sleep_for(
+        std::chrono::milliseconds(
+          current_slice));
+
+      waited_ms += current_slice;
+    }
+
+    return true;
+  }
+
   void execute_goal(
     const std::shared_ptr<GoalHandle>
     goal_handle,
@@ -301,6 +377,13 @@ private:
       }
 
       if (goal_handle->is_canceling()) {
+        if (!wait_for_cancel_completion_delay(
+            mode))
+        {
+          active_.store(false);
+          return;
+        }
+
         auto result =
           std::make_shared<
           NavigateToPose::Result>();
@@ -385,6 +468,13 @@ private:
     }
 
     if (goal_handle->is_canceling()) {
+      if (!wait_for_cancel_completion_delay(
+          mode))
+      {
+        active_.store(false);
+        return;
+      }
+
       auto result =
         std::make_shared<
         NavigateToPose::Result>();

@@ -23,12 +23,21 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
+  <depend>ament_index_cpp</depend>
   <depend>rclcpp</depend>
   <depend>std_msgs</depend>
   <depend>diagnostic_msgs</depend>
 
   <build_depend>libasound2-dev</build_depend>
   <exec_depend>libasound2</exec_depend>
+
+  <build_depend>pkg-config</build_depend>
+  <build_depend>libpocketsphinx-dev</build_depend>
+  <build_depend>libsphinxbase-dev</build_depend>
+
+  <exec_depend>libpocketsphinx3</exec_depend>
+  <exec_depend>libsphinxbase3</exec_depend>
+  <exec_depend>pocketsphinx-en-us</exec_depend>
 
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>

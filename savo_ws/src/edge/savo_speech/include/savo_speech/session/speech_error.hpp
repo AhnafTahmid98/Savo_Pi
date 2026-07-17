@@ -27,7 +27,8 @@ enum class SpeechError : std::uint8_t
   TtsFailed = 15U,
   PlaybackFailed = 16U,
   SessionCanceled = 17U,
-  InternalError = 18U
+  InternalError = 18U,
+  AudioProcessingFailed = 19U
 };
 
 [[nodiscard]] constexpr std::string_view to_string(
@@ -90,6 +91,9 @@ enum class SpeechError : std::uint8_t
 
     case SpeechError::InternalError:
       return "internal_error";
+
+    case SpeechError::AudioProcessingFailed:
+      return "audio_processing_failed";
   }
 
   return "unknown";
@@ -108,6 +112,7 @@ enum class SpeechError : std::uint8_t
     case SpeechError::AudioNotInitialized:
     case SpeechError::CaptureDeviceUnavailable:
     case SpeechError::CaptureStreamFailed:
+    case SpeechError::AudioProcessingFailed:
     case SpeechError::PlaybackDeviceUnavailable:
     case SpeechError::PlaybackStreamFailed:
     case SpeechError::NoSpeechTimeout:

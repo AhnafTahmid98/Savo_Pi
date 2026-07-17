@@ -42,6 +42,16 @@ enum class VoicePhase
   Error
 };
 
+enum class NavigationPhase
+{
+  Idle,
+  Preparing,
+  Navigating,
+  Paused,
+  Arrived,
+  Error
+};
+
 enum class ScreenRequestSource
 {
   Touch,
@@ -73,6 +83,49 @@ struct PowerUiSourceState
   std::chrono::steady_clock::time_point last_update{};
   std::deque<double> voltage_history{};
 };
+
+struct NavigationUiState
+{
+  bool live{false};
+  std::string state{"WAITING"};
+  std::string message{"Waiting for navigation"};
+  std::string error_message{"Navigation unavailable"};
+};
+
+
+struct VoiceUiState
+{
+  bool live{false};
+
+  std::string wake_word_state{"MISSING"};
+  std::string microphone_state{"MISSING"};
+  std::string speech_link_state{"MISSING"};
+
+  std::string stt_route{"MISSING"};
+  std::string tts_route{"MISSING"};
+  std::string provider{"--"};
+  std::string intent{"--"};
+
+  std::string playback_state{"IDLE"};
+  std::string speaker_state{"MISSING"};
+
+  std::string transcript{"No transcript"};
+  std::string reply{"No reply"};
+  std::string error_message{"No voice error"};
+  std::string error_detail{"--"};
+
+  double input_level_percent{0.0};
+  double elapsed_seconds{0.0};
+  double playback_progress{0.0};
+
+  std::array<double, 24> waveform{{
+    0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+  }};
+};
+
 
 struct ObstacleDistanceUiState
 {
@@ -257,6 +310,12 @@ private:
   void render_page_shell(
     const ImageAsset & shell,
     const std::string & page_name);
+  void render_voice_page(VoicePhase phase);
+  void seed_voice_preview_data(VoicePhase phase);
+
+  void render_navigation_page(NavigationPhase phase);
+  void seed_navigation_preview_data(NavigationPhase phase);
+
   void render_status_page();
   void seed_status_preview_data();
   void render_power_page();
@@ -293,6 +352,21 @@ private:
 
   UiScreen active_screen_{UiScreen::Intro};
   VoicePhase voice_phase_{VoicePhase::Idle};
+
+  // Framebuffer-safe Voice animation clocks.
+  double voice_animation_time_seconds_{0.0};
+  double voice_phase_elapsed_seconds_{0.0};
+  VoicePhase rendered_voice_phase_{VoicePhase::Idle};
+
+  NavigationPhase navigation_phase_{NavigationPhase::Idle};
+  double navigation_animation_time_seconds_{0.0};
+  double navigation_phase_elapsed_seconds_{0.0};
+  NavigationPhase rendered_navigation_phase_{NavigationPhase::Idle};
+
+  // Framebuffer-safe Status and Power presentation clocks.
+  double status_animation_time_seconds_{0.0};
+  double power_animation_time_seconds_{0.0};
+
   std::optional<UiScreen> pending_screen_;
 
   StatusView status_view_{StatusView::Overview};
@@ -304,6 +378,8 @@ private:
   std::string resolved_intent_;
   std::string navigation_destination_;
 
+  VoiceUiState voice_ui_;
+  NavigationUiState navigation_ui_;
   StatusUiState status_ui_;
 
   PowerUiSourceState core_power_;

@@ -6,7 +6,7 @@
 namespace savo_speech::ros::topics
 {
 
-// Phase 1 runtime and diagnostic topics.
+// Runtime and diagnostic topics.
 inline constexpr std::string_view kReadiness{
   "/savo_speech/readiness"};
 

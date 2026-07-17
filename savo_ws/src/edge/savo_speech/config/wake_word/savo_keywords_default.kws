@@ -1,0 +1,23 @@
+# Primary English wake phrases
+hey savo /1e-25/
+hi savo /1e-25/
+hello savo /1e-30/
+okay savo /1e-30/
+ok savo /1e-30/
+yo savo /1e-25/
+wake up savo /1e-35/
+
+# Finnish wake phrases
+hei savo /1e-25/
+moi savo /1e-25/
+
+# Robot-specific phrases
+robot savo /1e-30/
+savo robot /1e-30/
+hey robot savo /1e-35/
+hello robot savo /1e-40/
+hei robot savo /1e-35/
+moi robot savo /1e-35/
+
+# Short canonical wake word: intentionally strict
+savo /1e-10/

@@ -355,6 +355,95 @@ TEST(ExplorationGoalHandoff, ActiveCancellation)
     exploration::GoalHandoffState::kCanceled);
 }
 
+TEST(
+  ExplorationGoalHandoff,
+  CancelingCanResolveSucceeded)
+{
+  exploration::GoalHandoffMachine machine;
+
+  ASSERT_TRUE(
+    machine.begin(
+      "frontier-cancel-rejected-success").accepted);
+
+  ASSERT_TRUE(
+    machine.mark_server_available().accepted);
+
+  ASSERT_TRUE(
+    machine.mark_accepted().accepted);
+
+  ASSERT_TRUE(
+    machine.mark_executing().accepted);
+
+  ASSERT_TRUE(
+    machine.request_cancel().accepted);
+
+  ASSERT_EQ(
+    machine.state(),
+    exploration::GoalHandoffState::kCanceling);
+
+  const auto result =
+    machine.mark_succeeded();
+
+  EXPECT_TRUE(result.accepted);
+
+  EXPECT_EQ(
+    machine.state(),
+    exploration::GoalHandoffState::kSucceeded);
+
+  EXPECT_FALSE(
+    exploration::is_active(
+      machine.state()));
+
+  EXPECT_TRUE(
+    exploration::is_terminal(
+      machine.state()));
+}
+
+TEST(
+  ExplorationGoalHandoff,
+  CancelingCanResolveAborted)
+{
+  exploration::GoalHandoffMachine machine;
+
+  ASSERT_TRUE(
+    machine.begin(
+      "frontier-cancel-rejected-abort").accepted);
+
+  ASSERT_TRUE(
+    machine.mark_server_available().accepted);
+
+  ASSERT_TRUE(
+    machine.mark_accepted().accepted);
+
+  ASSERT_TRUE(
+    machine.mark_executing().accepted);
+
+  ASSERT_TRUE(
+    machine.request_cancel().accepted);
+
+  ASSERT_EQ(
+    machine.state(),
+    exploration::GoalHandoffState::kCanceling);
+
+  const auto result =
+    machine.mark_aborted(
+      "savo_nav_aborted_after_cancel_rejection");
+
+  EXPECT_TRUE(result.accepted);
+
+  EXPECT_EQ(
+    machine.state(),
+    exploration::GoalHandoffState::kAborted);
+
+  EXPECT_FALSE(
+    exploration::is_active(
+      machine.state()));
+
+  EXPECT_TRUE(
+    exploration::is_terminal(
+      machine.state()));
+}
+
 TEST(ExplorationGoalHandoff, RejectsInvalidTransition)
 {
   exploration::GoalHandoffMachine machine;

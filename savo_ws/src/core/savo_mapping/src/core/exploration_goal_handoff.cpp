@@ -143,6 +143,7 @@ bool transition_allowed(
 
     case GoalHandoffState::kCanceling:
       return
+        to == GoalHandoffState::kSucceeded ||
         to == GoalHandoffState::kCanceled ||
         to == GoalHandoffState::kAborted ||
         to == GoalHandoffState::kTimedOut ||
