@@ -43,9 +43,9 @@ bool lifecycle_state_is_terminal_error(
 {
   return
     state_id ==
-      lifecycle_state_id::FINALIZED ||
+    lifecycle_state_id::FINALIZED ||
     state_id ==
-      lifecycle_state_id::ERROR_PROCESSING;
+    lifecycle_state_id::ERROR_PROCESSING;
 }
 
 ManualWorkflowState evaluate_manual_workflow_state(
@@ -72,15 +72,15 @@ ManualWorkflowState evaluate_manual_workflow_state(
   }
 
   if (lifecycle.startup_grace_expired &&
-      (!lifecycle.response_received ||
-       !lifecycle.response_fresh))
+    (!lifecycle.response_received ||
+    !lifecycle.response_fresh))
   {
     return ManualWorkflowState::ERROR;
   }
 
   if (lifecycle.state_id ==
-        lifecycle_state_id::INACTIVE &&
-      lifecycle.ever_active)
+    lifecycle_state_id::INACTIVE &&
+    lifecycle.ever_active)
   {
     return ManualWorkflowState::PAUSED;
   }

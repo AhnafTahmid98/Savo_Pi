@@ -62,10 +62,10 @@ MapQualityPlaceholder evaluate_map_quality_placeholder(
   }
 
   if (free_threshold_percent < 0 ||
-      free_threshold_percent > 100 ||
-      occupied_threshold_percent < 0 ||
-      occupied_threshold_percent > 100 ||
-      free_threshold_percent >= occupied_threshold_percent)
+    free_threshold_percent > 100 ||
+    occupied_threshold_percent < 0 ||
+    occupied_threshold_percent > 100 ||
+    free_threshold_percent >= occupied_threshold_percent)
   {
     return make_invalid_result(
       result,
@@ -77,8 +77,8 @@ MapQualityPlaceholder evaluate_map_quality_placeholder(
     static_cast<std::uint64_t>(height);
 
   if (expected_cell_count >
-      static_cast<std::uint64_t>(
-        std::numeric_limits<std::size_t>::max()))
+    static_cast<std::uint64_t>(
+      std::numeric_limits<std::size_t>::max()))
   {
     return make_invalid_result(
       result,
@@ -86,7 +86,7 @@ MapQualityPlaceholder evaluate_map_quality_placeholder(
   }
 
   if (occupancy_data.size() !=
-      static_cast<std::size_t>(expected_cell_count))
+    static_cast<std::size_t>(expected_cell_count))
   {
     return make_invalid_result(
       result,

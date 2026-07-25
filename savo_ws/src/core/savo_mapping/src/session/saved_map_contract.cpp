@@ -31,7 +31,7 @@ bool is_nonempty_regular_file(
   std::error_code error;
 
   if (!fs::is_regular_file(path, error) ||
-      error)
+    error)
   {
     return false;
   }
@@ -90,7 +90,7 @@ std::string required_string(
   const std::string & field)
 {
   if (!node[field] ||
-      !node[field].IsScalar())
+    !node[field].IsScalar())
   {
     throw std::runtime_error(
             "missing_or_invalid_field:" + field);
@@ -235,10 +235,10 @@ SavedMapVerification verify_saved_map_session(
     }
 
     if (!manifest["map_quality"] ||
-        !manifest["map_quality"]
-          ["structurally_valid"] ||
-        !manifest["map_quality"]
-          ["structurally_valid"].as<bool>())
+      !manifest["map_quality"]
+      ["structurally_valid"] ||
+      !manifest["map_quality"]
+      ["structurally_valid"].as<bool>())
     {
       return fail(
         std::move(result),
@@ -262,7 +262,7 @@ SavedMapVerification verify_saved_map_session(
     }
 
     if (!manifest["occupancy_grid"] ||
-        !manifest["pose_graph"])
+      !manifest["pose_graph"])
     {
       return fail(
         std::move(result),
@@ -341,7 +341,7 @@ SavedMapVerification verify_saved_map_session(
     }
 
     if (result.paths.grid_image.stem() !=
-        map_id_string)
+      map_id_string)
     {
       return fail(
         std::move(result),
@@ -353,7 +353,7 @@ SavedMapVerification verify_saved_map_session(
       .string();
 
     if (extension != ".pgm" &&
-        extension != ".png")
+      extension != ".png")
     {
       return fail(
         std::move(result),
@@ -385,8 +385,8 @@ SavedMapVerification verify_saved_map_session(
     }
 
     if (!grid_yaml["resolution"] ||
-        grid_yaml["resolution"].as<double>() <=
-        0.0)
+      grid_yaml["resolution"].as<double>() <=
+      0.0)
     {
       return fail(
         std::move(result),
@@ -394,8 +394,8 @@ SavedMapVerification verify_saved_map_session(
     }
 
     if (!grid_yaml["origin"] ||
-        !grid_yaml["origin"].IsSequence() ||
-        grid_yaml["origin"].size() != 3)
+      !grid_yaml["origin"].IsSequence() ||
+      grid_yaml["origin"].size() != 3)
     {
       return fail(
         std::move(result),

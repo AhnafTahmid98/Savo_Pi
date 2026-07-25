@@ -8,10 +8,10 @@ namespace
 {
 
 using savo_mapping::workflow::
-  ManualWorkflowState;
+ManualWorkflowState;
 
 using savo_mapping::workflow::
-  SlamLifecycleObservation;
+SlamLifecycleObservation;
 
 SlamLifecycleObservation active_observation()
 {

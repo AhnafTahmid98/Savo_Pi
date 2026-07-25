@@ -156,11 +156,11 @@ TEST(ProductionMapRelease, CreateVerifyPromoteDeactivate)
   const fs::path root =
     fs::temp_directory_path() /
     (
-      "savo_mapping_release_test_" +
-      std::to_string(
+    "savo_mapping_release_test_" +
+    std::to_string(
         std::chrono::steady_clock::now()
-        .time_since_epoch()
-        .count()));
+      .time_since_epoch()
+      .count()));
 
   const fs::path sessions =
     root / "sessions";

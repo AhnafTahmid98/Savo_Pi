@@ -14,37 +14,37 @@ std::string validate_simulated_room_scan_config(
   const SimulatedRoomScanConfig & config)
 {
   if (!std::isfinite(config.half_width_m) ||
-      config.half_width_m <= 0.0)
+    config.half_width_m <= 0.0)
   {
     return "half_width_m_must_be_positive";
   }
 
   if (!std::isfinite(config.half_height_m) ||
-      config.half_height_m <= 0.0)
+    config.half_height_m <= 0.0)
   {
     return "half_height_m_must_be_positive";
   }
 
   if (config.sample_count < 36 ||
-      config.sample_count > 1440)
+    config.sample_count > 1440)
   {
     return "sample_count_outside_supported_range";
   }
 
   if (!std::isfinite(config.range_min_m) ||
-      config.range_min_m <= 0.0)
+    config.range_min_m <= 0.0)
   {
     return "range_min_m_must_be_positive";
   }
 
   if (!std::isfinite(config.range_max_m) ||
-      config.range_max_m <= config.range_min_m)
+    config.range_max_m <= config.range_min_m)
   {
     return "range_max_m_must_exceed_range_min_m";
   }
 
   if (config.range_min_m >=
-      std::min(config.half_width_m, config.half_height_m))
+    std::min(config.half_width_m, config.half_height_m))
   {
     return "room_walls_are_below_range_min";
   }
@@ -107,8 +107,8 @@ std::vector<float> generate_rectangular_room_scan(
     std::numeric_limits<double>::infinity();
 
   for (std::size_t index = 0;
-       index < config.sample_count;
-       ++index)
+    index < config.sample_count;
+    ++index)
   {
     const double angle =
       scan_angle_min_rad() +
@@ -132,8 +132,8 @@ std::vector<float> generate_rectangular_room_scan(
       distance_to_horizontal_wall);
 
     if (!std::isfinite(distance) ||
-        distance < config.range_min_m ||
-        distance > config.range_max_m)
+      distance < config.range_min_m ||
+      distance > config.range_max_m)
     {
       ranges.push_back(
         std::numeric_limits<float>::infinity());

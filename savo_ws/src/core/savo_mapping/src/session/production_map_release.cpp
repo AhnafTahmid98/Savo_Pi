@@ -138,8 +138,8 @@ std::string sha256_file(
 
   using ContextPtr =
     std::unique_ptr<
-      EVP_MD_CTX,
-      decltype(&EVP_MD_CTX_free)>;
+    EVP_MD_CTX,
+    decltype(&EVP_MD_CTX_free)>;
 
   ContextPtr context{
     EVP_MD_CTX_new(),
@@ -190,7 +190,7 @@ std::string sha256_file(
   }
 
   std::array<unsigned char, EVP_MAX_MD_SIZE>
-    digest{};
+  digest{};
 
   unsigned int digest_size = 0U;
 
@@ -216,7 +216,7 @@ std::string sha256_file(
     output
       << std::setw(2)
       << static_cast<unsigned int>(
-           digest[index]);
+      digest[index]);
   }
 
   return output.str();
@@ -250,7 +250,7 @@ void copy_required_file(
   const fs::path & destination)
 {
   if (!fs::is_regular_file(source) ||
-      fs::file_size(source) == 0U)
+    fs::file_size(source) == 0U)
   {
     throw std::runtime_error(
             "source_artifact_missing_or_empty:" +
@@ -296,9 +296,9 @@ fs::path resolve_release_path(
     resolved.lexically_relative(root);
 
   if (relative.empty() ||
-      relative.begin() ==
-        relative.end() ||
-      *relative.begin() == "..")
+    relative.begin() ==
+    relative.end() ||
+    *relative.begin() == "..")
   {
     throw std::runtime_error(
             "release_artifact_path_escape");
@@ -322,7 +322,7 @@ void validate_source_approval(
 
   if (!manifest[
       "navigation_handoff_ready"] ||
-      !manifest[
+    !manifest[
       "navigation_handoff_ready"].as<bool>())
   {
     throw std::runtime_error(
@@ -333,10 +333,10 @@ void validate_source_approval(
     manifest["map_quality"];
 
   if (!quality ||
-      !quality["evaluated"] ||
-      !quality["evaluated"].as<bool>() ||
-      !quality["passed"] ||
-      !quality["passed"].as<bool>())
+    !quality["evaluated"] ||
+    !quality["evaluated"].as<bool>() ||
+    !quality["passed"] ||
+    !quality["passed"].as<bool>())
   {
     throw std::runtime_error(
             "map_quality_not_passed");
@@ -346,16 +346,16 @@ void validate_source_approval(
     manifest["navigation_handoff"];
 
   if (!handoff ||
-      !handoff["approved"] ||
-      !handoff["approved"].as<bool>())
+    !handoff["approved"] ||
+    !handoff["approved"].as<bool>())
   {
     throw std::runtime_error(
             "navigation_handoff_not_approved");
   }
 
   if (!handoff["map_id"] ||
-      handoff["map_id"].as<std::string>() !=
-        source.map_id)
+    handoff["map_id"].as<std::string>() !=
+    source.map_id)
   {
     throw std::runtime_error(
             "navigation_handoff_map_id_mismatch");
@@ -382,10 +382,10 @@ void validate_source_approval(
     quality_report.string());
 
   if (!report["passed"] ||
-      !report["passed"].as<bool>() ||
-      !report["map_id"] ||
-      report["map_id"].as<std::string>() !=
-        source.map_id)
+    !report["passed"].as<bool>() ||
+    !report["map_id"] ||
+    report["map_id"].as<std::string>() !=
+    source.map_id)
   {
     throw std::runtime_error(
             "quality_report_not_approved");
@@ -461,9 +461,9 @@ void append_catalog_entry(
     catalog["releases"])
   {
     if (entry["release_id"] &&
-        entry["release_id"]
-        .as<std::string>() ==
-        release.release_id)
+      entry["release_id"]
+      .as<std::string>() ==
+      release.release_id)
     {
       throw std::runtime_error(
               "release_already_cataloged");
@@ -546,7 +546,7 @@ bool valid_release_id(
   const std::string & release_id)
 {
   if (release_id.empty() ||
-      release_id.size() > 64U)
+    release_id.size() > 64U)
   {
     return false;
   }
@@ -613,10 +613,10 @@ ReleaseRecord create_release(
   const fs::path staging =
     releases_root /
     (
-      "." +
-      release_id +
-      ".staging." +
-      std::to_string(unix_now_ns()));
+    "." +
+    release_id +
+    ".staging." +
+    std::to_string(unix_now_ns()));
 
   fs::create_directories(staging);
 
@@ -855,8 +855,8 @@ ReleaseRecord verify_release(
       release.release_manifest.string());
 
     if (!manifest["schema_version"] ||
-        manifest["schema_version"].as<int>() !=
-          kReleaseSchemaVersion)
+      manifest["schema_version"].as<int>() !=
+      kReleaseSchemaVersion)
     {
       release.reason =
         "release_schema_mismatch";
@@ -868,8 +868,8 @@ ReleaseRecord verify_release(
       manifest["schema_version"].as<int>();
 
     if (!manifest["release_id"] ||
-        manifest["release_id"].as<std::string>() !=
-          release_id)
+      manifest["release_id"].as<std::string>() !=
+      release_id)
     {
       release.reason =
         "release_id_mismatch";
@@ -878,7 +878,7 @@ ReleaseRecord verify_release(
     }
 
     if (!manifest["immutable"] ||
-        !manifest["immutable"].as<bool>())
+      !manifest["immutable"].as<bool>())
     {
       release.reason =
         "release_not_immutable";
@@ -900,7 +900,7 @@ ReleaseRecord verify_release(
       manifest["artifacts"];
 
     if (!artifacts ||
-        !artifacts.IsSequence())
+      !artifacts.IsSequence())
     {
       release.reason =
         "release_artifacts_missing";
@@ -941,7 +941,7 @@ ReleaseRecord verify_release(
 
       if (fs::file_size(
           artifact.path) !=
-          artifact.size_bytes)
+        artifact.size_bytes)
       {
         release.reason =
           "release_artifact_size_mismatch:" +
@@ -952,7 +952,7 @@ ReleaseRecord verify_release(
 
       if (sha256_file(
           artifact.path) !=
-          artifact.sha256)
+        artifact.sha256)
       {
         release.reason =
           "release_artifact_hash_mismatch:" +
@@ -996,11 +996,11 @@ ReleaseRecord verify_release(
     }
 
     if (release.map_yaml.empty() ||
-        release.map_image.empty() ||
-        release.posegraph.empty() ||
-        release.data.empty() ||
-        release.quality_report.empty() ||
-        release.source_manifest.empty())
+      release.map_image.empty() ||
+      release.posegraph.empty() ||
+      release.data.empty() ||
+      release.quality_report.empty() ||
+      release.source_manifest.empty())
     {
       release.reason =
         "required_release_artifact_missing";
@@ -1013,10 +1013,10 @@ ReleaseRecord verify_release(
       release.map_yaml.string());
 
     if (!map_yaml["image"] ||
-        map_yaml["image"].as<std::string>() !=
-          release.map_image
-          .filename()
-          .string())
+      map_yaml["image"].as<std::string>() !=
+      release.map_image
+      .filename()
+      .string())
     {
       release.reason =
         "release_map_image_contract_invalid";
@@ -1029,10 +1029,10 @@ ReleaseRecord verify_release(
       release.quality_report.string());
 
     if (!quality["passed"] ||
-        !quality["passed"].as<bool>() ||
-        !quality["map_id"] ||
-        quality["map_id"].as<std::string>() !=
-          release.map_id)
+      !quality["passed"].as<bool>() ||
+      !quality["map_id"] ||
+      quality["map_id"].as<std::string>() !=
+      release.map_id)
     {
       release.reason =
         "release_quality_contract_invalid";
@@ -1049,7 +1049,7 @@ ReleaseRecord verify_release(
     release.reason =
       std::string{
       "release_verification_error:"} +
-      exception.what();
+    exception.what();
 
     return release;
   }
@@ -1268,7 +1268,7 @@ ActiveMapContract read_active_map(
 
     if (sha256_file(
         active.release_manifest) !=
-        active.release_manifest_sha256)
+      active.release_manifest_sha256)
     {
       active.active = false;
       active.reason =
@@ -1287,7 +1287,7 @@ ActiveMapContract read_active_map(
     active.reason =
       std::string{
       "active_map_contract_error:"} +
-      exception.what();
+    exception.what();
 
     return active;
   }
@@ -1386,7 +1386,7 @@ std::string catalog_to_json(
     bool first = true;
 
     if (releases &&
-        releases.IsSequence())
+      releases.IsSequence())
     {
       for (const auto & entry :
         releases)
@@ -1402,19 +1402,19 @@ std::string catalog_to_json(
           << "\"release_id\":\""
           << escape_json(
                entry["release_id"]
-               .as<std::string>())
+          .as<std::string>())
           << "\",\"map_id\":\""
           << escape_json(
                entry["map_id"]
-               .as<std::string>())
+          .as<std::string>())
           << "\",\"frame_id\":\""
           << escape_json(
                entry["frame_id"]
-               .as<std::string>())
+          .as<std::string>())
           << "\",\"release_manifest\":\""
           << escape_json(
                entry["release_manifest"]
-               .as<std::string>())
+          .as<std::string>())
           << "\"}";
       }
     }

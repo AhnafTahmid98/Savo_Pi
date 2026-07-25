@@ -156,8 +156,8 @@ double require_parameter_in_closed_range(
   require_valid_name(name);
 
   if (!is_finite_number(value) ||
-      !is_finite_number(minimum) ||
-      !is_finite_number(maximum))
+    !is_finite_number(minimum) ||
+    !is_finite_number(maximum))
   {
     throw std::invalid_argument(
             "parameter value and range bounds must be finite");

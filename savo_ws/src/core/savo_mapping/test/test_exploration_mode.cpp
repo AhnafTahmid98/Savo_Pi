@@ -7,18 +7,26 @@
 TEST(ExplorationModeContract, ConvertsModeToStableString)
 {
   EXPECT_EQ(std::string{savo_mapping::to_string(savo_mapping::ExplorationMode::Idle)}, "idle");
-  EXPECT_EQ(std::string{savo_mapping::to_string(savo_mapping::ExplorationMode::Frontier)}, "frontier");
-  EXPECT_EQ(std::string{savo_mapping::to_string(savo_mapping::ExplorationMode::Scan360)}, "scan360");
-  EXPECT_EQ(std::string{savo_mapping::to_string(savo_mapping::ExplorationMode::Coverage)}, "coverage");
-  EXPECT_EQ(std::string{savo_mapping::to_string(savo_mapping::ExplorationMode::SemanticReview)}, "semantic_review");
+  EXPECT_EQ(std::string{savo_mapping::to_string(savo_mapping::ExplorationMode::Frontier)},
+    "frontier");
+  EXPECT_EQ(std::string{savo_mapping::to_string(savo_mapping::ExplorationMode::Scan360)},
+    "scan360");
+  EXPECT_EQ(std::string{savo_mapping::to_string(savo_mapping::ExplorationMode::Coverage)},
+    "coverage");
+  EXPECT_EQ(std::string{savo_mapping::to_string(savo_mapping::ExplorationMode::SemanticReview)},
+    "semantic_review");
 }
 
 TEST(ExplorationModeContract, ParsesStableStringsToModes)
 {
-  EXPECT_EQ(savo_mapping::exploration_mode_from_string("idle"), savo_mapping::ExplorationMode::Idle);
-  EXPECT_EQ(savo_mapping::exploration_mode_from_string("frontier"), savo_mapping::ExplorationMode::Frontier);
-  EXPECT_EQ(savo_mapping::exploration_mode_from_string("scan360"), savo_mapping::ExplorationMode::Scan360);
-  EXPECT_EQ(savo_mapping::exploration_mode_from_string("coverage"), savo_mapping::ExplorationMode::Coverage);
+  EXPECT_EQ(savo_mapping::exploration_mode_from_string("idle"),
+    savo_mapping::ExplorationMode::Idle);
+  EXPECT_EQ(savo_mapping::exploration_mode_from_string("frontier"),
+    savo_mapping::ExplorationMode::Frontier);
+  EXPECT_EQ(savo_mapping::exploration_mode_from_string("scan360"),
+    savo_mapping::ExplorationMode::Scan360);
+  EXPECT_EQ(savo_mapping::exploration_mode_from_string("coverage"),
+    savo_mapping::ExplorationMode::Coverage);
   EXPECT_EQ(
     savo_mapping::exploration_mode_from_string("semantic_review"),
     savo_mapping::ExplorationMode::SemanticReview);
@@ -39,7 +47,8 @@ TEST(ExplorationModeContract, ClassifiesNavigationGoalStrategies)
   EXPECT_TRUE(savo_mapping::requires_navigation_goal(savo_mapping::ExplorationMode::Frontier));
   EXPECT_FALSE(savo_mapping::requires_navigation_goal(savo_mapping::ExplorationMode::Scan360));
   EXPECT_TRUE(savo_mapping::requires_navigation_goal(savo_mapping::ExplorationMode::Coverage));
-  EXPECT_FALSE(savo_mapping::requires_navigation_goal(savo_mapping::ExplorationMode::SemanticReview));
+  EXPECT_FALSE(savo_mapping::requires_navigation_goal(
+    savo_mapping::ExplorationMode::SemanticReview));
 }
 
 TEST(ExplorationModeContract, ClassifiesRotationCommandStrategies)
@@ -48,16 +57,21 @@ TEST(ExplorationModeContract, ClassifiesRotationCommandStrategies)
   EXPECT_FALSE(savo_mapping::requires_rotation_command(savo_mapping::ExplorationMode::Frontier));
   EXPECT_TRUE(savo_mapping::requires_rotation_command(savo_mapping::ExplorationMode::Scan360));
   EXPECT_FALSE(savo_mapping::requires_rotation_command(savo_mapping::ExplorationMode::Coverage));
-  EXPECT_FALSE(savo_mapping::requires_rotation_command(savo_mapping::ExplorationMode::SemanticReview));
+  EXPECT_FALSE(savo_mapping::requires_rotation_command(
+    savo_mapping::ExplorationMode::SemanticReview));
 }
 
 TEST(ExplorationModeContract, ClassifiesSemanticConfirmationStrategies)
 {
   EXPECT_FALSE(savo_mapping::requires_semantic_confirmation(savo_mapping::ExplorationMode::Idle));
-  EXPECT_FALSE(savo_mapping::requires_semantic_confirmation(savo_mapping::ExplorationMode::Frontier));
-  EXPECT_FALSE(savo_mapping::requires_semantic_confirmation(savo_mapping::ExplorationMode::Scan360));
-  EXPECT_FALSE(savo_mapping::requires_semantic_confirmation(savo_mapping::ExplorationMode::Coverage));
-  EXPECT_TRUE(savo_mapping::requires_semantic_confirmation(savo_mapping::ExplorationMode::SemanticReview));
+  EXPECT_FALSE(savo_mapping::requires_semantic_confirmation(
+    savo_mapping::ExplorationMode::Frontier));
+  EXPECT_FALSE(savo_mapping::requires_semantic_confirmation(
+    savo_mapping::ExplorationMode::Scan360));
+  EXPECT_FALSE(savo_mapping::requires_semantic_confirmation(
+    savo_mapping::ExplorationMode::Coverage));
+  EXPECT_TRUE(savo_mapping::requires_semantic_confirmation(
+    savo_mapping::ExplorationMode::SemanticReview));
 }
 
 TEST(ExplorationModeContract, ClassifiesActiveExplorationModes)
@@ -66,5 +80,6 @@ TEST(ExplorationModeContract, ClassifiesActiveExplorationModes)
   EXPECT_TRUE(savo_mapping::is_active_exploration_mode(savo_mapping::ExplorationMode::Frontier));
   EXPECT_TRUE(savo_mapping::is_active_exploration_mode(savo_mapping::ExplorationMode::Scan360));
   EXPECT_TRUE(savo_mapping::is_active_exploration_mode(savo_mapping::ExplorationMode::Coverage));
-  EXPECT_TRUE(savo_mapping::is_active_exploration_mode(savo_mapping::ExplorationMode::SemanticReview));
+  EXPECT_TRUE(savo_mapping::is_active_exploration_mode(
+    savo_mapping::ExplorationMode::SemanticReview));
 }

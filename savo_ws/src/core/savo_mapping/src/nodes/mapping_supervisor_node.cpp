@@ -575,7 +575,7 @@ private:
         tf2::TimePointZero);
 
       if (require_fresh_stamp &&
-          !transform_stamp_is_fresh(transform))
+        !transform_stamp_is_fresh(transform))
       {
         failure_reason =
           "stale_transform:" + target_frame + "<-" + source_frame;
@@ -607,7 +607,7 @@ private:
     }
 
     if (require_map_to_odom_ &&
-        !check_transform(
+      !check_transform(
           map_frame_,
           odom_frame_,
           require_fresh_map_to_odom_,
@@ -617,7 +617,7 @@ private:
     }
 
     if (require_odom_to_base_ &&
-        !check_transform(
+      !check_transform(
           odom_frame_,
           base_frame_,
           require_fresh_odom_to_base_,
@@ -627,7 +627,7 @@ private:
     }
 
     if (require_base_to_lidar_ &&
-        !check_transform(
+      !check_transform(
           base_frame_,
           scan_frame,
           require_fresh_base_to_lidar_,

@@ -129,8 +129,8 @@ private:
         *this,
         "lifecycle.get_state_service",
         std::string{
-          slam_lifecycle_topics::
-          GET_STATE_SERVICE}));
+        slam_lifecycle_topics::
+        GET_STATE_SERVICE}));
 
     readiness_topic_ = require_non_empty(
       "topics.readiness",
@@ -138,7 +138,7 @@ private:
         *this,
         "topics.readiness",
         std::string{
-          slam_lifecycle_topics::READINESS}));
+        slam_lifecycle_topics::READINESS}));
 
     session_state_topic_ = require_non_empty(
       "topics.session_state",
@@ -146,7 +146,7 @@ private:
         *this,
         "topics.session_state",
         std::string{
-          slam_lifecycle_topics::SESSION_STATE}));
+        slam_lifecycle_topics::SESSION_STATE}));
 
     lifecycle_state_topic_ = require_non_empty(
       "topics.lifecycle_state",
@@ -154,8 +154,8 @@ private:
         *this,
         "topics.lifecycle_state",
         std::string{
-          slam_lifecycle_topics::
-          LIFECYCLE_STATE}));
+        slam_lifecycle_topics::
+        LIFECYCLE_STATE}));
 
     health_topic_ = require_non_empty(
       "topics.health",
@@ -163,7 +163,7 @@ private:
         *this,
         "topics.health",
         std::string{
-          slam_lifecycle_topics::HEALTH}));
+        slam_lifecycle_topics::HEALTH}));
 
     manual_workflow_state_topic_ =
       require_non_empty(
@@ -172,8 +172,8 @@ private:
         *this,
         "topics.manual_workflow_state",
         std::string{
-          slam_lifecycle_topics::
-          MANUAL_WORKFLOW_STATE}));
+        slam_lifecycle_topics::
+        MANUAL_WORKFLOW_STATE}));
   }
 
   void create_interfaces()
@@ -244,14 +244,14 @@ private:
     const auto now = SteadyClock::now();
 
     if (request_pending_ &&
-        pending_since_.has_value())
+      pending_since_.has_value())
     {
       const double pending_age_s =
         std::chrono::duration<double>(
         now - *pending_since_).count();
 
       if (pending_age_s >
-          response_timeout_s_)
+        response_timeout_s_)
       {
         request_pending_ = false;
         pending_since_.reset();
@@ -259,7 +259,7 @@ private:
     }
 
     if (service_available_ &&
-        !request_pending_)
+      !request_pending_)
     {
       send_get_state_request();
     }
@@ -294,7 +294,7 @@ private:
     rclcpp::Client<GetState>::SharedFuture future)
   {
     if (request_id <
-        latest_completed_request_id_)
+      latest_completed_request_id_)
     {
       return;
     }
@@ -391,15 +391,15 @@ private:
     }
 
     if (observation.state_id ==
-        workflow::lifecycle_state_id::
-        ERROR_PROCESSING)
+      workflow::lifecycle_state_id::
+      ERROR_PROCESSING)
     {
       return "lifecycle_error_processing";
     }
 
     if (observation.state_id ==
-        workflow::lifecycle_state_id::
-        FINALIZED)
+      workflow::lifecycle_state_id::
+      FINALIZED)
     {
       return "lifecycle_finalized";
     }
@@ -453,7 +453,7 @@ private:
       << lifecycle_healthy
       << ",\"state_id\":"
       << static_cast<unsigned int>(
-        observation.state_id)
+      observation.state_id)
       << ",\"state\":\""
       << lifecycle_state_label_
       << "\",\"reason\":\""
@@ -505,10 +505,10 @@ private:
   const SteadyClock::time_point started_at_;
 
   std::optional<SteadyClock::time_point>
-    last_response_at_;
+  last_response_at_;
 
   std::optional<SteadyClock::time_point>
-    pending_since_;
+  pending_since_;
 
   rclcpp::Client<GetState>::SharedPtr
     get_state_client_;

@@ -92,7 +92,7 @@ int main(int argc, char ** argv)
   try {
     const auto node =
       std::make_shared<
-        savo_mapping::SavedMapVerifierNode>();
+      savo_mapping::SavedMapVerifierNode>();
 
     const int result = node->verify();
 

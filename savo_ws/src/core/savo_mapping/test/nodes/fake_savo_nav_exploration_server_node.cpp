@@ -26,7 +26,7 @@ public:
 
   using GoalHandle =
     rclcpp_action::ServerGoalHandle<
-      NavigateToPose>;
+    NavigateToPose>;
 
   FakeSavoNavExplorationServerNode()
   : Node(
@@ -72,23 +72,23 @@ public:
 
     action_server_ =
       rclcpp_action::create_server<
-        NavigateToPose>(
+      NavigateToPose>(
         this,
         action_name_,
         std::bind(
           &FakeSavoNavExplorationServerNode::
-          handle_goal,
+        handle_goal,
           this,
           std::placeholders::_1,
           std::placeholders::_2),
         std::bind(
           &FakeSavoNavExplorationServerNode::
-          handle_cancel,
+        handle_cancel,
           this,
           std::placeholders::_1),
         std::bind(
           &FakeSavoNavExplorationServerNode::
-          handle_accepted,
+        handle_accepted,
           this,
           std::placeholders::_1));
 
@@ -154,10 +154,10 @@ private:
     }
 
     if (mode != "success" &&
-        mode != "abort" &&
-        mode != "delayed_accept" &&
-        mode != "delayed_cancel_completion" &&
-        mode != "reject_cancel")
+      mode != "abort" &&
+      mode != "delayed_accept" &&
+      mode != "delayed_cancel_completion" &&
+      mode != "reject_cancel")
     {
       RCLCPP_ERROR(
         get_logger(),
@@ -276,7 +276,7 @@ private:
     const std::string & mode)
   {
     if (mode !=
-        "delayed_cancel_completion")
+      "delayed_cancel_completion")
     {
       return true;
     }
@@ -304,7 +304,7 @@ private:
 
     while (waited_ms < delay_ms) {
       if (stopping_.load() ||
-          !rclcpp::ok())
+        !rclcpp::ok())
       {
         return false;
       }
@@ -370,7 +370,7 @@ private:
       ++step)
     {
       if (stopping_.load() ||
-          !rclcpp::ok())
+        !rclcpp::ok())
       {
         active_.store(false);
         return;
@@ -404,9 +404,9 @@ private:
 
       const double progress =
         static_cast<double>(
-          step + 1) /
+        step + 1) /
         static_cast<double>(
-          steps);
+        steps);
 
       const auto now =
         std::chrono::steady_clock::now();
@@ -418,11 +418,11 @@ private:
 
       const double remaining =
         static_cast<double>(
-          steps - step - 1) *
+        steps - step - 1) *
         (
-          static_cast<double>(
-            period_ms) /
-          1000.0
+        static_cast<double>(
+          period_ms) /
+        1000.0
         );
 
       auto feedback =

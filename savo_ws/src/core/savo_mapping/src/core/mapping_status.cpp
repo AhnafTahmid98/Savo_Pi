@@ -112,7 +112,8 @@ bool is_status_consistent(const MappingStatus & status)
   }
 
   if (is_session_finished(status.session_state) &&
-      is_active_phase(status.workflow_phase)) {
+    is_active_phase(status.workflow_phase))
+  {
     return false;
   }
 

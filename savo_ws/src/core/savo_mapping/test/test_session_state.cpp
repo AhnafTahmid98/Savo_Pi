@@ -12,19 +12,22 @@ TEST(SessionStateContract, ConvertsStateToStableString)
   EXPECT_EQ(std::string{savo_mapping::to_string(savo_mapping::SessionState::Paused)}, "paused");
   EXPECT_EQ(std::string{savo_mapping::to_string(savo_mapping::SessionState::Saving)}, "saving");
   EXPECT_EQ(std::string{savo_mapping::to_string(savo_mapping::SessionState::Saved)}, "saved");
-  EXPECT_EQ(std::string{savo_mapping::to_string(savo_mapping::SessionState::Cancelled)}, "cancelled");
+  EXPECT_EQ(std::string{savo_mapping::to_string(savo_mapping::SessionState::Cancelled)},
+    "cancelled");
   EXPECT_EQ(std::string{savo_mapping::to_string(savo_mapping::SessionState::Failed)}, "failed");
 }
 
 TEST(SessionStateContract, ParsesStableStringsToStates)
 {
   EXPECT_EQ(savo_mapping::session_state_from_string("idle"), savo_mapping::SessionState::Idle);
-  EXPECT_EQ(savo_mapping::session_state_from_string("starting"), savo_mapping::SessionState::Starting);
+  EXPECT_EQ(savo_mapping::session_state_from_string("starting"),
+    savo_mapping::SessionState::Starting);
   EXPECT_EQ(savo_mapping::session_state_from_string("active"), savo_mapping::SessionState::Active);
   EXPECT_EQ(savo_mapping::session_state_from_string("paused"), savo_mapping::SessionState::Paused);
   EXPECT_EQ(savo_mapping::session_state_from_string("saving"), savo_mapping::SessionState::Saving);
   EXPECT_EQ(savo_mapping::session_state_from_string("saved"), savo_mapping::SessionState::Saved);
-  EXPECT_EQ(savo_mapping::session_state_from_string("cancelled"), savo_mapping::SessionState::Cancelled);
+  EXPECT_EQ(savo_mapping::session_state_from_string("cancelled"),
+    savo_mapping::SessionState::Cancelled);
   EXPECT_EQ(savo_mapping::session_state_from_string("failed"), savo_mapping::SessionState::Failed);
 }
 

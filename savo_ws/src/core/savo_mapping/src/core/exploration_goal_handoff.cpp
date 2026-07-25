@@ -91,14 +91,14 @@ bool transition_allowed(
   }
 
   if ((from == GoalHandoffState::kIdle ||
-       is_terminal(from)) &&
-      to == GoalHandoffState::kWaitingForServer)
+    is_terminal(from)) &&
+    to == GoalHandoffState::kWaitingForServer)
   {
     return true;
   }
 
   if (is_terminal(from) &&
-      to == GoalHandoffState::kIdle)
+    to == GoalHandoffState::kIdle)
   {
     return true;
   }
@@ -235,9 +235,9 @@ GoalHandoffMachine::request_cancel(
   const std::string & reason)
 {
   if (state_ ==
-      GoalHandoffState::kWaitingForServer ||
-      state_ ==
-      GoalHandoffState::kSending)
+    GoalHandoffState::kWaitingForServer ||
+    state_ ==
+    GoalHandoffState::kSending)
   {
     return transition(
       GoalHandoffState::kCanceled,

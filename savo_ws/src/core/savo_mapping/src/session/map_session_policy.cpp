@@ -89,7 +89,7 @@ std::string validate_output_root(
   }
 
   for (const auto & component :
-       output_root.lexically_normal())
+    output_root.lexically_normal())
   {
     if (component == "..") {
       return "output_root_must_not_contain_parent_traversal";
@@ -161,19 +161,19 @@ std::string validate_save_readiness(
   bool require_structurally_valid_map)
 {
   if (require_mapping_ready &&
-      !readiness.mapping_ready)
+    !readiness.mapping_ready)
   {
     return "mapping_is_not_ready";
   }
 
   if (require_slam_active &&
-      !readiness.slam_active)
+    !readiness.slam_active)
   {
     return "slam_toolbox_is_not_active";
   }
 
   if (require_structurally_valid_map &&
-      !readiness.map_structurally_valid)
+    !readiness.map_structurally_valid)
   {
     return "map_is_not_structurally_valid";
   }

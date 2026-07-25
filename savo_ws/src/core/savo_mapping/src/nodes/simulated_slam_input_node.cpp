@@ -357,11 +357,11 @@ private:
 
   std::unique_ptr<
     tf2_ros::TransformBroadcaster>
-    transform_broadcaster_;
+  transform_broadcaster_;
 
   std::unique_ptr<
     tf2_ros::StaticTransformBroadcaster>
-    static_transform_broadcaster_;
+  static_transform_broadcaster_;
 
   rclcpp::TimerBase::SharedPtr publish_timer_;
 };

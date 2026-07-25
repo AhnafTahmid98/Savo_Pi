@@ -175,8 +175,8 @@ std::size_t calculate_largest_free_component(
   const std::vector<std::int8_t> & data)
 {
   if (width == 0U ||
-      height == 0U ||
-      data.size() != width * height)
+    height == 0U ||
+    data.size() != width * height)
   {
     return 0U;
   }
@@ -192,7 +192,7 @@ std::size_t calculate_largest_free_component(
     ++start)
   {
     if (visited[start] ||
-        data[start] != 0)
+      data[start] != 0)
     {
       continue;
     }
@@ -220,7 +220,7 @@ std::size_t calculate_largest_free_component(
         [&](const std::size_t neighbour)
         {
           if (!visited[neighbour] &&
-              data[neighbour] == 0)
+            data[neighbour] == 0)
           {
             visited[neighbour] = true;
             pending.push_back(neighbour);
@@ -389,7 +389,7 @@ QualityEvaluation evaluate_occupancy_grid(
     metrics.width * metrics.height;
 
   if (grid.data.size() !=
-      metrics.total_cells)
+    metrics.total_cells)
   {
     evaluation.reason =
       "quality_failed";
@@ -562,7 +562,7 @@ QualityEvaluation evaluate_saved_map_session(
     grid);
 
   if (status !=
-      nav2_map_server::LOAD_MAP_SUCCESS)
+    nav2_map_server::LOAD_MAP_SUCCESS)
   {
     evaluation.reason =
       "saved_map_load_failed";
@@ -633,7 +633,7 @@ void persist_quality_evaluation(
     evaluation.failed_checks)
   {
     map_quality["failed_checks"]
-      .push_back(check);
+    .push_back(check);
   }
 
   manifest["navigation_handoff_ready"] =
@@ -695,7 +695,7 @@ NavigationHandoff read_navigation_handoff(
   handoff.ready =
     manifest["navigation_handoff_ready"] &&
     manifest[
-      "navigation_handoff_ready"].as<bool>();
+    "navigation_handoff_ready"].as<bool>();
 
   const YAML::Node contract =
     manifest["navigation_handoff"];
@@ -710,7 +710,7 @@ NavigationHandoff read_navigation_handoff(
   if (contract["contract_version"]) {
     handoff.contract_version =
       contract[
-        "contract_version"].as<int>();
+      "contract_version"].as<int>();
   }
 
   if (contract["approved"]) {
@@ -761,10 +761,10 @@ NavigationHandoff set_navigation_handoff(
 
   if (approved) {
     if (!map_quality ||
-        !map_quality["evaluated"] ||
-        !map_quality["evaluated"].as<bool>() ||
-        !map_quality["passed"] ||
-        !map_quality["passed"].as<bool>())
+      !map_quality["evaluated"] ||
+      !map_quality["evaluated"].as<bool>() ||
+      !map_quality["passed"] ||
+      !map_quality["passed"].as<bool>())
     {
       throw std::runtime_error(
               "quality_evaluation_not_passed");
@@ -791,10 +791,10 @@ NavigationHandoff set_navigation_handoff(
       report_path.string());
 
     if (!report["passed"] ||
-        !report["passed"].as<bool>() ||
-        !report["map_id"] ||
-        report["map_id"].as<std::string>() !=
-          verification.map_id)
+      !report["passed"].as<bool>() ||
+      !report["map_id"] ||
+      report["map_id"].as<std::string>() !=
+      verification.map_id)
     {
       throw std::runtime_error(
               "quality_report_not_approved");
@@ -824,7 +824,7 @@ NavigationHandoff set_navigation_handoff(
     verification.paths.grid_yaml.string();
 
   if (map_quality &&
-      map_quality["report"])
+    map_quality["report"])
   {
     contract["quality_report"] =
       map_quality["report"].as<std::string>();
@@ -880,7 +880,7 @@ std::string quality_evaluation_to_json(
     << evaluation.metrics.known_ratio
     << ",\"largest_free_component_ratio\":"
     << evaluation.metrics
-       .largest_free_component_ratio
+    .largest_free_component_ratio
     << ",\"mapped_area_m2\":"
     << evaluation.metrics.mapped_area_m2
     << "},\"failed_checks\":[";

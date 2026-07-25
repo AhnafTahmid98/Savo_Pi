@@ -31,7 +31,7 @@ public:
 
   using ActionClient =
     rclcpp_action::Client<
-      NavigateToPose>;
+    NavigateToPose>;
 
   using GoalHandle =
     ActionClient::GoalHandle;
@@ -89,7 +89,7 @@ public:
 
     if (!std::isfinite(
         server_wait_timeout_sec_) ||
-        server_wait_timeout_sec_ <= 0.0)
+      server_wait_timeout_sec_ <= 0.0)
     {
       throw std::invalid_argument(
               "server_wait_timeout_must_be_positive");
@@ -97,7 +97,7 @@ public:
 
     if (!std::isfinite(
         goal_response_timeout_sec_) ||
-        goal_response_timeout_sec_ <= 0.0)
+      goal_response_timeout_sec_ <= 0.0)
     {
       throw std::invalid_argument(
               "goal_response_timeout_must_be_positive");
@@ -105,7 +105,7 @@ public:
 
     if (!std::isfinite(
         execution_timeout_sec_) ||
-        execution_timeout_sec_ <= 0.0)
+      execution_timeout_sec_ <= 0.0)
     {
       throw std::invalid_argument(
               "execution_timeout_must_be_positive");
@@ -113,7 +113,7 @@ public:
 
     if (!std::isfinite(
         feedback_stale_timeout_sec_) ||
-        feedback_stale_timeout_sec_ <= 0.0)
+      feedback_stale_timeout_sec_ <= 0.0)
     {
       throw std::invalid_argument(
               "feedback_stale_timeout_must_be_positive");
@@ -121,14 +121,14 @@ public:
 
     if (!std::isfinite(
         cancel_timeout_sec_) ||
-        cancel_timeout_sec_ <= 0.0)
+      cancel_timeout_sec_ <= 0.0)
     {
       throw std::invalid_argument(
               "cancel_timeout_must_be_positive");
     }
 
     if (poll_period_ms < 20 ||
-        poll_period_ms > 1000)
+      poll_period_ms > 1000)
     {
       throw std::invalid_argument(
               "server_poll_period_out_of_range");
@@ -142,47 +142,47 @@ public:
 
     state_publisher_ =
       create_publisher<
-        std_msgs::msg::String>(
+      std_msgs::msg::String>(
         exploration::kGoalStateTopic,
         state_qos);
 
     status_publisher_ =
       create_publisher<
-        std_msgs::msg::String>(
+      std_msgs::msg::String>(
         exploration::kGoalStatusTopic,
         state_qos);
 
     feedback_publisher_ =
       create_publisher<
-        std_msgs::msg::String>(
+      std_msgs::msg::String>(
         exploration::kGoalFeedbackTopic,
         rclcpp::QoS(10).reliable());
 
     selected_goal_subscription_ =
       create_subscription<
-        geometry_msgs::msg::PoseStamped>(
+      geometry_msgs::msg::PoseStamped>(
         exploration::kSelectedGoalTopic,
         rclcpp::QoS(1).reliable(),
         std::bind(
           &ExplorationGoalHandoffNode::
-          handle_selected_goal,
+        handle_selected_goal,
           this,
           std::placeholders::_1));
 
     cancel_service_ =
       create_service<
-        std_srvs::srv::Trigger>(
+      std_srvs::srv::Trigger>(
         exploration::kGoalCancelService,
         std::bind(
           &ExplorationGoalHandoffNode::
-          handle_cancel,
+        handle_cancel,
           this,
           std::placeholders::_1,
           std::placeholders::_2));
 
     action_client_ =
       rclcpp_action::create_client<
-        NavigateToPose>(
+      NavigateToPose>(
         this,
         exploration::kExplorationActionName);
 
@@ -192,7 +192,7 @@ public:
           poll_period_ms),
         std::bind(
           &ExplorationGoalHandoffNode::
-          check_handoff_watchdog,
+        check_handoff_watchdog,
           this));
 
     publish_state();
@@ -266,7 +266,7 @@ private:
     }
 
     if (pose.header.frame_id !=
-        expected_frame_)
+      expected_frame_)
     {
       reason =
         "goal_frame_mismatch:" +
@@ -282,8 +282,8 @@ private:
       pose.pose.orientation;
 
     if (!finite(position.x) ||
-        !finite(position.y) ||
-        !finite(position.z))
+      !finite(position.y) ||
+      !finite(position.z))
     {
       reason =
         "goal_position_not_finite";
@@ -292,9 +292,9 @@ private:
     }
 
     if (!finite(orientation.x) ||
-        !finite(orientation.y) ||
-        !finite(orientation.z) ||
-        !finite(orientation.w))
+      !finite(orientation.y) ||
+      !finite(orientation.z) ||
+      !finite(orientation.w))
     {
       reason =
         "goal_orientation_not_finite";
@@ -400,12 +400,12 @@ private:
       now();
 
     if (state ==
-        exploration::
-        GoalHandoffState::
-        kWaitingForServer)
+      exploration::
+      GoalHandoffState::
+      kWaitingForServer)
     {
       if (!pending_goal_.has_value() ||
-          !pending_started_.has_value())
+        !pending_started_.has_value())
       {
         publish_transition(
           machine_.mark_error(
@@ -416,7 +416,7 @@ private:
       }
 
       if (action_client_->
-          action_server_is_ready())
+        action_server_is_ready())
       {
         send_pending_goal();
         return;
@@ -424,12 +424,12 @@ private:
 
       const double elapsed =
         (
-          current_time -
-          pending_started_.value()
+        current_time -
+        pending_started_.value()
         ).seconds();
 
       if (elapsed >=
-          server_wait_timeout_sec_)
+        server_wait_timeout_sec_)
       {
         publish_transition(
           machine_.mark_timed_out(
@@ -448,8 +448,8 @@ private:
     }
 
     if (state ==
-        exploration::
-        GoalHandoffState::kSending)
+      exploration::
+      GoalHandoffState::kSending)
     {
       if (!goal_sent_at_.has_value()) {
         publish_transition(
@@ -462,12 +462,12 @@ private:
 
       const double elapsed =
         (
-          current_time -
-          goal_sent_at_.value()
+        current_time -
+        goal_sent_at_.value()
         ).seconds();
 
       if (elapsed >=
-          goal_response_timeout_sec_)
+        goal_response_timeout_sec_)
       {
         publish_transition(
           machine_.mark_timed_out(
@@ -486,14 +486,14 @@ private:
     }
 
     if (state ==
-        exploration::
-        GoalHandoffState::kAccepted ||
-        state ==
-        exploration::
-        GoalHandoffState::kExecuting)
+      exploration::
+      GoalHandoffState::kAccepted ||
+      state ==
+      exploration::
+      GoalHandoffState::kExecuting)
     {
       if (!goal_accepted_at_.has_value() ||
-          !last_feedback_at_.has_value())
+        !last_feedback_at_.has_value())
       {
         publish_transition(
           machine_.mark_error(
@@ -505,12 +505,12 @@ private:
 
       const double execution_elapsed =
         (
-          current_time -
-          goal_accepted_at_.value()
+        current_time -
+        goal_accepted_at_.value()
         ).seconds();
 
       if (execution_elapsed >=
-          execution_timeout_sec_)
+        execution_timeout_sec_)
       {
         timeout_active_goal(
           "savo_nav_execution_timeout",
@@ -521,12 +521,12 @@ private:
 
       const double feedback_elapsed =
         (
-          current_time -
-          last_feedback_at_.value()
+        current_time -
+        last_feedback_at_.value()
         ).seconds();
 
       if (feedback_elapsed >=
-          feedback_stale_timeout_sec_)
+        feedback_stale_timeout_sec_)
       {
         timeout_active_goal(
           "savo_nav_feedback_stale",
@@ -537,8 +537,8 @@ private:
     }
 
     if (state ==
-        exploration::
-        GoalHandoffState::kCanceling)
+      exploration::
+      GoalHandoffState::kCanceling)
     {
       if (!cancel_started_at_.has_value()) {
         publish_transition(
@@ -551,13 +551,13 @@ private:
 
       const double elapsed =
         (
-          current_time -
-          cancel_started_at_.value()
+        current_time -
+        cancel_started_at_.value()
         ).seconds();
 
       if (elapsed >=
-          cancel_timeout_sec_ &&
-          !cancel_timeout_reported_)
+        cancel_timeout_sec_ &&
+        !cancel_timeout_reported_)
       {
         cancel_timeout_reported_ = true;
 
@@ -580,37 +580,37 @@ private:
     const bool has_canceling_goal)
   {
     if (return_code ==
-        CancelResponse::ERROR_NONE)
+      CancelResponse::ERROR_NONE)
     {
       return has_canceling_goal ?
-        "" :
-        "savo_nav_cancel_ack_missing_goal";
+             "" :
+             "savo_nav_cancel_ack_missing_goal";
     }
 
     if (return_code ==
-        CancelResponse::ERROR_REJECTED)
+      CancelResponse::ERROR_REJECTED)
     {
       return "savo_nav_cancel_rejected";
     }
 
     if (return_code ==
-        CancelResponse::ERROR_UNKNOWN_GOAL_ID)
+      CancelResponse::ERROR_UNKNOWN_GOAL_ID)
     {
       return "savo_nav_cancel_unknown_goal";
     }
 
     if (return_code ==
-        CancelResponse::ERROR_GOAL_TERMINATED)
+      CancelResponse::ERROR_GOAL_TERMINATED)
     {
       return "savo_nav_cancel_goal_already_terminal";
     }
 
     return
       std::string{
-      "savo_nav_cancel_response_code_"} +
+        "savo_nav_cancel_response_code_"} +
       std::to_string(
         static_cast<int>(
-          return_code));
+        return_code));
   }
 
   void handle_active_cancel_response(
@@ -618,7 +618,7 @@ private:
     const CancelResponse::SharedPtr response)
   {
     if (request_id !=
-        machine_.request_id())
+      machine_.request_id())
     {
       RCLCPP_WARN(
         get_logger(),
@@ -643,8 +643,8 @@ private:
     }
 
     if (machine_.state() !=
-        exploration::
-        GoalHandoffState::kCanceling)
+      exploration::
+      GoalHandoffState::kCanceling)
     {
       RCLCPP_WARN(
         get_logger(),
@@ -787,7 +787,7 @@ private:
       const std::string cancel_reason =
         std::string{
         "savo_nav_cancel_request_exception:"} +
-        exception.what();
+      exception.what();
 
       publish_status(
         false,
@@ -837,12 +837,12 @@ private:
 
     typename rclcpp_action::Client<
       NavigateToPose>::
-      SendGoalOptions options;
+    SendGoalOptions options;
 
     options.goal_response_callback =
       [this, request_id](
-        const GoalHandle::SharedPtr &
-        goal_handle)
+      const GoalHandle::SharedPtr &
+      goal_handle)
       {
         handle_goal_response(
           request_id,
@@ -851,10 +851,10 @@ private:
 
     options.feedback_callback =
       [this, request_id](
-        GoalHandle::SharedPtr,
-        const std::shared_ptr<
-          const NavigateToPose::Feedback>
-          feedback)
+      GoalHandle::SharedPtr,
+      const std::shared_ptr<
+        const NavigateToPose::Feedback>
+      feedback)
       {
         handle_feedback(
           request_id,
@@ -863,8 +863,8 @@ private:
 
     options.result_callback =
       [this, request_id](
-        const GoalHandle::WrappedResult &
-        result)
+      const GoalHandle::WrappedResult &
+      result)
       {
         handle_result(
           request_id,
@@ -903,7 +903,7 @@ private:
     goal_handle)
   {
     if (request_id !=
-        machine_.request_id())
+      machine_.request_id())
     {
       if (goal_handle) {
         action_client_->
@@ -970,42 +970,42 @@ private:
     const std::string & request_id,
     const std::shared_ptr<
       const NavigateToPose::Feedback>
-      feedback)
+    feedback)
   {
     if (request_id !=
-        machine_.request_id())
+      machine_.request_id())
     {
       return;
     }
 
     if (machine_.state() ==
-        exploration::
-        GoalHandoffState::kAccepted ||
-        machine_.state() ==
-        exploration::
-        GoalHandoffState::kExecuting ||
-        machine_.state() ==
-        exploration::
-        GoalHandoffState::kCanceling)
+      exploration::
+      GoalHandoffState::kAccepted ||
+      machine_.state() ==
+      exploration::
+      GoalHandoffState::kExecuting ||
+      machine_.state() ==
+      exploration::
+      GoalHandoffState::kCanceling)
     {
       last_feedback_at_ =
         now();
     }
 
     if (machine_.state() ==
-        exploration::
-        GoalHandoffState::kAccepted)
+      exploration::
+      GoalHandoffState::kAccepted)
     {
       publish_transition(
         machine_.mark_executing());
     }
 
     if (machine_.state() !=
-        exploration::
-        GoalHandoffState::kExecuting &&
-        machine_.state() !=
-        exploration::
-        GoalHandoffState::kCanceling)
+      exploration::
+      GoalHandoffState::kExecuting &&
+      machine_.state() !=
+      exploration::
+      GoalHandoffState::kCanceling)
     {
       return;
     }
@@ -1025,15 +1025,15 @@ private:
       << feedback->number_of_recoveries
       << ",\"current_x\":"
       << feedback->
-         current_pose.pose.position.x
+      current_pose.pose.position.x
       << ",\"current_y\":"
       << feedback->
-         current_pose.pose.position.y
+      current_pose.pose.position.y
       << ",\"navigation_time_sec\":"
       << feedback->navigation_time.sec
       << ",\"navigation_time_nanosec\":"
       << feedback->
-         navigation_time.nanosec
+      navigation_time.nanosec
       << "}";
 
     std_msgs::msg::String message;
@@ -1048,7 +1048,7 @@ private:
     wrapped_result)
   {
     if (request_id !=
-        machine_.request_id())
+      machine_.request_id())
     {
       return;
     }
@@ -1085,56 +1085,56 @@ private:
     switch (wrapped_result.code) {
       case rclcpp_action::
         ResultCode::SUCCEEDED:
-      {
-        if (wrapped_result.result &&
+        {
+          if (wrapped_result.result &&
             wrapped_result.result->
             error_code != 0U)
-        {
-          publish_transition(
+          {
+            publish_transition(
             machine_.mark_aborted(
               result_reason(
                 "savo_nav_result_error",
                 wrapped_result.result)));
-        } else {
-          publish_transition(
+          } else {
+            publish_transition(
             machine_.mark_succeeded());
-        }
+          }
 
-        break;
-      }
+          break;
+        }
 
       case rclcpp_action::
         ResultCode::ABORTED:
-      {
-        publish_transition(
+        {
+          publish_transition(
           machine_.mark_aborted(
             result_reason(
               "savo_nav_aborted",
               wrapped_result.result)));
 
-        break;
-      }
+          break;
+        }
 
       case rclcpp_action::
         ResultCode::CANCELED:
-      {
-        publish_transition(
+        {
+          publish_transition(
           machine_.mark_canceled(
             "savo_nav_canceled"));
 
-        break;
-      }
+          break;
+        }
 
       case rclcpp_action::
         ResultCode::UNKNOWN:
       default:
-      {
-        publish_transition(
+        {
+          publish_transition(
           machine_.mark_error(
             "savo_nav_result_unknown"));
 
-        break;
-      }
+          break;
+        }
     }
 
     if (!exploration::is_terminal(
@@ -1143,12 +1143,12 @@ private:
       const std::string failure_reason =
         std::string{
         "terminal_result_transition_failed:"} +
-        exploration::to_string(
+      exploration::to_string(
           machine_.state()) +
-        ":result_code_" +
-        std::to_string(
+      ":result_code_" +
+      std::to_string(
           static_cast<int>(
-            wrapped_result.code));
+          wrapped_result.code));
 
       const auto error_transition =
         machine_.mark_error(
@@ -1202,11 +1202,11 @@ private:
     const std::string & prefix,
     const std::shared_ptr<
       const NavigateToPose::Result> &
-      result)
+    result)
   {
     if (!result) {
       return prefix +
-        ":result_missing";
+             ":result_missing";
     }
 
     std::string reason =
@@ -1229,7 +1229,7 @@ private:
       std_srvs::srv::Trigger::Request>,
     std::shared_ptr<
       std_srvs::srv::Trigger::Response>
-      response)
+    response)
   {
     if (!exploration::is_active(
         machine_.state()))
@@ -1242,8 +1242,8 @@ private:
     }
 
     if (machine_.state() ==
-        exploration::
-        GoalHandoffState::kCanceling)
+      exploration::
+      GoalHandoffState::kCanceling)
     {
       if (!current_goal_handle_) {
         response->success = false;
@@ -1274,7 +1274,7 @@ private:
         const std::string reason =
           std::string{
           "cancel_request_exception:"} +
-          exception.what();
+        exception.what();
 
         publish_status(
           false,
@@ -1311,8 +1311,8 @@ private:
       transition);
 
     if (transition.current ==
-        exploration::
-        GoalHandoffState::kCanceled)
+      exploration::
+      GoalHandoffState::kCanceled)
     {
       clear_runtime_goal();
 
@@ -1357,7 +1357,7 @@ private:
       const std::string reason =
         std::string{
         "cancel_request_exception:"} +
-        exception.what();
+      exception.what();
 
       publish_status(
         false,
@@ -1450,7 +1450,7 @@ private:
       << "\",\"action_name\":\""
       << escape_json(
            exploration::
-           kExplorationActionName)
+      kExplorationActionName)
       << "\"}";
 
     std_msgs::msg::String message;
@@ -1482,28 +1482,28 @@ private:
 
   std::optional<
     geometry_msgs::msg::PoseStamped>
-    pending_goal_;
+  pending_goal_;
 
   std::optional<rclcpp::Time>
-    pending_started_;
+  pending_started_;
 
   std::optional<rclcpp::Time>
-    goal_sent_at_;
+  goal_sent_at_;
 
   std::optional<rclcpp::Time>
-    goal_accepted_at_;
+  goal_accepted_at_;
 
   std::optional<rclcpp::Time>
-    last_feedback_at_;
+  last_feedback_at_;
 
   std::optional<rclcpp::Time>
-    cancel_started_at_;
+  cancel_started_at_;
 
   bool cancel_timeout_reported_{false};
   bool cancel_acknowledged_{false};
 
   std::optional<std::string>
-    timeout_reason_;
+  timeout_reason_;
 
   GoalHandle::SharedPtr
     current_goal_handle_;
@@ -1514,7 +1514,7 @@ private:
 
   rclcpp::Subscription<
     geometry_msgs::msg::PoseStamped>::
-    SharedPtr
+  SharedPtr
     selected_goal_subscription_;
 
   rclcpp::Publisher<

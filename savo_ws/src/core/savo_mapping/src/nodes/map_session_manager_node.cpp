@@ -85,7 +85,7 @@ std::int64_t unix_time_nanoseconds()
   return std::chrono::duration_cast<
     std::chrono::nanoseconds>(
     std::chrono::system_clock::now()
-      .time_since_epoch()).count();
+    .time_since_epoch()).count();
 }
 
 class OperationGuard
@@ -268,7 +268,7 @@ private:
 
         inputs_.readiness = message->data;
         inputs_.mapping_ready =
-          message->data == "ready";
+        message->data == "ready";
       });
 
     lifecycle_subscription_ =
@@ -285,10 +285,10 @@ private:
           inputs_mutex_};
 
         inputs_.lifecycle_state =
-          message->data;
+        message->data;
 
         inputs_.slam_active =
-          message->data == "active";
+        message->data == "active";
       });
 
     map_quality_subscription_ =
@@ -302,18 +302,18 @@ private:
         ConstSharedPtr message)
       {
         const std::string & data =
-          message->data;
+        message->data;
 
         const bool structurally_valid =
-          data.find(
+        data.find(
             "\"structurally_valid\":true") !=
-          std::string::npos;
+        std::string::npos;
 
         std::lock_guard<std::mutex> lock{
           inputs_mutex_};
 
         inputs_.map_structurally_valid =
-          structurally_valid;
+        structurally_valid;
       });
 
     service_callback_group_ =
@@ -472,7 +472,7 @@ private:
       request);
 
     if (future.wait_for(timeout) !=
-        std::future_status::ready)
+      std::future_status::ready)
     {
       failure_reason =
         "slam_save_map_service_timeout";
@@ -490,14 +490,14 @@ private:
     }
 
     if (response->result !=
-        SaveMap::Response::RESULT_SUCCESS)
+      SaveMap::Response::RESULT_SUCCESS)
     {
       std::ostringstream stream;
 
       stream
         << "slam_save_map_failed_result_"
         << static_cast<unsigned int>(
-          response->result);
+        response->result);
 
       failure_reason = stream.str();
       return false;
@@ -512,7 +512,7 @@ private:
     std::string & failure_reason)
   {
     if (!serialize_map_client_->
-        wait_for_service(timeout))
+      wait_for_service(timeout))
     {
       failure_reason =
         "slam_serialize_map_service_unavailable";
@@ -532,7 +532,7 @@ private:
       async_send_request(request);
 
     if (future.wait_for(timeout) !=
-        std::future_status::ready)
+      std::future_status::ready)
     {
       failure_reason =
         "slam_serialize_map_service_timeout";
@@ -550,15 +550,15 @@ private:
     }
 
     if (response->result !=
-        SerializePoseGraph::Response::
-        RESULT_SUCCESS)
+      SerializePoseGraph::Response::
+      RESULT_SUCCESS)
     {
       std::ostringstream stream;
 
       stream
         << "slam_serialize_map_failed_result_"
         << static_cast<unsigned int>(
-          response->result);
+        response->result);
 
       failure_reason = stream.str();
       return false;
@@ -620,22 +620,22 @@ private:
       << "occupancy_grid:\n"
       << "  yaml: \""
       << final_artifacts.grid_yaml
-        .generic_string()
+      .generic_string()
       << "\"\n"
       << "  image: \""
       << (
-        final_directory /
-        final_image.filename())
-        .generic_string()
+      final_directory /
+      final_image.filename())
+      .generic_string()
       << "\"\n"
       << "pose_graph:\n"
       << "  posegraph: \""
       << final_artifacts.posegraph
-        .generic_string()
+      .generic_string()
       << "\"\n"
       << "  data: \""
       << final_artifacts.posegraph_data
-        .generic_string()
+      .generic_string()
       << "\"\n"
       << "map_quality:\n"
       << "  structurally_valid: true\n"
@@ -720,10 +720,10 @@ private:
       backup_directory =
         final_directory.parent_path() /
         (
-          "." +
-          final_directory.filename().string() +
-          "_backup_" +
-          std::to_string(operation_id));
+        "." +
+        final_directory.filename().string() +
+        "_backup_" +
+        std::to_string(operation_id));
 
       fs::rename(
         final_directory,
@@ -736,8 +736,8 @@ private:
         final_directory);
     } catch (...) {
       if (!backup_directory.empty() &&
-          fs::exists(backup_directory) &&
-          !fs::exists(final_directory))
+        fs::exists(backup_directory) &&
+        !fs::exists(final_directory))
       {
         std::error_code restore_error;
 
@@ -884,7 +884,7 @@ private:
       }
 
       if (!allow_overwrite &&
-          session::session_target_exists(
+        session::session_target_exists(
             final_paths))
       {
         reject_request(
@@ -906,9 +906,9 @@ private:
       const fs::path staging_directory =
         output_root /
         (
-          "." + map_id +
-          "_staging_" +
-          std::to_string(operation_id));
+        "." + map_id +
+        "_staging_" +
+        std::to_string(operation_id));
 
       fs::create_directory(
         staging_directory);
@@ -1107,7 +1107,7 @@ int main(int argc, char ** argv)
   try {
     const auto node =
       std::make_shared<
-        savo_mapping::MapSessionManagerNode>();
+      savo_mapping::MapSessionManagerNode>();
 
     rclcpp::executors::
     MultiThreadedExecutor executor{

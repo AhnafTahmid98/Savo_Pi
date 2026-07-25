@@ -20,8 +20,8 @@ fs::path unique_test_root()
 
   return fs::temp_directory_path() /
          (
-           "savo_mapping_session_test_" +
-           std::to_string(value));
+    "savo_mapping_session_test_" +
+    std::to_string(value));
 }
 
 }  // namespace
@@ -89,25 +89,25 @@ TEST(MapSessionPolicy, BuildsExpectedArtifacts)
   EXPECT_EQ(
     paths.session_directory,
     fs::path{
-      "/tmp/savo_maps/campus_floor_2"});
+    "/tmp/savo_maps/campus_floor_2"});
 
   EXPECT_EQ(
     paths.artifacts.grid_yaml,
     fs::path{
-      "/tmp/savo_maps/campus_floor_2/"
-      "campus_floor_2.yaml"});
+    "/tmp/savo_maps/campus_floor_2/"
+    "campus_floor_2.yaml"});
 
   EXPECT_EQ(
     paths.artifacts.posegraph,
     fs::path{
-      "/tmp/savo_maps/campus_floor_2/"
-      "campus_floor_2.posegraph"});
+    "/tmp/savo_maps/campus_floor_2/"
+    "campus_floor_2.posegraph"});
 
   EXPECT_EQ(
     paths.artifacts.posegraph_data,
     fs::path{
-      "/tmp/savo_maps/campus_floor_2/"
-      "campus_floor_2.data"});
+    "/tmp/savo_maps/campus_floor_2/"
+    "campus_floor_2.data"});
 }
 
 TEST(MapSessionPolicy, EnforcesReadiness)

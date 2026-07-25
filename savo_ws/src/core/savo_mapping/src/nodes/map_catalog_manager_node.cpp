@@ -23,7 +23,7 @@ std::filesystem::path expand_home_path(
   const std::string & value)
 {
   if (value != "~" &&
-      value.rfind("~/", 0U) != 0U)
+    value.rfind("~/", 0U) != 0U)
   {
     return std::filesystem::path{value};
   }
@@ -32,7 +32,7 @@ std::filesystem::path expand_home_path(
     std::getenv("HOME");
 
   if (home == nullptr ||
-      std::string{home}.empty())
+    std::string{home}.empty())
   {
     throw std::runtime_error(
             "home_directory_not_available");
@@ -88,68 +88,68 @@ public:
 
     state_publisher_ =
       create_publisher<
-        std_msgs::msg::String>(
+      std_msgs::msg::String>(
         release::kReleaseStateTopic,
         state_qos);
 
     result_publisher_ =
       create_publisher<
-        std_msgs::msg::String>(
+      std_msgs::msg::String>(
         release::kReleaseResultTopic,
         state_qos);
 
     catalog_publisher_ =
       create_publisher<
-        std_msgs::msg::String>(
+      std_msgs::msg::String>(
         release::kMapCatalogTopic,
         state_qos);
 
     active_publisher_ =
       create_publisher<
-        std_msgs::msg::String>(
+      std_msgs::msg::String>(
         release::kActiveMapTopic,
         state_qos);
 
     create_service_ =
       create_service<
-        std_srvs::srv::Trigger>(
+      std_srvs::srv::Trigger>(
         release::kCreateReleaseService,
         std::bind(
           &MapCatalogManagerNode::
-          handle_create,
+        handle_create,
           this,
           std::placeholders::_1,
           std::placeholders::_2));
 
     verify_service_ =
       create_service<
-        std_srvs::srv::Trigger>(
+      std_srvs::srv::Trigger>(
         release::kVerifyReleaseService,
         std::bind(
           &MapCatalogManagerNode::
-          handle_verify,
+        handle_verify,
           this,
           std::placeholders::_1,
           std::placeholders::_2));
 
     promote_service_ =
       create_service<
-        std_srvs::srv::Trigger>(
+      std_srvs::srv::Trigger>(
         release::kPromoteReleaseService,
         std::bind(
           &MapCatalogManagerNode::
-          handle_promote,
+        handle_promote,
           this,
           std::placeholders::_1,
           std::placeholders::_2));
 
     deactivate_service_ =
       create_service<
-        std_srvs::srv::Trigger>(
+      std_srvs::srv::Trigger>(
         release::kDeactivateReleaseService,
         std::bind(
           &MapCatalogManagerNode::
-          handle_deactivate,
+        handle_deactivate,
           this,
           std::placeholders::_1,
           std::placeholders::_2));
@@ -190,20 +190,20 @@ private:
   {
     return get_parameter(
       "source.map_id")
-      .as_string();
+           .as_string();
   }
 
   std::string release_id() const
   {
     return get_parameter(
       "release.id")
-      .as_string();
+           .as_string();
   }
 
   void publish_string(
     const rclcpp::Publisher<
       std_msgs::msg::String>::SharedPtr &
-      publisher,
+    publisher,
     const std::string & value)
   {
     std_msgs::msg::String message;
@@ -265,7 +265,7 @@ private:
       std_srvs::srv::Trigger::Request>,
     std::shared_ptr<
       std_srvs::srv::Trigger::Response>
-      response)
+    response)
   {
     publish_state("creating");
 
@@ -305,7 +305,7 @@ private:
       response->message =
         std::string{
         "release_creation_error:"} +
-        exception.what();
+      exception.what();
 
       publish_state("error");
     }
@@ -316,7 +316,7 @@ private:
       std_srvs::srv::Trigger::Request>,
     std::shared_ptr<
       std_srvs::srv::Trigger::Response>
-      response)
+    response)
   {
     const auto verified =
       release::verify_release(
@@ -344,7 +344,7 @@ private:
       std_srvs::srv::Trigger::Request>,
     std::shared_ptr<
       std_srvs::srv::Trigger::Response>
-      response)
+    response)
   {
     publish_state("promoting");
 
@@ -379,7 +379,7 @@ private:
       response->message =
         std::string{
         "active_map_promotion_error:"} +
-        exception.what();
+      exception.what();
 
       publish_state("error");
     }
@@ -390,7 +390,7 @@ private:
       std_srvs::srv::Trigger::Request>,
     std::shared_ptr<
       std_srvs::srv::Trigger::Response>
-      response)
+    response)
   {
     try {
       const auto active =
@@ -415,7 +415,7 @@ private:
       response->message =
         std::string{
         "active_map_deactivation_error:"} +
-        exception.what();
+      exception.what();
 
       publish_state("error");
     }

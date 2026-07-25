@@ -16,10 +16,10 @@ fs::path unique_root()
 {
   return fs::temp_directory_path() /
          (
-           "savo_saved_map_test_" +
-           std::to_string(
+    "savo_saved_map_test_" +
+    std::to_string(
              std::chrono::steady_clock::now()
-             .time_since_epoch().count()));
+      .time_since_epoch().count()));
 }
 
 void write_file(
@@ -78,15 +78,15 @@ fs::path create_valid_session(
       session.generic_string() + "\"\n"
     "occupancy_grid:\n"
     "  yaml: \"" +
-      (base.string() + ".yaml") + "\"\n"
+    (base.string() + ".yaml") + "\"\n"
     "  image: \"" +
-      (base.string() + ".pgm") + "\"\n"
+    (base.string() + ".pgm") + "\"\n"
     "pose_graph:\n"
     "  posegraph: \"" +
-      (base.string() + ".posegraph") +
+    (base.string() + ".posegraph") +
       "\"\n"
     "  data: \"" +
-      (base.string() + ".data") + "\"\n"
+    (base.string() + ".data") + "\"\n"
     "map_quality:\n"
     "  structurally_valid: true\n"
     "  evaluated: false\n"

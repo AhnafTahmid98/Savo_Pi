@@ -357,6 +357,56 @@ install(
 )
 
 if(BUILD_TESTING)
+  find_package(ament_lint_auto REQUIRED)
+
+  # Zero-byte files are deferred phase scaffolds, not implemented code.
+  # As soon as a scaffold gains content, it automatically enters linting.
+  file(GLOB_RECURSE _savo_mapping_lint_candidates
+    CONFIGURE_DEPENDS
+    LIST_DIRECTORIES false
+    RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/config/*"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/*"
+    "${CMAKE_CURRENT_SOURCE_DIR}/launch/*"
+    "${CMAKE_CURRENT_SOURCE_DIR}/rviz/*"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/*"
+    "${CMAKE_CURRENT_SOURCE_DIR}/test/*"
+  )
+
+  foreach(_lint_candidate IN LISTS _savo_mapping_lint_candidates)
+    file(READ
+      "${CMAKE_CURRENT_SOURCE_DIR}/${_lint_candidate}"
+      _lint_first_byte
+      LIMIT 1
+    )
+
+    if(_lint_first_byte STREQUAL "")
+      list(APPEND AMENT_LINT_AUTO_FILE_EXCLUDE
+        "${CMAKE_CURRENT_SOURCE_DIR}/${_lint_candidate}"
+      )
+    endif()
+  endforeach()
+
+  list(SORT AMENT_LINT_AUTO_FILE_EXCLUDE)
+  list(APPEND AMENT_LINT_AUTO_EXCLUDE
+    ament_cmake_copyright
+    ament_cmake_xmllint
+  )
+
+  ament_lint_auto_find_test_dependencies()
+
+  find_package(ament_cmake_xmllint REQUIRED)
+  ament_xmllint(
+    package.xml
+    launch/exploration_goal_handoff.launch.xml
+    launch/manual_mapping.launch.xml
+    launch/map_catalog_manager.launch.xml
+    launch/map_quality_evaluator.launch.xml
+    launch/map_session_manager.launch.xml
+    launch/monitor_only.launch.xml
+    launch/simulated_manual_mapping.launch.xml
+  )
+
   find_package(ament_cmake_gtest REQUIRED)
 
   add_executable(

@@ -311,16 +311,16 @@ TEST(ConfigContracts, ExplorationHandoffBoundaryIsExplicitAndSafe)
     content,
     "\"" +
     std::string{
-      savo_mapping::exploration::
-      kGoalCancelService} +
+    savo_mapping::exploration::
+    kGoalCancelService} +
     "\"");
 
   expect_contains(
     content,
     "\"" +
     std::string{
-      savo_mapping::exploration::
-      kExplorationActionName} +
+    savo_mapping::exploration::
+    kExplorationActionName} +
     "\"");
 
   // savo_mapping must not expose a generic direct Nav2 goal contract.

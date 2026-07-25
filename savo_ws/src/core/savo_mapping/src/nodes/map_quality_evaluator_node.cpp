@@ -25,7 +25,7 @@ std::filesystem::path expand_home_path(
   const std::string & value)
 {
   if (value != "~" &&
-      value.rfind("~/", 0U) != 0U)
+    value.rfind("~/", 0U) != 0U)
   {
     return std::filesystem::path{value};
   }
@@ -34,7 +34,7 @@ std::filesystem::path expand_home_path(
     std::getenv("HOME");
 
   if (home == nullptr ||
-      std::string{home}.empty())
+    std::string{home}.empty())
   {
     throw std::runtime_error(
             "home_directory_not_available");
@@ -68,51 +68,51 @@ public:
 
     state_publisher_ =
       create_publisher<
-        std_msgs::msg::String>(
+      std_msgs::msg::String>(
         quality::kQualityStateTopic,
         state_qos);
 
     evaluation_publisher_ =
       create_publisher<
-        std_msgs::msg::String>(
+      std_msgs::msg::String>(
         quality::kQualityEvaluationTopic,
         state_qos);
 
     handoff_publisher_ =
       create_publisher<
-        std_msgs::msg::String>(
+      std_msgs::msg::String>(
         quality::kNavigationHandoffTopic,
         state_qos);
 
     evaluate_service_ =
       create_service<
-        std_srvs::srv::Trigger>(
+      std_srvs::srv::Trigger>(
         quality::kEvaluateService,
         std::bind(
           &MapQualityEvaluatorNode::
-          handle_evaluate,
+        handle_evaluate,
           this,
           std::placeholders::_1,
           std::placeholders::_2));
 
     approve_service_ =
       create_service<
-        std_srvs::srv::Trigger>(
+      std_srvs::srv::Trigger>(
         quality::kApproveHandoffService,
         std::bind(
           &MapQualityEvaluatorNode::
-          handle_approve,
+        handle_approve,
           this,
           std::placeholders::_1,
           std::placeholders::_2));
 
     revoke_service_ =
       create_service<
-        std_srvs::srv::Trigger>(
+      std_srvs::srv::Trigger>(
         quality::kRevokeHandoffService,
         std::bind(
           &MapQualityEvaluatorNode::
-          handle_revoke,
+        handle_revoke,
           this,
           std::placeholders::_1,
           std::placeholders::_2));
@@ -285,7 +285,7 @@ private:
 
   void publish_evaluation(
     const quality::QualityEvaluation &
-      evaluation)
+    evaluation)
   {
     std_msgs::msg::String message;
 
@@ -298,7 +298,7 @@ private:
 
   void publish_handoff(
     const quality::NavigationHandoff &
-      handoff)
+    handoff)
   {
     std_msgs::msg::String message;
 
@@ -339,7 +339,7 @@ private:
       std_srvs::srv::Trigger::Request>,
     std::shared_ptr<
       std_srvs::srv::Trigger::Response>
-      response)
+    response)
   {
     publish_state("evaluating");
 
@@ -399,7 +399,7 @@ private:
       response->message =
         std::string{
         "quality_evaluation_error:"} +
-        exception.what();
+      exception.what();
 
       publish_state("error");
 
@@ -415,7 +415,7 @@ private:
       std_srvs::srv::Trigger::Request>,
     std::shared_ptr<
       std_srvs::srv::Trigger::Response>
-      response)
+    response)
   {
     try {
       const auto verification =
@@ -449,7 +449,7 @@ private:
       response->message =
         std::string{
         "navigation_handoff_rejected:"} +
-        exception.what();
+      exception.what();
 
       publish_state("approval_rejected");
     }
@@ -460,7 +460,7 @@ private:
       std_srvs::srv::Trigger::Request>,
     std::shared_ptr<
       std_srvs::srv::Trigger::Response>
-      response)
+    response)
   {
     try {
       const auto verification =
@@ -494,7 +494,7 @@ private:
       response->message =
         std::string{
         "navigation_handoff_revoke_error:"} +
-        exception.what();
+      exception.what();
 
       publish_state("error");
     }

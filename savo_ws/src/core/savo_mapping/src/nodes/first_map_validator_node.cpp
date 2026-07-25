@@ -123,7 +123,7 @@ private:
     }
 
     if (!std::isfinite(message->info.resolution) ||
-        message->info.resolution <= 0.0)
+      message->info.resolution <= 0.0)
     {
       map_failure_reason_ = "invalid_map_resolution";
       return;
@@ -139,7 +139,7 @@ private:
     }
 
     if (message->info.width == 0 ||
-        message->info.height == 0)
+      message->info.height == 0)
     {
       map_failure_reason_ = "empty_map_dimensions";
       return;
@@ -152,15 +152,15 @@ private:
       message->info.height);
 
     if (expected_cells >
-        static_cast<std::uint64_t>(
-          std::numeric_limits<std::size_t>::max()))
+      static_cast<std::uint64_t>(
+        std::numeric_limits<std::size_t>::max()))
     {
       map_failure_reason_ = "map_cell_count_overflow";
       return;
     }
 
     if (message->data.size() !=
-        static_cast<std::size_t>(expected_cells))
+      static_cast<std::size_t>(expected_cells))
     {
       map_failure_reason_ = "map_cell_count_mismatch";
       return;
@@ -195,8 +195,8 @@ private:
     }
 
     if (known_cells <
-        static_cast<std::uint64_t>(
-          minimum_known_cells_))
+      static_cast<std::uint64_t>(
+        minimum_known_cells_))
     {
       map_failure_reason_ =
         "insufficient_known_map_cells";
@@ -230,12 +230,12 @@ private:
 
     quality_valid_ =
       data.find("\"structurally_valid\":true") !=
-        std::string::npos &&
+      std::string::npos &&
       data.find("\"evaluated\":false") !=
-        std::string::npos &&
+      std::string::npos &&
       data.find(
         "\"navigation_handoff_ready\":false") !=
-        std::string::npos;
+      std::string::npos;
 
     latest_quality_ = data;
   }
@@ -263,9 +263,9 @@ private:
       slam_toolbox_publishes_map();
 
     if (map_valid_ &&
-        readiness_ready_ &&
-        quality_valid_ &&
-        slam_publisher_present)
+      readiness_ready_ &&
+      quality_valid_ &&
+      slam_publisher_present)
     {
       success_ = true;
       finished_ = true;
