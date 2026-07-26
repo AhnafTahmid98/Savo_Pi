@@ -1,0 +1,38 @@
+# Copyright 2026 Ahnaf Tahmid
+# SPDX-License-Identifier: LicenseRef-Proprietary
+
+contract_version: 1
+package: savo_nav
+
+frames:
+  map: "map"
+  odom: "odom"
+  robot_base: "base_footprint"
+  robot_body: "base_link"
+  lidar: "laser_frame"
+  realsense_depth_optical: "camera_depth_optical_frame"
+
+tf_chain:
+  - parent: "map"
+    child: "odom"
+
+  - parent: "odom"
+    child: "base_footprint"
+
+  - parent: "base_footprint"
+    child: "base_link"
+
+ownership:
+  map_to_odom:
+    saved_map_navigation: "nav2_amcl"
+    live_mapping_navigation: "slam_toolbox"
+    simultaneous_publishers_allowed: false
+
+  odom_to_base_footprint: "savo_localization"
+  base_footprint_to_base_link: "robot_state_publisher"
+
+constraints:
+  global_frame: "map"
+  local_costmap_global_frame: "odom"
+  nav2_robot_base_frame: "base_footprint"
+  sensor_frames_must_connect_to: "base_link"

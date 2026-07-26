@@ -1,10 +1,36 @@
 <?xml version="1.0"?>
+<?xml-model
+  href="http://download.ros.org/schema/package_format3.xsd"
+  schematypens="http://www.w3.org/2001/XMLSchema"?>
+
 <package format="3">
   <name>savo_nav</name>
+
   <version>0.1.0</version>
-  <description>Navigation helpers: safety, kinematics, Nav2 interface</description>
-  <maintainer email="todo@example.com">TODO_NAME</maintainer>
-  <license>MIT</license>
+
+  <description>
+    Robot Savo core-side navigation package. It owns Nav2 orchestration,
+    saved-map localization integration, global and local costmaps, validated
+    navigation-goal execution, two-dimensional and three-dimensional
+    obstacle-aware path planning, navigation readiness, bounded recovery
+    coordination, and observer-only visualization outputs.
+  </description>
+
+  <maintainer email="tahmidahnaf998@gmail.com">
+    Ahnaf Tahmid
+  </maintainer>
+
+  <license>Proprietary</license>
+
   <buildtool_depend>ament_cmake</buildtool_depend>
-  <exec_depend>rclpy</exec_depend>
+
+  <test_depend>ament_cmake_pytest</test_depend>
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+  <test_depend>python3-pytest</test_depend>
+  <test_depend>python3-yaml</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
 </package>

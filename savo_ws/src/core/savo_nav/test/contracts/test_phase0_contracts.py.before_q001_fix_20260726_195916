@@ -1,0 +1,360 @@
+# Copyright 2026 Ahnaf Tahmid
+# SPDX-License-Identifier: LicenseRef-Proprietary
+
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import textwrap
+import xml.etree.ElementTree as ET
+
+import pytest
+import yaml
+
+
+ROOT = Path(__file__).resolve().parents[2]
+INCLUDE_DIR = ROOT / 'include'
+CONFIG_DIR = ROOT / 'config'
+
+
+def load_yaml(filename):
+    path = CONFIG_DIR / filename
+
+    with path.open('r', encoding='utf-8') as stream:
+        value = yaml.safe_load(stream)
+
+    assert isinstance(value, dict)
+    return value
+
+
+def read_string_constants(filename):
+    path = INCLUDE_DIR / 'savo_nav' / filename
+    text = path.read_text(encoding='utf-8')
+
+    pattern = re.compile(
+        'inline\\s+constexpr\\s+std::string_view\\s+'
+        '(k[A-Za-z0-9]+)\\s*=\\s*'
+        '\\"([^\\"]+)\\";',
+        re.MULTILINE,
+    )
+
+    return dict(pattern.findall(text))
+
+
+def test_package_identity():
+    package = ET.parse(ROOT / 'package.xml').getroot()
+    constants = read_string_constants('constants.hpp')
+
+    assert package.attrib['format'] == '3'
+    assert package.findtext('name') == 'savo_nav'
+    assert package.findtext('version') == '0.1.0'
+    assert package.findtext('license') == 'Proprietary'
+
+    assert constants['kPackageName'] == 'savo_nav'
+    assert constants['kRobotName'] == 'Robot Savo'
+    assert constants['kRosDistro'] == 'jazzy'
+    assert constants['kVersion'] == '0.1.0'
+
+
+def test_topic_header_matches_yaml():
+    contract = load_yaml('topics.yaml')
+    constants = read_string_constants('topic_names.hpp')
+
+    expected = {
+        'kMap': contract['topics']['inputs']['map'],
+        'kMapMetadata': contract['topics']['inputs']['map_metadata'],
+        'kTf': contract['topics']['inputs']['tf'],
+        'kTfStatic': contract['topics']['inputs']['tf_static'],
+        'kFilteredOdometry': contract['topics']['inputs'][
+            'filtered_odometry'
+        ],
+        'kLocalizationHealth': contract['topics']['inputs'][
+            'localization_health'
+        ],
+        'kLaserScan': contract['topics']['inputs']['laser_scan'],
+        'kRealSenseStatus': contract['topics']['inputs'][
+            'realsense_status'
+        ],
+        'kRawRealSensePoints': contract['topics']['inputs'][
+            'raw_realsense_points'
+        ],
+        'kFilteredObstaclePoints': contract['topics']['inputs'][
+            'filtered_obstacle_points'
+        ],
+        'kSafetyStop': contract['topics']['inputs']['safety_stop'],
+        'kSafetySlowdownFactor': contract['topics']['inputs'][
+            'safety_slowdown_factor'
+        ],
+        'kControlModeState': contract['topics']['inputs'][
+            'control_mode_state'
+        ],
+        'kControlModeCommand': contract['topics'][
+            'integration_commands'
+        ]['control_mode_command'],
+        'kNavigationVelocity': contract['topics'][
+            'velocity_output'
+        ]['navigation'],
+        'kState': contract['topics']['outputs']['state'],
+        'kStatus': contract['topics']['outputs']['status'],
+        'kReadiness': contract['topics']['outputs']['readiness'],
+        'kReadinessReason': contract['topics']['outputs'][
+            'readiness_reason'
+        ],
+        'kCurrentGoal': contract['topics']['outputs'][
+            'current_goal'
+        ],
+        'kGoalSource': contract['topics']['outputs']['goal_source'],
+        'kResult': contract['topics']['outputs']['result'],
+        'kRecoveryState': contract['topics']['outputs'][
+            'recovery_state'
+        ],
+        'kHeartbeat': contract['topics']['outputs']['heartbeat'],
+        'kMarkers': contract['topics']['outputs']['markers'],
+    }
+
+    for name, value in expected.items():
+        assert constants[name] == value
+        assert value.startswith('/')
+
+
+def test_velocity_boundary():
+    contract = load_yaml('topics.yaml')
+
+    nav_output = contract['topics']['velocity_output']['navigation']
+    forbidden = contract['topics']['forbidden_velocity_outputs']
+
+    assert nav_output == '/cmd_vel_nav'
+
+    assert forbidden == [
+        '/cmd_vel',
+        '/cmd_vel_safe',
+        '/cmd_vel_recovery',
+    ]
+
+    assert nav_output not in forbidden
+
+    assert contract['constraints'][
+        'only_navigation_velocity_output'
+    ] == '/cmd_vel_nav'
+
+
+def test_action_header_matches_yaml():
+    contract = load_yaml('action_servers.yaml')
+    constants = read_string_constants('action_names.hpp')
+
+    public_actions = contract['actions']['public']
+    internal_actions = contract['actions']['internal']
+
+    assert constants['kNavigationNavigateToPose'] == (
+        public_actions['navigation_navigate_to_pose']['name']
+    )
+
+    assert constants['kExplorationNavigateToPose'] == (
+        public_actions['exploration_navigate_to_pose']['name']
+    )
+
+    assert constants['kNav2NavigateToPose'] == (
+        internal_actions['nav2_navigate_to_pose']['name']
+    )
+
+    assert contract['constraints']['maximum_active_nav2_goals'] == 1
+
+    assert not contract['constraints'][
+        'silent_goal_replacement_allowed'
+    ]
+
+    assert contract['constraints'][
+        'cancellation_acknowledgement_required'
+    ]
+
+
+def test_frame_header_matches_yaml():
+    contract = load_yaml('frames.yaml')
+    constants = read_string_constants('frame_names.hpp')
+
+    assert constants['kMap'] == contract['frames']['map']
+    assert constants['kOdom'] == contract['frames']['odom']
+
+    assert constants['kBaseFootprint'] == (
+        contract['frames']['robot_base']
+    )
+
+    assert constants['kBaseLink'] == (
+        contract['frames']['robot_body']
+    )
+
+    assert constants['kLaser'] == contract['frames']['lidar']
+
+    assert constants['kCameraDepthOptical'] == (
+        contract['frames']['realsense_depth_optical']
+    )
+
+    chain = [
+        (item['parent'], item['child'])
+        for item in contract['tf_chain']
+    ]
+
+    assert chain == [
+        ('map', 'odom'),
+        ('odom', 'base_footprint'),
+        ('base_footprint', 'base_link'),
+    ]
+
+    assert contract['constraints'][
+        'nav2_robot_base_frame'
+    ] == 'base_footprint'
+
+
+def test_mapping_action_compatibility():
+    mapping_header = (
+        ROOT.parent
+        / 'savo_mapping'
+        / 'include'
+        / 'savo_mapping'
+        / 'exploration_goal_handoff.hpp'
+    )
+
+    if not mapping_header.is_file():
+        pytest.skip('savo_mapping header is unavailable')
+
+    mapping_text = mapping_header.read_text(encoding='utf-8')
+
+    assert (
+        '"/savo_nav/exploration/navigate_to_pose"'
+        in mapping_text
+    )
+
+
+def test_control_accepts_navigation_velocity():
+    control_config = (
+        ROOT.parent
+        / 'savo_control'
+        / 'config'
+        / 'twist_mux.yaml'
+    )
+
+    if not control_config.is_file():
+        pytest.skip('savo_control twist_mux is unavailable')
+
+    control_text = control_config.read_text(encoding='utf-8')
+
+    assert '/cmd_vel_nav' in control_text
+
+
+def test_no_service_contract_is_invented():
+    service_header = (
+        INCLUDE_DIR / 'savo_nav' / 'service_names.hpp'
+    ).read_text(encoding='utf-8')
+
+    assert 'std::string_view' not in service_header
+
+    assert re.search(
+        r'"/[A-Za-z0-9_/]+"',
+        service_header,
+    ) is None
+
+
+def test_contract_identity():
+    for filename in (
+        'topics.yaml',
+        'action_servers.yaml',
+        'frames.yaml',
+    ):
+        contract = load_yaml(filename)
+
+        assert contract['contract_version'] == 1
+        assert contract['package'] == 'savo_nav'
+
+
+def test_obsolete_scaffold_is_removed():
+    obsolete = [
+        'nav2_interface_node.py',
+        'safety_controller_node.py',
+        'odom_source.py',
+        'kinematics.py',
+        'config/safety.yaml',
+        'setup.py',
+        'setup.cfg',
+        'resource',
+        'savo_nav',
+    ]
+
+    for relative in obsolete:
+        assert not (ROOT / relative).exists()
+
+
+def test_contract_headers_compile(tmp_path):
+    compiler = shutil.which('c++')
+
+    if compiler is None:
+        pytest.skip('No C++ compiler is installed')
+
+    source = tmp_path / 'contract_compile.cpp'
+    object_file = tmp_path / 'contract_compile.o'
+
+    source.write_text(
+        textwrap.dedent(
+            '''
+            #include "savo_nav/action_names.hpp"
+            #include "savo_nav/constants.hpp"
+            #include "savo_nav/frame_names.hpp"
+            #include "savo_nav/service_names.hpp"
+            #include "savo_nav/topic_names.hpp"
+
+            static_assert(
+              savo_nav::constants::kVersionMajor == 0);
+
+            static_assert(
+              savo_nav::constants::kVersionMinor == 1);
+
+            static_assert(
+              savo_nav::constants::kVersionPatch == 0);
+
+            static_assert(
+              savo_nav::constants::kContractVersion == 1);
+
+            static_assert(
+              savo_nav::topics::kNavigationVelocity ==
+              "/cmd_vel_nav");
+
+            static_assert(
+              savo_nav::actions::kExplorationNavigateToPose ==
+              "/savo_nav/exploration/navigate_to_pose");
+
+            static_assert(
+              savo_nav::frames::kBaseFootprint ==
+              "base_footprint");
+
+            int main()
+            {
+              return 0;
+            }
+            '''
+        ).lstrip(),
+        encoding='utf-8',
+    )
+
+    result = subprocess.run(
+        [
+            compiler,
+            '-std=c++17',
+            '-Wall',
+            '-Wextra',
+            '-Wpedantic',
+            '-I',
+            str(INCLUDE_DIR),
+            '-c',
+            str(source),
+            '-o',
+            str(object_file),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, (
+        result.stdout + result.stderr
+    )
+
+    assert object_file.is_file()

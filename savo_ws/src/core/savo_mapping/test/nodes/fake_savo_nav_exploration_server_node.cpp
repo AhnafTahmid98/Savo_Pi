@@ -7,6 +7,7 @@
 #include <atomic>
 #include <chrono>
 #include <cmath>
+#include <cinttypes>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -182,8 +183,8 @@ private:
 
       RCLCPP_WARN(
         get_logger(),
-        "delaying fake goal response by %ld ms",
-        static_cast<long>(delay_ms));
+        "delaying fake goal response by %" PRId64 " ms",
+        delay_ms);
 
       std::this_thread::sleep_for(
         std::chrono::milliseconds(
@@ -295,8 +296,8 @@ private:
     RCLCPP_WARN(
       get_logger(),
       "delaying terminal canceled result "
-      "by %ld ms",
-      static_cast<long>(delay_ms));
+      "by %" PRId64 " ms",
+      delay_ms);
 
     constexpr std::int64_t slice_ms = 50;
 

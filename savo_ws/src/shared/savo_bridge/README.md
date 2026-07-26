@@ -65,3 +65,46 @@ action client, runtime snapshot writer or SavoMind transport.
 - ROS 2 Jazzy
 - modern C++
 - one native bridge process on `savo-edge`
+
+## Phase 1C graph discovery
+
+`savo_bridge` performs read-only ROS graph discovery. It does not
+subscribe to subsystem data and does not create service or action
+clients.
+
+Local DDS activity requires the bridge node and all bridge-owned
+status topics to appear in the graph. Core and edge visibility use
+explicit node and topic selector parameters:
+
+- `core_evidence_nodes`
+- `core_evidence_topics`
+- `edge_evidence_nodes`
+- `edge_evidence_topics`
+
+Selectors are empty by default. Graph presence is evidence of a
+configured public ROS entity, not proof of the physical hostname
+running that entity. Commands remain disabled and bridge readiness
+remains false during this phase.
+
+## Phase 2A runtime snapshot publication
+
+The native bridge can atomically publish a canonical read-only runtime
+snapshot for SavoMind.
+
+Parameters:
+
+- `snapshot_enabled` defaults to `false`.
+- `snapshot_path` defaults to `/run/savo_bridge/snapshot.json`.
+
+The parent directory must already exist and be writable by the native
+bridge process. The bridge does not create or change runtime-directory
+ownership.
+
+When enabled, the bridge writes once per status cycle using the tested
+same-directory temporary-file, `fsync`, atomic rename and parent
+directory `fsync` contract.
+
+During Phase 2A the snapshot contains no subsystem observations, so its
+derived health remains `unknown` with reason `no_topics`.
+`bridge_ready` remains false and commands remain disabled.
+

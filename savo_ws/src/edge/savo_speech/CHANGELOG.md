@@ -219,3 +219,103 @@
 - Added safe processor, backend, chain, dispatcher, and audio shutdown ordering.
 - Enabled the safer default wake-word profile in the production edge profile.
 - Added deterministic wake-word asset resolver tests.
+
+### Phase 4L-A
+
+- Added a hardware-independent VAD backend contract.
+- Added normalized speech-score backend results.
+- Added silence and speech processor states.
+- Added independent speech-start and speech-end thresholds.
+- Added threshold hysteresis and transition debounce.
+- Added stable speech-segment identifiers.
+- Added speech-start and speech-end transition events.
+- Added a bounded drop-oldest VAD event queue.
+- Added backend exception and invalid-result handling.
+- Added VAD state, transition, queue, sequence, and failure statistics.
+- Added deterministic reset behavior.
+- Added hardware-independent VAD processor unit tests.
+
+### Phase 4L-B
+
+- Added a lightweight adaptive-energy production VAD backend.
+- Reused the existing normalized RMS, peak, and clipping calculations.
+- Added configurable startup noise-floor calibration.
+- Added adaptive exponential background-noise tracking.
+- Added minimum absolute speech-energy gating.
+- Added SNR-based normalized speech scoring.
+- Added noise-floor freezing during probable speech.
+- Added mono and sample-rate validation.
+- Added calibration, noise update, freeze, clipping, sequence, and failure statistics.
+- Added deterministic reset and state snapshots.
+- Added architecture-independent adaptive-energy VAD tests.
+
+### Phase 4L-C
+
+- Integrated the adaptive-energy VAD backend into SpeechNode.
+- Added VAD backend and processor ROS parameters.
+- Added centralized backend and processor configuration validation.
+- Added required and optional VAD initialization behavior.
+- Registered VAD in the captured-audio processor chain.
+- Added explicit processor-before-backend shutdown ordering.
+- Added VAD dashboard state, levels, scoring, and event metrics.
+- Added dedicated savo_speech/vad diagnostics.
+- Added configurable Raspberry Pi and ReSpeaker production defaults.
+
+### Phase 4M-A
+
+- Added a hardware-independent utterance-session state machine.
+- Added idle, armed, and recording states.
+- Added wake-word event arming and replay rejection.
+- Added VAD speech-start and speech-end transition handling.
+- Added bounded chronological pre-roll capture.
+- Added stable utterance identifiers and wake/VAD metadata.
+- Added delayed speech-end handling until matching audio arrives.
+- Added speech-start and maximum-duration timeouts.
+- Added explicit cancellation and no-audio cancellation.
+- Added audio sequence, timestamp, format, and discontinuity validation.
+- Added completed utterance gap and missing-frame metadata.
+- Added a bounded drop-oldest completed-utterance queue.
+- Added deterministic reset, snapshot, polling, and timed-wait behavior.
+- Added hardware-independent utterance-session unit tests.
+
+### Phase 4M-B
+
+- Added a hardware-independent utterance-session processor bridge.
+- Connected WakeWordProcessor and VadProcessor event queues to UtteranceSessionCore.
+- Locked per-frame ordering as audio, wake events, VAD events, then time advancement.
+- Added same-frame wake-word and VAD speech-start handling.
+- Added same-frame speech-end audio inclusion before finalization.
+- Added deterministic timeout-boundary event precedence.
+- Added FIFO draining of all queued wake-word and VAD events.
+- Added accepted and rejected event statistics.
+- Added frame success, failure, and last-error statistics.
+- Added completed-utterance polling and timed-wait forwarding.
+- Added explicit cancellation forwarding.
+- Added reset behavior that discards pre-reset queued events.
+- Added upstream pending-event and session-state snapshots.
+- Added hardware-independent processor-bridge unit tests.
+
+### Phase 4M-C
+
+- Integrated UtteranceSessionProcessor into SpeechNode.
+- Added utterance-session enable and required parameters.
+- Added pre-roll, speech-start timeout, maximum-duration, and completed-queue parameters.
+- Added dependency validation requiring audio, wake word, and VAD.
+- Required sessions now require required wake-word and VAD processors.
+- Registered utterance_session as the final captured-audio processor.
+- Added required and optional session initialization behavior.
+- Added session-before-VAD shutdown ordering.
+- Mapped armed sessions to Listening and active sessions to Recording.
+- Added utterance-session dashboard and diagnostics integration.
+- Added Raspberry Pi and ReSpeaker production profile defaults.
+
+### Phase 4M-E
+
+- Integrated CompletedUtteranceWorker into SpeechNode.
+- Added bounded serialized-output queue configuration.
+- Added completed-source wait timeout and WAV byte limit parameters.
+- Added dependency validation on the utterance-session processor.
+- Added required and optional serialization-worker startup behavior.
+- Added dependency-safe worker shutdown before session destruction.
+- Added dashboard and dedicated diagnostics visibility.
+- Enabled serialization in the Raspberry Pi production profile.

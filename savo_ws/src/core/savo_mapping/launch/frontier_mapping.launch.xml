@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<launch>
+
+  <arg
+    name="enabled"
+    default="false"
+    description="Allow the explorer to publish selected frontier goals"/>
+
+  <arg
+    name="use_sim_time"
+    default="false"/>
+
+  <arg
+    name="map_frame"
+    default="map"/>
+
+  <arg
+    name="base_frame"
+    default="base_link"/>
+
+  <arg
+    name="frontier_params_file"
+    default="$(find-pkg-share savo_mapping)/config/frontier_mapping.yaml"/>
+
+  <arg
+    name="handoff_params_file"
+    default="$(find-pkg-share savo_mapping)/config/exploration_goal_handoff.yaml"/>
+
+  <node
+    pkg="savo_mapping"
+    exec="exploration_goal_handoff_node"
+    name="exploration_goal_handoff_node"
+    output="screen">
+
+    <param from="$(var handoff_params_file)"/>
+
+    <param
+      name="expected_frame"
+      value="$(var map_frame)"/>
+
+    <param
+      name="use_sim_time"
+      value="$(var use_sim_time)"/>
+  </node>
+
+  <node
+    pkg="savo_mapping"
+    exec="frontier_explorer_node"
+    name="frontier_explorer_node"
+    output="screen">
+
+    <param from="$(var frontier_params_file)"/>
+
+    <param
+      name="enabled"
+      value="$(var enabled)"/>
+
+    <param
+      name="use_sim_time"
+      value="$(var use_sim_time)"/>
+
+    <param
+      name="map_frame"
+      value="$(var map_frame)"/>
+
+    <param
+      name="base_frame"
+      value="$(var base_frame)"/>
+  </node>
+
+</launch>

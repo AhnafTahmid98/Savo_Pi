@@ -16,8 +16,12 @@
 #include "savo_speech/audio/captured_audio_processor_chain.hpp"
 #include "savo_speech/drivers/alsa_capture_stream.hpp"
 #include "savo_speech/drivers/alsa_playback_stream.hpp"
+#include "savo_speech/session/completed_utterance_worker.hpp"
 #include "savo_speech/session/speech_error.hpp"
 #include "savo_speech/session/speech_phase.hpp"
+#include "savo_speech/session/utterance_session_processor.hpp"
+#include "savo_speech/vad/adaptive_energy_vad_backend.hpp"
+#include "savo_speech/vad/vad_processor.hpp"
 #include "savo_speech/wake_word/pocketsphinx_wake_word_backend.hpp"
 #include "savo_speech/wake_word/wake_word_processor.hpp"
 
@@ -93,6 +97,57 @@ private:
     std::int64_t wake_word_cooldown_ms{2000};
     std::int64_t wake_word_event_queue_capacity{8};
 
+    bool vad_enabled{false};
+    bool vad_required{true};
+
+    std::int64_t vad_startup_calibration_frames{25};
+
+    double vad_initial_noise_floor_rms{0.005};
+    double vad_minimum_noise_floor_rms{0.0005};
+    double vad_maximum_noise_floor_rms{0.250};
+
+    double vad_noise_floor_update_alpha{0.05};
+    double vad_minimum_speech_rms{0.010};
+
+    double vad_speech_onset_snr_db{8.0};
+    double vad_speech_saturation_snr_db{20.0};
+
+    std::int64_t vad_clipping_threshold{32760};
+
+    double vad_speech_start_threshold{0.65};
+    double vad_speech_end_threshold{0.35};
+
+    std::int64_t vad_required_start_frames{3};
+    std::int64_t vad_required_end_frames{10};
+    std::int64_t vad_event_queue_capacity{8};
+
+    bool utterance_session_enabled{false};
+    bool utterance_session_required{true};
+
+    std::int64_t utterance_session_pre_roll_ms{1000};
+
+    std::int64_t
+      utterance_session_speech_start_timeout_ms{3000};
+
+    std::int64_t
+      utterance_session_maximum_duration_ms{15000};
+
+    std::int64_t
+      utterance_session_completed_queue_capacity{4};
+
+    bool utterance_serialization_enabled{false};
+    bool utterance_serialization_required{true};
+
+    std::int64_t
+      utterance_serialization_output_queue_capacity{4};
+
+    std::int64_t
+      utterance_serialization_source_wait_timeout_ms{100};
+
+    std::int64_t
+      utterance_serialization_maximum_wav_bytes{
+      2 * 1024 * 1024};
+
     double status_publish_rate_hz{2.0};
     double heartbeat_rate_hz{1.0};
   };
@@ -131,6 +186,9 @@ private:
   std::string reason_{"starting"};
 
   std::string wake_word_initialization_error_{};
+  std::string vad_initialization_error_{};
+  std::string utterance_session_initialization_error_{};
+  std::string utterance_serialization_initialization_error_{};
 
   std::uint64_t heartbeat_count_{0U};
 
@@ -152,6 +210,20 @@ private:
 
   std::unique_ptr<wake_word::WakeWordProcessor>
     wake_word_processor_;
+
+  std::unique_ptr<vad::AdaptiveEnergyVadBackend>
+    vad_backend_;
+
+  std::unique_ptr<vad::VadProcessor>
+    vad_processor_;
+
+  std::unique_ptr<
+    session::UtteranceSessionProcessor>
+    utterance_session_processor_;
+
+  std::unique_ptr<
+    session::CompletedUtteranceWorker>
+    completed_utterance_worker_;
 
   std::unique_ptr<audio::CapturedAudioProcessorChain>
     captured_audio_processor_chain_;

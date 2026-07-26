@@ -964,29 +964,19 @@ ReleaseRecord verify_release(
       if (artifact.role == "map_yaml") {
         release.map_yaml =
           artifact.path;
-      } else if (
-        artifact.role == "map_image")
-      {
+      } else if (artifact.role == "map_image") {
         release.map_image =
           artifact.path;
-      } else if (
-        artifact.role == "posegraph")
-      {
+      } else if (artifact.role == "posegraph") {
         release.posegraph =
           artifact.path;
-      } else if (
-        artifact.role == "data")
-      {
+      } else if (artifact.role == "data") {
         release.data =
           artifact.path;
-      } else if (
-        artifact.role == "quality_report")
-      {
+      } else if (artifact.role == "quality_report") {
         release.quality_report =
           artifact.path;
-      } else if (
-        artifact.role == "source_manifest")
-      {
+      } else if (artifact.role == "source_manifest") {
         release.source_manifest =
           artifact.path;
       }

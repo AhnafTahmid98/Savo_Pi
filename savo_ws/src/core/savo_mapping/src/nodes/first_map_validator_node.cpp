@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cinttypes>
 #include <cstdint>
 #include <iostream>
 #include <limits>
@@ -277,14 +278,15 @@ private:
       RCLCPP_INFO(
         get_logger(),
         "map=%ux%u resolution=%.3fm "
-        "known=%lu free=%lu occupied=%lu unknown=%lu",
+        "known=%" PRIu64 " free=%" PRIu64
+        " occupied=%" PRIu64 " unknown=%" PRIu64,
         map_width_,
         map_height_,
         map_resolution_m_,
-        static_cast<unsigned long>(known_cells_),
-        static_cast<unsigned long>(free_cells_),
-        static_cast<unsigned long>(occupied_cells_),
-        static_cast<unsigned long>(unknown_cells_));
+        known_cells_,
+        free_cells_,
+        occupied_cells_,
+        unknown_cells_);
 
       RCLCPP_INFO(
         get_logger(),

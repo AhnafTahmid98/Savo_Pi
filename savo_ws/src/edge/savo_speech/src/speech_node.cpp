@@ -429,6 +429,114 @@ void SpeechNode::declare_parameters()
     "wake_word.event_queue_capacity",
     8);
 
+  declare_parameter<bool>(
+    "vad.enabled",
+    false);
+
+  declare_parameter<bool>(
+    "vad.required",
+    true);
+
+  declare_parameter<std::int64_t>(
+    "vad.backend.startup_calibration_frames",
+    25);
+
+  declare_parameter<double>(
+    "vad.backend.initial_noise_floor_rms",
+    0.005);
+
+  declare_parameter<double>(
+    "vad.backend.minimum_noise_floor_rms",
+    0.0005);
+
+  declare_parameter<double>(
+    "vad.backend.maximum_noise_floor_rms",
+    0.250);
+
+  declare_parameter<double>(
+    "vad.backend.noise_floor_update_alpha",
+    0.05);
+
+  declare_parameter<double>(
+    "vad.backend.minimum_speech_rms",
+    0.010);
+
+  declare_parameter<double>(
+    "vad.backend.speech_onset_snr_db",
+    8.0);
+
+  declare_parameter<double>(
+    "vad.backend.speech_saturation_snr_db",
+    20.0);
+
+  declare_parameter<std::int64_t>(
+    "vad.backend.clipping_threshold",
+    32760);
+
+  declare_parameter<double>(
+    "vad.processor.speech_start_threshold",
+    0.65);
+
+  declare_parameter<double>(
+    "vad.processor.speech_end_threshold",
+    0.35);
+
+  declare_parameter<std::int64_t>(
+    "vad.processor.required_start_frames",
+    3);
+
+  declare_parameter<std::int64_t>(
+    "vad.processor.required_end_frames",
+    10);
+
+  declare_parameter<std::int64_t>(
+    "vad.processor.event_queue_capacity",
+    8);
+
+  declare_parameter<bool>(
+    "utterance_session.enabled",
+    false);
+
+  declare_parameter<bool>(
+    "utterance_session.required",
+    true);
+
+  declare_parameter<std::int64_t>(
+    "utterance_session.pre_roll_ms",
+    1000);
+
+  declare_parameter<std::int64_t>(
+    "utterance_session.speech_start_timeout_ms",
+    3000);
+
+  declare_parameter<std::int64_t>(
+    "utterance_session.maximum_duration_ms",
+    15000);
+
+  declare_parameter<std::int64_t>(
+    "utterance_session.completed_queue_capacity",
+    4);
+
+  declare_parameter<bool>(
+    "utterance_serialization.enabled",
+    false);
+
+  declare_parameter<bool>(
+    "utterance_serialization.required",
+    true);
+
+  declare_parameter<std::int64_t>(
+    "utterance_serialization.output_queue_capacity",
+    4);
+
+  declare_parameter<std::int64_t>(
+    "utterance_serialization.source_wait_timeout_ms",
+    100);
+
+  declare_parameter<std::int64_t>(
+    "utterance_serialization.maximum_wav_bytes",
+    2 * 1024 * 1024);
+
   declare_parameter<double>(
     "diagnostics.status_publish_rate_hz",
     constants::kDefaultStatusPublishRateHz);
@@ -563,6 +671,117 @@ void SpeechNode::load_parameters()
   config_.wake_word_event_queue_capacity =
     get_parameter(
     "wake_word.event_queue_capacity").as_int();
+
+  config_.vad_enabled =
+    get_parameter("vad.enabled").as_bool();
+
+  config_.vad_required =
+    get_parameter("vad.required").as_bool();
+
+  config_.vad_startup_calibration_frames =
+    get_parameter(
+    "vad.backend.startup_calibration_frames").as_int();
+
+  config_.vad_initial_noise_floor_rms =
+    get_parameter(
+    "vad.backend.initial_noise_floor_rms").as_double();
+
+  config_.vad_minimum_noise_floor_rms =
+    get_parameter(
+    "vad.backend.minimum_noise_floor_rms").as_double();
+
+  config_.vad_maximum_noise_floor_rms =
+    get_parameter(
+    "vad.backend.maximum_noise_floor_rms").as_double();
+
+  config_.vad_noise_floor_update_alpha =
+    get_parameter(
+    "vad.backend.noise_floor_update_alpha").as_double();
+
+  config_.vad_minimum_speech_rms =
+    get_parameter(
+    "vad.backend.minimum_speech_rms").as_double();
+
+  config_.vad_speech_onset_snr_db =
+    get_parameter(
+    "vad.backend.speech_onset_snr_db").as_double();
+
+  config_.vad_speech_saturation_snr_db =
+    get_parameter(
+    "vad.backend.speech_saturation_snr_db").as_double();
+
+  config_.vad_clipping_threshold =
+    get_parameter(
+    "vad.backend.clipping_threshold").as_int();
+
+  config_.vad_speech_start_threshold =
+    get_parameter(
+    "vad.processor.speech_start_threshold").as_double();
+
+  config_.vad_speech_end_threshold =
+    get_parameter(
+    "vad.processor.speech_end_threshold").as_double();
+
+  config_.vad_required_start_frames =
+    get_parameter(
+    "vad.processor.required_start_frames").as_int();
+
+  config_.vad_required_end_frames =
+    get_parameter(
+    "vad.processor.required_end_frames").as_int();
+
+  config_.vad_event_queue_capacity =
+    get_parameter(
+    "vad.processor.event_queue_capacity").as_int();
+
+  config_.utterance_session_enabled =
+    get_parameter(
+    "utterance_session.enabled").as_bool();
+
+  config_.utterance_session_required =
+    get_parameter(
+    "utterance_session.required").as_bool();
+
+  config_.utterance_session_pre_roll_ms =
+    get_parameter(
+    "utterance_session.pre_roll_ms").as_int();
+
+  config_.utterance_session_speech_start_timeout_ms =
+    get_parameter(
+    "utterance_session.speech_start_timeout_ms").as_int();
+
+  config_.utterance_session_maximum_duration_ms =
+    get_parameter(
+    "utterance_session.maximum_duration_ms").as_int();
+
+  config_.utterance_session_completed_queue_capacity =
+    get_parameter(
+    "utterance_session.completed_queue_capacity").as_int();
+
+  config_.utterance_serialization_enabled =
+    get_parameter(
+    "utterance_serialization.enabled").as_bool();
+
+  config_.utterance_serialization_required =
+    get_parameter(
+    "utterance_serialization.required").as_bool();
+
+  config_.
+  utterance_serialization_output_queue_capacity =
+    get_parameter(
+    "utterance_serialization.output_queue_capacity").
+    as_int();
+
+  config_.
+  utterance_serialization_source_wait_timeout_ms =
+    get_parameter(
+    "utterance_serialization.source_wait_timeout_ms").
+    as_int();
+
+  config_.utterance_serialization_maximum_wav_bytes =
+    get_parameter(
+    "utterance_serialization.maximum_wav_bytes").
+    as_int();
 
   config_.status_publish_rate_hz =
     get_parameter(
@@ -743,6 +962,253 @@ void SpeechNode::validate_parameters() const
       1,
       1024,
       "wake_word.event_queue_capacity");
+  }
+
+  if (config_.vad_enabled) {
+    if (!config_.audio_required) {
+      throw std::invalid_argument{
+              "vad.enabled requires audio.required=true"};
+    }
+
+    validate_integer_range(
+      config_.vad_startup_calibration_frames,
+      0,
+      100000,
+      "vad.backend.startup_calibration_frames");
+
+    validate_integer_range(
+      config_.vad_clipping_threshold,
+      1,
+      32768,
+      "vad.backend.clipping_threshold");
+
+    validate_integer_range(
+      config_.vad_required_start_frames,
+      1,
+      1000,
+      "vad.processor.required_start_frames");
+
+    validate_integer_range(
+      config_.vad_required_end_frames,
+      1,
+      1000,
+      "vad.processor.required_end_frames");
+
+    validate_integer_range(
+      config_.vad_event_queue_capacity,
+      1,
+      1024,
+      "vad.processor.event_queue_capacity");
+
+    vad::AdaptiveEnergyVadConfig backend_config;
+
+    backend_config.expected_sample_rate_hz =
+      static_cast<std::uint32_t>(
+      config_.sample_rate_hz);
+
+    backend_config.startup_calibration_frames =
+      static_cast<std::size_t>(
+      config_.vad_startup_calibration_frames);
+
+    backend_config.initial_noise_floor_rms =
+      config_.vad_initial_noise_floor_rms;
+
+    backend_config.minimum_noise_floor_rms =
+      config_.vad_minimum_noise_floor_rms;
+
+    backend_config.maximum_noise_floor_rms =
+      config_.vad_maximum_noise_floor_rms;
+
+    backend_config.noise_floor_update_alpha =
+      config_.vad_noise_floor_update_alpha;
+
+    backend_config.minimum_speech_rms =
+      config_.vad_minimum_speech_rms;
+
+    backend_config.speech_onset_snr_db =
+      config_.vad_speech_onset_snr_db;
+
+    backend_config.speech_saturation_snr_db =
+      config_.vad_speech_saturation_snr_db;
+
+    backend_config.clipping_threshold =
+      static_cast<std::uint32_t>(
+      config_.vad_clipping_threshold);
+
+    if (!backend_config.is_valid()) {
+      throw std::invalid_argument{
+              "invalid vad.backend parameter combination"};
+    }
+
+    vad::VadProcessorConfig processor_config;
+
+    processor_config.speech_start_threshold =
+      config_.vad_speech_start_threshold;
+
+    processor_config.speech_end_threshold =
+      config_.vad_speech_end_threshold;
+
+    processor_config.required_start_frames =
+      static_cast<std::size_t>(
+      config_.vad_required_start_frames);
+
+    processor_config.required_end_frames =
+      static_cast<std::size_t>(
+      config_.vad_required_end_frames);
+
+    processor_config.event_queue_capacity =
+      static_cast<std::size_t>(
+      config_.vad_event_queue_capacity);
+
+    if (!processor_config.is_valid()) {
+      throw std::invalid_argument{
+              "invalid vad.processor parameter combination"};
+    }
+  }
+
+  if (config_.utterance_session_enabled) {
+    if (!config_.audio_required) {
+      throw std::invalid_argument{
+              "utterance_session.enabled requires "
+              "audio.required=true"};
+    }
+
+    if (!config_.wake_word_enabled) {
+      throw std::invalid_argument{
+              "utterance_session.enabled requires "
+              "wake_word.enabled=true"};
+    }
+
+    if (!config_.vad_enabled) {
+      throw std::invalid_argument{
+              "utterance_session.enabled requires "
+              "vad.enabled=true"};
+    }
+
+    if (
+      config_.utterance_session_required &&
+      !config_.wake_word_required)
+    {
+      throw std::invalid_argument{
+              "required utterance session requires "
+              "wake_word.required=true"};
+    }
+
+    if (
+      config_.utterance_session_required &&
+      !config_.vad_required)
+    {
+      throw std::invalid_argument{
+              "required utterance session requires "
+              "vad.required=true"};
+    }
+
+    validate_integer_range(
+      config_.utterance_session_pre_roll_ms,
+      1,
+      10000,
+      "utterance_session.pre_roll_ms");
+
+    validate_integer_range(
+      config_.utterance_session_speech_start_timeout_ms,
+      1,
+      60000,
+      "utterance_session.speech_start_timeout_ms");
+
+    validate_integer_range(
+      config_.utterance_session_maximum_duration_ms,
+      1,
+      300000,
+      "utterance_session.maximum_duration_ms");
+
+    validate_integer_range(
+      config_.utterance_session_completed_queue_capacity,
+      1,
+      1024,
+      "utterance_session.completed_queue_capacity");
+
+    session::UtteranceSessionConfig session_config;
+
+    session_config.pre_roll_duration =
+      std::chrono::milliseconds{
+      config_.utterance_session_pre_roll_ms};
+
+    session_config.speech_start_timeout =
+      std::chrono::milliseconds{
+      config_.utterance_session_speech_start_timeout_ms};
+
+    session_config.maximum_utterance_duration =
+      std::chrono::milliseconds{
+      config_.utterance_session_maximum_duration_ms};
+
+    session_config.completed_queue_capacity =
+      static_cast<std::size_t>(
+      config_.utterance_session_completed_queue_capacity);
+
+    if (!session_config.is_valid()) {
+      throw std::invalid_argument{
+              "invalid utterance_session parameter "
+              "combination"};
+    }
+  }
+
+  if (config_.utterance_serialization_enabled) {
+    if (!config_.utterance_session_enabled) {
+      throw std::invalid_argument{
+              "utterance_serialization.enabled requires "
+              "utterance_session.enabled=true"};
+    }
+
+    if (
+      config_.utterance_serialization_required &&
+      !config_.utterance_session_required)
+    {
+      throw std::invalid_argument{
+              "required utterance serialization requires "
+              "utterance_session.required=true"};
+    }
+
+    validate_integer_range(
+      config_.
+      utterance_serialization_output_queue_capacity,
+      1,
+      1024,
+      "utterance_serialization.output_queue_capacity");
+
+    validate_integer_range(
+      config_.
+      utterance_serialization_source_wait_timeout_ms,
+      1,
+      5000,
+      "utterance_serialization.source_wait_timeout_ms");
+
+    validate_integer_range(
+      config_.utterance_serialization_maximum_wav_bytes,
+      44,
+      64 * 1024 * 1024,
+      "utterance_serialization.maximum_wav_bytes");
+
+    session::CompletedUtteranceWorkerConfig worker_config;
+
+    worker_config.output_queue_capacity =
+      static_cast<std::size_t>(
+      config_.
+      utterance_serialization_output_queue_capacity);
+
+    worker_config.source_wait_timeout =
+      std::chrono::milliseconds{
+      config_.
+      utterance_serialization_source_wait_timeout_ms};
+
+    worker_config.maximum_wav_bytes =
+      static_cast<std::size_t>(
+      config_.utterance_serialization_maximum_wav_bytes);
+
+    if (!worker_config.is_valid()) {
+      throw std::invalid_argument{
+              "invalid utterance_serialization parameter "
+              "combination"};
+    }
   }
 
   static_cast<void>(
@@ -1015,6 +1481,271 @@ void SpeechNode::initialize_audio_runtime()
       }
     }
 
+    vad_initialization_error_.clear();
+
+    if (config_.vad_enabled) {
+      try {
+        vad::AdaptiveEnergyVadConfig backend_config;
+
+        backend_config.expected_sample_rate_hz =
+          static_cast<std::uint32_t>(
+          config_.sample_rate_hz);
+
+        backend_config.startup_calibration_frames =
+          static_cast<std::size_t>(
+          config_.vad_startup_calibration_frames);
+
+        backend_config.initial_noise_floor_rms =
+          config_.vad_initial_noise_floor_rms;
+
+        backend_config.minimum_noise_floor_rms =
+          config_.vad_minimum_noise_floor_rms;
+
+        backend_config.maximum_noise_floor_rms =
+          config_.vad_maximum_noise_floor_rms;
+
+        backend_config.noise_floor_update_alpha =
+          config_.vad_noise_floor_update_alpha;
+
+        backend_config.minimum_speech_rms =
+          config_.vad_minimum_speech_rms;
+
+        backend_config.speech_onset_snr_db =
+          config_.vad_speech_onset_snr_db;
+
+        backend_config.speech_saturation_snr_db =
+          config_.vad_speech_saturation_snr_db;
+
+        backend_config.clipping_threshold =
+          static_cast<std::uint32_t>(
+          config_.vad_clipping_threshold);
+
+        vad_backend_ =
+          std::make_unique<
+          vad::AdaptiveEnergyVadBackend>(
+          backend_config);
+
+        vad::VadProcessorConfig processor_config;
+
+        processor_config.speech_start_threshold =
+          config_.vad_speech_start_threshold;
+
+        processor_config.speech_end_threshold =
+          config_.vad_speech_end_threshold;
+
+        processor_config.required_start_frames =
+          static_cast<std::size_t>(
+          config_.vad_required_start_frames);
+
+        processor_config.required_end_frames =
+          static_cast<std::size_t>(
+          config_.vad_required_end_frames);
+
+        processor_config.event_queue_capacity =
+          static_cast<std::size_t>(
+          config_.vad_event_queue_capacity);
+
+        vad_processor_ =
+          std::make_unique<vad::VadProcessor>(
+          *vad_backend_,
+          processor_config);
+
+        captured_audio_processor_chain_->add_processor(
+          "vad",
+          *vad_processor_,
+          config_.vad_required);
+
+        RCLCPP_INFO(
+          get_logger(),
+          "Adaptive-energy VAD ready: required=%s",
+          bool_text(config_.vad_required).c_str());
+      } catch (const std::exception & exception) {
+        vad_initialization_error_ =
+          exception.what();
+
+        vad_processor_.reset();
+        vad_backend_.reset();
+
+        if (config_.vad_required) {
+          throw std::runtime_error{
+                  "required VAD initialization failed: " +
+                  vad_initialization_error_};
+        }
+
+        RCLCPP_WARN(
+          get_logger(),
+          "Optional VAD backend unavailable: %s",
+          vad_initialization_error_.c_str());
+      }
+    }
+
+    utterance_session_initialization_error_.clear();
+
+    if (config_.utterance_session_enabled) {
+      try {
+        if (
+          !wake_word_processor_ ||
+          !vad_processor_)
+        {
+          throw std::runtime_error{
+                  "utterance session requires initialized "
+                  "wake-word and VAD processors"};
+        }
+
+        session::UtteranceSessionConfig session_config;
+
+        session_config.pre_roll_duration =
+          std::chrono::milliseconds{
+          config_.utterance_session_pre_roll_ms};
+
+        session_config.speech_start_timeout =
+          std::chrono::milliseconds{
+          config_.
+          utterance_session_speech_start_timeout_ms};
+
+        session_config.maximum_utterance_duration =
+          std::chrono::milliseconds{
+          config_.
+          utterance_session_maximum_duration_ms};
+
+        session_config.completed_queue_capacity =
+          static_cast<std::size_t>(
+          config_.
+          utterance_session_completed_queue_capacity);
+
+        utterance_session_processor_ =
+          std::make_unique<
+          session::UtteranceSessionProcessor>(
+          *wake_word_processor_,
+          *vad_processor_,
+          session_config);
+
+        captured_audio_processor_chain_->add_processor(
+          "utterance_session",
+          *utterance_session_processor_,
+          config_.utterance_session_required);
+
+        RCLCPP_INFO(
+          get_logger(),
+          "Utterance-session processor ready: "
+          "required=%s pre_roll_ms=%ld "
+          "speech_start_timeout_ms=%ld "
+          "maximum_duration_ms=%ld",
+          bool_text(
+            config_.
+            utterance_session_required).c_str(),
+          static_cast<long>(
+            config_.utterance_session_pre_roll_ms),
+          static_cast<long>(
+            config_.
+            utterance_session_speech_start_timeout_ms),
+          static_cast<long>(
+            config_.
+            utterance_session_maximum_duration_ms));
+      } catch (const std::exception & exception) {
+        utterance_session_initialization_error_ =
+          exception.what();
+
+        utterance_session_processor_.reset();
+
+        if (config_.utterance_session_required) {
+          throw std::runtime_error{
+                  "required utterance-session "
+                  "initialization failed: " +
+                  utterance_session_initialization_error_};
+        }
+
+        RCLCPP_WARN(
+          get_logger(),
+          "Optional utterance-session processor "
+          "unavailable: %s",
+          utterance_session_initialization_error_.c_str());
+      }
+    }
+
+    utterance_serialization_initialization_error_.clear();
+
+    if (config_.utterance_serialization_enabled) {
+      try {
+        if (!utterance_session_processor_) {
+          throw std::runtime_error{
+                  "utterance serialization requires an "
+                  "initialized utterance-session processor"};
+        }
+
+        session::CompletedUtteranceWorkerConfig worker_config;
+
+        worker_config.output_queue_capacity =
+          static_cast<std::size_t>(
+          config_.
+          utterance_serialization_output_queue_capacity);
+
+        worker_config.source_wait_timeout =
+          std::chrono::milliseconds{
+          config_.
+          utterance_serialization_source_wait_timeout_ms};
+
+        worker_config.maximum_wav_bytes =
+          static_cast<std::size_t>(
+          config_.
+          utterance_serialization_maximum_wav_bytes);
+
+        completed_utterance_worker_ =
+          std::make_unique<
+          session::CompletedUtteranceWorker>(
+          *utterance_session_processor_,
+          worker_config);
+
+        if (!completed_utterance_worker_->start()) {
+          throw std::runtime_error{
+                  "completed-utterance worker refused "
+                  "to start"};
+        }
+
+        RCLCPP_INFO(
+          get_logger(),
+          "Completed-utterance worker ready: "
+          "required=%s output_queue_capacity=%ld "
+          "source_wait_timeout_ms=%ld "
+          "maximum_wav_bytes=%ld",
+          bool_text(
+            config_.
+            utterance_serialization_required).c_str(),
+          static_cast<long>(
+            config_.
+            utterance_serialization_output_queue_capacity),
+          static_cast<long>(
+            config_.
+            utterance_serialization_source_wait_timeout_ms),
+          static_cast<long>(
+            config_.
+            utterance_serialization_maximum_wav_bytes));
+      } catch (const std::exception & exception) {
+        utterance_serialization_initialization_error_ =
+          exception.what();
+
+        if (completed_utterance_worker_) {
+          completed_utterance_worker_->stop();
+        }
+
+        completed_utterance_worker_.reset();
+
+        if (config_.utterance_serialization_required) {
+          throw std::runtime_error{
+                  "required utterance serialization "
+                  "initialization failed: " +
+                  utterance_serialization_initialization_error_};
+        }
+
+        RCLCPP_WARN(
+          get_logger(),
+          "Optional completed-utterance worker "
+          "unavailable: %s",
+          utterance_serialization_initialization_error_.
+          c_str());
+      }
+    }
+
     const bool processor_chain_sealed =
       captured_audio_processor_chain_->seal();
 
@@ -1092,8 +1823,23 @@ void SpeechNode::shutdown_audio_runtime() noexcept
     capture_processing_dispatcher_->stop();
   }
 
+  if (completed_utterance_worker_) {
+    completed_utterance_worker_->stop();
+  }
+
   capture_processing_dispatcher_.reset();
+  completed_utterance_worker_.reset();
+
   captured_audio_processor_chain_.reset();
+
+  utterance_session_processor_.reset();
+
+  vad_processor_.reset();
+  vad_backend_.reset();
+
+  wake_word_processor_.reset();
+  wake_word_backend_.reset();
+
   audio_activity_monitor_.reset();
 
   if (audio_runtime_) {
@@ -1247,7 +1993,28 @@ void SpeechNode::refresh_runtime_state()
         case audio::MicrophoneGateReason::
           PostPlaybackHold:
         case audio::MicrophoneGateReason::Shutdown:
-          phase_ = session::SpeechPhase::Idle;
+          if (!utterance_session_processor_) {
+            phase_ = session::SpeechPhase::Idle;
+            break;
+          }
+
+          switch (
+            utterance_session_processor_->
+            snapshot().session.state)
+          {
+            case session::UtteranceSessionState::Idle:
+              phase_ = session::SpeechPhase::Idle;
+              break;
+
+            case session::UtteranceSessionState::Armed:
+              phase_ = session::SpeechPhase::Listening;
+              break;
+
+            case session::UtteranceSessionState::Recording:
+              phase_ = session::SpeechPhase::Recording;
+              break;
+          }
+
           break;
       }
 
@@ -1505,6 +2272,214 @@ std::string SpeechNode::dashboard_text() const
     stream
       << " wake_initialization_error="
       << wake_word_initialization_error_;
+  }
+
+  stream
+    << " vad_enabled="
+    << bool_text(config_.vad_enabled)
+    << " vad_required="
+    << bool_text(config_.vad_required);
+
+  if (vad_backend_) {
+    const auto backend =
+      vad_backend_->snapshot();
+
+    stream
+      << " vad_calibrated="
+      << bool_text(backend.calibrated)
+      << " vad_calibration_frames="
+      << backend.calibration_frames_completed
+      << " vad_noise_floor_rms="
+      << backend.noise_floor_rms
+      << " vad_rms="
+      << backend.last_rms
+      << " vad_peak="
+      << backend.last_peak
+      << " vad_snr_db="
+      << backend.last_snr_db
+      << " vad_speech_score="
+      << backend.last_speech_score
+      << " vad_clipping="
+      << bool_text(backend.last_frame_clipping)
+      << " vad_backend_frames="
+      << backend.statistics.frames_analyzed
+      << " vad_noise_updates="
+      << backend.statistics.noise_floor_updates
+      << " vad_noise_freezes="
+      << backend.statistics.noise_floor_freezes;
+  }
+
+  if (vad_processor_) {
+    const auto processor =
+      vad_processor_->snapshot();
+
+    stream
+      << " vad_state="
+      << vad::to_string(processor.state)
+      << " vad_processor_frames="
+      << processor.statistics.frames_processed
+      << " vad_speech_started="
+      << processor.statistics.speech_started_events
+      << " vad_speech_ended="
+      << processor.statistics.speech_ended_events
+      << " vad_active_segment="
+      << processor.active_segment_id
+      << " vad_queued_events="
+      << processor.queued_events
+      << " vad_events_dropped="
+      << processor.statistics.events_dropped;
+  }
+
+  if (!vad_initialization_error_.empty()) {
+    stream
+      << " vad_initialization_error="
+      << vad_initialization_error_;
+  }
+
+  stream
+    << " utterance_session_enabled="
+    << bool_text(config_.utterance_session_enabled)
+    << " utterance_session_required="
+    << bool_text(config_.utterance_session_required);
+
+  if (utterance_session_processor_) {
+    const auto utterance =
+      utterance_session_processor_->snapshot();
+
+    const std::string last_completion =
+      utterance.session.last_completion_reason.has_value() ?
+      std::string{
+        session::to_string(
+          *utterance.session.last_completion_reason)} :
+      std::string{"none"};
+
+    stream
+      << " utterance_state="
+      << session::to_string(
+        utterance.session.state)
+      << " utterance_active_id="
+      << utterance.session.active_utterance_id
+      << " utterance_active_segment="
+      << utterance.session.active_vad_segment_id
+      << " utterance_wake_phrase="
+      << utterance.session.active_wake_phrase
+      << " utterance_active_samples="
+      << utterance.session.active_audio_samples
+      << " utterance_queued_completed="
+      << utterance.session.queued_completed_utterances
+      << " utterance_processor_frames="
+      << utterance.statistics.frames_received
+      << " utterance_processor_failures="
+      << utterance.statistics.frames_failed
+      << " utterance_wake_accepted="
+      << utterance.statistics.wake_events_accepted
+      << " utterance_wake_rejected="
+      << utterance.statistics.wake_events_rejected
+      << " utterance_vad_accepted="
+      << utterance.statistics.vad_events_accepted
+      << " utterance_vad_rejected="
+      << utterance.statistics.vad_events_rejected
+      << " utterances_completed="
+      << utterance.session.statistics.utterances_completed
+      << " utterance_sessions_canceled="
+      << utterance.session.statistics.sessions_canceled
+      << " utterance_sequence_gaps="
+      << utterance.session.statistics.sequence_gaps
+      << " utterance_missing_frames="
+      << utterance.session.statistics.missing_audio_frames
+      << " utterance_last_cancellation="
+      << session::to_string(
+        utterance.session.last_cancellation_reason)
+      << " utterance_last_completion="
+      << last_completion;
+
+    if (!utterance.last_error.empty()) {
+      stream
+        << " utterance_processor_error="
+        << utterance.last_error;
+    }
+
+    if (!utterance.session.last_error.empty()) {
+      stream
+        << " utterance_session_error="
+        << utterance.session.last_error;
+    }
+  }
+
+  if (
+    !utterance_session_initialization_error_.empty())
+  {
+    stream
+      << " utterance_initialization_error="
+      << utterance_session_initialization_error_;
+  }
+
+  stream
+    << " utterance_serialization_enabled="
+    << bool_text(config_.utterance_serialization_enabled)
+    << " utterance_serialization_required="
+    << bool_text(config_.utterance_serialization_required);
+
+  if (completed_utterance_worker_) {
+    const auto serialization =
+      completed_utterance_worker_->snapshot();
+
+    const std::string current_id =
+      serialization.current_utterance_id.has_value() ?
+      std::to_string(
+        *serialization.current_utterance_id) :
+      std::string{"none"};
+
+    const std::string last_id =
+      serialization.last_seen_utterance_id.has_value() ?
+      std::to_string(
+        *serialization.last_seen_utterance_id) :
+      std::string{"none"};
+
+    stream
+      << " utterance_serialization_state="
+      << session::to_string(serialization.state)
+      << " serialized_queue_size="
+      << serialization.output_queue.size
+      << " serialized_queue_capacity="
+      << serialization.output_queue.capacity
+      << " serialization_received="
+      << serialization.statistics.utterances_received
+      << " serialization_completed="
+      << serialization.statistics.utterances_serialized
+      << " serialization_invalid="
+      << serialization.statistics.invalid_utterances
+      << " serialization_id_rejections="
+      << serialization.statistics.
+      duplicate_or_out_of_order_ids
+      << " serialization_encoding_failures="
+      << serialization.statistics.encoding_failures
+      << " serialization_size_rejections="
+      << serialization.statistics.
+      wav_size_limit_rejections
+      << " serialization_queue_rejections="
+      << serialization.statistics.
+      output_queue_rejections
+      << " serialization_faults="
+      << serialization.statistics.faults
+      << " serialization_current_id="
+      << current_id
+      << " serialization_last_id="
+      << last_id;
+
+    if (!serialization.last_error.empty()) {
+      stream
+        << " serialization_error="
+        << serialization.last_error;
+    }
+  }
+
+  if (
+    !utterance_serialization_initialization_error_.empty())
+  {
+    stream
+      << " serialization_initialization_error="
+      << utterance_serialization_initialization_error_;
   }
 
   return stream.str();
@@ -2229,6 +3204,727 @@ SpeechNode::create_diagnostics() const
 
   array.status.push_back(
     std::move(wake_word_status));
+
+  diagnostic_msgs::msg::DiagnosticStatus vad_status;
+
+  vad_status.name = "savo_speech/vad";
+  vad_status.hardware_id = config_.device_id;
+
+  vad_status.values.push_back(
+    make_key_value(
+      "enabled",
+      bool_text(config_.vad_enabled)));
+
+  vad_status.values.push_back(
+    make_key_value(
+      "required",
+      bool_text(config_.vad_required)));
+
+  vad_status.values.push_back(
+    make_key_value(
+      "initialization_error",
+      vad_initialization_error_));
+
+  if (!config_.vad_enabled) {
+    vad_status.level =
+      diagnostic_msgs::msg::DiagnosticStatus::OK;
+
+    vad_status.message = "disabled";
+  } else if (!vad_backend_ || !vad_processor_) {
+    vad_status.level =
+      config_.vad_required ?
+      diagnostic_msgs::msg::DiagnosticStatus::ERROR :
+      diagnostic_msgs::msg::DiagnosticStatus::WARN;
+
+    vad_status.message = "not_initialized";
+  } else {
+    const auto backend =
+      vad_backend_->snapshot();
+
+    const auto processor =
+      vad_processor_->snapshot();
+
+    const bool healthy =
+      backend.last_error.empty() &&
+      processor.last_error.empty();
+
+    if (!healthy) {
+      vad_status.level =
+        config_.vad_required ?
+        diagnostic_msgs::msg::DiagnosticStatus::ERROR :
+        diagnostic_msgs::msg::DiagnosticStatus::WARN;
+
+      vad_status.message = "degraded";
+    } else if (!backend.calibrated) {
+      vad_status.level =
+        diagnostic_msgs::msg::DiagnosticStatus::WARN;
+
+      vad_status.message = "calibrating";
+    } else {
+      vad_status.level =
+        diagnostic_msgs::msg::DiagnosticStatus::OK;
+
+      vad_status.message = "running";
+    }
+
+    vad_status.values.push_back(
+      make_key_value(
+        "calibrated",
+        bool_text(backend.calibrated)));
+
+    vad_status.values.push_back(
+      make_key_value(
+        "calibration_frames_completed",
+        std::to_string(
+          backend.calibration_frames_completed)));
+
+    vad_status.values.push_back(
+      make_key_value(
+        "noise_floor_rms",
+        std::to_string(
+          backend.noise_floor_rms)));
+
+    vad_status.values.push_back(
+      make_key_value(
+        "last_rms",
+        std::to_string(
+          backend.last_rms)));
+
+    vad_status.values.push_back(
+      make_key_value(
+        "last_peak",
+        std::to_string(
+          backend.last_peak)));
+
+    vad_status.values.push_back(
+      make_key_value(
+        "last_snr_db",
+        std::to_string(
+          backend.last_snr_db)));
+
+    vad_status.values.push_back(
+      make_key_value(
+        "last_speech_score",
+        std::to_string(
+          backend.last_speech_score)));
+
+    vad_status.values.push_back(
+      make_key_value(
+        "last_frame_clipping",
+        bool_text(
+          backend.last_frame_clipping)));
+
+    vad_status.values.push_back(
+      make_key_value(
+        "backend_frames",
+        std::to_string(
+          backend.statistics.frames_analyzed)));
+
+    vad_status.values.push_back(
+      make_key_value(
+        "samples_analyzed",
+        std::to_string(
+          backend.statistics.samples_analyzed)));
+
+    vad_status.values.push_back(
+      make_key_value(
+        "noise_floor_updates",
+        std::to_string(
+          backend.statistics.noise_floor_updates)));
+
+    vad_status.values.push_back(
+      make_key_value(
+        "noise_floor_freezes",
+        std::to_string(
+          backend.statistics.noise_floor_freezes)));
+
+    vad_status.values.push_back(
+      make_key_value(
+        "clipping_frames",
+        std::to_string(
+          backend.statistics.clipping_frames)));
+
+    vad_status.values.push_back(
+      make_key_value(
+        "backend_last_error",
+        backend.last_error));
+
+    vad_status.values.push_back(
+      make_key_value(
+        "state",
+        std::string{
+          vad::to_string(processor.state)}));
+
+    vad_status.values.push_back(
+      make_key_value(
+        "processor_frames",
+        std::to_string(
+          processor.statistics.frames_processed)));
+
+    vad_status.values.push_back(
+      make_key_value(
+        "speech_started_events",
+        std::to_string(
+          processor.statistics.speech_started_events)));
+
+    vad_status.values.push_back(
+      make_key_value(
+        "speech_ended_events",
+        std::to_string(
+          processor.statistics.speech_ended_events)));
+
+    vad_status.values.push_back(
+      make_key_value(
+        "active_segment_id",
+        std::to_string(
+          processor.active_segment_id)));
+
+    vad_status.values.push_back(
+      make_key_value(
+        "queued_events",
+        std::to_string(
+          processor.queued_events)));
+
+    vad_status.values.push_back(
+      make_key_value(
+        "events_dropped",
+        std::to_string(
+          processor.statistics.events_dropped)));
+
+    vad_status.values.push_back(
+      make_key_value(
+        "processor_last_error",
+        processor.last_error));
+  }
+
+  array.status.push_back(
+    std::move(vad_status));
+
+  diagnostic_msgs::msg::DiagnosticStatus
+    utterance_status;
+
+  utterance_status.name =
+    "savo_speech/utterance_session";
+
+  utterance_status.hardware_id =
+    config_.device_id;
+
+  utterance_status.values.push_back(
+    make_key_value(
+      "enabled",
+      bool_text(
+        config_.utterance_session_enabled)));
+
+  utterance_status.values.push_back(
+    make_key_value(
+      "required",
+      bool_text(
+        config_.utterance_session_required)));
+
+  utterance_status.values.push_back(
+    make_key_value(
+      "pre_roll_ms",
+      std::to_string(
+        config_.utterance_session_pre_roll_ms)));
+
+  utterance_status.values.push_back(
+    make_key_value(
+      "speech_start_timeout_ms",
+      std::to_string(
+        config_.
+        utterance_session_speech_start_timeout_ms)));
+
+  utterance_status.values.push_back(
+    make_key_value(
+      "maximum_duration_ms",
+      std::to_string(
+        config_.
+        utterance_session_maximum_duration_ms)));
+
+  utterance_status.values.push_back(
+    make_key_value(
+      "completed_queue_capacity",
+      std::to_string(
+        config_.
+        utterance_session_completed_queue_capacity)));
+
+  utterance_status.values.push_back(
+    make_key_value(
+      "initialization_error",
+      utterance_session_initialization_error_));
+
+  if (!config_.utterance_session_enabled) {
+    utterance_status.level =
+      diagnostic_msgs::msg::DiagnosticStatus::OK;
+
+    utterance_status.message = "disabled";
+  } else if (!utterance_session_processor_) {
+    utterance_status.level =
+      config_.utterance_session_required ?
+      diagnostic_msgs::msg::DiagnosticStatus::ERROR :
+      diagnostic_msgs::msg::DiagnosticStatus::WARN;
+
+    utterance_status.message = "not_initialized";
+  } else {
+    const auto utterance =
+      utterance_session_processor_->snapshot();
+
+    const bool healthy =
+      utterance.last_error.empty() &&
+      utterance.session.last_error.empty();
+
+    if (healthy) {
+      utterance_status.level =
+        diagnostic_msgs::msg::DiagnosticStatus::OK;
+
+      utterance_status.message =
+        std::string{
+        session::to_string(
+          utterance.session.state)};
+    } else {
+      utterance_status.level =
+        config_.utterance_session_required ?
+        diagnostic_msgs::msg::DiagnosticStatus::ERROR :
+        diagnostic_msgs::msg::DiagnosticStatus::WARN;
+
+      utterance_status.message = "degraded";
+    }
+
+    const std::string last_completion =
+      utterance.session.last_completion_reason.has_value() ?
+      std::string{
+        session::to_string(
+          *utterance.session.last_completion_reason)} :
+      std::string{"none"};
+
+    utterance_status.values.push_back(
+      make_key_value(
+        "state",
+        std::string{
+          session::to_string(
+            utterance.session.state)}));
+
+    utterance_status.values.push_back(
+      make_key_value(
+        "active_utterance_id",
+        std::to_string(
+          utterance.session.active_utterance_id)));
+
+    utterance_status.values.push_back(
+      make_key_value(
+        "active_vad_segment_id",
+        std::to_string(
+          utterance.session.active_vad_segment_id)));
+
+    utterance_status.values.push_back(
+      make_key_value(
+        "active_wake_phrase",
+        utterance.session.active_wake_phrase));
+
+    utterance_status.values.push_back(
+      make_key_value(
+        "active_audio_samples",
+        std::to_string(
+          utterance.session.active_audio_samples)));
+
+    utterance_status.values.push_back(
+      make_key_value(
+        "queued_completed_utterances",
+        std::to_string(
+          utterance.session.
+          queued_completed_utterances)));
+
+    utterance_status.values.push_back(
+      make_key_value(
+        "pending_wake_events",
+        std::to_string(
+          utterance.pending_wake_events)));
+
+    utterance_status.values.push_back(
+      make_key_value(
+        "pending_vad_events",
+        std::to_string(
+          utterance.pending_vad_events)));
+
+    utterance_status.values.push_back(
+      make_key_value(
+        "processor_frames_received",
+        std::to_string(
+          utterance.statistics.frames_received)));
+
+    utterance_status.values.push_back(
+      make_key_value(
+        "processor_frames_completed",
+        std::to_string(
+          utterance.statistics.frames_completed)));
+
+    utterance_status.values.push_back(
+      make_key_value(
+        "processor_frames_failed",
+        std::to_string(
+          utterance.statistics.frames_failed)));
+
+    utterance_status.values.push_back(
+      make_key_value(
+        "wake_events_accepted",
+        std::to_string(
+          utterance.statistics.
+          wake_events_accepted)));
+
+    utterance_status.values.push_back(
+      make_key_value(
+        "wake_events_rejected",
+        std::to_string(
+          utterance.statistics.
+          wake_events_rejected)));
+
+    utterance_status.values.push_back(
+      make_key_value(
+        "vad_events_accepted",
+        std::to_string(
+          utterance.statistics.
+          vad_events_accepted)));
+
+    utterance_status.values.push_back(
+      make_key_value(
+        "vad_events_rejected",
+        std::to_string(
+          utterance.statistics.
+          vad_events_rejected)));
+
+    utterance_status.values.push_back(
+      make_key_value(
+        "utterances_completed",
+        std::to_string(
+          utterance.session.statistics.
+          utterances_completed)));
+
+    utterance_status.values.push_back(
+      make_key_value(
+        "speech_ended_completions",
+        std::to_string(
+          utterance.session.statistics.
+          speech_ended_completions)));
+
+    utterance_status.values.push_back(
+      make_key_value(
+        "maximum_duration_completions",
+        std::to_string(
+          utterance.session.statistics.
+          maximum_duration_completions)));
+
+    utterance_status.values.push_back(
+      make_key_value(
+        "sessions_canceled",
+        std::to_string(
+          utterance.session.statistics.
+          sessions_canceled)));
+
+    utterance_status.values.push_back(
+      make_key_value(
+        "speech_start_timeouts",
+        std::to_string(
+          utterance.session.statistics.
+          speech_start_timeouts)));
+
+    utterance_status.values.push_back(
+      make_key_value(
+        "sequence_gaps",
+        std::to_string(
+          utterance.session.statistics.
+          sequence_gaps)));
+
+    utterance_status.values.push_back(
+      make_key_value(
+        "missing_audio_frames",
+        std::to_string(
+          utterance.session.statistics.
+          missing_audio_frames)));
+
+    utterance_status.values.push_back(
+      make_key_value(
+        "completed_queue_overflows",
+        std::to_string(
+          utterance.session.statistics.
+          completed_queue_overflows)));
+
+    utterance_status.values.push_back(
+      make_key_value(
+        "last_cancellation_reason",
+        std::string{
+          session::to_string(
+            utterance.session.
+            last_cancellation_reason)}));
+
+    utterance_status.values.push_back(
+      make_key_value(
+        "last_completion_reason",
+        last_completion));
+
+    utterance_status.values.push_back(
+      make_key_value(
+        "processor_last_error",
+        utterance.last_error));
+
+    utterance_status.values.push_back(
+      make_key_value(
+        "session_last_error",
+        utterance.session.last_error));
+  }
+
+  array.status.push_back(
+    std::move(utterance_status));
+
+  diagnostic_msgs::msg::DiagnosticStatus
+    serialization_status;
+
+  serialization_status.name =
+    "savo_speech/utterance_serialization";
+
+  serialization_status.hardware_id =
+    config_.device_id;
+
+  serialization_status.values.push_back(
+    make_key_value(
+      "enabled",
+      bool_text(
+        config_.utterance_serialization_enabled)));
+
+  serialization_status.values.push_back(
+    make_key_value(
+      "required",
+      bool_text(
+        config_.utterance_serialization_required)));
+
+  serialization_status.values.push_back(
+    make_key_value(
+      "output_queue_capacity",
+      std::to_string(
+        config_.
+        utterance_serialization_output_queue_capacity)));
+
+  serialization_status.values.push_back(
+    make_key_value(
+      "source_wait_timeout_ms",
+      std::to_string(
+        config_.
+        utterance_serialization_source_wait_timeout_ms)));
+
+  serialization_status.values.push_back(
+    make_key_value(
+      "maximum_wav_bytes",
+      std::to_string(
+        config_.
+        utterance_serialization_maximum_wav_bytes)));
+
+  serialization_status.values.push_back(
+    make_key_value(
+      "initialization_error",
+      utterance_serialization_initialization_error_));
+
+  if (!config_.utterance_serialization_enabled) {
+    serialization_status.level =
+      diagnostic_msgs::msg::DiagnosticStatus::OK;
+
+    serialization_status.message = "disabled";
+  } else if (!completed_utterance_worker_) {
+    serialization_status.level =
+      config_.utterance_serialization_required ?
+      diagnostic_msgs::msg::DiagnosticStatus::ERROR :
+      diagnostic_msgs::msg::DiagnosticStatus::WARN;
+
+    serialization_status.message = "not_initialized";
+  } else {
+    const auto serialization =
+      completed_utterance_worker_->snapshot();
+
+    const std::string current_id =
+      serialization.current_utterance_id.has_value() ?
+      std::to_string(
+        *serialization.current_utterance_id) :
+      std::string{"none"};
+
+    const std::string last_id =
+      serialization.last_seen_utterance_id.has_value() ?
+      std::to_string(
+        *serialization.last_seen_utterance_id) :
+      std::string{"none"};
+
+    if (
+      serialization.state ==
+      session::CompletedUtteranceWorkerState::Faulted)
+    {
+      serialization_status.level =
+        config_.utterance_serialization_required ?
+        diagnostic_msgs::msg::DiagnosticStatus::ERROR :
+        diagnostic_msgs::msg::DiagnosticStatus::WARN;
+
+      serialization_status.message = "faulted";
+    } else if (
+      serialization.state !=
+      session::CompletedUtteranceWorkerState::Running)
+    {
+      serialization_status.level =
+        config_.utterance_serialization_required ?
+        diagnostic_msgs::msg::DiagnosticStatus::ERROR :
+        diagnostic_msgs::msg::DiagnosticStatus::WARN;
+
+      serialization_status.message =
+        std::string{
+        session::to_string(serialization.state)};
+    } else if (!serialization.last_error.empty()) {
+      serialization_status.level =
+        diagnostic_msgs::msg::DiagnosticStatus::WARN;
+
+      serialization_status.message = "degraded";
+    } else {
+      serialization_status.level =
+        diagnostic_msgs::msg::DiagnosticStatus::OK;
+
+      serialization_status.message = "running";
+    }
+
+    serialization_status.values.push_back(
+      make_key_value(
+        "state",
+        std::string{
+          session::to_string(serialization.state)}));
+
+    serialization_status.values.push_back(
+      make_key_value(
+        "queue_size",
+        std::to_string(
+          serialization.output_queue.size)));
+
+    serialization_status.values.push_back(
+      make_key_value(
+        "queue_capacity",
+        std::to_string(
+          serialization.output_queue.capacity)));
+
+    serialization_status.values.push_back(
+      make_key_value(
+        "queue_accepted",
+        std::to_string(
+          serialization.output_queue.accepted)));
+
+    serialization_status.values.push_back(
+      make_key_value(
+        "queue_rejected_invalid",
+        std::to_string(
+          serialization.output_queue.rejected_invalid)));
+
+    serialization_status.values.push_back(
+      make_key_value(
+        "queue_rejected_duplicate_id",
+        std::to_string(
+          serialization.output_queue.
+          rejected_duplicate_id)));
+
+    serialization_status.values.push_back(
+      make_key_value(
+        "queue_rejected_full",
+        std::to_string(
+          serialization.output_queue.rejected_full)));
+
+    serialization_status.values.push_back(
+      make_key_value(
+        "queue_popped",
+        std::to_string(
+          serialization.output_queue.popped)));
+
+    serialization_status.values.push_back(
+      make_key_value(
+        "starts",
+        std::to_string(
+          serialization.statistics.starts)));
+
+    serialization_status.values.push_back(
+      make_key_value(
+        "stops",
+        std::to_string(
+          serialization.statistics.stops)));
+
+    serialization_status.values.push_back(
+      make_key_value(
+        "source_wait_timeouts",
+        std::to_string(
+          serialization.statistics.
+          source_wait_timeouts)));
+
+    serialization_status.values.push_back(
+      make_key_value(
+        "utterances_received",
+        std::to_string(
+          serialization.statistics.
+          utterances_received)));
+
+    serialization_status.values.push_back(
+      make_key_value(
+        "utterances_serialized",
+        std::to_string(
+          serialization.statistics.
+          utterances_serialized)));
+
+    serialization_status.values.push_back(
+      make_key_value(
+        "invalid_utterances",
+        std::to_string(
+          serialization.statistics.
+          invalid_utterances)));
+
+    serialization_status.values.push_back(
+      make_key_value(
+        "duplicate_or_out_of_order_ids",
+        std::to_string(
+          serialization.statistics.
+          duplicate_or_out_of_order_ids)));
+
+    serialization_status.values.push_back(
+      make_key_value(
+        "encoding_failures",
+        std::to_string(
+          serialization.statistics.
+          encoding_failures)));
+
+    serialization_status.values.push_back(
+      make_key_value(
+        "wav_size_limit_rejections",
+        std::to_string(
+          serialization.statistics.
+          wav_size_limit_rejections)));
+
+    serialization_status.values.push_back(
+      make_key_value(
+        "output_queue_rejections",
+        std::to_string(
+          serialization.statistics.
+          output_queue_rejections)));
+
+    serialization_status.values.push_back(
+      make_key_value(
+        "faults",
+        std::to_string(
+          serialization.statistics.faults)));
+
+    serialization_status.values.push_back(
+      make_key_value(
+        "current_utterance_id",
+        current_id));
+
+    serialization_status.values.push_back(
+      make_key_value(
+        "last_seen_utterance_id",
+        last_id));
+
+    serialization_status.values.push_back(
+      make_key_value(
+        "last_error",
+        serialization.last_error));
+  }
+
+  array.status.push_back(
+    std::move(serialization_status));
 
   return array;
 }

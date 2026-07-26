@@ -105,6 +105,12 @@ add_library(savo_speech_audio_core STATIC
   src/audio/playback_worker.cpp
   src/audio/wav_reader.cpp
   src/audio/wav_writer.cpp
+  src/session/completed_utterance_queue.cpp
+  src/session/completed_utterance_worker.cpp
+  src/session/utterance_session_core.cpp
+  src/session/utterance_session_processor.cpp
+  src/vad/adaptive_energy_vad_backend.cpp
+  src/vad/vad_processor.cpp
   src/wake_word/wake_word_processor.cpp
   src/wake_word/wake_word_asset_resolver.cpp
 )
@@ -320,6 +326,12 @@ if(BUILD_TESTING)
     test/unit/test_microphone_gate.cpp
     test/unit/test_playback_controller.cpp
     test/unit/test_playback_worker.cpp
+    test/unit/test_adaptive_energy_vad_backend.cpp
+    test/unit/test_vad_processor.cpp
+    test/unit/test_utterance_session_core.cpp
+    test/unit/test_utterance_session_processor.cpp
+    test/unit/test_completed_utterance_queue.cpp
+    test/unit/test_completed_utterance_worker.cpp
     test/unit/test_pocketsphinx_wake_word_backend.cpp
     test/unit/test_wake_word_assets.cpp
     test/unit/test_wake_word_asset_resolver.cpp

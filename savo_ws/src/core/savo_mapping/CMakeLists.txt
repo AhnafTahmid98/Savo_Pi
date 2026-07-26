@@ -1,6 +1,12 @@
 cmake_minimum_required(VERSION 3.8)
 project(savo_mapping VERSION 0.1.0)
 
+option(
+  SAVO_MAPPING_BUILD_PC_SIMULATION
+  "Build and install PC-only simulation tooling"
+  OFF
+)
+
 if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 17)
 endif()
@@ -36,10 +42,15 @@ add_library(${PROJECT_NAME}_core
   src/core/mapping_types.cpp
   src/core/mapping_status.cpp
   src/core/supervisor_runtime.cpp
+  src/exploration/exploration_goal.cpp
+  src/exploration/exploration_planner.cpp
+  src/frontier/frontier_detector.cpp
+  src/frontier/frontier_selector.cpp
   src/quality/map_quality_placeholder.cpp
   src/slam/slam_contract.cpp
   src/slam/simulated_scan_model.cpp
   src/workflow/manual_workflow_state.cpp
+  src/workflow/workflow_authority.cpp
   src/session/map_session_policy.cpp
   src/session/saved_map_contract.cpp
   src/session/saved_map_quality.cpp
@@ -100,26 +111,34 @@ install(
   DESTINATION lib/${PROJECT_NAME}
 )
 
-add_executable(simulated_slam_input_node
-  src/nodes/simulated_slam_input_node.cpp
-)
+if(SAVO_MAPPING_BUILD_PC_SIMULATION)
+  add_executable(simulated_slam_input_node
+    src/nodes/simulated_slam_input_node.cpp
+  )
 
-target_compile_features(simulated_slam_input_node
-  PRIVATE
-    cxx_std_17
-)
+  target_compile_features(simulated_slam_input_node
+    PRIVATE
+      cxx_std_17
+  )
 
-target_link_libraries(simulated_slam_input_node
-  ${PROJECT_NAME}_core
-)
+  target_link_libraries(simulated_slam_input_node
+    ${PROJECT_NAME}_core
+  )
 
-ament_target_dependencies(simulated_slam_input_node
-  rclcpp
-  geometry_msgs
-  sensor_msgs
-  nav_msgs
-  tf2_ros
-)
+  ament_target_dependencies(simulated_slam_input_node
+    rclcpp
+    geometry_msgs
+    sensor_msgs
+    nav_msgs
+    tf2_ros
+  )
+
+  install(
+    TARGETS
+      simulated_slam_input_node
+    DESTINATION lib/${PROJECT_NAME}
+  )
+endif()
 
 add_executable(first_map_validator_node
   src/nodes/first_map_validator_node.cpp
@@ -142,7 +161,6 @@ ament_target_dependencies(first_map_validator_node
 
 install(
   TARGETS
-    simulated_slam_input_node
     first_map_validator_node
   DESTINATION lib/${PROJECT_NAME}
 )
@@ -156,30 +174,103 @@ install(
   INCLUDES DESTINATION include
 )
 
-install(
-  DIRECTORY include/
-  DESTINATION include
+set(_savo_mapping_public_headers
+  include/savo_mapping/exploration_goal_handoff.hpp
+  include/savo_mapping/exploration_mode.hpp
+  include/savo_mapping/exploration_goal.hpp
+  include/savo_mapping/exploration_planner.hpp
+  include/savo_mapping/frontier_detector.hpp
+  include/savo_mapping/frontier_selector.hpp
+  include/savo_mapping/manual_workflow_state.hpp
+  include/savo_mapping/workflow_authority.hpp
+  include/savo_mapping/map_quality_placeholder.hpp
+  include/savo_mapping/map_session_policy.hpp
+  include/savo_mapping/mapping_mode.hpp
+  include/savo_mapping/mapping_status.hpp
+  include/savo_mapping/mapping_types.hpp
+  include/savo_mapping/parameter_utils.hpp
+  include/savo_mapping/production_map_release.hpp
+  include/savo_mapping/qos_profiles.hpp
+  include/savo_mapping/saved_map_contract.hpp
+  include/savo_mapping/saved_map_quality.hpp
+  include/savo_mapping/session_state.hpp
+  include/savo_mapping/simulated_scan_model.hpp
+  include/savo_mapping/slam_contract.hpp
+  include/savo_mapping/slam_lifecycle_topics.hpp
+  include/savo_mapping/supervisor_runtime.hpp
+  include/savo_mapping/topic_names.hpp
+  include/savo_mapping/version.hpp
+  include/savo_mapping/workflow_phase.hpp
 )
 
 install(
-  DIRECTORY config/
+  FILES ${_savo_mapping_public_headers}
+  DESTINATION include/${PROJECT_NAME}
+)
+
+set(_savo_mapping_production_config
+  config/exploration_goal_handoff.yaml
+  config/frontier_mapping.yaml
+  config/frames.yaml
+  config/map_catalog_manager.yaml
+  config/map_quality.yaml
+  config/map_quality_evaluator.yaml
+  config/map_session.yaml
+  config/map_session_manager.yaml
+  config/mapping_common.yaml
+  config/qos.yaml
+  config/slam_lifecycle_health.yaml
+  config/slam_toolbox_mapping.yaml
+  config/topics.yaml
+)
+
+install(
+  FILES ${_savo_mapping_production_config}
   DESTINATION share/${PROJECT_NAME}/config
 )
 
+set(_savo_mapping_production_profiles
+  config/profiles/manual_mapping.yaml
+  config/profiles/monitor_only.yaml
+)
+
 install(
-  DIRECTORY launch/
+  FILES ${_savo_mapping_production_profiles}
+  DESTINATION share/${PROJECT_NAME}/config/profiles
+)
+
+set(_savo_mapping_production_launch
+  launch/continued_mapping.launch.py
+  launch/exploration_goal_handoff.launch.xml
+  launch/frontier_mapping.launch.xml
+  launch/manual_mapping.launch.xml
+  launch/map_catalog_manager.launch.xml
+  launch/map_quality_evaluator.launch.xml
+  launch/map_session_manager.launch.xml
+  launch/monitor_only.launch.xml
+)
+
+install(
+  FILES ${_savo_mapping_production_launch}
   DESTINATION share/${PROJECT_NAME}/launch
 )
 
-install(
-  DIRECTORY rviz/
-  DESTINATION share/${PROJECT_NAME}/rviz
-)
+if(SAVO_MAPPING_BUILD_PC_SIMULATION)
+  set(_savo_mapping_simulation_profiles
+    config/profiles/map_quality_simulated.yaml
+    config/profiles/simulated_slam.yaml
+  )
 
-install(
-  DIRECTORY resource/
-  DESTINATION share/${PROJECT_NAME}/resource
-)
+  install(
+    FILES ${_savo_mapping_simulation_profiles}
+    DESTINATION share/${PROJECT_NAME}/config/profiles
+  )
+
+  install(
+    FILES launch/simulated_manual_mapping.launch.xml
+    DESTINATION share/${PROJECT_NAME}/launch
+  )
+endif()
 
 install(
   FILES README.md package.xml
@@ -325,6 +416,38 @@ install(
   DESTINATION lib/${PROJECT_NAME}
 )
 
+
+add_executable(frontier_explorer_node
+  src/nodes/frontier_explorer_node.cpp
+)
+
+target_compile_features(
+  frontier_explorer_node
+  PRIVATE
+    cxx_std_17
+)
+
+target_link_libraries(
+  frontier_explorer_node
+  ${PROJECT_NAME}_core
+)
+
+ament_target_dependencies(
+  frontier_explorer_node
+  geometry_msgs
+  nav_msgs
+  rclcpp
+  std_msgs
+  tf2
+  tf2_ros
+)
+
+install(
+  TARGETS
+    frontier_explorer_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 add_executable(exploration_goal_handoff_node
   src/nodes/exploration_goal_handoff_node.cpp
 )
@@ -384,21 +507,50 @@ if(BUILD_TESTING)
       list(APPEND AMENT_LINT_AUTO_FILE_EXCLUDE
         "${CMAKE_CURRENT_SOURCE_DIR}/${_lint_candidate}"
       )
+    elseif(_lint_candidate MATCHES
+        "[.](c|cc|cpp|cxx|h|hh|hpp|hxx)$")
+      list(APPEND _savo_mapping_active_cpp_files
+        "${CMAKE_CURRENT_SOURCE_DIR}/${_lint_candidate}"
+      )
     endif()
   endforeach()
 
   list(SORT AMENT_LINT_AUTO_FILE_EXCLUDE)
   list(APPEND AMENT_LINT_AUTO_EXCLUDE
     ament_cmake_copyright
+    ament_cmake_cppcheck
+    ament_cmake_cpplint
     ament_cmake_xmllint
   )
 
   ament_lint_auto_find_test_dependencies()
 
+  find_package(ament_cmake_cppcheck REQUIRED)
+  ament_cppcheck(
+    ${_savo_mapping_active_cpp_files}
+    LANGUAGE c++
+    INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/include"
+  )
+
+  set_tests_properties(
+    cppcheck
+    PROPERTIES
+      ENVIRONMENT "AMENT_CPPCHECK_ALLOW_SLOW_VERSIONS=1"
+  )
+
+  find_package(ament_cmake_cpplint REQUIRED)
+  ament_cpplint(
+    ${_savo_mapping_active_cpp_files}
+    FILTERS
+      "-build/include_order"
+      "-legal/copyright"
+  )
+
   find_package(ament_cmake_xmllint REQUIRED)
   ament_xmllint(
     package.xml
     launch/exploration_goal_handoff.launch.xml
+    launch/frontier_mapping.launch.xml
     launch/manual_mapping.launch.xml
     launch/map_catalog_manager.launch.xml
     launch/map_quality_evaluator.launch.xml
@@ -446,6 +598,27 @@ if(BUILD_TESTING)
     test/test_exploration_mode.cpp
   )
   target_link_libraries(test_exploration_mode
+    ${PROJECT_NAME}_core
+  )
+
+  ament_add_gtest(test_frontier_detector
+    test/test_frontier_detector.cpp
+  )
+  target_link_libraries(test_frontier_detector
+    ${PROJECT_NAME}_core
+  )
+
+  ament_add_gtest(test_frontier_selector
+    test/test_frontier_selector.cpp
+  )
+  target_link_libraries(test_frontier_selector
+    ${PROJECT_NAME}_core
+  )
+
+  ament_add_gtest(test_exploration_planner
+    test/test_exploration_planner.cpp
+  )
+  target_link_libraries(test_exploration_planner
     ${PROJECT_NAME}_core
   )
 
@@ -538,6 +711,15 @@ if(BUILD_TESTING)
     test_manual_workflow_state
     ${PROJECT_NAME}_core
   )
+  ament_add_gtest(test_workflow_authority
+    test/test_workflow_authority.cpp
+  )
+
+  target_link_libraries(
+    test_workflow_authority
+    ${PROJECT_NAME}_core
+  )
+
   ament_add_gtest(test_map_session_policy
     test/test_map_session_policy.cpp
   )
@@ -570,6 +752,22 @@ if(BUILD_TESTING)
     test_production_map_release
     ${PROJECT_NAME}_core
   )
+
+  ament_add_gtest(test_frontier_explorer_contract
+    test/test_frontier_explorer_contract.cpp
+  )
+
+  target_compile_definitions(
+    test_frontier_explorer_contract
+    PRIVATE
+      SAVO_MAPPING_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+  )
+
+  target_link_libraries(
+    test_frontier_explorer_contract
+    ${PROJECT_NAME}_core
+  )
+
   ament_add_gtest(test_exploration_goal_handoff
     test/test_exploration_goal_handoff.cpp
   )

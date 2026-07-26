@@ -1,0 +1,46 @@
+frontier_explorer_node:
+  ros__parameters:
+    # Phase 4J-C2 remains opt-in until workflow authority is wired in 4J-D.
+    enabled: false
+    require_handoff_state: true
+    use_sim_time: false
+
+    map_topic: "/map"
+
+    selected_goal_topic:
+      "/savo_mapping/exploration/selected_goal"
+
+    handoff_state_topic:
+      "/savo_mapping/exploration_goal/state"
+
+    state_topic:
+      "/savo_mapping/frontier_explorer/state"
+
+    status_topic:
+      "/savo_mapping/frontier_explorer/status"
+
+    map_frame: "map"
+    base_frame: "base_link"
+
+    planning_period_ms: 1000
+    tf_timeout_sec: 0.20
+    goal_ack_timeout_sec: 3.0
+    replan_delay_sec: 2.0
+    repeat_goal_cooldown_sec: 5.0
+
+    map_orientation_tolerance_rad: 0.000001
+
+    detector:
+      free_threshold: 0
+      minimum_cluster_size: 3
+      cluster_diagonally: true
+
+    selector:
+      information_gain_weight: 1.0
+      distance_weight: 1.0
+      minimum_information_gain_m2: 0.0
+
+      # Zero disables the maximum-distance filter.
+      maximum_distance_m: 0.0
+
+    goal_id_prefix: "frontier"

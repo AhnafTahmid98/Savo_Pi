@@ -69,6 +69,61 @@ savo_speech_node:
       cooldown_ms: 2000
       event_queue_capacity: 8
 
+    vad:
+      enabled: true
+      required: true
+
+      backend:
+        # Temporary production defaults. Final values will be tuned on
+        # Raspberry Pi 5 using the ReSpeaker microphone array.
+        startup_calibration_frames: 25
+
+        initial_noise_floor_rms: 0.005
+        minimum_noise_floor_rms: 0.0005
+        maximum_noise_floor_rms: 0.250
+
+        noise_floor_update_alpha: 0.05
+        minimum_speech_rms: 0.010
+
+        speech_onset_snr_db: 8.0
+        speech_saturation_snr_db: 20.0
+
+        clipping_threshold: 32760
+
+      processor:
+        # At 320 frames per 16 kHz capture period, each input frame is
+        # approximately 20 ms.
+        speech_start_threshold: 0.65
+        speech_end_threshold: 0.35
+
+        required_start_frames: 3
+        required_end_frames: 10
+
+        event_queue_capacity: 8
+
+    utterance_session:
+      enabled: true
+      required: true
+
+      # Temporary production defaults. Final values will be tuned
+      # on Raspberry Pi 5 using the ReSpeaker microphone array.
+      pre_roll_ms: 1000
+      speech_start_timeout_ms: 3000
+      maximum_duration_ms: 15000
+
+      completed_queue_capacity: 4
+
+    utterance_serialization:
+      enabled: true
+      required: true
+
+      output_queue_capacity: 4
+      source_wait_timeout_ms: 100
+
+      # 2 MiB comfortably contains the configured 16 kHz mono
+      # utterance limit while retaining a strict memory boundary.
+      maximum_wav_bytes: 2097152
+
     diagnostics:
       status_publish_rate_hz: 2.0
       heartbeat_rate_hz: 1.0

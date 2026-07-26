@@ -1,0 +1,52 @@
+# Copyright 2026 Ahnaf Tahmid
+# SPDX-License-Identifier: LicenseRef-Proprietary
+
+contract_version: 1
+package: savo_nav
+
+topics:
+  inputs:
+    map: "/map"
+    map_metadata: "/map_metadata"
+    tf: "/tf"
+    tf_static: "/tf_static"
+
+    filtered_odometry: "/odometry/filtered"
+    localization_health: "/savo_localization/health"
+    laser_scan: "/scan"
+
+    realsense_status: "/savo_realsense/status"
+    raw_realsense_points: "/camera/camera/depth/color/points"
+    filtered_obstacle_points: "/savo_perception/obstacles/points"
+
+    safety_stop: "/safety/stop"
+    safety_slowdown_factor: "/safety/slowdown_factor"
+    control_mode_state: "/savo_control/mode_state"
+
+  integration_commands:
+    control_mode_command: "/savo_control/mode_cmd"
+
+  velocity_output:
+    navigation: "/cmd_vel_nav"
+
+  outputs:
+    state: "/savo_nav/state"
+    status: "/savo_nav/status"
+    readiness: "/savo_nav/readiness"
+    readiness_reason: "/savo_nav/readiness_reason"
+    current_goal: "/savo_nav/current_goal"
+    goal_source: "/savo_nav/goal_source"
+    result: "/savo_nav/result"
+    recovery_state: "/savo_nav/recovery_state"
+    heartbeat: "/savo_nav/heartbeat"
+    markers: "/savo_nav/markers"
+
+  forbidden_velocity_outputs:
+    - "/cmd_vel"
+    - "/cmd_vel_safe"
+    - "/cmd_vel_recovery"
+
+constraints:
+  only_navigation_velocity_output: "/cmd_vel_nav"
+  rviz_is_observer_only: true
+  raspberry_pis_run_rviz: false
