@@ -4,7 +4,7 @@
 wheel_odom_node:
   ros__parameters:
     odom_frame_id: odom
-    base_frame_id: base_link
+    base_frame_id: base_footprint
 
     wheel_odom_topic: /wheel/odom
     wheel_odom_state_topic: /savo_localization/wheel_odom_state

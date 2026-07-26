@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from savo_localization.constants import (
-    FRAME_BASE_LINK,
+    FRAME_BASE_FOOTPRINT,
     FRAME_ODOM,
     ODOM_MODEL_MECANUM_4ENC,
     STATUS_ERROR,
@@ -41,7 +41,7 @@ class WheelOdomSample:
     wheel_speeds: WheelSpeeds = field(default_factory=WheelSpeeds)
 
     odom_frame_id: str = FRAME_ODOM
-    base_frame_id: str = FRAME_BASE_LINK
+    base_frame_id: str = FRAME_BASE_FOOTPRINT
 
     active_wheel_count: int = 0
     encoder_sample_count: int = 0
@@ -338,7 +338,7 @@ def make_wheel_odom_sample(
     twist: Twist2D,
     wheel_speeds: WheelSpeeds | None = None,
     odom_frame_id: str = FRAME_ODOM,
-    base_frame_id: str = FRAME_BASE_LINK,
+    base_frame_id: str = FRAME_BASE_FOOTPRINT,
     active_wheel_count: int = 0,
     encoder_sample_count: int = 0,
 ) -> WheelOdomSample:

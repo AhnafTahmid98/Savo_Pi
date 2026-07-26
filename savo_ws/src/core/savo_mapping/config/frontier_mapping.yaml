@@ -1,6 +1,7 @@
 frontier_explorer_node:
   ros__parameters:
-    # Phase 4J-C2 remains opt-in until workflow authority is wired in 4J-D.
+    # Static hard gate. Set true only in a launch that also starts the
+    # exploration manager; runtime authority remains an additional gate.
     enabled: false
     require_handoff_state: true
     use_sim_time: false
@@ -12,6 +13,9 @@ frontier_explorer_node:
 
     handoff_state_topic:
       "/savo_mapping/exploration_goal/state"
+
+    runtime_enabled_topic:
+      "/savo_mapping/exploration/runtime_enabled"
 
     state_topic:
       "/savo_mapping/frontier_explorer/state"

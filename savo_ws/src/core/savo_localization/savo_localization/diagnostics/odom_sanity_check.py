@@ -12,7 +12,7 @@ from typing import Iterable
 from savo_localization.constants import (
     DEFAULT_MAX_ODOM_ANGULAR_SPEED_RAD_S,
     DEFAULT_MAX_ODOM_LINEAR_SPEED_MPS,
-    FRAME_BASE_LINK,
+    FRAME_BASE_FOOTPRINT,
     FRAME_ODOM,
     STATUS_ERROR,
     STATUS_OK,
@@ -73,7 +73,7 @@ def check_pose_twist(
     *,
     dt_s: float,
     odom_frame_id: str = FRAME_ODOM,
-    base_frame_id: str = FRAME_BASE_LINK,
+    base_frame_id: str = FRAME_BASE_FOOTPRINT,
     require_frame_ids: bool = True,
     require_frames: bool | None = None,
     max_linear_mps: float = DEFAULT_MAX_ODOM_LINEAR_SPEED_MPS,

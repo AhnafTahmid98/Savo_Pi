@@ -84,7 +84,7 @@ private:
     double gear_ratio);
 
   std::string odom_frame_id_{"odom"};
-  std::string base_frame_id_{"base_link"};
+  std::string base_frame_id_{"base_footprint"};
 
   std::string wheel_odom_topic_{"/wheel/odom"};
   std::string wheel_odom_state_topic_{"/savo_localization/wheel_odom_state"};

@@ -27,6 +27,10 @@
     name="handoff_params_file"
     default="$(find-pkg-share savo_mapping)/config/exploration_goal_handoff.yaml"/>
 
+  <arg
+    name="manager_params_file"
+    default="$(find-pkg-share savo_mapping)/config/exploration_manager.yaml"/>
+
   <node
     pkg="savo_mapping"
     exec="exploration_goal_handoff_node"
@@ -38,6 +42,19 @@
     <param
       name="expected_frame"
       value="$(var map_frame)"/>
+
+    <param
+      name="use_sim_time"
+      value="$(var use_sim_time)"/>
+  </node>
+
+  <node
+    pkg="savo_mapping"
+    exec="exploration_manager_node"
+    name="exploration_manager_node"
+    output="screen">
+
+    <param from="$(var manager_params_file)"/>
 
     <param
       name="use_sim_time"

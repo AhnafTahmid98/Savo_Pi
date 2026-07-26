@@ -51,6 +51,10 @@ add_library(${PROJECT_NAME}_core
   src/slam/simulated_scan_model.cpp
   src/workflow/manual_workflow_state.cpp
   src/workflow/workflow_authority.cpp
+  src/workflow/exploration_runtime.cpp
+  src/scan360/scan360_planner.cpp
+  src/scan360/scan360_controller.cpp
+  src/scan360/scan360_quality.cpp
   src/session/map_session_policy.cpp
   src/session/saved_map_contract.cpp
   src/session/saved_map_quality.cpp
@@ -82,6 +86,29 @@ ament_target_dependencies(
 )
 
 target_link_libraries(${PROJECT_NAME}_core yaml-cpp OpenSSL::Crypto)
+
+add_executable(mapping_mode_manager_node
+  src/nodes/mapping_mode_manager_node.cpp
+)
+
+target_compile_features(mapping_mode_manager_node
+  PRIVATE
+    cxx_std_17
+)
+
+target_link_libraries(mapping_mode_manager_node
+  ${PROJECT_NAME}_core
+)
+
+ament_target_dependencies(mapping_mode_manager_node
+  rclcpp
+  std_msgs
+)
+
+install(
+  TARGETS mapping_mode_manager_node
+  DESTINATION lib/${PROJECT_NAME}
+)
 
 add_executable(mapping_supervisor_node
   src/nodes/mapping_supervisor_node.cpp
@@ -183,6 +210,10 @@ set(_savo_mapping_public_headers
   include/savo_mapping/frontier_selector.hpp
   include/savo_mapping/manual_workflow_state.hpp
   include/savo_mapping/workflow_authority.hpp
+  include/savo_mapping/exploration_runtime.hpp
+  include/savo_mapping/scan360_planner.hpp
+  include/savo_mapping/scan360_controller.hpp
+  include/savo_mapping/scan360_quality.hpp
   include/savo_mapping/map_quality_placeholder.hpp
   include/savo_mapping/map_session_policy.hpp
   include/savo_mapping/mapping_mode.hpp
@@ -210,6 +241,7 @@ install(
 
 set(_savo_mapping_production_config
   config/exploration_goal_handoff.yaml
+  config/exploration_manager.yaml
   config/frontier_mapping.yaml
   config/frames.yaml
   config/map_catalog_manager.yaml
@@ -218,6 +250,7 @@ set(_savo_mapping_production_config
   config/map_session.yaml
   config/map_session_manager.yaml
   config/mapping_common.yaml
+  config/mapping_mode_manager.yaml
   config/qos.yaml
   config/slam_lifecycle_health.yaml
   config/slam_toolbox_mapping.yaml
@@ -416,6 +449,34 @@ install(
   DESTINATION lib/${PROJECT_NAME}
 )
 
+
+add_executable(exploration_manager_node
+  src/nodes/exploration_manager_node.cpp
+)
+
+target_compile_features(
+  exploration_manager_node
+  PRIVATE
+    cxx_std_17
+)
+
+target_link_libraries(
+  exploration_manager_node
+  ${PROJECT_NAME}_core
+)
+
+ament_target_dependencies(
+  exploration_manager_node
+  rclcpp
+  std_msgs
+  std_srvs
+)
+
+install(
+  TARGETS
+    exploration_manager_node
+  DESTINATION lib/${PROJECT_NAME}
+)
 
 add_executable(frontier_explorer_node
   src/nodes/frontier_explorer_node.cpp
@@ -685,6 +746,21 @@ if(BUILD_TESTING)
   ament_target_dependencies(test_config_contracts
     rclcpp
   )
+  ament_add_gtest(test_mapping_mode_manager_contract
+    test/test_mapping_mode_manager_contract.cpp
+  )
+
+  target_compile_definitions(
+    test_mapping_mode_manager_contract
+    PRIVATE
+      SAVO_MAPPING_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+  )
+
+  target_link_libraries(
+    test_mapping_mode_manager_contract
+    ${PROJECT_NAME}_core
+  )
+
   ament_add_gtest(test_mapping_supervisor_runtime
     test/test_mapping_supervisor_runtime.cpp
   )
@@ -720,6 +796,42 @@ if(BUILD_TESTING)
     ${PROJECT_NAME}_core
   )
 
+  ament_add_gtest(test_exploration_runtime
+    test/test_exploration_runtime.cpp
+  )
+
+  target_link_libraries(
+    test_exploration_runtime
+    ${PROJECT_NAME}_core
+  )
+
+  ament_add_gtest(test_scan360_planner
+    test/test_scan360_planner.cpp
+  )
+
+  target_link_libraries(
+    test_scan360_planner
+    ${PROJECT_NAME}_core
+  )
+
+  ament_add_gtest(test_scan360_controller
+    test/test_scan360_controller.cpp
+  )
+
+  target_link_libraries(
+    test_scan360_controller
+    ${PROJECT_NAME}_core
+  )
+
+  ament_add_gtest(test_scan360_quality
+    test/test_scan360_quality.cpp
+  )
+
+  target_link_libraries(
+    test_scan360_quality
+    ${PROJECT_NAME}_core
+  )
+
   ament_add_gtest(test_map_session_policy
     test/test_map_session_policy.cpp
   )
@@ -750,6 +862,21 @@ if(BUILD_TESTING)
 
   target_link_libraries(
     test_production_map_release
+    ${PROJECT_NAME}_core
+  )
+
+  ament_add_gtest(test_exploration_manager_contract
+    test/test_exploration_manager_contract.cpp
+  )
+
+  target_compile_definitions(
+    test_exploration_manager_contract
+    PRIVATE
+      SAVO_MAPPING_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+  )
+
+  target_link_libraries(
+    test_exploration_manager_contract
     ${PROJECT_NAME}_core
   )
 

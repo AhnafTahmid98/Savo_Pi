@@ -108,7 +108,7 @@ def test_deep_merge_dicts_preserves_nested_values() -> None:
             "ros__parameters": {
                 "frames": {
                     "odom": "odom",
-                    "base": "base_link",
+                    "base": "base_footprint",
                 },
                 "publish_rate_hz": 30.0,
             }
@@ -323,7 +323,7 @@ def test_robot_savo_profile_overlay_example(tmp_path: Path) -> None:
             "wheel_odom_node": {
                 "ros__parameters": {
                     "odom_frame_id": "odom",
-                    "base_frame_id": "base_link",
+                    "base_frame_id": "base_footprint",
                 }
             },
         },
@@ -359,6 +359,6 @@ def test_robot_savo_profile_overlay_example(tmp_path: Path) -> None:
     assert wheel_params["wheel_odom_topic"] == "/wheel/odom"
     assert wheel_params["wheel_odom_state_topic"] == "/savo_localization/wheel_odom_state"
     assert wheel_params["odom_frame_id"] == "odom"
-    assert wheel_params["base_frame_id"] == "base_link"
+    assert wheel_params["base_frame_id"] == "base_footprint"
     assert wheel_params["publish_rate_hz"] == pytest.approx(30.0)
     assert wheel_params["publish_tf"] is False

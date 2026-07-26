@@ -9,6 +9,7 @@ import pytest
 
 from savo_localization.constants import (
     FRAME_BASE_LINK,
+    FRAME_BASE_FOOTPRINT,
     FRAME_IMU,
     FRAME_MAP,
     FRAME_ODOM,
@@ -47,6 +48,7 @@ def test_frame_id_valid_true_for_robot_savo_frames() -> None:
     assert frame_id_valid(FRAME_MAP)
     assert frame_id_valid(FRAME_ODOM)
     assert frame_id_valid(FRAME_BASE_LINK)
+    assert frame_id_valid(FRAME_BASE_FOOTPRINT)
     assert frame_id_valid(FRAME_IMU)
 
 
@@ -77,7 +79,8 @@ def test_require_frame_id_rejects_empty_value() -> None:
 
 
 def test_frame_pair_valid_true_for_expected_edges() -> None:
-    assert frame_pair_valid(FRAME_ODOM, FRAME_BASE_LINK)
+    assert frame_pair_valid(FRAME_ODOM, FRAME_BASE_FOOTPRINT)
+    assert frame_pair_valid(FRAME_BASE_FOOTPRINT, FRAME_BASE_LINK)
     assert frame_pair_valid(FRAME_BASE_LINK, FRAME_IMU)
     assert frame_pair_valid(FRAME_MAP, FRAME_ODOM)
 
@@ -129,5 +132,6 @@ def test_make_tf_edge_label_normalizes_frames() -> None:
 
 def test_robot_savo_localization_frame_chain() -> None:
     assert make_tf_edge_label(FRAME_MAP, FRAME_ODOM) == "map -> odom"
-    assert make_tf_edge_label(FRAME_ODOM, FRAME_BASE_LINK) == "odom -> base_link"
+    assert make_tf_edge_label(FRAME_ODOM, FRAME_BASE_FOOTPRINT) == "odom -> base_footprint"
+    assert make_tf_edge_label(FRAME_BASE_FOOTPRINT, FRAME_BASE_LINK) == "base_footprint -> base_link"
     assert make_tf_edge_label(FRAME_BASE_LINK, FRAME_IMU) == "base_link -> imu_link"

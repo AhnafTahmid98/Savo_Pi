@@ -9,7 +9,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Iterable
 
 from savo_localization.constants import (
-    FRAME_BASE_LINK,
+    FRAME_BASE_FOOTPRINT,
     FRAME_IMU,
     FRAME_MAP,
     FRAME_ODOM,
@@ -245,7 +245,7 @@ def check_odom_to_base_tf(
 ) -> TfEdgeCheckResult:
     return make_tf_edge_result(
         parent_frame=FRAME_ODOM,
-        child_frame=FRAME_BASE_LINK,
+        child_frame=FRAME_BASE_FOOTPRINT,
         available=available,
         age_s=age_s,
         max_age_s=max_age_s,
@@ -261,7 +261,7 @@ def check_base_to_imu_tf(
     message: str = "",
 ) -> TfEdgeCheckResult:
     return make_tf_edge_result(
-        parent_frame=FRAME_BASE_LINK,
+        parent_frame=FRAME_BASE_FOOTPRINT,
         child_frame=FRAME_IMU,
         available=available,
         age_s=age_s,
@@ -280,10 +280,10 @@ def expected_localization_edges(
     if include_map_to_odom:
         edges["map_to_odom"] = (FRAME_MAP, FRAME_ODOM)
 
-    edges["odom_to_base"] = (FRAME_ODOM, FRAME_BASE_LINK)
+    edges["odom_to_base"] = (FRAME_ODOM, FRAME_BASE_FOOTPRINT)
 
     if include_base_to_imu:
-        edges["base_to_imu"] = (FRAME_BASE_LINK, FRAME_IMU)
+        edges["base_to_imu"] = (FRAME_BASE_FOOTPRINT, FRAME_IMU)
 
     return edges
 

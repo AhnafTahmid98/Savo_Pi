@@ -1,0 +1,6 @@
+/mapping_mode_manager_node:
+  ros__parameters:
+    authority:
+      initial_mode: "monitor_only"
+      initial_session_state: "idle"
+      default_autonomous_strategy: "frontier"

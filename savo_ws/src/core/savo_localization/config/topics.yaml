@@ -28,7 +28,7 @@ localization_health_node:
     state_summary_topic: /savo_localization/state_summary
 
     odom_frame_id: odom
-    base_frame_id: base_link
+    base_frame_id: base_footprint
     imu_frame_id: imu_link
 
 localization_dashboard:
@@ -44,7 +44,7 @@ localization_dashboard:
     state_summary_topic: /savo_localization/state_summary
 
     odom_frame_id: odom
-    base_frame_id: base_link
+    base_frame_id: base_footprint
     imu_frame_id: imu_link
 
 ekf_state_publisher_node:
@@ -54,4 +54,4 @@ ekf_state_publisher_node:
     state_summary_topic: /savo_localization/state_summary
 
     odom_frame_id: odom
-    base_frame_id: base_link
+    base_frame_id: base_footprint

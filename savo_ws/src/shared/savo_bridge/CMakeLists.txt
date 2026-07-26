@@ -28,6 +28,7 @@ add_library(${PROJECT_NAME}_core STATIC
   src/freshness_tracker.cpp
   src/graph_evidence.cpp
   src/health_evaluator.cpp
+  src/observation_config.cpp
   src/snapshot_writer.cpp
   src/topic_observation.cpp
   src/version.cpp
@@ -183,6 +184,36 @@ if(BUILD_TESTING)
       diagnostic_msgs
       rclcpp
       std_msgs
+    )
+  endif()
+
+  ament_add_gtest(test_savo_bridge_generic_topic_observation
+    test/unit/test_generic_topic_observation.cpp
+  )
+
+  if(TARGET test_savo_bridge_generic_topic_observation)
+    target_link_libraries(
+      test_savo_bridge_generic_topic_observation
+      ${PROJECT_NAME}_ros
+      ${PROJECT_NAME}_core
+    )
+
+    ament_target_dependencies(
+      test_savo_bridge_generic_topic_observation
+      diagnostic_msgs
+      rclcpp
+      std_msgs
+    )
+  endif()
+
+  ament_add_gtest(test_savo_bridge_observation_config
+    test/unit/test_observation_config.cpp
+  )
+
+  if(TARGET test_savo_bridge_observation_config)
+    target_link_libraries(
+      test_savo_bridge_observation_config
+      ${PROJECT_NAME}_core
     )
   endif()
 

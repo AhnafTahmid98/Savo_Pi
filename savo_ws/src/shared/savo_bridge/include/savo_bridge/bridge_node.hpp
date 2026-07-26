@@ -9,8 +9,10 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include <diagnostic_msgs/msg/diagnostic_array.hpp>
+#include <rclcpp/generic_subscription.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/bool.hpp>
 #include <std_msgs/msg/string.hpp>
@@ -18,6 +20,7 @@
 
 #include "savo_bridge/graph_evidence.hpp"
 #include "savo_bridge/snapshot_writer.hpp"
+#include "savo_bridge/topic_observation.hpp"
 
 namespace savo_bridge
 {
@@ -30,10 +33,29 @@ public:
     rclcpp::NodeOptions());
 
 private:
+  struct ObservationRuntime
+  {
+    std::string topic_name;
+    std::unique_ptr<TopicObservation> observation;
+    std::string topic_type;
+    std::shared_ptr<rclcpp::GenericSubscription> subscription;
+    std::string error;
+  };
+
   void publish_status();
-  void publish_runtime_snapshot();
+  void refresh_observation_subscriptions();
+
+  void publish_runtime_snapshot(
+    const std::vector<TopicObservation::Snapshot> &
+    topic_snapshots);
+
+  [[nodiscard]] std::vector<TopicObservation::Snapshot>
+  collect_observation_snapshots(
+    TopicObservation::TimePoint evaluated_at) const;
 
   GraphEvidenceConfig graph_config_;
+
+  std::vector<ObservationRuntime> observation_runtimes_;
 
   bool snapshot_enabled_{false};
   std::string snapshot_path_;

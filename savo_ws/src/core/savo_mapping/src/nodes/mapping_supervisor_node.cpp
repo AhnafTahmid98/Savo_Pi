@@ -350,6 +350,13 @@ private:
       params::declare_or_get<std::string>(
         *this, "topics.outputs.mode", std::string{topics::MODE}));
 
+    exploration_mode_topic_ = require_non_empty(
+      "topics.outputs.exploration_mode",
+      params::declare_or_get<std::string>(
+        *this,
+        "topics.outputs.exploration_mode",
+        std::string{topics::EXPLORATION_MODE}));
+
     workflow_phase_topic_ = require_non_empty(
       "topics.outputs.workflow_phase",
       params::declare_or_get<std::string>(
@@ -424,18 +431,6 @@ private:
       create_publisher<std_msgs::msg::String>(
       readiness_topic_, qos::state_qos());
 
-    mode_publisher_ =
-      create_publisher<std_msgs::msg::String>(
-      mode_topic_, qos::state_qos());
-
-    workflow_phase_publisher_ =
-      create_publisher<std_msgs::msg::String>(
-      workflow_phase_topic_, qos::state_qos());
-
-    session_state_publisher_ =
-      create_publisher<std_msgs::msg::String>(
-      session_state_topic_, qos::state_qos());
-
     dashboard_publisher_ =
       create_publisher<std_msgs::msg::String>(
       dashboard_topic_, qos::status_qos());
@@ -468,6 +463,45 @@ private:
       .reliable()
       .durability_volatile(),
       std::bind(&MappingSupervisorNode::on_odom, this, _1));
+
+    mode_subscription_ =
+      create_subscription<std_msgs::msg::String>(
+      mode_topic_,
+      qos::state_qos(),
+      std::bind(
+        &MappingSupervisorNode::on_mode_state,
+        this,
+        _1));
+
+    exploration_mode_subscription_ =
+      create_subscription<std_msgs::msg::String>(
+      exploration_mode_topic_,
+      qos::state_qos(),
+      std::bind(
+        &MappingSupervisorNode::
+        on_exploration_mode_state,
+        this,
+        _1));
+
+    workflow_phase_subscription_ =
+      create_subscription<std_msgs::msg::String>(
+      workflow_phase_topic_,
+      qos::state_qos(),
+      std::bind(
+        &MappingSupervisorNode::
+        on_workflow_phase_state,
+        this,
+        _1));
+
+    session_state_subscription_ =
+      create_subscription<std_msgs::msg::String>(
+      session_state_topic_,
+      qos::state_qos(),
+      std::bind(
+        &MappingSupervisorNode::
+        on_session_state,
+        this,
+        _1));
   }
 
   void create_timers()
@@ -521,6 +555,82 @@ private:
     std::lock_guard<std::mutex> lock(status_mutex_);
 
     last_odom_receipt_ = SteadyClock::now();
+  }
+
+  void on_mode_state(
+    const std_msgs::msg::String::ConstSharedPtr message)
+  {
+    const auto parsed =
+      mapping_mode_from_string(message->data);
+
+    if (!parsed.has_value()) {
+      RCLCPP_WARN(
+        get_logger(),
+        "ignored invalid mapping mode state: %s",
+        message->data.c_str());
+
+      return;
+    }
+
+    std::lock_guard<std::mutex> lock(status_mutex_);
+    status_.mode = parsed.value();
+  }
+
+  void on_exploration_mode_state(
+    const std_msgs::msg::String::ConstSharedPtr message)
+  {
+    const auto parsed =
+      exploration_mode_from_string(message->data);
+
+    if (!parsed.has_value()) {
+      RCLCPP_WARN(
+        get_logger(),
+        "ignored invalid exploration mode state: %s",
+        message->data.c_str());
+
+      return;
+    }
+
+    std::lock_guard<std::mutex> lock(status_mutex_);
+    status_.exploration_mode = parsed.value();
+  }
+
+  void on_workflow_phase_state(
+    const std_msgs::msg::String::ConstSharedPtr message)
+  {
+    const auto parsed =
+      workflow_phase_from_string(message->data);
+
+    if (!parsed.has_value()) {
+      RCLCPP_WARN(
+        get_logger(),
+        "ignored invalid workflow phase state: %s",
+        message->data.c_str());
+
+      return;
+    }
+
+    std::lock_guard<std::mutex> lock(status_mutex_);
+    status_.workflow_phase = parsed.value();
+  }
+
+  void on_session_state(
+    const std_msgs::msg::String::ConstSharedPtr message)
+  {
+    const auto parsed =
+      session_state_from_string(message->data);
+
+    if (!parsed.has_value()) {
+      RCLCPP_WARN(
+        get_logger(),
+        "ignored invalid session state: %s",
+        message->data.c_str());
+
+      return;
+    }
+
+    std::lock_guard<std::mutex> lock(status_mutex_);
+    status_.session_state = parsed.value();
   }
 
   void on_status_timer()
@@ -756,13 +866,6 @@ private:
 
     publish_text(status_publisher_, make_status_json(snapshot));
     publish_text(readiness_publisher_, snapshot.message);
-    publish_text(mode_publisher_, std::string{to_string(snapshot.mode)});
-    publish_text(
-      workflow_phase_publisher_,
-      std::string{to_string(snapshot.workflow_phase)});
-    publish_text(
-      session_state_publisher_,
-      std::string{to_string(snapshot.session_state)});
     publish_text(
       dashboard_publisher_,
       make_dashboard_text(snapshot));
@@ -846,6 +949,7 @@ private:
   std::string status_topic_;
   std::string readiness_topic_;
   std::string mode_topic_;
+  std::string exploration_mode_topic_;
   std::string workflow_phase_topic_;
   std::string session_state_topic_;
   std::string dashboard_topic_;
@@ -873,9 +977,6 @@ private:
 
   StringPublisher::SharedPtr status_publisher_;
   StringPublisher::SharedPtr readiness_publisher_;
-  StringPublisher::SharedPtr mode_publisher_;
-  StringPublisher::SharedPtr workflow_phase_publisher_;
-  StringPublisher::SharedPtr session_state_publisher_;
   StringPublisher::SharedPtr dashboard_publisher_;
   StringPublisher::SharedPtr map_quality_publisher_;
 
@@ -887,6 +988,18 @@ private:
 
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr
     odom_subscription_;
+
+  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr
+    mode_subscription_;
+
+  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr
+    exploration_mode_subscription_;
+
+  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr
+    workflow_phase_subscription_;
+
+  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr
+    session_state_subscription_;
 
   rclcpp::TimerBase::SharedPtr status_timer_;
   rclcpp::TimerBase::SharedPtr heartbeat_timer_;

@@ -17,7 +17,7 @@ localization_dashboard:
 
     map_frame_id: map
     odom_frame_id: odom
-    base_frame_id: base_link
+    base_frame_id: base_footprint
     imu_frame_id: imu_link
 
     show_imu: true

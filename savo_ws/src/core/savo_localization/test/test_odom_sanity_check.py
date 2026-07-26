@@ -10,7 +10,7 @@ import math
 import pytest
 
 from savo_localization.constants import (
-    FRAME_BASE_LINK,
+    FRAME_BASE_FOOTPRINT,
     FRAME_ODOM,
     STATUS_ERROR,
     STATUS_OK,
@@ -46,7 +46,7 @@ def make_sample(
     vy_mps: float = 0.0,
     omega_rad_s: float = 0.0,
     odom_frame_id: str = FRAME_ODOM,
-    base_frame_id: str = FRAME_BASE_LINK,
+    base_frame_id: str = FRAME_BASE_FOOTPRINT,
 ):
     return make_wheel_odom_sample(
         stamp_s=stamp_s,
@@ -111,7 +111,7 @@ def test_check_pose_twist_healthy_stationary() -> None:
         twist=Twist2D(),
         dt_s=0.1,
         odom_frame_id=FRAME_ODOM,
-        base_frame_id=FRAME_BASE_LINK,
+        base_frame_id=FRAME_BASE_FOOTPRINT,
     )
 
     assert result.ok is True
@@ -129,7 +129,7 @@ def test_check_pose_twist_healthy_mecanum_strafe() -> None:
         twist=Twist2D(vx_mps=0.0, vy_mps=0.2, omega_rad_s=0.0),
         dt_s=0.1,
         odom_frame_id=FRAME_ODOM,
-        base_frame_id=FRAME_BASE_LINK,
+        base_frame_id=FRAME_BASE_FOOTPRINT,
     )
 
     assert result.ok is True
@@ -144,7 +144,7 @@ def test_check_pose_twist_warns_on_high_linear_speed() -> None:
         twist=Twist2D(vx_mps=2.0, vy_mps=0.0, omega_rad_s=0.0),
         dt_s=0.1,
         odom_frame_id=FRAME_ODOM,
-        base_frame_id=FRAME_BASE_LINK,
+        base_frame_id=FRAME_BASE_FOOTPRINT,
         max_linear_mps=1.5,
     )
 
@@ -160,7 +160,7 @@ def test_check_pose_twist_warns_on_high_angular_speed() -> None:
         twist=Twist2D(vx_mps=0.0, vy_mps=0.0, omega_rad_s=5.0),
         dt_s=0.1,
         odom_frame_id=FRAME_ODOM,
-        base_frame_id=FRAME_BASE_LINK,
+        base_frame_id=FRAME_BASE_FOOTPRINT,
         max_angular_rad_s=4.0,
     )
 
@@ -176,7 +176,7 @@ def test_check_pose_twist_errors_on_non_finite_pose() -> None:
         twist=Twist2D(),
         dt_s=0.1,
         odom_frame_id=FRAME_ODOM,
-        base_frame_id=FRAME_BASE_LINK,
+        base_frame_id=FRAME_BASE_FOOTPRINT,
     )
 
     assert result.ok is False
@@ -191,7 +191,7 @@ def test_check_pose_twist_errors_on_non_finite_twist() -> None:
         twist=Twist2D(vx_mps=0.0, vy_mps=math.inf, omega_rad_s=0.0),
         dt_s=0.1,
         odom_frame_id=FRAME_ODOM,
-        base_frame_id=FRAME_BASE_LINK,
+        base_frame_id=FRAME_BASE_FOOTPRINT,
     )
 
     assert result.ok is False
@@ -206,7 +206,7 @@ def test_check_pose_twist_errors_on_bad_dt() -> None:
         twist=Twist2D(),
         dt_s=-0.1,
         odom_frame_id=FRAME_ODOM,
-        base_frame_id=FRAME_BASE_LINK,
+        base_frame_id=FRAME_BASE_FOOTPRINT,
     )
 
     assert result.ok is False
@@ -253,7 +253,7 @@ def test_check_pose_twist_rejects_bad_limits() -> None:
             twist=Twist2D(),
             dt_s=0.1,
             odom_frame_id=FRAME_ODOM,
-            base_frame_id=FRAME_BASE_LINK,
+            base_frame_id=FRAME_BASE_FOOTPRINT,
             max_linear_mps=0.0,
         )
 
@@ -263,7 +263,7 @@ def test_check_pose_twist_rejects_bad_limits() -> None:
             twist=Twist2D(),
             dt_s=0.1,
             odom_frame_id=FRAME_ODOM,
-            base_frame_id=FRAME_BASE_LINK,
+            base_frame_id=FRAME_BASE_FOOTPRINT,
             max_angular_rad_s=0.0,
         )
 
@@ -515,7 +515,7 @@ def test_odom_sample_summary() -> None:
     assert summary["stamp_s"] == pytest.approx(2.0)
     assert summary["dt_s"] == pytest.approx(0.1)
     assert summary["odom_frame_id"] == FRAME_ODOM
-    assert summary["base_frame_id"] == FRAME_BASE_LINK
+    assert summary["base_frame_id"] == FRAME_BASE_FOOTPRINT
     assert summary["pose"]["x_m"] == pytest.approx(1.0)
     assert summary["twist"]["vx_mps"] == pytest.approx(0.2)
     assert summary["active_wheel_count"] == 4

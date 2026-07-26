@@ -4,10 +4,12 @@
 
 #include "savo_bridge/bridge_node.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <exception>
+#include <functional>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -16,7 +18,10 @@
 
 #include <diagnostic_msgs/msg/diagnostic_status.hpp>
 #include <diagnostic_msgs/msg/key_value.hpp>
+#include <rclcpp/serialized_message.hpp>
 
+#include "savo_bridge/health_evaluator.hpp"
+#include "savo_bridge/observation_config.hpp"
 #include "savo_bridge/qos_profiles.hpp"
 #include "savo_bridge/ros_graph_discovery.hpp"
 
@@ -61,6 +66,7 @@ void append_json_string(
           output += "\\u00";
           output.push_back(
             hexadecimal[(character >> 4U) & 0x0FU]);
+
           output.push_back(
             hexadecimal[character & 0x0FU]);
         } else {
@@ -128,18 +134,31 @@ struct SnapshotPublicationState
   std::string error;
 };
 
+struct ObservationRuntimeState
+{
+  std::size_t configured{0U};
+  std::size_t active{0U};
+
+  std::vector<std::string> active_topics;
+  std::vector<std::string> error_topics;
+
+  std::string runtime_error;
+};
+
 [[nodiscard]] std::string make_state_json(
   const GraphEvidence & evidence,
   const std::string & graph_error,
-  const SnapshotPublicationState & snapshot)
+  const SnapshotPublicationState & snapshot,
+  const ObservationRuntimeState & observations,
+  const HealthEvaluation & health)
 {
   std::string output;
-  output.reserve(1536U);
+  output.reserve(2048U);
 
   output += "{\"schema_name\":\"savo_bridge_state\"";
   output += ",\"schema_version\":1";
   output += ",\"owner\":\"savo_bridge\"";
-  output += ",\"phase\":\"snapshot_publication\"";
+  output += ",\"phase\":\"topic_observation\"";
   output += ",\"read_only\":true";
   output += ",\"commands_enabled\":false";
   output += ",\"process_alive\":true";
@@ -210,6 +229,47 @@ struct SnapshotPublicationState
   output += ",\"graph_error\":";
   append_json_string(output, graph_error);
 
+  output += ",\"observation_topics_configured\":";
+  append_integer(output, observations.configured);
+
+  output += ",\"observation_subscriptions_active\":";
+  append_integer(output, observations.active);
+
+  output += ",\"observation_active_topics\":";
+  append_string_array(
+    output,
+    observations.active_topics);
+
+  output += ",\"observation_error_topics\":";
+  append_string_array(
+    output,
+    observations.error_topics);
+
+  output += ",\"observation_runtime_error\":";
+  append_json_string(
+    output,
+    observations.runtime_error);
+
+  output += ",\"observation_health_status\":";
+  append_json_string(
+    output,
+    to_string(health.status));
+
+  output += ",\"observation_health_reason\":";
+  append_json_string(
+    output,
+    to_string(health.reason));
+
+  output += ",\"required_topics_ready\":";
+  append_boolean(
+    output,
+    health.required_topics_ready);
+
+  output += ",\"all_topics_fresh\":";
+  append_boolean(
+    output,
+    health.all_topics_fresh);
+
   output += ",\"snapshot_enabled\":";
   append_boolean(output, snapshot.enabled);
 
@@ -259,6 +319,16 @@ struct SnapshotPublicationState
   const bool value)
 {
   return value ? "true" : "false";
+}
+
+[[nodiscard]] rclcpp::QoS observation_qos()
+{
+  rclcpp::QoS qos(rclcpp::KeepLast(10));
+
+  qos.best_effort();
+  qos.durability_volatile();
+
+  return qos;
 }
 
 }  // namespace
@@ -321,6 +391,46 @@ BridgeNode::BridgeNode(
     "edge_evidence_topics",
     std::vector<std::string>{});
 
+  ObservationParameterSet observation_parameters;
+
+  observation_parameters.topic_names =
+    declare_parameter<std::vector<std::string>>(
+    "observation_topics",
+    std::vector<std::string>{});
+
+  observation_parameters.requirements =
+    declare_parameter<std::vector<std::string>>(
+    "observation_requirements",
+    std::vector<std::string>{});
+
+  observation_parameters.stale_after_ms =
+    declare_parameter<std::vector<std::int64_t>>(
+    "observation_stale_after_ms",
+    std::vector<std::int64_t>{});
+
+  const std::vector<TopicObservationConfig>
+  observation_configs = make_observation_configs(
+    observation_parameters,
+    graph_config_.owned_topic_names);
+
+  observation_runtimes_.reserve(
+    observation_configs.size());
+
+  for (const TopicObservationConfig & config :
+    observation_configs)
+  {
+    ObservationRuntime runtime;
+    runtime.topic_name = config.topic_name;
+
+    runtime.observation =
+      std::make_unique<TopicObservation>(config);
+
+    runtime.error = "topic_type_unresolved";
+
+    observation_runtimes_.push_back(
+      std::move(runtime));
+  }
+
   snapshot_enabled_ =
     declare_parameter<bool>(
     "snapshot_enabled",
@@ -343,13 +453,136 @@ BridgeNode::BridgeNode(
 
   RCLCPP_INFO(
     get_logger(),
-    "savo_bridge Phase 2A snapshot publication started; "
-    "enabled=%s path=%s commands remain disabled",
-    snapshot_enabled_ ? "true" : "false",
-    snapshot_path_.c_str());
+    "savo_bridge Phase 2B-2 topic observation started; "
+    "configured_topics=%zu snapshot_enabled=%s "
+    "commands remain disabled",
+    observation_runtimes_.size(),
+    snapshot_enabled_ ? "true" : "false");
 }
 
-void BridgeNode::publish_runtime_snapshot()
+void BridgeNode::refresh_observation_subscriptions()
+{
+  const auto graph_interface =
+    get_node_graph_interface();
+
+  const auto topic_names_and_types =
+    graph_interface->get_topic_names_and_types();
+
+  for (ObservationRuntime & runtime :
+    observation_runtimes_)
+  {
+    const auto iterator =
+      topic_names_and_types.find(runtime.topic_name);
+
+    if (iterator == topic_names_and_types.end()) {
+      if (!runtime.subscription) {
+        runtime.error = "topic_type_unresolved";
+      }
+
+      continue;
+    }
+
+    std::vector<std::string> topic_types =
+      iterator->second;
+
+    std::sort(
+      topic_types.begin(),
+      topic_types.end());
+
+    topic_types.erase(
+      std::unique(
+        topic_types.begin(),
+        topic_types.end()),
+      topic_types.end());
+
+    if (topic_types.size() != 1U) {
+      runtime.subscription.reset();
+      runtime.topic_type.clear();
+
+      runtime.error =
+        topic_types.empty() ?
+        "topic_type_unresolved" :
+        "topic_type_ambiguous";
+
+      continue;
+    }
+
+    const std::string & topic_type =
+      topic_types.front();
+
+    if (topic_type.empty()) {
+      runtime.subscription.reset();
+      runtime.topic_type.clear();
+      runtime.error = "topic_type_empty";
+      continue;
+    }
+
+    if (
+      runtime.subscription &&
+      runtime.topic_type == topic_type)
+    {
+      runtime.error.clear();
+      continue;
+    }
+
+    runtime.subscription.reset();
+    runtime.topic_type.clear();
+
+    TopicObservation * const observation =
+      runtime.observation.get();
+
+    std::function<void(
+        std::shared_ptr<rclcpp::SerializedMessage>)>
+    callback =
+      [observation](
+      std::shared_ptr<rclcpp::SerializedMessage>)
+      {
+        (void)observation->observe(
+          TopicObservation::Clock::now());
+      };
+
+    try {
+      runtime.subscription =
+        create_generic_subscription(
+        runtime.topic_name,
+        topic_type,
+        observation_qos(),
+        std::move(callback));
+
+      runtime.topic_type = topic_type;
+      runtime.error.clear();
+    } catch (const std::exception & exception) {
+      runtime.subscription.reset();
+      runtime.topic_type.clear();
+
+      runtime.error =
+        std::string("subscription_creation_failed:") +
+        exception.what();
+    }
+  }
+}
+
+std::vector<TopicObservation::Snapshot>
+BridgeNode::collect_observation_snapshots(
+  const TopicObservation::TimePoint evaluated_at) const
+{
+  std::vector<TopicObservation::Snapshot> result;
+
+  result.reserve(observation_runtimes_.size());
+
+  for (const ObservationRuntime & runtime :
+    observation_runtimes_)
+  {
+    result.push_back(
+      runtime.observation->snapshot(evaluated_at));
+  }
+
+  return result;
+}
+
+void BridgeNode::publish_runtime_snapshot(
+  const std::vector<TopicObservation::Snapshot> &
+  topic_snapshots)
 {
   snapshot_last_write_ok_ = false;
   snapshot_replaced_existing_ = false;
@@ -362,6 +595,7 @@ void BridgeNode::publish_runtime_snapshot()
 
   SnapshotDocument document;
   document.sequence = snapshot_sequence_ + 1U;
+  document.topics = topic_snapshots;
 
   try {
     const SnapshotWriteResult result =
@@ -385,6 +619,13 @@ void BridgeNode::publish_status()
 {
   GraphEvidence evidence;
   std::string graph_error;
+  std::string observation_runtime_error;
+
+  try {
+    refresh_observation_subscriptions();
+  } catch (const std::exception & exception) {
+    observation_runtime_error = exception.what();
+  }
 
   try {
     const GraphSnapshot snapshot =
@@ -399,7 +640,42 @@ void BridgeNode::publish_status()
     graph_error = exception.what();
   }
 
-  publish_runtime_snapshot();
+  const TopicObservation::TimePoint evaluated_at =
+    TopicObservation::Clock::now();
+
+  const std::vector<TopicObservation::Snapshot>
+  topic_snapshots =
+    collect_observation_snapshots(evaluated_at);
+
+  const HealthEvaluator health_evaluator;
+
+  const HealthEvaluation health =
+    health_evaluator.evaluate(topic_snapshots);
+
+  publish_runtime_snapshot(topic_snapshots);
+
+  ObservationRuntimeState observation_state;
+  observation_state.configured =
+    observation_runtimes_.size();
+
+  observation_state.runtime_error =
+    observation_runtime_error;
+
+  for (const ObservationRuntime & runtime :
+    observation_runtimes_)
+  {
+    if (runtime.subscription) {
+      ++observation_state.active;
+
+      observation_state.active_topics.push_back(
+        runtime.topic_name);
+    }
+
+    if (!runtime.error.empty()) {
+      observation_state.error_topics.push_back(
+        runtime.topic_name);
+    }
+  }
 
   const SnapshotPublicationState snapshot_state{
     snapshot_enabled_,
@@ -418,11 +694,14 @@ void BridgeNode::publish_status()
   readiness_publisher_->publish(readiness_message);
 
   std_msgs::msg::String state_message;
+
   state_message.data =
     make_state_json(
     evidence,
     graph_error,
-    snapshot_state);
+    snapshot_state,
+    observation_state,
+    health);
 
   state_publisher_->publish(state_message);
 
@@ -434,7 +713,7 @@ void BridgeNode::publish_status()
   diagnostics_message.header.stamp = now();
 
   diagnostic_msgs::msg::DiagnosticStatus status;
-  status.name = "/savo_bridge/runtime_snapshot";
+  status.name = "/savo_bridge/topic_observation";
   status.hardware_id = "savo-edge";
 
   const bool selectors_configured =
@@ -449,11 +728,20 @@ void BridgeNode::publish_status()
     snapshot_enabled_ &&
     !snapshot_last_write_ok_;
 
+  const bool subscriptions_incomplete =
+    observation_state.active <
+    observation_state.configured;
+
   if (!graph_error.empty()) {
     status.level =
       diagnostic_msgs::msg::DiagnosticStatus::ERROR;
 
     status.message = "graph_discovery_failed";
+  } else if (!observation_runtime_error.empty()) {
+    status.level =
+      diagnostic_msgs::msg::DiagnosticStatus::ERROR;
+
+    status.message = "observation_runtime_failed";
   } else if (snapshot_failed) {
     status.level =
       diagnostic_msgs::msg::DiagnosticStatus::ERROR;
@@ -475,6 +763,27 @@ void BridgeNode::publish_status()
       diagnostic_msgs::msg::DiagnosticStatus::WARN;
 
     status.message = "graph_evidence_incomplete";
+  } else if (observation_state.configured == 0U) {
+    status.level =
+      diagnostic_msgs::msg::DiagnosticStatus::WARN;
+
+    status.message = "observation_topics_unconfigured";
+  } else if (subscriptions_incomplete) {
+    status.level =
+      diagnostic_msgs::msg::DiagnosticStatus::WARN;
+
+    status.message =
+      "observation_subscriptions_incomplete";
+  } else if (health.status == HealthStatus::kUnhealthy) {
+    status.level =
+      diagnostic_msgs::msg::DiagnosticStatus::ERROR;
+
+    status.message = "observation_health_unhealthy";
+  } else if (health.status == HealthStatus::kDegraded) {
+    status.level =
+      diagnostic_msgs::msg::DiagnosticStatus::WARN;
+
+    status.message = "observation_health_degraded";
   } else if (!snapshot_enabled_) {
     status.level =
       diagnostic_msgs::msg::DiagnosticStatus::WARN;
@@ -485,7 +794,7 @@ void BridgeNode::publish_status()
       diagnostic_msgs::msg::DiagnosticStatus::WARN;
 
     status.message =
-      "snapshot_publication_active_observation_not_started";
+      "observation_active_readiness_not_enabled";
   }
 
   status.values.push_back(
@@ -512,6 +821,36 @@ void BridgeNode::publish_status()
     make_key_value(
       "edge_visible",
       boolean_string(evidence.edge_visible)));
+
+  status.values.push_back(
+    make_key_value(
+      "observation_topics_configured",
+      std::to_string(observation_state.configured)));
+
+  status.values.push_back(
+    make_key_value(
+      "observation_subscriptions_active",
+      std::to_string(observation_state.active)));
+
+  status.values.push_back(
+    make_key_value(
+      "observation_health_status",
+      std::string(to_string(health.status))));
+
+  status.values.push_back(
+    make_key_value(
+      "observation_health_reason",
+      std::string(to_string(health.reason))));
+
+  status.values.push_back(
+    make_key_value(
+      "required_topics_ready",
+      boolean_string(health.required_topics_ready)));
+
+  status.values.push_back(
+    make_key_value(
+      "all_topics_fresh",
+      boolean_string(health.all_topics_fresh)));
 
   status.values.push_back(
     make_key_value(
@@ -550,23 +889,13 @@ void BridgeNode::publish_status()
 
   status.values.push_back(
     make_key_value(
-      "snapshot_replaced_existing",
-      boolean_string(snapshot_replaced_existing_)));
-
-  status.values.push_back(
-    make_key_value(
       "snapshot_error",
       snapshot_error_));
 
   status.values.push_back(
     make_key_value(
-      "discovered_nodes",
-      std::to_string(evidence.discovered_nodes)));
-
-  status.values.push_back(
-    make_key_value(
-      "discovered_topics",
-      std::to_string(evidence.discovered_topics)));
+      "observation_runtime_error",
+      observation_runtime_error));
 
   status.values.push_back(
     make_key_value(

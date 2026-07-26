@@ -86,7 +86,7 @@ def generate_launch_description() -> LaunchDescription:
             ),
             Node(
                 package="savo_localization",
-                executable="localization_health_node.py",
+                executable="localization_health_node",
                 name="localization_health_node",
                 output="screen",
                 condition=IfCondition(use_health),

@@ -115,7 +115,7 @@ wheel_odom_fallback_node:
     wheel_odom_state_topic: /savo_localization/wheel_odom_state
 
     odom_frame_id: odom
-    base_frame_id: base_link
+    base_frame_id: base_footprint
 
     max_odom_linear_speed_mps: 1.5
     max_odom_angular_speed_rad_s: 4.0

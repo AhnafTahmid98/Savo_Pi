@@ -20,7 +20,7 @@ from savo_localization.constants import (
     DEFAULT_ENCODER_CPR,
     DEFAULT_ENCODER_DECODING,
     DEFAULT_GEAR_RATIO,
-    FRAME_BASE_LINK,
+    FRAME_BASE_FOOTPRINT,
     FRAME_ODOM,
     ODOM_MODEL_MECANUM_4ENC,
 )
@@ -173,7 +173,7 @@ class WheelOdomConfig:
     model: str = ODOM_MODEL_MECANUM_4ENC
 
     odom_frame_id: str = FRAME_ODOM
-    base_frame_id: str = FRAME_BASE_LINK
+    base_frame_id: str = FRAME_BASE_FOOTPRINT
 
     wheel_odom_topic: str = DEFAULT_WHEEL_ODOM_TOPIC
     wheel_odom_state_topic: str = DEFAULT_WHEEL_ODOM_STATE_TOPIC
@@ -280,7 +280,7 @@ def wheel_odom_config_from_ros_params(params: dict[str, Any]) -> WheelOdomConfig
     config = WheelOdomConfig(
         model=str(params.get("model", ODOM_MODEL_MECANUM_4ENC)),
         odom_frame_id=str(params.get("odom_frame_id", FRAME_ODOM)),
-        base_frame_id=str(params.get("base_frame_id", FRAME_BASE_LINK)),
+        base_frame_id=str(params.get("base_frame_id", FRAME_BASE_FOOTPRINT)),
         wheel_odom_topic=str(
             params.get("wheel_odom_topic", DEFAULT_WHEEL_ODOM_TOPIC)
         ),

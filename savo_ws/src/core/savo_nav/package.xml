@@ -10,10 +10,9 @@
 
   <description>
     Robot Savo core-side navigation package. It owns Nav2 orchestration,
-    saved-map localization integration, global and local costmaps, validated
-    navigation-goal execution, two-dimensional and three-dimensional
-    obstacle-aware path planning, navigation readiness, bounded recovery
-    coordination, and observer-only visualization outputs.
+    saved-map localization integration, costmaps, validated navigation-goal
+    execution, navigation readiness, recovery coordination, and observer
+    outputs. Hardware remains owned by dedicated Robot Savo packages.
   </description>
 
   <maintainer email="tahmidahnaf998@gmail.com">
@@ -24,11 +23,40 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
+  <depend>action_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>nav2_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>rclcpp</depend>
+  <depend>rclcpp_action</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>tf2_msgs</depend>
+
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>rclpy</exec_depend>
+
+  <exec_depend>nav2_amcl</exec_depend>
+  <exec_depend>nav2_behaviors</exec_depend>
+  <exec_depend>nav2_bt_navigator</exec_depend>
+  <exec_depend>nav2_common</exec_depend>
+  <exec_depend>nav2_controller</exec_depend>
+  <exec_depend>nav2_costmap_2d</exec_depend>
+  <exec_depend>nav2_dwb_controller</exec_depend>
+  <exec_depend>nav2_lifecycle_manager</exec_depend>
+  <exec_depend>nav2_map_server</exec_depend>
+  <exec_depend>nav2_navfn_planner</exec_depend>
+  <exec_depend>nav2_planner</exec_depend>
+  <exec_depend>nav2_waypoint_follower</exec_depend>
+
+  <test_depend>ament_cmake_gtest</test_depend>
   <test_depend>ament_cmake_pytest</test_depend>
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
   <test_depend>python3-pytest</test_depend>
   <test_depend>python3-yaml</test_depend>
+  <test_depend>rclpy</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

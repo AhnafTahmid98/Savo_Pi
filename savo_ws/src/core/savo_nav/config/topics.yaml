@@ -19,6 +19,9 @@ topics:
     raw_realsense_points: "/camera/camera/depth/color/points"
     filtered_obstacle_points: "/savo_perception/obstacles/points"
 
+    global_costmap: "/global_costmap/costmap"
+    local_costmap: "/local_costmap/costmap"
+
     safety_stop: "/safety/stop"
     safety_slowdown_factor: "/safety/slowdown_factor"
     control_mode_state: "/savo_control/mode_state"
@@ -50,3 +53,9 @@ constraints:
   only_navigation_velocity_output: "/cmd_vel_nav"
   rviz_is_observer_only: true
   raspberry_pis_run_rviz: false
+
+phase6_goal_gateway:
+  navigation_state: "/savo_nav/navigation/state"
+  navigation_status: "/savo_nav/navigation/status"
+  navigation_feedback: "/savo_nav/navigation/feedback"
+  navigation_result: "/savo_nav/navigation/result"

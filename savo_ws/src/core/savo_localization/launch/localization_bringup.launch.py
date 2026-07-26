@@ -140,7 +140,7 @@ def generate_launch_description() -> LaunchDescription:
             ),
             DeclareLaunchArgument(
                 "use_health",
-                default_value="false",
+                default_value="true",
                 description="Start localization_health_node.",
             ),
             DeclareLaunchArgument(
@@ -228,7 +228,7 @@ def generate_launch_description() -> LaunchDescription:
 
             Node(
                 package="savo_localization",
-                executable="localization_health_node.py",
+                executable="localization_health_node",
                 name="localization_health_node",
                 output="screen",
                 condition=IfCondition(use_health),

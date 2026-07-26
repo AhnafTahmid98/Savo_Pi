@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from savo_localization.constants import (
-    FRAME_BASE_LINK,
+    FRAME_BASE_FOOTPRINT,
     FRAME_FILTERED_ODOM,
     FRAME_IMU,
     FRAME_MAP,
@@ -49,7 +49,7 @@ class FramePair:
 class LocalizationFrames:
     map_frame: str = FRAME_MAP
     odom_frame: str = FRAME_ODOM
-    base_frame: str = FRAME_BASE_LINK
+    base_frame: str = FRAME_BASE_FOOTPRINT
     imu_frame: str = FRAME_IMU
     wheel_odom_frame: str = FRAME_WHEEL_ODOM
     filtered_odom_frame: str = FRAME_FILTERED_ODOM
@@ -146,23 +146,23 @@ def map_to_odom_pair() -> FramePair:
 
 
 def odom_to_base_pair() -> FramePair:
-    return frame_pair(FRAME_ODOM, FRAME_BASE_LINK)
+    return frame_pair(FRAME_ODOM, FRAME_BASE_FOOTPRINT)
 
 
 def base_to_imu_pair() -> FramePair:
-    return frame_pair(FRAME_BASE_LINK, FRAME_IMU)
+    return frame_pair(FRAME_BASE_FOOTPRINT, FRAME_IMU)
 
 
 def wheel_odom_to_base_pair() -> FramePair:
-    return frame_pair(FRAME_WHEEL_ODOM, FRAME_BASE_LINK)
+    return frame_pair(FRAME_WHEEL_ODOM, FRAME_BASE_FOOTPRINT)
 
 
 def filtered_odom_to_base_pair() -> FramePair:
-    return frame_pair(FRAME_FILTERED_ODOM, FRAME_BASE_LINK)
+    return frame_pair(FRAME_FILTERED_ODOM, FRAME_BASE_FOOTPRINT)
 
 
 def vo_odom_to_base_pair() -> FramePair:
-    return frame_pair(FRAME_VO_ODOM, FRAME_BASE_LINK)
+    return frame_pair(FRAME_VO_ODOM, FRAME_BASE_FOOTPRINT)
 
 
 def is_expected_odom_frame(frame_id: str | None) -> bool:
@@ -170,7 +170,7 @@ def is_expected_odom_frame(frame_id: str | None) -> bool:
 
 
 def is_expected_base_frame(frame_id: str | None) -> bool:
-    return normalize_frame_id(frame_id) == FRAME_BASE_LINK
+    return normalize_frame_id(frame_id) == FRAME_BASE_FOOTPRINT
 
 
 def is_expected_imu_frame(frame_id: str | None) -> bool:
@@ -196,7 +196,7 @@ def make_localization_frames(
     *,
     map_frame: str = FRAME_MAP,
     odom_frame: str = FRAME_ODOM,
-    base_frame: str = FRAME_BASE_LINK,
+    base_frame: str = FRAME_BASE_FOOTPRINT,
     imu_frame: str = FRAME_IMU,
     wheel_odom_frame: str = FRAME_WHEEL_ODOM,
     filtered_odom_frame: str = FRAME_FILTERED_ODOM,

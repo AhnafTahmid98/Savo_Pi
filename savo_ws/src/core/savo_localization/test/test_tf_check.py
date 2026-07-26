@@ -8,7 +8,7 @@ from __future__ import annotations
 import pytest
 
 from savo_localization.constants import (
-    FRAME_BASE_LINK,
+    FRAME_BASE_FOOTPRINT,
     FRAME_IMU,
     FRAME_MAP,
     FRAME_ODOM,
@@ -29,23 +29,23 @@ from savo_localization.diagnostics.tf_check import (
 
 
 def test_tf_edge_label() -> None:
-    assert tf_edge_label(FRAME_ODOM, FRAME_BASE_LINK) == "odom -> base_link"
-    assert tf_edge_label(FRAME_BASE_LINK, FRAME_IMU) == "base_link -> imu_link"
-    assert tf_edge_label("/odom", "/base_link") == "odom -> base_link"
+    assert tf_edge_label(FRAME_ODOM, FRAME_BASE_FOOTPRINT) == "odom -> base_footprint"
+    assert tf_edge_label(FRAME_BASE_FOOTPRINT, FRAME_IMU) == "base_footprint -> imu_link"
+    assert tf_edge_label("/odom", "/base_footprint") == "odom -> base_footprint"
 
 
 def test_make_tf_edge_result_available_and_fresh() -> None:
     result = make_tf_edge_result(
         parent_frame=FRAME_ODOM,
-        child_frame=FRAME_BASE_LINK,
+        child_frame=FRAME_BASE_FOOTPRINT,
         available=True,
         age_s=0.05,
         max_age_s=0.5,
     )
 
     assert result.parent_frame == FRAME_ODOM
-    assert result.child_frame == FRAME_BASE_LINK
-    assert result.label == "odom -> base_link"
+    assert result.child_frame == FRAME_BASE_FOOTPRINT
+    assert result.label == "odom -> base_footprint"
     assert result.available is True
     assert result.fresh is True
     assert result.ok is True
@@ -57,7 +57,7 @@ def test_make_tf_edge_result_available_and_fresh() -> None:
 def test_make_tf_edge_result_available_but_stale() -> None:
     result = make_tf_edge_result(
         parent_frame=FRAME_ODOM,
-        child_frame=FRAME_BASE_LINK,
+        child_frame=FRAME_BASE_FOOTPRINT,
         available=True,
         age_s=1.0,
         max_age_s=0.5,
@@ -74,7 +74,7 @@ def test_make_tf_edge_result_available_but_stale() -> None:
 def test_make_tf_edge_result_missing() -> None:
     result = make_tf_edge_result(
         parent_frame=FRAME_ODOM,
-        child_frame=FRAME_BASE_LINK,
+        child_frame=FRAME_BASE_FOOTPRINT,
         available=False,
         age_s=None,
         max_age_s=0.5,
@@ -93,7 +93,7 @@ def test_make_tf_edge_result_rejects_bad_age_limit() -> None:
     with pytest.raises(ValueError):
         make_tf_edge_result(
             parent_frame=FRAME_ODOM,
-            child_frame=FRAME_BASE_LINK,
+            child_frame=FRAME_BASE_FOOTPRINT,
             available=True,
             age_s=0.1,
             max_age_s=0.0,
@@ -103,8 +103,8 @@ def test_make_tf_edge_result_rejects_bad_age_limit() -> None:
 def test_make_tf_edge_result_rejects_bad_frame_pair() -> None:
     with pytest.raises(ValueError):
         make_tf_edge_result(
-            parent_frame=FRAME_BASE_LINK,
-            child_frame=FRAME_BASE_LINK,
+            parent_frame=FRAME_BASE_FOOTPRINT,
+            child_frame=FRAME_BASE_FOOTPRINT,
             available=True,
             age_s=0.1,
             max_age_s=0.5,
@@ -114,7 +114,7 @@ def test_make_tf_edge_result_rejects_bad_frame_pair() -> None:
 def test_tf_edge_check_result_to_dict() -> None:
     result = TfEdgeCheckResult(
         parent_frame=FRAME_ODOM,
-        child_frame=FRAME_BASE_LINK,
+        child_frame=FRAME_BASE_FOOTPRINT,
         available=True,
         fresh=True,
         age_s=0.05,
@@ -126,8 +126,8 @@ def test_tf_edge_check_result_to_dict() -> None:
     data = result.to_dict()
 
     assert data["parent_frame"] == FRAME_ODOM
-    assert data["child_frame"] == FRAME_BASE_LINK
-    assert data["label"] == "odom -> base_link"
+    assert data["child_frame"] == FRAME_BASE_FOOTPRINT
+    assert data["label"] == "odom -> base_footprint"
     assert data["available"] is True
     assert data["fresh"] is True
     assert data["ok"] is True
@@ -140,7 +140,7 @@ def test_tf_edge_check_result_to_dict() -> None:
 def test_check_tf_edge_healthy() -> None:
     edge = make_tf_edge_result(
         parent_frame=FRAME_ODOM,
-        child_frame=FRAME_BASE_LINK,
+        child_frame=FRAME_BASE_FOOTPRINT,
         available=True,
         age_s=0.05,
         max_age_s=0.5,
@@ -158,7 +158,7 @@ def test_check_tf_edge_healthy() -> None:
 def test_check_tf_edge_stale() -> None:
     edge = make_tf_edge_result(
         parent_frame=FRAME_ODOM,
-        child_frame=FRAME_BASE_LINK,
+        child_frame=FRAME_BASE_FOOTPRINT,
         available=True,
         age_s=1.0,
         max_age_s=0.5,
@@ -176,7 +176,7 @@ def test_check_tf_edge_stale() -> None:
 def test_check_tf_edge_missing() -> None:
     edge = make_tf_edge_result(
         parent_frame=FRAME_ODOM,
-        child_frame=FRAME_BASE_LINK,
+        child_frame=FRAME_BASE_FOOTPRINT,
         available=False,
         age_s=None,
         max_age_s=0.5,
@@ -194,14 +194,14 @@ def test_check_tf_edge_missing() -> None:
 def test_tf_chain_check_result_to_dict() -> None:
     odom_to_base = make_tf_edge_result(
         parent_frame=FRAME_ODOM,
-        child_frame=FRAME_BASE_LINK,
+        child_frame=FRAME_BASE_FOOTPRINT,
         available=True,
         age_s=0.05,
         max_age_s=0.5,
     )
 
     base_to_imu = make_tf_edge_result(
-        parent_frame=FRAME_BASE_LINK,
+        parent_frame=FRAME_BASE_FOOTPRINT,
         child_frame=FRAME_IMU,
         available=True,
         age_s=0.05,
@@ -236,13 +236,13 @@ def test_check_tf_chain_healthy_baseline() -> None:
     edges = {
         "odom_to_base": make_tf_edge_result(
             parent_frame=FRAME_ODOM,
-            child_frame=FRAME_BASE_LINK,
+            child_frame=FRAME_BASE_FOOTPRINT,
             available=True,
             age_s=0.05,
             max_age_s=0.5,
         ),
         "base_to_imu": make_tf_edge_result(
-            parent_frame=FRAME_BASE_LINK,
+            parent_frame=FRAME_BASE_FOOTPRINT,
             child_frame=FRAME_IMU,
             available=True,
             age_s=0.05,
@@ -271,13 +271,13 @@ def test_check_tf_chain_with_optional_map_to_odom() -> None:
         ),
         "odom_to_base": make_tf_edge_result(
             parent_frame=FRAME_ODOM,
-            child_frame=FRAME_BASE_LINK,
+            child_frame=FRAME_BASE_FOOTPRINT,
             available=True,
             age_s=0.05,
             max_age_s=0.5,
         ),
         "base_to_imu": make_tf_edge_result(
-            parent_frame=FRAME_BASE_LINK,
+            parent_frame=FRAME_BASE_FOOTPRINT,
             child_frame=FRAME_IMU,
             available=True,
             age_s=0.05,
@@ -298,14 +298,14 @@ def test_check_tf_chain_missing_required_edge() -> None:
     edges = {
         "odom_to_base": make_tf_edge_result(
             parent_frame=FRAME_ODOM,
-            child_frame=FRAME_BASE_LINK,
+            child_frame=FRAME_BASE_FOOTPRINT,
             available=False,
             age_s=None,
             max_age_s=0.5,
             message="transform not available",
         ),
         "base_to_imu": make_tf_edge_result(
-            parent_frame=FRAME_BASE_LINK,
+            parent_frame=FRAME_BASE_FOOTPRINT,
             child_frame=FRAME_IMU,
             available=True,
             age_s=0.05,
@@ -327,13 +327,13 @@ def test_check_tf_chain_stale_required_edge() -> None:
     edges = {
         "odom_to_base": make_tf_edge_result(
             parent_frame=FRAME_ODOM,
-            child_frame=FRAME_BASE_LINK,
+            child_frame=FRAME_BASE_FOOTPRINT,
             available=True,
             age_s=1.0,
             max_age_s=0.5,
         ),
         "base_to_imu": make_tf_edge_result(
-            parent_frame=FRAME_BASE_LINK,
+            parent_frame=FRAME_BASE_FOOTPRINT,
             child_frame=FRAME_IMU,
             available=True,
             age_s=0.05,
@@ -366,13 +366,13 @@ def test_tf_chain_summary() -> None:
     edges = {
         "odom_to_base": make_tf_edge_result(
             parent_frame=FRAME_ODOM,
-            child_frame=FRAME_BASE_LINK,
+            child_frame=FRAME_BASE_FOOTPRINT,
             available=True,
             age_s=0.05,
             max_age_s=0.5,
         ),
         "base_to_imu": make_tf_edge_result(
-            parent_frame=FRAME_BASE_LINK,
+            parent_frame=FRAME_BASE_FOOTPRINT,
             child_frame=FRAME_IMU,
             available=True,
             age_s=0.05,
@@ -394,13 +394,13 @@ def test_robot_savo_localization_tf_chain_is_healthy() -> None:
     edges = {
         "odom_to_base": make_tf_edge_result(
             parent_frame=FRAME_ODOM,
-            child_frame=FRAME_BASE_LINK,
+            child_frame=FRAME_BASE_FOOTPRINT,
             available=True,
             age_s=0.03,
             max_age_s=0.5,
         ),
         "base_to_imu": make_tf_edge_result(
-            parent_frame=FRAME_BASE_LINK,
+            parent_frame=FRAME_BASE_FOOTPRINT,
             child_frame=FRAME_IMU,
             available=True,
             age_s=0.03,
@@ -420,14 +420,14 @@ def test_robot_savo_missing_odom_to_base_tf_is_not_usable() -> None:
     edges = {
         "odom_to_base": make_tf_edge_result(
             parent_frame=FRAME_ODOM,
-            child_frame=FRAME_BASE_LINK,
+            child_frame=FRAME_BASE_FOOTPRINT,
             available=False,
             age_s=None,
             max_age_s=0.5,
-            message="EKF is not publishing odom -> base_link",
+            message="EKF is not publishing odom -> base_footprint",
         ),
         "base_to_imu": make_tf_edge_result(
-            parent_frame=FRAME_BASE_LINK,
+            parent_frame=FRAME_BASE_FOOTPRINT,
             child_frame=FRAME_IMU,
             available=True,
             age_s=0.03,
@@ -441,25 +441,25 @@ def test_robot_savo_missing_odom_to_base_tf_is_not_usable() -> None:
     assert result.status == STATUS_STALE
     assert result.healthy_count == 1
     assert result.available_count == 1
-    assert any("odom -> base_link" in reason for reason in result.reasons)
+    assert any("odom -> base_footprint" in reason for reason in result.reasons)
 
 
 def test_robot_savo_missing_base_to_imu_tf_is_not_usable() -> None:
     edges = {
         "odom_to_base": make_tf_edge_result(
             parent_frame=FRAME_ODOM,
-            child_frame=FRAME_BASE_LINK,
+            child_frame=FRAME_BASE_FOOTPRINT,
             available=True,
             age_s=0.03,
             max_age_s=0.5,
         ),
         "base_to_imu": make_tf_edge_result(
-            parent_frame=FRAME_BASE_LINK,
+            parent_frame=FRAME_BASE_FOOTPRINT,
             child_frame=FRAME_IMU,
             available=False,
             age_s=None,
             max_age_s=0.5,
-            message="robot_state_publisher is not publishing base_link -> imu_link",
+            message="robot_state_publisher is not publishing base_footprint -> imu_link",
         ),
     }
 
@@ -469,18 +469,18 @@ def test_robot_savo_missing_base_to_imu_tf_is_not_usable() -> None:
     assert result.status == STATUS_STALE
     assert result.healthy_count == 1
     assert result.available_count == 1
-    assert any("base_link -> imu_link" in reason for reason in result.reasons)
+    assert any("base_footprint -> imu_link" in reason for reason in result.reasons)
 
 
 def test_default_edge_result_values() -> None:
     result = TfEdgeCheckResult(
         parent_frame=FRAME_ODOM,
-        child_frame=FRAME_BASE_LINK,
+        child_frame=FRAME_BASE_FOOTPRINT,
     )
 
     assert result.parent_frame == FRAME_ODOM
-    assert result.child_frame == FRAME_BASE_LINK
-    assert result.label == "odom -> base_link"
+    assert result.child_frame == FRAME_BASE_FOOTPRINT
+    assert result.label == "odom -> base_footprint"
     assert result.available is False
     assert result.fresh is False
     assert result.ok is False

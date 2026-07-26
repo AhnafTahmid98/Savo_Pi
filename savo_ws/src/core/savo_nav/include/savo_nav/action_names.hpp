@@ -8,13 +8,16 @@
 namespace savo_nav::actions
 {
 
-inline constexpr std::string_view kNavigationNavigateToPose =
+inline constexpr std::string_view
+  kNavigationNavigateToPose =
   "/savo_nav/navigation/navigate_to_pose";
 
-inline constexpr std::string_view kExplorationNavigateToPose =
+inline constexpr std::string_view
+  kExplorationNavigateToPose =
   "/savo_nav/exploration/navigate_to_pose";
 
-inline constexpr std::string_view kNav2NavigateToPose =
+inline constexpr std::string_view
+  kNav2NavigateToPose =
   "/navigate_to_pose";
 
 }  // namespace savo_nav::actions

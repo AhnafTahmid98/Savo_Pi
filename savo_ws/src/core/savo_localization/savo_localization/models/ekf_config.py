@@ -18,7 +18,7 @@ from savo_localization.constants import (
     DEFAULT_PUBLISH_TF,
     DEFAULT_TWO_D_MODE,
     DEFAULT_WHEEL_ODOM_TOPIC,
-    FRAME_BASE_LINK,
+    FRAME_BASE_FOOTPRINT,
     FRAME_ODOM,
 )
 
@@ -200,7 +200,7 @@ class EkfConfig:
 
     map_frame: str = DEFAULT_MAP_FRAME
     odom_frame: str = FRAME_ODOM
-    base_link_frame: str = FRAME_BASE_LINK
+    base_link_frame: str = FRAME_BASE_FOOTPRINT
     world_frame: str = DEFAULT_WORLD_FRAME
 
     transform_time_offset_s: float = 0.0
@@ -448,7 +448,7 @@ def ekf_config_from_ros_params(params: dict[str, Any]) -> EkfConfig:
         publish_acceleration=_parse_bool(params.get("publish_acceleration", False)),
         map_frame=str(params.get("map_frame", DEFAULT_MAP_FRAME)),
         odom_frame=str(params.get("odom_frame", FRAME_ODOM)),
-        base_link_frame=str(params.get("base_link_frame", FRAME_BASE_LINK)),
+        base_link_frame=str(params.get("base_link_frame", FRAME_BASE_FOOTPRINT)),
         world_frame=str(params.get("world_frame", DEFAULT_WORLD_FRAME)),
         transform_time_offset_s=float(params.get("transform_time_offset_s", 0.0)),
         transform_timeout_s=float(params.get("transform_timeout_s", 0.0)),

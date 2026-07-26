@@ -1,0 +1,24 @@
+# Copyright 2026 Ahnaf Tahmid
+# SPDX-License-Identifier: LicenseRef-Proprietary
+
+goal_gateway_node:
+  ros__parameters:
+    navigation_action_name: "/savo_nav/navigation/navigate_to_pose"
+
+    exploration_action_name: "/savo_nav/exploration/navigate_to_pose"
+
+    nav2_action_name: "/navigate_to_pose"
+
+    map_mode: "saved_map"
+    active_map_id: "saved_map"
+    map_revision: 1
+
+    recent_history_capacity: 32
+
+    max_abs_coordinate_m: 1000.0
+
+    allow_degraded_readiness: false
+    allow_behavior_tree_override: false
+
+    execution_timeout_seconds: 300.0
+    feedback_stale_timeout_seconds: 10.0

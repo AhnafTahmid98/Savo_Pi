@@ -1,9 +1,11 @@
 #include "savo_mapping/exploration_goal_handoff.hpp"
 #include "savo_mapping/exploration_planner.hpp"
+#include "savo_mapping/topic_names.hpp"
 
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <nav_msgs/msg/occupancy_grid.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <std_msgs/msg/bool.hpp>
 #include <std_msgs/msg/string.hpp>
 #include <tf2/exceptions.h>
 #include <tf2/time.h>
@@ -121,6 +123,12 @@ public:
       declare_parameter<std::string>(
       "handoff_state_topic",
       exploration::kGoalStateTopic);
+
+    runtime_enabled_topic_ =
+      declare_parameter<std::string>(
+      "runtime_enabled_topic",
+      std::string{
+        topics::EXPLORATION_RUNTIME_ENABLED});
 
     state_topic_ =
       declare_parameter<std::string>(
@@ -277,6 +285,17 @@ public:
           this,
           std::placeholders::_1));
 
+    runtime_enabled_subscription_ =
+      create_subscription<
+      std_msgs::msg::Bool>(
+        runtime_enabled_topic_,
+        retained_qos,
+        std::bind(
+          &FrontierExplorerNode::
+        handle_runtime_enabled,
+          this,
+          std::placeholders::_1));
+
     planning_timer_ =
       create_wall_timer(
         std::chrono::milliseconds(
@@ -286,14 +305,16 @@ public:
           this));
 
     set_state(
-      enabled_ ? "waiting_for_map" : "disabled",
       enabled_ ?
-      "waiting_for_first_map" :
-      "exploration_disabled");
+      "waiting_for_runtime_authority" :
+      "disabled",
+      enabled_ ?
+      "waiting_for_runtime_authority" :
+      "exploration_disabled_by_configuration");
 
     RCLCPP_INFO(
       get_logger(),
-      "frontier explorer ready: enabled=%s",
+      "frontier explorer ready: configured_enabled=%s",
       enabled_ ? "true" : "false");
 
     RCLCPP_INFO(
@@ -311,6 +332,7 @@ private:
     if (map_topic_.empty() ||
       selected_goal_topic_.empty() ||
       handoff_state_topic_.empty() ||
+      runtime_enabled_topic_.empty() ||
       state_topic_.empty() ||
       status_topic_.empty() ||
       map_frame_.empty() ||
@@ -577,14 +599,53 @@ private:
     return {x_m, y_m};
   }
 
+  void handle_runtime_enabled(
+    const std_msgs::msg::Bool::ConstSharedPtr message)
+  {
+    runtime_enabled_received_ = true;
+    runtime_enabled_ = message->data;
+
+    if (!effective_enabled()) {
+      set_state(
+        "disabled",
+        enabled_ ?
+        "runtime_authority_disabled" :
+        "exploration_disabled_by_configuration");
+
+      return;
+    }
+
+    set_state(
+      latest_map_ ?
+      "waiting_for_map_update" :
+      "waiting_for_map",
+      latest_map_ ?
+      "runtime_authority_enabled" :
+      "waiting_for_first_map");
+  }
+
+  bool effective_enabled() const
+  {
+    return
+      enabled_ &&
+      runtime_enabled_received_ &&
+      runtime_enabled_;
+  }
+
   void planning_tick()
   {
     const rclcpp::Time current_time = now();
 
-    if (!enabled_) {
+    if (!effective_enabled()) {
       set_state(
+        enabled_ && !runtime_enabled_received_ ?
+        "waiting_for_runtime_authority" :
         "disabled",
-        "exploration_disabled");
+        enabled_ ?
+        (runtime_enabled_received_ ?
+        "runtime_authority_disabled" :
+        "waiting_for_runtime_authority") :
+        "exploration_disabled_by_configuration");
 
       return;
     }
@@ -781,8 +842,16 @@ private:
       << json_escape(current_state_)
       << "\",\"reason\":\""
       << json_escape(current_reason_)
-      << "\",\"enabled\":"
+      << "\",\"configured_enabled\":"
       << (enabled_ ? "true" : "false")
+      << ",\"runtime_authority_received\":"
+      << (runtime_enabled_received_ ?
+    "true" : "false")
+      << ",\"runtime_enabled\":"
+      << (runtime_enabled_ ? "true" : "false")
+      << ",\"enabled\":"
+      << (effective_enabled() ?
+    "true" : "false")
       << ",\"map_received\":"
       << (latest_map_ ? "true" : "false")
       << ",\"map_generation\":"
@@ -807,10 +876,13 @@ private:
 
   bool enabled_{false};
   bool require_handoff_state_{true};
+  bool runtime_enabled_received_{false};
+  bool runtime_enabled_{false};
 
   std::string map_topic_;
   std::string selected_goal_topic_;
   std::string handoff_state_topic_;
+  std::string runtime_enabled_topic_;
   std::string state_topic_;
   std::string status_topic_;
   std::string map_frame_;
@@ -877,6 +949,10 @@ private:
   rclcpp::Subscription<
     std_msgs::msg::String>::SharedPtr
     handoff_state_subscription_;
+
+  rclcpp::Subscription<
+    std_msgs::msg::Bool>::SharedPtr
+    runtime_enabled_subscription_;
 
   rclcpp::TimerBase::SharedPtr planning_timer_;
 };

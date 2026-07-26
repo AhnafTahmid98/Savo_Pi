@@ -146,7 +146,7 @@ def make_missing_output() -> EkfOutputHealth:
 def make_healthy_tf() -> EkfTfHealth:
     return EkfTfHealth(
         parent_frame="odom",
-        child_frame="base_link",
+        child_frame="base_footprint",
         available=True,
         fresh=True,
         last_age_s=0.05,
@@ -159,7 +159,7 @@ def make_healthy_tf() -> EkfTfHealth:
 def make_stale_tf() -> EkfTfHealth:
     return EkfTfHealth(
         parent_frame="odom",
-        child_frame="base_link",
+        child_frame="base_footprint",
         available=True,
         fresh=False,
         last_age_s=1.5,
@@ -172,7 +172,7 @@ def make_stale_tf() -> EkfTfHealth:
 def make_missing_tf() -> EkfTfHealth:
     return EkfTfHealth(
         parent_frame="odom",
-        child_frame="base_link",
+        child_frame="base_footprint",
         available=False,
         fresh=False,
         last_age_s=None,

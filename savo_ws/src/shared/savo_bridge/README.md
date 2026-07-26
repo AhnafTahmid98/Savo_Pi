@@ -108,3 +108,52 @@ During Phase 2A the snapshot contains no subsystem observations, so its
 derived health remains `unknown` with reason `no_topics`.
 `bridge_ready` remains false and commands remain disabled.
 
+## Phase 2B-1 observation configuration contract
+
+The bridge observation configuration is represented by three parallel
+parameter arrays:
+
+- observation topic names
+- observation requirements
+- stale thresholds in milliseconds
+
+The configuration contract requires equal array lengths, unique absolute
+ROS topic names, a requirement of either `required` or `optional`, and a
+strictly positive stale threshold representable by the monotonic clock.
+
+Bridge-owned `/savo_bridge/*` topics are forbidden as external
+observations. This prevents the bridge from treating its own output as
+evidence of Robot Savo subsystem health.
+
+Phase 2B-1 is ROS-independent and introduces no subscriptions, service
+clients, action clients, command topics or movement authority.
+
+## Phase 2B-2 generic serialized topic observation
+
+The bridge can resolve configured topic types from the ROS 2 graph and
+create generic serialized subscriptions without linking against Robot
+Savo implementation packages.
+
+Parameters:
+
+- `observation_topics`
+- `observation_requirements`
+- `observation_stale_after_ms`
+
+Each serialized callback ignores the payload and records only the
+monotonic receipt time. The atomic snapshot therefore exposes topic
+availability and freshness without interpreting subsystem-specific
+message contents.
+
+The observation subscriber uses best-effort, volatile QoS to remain
+compatible with both best-effort sensor publishers and reliable
+continuous status publishers.
+
+Topics that are absent from the graph remain unresolved. Topics exposing
+multiple message types are rejected as ambiguous. Existing subscriptions
+become stale naturally when publishers stop.
+
+Phase 2B-2 remains read-only. It adds no service clients, action clients,
+navigation goals, teleoperation commands, velocity commands or movement
+authority. `bridge_ready` remains false.
+

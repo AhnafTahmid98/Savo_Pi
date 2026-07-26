@@ -29,6 +29,14 @@ inline constexpr std::string_view HEAD_SEMANTIC_CONFIRMATIONS =
 inline constexpr std::string_view STATUS = "/savo_mapping/status";
 inline constexpr std::string_view READINESS = "/savo_mapping/readiness";
 inline constexpr std::string_view MODE = "/savo_mapping/mode";
+inline constexpr std::string_view EXPLORATION_MODE =
+  "/savo_mapping/exploration_mode";
+inline constexpr std::string_view MODE_MANAGER_STATUS =
+  "/savo_mapping/mode_manager/status";
+inline constexpr std::string_view EXPLORATION_RUNTIME_ENABLED =
+  "/savo_mapping/exploration/runtime_enabled";
+inline constexpr std::string_view EXPLORATION_MANAGER_STATUS =
+  "/savo_mapping/exploration_manager/status";
 inline constexpr std::string_view WORKFLOW_PHASE = "/savo_mapping/workflow_phase";
 inline constexpr std::string_view SESSION_STATE = "/savo_mapping/session_state";
 inline constexpr std::string_view MAP_QUALITY = "/savo_mapping/map_quality";

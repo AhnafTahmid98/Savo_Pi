@@ -10,7 +10,7 @@ from typing import Any
 
 from savo_localization.constants import (
     DEFAULT_FILTERED_ODOM_TOPIC,
-    FRAME_BASE_LINK,
+    FRAME_BASE_FOOTPRINT,
     FRAME_ODOM,
     STATUS_UNKNOWN,
 )
@@ -123,7 +123,7 @@ class EkfOutputHealth:
 @dataclass
 class EkfTfHealth:
     parent_frame: str = FRAME_ODOM
-    child_frame: str = FRAME_BASE_LINK
+    child_frame: str = FRAME_BASE_FOOTPRINT
 
     available: bool = False
     fresh: bool = False
@@ -283,7 +283,7 @@ def make_ekf_output_health(
 def make_ekf_tf_health(
     *,
     parent_frame: str = FRAME_ODOM,
-    child_frame: str = FRAME_BASE_LINK,
+    child_frame: str = FRAME_BASE_FOOTPRINT,
     available: bool = False,
     fresh: bool = False,
     last_age_s: float | None = None,

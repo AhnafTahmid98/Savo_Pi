@@ -19,6 +19,7 @@ DEFAULT_LOCALIZATION_DASHBOARD_NODE_NAME = "localization_dashboard"
 # Frames
 FRAME_MAP = "map"
 FRAME_ODOM = "odom"
+FRAME_BASE_FOOTPRINT = "base_footprint"
 FRAME_BASE_LINK = "base_link"
 FRAME_IMU = "imu_link"
 
@@ -231,6 +232,7 @@ __all__ = [
     "DEFAULT_LOCALIZATION_DASHBOARD_NODE_NAME",
     "FRAME_MAP",
     "FRAME_ODOM",
+    "FRAME_BASE_FOOTPRINT",
     "FRAME_BASE_LINK",
     "FRAME_IMU",
     "FRAME_WHEEL_ODOM",

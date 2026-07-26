@@ -27,6 +27,11 @@ inline constexpr std::string_view kRawRealSensePoints =
 inline constexpr std::string_view kFilteredObstaclePoints =
   "/savo_perception/obstacles/points";
 
+inline constexpr std::string_view kGlobalCostmap =
+  "/global_costmap/costmap";
+inline constexpr std::string_view kLocalCostmap =
+  "/local_costmap/costmap";
+
 // Safety and control integration.
 inline constexpr std::string_view kSafetyStop = "/safety/stop";
 inline constexpr std::string_view kSafetySlowdownFactor =
@@ -70,5 +75,22 @@ inline constexpr std::string_view kRecoveryCommandVelocity =
   "/cmd_vel_recovery";
 
 }  // namespace forbidden
+
+
+inline constexpr std::string_view
+  kNavigationState =
+  "/savo_nav/navigation/state";
+
+inline constexpr std::string_view
+  kNavigationStatus =
+  "/savo_nav/navigation/status";
+
+inline constexpr std::string_view
+  kNavigationFeedback =
+  "/savo_nav/navigation/feedback";
+
+inline constexpr std::string_view
+  kNavigationResult =
+  "/savo_nav/navigation/result";
 
 }  // namespace savo_nav::topics

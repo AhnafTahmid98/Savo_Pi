@@ -15,7 +15,7 @@ from sensor_msgs.msg import Imu
 from std_msgs.msg import String
 
 from savo_localization.constants import (
-    FRAME_BASE_LINK,
+    FRAME_BASE_FOOTPRINT,
     FRAME_IMU,
     FRAME_ODOM,
     STATUS_UNKNOWN,
@@ -140,7 +140,7 @@ def validate_odom_frames(
     msg: Odometry,
     *,
     expected_frame_id: str = FRAME_ODOM,
-    expected_child_frame_id: str = FRAME_BASE_LINK,
+    expected_child_frame_id: str = FRAME_BASE_FOOTPRINT,
 ) -> bool:
     return (
         str(msg.header.frame_id).strip() == str(expected_frame_id).strip()

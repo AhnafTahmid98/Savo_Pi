@@ -10,7 +10,7 @@ import math
 import pytest
 
 from savo_localization.constants import (
-    FRAME_BASE_LINK,
+    FRAME_BASE_FOOTPRINT,
     FRAME_ODOM,
     STATUS_OK,
     STATUS_STALE,
@@ -31,7 +31,7 @@ def test_wheel_odom_sample_defaults() -> None:
     assert sample.stamp_s == pytest.approx(0.0)
     assert sample.dt_s == pytest.approx(0.0)
     assert sample.odom_frame_id == FRAME_ODOM
-    assert sample.base_frame_id == FRAME_BASE_LINK
+    assert sample.base_frame_id == FRAME_BASE_FOOTPRINT
 
     assert sample.pose.x_m == pytest.approx(0.0)
     assert sample.pose.y_m == pytest.approx(0.0)
@@ -54,7 +54,7 @@ def test_make_wheel_odom_sample_stationary() -> None:
         pose=Pose2D(x_m=1.0, y_m=2.0, yaw_rad=0.5),
         twist=Twist2D(vx_mps=0.0, vy_mps=0.0, omega_rad_s=0.0),
         odom_frame_id=FRAME_ODOM,
-        base_frame_id=FRAME_BASE_LINK,
+        base_frame_id=FRAME_BASE_FOOTPRINT,
         active_wheel_count=0,
         encoder_sample_count=5,
     )
@@ -137,8 +137,8 @@ def test_wheel_odom_sample_rejects_bad_frames() -> None:
             dt_s=0.1,
             pose=Pose2D(),
             twist=Twist2D(),
-            odom_frame_id="base_link",
-            base_frame_id="base_link",
+            odom_frame_id="base_footprint",
+            base_frame_id="base_footprint",
         )
 
 
@@ -171,7 +171,7 @@ def test_wheel_odom_sample_to_dict() -> None:
         pose=Pose2D(x_m=1.0, y_m=-0.5, yaw_rad=0.25),
         twist=Twist2D(vx_mps=0.1, vy_mps=0.2, omega_rad_s=0.3),
         odom_frame_id=FRAME_ODOM,
-        base_frame_id=FRAME_BASE_LINK,
+        base_frame_id=FRAME_BASE_FOOTPRINT,
         active_wheel_count=4,
         encoder_sample_count=12,
     )
@@ -181,7 +181,7 @@ def test_wheel_odom_sample_to_dict() -> None:
     assert data["stamp_s"] == pytest.approx(2.5)
     assert data["dt_s"] == pytest.approx(0.1)
     assert data["odom_frame_id"] == FRAME_ODOM
-    assert data["base_frame_id"] == FRAME_BASE_LINK
+    assert data["base_frame_id"] == FRAME_BASE_FOOTPRINT
 
     assert data["pose"]["x_m"] == pytest.approx(1.0)
     assert data["pose"]["y_m"] == pytest.approx(-0.5)
@@ -398,7 +398,7 @@ def test_robot_savo_forward_wheel_odom_sample_is_valid() -> None:
     )
 
     assert sample.odom_frame_id == FRAME_ODOM
-    assert sample.base_frame_id == FRAME_BASE_LINK
+    assert sample.base_frame_id == FRAME_BASE_FOOTPRINT
     assert sample.finite is True
     assert sample.moving is True
     assert sample.linear_speed_mps == pytest.approx(0.2)

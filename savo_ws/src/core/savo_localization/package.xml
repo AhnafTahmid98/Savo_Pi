@@ -16,6 +16,7 @@
   <build_depend>ament_cmake_python</build_depend>
 
   <depend>rclcpp</depend>
+  <depend>builtin_interfaces</depend>
   <depend>rclpy</depend>
   <depend>std_msgs</depend>
   <depend>sensor_msgs</depend>
@@ -32,6 +33,8 @@
   <exec_depend>python3-yaml</exec_depend>
   <exec_depend>robot_localization</exec_depend>
 
+  <test_depend>ament_cmake_flake8</test_depend>
+  <test_depend>ament_cmake_gtest</test_depend>
   <test_depend>ament_cmake_pytest</test_depend>
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
