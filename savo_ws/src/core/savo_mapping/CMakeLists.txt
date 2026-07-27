@@ -18,6 +18,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
+find_package(savo_msgs REQUIRED)
 find_package(nav2_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(slam_toolbox REQUIRED)
@@ -202,6 +203,7 @@ install(
 )
 
 set(_savo_mapping_public_headers
+  include/savo_mapping/scan360_rotate_action_client.hpp
   include/savo_mapping/exploration_goal_handoff.hpp
   include/savo_mapping/exploration_mode.hpp
   include/savo_mapping/exploration_goal.hpp
@@ -540,7 +542,40 @@ install(
   DESTINATION lib/${PROJECT_NAME}
 )
 
+add_library(savo_mapping_scan360_rotate_action_client
+  src/ros/scan360_rotate_action_client.cpp
+)
+
+target_include_directories(
+  savo_mapping_scan360_rotate_action_client
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+
+target_compile_features(
+  savo_mapping_scan360_rotate_action_client
+  PUBLIC
+    cxx_std_17
+)
+
+ament_target_dependencies(
+  savo_mapping_scan360_rotate_action_client
+  rclcpp
+  rclcpp_action
+  savo_msgs
+)
+
+install(
+  TARGETS
+    savo_mapping_scan360_rotate_action_client
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
+
 if(BUILD_TESTING)
+  find_package(ament_cmake_pytest REQUIRED)
   find_package(ament_lint_auto REQUIRED)
 
   # Zero-byte files are deferred phase scaffolds, not implemented code.
@@ -589,6 +624,8 @@ if(BUILD_TESTING)
   find_package(ament_cmake_cppcheck REQUIRED)
   ament_cppcheck(
     ${_savo_mapping_active_cpp_files}
+    EXCLUDE
+      "${CMAKE_CURRENT_SOURCE_DIR}/test/test_scan360_rotate_action_client_runtime.cpp"
     LANGUAGE c++
     INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/include"
   )
@@ -620,7 +657,39 @@ if(BUILD_TESTING)
     launch/simulated_manual_mapping.launch.xml
   )
 
+  ament_add_pytest_test(
+    test_scan360_rotate_action_client_contract
+    test/test_scan360_rotate_action_client_contract.py
+    TIMEOUT 60
+  )
+
   find_package(ament_cmake_gtest REQUIRED)
+
+  ament_add_gtest(
+    test_scan360_rotate_action_client_runtime
+    test/test_scan360_rotate_action_client_runtime.cpp
+  )
+
+  if(TARGET test_scan360_rotate_action_client_runtime)
+    target_link_libraries(
+      test_scan360_rotate_action_client_runtime
+      savo_mapping_scan360_rotate_action_client
+    )
+
+    ament_target_dependencies(
+      test_scan360_rotate_action_client_runtime
+      rclcpp
+      rclcpp_action
+      savo_msgs
+    )
+
+    set_tests_properties(
+      test_scan360_rotate_action_client_runtime
+      PROPERTIES
+        TIMEOUT 60
+    )
+  endif()
+
 
   add_executable(
     fake_savo_nav_exploration_server_node
@@ -917,5 +986,7 @@ ament_export_dependencies(
   tf2
   tf2_ros
 )
+
+ament_export_dependencies(rclcpp rclcpp_action savo_msgs)
 
 ament_package()

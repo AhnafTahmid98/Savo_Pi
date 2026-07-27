@@ -316,3 +316,19 @@ stale-feedback watchdogs request Nav2 cancellation.
 
 The gateway publishes observer-only state, status, feedback and result topics.
 It does not publish velocity, lifecycle or hardware commands.
+
+## Phase 7A implementation
+
+Phase 7A adds a read-only control and recovery guard.
+
+It consumes the existing `savo_control` mode and recovery evidence and
+publishes whether navigation may be admitted. Navigation is allowed only when
+the control mode is fresh and equal to `NAV`, the recovery-active state is
+fresh, and recovery is inactive.
+
+Unknown, malformed, stale, non-NAV, or active-recovery evidence blocks new
+navigation and indicates that an existing goal should be canceled.
+
+The guard never publishes mode commands, recovery requests, velocity commands,
+lifecycle commands, or hardware commands. Supervisor and `savo_control`
+authority remain unchanged.

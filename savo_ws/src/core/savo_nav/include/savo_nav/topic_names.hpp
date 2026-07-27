@@ -93,4 +93,37 @@ inline constexpr std::string_view
   kNavigationResult =
   "/savo_nav/navigation/result";
 
+
+inline constexpr std::string_view
+  kControlModeReason =
+  "/savo_control/mode_reason";
+
+inline constexpr std::string_view
+  kControlStatus =
+  "/savo_control/control_status";
+
+inline constexpr std::string_view
+  kRecoveryActive =
+  "/savo_control/recovery_active";
+
+inline constexpr std::string_view
+  kControlRecoveryState =
+  "/savo_control/recovery_state";
+
+inline constexpr std::string_view
+  kRecoveryStatus =
+  "/savo_control/recovery_status";
+
+inline constexpr std::string_view
+  kControlRecoveryAllowed =
+  "/savo_nav/control_recovery/allowed";
+
+inline constexpr std::string_view
+  kControlRecoveryReason =
+  "/savo_nav/control_recovery/reason";
+
+inline constexpr std::string_view
+  kControlRecoveryStatus =
+  "/savo_nav/control_recovery/status";
+
 }  // namespace savo_nav::topics

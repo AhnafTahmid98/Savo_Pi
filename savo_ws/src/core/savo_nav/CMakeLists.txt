@@ -31,6 +31,9 @@ find_package(tf2_msgs REQUIRED)
 add_library(
   savo_nav_core
   SHARED
+  src/core/control_mode_client.cpp
+  src/core/control_recovery_guard.cpp
+  src/core/recovery_bridge.cpp
   src/core/goal_arbiter.cpp
   src/core/goal_context.cpp
   src/core/goal_gateway.cpp
@@ -81,6 +84,22 @@ ament_target_dependencies(
 )
 
 add_executable(
+  control_recovery_guard_node
+  src/nodes/control_recovery_guard_node.cpp
+)
+
+target_link_libraries(
+  control_recovery_guard_node
+  savo_nav_core
+)
+
+ament_target_dependencies(
+  control_recovery_guard_node
+  rclcpp
+  std_msgs
+)
+
+add_executable(
   goal_gateway_node
   src/nodes/goal_gateway_node.cpp
 )
@@ -111,6 +130,7 @@ install(
 install(
   TARGETS
     navigation_readiness_node
+    control_recovery_guard_node
     goal_gateway_node
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
@@ -254,6 +274,24 @@ if(BUILD_TESTING)
   install(
     TARGETS fake_nav2_server_node
     RUNTIME DESTINATION lib/${PROJECT_NAME}
+  )
+
+  ament_add_gtest(
+    test_control_recovery
+    test/unit/test_control_recovery.cpp
+  )
+
+  if(TARGET test_control_recovery)
+    target_link_libraries(
+      test_control_recovery
+      savo_nav_core
+    )
+  endif()
+
+  ament_add_pytest_test(
+    test_phase7_control_recovery_contracts
+    test/contracts/test_phase7_control_recovery_contracts.py
+    TIMEOUT 60
   )
 
   ament_add_pytest_test(

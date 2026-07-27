@@ -21,10 +21,13 @@ endif()
 
 find_package(ament_cmake REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
+find_package(nlohmann_json REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 
 add_library(${PROJECT_NAME}_core STATIC
+  src/command_server.cpp
+  src/command_protocol.cpp
   src/freshness_tracker.cpp
   src/graph_evidence.cpp
   src/health_evaluator.cpp
@@ -43,6 +46,11 @@ target_include_directories(${PROJECT_NAME}_core
 target_compile_features(${PROJECT_NAME}_core
   PUBLIC
     cxx_std_17
+)
+
+target_link_libraries(${PROJECT_NAME}_core
+  PUBLIC
+    nlohmann_json::nlohmann_json
 )
 
 add_library(${PROJECT_NAME}_ros STATIC
@@ -128,6 +136,26 @@ if(BUILD_TESTING)
 
   if(TARGET test_savo_bridge_version)
     target_link_libraries(test_savo_bridge_version
+      ${PROJECT_NAME}_core
+    )
+  endif()
+
+  ament_add_gtest(test_savo_bridge_command_protocol
+    test/unit/test_command_protocol.cpp
+  )
+
+  if(TARGET test_savo_bridge_command_protocol)
+    target_link_libraries(test_savo_bridge_command_protocol
+      ${PROJECT_NAME}_core
+    )
+  endif()
+
+  ament_add_gtest(test_savo_bridge_command_server
+    test/unit/test_command_server.cpp
+  )
+
+  if(TARGET test_savo_bridge_command_server)
+    target_link_libraries(test_savo_bridge_command_server
       ${PROJECT_NAME}_core
     )
   endif()
@@ -307,6 +335,7 @@ ament_export_targets(
 
 ament_export_dependencies(
   diagnostic_msgs
+  nlohmann_json
   rclcpp
   std_msgs
 )

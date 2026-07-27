@@ -97,7 +97,7 @@ Implemented and reserved contracts are maintained in:
 ### Exploration goal handoff
 
 | Direction | Interface | Type |
-|---|---|---|
+| --- | --- | --- |
 | Subscribe | `/savo_mapping/exploration/selected_goal` | `geometry_msgs/msg/PoseStamped` |
 | Publish | `/savo_mapping/exploration_goal/state` | `std_msgs/msg/String` |
 | Publish | `/savo_mapping/exploration_goal/status` | `std_msgs/msg/String` |
@@ -111,7 +111,7 @@ only after the action reports a terminal result.
 ### Map-session saving
 
 | Direction | Interface | Type |
-|---|---|---|
+| --- | --- | --- |
 | Service | `/savo_mapping/map_session/save` | `std_srvs/srv/Trigger` |
 | Service client | `/slam_toolbox/save_map` | `slam_toolbox/srv/SaveMap` |
 | Service client | `/slam_toolbox/serialize_map` | `slam_toolbox/srv/SerializePoseGraph` |
@@ -125,7 +125,7 @@ pose-graph data, and a package-owned manifest.
 ### Saved-map quality and navigation approval
 
 | Direction | Interface | Type |
-|---|---|---|
+| --- | --- | --- |
 | Service | `/savo_mapping/map_quality/evaluate` | `std_srvs/srv/Trigger` |
 | Service | `/savo_mapping/navigation_handoff/approve` | `std_srvs/srv/Trigger` |
 | Service | `/savo_mapping/navigation_handoff/revoke` | `std_srvs/srv/Trigger` |
@@ -139,7 +139,7 @@ move the robot.
 ### Production map release and catalog
 
 | Direction | Interface | Type |
-|---|---|---|
+| --- | --- | --- |
 | Service | `/savo_mapping/map_release/create` | `std_srvs/srv/Trigger` |
 | Service | `/savo_mapping/map_release/verify` | `std_srvs/srv/Trigger` |
 | Service | `/savo_mapping/map_release/promote` | `std_srvs/srv/Trigger` |
@@ -155,7 +155,7 @@ or launch Nav2.
 ### SLAM lifecycle health
 
 | Direction | Interface | Type |
-|---|---|---|
+| --- | --- | --- |
 | Service client | `/slam_toolbox/get_state` | `lifecycle_msgs/srv/GetState` |
 | Publish | `/savo_mapping/slam_lifecycle_state` | `std_msgs/msg/String` |
 | Publish | `/savo_mapping/slam_health` | `std_msgs/msg/String` |

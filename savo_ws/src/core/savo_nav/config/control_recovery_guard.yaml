@@ -1,0 +1,21 @@
+# Copyright 2026 Ahnaf Tahmid
+# SPDX-License-Identifier: LicenseRef-Proprietary
+
+control_recovery_guard_node:
+  ros__parameters:
+    publish_hz: 10.0
+
+    control_mode_timeout_seconds: 1.5
+    recovery_timeout_seconds: 1.0
+
+    control_mode_state_topic: "/savo_control/mode_state"
+    control_mode_reason_topic: "/savo_control/mode_reason"
+    control_status_topic: "/savo_control/control_status"
+
+    recovery_active_topic: "/savo_control/recovery_active"
+    recovery_state_topic: "/savo_control/recovery_state"
+    recovery_status_topic: "/savo_control/recovery_status"
+
+    navigation_allowed_topic: "/savo_nav/control_recovery/allowed"
+    navigation_reason_topic: "/savo_nav/control_recovery/reason"
+    navigation_status_topic: "/savo_nav/control_recovery/status"
