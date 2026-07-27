@@ -13,6 +13,7 @@ find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 
 find_package(rclcpp REQUIRED)
+find_package(rclcpp_action REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
@@ -93,6 +94,11 @@ savo_add_node(heading_pid_node
 
 savo_add_node(rotate_to_heading_node
   src/nodes/rotate_to_heading_node.cpp
+)
+
+ament_target_dependencies(
+  rotate_to_heading_node
+  rclcpp_action
 )
 
 savo_add_node(distance_approach_node
@@ -182,6 +188,14 @@ if(BUILD_TESTING)
   add_pytest_if_exists(test_control_modes_interface test/test_control_modes_interface.py)
   add_pytest_if_exists(test_distance_pid_controller test/test_distance_pid_controller.py)
   add_pytest_if_exists(test_heading_pid_controller test/test_heading_pid_controller.py)
+  add_pytest_if_exists(test_rotate_to_heading_contract test/test_rotate_to_heading_contract.py)
+  add_pytest_if_exists(test_rotate_to_heading_action_plumbing test/test_rotate_to_heading_action_plumbing.py)
+  add_pytest_if_exists(test_rotate_to_heading_action_server_contract test/test_rotate_to_heading_action_server_contract.py)
+  add_pytest_if_exists(test_rotate_to_heading_action_runtime test/test_rotate_to_heading_action_runtime.py)
+  set_tests_properties(
+    test_rotate_to_heading_action_runtime
+    PROPERTIES TIMEOUT 60
+  )
   add_pytest_if_exists(test_pid_controller test/test_pid_controller.py)
   add_pytest_if_exists(test_control_status_node_helpers test/test_control_status_node_helpers.py)
   add_pytest_if_exists(test_recovery_status_node_compile test/test_recovery_status_node_compile.py)

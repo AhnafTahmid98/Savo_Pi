@@ -63,9 +63,9 @@ bool twist_has_motion(
     std::isfinite(msg.linear.y) &&
     std::isfinite(msg.angular.z) &&
     (
-      std::abs(msg.linear.x) >= vx_threshold ||
-      std::abs(msg.linear.y) >= vy_threshold ||
-      std::abs(msg.angular.z) >= wz_threshold
+    std::abs(msg.linear.x) >= vx_threshold ||
+    std::abs(msg.linear.y) >= vy_threshold ||
+    std::abs(msg.angular.z) >= wz_threshold
     );
 }
 

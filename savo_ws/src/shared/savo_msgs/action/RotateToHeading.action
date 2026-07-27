@@ -1,0 +1,44 @@
+# Goal
+#
+# Absolute target yaw in radians using the ROS odom/base_link convention.
+# Positive yaw is counter-clockwise around +Z.
+float64 target_yaw_rad
+
+# Maximum permitted execution time for this goal.
+# A value <= 0.0 requests the server's configured default.
+float64 max_duration_sec
+---
+# Result
+#
+# True only when the requested heading was reached within tolerance.
+# Canceled and aborted actions must report false.
+bool success
+
+# Last valid measured yaw when the action terminated.
+float64 final_yaw_rad
+
+# Signed shortest angular error at termination.
+float64 final_error_rad
+
+# Stable machine-readable reason such as:
+# goal_reached, canceled, timeout, safety_stop, odom_stale, or disabled.
+string reason
+---
+# Feedback
+#
+# Latest measured and requested heading information.
+float64 current_yaw_rad
+float64 target_yaw_rad
+float64 error_rad
+
+# Angular velocity currently requested by savo_control.
+float64 commanded_wz_rad_s
+
+# Time elapsed since this goal was accepted.
+float64 elapsed_sec
+
+# True while the movement safety stop is active.
+bool safety_stop_active
+
+# Current executor state, for example tracking or safety_stop.
+string state

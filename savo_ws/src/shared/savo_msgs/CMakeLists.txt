@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.8)
 project(savo_msgs)
 
 # ---------------------------------------------------------------------------
-# compiler settings
+# Compiler settings
 # ---------------------------------------------------------------------------
 if(NOT CMAKE_C_STANDARD)
   set(CMAKE_C_STANDARD 99)
@@ -18,11 +18,6 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 
-# Message type dependencies:
-# - builtin_interfaces: for Time/Duration in messages
-# - std_msgs         : for basic types (if we embed them later)
-# - geometry_msgs    : for Pose, Twist, etc. (used in NavState / RobotStatus)
-# - nav_msgs         : for Odometry (used in NavState)
 find_package(builtin_interfaces REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
@@ -36,22 +31,53 @@ set(ROSIDL_DEPENDENCIES
 )
 
 # ---------------------------------------------------------------------------
-# Message files
+# Interface files
 # ---------------------------------------------------------------------------
 set(msg_files
   "msg/NavState.msg"
   "msg/RobotStatus.msg"
   "msg/IntentResult.msg"
+  "msg/AprilTagObservation.msg"
 )
 
-# Generate the interfaces
+set(action_files
+  "action/ConfirmAprilTag.action"
+  "action/RotateToHeading.action"
+)
+
 rosidl_generate_interfaces(${PROJECT_NAME}
   ${msg_files}
+  ${action_files}
   DEPENDENCIES ${ROSIDL_DEPENDENCIES}
 )
 
 # ---------------------------------------------------------------------------
-# Export + package
+# Tests
+# ---------------------------------------------------------------------------
+if(BUILD_TESTING)
+  find_package(ament_cmake_pytest REQUIRED)
+
+  ament_add_pytest_test(
+    test_apriltag_interfaces
+    test/test_apriltag_interfaces.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
+    test_rotate_to_heading_action_contract
+    test/test_rotate_to_heading_action_contract.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
+    test_rotate_to_heading_registration
+    test/test_rotate_to_heading_registration.py
+    TIMEOUT 60
+  )
+endif()
+
+# ---------------------------------------------------------------------------
+# Export and package
 # ---------------------------------------------------------------------------
 ament_export_dependencies(rosidl_default_runtime)
 

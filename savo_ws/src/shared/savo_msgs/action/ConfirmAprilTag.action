@@ -1,0 +1,108 @@
+# Robot Savo — stable AprilTag confirmation action.
+#
+# This action has exactly two production duties:
+#
+# 1. REGISTER_LOCATION
+#    Confirm a newly discovered AprilTag during mapping so that:
+#    - savo_mapping can georeference and validate it;
+#    - the operator can provide the location name and semantic information;
+#    - savo_locations can store the candidate or approved location.
+#
+# 2. CONFIRM_ARRIVAL
+#    Confirm the expected saved AprilTag after savo_nav reaches the
+#    destination approach or confirmation pose.
+
+# Goal modes.
+uint8 REGISTER_LOCATION=1
+uint8 CONFIRM_ARRIVAL=2
+
+# Used by REGISTER_LOCATION when any new valid tag is acceptable.
+int32 ANY_TAG_ID=-1
+
+# Requested confirmation duty.
+uint8 mode
+
+# Expected AprilTag family.
+# Robot Savo's production default is:
+#   tag36h11
+string expected_family
+
+# REGISTER_LOCATION:
+# - May use ANY_TAG_ID when discovering a new location.
+# - May provide a specific ID when confirming a known candidate.
+#
+# CONFIRM_ARRIVAL:
+# - Must provide the expected saved tag ID.
+int32 expected_tag_id
+
+# Optional correlation and ownership context.
+#
+# location_id can be empty during first discovery.
+# map_id and map_version identify the active map coordinate system.
+string location_id
+string map_id
+uint32 map_version
+
+# Maximum time allowed for searching, observation collection,
+# stability validation and optional TF transformation.
+builtin_interfaces/Duration timeout
+
+# Registration normally requires a valid camera-to-map transformation.
+#
+# Arrival confirmation may set this false when tag identity is sufficient,
+# while the server can still return a map pose when one is available.
+bool require_map_pose
+---
+# Terminal result codes.
+uint8 RESULT_CONFIRMED=0
+uint8 RESULT_INVALID_REQUEST=1
+uint8 RESULT_NOT_FOUND=2
+uint8 RESULT_WRONG_TAG=3
+uint8 RESULT_UNSTABLE=4
+uint8 RESULT_CAMERA_UNAVAILABLE=5
+uint8 RESULT_HEAD_UNAVAILABLE=6
+uint8 RESULT_ROBOT_MOVING=7
+uint8 RESULT_TF_UNAVAILABLE=8
+uint8 RESULT_LOCALIZATION_UNHEALTHY=9
+uint8 RESULT_TIMED_OUT=10
+uint8 RESULT_CANCELED=11
+uint8 RESULT_INTERNAL_ERROR=12
+
+bool confirmed
+uint8 result_code
+string reason
+
+# Final detector observation accepted by the confirmation server.
+savo_msgs/AprilTagObservation final_observation
+
+# AprilTag pose transformed into the active map frame when available.
+bool map_pose_valid
+geometry_msgs/PoseStamped tag_pose_map
+
+# Stability evidence calculated by the confirmation server.
+#
+# The server must calculate these values itself. It must not trust an
+# externally supplied "stable frames" number.
+uint32 accepted_observations
+uint32 rejected_observations
+float32 position_stddev_m
+float32 yaw_stddev_rad
+---
+# Action feedback states.
+uint8 STATE_WAITING_FOR_CAMERA=0
+uint8 STATE_WAITING_FOR_HEAD_SETTLE=1
+uint8 STATE_SEARCHING=2
+uint8 STATE_COLLECTING=3
+uint8 STATE_VALIDATING_TF=4
+uint8 STATE_CONFIRMING=5
+
+uint8 state
+string state_text
+
+uint32 accepted_observations
+uint32 rejected_observations
+
+int32 current_tag_id
+float32 current_detection_quality
+
+savo_msgs/AprilTagObservation latest_observation

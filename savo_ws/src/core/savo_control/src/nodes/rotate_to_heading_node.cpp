@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <functional>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -8,6 +9,8 @@
 #include "geometry_msgs/msg/twist.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "rclcpp_action/rclcpp_action.hpp"
+#include "savo_msgs/action/rotate_to_heading.hpp"
 #include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/float64.hpp"
 #include "std_msgs/msg/string.hpp"
@@ -59,6 +62,10 @@ namespace savo_control
 class RotateToHeadingNode : public rclcpp::Node
 {
 public:
+  using RotateToHeading = savo_msgs::action::RotateToHeading;
+  using GoalHandleRotateToHeading =
+    rclcpp_action::ServerGoalHandle<RotateToHeading>;
+
   RotateToHeadingNode()
   : Node("rotate_to_heading_node")
   {
@@ -84,6 +91,13 @@ public:
       target_topic_,
       10,
       [this](const std_msgs::msg::Float64::SharedPtr msg) {
+        if (action_goal_reserved_ || action_goal_active()) {
+          RCLCPP_WARN(
+            get_logger(),
+            "Ignoring legacy rotate target while an action goal owns rotation");
+          return;
+        }
+
         set_target(msg->data, now_seconds(*this));
 
         if (start_on_target_) {
@@ -98,6 +112,13 @@ public:
       10,
       [this](const std_msgs::msg::Bool::SharedPtr msg) {
         const double now_s = now_seconds(*this);
+
+        if (action_goal_reserved_ || action_goal_active()) {
+          if (!msg->data) {
+            action_abort_reason_ = "legacy_disabled";
+          }
+          return;
+        }
 
         active_ = msg->data;
         if (active_) {
@@ -115,11 +136,18 @@ public:
       cancel_topic_,
       10,
       [this](const std_msgs::msg::Bool::SharedPtr msg) {
-        if (msg->data) {
-          active_ = false;
-          controller_.reset();
-          publish_zero("cancelled", now_seconds(*this));
+        if (!msg->data) {
+          return;
         }
+
+        if (action_goal_reserved_ || action_goal_active()) {
+          action_abort_reason_ = "legacy_cancel";
+          return;
+        }
+
+        active_ = false;
+        controller_.reset();
+        publish_zero("cancelled", now_seconds(*this));
       });
 
     safety_stop_sub_ = create_subscription<std_msgs::msg::Bool>(
@@ -134,6 +162,23 @@ public:
           controller_.reset();
         }
       });
+
+    action_server_ = rclcpp_action::create_server<RotateToHeading>(
+      this,
+      action_name_,
+      std::bind(
+        &RotateToHeadingNode::handle_action_goal,
+        this,
+        std::placeholders::_1,
+        std::placeholders::_2),
+      std::bind(
+        &RotateToHeadingNode::handle_action_cancel,
+        this,
+        std::placeholders::_1),
+      std::bind(
+        &RotateToHeadingNode::handle_action_accepted,
+        this,
+        std::placeholders::_1));
 
     timer_ = create_wall_timer(
       std::chrono::duration<double>(1.0 / publish_hz_),
@@ -177,13 +222,16 @@ private:
     declare_parameter<double>("max_dt_sec", 0.50);
 
     declare_parameter<std::string>("odom_topic", topics::ODOM_FILTERED);
-    declare_parameter<std::string>("target_topic", "/savo_control/rotate_target_rad");
-    declare_parameter<std::string>("enable_topic", "/savo_control/rotate_enable");
-    declare_parameter<std::string>("cancel_topic", "/savo_control/rotate_cancel");
+    declare_parameter<std::string>("target_topic", topics::ROTATE_TARGET_RAD);
+    declare_parameter<std::string>("enable_topic", topics::ROTATE_ENABLE);
+    declare_parameter<std::string>("cancel_topic", topics::ROTATE_CANCEL);
     declare_parameter<std::string>("safety_stop_topic", topics::SAFETY_STOP);
-    declare_parameter<std::string>("output_topic", topics::CMD_VEL_RECOVERY);
-    declare_parameter<std::string>("state_topic", "/savo_control/rotate_state");
-    declare_parameter<std::string>("status_topic", "/savo_control/rotate_status");
+    declare_parameter<std::string>("output_topic", topics::CMD_VEL_AUTO);
+    declare_parameter<std::string>("state_topic", topics::ROTATE_STATE);
+    declare_parameter<std::string>("status_topic", topics::ROTATE_STATUS);
+    declare_parameter<std::string>(
+      "action_name",
+      topics::ROTATE_TO_HEADING_ACTION);
   }
 
   void load_parameters()
@@ -225,6 +273,7 @@ private:
     output_topic_ = get_parameter("output_topic").as_string();
     state_topic_ = get_parameter("state_topic").as_string();
     status_topic_ = get_parameter("status_topic").as_string();
+    action_name_ = get_parameter("action_name").as_string();
   }
 
   HeadingControllerConfig make_config() const
@@ -249,6 +298,225 @@ private:
     return config.sanitized();
   }
 
+  bool action_goal_active() const
+  {
+    return static_cast<bool>(action_goal_handle_);
+  }
+
+  rclcpp_action::GoalResponse handle_action_goal(
+    const rclcpp_action::GoalUUID &,
+    const std::shared_ptr<const RotateToHeading::Goal> goal)
+  {
+    const double now_s = now_seconds(*this);
+
+    if (!goal) {
+      return rclcpp_action::GoalResponse::REJECT;
+    }
+
+    if (action_goal_reserved_ || action_goal_active() || active_) {
+      return rclcpp_action::GoalResponse::REJECT;
+    }
+
+    if (!enabled_) {
+      return rclcpp_action::GoalResponse::REJECT;
+    }
+
+    if (!std::isfinite(goal->target_yaw_rad) ||
+      !std::isfinite(goal->max_duration_sec))
+    {
+      return rclcpp_action::GoalResponse::REJECT;
+    }
+
+    if (!odom_fresh(now_s)) {
+      return rclcpp_action::GoalResponse::REJECT;
+    }
+
+    if (safety_stop_blocks_motion_ && safety_stop_active(now_s)) {
+      return rclcpp_action::GoalResponse::REJECT;
+    }
+
+    action_goal_reserved_ = true;
+    return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
+  }
+
+  rclcpp_action::CancelResponse handle_action_cancel(
+    const std::shared_ptr<GoalHandleRotateToHeading> goal_handle)
+  {
+    if (!action_goal_active() ||
+      goal_handle != action_goal_handle_)
+    {
+      return rclcpp_action::CancelResponse::REJECT;
+    }
+
+    action_cancel_requested_ = true;
+    return rclcpp_action::CancelResponse::ACCEPT;
+  }
+
+  void handle_action_accepted(
+    const std::shared_ptr<GoalHandleRotateToHeading> goal_handle)
+  {
+    action_goal_reserved_ = false;
+
+    if (!goal_handle) {
+      return;
+    }
+
+    const auto goal = goal_handle->get_goal();
+    const double now_s = now_seconds(*this);
+
+    action_goal_handle_ = goal_handle;
+    action_cancel_requested_ = false;
+    action_abort_reason_.clear();
+
+    action_max_duration_s_ =
+      goal->max_duration_sec > 0.0 ?
+      goal->max_duration_sec :
+      max_duration_s_;
+
+    set_target(goal->target_yaw_rad, now_s);
+
+    active_ = true;
+    active_start_s_ = now_s;
+    last_update_s_ = now_s;
+    controller_.reset();
+
+    RCLCPP_INFO(
+      get_logger(),
+      "Accepted RotateToHeading goal | "
+      "target_yaw_rad=%.6f max_duration_s=%.3f",
+      target_yaw_rad_,
+      action_max_duration_s_);
+  }
+
+  double active_duration_limit_s() const
+  {
+    if (action_goal_active() &&
+      std::isfinite(action_max_duration_s_) &&
+      action_max_duration_s_ > 0.0)
+    {
+      return action_max_duration_s_;
+    }
+
+    return max_duration_s_;
+  }
+
+  double action_elapsed_s(const double now_s) const
+  {
+    if (!action_goal_active()) {
+      return 0.0;
+    }
+
+    return std::max(0.0, now_s - active_start_s_);
+  }
+
+  std::shared_ptr<RotateToHeading::Result> make_action_result(
+    const bool success,
+    const std::string & reason) const
+  {
+    auto result =
+      std::make_shared<RotateToHeading::Result>();
+
+    const double final_error_rad =
+      have_odom_ && has_target_ ?
+      ControlMath::shortest_angular_distance_rad(
+        current_yaw_rad_,
+        target_yaw_rad_) :
+      0.0;
+
+    result->success = success;
+    result->final_yaw_rad =
+      ControlMath::finite_or_zero(current_yaw_rad_);
+    result->final_error_rad =
+      ControlMath::finite_or_zero(final_error_rad);
+    result->reason = reason;
+
+    return result;
+  }
+
+  void clear_action_state()
+  {
+    action_goal_handle_.reset();
+    action_goal_reserved_ = false;
+    action_cancel_requested_ = false;
+    action_abort_reason_.clear();
+    action_max_duration_s_ = 0.0;
+  }
+
+  void finish_action_succeeded(
+    const std::string & reason)
+  {
+    if (!action_goal_active()) {
+      return;
+    }
+
+    const auto goal_handle = action_goal_handle_;
+    const auto result =
+      make_action_result(true, reason);
+
+    goal_handle->succeed(result);
+    clear_action_state();
+  }
+
+  void finish_action_aborted(
+    const std::string & reason)
+  {
+    if (!action_goal_active()) {
+      return;
+    }
+
+    const auto goal_handle = action_goal_handle_;
+    const auto result =
+      make_action_result(false, reason);
+
+    goal_handle->abort(result);
+    clear_action_state();
+  }
+
+  void finish_action_canceled(
+    const std::string & reason)
+  {
+    if (!action_goal_active()) {
+      return;
+    }
+
+    const auto goal_handle = action_goal_handle_;
+    const auto result =
+      make_action_result(false, reason);
+
+    goal_handle->canceled(result);
+    clear_action_state();
+  }
+
+  void publish_action_feedback(
+    const HeadingControllerResult & result,
+    const geometry_msgs::msg::Twist & cmd,
+    const std::string & state,
+    const double now_s)
+  {
+    if (!action_goal_active()) {
+      return;
+    }
+
+    auto feedback =
+      std::make_shared<RotateToHeading::Feedback>();
+
+    feedback->current_yaw_rad =
+      ControlMath::finite_or_zero(current_yaw_rad_);
+    feedback->target_yaw_rad =
+      ControlMath::finite_or_zero(target_yaw_rad_);
+    feedback->error_rad =
+      ControlMath::finite_or_zero(result.error_rad);
+    feedback->commanded_wz_rad_s =
+      ControlMath::finite_or_zero(cmd.angular.z);
+    feedback->elapsed_sec =
+      action_elapsed_s(now_s);
+    feedback->safety_stop_active =
+      safety_stop_active(now_s);
+    feedback->state = state;
+
+    action_goal_handle_->publish_feedback(feedback);
+  }
+
   void set_target(const double target_yaw_rad, const double now_s)
   {
     target_yaw_rad_ = ControlMath::wrap_angle_rad(
@@ -263,9 +531,28 @@ private:
   {
     const double now_s = now_seconds(*this);
 
+    if (action_goal_active() && action_cancel_requested_) {
+      active_ = false;
+      controller_.reset();
+      publish_zero("canceled", now_s);
+      finish_action_canceled("canceled");
+      return;
+    }
+
+    if (action_goal_active() && !action_abort_reason_.empty()) {
+      const std::string reason = action_abort_reason_;
+      active_ = false;
+      controller_.reset();
+      publish_zero(reason, now_s);
+      finish_action_aborted(reason);
+      return;
+    }
+
     if (!enabled_) {
       active_ = false;
+      controller_.reset();
       publish_zero("disabled", now_s);
+      finish_action_aborted("disabled");
       return;
     }
 
@@ -273,30 +560,40 @@ private:
       if (publish_zero_when_inactive_) {
         publish_zero("inactive", now_s);
       }
+
+      finish_action_aborted("inactive");
       return;
     }
 
     if (safety_stop_blocks_motion_ && safety_stop_active(now_s)) {
+      active_ = false;
       controller_.reset();
       publish_zero("safety_stop", now_s);
+      finish_action_aborted("safety_stop");
       return;
     }
 
     if (!has_target_) {
+      active_ = false;
+      controller_.reset();
       publish_zero("no_target", now_s);
+      finish_action_aborted("no_target");
       return;
     }
 
     if (!odom_fresh(now_s)) {
+      active_ = false;
       controller_.reset();
       publish_zero("odom_stale", now_s);
+      finish_action_aborted("odom_stale");
       return;
     }
 
-    if ((now_s - active_start_s_) > max_duration_s_) {
+    if ((now_s - active_start_s_) > active_duration_limit_s()) {
       active_ = false;
       controller_.reset();
       publish_zero("timeout", now_s);
+      finish_action_aborted("timeout");
       return;
     }
 
@@ -312,19 +609,52 @@ private:
     const HeadingControllerResult result =
       controller_.update(current_yaw_rad_, target_yaw_rad_, dt_s);
 
+    if (action_goal_active() && !result.valid) {
+      const std::string reason =
+        result.reason.empty() ?
+        "controller_invalid" :
+        result.reason;
+
+      active_ = false;
+      controller_.reset();
+      publish_zero(reason, now_s);
+      finish_action_aborted(reason);
+      return;
+    }
+
     geometry_msgs::msg::Twist cmd = zero_twist();
 
     if (result.valid && !result.within_tolerance) {
       cmd.angular.z = result.wz_cmd_rad_s;
     }
 
-    if (result.within_tolerance && auto_disable_when_goal_reached_) {
+    const bool action_goal_reached =
+      action_goal_active() && result.within_tolerance;
+
+    if (result.within_tolerance &&
+      (auto_disable_when_goal_reached_ || action_goal_reached))
+    {
       active_ = false;
       controller_.reset();
     }
 
     cmd_pub_->publish(cmd);
-    publish_state_and_status(result, cmd, "tracking", now_s);
+    publish_state_and_status(
+      result,
+      cmd,
+      action_goal_reached ? "goal_reached" : "tracking",
+      now_s);
+
+    if (action_goal_reached) {
+      finish_action_succeeded("goal_reached");
+      return;
+    }
+
+    publish_action_feedback(
+      result,
+      cmd,
+      "tracking",
+      now_s);
   }
 
   void publish_zero(const std::string & reason, const double now_s)
@@ -452,13 +782,14 @@ private:
   double max_dt_sec_{0.50};
 
   std::string odom_topic_{topics::ODOM_FILTERED};
-  std::string target_topic_{"/savo_control/rotate_target_rad"};
-  std::string enable_topic_{"/savo_control/rotate_enable"};
-  std::string cancel_topic_{"/savo_control/rotate_cancel"};
+  std::string target_topic_{topics::ROTATE_TARGET_RAD};
+  std::string enable_topic_{topics::ROTATE_ENABLE};
+  std::string cancel_topic_{topics::ROTATE_CANCEL};
   std::string safety_stop_topic_{topics::SAFETY_STOP};
-  std::string output_topic_{topics::CMD_VEL_RECOVERY};
-  std::string state_topic_{"/savo_control/rotate_state"};
-  std::string status_topic_{"/savo_control/rotate_status"};
+  std::string output_topic_{topics::CMD_VEL_AUTO};
+  std::string state_topic_{topics::ROTATE_STATE};
+  std::string status_topic_{topics::ROTATE_STATUS};
+  std::string action_name_{topics::ROTATE_TO_HEADING_ACTION};
 
   double current_yaw_rad_{0.0};
   double target_yaw_rad_{0.0};
@@ -477,6 +808,14 @@ private:
   double safety_stop_stamp_s_{0.0};
 
   HeadingController controller_{};
+
+  double action_max_duration_s_{0.0};
+  bool action_goal_reserved_{false};
+  bool action_cancel_requested_{false};
+  std::string action_abort_reason_{};
+
+  rclcpp_action::Server<RotateToHeading>::SharedPtr action_server_;
+  std::shared_ptr<GoalHandleRotateToHeading> action_goal_handle_;
 
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_pub_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr state_pub_;

@@ -1,54 +1,38 @@
 rotate_to_heading_node:
   ros__parameters:
-    odom_topic: "/odometry/filtered"
-    rotate_target_topic: "/savo_control/rotate_target"
-    enable_topic: "/savo_control/heading_hold_enable"
-    cancel_topic: "/savo_control/recovery_request"
+    publish_hz: 30.0
+    input_timeout_s: 0.40
 
-    # Keep AUTO path for the current rotate test launch.
+    enabled: true
+    start_on_target: true
+    auto_disable_when_goal_reached: true
+    safety_stop_blocks_motion: true
+    publish_zero_when_inactive: true
+
+    target_tolerance_rad: 0.06
+    max_duration_s: 8.0
+
+    kp: 0.80
+    ki: 0.0
+    kd: 0.03
+
+    max_wz_rad_s: 0.35
+    min_wz_when_active: 0.08
+    disable_min_wz_below_error_rad: 0.08
+    output_deadband_rad_s: 0.0
+
+    min_dt_sec: 0.001
+    max_dt_sec: 0.20
+
+    odom_topic: "/odometry/filtered"
+    target_topic: "/savo_control/rotate_target_rad"
+    enable_topic: "/savo_control/rotate_enable"
+    cancel_topic: "/savo_control/rotate_cancel"
+    safety_stop_topic: "/safety/stop"
+
+    # Normal requested rotation uses the AUTO lane.
+    # Recovery behavior remains on /cmd_vel_recovery.
     output_topic: "/cmd_vel_auto"
 
     state_topic: "/savo_control/rotate_state"
-    status_topic: "/savo_control/recovery_status"
-
-    publish_rate_hz: 30.0
-    odom_timeout_sec: 0.40
-    zero_on_stale_odom: true
-
-    auto_enable_on_target: true
-    stop_and_hold_zero_after_done: true
-    reset_pid_on_new_target: true
-
-    settle_cycles_required: 5
-    max_rotate_time_sec: 8.0
-    min_error_to_command_rad: 0.0
-
-    output:
-      wz_max_abs: 0.35
-
-    pid:
-      kp: 0.80
-      ki: 0.0
-      kd: 0.03
-      output_min: -0.35
-      output_max: 0.35
-      integral_clamp: 0.20
-      d_filter_alpha: 0.35
-      min_dt_sec: 0.001
-      max_dt_sec: 0.20
-      freeze_integral_on_invalid_dt: true
-
-    # About 3.4 degrees.
-    heading_tolerance_rad: 0.06
-
-    output_deadband_rad_s: 0.0
-    min_effective_wz_rad_s: 0.08
-    max_wz_rad_s: 0.35
-
-    reset_pid_on_hold_capture: true
-    reset_pid_on_target_change: true
-    target_change_reset_threshold_rad: 0.02
-
-    ctrl:
-      min_dt_sec: 0.001
-      max_dt_sec: 0.20
+    status_topic: "/savo_control/rotate_status"

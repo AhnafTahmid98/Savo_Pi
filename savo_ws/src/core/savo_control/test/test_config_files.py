@@ -205,26 +205,69 @@ def test_rotate_to_heading_contract():
     cfg = params(data, "rotate_to_heading_node")
 
     required = [
-        "odom_topic",
-        "rotate_target_topic",
-        "enable_topic",
-        "output_topic",
-        "publish_rate_hz",
-        "odom_timeout_sec",
-        "settle_cycles_required",
-        "max_rotate_time_sec",
-        "output",
-        "pid",
-        "heading_tolerance_rad",
+        "publish_hz",
+        "input_timeout_s",
+        "enabled",
+        "start_on_target",
+        "auto_disable_when_goal_reached",
+        "safety_stop_blocks_motion",
+        "publish_zero_when_inactive",
+        "target_tolerance_rad",
+        "max_duration_s",
+        "kp",
+        "ki",
+        "kd",
         "max_wz_rad_s",
-        "ctrl",
+        "min_wz_when_active",
+        "disable_min_wz_below_error_rad",
+        "output_deadband_rad_s",
+        "min_dt_sec",
+        "max_dt_sec",
+        "odom_topic",
+        "target_topic",
+        "enable_topic",
+        "cancel_topic",
+        "safety_stop_topic",
+        "output_topic",
+        "state_topic",
+        "status_topic",
     ]
 
     for key in required:
         assert key in cfg
 
+    legacy = [
+        "rotate_target_topic",
+        "publish_rate_hz",
+        "odom_timeout_sec",
+        "zero_on_stale_odom",
+        "auto_enable_on_target",
+        "stop_and_hold_zero_after_done",
+        "reset_pid_on_new_target",
+        "settle_cycles_required",
+        "max_rotate_time_sec",
+        "min_error_to_command_rad",
+        "output",
+        "pid",
+        "heading_tolerance_rad",
+        "min_effective_wz_rad_s",
+        "reset_pid_on_hold_capture",
+        "reset_pid_on_target_change",
+        "target_change_reset_threshold_rad",
+        "ctrl",
+    ]
+
+    for key in legacy:
+        assert key not in cfg
+
+    assert cfg["odom_topic"] == "/odometry/filtered"
+    assert cfg["target_topic"] == "/savo_control/rotate_target_rad"
+    assert cfg["enable_topic"] == "/savo_control/rotate_enable"
+    assert cfg["cancel_topic"] == "/savo_control/rotate_cancel"
+    assert cfg["safety_stop_topic"] == "/safety/stop"
     assert cfg["output_topic"] == "/cmd_vel_auto"
-    assert cfg["settle_cycles_required"] >= 1
+    assert cfg["state_topic"] == "/savo_control/rotate_state"
+    assert cfg["status_topic"] == "/savo_control/rotate_status"
 
 
 def test_recovery_contract():

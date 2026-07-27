@@ -48,6 +48,14 @@ inline constexpr const char * DISTANCE_TEST_ENABLE = "/savo_control/distance_app
 inline constexpr const char * DISTANCE_TEST_TARGET = "/savo_control/distance_test_target_m";
 inline constexpr const char * DISTANCE_TEST_STATE = "/savo_control/distance_test_state";
 
+// Rotation
+inline constexpr const char * ROTATE_TARGET_RAD = "/savo_control/rotate_target_rad";
+inline constexpr const char * ROTATE_ENABLE = "/savo_control/rotate_enable";
+inline constexpr const char * ROTATE_CANCEL = "/savo_control/rotate_cancel";
+inline constexpr const char * ROTATE_STATE = "/savo_control/rotate_state";
+inline constexpr const char * ROTATE_STATUS = "/savo_control/rotate_status";
+inline constexpr const char * ROTATE_TO_HEADING_ACTION = "/savo_control/rotate_to_heading";
+
 // Perception / odom inputs used by control
 inline constexpr const char * ODOM_FILTERED = "/odometry/filtered";
 inline constexpr const char * WHEEL_ODOM = "/wheel/odom";
@@ -106,7 +114,9 @@ inline bool is_status_topic(const std::string & topic)
          topic == AUTO_TEST_STATE ||
          topic == RECOVERY_TEST_STATUS ||
          topic == STRAIGHT_LINE_STATE ||
-         topic == DISTANCE_TEST_STATE;
+         topic == DISTANCE_TEST_STATE ||
+         topic == ROTATE_STATE ||
+         topic == ROTATE_STATUS;
 }
 
 inline bool is_sensor_topic(const std::string & topic)
