@@ -9,6 +9,17 @@ namespace topics
 inline constexpr const char * kCmdVel = "/cmd_vel";
 inline constexpr const char * kCmdVelSafe = "/cmd_vel_safe";
 
+inline constexpr const char * kRawRealSensePointCloud =
+  "/camera/camera/depth/color/points";
+inline constexpr const char * kFilteredObstaclePointCloud =
+  "/savo_perception/obstacles/points";
+inline constexpr const char * kObstacleCloudHealth =
+  "/savo_perception/obstacle_cloud/health";
+inline constexpr const char * kObstacleCloudStatus =
+  "/savo_perception/obstacle_cloud/status";
+inline constexpr const char * kObstacleCloudHeartbeat =
+  "/savo_perception/obstacle_cloud/heartbeat";
+
 inline constexpr const char * kDepthFrontM = "/depth/min_front_m";
 
 inline constexpr const char * kTofLeftM = "/savo_perception/range/left_m";

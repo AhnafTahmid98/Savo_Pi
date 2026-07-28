@@ -1,6 +1,5 @@
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
-from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
@@ -37,6 +36,13 @@ def _make_nodes(context):
                     "backend": backend,
                     "center_on_start": center_on_start,
                     "center_on_shutdown": center_on_shutdown,
+                    "status_topic": (
+                        "/savo_head/controller/status"
+                    ),
+                    "diagnostics_topic": "/diagnostics",
+                    "dashboard_text_topic": (
+                        "/savo_head/controller/dashboard_text"
+                    ),
                 }
             ],
         )
@@ -75,6 +81,14 @@ def _make_nodes(context):
                 executable=f"head_status_node{executable_suffix}",
                 name="head_status_node",
                 output="screen",
+                parameters=[
+                    {
+                        "status_topic": "/savo_head/status",
+                        "dashboard_text_topic": (
+                            "/savo_head/dashboard_text"
+                        ),
+                    }
+                ],
             )
         )
 
@@ -94,27 +108,48 @@ def _make_nodes(context):
 def generate_launch_description():
     package_share = FindPackageShare("savo_head")
 
-    camera_stream = IncludeLaunchDescription(
+    camera_stack = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             PathJoinSubstitution(
                 [
                     package_share,
                     "launch",
-                    "head_camera_stream.launch.py",
+                    "head_camera_stack.launch.py",
                 ]
             )
         ),
-        condition=IfCondition(LaunchConfiguration("enable_camera_stream")),
         launch_arguments={
-            "enabled": "true",
+            "camera_mode": LaunchConfiguration("camera_mode"),
             "source": LaunchConfiguration("camera_source"),
             "width": LaunchConfiguration("camera_width"),
             "height": LaunchConfiguration("camera_height"),
             "fps": LaunchConfiguration("camera_fps"),
-            "format": LaunchConfiguration("camera_format"),
-            "bitrate_kbps": LaunchConfiguration("camera_bitrate_kbps"),
-            "udp_host": LaunchConfiguration("camera_udp_host"),
-            "udp_port": LaunchConfiguration("camera_udp_port"),
+            "ros_source_format": LaunchConfiguration(
+                "camera_ros_source_format"
+            ),
+            "udp_format": LaunchConfiguration("camera_format"),
+            "camera_name": LaunchConfiguration("camera_name"),
+            "frame_id": LaunchConfiguration(
+                "camera_frame_id"
+            ),
+            "camera_info_url": LaunchConfiguration(
+                "camera_info_url"
+            ),
+            "ros_config_file": LaunchConfiguration(
+                "camera_ros_config_file"
+            ),
+            "camera_health_config_file": LaunchConfiguration(
+                "camera_health_config_file"
+            ),
+            "udp_bitrate_kbps": LaunchConfiguration(
+                "camera_bitrate_kbps"
+            ),
+            "udp_host": LaunchConfiguration(
+                "camera_udp_host"
+            ),
+            "udp_port": LaunchConfiguration(
+                "camera_udp_port"
+            ),
         }.items(),
     )
 
@@ -161,14 +196,80 @@ def generate_launch_description():
                 description="Center pan-tilt when controller shuts down.",
             ),
             DeclareLaunchArgument(
-                "enable_camera_stream",
-                default_value="false",
-                description="Start optional GStreamer Pi camera UDP stream.",
+                "camera_mode",
+                default_value="disabled",
+                description=(
+                    "Camera transport: disabled, ros, or udp. "
+                    "The launch system enforces mutual "
+                    "exclusivity."
+                ),
             ),
             DeclareLaunchArgument(
                 "camera_source",
                 default_value="libcamerasrc",
-                description="Camera source. Use libcamerasrc on robot, videotestsrc for PC smoke.",
+                description=(
+                    "Use libcamerasrc on the robot or "
+                    "videotestsrc for PC validation."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "camera_ros_source_format",
+                default_value="I420",
+                description=(
+                    "Raw source format for the ROS "
+                    "gscam path."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "camera_name",
+                default_value="savo_head_camera",
+                description=(
+                    "Logical camera name used in CameraInfo."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "camera_frame_id",
+                default_value="pi_camera_optical_frame",
+                description=(
+                    "Optical frame used by Image "
+                    "and CameraInfo."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "camera_info_url",
+                default_value="",
+                description=(
+                    "Camera calibration URL for "
+                    "the ROS path."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "camera_ros_config_file",
+                default_value=PathJoinSubstitution(
+                    [
+                        package_share,
+                        "config",
+                        "camera_ros.yaml",
+                    ]
+                ),
+                description=(
+                    "Parameter file for the ROS "
+                    "camera driver."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "camera_health_config_file",
+                default_value=PathJoinSubstitution(
+                    [
+                        package_share,
+                        "config",
+                        "camera_health.yaml",
+                    ]
+                ),
+                description=(
+                    "Parameter file for "
+                    "head_camera_status_node."
+                ),
             ),
             DeclareLaunchArgument(
                 "camera_width",
@@ -206,6 +307,6 @@ def generate_launch_description():
                 description="Receiver UDP port.",
             ),
             OpaqueFunction(function=_make_nodes),
-            camera_stream,
+            camera_stack,
         ]
     )

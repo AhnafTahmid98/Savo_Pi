@@ -55,3 +55,7 @@ phase7_control_recovery:
   navigation_allowed: /savo_nav/control_recovery/allowed
   navigation_reason: /savo_nav/control_recovery/reason
   navigation_status: /savo_nav/control_recovery/status
+phase7b_goal_admission:
+  state: /savo_nav/goal_admission/state
+  reason: /savo_nav/goal_admission/reason
+  status: /savo_nav/goal_admission/status

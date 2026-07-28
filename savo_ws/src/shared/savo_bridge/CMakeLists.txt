@@ -160,6 +160,37 @@ if(BUILD_TESTING)
     )
   endif()
 
+  ament_add_gtest(test_bridge_node_command_server
+    test/integration/test_bridge_node_command_server.cpp
+  )
+
+  if(TARGET test_bridge_node_command_server)
+    target_link_libraries(test_bridge_node_command_server
+      ${PROJECT_NAME}_ros
+      ${PROJECT_NAME}_core
+    )
+
+    ament_target_dependencies(
+      test_bridge_node_command_server
+      diagnostic_msgs
+      rclcpp
+      std_msgs
+    )
+  endif()
+
+  add_executable(savo_bridge_command_server_fixture
+    test/fixture/command_server_fixture.cpp
+  )
+
+  target_compile_features(savo_bridge_command_server_fixture
+    PRIVATE
+      cxx_std_17
+  )
+
+  target_link_libraries(savo_bridge_command_server_fixture
+    ${PROJECT_NAME}_core
+  )
+
   ament_add_gtest(test_savo_bridge_freshness
     test/unit/test_freshness_tracker.cpp
   )

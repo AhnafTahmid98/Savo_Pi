@@ -7,6 +7,8 @@ savo_head:
     scan_state_topic: /savo_head/scan_state
     status_topic: /savo_head/status
     dashboard_text_topic: /savo_head/dashboard_text
+    controller_status_topic: /savo_head/controller/status
+    controller_dashboard_text_topic: /savo_head/controller/dashboard_text
     diagnostics_topic: /diagnostics
     camera_stream_cmd_topic: /savo_head/camera_stream_cmd
     camera_stream_state_topic: /savo_head/camera_stream_state

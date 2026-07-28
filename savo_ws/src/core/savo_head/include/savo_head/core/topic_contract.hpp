@@ -21,8 +21,13 @@ struct HeadTopicContract
   std::string scan_state{kTopicScanState};
 
   std::string status{kTopicStatus};
+  std::string controller_status{kTopicControllerStatus};
+
   std::string diagnostics{"/diagnostics"};
+
   std::string dashboard_text{kTopicDashboardText};
+  std::string controller_dashboard_text{
+    kTopicControllerDashboardText};
 
   std::string emergency_center{kTopicEmergencyCenter};
 
@@ -53,8 +58,10 @@ struct HeadTopicContract
       scan_cmd,
       scan_state,
       status,
+      controller_status,
       diagnostics,
       dashboard_text,
+      controller_dashboard_text,
       emergency_center,
       camera_stream_cmd,
       camera_stream_state,

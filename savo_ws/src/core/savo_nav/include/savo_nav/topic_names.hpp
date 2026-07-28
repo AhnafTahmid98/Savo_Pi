@@ -126,4 +126,17 @@ inline constexpr std::string_view
   kControlRecoveryStatus =
   "/savo_nav/control_recovery/status";
 
+
+inline constexpr std::string_view
+  kGoalAdmissionState =
+  "/savo_nav/goal_admission/state";
+
+inline constexpr std::string_view
+  kGoalAdmissionReason =
+  "/savo_nav/goal_admission/reason";
+
+inline constexpr std::string_view
+  kGoalAdmissionStatus =
+  "/savo_nav/goal_admission/status";
+
 }  // namespace savo_nav::topics

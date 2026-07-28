@@ -5,10 +5,12 @@
 #ifndef SAVO_BRIDGE__BRIDGE_NODE_HPP_
 #define SAVO_BRIDGE__BRIDGE_NODE_HPP_
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include <diagnostic_msgs/msg/diagnostic_array.hpp>
@@ -18,6 +20,7 @@
 #include <std_msgs/msg/string.hpp>
 #include <std_msgs/msg/u_int64.hpp>
 
+#include "savo_bridge/command_server.hpp"
 #include "savo_bridge/graph_evidence.hpp"
 #include "savo_bridge/snapshot_writer.hpp"
 #include "savo_bridge/topic_observation.hpp"
@@ -31,6 +34,10 @@ public:
   explicit BridgeNode(
     const rclcpp::NodeOptions & options =
     rclcpp::NodeOptions());
+  ~BridgeNode() override;
+
+  [[nodiscard]] bool command_server_enabled() const noexcept;
+  [[nodiscard]] bool command_worker_joinable() const noexcept;
 
 private:
   struct ObservationRuntime
@@ -44,6 +51,9 @@ private:
 
   void publish_status();
   void refresh_observation_subscriptions();
+  void configure_command_server();
+  void start_command_server();
+  void run_command_worker() noexcept;
 
   void publish_runtime_snapshot(
     const std::vector<TopicObservation::Snapshot> &
@@ -88,6 +98,17 @@ private:
   rclcpp::TimerBase::SharedPtr status_timer_;
 
   std::uint64_t heartbeat_sequence_{0U};
+
+  bool command_server_enabled_{false};
+  std::unique_ptr<CommandServerConfig> command_server_config_;
+  std::unique_ptr<CommandServer> command_server_;
+  std::thread command_worker_;
+  std::atomic<bool> command_stop_requested_{false};
+  std::atomic<CommandServerStatus> command_last_status_{
+    CommandServerStatus::Disabled};
+  std::atomic<std::uint64_t> command_accepted_count_{0U};
+  std::atomic<std::uint64_t> command_rejected_count_{0U};
+  std::atomic<bool> command_worker_fatal_{false};
 };
 
 }  // namespace savo_bridge

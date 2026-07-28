@@ -41,6 +41,12 @@ inline constexpr const char * kTopicScanCmd = "/savo_head/scan_cmd";
 inline constexpr const char * kTopicScanState = "/savo_head/scan_state";
 inline constexpr const char * kTopicStatus = "/savo_head/status";
 inline constexpr const char * kTopicDashboardText = "/savo_head/dashboard_text";
+
+inline constexpr const char * kTopicControllerStatus =
+  "/savo_head/controller/status";
+
+inline constexpr const char * kTopicControllerDashboardText =
+  "/savo_head/controller/dashboard_text";
 inline constexpr const char * kTopicEmergencyCenter = "/savo_head/emergency_center";
 inline constexpr const char * kTopicCameraImageRaw = "/savo_head/camera/image_raw";
 inline constexpr const char * kTopicCameraInfo = "/savo_head/camera/camera_info";

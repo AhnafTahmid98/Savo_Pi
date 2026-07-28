@@ -44,6 +44,15 @@ diagnostic_msgs::msg::KeyValue kv(const std::string & key, const std::string & v
   return item;
 }
 
+diagnostic_msgs::msg::KeyValue kv(
+  const std::string & key,
+  const char * value)
+{
+  return kv(
+    key,
+    std::string(value != nullptr ? value : ""));
+}
+
 diagnostic_msgs::msg::KeyValue kv(const std::string & key, int value)
 {
   return kv(key, std::to_string(value));
@@ -186,9 +195,13 @@ private:
 
     declare_parameter<std::string>("pan_tilt_cmd_topic", kTopicPanTiltCmd);
     declare_parameter<std::string>("pan_tilt_state_topic", kTopicPanTiltState);
-    declare_parameter<std::string>("status_topic", kTopicStatus);
+    declare_parameter<std::string>(
+      "status_topic",
+      kTopicControllerStatus);
     declare_parameter<std::string>("diagnostics_topic", "/diagnostics");
-    declare_parameter<std::string>("dashboard_text_topic", kTopicDashboardText);
+    declare_parameter<std::string>(
+      "dashboard_text_topic",
+      kTopicControllerDashboardText);
     declare_parameter<std::string>("emergency_center_topic", kTopicEmergencyCenter);
 
     declare_parameter<std::string>("center_service", "/savo_head/center");

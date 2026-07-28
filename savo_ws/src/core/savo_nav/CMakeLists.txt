@@ -34,6 +34,7 @@ add_library(
   src/core/control_mode_client.cpp
   src/core/control_recovery_guard.cpp
   src/core/recovery_bridge.cpp
+  src/core/goal_admission_policy.cpp
   src/core/goal_arbiter.cpp
   src/core/goal_context.cpp
   src/core/goal_gateway.cpp
@@ -100,6 +101,25 @@ ament_target_dependencies(
 )
 
 add_executable(
+  goal_admission_gate_node
+  src/nodes/goal_admission_gate_node.cpp
+)
+
+target_link_libraries(
+  goal_admission_gate_node
+  savo_nav_core
+)
+
+ament_target_dependencies(
+  goal_admission_gate_node
+  action_msgs
+  nav2_msgs
+  rclcpp
+  rclcpp_action
+  std_msgs
+)
+
+add_executable(
   goal_gateway_node
   src/nodes/goal_gateway_node.cpp
 )
@@ -131,6 +151,7 @@ install(
   TARGETS
     navigation_readiness_node
     control_recovery_guard_node
+    goal_admission_gate_node
     goal_gateway_node
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
@@ -294,6 +315,47 @@ if(BUILD_TESTING)
     TIMEOUT 60
   )
 
+  ament_add_gtest(
+    test_goal_admission_policy
+    test/unit/test_goal_admission_policy.cpp
+  )
+
+  if(TARGET test_goal_admission_policy)
+    target_link_libraries(
+      test_goal_admission_policy
+      savo_nav_core
+    )
+  endif()
+
+  ament_add_pytest_test(
+    test_phase7b_goal_admission_contracts
+    test/contracts/test_phase7b_goal_admission_contracts.py
+    TIMEOUT 60
+  )
+
+  add_executable(
+    fake_guarded_gateway_server_node
+    test/fixtures/fake_guarded_gateway_server_node.cpp
+  )
+
+  ament_target_dependencies(
+    fake_guarded_gateway_server_node
+    nav2_msgs
+    rclcpp
+    rclcpp_action
+    std_msgs
+  )
+
+  target_link_libraries(
+    fake_guarded_gateway_server_node
+    savo_nav_core
+  )
+
+  install(
+    TARGETS fake_guarded_gateway_server_node
+    DESTINATION lib/${PROJECT_NAME}
+  )
+
   ament_add_pytest_test(
     test_source_headers
     test/contracts/test_source_headers.py
@@ -333,6 +395,18 @@ if(BUILD_TESTING)
   ament_add_pytest_test(
     test_saved_map_launch
     test/launch/test_saved_map_launch.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
+    test_phase7c_fault_launch_contracts
+    test/contracts/test_phase7c_fault_launch_contracts.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
+    test_phase8_costmap_sensor_contracts
+    test/contracts/test_phase8_costmap_sensor_contracts.py
     TIMEOUT 60
   )
 

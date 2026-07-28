@@ -1,0 +1,41 @@
+# Copyright 2026 Ahnaf Tahmid
+# SPDX-License-Identifier: LicenseRef-Proprietary
+
+# Host: savo-edge
+# Raw producer: savo_realsense
+# Filtered producer: savo_perception
+# Consumer: savo_nav on savo-core
+# Semantics: obstacle_only
+# Nav2 clearing must remain false; LiDAR owns reliable clearing.
+# Self-filter dimensions are provisional and require real-hardware tuning.
+
+obstacle_cloud_filter_node:
+  ros__parameters:
+    input_topic: /camera/camera/depth/color/points
+    output_topic: /savo_perception/obstacles/points
+    output_frame: base_link
+
+    health_topic: /savo_perception/obstacle_cloud/health
+    status_topic: /savo_perception/obstacle_cloud/status
+    heartbeat_topic: /savo_perception/obstacle_cloud/heartbeat
+
+    min_range_m: 0.20
+    max_range_m: 3.00
+    min_height_m: 0.05
+    max_height_m: 1.60
+    voxel_size_m: 0.05
+
+    self_filter_enabled: true
+    self_min_x_m: -0.30
+    self_max_x_m: 0.30
+    self_min_y_m: -0.26
+    self_max_y_m: 0.26
+    self_min_z_m: -0.10
+    self_max_z_m: 0.70
+
+    max_output_points: 100000
+    transform_timeout_s: 0.10
+    stale_timeout_s: 0.75
+    status_publish_hz: 2.0
+    heartbeat_hz: 1.0
+    startup_fail_is_fatal: false

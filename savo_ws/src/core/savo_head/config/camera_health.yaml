@@ -1,0 +1,30 @@
+/savo_head/head_camera_status_node:
+  ros__parameters:
+    image_topic: "/savo_head/camera/image_raw"
+    camera_info_topic: "/savo_head/camera/camera_info"
+
+    status_topic: "/savo_head/camera/status"
+    diagnostics_topic: "/diagnostics"
+    health_check_service: "/savo_head/camera/health_check"
+
+    expected_width: 640
+    expected_height: 480
+    expected_frame_id: "pi_camera_optical_frame"
+    expected_encoding: "rgb8"
+
+    startup_grace_s: 3.0
+
+    image_stale_timeout_s: 2.0
+    camera_info_stale_timeout_s: 2.0
+
+    min_frame_rate_hz: 10.0
+    min_frame_samples: 5
+    frame_rate_ema_alpha: 0.20
+
+    require_calibration_for_pose: true
+
+    strict_frame_id: true
+    strict_resolution: true
+    strict_encoding: true
+
+    status_publish_hz: 2.0

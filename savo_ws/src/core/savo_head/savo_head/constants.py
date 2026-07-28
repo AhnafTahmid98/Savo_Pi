@@ -33,6 +33,14 @@ TOPIC_SCAN_STATE: Final[str] = "/savo_head/scan_state"
 TOPIC_STATUS: Final[str] = "/savo_head/status"
 TOPIC_DASHBOARD_TEXT: Final[str] = "/savo_head/dashboard_text"
 
+TOPIC_CONTROLLER_STATUS: Final[str] = (
+    "/savo_head/controller/status"
+)
+
+TOPIC_CONTROLLER_DASHBOARD_TEXT: Final[str] = (
+    "/savo_head/controller/dashboard_text"
+)
+
 TOPIC_IMAGE_RAW: Final[str] = "/savo_head/camera/image_raw"
 TOPIC_CAMERA_INFO: Final[str] = "/savo_head/camera/camera_info"
 TOPIC_CAMERA_STATUS: Final[str] = "/savo_head/camera/status"
@@ -230,6 +238,15 @@ class HeadDefaults:
     scan_state_topic: str = TOPIC_SCAN_STATE
     status_topic: str = TOPIC_STATUS
     dashboard_text_topic: str = TOPIC_DASHBOARD_TEXT
+
+    controller_status_topic: str = (
+        TOPIC_CONTROLLER_STATUS
+    )
+
+    controller_dashboard_text_topic: str = (
+        TOPIC_CONTROLLER_DASHBOARD_TEXT
+    )
+
     image_raw_topic: str = TOPIC_IMAGE_RAW
     camera_info_topic: str = TOPIC_CAMERA_INFO
     camera_status_topic: str = TOPIC_CAMERA_STATUS
@@ -298,6 +315,12 @@ class HeadDefaults:
                 "scan_state": self.scan_state_topic,
                 "status": self.status_topic,
                 "dashboard_text": self.dashboard_text_topic,
+                "controller_status": (
+                    self.controller_status_topic
+                ),
+                "controller_dashboard_text": (
+                    self.controller_dashboard_text_topic
+                ),
                 "image_raw": self.image_raw_topic,
                 "camera_info": self.camera_info_topic,
                 "camera_status": self.camera_status_topic,

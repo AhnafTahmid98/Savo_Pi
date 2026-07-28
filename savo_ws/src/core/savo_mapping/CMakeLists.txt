@@ -55,6 +55,7 @@ add_library(${PROJECT_NAME}_core
   src/workflow/exploration_runtime.cpp
   src/scan360/scan360_planner.cpp
   src/scan360/scan360_controller.cpp
+  src/scan360/scan360_orchestrator.cpp
   src/scan360/scan360_quality.cpp
   src/session/map_session_policy.cpp
   src/session/saved_map_contract.cpp
@@ -215,6 +216,7 @@ set(_savo_mapping_public_headers
   include/savo_mapping/exploration_runtime.hpp
   include/savo_mapping/scan360_planner.hpp
   include/savo_mapping/scan360_controller.hpp
+  include/savo_mapping/scan360_orchestrator.hpp
   include/savo_mapping/scan360_quality.hpp
   include/savo_mapping/map_quality_placeholder.hpp
   include/savo_mapping/map_session_policy.hpp
@@ -663,6 +665,12 @@ if(BUILD_TESTING)
     TIMEOUT 60
   )
 
+  ament_add_pytest_test(
+    test_scan360_orchestrator_contract
+    test/test_scan360_orchestrator_contract.py
+    TIMEOUT 60
+  )
+
   find_package(ament_cmake_gtest REQUIRED)
 
   ament_add_gtest(
@@ -889,6 +897,15 @@ if(BUILD_TESTING)
 
   target_link_libraries(
     test_scan360_controller
+    ${PROJECT_NAME}_core
+  )
+
+  ament_add_gtest(test_scan360_orchestrator
+    test/test_scan360_orchestrator.cpp
+  )
+
+  target_link_libraries(
+    test_scan360_orchestrator
     ${PROJECT_NAME}_core
   )
 

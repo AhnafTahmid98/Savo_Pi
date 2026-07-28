@@ -20,4 +20,13 @@ inline constexpr std::string_view
   kNav2NavigateToPose =
   "/navigate_to_pose";
 
+
+inline constexpr std::string_view
+  kInternalNavigationNavigateToPose =
+  "/savo_nav/_internal/navigation/navigate_to_pose";
+
+inline constexpr std::string_view
+  kInternalExplorationNavigateToPose =
+  "/savo_nav/_internal/exploration/navigate_to_pose";
+
 }  // namespace savo_nav::actions

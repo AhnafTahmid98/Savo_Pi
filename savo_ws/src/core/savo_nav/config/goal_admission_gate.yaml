@@ -1,0 +1,21 @@
+# Copyright 2026 Ahnaf Tahmid
+# SPDX-License-Identifier: LicenseRef-Proprietary
+
+goal_admission_gate_node:
+  ros__parameters:
+    publish_hz: 20.0
+    guard_timeout_seconds: 0.75
+    internal_server_timeout_seconds: 1.0
+
+    control_recovery_allowed_topic: "/savo_nav/control_recovery/allowed"
+    control_recovery_reason_topic: "/savo_nav/control_recovery/reason"
+
+    public_navigation_action: "/savo_nav/navigation/navigate_to_pose"
+    public_exploration_action: "/savo_nav/exploration/navigate_to_pose"
+
+    internal_navigation_action: "/savo_nav/_internal/navigation/navigate_to_pose"
+    internal_exploration_action: "/savo_nav/_internal/exploration/navigate_to_pose"
+
+    state_topic: "/savo_nav/goal_admission/state"
+    reason_topic: "/savo_nav/goal_admission/reason"
+    status_topic: "/savo_nav/goal_admission/status"

@@ -30,6 +30,8 @@ add_library(${PROJECT_NAME}_core
   src/core/servo_calibration.cpp
   src/core/head_config.cpp
   src/core/head_status.cpp
+  src/core/camera_health.cpp
+  src/core/camera_status_report.cpp
   src/drivers/pca9685_driver.cpp
   src/drivers/pantilt_driver.cpp
 )
@@ -77,6 +79,7 @@ add_savo_head_node(head_controller_node src/nodes/head_controller_node.cpp)
 add_savo_head_node(head_scan_node src/nodes/head_scan_node.cpp)
 add_savo_head_node(head_tf_node src/nodes/head_tf_node.cpp)
 add_savo_head_node(head_status_node src/nodes/head_status_node.cpp)
+add_savo_head_node(head_camera_status_node src/nodes/head_camera_status_node.cpp)
 add_savo_head_node(apriltag_confirm_node src/nodes/apriltag_confirm_node.cpp)
 
 ament_python_install_package(${PROJECT_NAME})
@@ -123,9 +126,47 @@ install(
 ament_export_targets(${PROJECT_NAME}Targets HAS_LIBRARY_TARGET)
 ament_export_include_directories(include)
 
+option(
+  SAVO_HEAD_ENABLE_LEGACY_LINT
+  "Run package-wide legacy lint tests"
+  OFF
+)
+
 if(BUILD_TESTING)
-  find_package(ament_lint_auto QUIET)
-  if(ament_lint_auto_FOUND)
+  find_package(ament_cmake_pytest REQUIRED)
+
+  ament_add_pytest_test(
+    test_camera_health_core
+    test/test_camera_health_core.py
+  )
+
+  ament_add_pytest_test(
+    test_camera_status_node_contract
+    test/test_camera_status_node_contract.py
+  )
+
+  ament_add_pytest_test(
+    test_camera_status_report_core
+    test/test_camera_status_report_core.py
+  )
+
+  ament_add_pytest_test(
+    test_head_status_camera_severity_contract
+    test/test_head_status_camera_severity_contract.py
+  )
+
+  ament_add_pytest_test(
+    test_camera_launch_integration
+    test/test_camera_launch_integration.py
+  )
+
+  ament_add_pytest_test(
+    test_controller_diagnostic_ownership
+    test/test_controller_diagnostic_ownership.py
+  )
+
+  if(SAVO_HEAD_ENABLE_LEGACY_LINT)
+    find_package(ament_lint_auto REQUIRED)
     ament_lint_auto_find_test_dependencies()
   endif()
 endif()

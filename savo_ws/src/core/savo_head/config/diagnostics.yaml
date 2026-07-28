@@ -4,6 +4,8 @@ savo_head:
     diagnostics_topic: /diagnostics
     status_topic: /savo_head/status
     dashboard_text_topic: /savo_head/dashboard_text
+    controller_status_topic: /savo_head/controller/status
+    controller_dashboard_text_topic: /savo_head/controller/dashboard_text
     hardware_status_name: savo_head.hardware
     scan_status_name: savo_head.scan
     tf_status_name: savo_head.tf

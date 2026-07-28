@@ -1,28 +1,26 @@
-# Copyright 2026 Ahnaf Tahmid
-# SPDX-License-Identifier: LicenseRef-Proprietary
-
 contract_version: 1
 package: savo_nav
-
 actions:
   public:
     navigation_navigate_to_pose:
-      name: "/savo_nav/navigation/navigate_to_pose"
-      type: "nav2_msgs/action/NavigateToPose"
-      source: "mission_or_validated_location"
-
+      name: /savo_nav/navigation/navigate_to_pose
+      type: nav2_msgs/action/NavigateToPose
+      source: mission_or_validated_location
     exploration_navigate_to_pose:
-      name: "/savo_nav/exploration/navigate_to_pose"
-      type: "nav2_msgs/action/NavigateToPose"
-      source: "savo_mapping"
-
+      name: /savo_nav/exploration/navigate_to_pose
+      type: nav2_msgs/action/NavigateToPose
+      source: savo_mapping
   internal:
     nav2_navigate_to_pose:
-      name: "/navigate_to_pose"
-      type: "nav2_msgs/action/NavigateToPose"
-      owner: "nav2_bt_navigator"
-
+      name: /navigate_to_pose
+      type: nav2_msgs/action/NavigateToPose
+      owner: nav2_bt_navigator
 constraints:
   maximum_active_nav2_goals: 1
   silent_goal_replacement_allowed: false
   cancellation_acknowledgement_required: true
+phase7b_internal_gateway_actions:
+  navigation: /savo_nav/_internal/navigation/navigate_to_pose
+  exploration: /savo_nav/_internal/exploration/navigate_to_pose
+  type: nav2_msgs/action/NavigateToPose
+  public_access: false

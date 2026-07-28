@@ -4,15 +4,21 @@
 
 #include "savo_bridge/bridge_node.hpp"
 
+#include <sys/types.h>
+
 #include <algorithm>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <exception>
 #include <functional>
+#include <limits>
 #include <memory>
+#include <set>
+#include <stdexcept>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -331,6 +337,28 @@ struct ObservationRuntimeState
   return qos;
 }
 
+template<typename Value>
+[[nodiscard]] Value declare_read_only_parameter(
+  rclcpp::Node & node,
+  const std::string & name,
+  const Value & default_value)
+{
+  rcl_interfaces::msg::ParameterDescriptor descriptor;
+  descriptor.read_only = true;
+  return node.declare_parameter<Value>(
+    name,
+    default_value,
+    descriptor);
+}
+
+[[nodiscard]] bool is_fatal_command_server_status(
+  const CommandServerStatus status) noexcept
+{
+  return status == CommandServerStatus::NotRunning ||
+         status == CommandServerStatus::AcceptError ||
+         status == CommandServerStatus::SocketError;
+}
+
 }  // namespace
 
 BridgeNode::BridgeNode(
@@ -340,6 +368,8 @@ BridgeNode::BridgeNode(
     "/savo_bridge",
     options)
 {
+  configure_command_server();
+
   readiness_publisher_ =
     create_publisher<std_msgs::msg::Bool>(
     "/savo_bridge/readiness",
@@ -451,6 +481,8 @@ BridgeNode::BridgeNode(
       publish_status();
     });
 
+  start_command_server();
+
   RCLCPP_INFO(
     get_logger(),
     "savo_bridge Phase 2B-2 topic observation started; "
@@ -458,6 +490,267 @@ BridgeNode::BridgeNode(
     "commands remain disabled",
     observation_runtimes_.size(),
     snapshot_enabled_ ? "true" : "false");
+}
+
+BridgeNode::~BridgeNode()
+{
+  command_stop_requested_.store(
+    true,
+    std::memory_order_release);
+
+  if (command_worker_.joinable()) {
+    command_worker_.join();
+  }
+
+  if (command_server_) {
+    (void)command_server_->stop();
+    command_server_.reset();
+  }
+}
+
+bool BridgeNode::command_server_enabled() const noexcept
+{
+  return command_server_enabled_;
+}
+
+bool BridgeNode::command_worker_joinable() const noexcept
+{
+  return command_worker_.joinable();
+}
+
+void BridgeNode::configure_command_server()
+{
+  command_server_enabled_ =
+    declare_read_only_parameter<bool>(
+    *this,
+    "command_server.enabled",
+    false);
+
+  const std::string execution_mode =
+    declare_read_only_parameter<std::string>(
+    *this,
+    "command_server.execution_mode",
+    "dry_run");
+
+  const std::string socket_path =
+    declare_read_only_parameter<std::string>(
+    *this,
+    "command_server.socket_path",
+    "/run/savo_bridge/command.sock");
+
+  const std::string bridge_instance_id =
+    declare_read_only_parameter<std::string>(
+    *this,
+    "command_server.bridge_instance_id",
+    "savo-bridge-native");
+
+  const std::int64_t max_request_bytes =
+    declare_read_only_parameter<std::int64_t>(
+    *this,
+    "command_server.max_request_bytes",
+    65536);
+
+  const std::int64_t max_response_bytes =
+    declare_read_only_parameter<std::int64_t>(
+    *this,
+    "command_server.max_response_bytes",
+    65536);
+
+  const std::int64_t accept_timeout_ms =
+    declare_read_only_parameter<std::int64_t>(
+    *this,
+    "command_server.accept_timeout_ms",
+    250);
+
+  const std::int64_t client_read_timeout_ms =
+    declare_read_only_parameter<std::int64_t>(
+    *this,
+    "command_server.client_read_timeout_ms",
+    1000);
+
+  const std::int64_t client_write_timeout_ms =
+    declare_read_only_parameter<std::int64_t>(
+    *this,
+    "command_server.client_write_timeout_ms",
+    1000);
+
+  const std::int64_t socket_mode =
+    declare_read_only_parameter<std::int64_t>(
+    *this,
+    "command_server.socket_mode",
+    432);
+
+  const std::vector<std::int64_t> allowed_peer_uids =
+    declare_read_only_parameter<std::vector<std::int64_t>>(
+    *this,
+    "command_server.allowed_peer_uids",
+    std::vector<std::int64_t>{});
+
+  if (!command_server_enabled_) {
+    command_last_status_.store(
+      CommandServerStatus::Disabled,
+      std::memory_order_release);
+    return;
+  }
+
+  const auto invalid_configuration = [this]() {
+      RCLCPP_ERROR(
+        get_logger(),
+        "command server configuration rejected");
+      throw std::invalid_argument(
+              "command server configuration invalid");
+    };
+
+  if (execution_mode != "dry_run" ||
+    max_request_bytes <= 0 ||
+    max_response_bytes <= 0 ||
+    static_cast<std::uintmax_t>(max_request_bytes) >
+    std::numeric_limits<std::size_t>::max() ||
+    static_cast<std::uintmax_t>(max_response_bytes) >
+    std::numeric_limits<std::size_t>::max() ||
+    socket_mode < 0 ||
+    static_cast<std::uintmax_t>(socket_mode) >
+    std::numeric_limits<std::uint32_t>::max())
+  {
+    invalid_configuration();
+  }
+
+  CommandServerConfig config;
+  config.enabled = true;
+  config.socket_path = socket_path;
+  config.bridge_instance_id = bridge_instance_id;
+  config.max_request_bytes =
+    static_cast<std::size_t>(max_request_bytes);
+  config.max_response_bytes =
+    static_cast<std::size_t>(max_response_bytes);
+  config.accept_timeout_ms = accept_timeout_ms;
+  config.client_read_timeout_ms =
+    client_read_timeout_ms;
+  config.client_write_timeout_ms =
+    client_write_timeout_ms;
+  config.socket_mode =
+    static_cast<std::uint32_t>(socket_mode);
+
+  if (!allowed_peer_uids.empty()) {
+    std::set<std::uint32_t> unique_uids;
+    config.allowed_peer_uids.clear();
+    config.allowed_peer_uids.reserve(
+      allowed_peer_uids.size());
+
+    for (const std::int64_t uid : allowed_peer_uids) {
+      if (uid < 0 ||
+        static_cast<std::uintmax_t>(uid) >
+        std::numeric_limits<uid_t>::max())
+      {
+        invalid_configuration();
+      }
+
+      const auto converted =
+        static_cast<std::uint32_t>(uid);
+      if (!unique_uids.insert(converted).second) {
+        invalid_configuration();
+      }
+      config.allowed_peer_uids.push_back(converted);
+    }
+  }
+
+  command_server_config_ =
+    std::make_unique<CommandServerConfig>(
+    std::move(config));
+}
+
+void BridgeNode::start_command_server()
+{
+  if (!command_server_enabled_) {
+    return;
+  }
+
+  command_server_ =
+    std::make_unique<CommandServer>(
+    *command_server_config_);
+
+  const CommandServerResult start_result =
+    command_server_->start();
+  command_last_status_.store(
+    start_result.status,
+    std::memory_order_release);
+
+  if (start_result.status != CommandServerStatus::Started) {
+    command_server_.reset();
+    RCLCPP_ERROR(
+      get_logger(),
+      "command server startup failed: %s",
+      start_result.reason.c_str());
+    throw std::runtime_error(
+            "command server startup failed");
+  }
+
+  command_stop_requested_.store(
+    false,
+    std::memory_order_release);
+
+  try {
+    command_worker_ =
+      std::thread(
+      &BridgeNode::run_command_worker,
+      this);
+  } catch (const std::system_error &) {
+    (void)command_server_->stop();
+    command_server_.reset();
+    throw std::runtime_error(
+            "command server worker startup failed");
+  }
+
+  RCLCPP_INFO(
+    get_logger(),
+    "command server enabled in dry-run mode");
+}
+
+void BridgeNode::run_command_worker() noexcept
+{
+  try {
+    while (!command_stop_requested_.load(
+        std::memory_order_acquire))
+    {
+      const CommandServerResult result =
+        command_server_->serve_one();
+
+      command_last_status_.store(
+        result.status,
+        std::memory_order_release);
+
+      if (result.status ==
+        CommandServerStatus::AcceptTimeout)
+      {
+        continue;
+      }
+
+      if (result.status ==
+        CommandServerStatus::DryRunAcknowledged)
+      {
+        command_accepted_count_.fetch_add(
+          1U,
+          std::memory_order_relaxed);
+      } else {
+        command_rejected_count_.fetch_add(
+          1U,
+          std::memory_order_relaxed);
+      }
+
+      if (is_fatal_command_server_status(
+          result.status))
+      {
+        command_worker_fatal_.store(
+          true,
+          std::memory_order_release);
+        return;
+      }
+    }
+  } catch (...) {
+    command_worker_fatal_.store(
+      true,
+      std::memory_order_release);
+  }
 }
 
 void BridgeNode::refresh_observation_subscriptions()

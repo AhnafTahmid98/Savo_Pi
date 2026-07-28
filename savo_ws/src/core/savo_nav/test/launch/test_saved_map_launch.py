@@ -52,7 +52,7 @@ def test_launch_description_constructs():
         if isinstance(entity, Node)
     ]
 
-    assert len(nodes) == 11
+    assert len(nodes) == 13
 
 
 def test_launch_file_has_no_default_map_fixture():

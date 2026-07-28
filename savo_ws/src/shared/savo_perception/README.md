@@ -154,8 +154,9 @@ Configuration file:
 This contains parameters for Nav2 costmap plugins such as:
 - **Voxel Layer** OR **Spatio-Temporal Voxel Layer (STVL)**
 
-RealSense pointcloud (typical):
-- `/camera/camera/depth/color/points` (sensor_msgs/PointCloud2)
+RealSense obstacle cloud for future Nav2 integration:
+- `/savo_perception/obstacles/points` (sensor_msgs/PointCloud2)
+- The raw `/camera/camera/depth/color/points` cloud is input only to the edge filter and is not a Nav2 source.
 
 Important:
 - Costmap layers help global/local avoidance,
@@ -190,3 +191,24 @@ Important:
 - Depth/voxel layers are complementary to near-field safety; they improve avoidance but are not a substitute for the reflex stop layer.
 
 ---
+
+## Phase 8A obstacle-cloud filtering
+
+RealSense Nav2 clearing remains false because the filtered output has obstacle-only semantics; LiDAR remains responsible for reliable costmap clearing.
+
+The raw RealSense cloud is owned by `savo_realsense` and is filtered by
+`savo_perception` on `savo-edge`. The filtered topic is
+`/savo_perception/obstacles/points`; its consumer is `savo_nav` on
+`savo-core`.
+
+The lightweight pure C++ filter has no PCL dependency and publishes XYZ-only
+PointCloud2 data with obstacle-only semantics. RealSense Nav2 clearing remains
+false; LiDAR remains responsible for reliable clearing.
+
+PC synthetic validation covers filtering, transforms, missing-transform
+containment, staleness, and recovery. Real D435 hardware validation remains
+pending. The provisional self-filter bounds require real-robot measurement and
+tuning before production activation.
+
+This producer adds no control, recovery, velocity, safety-stop, or hardware
+authority. The raw RealSense cloud is not consumed directly by Nav2.

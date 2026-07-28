@@ -15,6 +15,8 @@ inline constexpr const char * kUltrasonicNodeName = "ultrasonic_node";
 inline constexpr const char * kSafetyStopNodeName = "safety_stop_node";
 inline constexpr const char * kCmdVelSafetyGateNodeName = "cmd_vel_safety_gate";
 inline constexpr const char * kRangeHealthNodeName = "range_health_node";
+inline constexpr const char * kObstacleCloudFilterNodeName =
+  "obstacle_cloud_filter_node";
 inline constexpr const char * kSensorDashboardNodeName = "sensor_dashboard_node";
 
 inline constexpr int kI2cBusDefault = 1;

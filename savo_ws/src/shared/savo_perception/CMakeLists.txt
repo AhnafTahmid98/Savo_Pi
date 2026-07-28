@@ -14,6 +14,9 @@ find_package(ament_cmake_python REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(sensor_msgs REQUIRED)
 
 include_directories(include)
 
@@ -133,6 +136,56 @@ add_executable(range_health_node
 )
 configure_savo_cpp_target(range_health_node)
 
+
+# Phase 8A: edge-hosted filtered RealSense obstacle-cloud producer.
+add_library(savo_perception_obstacle_cloud_filter
+  src/filtering/obstacle_cloud_filter.cpp
+)
+
+target_include_directories(savo_perception_obstacle_cloud_filter PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
+target_compile_features(savo_perception_obstacle_cloud_filter PUBLIC cxx_std_17)
+
+add_executable(obstacle_cloud_filter_node
+  src/nodes/obstacle_cloud_filter_node.cpp
+)
+
+target_include_directories(obstacle_cloud_filter_node PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+target_compile_features(obstacle_cloud_filter_node PRIVATE cxx_std_17)
+
+target_link_libraries(obstacle_cloud_filter_node
+  savo_perception_obstacle_cloud_filter
+)
+
+ament_target_dependencies(obstacle_cloud_filter_node
+  geometry_msgs
+  rclcpp
+  sensor_msgs
+  std_msgs
+  tf2
+  tf2_ros
+)
+
+install(TARGETS
+  savo_perception_obstacle_cloud_filter
+  obstacle_cloud_filter_node
+  EXPORT savo_perception_obstacle_cloud_filter_targets
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
+)
+
+ament_export_targets(
+  savo_perception_obstacle_cloud_filter_targets
+  HAS_LIBRARY_TARGET
+)
+
 install(DIRECTORY include/
   DESTINATION include
 )
@@ -217,9 +270,31 @@ ament_export_dependencies(
   rclcpp
   std_msgs
   geometry_msgs
+  sensor_msgs
+  tf2
+  tf2_ros
 )
 
 if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+  find_package(ament_cmake_pytest REQUIRED)
+
+  ament_add_gtest(test_obstacle_cloud_filter
+    test/unit/test_obstacle_cloud_filter.cpp
+  )
+
+  if(TARGET test_obstacle_cloud_filter)
+    target_link_libraries(test_obstacle_cloud_filter
+      savo_perception_obstacle_cloud_filter
+    )
+  endif()
+
+  ament_add_pytest_test(
+    test_phase8a_obstacle_cloud_contracts
+    test/contracts/test_phase8a_obstacle_cloud_contracts.py
+    TIMEOUT 60
+  )
+
   find_package(ament_lint_auto REQUIRED)
 
   # Skip noisy style-only linters for this hybrid production package.

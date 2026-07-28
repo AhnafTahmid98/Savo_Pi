@@ -89,6 +89,29 @@ def generate_launch_description():
         'waypoint_follower',
     ]
 
+    control_recovery_guard = Node(
+        package='savo_nav',
+        executable='control_recovery_guard_node',
+        name='control_recovery_guard_node',
+        output='screen',
+        parameters=[
+            PathJoinSubstitution(
+                [
+                    package_share,
+                    'config',
+                    'control_recovery_guard.yaml',
+                ]
+            )
+        ],
+    )
+
+    goal_admission_gate = Node(
+        package='savo_nav',
+        executable='goal_admission_gate_node',
+        name='goal_admission_gate_node',
+        output='screen',
+    )
+
     return LaunchDescription(
         [
             DeclareLaunchArgument(
@@ -337,6 +360,16 @@ def generate_launch_description():
                     '--log-level',
                     log_level,
                 ],
+                remappings=[
+                    (
+                        '/savo_nav/navigation/navigate_to_pose',
+                        '/savo_nav/_internal/navigation/navigate_to_pose',
+                    ),
+                    (
+                        '/savo_nav/exploration/navigate_to_pose',
+                        '/savo_nav/_internal/exploration/navigate_to_pose',
+                    ),
+                ],
             ),
             Node(
                 package='savo_nav',
@@ -352,5 +385,7 @@ def generate_launch_description():
                     log_level,
                 ],
             ),
+            control_recovery_guard,
+            goal_admission_gate,
         ]
     )

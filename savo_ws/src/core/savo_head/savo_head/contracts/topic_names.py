@@ -18,6 +18,15 @@ SCAN_STATE: Final[str] = "/savo_head/scan_state"
 
 STATUS: Final[str] = "/savo_head/status"
 DASHBOARD_TEXT: Final[str] = "/savo_head/dashboard_text"
+
+CONTROLLER_STATUS: Final[str] = (
+    "/savo_head/controller/status"
+)
+
+CONTROLLER_DASHBOARD_TEXT: Final[str] = (
+    "/savo_head/controller/dashboard_text"
+)
+
 DIAGNOSTICS: Final[str] = "/diagnostics"
 
 CAMERA_STREAM_CMD: Final[str] = "/savo_head/camera_stream_cmd"
@@ -57,6 +66,12 @@ class HeadTopicNames:
 
     status: str = STATUS
     dashboard_text: str = DASHBOARD_TEXT
+
+    controller_status: str = CONTROLLER_STATUS
+    controller_dashboard_text: str = (
+        CONTROLLER_DASHBOARD_TEXT
+    )
+
     diagnostics: str = DIAGNOSTICS
 
     camera_stream_cmd: str = CAMERA_STREAM_CMD
@@ -87,6 +102,8 @@ class HeadTopicNames:
             self.scan_state,
             self.status,
             self.dashboard_text,
+            self.controller_status,
+            self.controller_dashboard_text,
             self.camera_stream_cmd,
             self.camera_stream_state,
             self.camera_status,
@@ -129,6 +146,8 @@ __all__ = [
     "SCAN_STATE",
     "STATUS",
     "DASHBOARD_TEXT",
+    "CONTROLLER_STATUS",
+    "CONTROLLER_DASHBOARD_TEXT",
     "DIAGNOSTICS",
     "CAMERA_STREAM_CMD",
     "CAMERA_STREAM_STATE",

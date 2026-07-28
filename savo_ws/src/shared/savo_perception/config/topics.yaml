@@ -5,6 +5,13 @@ topics:
     cmd_vel_in: /cmd_vel
     cmd_vel_safe: /cmd_vel_safe
 
+  obstacle_cloud:
+    raw_points: /camera/camera/depth/color/points
+    filtered_points: /savo_perception/obstacles/points
+    health: /savo_perception/obstacle_cloud/health
+    status: /savo_perception/obstacle_cloud/status
+    heartbeat: /savo_perception/obstacle_cloud/heartbeat
+
   range:
     depth_front_m: /depth/min_front_m
     tof_left_m: /savo_perception/range/left_m
@@ -33,6 +40,23 @@ topics:
     busy: /savo_perception/diag/busy
 
 ownership:
+  raw_realsense_point_cloud:
+    producer: savo_realsense
+    host: savo-edge
+    consumer: savo_perception
+    message_type: sensor_msgs/msg/PointCloud2
+    topic: /camera/camera/depth/color/points
+
+  filtered_obstacle_cloud:
+    producer: savo_perception
+    host: savo-edge
+    consumer: savo_nav
+    consumer_host: savo-core
+    message_type: sensor_msgs/msg/PointCloud2
+    topic: /savo_perception/obstacles/points
+    semantics: obstacle_only
+    clearing_supported: false
+
   depth_front_m:
     producer: savo_realsense
     host: savo-edge

@@ -1,0 +1,46 @@
+# Copyright 2026 Ahnaf Tahmid
+# SPDX-License-Identifier: LicenseRef-Proprietary
+
+costmap_sensors:
+  integration_status: blocked_missing_filtered_realsense_producer
+
+  lidar:
+    topic: /scan
+    message_type: sensor_msgs/msg/LaserScan
+    required_for_navigation: true
+    global_costmap: true
+    local_costmap: true
+    marking: true
+    clearing: true
+    inf_is_valid: true
+    publisher_verified: true
+    publisher_source: savo_lidar/src/ros/scan_publisher.cpp
+    infinity_evidence: >-
+      savo_lidar/src/drivers/rplidar_driver.cpp converts invalid or
+      out-of-range measurements to positive infinity.
+
+  realsense:
+    filtered_topic: /savo_perception/obstacles/points
+    raw_topic: /camera/camera/depth/color/points
+    message_type: sensor_msgs/msg/PointCloud2
+    required_for_navigation: false
+    global_costmap: false
+    local_costmap: true
+    layer: voxel
+    marking: true
+    clearing: false
+    producer_verified: false
+    raw_topic_allowed_in_nav2: false
+    evidence: >-
+      Complete workspace inspection found no production PointCloud2 publisher
+      for the filtered topic. savo_realsense monitors the raw camera cloud and
+      savo_perception currently has no PointCloud2 producer. Free-space ray
+      geometry is therefore not proven, so clearing remains false and the
+      RealSense voxel layer must not be enabled.
+
+  ownership:
+    sensor_production: false
+    control_mode: false
+    recovery_execution: false
+    velocity: false
+    hardware: false

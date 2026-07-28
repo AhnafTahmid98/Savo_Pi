@@ -28,12 +28,12 @@ from savo_head.constants import (
 )
 from savo_head.contracts.frame_names import HEAD_PAN_JOINT, HEAD_TILT_JOINT
 from savo_head.contracts.topic_names import (
-    DASHBOARD_TEXT,
+    CONTROLLER_DASHBOARD_TEXT,
+    CONTROLLER_STATUS,
     DIAGNOSTICS,
     EMERGENCY_CENTER,
     PAN_TILT_CMD,
     PAN_TILT_STATE,
-    STATUS,
 )
 from savo_head.drivers.pantilt_driver import (
     BACKEND_DRYRUN,
@@ -157,9 +157,18 @@ class HeadControllerNode(Node):
 
         self.declare_parameter("pan_tilt_cmd_topic", PAN_TILT_CMD)
         self.declare_parameter("pan_tilt_state_topic", PAN_TILT_STATE)
-        self.declare_parameter("status_topic", STATUS)
-        self.declare_parameter("diagnostics_topic", DIAGNOSTICS)
-        self.declare_parameter("dashboard_text_topic", DASHBOARD_TEXT)
+        self.declare_parameter(
+            "status_topic",
+            CONTROLLER_STATUS,
+        )
+        self.declare_parameter(
+            "diagnostics_topic",
+            DIAGNOSTICS,
+        )
+        self.declare_parameter(
+            "dashboard_text_topic",
+            CONTROLLER_DASHBOARD_TEXT,
+        )
         self.declare_parameter("emergency_center_topic", EMERGENCY_CENTER)
         self.declare_parameter("center_service", "/savo_head/center")
         self.declare_parameter("health_check_service", "/savo_head/health_check")

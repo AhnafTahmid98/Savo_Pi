@@ -332,3 +332,45 @@ navigation and indicates that an existing goal should be canceled.
 The guard never publishes mode commands, recovery requests, velocity commands,
 lifecycle commands, or hardware commands. Supervisor and `savo_control`
 authority remain unchanged.
+
+## Phase 7B implementation
+
+Phase 7B places a fail-closed goal-admission gate in front of the Phase 6 goal
+gateway. The public navigation and exploration action names remain unchanged.
+The Phase 6 gateway is remapped behind hidden internal action names.
+
+A new goal is accepted only while the Phase 7A control/recovery permission is
+observed, fresh, and allowed. Unknown, stale, or blocked guard evidence rejects
+new goals. If permission is lost while a goal is active, the gate sends exactly
+one cancellation request to the internal gateway and waits for its terminal
+result. External cancellation is still forwarded and acknowledged normally.
+
+Guard-triggered interruption is reported to the public action client as an
+aborted goal with the deterministic guard reason. This avoids claiming a client
+cancellation that the client did not request. The gate does not publish control
+mode commands, recovery requests, velocity commands, or hardware commands.
+
+## Phase 7C fault and launch-chain validation
+
+Phase 7C validates the complete read-only chain from raw control and recovery
+evidence through the control/recovery guard and goal-admission gate to the
+hidden goal gateway. Runtime fixtures cover raw-control faults, guard process
+loss and restart, downstream gateway loss and restart, and stale evidence.
+Every fault remains fail-closed. This phase adds no control-mode, recovery,
+velocity, motion, or hardware authority to `savo_nav`.
+
+## Phase 8 costmap sensor integration
+
+Phase 8 is blocked pending a production filtered PointCloud2 publisher for
+`/savo_perception/obstacles/points`. The current global static-map plus LiDAR
+and local LiDAR baseline remains unchanged. The raw RealSense topic
+`/camera/camera/depth/color/points` is prohibited from Nav2.
+
+Workspace inspection found no filtered-cloud producer, so obstacle-only versus
+ray-preserving semantics cannot be proven and RealSense clearing is fixed to
+false in the blocked sensor contract. LiDAR remains a hard navigation
+dependency; RealSense remains optional/profile-dependent. `savo_nav` gains no
+sensor-production, control, recovery, velocity, motion, or hardware authority.
+Synthetic costmap marking validation is intentionally deferred until the real
+filtered producer exists and its frame, height, range, and ray semantics can be
+validated.
