@@ -157,7 +157,7 @@ TEST(CoverageGrid, ClassifiesFreeOccupiedAndUnknown)
     metadata(3, 1), {0, 50, -1},
     CoverageGridOptions{0, 65, false, 0.0});
   EXPECT_EQ(grid.cell({0, 0}), CoverageCell::Free);
-  EXPECT_EQ(grid.cell({1, 0}), CoverageCell::Occupied);
+  EXPECT_EQ(grid.cell({1, 0}), CoverageCell::Unknown);
   EXPECT_EQ(grid.cell({2, 0}), CoverageCell::Unknown);
 }
 

@@ -319,8 +319,10 @@ void CoverageGrid::build_cell_classification()
       cells_.push_back(CoverageCell::Unknown);
     } else if (value <= options_.free_threshold) {
       cells_.push_back(CoverageCell::Free);
-    } else {
+    } else if (value >= options_.occupied_threshold) {
       cells_.push_back(CoverageCell::Occupied);
+    } else {
+      cells_.push_back(CoverageCell::Unknown);
     }
   }
 }
@@ -332,8 +334,14 @@ void CoverageGrid::build_inflation_mask()
     return;
   }
 
-  const auto radius_cells = static_cast<std::int64_t>(
-    std::ceil(options_.inflation_radius_m / metadata_.resolution_m));
+  const double requested_radius_cells =
+    std::ceil(options_.inflation_radius_m / metadata_.resolution_m);
+  const auto maximum_relevant_radius =
+    std::max(metadata_.width, metadata_.height);
+  const auto radius_cells = requested_radius_cells >=
+    static_cast<double>(maximum_relevant_radius) ?
+    static_cast<std::int64_t>(maximum_relevant_radius) :
+    static_cast<std::int64_t>(requested_radius_cells);
   for (std::size_t occupied_linear = 0;
     occupied_linear < size(); ++occupied_linear)
   {

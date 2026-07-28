@@ -1,0 +1,23 @@
+savo_supervisor_node:
+  ros__parameters:
+    publish_rate_hz: 2.0
+    startup_grace_s: 3.0
+
+    state_summary_topic: /savo_supervisor/state_summary
+    heartbeat_topic: /savo_supervisor/heartbeat
+    health_topic: /savo_supervisor/health
+    events_topic: /savo_supervisor/events
+
+    localization:
+      enabled: true
+      required: true
+
+      health_topic: /savo_localization/health
+      summary_topic: /savo_localization/state_summary
+      heartbeat_topic: /savo_localization/heartbeat
+
+      health_timeout_s: 1.5
+      summary_timeout_s: 1.5
+      heartbeat_timeout_s: 2.5
+
+      expected_schema_version: 1

@@ -1,0 +1,13 @@
+coverage_mapper_node:
+  ros__parameters:
+    # Loading the real-robot profile never authorizes automatic planning.
+    auto_plan: false
+    plan_once: true
+    allow_unknown: false
+
+    # Initial guarded value derived from the existing provisional 0.22 m
+    # Nav2 radius plus 0.02 m footprint padding. Final inflation, lane
+    # spacing, timing, and freshness values require Pi and floor validation.
+    inflation_radius_m: 0.24
+    map_stale_timeout_sec: 2.0
+    tf_stale_timeout_sec: 0.5

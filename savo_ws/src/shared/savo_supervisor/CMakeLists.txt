@@ -1,0 +1,152 @@
+cmake_minimum_required(VERSION 3.8)
+project(savo_supervisor VERSION 0.1.0 LANGUAGES CXX)
+
+# -----------------------------------------------------------------------------
+# Compiler defaults (C++)
+# -----------------------------------------------------------------------------
+if(CMAKE_CXX_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# -----------------------------------------------------------------------------
+# Dependencies
+# -----------------------------------------------------------------------------
+find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(diagnostic_msgs REQUIRED)
+find_package(builtin_interfaces REQUIRED)
+
+# -----------------------------------------------------------------------------
+# Library targets
+# -----------------------------------------------------------------------------
+add_library(savo_supervisor_core
+  src/freshness_tracker.cpp
+  src/supervisor_policy.cpp
+)
+
+target_include_directories(savo_supervisor_core
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+
+target_compile_features(savo_supervisor_core
+  PUBLIC
+    cxx_std_17
+)
+
+ament_target_dependencies(savo_supervisor_core
+  rclcpp
+  builtin_interfaces
+)
+
+# -----------------------------------------------------------------------------
+# Node target
+# -----------------------------------------------------------------------------
+add_executable(supervisor_node
+  src/supervisor_node.cpp
+)
+
+target_compile_features(supervisor_node
+  PRIVATE
+    cxx_std_17
+)
+
+target_link_libraries(supervisor_node
+  savo_supervisor_core
+)
+
+ament_target_dependencies(supervisor_node
+  rclcpp
+  std_msgs
+  diagnostic_msgs
+  builtin_interfaces
+)
+
+# -----------------------------------------------------------------------------
+# Install
+# -----------------------------------------------------------------------------
+install(TARGETS supervisor_node
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
+)
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/include")
+  install(DIRECTORY include/
+    DESTINATION include
+  )
+endif()
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/config")
+  install(DIRECTORY config/
+    DESTINATION share/${PROJECT_NAME}/config
+  )
+endif()
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/launch")
+  install(DIRECTORY launch/
+    DESTINATION share/${PROJECT_NAME}/launch
+  )
+endif()
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resource")
+  install(DIRECTORY resource/
+    DESTINATION share/${PROJECT_NAME}/resource
+  )
+endif()
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
+  install(FILES README.md
+    DESTINATION share/${PROJECT_NAME}
+  )
+endif()
+
+install(FILES package.xml
+  DESTINATION share/${PROJECT_NAME}
+)
+
+# -----------------------------------------------------------------------------
+# Testing
+# -----------------------------------------------------------------------------
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+
+  ament_add_gtest(test_freshness_tracker
+    test/test_freshness_tracker.cpp
+  )
+  target_link_libraries(test_freshness_tracker
+    savo_supervisor_core
+  )
+  ament_target_dependencies(test_freshness_tracker
+    rclcpp
+    builtin_interfaces
+  )
+
+  ament_add_gtest(test_supervisor_policy
+    test/test_supervisor_policy.cpp
+  )
+  target_link_libraries(test_supervisor_policy
+    savo_supervisor_core
+  )
+  ament_target_dependencies(test_supervisor_policy
+    rclcpp
+    builtin_interfaces
+  )
+
+  ament_add_gtest(test_supervisor_contract
+    test/test_supervisor_contract.cpp
+  )
+  target_link_libraries(test_supervisor_contract
+    savo_supervisor_core
+  )
+  ament_target_dependencies(test_supervisor_contract
+    rclcpp
+    builtin_interfaces
+  )
+endif()
+
+ament_package()

@@ -1,0 +1,33 @@
+coverage_mapper_node:
+  ros__parameters:
+    enabled: true
+
+    # Loading this file only enables the planning node. It does not authorize
+    # navigation or movement, and automatic planning remains opt-in.
+    auto_plan: false
+    plan_once: true
+    replan_on_map_update: false
+
+    map_topic: "/map"
+    map_frame: "map"
+    base_frame: "base_link"
+
+    path_topic: "/savo_mapping/coverage/path"
+    status_topic: "/savo_mapping/coverage/status"
+    state_topic: "/savo_mapping/coverage/state"
+
+    tick_period_sec: 0.10
+    map_stale_timeout_sec: 5.0
+    tf_lookup_timeout_sec: 0.20
+    tf_stale_timeout_sec: 1.0
+
+    free_threshold: 0
+    occupied_threshold: 65
+    allow_unknown: false
+    inflation_radius_m: 0.0
+    connectivity: "four"
+
+    sweep_axis: "automatic"
+    track_spacing_m: 0.5
+    minimum_segment_length_m: 0.0
+    maximum_waypoints: 10000

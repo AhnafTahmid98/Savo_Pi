@@ -206,6 +206,7 @@ install(
 )
 
 set(_savo_mapping_public_headers
+  include/savo_mapping/tf_pose_reader.hpp
   include/savo_mapping/scan360_rotate_action_binding.hpp
   include/savo_mapping/scan360_rotate_action_client.hpp
   include/savo_mapping/exploration_goal_handoff.hpp
@@ -557,6 +558,73 @@ install(
   DESTINATION lib/${PROJECT_NAME}
 )
 
+add_library(${PROJECT_NAME}_tf_pose_reader
+  src/ros/tf_pose_reader.cpp
+)
+
+target_include_directories(
+  ${PROJECT_NAME}_tf_pose_reader
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+
+target_compile_features(
+  ${PROJECT_NAME}_tf_pose_reader
+  PUBLIC
+    cxx_std_17
+)
+
+ament_target_dependencies(
+  ${PROJECT_NAME}_tf_pose_reader
+  geometry_msgs
+  rclcpp
+  tf2
+  tf2_ros
+)
+
+install(
+  TARGETS
+    ${PROJECT_NAME}_tf_pose_reader
+  EXPORT ${PROJECT_NAME}_tf_pose_reader_targets
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+  INCLUDES DESTINATION include
+)
+
+add_executable(
+  coverage_mapper_node
+  src/nodes/coverage_mapper_node.cpp
+)
+
+target_compile_features(
+  coverage_mapper_node
+  PRIVATE
+    cxx_std_17
+)
+
+target_link_libraries(
+  coverage_mapper_node
+  ${PROJECT_NAME}_core
+  ${PROJECT_NAME}_tf_pose_reader
+)
+
+ament_target_dependencies(
+  coverage_mapper_node
+  geometry_msgs
+  nav_msgs
+  rclcpp
+  std_msgs
+  tf2_ros
+)
+
+install(
+  TARGETS
+    coverage_mapper_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 add_library(savo_mapping_scan360_rotate_action_client
   src/ros/scan360_rotate_action_client.cpp
 )
@@ -656,6 +724,26 @@ if(BUILD_TESTING)
   find_package(ament_cmake_pytest REQUIRED)
   find_package(ament_lint_auto REQUIRED)
 
+  set(
+    _savo_mapping_tf_pose_reader_ros_log_dir
+    "${CMAKE_CURRENT_BINARY_DIR}/tf_pose_reader_ros_logs"
+  )
+
+  file(
+    MAKE_DIRECTORY
+    "${_savo_mapping_tf_pose_reader_ros_log_dir}"
+  )
+
+  set(
+    _savo_mapping_coverage_mapper_ros_log_dir
+    "${CMAKE_CURRENT_BINARY_DIR}/coverage_mapper_ros_logs"
+  )
+
+  file(
+    MAKE_DIRECTORY
+    "${_savo_mapping_coverage_mapper_ros_log_dir}"
+  )
+
   # Zero-byte files are deferred phase scaffolds, not implemented code.
   # As soon as a scaffold gains content, it automatically enters linting.
   file(GLOB_RECURSE _savo_mapping_lint_candidates
@@ -705,6 +793,7 @@ if(BUILD_TESTING)
     EXCLUDE
       "${CMAKE_CURRENT_SOURCE_DIR}/test/test_scan360_rotate_action_binding.cpp"
       "${CMAKE_CURRENT_SOURCE_DIR}/test/test_scan360_rotate_action_client_runtime.cpp"
+      "${CMAKE_CURRENT_SOURCE_DIR}/test/test_tf_pose_reader.cpp"
     LANGUAGE c++
     INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/include"
   )
@@ -740,6 +829,44 @@ if(BUILD_TESTING)
   ament_add_pytest_test(
     test_scan360_rotate_action_client_contract
     test/test_scan360_rotate_action_client_contract.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
+    test_tf_pose_reader_runtime
+    test/test_tf_pose_reader_runtime.py
+    TIMEOUT 45
+  )
+
+  set_tests_properties(
+    test_tf_pose_reader_runtime
+    PROPERTIES
+      ENVIRONMENT
+        "PYTHONDONTWRITEBYTECODE=1;ROS_LOCALHOST_ONLY=1;ROS_DOMAIN_ID=220;ROS_LOG_DIR=${_savo_mapping_tf_pose_reader_ros_log_dir};TF_POSE_READER_FIXTURE_EXECUTABLE=${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}/tf_pose_reader_fixture"
+  )
+
+  ament_add_pytest_test(
+    test_tf_pose_reader_contract
+    test/test_tf_pose_reader_contract.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
+    test_coverage_mapper_node_runtime
+    test/test_coverage_mapper_node_runtime.py
+    TIMEOUT 240
+  )
+
+  set_tests_properties(
+    test_coverage_mapper_node_runtime
+    PROPERTIES
+      ENVIRONMENT
+        "PYTHONDONTWRITEBYTECODE=1;ROS_LOCALHOST_ONLY=1;ROS_DOMAIN_ID=221;ROS_LOG_DIR=${_savo_mapping_coverage_mapper_ros_log_dir};COVERAGE_MAPPER_EXECUTABLE=${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}/coverage_mapper_node"
+  )
+
+  ament_add_pytest_test(
+    test_coverage_mapper_node_contract
+    test/test_coverage_mapper_node_contract.py
     TIMEOUT 60
   )
 
@@ -794,6 +921,69 @@ if(BUILD_TESTING)
   )
 
   find_package(ament_cmake_gtest REQUIRED)
+
+  ament_add_gtest(
+    test_tf_pose_reader
+    test/test_tf_pose_reader.cpp
+  )
+
+  if(TARGET test_tf_pose_reader)
+    target_link_libraries(
+      test_tf_pose_reader
+      ${PROJECT_NAME}_tf_pose_reader
+    )
+
+    ament_target_dependencies(
+      test_tf_pose_reader
+      geometry_msgs
+      rclcpp
+      tf2
+      tf2_ros
+    )
+
+    set_tests_properties(
+      test_tf_pose_reader
+      PROPERTIES
+        ENVIRONMENT
+          "ROS_LOCALHOST_ONLY=1;ROS_DOMAIN_ID=220;ROS_LOG_DIR=${_savo_mapping_tf_pose_reader_ros_log_dir}"
+    )
+  endif()
+
+  add_executable(
+    tf_pose_reader_fixture
+    test/test_tf_pose_reader.cpp
+  )
+
+  target_compile_definitions(
+    tf_pose_reader_fixture
+    PRIVATE
+      SAVO_MAPPING_TF_POSE_READER_RUNTIME_FIXTURE=1
+  )
+
+  target_compile_features(
+    tf_pose_reader_fixture
+    PRIVATE
+      cxx_std_17
+  )
+
+  target_link_libraries(
+    tf_pose_reader_fixture
+    ${PROJECT_NAME}_tf_pose_reader
+  )
+
+  ament_target_dependencies(
+    tf_pose_reader_fixture
+    geometry_msgs
+    rclcpp
+    tf2
+    tf2_ros
+  )
+
+  install(
+    TARGETS
+      tf_pose_reader_fixture
+    DESTINATION lib/${PROJECT_NAME}
+  )
 
   ament_add_gtest(
     test_scan360_rotate_action_client_runtime
@@ -1164,6 +1354,10 @@ if(BUILD_TESTING)
 endif()
 
 ament_export_targets(${PROJECT_NAME}_core_targets HAS_LIBRARY_TARGET)
+ament_export_targets(
+  ${PROJECT_NAME}_tf_pose_reader_targets
+  HAS_LIBRARY_TARGET
+)
 ament_export_include_directories(include)
 ament_export_dependencies(
   rclcpp

@@ -17,7 +17,6 @@ CORE_FILES = (
     Path('test/test_coverage_planner.cpp'),
 )
 DEFERRED_ASSETS = (
-    Path('src/nodes/coverage_mapper_node.cpp'),
     Path('config/coverage_mapping.yaml'),
     Path('config/profiles/coverage_mapping_real_robot.yaml'),
     Path('launch/coverage_mapping.launch.xml'),
