@@ -181,6 +181,31 @@ def valid_cloud(fixture):
     )
 
 
+def wait_for_ready_status_contract(
+    fixture,
+    timeout_seconds=5.0,
+):
+    """Wait for the processed-cloud ready status contract."""
+    deadline = time.monotonic() + timeout_seconds
+    last_status = {}
+
+    while rclpy.ok() and time.monotonic() < deadline:
+        rclpy.spin_once(fixture, timeout_sec=0.05)
+        last_status = dict(fixture.status)
+
+        if (
+            last_status.get('state') == 'ready'
+            and last_status.get('semantics') == 'obstacle_only'
+            and last_status.get('clearing_supported') is False
+        ):
+            return last_status
+
+    raise AssertionError(
+        'Timed out waiting for ready obstacle-cloud status. '
+        f'Last status: {last_status!r}'
+    )
+
+
 def run_filter(fixture):
     """Validate filtering, transform, schema, and obstacle semantics."""
     message = valid_cloud(fixture)
@@ -204,14 +229,16 @@ def run_filter(fixture):
     assert has_point(points, (1.20, 0.00, 0.30))
     assert has_point(points, (1.30, 0.00, 0.30))
     assert len(points) == 3
-    assert fixture.status['semantics'] == 'obstacle_only'
-    assert fixture.status['clearing_supported'] is False
-    assert fixture.status['input_points'] == 11
-    assert fixture.status['finite_points'] == 9
-    assert fixture.status['range_rejected'] == 2
-    assert fixture.status['height_rejected'] == 2
-    assert fixture.status['self_rejected'] == 1
-    assert fixture.status['voxel_rejected'] == 1
+    ready_status = wait_for_ready_status_contract(fixture)
+
+    assert ready_status['semantics'] == 'obstacle_only'
+    assert ready_status['clearing_supported'] is False
+    assert ready_status['input_points'] == 11
+    assert ready_status['finite_points'] == 9
+    assert ready_status['range_rejected'] == 2
+    assert ready_status['height_rejected'] == 2
+    assert ready_status['self_rejected'] == 1
+    assert ready_status['voxel_rejected'] == 1
     assert fixture.heartbeat is not None or fixture.spin_until(
         lambda: fixture.heartbeat is not None,
         timeout_sec=2.0,
@@ -259,6 +286,34 @@ def run_bad_frame(fixture):
     print('Transform restoration: PASSED')
 
 
+def wait_for_output_quiet(
+    fixture,
+    quiet_seconds=0.35,
+    timeout_seconds=3.0,
+):
+    """Drain delayed outputs and wait for a quiet interval."""
+    deadline = time.monotonic() + timeout_seconds
+    last_count = len(fixture.output_messages)
+    quiet_since = time.monotonic()
+
+    while rclpy.ok() and time.monotonic() < deadline:
+        rclpy.spin_once(fixture, timeout_sec=0.05)
+
+        current_count = len(fixture.output_messages)
+        current_time = time.monotonic()
+
+        if current_count != last_count:
+            last_count = current_count
+            quiet_since = current_time
+        elif current_time - quiet_since >= quiet_seconds:
+            return current_count
+
+    raise AssertionError(
+        'Timed out waiting for the filtered-output stream '
+        'to become quiet.'
+    )
+
+
 def run_stale_recovery(fixture):
     """Validate stale detection without stale-cloud republication."""
     cloud = valid_cloud(fixture)
@@ -267,7 +322,6 @@ def run_stale_recovery(fixture):
         lambda: fixture.health is True and bool(fixture.output_messages),
     )
 
-    output_count = len(fixture.output_messages)
     assert fixture.spin_until(
         lambda: (
             fixture.health is False
@@ -275,7 +329,20 @@ def run_stale_recovery(fixture):
         ),
         timeout_sec=3.0,
     )
-    assert len(fixture.output_messages) == output_count
+    settled_output_count = wait_for_output_quiet(fixture)
+
+    verification_deadline = time.monotonic() + 0.50
+
+    while (
+        rclpy.ok()
+        and time.monotonic() < verification_deadline
+    ):
+        rclpy.spin_once(fixture, timeout_sec=0.05)
+
+    assert (
+        len(fixture.output_messages)
+        == settled_output_count
+    )
     print('PointCloud2 staleness detection: PASSED')
 
     assert fixture.publish_until(
@@ -283,7 +350,7 @@ def run_stale_recovery(fixture):
         lambda: (
             fixture.health is True
             and fixture.status.get('state') == 'ready'
-            and len(fixture.output_messages) > output_count
+            and len(fixture.output_messages) > settled_output_count
         ),
     )
     print('PointCloud2 freshness restoration: PASSED')

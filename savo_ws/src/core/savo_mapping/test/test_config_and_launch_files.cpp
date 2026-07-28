@@ -65,7 +65,9 @@ TEST(ConfigContracts, RequiredConfigFilesExistAndAreNotEmpty)
     "qos.yaml",
     "mapping_common.yaml",
     "map_session.yaml",
-    "map_quality.yaml"
+    "map_quality.yaml",
+    "scan360_mapping.yaml",
+    "profiles/scan360_real_robot.yaml"
   };
 
   for (const auto & filename : filenames) {
@@ -226,7 +228,9 @@ TEST(ConfigContracts, FilesParseWithRosParameterParser)
     "qos.yaml",
     "mapping_common.yaml",
     "map_session.yaml",
-    "map_quality.yaml"
+    "map_quality.yaml",
+    "scan360_mapping.yaml",
+    "profiles/scan360_real_robot.yaml"
   };
 
   for (const auto & filename : filenames) {

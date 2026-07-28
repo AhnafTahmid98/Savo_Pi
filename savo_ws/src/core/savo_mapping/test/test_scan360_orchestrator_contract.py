@@ -61,15 +61,6 @@ IMMUTABLE_HASHES = {
 }
 
 
-RUNTIME_SCAFFOLDS = (
-    'src/nodes/scan360_mapper_node.cpp',
-    'config/scan360_mapping.yaml',
-    'config/profiles/scan360_real_robot.yaml',
-    'launch/scan360_mapping.launch.xml',
-    'rviz/scan360_mapping.rviz',
-)
-
-
 def read(path: Path) -> str:
     return path.read_text(encoding='utf-8')
 
@@ -108,17 +99,6 @@ def test_b3b_immutable_files_retain_locked_hashes() -> None:
         assert actual_hash == expected_hash, (
             f'{path}: immutable hash changed; '
             f'expected {expected_hash}, got {actual_hash}'
-        )
-
-
-def test_runtime_scaffolds_remain_exactly_zero_byte() -> None:
-    for relative_path in RUNTIME_SCAFFOLDS:
-        path = ROOT / relative_path
-        assert path.is_file(), (
-            f'{path}: runtime scaffold is missing'
-        )
-        assert path.stat().st_size == 0, (
-            f'{path}: runtime scaffold must remain zero-byte'
         )
 
 

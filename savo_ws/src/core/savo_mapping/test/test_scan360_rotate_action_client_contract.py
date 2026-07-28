@@ -313,30 +313,6 @@ def test_contract_test_is_registered() -> None:
     assert 'TIMEOUT 60' in cmake
 
 
-def test_zero_byte_runtime_scaffolds_remain_untouched() -> None:
-    paths = (
-        ROOT /
-        'src/nodes/scan360_mapper_node.cpp',
-
-        ROOT /
-        'config/scan360_mapping.yaml',
-
-        ROOT /
-        'config/profiles/'
-        'scan360_real_robot.yaml',
-
-        ROOT /
-        'launch/scan360_mapping.launch.xml',
-
-        ROOT /
-        'rviz/scan360_mapping.rviz',
-    )
-
-    for path in paths:
-        assert path.is_file()
-        assert path.stat().st_size == 0
-
-
 def test_runtime_fixture_is_registered() -> None:
     cmake = read(CMAKE)
 

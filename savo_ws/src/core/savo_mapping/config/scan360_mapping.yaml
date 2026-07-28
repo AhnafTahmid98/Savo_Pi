@@ -1,0 +1,31 @@
+scan360_mapper_node:
+  ros__parameters:
+    enabled: true
+
+    # Loading this file never authorizes motion. An operator or owning
+    # bringup must explicitly opt in after the robot is ready.
+    auto_start: false
+
+    # Rotation execution remains exclusively owned by savo_control.
+    action_name: "/savo_control/rotate_to_heading"
+
+    # Fused yaw is owned by savo_localization.
+    odom_topic: "/odometry/filtered"
+    odom_frame: "odom"
+    yaw_stale_timeout_sec: 1.0
+
+    status_topic: "/savo_mapping/scan360/status"
+    state_topic: "/savo_mapping/scan360/state"
+
+    sweep_angle_rad: 6.283185307179586
+    step_angle_rad: 0.5235987755982988
+    direction: "counter_clockwise"
+    settle_duration_sec: 0.5
+    rotation_max_duration_sec: 20.0
+    tick_period_sec: 0.05
+
+    server_wait_timeout_sec: 1.0
+    goal_response_timeout_sec: 1.5
+    feedback_stale_timeout_sec: 3.0
+    cancel_timeout_sec: 2.0
+    execution_grace_timeout_sec: 1.0

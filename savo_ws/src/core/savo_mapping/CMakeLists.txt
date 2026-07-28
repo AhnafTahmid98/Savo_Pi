@@ -53,6 +53,8 @@ add_library(${PROJECT_NAME}_core
   src/workflow/manual_workflow_state.cpp
   src/workflow/workflow_authority.cpp
   src/workflow/exploration_runtime.cpp
+  src/coverage/coverage_grid.cpp
+  src/coverage/coverage_planner.cpp
   src/scan360/scan360_planner.cpp
   src/scan360/scan360_controller.cpp
   src/scan360/scan360_orchestrator.cpp
@@ -204,6 +206,7 @@ install(
 )
 
 set(_savo_mapping_public_headers
+  include/savo_mapping/scan360_rotate_action_binding.hpp
   include/savo_mapping/scan360_rotate_action_client.hpp
   include/savo_mapping/exploration_goal_handoff.hpp
   include/savo_mapping/exploration_mode.hpp
@@ -214,6 +217,8 @@ set(_savo_mapping_public_headers
   include/savo_mapping/manual_workflow_state.hpp
   include/savo_mapping/workflow_authority.hpp
   include/savo_mapping/exploration_runtime.hpp
+  include/savo_mapping/coverage_grid.hpp
+  include/savo_mapping/coverage_planner.hpp
   include/savo_mapping/scan360_planner.hpp
   include/savo_mapping/scan360_controller.hpp
   include/savo_mapping/scan360_orchestrator.hpp
@@ -256,6 +261,7 @@ set(_savo_mapping_production_config
   config/mapping_common.yaml
   config/mapping_mode_manager.yaml
   config/qos.yaml
+  config/scan360_mapping.yaml
   config/slam_lifecycle_health.yaml
   config/slam_toolbox_mapping.yaml
   config/topics.yaml
@@ -269,6 +275,7 @@ install(
 set(_savo_mapping_production_profiles
   config/profiles/manual_mapping.yaml
   config/profiles/monitor_only.yaml
+  config/profiles/scan360_real_robot.yaml
 )
 
 install(
@@ -285,11 +292,17 @@ set(_savo_mapping_production_launch
   launch/map_quality_evaluator.launch.xml
   launch/map_session_manager.launch.xml
   launch/monitor_only.launch.xml
+  launch/scan360_mapping.launch.xml
 )
 
 install(
   FILES ${_savo_mapping_production_launch}
   DESTINATION share/${PROJECT_NAME}/launch
+)
+
+install(
+  FILES rviz/scan360_mapping.rviz
+  DESTINATION share/${PROJECT_NAME}/rviz
 )
 
 if(SAVO_MAPPING_BUILD_PC_SIMULATION)
@@ -576,6 +589,69 @@ install(
   RUNTIME DESTINATION bin
 )
 
+add_library(savo_mapping_scan360_rotate_action_binding
+  src/ros/scan360_rotate_action_binding.cpp
+)
+
+target_include_directories(
+  savo_mapping_scan360_rotate_action_binding
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+
+target_compile_features(
+  savo_mapping_scan360_rotate_action_binding
+  PUBLIC
+    cxx_std_17
+)
+
+target_link_libraries(
+  savo_mapping_scan360_rotate_action_binding
+  PUBLIC
+    ${PROJECT_NAME}_core
+    savo_mapping_scan360_rotate_action_client
+)
+
+install(
+  TARGETS
+    savo_mapping_scan360_rotate_action_binding
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
+
+add_executable(
+  scan360_mapper_node
+  src/nodes/scan360_mapper_node.cpp
+)
+
+target_compile_features(
+  scan360_mapper_node
+  PRIVATE
+    cxx_std_17
+)
+
+target_link_libraries(
+  scan360_mapper_node
+  ${PROJECT_NAME}_core
+  savo_mapping_scan360_rotate_action_client
+  savo_mapping_scan360_rotate_action_binding
+)
+
+ament_target_dependencies(
+  scan360_mapper_node
+  nav_msgs
+  rclcpp
+  std_msgs
+)
+
+install(
+  TARGETS
+    scan360_mapper_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 if(BUILD_TESTING)
   find_package(ament_cmake_pytest REQUIRED)
   find_package(ament_lint_auto REQUIRED)
@@ -627,6 +703,7 @@ if(BUILD_TESTING)
   ament_cppcheck(
     ${_savo_mapping_active_cpp_files}
     EXCLUDE
+      "${CMAKE_CURRENT_SOURCE_DIR}/test/test_scan360_rotate_action_binding.cpp"
       "${CMAKE_CURRENT_SOURCE_DIR}/test/test_scan360_rotate_action_client_runtime.cpp"
     LANGUAGE c++
     INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/include"
@@ -656,6 +733,7 @@ if(BUILD_TESTING)
     launch/map_quality_evaluator.launch.xml
     launch/map_session_manager.launch.xml
     launch/monitor_only.launch.xml
+    launch/scan360_mapping.launch.xml
     launch/simulated_manual_mapping.launch.xml
   )
 
@@ -669,6 +747,50 @@ if(BUILD_TESTING)
     test_scan360_orchestrator_contract
     test/test_scan360_orchestrator_contract.py
     TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
+    test_scan360_rotate_action_binding_contract
+    test/test_scan360_rotate_action_binding_contract.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
+    test_scan360_mapper_node_runtime
+    test/test_scan360_mapper_node_runtime.py
+    TIMEOUT 180
+  )
+
+  set_tests_properties(
+    test_scan360_mapper_node_runtime
+    PROPERTIES
+      ENVIRONMENT
+        "PYTHONDONTWRITEBYTECODE=1;ROS_LOCALHOST_ONLY=1;ROS_DOMAIN_ID=217"
+  )
+
+  ament_add_pytest_test(
+    test_scan360_mapper_node_contract
+    test/test_scan360_mapper_node_contract.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
+    test_scan360_deployment_assets_contract
+    test/test_scan360_deployment_assets_contract.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
+    test_scan360_launch_runtime
+    test/test_scan360_launch_runtime.py
+    TIMEOUT 120
+  )
+
+  set_tests_properties(
+    test_scan360_launch_runtime
+    PROPERTIES
+      ENVIRONMENT
+        "PYTHONDONTWRITEBYTECODE=1;ROS_LOCALHOST_ONLY=1;ROS_DOMAIN_ID=218"
   )
 
   find_package(ament_cmake_gtest REQUIRED)
@@ -693,6 +815,31 @@ if(BUILD_TESTING)
 
     set_tests_properties(
       test_scan360_rotate_action_client_runtime
+      PROPERTIES
+        TIMEOUT 60
+    )
+  endif()
+
+  ament_add_gtest(
+    test_scan360_rotate_action_binding
+    test/test_scan360_rotate_action_binding.cpp
+  )
+
+  if(TARGET test_scan360_rotate_action_binding)
+    target_link_libraries(
+      test_scan360_rotate_action_binding
+      savo_mapping_scan360_rotate_action_binding
+    )
+
+    ament_target_dependencies(
+      test_scan360_rotate_action_binding
+      rclcpp
+      rclcpp_action
+      savo_msgs
+    )
+
+    set_tests_properties(
+      test_scan360_rotate_action_binding
       PROPERTIES
         TIMEOUT 60
     )
@@ -880,6 +1027,30 @@ if(BUILD_TESTING)
   target_link_libraries(
     test_exploration_runtime
     ${PROJECT_NAME}_core
+  )
+
+  ament_add_gtest(test_coverage_grid
+    test/test_coverage_grid.cpp
+  )
+
+  target_link_libraries(
+    test_coverage_grid
+    ${PROJECT_NAME}_core
+  )
+
+  ament_add_gtest(test_coverage_planner
+    test/test_coverage_planner.cpp
+  )
+
+  target_link_libraries(
+    test_coverage_planner
+    ${PROJECT_NAME}_core
+  )
+
+  ament_add_pytest_test(
+    test_coverage_core_contract
+    test/test_coverage_core_contract.py
+    TIMEOUT 30
   )
 
   ament_add_gtest(test_scan360_planner

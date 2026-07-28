@@ -33,6 +33,7 @@ add_library(${PROJECT_NAME}_core STATIC
   src/health_evaluator.cpp
   src/observation_config.cpp
   src/snapshot_writer.cpp
+  src/stop_command_adapter.cpp
   src/topic_observation.cpp
   src/version.cpp
 )
@@ -150,6 +151,29 @@ if(BUILD_TESTING)
     )
   endif()
 
+  ament_add_gtest(test_savo_bridge_stop_command_adapter
+    test/unit/test_stop_command_adapter.cpp
+  )
+
+  if(TARGET test_savo_bridge_stop_command_adapter)
+    target_include_directories(
+      test_savo_bridge_stop_command_adapter
+      PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/test
+    )
+
+    target_compile_definitions(
+      test_savo_bridge_stop_command_adapter
+      PRIVATE
+        SAVO_BRIDGE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+    )
+
+    target_link_libraries(
+      test_savo_bridge_stop_command_adapter
+      ${PROJECT_NAME}_core
+    )
+  endif()
+
   ament_add_gtest(test_savo_bridge_command_server
     test/unit/test_command_server.cpp
   )
@@ -188,6 +212,25 @@ if(BUILD_TESTING)
   )
 
   target_link_libraries(savo_bridge_command_server_fixture
+    ${PROJECT_NAME}_core
+  )
+
+  add_executable(savo_bridge_stop_adapter_fixture
+    test/fixture/stop_command_adapter_fixture.cpp
+  )
+
+  target_compile_features(savo_bridge_stop_adapter_fixture
+    PRIVATE
+      cxx_std_17
+  )
+
+  target_include_directories(
+    savo_bridge_stop_adapter_fixture
+    PRIVATE
+      ${CMAKE_CURRENT_SOURCE_DIR}/test
+  )
+
+  target_link_libraries(savo_bridge_stop_adapter_fixture
     ${PROJECT_NAME}_core
   )
 

@@ -212,3 +212,5 @@ tuning before production activation.
 
 This producer adds no control, recovery, velocity, safety-stop, or hardware
 authority. The raw RealSense cloud is not consumed directly by Nav2.
+
+Phase 8A1-A4 uses PC-side synthetic validation; real D435 hardware validation remains pending.
