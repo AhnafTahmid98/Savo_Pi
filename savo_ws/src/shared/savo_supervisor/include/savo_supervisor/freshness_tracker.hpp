@@ -1,3 +1,6 @@
+// Copyright 2026 Ahnaf Tahmid
+// SPDX-License-Identifier: LicenseRef-Proprietary
+
 #pragma once
 
 #include <cstddef>

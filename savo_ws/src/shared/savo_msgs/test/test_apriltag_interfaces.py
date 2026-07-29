@@ -66,7 +66,7 @@ def test_confirmation_action_locks_two_duties() -> None:
         "int32 expected_tag_id",
         "string location_id",
         "string map_id",
-        "uint32 map_version",
+        "uint32 map_revision",
         "builtin_interfaces/Duration timeout",
         "bool require_map_pose",
     }
@@ -135,7 +135,7 @@ def test_package_metadata() -> None:
     root = ET.parse(ROOT / "package.xml").getroot()
 
     assert root.findtext("name") == "savo_msgs"
-    assert root.findtext("version") == "0.2.0"
+    assert root.findtext("version") == "0.3.0"
     assert root.findtext("member_of_group") == "rosidl_interface_packages"
 
     dependencies = {

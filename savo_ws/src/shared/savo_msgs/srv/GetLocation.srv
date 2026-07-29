@@ -1,0 +1,15 @@
+string location_id
+bool include_disabled
+bool include_retired
+---
+uint8 RESULT_FOUND=0
+uint8 RESULT_INVALID_ID=1
+uint8 RESULT_NOT_FOUND=2
+uint8 RESULT_DISABLED=3
+uint8 RESULT_RETIRED=4
+uint8 RESULT_INTERNAL_ERROR=5
+
+bool found
+uint8 result_code
+string reason
+savo_msgs/LocationRecord location

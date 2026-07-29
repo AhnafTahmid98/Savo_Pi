@@ -66,7 +66,9 @@ TEST(ConfigContracts, RequiredConfigFilesExistAndAreNotEmpty)
     "mapping_common.yaml",
     "map_session.yaml",
     "map_quality.yaml",
+    "coverage_mapping.yaml",
     "scan360_mapping.yaml",
+    "profiles/coverage_mapping_real_robot.yaml",
     "profiles/scan360_real_robot.yaml"
   };
 
@@ -220,6 +222,30 @@ TEST(ConfigContracts, QualityConfigContainsNavigationGate)
   expect_contains(content, "require_complete_session: true");
 }
 
+TEST(ConfigContracts, CoverageConfigDefaultsToReadOnlySafePlanning)
+{
+  const auto content =
+    read_text_file(config_root / "coverage_mapping.yaml");
+
+  expect_contains(content, "coverage_mapper_node:");
+  expect_contains(content, "auto_plan: false");
+  expect_contains(content, "plan_once: true");
+  expect_contains(content, "replan_on_map_update: false");
+  expect_contains(content, "map_topic: \"/map\"");
+  expect_contains(content, "map_frame: \"map\"");
+  expect_contains(content, "base_frame: \"base_link\"");
+  expect_contains(
+    content,
+    "path_topic: \"/savo_mapping/coverage/path\"");
+  expect_contains(content, "allow_unknown: false");
+
+  const auto profile = read_text_file(
+    config_root / "profiles/coverage_mapping_real_robot.yaml");
+  expect_contains(profile, "auto_plan: false");
+  expect_contains(profile, "allow_unknown: false");
+  expect_contains(profile, "inflation_radius_m: 0.24");
+}
+
 TEST(ConfigContracts, FilesParseWithRosParameterParser)
 {
   const std::vector<std::string> filenames{
@@ -229,7 +255,9 @@ TEST(ConfigContracts, FilesParseWithRosParameterParser)
     "mapping_common.yaml",
     "map_session.yaml",
     "map_quality.yaml",
+    "coverage_mapping.yaml",
     "scan360_mapping.yaml",
+    "profiles/coverage_mapping_real_robot.yaml",
     "profiles/scan360_real_robot.yaml"
   };
 

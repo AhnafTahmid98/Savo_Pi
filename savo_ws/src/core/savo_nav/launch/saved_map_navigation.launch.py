@@ -41,6 +41,14 @@ def generate_launch_description():
         ]
     )
 
+    default_goal_admission_gate_params = PathJoinSubstitution(
+        [
+            package_share,
+            'config',
+            'goal_admission_gate.yaml',
+        ]
+    )
+
     map_yaml = LaunchConfiguration('map')
     map_id = LaunchConfiguration('map_id')
 
@@ -52,6 +60,10 @@ def generate_launch_description():
 
     goal_gateway_params = LaunchConfiguration(
         'goal_gateway_params'
+    )
+
+    goal_admission_gate_params = LaunchConfiguration(
+        'goal_admission_gate_params'
     )
 
     use_sim_time = LaunchConfiguration('use_sim_time')
@@ -110,6 +122,7 @@ def generate_launch_description():
         executable='goal_admission_gate_node',
         name='goal_admission_gate_node',
         output='screen',
+        parameters=[goal_admission_gate_params],
     )
 
     return LaunchDescription(
@@ -147,6 +160,13 @@ def generate_launch_description():
                 default_value=default_gateway_params,
                 description=(
                     'Absolute path to gateway parameters.'
+                ),
+            ),
+            DeclareLaunchArgument(
+                'goal_admission_gate_params',
+                default_value=default_goal_admission_gate_params,
+                description=(
+                    'Absolute path to goal-admission parameters.'
                 ),
             ),
             DeclareLaunchArgument(
@@ -368,6 +388,10 @@ def generate_launch_description():
                     (
                         '/savo_nav/exploration/navigate_to_pose',
                         '/savo_nav/_internal/exploration/navigate_to_pose',
+                    ),
+                    (
+                        '/savo_nav/coverage/execute_path',
+                        '/savo_nav/_internal/coverage/execute_path',
                     ),
                 ],
             ),

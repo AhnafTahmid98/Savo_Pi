@@ -1,3 +1,6 @@
+// Copyright 2026 Ahnaf Tahmid
+// SPDX-License-Identifier: LicenseRef-Proprietary
+
 #pragma once
 
 #include <string>
@@ -42,4 +45,4 @@ struct SupervisorPolicy
     const rclcpp::Time & now) const;
 };
 
-} // namespace savo_supervisor
+}  // namespace savo_supervisor

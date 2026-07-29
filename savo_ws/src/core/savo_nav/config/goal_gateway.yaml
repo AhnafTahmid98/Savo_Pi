@@ -7,7 +7,17 @@ goal_gateway_node:
 
     exploration_action_name: "/savo_nav/exploration/navigate_to_pose"
 
+    coverage_action_name: "/savo_nav/coverage/execute_path"
+
     nav2_action_name: "/navigate_to_pose"
+    nav2_follow_path_action_name: "/follow_path"
+
+    coverage_controller_id: ""
+    coverage_goal_checker_id: ""
+    coverage_progress_checker_id: ""
+
+    coverage_maximum_execution_timeout_seconds: 3600.0
+    coverage_cancel_timeout_seconds: 5.0
 
     map_mode: "saved_map"
     active_map_id: "saved_map"

@@ -19,12 +19,14 @@ endif()
 
 find_package(ament_cmake REQUIRED)
 find_package(action_msgs REQUIRED)
+find_package(builtin_interfaces REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav2_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(savo_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(tf2_msgs REQUIRED)
 
@@ -33,6 +35,9 @@ add_library(
   SHARED
   src/core/control_mode_client.cpp
   src/core/control_recovery_guard.cpp
+  src/core/coverage_execution_model.cpp
+  src/core/coverage_path_validator.cpp
+  src/core/coverage_progress_tracker.cpp
   src/core/recovery_bridge.cpp
   src/core/goal_admission_policy.cpp
   src/core/goal_arbiter.cpp
@@ -61,6 +66,38 @@ target_compile_features(
   savo_nav_core
   PUBLIC
     cxx_std_17
+)
+
+add_library(
+  savo_nav_coverage_ros_adapter
+  SHARED
+  src/ros/coverage_action_adapter.cpp
+  src/ros/coverage_admission_proxy.cpp
+  src/ros/coverage_follow_path_gateway.cpp
+)
+
+target_include_directories(
+  savo_nav_coverage_ros_adapter
+  PUBLIC
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+    "$<INSTALL_INTERFACE:include>"
+)
+
+target_link_libraries(
+  savo_nav_coverage_ros_adapter
+  savo_nav_core
+)
+
+ament_target_dependencies(
+  savo_nav_coverage_ros_adapter
+  action_msgs
+  builtin_interfaces
+  geometry_msgs
+  nav2_msgs
+  nav_msgs
+  rclcpp
+  rclcpp_action
+  savo_msgs
 )
 
 add_executable(
@@ -108,6 +145,7 @@ add_executable(
 target_link_libraries(
   goal_admission_gate_node
   savo_nav_core
+  savo_nav_coverage_ros_adapter
 )
 
 ament_target_dependencies(
@@ -116,6 +154,7 @@ ament_target_dependencies(
   nav2_msgs
   rclcpp
   rclcpp_action
+  savo_msgs
   std_msgs
 )
 
@@ -127,6 +166,7 @@ add_executable(
 target_link_libraries(
   goal_gateway_node
   savo_nav_core
+  savo_nav_coverage_ros_adapter
 )
 
 ament_target_dependencies(
@@ -134,13 +174,17 @@ ament_target_dependencies(
   action_msgs
   geometry_msgs
   nav2_msgs
+  nav_msgs
   rclcpp
   rclcpp_action
+  savo_msgs
   std_msgs
 )
 
 install(
-  TARGETS savo_nav_core
+  TARGETS
+    savo_nav_core
+    savo_nav_coverage_ros_adapter
   EXPORT export_savo_nav_core
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
@@ -201,6 +245,11 @@ ament_export_targets(
 )
 
 ament_export_include_directories(include)
+ament_export_dependencies(
+  builtin_interfaces
+  nav_msgs
+  savo_msgs
+)
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
@@ -252,6 +301,60 @@ if(BUILD_TESTING)
     target_link_libraries(
       test_readiness_core
       savo_nav_core
+    )
+  endif()
+
+  ament_add_gtest(
+    test_coverage_path_validator
+    test/unit/test_coverage_path_validator.cpp
+  )
+
+  if(TARGET test_coverage_path_validator)
+    target_link_libraries(
+      test_coverage_path_validator
+      savo_nav_core
+    )
+  endif()
+
+  ament_add_gtest(
+    test_coverage_progress_tracker
+    test/unit/test_coverage_progress_tracker.cpp
+  )
+
+  if(TARGET test_coverage_progress_tracker)
+    target_link_libraries(
+      test_coverage_progress_tracker
+      savo_nav_core
+    )
+  endif()
+
+  ament_add_gtest(
+    test_coverage_execution_model
+    test/unit/test_coverage_execution_model.cpp
+  )
+
+  if(TARGET test_coverage_execution_model)
+    target_link_libraries(
+      test_coverage_execution_model
+      savo_nav_core
+    )
+  endif()
+
+  ament_add_gtest(
+    test_coverage_action_adapter
+    test/unit/test_coverage_action_adapter.cpp
+  )
+
+  if(TARGET test_coverage_action_adapter)
+    target_link_libraries(
+      test_coverage_action_adapter
+      savo_nav_coverage_ros_adapter
+    )
+
+    ament_target_dependencies(
+      test_coverage_action_adapter
+      geometry_msgs
+      savo_msgs
     )
   endif()
 
@@ -330,6 +433,18 @@ if(BUILD_TESTING)
   ament_add_pytest_test(
     test_phase7b_goal_admission_contracts
     test/contracts/test_phase7b_goal_admission_contracts.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
+    test_phase4l_b3_coverage_contracts
+    test/contracts/test_phase4l_b3_coverage_contracts.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
+    test_phase4l_b3d_runtime_contracts
+    test/contracts/test_phase4l_b3d_runtime_contracts.py
     TIMEOUT 60
   )
 

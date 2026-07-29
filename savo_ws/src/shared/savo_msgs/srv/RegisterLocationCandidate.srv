@@ -1,0 +1,15 @@
+savo_msgs/LocationCandidate candidate
+string actor_id
+---
+uint8 RESULT_REGISTERED=0
+uint8 RESULT_INVALID_CANDIDATE=1
+uint8 RESULT_DUPLICATE_CANDIDATE_ID=2
+uint8 RESULT_TAG_CONFLICT=3
+uint8 RESULT_MAP_MISMATCH=4
+uint8 RESULT_STORAGE_UNAVAILABLE=5
+uint8 RESULT_INTERNAL_ERROR=6
+
+bool registered
+uint8 result_code
+string reason
+savo_msgs/LocationCandidate stored_candidate

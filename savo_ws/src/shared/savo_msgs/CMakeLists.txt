@@ -38,16 +38,29 @@ set(msg_files
   "msg/RobotStatus.msg"
   "msg/IntentResult.msg"
   "msg/AprilTagObservation.msg"
+  "msg/LocationRecord.msg"
+  "msg/LocationCandidate.msg"
+  "msg/LocationEvent.msg"
 )
 
 set(action_files
   "action/ConfirmAprilTag.action"
+  "action/ExecuteCoveragePath.action"
   "action/RotateToHeading.action"
+)
+set(srv_files
+  "srv/ResolveLocation.srv"
+  "srv/GetLocation.srv"
+  "srv/ListLocations.srv"
+  "srv/RegisterLocationCandidate.srv"
+  "srv/ApproveLocation.srv"
+  "srv/SetLocationEnabled.srv"
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   ${msg_files}
   ${action_files}
+  ${srv_files}
   DEPENDENCIES ${ROSIDL_DEPENDENCIES}
 )
 
@@ -74,10 +87,28 @@ if(BUILD_TESTING)
     test/test_rotate_to_heading_registration.py
     TIMEOUT 60
   )
+
+  ament_add_pytest_test(
+    test_execute_coverage_path_action_contract
+    test/test_execute_coverage_path_action_contract.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
+    test_execute_coverage_path_registration
+    test/test_execute_coverage_path_registration.py
+    TIMEOUT 60
+  )
+ament_add_pytest_test(
+    test_location_interfaces
+    test/test_location_interfaces.py
+    TIMEOUT 60
+  )
 endif()
 
 # ---------------------------------------------------------------------------
 # Export and package
+
 # ---------------------------------------------------------------------------
 ament_export_dependencies(rosidl_default_runtime)
 

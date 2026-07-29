@@ -54,6 +54,7 @@ add_library(${PROJECT_NAME}_core
   src/workflow/workflow_authority.cpp
   src/workflow/exploration_runtime.cpp
   src/coverage/coverage_grid.cpp
+  src/coverage/coverage_mission.cpp
   src/coverage/coverage_planner.cpp
   src/scan360/scan360_planner.cpp
   src/scan360/scan360_controller.cpp
@@ -219,6 +220,7 @@ set(_savo_mapping_public_headers
   include/savo_mapping/workflow_authority.hpp
   include/savo_mapping/exploration_runtime.hpp
   include/savo_mapping/coverage_grid.hpp
+  include/savo_mapping/coverage_mission.hpp
   include/savo_mapping/coverage_planner.hpp
   include/savo_mapping/scan360_planner.hpp
   include/savo_mapping/scan360_controller.hpp
@@ -250,6 +252,7 @@ install(
 )
 
 set(_savo_mapping_production_config
+  config/coverage_mapping.yaml
   config/exploration_goal_handoff.yaml
   config/exploration_manager.yaml
   config/frontier_mapping.yaml
@@ -274,6 +277,7 @@ install(
 )
 
 set(_savo_mapping_production_profiles
+  config/profiles/coverage_mapping_real_robot.yaml
   config/profiles/manual_mapping.yaml
   config/profiles/monitor_only.yaml
   config/profiles/scan360_real_robot.yaml
@@ -286,6 +290,7 @@ install(
 
 set(_savo_mapping_production_launch
   launch/continued_mapping.launch.py
+  launch/coverage_mapping.launch.xml
   launch/exploration_goal_handoff.launch.xml
   launch/frontier_mapping.launch.xml
   launch/manual_mapping.launch.xml
@@ -302,7 +307,9 @@ install(
 )
 
 install(
-  FILES rviz/scan360_mapping.rviz
+  FILES
+    rviz/coverage_mapping.rviz
+    rviz/scan360_mapping.rviz
   DESTINATION share/${PROJECT_NAME}/rviz
 )
 
@@ -793,6 +800,7 @@ if(BUILD_TESTING)
     EXCLUDE
       "${CMAKE_CURRENT_SOURCE_DIR}/test/test_scan360_rotate_action_binding.cpp"
       "${CMAKE_CURRENT_SOURCE_DIR}/test/test_scan360_rotate_action_client_runtime.cpp"
+      "${CMAKE_CURRENT_SOURCE_DIR}/test/test_coverage_mission.cpp"
       "${CMAKE_CURRENT_SOURCE_DIR}/test/test_tf_pose_reader.cpp"
     LANGUAGE c++
     INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/include"
@@ -815,6 +823,7 @@ if(BUILD_TESTING)
   find_package(ament_cmake_xmllint REQUIRED)
   ament_xmllint(
     package.xml
+    launch/coverage_mapping.launch.xml
     launch/exploration_goal_handoff.launch.xml
     launch/frontier_mapping.launch.xml
     launch/manual_mapping.launch.xml
@@ -868,6 +877,26 @@ if(BUILD_TESTING)
     test_coverage_mapper_node_contract
     test/test_coverage_mapper_node_contract.py
     TIMEOUT 60
+  )
+
+
+  ament_add_pytest_test(
+    test_coverage_deployment_assets_contract
+    test/test_coverage_deployment_assets_contract.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
+    test_coverage_launch_runtime
+    test/test_coverage_launch_runtime.py
+    TIMEOUT 180
+  )
+
+  set_tests_properties(
+    test_coverage_launch_runtime
+    PROPERTIES
+      ENVIRONMENT
+        "PYTHONDONTWRITEBYTECODE=1;ROS_LOCALHOST_ONLY=1;ROS_DOMAIN_ID=222;ROS_LOG_DIR=${_savo_mapping_coverage_mapper_ros_log_dir}"
   )
 
   ament_add_pytest_test(
@@ -1340,6 +1369,21 @@ if(BUILD_TESTING)
   target_link_libraries(
     test_frontier_explorer_contract
     ${PROJECT_NAME}_core
+  )
+
+  ament_add_gtest(test_coverage_mission
+    test/test_coverage_mission.cpp
+  )
+
+  target_link_libraries(
+    test_coverage_mission
+    ${PROJECT_NAME}_core
+  )
+
+  set_tests_properties(
+    test_coverage_mission
+    PROPERTIES
+      TIMEOUT 60
   )
 
   ament_add_gtest(test_exploration_goal_handoff

@@ -198,6 +198,38 @@ Add supervisor_node.py
 Watch required topics and node health
 Publish /savo_supervisor/state
 Add mode model: BOOTING, IDLE, INTERACT, NAVIGATE, FOLLOW, MAPPING, ERROR, ESTOP
+
+# savo_supervisor
+
+`savo_supervisor` is Robot Savo's production monitor-only readiness and
+health aggregation package.
+
+The current Phase S1 implementation observes localization contracts,
+evaluates freshness and consistency, and publishes aggregate supervisor
+state, heartbeat, diagnostics, and transition events.
+
+It does not command or control the robot.
+
+## Current status
+
+The package is implemented in C++17 and has been validated through:
+
+- static compilation with ROS 2 Jazzy
+- deterministic freshness tests
+- strict JSON contract tests
+- supervisor-policy tests
+- transition-event tests
+- configuration-contract tests
+- supervisor-only runtime validation
+- healthy, stale, and recovery runtime validation
+
+The runtime sequence validated with the package-local fixture is:
+
+```text
+FAULTED -> RUNNING -> FAULTED -> RUNNING
+STALE   -> OK      -> STALE   -> OK
+```
+
 Add readiness logic for navigation/mapping/follow
 Connect state to UI and LLM status replies
 Add tests for readiness and mode transitions

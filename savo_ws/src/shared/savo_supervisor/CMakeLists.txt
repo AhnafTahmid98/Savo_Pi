@@ -20,13 +20,16 @@ find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
 find_package(builtin_interfaces REQUIRED)
+find_package(nlohmann_json REQUIRED)
 
 # -----------------------------------------------------------------------------
 # Library targets
 # -----------------------------------------------------------------------------
 add_library(savo_supervisor_core
   src/freshness_tracker.cpp
+  src/localization_payload_parser.cpp
   src/supervisor_policy.cpp
+  src/transition_tracker.cpp
 )
 
 target_include_directories(savo_supervisor_core
@@ -43,6 +46,10 @@ target_compile_features(savo_supervisor_core
 ament_target_dependencies(savo_supervisor_core
   rclcpp
   builtin_interfaces
+)
+
+target_link_libraries(savo_supervisor_core
+  nlohmann_json::nlohmann_json
 )
 
 # -----------------------------------------------------------------------------
@@ -71,6 +78,14 @@ ament_target_dependencies(supervisor_node
 # -----------------------------------------------------------------------------
 # Install
 # -----------------------------------------------------------------------------
+install(TARGETS savo_supervisor_core
+  EXPORT export_savo_supervisor_core
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+  INCLUDES DESTINATION include
+)
+
 install(TARGETS supervisor_node
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
@@ -113,6 +128,13 @@ install(FILES package.xml
 # Testing
 # -----------------------------------------------------------------------------
 if(BUILD_TESTING)
+  # ament_copyright does not recognize LicenseRef-Proprietary.
+  # Copyright notices remain enforced by cpplint.
+  set(ament_cmake_copyright_FOUND TRUE)
+
+  find_package(ament_lint_auto REQUIRED)
+  ament_lint_auto_find_test_dependencies()
+
   find_package(ament_cmake_gtest REQUIRED)
 
   ament_add_gtest(test_freshness_tracker
@@ -124,6 +146,26 @@ if(BUILD_TESTING)
   ament_target_dependencies(test_freshness_tracker
     rclcpp
     builtin_interfaces
+  )
+
+  ament_add_gtest(test_localization_payload_parser
+    test/test_localization_payload_parser.cpp
+  )
+  target_link_libraries(test_localization_payload_parser
+    savo_supervisor_core
+  )
+  ament_target_dependencies(test_localization_payload_parser
+    builtin_interfaces
+  )
+
+  ament_add_gtest(test_transition_tracker
+    test/test_transition_tracker.cpp
+  )
+  target_link_libraries(test_transition_tracker
+    savo_supervisor_core
+  )
+  ament_target_dependencies(test_transition_tracker
+    rclcpp
   )
 
   ament_add_gtest(test_supervisor_policy
@@ -148,5 +190,18 @@ if(BUILD_TESTING)
     builtin_interfaces
   )
 endif()
+
+ament_export_targets(
+  export_savo_supervisor_core
+  HAS_LIBRARY_TARGET
+)
+
+ament_export_include_directories(include)
+
+ament_export_dependencies(
+  rclcpp
+  builtin_interfaces
+  nlohmann_json
+)
 
 ament_package()

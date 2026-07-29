@@ -16,12 +16,6 @@ CORE_FILES = (
     Path('src/coverage/coverage_planner.cpp'),
     Path('test/test_coverage_planner.cpp'),
 )
-DEFERRED_ASSETS = (
-    Path('config/coverage_mapping.yaml'),
-    Path('config/profiles/coverage_mapping_real_robot.yaml'),
-    Path('launch/coverage_mapping.launch.xml'),
-    Path('rviz/coverage_mapping.rviz'),
-)
 
 
 class CoverageCoreContract(unittest.TestCase):
@@ -58,12 +52,6 @@ class CoverageCoreContract(unittest.TestCase):
             'estimated_path_length_m',
         ):
             self.assertIn(symbol, combined, symbol)
-
-    def test_deferred_deployment_assets_remain_zero_byte(self) -> None:
-        for relative in DEFERRED_ASSETS:
-            path = PACKAGE / relative
-            self.assertTrue(path.is_file(), relative)
-            self.assertEqual(path.stat().st_size, 0, relative)
 
     def test_core_has_no_ros_or_execution_authority(self) -> None:
         forbidden = re.compile(

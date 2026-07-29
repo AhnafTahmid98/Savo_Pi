@@ -505,6 +505,18 @@ TEST(GoalArbiterTest, SourcePrioritiesAreDeterministic)
     savo_nav::GoalArbiter::SourcePriority(
       Source::kNavigation),
     savo_nav::GoalArbiter::SourcePriority(
+      Source::kSemantic));
+
+  EXPECT_GT(
+    savo_nav::GoalArbiter::SourcePriority(
+      Source::kSemantic),
+    savo_nav::GoalArbiter::SourcePriority(
+      Source::kCoverage));
+
+  EXPECT_GT(
+    savo_nav::GoalArbiter::SourcePriority(
+      Source::kCoverage),
+    savo_nav::GoalArbiter::SourcePriority(
       Source::kExploration));
 }
 

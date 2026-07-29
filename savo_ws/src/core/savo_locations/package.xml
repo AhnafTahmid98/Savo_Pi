@@ -1,9 +1,21 @@
-<?xml version="1.0"?>
+<?xml version='1.0' encoding='utf-8'?>
 <package format="3">
   <name>savo_locations</name>
-  <version>0.1.0</version>
-  <description>Static map of known campus locations for navigation</description>
-  <maintainer email="todo@example.com">TODO_NAME</maintainer>
-  <license>MIT</license>
+  <version>0.6.0</version>
+  <description>
+    Authoritative semantic location registry foundation for Robot Savo.
+  </description>
+  <maintainer email="robot-savo@localhost.localdomain">
+    Robot Savo Maintainers
+  </maintainer>
+  <license>Apache-2.0</license>
   <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>savo_msgs</depend>
+  <depend>sqlite3</depend>
+  <test_depend>ament_cmake_gtest</test_depend>
+  <test_depend>ament_cmake_pytest</test_depend>
+  <test_depend>python3-pytest</test_depend>
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
 </package>

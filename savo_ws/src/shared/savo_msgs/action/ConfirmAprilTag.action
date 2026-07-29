@@ -38,10 +38,10 @@ int32 expected_tag_id
 # Optional correlation and ownership context.
 #
 # location_id can be empty during first discovery.
-# map_id and map_version identify the active map coordinate system.
+# map_id and map_revision identify the active map coordinate system.
 string location_id
 string map_id
-uint32 map_version
+uint32 map_revision
 
 # Maximum time allowed for searching, observation collection,
 # stability validation and optional TF transformation.

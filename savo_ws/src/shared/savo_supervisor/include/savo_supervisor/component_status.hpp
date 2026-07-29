@@ -1,3 +1,6 @@
+// Copyright 2026 Ahnaf Tahmid
+// SPDX-License-Identifier: LicenseRef-Proprietary
+
 #pragma once
 
 #include <string>
@@ -49,4 +52,4 @@ struct ComponentStatus
   std::string heartbeat_reason_code;
 };
 
-} // namespace savo_supervisor
+}  // namespace savo_supervisor

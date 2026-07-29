@@ -1,0 +1,122 @@
+schema_version: 1
+
+registry:
+  authoritative_runtime_store: sqlite
+  seed_file_is_authoritative: false
+  require_active_map_match: true
+  require_approved_state: true
+  require_enabled_record: true
+
+identity:
+  canonical_id_pattern: "^[A-Z0-9][A-Z0-9_-]{0,63}$"
+  maximum_id_length: 64
+  maximum_display_name_length: 128
+  maximum_alias_count: 32
+  maximum_alias_length: 128
+
+map_context:
+  require_map_id: true
+  require_map_revision: true
+  preserve_map_release_id: true
+
+pose:
+  frame_id: map
+  approach_pose_required_for_approval: true
+  separate_approach_pose_from_tag_pose: true
+  confirmation_pose_optional: true
+
+apriltag:
+  family_required: true
+  id_required: true
+  unique_within_map_revision: true
+
+arrival:
+  confirmation_required_by_default: true
+
+semantic_types:
+  - room
+  - corridor
+  - reception
+  - laboratory
+  - elevator
+  - doorway
+  - stairwell
+  - restroom
+  - office
+  - classroom
+  - service_point
+  - charging_station
+  - other
+normalization:
+  trim_ascii_whitespace: true
+  collapse_ascii_whitespace: true
+  lookup_ascii_case: lowercase
+  lookup_ascii_punctuation_as_separator: true
+  location_id_ascii_case: uppercase
+  location_id_spaces_to_underscore: true
+
+  # LOC-1A deliberately avoids locale-dependent C/C++ case
+  # conversion. Non-ASCII UTF-8 bytes are preserved exactly.
+  unicode_casefold_enabled: false
+in_memory_registry:
+  deterministic_order: location_id
+  location_id_unique_globally: true
+  identity_unique_within_map_revision: true
+  apriltag_unique_within_map_revision: true
+
+  disabled_locations_reserve_identity: true
+  retired_locations_release_identity: true
+
+  exact_location_id_match_preferred: true
+  map_context_required_when_requested: true
+  ambiguous_resolution_is_failure: true
+
+  replacement_requires_expected_revision: true
+  replacement_revision_increment: 1
+  enable_disable_increments_revision: true
+candidate_registry:
+  initial_state: pending_review
+  initial_revision: 1
+  candidate_id_unique_globally: true
+
+  pending_tag_unique_within_map_revision: true
+  rejected_candidate_releases_tag: true
+  approved_candidate_tag_owned_by_location: true
+
+  update_requires_pending_state: true
+  update_requires_expected_revision: true
+  update_increments_revision: true
+
+  rejection_requires_reason: true
+  rejection_increments_revision: true
+
+approval:
+  requires_pending_candidate: true
+  requires_expected_candidate_revision: true
+  requires_approach_pose: true
+
+  map_context_source: candidate
+  apriltag_binding_source: candidate
+  tag_pose_source: candidate
+
+  location_initial_state: approved
+  location_initial_enabled: true
+  location_initial_revision: 1
+
+  candidate_revision_increment: 1
+  atomic_on_location_conflict: true
+sqlite_foundation:
+  supported_schema_version: 1
+  migration_mode: transactional
+  transaction_begin_mode: IMMEDIATE
+  reject_newer_schema: true
+  integrity_check_required: true
+  foreign_key_check_required: true
+
+  active_location_tag_unique: true
+  active_identity_key_unique: true
+  pending_candidate_tag_unique: true
+
+  metadata_upsert_supported: true
+  transaction_owner_thread_enforced: true
+  rollback_active_transaction_on_close: true

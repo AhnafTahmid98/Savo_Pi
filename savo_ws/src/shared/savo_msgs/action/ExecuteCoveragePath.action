@@ -1,0 +1,60 @@
+# Robot Savo guarded Coverage execution action.
+#
+# Ownership:
+# - savo_mapping is the production action client.
+# - savo_nav is the production action server.
+# - savo_nav owns validation, admission and backend execution.
+# - savo_control remains the final movement authority.
+#
+# Publishing /savo_mapping/coverage/path must never trigger execution.
+
+uint32 CONTRACT_VERSION=1
+
+uint32 contract_version
+string mission_id
+nav_msgs/Path path
+
+# Zero requests the server default.
+builtin_interfaces/Duration execution_timeout
+---
+uint8 RESULT_SUCCEEDED=0
+uint8 RESULT_INVALID_REQUEST=1
+uint8 RESULT_NOT_READY=2
+uint8 RESULT_BUSY=3
+uint8 RESULT_BACKEND_UNAVAILABLE=4
+uint8 RESULT_BACKEND_REJECTED=5
+uint8 RESULT_ABORTED=6
+uint8 RESULT_CANCELED=7
+uint8 RESULT_TIMED_OUT=8
+uint8 RESULT_FEEDBACK_STALE=9
+uint8 RESULT_INTERNAL_ERROR=10
+
+bool success
+uint8 result_code
+string terminal_state
+string reason
+
+uint32 completed_waypoints
+uint32 total_waypoints
+float64 completion_ratio
+float64 remaining_distance_m
+---
+uint8 STATE_WAITING_FOR_ADMISSION=0
+uint8 STATE_WAITING_FOR_BACKEND=1
+uint8 STATE_EXECUTING=2
+uint8 STATE_CANCELING=3
+
+uint32 NO_WAYPOINT=4294967295
+
+uint8 state
+string state_text
+string reason
+
+uint32 current_waypoint
+uint32 completed_waypoints
+uint32 total_waypoints
+float64 completion_ratio
+float64 remaining_distance_m
+
+builtin_interfaces/Duration elapsed_time
+builtin_interfaces/Duration estimated_time_remaining

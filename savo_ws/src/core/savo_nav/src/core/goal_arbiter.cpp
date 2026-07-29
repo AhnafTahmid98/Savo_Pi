@@ -306,6 +306,9 @@ int GoalArbiter::SourcePriority(
     case GoalSource::kSemantic:
       return 200;
 
+    case GoalSource::kCoverage:
+      return 150;
+
     case GoalSource::kExploration:
       return 100;
 

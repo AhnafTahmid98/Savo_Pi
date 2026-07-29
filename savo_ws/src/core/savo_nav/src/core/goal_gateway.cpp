@@ -24,10 +24,27 @@ GoalGatewayDecision GoalGateway::Admit(
     request,
     validation_policy_);
 
-  const auto arbitration =
-    arbiter_.TryAcquire(
+  return AdmitValidated(
     request.context,
     validation);
+}
+
+GoalGatewayDecision GoalGateway::AdmitValidated(
+  const GoalContext & context,
+  const ValidationResult & validation)
+{
+  const auto context_validation =
+    GoalContextContract::Validate(context);
+
+  const ValidationResult effective_validation =
+    context_validation.IsValid() ?
+    validation :
+    context_validation;
+
+  const auto arbitration =
+    arbiter_.TryAcquire(
+    context,
+    effective_validation);
 
   GoalGatewayDecision decision;
 
@@ -36,7 +53,8 @@ GoalGatewayDecision GoalGateway::Admit(
     arbitration.state_changed;
 
   decision.reason = arbitration.reason;
-  decision.validation_code = validation.code;
+  decision.validation_code =
+    effective_validation.code;
 
   decision.arbitration_code =
     arbitration.code;

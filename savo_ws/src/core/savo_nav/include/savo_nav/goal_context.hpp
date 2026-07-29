@@ -21,7 +21,8 @@ enum class GoalSource : std::uint8_t
   kArea,
   kSemantic,
   kOperator,
-  kSupervisor
+  kSupervisor,
+  kCoverage
 };
 
 struct GoalContext

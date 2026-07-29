@@ -61,6 +61,10 @@ public:
   [[nodiscard]] GoalGatewayDecision Admit(
     const GoalValidationRequest & request);
 
+  [[nodiscard]] GoalGatewayDecision AdmitValidated(
+    const GoalContext & context,
+    const ValidationResult & validation);
+
   [[nodiscard]] bool MarkForwarding(
     const std::string & goal_id,
     std::uint64_t sequence);

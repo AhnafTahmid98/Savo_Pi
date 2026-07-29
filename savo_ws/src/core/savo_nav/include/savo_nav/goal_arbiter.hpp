@@ -90,7 +90,7 @@ public:
     GoalArbitrationCode code) noexcept;
 
 private:
-  static constexpr std::size_t kGoalSourceCount = 8;
+  static constexpr std::size_t kGoalSourceCount = 9;
 
   [[nodiscard]] static std::size_t SourceIndex(
     GoalSource source) noexcept;

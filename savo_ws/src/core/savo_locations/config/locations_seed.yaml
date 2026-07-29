@@ -1,0 +1,7 @@
+schema_version: 1
+
+# Seed/import file only.
+# The authoritative LOC-2 runtime store will be SQLite.
+#
+# Do not place unvalidated example coordinates here.
+locations: []

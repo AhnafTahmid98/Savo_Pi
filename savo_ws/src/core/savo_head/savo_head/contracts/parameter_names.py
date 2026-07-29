@@ -178,6 +178,8 @@ SCAN_CMD_TOPIC: Final[str] = "scan_cmd_topic"
 SCAN_STATE_TOPIC: Final[str] = "scan_state_topic"
 STATUS_TOPIC_PARAM: Final[str] = "status_topic"
 DASHBOARD_TEXT_TOPIC_PARAM: Final[str] = "dashboard_text_topic"
+CONTROLLER_STATUS_TOPIC: Final[str] = "controller_status_topic"
+CONTROLLER_DASHBOARD_TEXT_TOPIC: Final[str] = "controller_dashboard_text_topic"
 CAMERA_STREAM_CMD_TOPIC: Final[str] = "camera_stream_cmd_topic"
 CAMERA_STREAM_STATE_TOPIC: Final[str] = "camera_stream_state_topic"
 CAMERA_STATUS_TOPIC: Final[str] = "camera_status_topic"
@@ -251,6 +253,8 @@ class HeadParameterNames:
         SCAN_STATE_TOPIC,
         STATUS_TOPIC_PARAM,
         DASHBOARD_TEXT_TOPIC_PARAM,
+        CONTROLLER_STATUS_TOPIC,
+        CONTROLLER_DASHBOARD_TEXT_TOPIC,
         CAMERA_STREAM_CMD_TOPIC,
         CAMERA_STREAM_STATE_TOPIC,
         CAMERA_STATUS_TOPIC,

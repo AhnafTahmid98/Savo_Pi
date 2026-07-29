@@ -1,0 +1,19 @@
+uint8 STATE_ANY=0
+uint8 STATE_APPROVED=1
+uint8 STATE_RETIRED=2
+
+string map_id
+uint32 map_revision
+bool enforce_map_context
+string semantic_type
+uint8 state_filter
+bool enabled_only
+---
+uint8 RESULT_OK=0
+uint8 RESULT_INVALID_FILTER=1
+uint8 RESULT_INTERNAL_ERROR=2
+
+bool success
+uint8 result_code
+string reason
+savo_msgs/LocationRecord[] locations

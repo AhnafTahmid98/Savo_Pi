@@ -1,0 +1,28 @@
+schema_version: 1
+
+storage:
+  database_path: /var/lib/robot_savo/locations/locations.db
+  backup_directory: /var/lib/robot_savo/locations/backups
+
+  authoritative_runtime_store: sqlite
+  create_parent_directories: true
+
+  journal_mode: WAL
+  synchronous: NORMAL
+  foreign_keys: true
+  busy_timeout_ms: 5000
+  temporary_store: MEMORY
+
+  migrate_on_startup: true
+  fail_on_newer_schema: true
+  integrity_check_on_startup: true
+  fail_closed_on_integrity_error: true
+
+runtime_permissions:
+  directory_mode: "0750"
+  database_mode: "0640"
+
+testing:
+  use_tmp_directory: false
+  file_database_root: build/savo_locations/storage_test_runtime
+  in_memory_database_allowed: true

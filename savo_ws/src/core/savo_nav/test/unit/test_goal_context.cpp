@@ -110,7 +110,8 @@ TEST(GoalContextTest, ConvertsEveryGoalSource)
     {Source::kArea, "area"},
     {Source::kSemantic, "semantic"},
     {Source::kOperator, "operator"},
-    {Source::kSupervisor, "supervisor"}
+    {Source::kSupervisor, "supervisor"},
+    {Source::kCoverage, "coverage"}
   };
 
   for (const auto & item : expected) {

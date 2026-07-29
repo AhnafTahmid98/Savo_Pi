@@ -1,0 +1,36 @@
+string candidate_id
+uint64 expected_candidate_revision
+string actor_id
+
+string location_id
+string display_name
+string[] aliases
+string semantic_type
+
+geometry_msgs/PoseStamped approach_pose
+
+bool confirmation_pose_valid
+geometry_msgs/PoseStamped confirmation_pose
+
+bool arrival_confirmation_required
+
+string building
+string floor
+string area
+string notes
+---
+uint8 RESULT_APPROVED=0
+uint8 RESULT_INVALID_REQUEST=1
+uint8 RESULT_CANDIDATE_NOT_FOUND=2
+uint8 RESULT_CANDIDATE_NOT_PENDING=3
+uint8 RESULT_STALE_REVISION=4
+uint8 RESULT_LOCATION_ID_CONFLICT=5
+uint8 RESULT_ALIAS_CONFLICT=6
+uint8 RESULT_INVALID_APPROACH_POSE=7
+uint8 RESULT_STORAGE_UNAVAILABLE=8
+uint8 RESULT_INTERNAL_ERROR=9
+
+bool approved
+uint8 result_code
+string reason
+savo_msgs/LocationRecord location

@@ -57,6 +57,7 @@ ValidationResult GoalContextContract::Validate(
     case GoalSource::kSemantic:
     case GoalSource::kOperator:
     case GoalSource::kSupervisor:
+    case GoalSource::kCoverage:
       break;
 
     default:
@@ -110,6 +111,9 @@ std::string_view GoalContextContract::ToString(
 
     case GoalSource::kSupervisor:
       return "supervisor";
+
+    case GoalSource::kCoverage:
+      return "coverage";
   }
 
   return "unknown";

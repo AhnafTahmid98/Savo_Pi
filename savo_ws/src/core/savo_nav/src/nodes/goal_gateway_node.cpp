@@ -24,6 +24,7 @@
 #include "std_msgs/msg/string.hpp"
 
 #include "savo_nav/action_names.hpp"
+#include "savo_nav/coverage_follow_path_gateway.hpp"
 #include "savo_nav/goal_gateway.hpp"
 #include "savo_nav/topic_names.hpp"
 
@@ -166,6 +167,35 @@ public:
         savo_nav::actions::
         kNav2NavigateToPose));
 
+    const std::string coverage_action =
+      declare_parameter<std::string>(
+      "coverage_action_name",
+      std::string(
+        savo_nav::actions::
+        kCoverageExecutePath));
+
+    const std::string follow_path_action =
+      declare_parameter<std::string>(
+      "nav2_follow_path_action_name",
+      std::string(
+        savo_nav::actions::
+        kNav2FollowPath));
+
+    const std::string coverage_controller_id =
+      declare_parameter<std::string>(
+      "coverage_controller_id",
+      "");
+
+    const std::string coverage_goal_checker_id =
+      declare_parameter<std::string>(
+      "coverage_goal_checker_id",
+      "");
+
+    const std::string coverage_progress_checker_id =
+      declare_parameter<std::string>(
+      "coverage_progress_checker_id",
+      "");
+
     const std::string map_mode =
       declare_parameter<std::string>(
       "map_mode",
@@ -210,6 +240,16 @@ public:
       declare_parameter<double>(
       "feedback_stale_timeout_seconds",
       10.0);
+
+    const double coverage_maximum_timeout_seconds =
+      declare_parameter<double>(
+      "coverage_maximum_execution_timeout_seconds",
+      3600.0);
+
+    const double coverage_cancel_timeout_seconds =
+      declare_parameter<double>(
+      "coverage_cancel_timeout_seconds",
+      5.0);
 
     if (
       !std::isfinite(execution_timeout_seconds_) ||
@@ -337,6 +377,64 @@ public:
       CreatePublicServer(
       exploration_action,
       savo_nav::GoalSource::kExploration);
+
+    savo_nav::CoverageActionAdapterPolicy
+      coverage_adapter_policy;
+
+    coverage_adapter_policy.validation_policy.
+    maximum_absolute_coordinate_m =
+      policy.max_abs_coordinate_m;
+
+    coverage_adapter_policy.validation_policy.
+    allow_degraded_readiness =
+      policy.allow_degraded_readiness;
+
+    coverage_adapter_policy.
+    default_execution_timeout_seconds =
+      execution_timeout_seconds_;
+
+    coverage_adapter_policy.
+    maximum_execution_timeout_seconds =
+      coverage_maximum_timeout_seconds;
+
+    savo_nav::CoverageExecutionPolicy
+      coverage_execution_policy;
+
+    coverage_execution_policy.
+    default_execution_timeout_seconds =
+      execution_timeout_seconds_;
+
+    coverage_execution_policy.
+    maximum_execution_timeout_seconds =
+      coverage_maximum_timeout_seconds;
+
+    coverage_execution_policy.
+    feedback_stale_timeout_seconds =
+      feedback_stale_timeout_seconds_;
+
+    coverage_execution_policy.
+    cancel_timeout_seconds =
+      coverage_cancel_timeout_seconds;
+
+    coverage_gateway_ =
+      std::make_unique<
+      savo_nav::CoverageFollowPathGateway>(
+      *this,
+      mutex_,
+      *gateway_,
+      map_context_,
+      readiness_,
+      coverage_action,
+      follow_path_action,
+      coverage_controller_id,
+      coverage_goal_checker_id,
+      coverage_progress_checker_id,
+      coverage_adapter_policy,
+      coverage_execution_policy,
+      [this](const std::string & reason)
+      {
+        PublishStateLocked(reason);
+      });
 
     watchdog_timer_ =
       create_wall_timer(
@@ -953,6 +1051,14 @@ private:
 
   void CheckWatchdogs()
   {
+    if (
+      coverage_gateway_ &&
+      coverage_gateway_->Active())
+    {
+      coverage_gateway_->CheckWatchdogs();
+      return;
+    }
+
     InternalGoalHandle::SharedPtr handle_to_cancel;
 
     {
@@ -1274,6 +1380,10 @@ private:
   rclcpp::Publisher<
     std_msgs::msg::String>::SharedPtr
     result_publisher_;
+
+  std::unique_ptr<
+    savo_nav::CoverageFollowPathGateway>
+  coverage_gateway_;
 
   rclcpp::TimerBase::SharedPtr
     watchdog_timer_;

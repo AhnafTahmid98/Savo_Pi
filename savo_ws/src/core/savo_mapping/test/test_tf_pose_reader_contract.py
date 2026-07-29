@@ -14,13 +14,6 @@ UNIT_TEST = PACKAGE / 'test/test_tf_pose_reader.cpp'
 RUNTIME_TEST = PACKAGE / 'test/test_tf_pose_reader_runtime.py'
 CMAKE = PACKAGE / 'CMakeLists.txt'
 
-DEFERRED_COVERAGE_ASSETS = (
-    'config/coverage_mapping.yaml',
-    'config/profiles/coverage_mapping_real_robot.yaml',
-    'launch/coverage_mapping.launch.xml',
-    'rviz/coverage_mapping.rviz',
-)
-
 COVERAGE_CORE_HASHES = {
     'include/savo_mapping/coverage_grid.hpp':
         '21b7ffd057e3c289df8c7eb64a17ff8eb117f4e9b3ddb33f1a0b4dcf447e4e93',
@@ -275,13 +268,6 @@ def test_runtime_uses_only_isolated_fixture_frames():
         'savo_nav',
     ):
         assert forbidden not in runtime, forbidden
-
-
-def test_deferred_coverage_assets_remain_zero_byte():
-    for relative in DEFERRED_COVERAGE_ASSETS:
-        path = PACKAGE / relative
-        assert path.is_file(), relative
-        assert path.stat().st_size == 0, relative
 
 
 def test_coverage_core_hashes_remain_locked():

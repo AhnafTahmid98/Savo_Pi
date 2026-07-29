@@ -12,9 +12,11 @@ goal_admission_gate_node:
 
     public_navigation_action: "/savo_nav/navigation/navigate_to_pose"
     public_exploration_action: "/savo_nav/exploration/navigate_to_pose"
+    public_coverage_action: "/savo_nav/coverage/execute_path"
 
     internal_navigation_action: "/savo_nav/_internal/navigation/navigate_to_pose"
     internal_exploration_action: "/savo_nav/_internal/exploration/navigate_to_pose"
+    internal_coverage_action: "/savo_nav/_internal/coverage/execute_path"
 
     state_topic: "/savo_nav/goal_admission/state"
     reason_topic: "/savo_nav/goal_admission/reason"

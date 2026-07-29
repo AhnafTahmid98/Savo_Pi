@@ -17,8 +17,16 @@ inline constexpr std::string_view
   "/savo_nav/exploration/navigate_to_pose";
 
 inline constexpr std::string_view
+  kCoverageExecutePath =
+  "/savo_nav/coverage/execute_path";
+
+inline constexpr std::string_view
   kNav2NavigateToPose =
   "/navigate_to_pose";
+
+inline constexpr std::string_view
+  kNav2FollowPath =
+  "/follow_path";
 
 
 inline constexpr std::string_view
@@ -28,5 +36,9 @@ inline constexpr std::string_view
 inline constexpr std::string_view
   kInternalExplorationNavigateToPose =
   "/savo_nav/_internal/exploration/navigate_to_pose";
+
+inline constexpr std::string_view
+  kInternalCoverageExecutePath =
+  "/savo_nav/_internal/coverage/execute_path";
 
 }  // namespace savo_nav::actions

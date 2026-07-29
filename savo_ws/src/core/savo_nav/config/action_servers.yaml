@@ -10,11 +10,19 @@ actions:
       name: /savo_nav/exploration/navigate_to_pose
       type: nav2_msgs/action/NavigateToPose
       source: savo_mapping
+    coverage_execute_path:
+      name: /savo_nav/coverage/execute_path
+      type: savo_msgs/action/ExecuteCoveragePath
+      source: savo_mapping
   internal:
     nav2_navigate_to_pose:
       name: /navigate_to_pose
       type: nav2_msgs/action/NavigateToPose
       owner: nav2_bt_navigator
+    nav2_follow_path:
+      name: /follow_path
+      type: nav2_msgs/action/FollowPath
+      owner: nav2_controller_server
 constraints:
   maximum_active_nav2_goals: 1
   silent_goal_replacement_allowed: false
@@ -22,5 +30,7 @@ constraints:
 phase7b_internal_gateway_actions:
   navigation: /savo_nav/_internal/navigation/navigate_to_pose
   exploration: /savo_nav/_internal/exploration/navigate_to_pose
+  coverage: /savo_nav/_internal/coverage/execute_path
   type: nav2_msgs/action/NavigateToPose
+  coverage_type: savo_msgs/action/ExecuteCoveragePath
   public_access: false

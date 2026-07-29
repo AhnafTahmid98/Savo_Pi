@@ -1,11 +1,11 @@
 <?xml version="1.0"?>
 <package format="3">
   <name>savo_msgs</name>
-  <version>0.2.0</version>
+  <version>0.3.0</version>
 
   <description>
     Robot Savo shared ROS 2 interfaces, including navigation and robot-status
-    messages plus typed AprilTag observation and confirmation contracts.
+    messages, typed AprilTag contracts and semantic-location registry interfaces.
   </description>
 
   <maintainer email="tahmidahnaf998@gmail.com">

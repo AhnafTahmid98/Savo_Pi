@@ -1,3 +1,6 @@
+// Copyright 2026 Ahnaf Tahmid
+// SPDX-License-Identifier: LicenseRef-Proprietary
+
 #pragma once
 
 #include <string>
@@ -159,4 +162,4 @@ inline const char * ToString(ComponentState value)
   return "UNKNOWN";
 }
 
-} // namespace savo_supervisor
+}  // namespace savo_supervisor

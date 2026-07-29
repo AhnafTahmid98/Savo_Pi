@@ -12,13 +12,6 @@ NODE = PACKAGE / 'src/nodes/coverage_mapper_node.cpp'
 RUNTIME_TEST = PACKAGE / 'test/test_coverage_mapper_node_runtime.py'
 CMAKE = PACKAGE / 'CMakeLists.txt'
 
-DEFERRED_ASSETS = (
-    'config/coverage_mapping.yaml',
-    'config/profiles/coverage_mapping_real_robot.yaml',
-    'launch/coverage_mapping.launch.xml',
-    'rviz/coverage_mapping.rviz',
-)
-
 COVERAGE_HASHES = {
     'include/savo_mapping/coverage_grid.hpp':
         '21b7ffd057e3c289df8c7eb64a17ff8eb117f4e9b3ddb33f1a0b4dcf447e4e93',
@@ -47,9 +40,9 @@ TF_READER_HASHES = {
 
 MIGRATED_CONTRACT_HASHES = {
     'test/test_coverage_core_contract.py':
-        '42fdd05b2f800ce53146800f961ad25004e7a22167ba9f84d103e58d8d87ef1d',
+        'a55b9989c2c4ceb145745a295c6ccd8d297cae389c2e8f65192cd1b8c936fe33',
     'test/test_tf_pose_reader_contract.py':
-        'bc3542d3139b9f3fbd23bdba903ff144ebbe0167466b145cd7a77b9782a74dc3',
+        'f9669e255ce9a3133c28db8b062128110ae5365296430a2e4094919841b42914',
 }
 
 SCAN360_HASHES = {
@@ -582,18 +575,6 @@ def test_cmake_builds_links_installs_and_registers_once() -> None:
         assert len(calls) == 1, name
         assert path in calls[0], path
         assert cmake.count(path) == 1, path
-
-
-def test_deferred_assets_remain_empty_and_uninstalled() -> None:
-    """Keep deployment configuration deferred to its later phase."""
-    cmake = read(CMAKE)
-    installed = '\n'.join(cmake_call_bodies(cmake, 'install'))
-
-    for relative in DEFERRED_ASSETS:
-        path = PACKAGE / relative
-        assert path.is_file(), relative
-        assert path.stat().st_size == 0, relative
-        assert relative not in installed, relative
 
 
 def test_runtime_uses_installed_node_and_isolated_fixtures() -> None:

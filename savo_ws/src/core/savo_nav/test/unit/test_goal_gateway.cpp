@@ -272,6 +272,129 @@ TEST(GoalGatewayTest, LateSuccessAfterCancelCompletes)
     GatewayState::kIdle);
 }
 
+TEST(
+  GoalGatewayTest,
+  AdmitsPrevalidatedCoverageGoal)
+{
+  savo_nav::GoalGateway gateway;
+
+  const auto context =
+    MakeRequest(
+    "coverage-1",
+    Source::kCoverage,
+    1).context;
+
+  const savo_nav::ValidationResult validation{};
+
+  const auto decision =
+    gateway.AdmitValidated(
+    context,
+    validation);
+
+  EXPECT_TRUE(decision.accepted);
+  EXPECT_TRUE(gateway.HasActiveGoal());
+
+  EXPECT_EQ(
+    gateway.Snapshot().source,
+    Source::kCoverage);
+}
+
+TEST(
+  GoalGatewayTest,
+  RejectsInvalidPrevalidatedCoverageGoal)
+{
+  savo_nav::GoalGateway gateway;
+
+  const auto context =
+    MakeRequest(
+    "coverage-1",
+    Source::kCoverage,
+    1).context;
+
+  const savo_nav::ValidationResult validation{
+    savo_nav::ValidationCode::kNotReady,
+    "coverage_path_not_ready"
+  };
+
+  const auto decision =
+    gateway.AdmitValidated(
+    context,
+    validation);
+
+  EXPECT_FALSE(decision.accepted);
+  EXPECT_FALSE(gateway.HasActiveGoal());
+
+  EXPECT_EQ(
+    decision.validation_code,
+    savo_nav::ValidationCode::kNotReady);
+}
+
+TEST(
+  GoalGatewayTest,
+  RejectsInvalidCoverageContext)
+{
+  savo_nav::GoalGateway gateway;
+
+  auto context =
+    MakeRequest(
+    "coverage-1",
+    Source::kCoverage,
+    1).context;
+
+  context.goal_id.clear();
+
+  const savo_nav::ValidationResult validation{};
+
+  const auto decision =
+    gateway.AdmitValidated(
+    context,
+    validation);
+
+  EXPECT_FALSE(decision.accepted);
+  EXPECT_FALSE(gateway.HasActiveGoal());
+
+  EXPECT_EQ(
+    decision.validation_code,
+    savo_nav::ValidationCode::kEmptyIdentifier);
+}
+
+TEST(
+  GoalGatewayTest,
+  CoverageSharesSingleActiveSlot)
+{
+  savo_nav::GoalGateway gateway;
+
+  ASSERT_TRUE(
+    gateway.Admit(
+      MakeRequest(
+        "navigation-1",
+        Source::kNavigation,
+        1)).accepted);
+
+  const auto coverage_context =
+    MakeRequest(
+    "coverage-1",
+    Source::kCoverage,
+    1).context;
+
+  const savo_nav::ValidationResult validation{};
+
+  const auto coverage =
+    gateway.AdmitValidated(
+    coverage_context,
+    validation);
+
+  EXPECT_FALSE(coverage.accepted);
+
+  EXPECT_EQ(
+    coverage.arbitration_code,
+    savo_nav::GoalArbitrationCode::kBusy);
+
+  EXPECT_EQ(
+    gateway.Snapshot().source,
+    Source::kNavigation);
+}
+
 TEST(GoalGatewayTest, ConvertsEveryState)
 {
   EXPECT_EQ(

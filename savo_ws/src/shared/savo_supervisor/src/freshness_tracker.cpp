@@ -19,7 +19,7 @@ bool valid_header_stamp(
 {
   return stamp.sec >= 0 &&
          stamp.nanosec < static_cast<uint32_t>(
-           kNanosecondsPerSecond);
+    kNanosecondsPerSecond);
 }
 
 int64_t header_stamp_to_nanoseconds(
@@ -75,12 +75,14 @@ void FreshnessTracker::observe_message(
     {
       time_regression_ = true;
       detail_ = "receive clock type changed";
-    } else if (
-      receive_time.nanoseconds() <
-      last_receive_time_.nanoseconds())
-    {
-      time_regression_ = true;
-      detail_ = "receive time regressed";
+    } else {
+      if (
+        receive_time.nanoseconds() <
+        last_receive_time_.nanoseconds())
+      {
+        time_regression_ = true;
+        detail_ = "receive time regressed";
+      }
     }
   }
 

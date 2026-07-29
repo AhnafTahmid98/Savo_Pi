@@ -1,0 +1,27 @@
+string query
+bool enforce_map_context
+string map_id
+uint32 map_revision
+---
+uint8 RESULT_RESOLVED=0
+uint8 RESULT_INVALID_QUERY=1
+uint8 RESULT_NOT_FOUND=2
+uint8 RESULT_AMBIGUOUS=3
+uint8 RESULT_DISABLED=4
+uint8 RESULT_RETIRED=5
+uint8 RESULT_MAP_MISMATCH=6
+uint8 RESULT_INTERNAL_ERROR=7
+
+uint8 MATCH_NONE=0
+uint8 MATCH_LOCATION_ID=1
+uint8 MATCH_DISPLAY_NAME=2
+uint8 MATCH_ALIAS=3
+
+bool resolved
+uint8 result_code
+string reason
+string normalized_query
+uint8 match_type
+
+savo_msgs/LocationRecord location
+string[] ambiguous_location_ids

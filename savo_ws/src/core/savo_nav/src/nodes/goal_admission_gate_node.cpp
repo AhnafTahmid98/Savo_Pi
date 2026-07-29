@@ -21,6 +21,7 @@
 #include <std_msgs/msg/string.hpp>
 
 #include "savo_nav/action_names.hpp"
+#include "savo_nav/coverage_admission_proxy.hpp"
 #include "savo_nav/goal_admission_policy.hpp"
 #include "savo_nav/topic_names.hpp"
 
@@ -115,6 +116,18 @@ public:
       "internal_exploration_action",
       std::string(
         savo_nav::actions::kInternalExplorationNavigateToPose));
+
+    const std::string public_coverage_action =
+      declare_parameter<std::string>(
+      "public_coverage_action",
+      std::string(
+        savo_nav::actions::kCoverageExecutePath));
+
+    const std::string internal_coverage_action =
+      declare_parameter<std::string>(
+      "internal_coverage_action",
+      std::string(
+        savo_nav::actions::kInternalCoverageExecutePath));
 
     const std::string state_topic =
       declare_parameter<std::string>(
@@ -250,6 +263,31 @@ public:
         HandleAccepted(
           GoalSource::kExploration,
           goal_handle);
+      });
+
+    coverage_proxy_ =
+      std::make_unique<
+      savo_nav::CoverageAdmissionProxy>(
+      *this,
+      mutex_,
+      slot_reserved_,
+      active_goal_,
+      cancellation_requested_,
+      internal_cancel_sent_,
+      cancellation_reason_,
+      active_generation_,
+      internal_server_timeout_seconds_,
+      public_coverage_action,
+      internal_coverage_action,
+      [this]()
+      {
+        return EvaluateLocked();
+      },
+      [this](
+        const std::string & state,
+        const std::string & reason)
+      {
+        PublishState(state, reason);
       });
 
     timer_ = create_wall_timer(
@@ -847,8 +885,11 @@ private:
   void OnTimer()
   {
     std::uint64_t generation = 0;
-    bool request_cancel = false;
+
+    bool request_pose_cancel = false;
+    bool request_coverage_cancel = false;
     bool active = false;
+
     savo_nav::GoalAdmissionDecision decision;
 
     {
@@ -862,7 +903,12 @@ private:
         cancellation_reason_ = decision.reason;
         generation = active_generation_;
 
-        request_cancel =
+        request_coverage_cancel =
+          coverage_proxy_ &&
+          coverage_proxy_->ActiveLocked();
+
+        request_pose_cancel =
+          !request_coverage_cancel &&
           internal_goal_handle_ != nullptr &&
           !internal_cancel_sent_;
       }
@@ -878,7 +924,10 @@ private:
         decision.reason);
     }
 
-    if (request_cancel) {
+    if (request_coverage_cancel) {
+      coverage_proxy_->RequestCancel(
+        decision.reason);
+    } else if (request_pose_cancel) {
       RequestInternalCancel(generation);
     }
   }
@@ -977,6 +1026,10 @@ private:
 
   rclcpp_action::Server<NavigateToPose>::SharedPtr
     exploration_server_;
+
+  std::unique_ptr<
+    savo_nav::CoverageAdmissionProxy>
+  coverage_proxy_;
 
   rclcpp::TimerBase::SharedPtr timer_;
 };
