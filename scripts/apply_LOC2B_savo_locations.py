@@ -436,21 +436,47 @@ def main() -> None:
     )
 
     if "friend class SqliteRepository;" not in store_text:
-        marker = "        private:\n"
+        lines = store_text.splitlines(
+            keepends=True
+        )
 
-        if marker not in store_text:
+        private_index = None
+
+        for index, line in enumerate(lines):
+            if line.strip() == "private:":
+                private_index = index
+                break
+
+        if private_index is None:
             raise RuntimeError(
                 "Could not locate SqliteStore private section"
             )
 
-        store_text = store_text.replace(
-            marker,
+        private_line = lines[private_index]
+
+        indentation = private_line[
+            :len(private_line) -
+            len(private_line.lstrip())
+        ]
+
+        lines.insert(
+            private_index + 1,
             (
-                "        private:\n"
-                "          friend class SqliteRepository;\n\n"
+                f"{indentation}  "
+                "friend class SqliteRepository;\n\n"
             ),
-            1,
         )
+
+        store_text = "".join(lines)
+
+        if (
+            "friend class SqliteRepository;"
+            not in store_text
+        ):
+            raise RuntimeError(
+                "SqliteRepository friend declaration "
+                "failed verification"
+            )
 
         store_header.write_text(
             store_text,

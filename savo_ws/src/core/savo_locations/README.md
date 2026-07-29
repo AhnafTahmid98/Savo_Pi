@@ -238,3 +238,72 @@ Integrity validation runs both SQLite `integrity_check` and
 LOC-2A does not yet serialize domain records, load the in-memory
 catalog, create backups, expose ROS services or start a runtime
 node. Those capabilities follow in later LOC-2 phases.
+## LOC-2B typed SQLite snapshots
+
+LOC-2B persists complete typed location and candidate snapshots.
+
+Persisted locations include:
+
+- approval/retirement state;
+- enabled state and record revision;
+- canonical identity, display name and aliases;
+- semantic type;
+- map ID, map revision and map release ID;
+- approach, confirmation and tag poses;
+- AprilTag binding;
+- semantic area metadata;
+- originating candidate ID.
+
+Persisted candidates include:
+
+- lifecycle state and candidate revision;
+- mapping and AprilTag evidence;
+- detection quality and observation statistics;
+- optional approach and confirmation poses;
+- suggested identity and semantic metadata;
+- mapping session and source component;
+- review reason and approved location binding.
+
+Snapshot replacement uses one `BEGIN IMMEDIATE` transaction.
+Existing locations and candidates are restored automatically if
+any new row or identity index fails.
+
+Domain validation runs before persistence and after loading.
+Persisted data that no longer satisfies the domain contracts is
+reported as corrupt and is not returned to runtime consumers.
+
+LOC-2B still does not introduce a ROS node, runtime services,
+automatic catalog rehydration, backup rotation or event writes.
+## LOC-3A read-only ROS registry
+
+LOC-3A adds the production C++ ROS registry node.
+
+Startup behavior:
+
+- opens the configured SQLite authority;
+- applies supported schema migrations when enabled;
+- performs SQLite integrity and foreign-key checks;
+- loads and validates the complete persistent catalog;
+- enters `ready` only after bootstrap succeeds;
+- remains alive but fail-closed in `degraded` state when storage
+  cannot be trusted.
+
+Read services:
+
+- `/savo_locations/resolve`
+- `/savo_locations/get`
+- `/savo_locations/list`
+
+Runtime diagnostics:
+
+- `/savo_locations/status`
+- `/savo_locations/heartbeat`
+- `/savo_locations/snapshot`
+
+Status and snapshot use reliable transient-local JSON diagnostic
+messages. Typed location access remains the three `savo_msgs`
+read services.
+
+LOC-3A deliberately does not expose candidate registration,
+approval, rejection, enable/disable, import or other write paths.
+Those operations require a separately validated write phase.

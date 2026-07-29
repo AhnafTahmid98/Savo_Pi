@@ -17,6 +17,7 @@ endif()
 
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(builtin_interfaces REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(savo_msgs REQUIRED)
 find_package(nav2_msgs REQUIRED)
@@ -54,6 +55,7 @@ add_library(${PROJECT_NAME}_core
   src/workflow/workflow_authority.cpp
   src/workflow/exploration_runtime.cpp
   src/coverage/coverage_grid.cpp
+  src/coverage/coverage_execution_handoff.cpp
   src/coverage/coverage_mission.cpp
   src/coverage/coverage_planner.cpp
   src/scan360/scan360_planner.cpp
@@ -220,6 +222,7 @@ set(_savo_mapping_public_headers
   include/savo_mapping/workflow_authority.hpp
   include/savo_mapping/exploration_runtime.hpp
   include/savo_mapping/coverage_grid.hpp
+  include/savo_mapping/coverage_execution_handoff.hpp
   include/savo_mapping/coverage_mission.hpp
   include/savo_mapping/coverage_planner.hpp
   include/savo_mapping/scan360_planner.hpp
@@ -252,6 +255,7 @@ install(
 )
 
 set(_savo_mapping_production_config
+  config/coverage_execution_handoff.yaml
   config/coverage_mapping.yaml
   config/exploration_goal_handoff.yaml
   config/exploration_manager.yaml
@@ -290,6 +294,7 @@ install(
 
 set(_savo_mapping_production_launch
   launch/continued_mapping.launch.py
+  launch/coverage_execution_handoff.launch.xml
   launch/coverage_mapping.launch.xml
   launch/exploration_goal_handoff.launch.xml
   launch/frontier_mapping.launch.xml
@@ -632,6 +637,39 @@ install(
   DESTINATION lib/${PROJECT_NAME}
 )
 
+add_executable(
+  coverage_execution_handoff_node
+  src/nodes/coverage_execution_handoff_node.cpp
+)
+
+target_compile_features(
+  coverage_execution_handoff_node
+  PRIVATE
+    cxx_std_17
+)
+
+target_link_libraries(
+  coverage_execution_handoff_node
+  ${PROJECT_NAME}_core
+)
+
+ament_target_dependencies(
+  coverage_execution_handoff_node
+  builtin_interfaces
+  nav_msgs
+  rclcpp
+  rclcpp_action
+  savo_msgs
+  std_msgs
+  std_srvs
+)
+
+install(
+  TARGETS
+    coverage_execution_handoff_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 add_library(savo_mapping_scan360_rotate_action_client
   src/ros/scan360_rotate_action_client.cpp
 )
@@ -823,6 +861,7 @@ if(BUILD_TESTING)
   find_package(ament_cmake_xmllint REQUIRED)
   ament_xmllint(
     package.xml
+    launch/coverage_execution_handoff.launch.xml
     launch/coverage_mapping.launch.xml
     launch/exploration_goal_handoff.launch.xml
     launch/frontier_mapping.launch.xml
@@ -1369,6 +1408,34 @@ if(BUILD_TESTING)
   target_link_libraries(
     test_frontier_explorer_contract
     ${PROJECT_NAME}_core
+  )
+
+  ament_add_gtest(test_coverage_execution_handoff
+    test/test_coverage_execution_handoff.cpp
+  )
+
+  target_link_libraries(
+    test_coverage_execution_handoff
+    ${PROJECT_NAME}_core
+  )
+
+  ament_add_pytest_test(
+    test_phase4l_b3f_contract
+    test/test_phase4l_b3f_contract.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
+    test_coverage_execution_handoff_runtime
+    test/test_coverage_execution_handoff_runtime.py
+    TIMEOUT 90
+  )
+
+  set_tests_properties(
+    test_coverage_execution_handoff_runtime
+    PROPERTIES
+      ENVIRONMENT
+        "PYTHONDONTWRITEBYTECODE=1;ROS_LOCALHOST_ONLY=1;ROS_DOMAIN_ID=223;COVERAGE_HANDOFF_EXECUTABLE=${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}/coverage_execution_handoff_node"
   )
 
   ament_add_gtest(test_coverage_mission

@@ -254,6 +254,7 @@ ament_export_dependencies(
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
   find_package(ament_cmake_pytest REQUIRED)
+  find_package(launch_testing_ament_cmake REQUIRED)
   find_package(ament_lint_auto REQUIRED)
   find_package(ament_lint_common REQUIRED)
 
@@ -446,6 +447,36 @@ if(BUILD_TESTING)
     test_phase4l_b3d_runtime_contracts
     test/contracts/test_phase4l_b3d_runtime_contracts.py
     TIMEOUT 60
+  )
+
+  add_executable(
+    fake_follow_path_server_node
+    test/fixtures/fake_follow_path_server_node.cpp
+  )
+
+  ament_target_dependencies(
+    fake_follow_path_server_node
+    nav2_msgs
+    rclcpp
+    rclcpp_action
+    std_msgs
+  )
+
+  install(
+    TARGETS
+      fake_follow_path_server_node
+    DESTINATION lib/${PROJECT_NAME}
+  )
+
+  ament_add_pytest_test(
+    test_phase4l_b3e_integration_contracts
+    test/contracts/test_phase4l_b3e_integration_contracts.py
+    TIMEOUT 60
+  )
+
+  add_launch_test(
+    test/launch/test_phase4l_b3e_coverage_runtime_launch.py
+    TIMEOUT 90
   )
 
   add_executable(

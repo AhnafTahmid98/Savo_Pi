@@ -455,13 +455,6 @@ StorageResult SqliteStore::migrate(
     return success("schema already current");
   }
 
-  if (status->previous_version != 0U) {
-    return failure(
-      StorageCode::kMigrationFailed,
-      SQLITE_ERROR,
-      "no migration path exists for schema version");
-  }
-
   auto begin_result =
     execute_locked("BEGIN IMMEDIATE;");
 
@@ -477,61 +470,134 @@ StorageResult SqliteStore::migrate(
   transaction_owner_ =
     std::this_thread::get_id();
 
-  const auto schema_result =
-    execute_locked(kMigration001Sql);
+  auto rollback_migration =
+    [this]()
+    {
+      static_cast<void>(rollback_locked());
+    };
 
-  if (!schema_result.success) {
-    static_cast<void>(rollback_locked());
+  std::uint32_t working_version =
+    status->previous_version;
 
-    return failure(
-      StorageCode::kMigrationFailed,
-      schema_result.sqlite_code,
-      schema_result.reason);
+  if (working_version == 0U) {
+    const auto schema_result =
+      execute_locked(kMigration001Sql);
+
+    if (!schema_result.success) {
+      rollback_migration();
+
+      return failure(
+        StorageCode::kMigrationFailed,
+        schema_result.sqlite_code,
+        schema_result.reason);
+    }
+
+    const std::string migration_insert =
+      "INSERT INTO schema_migrations("
+      "schema_version,"
+      "migration_name,"
+      "applied_at_unix_ns"
+      ") VALUES("
+      "1,"
+      "'001_initial_schema',"
+      + std::to_string(unix_time_ns()) +
+      ");";
+
+    const auto insert_result =
+      execute_locked(migration_insert);
+
+    if (!insert_result.success) {
+      rollback_migration();
+
+      return failure(
+        StorageCode::kMigrationFailed,
+        insert_result.sqlite_code,
+        insert_result.reason);
+    }
+
+    const auto version_update =
+      execute_locked("PRAGMA user_version=1;");
+
+    if (!version_update.success) {
+      rollback_migration();
+
+      return failure(
+        StorageCode::kMigrationFailed,
+        version_update.sqlite_code,
+        version_update.reason);
+    }
+
+    working_version = 1U;
   }
 
-  const auto timestamp =
-    std::to_string(unix_time_ns());
+  if (working_version == 1U) {
+    const auto schema_result =
+      execute_locked(kMigration002Sql);
 
-  const std::string migration_insert =
-    "INSERT INTO schema_migrations("
-    "schema_version,"
-    "migration_name,"
-    "applied_at_unix_ns"
-    ") VALUES("
-    "1,"
-    "'001_initial_schema',"
-    + timestamp +
-    ");";
+    if (!schema_result.success) {
+      rollback_migration();
 
-  const auto insert_result =
-    execute_locked(migration_insert);
+      return failure(
+        StorageCode::kMigrationFailed,
+        schema_result.sqlite_code,
+        schema_result.reason);
+    }
 
-  if (!insert_result.success) {
-    static_cast<void>(rollback_locked());
+    const std::string migration_insert =
+      "INSERT INTO schema_migrations("
+      "schema_version,"
+      "migration_name,"
+      "applied_at_unix_ns"
+      ") VALUES("
+      "2,"
+      "'002_append_only_event_journal',"
+      + std::to_string(unix_time_ns()) +
+      ");";
 
-    return failure(
-      StorageCode::kMigrationFailed,
-      insert_result.sqlite_code,
-      insert_result.reason);
+    const auto insert_result =
+      execute_locked(migration_insert);
+
+    if (!insert_result.success) {
+      rollback_migration();
+
+      return failure(
+        StorageCode::kMigrationFailed,
+        insert_result.sqlite_code,
+        insert_result.reason);
+    }
+
+    const auto version_update =
+      execute_locked("PRAGMA user_version=2;");
+
+    if (!version_update.success) {
+      rollback_migration();
+
+      return failure(
+        StorageCode::kMigrationFailed,
+        version_update.sqlite_code,
+        version_update.reason);
+    }
+
+    working_version = 2U;
   }
 
-  const auto version_update =
-    execute_locked("PRAGMA user_version=1;");
-
-  if (!version_update.success) {
-    static_cast<void>(rollback_locked());
+  if (
+    working_version !=
+    kSupportedSqliteSchemaVersion)
+  {
+    rollback_migration();
 
     return failure(
       StorageCode::kMigrationFailed,
-      version_update.sqlite_code,
-      version_update.reason);
+      SQLITE_ERROR,
+      "no migration path exists for schema version");
   }
 
   const auto commit_result =
     execute_locked("COMMIT;");
 
   if (!commit_result.success) {
-    static_cast<void>(rollback_locked());
+    rollback_migration();
 
     return failure(
       StorageCode::kMigrationFailed,
@@ -547,8 +613,9 @@ StorageResult SqliteStore::migrate(
 
   status->migration_applied = true;
 
-  return success("migration 001 applied");
+  return success("schema migrations applied");
 }
+
 
 
 StorageResult SqliteStore::schema_version(

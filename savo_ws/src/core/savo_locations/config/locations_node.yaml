@@ -1,0 +1,19 @@
+savo_locations:
+  ros__parameters:
+    # SQLite is the production authority. The parent directory must be
+    # provisioned with ownership for the robot runtime user.
+    database_path: /var/lib/robot_savo/locations/locations.db
+
+    # Production startup may apply supported forward migrations.
+    auto_migrate: true
+
+    # System deployment should create /var/lib/robot_savo/locations.
+    # Keep this false so the node does not silently alter permissions.
+    create_parent_directories: false
+
+    status_publish_hz: 1.0
+    heartbeat_publish_hz: 2.0
+
+    # Transient-local JSON diagnostic snapshot. Typed read access
+    # remains ResolveLocation/GetLocation/ListLocations services.
+    publish_snapshot: true

@@ -63,6 +63,14 @@ inline constexpr std::string_view EXPLORATION_GOAL_STATUS =
   "/savo_mapping/exploration_goal/status";
 inline constexpr std::string_view EXPLORATION_GOAL_FEEDBACK =
   "/savo_mapping/exploration_goal/feedback";
+inline constexpr std::string_view COVERAGE_PATH =
+  "/savo_mapping/coverage/path";
+inline constexpr std::string_view COVERAGE_EXECUTION_STATE =
+  "/savo_mapping/coverage_execution/state";
+inline constexpr std::string_view COVERAGE_EXECUTION_STATUS =
+  "/savo_mapping/coverage_execution/status";
+inline constexpr std::string_view COVERAGE_EXECUTION_FEEDBACK =
+  "/savo_mapping/coverage_execution/feedback";
 
 // Read-only awareness of savo_nav state
 inline constexpr std::string_view NAV_STATUS = "/savo_nav/status";

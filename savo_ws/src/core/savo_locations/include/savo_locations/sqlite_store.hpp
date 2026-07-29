@@ -147,6 +147,8 @@ public:
     bool * exists) const;
 
 private:
+  friend class SqliteRepository;
+
   [[nodiscard]]
   StorageResult execute_locked(
     std::string_view sql) const;

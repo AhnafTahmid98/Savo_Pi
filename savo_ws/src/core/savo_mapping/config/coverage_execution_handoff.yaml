@@ -1,0 +1,27 @@
+coverage_execution_handoff_node:
+  ros__parameters:
+    enabled: true
+
+    # This node only stages retained plans. Motion is dispatched exclusively
+    # after an explicit call to the approval service.
+    expected_frame: "map"
+    mission_id_prefix: "coverage"
+
+    plan_topic: "/savo_mapping/coverage/path"
+    action_name: "/savo_nav/coverage/execute_path"
+    state_topic: "/savo_mapping/coverage_execution/state"
+    status_topic: "/savo_mapping/coverage_execution/status"
+    feedback_topic: "/savo_mapping/coverage_execution/feedback"
+
+    approve_service: "/savo_mapping/coverage_execution/approve"
+    cancel_service: "/savo_mapping/coverage_execution/cancel"
+    reset_service: "/savo_mapping/coverage_execution/reset"
+
+    server_wait_timeout_sec: 3.0
+    goal_response_timeout_sec: 3.0
+    cancel_timeout_sec: 5.0
+
+    # Zero delegates the execution timeout to savo_nav's guarded default.
+    execution_timeout_sec: 0.0
+    maximum_waypoints: 10000
+    watchdog_period_ms: 100

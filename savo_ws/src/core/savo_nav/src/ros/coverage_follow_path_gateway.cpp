@@ -88,6 +88,11 @@ CoverageFollowPathGateway::HandleGoal(
 {
   std::lock_guard<std::mutex> lock(mutex_);
 
+  if (active_) {
+    publish_("coverage_rejected_goal_gateway_busy");
+    return rclcpp_action::GoalResponse::REJECT;
+  }
+
   if (!follow_path_client_->wait_for_action_server(
       std::chrono::seconds(0)))
   {

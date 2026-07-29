@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <package format="3">
   <name>savo_locations</name>
-  <version>0.6.0</version>
+  <version>0.8.0</version>
   <description>
     Authoritative semantic location registry foundation for Robot Savo.
   </description>
@@ -18,4 +18,10 @@
   <export>
     <build_type>ament_cmake</build_type>
   </export>
+  <depend>rclcpp</depend>
+  <depend>std_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>builtin_interfaces</depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
 </package>

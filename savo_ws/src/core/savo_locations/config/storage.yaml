@@ -26,3 +26,19 @@ testing:
   use_tmp_directory: false
   file_database_root: build/savo_locations/storage_test_runtime
   in_memory_database_allowed: true
+snapshot_persistence:
+  typed_domain_records: true
+  validate_before_write: true
+  validate_after_read: true
+
+  write_mode: atomic_replace
+  transaction_begin_mode: IMMEDIATE
+
+  preserve_event_journal: true
+  replace_locations: true
+  replace_candidates: true
+
+  reject_identity_conflicts: true
+  reject_tag_conflicts: true
+  reject_missing_approved_location: true
+  reject_corrupt_loaded_records: true

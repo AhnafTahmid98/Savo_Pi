@@ -154,7 +154,10 @@ TEST(SqliteStore, AppliesMigration001)
   ASSERT_TRUE(
     store.schema_version(&version).success);
 
-  EXPECT_EQ(version, 1U);
+  EXPECT_EQ(
+    version,
+    savo_locations::
+      kSupportedSqliteSchemaVersion);
 }
 
 
@@ -229,8 +232,8 @@ TEST(SqliteStore, MigrationIsIdempotent)
       store.migrate(&status).success);
 
     EXPECT_FALSE(status.migration_applied);
-    EXPECT_EQ(status.previous_version, 1U);
-    EXPECT_EQ(status.current_version, 1U);
+    EXPECT_EQ(status.previous_version, 2U);
+    EXPECT_EQ(status.current_version, 2U);
   }
 }
 

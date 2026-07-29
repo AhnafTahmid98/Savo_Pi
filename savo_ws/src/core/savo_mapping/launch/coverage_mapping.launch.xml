@@ -29,6 +29,9 @@
   <arg name="status_topic" default="/savo_mapping/coverage/status" description="Coverage status output"/>
   <arg name="state_topic" default="/savo_mapping/coverage/state" description="Coverage state output"/>
 
+  <arg name="start_execution_handoff" default="true" description="Start the explicit Coverage approval and action-client node"/>
+  <arg name="execution_handoff_params_file" default="$(find-pkg-share savo_mapping)/config/coverage_execution_handoff.yaml" description="Coverage execution handoff parameters"/>
+
   <arg name="use_sim_time" default="false" description="Use the ROS simulation clock"/>
 
   <node
@@ -73,5 +76,15 @@
     <param name="state_topic" value="$(var state_topic)"/>
     <param name="use_sim_time" value="$(var use_sim_time)"/>
   </node>
+
+  <include
+    file="$(find-pkg-share savo_mapping)/launch/coverage_execution_handoff.launch.xml"
+    if="$(var start_execution_handoff)">
+    <arg name="params_file" value="$(var execution_handoff_params_file)"/>
+    <arg name="enabled" value="true"/>
+    <arg name="expected_frame" value="$(var map_frame)"/>
+    <arg name="plan_topic" value="$(var path_topic)"/>
+    <arg name="use_sim_time" value="$(var use_sim_time)"/>
+  </include>
 
 </launch>

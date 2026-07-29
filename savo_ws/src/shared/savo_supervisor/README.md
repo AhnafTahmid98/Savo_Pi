@@ -199,7 +199,7 @@ Watch required topics and node health
 Publish /savo_supervisor/state
 Add mode model: BOOTING, IDLE, INTERACT, NAVIGATE, FOLLOW, MAPPING, ERROR, ESTOP
 
-# savo_supervisor
+# savo_supervisor_implementation
 
 `savo_supervisor` is Robot Savo's production monitor-only readiness and
 health aggregation package.

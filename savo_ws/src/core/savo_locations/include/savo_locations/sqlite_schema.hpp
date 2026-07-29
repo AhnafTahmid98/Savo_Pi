@@ -8,7 +8,7 @@ namespace savo_locations
 {
 
 inline constexpr std::uint32_t
-  kSupportedSqliteSchemaVersion{1U};
+  kSupportedSqliteSchemaVersion{2U};
 
 inline constexpr std::string_view
   kMigration001Sql{R"SQL(
@@ -331,6 +331,30 @@ ON location_events(
   event_sequence
 );
 )SQL"};
+
+inline constexpr std::string_view
+  kMigration002Sql{R"SQL(
+CREATE TRIGGER IF NOT EXISTS
+  location_events_reject_update
+BEFORE UPDATE ON location_events
+BEGIN
+  SELECT RAISE(
+    ABORT,
+    'location_events is append-only'
+  );
+END;
+
+CREATE TRIGGER IF NOT EXISTS
+  location_events_reject_delete
+BEFORE DELETE ON location_events
+BEGIN
+  SELECT RAISE(
+    ABORT,
+    'location_events is append-only'
+  );
+END;
+)SQL"};
+
 
 }  // namespace savo_locations
 

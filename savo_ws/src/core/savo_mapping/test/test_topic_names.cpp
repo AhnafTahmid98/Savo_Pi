@@ -70,6 +70,22 @@ TEST(TopicNamesContract, ExplorationHandoffTopicsAreStable)
   EXPECT_EQ(
     std::string{savo_mapping::topics::EXPLORATION_GOAL_FEEDBACK},
     "/savo_mapping/exploration_goal/feedback");
+
+  EXPECT_EQ(
+    std::string{savo_mapping::topics::COVERAGE_PATH},
+    "/savo_mapping/coverage/path");
+
+  EXPECT_EQ(
+    std::string{savo_mapping::topics::COVERAGE_EXECUTION_STATE},
+    "/savo_mapping/coverage_execution/state");
+
+  EXPECT_EQ(
+    std::string{savo_mapping::topics::COVERAGE_EXECUTION_STATUS},
+    "/savo_mapping/coverage_execution/status");
+
+  EXPECT_EQ(
+    std::string{savo_mapping::topics::COVERAGE_EXECUTION_FEEDBACK},
+    "/savo_mapping/coverage_execution/feedback");
 }
 
 TEST(TopicNamesContract, NavigationAwarenessAndSafetyTopicsAreStable)
@@ -167,6 +183,22 @@ TEST(TopicNamesContract, ClassifiesNavigationAndSafetyTopics)
   EXPECT_TRUE(
     savo_mapping::topics::is_navigation_handoff_topic(
       savo_mapping::topics::EXPLORATION_GOAL_FEEDBACK));
+
+  EXPECT_TRUE(
+    savo_mapping::topics::is_navigation_handoff_topic(
+      savo_mapping::topics::COVERAGE_PATH));
+
+  EXPECT_TRUE(
+    savo_mapping::topics::is_navigation_handoff_topic(
+      savo_mapping::topics::COVERAGE_EXECUTION_STATE));
+
+  EXPECT_TRUE(
+    savo_mapping::topics::is_navigation_handoff_topic(
+      savo_mapping::topics::COVERAGE_EXECUTION_STATUS));
+
+  EXPECT_TRUE(
+    savo_mapping::topics::is_navigation_handoff_topic(
+      savo_mapping::topics::COVERAGE_EXECUTION_FEEDBACK));
 
   EXPECT_TRUE(
     savo_mapping::topics::is_navigation_handoff_topic(

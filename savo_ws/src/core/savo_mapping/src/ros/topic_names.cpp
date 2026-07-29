@@ -77,6 +77,10 @@ bool is_navigation_handoff_topic(std::string_view topic)
          topic == EXPLORATION_GOAL_STATE ||
          topic == EXPLORATION_GOAL_STATUS ||
          topic == EXPLORATION_GOAL_FEEDBACK ||
+         topic == COVERAGE_PATH ||
+         topic == COVERAGE_EXECUTION_STATE ||
+         topic == COVERAGE_EXECUTION_STATUS ||
+         topic == COVERAGE_EXECUTION_FEEDBACK ||
          topic == NAV_STATUS;
 }
 

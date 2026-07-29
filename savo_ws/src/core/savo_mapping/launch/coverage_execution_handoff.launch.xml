@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<launch>
+
+  <arg
+    name="params_file"
+    default="$(find-pkg-share savo_mapping)/config/coverage_execution_handoff.yaml"
+    description="Coverage execution handoff parameters"/>
+
+  <arg name="enabled" default="true" description="Stage Coverage plans for explicit approval"/>
+  <arg name="expected_frame" default="map" description="Required Coverage path frame"/>
+  <arg name="plan_topic" default="/savo_mapping/coverage/path" description="Read-only planned Coverage path"/>
+  <arg name="action_name" default="/savo_nav/coverage/execute_path" description="Guarded savo_nav Coverage action"/>
+  <arg name="approve_service" default="/savo_mapping/coverage_execution/approve" description="Explicit Coverage execution approval"/>
+  <arg name="cancel_service" default="/savo_mapping/coverage_execution/cancel" description="Cancel the active Coverage mission"/>
+  <arg name="reset_service" default="/savo_mapping/coverage_execution/reset" description="Reset a terminal Coverage mission"/>
+  <arg name="use_sim_time" default="false" description="Use the ROS simulation clock"/>
+
+  <node
+    pkg="savo_mapping"
+    exec="coverage_execution_handoff_node"
+    name="coverage_execution_handoff_node"
+    output="screen">
+
+    <param from="$(var params_file)"/>
+    <param name="enabled" value="$(var enabled)"/>
+    <param name="expected_frame" value="$(var expected_frame)"/>
+    <param name="plan_topic" value="$(var plan_topic)"/>
+    <param name="action_name" value="$(var action_name)"/>
+    <param name="approve_service" value="$(var approve_service)"/>
+    <param name="cancel_service" value="$(var cancel_service)"/>
+    <param name="reset_service" value="$(var reset_service)"/>
+    <param name="use_sim_time" value="$(var use_sim_time)"/>
+  </node>
+
+</launch>
