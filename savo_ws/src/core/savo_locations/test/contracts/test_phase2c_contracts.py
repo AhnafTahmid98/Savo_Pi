@@ -149,16 +149,34 @@ def test_loc2c_tests_exist() -> None:
     assert "test_phase2c_contracts" in cmake
 
 
-def test_loc2c_remains_without_ros_runtime() -> None:
-    cmake = read("CMakeLists.txt")
+def test_loc2c_persistence_remains_ros_independent() -> None:
+    persistence_layer = "\n".join(
+        (
+            read(
+                "include/savo_locations/"
+                "sqlite_schema.hpp"
+            ),
+            read(
+                "include/savo_locations/"
+                "sqlite_store.hpp"
+            ),
+            read(
+                "include/savo_locations/"
+                "sqlite_repository.hpp"
+            ),
+            read("src/sqlite_store.cpp"),
+            read("src/sqlite_repository.cpp"),
+        )
+    )
 
-    assert "find_package(rclcpp" not in cmake
-    assert "add_executable(" not in cmake
+    # Bootstrap, transactions and the append-only event
+    # journal remain ROS-independent storage behavior.
+    for forbidden in (
+        "rclcpp",
+        "std_msgs",
+        "geometry_msgs",
+        "builtin_interfaces",
+        "savo_msgs",
+    ):
+        assert forbidden not in persistence_layer
 
-    assert not (
-        ROOT
-        / "src"
-        / "location_registry_node.cpp"
-    ).exists()
-
-    assert not (ROOT / "launch").exists()

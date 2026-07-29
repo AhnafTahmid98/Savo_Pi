@@ -26,7 +26,9 @@ enum class SnapshotCode : std::uint8_t
   kSqlError,
   kCorruptData,
   kStaleRevision,
+  kCandidateRegistrationDeltaInvalid,
   kApprovalDeltaInvalid,
+  kLocationEnabledDeltaInvalid,
   kEventJournalError,
 };
 
@@ -101,6 +103,18 @@ struct BootstrapReport
 };
 
 
+struct CandidateRegistrationCommit
+{
+  std::string candidate_id;
+
+  std::string actor_id;
+  std::string reason;
+  std::string payload_json{"{}"};
+
+  CatalogSnapshot post_registration_snapshot;
+};
+
+
 struct CandidateApprovalCommit
 {
   std::string candidate_id;
@@ -115,6 +129,23 @@ struct CandidateApprovalCommit
   std::string payload_json{"{}"};
 
   CatalogSnapshot post_approval_snapshot;
+};
+
+
+struct LocationEnabledCommit
+{
+  std::string location_id;
+
+  std::uint64_t
+    expected_record_revision{0U};
+
+  bool enabled{false};
+
+  std::string actor_id;
+  std::string reason;
+  std::string payload_json{"{}"};
+
+  CatalogSnapshot post_update_snapshot;
 };
 
 
@@ -149,8 +180,18 @@ SnapshotResult list_events(
   std::vector<PersistenceEvent> * events) const;
 
 [[nodiscard]]
+SnapshotResult commit_candidate_registration(
+  const CandidateRegistrationCommit & request,
+  std::uint64_t * event_sequence);
+
+[[nodiscard]]
 SnapshotResult commit_candidate_approval(
   const CandidateApprovalCommit & request,
+  std::uint64_t * event_sequence);
+
+[[nodiscard]]
+SnapshotResult commit_location_enabled(
+  const LocationEnabledCommit & request,
   std::uint64_t * event_sequence);
 
 private:

@@ -120,8 +120,6 @@ def test_registry_checks_identity_and_tag_conflicts() -> None:
 
 
 def test_loc1b_registry_remains_dependency_isolated() -> None:
-    cmake = read("CMakeLists.txt")
-
     registry_layer = "\n".join(
         (
             read("include/savo_locations/registry.hpp"),
@@ -129,22 +127,18 @@ def test_loc1b_registry_remains_dependency_isolated() -> None:
         )
     )
 
-    # Later storage phases may add SQLite to a separate
-    # library. The LOC-1B in-memory registry itself must
-    # remain independent of ROS and SQLite.
-    assert "find_package(rclcpp" not in cmake
-    assert "rclcpp::rclcpp" not in cmake
-    assert "add_executable(" not in cmake
+    # The in-memory registry remains independent even
+    # though later targets in the package use ROS/SQLite.
+    for forbidden in (
+        "rclcpp",
+        "std_msgs",
+        "geometry_msgs",
+        "builtin_interfaces",
+        "sqlite3",
+        "sqlite_store",
+        "sqlite_repository",
+    ):
+        assert forbidden not in registry_layer
 
-    assert "#include <sqlite3.h>" not in registry_layer
-    assert "sqlite3_" not in registry_layer
-
-    assert not (ROOT / "launch").exists()
-
-    assert not (
-        ROOT
-        / "src"
-        / "location_registry_node.cpp"
-    ).exists()
 
 

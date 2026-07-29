@@ -414,6 +414,135 @@ InMemoryLocationCatalog::register_candidate(
 
 
 CandidateMutationResult
+InMemoryLocationCatalog::restore_candidate_record(
+  CandidateRecordData record)
+{
+  record.candidate.candidate_id =
+    candidate_key(
+      record.candidate.candidate_id);
+
+  const auto validation =
+    validate_candidate_draft(
+      record.candidate);
+
+  if (!validation.valid()) {
+    return candidate_validation_failure(
+      validation);
+  }
+
+  if (
+    record.candidate_revision == 0U ||
+    record.state == CandidateState::kUnknown)
+  {
+    return candidate_failure(
+      CandidateMutationCode::kInvalidCandidate,
+      "persisted candidate envelope is invalid");
+  }
+
+  switch (record.state) {
+    case CandidateState::kPendingReview:
+      if (
+        !trim_ascii(record.review_reason).empty() ||
+        !trim_ascii(
+          record.approved_location_id).empty())
+      {
+        return candidate_failure(
+          CandidateMutationCode::kInvalidCandidate,
+          "pending candidate envelope is invalid");
+      }
+      break;
+
+    case CandidateState::kApproved:
+      if (
+        trim_ascii(
+          record.approved_location_id).empty())
+      {
+        return candidate_failure(
+          CandidateMutationCode::kInvalidCandidate,
+          "approved candidate location is required");
+      }
+      break;
+
+    case CandidateState::kRejected:
+      if (
+        trim_ascii(record.review_reason).empty() ||
+        !trim_ascii(
+          record.approved_location_id).empty())
+      {
+        return candidate_failure(
+          CandidateMutationCode::kInvalidCandidate,
+          "rejected candidate envelope is invalid");
+      }
+      break;
+
+    case CandidateState::kUnknown:
+    default:
+      return candidate_failure(
+        CandidateMutationCode::kInvalidCandidate,
+        "candidate state is invalid");
+  }
+
+  std::unique_lock<std::shared_mutex> lock{
+    mutex_};
+
+  const auto key =
+    record.candidate.candidate_id;
+
+  if (candidates_.find(key) != candidates_.end()) {
+    return candidate_failure(
+      CandidateMutationCode::kCandidateIdConflict,
+      "candidate ID already exists");
+  }
+
+  if (
+    record.state == CandidateState::kPendingReview)
+  {
+    std::string conflict;
+
+    if (
+      candidate_tag_conflict_locked(
+        record.candidate,
+        "",
+        &conflict))
+    {
+      return candidate_failure(
+        CandidateMutationCode::kTagConflict,
+        "candidate AprilTag conflicts with " +
+        conflict);
+    }
+
+    if (
+      candidate_tag_conflicts_with_location_locked(
+        record.candidate,
+        &conflict))
+    {
+      return candidate_failure(
+        CandidateMutationCode::kTagConflict,
+        "candidate AprilTag conflicts with location " +
+        conflict);
+    }
+  }
+
+  if (
+    record.state == CandidateState::kApproved &&
+    !locations_.get(
+      record.approved_location_id).has_value())
+  {
+    return candidate_failure(
+      CandidateMutationCode::kInvalidCandidate,
+      "approved candidate references a missing location");
+  }
+
+  candidates_.emplace(key, record);
+
+  return candidate_success(
+    CandidateMutationCode::kUpdated,
+    "candidate record restored",
+    record);
+}
+
+
+CandidateMutationResult
 InMemoryLocationCatalog::replace_candidate(
   const std::string_view candidate_id,
   CandidateDraft replacement,

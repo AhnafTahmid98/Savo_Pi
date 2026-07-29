@@ -21,6 +21,7 @@ endif()
 
 find_package(ament_cmake REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
@@ -57,6 +58,7 @@ target_link_libraries(${PROJECT_NAME}_core
 add_library(${PROJECT_NAME}_ros STATIC
   src/bridge_node.cpp
   src/qos_profiles.cpp
+  src/ros_command_dispatcher.cpp
   src/ros_graph_discovery.cpp
 )
 
@@ -73,6 +75,7 @@ target_compile_features(${PROJECT_NAME}_ros
 
 ament_target_dependencies(${PROJECT_NAME}_ros
   diagnostic_msgs
+  geometry_msgs
   rclcpp
   std_msgs
 )
@@ -171,6 +174,28 @@ if(BUILD_TESTING)
     target_link_libraries(
       test_savo_bridge_stop_command_adapter
       ${PROJECT_NAME}_core
+    )
+  endif()
+
+
+  ament_add_gtest(
+    test_savo_bridge_ros_command_dispatcher
+    test/integration/test_ros_command_dispatcher.cpp
+    TIMEOUT 30
+  )
+
+  if(TARGET test_savo_bridge_ros_command_dispatcher)
+    target_link_libraries(
+      test_savo_bridge_ros_command_dispatcher
+      ${PROJECT_NAME}_ros
+      ${PROJECT_NAME}_core
+    )
+
+    ament_target_dependencies(
+      test_savo_bridge_ros_command_dispatcher
+      geometry_msgs
+      rclcpp
+      std_msgs
     )
   endif()
 
@@ -409,6 +434,7 @@ ament_export_targets(
 
 ament_export_dependencies(
   diagnostic_msgs
+  geometry_msgs
   nlohmann_json
   rclcpp
   std_msgs

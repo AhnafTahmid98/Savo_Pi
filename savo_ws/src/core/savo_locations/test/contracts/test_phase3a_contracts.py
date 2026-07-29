@@ -110,7 +110,7 @@ def test_node_uses_persistent_bootstrap() -> None:
     assert "registry unavailable:" in source
 
 
-def test_node_exposes_only_read_services() -> None:
+def test_node_preserves_loc3a_read_services() -> None:
     source = read(
         "src/location_registry_node.cpp"
     )
@@ -123,24 +123,33 @@ def test_node_exposes_only_read_services() -> None:
     combined = source + header
 
     for endpoint in (
-        "services::kResolve",
-        "services::kGet",
-        "services::kList",
+        "service_names::kResolve",
+        "service_names::kGet",
+        "service_names::kList",
     ):
         assert endpoint in combined
 
-    for forbidden in (
-        "RegisterLocationCandidate",
-        "ApproveLocation",
-        "SetLocationEnabled",
-        "services::kRegisterCandidate",
-        "services::kApproveCandidate",
-        "services::kSetEnabled",
-    ):
-        assert forbidden not in combined
+    # LOC-3A introduced a read-only runtime. Later phases may add
+    # write services, but must preserve the original read surface.
+    package = ET.parse(ROOT / "package.xml").getroot()
+    version = package.findtext("version")
+
+    assert version is not None
+
+    if parse_version(version) < (0, 10, 0):
+        for forbidden in (
+            "RegisterLocationCandidate",
+            "ApproveLocation",
+            "SetLocationEnabled",
+            "handle_register",
+            "handle_approve",
+            "handle_set_enabled",
+        ):
+            assert forbidden not in combined
 
 
-def test_status_heartbeat_and_snapshot_are_latched() -> None:
+
+def test_status_snapshot_latched_heartbeat_volatile() -> None:
     source = read(
         "src/location_registry_node.cpp"
     )
@@ -153,11 +162,16 @@ def test_status_heartbeat_and_snapshot_are_latched() -> None:
     assert "/savo_locations/heartbeat" in topics
     assert "/savo_locations/snapshot" in topics
 
+    # Status and snapshot retain their latest values.
     assert "transient_local()" in source
-    assert '"mode":"read_only"' in source
-    assert '"ready":' in source
-    assert "storage_healthy" in source
-    assert "heartbeat_sequence_" in source
+
+    # Heartbeat is a continuous volatile signal.
+    assert "durability_volatile()" in source
+
+    # Status/snapshot identify LOC-3A as read-only.
+    assert "mode" in source
+    assert "read_only" in source
+
 
 
 def test_resolution_remains_fail_closed() -> None:

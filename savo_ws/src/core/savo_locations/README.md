@@ -307,3 +307,24 @@ read services.
 LOC-3A deliberately does not expose candidate registration,
 approval, rejection, enable/disable, import or other write paths.
 Those operations require a separately validated write phase.
+
+
+## LOC-3B2 persistent ROS write services
+
+LOC-3B2 exposes the persistent mutation surface:
+
+- `/savo_locations/candidates/register`;
+- `/savo_locations/candidates/approve`;
+- `/savo_locations/set_enabled`;
+- `/savo_locations/events` for reliable post-commit events.
+
+Every mutation is serialized, validated against a complete hydrated catalog,
+and committed through the dedicated atomic SQLite transaction API introduced
+in LOC-3B1. Service success is returned only after the snapshot and immutable
+event row commit together. Validation, duplicate, conflict, stale-revision and
+no-op requests do not modify persistent state.
+
+A persistence or event-journal failure disables further writes until restart
+while the last committed in-memory read view remains available. Status reports
+separate `read_ready` and `write_ready` fields so supervision can distinguish a
+readable registry from a write-degraded registry.

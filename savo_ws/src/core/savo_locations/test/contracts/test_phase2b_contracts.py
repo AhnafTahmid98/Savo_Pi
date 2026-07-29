@@ -130,16 +130,25 @@ def test_repository_validates_before_and_after_io() -> None:
     assert "persisted catalog failed domain validation" in implementation
 
 
-def test_loc2b_still_has_no_ros_runtime_node() -> None:
-    cmake = read("CMakeLists.txt")
+def test_loc2b_repository_remains_ros_independent() -> None:
+    repository_layer = "\n".join(
+        (
+            read(
+                "include/savo_locations/"
+                "sqlite_repository.hpp"
+            ),
+            read("src/sqlite_repository.cpp"),
+        )
+    )
 
-    assert "find_package(rclcpp" not in cmake
-    assert "add_executable(" not in cmake
+    # Typed persistence remains below and independent
+    # from the later LOC-3A ROS adapter.
+    for forbidden in (
+        "rclcpp",
+        "std_msgs",
+        "geometry_msgs",
+        "builtin_interfaces",
+        "savo_msgs",
+    ):
+        assert forbidden not in repository_layer
 
-    assert not (
-        ROOT
-        / "src"
-        / "location_registry_node.cpp"
-    ).exists()
-
-    assert not (ROOT / "launch").exists()

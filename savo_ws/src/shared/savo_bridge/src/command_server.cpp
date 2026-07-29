@@ -632,11 +632,13 @@ struct WriteResult
   return result;
 }
 
-[[nodiscard]] Json response_details()
+[[nodiscard]] Json response_details(
+  const bool dispatch_attempted = false,
+  const std::size_t ros_publications = 0U)
 {
   return Json{
-    {"dispatch_attempted", false},
-    {"ros_publications", 0},
+    {"dispatch_attempted", dispatch_attempted},
+    {"ros_publications", ros_publications},
   };
 }
 
@@ -665,20 +667,24 @@ struct WriteResult
 [[nodiscard]] Json acknowledgement_response(
   const ValidatedCommand & command,
   const std::string & bridge_instance_id,
+  const std::string & execution_mode,
+  const CommandDispatchResult & dispatch,
   const std::int64_t received_at_unix_ms)
 {
   return Json{
     {"protocol_version", COMMAND_PROTOCOL_VERSION},
     {"message_type", "command_acknowledgement"},
     {"command_id", command.command_id},
-    {"accepted", true},
-    {"state", "dry_run"},
-    {"reason", "bridge_command_dry_run_accepted"},
+    {"accepted", dispatch.accepted},
+    {"state", dispatch.state},
+    {"reason", dispatch.reason},
     {"bridge_instance_id", bridge_instance_id},
-    {"execution_mode", "dry_run"},
+    {"execution_mode", execution_mode},
     {"duplicate", false},
     {"received_at_unix_ms", received_at_unix_ms},
-    {"details", response_details()},
+    {"details", response_details(
+        dispatch.dispatch_attempted,
+        dispatch.ros_publications)},
   };
 }
 
@@ -733,6 +739,10 @@ const char * to_string(const CommandServerStatus status) noexcept
       return "protocol_error";
     case CommandServerStatus::DryRunAcknowledged:
       return "dry_run_acknowledged";
+    case CommandServerStatus::CommandAcknowledged:
+      return "command_acknowledged";
+    case CommandServerStatus::CommandRejected:
+      return "command_rejected";
     case CommandServerStatus::ResponseTooLarge:
       return "response_too_large";
     case CommandServerStatus::WriteTimeout:
@@ -746,9 +756,13 @@ const char * to_string(const CommandServerStatus status) noexcept
 class CommandServer::Impl
 {
 public:
-  Impl(CommandServerConfig config, Clock clock)
+  Impl(
+    CommandServerConfig config,
+    Clock clock,
+    Dispatcher dispatcher)
   : config_(std::move(config)),
-    clock_(std::move(clock))
+    clock_(std::move(clock)),
+    dispatcher_(std::move(dispatcher))
   {
     if (!clock_) {
       clock_ = default_now_unix_ms;
@@ -771,6 +785,24 @@ public:
       return make_result(
         CommandServerStatus::Started,
         "command_server_already_started");
+    }
+
+    if (
+      config_.execution_mode != "dry_run" &&
+      config_.execution_mode != "live")
+    {
+      return make_result(
+        CommandServerStatus::InvalidConfig,
+        "command_server_execution_mode_invalid");
+    }
+
+    if (
+      config_.execution_mode == "live" &&
+      !dispatcher_)
+    {
+      return make_result(
+        CommandServerStatus::InvalidConfig,
+        "command_server_live_dispatcher_missing");
     }
 
     const auto validation = validate_config();
@@ -853,6 +885,20 @@ public:
       return make_result(
         CommandServerStatus::SocketError,
         "command_server_chmod_failed");
+    }
+
+    if (
+      config_.socket_gid.has_value() &&
+      ::chown(
+        config_.socket_path.c_str(),
+        static_cast<uid_t>(-1),
+        static_cast<gid_t>(
+          config_.socket_gid.value())) != 0)
+    {
+      remove_if_identity(config_.socket_path, created);
+      return make_result(
+        CommandServerStatus::SocketError,
+        "command_server_chown_failed");
     }
 
     if (::listen(listener.get(), 4) != 0) {
@@ -971,15 +1017,73 @@ public:
       return send_and_finish(client.get(), response, std::move(result));
     }
 
-    result.status = CommandServerStatus::DryRunAcknowledged;
-    result.reason = "bridge_command_dry_run_accepted";
     result.command_id = parsed.command->command_id;
+
+    CommandDispatchResult dispatch;
+
+    if (config_.execution_mode == "dry_run") {
+      dispatch.accepted = true;
+      dispatch.state = "dry_run";
+      dispatch.reason = "bridge_command_dry_run_accepted";
+      dispatch.dispatch_attempted = false;
+      dispatch.ros_publications = 0U;
+
+      result.status =
+        CommandServerStatus::DryRunAcknowledged;
+    } else {
+      try {
+        dispatch = dispatcher_(
+          parsed.command.value());
+      } catch (const std::exception &) {
+        dispatch.accepted = false;
+        dispatch.state = "rejected";
+        dispatch.reason =
+          "bridge_command_live_dispatch_internal_error";
+        dispatch.dispatch_attempted = true;
+        dispatch.ros_publications = 0U;
+      } catch (...) {
+        dispatch.accepted = false;
+        dispatch.state = "rejected";
+        dispatch.reason =
+          "bridge_command_live_dispatch_internal_error";
+        dispatch.dispatch_attempted = true;
+        dispatch.ros_publications = 0U;
+      }
+
+      if (dispatch.accepted) {
+        dispatch.state = "accepted";
+        result.status =
+          CommandServerStatus::CommandAcknowledged;
+      } else {
+        dispatch.state = "rejected";
+        result.status =
+          CommandServerStatus::CommandRejected;
+      }
+
+      if (dispatch.reason.empty()) {
+        dispatch.reason = dispatch.accepted ?
+          "bridge_command_accepted" :
+          "bridge_command_rejected";
+      }
+    }
+
+    result.reason = dispatch.reason;
+    result.dispatch_attempted =
+      dispatch.dispatch_attempted;
+    result.ros_publications =
+      dispatch.ros_publications;
 
     const auto response = acknowledgement_response(
       parsed.command.value(),
       config_.bridge_instance_id,
+      config_.execution_mode,
+      dispatch,
       now);
-    return send_and_finish(client.get(), response, std::move(result));
+
+    return send_and_finish(
+      client.get(),
+      response,
+      std::move(result));
   }
 
   [[nodiscard]] CommandServerResult stop() noexcept
@@ -1078,13 +1182,20 @@ private:
 
   CommandServerConfig config_;
   Clock clock_;
+  Dispatcher dispatcher_;
   FileDescriptor listener_;
   dev_t socket_device_{0};
   ino_t socket_inode_{0};
 };
 
-CommandServer::CommandServer(CommandServerConfig config, Clock clock)
-: impl_(std::make_unique<Impl>(std::move(config), std::move(clock)))
+CommandServer::CommandServer(
+  CommandServerConfig config,
+  Clock clock,
+  Dispatcher dispatcher)
+: impl_(std::make_unique<Impl>(
+    std::move(config),
+    std::move(clock),
+    std::move(dispatcher)))
 {
 }
 

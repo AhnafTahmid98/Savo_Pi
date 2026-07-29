@@ -13,6 +13,8 @@
 #include <string>
 #include <vector>
 
+#include "savo_bridge/command_protocol.hpp"
+
 namespace savo_bridge
 {
 
@@ -33,8 +35,10 @@ struct CommandServerConfig
   std::int64_t client_read_timeout_ms{DEFAULT_COMMAND_READ_TIMEOUT_MS};
   std::int64_t client_write_timeout_ms{DEFAULT_COMMAND_WRITE_TIMEOUT_MS};
   std::uint32_t socket_mode{DEFAULT_COMMAND_SOCKET_MODE};
+  std::optional<std::uint32_t> socket_gid;
   std::vector<std::uint32_t> allowed_peer_uids;
   std::string bridge_instance_id{"savo-bridge"};
+  std::string execution_mode{"dry_run"};
 
   CommandServerConfig();
 };
@@ -60,6 +64,8 @@ enum class CommandServerStatus
   InvalidFrame,
   ProtocolError,
   DryRunAcknowledged,
+  CommandAcknowledged,
+  CommandRejected,
   ResponseTooLarge,
   WriteTimeout,
   WriteError,
@@ -67,6 +73,15 @@ enum class CommandServerStatus
 
 [[nodiscard]] const char * to_string(
   CommandServerStatus status) noexcept;
+
+struct CommandDispatchResult
+{
+  bool accepted{false};
+  std::string state{"rejected"};
+  std::string reason{"bridge_command_dispatch_rejected"};
+  bool dispatch_attempted{false};
+  std::size_t ros_publications{0U};
+};
 
 struct CommandServerResult
 {
@@ -88,10 +103,13 @@ class CommandServer
 {
 public:
   using Clock = std::function<std::int64_t()>;
+  using Dispatcher = std::function<
+    CommandDispatchResult(const ValidatedCommand &)>;
 
   explicit CommandServer(
     CommandServerConfig config,
-    Clock clock = {});
+    Clock clock = {},
+    Dispatcher dispatcher = {});
   ~CommandServer();
 
   CommandServer(const CommandServer &) = delete;

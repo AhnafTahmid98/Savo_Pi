@@ -2265,6 +2265,301 @@ int insert_event_row(
 }
 
 
+SnapshotResult validate_registration_delta(
+  const CatalogSnapshot & current,
+  const CandidateRegistrationCommit & request)
+{
+  const auto & post =
+    request.post_registration_snapshot;
+
+  if (
+    find_candidate(
+      current,
+      request.candidate_id) != nullptr)
+  {
+    return snapshot_failure(
+      SnapshotCode::
+        kCandidateRegistrationDeltaInvalid,
+      SQLITE_CONSTRAINT,
+      "candidate registration ID already exists");
+  }
+
+  if (
+    post.locations.size() !=
+    current.locations.size())
+  {
+    return snapshot_failure(
+      SnapshotCode::
+        kCandidateRegistrationDeltaInvalid,
+      SQLITE_CONSTRAINT,
+      "candidate registration changed locations");
+  }
+
+  for (
+    const auto & previous :
+    current.locations)
+  {
+    const auto * next =
+      find_location(
+        post,
+        previous.location.location_id);
+
+    if (
+      next == nullptr ||
+      !same_location_record(
+        previous,
+        *next))
+    {
+      return snapshot_failure(
+        SnapshotCode::
+          kCandidateRegistrationDeltaInvalid,
+        SQLITE_CONSTRAINT,
+        "candidate registration changed "
+        "an existing location");
+    }
+  }
+
+  if (
+    post.candidates.size() !=
+    current.candidates.size() + 1U)
+  {
+    return snapshot_failure(
+      SnapshotCode::
+        kCandidateRegistrationDeltaInvalid,
+      SQLITE_CONSTRAINT,
+      "candidate registration must add "
+      "exactly one candidate");
+  }
+
+  for (
+    const auto & previous :
+    current.candidates)
+  {
+    const auto * next =
+      find_candidate(
+        post,
+        previous.candidate.candidate_id);
+
+    if (
+      next == nullptr ||
+      !same_candidate_record(
+        previous,
+        *next))
+    {
+      return snapshot_failure(
+        SnapshotCode::
+          kCandidateRegistrationDeltaInvalid,
+        SQLITE_CONSTRAINT,
+        "candidate registration changed "
+        "an existing candidate");
+    }
+  }
+
+  const auto * registered =
+    find_candidate(
+      post,
+      request.candidate_id);
+
+  if (
+    registered == nullptr ||
+    registered->state !=
+      CandidateState::kPendingReview ||
+    registered->candidate_revision != 1U ||
+    registered->candidate.candidate_id !=
+      request.candidate_id ||
+    !registered->review_reason.empty() ||
+    !registered->approved_location_id.empty())
+  {
+    return snapshot_failure(
+      SnapshotCode::
+        kCandidateRegistrationDeltaInvalid,
+      SQLITE_CONSTRAINT,
+      "registered candidate transition is invalid");
+  }
+
+  return snapshot_success(
+    "candidate registration delta is valid");
+}
+
+
+SnapshotResult validate_location_enabled_delta(
+  const CatalogSnapshot & current,
+  const LocationEnabledCommit & request)
+{
+  const auto & post =
+    request.post_update_snapshot;
+
+  const auto * current_location =
+    find_location(
+      current,
+      request.location_id);
+
+  if (current_location == nullptr) {
+    return snapshot_failure(
+      SnapshotCode::
+        kLocationEnabledDeltaInvalid,
+      SQLITE_NOTFOUND,
+      "location does not exist");
+  }
+
+  if (
+    current_location->record_revision !=
+    request.expected_record_revision)
+  {
+    return snapshot_failure(
+      SnapshotCode::kStaleRevision,
+      SQLITE_BUSY,
+      "location revision is stale");
+  }
+
+  if (
+    current_location->state ==
+      LocationState::kRetired)
+  {
+    return snapshot_failure(
+      SnapshotCode::
+        kLocationEnabledDeltaInvalid,
+      SQLITE_CONSTRAINT,
+      "retired location cannot change enablement");
+  }
+
+  if (
+    current_location->enabled ==
+    request.enabled)
+  {
+    return snapshot_failure(
+      SnapshotCode::
+        kLocationEnabledDeltaInvalid,
+      SQLITE_CONSTRAINT,
+      "location already has the requested "
+      "enablement state");
+  }
+
+  if (
+    request.expected_record_revision ==
+    std::numeric_limits<
+      std::uint64_t>::max())
+  {
+    return snapshot_failure(
+      SnapshotCode::
+        kLocationEnabledDeltaInvalid,
+      SQLITE_CONSTRAINT,
+      "location revision cannot be incremented");
+  }
+
+  if (
+    post.candidates.size() !=
+    current.candidates.size())
+  {
+    return snapshot_failure(
+      SnapshotCode::
+        kLocationEnabledDeltaInvalid,
+      SQLITE_CONSTRAINT,
+      "enablement change modified candidates");
+  }
+
+  for (
+    const auto & previous :
+    current.candidates)
+  {
+    const auto * next =
+      find_candidate(
+        post,
+        previous.candidate.candidate_id);
+
+    if (
+      next == nullptr ||
+      !same_candidate_record(
+        previous,
+        *next))
+    {
+      return snapshot_failure(
+        SnapshotCode::
+          kLocationEnabledDeltaInvalid,
+        SQLITE_CONSTRAINT,
+        "enablement change modified a candidate");
+    }
+  }
+
+  if (
+    post.locations.size() !=
+    current.locations.size())
+  {
+    return snapshot_failure(
+      SnapshotCode::
+        kLocationEnabledDeltaInvalid,
+      SQLITE_CONSTRAINT,
+      "enablement change modified location count");
+  }
+
+  for (
+    const auto & previous :
+    current.locations)
+  {
+    const auto * next =
+      find_location(
+        post,
+        previous.location.location_id);
+
+    if (next == nullptr) {
+      return snapshot_failure(
+        SnapshotCode::
+          kLocationEnabledDeltaInvalid,
+        SQLITE_CONSTRAINT,
+        "enablement change removed a location");
+    }
+
+    if (
+      previous.location.location_id ==
+      request.location_id)
+    {
+      continue;
+    }
+
+    if (
+      !same_location_record(
+        previous,
+        *next))
+    {
+      return snapshot_failure(
+        SnapshotCode::
+          kLocationEnabledDeltaInvalid,
+        SQLITE_CONSTRAINT,
+        "enablement change modified "
+        "an unrelated location");
+    }
+  }
+
+  const auto * updated =
+    find_location(
+      post,
+      request.location_id);
+
+  if (
+    updated == nullptr ||
+    updated->state !=
+      current_location->state ||
+    updated->enabled != request.enabled ||
+    updated->record_revision !=
+      request.expected_record_revision + 1U ||
+    updated->source_candidate_id !=
+      current_location->source_candidate_id ||
+    !same_location_draft(
+      updated->location,
+      current_location->location))
+  {
+    return snapshot_failure(
+      SnapshotCode::
+        kLocationEnabledDeltaInvalid,
+      SQLITE_CONSTRAINT,
+      "location enablement transition is invalid");
+  }
+
+  return snapshot_success(
+    "location enablement delta is valid");
+}
+
+
 SnapshotResult validate_approval_delta(
   const CatalogSnapshot & current,
   const CandidateApprovalCommit & request)
@@ -2500,8 +2795,16 @@ std::string_view to_string(
     case SnapshotCode::kStaleRevision:
       return "stale_revision";
 
+    case SnapshotCode::
+        kCandidateRegistrationDeltaInvalid:
+      return "candidate_registration_delta_invalid";
+
     case SnapshotCode::kApprovalDeltaInvalid:
       return "approval_delta_invalid";
+
+    case SnapshotCode::
+        kLocationEnabledDeltaInvalid:
+      return "location_enabled_delta_invalid";
 
     case SnapshotCode::kEventJournalError:
       return "event_journal_error";
@@ -3163,6 +3466,206 @@ SnapshotResult SqliteRepository::list_events(
 
 
 SnapshotResult
+SqliteRepository::commit_candidate_registration(
+  const CandidateRegistrationCommit & request,
+  std::uint64_t * event_sequence)
+{
+  if (
+    trim_ascii(request.candidate_id).empty() ||
+    trim_ascii(request.actor_id).empty() ||
+    trim_ascii(request.reason).empty())
+  {
+    return snapshot_failure(
+      SnapshotCode::kInvalidArgument,
+      SQLITE_MISUSE,
+      "candidate ID, actor and reason are required");
+  }
+
+  const auto post_validation =
+    validate_snapshot(
+      request.post_registration_snapshot);
+
+  if (!post_validation.success) {
+    return post_validation;
+  }
+
+  std::lock_guard<std::mutex> lock{
+    store_.mutex_};
+
+  if (store_.database_ == nullptr) {
+    return snapshot_failure(
+      SnapshotCode::kStoreNotOpen,
+      SQLITE_MISUSE,
+      "SQLite store is not open");
+  }
+
+  if (store_.transaction_active_) {
+    return snapshot_failure(
+      SnapshotCode::kTransactionActive,
+      SQLITE_BUSY,
+      "SQLite store already has an active transaction");
+  }
+
+  int code = execute_sql(
+    store_.database_,
+    "BEGIN IMMEDIATE;");
+
+  if (code != SQLITE_OK) {
+    return sqlite_failure(
+      store_.database_,
+      code,
+      "could not begin candidate registration "
+      "transaction");
+  }
+
+  store_.transaction_active_ = true;
+
+  store_.transaction_owner_ =
+    std::this_thread::get_id();
+
+  auto rollback =
+    [&]()
+    {
+      static_cast<void>(
+        execute_sql(
+          store_.database_,
+          "ROLLBACK;"));
+
+      store_.transaction_active_ = false;
+      store_.transaction_owner_ =
+        std::thread::id{};
+    };
+
+  CatalogSnapshot current;
+
+  auto result = read_locations(
+    store_.database_,
+    &current);
+
+  if (!result.success) {
+    rollback();
+    return result;
+  }
+
+  result = read_candidates(
+    store_.database_,
+    &current);
+
+  if (!result.success) {
+    rollback();
+    return result;
+  }
+
+  result = validate_snapshot(current);
+
+  if (!result.success) {
+    rollback();
+
+    result.code =
+      SnapshotCode::kCorruptData;
+
+    result.sqlite_code =
+      SQLITE_CORRUPT;
+
+    result.reason =
+      "persisted pre-registration catalog "
+      "is invalid: " +
+      result.reason;
+
+    return result;
+  }
+
+  result = validate_registration_delta(
+    current,
+    request);
+
+  if (!result.success) {
+    rollback();
+    return result;
+  }
+
+  const std::int64_t timestamp =
+    unix_time_ns();
+
+  code = replace_snapshot_rows(
+    store_.database_,
+    request.post_registration_snapshot,
+    timestamp);
+
+  if (code != SQLITE_OK) {
+    rollback();
+
+    return sqlite_failure(
+      store_.database_,
+      code,
+      "could not persist candidate registration");
+  }
+
+  PersistenceEvent event;
+
+  event.event_time_unix_ns = timestamp;
+
+  event.event_type =
+    PersistenceEventType::
+      kCandidateRegistered;
+
+  event.candidate_id =
+    request.candidate_id;
+
+  event.entity_revision = 1U;
+  event.actor_id = request.actor_id;
+  event.reason = request.reason;
+
+  event.payload_json =
+    request.payload_json.empty() ?
+      "{}" :
+      request.payload_json;
+
+  std::uint64_t inserted_sequence = 0U;
+
+  code = insert_event_row(
+    store_.database_,
+    event,
+    &inserted_sequence);
+
+  if (code != SQLITE_OK) {
+    rollback();
+
+    return snapshot_failure(
+      SnapshotCode::kEventJournalError,
+      code,
+      "candidate registration event append failed; "
+      "snapshot was rolled back");
+  }
+
+  code = execute_sql(
+    store_.database_,
+    "COMMIT;");
+
+  if (code != SQLITE_OK) {
+    rollback();
+
+    return sqlite_failure(
+      store_.database_,
+      code,
+      "could not commit candidate registration "
+      "transaction");
+  }
+
+  store_.transaction_active_ = false;
+  store_.transaction_owner_ =
+    std::thread::id{};
+
+  if (event_sequence != nullptr) {
+    *event_sequence = inserted_sequence;
+  }
+
+  return snapshot_success(
+    "candidate registration persisted atomically");
+}
+
+
+SnapshotResult
 SqliteRepository::commit_candidate_approval(
   const CandidateApprovalCommit & request,
   std::uint64_t * event_sequence)
@@ -3365,6 +3868,210 @@ SqliteRepository::commit_candidate_approval(
 
   return snapshot_success(
     "candidate approval persisted atomically");
+}
+
+
+SnapshotResult
+SqliteRepository::commit_location_enabled(
+  const LocationEnabledCommit & request,
+  std::uint64_t * event_sequence)
+{
+  if (
+    trim_ascii(request.location_id).empty() ||
+    request.expected_record_revision == 0U ||
+    trim_ascii(request.actor_id).empty() ||
+    trim_ascii(request.reason).empty())
+  {
+    return snapshot_failure(
+      SnapshotCode::kInvalidArgument,
+      SQLITE_MISUSE,
+      "location ID, revision, actor and reason "
+      "are required");
+  }
+
+  const auto post_validation =
+    validate_snapshot(
+      request.post_update_snapshot);
+
+  if (!post_validation.success) {
+    return post_validation;
+  }
+
+  std::lock_guard<std::mutex> lock{
+    store_.mutex_};
+
+  if (store_.database_ == nullptr) {
+    return snapshot_failure(
+      SnapshotCode::kStoreNotOpen,
+      SQLITE_MISUSE,
+      "SQLite store is not open");
+  }
+
+  if (store_.transaction_active_) {
+    return snapshot_failure(
+      SnapshotCode::kTransactionActive,
+      SQLITE_BUSY,
+      "SQLite store already has an active transaction");
+  }
+
+  int code = execute_sql(
+    store_.database_,
+    "BEGIN IMMEDIATE;");
+
+  if (code != SQLITE_OK) {
+    return sqlite_failure(
+      store_.database_,
+      code,
+      "could not begin location enablement "
+      "transaction");
+  }
+
+  store_.transaction_active_ = true;
+
+  store_.transaction_owner_ =
+    std::this_thread::get_id();
+
+  auto rollback =
+    [&]()
+    {
+      static_cast<void>(
+        execute_sql(
+          store_.database_,
+          "ROLLBACK;"));
+
+      store_.transaction_active_ = false;
+      store_.transaction_owner_ =
+        std::thread::id{};
+    };
+
+  CatalogSnapshot current;
+
+  auto result = read_locations(
+    store_.database_,
+    &current);
+
+  if (!result.success) {
+    rollback();
+    return result;
+  }
+
+  result = read_candidates(
+    store_.database_,
+    &current);
+
+  if (!result.success) {
+    rollback();
+    return result;
+  }
+
+  result = validate_snapshot(current);
+
+  if (!result.success) {
+    rollback();
+
+    result.code =
+      SnapshotCode::kCorruptData;
+
+    result.sqlite_code =
+      SQLITE_CORRUPT;
+
+    result.reason =
+      "persisted pre-enablement catalog "
+      "is invalid: " +
+      result.reason;
+
+    return result;
+  }
+
+  result = validate_location_enabled_delta(
+    current,
+    request);
+
+  if (!result.success) {
+    rollback();
+    return result;
+  }
+
+  const std::int64_t timestamp =
+    unix_time_ns();
+
+  code = replace_snapshot_rows(
+    store_.database_,
+    request.post_update_snapshot,
+    timestamp);
+
+  if (code != SQLITE_OK) {
+    rollback();
+
+    return sqlite_failure(
+      store_.database_,
+      code,
+      "could not persist location enablement");
+  }
+
+  PersistenceEvent event;
+
+  event.event_time_unix_ns = timestamp;
+
+  event.event_type =
+    PersistenceEventType::
+      kLocationEnabledChanged;
+
+  event.location_id =
+    request.location_id;
+
+  event.entity_revision =
+    request.expected_record_revision + 1U;
+
+  event.actor_id = request.actor_id;
+  event.reason = request.reason;
+
+  event.payload_json =
+    request.payload_json.empty() ?
+      "{}" :
+      request.payload_json;
+
+  std::uint64_t inserted_sequence = 0U;
+
+  code = insert_event_row(
+    store_.database_,
+    event,
+    &inserted_sequence);
+
+  if (code != SQLITE_OK) {
+    rollback();
+
+    return snapshot_failure(
+      SnapshotCode::kEventJournalError,
+      code,
+      "location enablement event append failed; "
+      "snapshot was rolled back");
+  }
+
+  code = execute_sql(
+    store_.database_,
+    "COMMIT;");
+
+  if (code != SQLITE_OK) {
+    rollback();
+
+    return sqlite_failure(
+      store_.database_,
+      code,
+      "could not commit location enablement "
+      "transaction");
+  }
+
+  store_.transaction_active_ = false;
+  store_.transaction_owner_ =
+    std::thread::id{};
+
+  if (event_sequence != nullptr) {
+    *event_sequence = inserted_sequence;
+  }
+
+  return snapshot_success(
+    "location enablement persisted atomically");
 }
 
 }  // namespace savo_locations

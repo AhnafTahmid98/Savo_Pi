@@ -1,0 +1,3028 @@
+Robot Savo — R1-B dispatcher final contracts
+Generated: 2026-07-29T22:19:42+03:00
+
+======================================================================
+SAVO NAV ACTION NAMES
+======================================================================
+
+FILE: src/core/savo_nav/include/savo_nav/action_names.hpp
+----------------------------------------------------------------------
+// Copyright 2026 Ahnaf Tahmid
+// SPDX-License-Identifier: LicenseRef-Proprietary
+
+#pragma once
+
+#include <string_view>
+
+namespace savo_nav::actions
+{
+
+inline constexpr std::string_view
+  kNavigationNavigateToPose =
+  "/savo_nav/navigation/navigate_to_pose";
+
+inline constexpr std::string_view
+  kExplorationNavigateToPose =
+  "/savo_nav/exploration/navigate_to_pose";
+
+inline constexpr std::string_view
+  kCoverageExecutePath =
+  "/savo_nav/coverage/execute_path";
+
+inline constexpr std::string_view
+  kNav2NavigateToPose =
+  "/navigate_to_pose";
+
+inline constexpr std::string_view
+  kNav2FollowPath =
+  "/follow_path";
+
+
+inline constexpr std::string_view
+  kInternalNavigationNavigateToPose =
+  "/savo_nav/_internal/navigation/navigate_to_pose";
+
+inline constexpr std::string_view
+  kInternalExplorationNavigateToPose =
+  "/savo_nav/_internal/exploration/navigate_to_pose";
+
+inline constexpr std::string_view
+  kInternalCoverageExecutePath =
+  "/savo_nav/_internal/coverage/execute_path";
+
+}  // namespace savo_nav::actions
+
+FILE: src/core/savo_nav/include/savo_nav/topic_names.hpp
+----------------------------------------------------------------------
+// Copyright 2026 Ahnaf Tahmid
+// SPDX-License-Identifier: LicenseRef-Proprietary
+
+#pragma once
+
+#include <string_view>
+
+namespace savo_nav::topics
+{
+
+// Map, TF, localization, and sensor inputs.
+inline constexpr std::string_view kMap = "/map";
+inline constexpr std::string_view kMapMetadata = "/map_metadata";
+inline constexpr std::string_view kTf = "/tf";
+inline constexpr std::string_view kTfStatic = "/tf_static";
+inline constexpr std::string_view kFilteredOdometry =
+  "/odometry/filtered";
+inline constexpr std::string_view kLocalizationHealth =
+  "/savo_localization/health";
+inline constexpr std::string_view kLaserScan = "/scan";
+
+// RealSense and three-dimensional obstacle inputs.
+inline constexpr std::string_view kRealSenseStatus =
+  "/savo_realsense/status";
+inline constexpr std::string_view kRawRealSensePoints =
+  "/camera/camera/depth/color/points";
+inline constexpr std::string_view kFilteredObstaclePoints =
+  "/savo_perception/obstacles/points";
+
+inline constexpr std::string_view kGlobalCostmap =
+  "/global_costmap/costmap";
+inline constexpr std::string_view kLocalCostmap =
+  "/local_costmap/costmap";
+
+// Safety and control integration.
+inline constexpr std::string_view kSafetyStop = "/safety/stop";
+inline constexpr std::string_view kSafetySlowdownFactor =
+  "/safety/slowdown_factor";
+inline constexpr std::string_view kControlModeCommand =
+  "/savo_control/mode_cmd";
+inline constexpr std::string_view kControlModeState =
+  "/savo_control/mode_state";
+
+// The only velocity output owned by savo_nav.
+inline constexpr std::string_view kNavigationVelocity =
+  "/cmd_vel_nav";
+
+// Navigation state and observer outputs.
+inline constexpr std::string_view kState = "/savo_nav/state";
+inline constexpr std::string_view kStatus = "/savo_nav/status";
+inline constexpr std::string_view kReadiness =
+  "/savo_nav/readiness";
+inline constexpr std::string_view kReadinessReason =
+  "/savo_nav/readiness_reason";
+inline constexpr std::string_view kCurrentGoal =
+  "/savo_nav/current_goal";
+inline constexpr std::string_view kGoalSource =
+  "/savo_nav/goal_source";
+inline constexpr std::string_view kResult = "/savo_nav/result";
+inline constexpr std::string_view kRecoveryState =
+  "/savo_nav/recovery_state";
+inline constexpr std::string_view kHeartbeat =
+  "/savo_nav/heartbeat";
+inline constexpr std::string_view kMarkers =
+  "/savo_nav/markers";
+
+namespace forbidden
+{
+
+inline constexpr std::string_view kCommandVelocity =
+  "/cmd_vel";
+inline constexpr std::string_view kSafeCommandVelocity =
+  "/cmd_vel_safe";
+inline constexpr std::string_view kRecoveryCommandVelocity =
+  "/cmd_vel_recovery";
+
+}  // namespace forbidden
+
+
+inline constexpr std::string_view
+  kNavigationState =
+  "/savo_nav/navigation/state";
+
+inline constexpr std::string_view
+  kNavigationStatus =
+  "/savo_nav/navigation/status";
+
+inline constexpr std::string_view
+  kNavigationFeedback =
+  "/savo_nav/navigation/feedback";
+
+inline constexpr std::string_view
+  kNavigationResult =
+  "/savo_nav/navigation/result";
+
+
+inline constexpr std::string_view
+  kControlModeReason =
+  "/savo_control/mode_reason";
+
+inline constexpr std::string_view
+  kControlStatus =
+  "/savo_control/control_status";
+
+inline constexpr std::string_view
+  kRecoveryActive =
+  "/savo_control/recovery_active";
+
+inline constexpr std::string_view
+  kControlRecoveryState =
+  "/savo_control/recovery_state";
+
+inline constexpr std::string_view
+  kRecoveryStatus =
+  "/savo_control/recovery_status";
+
+inline constexpr std::string_view
+  kControlRecoveryAllowed =
+  "/savo_nav/control_recovery/allowed";
+
+inline constexpr std::string_view
+  kControlRecoveryReason =
+  "/savo_nav/control_recovery/reason";
+
+inline constexpr std::string_view
+  kControlRecoveryStatus =
+  "/savo_nav/control_recovery/status";
+
+
+inline constexpr std::string_view
+  kGoalAdmissionState =
+  "/savo_nav/goal_admission/state";
+
+inline constexpr std::string_view
+  kGoalAdmissionReason =
+  "/savo_nav/goal_admission/reason";
+
+inline constexpr std::string_view
+  kGoalAdmissionStatus =
+  "/savo_nav/goal_admission/status";
+
+}  // namespace savo_nav::topics
+
+FILE: src/core/savo_nav/include/savo_nav/navigation_readiness.hpp
+----------------------------------------------------------------------
+// Copyright 2026 Ahnaf Tahmid
+// SPDX-License-Identifier: LicenseRef-Proprietary
+
+#pragma once
+
+#include <string>
+#include <string_view>
+#include <vector>
+
+#include "savo_nav/types.hpp"
+
+namespace savo_nav
+{
+
+struct NavigationReadinessPolicy
+{
+  bool require_pointcloud{true};
+  bool require_control_mode{true};
+  bool require_safety_state{true};
+  bool require_global_costmap{true};
+  bool require_local_costmap{true};
+};
+
+struct NavigationDependencySnapshot
+{
+  bool map_available{false};
+
+  bool map_to_odom_fresh{false};
+  bool odom_to_base_fresh{false};
+  bool base_footprint_to_base_link_available{false};
+
+  bool localization_fresh{false};
+  bool lidar_fresh{false};
+  bool pointcloud_fresh{false};
+
+  bool nav2_action_server_available{false};
+  bool global_costmap_fresh{false};
+  bool local_costmap_fresh{false};
+
+  bool control_state_fresh{false};
+  bool control_allows_navigation{false};
+
+  bool safety_state_fresh{false};
+  bool safety_stop_active{false};
+  bool slowdown_valid{false};
+  double slowdown_factor{0.0};
+};
+
+class NavigationReadiness
+{
+public:
+  NavigationReadiness();
+
+  [[nodiscard]] const NavigationReadinessResult &
+  GetResult() const noexcept;
+
+  [[nodiscard]] bool Update(
+    NavigationReadinessState state,
+    bool goal_acceptance_allowed,
+    std::string reason,
+    std::vector<std::string> failed_dependencies);
+
+  [[nodiscard]] static NavigationReadinessResult Evaluate(
+    const NavigationDependencySnapshot & snapshot,
+    const NavigationReadinessPolicy & policy);
+
+  [[nodiscard]] static std::string_view ToString(
+    NavigationReadinessState state) noexcept;
+
+private:
+  [[nodiscard]] static bool IsUpdateValid(
+    NavigationReadinessState state,
+    bool goal_acceptance_allowed,
+    const std::string & reason,
+    const std::vector<std::string> & failed_dependencies) noexcept;
+
+  NavigationReadinessResult result_{};
+};
+
+}  // namespace savo_nav
+
+FILE: src/core/savo_nav/config/readiness.yaml
+----------------------------------------------------------------------
+# Copyright 2026 Ahnaf Tahmid
+# SPDX-License-Identifier: LicenseRef-Proprietary
+
+navigation_readiness_node:
+  ros__parameters:
+    publish_period_ms: 200
+
+    require_pointcloud: true
+    require_control_mode: true
+    require_safety_state: true
+    require_global_costmap: true
+    require_local_costmap: true
+
+    tf_timeout_seconds: 3.0
+    odometry_timeout_seconds: 1.0
+    lidar_timeout_seconds: 1.0
+    pointcloud_timeout_seconds: 1.0
+    costmap_timeout_seconds: 3.0
+    control_timeout_seconds: 2.0
+    safety_timeout_seconds: 1.0
+
+    accepted_control_modes:
+      - "NAVIGATION"
+
+    map_topic: "/map"
+    tf_topic: "/tf"
+    tf_static_topic: "/tf_static"
+    odometry_topic: "/odometry/filtered"
+    scan_topic: "/scan"
+
+    pointcloud_topic: "/savo_perception/obstacles/points"
+
+    global_costmap_topic: "/global_costmap/costmap"
+    local_costmap_topic: "/local_costmap/costmap"
+
+    control_mode_topic: "/savo_control/mode_state"
+
+    safety_stop_topic: "/safety/stop"
+    safety_slowdown_topic: "/safety/slowdown_factor"
+
+    nav2_action_name: "/navigate_to_pose"
+
+FILE: src/core/savo_nav/src/nodes/navigation_readiness_node.cpp
+----------------------------------------------------------------------
+// Copyright 2026 Ahnaf Tahmid
+// SPDX-License-Identifier: LicenseRef-Proprietary
+
+#include <algorithm>
+#include <chrono>
+#include <cctype>
+#include <cmath>
+#include <cstdint>
+#include <exception>
+#include <memory>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "nav2_msgs/action/navigate_to_pose.hpp"
+#include "nav_msgs/msg/occupancy_grid.hpp"
+#include "nav_msgs/msg/odometry.hpp"
+#include "rclcpp/rclcpp.hpp"
+#include "rclcpp_action/rclcpp_action.hpp"
+#include "sensor_msgs/msg/laser_scan.hpp"
+#include "sensor_msgs/msg/point_cloud2.hpp"
+#include "std_msgs/msg/bool.hpp"
+#include "std_msgs/msg/float32.hpp"
+#include "std_msgs/msg/string.hpp"
+#include "std_msgs/msg/u_int64.hpp"
+#include "tf2_msgs/msg/tf_message.hpp"
+
+#include "savo_nav/action_names.hpp"
+#include "savo_nav/frame_names.hpp"
+#include "savo_nav/localization_monitor.hpp"
+#include "savo_nav/nav2_health_monitor.hpp"
+#include "savo_nav/navigation_readiness.hpp"
+#include "savo_nav/safety_state_monitor.hpp"
+#include "savo_nav/sensor_freshness_monitor.hpp"
+#include "savo_nav/topic_names.hpp"
+
+namespace
+{
+
+using NavigateToPose = nav2_msgs::action::NavigateToPose;
+
+double MonotonicSeconds()
+{
+  const auto now =
+    std::chrono::steady_clock::now().time_since_epoch();
+
+  return std::chrono::duration<double>(now).count();
+}
+
+std::string NormalizeFrame(std::string frame)
+{
+  while (!frame.empty() && frame.front() == '/') {
+    frame.erase(frame.begin());
+  }
+
+  return frame;
+}
+
+std::string NormalizeMode(std::string mode)
+{
+  mode.erase(
+    mode.begin(),
+    std::find_if(
+      mode.begin(),
+      mode.end(),
+      [](const unsigned char character)
+      {
+        return std::isspace(character) == 0;
+      }));
+
+  mode.erase(
+    std::find_if(
+      mode.rbegin(),
+      mode.rend(),
+      [](const unsigned char character)
+      {
+        return std::isspace(character) == 0;
+      }).base(),
+    mode.end());
+
+  std::transform(
+    mode.begin(),
+    mode.end(),
+    mode.begin(),
+    [](const unsigned char character)
+    {
+      return static_cast<char>(
+        std::toupper(character));
+    });
+
+  return mode;
+}
+
+std::string Join(
+  const std::vector<std::string> & values)
+{
+  std::ostringstream stream;
+
+  for (std::size_t index = 0; index < values.size(); ++index) {
+    if (index > 0) {
+      stream << ',';
+    }
+
+    stream << values[index];
+  }
+
+  return stream.str();
+}
+
+class NavigationReadinessNode final : public rclcpp::Node
+{
+public:
+  NavigationReadinessNode()
+  : Node("navigation_readiness_node")
+  {
+    const int publish_period_ms =
+      declare_parameter<int>(
+      "publish_period_ms",
+      200);
+
+    if (publish_period_ms <= 0) {
+      throw std::invalid_argument(
+              "publish_period_ms must be greater than zero");
+    }
+
+    policy_.require_pointcloud =
+      declare_parameter<bool>(
+      "require_pointcloud",
+      true);
+
+    policy_.require_control_mode =
+      declare_parameter<bool>(
+      "require_control_mode",
+      true);
+
+    policy_.require_safety_state =
+      declare_parameter<bool>(
+      "require_safety_state",
+      true);
+
+    policy_.require_global_costmap =
+      declare_parameter<bool>(
+      "require_global_costmap",
+      true);
+
+    policy_.require_local_costmap =
+      declare_parameter<bool>(
+      "require_local_costmap",
+      true);
+
+    const double tf_timeout_seconds =
+      declare_parameter<double>(
+      "tf_timeout_seconds",
+      3.0);
+
+    const double odometry_timeout_seconds =
+      declare_parameter<double>(
+      "odometry_timeout_seconds",
+      1.0);
+
+    const double lidar_timeout_seconds =
+      declare_parameter<double>(
+      "lidar_timeout_seconds",
+      1.0);
+
+    const double pointcloud_timeout_seconds =
+      declare_parameter<double>(
+      "pointcloud_timeout_seconds",
+      1.0);
+
+    const double costmap_timeout_seconds =
+      declare_parameter<double>(
+      "costmap_timeout_seconds",
+      3.0);
+
+    const double control_timeout_seconds =
+      declare_parameter<double>(
+      "control_timeout_seconds",
+      2.0);
+
+    const double safety_timeout_seconds =
+      declare_parameter<double>(
+      "safety_timeout_seconds",
+      1.0);
+
+    accepted_control_modes_ =
+      declare_parameter<std::vector<std::string>>(
+      "accepted_control_modes",
+      std::vector<std::string>{"NAVIGATION"});
+
+    for (auto & mode : accepted_control_modes_) {
+      mode = NormalizeMode(mode);
+    }
+
+    map_to_odom_monitor_ =
+      std::make_unique<savo_nav::SensorFreshnessMonitor>(
+      tf_timeout_seconds);
+
+    odom_to_base_monitor_ =
+      std::make_unique<savo_nav::SensorFreshnessMonitor>(
+      tf_timeout_seconds);
+
+    lidar_monitor_ =
+      std::make_unique<savo_nav::SensorFreshnessMonitor>(
+      lidar_timeout_seconds);
+
+    pointcloud_monitor_ =
+      std::make_unique<savo_nav::SensorFreshnessMonitor>(
+      pointcloud_timeout_seconds);
+
+    control_monitor_ =
+      std::make_unique<savo_nav::SensorFreshnessMonitor>(
+      control_timeout_seconds);
+
+    localization_monitor_ =
+      std::make_unique<savo_nav::LocalizationMonitor>(
+      odometry_timeout_seconds);
+
+    safety_monitor_ =
+      std::make_unique<savo_nav::SafetyStateMonitor>(
+      safety_timeout_seconds);
+
+    nav2_monitor_ =
+      std::make_unique<savo_nav::Nav2HealthMonitor>(
+      costmap_timeout_seconds);
+
+    const std::string map_topic =
+      declare_parameter<std::string>(
+      "map_topic",
+      std::string(savo_nav::topics::kMap));
+
+    const std::string tf_topic =
+      declare_parameter<std::string>(
+      "tf_topic",
+      std::string(savo_nav::topics::kTf));
+
+    const std::string tf_static_topic =
+      declare_parameter<std::string>(
+      "tf_static_topic",
+      std::string(savo_nav::topics::kTfStatic));
+
+    const std::string odometry_topic =
+      declare_parameter<std::string>(
+      "odometry_topic",
+      std::string(
+        savo_nav::topics::kFilteredOdometry));
+
+    const std::string scan_topic =
+      declare_parameter<std::string>(
+      "scan_topic",
+      std::string(savo_nav::topics::kLaserScan));
+
+    const std::string pointcloud_topic =
+      declare_parameter<std::string>(
+      "pointcloud_topic",
+      std::string(
+        savo_nav::topics::kFilteredObstaclePoints));
+
+    const std::string global_costmap_topic =
+      declare_parameter<std::string>(
+      "global_costmap_topic",
+      std::string(
+        savo_nav::topics::kGlobalCostmap));
+
+    const std::string local_costmap_topic =
+      declare_parameter<std::string>(
+      "local_costmap_topic",
+      std::string(
+        savo_nav::topics::kLocalCostmap));
+
+    const std::string control_mode_topic =
+      declare_parameter<std::string>(
+      "control_mode_topic",
+      std::string(
+        savo_nav::topics::kControlModeState));
+
+    const std::string safety_stop_topic =
+      declare_parameter<std::string>(
+      "safety_stop_topic",
+      std::string(savo_nav::topics::kSafetyStop));
+
+    const std::string safety_slowdown_topic =
+      declare_parameter<std::string>(
+      "safety_slowdown_topic",
+      std::string(
+        savo_nav::topics::kSafetySlowdownFactor));
+
+    const std::string nav2_action_name =
+      declare_parameter<std::string>(
+      "nav2_action_name",
+      std::string(
+        savo_nav::actions::kNav2NavigateToPose));
+
+    auto state_qos = rclcpp::QoS(rclcpp::KeepLast(1));
+    state_qos.reliable();
+    state_qos.transient_local();
+
+    auto heartbeat_qos =
+      rclcpp::QoS(rclcpp::KeepLast(10));
+    heartbeat_qos.reliable();
+
+    readiness_publisher_ =
+      create_publisher<std_msgs::msg::String>(
+      std::string(savo_nav::topics::kReadiness),
+      state_qos);
+
+    reason_publisher_ =
+      create_publisher<std_msgs::msg::String>(
+      std::string(
+        savo_nav::topics::kReadinessReason),
+      state_qos);
+
+    status_publisher_ =
+      create_publisher<std_msgs::msg::String>(
+      std::string(savo_nav::topics::kStatus),
+      state_qos);
+
+    heartbeat_publisher_ =
+      create_publisher<std_msgs::msg::UInt64>(
+      std::string(savo_nav::topics::kHeartbeat),
+      heartbeat_qos);
+
+    auto map_qos = rclcpp::QoS(rclcpp::KeepLast(1));
+    map_qos.reliable();
+    map_qos.transient_local();
+
+    map_subscription_ =
+      create_subscription<nav_msgs::msg::OccupancyGrid>(
+      map_topic,
+      map_qos,
+      [this](
+        const nav_msgs::msg::OccupancyGrid::SharedPtr message)
+      {
+        map_available_ =
+        message->info.width > 0 &&
+        message->info.height > 0 &&
+        NormalizeFrame(message->header.frame_id) ==
+        savo_nav::frames::kMap;
+      });
+
+    tf_subscription_ =
+      create_subscription<tf2_msgs::msg::TFMessage>(
+      tf_topic,
+      rclcpp::SensorDataQoS(),
+      [this](
+        const tf2_msgs::msg::TFMessage::SharedPtr message)
+      {
+        OnTf(message);
+      });
+
+    auto tf_static_qos =
+      rclcpp::QoS(rclcpp::KeepLast(100));
+
+    tf_static_qos.reliable();
+    tf_static_qos.transient_local();
+
+    tf_static_subscription_ =
+      create_subscription<tf2_msgs::msg::TFMessage>(
+      tf_static_topic,
+      tf_static_qos,
+      [this](
+        const tf2_msgs::msg::TFMessage::SharedPtr message)
+      {
+        OnTf(message);
+      });
+
+    odometry_subscription_ =
+      create_subscription<nav_msgs::msg::Odometry>(
+      odometry_topic,
+      rclcpp::SensorDataQoS(),
+      [this](
+        const nav_msgs::msg::Odometry::SharedPtr message)
+      {
+        const std::string parent =
+        NormalizeFrame(message->header.frame_id);
+
+        const std::string child =
+        NormalizeFrame(message->child_frame_id);
+
+        if (
+          parent == savo_nav::frames::kOdom &&
+          child == savo_nav::frames::kBaseFootprint &&
+          std::isfinite(
+            message->pose.pose.position.x) &&
+          std::isfinite(
+            message->pose.pose.position.y))
+        {
+          localization_monitor_->MarkOdometryReceived(
+            MonotonicSeconds());
+        }
+      });
+
+    scan_subscription_ =
+      create_subscription<sensor_msgs::msg::LaserScan>(
+      scan_topic,
+      rclcpp::SensorDataQoS(),
+      [this](
+        const sensor_msgs::msg::LaserScan::SharedPtr message)
+      {
+        if (
+          !message->ranges.empty() &&
+          std::isfinite(message->angle_increment) &&
+          message->angle_increment > 0.0)
+        {
+          lidar_monitor_->MarkReceived(
+            MonotonicSeconds());
+        }
+      });
+
+    pointcloud_subscription_ =
+      create_subscription<sensor_msgs::msg::PointCloud2>(
+      pointcloud_topic,
+      rclcpp::SensorDataQoS(),
+      [this](
+        const sensor_msgs::msg::PointCloud2::SharedPtr message)
+      {
+        if (
+          message->width > 0 &&
+          message->height > 0 &&
+          !message->data.empty())
+        {
+          pointcloud_monitor_->MarkReceived(
+            MonotonicSeconds());
+        }
+      });
+
+    global_costmap_subscription_ =
+      create_subscription<nav_msgs::msg::OccupancyGrid>(
+      global_costmap_topic,
+      map_qos,
+      [this](
+        const nav_msgs::msg::OccupancyGrid::SharedPtr message)
+      {
+        if (
+          message->info.width > 0 &&
+          message->info.height > 0 &&
+          NormalizeFrame(message->header.frame_id) ==
+          savo_nav::frames::kMap)
+        {
+          nav2_monitor_->MarkGlobalCostmapReceived(
+            MonotonicSeconds());
+        }
+      });
+
+    local_costmap_subscription_ =
+      create_subscription<nav_msgs::msg::OccupancyGrid>(
+      local_costmap_topic,
+      map_qos,
+      [this](
+        const nav_msgs::msg::OccupancyGrid::SharedPtr message)
+      {
+        if (
+          message->info.width > 0 &&
+          message->info.height > 0 &&
+          NormalizeFrame(message->header.frame_id) ==
+          savo_nav::frames::kOdom)
+        {
+          nav2_monitor_->MarkLocalCostmapReceived(
+            MonotonicSeconds());
+        }
+      });
+
+    control_mode_subscription_ =
+      create_subscription<std_msgs::msg::String>(
+      control_mode_topic,
+      rclcpp::QoS(10).reliable(),
+      [this](
+        const std_msgs::msg::String::SharedPtr message)
+      {
+        control_mode_ = NormalizeMode(message->data);
+
+        control_allows_navigation_ =
+        std::find(
+          accepted_control_modes_.begin(),
+          accepted_control_modes_.end(),
+          control_mode_) !=
+        accepted_control_modes_.end();
+
+        control_monitor_->MarkReceived(
+          MonotonicSeconds());
+      });
+
+    safety_stop_subscription_ =
+      create_subscription<std_msgs::msg::Bool>(
+      safety_stop_topic,
+      rclcpp::QoS(10).reliable(),
+      [this](
+        const std_msgs::msg::Bool::SharedPtr message)
+      {
+        safety_monitor_->UpdateStop(
+          message->data,
+          MonotonicSeconds());
+      });
+
+    safety_slowdown_subscription_ =
+      create_subscription<std_msgs::msg::Float32>(
+      safety_slowdown_topic,
+      rclcpp::QoS(10).reliable(),
+      [this](
+        const std_msgs::msg::Float32::SharedPtr message)
+      {
+        safety_monitor_->UpdateSlowdown(
+          static_cast<double>(message->data),
+          MonotonicSeconds());
+      });
+
+    nav2_client_ =
+      rclcpp_action::create_client<NavigateToPose>(
+      this,
+      nav2_action_name);
+
+    timer_ = create_wall_timer(
+      std::chrono::milliseconds(publish_period_ms),
+      [this]()
+      {
+        EvaluateAndPublish();
+      });
+
+    EvaluateAndPublish();
+
+    RCLCPP_INFO(
+      get_logger(),
+      "Navigation readiness node started: "
+      "subscriber-only external package monitoring enabled");
+  }
+
+private:
+  void OnTf(
+    const tf2_msgs::msg::TFMessage::SharedPtr & message)
+  {
+    const double now = MonotonicSeconds();
+
+    for (const auto & transform : message->transforms) {
+      const std::string parent =
+        NormalizeFrame(transform.header.frame_id);
+
+      const std::string child =
+        NormalizeFrame(transform.child_frame_id);
+
+      if (
+        parent == savo_nav::frames::kMap &&
+        child == savo_nav::frames::kOdom)
+      {
+        map_to_odom_monitor_->MarkReceived(now);
+      }
+
+      if (
+        parent == savo_nav::frames::kOdom &&
+        child == savo_nav::frames::kBaseFootprint)
+      {
+        odom_to_base_monitor_->MarkReceived(now);
+      }
+
+      if (
+        parent == savo_nav::frames::kBaseFootprint &&
+        child == savo_nav::frames::kBaseLink)
+      {
+        base_footprint_to_base_link_available_ = true;
+      }
+    }
+  }
+
+  void EvaluateAndPublish()
+  {
+    const double now = MonotonicSeconds();
+
+    nav2_monitor_->UpdateActionServerAvailable(
+      nav2_client_->wait_for_action_server(
+        std::chrono::seconds(0)));
+
+    const auto localization =
+      localization_monitor_->GetSnapshot(now);
+
+    const auto safety =
+      safety_monitor_->GetSnapshot(now);
+
+    const auto nav2 =
+      nav2_monitor_->GetSnapshot(now);
+
+    savo_nav::NavigationDependencySnapshot snapshot;
+
+    snapshot.map_available = map_available_;
+
+    snapshot.map_to_odom_fresh =
+      map_to_odom_monitor_->IsFresh(now);
+
+    snapshot.odom_to_base_fresh =
+      odom_to_base_monitor_->IsFresh(now);
+
+    snapshot.base_footprint_to_base_link_available =
+      base_footprint_to_base_link_available_;
+
+    snapshot.localization_fresh =
+      localization.odometry_fresh;
+
+    snapshot.lidar_fresh =
+      lidar_monitor_->IsFresh(now);
+
+    snapshot.pointcloud_fresh =
+      pointcloud_monitor_->IsFresh(now);
+
+    snapshot.nav2_action_server_available =
+      nav2.action_server_available;
+
+    snapshot.global_costmap_fresh =
+      nav2.global_costmap_fresh;
+
+    snapshot.local_costmap_fresh =
+      nav2.local_costmap_fresh;
+
+    snapshot.control_state_fresh =
+      control_monitor_->IsFresh(now);
+
+    snapshot.control_allows_navigation =
+      control_allows_navigation_;
+
+    snapshot.safety_state_fresh =
+      safety.state_fresh;
+
+    snapshot.safety_stop_active =
+      safety.stop_active;
+
+    snapshot.slowdown_valid =
+      safety.slowdown_valid;
+
+    snapshot.slowdown_factor =
+      safety.slowdown_factor;
+
+    const auto evaluated =
+      savo_nav::NavigationReadiness::Evaluate(
+      snapshot,
+      policy_);
+
+    const bool changed =
+      evaluated.state != readiness_.GetResult().state ||
+      evaluated.reason != readiness_.GetResult().reason;
+
+    const bool updated = readiness_.Update(
+      evaluated.state,
+      evaluated.goal_acceptance_allowed,
+      evaluated.reason,
+      evaluated.failed_dependencies);
+
+    if (!updated) {
+      RCLCPP_ERROR(
+        get_logger(),
+        "Readiness evaluator produced an invalid result");
+
+      return;
+    }
+
+    Publish();
+
+    if (changed) {
+      RCLCPP_INFO(
+        get_logger(),
+        "Readiness changed: state=%s reason=%s "
+        "goal_acceptance_allowed=%s",
+        std::string(
+          savo_nav::NavigationReadiness::ToString(
+            readiness_.GetResult().state)).c_str(),
+        readiness_.GetResult().reason.c_str(),
+        readiness_.GetResult().goal_acceptance_allowed ?
+        "true" : "false");
+    }
+  }
+
+  void Publish()
+  {
+    const auto & result = readiness_.GetResult();
+
+    std_msgs::msg::String readiness_message;
+
+    readiness_message.data = std::string(
+      savo_nav::NavigationReadiness::ToString(
+        result.state));
+
+    readiness_publisher_->publish(readiness_message);
+
+    std_msgs::msg::String reason_message;
+    reason_message.data = result.reason;
+
+    reason_publisher_->publish(reason_message);
+
+    std_msgs::msg::String status_message;
+
+    status_message.data =
+      "state=" + readiness_message.data +
+      ";goal_acceptance_allowed=" +
+      (
+      result.goal_acceptance_allowed ?
+      std::string("true") :
+      std::string("false")
+      ) +
+      ";reason=" + result.reason +
+      ";failed_dependencies=" +
+      Join(result.failed_dependencies);
+
+    status_publisher_->publish(status_message);
+
+    std_msgs::msg::UInt64 heartbeat_message;
+    heartbeat_message.data = ++heartbeat_count_;
+
+    heartbeat_publisher_->publish(heartbeat_message);
+  }
+
+  savo_nav::NavigationReadiness readiness_{};
+  savo_nav::NavigationReadinessPolicy policy_{};
+
+  std::unique_ptr<savo_nav::SensorFreshnessMonitor>
+  map_to_odom_monitor_;
+
+  std::unique_ptr<savo_nav::SensorFreshnessMonitor>
+  odom_to_base_monitor_;
+
+  std::unique_ptr<savo_nav::SensorFreshnessMonitor>
+  lidar_monitor_;
+
+  std::unique_ptr<savo_nav::SensorFreshnessMonitor>
+  pointcloud_monitor_;
+
+  std::unique_ptr<savo_nav::SensorFreshnessMonitor>
+  control_monitor_;
+
+  std::unique_ptr<savo_nav::LocalizationMonitor>
+  localization_monitor_;
+
+  std::unique_ptr<savo_nav::SafetyStateMonitor>
+  safety_monitor_;
+
+  std::unique_ptr<savo_nav::Nav2HealthMonitor>
+  nav2_monitor_;
+
+  std::vector<std::string> accepted_control_modes_;
+
+  bool map_available_{false};
+
+  bool base_footprint_to_base_link_available_{false};
+
+  bool control_allows_navigation_{false};
+
+  std::string control_mode_{};
+
+  std::uint64_t heartbeat_count_{0};
+
+  rclcpp_action::Client<NavigateToPose>::SharedPtr
+    nav2_client_;
+
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr
+    readiness_publisher_;
+
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr
+    reason_publisher_;
+
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr
+    status_publisher_;
+
+  rclcpp::Publisher<std_msgs::msg::UInt64>::SharedPtr
+    heartbeat_publisher_;
+
+  rclcpp::Subscription<
+    nav_msgs::msg::OccupancyGrid>::SharedPtr
+    map_subscription_;
+
+  rclcpp::Subscription<
+    tf2_msgs::msg::TFMessage>::SharedPtr
+    tf_subscription_;
+
+  rclcpp::Subscription<
+    tf2_msgs::msg::TFMessage>::SharedPtr
+    tf_static_subscription_;
+
+  rclcpp::Subscription<
+    nav_msgs::msg::Odometry>::SharedPtr
+    odometry_subscription_;
+
+  rclcpp::Subscription<
+    sensor_msgs::msg::LaserScan>::SharedPtr
+    scan_subscription_;
+
+  rclcpp::Subscription<
+    sensor_msgs::msg::PointCloud2>::SharedPtr
+    pointcloud_subscription_;
+
+  rclcpp::Subscription<
+    nav_msgs::msg::OccupancyGrid>::SharedPtr
+    global_costmap_subscription_;
+
+  rclcpp::Subscription<
+    nav_msgs::msg::OccupancyGrid>::SharedPtr
+    local_costmap_subscription_;
+
+  rclcpp::Subscription<
+    std_msgs::msg::String>::SharedPtr
+    control_mode_subscription_;
+
+  rclcpp::Subscription<
+    std_msgs::msg::Bool>::SharedPtr
+    safety_stop_subscription_;
+
+  rclcpp::Subscription<
+    std_msgs::msg::Float32>::SharedPtr
+    safety_slowdown_subscription_;
+
+  rclcpp::TimerBase::SharedPtr timer_;
+};
+
+}  // namespace
+
+int main(int argc, char ** argv)
+{
+  rclcpp::init(argc, argv);
+
+  int exit_code = 0;
+
+  try {
+    rclcpp::spin(
+      std::make_shared<NavigationReadinessNode>());
+  } catch (const std::exception & exception) {
+    RCLCPP_FATAL(
+      rclcpp::get_logger(
+        "navigation_readiness_node"),
+      "Fatal error: %s",
+      exception.what());
+
+    exit_code = 1;
+  }
+
+  rclcpp::shutdown();
+
+  return exit_code;
+}
+
+======================================================================
+CONTROL ROS MESSAGE TYPES
+======================================================================
+src/core/savo_control/test/test_config_files.py:163:        "external_stop_topic",
+src/core/savo_control/test/test_topic_names.py:17:    CONTROL_MODE_CMD,
+src/core/savo_control/test/test_topic_names.py:18:    CONTROL_MODE_STATE,
+src/core/savo_control/test/test_topic_names.py:51:    assert CONTROL_MODE_CMD == c.TOPIC_CONTROL_MODE_CMD
+src/core/savo_control/test/test_topic_names.py:52:    assert CONTROL_MODE_STATE == c.TOPIC_CONTROL_MODE_STATE
+src/core/savo_control/test/test_topic_names.py:59:    assert CONTROL_MODE_CMD == "/savo_control/mode_cmd"
+src/core/savo_control/test/test_topic_names.py:60:    assert CONTROL_MODE_STATE == "/savo_control/mode_state"
+src/core/savo_control/test/test_package_identity.py:23:    TOPIC_CONTROL_MODE_CMD,
+src/core/savo_control/test/test_package_identity.py:24:    TOPIC_CONTROL_MODE_STATE,
+src/core/savo_control/test/test_package_identity.py:50:    assert TOPIC_CONTROL_MODE_CMD == "/savo_control/mode_cmd"
+src/core/savo_control/test/test_package_identity.py:51:    assert TOPIC_CONTROL_MODE_STATE == "/savo_control/mode_state"
+src/core/savo_control/include/savo_control/topic_names.hpp:18:inline constexpr const char * CONTROL_MODE_CMD = "/savo_control/mode_cmd";
+src/core/savo_control/include/savo_control/topic_names.hpp:19:inline constexpr const char * CONTROL_MODE_STATE = "/savo_control/mode_state";
+src/core/savo_control/include/savo_control/topic_names.hpp:108:         topic == CONTROL_MODE_STATE ||
+src/core/savo_control/savo_control/nodes/control_dashboard_node.py:27:    CONTROL_MODE_STATE,
+src/core/savo_control/savo_control/nodes/control_dashboard_node.py:68:        self.declare_parameter("mode_state_topic", CONTROL_MODE_STATE)
+src/core/savo_control/savo_control/nodes/recovery_test_manager_node.py:28:    CONTROL_MODE_CMD,
+src/core/savo_control/savo_control/nodes/recovery_test_manager_node.py:53:        self.declare_parameter("mode_cmd_topic", CONTROL_MODE_CMD)
+src/core/savo_control/savo_control/nodes/recovery_test_manager_node.py:85:        self._mode_pub = self.create_publisher(String, self._mode_cmd_topic, 10)
+src/core/savo_control/savo_control/nodes/recovery_status_node.py:27:    CONTROL_MODE_CMD,
+src/core/savo_control/savo_control/nodes/recovery_status_node.py:28:    CONTROL_MODE_STATE,
+src/core/savo_control/savo_control/nodes/recovery_status_node.py:71:        self.declare_parameter("mode_cmd_topic", CONTROL_MODE_CMD)
+src/core/savo_control/savo_control/nodes/recovery_status_node.py:72:        self.declare_parameter("mode_state_topic", CONTROL_MODE_STATE)
+src/core/savo_control/savo_control/nodes/recovery_status_node.py:198:        self.create_subscription(String, self._mode_cmd_topic, self._on_mode_cmd, 10)
+src/core/savo_control/savo_control/nodes/recovery_status_node.py:199:        self.create_subscription(String, self._mode_state_topic, self._on_mode_state, 10)
+src/core/savo_control/savo_control/nodes/control_status_node.py:32:    CONTROL_MODE_CMD,
+src/core/savo_control/savo_control/nodes/control_status_node.py:33:    CONTROL_MODE_STATE,
+src/core/savo_control/savo_control/nodes/control_status_node.py:71:        self.declare_parameter("mode_cmd_topic", CONTROL_MODE_CMD)
+src/core/savo_control/savo_control/nodes/control_status_node.py:72:        self.declare_parameter("mode_state_topic", CONTROL_MODE_STATE)
+src/core/savo_control/savo_control/nodes/control_status_node.py:148:        self.create_subscription(String, self._mode_cmd_topic, self._on_mode_cmd, 10)
+src/core/savo_control/savo_control/nodes/control_status_node.py:149:        self.create_subscription(String, self._mode_state_topic, self._on_mode_state, 10)
+src/core/savo_control/savo_control/nodes/auto_test_manager_node.py:30:    CONTROL_MODE_CMD,
+src/core/savo_control/savo_control/nodes/auto_test_manager_node.py:52:        self.declare_parameter("mode_cmd_topic", CONTROL_MODE_CMD)
+src/core/savo_control/savo_control/nodes/auto_test_manager_node.py:85:        self._mode_pub = self.create_publisher(String, self._mode_cmd_topic, 10)
+src/core/savo_control/savo_control/constants.py:61:TOPIC_CONTROL_MODE_CMD: Final[str] = "/savo_control/mode_cmd"
+src/core/savo_control/savo_control/constants.py:62:TOPIC_CONTROL_MODE_STATE: Final[str] = "/savo_control/mode_state"
+src/core/savo_control/savo_control/constants.py:191:    mode_cmd_topic: str = TOPIC_CONTROL_MODE_CMD
+src/core/savo_control/savo_control/constants.py:192:    mode_state_topic: str = TOPIC_CONTROL_MODE_STATE
+src/core/savo_control/savo_control/ros/topic_names.py:37:CONTROL_MODE_CMD: Final[str] = c.TOPIC_CONTROL_MODE_CMD
+src/core/savo_control/savo_control/ros/topic_names.py:38:CONTROL_MODE_STATE: Final[str] = c.TOPIC_CONTROL_MODE_STATE
+src/core/savo_control/savo_control/ros/topic_names.py:87:    mode_cmd: str = CONTROL_MODE_CMD
+src/core/savo_control/savo_control/ros/topic_names.py:88:    mode_state: str = CONTROL_MODE_STATE
+src/core/savo_control/savo_control/ros/topic_names.py:165:    "CONTROL_MODE_CMD",
+src/core/savo_control/savo_control/ros/topic_names.py:166:    "CONTROL_MODE_STATE",
+src/core/savo_control/savo_control/ros/__init__.py:59:    CONTROL_MODE_CMD,
+src/core/savo_control/savo_control/ros/__init__.py:60:    CONTROL_MODE_STATE,
+src/core/savo_control/savo_control/ros/__init__.py:107:    "CONTROL_MODE_CMD",
+src/core/savo_control/savo_control/ros/__init__.py:108:    "CONTROL_MODE_STATE",
+src/core/savo_control/scripts/mode_cmd_cli.py:14:from savo_control.ros import CONTROL_MODE_CMD
+src/core/savo_control/scripts/mode_cmd_cli.py:28:        default=CONTROL_MODE_CMD,
+src/core/savo_control/scripts/mode_cmd_cli.py:29:        help=f"Mode command topic. Default: {CONTROL_MODE_CMD}",
+src/core/savo_control/scripts/control_topic_check_cli.py:28:    CONTROL_MODE_CMD,
+src/core/savo_control/scripts/control_topic_check_cli.py:29:    CONTROL_MODE_STATE,
+src/core/savo_control/scripts/control_topic_check_cli.py:74:            "command": CONTROL_MODE_CMD,
+src/core/savo_control/scripts/control_topic_check_cli.py:75:            "state": CONTROL_MODE_STATE,
+src/core/savo_control/src/nodes/cmd_vel_shaper_node.cpp:165:    declare_parameter<std::string>("mode_topic", topics::CONTROL_MODE_STATE);
+src/core/savo_control/src/nodes/cmd_vel_shaper_node.cpp:443:  std::string mode_topic_{topics::CONTROL_MODE_STATE};
+src/core/savo_control/src/nodes/control_mode_manager_node.cpp:59:      external_stop_topic_,
+src/core/savo_control/src/nodes/control_mode_manager_node.cpp:126:    declare_parameter<std::string>("mode_cmd_topic", topics::CONTROL_MODE_CMD);
+src/core/savo_control/src/nodes/control_mode_manager_node.cpp:127:    declare_parameter<std::string>("mode_state_topic", topics::CONTROL_MODE_STATE);
+src/core/savo_control/src/nodes/control_mode_manager_node.cpp:132:    declare_parameter<std::string>("external_stop_topic", "/savo_control/external_stop");
+src/core/savo_control/src/nodes/control_mode_manager_node.cpp:175:    external_stop_topic_ = get_parameter("external_stop_topic").as_string();
+src/core/savo_control/src/nodes/control_mode_manager_node.cpp:221:  std::string mode_cmd_topic_{topics::CONTROL_MODE_CMD};
+src/core/savo_control/src/nodes/control_mode_manager_node.cpp:222:  std::string mode_state_topic_{topics::CONTROL_MODE_STATE};
+src/core/savo_control/src/nodes/control_mode_manager_node.cpp:227:  std::string external_stop_topic_{"/savo_control/external_stop"};
+src/core/savo_control/src/nodes/twist_mux_node.cpp:188:    declare_parameter<std::string>("mode_topic", topics::CONTROL_MODE_STATE);
+src/core/savo_control/src/nodes/twist_mux_node.cpp:400:  std::string mode_topic_{topics::CONTROL_MODE_STATE};
+src/core/savo_control/src/nodes/distance_approach_node.cpp:61:    mode_cmd_pub_ = create_publisher<std_msgs::msg::String>(mode_cmd_topic_, 10);
+src/core/savo_control/src/nodes/distance_approach_node.cpp:182:    declare_parameter<std::string>("mode_cmd_topic", topics::CONTROL_MODE_CMD);
+src/core/savo_control/src/nodes/distance_approach_node.cpp:487:  std::string mode_cmd_topic_{topics::CONTROL_MODE_CMD};
+
+----------------------------------------------------------------------
+Likely control-node files
+----------------------------------------------------------------------
+src/core/savo_control/include/savo_control/control_mode_manager.hpp
+src/core/savo_control/src/nodes/control_mode_manager_node.cpp
+
+FILE: src/core/savo_control/include/savo_control/control_mode_manager.hpp
+----------------------------------------------------------------------
+21-  double manual_override_timeout_s{1.5};
+22-
+23-  bool allow_manual{true};
+24-  bool allow_auto{true};
+25-  bool allow_nav{true};
+26-  bool allow_recovery{true};
+27-
+28-  bool safety_stop_forces_stop{true};
+29:  bool external_stop_forces_stop{true};
+30-  bool recovery_active_forces_recovery{true};
+31-
+32-  ControlModeManagerConfig sanitized() const
+33-  {
+34-    ControlModeManagerConfig out = *this;
+35-
+36-    if (!std::isfinite(out.request_timeout_s) || out.request_timeout_s < 0.0) {
+37-      out.request_timeout_s = 1.0;
+38-    }
+39-
+40-    if (
+41-      !std::isfinite(out.recovery_latch_timeout_s) ||
+42-      out.recovery_latch_timeout_s < 0.0)
+43-    {
+--
+123-{
+124-  ControlMode mode{ControlMode::STOP};
+125-  ControlMode previous_mode{ControlMode::STOP};
+126-  ControlModeReason reason{ControlModeReason::STARTUP};
+127-
+128-  std::string source{"startup"};
+129-
+130-  bool safety_stop_active{false};
+131:  bool external_stop_active{false};
+132-  bool recovery_active{false};
+133-  bool manual_override_active{false};
+134-  bool request_stale{false};
+135-
+136-  double last_update_s{0.0};
+137-  double last_request_s{0.0};
+138-  double last_recovery_s{0.0};
+139-  double last_manual_override_s{0.0};
+140-};
+141-
+142-class ControlModeManager
+143-{
+144-public:
+145-  ControlModeManager()
+--
+250-  void set_safety_stop(const bool active)
+251-  {
+252-    state_.safety_stop_active = active;
+253-    if (active && config_.safety_stop_forces_stop) {
+254-      set_mode(ControlMode::STOP, ControlModeReason::SAFETY_STOP_ACTIVE, "safety_stop");
+255-    }
+256-  }
+257-
+258:  void set_external_stop(const bool active)
+259-  {
+260:    state_.external_stop_active = active;
+261:    if (active && config_.external_stop_forces_stop) {
+262:      set_mode(ControlMode::STOP, ControlModeReason::EXTERNAL_STOP, "external_stop");
+263-    }
+264-  }
+265-
+266-  void set_recovery_active(const bool active, const double now_s)
+267-  {
+268-    state_.recovery_active = active;
+269-    if (active) {
+270-      state_.last_recovery_s = ControlMath::finite_or_zero(now_s);
+271-
+272-      if (config_.recovery_active_forces_recovery && config_.allow_recovery) {
+273-        set_mode(ControlMode::RECOVERY, ControlModeReason::RECOVERY_ACTIVE, "recovery");
+274-      }
+275-    }
+276-  }
+--
+294-
+295-    state_.request_stale = is_request_stale(now);
+296-
+297-    if (state_.safety_stop_active && config_.safety_stop_forces_stop) {
+298-      set_mode(ControlMode::STOP, ControlModeReason::SAFETY_STOP_ACTIVE, "safety_stop");
+299-      return state_.mode;
+300-    }
+301-
+302:    if (state_.external_stop_active && config_.external_stop_forces_stop) {
+303:      set_mode(ControlMode::STOP, ControlModeReason::EXTERNAL_STOP, "external_stop");
+304-      return state_.mode;
+305-    }
+306-
+307-    if (state_.recovery_active && config_.recovery_active_forces_recovery &&
+308-      config_.allow_recovery)
+309-    {
+310-      set_mode(ControlMode::RECOVERY, ControlModeReason::RECOVERY_ACTIVE, "recovery");
+311-      return state_.mode;
+312-    }
+313-
+314-    if (
+315-      state_.mode == ControlMode::RECOVERY &&
+316-      !state_.recovery_active &&
+317-      recovery_latch_expired(now))
+--
+368-    return state_.safety_stop_active;
+369-  }
+370-
+371-  bool recovery_active() const
+372-  {
+373-    return state_.recovery_active;
+374-  }
+375-
+376:  bool external_stop_active() const
+377-  {
+378:    return state_.external_stop_active;
+379-  }
+380-
+381-  bool manual_override_active() const
+382-  {
+383-    return state_.manual_override_active;
+384-  }
+385-
+386-  bool request_stale() const
+387-  {
+388-    return state_.request_stale;
+389-  }
+390-
+391-  bool allows_motion() const
+392-  {
+393:    if (state_.safety_stop_active || state_.external_stop_active) {
+394-      return false;
+395-    }
+396-
+397-    return is_motion_mode(state_.mode);
+398-  }
+399-
+400-  std::string mux_mode_string() const
+401-  {
+402-    return plain_mux_mode_string(state_.mode);
+403-  }
+404-
+405-  std::string status_string() const
+406-  {
+407-    std::ostringstream ss;
+408-    ss << "mode=" << to_string(state_.mode)
+409-       << "; previous=" << to_string(state_.previous_mode)
+410-       << "; reason=" << to_string(state_.reason)
+411-       << "; source=" << state_.source
+412-       << "; safety_stop=" << bool_text(state_.safety_stop_active)
+413:       << "; external_stop=" << bool_text(state_.external_stop_active)
+414-       << "; recovery_active=" << bool_text(state_.recovery_active)
+415-       << "; manual_override=" << bool_text(state_.manual_override_active)
+416-       << "; request_stale=" << bool_text(state_.request_stale)
+417-       << "; mux_mode=" << mux_mode_string();
+418-
+419-    return ss.str();
+420-  }
+421-
+422-private:
+423-  void set_mode(
+424-    const ControlMode mode,
+425-    const ControlModeReason reason,
+426-    const std::string & source)
+427-  {
+
+FILE: src/core/savo_control/src/nodes/control_mode_manager_node.cpp
+----------------------------------------------------------------------
+35-{
+36-public:
+37-  ControlModeManagerNode()
+38-  : Node("control_mode_manager_node")
+39-  {
+40-    declare_parameters();
+41-    load_parameters();
+42-
+43:    mode_cmd_sub_ = create_subscription<std_msgs::msg::String>(
+44:      mode_cmd_topic_,
+45-      10,
+46-      [this](const std_msgs::msg::String::SharedPtr msg) {
+47-        handle_mode_command(msg->data);
+48-      });
+49-
+50:    safety_stop_sub_ = create_subscription<std_msgs::msg::Bool>(
+51-      safety_stop_topic_,
+52-      10,
+53-      [this](const std_msgs::msg::Bool::SharedPtr msg) {
+54-        manager_.set_safety_stop(msg->data);
+55-        publish_now();
+56-      });
+57-
+58:    external_stop_sub_ = create_subscription<std_msgs::msg::Bool>(
+59:      external_stop_topic_,
+60-      10,
+61-      [this](const std_msgs::msg::Bool::SharedPtr msg) {
+62:        manager_.set_external_stop(msg->data);
+63-        publish_now();
+64-      });
+65-
+66:    recovery_active_sub_ = create_subscription<std_msgs::msg::Bool>(
+67-      recovery_active_topic_,
+68-      10,
+69-      [this](const std_msgs::msg::Bool::SharedPtr msg) {
+70-        manager_.set_recovery_active(msg->data, now_seconds(*this));
+71-        publish_now();
+72-      });
+73-
+74:    manual_override_sub_ = create_subscription<std_msgs::msg::Bool>(
+75-      manual_override_topic_,
+76-      10,
+77-      [this](const std_msgs::msg::Bool::SharedPtr msg) {
+78-        manager_.set_manual_override(msg->data, now_seconds(*this));
+79-        publish_now();
+80-      });
+81-
+82:    mode_state_pub_ = create_publisher<std_msgs::msg::String>(
+83:      mode_state_topic_,
+84-      rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local());
+85:    mode_reason_pub_ = create_publisher<std_msgs::msg::String>(mode_reason_topic_, 10);
+86:    control_status_pub_ = create_publisher<std_msgs::msg::String>(control_status_topic_, 10);
+87-
+88-    timer_ = create_wall_timer(
+89-      std::chrono::duration<double>(1.0 / publish_hz_),
+90-      [this]() {
+91-        on_timer();
+92-      });
+93-
+94-    manager_.reset(now_seconds(*this));
+95-    publish_now();
+96-
+97-    RCLCPP_INFO(
+98-      get_logger(),
+99-      "control_mode_manager_node started | cmd=%s | state=%s | status=%s",
+100:      mode_cmd_topic_.c_str(),
+101:      mode_state_topic_.c_str(),
+102-      control_status_topic_.c_str());
+103-  }
+104-
+105-private:
+106-  void declare_parameters()
+107-  {
+108-    declare_parameter<std::string>("startup_mode", "STOP");
+109-    declare_parameter<std::string>("fallback_mode", "STOP");
+110-
+111-    declare_parameter<double>("request_timeout_s", 1.0);
+112-    declare_parameter<double>("recovery_latch_timeout_s", 2.0);
+113-    declare_parameter<double>("manual_override_timeout_s", 1.5);
+114-
+115-    declare_parameter<bool>("allow_manual", true);
+116-    declare_parameter<bool>("allow_auto", true);
+117-    declare_parameter<bool>("allow_nav", true);
+118-    declare_parameter<bool>("allow_recovery", true);
+119-
+120-    declare_parameter<bool>("safety_stop_forces_stop", true);
+121:    declare_parameter<bool>("external_stop_forces_stop", true);
+122-    declare_parameter<bool>("recovery_active_forces_recovery", true);
+123-
+124-    declare_parameter<double>("publish_hz", 10.0);
+125-
+126:    declare_parameter<std::string>("mode_cmd_topic", topics::CONTROL_MODE_CMD);
+127:    declare_parameter<std::string>("mode_state_topic", topics::CONTROL_MODE_STATE);
+128-    declare_parameter<std::string>("mode_reason_topic", topics::CONTROL_MODE_REASON);
+129-    declare_parameter<std::string>("control_status_topic", topics::CONTROL_STATUS);
+130-
+131-    declare_parameter<std::string>("safety_stop_topic", topics::SAFETY_STOP);
+132:    declare_parameter<std::string>("external_stop_topic", "/savo_control/external_stop");
+133-    declare_parameter<std::string>("recovery_active_topic", topics::RECOVERY_ACTIVE);
+134-    declare_parameter<std::string>("manual_override_topic", "/savo_control/manual_override");
+135-  }
+136-
+137-  void load_parameters()
+138-  {
+139-    ControlModeManagerConfig config;
+140-
+141-    config.startup_mode = parse_control_mode(
+142-      get_parameter("startup_mode").as_string(),
+143-      ControlMode::STOP);
+144-    config.fallback_mode = parse_control_mode(
+145-      get_parameter("fallback_mode").as_string(),
+146-      ControlMode::STOP);
+--
+150-    config.manual_override_timeout_s = get_parameter("manual_override_timeout_s").as_double();
+151-
+152-    config.allow_manual = get_parameter("allow_manual").as_bool();
+153-    config.allow_auto = get_parameter("allow_auto").as_bool();
+154-    config.allow_nav = get_parameter("allow_nav").as_bool();
+155-    config.allow_recovery = get_parameter("allow_recovery").as_bool();
+156-
+157-    config.safety_stop_forces_stop = get_parameter("safety_stop_forces_stop").as_bool();
+158:    config.external_stop_forces_stop = get_parameter("external_stop_forces_stop").as_bool();
+159-    config.recovery_active_forces_recovery =
+160-      get_parameter("recovery_active_forces_recovery").as_bool();
+161-
+162-    manager_.set_config(config);
+163-
+164-    publish_hz_ = get_parameter("publish_hz").as_double();
+165-    if (!std::isfinite(publish_hz_) || publish_hz_ <= 0.0) {
+166-      publish_hz_ = 10.0;
+167-    }
+168-
+169:    mode_cmd_topic_ = get_parameter("mode_cmd_topic").as_string();
+170:    mode_state_topic_ = get_parameter("mode_state_topic").as_string();
+171-    mode_reason_topic_ = get_parameter("mode_reason_topic").as_string();
+172-    control_status_topic_ = get_parameter("control_status_topic").as_string();
+173-
+174-    safety_stop_topic_ = get_parameter("safety_stop_topic").as_string();
+175:    external_stop_topic_ = get_parameter("external_stop_topic").as_string();
+176-    recovery_active_topic_ = get_parameter("recovery_active_topic").as_string();
+177-    manual_override_topic_ = get_parameter("manual_override_topic").as_string();
+178-  }
+179-
+180-  void handle_mode_command(const std::string & mode_text)
+181-  {
+182-    const double now_s = now_seconds(*this);
+183:    const bool accepted = manager_.request_mode(mode_text, now_s, "mode_cmd");
+184-
+185-    RCLCPP_INFO(
+186-      get_logger(),
+187-      "Mode command received: '%s' accepted=%s resulting_mode=%s",
+188-      mode_text.c_str(),
+189-      accepted ? "true" : "false",
+190-      to_string(manager_.state().mode).c_str());
+191-
+192-    if (!accepted) {
+193-      RCLCPP_WARN(
+194-        get_logger(),
+195-        "Rejected control mode command: '%s'",
+196-        mode_text.c_str());
+197-    }
+--
+204-    manager_.update(now_seconds(*this));
+205-    publish_now();
+206-  }
+207-
+208-  void publish_now()
+209-  {
+210-    const auto & state = manager_.state();
+211-
+212:    mode_state_pub_->publish(string_msg(to_string(state.mode)));
+213-    mode_reason_pub_->publish(string_msg(to_string(state.reason)));
+214-    control_status_pub_->publish(string_msg(manager_.status_string()));
+215-  }
+216-
+217-  ControlModeManager manager_{};
+218-
+219-  double publish_hz_{10.0};
+220-
+221:  std::string mode_cmd_topic_{topics::CONTROL_MODE_CMD};
+222:  std::string mode_state_topic_{topics::CONTROL_MODE_STATE};
+223-  std::string mode_reason_topic_{topics::CONTROL_MODE_REASON};
+224-  std::string control_status_topic_{topics::CONTROL_STATUS};
+225-
+226-  std::string safety_stop_topic_{topics::SAFETY_STOP};
+227:  std::string external_stop_topic_{"/savo_control/external_stop"};
+228-  std::string recovery_active_topic_{topics::RECOVERY_ACTIVE};
+229-  std::string manual_override_topic_{"/savo_control/manual_override"};
+230-
+231:  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr mode_cmd_sub_;
+232-  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr safety_stop_sub_;
+233:  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr external_stop_sub_;
+234-  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr recovery_active_sub_;
+235-  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr manual_override_sub_;
+236-
+237:  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr mode_state_pub_;
+238-  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr mode_reason_pub_;
+239-  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr control_status_pub_;
+240-
+241-  rclcpp::TimerBase::SharedPtr timer_;
+242-};
+243-
+244-}  // namespace savo_control
+245-
+246-int main(int argc, char ** argv)
+247-{
+248-  rclcpp::init(argc, argv);
+249-  rclcpp::spin(std::make_shared<savo_control::ControlModeManagerNode>());
+250-  rclcpp::shutdown();
+251-  return 0;
+
+======================================================================
+SAVO LOCATIONS PACKAGE
+======================================================================
+src/core/savo_locations
+src/core/savo_locations/include/savo_locations
+
+ROOT: src/core/savo_locations
+----------------------------------------------------------------------
+
+Interface definitions:
+
+Approval and map contract matches:
+src/core/savo_locations/test/contracts/test_phase3a_contracts.py:59:        "read_only_catalog_view.hpp",
+src/core/savo_locations/test/contracts/test_phase3a_contracts.py:63:        "location_registry_node.hpp",
+src/core/savo_locations/test/contracts/test_phase3a_contracts.py:64:        "src/read_only_catalog_view.cpp",
+src/core/savo_locations/test/contracts/test_phase3a_contracts.py:66:        "src/location_registry_node.cpp",
+src/core/savo_locations/test/contracts/test_phase3a_contracts.py:67:        "src/location_registry_main.cpp",
+src/core/savo_locations/test/contracts/test_phase3a_contracts.py:82:        "src/location_registry_node.cpp",
+src/core/savo_locations/test/contracts/test_phase3a_contracts.py:83:        "src/location_registry_main.cpp",
+src/core/savo_locations/test/contracts/test_phase3a_contracts.py:86:        "test_registry_node",
+src/core/savo_locations/test/contracts/test_phase3a_contracts.py:94:        "src/location_registry_node.cpp"
+src/core/savo_locations/test/contracts/test_phase3a_contracts.py:101:    assert "catalog_view_.replace(" in source
+src/core/savo_locations/test/contracts/test_phase3a_contracts.py:110:    assert "registry unavailable:" in source
+src/core/savo_locations/test/contracts/test_phase3a_contracts.py:115:        "src/location_registry_node.cpp"
+src/core/savo_locations/test/contracts/test_phase3a_contracts.py:120:        "location_registry_node.hpp"
+src/core/savo_locations/test/contracts/test_phase3a_contracts.py:148:        "src/location_registry_node.cpp"
+src/core/savo_locations/test/contracts/test_phase3a_contracts.py:173:        "src/read_only_catalog_view.cpp"
+src/core/savo_locations/test/contracts/test_phase3a_contracts.py:201:        "test_read_only_catalog_view",
+src/core/savo_locations/test/contracts/test_phase3a_contracts.py:202:        "test_registry_node",
+src/core/savo_locations/test/contracts/test_phase2b_contracts.py:98:def test_repository_persists_location_identity_rows() -> None:
+src/core/savo_locations/test/contracts/test_phase2b_contracts.py:103:    assert "insert_location_identity" in implementation
+src/core/savo_locations/test/contracts/test_phase2b_contracts.py:116:    assert "approved_location_id" in implementation
+src/core/savo_locations/test/contracts/test_phase2b_contracts.py:130:    assert "persisted catalog failed domain validation" in implementation
+src/core/savo_locations/test/contracts/test_phase0_contracts.py:75:    assert "`map_id`" in readme
+src/core/savo_locations/test/contracts/test_phase2c_contracts.py:143:        / "test_persistent_catalog.cpp"
+src/core/savo_locations/test/contracts/test_phase2c_contracts.py:148:    assert "test_persistent_catalog" in cmake
+src/core/savo_locations/test/contracts/test_phase1a_contracts.py:128:    assert "canonicalize_location_id" in implementation
+src/core/savo_locations/test/contracts/test_phase1a_contracts.py:129:    assert "is_canonical_location_id" in implementation
+src/core/savo_locations/test/contracts/test_phase2a_contracts.py:79:        "registry_metadata",
+src/core/savo_locations/test/contracts/test_phase1b_contracts.py:41:def test_registry_files_exist() -> None:
+src/core/savo_locations/test/contracts/test_phase1b_contracts.py:43:        "include/savo_locations/registry.hpp",
+src/core/savo_locations/test/contracts/test_phase1b_contracts.py:44:        "src/registry.cpp",
+src/core/savo_locations/test/contracts/test_phase1b_contracts.py:45:        "test/unit/test_registry.cpp",
+src/core/savo_locations/test/contracts/test_phase1b_contracts.py:50:def test_cmake_builds_registry() -> None:
+src/core/savo_locations/test/contracts/test_phase1b_contracts.py:53:    assert "src/registry.cpp" in cmake
+src/core/savo_locations/test/contracts/test_phase1b_contracts.py:54:    assert "test_location_registry" in cmake
+src/core/savo_locations/test/contracts/test_phase1b_contracts.py:58:def test_registry_supports_safe_resolution() -> None:
+src/core/savo_locations/test/contracts/test_phase1b_contracts.py:60:        "include/savo_locations/registry.hpp"
+src/core/savo_locations/test/contracts/test_phase1b_contracts.py:77:    assert "ambiguous_location_ids" in header
+src/core/savo_locations/test/contracts/test_phase1b_contracts.py:80:def test_registry_supports_revision_guards() -> None:
+src/core/savo_locations/test/contracts/test_phase1b_contracts.py:82:        "include/savo_locations/registry.hpp"
+src/core/savo_locations/test/contracts/test_phase1b_contracts.py:86:        "src/registry.cpp"
+src/core/savo_locations/test/contracts/test_phase1b_contracts.py:99:def test_registry_checks_identity_and_tag_conflicts() -> None:
+src/core/savo_locations/test/contracts/test_phase1b_contracts.py:101:        "include/savo_locations/registry.hpp"
+src/core/savo_locations/test/contracts/test_phase1b_contracts.py:105:        "src/registry.cpp"
+src/core/savo_locations/test/contracts/test_phase1b_contracts.py:122:def test_loc1b_registry_remains_dependency_isolated() -> None:
+src/core/savo_locations/test/contracts/test_phase1b_contracts.py:123:    registry_layer = "\n".join(
+src/core/savo_locations/test/contracts/test_phase1b_contracts.py:125:            read("include/savo_locations/registry.hpp"),
+src/core/savo_locations/test/contracts/test_phase1b_contracts.py:126:            read("src/registry.cpp"),
+src/core/savo_locations/test/contracts/test_phase1b_contracts.py:130:    # The in-memory registry remains independent even
+src/core/savo_locations/test/contracts/test_phase1b_contracts.py:141:        assert forbidden not in registry_layer
+src/core/savo_locations/test/contracts/test_phase1c_contracts.py:43:def test_candidate_catalog_files_exist() -> None:
+src/core/savo_locations/test/contracts/test_phase1c_contracts.py:45:        "include/savo_locations/location_catalog.hpp",
+src/core/savo_locations/test/contracts/test_phase1c_contracts.py:46:        "src/location_catalog.cpp",
+src/core/savo_locations/test/contracts/test_phase1c_contracts.py:47:        "test/unit/test_location_catalog.cpp",
+src/core/savo_locations/test/contracts/test_phase1c_contracts.py:52:def test_cmake_builds_location_catalog() -> None:
+src/core/savo_locations/test/contracts/test_phase1c_contracts.py:55:    assert "src/location_catalog.cpp" in cmake
+src/core/savo_locations/test/contracts/test_phase1c_contracts.py:56:    assert "test_location_catalog" in cmake
+src/core/savo_locations/test/contracts/test_phase1c_contracts.py:62:        "include/savo_locations/location_catalog.hpp"
+src/core/savo_locations/test/contracts/test_phase1c_contracts.py:81:        "include/savo_locations/location_catalog.hpp"
+src/core/savo_locations/test/contracts/test_phase1c_contracts.py:85:        "src/location_catalog.cpp"
+src/core/savo_locations/test/contracts/test_phase1c_contracts.py:120:        "src/location_catalog.cpp"
+src/core/savo_locations/test/contracts/test_phase1c_contracts.py:135:def test_loc1c_catalog_remains_dependency_isolated() -> None:
+src/core/savo_locations/test/contracts/test_phase1c_contracts.py:136:    catalog_layer = "\n".join(
+src/core/savo_locations/test/contracts/test_phase1c_contracts.py:140:                "location_catalog.hpp"
+src/core/savo_locations/test/contracts/test_phase1c_contracts.py:142:            read("src/location_catalog.cpp"),
+src/core/savo_locations/test/contracts/test_phase1c_contracts.py:157:        assert forbidden not in catalog_layer
+src/core/savo_locations/test/contracts/test_phase3b1_contracts.py:108:        "src/location_registry_node.cpp"
+src/core/savo_locations/test/contracts/test_phase3b1_contracts.py:113:        "location_registry_node.hpp"
+src/core/savo_locations/test/storage/test_persistent_catalog.cpp:66:  record.candidate.map.map_id =
+src/core/savo_locations/test/storage/test_persistent_catalog.cpp:100:  record.candidate.suggested_location_id =
+src/core/savo_locations/test/storage/test_persistent_catalog.cpp:128:make_approved_location()
+src/core/savo_locations/test/storage/test_persistent_catalog.cpp:139:  record.location.location_id = "A201";
+src/core/savo_locations/test/storage/test_persistent_catalog.cpp:145:  record.location.map.map_id =
+src/core/savo_locations/test/storage/test_persistent_catalog.cpp:195:make_approved_snapshot()
+src/core/savo_locations/test/storage/test_persistent_catalog.cpp:207:  candidate.review_reason = "approved";
+src/core/savo_locations/test/storage/test_persistent_catalog.cpp:209:  candidate.approved_location_id =
+src/core/savo_locations/test/storage/test_persistent_catalog.cpp:213:    make_approved_location());
+src/core/savo_locations/test/storage/test_persistent_catalog.cpp:249:  request.approved_location_id = "A201";
+src/core/savo_locations/test/storage/test_persistent_catalog.cpp:253:    "mapping evidence approved";
+src/core/savo_locations/test/storage/test_persistent_catalog.cpp:259:    make_approved_snapshot();
+src/core/savo_locations/test/storage/test_persistent_catalog.cpp:563:    events.front().location_id,
+src/core/savo_locations/test/storage/test_sqlite_store.cpp:182:    "registry_metadata",
+src/core/savo_locations/test/storage/test_sqlite_store.cpp:326:      "active_map_id",
+src/core/savo_locations/test/storage/test_sqlite_store.cpp:337:      "active_map_id",
+src/core/savo_locations/test/storage/test_sqlite_store.cpp:361:      "active_map_id",
+src/core/savo_locations/test/storage/test_sqlite_store.cpp:370:      "active_map_id",
+src/core/savo_locations/test/storage/test_sqlite_repository.cpp:66:  record.location.location_id = "A201";
+src/core/savo_locations/test/storage/test_sqlite_repository.cpp:77:  record.location.map.map_id =
+src/core/savo_locations/test/storage/test_sqlite_repository.cpp:127:  record.candidate.map.map_id =
+src/core/savo_locations/test/storage/test_sqlite_repository.cpp:158:  record.candidate.suggested_location_id =
+src/core/savo_locations/test/storage/test_sqlite_repository.cpp:190:make_approved_candidate()
+src/core/savo_locations/test/storage/test_sqlite_repository.cpp:199:  record.candidate.suggested_location_id =
+src/core/savo_locations/test/storage/test_sqlite_repository.cpp:214:  record.review_reason = "approved";
+src/core/savo_locations/test/storage/test_sqlite_repository.cpp:215:  record.approved_location_id = "A201";
+src/core/savo_locations/test/storage/test_sqlite_repository.cpp:290:    location.location.location_id,
+src/core/savo_locations/test/storage/test_sqlite_repository.cpp:390:    make_approved_candidate());
+src/core/savo_locations/test/storage/test_sqlite_repository.cpp:410:      .approved_location_id,
+src/core/savo_locations/test/storage/test_sqlite_repository.cpp:436:      make_approved_candidate());
+src/core/savo_locations/test/storage/test_sqlite_repository.cpp:518:      .location_id,
+src/core/savo_locations/test/storage/test_sqlite_repository.cpp:539:  second.location.location_id = "B201";
+src/core/savo_locations/test/storage/test_persistent_mutation_commits.cpp:65:  candidate.map.map_id = "campus_main";
+src/core/savo_locations/test/storage/test_persistent_mutation_commits.cpp:76:  candidate.suggested_location_id = "B301";
+src/core/savo_locations/test/storage/test_persistent_mutation_commits.cpp:107:  value.location_id = "B301";
+src/core/savo_locations/test/storage/test_persistent_mutation_commits.cpp:110:  value.map.map_id = "campus_main";
+src/core/savo_locations/test/storage/test_persistent_mutation_commits.cpp:204:  request.location_id = "B301";
+src/core/savo_locations/test/storage/test_persistent_mutation_commits.cpp:425:  no_op.location_id = "B301";
+src/core/savo_locations/test/unit/test_location_catalog.cpp:7:#include "savo_locations/location_catalog.hpp"
+src/core/savo_locations/test/unit/test_location_catalog.cpp:28:  const std::string & map_id,
+src/core/savo_locations/test/unit/test_location_catalog.cpp:31:  const std::string & suggested_location_id)
+src/core/savo_locations/test/unit/test_location_catalog.cpp:37:  candidate.map.map_id = map_id;
+src/core/savo_locations/test/unit/test_location_catalog.cpp:51:  candidate.suggested_location_id =
+src/core/savo_locations/test/unit/test_location_catalog.cpp:52:    suggested_location_id;
+src/core/savo_locations/test/unit/test_location_catalog.cpp:55:    "Room " + suggested_location_id;
+src/core/savo_locations/test/unit/test_location_catalog.cpp:58:    suggested_location_id.substr(0U, 1U) +
+src/core/savo_locations/test/unit/test_location_catalog.cpp:60:    suggested_location_id.substr(1U),
+src/core/savo_locations/test/unit/test_location_catalog.cpp:71:  const std::string & location_id,
+src/core/savo_locations/test/unit/test_location_catalog.cpp:72:  const std::string & map_id,
+src/core/savo_locations/test/unit/test_location_catalog.cpp:85:  record.location.location_id =
+src/core/savo_locations/test/unit/test_location_catalog.cpp:86:    location_id;
+src/core/savo_locations/test/unit/test_location_catalog.cpp:89:    "Room " + location_id;
+src/core/savo_locations/test/unit/test_location_catalog.cpp:94:  record.location.map.map_id = map_id;
+src/core/savo_locations/test/unit/test_location_catalog.cpp:132:  savo_locations::InMemoryLocationCatalog catalog;
+src/core/savo_locations/test/unit/test_location_catalog.cpp:135:    catalog.register_candidate(
+src/core/savo_locations/test/unit/test_location_catalog.cpp:161:  EXPECT_EQ(catalog.candidate_size(), 1U);
+src/core/savo_locations/test/unit/test_location_catalog.cpp:167:  savo_locations::InMemoryLocationCatalog catalog;
+src/core/savo_locations/test/unit/test_location_catalog.cpp:170:    catalog.register_candidate(
+src/core/savo_locations/test/unit/test_location_catalog.cpp:179:    catalog.register_candidate(
+src/core/savo_locations/test/unit/test_location_catalog.cpp:198:  savo_locations::InMemoryLocationCatalog catalog;
+src/core/savo_locations/test/unit/test_location_catalog.cpp:201:    catalog.register_candidate(
+src/core/savo_locations/test/unit/test_location_catalog.cpp:210:    catalog.register_candidate(
+src/core/savo_locations/test/unit/test_location_catalog.cpp:229:  savo_locations::InMemoryLocationCatalog catalog;
+src/core/savo_locations/test/unit/test_location_catalog.cpp:232:    catalog.register_candidate(
+src/core/savo_locations/test/unit/test_location_catalog.cpp:241:    catalog.register_candidate(
+src/core/savo_locations/test/unit/test_location_catalog.cpp:249:  EXPECT_EQ(catalog.candidate_size(), 2U);
+src/core/savo_locations/test/unit/test_location_catalog.cpp:255:  savo_locations::InMemoryLocationCatalog catalog;
+src/core/savo_locations/test/unit/test_location_catalog.cpp:258:    catalog.insert_location(
+src/core/savo_locations/test/unit/test_location_catalog.cpp:266:    catalog.register_candidate(
+src/core/savo_locations/test/unit/test_location_catalog.cpp:285:  savo_locations::InMemoryLocationCatalog catalog;
+src/core/savo_locations/test/unit/test_location_catalog.cpp:296:    catalog.register_candidate(
+src/core/savo_locations/test/unit/test_location_catalog.cpp:303:    catalog.replace_candidate(
+src/core/savo_locations/test/unit/test_location_catalog.cpp:325:  savo_locations::InMemoryLocationCatalog catalog;
+src/core/savo_locations/test/unit/test_location_catalog.cpp:336:    catalog.register_candidate(
+src/core/savo_locations/test/unit/test_location_catalog.cpp:340:    catalog.replace_candidate(
+src/core/savo_locations/test/unit/test_location_catalog.cpp:356:  savo_locations::InMemoryLocationCatalog catalog;
+src/core/savo_locations/test/unit/test_location_catalog.cpp:359:    catalog.register_candidate(
+src/core/savo_locations/test/unit/test_location_catalog.cpp:368:    catalog.reject_candidate(
+src/core/savo_locations/test/unit/test_location_catalog.cpp:393:  savo_locations::InMemoryLocationCatalog catalog;
+src/core/savo_locations/test/unit/test_location_catalog.cpp:396:    catalog.register_candidate(
+src/core/savo_locations/test/unit/test_location_catalog.cpp:405:    catalog.reject_candidate(
+src/core/savo_locations/test/unit/test_location_catalog.cpp:421:  savo_locations::InMemoryLocationCatalog catalog;
+src/core/savo_locations/test/unit/test_location_catalog.cpp:424:    catalog.register_candidate(
+src/core/savo_locations/test/unit/test_location_catalog.cpp:433:    catalog.reject_candidate(
+src/core/savo_locations/test/unit/test_location_catalog.cpp:439:    catalog.approve_candidate(
+src/core/savo_locations/test/unit/test_location_catalog.cpp:455:  savo_locations::InMemoryLocationCatalog catalog;
+src/core/savo_locations/test/unit/test_location_catalog.cpp:458:    catalog.register_candidate(
+src/core/savo_locations/test/unit/test_location_catalog.cpp:467:    catalog.approve_candidate(
+src/core/savo_locations/test/unit/test_location_catalog.cpp:492:      ->approved_location_id,
+src/core/savo_locations/test/unit/test_location_catalog.cpp:500:  EXPECT_EQ(catalog.location_size(), 1U);
+src/core/savo_locations/test/unit/test_location_catalog.cpp:501:  EXPECT_EQ(catalog.candidate_size(), 1U);
+src/core/savo_locations/test/unit/test_location_catalog.cpp:504:    catalog.resolve_location("A201");
+src/core/savo_locations/test/unit/test_location_catalog.cpp:512:  savo_locations::InMemoryLocationCatalog catalog;
+src/core/savo_locations/test/unit/test_location_catalog.cpp:526:    catalog.register_candidate(
+src/core/savo_locations/test/unit/test_location_catalog.cpp:534:  request.location_id = "a 201";
+src/core/savo_locations/test/unit/test_location_catalog.cpp:538:    catalog.approve_candidate(request);
+src/core/savo_locations/test/unit/test_location_catalog.cpp:546:      .location_id,
+src/core/savo_locations/test/unit/test_location_catalog.cpp:561:      .map_id,
+src/core/savo_locations/test/unit/test_location_catalog.cpp:597:          savo_locations::InMemoryLocationCatalog catalog;
+src/core/savo_locations/test/unit/test_location_catalog.cpp:600:            catalog.register_candidate(
+src/core/savo_locations/test/unit/test_location_catalog.cpp:613:          request.location_id = "a 201";
+src/core/savo_locations/test/unit/test_location_catalog.cpp:621:            catalog.approve_candidate(request);
+src/core/savo_locations/test/unit/test_location_catalog.cpp:631:            catalog.get_candidate(
+src/core/savo_locations/test/unit/test_location_catalog.cpp:649:  savo_locations::InMemoryLocationCatalog catalog;
+src/core/savo_locations/test/unit/test_location_catalog.cpp:662:    catalog.register_candidate(
+src/core/savo_locations/test/unit/test_location_catalog.cpp:670:    catalog.approve_candidate(request);
+src/core/savo_locations/test/unit/test_location_catalog.cpp:683:  savo_locations::InMemoryLocationCatalog catalog;
+src/core/savo_locations/test/unit/test_location_catalog.cpp:686:    catalog.register_candidate(
+src/core/savo_locations/test/unit/test_location_catalog.cpp:695:    catalog.approve_candidate(
+src/core/savo_locations/test/unit/test_location_catalog.cpp:711:  savo_locations::InMemoryLocationCatalog catalog;
+src/core/savo_locations/test/unit/test_location_catalog.cpp:714:    catalog.insert_location(
+src/core/savo_locations/test/unit/test_location_catalog.cpp:723:    catalog.register_candidate(
+src/core/savo_locations/test/unit/test_location_catalog.cpp:736:  request.location_id = "B201";
+src/core/savo_locations/test/unit/test_location_catalog.cpp:744:    catalog.approve_candidate(request);
+src/core/savo_locations/test/unit/test_location_catalog.cpp:753:  EXPECT_EQ(catalog.location_size(), 1U);
+src/core/savo_locations/test/unit/test_location_catalog.cpp:756:    catalog.get_candidate(
+src/core/savo_locations/test/unit/test_location_catalog.cpp:771:    candidate->approved_location_id.empty());
+src/core/savo_locations/test/unit/test_location_catalog.cpp:777:  savo_locations::InMemoryLocationCatalog catalog;
+src/core/savo_locations/test/unit/test_location_catalog.cpp:780:    catalog.register_candidate(
+src/core/savo_locations/test/unit/test_location_catalog.cpp:789:    catalog.register_candidate(
+src/core/savo_locations/test/unit/test_location_catalog.cpp:798:    catalog.register_candidate(
+src/core/savo_locations/test/unit/test_location_catalog.cpp:807:    catalog.list_candidates();
+src/core/savo_locations/test/unit/test_location_catalog.cpp:827:  savo_locations::InMemoryLocationCatalog catalog;
+src/core/savo_locations/test/unit/test_location_catalog.cpp:830:    catalog.insert_location(
+src/core/savo_locations/test/unit/test_location_catalog.cpp:838:    catalog.register_candidate(
+src/core/savo_locations/test/unit/test_location_catalog.cpp:846:  catalog.clear();
+src/core/savo_locations/test/unit/test_location_catalog.cpp:848:  EXPECT_EQ(catalog.location_size(), 0U);
+src/core/savo_locations/test/unit/test_location_catalog.cpp:849:  EXPECT_EQ(catalog.candidate_size(), 0U);
+src/core/savo_locations/test/unit/test_validation.cpp:17:  location.location_id = "A201";
+src/core/savo_locations/test/unit/test_validation.cpp:26:  location.map.map_id = "campus_main";
+src/core/savo_locations/test/unit/test_validation.cpp:59:  candidate.map.map_id = "campus_main";
+src/core/savo_locations/test/unit/test_validation.cpp:75:  candidate.suggested_location_id = "A201";
+src/core/savo_locations/test/unit/test_validation.cpp:106:  location.location_id = "a 201";
+src/core/savo_locations/test/unit/test_registry.cpp:7:#include "savo_locations/registry.hpp"
+src/core/savo_locations/test/unit/test_registry.cpp:14:  const std::string & location_id,
+src/core/savo_locations/test/unit/test_registry.cpp:16:  const std::string & map_id,
+src/core/savo_locations/test/unit/test_registry.cpp:29:  record.location.location_id =
+src/core/savo_locations/test/unit/test_registry.cpp:30:    location_id;
+src/core/savo_locations/test/unit/test_registry.cpp:39:  record.location.map.map_id = map_id;
+src/core/savo_locations/test/unit/test_registry.cpp:60:  savo_locations::InMemoryRegistry registry;
+src/core/savo_locations/test/unit/test_registry.cpp:63:    registry.insert(
+src/core/savo_locations/test/unit/test_registry.cpp:78:  EXPECT_EQ(registry.size(), 1U);
+src/core/savo_locations/test/unit/test_registry.cpp:80:  const auto stored = registry.get("a201");
+src/core/savo_locations/test/unit/test_registry.cpp:85:    stored->location.location_id,
+src/core/savo_locations/test/unit/test_registry.cpp:92:  savo_locations::InMemoryRegistry registry;
+src/core/savo_locations/test/unit/test_registry.cpp:95:    registry.insert(
+src/core/savo_locations/test/unit/test_registry.cpp:105:    registry.resolve("a201");
+src/core/savo_locations/test/unit/test_registry.cpp:120:    result.record->location.location_id,
+src/core/savo_locations/test/unit/test_registry.cpp:127:  savo_locations::InMemoryRegistry registry;
+src/core/savo_locations/test/unit/test_registry.cpp:130:    registry.insert(
+src/core/savo_locations/test/unit/test_registry.cpp:143:    registry.resolve(" room-a201 ");
+src/core/savo_locations/test/unit/test_registry.cpp:152:    registry.resolve("east_classroom");
+src/core/savo_locations/test/unit/test_registry.cpp:164:  savo_locations::InMemoryRegistry registry;
+src/core/savo_locations/test/unit/test_registry.cpp:167:    registry.insert(
+src/core/savo_locations/test/unit/test_registry.cpp:177:    registry.insert(
+src/core/savo_locations/test/unit/test_registry.cpp:197:  savo_locations::InMemoryRegistry registry;
+src/core/savo_locations/test/unit/test_registry.cpp:200:    registry.insert(
+src/core/savo_locations/test/unit/test_registry.cpp:209:    registry.insert(
+src/core/savo_locations/test/unit/test_registry.cpp:228:  savo_locations::InMemoryRegistry registry;
+src/core/savo_locations/test/unit/test_registry.cpp:231:    registry.insert(
+src/core/savo_locations/test/unit/test_registry.cpp:241:    registry.insert(
+src/core/savo_locations/test/unit/test_registry.cpp:251:    registry.resolve("information desk");
+src/core/savo_locations/test/unit/test_registry.cpp:260:    ambiguous.ambiguous_location_ids.size(),
+src/core/savo_locations/test/unit/test_registry.cpp:265:  options.map.map_id = "campus_north";
+src/core/savo_locations/test/unit/test_registry.cpp:269:    registry.resolve(
+src/core/savo_locations/test/unit/test_registry.cpp:277:    resolved.record->location.location_id,
+src/core/savo_locations/test/unit/test_registry.cpp:284:  savo_locations::InMemoryRegistry registry;
+src/core/savo_locations/test/unit/test_registry.cpp:287:    registry.insert(
+src/core/savo_locations/test/unit/test_registry.cpp:297:  options.map.map_id = "campus_other";
+src/core/savo_locations/test/unit/test_registry.cpp:301:    registry.resolve("A201", options);
+src/core/savo_locations/test/unit/test_registry.cpp:313:  savo_locations::InMemoryRegistry registry;
+src/core/savo_locations/test/unit/test_registry.cpp:326:    registry.insert(record).success);
+src/core/savo_locations/test/unit/test_registry.cpp:329:    registry.resolve("A201");
+src/core/savo_locations/test/unit/test_registry.cpp:341:  savo_locations::InMemoryRegistry registry;
+src/core/savo_locations/test/unit/test_registry.cpp:358:    registry.insert(record).success);
+src/core/savo_locations/test/unit/test_registry.cpp:361:    registry.resolve("old classroom");
+src/core/savo_locations/test/unit/test_registry.cpp:373:  savo_locations::InMemoryRegistry registry;
+src/core/savo_locations/test/unit/test_registry.cpp:384:    registry.insert(original).success);
+src/core/savo_locations/test/unit/test_registry.cpp:393:    registry.replace(
+src/core/savo_locations/test/unit/test_registry.cpp:408:  savo_locations::InMemoryRegistry registry;
+src/core/savo_locations/test/unit/test_registry.cpp:419:    registry.insert(original).success);
+src/core/savo_locations/test/unit/test_registry.cpp:425:    registry.replace(
+src/core/savo_locations/test/unit/test_registry.cpp:440:  savo_locations::InMemoryRegistry registry;
+src/core/savo_locations/test/unit/test_registry.cpp:451:    registry.insert(original).success);
+src/core/savo_locations/test/unit/test_registry.cpp:465:    registry.replace(
+src/core/savo_locations/test/unit/test_registry.cpp:476:    registry.resolve("classroom a201");
+src/core/savo_locations/test/unit/test_registry.cpp:489:  savo_locations::InMemoryRegistry registry;
+src/core/savo_locations/test/unit/test_registry.cpp:492:    registry.insert(
+src/core/savo_locations/test/unit/test_registry.cpp:501:    registry.set_enabled(
+src/core/savo_locations/test/unit/test_registry.cpp:516:    registry.resolve("A201");
+src/core/savo_locations/test/unit/test_registry.cpp:526:  savo_locations::InMemoryRegistry registry;
+src/core/savo_locations/test/unit/test_registry.cpp:529:    registry.insert(
+src/core/savo_locations/test/unit/test_registry.cpp:538:    registry.insert(
+src/core/savo_locations/test/unit/test_registry.cpp:547:    registry.insert(
+src/core/savo_locations/test/unit/test_registry.cpp:555:  const auto records = registry.list();
+src/core/savo_locations/test/unit/test_registry.cpp:560:    records[0].location.location_id,
+src/core/savo_locations/test/unit/test_registry.cpp:564:    records[1].location.location_id,
+src/core/savo_locations/test/unit/test_registry.cpp:568:    records[2].location.location_id,
+src/core/savo_locations/test/unit/test_registry.cpp:575:  savo_locations::InMemoryRegistry registry;
+src/core/savo_locations/test/unit/test_registry.cpp:578:    registry.insert(
+src/core/savo_locations/test/unit/test_registry.cpp:586:  registry.clear();
+src/core/savo_locations/test/unit/test_registry.cpp:588:  EXPECT_EQ(registry.size(), 0U);
+src/core/savo_locations/test/unit/test_registry.cpp:591:    registry.resolve("A201").code,
+src/core/savo_locations/test/unit/test_types.cpp:24:    "approved");
+src/core/savo_locations/test/unit/test_normalization.cpp:43:      canonicalize_location_id(
+src/core/savo_locations/test/unit/test_normalization.cpp:49:      canonicalize_location_id(
+src/core/savo_locations/test/unit/test_normalization.cpp:59:      is_canonical_location_id(
+src/core/savo_locations/test/unit/test_normalization.cpp:64:      is_canonical_location_id(
+src/core/savo_locations/test/unit/test_normalization.cpp:69:      is_canonical_location_id(
+src/core/savo_locations/test/unit/test_normalization.cpp:74:      is_canonical_location_id(
+src/core/savo_locations/test/unit/test_normalization.cpp:79:      is_canonical_location_id(
+src/core/savo_locations/test/ros/test_read_only_catalog_view.cpp:6:#include "savo_locations/read_only_catalog_view.hpp"
+src/core/savo_locations/test/ros/test_read_only_catalog_view.cpp:30:  std::string map_id,
+src/core/savo_locations/test/ros/test_read_only_catalog_view.cpp:43:  record.location.location_id =
+src/core/savo_locations/test/ros/test_read_only_catalog_view.cpp:52:  record.location.map.map_id =
+src/core/savo_locations/test/ros/test_read_only_catalog_view.cpp:53:    std::move(map_id);
+src/core/savo_locations/test/ros/test_read_only_catalog_view.cpp:143:    result.location.location.location_id,
+src/core/savo_locations/test/ros/test_read_only_catalog_view.cpp:186:    result.ambiguous_location_ids.size(),
+src/core/savo_locations/test/ros/test_read_only_catalog_view.cpp:190:    result.ambiguous_location_ids[0],
+src/core/savo_locations/test/ros/test_read_only_catalog_view.cpp:194:    result.ambiguous_location_ids[1],
+src/core/savo_locations/test/ros/test_read_only_catalog_view.cpp:207:  request.map_id = "campus_annex";
+src/core/savo_locations/test/ros/test_read_only_catalog_view.cpp:219:    result.location.location.location_id,
+src/core/savo_locations/test/ros/test_read_only_catalog_view.cpp:275:  request.map_id = "campus_main";
+src/core/savo_locations/test/ros/test_read_only_catalog_view.cpp:288:      .location_id,
+src/core/savo_locations/test/ros/test_read_only_catalog_view.cpp:300:  request.map_id = "campus_main";
+src/core/savo_locations/test/ros/test_registry_node.cpp:14:#include "savo_msgs/srv/resolve_location.hpp"
+src/core/savo_locations/test/ros/test_registry_node.cpp:16:#include "savo_locations/location_registry_node.hpp"
+src/core/savo_locations/test/ros/test_registry_node.cpp:72:  record.location.location_id = "A201";
+src/core/savo_locations/test/ros/test_registry_node.cpp:82:  record.location.map.map_id =
+src/core/savo_locations/test/ros/test_registry_node.cpp:109:    "loc3a_registry_node.sqlite3";
+src/core/savo_locations/test/ros/test_registry_node.cpp:185:  auto registry =
+src/core/savo_locations/test/ros/test_registry_node.cpp:191:    registry->registry_ready());
+src/core/savo_locations/test/ros/test_registry_node.cpp:249:  executor.add_node(registry);
+src/core/savo_locations/test/ros/test_registry_node.cpp:312:      .location_id,
+src/core/savo_locations/test/ros/test_registry_node.cpp:320:  get_request->location_id = "A201";
+src/core/savo_locations/test/ros/test_registry_node.cpp:338:    get_response->location.location_id,
+src/core/savo_locations/test/ros/test_registry_node.cpp:346:  list_request->map_id =
+src/core/savo_locations/test/ros/test_registry_node.cpp:375:      .location_id,
+src/core/savo_locations/test/ros/test_registry_node.cpp:401:  executor.remove_node(registry);
+src/core/savo_locations/include/savo_locations/read_only_catalog_view.hpp:36:  std::string map_id;
+src/core/savo_locations/include/savo_locations/read_only_catalog_view.hpp:63:    ambiguous_location_ids;
+src/core/savo_locations/include/savo_locations/read_only_catalog_view.hpp:89:  std::string map_id;
+src/core/savo_locations/include/savo_locations/read_only_catalog_view.hpp:127:    std::string_view location_id,
+src/core/savo_locations/include/savo_locations/sqlite_repository.hpp:83:  std::string location_id;
+src/core/savo_locations/include/savo_locations/sqlite_repository.hpp:125:  std::string approved_location_id;
+src/core/savo_locations/include/savo_locations/sqlite_repository.hpp:137:  std::string location_id;
+src/core/savo_locations/include/savo_locations/ros_conversions.hpp:7:#include "geometry_msgs/msg/pose_stamped.hpp"
+src/core/savo_locations/include/savo_locations/ros_conversions.hpp:17:geometry_msgs::msg::PoseStamped
+src/core/savo_locations/include/savo_locations/registry.hpp:82:  std::vector<std::string> ambiguous_location_ids;
+src/core/savo_locations/include/savo_locations/registry.hpp:113:    std::string_view location_id,
+src/core/savo_locations/include/savo_locations/registry.hpp:125:    std::string_view location_id) const;
+src/core/savo_locations/include/savo_locations/registry.hpp:139:    std::string_view excluded_location_id,
+src/core/savo_locations/include/savo_locations/registry.hpp:140:    std::string * conflicting_location_id) const;
+src/core/savo_locations/include/savo_locations/registry.hpp:145:    std::string_view excluded_location_id,
+src/core/savo_locations/include/savo_locations/registry.hpp:146:    std::string * conflicting_location_id) const;
+src/core/savo_locations/include/savo_locations/sqlite_schema.hpp:23:CREATE TABLE IF NOT EXISTS registry_metadata (
+src/core/savo_locations/include/savo_locations/sqlite_schema.hpp:31:  location_id TEXT PRIMARY KEY,
+src/core/savo_locations/include/savo_locations/sqlite_schema.hpp:45:  map_id TEXT NOT NULL,
+src/core/savo_locations/include/savo_locations/sqlite_schema.hpp:111:  location_id TEXT NOT NULL,
+src/core/savo_locations/include/savo_locations/sqlite_schema.hpp:122:  map_id TEXT NOT NULL,
+src/core/savo_locations/include/savo_locations/sqlite_schema.hpp:130:  PRIMARY KEY(location_id, alias_order),
+src/core/savo_locations/include/savo_locations/sqlite_schema.hpp:132:  UNIQUE(location_id, normalized_key),
+src/core/savo_locations/include/savo_locations/sqlite_schema.hpp:134:  FOREIGN KEY(location_id)
+src/core/savo_locations/include/savo_locations/sqlite_schema.hpp:135:    REFERENCES locations(location_id)
+src/core/savo_locations/include/savo_locations/sqlite_schema.hpp:149:  map_id TEXT NOT NULL,
+src/core/savo_locations/include/savo_locations/sqlite_schema.hpp:212:  suggested_location_id TEXT NOT NULL DEFAULT '',
+src/core/savo_locations/include/savo_locations/sqlite_schema.hpp:225:  approved_location_id TEXT NOT NULL DEFAULT '',
+src/core/savo_locations/include/savo_locations/sqlite_schema.hpp:263:  location_id TEXT NOT NULL DEFAULT '',
+src/core/savo_locations/include/savo_locations/sqlite_schema.hpp:277:  map_id,
+src/core/savo_locations/include/savo_locations/sqlite_schema.hpp:287:  map_id,
+src/core/savo_locations/include/savo_locations/sqlite_schema.hpp:296:  map_id,
+src/core/savo_locations/include/savo_locations/sqlite_schema.hpp:306:  map_id,
+src/core/savo_locations/include/savo_locations/sqlite_schema.hpp:316:  map_id,
+src/core/savo_locations/include/savo_locations/sqlite_schema.hpp:323:  location_id,
+src/core/savo_locations/include/savo_locations/model.hpp:31:  std::string map_id;
+src/core/savo_locations/include/savo_locations/model.hpp:46:  std::string location_id;
+src/core/savo_locations/include/savo_locations/model.hpp:96:  std::string suggested_location_id;
+src/core/savo_locations/include/savo_locations/model.hpp:121:  std::string approved_location_id;
+src/core/savo_locations/include/savo_locations/model.hpp:130:  std::string location_id;
+src/core/savo_locations/include/savo_locations/location_registry_node.hpp:18:#include "savo_msgs/srv/resolve_location.hpp"
+src/core/savo_locations/include/savo_locations/location_registry_node.hpp:20:#include "savo_locations/read_only_catalog_view.hpp"
+src/core/savo_locations/include/savo_locations/location_registry_node.hpp:37:  bool registry_ready() const;
+src/core/savo_locations/include/savo_locations/location_registry_node.hpp:90:  ReadOnlyCatalogView catalog_view_;
+src/core/savo_locations/include/savo_locations/location_catalog.hpp:14:#include "savo_locations/registry.hpp"
+src/core/savo_locations/include/savo_locations/location_catalog.hpp:108:    std::string_view location_id,
+src/core/savo_locations/include/savo_locations/location_catalog.hpp:113:  ResolveResult resolve_location(
+src/core/savo_locations/include/savo_locations/location_catalog.hpp:120:    std::string_view location_id) const;
+src/core/savo_locations/include/savo_locations/location_catalog.hpp:173:    std::string * conflicting_location_id) const;
+src/core/savo_locations/include/savo_locations/normalization.hpp:26:std::string canonicalize_location_id(
+src/core/savo_locations/include/savo_locations/normalization.hpp:30:bool is_canonical_location_id(
+src/core/savo_locations/config/storage.yaml:43:  reject_missing_approved_location: true
+src/core/savo_locations/config/location_policy.yaml:3:registry:
+src/core/savo_locations/config/location_policy.yaml:7:  require_approved_state: true
+src/core/savo_locations/config/location_policy.yaml:18:  require_map_id: true
+src/core/savo_locations/config/location_policy.yaml:55:  location_id_ascii_case: uppercase
+src/core/savo_locations/config/location_policy.yaml:56:  location_id_spaces_to_underscore: true
+src/core/savo_locations/config/location_policy.yaml:61:in_memory_registry:
+src/core/savo_locations/config/location_policy.yaml:62:  deterministic_order: location_id
+src/core/savo_locations/config/location_policy.yaml:63:  location_id_unique_globally: true
+src/core/savo_locations/config/location_policy.yaml:70:  exact_location_id_match_preferred: true
+src/core/savo_locations/config/location_policy.yaml:77:candidate_registry:
+src/core/savo_locations/config/location_policy.yaml:84:  approved_candidate_tag_owned_by_location: true
+src/core/savo_locations/config/location_policy.yaml:102:  location_initial_state: approved
+src/core/savo_locations/README.md:3:`savo_locations` is the authoritative semantic-location registry for
+src/core/savo_locations/README.md:19:- candidate and approved-location lifecycle;
+src/core/savo_locations/README.md:21:- registry persistence and audit history.
+src/core/savo_locations/README.md:37:- `savo_locations` stores and resolves approved locations.
+src/core/savo_locations/README.md:46:- `map_id`
+src/core/savo_locations/README.md:66:Navigation must use the approved approach pose.
+src/core/savo_locations/README.md:74:- approved
+src/core/savo_locations/README.md:80:- approved
+src/core/savo_locations/README.md:83:Only approved and enabled records may resolve for navigation.
+src/core/savo_locations/README.md:140:## LOC-1B in-memory registry
+src/core/savo_locations/README.md:143:in-memory location registry.
+src/core/savo_locations/README.md:145:The registry supports:
+src/core/savo_locations/README.md:187:- the candidate remains authoritative for `map_id`,
+src/core/savo_locations/README.md:190:- the approved location stores the originating candidate ID;
+src/core/savo_locations/README.md:191:- location records begin approved, enabled and at revision 1.
+src/core/savo_locations/README.md:193:Approval is atomic from the catalog API. If location insertion
+src/core/savo_locations/README.md:239:catalog, create backups, expose ROS services or start a runtime
+src/core/savo_locations/README.md:265:- review reason and approved location binding.
+src/core/savo_locations/README.md:276:automatic catalog rehydration, backup rotation or event writes.
+src/core/savo_locations/README.md:277:## LOC-3A read-only ROS registry
+src/core/savo_locations/README.md:279:LOC-3A adds the production C++ ROS registry node.
+src/core/savo_locations/README.md:286:- loads and validates the complete persistent catalog;
+src/core/savo_locations/src/sqlite_store.cpp:931:    "INSERT INTO registry_metadata("
+src/core/savo_locations/src/sqlite_store.cpp:1032:    "FROM registry_metadata "
+src/core/savo_locations/src/read_only_catalog_view.cpp:4:#include "savo_locations/read_only_catalog_view.hpp"
+src/core/savo_locations/src/read_only_catalog_view.cpp:34:bool is_valid_location_id(
+src/core/savo_locations/src/read_only_catalog_view.cpp:69:  const std::string_view map_id,
+src/core/savo_locations/src/read_only_catalog_view.cpp:73:    record.location.map.map_id == map_id &&
+src/core/savo_locations/src/read_only_catalog_view.cpp:123:      "location is not approved";
+src/core/savo_locations/src/read_only_catalog_view.cpp:171:        lhs.location.location_id <
+src/core/savo_locations/src/read_only_catalog_view.cpp:172:        rhs.location.location_id;
+src/core/savo_locations/src/read_only_catalog_view.cpp:205:      trim_ascii(request.map_id).empty() ||
+src/core/savo_locations/src/read_only_catalog_view.cpp:214:      "map_id and map_revision";
+src/core/savo_locations/src/read_only_catalog_view.cpp:226:        record.location.location_id) !=
+src/core/savo_locations/src/read_only_catalog_view.cpp:236:        request.map_id,
+src/core/savo_locations/src/read_only_catalog_view.cpp:324:          request.map_id,
+src/core/savo_locations/src/read_only_catalog_view.cpp:357:      result.ambiguous_location_ids.push_back(
+src/core/savo_locations/src/read_only_catalog_view.cpp:360:          .location_id);
+src/core/savo_locations/src/read_only_catalog_view.cpp:364:      result.ambiguous_location_ids.begin(),
+src/core/savo_locations/src/read_only_catalog_view.cpp:365:      result.ambiguous_location_ids.end());
+src/core/savo_locations/src/read_only_catalog_view.cpp:367:    result.ambiguous_location_ids.erase(
+src/core/savo_locations/src/read_only_catalog_view.cpp:369:        result.ambiguous_location_ids.begin(),
+src/core/savo_locations/src/read_only_catalog_view.cpp:370:        result.ambiguous_location_ids.end()),
+src/core/savo_locations/src/read_only_catalog_view.cpp:371:      result.ambiguous_location_ids.end());
+src/core/savo_locations/src/read_only_catalog_view.cpp:384:  const std::string_view location_id,
+src/core/savo_locations/src/read_only_catalog_view.cpp:390:  if (!is_valid_location_id(location_id)) {
+src/core/savo_locations/src/read_only_catalog_view.cpp:395:      "location_id is not canonical";
+src/core/savo_locations/src/read_only_catalog_view.cpp:404:      [location_id](
+src/core/savo_locations/src/read_only_catalog_view.cpp:408:          record.location.location_id ==
+src/core/savo_locations/src/read_only_catalog_view.cpp:409:          location_id;
+src/core/savo_locations/src/read_only_catalog_view.cpp:477:      trim_ascii(request.map_id).empty() ||
+src/core/savo_locations/src/read_only_catalog_view.cpp:484:      "map_id and map_revision";
+src/core/savo_locations/src/read_only_catalog_view.cpp:491:    trim_ascii(request.map_id).empty())
+src/core/savo_locations/src/read_only_catalog_view.cpp:495:      "map_revision requires map_id";
+src/core/savo_locations/src/read_only_catalog_view.cpp:509:      !request.map_id.empty() &&
+src/core/savo_locations/src/read_only_catalog_view.cpp:510:      record.location.map.map_id !=
+src/core/savo_locations/src/read_only_catalog_view.cpp:511:        request.map_id)
+src/core/savo_locations/src/ros_conversions.cpp:12:geometry_msgs::msg::PoseStamped
+src/core/savo_locations/src/ros_conversions.cpp:16:  geometry_msgs::msg::PoseStamped message;
+src/core/savo_locations/src/ros_conversions.cpp:49:  message.location_id =
+src/core/savo_locations/src/ros_conversions.cpp:50:    record.location.location_id;
+src/core/savo_locations/src/ros_conversions.cpp:61:  message.map_id =
+src/core/savo_locations/src/ros_conversions.cpp:62:    record.location.map.map_id;
+src/core/savo_locations/src/location_registry_node.cpp:4:#include "savo_locations/location_registry_node.hpp"
+src/core/savo_locations/src/location_registry_node.cpp:200:LocationRegistryNode::registry_ready() const
+src/core/savo_locations/src/location_registry_node.cpp:218:  reason_ = "opening SQLite registry";
+src/core/savo_locations/src/location_registry_node.cpp:307:        "catalog bootstrap failed: " +
+src/core/savo_locations/src/location_registry_node.cpp:311:    catalog_view_.replace(
+src/core/savo_locations/src/location_registry_node.cpp:320:      "persistent read-only registry ready";
+src/core/savo_locations/src/location_registry_node.cpp:436:    catalog_view_.locations())
+src/core/savo_locations/src/location_registry_node.cpp:446:      << "\"location_id\":\""
+src/core/savo_locations/src/location_registry_node.cpp:448:           record.location.location_id)
+src/core/savo_locations/src/location_registry_node.cpp:458:      << "\"map_id\":\""
+src/core/savo_locations/src/location_registry_node.cpp:460:           record.location.map.map_id)
+src/core/savo_locations/src/location_registry_node.cpp:506:      "registry unavailable: " + reason_;
+src/core/savo_locations/src/location_registry_node.cpp:518:  view_request.map_id =
+src/core/savo_locations/src/location_registry_node.cpp:519:    request->map_id;
+src/core/savo_locations/src/location_registry_node.cpp:525:    catalog_view_.resolve(view_request);
+src/core/savo_locations/src/location_registry_node.cpp:536:  response->ambiguous_location_ids =
+src/core/savo_locations/src/location_registry_node.cpp:537:    result.ambiguous_location_ids;
+src/core/savo_locations/src/location_registry_node.cpp:600:          .location_id
+src/core/savo_locations/src/location_registry_node.cpp:631:      "registry unavailable: " + reason_;
+src/core/savo_locations/src/location_registry_node.cpp:637:    catalog_view_.get(
+src/core/savo_locations/src/location_registry_node.cpp:638:      request->location_id,
+src/core/savo_locations/src/location_registry_node.cpp:712:      "registry unavailable: " + reason_;
+src/core/savo_locations/src/location_registry_node.cpp:719:  view_request.map_id =
+src/core/savo_locations/src/location_registry_node.cpp:720:    request->map_id;
+src/core/savo_locations/src/location_registry_node.cpp:738:    catalog_view_.list(view_request);
+src/core/savo_locations/src/sqlite_repository.cpp:15:#include "savo_locations/registry.hpp"
+src/core/savo_locations/src/sqlite_repository.cpp:479:        record.approved_location_id.empty();
+src/core/savo_locations/src/sqlite_repository.cpp:483:        !record.approved_location_id.empty();
+src/core/savo_locations/src/sqlite_repository.cpp:489:        record.approved_location_id.empty();
+src/core/savo_locations/src/sqlite_repository.cpp:503:    map.map_id +
+src/core/savo_locations/src/sqlite_repository.cpp:516:  InMemoryRegistry registry;
+src/core/savo_locations/src/sqlite_repository.cpp:546:      registry.insert(location);
+src/core/savo_locations/src/sqlite_repository.cpp:640:      !registry.get(
+src/core/savo_locations/src/sqlite_repository.cpp:641:        candidate.approved_location_id)
+src/core/savo_locations/src/sqlite_repository.cpp:647:        "approved candidate references "
+src/core/savo_locations/src/sqlite_repository.cpp:664:    "location_id,state,enabled,record_revision,"
+src/core/savo_locations/src/sqlite_repository.cpp:666:    "map_id,map_revision,map_release_id,"
+src/core/savo_locations/src/sqlite_repository.cpp:711:      location.location_id);
+src/core/savo_locations/src/sqlite_repository.cpp:753:      location.map.map_id);
+src/core/savo_locations/src/sqlite_repository.cpp:880:int insert_location_identity(
+src/core/savo_locations/src/sqlite_repository.cpp:889:    "location_id,alias_order,alias_kind,"
+src/core/savo_locations/src/sqlite_repository.cpp:891:    "map_id,map_revision,reserves_identity"
+src/core/savo_locations/src/sqlite_repository.cpp:908:    record.location.location_id);
+src/core/savo_locations/src/sqlite_repository.cpp:942:      record.location.map.map_id);
+src/core/savo_locations/src/sqlite_repository.cpp:984:  int code = insert_location_identity(
+src/core/savo_locations/src/sqlite_repository.cpp:989:    record.location.location_id);
+src/core/savo_locations/src/sqlite_repository.cpp:995:  code = insert_location_identity(
+src/core/savo_locations/src/sqlite_repository.cpp:1010:    code = insert_location_identity(
+src/core/savo_locations/src/sqlite_repository.cpp:1034:    "map_id,map_revision,map_release_id,"
+src/core/savo_locations/src/sqlite_repository.cpp:1050:    "suggested_location_id,"
+src/core/savo_locations/src/sqlite_repository.cpp:1055:    "review_reason,approved_location_id,"
+src/core/savo_locations/src/sqlite_repository.cpp:1104:      candidate.map.map_id);
+src/core/savo_locations/src/sqlite_repository.cpp:1192:      candidate.suggested_location_id);
+src/core/savo_locations/src/sqlite_repository.cpp:1262:      record.approved_location_id);
+src/core/savo_locations/src/sqlite_repository.cpp:1368:    "WHERE location_id=?1 AND alias_kind=3 "
+src/core/savo_locations/src/sqlite_repository.cpp:1386:    record->location.location_id);
+src/core/savo_locations/src/sqlite_repository.cpp:1489:    "location_id,state,enabled,record_revision,"
+src/core/savo_locations/src/sqlite_repository.cpp:1491:    "map_id,map_revision,map_release_id,"
+src/core/savo_locations/src/sqlite_repository.cpp:1510:    "ORDER BY location_id;";
+src/core/savo_locations/src/sqlite_repository.cpp:1535:    record.location.location_id =
+src/core/savo_locations/src/sqlite_repository.cpp:1579:    record.location.map.map_id =
+src/core/savo_locations/src/sqlite_repository.cpp:1671:    "map_id,map_revision,map_release_id,"
+src/core/savo_locations/src/sqlite_repository.cpp:1687:    "suggested_location_id,"
+src/core/savo_locations/src/sqlite_repository.cpp:1692:    "review_reason,approved_location_id,"
+src/core/savo_locations/src/sqlite_repository.cpp:1755:    record.candidate.map.map_id =
+src/core/savo_locations/src/sqlite_repository.cpp:1826:      .suggested_location_id =
+src/core/savo_locations/src/sqlite_repository.cpp:1858:    record.approved_location_id =
+src/core/savo_locations/src/sqlite_repository.cpp:1925:    lhs.map_id == rhs.map_id &&
+src/core/savo_locations/src/sqlite_repository.cpp:1946:    lhs.location_id == rhs.location_id &&
+src/core/savo_locations/src/sqlite_repository.cpp:2012:    lhs.suggested_location_id ==
+src/core/savo_locations/src/sqlite_repository.cpp:2013:      rhs.suggested_location_id &&
+src/core/savo_locations/src/sqlite_repository.cpp:2041:    lhs.approved_location_id ==
+src/core/savo_locations/src/sqlite_repository.cpp:2042:      rhs.approved_location_id &&
+src/core/savo_locations/src/sqlite_repository.cpp:2071:  const std::string_view location_id)
+src/core/savo_locations/src/sqlite_repository.cpp:2078:      location.location.location_id ==
+src/core/savo_locations/src/sqlite_repository.cpp:2079:      location_id)
+src/core/savo_locations/src/sqlite_repository.cpp:2163:    "location_id,"
+src/core/savo_locations/src/sqlite_repository.cpp:2209:      event.location_id);
+src/core/savo_locations/src/sqlite_repository.cpp:2305:        previous.location.location_id);
+src/core/savo_locations/src/sqlite_repository.cpp:2371:    !registered->approved_location_id.empty())
+src/core/savo_locations/src/sqlite_repository.cpp:2395:      request.location_id);
+src/core/savo_locations/src/sqlite_repository.cpp:2502:        previous.location.location_id);
+src/core/savo_locations/src/sqlite_repository.cpp:2513:      previous.location.location_id ==
+src/core/savo_locations/src/sqlite_repository.cpp:2514:      request.location_id)
+src/core/savo_locations/src/sqlite_repository.cpp:2536:      request.location_id);
+src/core/savo_locations/src/sqlite_repository.cpp:2602:  const auto * approved_candidate =
+src/core/savo_locations/src/sqlite_repository.cpp:2607:  if (approved_candidate == nullptr) {
+src/core/savo_locations/src/sqlite_repository.cpp:2615:    approved_candidate->state !=
+src/core/savo_locations/src/sqlite_repository.cpp:2617:    approved_candidate->candidate_revision !=
+src/core/savo_locations/src/sqlite_repository.cpp:2619:    approved_candidate->approved_location_id !=
+src/core/savo_locations/src/sqlite_repository.cpp:2620:      request.approved_location_id ||
+src/core/savo_locations/src/sqlite_repository.cpp:2623:      approved_candidate->candidate))
+src/core/savo_locations/src/sqlite_repository.cpp:2673:      request.approved_location_id) != nullptr)
+src/core/savo_locations/src/sqlite_repository.cpp:2698:        previous.location.location_id);
+src/core/savo_locations/src/sqlite_repository.cpp:2713:  const auto * approved_location =
+src/core/savo_locations/src/sqlite_repository.cpp:2716:      request.approved_location_id);
+src/core/savo_locations/src/sqlite_repository.cpp:2718:  if (approved_location == nullptr) {
+src/core/savo_locations/src/sqlite_repository.cpp:2722:      "approved location is missing");
+src/core/savo_locations/src/sqlite_repository.cpp:2726:    approved_location->state !=
+src/core/savo_locations/src/sqlite_repository.cpp:2728:    !approved_location->enabled ||
+src/core/savo_locations/src/sqlite_repository.cpp:2729:    approved_location->record_revision != 1U ||
+src/core/savo_locations/src/sqlite_repository.cpp:2730:    approved_location->source_candidate_id !=
+src/core/savo_locations/src/sqlite_repository.cpp:2733:      approved_location->location.map,
+src/core/savo_locations/src/sqlite_repository.cpp:2734:      approved_candidate->candidate.map) ||
+src/core/savo_locations/src/sqlite_repository.cpp:2736:      approved_location->location.tag,
+src/core/savo_locations/src/sqlite_repository.cpp:2737:      approved_candidate->candidate.tag) ||
+src/core/savo_locations/src/sqlite_repository.cpp:2738:    !approved_location
+src/core/savo_locations/src/sqlite_repository.cpp:2743:      approved_location
+src/core/savo_locations/src/sqlite_repository.cpp:2747:      approved_candidate
+src/core/savo_locations/src/sqlite_repository.cpp:2754:      "approved location does not match candidate evidence");
+src/core/savo_locations/src/sqlite_repository.cpp:2984:    "catalog snapshot persisted");
+src/core/savo_locations/src/sqlite_repository.cpp:3039:      "persisted catalog failed domain validation: " +
+src/core/savo_locations/src/sqlite_repository.cpp:3048:    "catalog snapshot loaded");
+src/core/savo_locations/src/sqlite_repository.cpp:3174:    "persistent catalog bootstrapped");
+src/core/savo_locations/src/sqlite_repository.cpp:3322:    "location_id,"
+src/core/savo_locations/src/sqlite_repository.cpp:3417:    event.location_id =
+src/core/savo_locations/src/sqlite_repository.cpp:3571:      "persisted pre-registration catalog "
+src/core/savo_locations/src/sqlite_repository.cpp:3677:      request.approved_location_id).empty() ||
+src/core/savo_locations/src/sqlite_repository.cpp:3774:      "persisted pre-approval catalog is invalid: " +
+src/core/savo_locations/src/sqlite_repository.cpp:3817:  event.location_id =
+src/core/savo_locations/src/sqlite_repository.cpp:3818:    request.approved_location_id;
+src/core/savo_locations/src/sqlite_repository.cpp:3880:    trim_ascii(request.location_id).empty() ||
+src/core/savo_locations/src/sqlite_repository.cpp:3979:      "persisted pre-enablement catalog "
+src/core/savo_locations/src/sqlite_repository.cpp:4020:  event.location_id =
+src/core/savo_locations/src/sqlite_repository.cpp:4021:    request.location_id;
+src/core/savo_locations/src/validation.cpp:109:  const std::string_view location_id,
+src/core/savo_locations/src/validation.cpp:126:    normalize_lookup_key(location_id);
+src/core/savo_locations/src/validation.cpp:327:    context.map_id,
+src/core/savo_locations/src/validation.cpp:328:    "map.map_id",
+src/core/savo_locations/src/validation.cpp:431:    location.location_id,
+src/core/savo_locations/src/validation.cpp:432:    "location_id",
+src/core/savo_locations/src/validation.cpp:436:    !location.location_id.empty() &&
+src/core/savo_locations/src/validation.cpp:437:    !is_canonical_location_id(
+src/core/savo_locations/src/validation.cpp:438:      location.location_id))
+src/core/savo_locations/src/validation.cpp:442:      "location_id",
+src/core/savo_locations/src/validation.cpp:460:    location.location_id,
+src/core/savo_locations/src/validation.cpp:575:    !candidate.suggested_location_id.empty() &&
+src/core/savo_locations/src/validation.cpp:576:    !is_canonical_location_id(
+src/core/savo_locations/src/validation.cpp:577:      candidate.suggested_location_id))
+src/core/savo_locations/src/validation.cpp:581:      "suggested_location_id",
+src/core/savo_locations/src/validation.cpp:599:    candidate.suggested_location_id,
+src/core/savo_locations/src/registry.cpp:1:#include "savo_locations/registry.hpp"
+src/core/savo_locations/src/registry.cpp:27:    left.map_id == right.map_id &&
+src/core/savo_locations/src/registry.cpp:46:      record.location.location_id);
+src/core/savo_locations/src/registry.cpp:210:      record.location.location_id) ==
+src/core/savo_locations/src/registry.cpp:265:      return "location_id_conflict";
+src/core/savo_locations/src/registry.cpp:318:      return "location_id";
+src/core/savo_locations/src/registry.cpp:362:      record.location.location_id) !=
+src/core/savo_locations/src/registry.cpp:396:  const auto location_id =
+src/core/savo_locations/src/registry.cpp:397:    record.location.location_id;
+src/core/savo_locations/src/registry.cpp:400:    location_id,
+src/core/savo_locations/src/registry.cpp:440:      record.location.location_id);
+src/core/savo_locations/src/registry.cpp:485:      record.location.location_id,
+src/core/savo_locations/src/registry.cpp:497:      record.location.location_id,
+src/core/savo_locations/src/registry.cpp:517:  const std::string_view location_id,
+src/core/savo_locations/src/registry.cpp:522:    canonicalize_location_id(location_id);
+src/core/savo_locations/src/registry.cpp:525:    !is_canonical_location_id(
+src/core/savo_locations/src/registry.cpp:626:    canonicalize_location_id(query);
+src/core/savo_locations/src/registry.cpp:629:    is_canonical_location_id(
+src/core/savo_locations/src/registry.cpp:757:      ambiguous.ambiguous_location_ids.push_back(
+src/core/savo_locations/src/registry.cpp:758:        match.record.location.location_id);
+src/core/savo_locations/src/registry.cpp:776:  const std::string_view location_id) const
+src/core/savo_locations/src/registry.cpp:779:    canonicalize_location_id(location_id);
+src/core/savo_locations/src/registry.cpp:782:    !is_canonical_location_id(
+src/core/savo_locations/src/registry.cpp:841:  const std::string_view excluded_location_id,
+src/core/savo_locations/src/registry.cpp:842:  std::string * conflicting_location_id) const
+src/core/savo_locations/src/registry.cpp:851:      excluded_location_id)
+src/core/savo_locations/src/registry.cpp:874:        conflicting_location_id !=
+src/core/savo_locations/src/registry.cpp:877:        *conflicting_location_id =
+src/core/savo_locations/src/registry.cpp:892:  const std::string_view excluded_location_id,
+src/core/savo_locations/src/registry.cpp:893:  std::string * conflicting_location_id) const
+src/core/savo_locations/src/registry.cpp:902:      excluded_location_id)
+src/core/savo_locations/src/registry.cpp:929:        conflicting_location_id !=
+src/core/savo_locations/src/registry.cpp:932:        *conflicting_location_id =
+src/core/savo_locations/src/location_registry_main.cpp:8:#include "savo_locations/location_registry_node.hpp"
+src/core/savo_locations/src/types.cpp:14:      return "approved";
+src/core/savo_locations/src/types.cpp:31:      return "approved";
+src/core/savo_locations/src/normalization.cpp:194:std::string canonicalize_location_id(
+src/core/savo_locations/src/normalization.cpp:239:bool is_canonical_location_id(
+src/core/savo_locations/src/location_catalog.cpp:1:#include "savo_locations/location_catalog.hpp"
+src/core/savo_locations/src/location_catalog.cpp:19:    left.map_id == right.map_id &&
+src/core/savo_locations/src/location_catalog.cpp:107:    "approved location validation failed";
+src/core/savo_locations/src/location_catalog.cpp:135:          const std::string_view location_id,
+src/core/savo_locations/src/location_catalog.cpp:146:          const auto location_id_key =
+src/core/savo_locations/src/location_catalog.cpp:147:            normalize_lookup_key(location_id);
+src/core/savo_locations/src/location_catalog.cpp:166:                  alias_key == location_id_key ||
+src/core/savo_locations/src/location_catalog.cpp:235:      return "approved";
+src/core/savo_locations/src/location_catalog.cpp:297:  const std::string_view location_id,
+src/core/savo_locations/src/location_catalog.cpp:305:    location_id,
+src/core/savo_locations/src/location_catalog.cpp:312:InMemoryLocationCatalog::resolve_location(
+src/core/savo_locations/src/location_catalog.cpp:325:  const std::string_view location_id) const
+src/core/savo_locations/src/location_catalog.cpp:330:  return locations_.get(location_id);
+src/core/savo_locations/src/location_catalog.cpp:663:  location.location_id =
+src/core/savo_locations/src/location_catalog.cpp:664:    canonicalize_location_id(
+src/core/savo_locations/src/location_catalog.cpp:666:        request.location_id,
+src/core/savo_locations/src/location_catalog.cpp:667:        source.suggested_location_id));
+src/core/savo_locations/src/location_catalog.cpp:678:              location.location_id,
+src/core/savo_locations/src/location_catalog.cpp:748:  auto approved_candidate =
+src/core/savo_locations/src/location_catalog.cpp:751:  approved_candidate.state =
+src/core/savo_locations/src/location_catalog.cpp:754:  approved_candidate.candidate_revision +=
+src/core/savo_locations/src/location_catalog.cpp:757:  approved_candidate.review_reason =
+src/core/savo_locations/src/location_catalog.cpp:758:    "approved";
+src/core/savo_locations/src/location_catalog.cpp:760:  approved_candidate.approved_location_id =
+src/core/savo_locations/src/location_catalog.cpp:761:    location_record.location.location_id;
+src/core/savo_locations/src/location_catalog.cpp:803:    approved_candidate;
+src/core/savo_locations/src/location_catalog.cpp:808:  result.reason = "candidate approved";
+src/core/savo_locations/src/location_catalog.cpp:814:    approved_candidate;
+src/core/savo_locations/src/location_catalog.cpp:938:  std::string * conflicting_location_id) const
+src/core/savo_locations/src/location_catalog.cpp:964:        conflicting_location_id !=
+src/core/savo_locations/src/location_catalog.cpp:967:        *conflicting_location_id =
+src/core/savo_locations/src/location_catalog.cpp:968:          location.location.location_id;
+
+ROOT: src/core/savo_locations/include/savo_locations
+----------------------------------------------------------------------
+
+Interface definitions:
+
+Approval and map contract matches:
+src/core/savo_locations/include/savo_locations/read_only_catalog_view.hpp:36:  std::string map_id;
+src/core/savo_locations/include/savo_locations/read_only_catalog_view.hpp:63:    ambiguous_location_ids;
+src/core/savo_locations/include/savo_locations/read_only_catalog_view.hpp:89:  std::string map_id;
+src/core/savo_locations/include/savo_locations/read_only_catalog_view.hpp:127:    std::string_view location_id,
+src/core/savo_locations/include/savo_locations/sqlite_repository.hpp:83:  std::string location_id;
+src/core/savo_locations/include/savo_locations/sqlite_repository.hpp:125:  std::string approved_location_id;
+src/core/savo_locations/include/savo_locations/sqlite_repository.hpp:137:  std::string location_id;
+src/core/savo_locations/include/savo_locations/ros_conversions.hpp:7:#include "geometry_msgs/msg/pose_stamped.hpp"
+src/core/savo_locations/include/savo_locations/ros_conversions.hpp:17:geometry_msgs::msg::PoseStamped
+src/core/savo_locations/include/savo_locations/registry.hpp:82:  std::vector<std::string> ambiguous_location_ids;
+src/core/savo_locations/include/savo_locations/registry.hpp:113:    std::string_view location_id,
+src/core/savo_locations/include/savo_locations/registry.hpp:125:    std::string_view location_id) const;
+src/core/savo_locations/include/savo_locations/registry.hpp:139:    std::string_view excluded_location_id,
+src/core/savo_locations/include/savo_locations/registry.hpp:140:    std::string * conflicting_location_id) const;
+src/core/savo_locations/include/savo_locations/registry.hpp:145:    std::string_view excluded_location_id,
+src/core/savo_locations/include/savo_locations/registry.hpp:146:    std::string * conflicting_location_id) const;
+src/core/savo_locations/include/savo_locations/sqlite_schema.hpp:23:CREATE TABLE IF NOT EXISTS registry_metadata (
+src/core/savo_locations/include/savo_locations/sqlite_schema.hpp:31:  location_id TEXT PRIMARY KEY,
+src/core/savo_locations/include/savo_locations/sqlite_schema.hpp:45:  map_id TEXT NOT NULL,
+src/core/savo_locations/include/savo_locations/sqlite_schema.hpp:111:  location_id TEXT NOT NULL,
+src/core/savo_locations/include/savo_locations/sqlite_schema.hpp:122:  map_id TEXT NOT NULL,
+src/core/savo_locations/include/savo_locations/sqlite_schema.hpp:130:  PRIMARY KEY(location_id, alias_order),
+src/core/savo_locations/include/savo_locations/sqlite_schema.hpp:132:  UNIQUE(location_id, normalized_key),
+src/core/savo_locations/include/savo_locations/sqlite_schema.hpp:134:  FOREIGN KEY(location_id)
+src/core/savo_locations/include/savo_locations/sqlite_schema.hpp:135:    REFERENCES locations(location_id)
+src/core/savo_locations/include/savo_locations/sqlite_schema.hpp:149:  map_id TEXT NOT NULL,
+src/core/savo_locations/include/savo_locations/sqlite_schema.hpp:212:  suggested_location_id TEXT NOT NULL DEFAULT '',
+src/core/savo_locations/include/savo_locations/sqlite_schema.hpp:225:  approved_location_id TEXT NOT NULL DEFAULT '',
+src/core/savo_locations/include/savo_locations/sqlite_schema.hpp:263:  location_id TEXT NOT NULL DEFAULT '',
+src/core/savo_locations/include/savo_locations/sqlite_schema.hpp:277:  map_id,
+src/core/savo_locations/include/savo_locations/sqlite_schema.hpp:287:  map_id,
+src/core/savo_locations/include/savo_locations/sqlite_schema.hpp:296:  map_id,
+src/core/savo_locations/include/savo_locations/sqlite_schema.hpp:306:  map_id,
+src/core/savo_locations/include/savo_locations/sqlite_schema.hpp:316:  map_id,
+src/core/savo_locations/include/savo_locations/sqlite_schema.hpp:323:  location_id,
+src/core/savo_locations/include/savo_locations/model.hpp:31:  std::string map_id;
+src/core/savo_locations/include/savo_locations/model.hpp:46:  std::string location_id;
+src/core/savo_locations/include/savo_locations/model.hpp:96:  std::string suggested_location_id;
+src/core/savo_locations/include/savo_locations/model.hpp:121:  std::string approved_location_id;
+src/core/savo_locations/include/savo_locations/model.hpp:130:  std::string location_id;
+src/core/savo_locations/include/savo_locations/location_registry_node.hpp:18:#include "savo_msgs/srv/resolve_location.hpp"
+src/core/savo_locations/include/savo_locations/location_registry_node.hpp:20:#include "savo_locations/read_only_catalog_view.hpp"
+src/core/savo_locations/include/savo_locations/location_registry_node.hpp:37:  bool registry_ready() const;
+src/core/savo_locations/include/savo_locations/location_registry_node.hpp:90:  ReadOnlyCatalogView catalog_view_;
+src/core/savo_locations/include/savo_locations/location_catalog.hpp:14:#include "savo_locations/registry.hpp"
+src/core/savo_locations/include/savo_locations/location_catalog.hpp:108:    std::string_view location_id,
+src/core/savo_locations/include/savo_locations/location_catalog.hpp:113:  ResolveResult resolve_location(
+src/core/savo_locations/include/savo_locations/location_catalog.hpp:120:    std::string_view location_id) const;
+src/core/savo_locations/include/savo_locations/location_catalog.hpp:173:    std::string * conflicting_location_id) const;
+src/core/savo_locations/include/savo_locations/normalization.hpp:26:std::string canonicalize_location_id(
+src/core/savo_locations/include/savo_locations/normalization.hpp:30:bool is_canonical_location_id(
+
+======================================================================
+SAVO MSGS RELEVANT INTERFACES
+======================================================================
+src/shared/savo_msgs/action/ConfirmAprilTag.action
+src/shared/savo_msgs/action/ExecuteCoveragePath.action
+src/shared/savo_msgs/action/RotateToHeading.action
+src/shared/savo_msgs/msg/AprilTagObservation.msg
+src/shared/savo_msgs/msg/IntentResult.msg
+src/shared/savo_msgs/msg/LocationCandidate.msg
+src/shared/savo_msgs/msg/LocationEvent.msg
+src/shared/savo_msgs/msg/LocationRecord.msg
+src/shared/savo_msgs/msg/NavState.msg
+src/shared/savo_msgs/msg/RobotStatus.msg
+src/shared/savo_msgs/srv/ApproveLocation.srv
+src/shared/savo_msgs/srv/GetLocation.srv
+src/shared/savo_msgs/srv/ListLocations.srv
+src/shared/savo_msgs/srv/RegisterLocationCandidate.srv
+src/shared/savo_msgs/srv/ResolveLocation.srv
+src/shared/savo_msgs/srv/SetLocationEnabled.srv
+
+FILE: src/shared/savo_msgs/action/ConfirmAprilTag.action
+----------------------------------------------------------------------
+# Robot Savo — stable AprilTag confirmation action.
+#
+# This action has exactly two production duties:
+#
+# 1. REGISTER_LOCATION
+#    Confirm a newly discovered AprilTag during mapping so that:
+#    - savo_mapping can georeference and validate it;
+#    - the operator can provide the location name and semantic information;
+#    - savo_locations can store the candidate or approved location.
+#
+# 2. CONFIRM_ARRIVAL
+#    Confirm the expected saved AprilTag after savo_nav reaches the
+#    destination approach or confirmation pose.
+
+# Goal modes.
+uint8 REGISTER_LOCATION=1
+uint8 CONFIRM_ARRIVAL=2
+
+# Used by REGISTER_LOCATION when any new valid tag is acceptable.
+int32 ANY_TAG_ID=-1
+
+# Requested confirmation duty.
+uint8 mode
+
+# Expected AprilTag family.
+# Robot Savo's production default is:
+#   tag36h11
+string expected_family
+
+# REGISTER_LOCATION:
+# - May use ANY_TAG_ID when discovering a new location.
+# - May provide a specific ID when confirming a known candidate.
+#
+# CONFIRM_ARRIVAL:
+# - Must provide the expected saved tag ID.
+int32 expected_tag_id
+
+# Optional correlation and ownership context.
+#
+# location_id can be empty during first discovery.
+# map_id and map_revision identify the active map coordinate system.
+string location_id
+string map_id
+uint32 map_revision
+
+# Maximum time allowed for searching, observation collection,
+# stability validation and optional TF transformation.
+builtin_interfaces/Duration timeout
+
+# Registration normally requires a valid camera-to-map transformation.
+#
+# Arrival confirmation may set this false when tag identity is sufficient,
+# while the server can still return a map pose when one is available.
+bool require_map_pose
+---
+# Terminal result codes.
+uint8 RESULT_CONFIRMED=0
+uint8 RESULT_INVALID_REQUEST=1
+uint8 RESULT_NOT_FOUND=2
+uint8 RESULT_WRONG_TAG=3
+uint8 RESULT_UNSTABLE=4
+uint8 RESULT_CAMERA_UNAVAILABLE=5
+uint8 RESULT_HEAD_UNAVAILABLE=6
+uint8 RESULT_ROBOT_MOVING=7
+uint8 RESULT_TF_UNAVAILABLE=8
+uint8 RESULT_LOCALIZATION_UNHEALTHY=9
+uint8 RESULT_TIMED_OUT=10
+uint8 RESULT_CANCELED=11
+uint8 RESULT_INTERNAL_ERROR=12
+
+bool confirmed
+uint8 result_code
+string reason
+
+# Final detector observation accepted by the confirmation server.
+savo_msgs/AprilTagObservation final_observation
+
+# AprilTag pose transformed into the active map frame when available.
+bool map_pose_valid
+geometry_msgs/PoseStamped tag_pose_map
+
+# Stability evidence calculated by the confirmation server.
+#
+# The server must calculate these values itself. It must not trust an
+# externally supplied "stable frames" number.
+uint32 accepted_observations
+uint32 rejected_observations
+float32 position_stddev_m
+float32 yaw_stddev_rad
+---
+# Action feedback states.
+uint8 STATE_WAITING_FOR_CAMERA=0
+uint8 STATE_WAITING_FOR_HEAD_SETTLE=1
+uint8 STATE_SEARCHING=2
+uint8 STATE_COLLECTING=3
+uint8 STATE_VALIDATING_TF=4
+uint8 STATE_CONFIRMING=5
+
+uint8 state
+string state_text
+
+uint32 accepted_observations
+uint32 rejected_observations
+
+int32 current_tag_id
+float32 current_detection_quality
+
+savo_msgs/AprilTagObservation latest_observation
+
+FILE: src/shared/savo_msgs/action/RotateToHeading.action
+----------------------------------------------------------------------
+# Goal
+#
+# Absolute target yaw in radians using the ROS odom/base_link convention.
+# Positive yaw is counter-clockwise around +Z.
+float64 target_yaw_rad
+
+# Maximum permitted execution time for this goal.
+# A value <= 0.0 requests the server's configured default.
+float64 max_duration_sec
+---
+# Result
+#
+# True only when the requested heading was reached within tolerance.
+# Canceled and aborted actions must report false.
+bool success
+
+# Last valid measured yaw when the action terminated.
+float64 final_yaw_rad
+
+# Signed shortest angular error at termination.
+float64 final_error_rad
+
+# Stable machine-readable reason such as:
+# goal_reached, canceled, timeout, safety_stop, odom_stale, or disabled.
+string reason
+---
+# Feedback
+#
+# Latest measured and requested heading information.
+float64 current_yaw_rad
+float64 target_yaw_rad
+float64 error_rad
+
+# Angular velocity currently requested by savo_control.
+float64 commanded_wz_rad_s
+
+# Time elapsed since this goal was accepted.
+float64 elapsed_sec
+
+# True while the movement safety stop is active.
+bool safety_stop_active
+
+# Current executor state, for example tracking or safety_stop.
+string state
+
+FILE: src/shared/savo_msgs/msg/AprilTagObservation.msg
+----------------------------------------------------------------------
+# Robot Savo — one camera-derived AprilTag observation.
+#
+# This message contains detector evidence only.
+# It does not:
+# - create or approve a semantic location;
+# - declare navigation success;
+# - command the head or robot base.
+
+# Timestamp of the camera frame and camera optical frame ID.
+# The normal production frame is:
+#   head_camera_optical_frame
+std_msgs/Header header
+
+# Detector implementation and AprilTag identity.
+string detector_name
+string family
+int32 tag_id
+
+# Physical black-square edge length used for pose estimation, in metres.
+#
+# This must match the measured printed black-square size.
+# Zero means that no metric pose was calculated.
+float64 tag_size_m
+
+# Monotonically increasing observation sequence assigned by the detector.
+# This helps the confirmation node reject duplicate observations.
+uint64 observation_sequence
+
+# Dimensions of the image used for this detection.
+uint32 image_width
+uint32 image_height
+
+# Four detected image-space corners:
+#
+# [x0, y0,
+#  x1, y1,
+#  x2, y2,
+#  x3, y3]
+#
+# Units are pixels. Corner ordering must remain consistent for every
+# observation produced by the detector.
+float32[8] image_corners_xy
+
+# Detector quality evidence.
+#
+# detection_quality:
+#   Normalized detector quality in the range 0.0 to 1.0.
+#
+# decision_margin:
+#   Raw AprilTag decision-separation metric.
+#
+# hamming_distance:
+#   Number of corrected code bits.
+float32 detection_quality
+float32 decision_margin
+uint8 hamming_distance
+
+# Pose of the AprilTag relative to header.frame_id.
+#
+# The confirmation node must still validate:
+# - timestamp freshness;
+# - repeated-observation stability;
+# - head settling;
+# - robot motion;
+# - TF availability;
+# - localization health.
+bool pose_valid
+geometry_msgs/PoseWithCovariance pose
+
+# Detector-specific pose-estimation error.
+# Lower values represent a better estimate.
+float32 pose_error
+
+FILE: src/shared/savo_msgs/msg/IntentResult.msg
+----------------------------------------------------------------------
+# Robot Savo — Result from LLM /chat
+# ----------------------------------
+# High-level output from the LLM server, already parsed and cleaned.
+# This is what other ROS 2 nodes (Nav2, UI, TTS, safety, etc.) should subscribe to.
+
+# ---------------------------------------------------------------------------
+# Source / identity
+# ---------------------------------------------------------------------------
+
+# Where this text came from in the robot:
+# - "system"   : internal call from the ROS2 pipeline
+# - "mic"      : voice input from microphone
+# - "keyboard" : manually typed on a UI
+# - "test"     : test tools / scripts
+string source
+
+# Which robot produced this result (e.g. "robot_savo_pi").
+string robot_id
+
+# ---------------------------------------------------------------------------
+# Text content
+# ---------------------------------------------------------------------------
+
+# What the human said (after STT / preprocessing).
+string user_text
+
+# What Robot Savo should actually say out loud.
+# Short, B1 English sentences, already clamped for length on the server side.
+string reply_text
+
+# ---------------------------------------------------------------------------
+# Intent and navigation decision
+# ---------------------------------------------------------------------------
+
+# High-level intent decided by the deterministic classifier:
+# One of: "STOP", "FOLLOW", "NAVIGATE", "STATUS", "CHATBOT"
+string intent
+
+# Canonical navigation goal if this is a NAVIGATE or FOLLOW intent.
+# Examples: "A201", "Info Desk". Empty string ("") when not applicable.
+string nav_goal
+
+# ---------------------------------------------------------------------------
+# LLM backend info
+# ---------------------------------------------------------------------------
+
+# Which tier was used by the LLM server:
+# - "tier1"  : online OpenRouter (primary)
+# - "tier2"  : local Ollama
+# - "tier3"  : Pi fallback templates
+# - "tier_error" : used when the bridge had to fall back locally
+string tier_used
+
+# ---------------------------------------------------------------------------
+# Health / diagnostics
+# ---------------------------------------------------------------------------
+
+# True if the /chat call succeeded end-to-end and produced a valid reply_text.
+bool success
+
+# Short error description when success == false, otherwise empty string ("").
+# Examples: "timeout", "http_error", "url_error", "json_error"
+string error
+
+FILE: src/shared/savo_msgs/msg/LocationCandidate.msg
+----------------------------------------------------------------------
+uint8 STATE_UNKNOWN=0
+uint8 STATE_PENDING_REVIEW=1
+uint8 STATE_APPROVED=2
+uint8 STATE_REJECTED=3
+
+uint8 state
+uint64 candidate_revision
+string candidate_id
+
+string map_id
+uint32 map_revision
+string map_release_id
+
+string tag_family
+int32 tag_id
+geometry_msgs/PoseStamped tag_pose_map
+
+float32 detection_quality
+uint32 accepted_observations
+float32 position_stddev_m
+float32 yaw_stddev_rad
+
+bool approach_pose_valid
+geometry_msgs/PoseStamped approach_pose
+
+bool confirmation_pose_valid
+geometry_msgs/PoseStamped confirmation_pose
+
+string suggested_location_id
+string suggested_display_name
+string[] suggested_aliases
+string suggested_semantic_type
+
+string building
+string floor
+string area
+string notes
+
+string source_session_id
+string source_component
+string review_reason
+
+builtin_interfaces/Time created_at
+builtin_interfaces/Time updated_at
+
+FILE: src/shared/savo_msgs/msg/LocationEvent.msg
+----------------------------------------------------------------------
+uint8 EVENT_UNKNOWN=0
+uint8 EVENT_CANDIDATE_REGISTERED=1
+uint8 EVENT_LOCATION_APPROVED=2
+uint8 EVENT_CANDIDATE_REJECTED=3
+uint8 EVENT_LOCATION_UPDATED=4
+uint8 EVENT_LOCATION_ENABLED=5
+uint8 EVENT_LOCATION_DISABLED=6
+uint8 EVENT_LOCATION_RETIRED=7
+uint8 EVENT_IMPORT_COMPLETED=8
+uint8 EVENT_STORAGE_DEGRADED=9
+
+uint64 event_sequence
+builtin_interfaces/Time stamp
+uint8 event_type
+
+string candidate_id
+string location_id
+uint64 entity_revision
+
+string actor_id
+string reason
+
+FILE: src/shared/savo_msgs/msg/LocationRecord.msg
+----------------------------------------------------------------------
+uint8 STATE_UNKNOWN=0
+uint8 STATE_APPROVED=1
+uint8 STATE_RETIRED=2
+
+uint8 state
+bool enabled
+uint64 record_revision
+
+string location_id
+string display_name
+string[] aliases
+string semantic_type
+
+string map_id
+uint32 map_revision
+string map_release_id
+
+geometry_msgs/PoseStamped approach_pose
+
+bool confirmation_pose_valid
+geometry_msgs/PoseStamped confirmation_pose
+
+string tag_family
+int32 tag_id
+
+bool tag_pose_map_valid
+geometry_msgs/PoseStamped tag_pose_map
+
+bool arrival_confirmation_required
+
+string building
+string floor
+string area
+string notes
+
+string source_candidate_id
+
+builtin_interfaces/Time created_at
+builtin_interfaces/Time updated_at
+
+FILE: src/shared/savo_msgs/msg/NavState.msg
+----------------------------------------------------------------------
+# Robot Savo — Navigation State
+# Compact summary of what the navigation stack is doing right now.
+# This will be serialized to JSON and sent to the LLM server.
+
+std_msgs/Header header
+
+# High-level navigation state:
+#  - "IDLE"        : not moving, no active goal
+#  - "NAVIGATING"  : following a path to a goal
+#  - "FOLLOWING"   : following a person
+#  - "MAPPING"     : mapping / exploration mode
+#  - "PAUSED"      : temporarily stopped, goal still active
+#  - "STOPPED"     : fully stopped, no motion commands
+#  - "ERROR"       : navigation stack has a problem
+string state
+
+# Canonical ID of the active goal (for LLM + map), e.g. "A201", "Info Desk".
+string goal_id
+
+# Human-friendly label for the goal, e.g. "Room A201 (Electronics Lab)".
+string goal_label
+
+# Remaining distance along the path to the goal, in metres.
+# Use a negative value (e.g. -1.0) if unknown.
+float32 distance_to_goal_m
+
+# Current commanded base velocity (same sign convention as /cmd_vel).
+# vx: forward (+) / backward (-) in the robot base frame
+# vy: left (+) / right (-) for mecanum strafing
+# wz: yaw rotation around Z, CCW positive
+float32 cmd_vx_mps
+float32 cmd_vy_mps
+float32 cmd_wz_radps
+
+# Path and safety flags.
+bool have_path       # true if a valid path exists
+bool blocked         # true if obstacles are blocking progress
+bool emergency_stop  # true if near-field safety layer has latched
+
+# Frame used for distance_to_goal_m, usually "map".
+string frame_id
+
+FILE: src/shared/savo_msgs/msg/RobotStatus.msg
+----------------------------------------------------------------------
+# Robot Savo — Robot Status
+# Snapshot of the robot's health and runtime state.
+# This will be serialized to JSON and sent to the LLM server.
+
+std_msgs/Header header
+
+# Logical ID of this robot (e.g. "robot_savo_pi")
+string robot_id
+
+# -------------------------------------------------------------------
+# Battery / power status
+# -------------------------------------------------------------------
+# UPS HAT battery (the Pi power source)
+# Use -1.0 when value is unknown / not measured.
+float32 ups_voltage_v         # e.g. 3.7–4.2 V
+float32 ups_soc_pct           # 0–100 %, SoC estimate
+
+# Kit (drive) battery powering motors and sensors
+float32 kit_voltage_v         # e.g. 6.4–8.4 V range
+float32 kit_soc_pct           # 0–100 %, SoC estimate
+
+# High-level battery health summary (words only):
+#  - "UPS low"
+#  - "Kit low"
+#  - "Both low"
+#  - "Good condition"
+#  - "Needs charging"
+string battery_health_note
+
+# True when any battery is considered critically low for safe navigation.
+bool battery_critical
+
+# -------------------------------------------------------------------
+# Thermal status
+# -------------------------------------------------------------------
+# Temperatures in °C. Use NaN or -1.0 if a sensor is missing.
+float32 cpu_temp_c            # CPU temperature from Pi
+float32 board_temp_c          # Optional: other board/internal sensor
+
+# True if any temperature is in a "too hot / throttling risk" range.
+bool overheating
+
+# -------------------------------------------------------------------
+# Motion / system state
+# -------------------------------------------------------------------
+bool motors_enabled           # Motor drivers enabled (can move)
+bool in_motion                # Robot is actually moving now
+bool estop_active             # Emergency stop asserted (near-field or physical)
+
+# -------------------------------------------------------------------
+# Connectivity / uptime
+# -------------------------------------------------------------------
+bool network_ok               # True if Wi-Fi/network is working
+float32 wifi_rssi_dbm         # Wi-Fi signal strength (dBm); use 0.0 or -100.0 if unknown
+
+# Robot uptime in seconds since last boot.
+float32 uptime_sec
+
+# -------------------------------------------------------------------
+# Diagnostics / notes
+# -------------------------------------------------------------------
+# Last significant error code or short label (e.g. "LIDAR_TIMEOUT", "IMU_FAIL").
+string last_error_code
+
+# Free-form human-readable status line, e.g.:
+# "All systems nominal", "Mapping mode, battery 40%", "Waiting for network".
+string status_note
+
+FILE: src/shared/savo_msgs/srv/ApproveLocation.srv
+----------------------------------------------------------------------
+string candidate_id
+uint64 expected_candidate_revision
+string actor_id
+
+string location_id
+string display_name
+string[] aliases
+string semantic_type
+
+geometry_msgs/PoseStamped approach_pose
+
+bool confirmation_pose_valid
+geometry_msgs/PoseStamped confirmation_pose
+
+bool arrival_confirmation_required
+
+string building
+string floor
+string area
+string notes
+---
+uint8 RESULT_APPROVED=0
+uint8 RESULT_INVALID_REQUEST=1
+uint8 RESULT_CANDIDATE_NOT_FOUND=2
+uint8 RESULT_CANDIDATE_NOT_PENDING=3
+uint8 RESULT_STALE_REVISION=4
+uint8 RESULT_LOCATION_ID_CONFLICT=5
+uint8 RESULT_ALIAS_CONFLICT=6
+uint8 RESULT_INVALID_APPROACH_POSE=7
+uint8 RESULT_STORAGE_UNAVAILABLE=8
+uint8 RESULT_INTERNAL_ERROR=9
+
+bool approved
+uint8 result_code
+string reason
+savo_msgs/LocationRecord location
+
+FILE: src/shared/savo_msgs/srv/GetLocation.srv
+----------------------------------------------------------------------
+string location_id
+bool include_disabled
+bool include_retired
+---
+uint8 RESULT_FOUND=0
+uint8 RESULT_INVALID_ID=1
+uint8 RESULT_NOT_FOUND=2
+uint8 RESULT_DISABLED=3
+uint8 RESULT_RETIRED=4
+uint8 RESULT_INTERNAL_ERROR=5
+
+bool found
+uint8 result_code
+string reason
+savo_msgs/LocationRecord location
+
+FILE: src/shared/savo_msgs/srv/ListLocations.srv
+----------------------------------------------------------------------
+uint8 STATE_ANY=0
+uint8 STATE_APPROVED=1
+uint8 STATE_RETIRED=2
+
+string map_id
+uint32 map_revision
+bool enforce_map_context
+string semantic_type
+uint8 state_filter
+bool enabled_only
+---
+uint8 RESULT_OK=0
+uint8 RESULT_INVALID_FILTER=1
+uint8 RESULT_INTERNAL_ERROR=2
+
+bool success
+uint8 result_code
+string reason
+savo_msgs/LocationRecord[] locations
+
+FILE: src/shared/savo_msgs/srv/RegisterLocationCandidate.srv
+----------------------------------------------------------------------
+savo_msgs/LocationCandidate candidate
+string actor_id
+---
+uint8 RESULT_REGISTERED=0
+uint8 RESULT_INVALID_CANDIDATE=1
+uint8 RESULT_DUPLICATE_CANDIDATE_ID=2
+uint8 RESULT_TAG_CONFLICT=3
+uint8 RESULT_MAP_MISMATCH=4
+uint8 RESULT_STORAGE_UNAVAILABLE=5
+uint8 RESULT_INTERNAL_ERROR=6
+
+bool registered
+uint8 result_code
+string reason
+savo_msgs/LocationCandidate stored_candidate
+
+FILE: src/shared/savo_msgs/srv/ResolveLocation.srv
+----------------------------------------------------------------------
+string query
+bool enforce_map_context
+string map_id
+uint32 map_revision
+---
+uint8 RESULT_RESOLVED=0
+uint8 RESULT_INVALID_QUERY=1
+uint8 RESULT_NOT_FOUND=2
+uint8 RESULT_AMBIGUOUS=3
+uint8 RESULT_DISABLED=4
+uint8 RESULT_RETIRED=5
+uint8 RESULT_MAP_MISMATCH=6
+uint8 RESULT_INTERNAL_ERROR=7
+
+uint8 MATCH_NONE=0
+uint8 MATCH_LOCATION_ID=1
+uint8 MATCH_DISPLAY_NAME=2
+uint8 MATCH_ALIAS=3
+
+bool resolved
+uint8 result_code
+string reason
+string normalized_query
+uint8 match_type
+
+savo_msgs/LocationRecord location
+string[] ambiguous_location_ids
+
+FILE: src/shared/savo_msgs/srv/SetLocationEnabled.srv
+----------------------------------------------------------------------
+string location_id
+uint64 expected_record_revision
+bool enabled
+string actor_id
+string reason
+---
+uint8 RESULT_UPDATED=0
+uint8 RESULT_INVALID_REQUEST=1
+uint8 RESULT_NOT_FOUND=2
+uint8 RESULT_RETIRED=3
+uint8 RESULT_STALE_REVISION=4
+uint8 RESULT_STORAGE_UNAVAILABLE=5
+uint8 RESULT_INTERNAL_ERROR=6
+
+bool updated
+uint8 result_code
+string reason
+savo_msgs/LocationRecord location

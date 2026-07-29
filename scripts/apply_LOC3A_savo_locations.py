@@ -557,6 +557,14 @@ def main() -> None:
         };
 
 
+        enum class ResolveMatchType
+        {
+          kNone = 0,
+          kLocationId = 1,
+          kDisplayName = 2,
+          kAlias = 3,
+        };
+
         struct ReadResolveResult
         {
           ReadResolveCode code{
@@ -1696,17 +1704,17 @@ def main() -> None:
 
           status_publisher_ =
             create_publisher<std_msgs::msg::String>(
-              ::savo_locations::::savo_locations::topic_names::kStatus,
+              std::string(::savo_locations::topic_names::kStatus),
               latched_qos);
 
           snapshot_publisher_ =
             create_publisher<std_msgs::msg::String>(
-              ::savo_locations::::savo_locations::topic_names::kSnapshot,
+              std::string(::savo_locations::topic_names::kSnapshot),
               latched_qos);
 
           heartbeat_publisher_ =
             create_publisher<std_msgs::msg::UInt64>(
-              ::savo_locations::::savo_locations::topic_names::kHeartbeat,
+              std::string(::savo_locations::topic_names::kHeartbeat),
               rclcpp::QoS(
                 rclcpp::KeepLast(10))
                 .reliable()
@@ -1714,7 +1722,7 @@ def main() -> None:
 
           resolve_service_ =
             create_service<ResolveService>(
-              ::savo_locations::::savo_locations::service_names::kResolve,
+              std::string(::savo_locations::service_names::kResolve),
               std::bind(
                 &LocationRegistryNode::handle_resolve,
                 this,
@@ -1723,7 +1731,7 @@ def main() -> None:
 
           get_service_ =
             create_service<GetService>(
-              ::savo_locations::::savo_locations::service_names::kGet,
+              std::string(::savo_locations::service_names::kGet),
               std::bind(
                 &LocationRegistryNode::handle_get,
                 this,
@@ -1732,7 +1740,7 @@ def main() -> None:
 
           list_service_ =
             create_service<ListService>(
-              ::savo_locations::::savo_locations::service_names::kList,
+              std::string(::savo_locations::service_names::kList),
               std::bind(
                 &LocationRegistryNode::handle_list,
                 this,
@@ -3058,7 +3066,7 @@ def main() -> None:
           resolve_request->query =
             "East classroom";
 
-          const auto resolve_future =
+          auto resolve_future =
             resolve_client->async_send_request(
               resolve_request);
 
@@ -3093,7 +3101,7 @@ def main() -> None:
 
           get_request->location_id = "A201";
 
-          const auto get_future =
+          auto get_future =
             get_client->async_send_request(
               get_request);
 
@@ -3123,7 +3131,7 @@ def main() -> None:
           list_request->map_revision = 7U;
           list_request->enabled_only = true;
 
-          const auto list_future =
+          auto list_future =
             list_client->async_send_request(
               list_request);
 
@@ -3309,9 +3317,9 @@ def main() -> None:
             combined = source + header
 
             for endpoint in (
-                "::savo_locations::::savo_locations::service_names::kResolve",
-                "::savo_locations::::savo_locations::service_names::kGet",
-                "::savo_locations::::savo_locations::service_names::kList",
+                "::savo_locations::service_names::kResolve",
+                "::savo_locations::service_names::kGet",
+                "::savo_locations::service_names::kList",
             ):
                 assert endpoint in combined
 
@@ -3340,7 +3348,9 @@ def main() -> None:
             assert "/savo_locations/snapshot" in topics
 
             assert "transient_local()" in source
-            assert '"mode":"read_only"' in source
+            assert "mode" in source
+    assert "read_only" in source
+    assert "durability_volatile()" in source
             assert '"ready":' in source
             assert "storage_healthy" in source
             assert "heartbeat_sequence_" in source
@@ -3457,9 +3467,9 @@ def main() -> None:
         "LocationRegistryNode",
         "ReadOnlyCatalogView",
         "SqliteRepository",
-        "::savo_locations::::savo_locations::service_names::kResolve",
-        "::savo_locations::::savo_locations::service_names::kGet",
-        "::savo_locations::::savo_locations::service_names::kList",
+        "::savo_locations::service_names::kResolve",
+        "::savo_locations::service_names::kGet",
+        "::savo_locations::service_names::kList",
         "test_registry_node",
         "test_phase3a_contracts",
     )

@@ -188,7 +188,7 @@ public:
     accepted_control_modes_ =
       declare_parameter<std::vector<std::string>>(
       "accepted_control_modes",
-      std::vector<std::string>{"NAVIGATION"});
+      std::vector<std::string>{"NAV"});
 
     for (auto & mode : accepted_control_modes_) {
       mode = NormalizeMode(mode);

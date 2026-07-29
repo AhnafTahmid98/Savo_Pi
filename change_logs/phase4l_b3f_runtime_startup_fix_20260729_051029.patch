@@ -1,0 +1,12 @@
+--- /home/ahnaf-tahmid/Savo_Pi/change_logs/test_coverage_execution_handoff_runtime.py.pre_startup_fix_20260729_051029	2026-07-29 05:10:29.181122270 +0300
++++ test/test_coverage_execution_handoff_runtime.py	2026-07-29 05:10:29.204667985 +0300
+@@ -203,7 +203,8 @@
+             lambda: self.process.poll() is not None
+             or (
+                 self.approve_client.service_is_ready()
+-                and bool(self.statuses)
++                and bool(self.states)
++                and self.states[-1] == 'waiting_for_plan'
+             )
+         ), self.diagnostics()
+         assert self.process.poll() is None, self.diagnostics()

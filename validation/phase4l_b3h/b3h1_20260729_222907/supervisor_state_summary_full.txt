@@ -1,0 +1,2 @@
+{"schema_version":1,"node":"savo_supervisor","lifecycle":"FAULTED","operating_mode":"STOP","health":"ERROR","safety":"UNKNOWN","ready":false,"degraded":false,"reason_code":"localization_health_missing","stamp_s":1785354135.022306,"components":{"localization":{"enabled":true,"required":true,"received":false,"ready":false,"degraded":false,"state":"STALE","reason_code":"localization_health_missing","last_message_age_s":-1.000000,"timeout_s":2.500000,"malformed_message_count":0,"recovery_count":0}}}
+---

@@ -63,8 +63,6 @@ def test_cmake_builds_loc1a_sources() -> None:
 
 
 def test_loc1a_core_remains_dependency_isolated() -> None:
-    cmake = read("CMakeLists.txt")
-
     core_sources = "\n".join(
         read(relative)
         for relative in (
@@ -76,21 +74,20 @@ def test_loc1a_core_remains_dependency_isolated() -> None:
         )
     )
 
-    # LOC-1A remains a ROS-independent deterministic
-    # domain layer even when later phases add a separate
-    # SQLite storage library to the package.
-    assert "find_package(rclcpp" not in cmake
-    assert "rclcpp::rclcpp" not in cmake
-    assert "add_executable(" not in cmake
+    # Later phases may add separate storage and ROS
+    # targets to this package. The LOC-1A domain
+    # implementation itself must remain isolated.
+    for forbidden in (
+        "rclcpp",
+        "std_msgs",
+        "geometry_msgs",
+        "builtin_interfaces",
+        "sqlite3",
+        "sqlite_store",
+        "sqlite_repository",
+    ):
+        assert forbidden not in core_sources
 
-    assert "#include <sqlite3.h>" not in core_sources
-    assert "sqlite3_" not in core_sources
-
-    assert not (
-        ROOT
-        / "src"
-        / "location_registry_node.cpp"
-    ).exists()
 
 
 def test_validation_contract_covers_safety_fields() -> None:

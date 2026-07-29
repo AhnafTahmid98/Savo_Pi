@@ -380,7 +380,8 @@ private:
       state_topic_, qos::state_qos());
     status_publisher_ =
       create_publisher<std_msgs::msg::String>(
-      status_topic_, qos::status_qos());
+      status_topic_,
+      rclcpp::QoS(10).reliable().transient_local());
     feedback_publisher_ =
       create_publisher<std_msgs::msg::String>(
       feedback_topic_, qos::status_qos());
@@ -456,20 +457,22 @@ private:
     candidate_total_distance_m_ =
       validation.total_distance_m;
 
+    const auto candidate_generation_text =
+      std::to_string(candidate_generation_);
     if (validation.valid) {
       candidate_path_ = *message;
       RCLCPP_INFO(
         get_logger(),
-        "Coverage plan staged: generation=%llu waypoints=%zu distance=%.3f",
-        static_cast<unsigned long long>(candidate_generation_),
+        "Coverage plan staged: generation=%s waypoints=%zu distance=%.3f",
+        candidate_generation_text.c_str(),
         candidate_path_->poses.size(),
         candidate_total_distance_m_);
     } else {
       candidate_path_.reset();
       RCLCPP_WARN(
         get_logger(),
-        "Coverage plan rejected: generation=%llu reason=%s",
-        static_cast<unsigned long long>(candidate_generation_),
+        "Coverage plan rejected: generation=%s reason=%s",
+        candidate_generation_text.c_str(),
         validation.reason.c_str());
     }
 
@@ -1002,26 +1005,30 @@ private:
     const auto result_code =
       wrapped.result->result_code;
     const auto event_time_ns = next_event_time_ns();
-    if (wrapped.result->success &&
+    const bool succeeded =
+      wrapped.result->success &&
       result_code ==
-      ExecuteCoveragePath::Result::RESULT_SUCCEEDED)
-    {
+      ExecuteCoveragePath::Result::RESULT_SUCCEEDED;
+    const bool canceled =
+      result_code ==
+      ExecuteCoveragePath::Result::RESULT_CANCELED ||
+      wrapped.code == rclcpp_action::ResultCode::CANCELED;
+    const bool timed_out =
+      result_code ==
+      ExecuteCoveragePath::Result::RESULT_TIMED_OUT ||
+      result_code ==
+      ExecuteCoveragePath::Result::RESULT_FEEDBACK_STALE;
+
+    if (succeeded) {
       static_cast<void>(
         mission_.mark_succeeded(event_time_ns));
-    } else if (result_code ==
-      ExecuteCoveragePath::Result::RESULT_CANCELED ||
-      wrapped.code == rclcpp_action::ResultCode::CANCELED)
-    {
+    } else if (canceled) {
       static_cast<void>(
         mission_.mark_canceled(
           event_time_ns,
           result_reason_or(
             "savo_nav_coverage_canceled")));
-    } else if (result_code ==
-      ExecuteCoveragePath::Result::RESULT_TIMED_OUT ||
-      result_code ==
-      ExecuteCoveragePath::Result::RESULT_FEEDBACK_STALE)
-    {
+    } else if (timed_out) {
       static_cast<void>(
         mission_.mark_timed_out(
           event_time_ns,
@@ -1185,7 +1192,7 @@ private:
       << candidate_generation_
       << ",\"candidate_waypoints\":"
       << (candidate_path_ ?
-      candidate_path_->poses.size() : 0U)
+    candidate_path_->poses.size() : 0U)
       << ",\"candidate_distance_m\":"
       << candidate_total_distance_m_
       << ",\"candidate_age_sec\":"
@@ -1262,13 +1269,13 @@ private:
   std::optional<nav_msgs::msg::Path> candidate_path_;
   std::optional<nav_msgs::msg::Path> active_path_;
   std::optional<std::chrono::steady_clock::time_point>
-    candidate_received_at_;
+  candidate_received_at_;
   std::optional<std::chrono::steady_clock::time_point>
-    pending_started_at_;
+  pending_started_at_;
   std::optional<std::chrono::steady_clock::time_point>
-    goal_sent_at_;
+  goal_sent_at_;
   std::optional<std::chrono::steady_clock::time_point>
-    cancel_started_at_;
+  cancel_started_at_;
   bool goal_sent_{false};
   bool goal_accepted_{false};
   bool cancel_requested_{false};

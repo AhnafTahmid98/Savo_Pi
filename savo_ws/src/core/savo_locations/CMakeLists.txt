@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(savo_locations VERSION 0.8.0 LANGUAGES CXX)
+project(savo_locations VERSION 0.10.0 LANGUAGES CXX)
 
 if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 17)
@@ -345,6 +345,25 @@ if(BUILD_TESTING)
     )
   endif()
 
+  ament_add_gtest(
+    test_persistent_mutation_commits
+    test/storage/test_persistent_mutation_commits.cpp
+  )
+
+  if(TARGET test_persistent_mutation_commits)
+    target_link_libraries(
+      test_persistent_mutation_commits
+      savo_locations_storage
+      SQLite::SQLite3
+    )
+
+    target_compile_definitions(
+      test_persistent_mutation_commits
+      PRIVATE
+        "SAVO_LOCATIONS_TEST_DB_DIR=\"${CMAKE_CURRENT_BINARY_DIR}/storage_test_runtime\""
+    )
+  endif()
+
   ament_add_pytest_test(
     test_phase0_contracts
     test/contracts/test_phase0_contracts.py
@@ -424,9 +443,47 @@ if(TARGET test_registry_node)
   )
 endif()
 
+ament_add_gtest(
+  test_registry_write_node
+  test/ros/test_registry_write_node.cpp
+)
+
+if(TARGET test_registry_write_node)
+  target_link_libraries(
+    test_registry_write_node
+    savo_locations_ros
+    SQLite::SQLite3
+  )
+
+  ament_target_dependencies(
+    test_registry_write_node
+    rclcpp
+    std_msgs
+    savo_msgs
+  )
+
+  target_compile_definitions(
+    test_registry_write_node
+    PRIVATE
+      "SAVO_LOCATIONS_TEST_DB_DIR=\"${CMAKE_CURRENT_BINARY_DIR}/storage_test_runtime\""
+  )
+endif()
+
 ament_add_pytest_test(
   test_phase3a_contracts
   test/contracts/test_phase3a_contracts.py
+  TIMEOUT 60
+)
+
+ament_add_pytest_test(
+  test_phase3b1_contracts
+  test/contracts/test_phase3b1_contracts.py
+  TIMEOUT 60
+)
+
+ament_add_pytest_test(
+  test_phase3b2_contracts
+  test/contracts/test_phase3b2_contracts.py
   TIMEOUT 60
 )
 

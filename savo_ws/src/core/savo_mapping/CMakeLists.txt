@@ -27,6 +27,7 @@ find_package(nav2_map_server REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(yaml_cpp_vendor REQUIRED)
+find_package(nlohmann_json REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(lifecycle_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
@@ -56,6 +57,7 @@ add_library(${PROJECT_NAME}_core
   src/workflow/exploration_runtime.cpp
   src/coverage/coverage_grid.cpp
   src/coverage/coverage_execution_handoff.cpp
+  src/coverage/coverage_operation_orchestrator.cpp
   src/coverage/coverage_mission.cpp
   src/coverage/coverage_planner.cpp
   src/scan360/scan360_planner.cpp
@@ -92,7 +94,12 @@ ament_target_dependencies(
   nav_msgs
 )
 
-target_link_libraries(${PROJECT_NAME}_core yaml-cpp OpenSSL::Crypto)
+target_link_libraries(
+  ${PROJECT_NAME}_core
+  yaml-cpp
+  OpenSSL::Crypto
+  nlohmann_json::nlohmann_json
+)
 
 add_executable(mapping_mode_manager_node
   src/nodes/mapping_mode_manager_node.cpp
@@ -223,6 +230,7 @@ set(_savo_mapping_public_headers
   include/savo_mapping/exploration_runtime.hpp
   include/savo_mapping/coverage_grid.hpp
   include/savo_mapping/coverage_execution_handoff.hpp
+  include/savo_mapping/coverage_operation_orchestrator.hpp
   include/savo_mapping/coverage_mission.hpp
   include/savo_mapping/coverage_planner.hpp
   include/savo_mapping/scan360_planner.hpp
@@ -256,6 +264,7 @@ install(
 
 set(_savo_mapping_production_config
   config/coverage_execution_handoff.yaml
+  config/coverage_operation_orchestrator.yaml
   config/coverage_mapping.yaml
   config/exploration_goal_handoff.yaml
   config/exploration_manager.yaml
@@ -295,6 +304,7 @@ install(
 set(_savo_mapping_production_launch
   launch/continued_mapping.launch.py
   launch/coverage_execution_handoff.launch.xml
+  launch/coverage_operation_orchestrator.launch.xml
   launch/coverage_mapping.launch.xml
   launch/exploration_goal_handoff.launch.xml
   launch/frontier_mapping.launch.xml
@@ -670,6 +680,35 @@ install(
   DESTINATION lib/${PROJECT_NAME}
 )
 
+add_executable(
+  coverage_operation_orchestrator_node
+  src/nodes/coverage_operation_orchestrator_node.cpp
+)
+
+target_compile_features(
+  coverage_operation_orchestrator_node
+  PRIVATE
+    cxx_std_17
+)
+
+target_link_libraries(
+  coverage_operation_orchestrator_node
+  ${PROJECT_NAME}_core
+)
+
+ament_target_dependencies(
+  coverage_operation_orchestrator_node
+  rclcpp
+  std_msgs
+  std_srvs
+)
+
+install(
+  TARGETS
+    coverage_operation_orchestrator_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 add_library(savo_mapping_scan360_rotate_action_client
   src/ros/scan360_rotate_action_client.cpp
 )
@@ -839,6 +878,8 @@ if(BUILD_TESTING)
       "${CMAKE_CURRENT_SOURCE_DIR}/test/test_scan360_rotate_action_binding.cpp"
       "${CMAKE_CURRENT_SOURCE_DIR}/test/test_scan360_rotate_action_client_runtime.cpp"
       "${CMAKE_CURRENT_SOURCE_DIR}/test/test_coverage_mission.cpp"
+      "${CMAKE_CURRENT_SOURCE_DIR}/test/test_coverage_execution_handoff.cpp"
+      "${CMAKE_CURRENT_SOURCE_DIR}/test/test_coverage_operation_orchestrator.cpp"
       "${CMAKE_CURRENT_SOURCE_DIR}/test/test_tf_pose_reader.cpp"
     LANGUAGE c++
     INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/include"
@@ -862,6 +903,7 @@ if(BUILD_TESTING)
   ament_xmllint(
     package.xml
     launch/coverage_execution_handoff.launch.xml
+    launch/coverage_operation_orchestrator.launch.xml
     launch/coverage_mapping.launch.xml
     launch/exploration_goal_handoff.launch.xml
     launch/frontier_mapping.launch.xml
@@ -1436,6 +1478,34 @@ if(BUILD_TESTING)
     PROPERTIES
       ENVIRONMENT
         "PYTHONDONTWRITEBYTECODE=1;ROS_LOCALHOST_ONLY=1;ROS_DOMAIN_ID=223;COVERAGE_HANDOFF_EXECUTABLE=${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}/coverage_execution_handoff_node"
+  )
+
+  ament_add_gtest(test_coverage_operation_orchestrator
+    test/test_coverage_operation_orchestrator.cpp
+  )
+
+  target_link_libraries(
+    test_coverage_operation_orchestrator
+    ${PROJECT_NAME}_core
+  )
+
+  ament_add_pytest_test(
+    test_phase4l_b3g_contract
+    test/test_phase4l_b3g_contract.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
+    test_coverage_operation_orchestrator_runtime
+    test/test_coverage_operation_orchestrator_runtime.py
+    TIMEOUT 90
+  )
+
+  set_tests_properties(
+    test_coverage_operation_orchestrator_runtime
+    PROPERTIES
+      ENVIRONMENT
+        "PYTHONDONTWRITEBYTECODE=1;ROS_LOCALHOST_ONLY=1;ROS_DOMAIN_ID=224;COVERAGE_ORCHESTRATOR_EXECUTABLE=${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}/coverage_operation_orchestrator_node"
   )
 
   ament_add_gtest(test_coverage_mission

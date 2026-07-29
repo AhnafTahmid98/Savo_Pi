@@ -127,6 +127,13 @@ public:
   CandidateMutationResult register_candidate(
     CandidateDraft candidate);
 
+  // Restores a trusted persisted candidate record into a temporary
+  // catalog used for deterministic mutation planning. The record is
+  // still fully validated and conflict checked before insertion.
+  [[nodiscard]]
+  CandidateMutationResult restore_candidate_record(
+    CandidateRecordData record);
+
   [[nodiscard]]
   CandidateMutationResult replace_candidate(
     std::string_view candidate_id,

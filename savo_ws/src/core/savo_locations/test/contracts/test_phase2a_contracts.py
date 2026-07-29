@@ -153,16 +153,29 @@ def test_store_has_fail_closed_schema_handling() -> None:
     )
 
 
-def test_loc2a_has_no_ros_runtime_node() -> None:
-    cmake = read("CMakeLists.txt")
+def test_loc2a_storage_layer_remains_ros_independent() -> None:
+    storage_layer = "\n".join(
+        (
+            read(
+                "include/savo_locations/"
+                "sqlite_schema.hpp"
+            ),
+            read(
+                "include/savo_locations/"
+                "sqlite_store.hpp"
+            ),
+            read("src/sqlite_store.cpp"),
+        )
+    )
 
-    assert "find_package(rclcpp" not in cmake
-    assert "add_executable(" not in cmake
+    # LOC-3A may add a separate ROS target. LOC-2A
+    # storage implementation must not depend on ROS.
+    for forbidden in (
+        "rclcpp",
+        "std_msgs",
+        "geometry_msgs",
+        "builtin_interfaces",
+        "savo_msgs",
+    ):
+        assert forbidden not in storage_layer
 
-    assert not (
-        ROOT
-        / "src"
-        / "location_registry_node.cpp"
-    ).exists()
-
-    assert not (ROOT / "launch").exists()

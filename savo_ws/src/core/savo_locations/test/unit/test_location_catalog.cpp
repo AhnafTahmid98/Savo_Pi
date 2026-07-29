@@ -822,6 +822,123 @@ TEST(LocationCatalog, CandidateListIsDeterministic)
 }
 
 
+TEST(LocationCatalog, RestoresPersistedCandidateStates)
+{
+  savo_locations::InMemoryLocationCatalog catalog;
+
+  auto pending = make_candidate(
+    "candidate-pending",
+    "campus_main",
+    7U,
+    27,
+    "A201");
+
+  savo_locations::CandidateRecordData
+    pending_record;
+
+  pending_record.state =
+    savo_locations::CandidateState::
+      kPendingReview;
+
+  pending_record.candidate_revision = 3U;
+  pending_record.candidate = pending;
+
+  ASSERT_TRUE(
+    catalog.restore_candidate_record(
+      pending_record).success);
+
+  auto location = make_location(
+    "B101",
+    "campus_main",
+    7U,
+    28);
+
+  location.source_candidate_id =
+    "candidate-approved";
+
+  ASSERT_TRUE(
+    catalog.insert_location(location).success);
+
+  auto approved = make_candidate(
+    "candidate-approved",
+    "campus_main",
+    7U,
+    28,
+    "B101");
+
+  savo_locations::CandidateRecordData
+    approved_record;
+
+  approved_record.state =
+    savo_locations::CandidateState::kApproved;
+
+  approved_record.candidate_revision = 2U;
+  approved_record.candidate = approved;
+  approved_record.review_reason = "approved";
+  approved_record.approved_location_id = "B101";
+
+  ASSERT_TRUE(
+    catalog.restore_candidate_record(
+      approved_record).success);
+
+  auto rejected = make_candidate(
+    "candidate-rejected",
+    "campus_main",
+    7U,
+    29,
+    "C301");
+
+  savo_locations::CandidateRecordData
+    rejected_record;
+
+  rejected_record.state =
+    savo_locations::CandidateState::kRejected;
+
+  rejected_record.candidate_revision = 2U;
+  rejected_record.candidate = rejected;
+  rejected_record.review_reason = "bad geometry";
+
+  ASSERT_TRUE(
+    catalog.restore_candidate_record(
+      rejected_record).success);
+
+  EXPECT_EQ(catalog.candidate_size(), 3U);
+
+  const auto restored_pending =
+    catalog.get_candidate("candidate-pending");
+
+  ASSERT_TRUE(restored_pending.has_value());
+  EXPECT_EQ(restored_pending->candidate_revision, 3U);
+}
+
+
+TEST(LocationCatalog, RestoreRejectsInvalidEnvelope)
+{
+  savo_locations::InMemoryLocationCatalog catalog;
+
+  savo_locations::CandidateRecordData record;
+  record.state =
+    savo_locations::CandidateState::kApproved;
+  record.candidate_revision = 2U;
+  record.candidate = make_candidate(
+    "candidate-invalid",
+    "campus_main",
+    7U,
+    27,
+    "A201");
+
+  const auto result =
+    catalog.restore_candidate_record(record);
+
+  EXPECT_FALSE(result.success);
+
+  EXPECT_EQ(
+    result.code,
+    savo_locations::CandidateMutationCode::
+      kInvalidCandidate);
+}
+
+
 TEST(LocationCatalog, ClearRemovesAllEntities)
 {
   savo_locations::InMemoryLocationCatalog catalog;

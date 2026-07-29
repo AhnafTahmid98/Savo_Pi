@@ -1,0 +1,33 @@
+coverage_operation_orchestrator_node:
+  ros__parameters:
+    enabled: true
+
+    supervisor_state_topic: "/savo_supervisor/state_summary"
+
+    handoff_state_topic: "/savo_mapping/coverage_execution/state"
+    handoff_status_topic: "/savo_mapping/coverage_execution/status"
+    handoff_feedback_topic: "/savo_mapping/coverage_execution/feedback"
+
+    state_topic: "/savo_mapping/coverage_operation/state"
+    status_topic: "/savo_mapping/coverage_operation/status"
+    events_topic: "/savo_mapping/coverage_operation/events"
+
+    approve_service: "/savo_mapping/coverage_operation/approve"
+    cancel_service: "/savo_mapping/coverage_operation/cancel"
+    reset_service: "/savo_mapping/coverage_operation/reset"
+
+    # The B3F handoff services are private when B3G owns bringup.
+    internal_approve_service: "/savo_mapping/_internal/coverage_execution/approve"
+    internal_cancel_service: "/savo_mapping/_internal/coverage_execution/cancel"
+    internal_reset_service: "/savo_mapping/_internal/coverage_execution/reset"
+
+    supervisor_timeout_sec: 1.5
+    maximum_candidate_age_sec: 300.0
+    internal_service_timeout_sec: 2.0
+
+    allow_degraded_supervisor: false
+    cancel_on_supervisor_loss: true
+    supervisor_loss_cancel_delay_sec: 0.5
+
+    watchdog_period_ms: 100
+    publish_period_ms: 500

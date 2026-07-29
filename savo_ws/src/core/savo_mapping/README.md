@@ -220,3 +220,31 @@ zero failures, and zero skipped tests.
 - No unfinished scaffold may be installed as a production artifact.
 - Fake data and fake servers are permitted only for PC validation.
 - Real-robot strategy profiles remain deferred until hardware validation.
+
+## Phase 4L-B3G — unified Coverage operation orchestration
+
+Production Coverage bringup uses `coverage_operation_orchestrator_node` as the
+only public operator approval surface. The B3F approve, cancel and reset
+services are remapped under `/savo_mapping/_internal/coverage_execution/*`.
+
+The orchestrator requires both:
+
+1. a staged valid Coverage plan in `coverage_execution_handoff_node`; and
+2. a fresh, ready and authorized `/savo_supervisor/state_summary` snapshot.
+
+Public operation interfaces:
+
+| Direction | Name | Type |
+|---|---|---|
+| Service | `/savo_mapping/coverage_operation/approve` | `std_srvs/srv/Trigger` |
+| Service | `/savo_mapping/coverage_operation/cancel` | `std_srvs/srv/Trigger` |
+| Service | `/savo_mapping/coverage_operation/reset` | `std_srvs/srv/Trigger` |
+| Publish | `/savo_mapping/coverage_operation/state` | `std_msgs/msg/String` |
+| Publish | `/savo_mapping/coverage_operation/status` | `std_msgs/msg/String` |
+| Publish | `/savo_mapping/coverage_operation/events` | `std_msgs/msg/String` |
+
+Publishing `/savo_mapping/coverage/path` remains planning output only. The
+orchestrator does not subscribe to that path, own an action client, publish
+velocity commands or bypass `savo_nav`. If supervisor authorization is lost
+during an active Coverage mission, it can only request cancellation through
+the internal B3F service.

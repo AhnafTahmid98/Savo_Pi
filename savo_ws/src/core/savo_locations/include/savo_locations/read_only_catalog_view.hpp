@@ -38,6 +38,14 @@ struct ReadResolveRequest
 };
 
 
+enum class ResolveMatchType
+{
+  kNone = 0,
+  kLocationId = 1,
+  kDisplayName = 2,
+  kAlias = 3,
+};
+
 struct ReadResolveResult
 {
   ReadResolveCode code{

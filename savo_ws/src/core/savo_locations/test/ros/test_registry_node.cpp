@@ -284,7 +284,7 @@ TEST(RegistryNode, BootstrapsAndServesReads)
   resolve_request->query =
     "East classroom";
 
-  const auto resolve_future =
+  auto resolve_future =
     resolve_client->async_send_request(
       resolve_request);
 
@@ -319,7 +319,7 @@ TEST(RegistryNode, BootstrapsAndServesReads)
 
   get_request->location_id = "A201";
 
-  const auto get_future =
+  auto get_future =
     get_client->async_send_request(
       get_request);
 
@@ -349,7 +349,7 @@ TEST(RegistryNode, BootstrapsAndServesReads)
   list_request->map_revision = 7U;
   list_request->enabled_only = true;
 
-  const auto list_future =
+  auto list_future =
     list_client->async_send_request(
       list_request);
 

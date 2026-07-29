@@ -14,6 +14,10 @@ savo_locations:
     status_publish_hz: 1.0
     heartbeat_publish_hz: 2.0
 
-    # Transient-local JSON diagnostic snapshot. Typed read access
-    # remains ResolveLocation/GetLocation/ListLocations services.
+    # Expose persistent candidate registration, approval and
+    # enable/disable services. Set false for maintenance read-only mode.
+    enable_write_services: true
+
+    # Transient-local JSON diagnostic snapshot. Typed access remains
+    # available through the read and write service contracts.
     publish_snapshot: true

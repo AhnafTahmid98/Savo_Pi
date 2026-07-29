@@ -133,8 +133,6 @@ def test_candidate_owns_mapping_evidence() -> None:
 
 
 def test_loc1c_catalog_remains_dependency_isolated() -> None:
-    cmake = read("CMakeLists.txt")
-
     catalog_layer = "\n".join(
         (
             read(
@@ -145,22 +143,18 @@ def test_loc1c_catalog_remains_dependency_isolated() -> None:
         )
     )
 
-    # SQLite is allowed only in the dedicated LOC-2
-    # storage layer. The candidate and approval catalog
-    # must remain a pure in-memory domain component.
-    assert "find_package(rclcpp" not in cmake
-    assert "rclcpp::rclcpp" not in cmake
-    assert "add_executable(" not in cmake
+    # Candidate and approval behavior remains a pure
+    # in-memory domain component.
+    for forbidden in (
+        "rclcpp",
+        "std_msgs",
+        "geometry_msgs",
+        "builtin_interfaces",
+        "sqlite3",
+        "sqlite_store",
+        "sqlite_repository",
+    ):
+        assert forbidden not in catalog_layer
 
-    assert "#include <sqlite3.h>" not in catalog_layer
-    assert "sqlite3_" not in catalog_layer
-
-    assert not (ROOT / "launch").exists()
-
-    assert not (
-        ROOT
-        / "src"
-        / "location_registry_node.cpp"
-    ).exists()
 
 

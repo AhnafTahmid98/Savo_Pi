@@ -1,0 +1,4 @@
+/savo_supervisor/events [std_msgs/msg/String]
+/savo_supervisor/health [diagnostic_msgs/msg/DiagnosticArray]
+/savo_supervisor/heartbeat [std_msgs/msg/String]
+/savo_supervisor/state_summary [std_msgs/msg/String]

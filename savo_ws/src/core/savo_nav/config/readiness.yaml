@@ -20,7 +20,7 @@ navigation_readiness_node:
     safety_timeout_seconds: 1.0
 
     accepted_control_modes:
-      - "NAVIGATION"
+      - "NAV"
 
     map_topic: "/map"
     tf_topic: "/tf"
