@@ -34,6 +34,7 @@ find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
 
 add_library(${PROJECT_NAME}_core
   src/core/version.cpp
@@ -147,6 +148,7 @@ ament_target_dependencies(mapping_supervisor_node
   nav_msgs
   tf2
   tf2_ros
+  tf2_geometry_msgs
 )
 
 install(
@@ -617,6 +619,37 @@ install(
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
   INCLUDES DESTINATION include
+)
+
+add_executable(
+  mapped_location_registration_node
+  src/nodes/mapped_location_registration_node.cpp
+)
+
+target_compile_features(
+  mapped_location_registration_node
+  PRIVATE
+    cxx_std_17
+)
+
+target_link_libraries(
+  mapped_location_registration_node
+  ${PROJECT_NAME}_core
+)
+
+ament_target_dependencies(
+  mapped_location_registration_node
+  geometry_msgs
+  rclcpp
+  rclcpp_action
+  savo_msgs
+  tf2
+  tf2_geometry_msgs
+)
+
+install(
+  TARGETS mapped_location_registration_node
+  DESTINATION lib/${PROJECT_NAME}
 )
 
 add_executable(
@@ -1538,6 +1571,12 @@ if(BUILD_TESTING)
 
   ament_add_gtest(test_semantic_landmark
     test/test_semantic_landmark.cpp
+  )
+
+  ament_add_pytest_test(
+    test_location_registration_runtime_contract
+    test/test_location_registration_runtime_contract.py
+    TIMEOUT 60
   )
 
   target_link_libraries(

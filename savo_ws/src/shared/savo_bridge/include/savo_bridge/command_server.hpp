@@ -24,6 +24,7 @@ inline constexpr std::int64_t DEFAULT_COMMAND_ACCEPT_TIMEOUT_MS = 250;
 inline constexpr std::int64_t DEFAULT_COMMAND_READ_TIMEOUT_MS = 1000;
 inline constexpr std::int64_t DEFAULT_COMMAND_WRITE_TIMEOUT_MS = 1000;
 inline constexpr std::uint32_t DEFAULT_COMMAND_SOCKET_MODE = 0660U;
+inline constexpr std::size_t DEFAULT_COMMAND_ID_CACHE_CAPACITY = 1024U;
 
 struct CommandServerConfig
 {
@@ -39,6 +40,8 @@ struct CommandServerConfig
   std::vector<std::uint32_t> allowed_peer_uids;
   std::string bridge_instance_id{"savo-bridge"};
   std::string execution_mode{"dry_run"};
+  std::size_t command_id_cache_capacity{
+    DEFAULT_COMMAND_ID_CACHE_CAPACITY};
 
   CommandServerConfig();
 };
@@ -97,6 +100,7 @@ struct CommandServerResult
   std::size_t bytes_sent{0U};
   bool dispatch_attempted{false};
   std::size_t ros_publications{0U};
+  bool duplicate{false};
 };
 
 class CommandServer

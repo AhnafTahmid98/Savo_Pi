@@ -15,6 +15,7 @@
 #include "diagnostic_msgs/msg/diagnostic_status.hpp"
 #include "diagnostic_msgs/msg/key_value.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "savo_msgs/msg/april_tag_observation.hpp"
 #include "std_msgs/msg/string.hpp"
 
 #include "savo_head/core/diagnostics.hpp"
@@ -433,6 +434,11 @@ public:
       get_parameter("semantic_confirmations_topic").as_string(),
       rclcpp::QoS(10).reliable());
 
+    typed_observation_pub_ =
+      create_publisher<savo_msgs::msg::AprilTagObservation>(
+      get_parameter("typed_observations_topic").as_string(),
+      rclcpp::SensorDataQoS());
+
     status_pub_ = create_publisher<diagnostic_msgs::msg::DiagnosticArray>(
       get_parameter("status_topic").as_string(),
       rclcpp::QoS(10).reliable());
@@ -460,6 +466,11 @@ private:
 
     declare_parameter<std::string>("apriltag_detections_topic", kTopicAprilTagDetections);
     declare_parameter<std::string>("semantic_confirmations_topic", kTopicSemanticConfirmations);
+    declare_parameter<std::string>(
+      "typed_observations_topic",
+      "/savo_head/apriltag/observations");
+    declare_parameter<std::string>("detector_name", "legacy_json_bridge");
+    declare_parameter<double>("tag_size_m", 0.0);
     declare_parameter<std::string>("robot_pose_snapshot_topic", "/savo_head/robot_pose_snapshot");
 
     declare_parameter<std::string>("status_topic", kTopicStatus);
@@ -592,6 +603,7 @@ private:
 
     try {
       const auto observation = parse_observation(msg->data, stamp);
+      publish_typed_observation(observation);
       auto registration = registration_for(observation.tag_id);
       auto pose = latest_robot_pose_;
 
@@ -637,6 +649,50 @@ private:
       last_error_ = exc.what();
       RCLCPP_ERROR(get_logger(), "AprilTag confirmation failed: %s", exc.what());
     }
+  }
+
+
+  void publish_typed_observation(const AprilTagObservation & observation)
+  {
+    savo_msgs::msg::AprilTagObservation message;
+    const auto stamp_nanoseconds = static_cast<std::int64_t>(
+      std::max(0.0, observation.stamp_s) * 1.0e9);
+    message.header.stamp = rclcpp::Time(stamp_nanoseconds);
+    message.header.frame_id = observation.frame_id;
+    message.detector_name = get_parameter("detector_name").as_string();
+    message.family = observation.family;
+    message.tag_id = observation.tag_id;
+    message.tag_size_m = get_parameter("tag_size_m").as_double();
+    message.observation_sequence = ++observation_sequence_;
+    message.detection_quality = static_cast<float>(
+      std::clamp(observation.confidence, 0.0, 1.0));
+    message.pose_valid =
+      std::isfinite(observation.pose_camera_xyz_m.x) &&
+      std::isfinite(observation.pose_camera_xyz_m.y) &&
+      std::isfinite(observation.pose_camera_xyz_m.z) &&
+      std::isfinite(observation.pose_camera_rpy_rad.x) &&
+      std::isfinite(observation.pose_camera_rpy_rad.y) &&
+      std::isfinite(observation.pose_camera_rpy_rad.z);
+
+    if (message.pose_valid) {
+      message.pose.pose.position.x = observation.pose_camera_xyz_m.x;
+      message.pose.pose.position.y = observation.pose_camera_xyz_m.y;
+      message.pose.pose.position.z = observation.pose_camera_xyz_m.z;
+
+      const double cr = std::cos(observation.pose_camera_rpy_rad.x * 0.5);
+      const double sr = std::sin(observation.pose_camera_rpy_rad.x * 0.5);
+      const double cp = std::cos(observation.pose_camera_rpy_rad.y * 0.5);
+      const double sp = std::sin(observation.pose_camera_rpy_rad.y * 0.5);
+      const double cy = std::cos(observation.pose_camera_rpy_rad.z * 0.5);
+      const double sy = std::sin(observation.pose_camera_rpy_rad.z * 0.5);
+
+      message.pose.pose.orientation.w = cr * cp * cy + sr * sp * sy;
+      message.pose.pose.orientation.x = sr * cp * cy - cr * sp * sy;
+      message.pose.pose.orientation.y = cr * sp * cy + sr * cp * sy;
+      message.pose.pose.orientation.z = cr * cp * sy - sr * sp * cy;
+    }
+
+    typed_observation_pub_->publish(message);
   }
 
   RobotPoseSnapshot parse_robot_pose(const std::string & text) const
@@ -848,11 +904,14 @@ private:
   std::optional<std::string> last_error_{};
   std::size_t confirm_count_{0};
   std::size_t reject_count_{0};
+  std::uint64_t observation_sequence_{0U};
 
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr detection_sub_{};
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr robot_pose_sub_{};
 
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr semantic_pub_{};
+  rclcpp::Publisher<savo_msgs::msg::AprilTagObservation>::SharedPtr
+    typed_observation_pub_{};
   rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr status_pub_{};
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr dashboard_pub_{};
 

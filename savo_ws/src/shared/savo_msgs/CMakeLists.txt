@@ -68,6 +68,11 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   DEPENDENCIES ${ROSIDL_DEPENDENCIES}
 )
 
+install(
+  DIRECTORY docs/
+  DESTINATION share/${PROJECT_NAME}/docs
+)
+
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------

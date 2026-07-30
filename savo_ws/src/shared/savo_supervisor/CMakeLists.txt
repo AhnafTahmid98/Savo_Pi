@@ -75,6 +75,7 @@ ament_target_dependencies(supervisor_node
   std_msgs
   diagnostic_msgs
   builtin_interfaces
+  savo_msgs
 )
 
 # -----------------------------------------------------------------------------
@@ -194,6 +195,13 @@ if(BUILD_TESTING)
 
   ament_add_gtest(test_location_authorization_policy
     test/test_location_authorization_policy.cpp
+  )
+
+  find_package(ament_cmake_pytest REQUIRED)
+  ament_add_pytest_test(
+    test_location_authorization_runtime_contract
+    test/test_location_authorization_runtime_contract.py
+    TIMEOUT 60
   )
   target_link_libraries(test_location_authorization_policy
     savo_supervisor_core

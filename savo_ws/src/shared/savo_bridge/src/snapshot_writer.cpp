@@ -215,6 +215,190 @@ void append_string_array(
     duration).count();
 }
 
+void append_bridge_runtime(
+  std::string & output,
+  const BridgeRuntimeSnapshot & bridge)
+{
+  output += "\"bridge\":{";
+
+  output += "\"owner\":";
+  append_json_string(output, bridge.owner);
+
+  output += ",\"instance_id\":";
+  append_json_string(output, bridge.instance_id);
+
+  output += ",\"process_alive\":";
+  append_boolean(output, bridge.process_alive);
+
+  output += ",\"read_only\":";
+  append_boolean(output, bridge.read_only);
+
+  output += ",\"commands_enabled\":";
+  append_boolean(output, bridge.commands_enabled);
+
+  output += ",\"bridge_ready\":";
+  append_boolean(output, bridge.bridge_ready);
+
+  output += ",\"validated\":";
+  append_boolean(output, bridge.validated);
+
+  output += ",\"dispatch_enabled\":";
+  append_boolean(output, bridge.dispatch_enabled);
+
+  output += ",\"navigation_bridge_validated\":";
+  append_boolean(output, bridge.navigation_bridge_validated);
+
+  output += ",\"block_navigation\":";
+  append_boolean(output, bridge.block_navigation);
+
+  output += ",\"readiness_reason\":";
+  append_json_string(output, bridge.readiness_reason);
+
+  output += ",\"command_server_enabled\":";
+  append_boolean(output, bridge.command_server_enabled);
+
+  output += ",\"command_execution_mode\":";
+  append_json_string(output, bridge.command_execution_mode);
+
+  output += ",\"command_worker_fatal\":";
+  append_boolean(output, bridge.command_worker_fatal);
+
+  output += ",\"command_last_status\":";
+  append_json_string(output, bridge.command_last_status);
+
+  output += ",\"command_accepted_count\":";
+  append_integer(output, bridge.command_accepted_count);
+
+  output += ",\"command_rejected_count\":";
+  append_integer(output, bridge.command_rejected_count);
+
+  output += ",\"stop_ready\":";
+  append_boolean(output, bridge.stop_ready);
+
+  output += ",\"teleop_ready\":";
+  append_boolean(output, bridge.teleop_ready);
+
+  output += ",\"navigation_ready\":";
+  append_boolean(output, bridge.navigation_ready);
+
+  output += ",\"dds_active\":";
+  append_boolean(output, bridge.dds_active);
+
+  output += ",\"core_visible\":";
+  append_boolean(output, bridge.core_visible);
+
+  output += ",\"edge_visible\":";
+  append_boolean(output, bridge.edge_visible);
+
+  output += ",\"observation_subscriptions_complete\":";
+  append_boolean(
+    output,
+    bridge.observation_subscriptions_complete);
+
+  output += ",\"required_topics_ready\":";
+  append_boolean(output, bridge.required_topics_ready);
+
+  output += ",\"all_topics_fresh\":";
+  append_boolean(output, bridge.all_topics_fresh);
+
+  output += ",\"location_service_configured\":";
+  append_boolean(output, bridge.location_service_configured);
+
+  output += ",\"active_map_context_configured\":";
+  append_boolean(
+    output,
+    bridge.active_map_context_configured);
+
+  output += ",\"dispatcher\":{";
+
+  output += "\"command_active\":";
+  append_boolean(output, bridge.command_active);
+
+  output += ",\"teleop_active\":";
+  append_boolean(output, bridge.teleop_active);
+
+  output += ",\"navigation_goal_active\":";
+  append_boolean(output, bridge.navigation_goal_active);
+
+  output += ",\"active_command_id\":";
+  append_json_string(output, bridge.active_command_id);
+
+  output += ",\"active_command_type\":";
+  append_json_string(output, bridge.active_command_type);
+
+  output += ",\"last_terminal_command_id\":";
+  append_json_string(output, bridge.last_terminal_command_id);
+
+  output += ",\"mode_state_observed\":";
+  append_boolean(output, bridge.mode_state_observed);
+
+  output += ",\"mode_state\":";
+  append_json_string(output, bridge.mode_state);
+
+  output += ",\"mode_state_age_ms\":";
+  append_integer(output, bridge.mode_state_age_ms);
+
+  output += ",\"external_stop_state_known\":";
+  append_boolean(output, bridge.external_stop_state_known);
+
+  output += ",\"external_stop_active\":";
+  append_boolean(output, bridge.external_stop_active);
+
+  output += ",\"external_stop_age_ms\":";
+  append_integer(output, bridge.external_stop_age_ms);
+
+  output += ",\"safety_stop_state_known\":";
+  append_boolean(output, bridge.safety_stop_state_known);
+
+  output += ",\"safety_stop_active\":";
+  append_boolean(output, bridge.safety_stop_active);
+
+  output += ",\"safety_stop_age_ms\":";
+  append_integer(output, bridge.safety_stop_age_ms);
+
+  output += ",\"safe_velocity_state_known\":";
+  append_boolean(output, bridge.safe_velocity_state_known);
+
+  output += ",\"safe_velocity_zero\":";
+  append_boolean(output, bridge.safe_velocity_zero);
+
+  output += ",\"safe_velocity_age_ms\":";
+  append_integer(output, bridge.safe_velocity_age_ms);
+
+  output += ",\"navigation_readiness_observed\":";
+  append_boolean(
+    output,
+    bridge.navigation_readiness_observed);
+
+  output += ",\"navigation_readiness\":";
+  append_json_string(output, bridge.navigation_readiness);
+
+  output += ",\"navigation_readiness_age_ms\":";
+  append_integer(
+    output,
+    bridge.navigation_readiness_age_ms);
+
+  output += ",\"accepted_command_count\":";
+  append_integer(
+    output,
+    bridge.dispatcher_accepted_command_count);
+
+  output += ",\"rejected_command_count\":";
+  append_integer(
+    output,
+    bridge.dispatcher_rejected_command_count);
+
+  output += ",\"ros_publication_count\":";
+  append_integer(
+    output,
+    bridge.dispatcher_ros_publication_count);
+
+  output += ",\"last_reason\":";
+  append_json_string(output, bridge.dispatcher_last_reason);
+
+  output += "}}";
+}
+
 void append_health(
   std::string & output,
   const HealthEvaluation & health)
@@ -442,9 +626,11 @@ std::string serialize_snapshot(
   output.reserve(512U + (topics.size() * 256U));
 
   output += "{\"schema_name\":\"savo_bridge_snapshot\"";
-  output += ",\"schema_version\":1";
+  output += ",\"schema_version\":2";
   output += ",\"snapshot_sequence\":";
   append_integer(output, document.sequence);
+  output.push_back(',');
+  append_bridge_runtime(output, document.bridge);
   output.push_back(',');
   append_health(output, health);
   output += ",\"topics\":[";

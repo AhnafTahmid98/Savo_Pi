@@ -11,8 +11,11 @@
 #include <cctype>
 #include <cstddef>
 #include <cstdint>
+#include <future>
 #include <limits>
+#include <memory>
 #include <mutex>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -20,8 +23,13 @@
 #include <utility>
 #include <variant>
 
+#include "geometry_msgs/msg/pose_stamped.hpp"
 #include "geometry_msgs/msg/twist.hpp"
+#include "nav2_msgs/action/navigate_to_pose.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "rclcpp_action/rclcpp_action.hpp"
+#include "savo_msgs/msg/location_record.hpp"
+#include "savo_msgs/srv/resolve_location.hpp"
 #include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/string.hpp"
 
@@ -99,6 +107,35 @@ using TimePoint = SteadyClock::time_point;
     std::abs(message.angular.x) <= limit &&
     std::abs(message.angular.y) <= limit &&
     std::abs(message.angular.z) <= limit;
+}
+
+[[nodiscard]] bool valid_map_pose(
+  const geometry_msgs::msg::PoseStamped & pose,
+  const std::string & expected_frame) noexcept
+{
+  const auto & position = pose.pose.position;
+  const auto & orientation = pose.pose.orientation;
+
+  if (
+    pose.header.frame_id != expected_frame ||
+    !std::isfinite(position.x) ||
+    !std::isfinite(position.y) ||
+    !std::isfinite(position.z) ||
+    !std::isfinite(orientation.x) ||
+    !std::isfinite(orientation.y) ||
+    !std::isfinite(orientation.z) ||
+    !std::isfinite(orientation.w))
+  {
+    return false;
+  }
+
+  const double norm_squared =
+    orientation.x * orientation.x +
+    orientation.y * orientation.y +
+    orientation.z * orientation.z +
+    orientation.w * orientation.w;
+
+  return norm_squared > 1.0e-12;
 }
 
 [[nodiscard]] bool time_point_present(
@@ -200,6 +237,16 @@ using TimePoint = SteadyClock::time_point;
 
 class RosCommandDispatcher::Impl
 {
+private:
+  using NavigateToPose =
+    nav2_msgs::action::NavigateToPose;
+
+  using NavigationGoalHandle =
+    rclcpp_action::ClientGoalHandle<NavigateToPose>;
+
+  using ResolveLocation =
+    savo_msgs::srv::ResolveLocation;
+
 public:
   Impl(
     rclcpp::Node & node,
@@ -334,13 +381,27 @@ public:
           navigation_readiness_observed_ = true;
 
           navigation_readiness_ =
-            normalize_upper(message->data);
+          normalize_upper(message->data);
 
           navigation_readiness_observed_at_ = now;
         }
 
         observation_changed_.notify_all();
       });
+
+    if (!config_.location_resolve_service.empty()) {
+      location_resolve_client_ =
+        node_.create_client<ResolveLocation>(
+        config_.location_resolve_service);
+    }
+
+    navigation_action_client_ =
+      rclcpp_action::create_client<NavigateToPose>(
+      node_.get_node_base_interface(),
+      node_.get_node_graph_interface(),
+      node_.get_node_logging_interface(),
+      node_.get_node_waitables_interface(),
+      config_.navigation_action_name);
 
     {
       std::lock_guard<std::mutex> lock(mutex_);
@@ -351,8 +412,8 @@ public:
 
     RCLCPP_INFO(
       node_.get_logger(),
-      "ROS command dispatcher STOP foundation created; "
-      "live teleop and navigation remain fail-closed");
+      "ROS command dispatcher created; "
+      "STOP, bounded teleop and guarded navigation enabled");
   }
 
   ~Impl()
@@ -379,6 +440,20 @@ public:
       CommandType::CancelAction)
     {
       return dispatch_cancel_action(command);
+    }
+
+    if (
+      command.command_type ==
+      CommandType::NavigateToLocation)
+    {
+      return dispatch_navigation(command);
+    }
+
+    if (
+      command.command_type ==
+      CommandType::CancelNavigation)
+    {
+      return dispatch_cancel_navigation(command);
     }
 
     {
@@ -506,6 +581,7 @@ public:
   {
     bool already_shutdown = false;
     std::thread teleop_to_join;
+    std::thread navigation_to_join;
 
     {
       std::lock_guard<std::mutex> lock(mutex_);
@@ -521,35 +597,42 @@ public:
           std::move(teleop_thread_);
       }
 
+      if (navigation_thread_.joinable()) {
+        navigation_to_join =
+          std::move(navigation_thread_);
+      }
+
       last_reason_ =
         "ros_command_dispatcher_shutdown";
     }
 
     observation_changed_.notify_all();
 
+    if (!already_shutdown) {
+      try {
+        std::size_t ignored_publications = 0U;
+
+        publish_zero_manual_velocity(
+          ignored_publications);
+
+        publish_external_stop(
+          true,
+          ignored_publications);
+
+        publish_mode(
+          config_.stop_mode,
+          ignored_publications);
+      } catch (...) {
+        // Destructors and shutdown paths must not throw.
+      }
+    }
+
     if (teleop_to_join.joinable()) {
       teleop_to_join.join();
     }
 
-    if (already_shutdown) {
-      return;
-    }
-
-    try {
-      std::size_t ignored_publications = 0U;
-
-      publish_zero_manual_velocity(
-        ignored_publications);
-
-      publish_external_stop(
-        true,
-        ignored_publications);
-
-      publish_mode(
-        config_.stop_mode,
-        ignored_publications);
-    } catch (...) {
-      // Destructors and shutdown paths must not throw.
+    if (navigation_to_join.joinable()) {
+      navigation_to_join.join();
     }
   }
 
@@ -571,6 +654,19 @@ private:
         throw std::invalid_argument(
                 "ros_command_dispatcher_topic_invalid");
       }
+    }
+
+    if (!valid_topic(config_.navigation_action_name)) {
+      throw std::invalid_argument(
+              "ros_command_dispatcher_navigation_action_invalid");
+    }
+
+    if (
+      !config_.location_resolve_service.empty() &&
+      !valid_topic(config_.location_resolve_service))
+    {
+      throw std::invalid_argument(
+              "ros_command_dispatcher_location_service_invalid");
     }
 
     if (
@@ -603,7 +699,12 @@ private:
     if (
       !valid_timeout(config_.observed_state_timeout_ms) ||
       !valid_timeout(config_.mode_transition_timeout_ms) ||
-      !valid_timeout(config_.stop_confirmation_timeout_ms))
+      !valid_timeout(config_.stop_confirmation_timeout_ms) ||
+      !valid_timeout(config_.location_service_timeout_ms) ||
+      !valid_timeout(config_.navigation_server_timeout_ms) ||
+      !valid_timeout(config_.navigation_goal_response_timeout_ms) ||
+      !valid_timeout(config_.navigation_execution_timeout_ms) ||
+      !valid_timeout(config_.navigation_cancel_timeout_ms))
     {
       throw std::invalid_argument(
               "ros_command_dispatcher_timeout_invalid");
@@ -749,28 +850,28 @@ private:
 
     const bool direction_matches =
       (
-        payload.direction == "forward" &&
-        payload.linear_x_mps > 0.0
+      payload.direction == "forward" &&
+      payload.linear_x_mps > 0.0
       ) ||
       (
-        payload.direction == "backward" &&
-        payload.linear_x_mps < 0.0
+      payload.direction == "backward" &&
+      payload.linear_x_mps < 0.0
       ) ||
       (
-        payload.direction == "strafe_left" &&
-        payload.linear_y_mps > 0.0
+      payload.direction == "strafe_left" &&
+      payload.linear_y_mps > 0.0
       ) ||
       (
-        payload.direction == "strafe_right" &&
-        payload.linear_y_mps < 0.0
+      payload.direction == "strafe_right" &&
+      payload.linear_y_mps < 0.0
       ) ||
       (
-        payload.direction == "turn_left" &&
-        payload.angular_z_radps > 0.0
+      payload.direction == "turn_left" &&
+      payload.angular_z_radps > 0.0
       ) ||
       (
-        payload.direction == "turn_right" &&
-        payload.angular_z_radps < 0.0
+      payload.direction == "turn_right" &&
+      payload.angular_z_radps < 0.0
       );
 
     if (!direction_matches) {
@@ -1054,8 +1155,8 @@ private:
     try {
       std::thread worker(
         [this, command_id = command.command_id,
-          teleop_payload = *payload,
-          requested_at]()
+        teleop_payload = *payload,
+        requested_at]()
         {
           run_teleop(
             command_id,
@@ -1144,7 +1245,7 @@ private:
           [this, requested_at]()
           {
             const TimePoint now =
-              SteadyClock::now();
+            SteadyClock::now();
 
             if (
               shutdown_requested_ ||
@@ -1154,38 +1255,38 @@ private:
             }
 
             const bool external_stop_released =
-              external_stop_observed_ &&
-              !external_stop_active_ &&
-              external_stop_observed_at_ >=
-              requested_at &&
-              observation_fresh(
+            external_stop_observed_ &&
+            !external_stop_active_ &&
+            external_stop_observed_at_ >=
+            requested_at &&
+            observation_fresh(
                 external_stop_observed_at_,
                 now,
                 config_.observed_state_timeout_ms);
 
             const bool manual_mode_confirmed =
-              mode_state_observed_ &&
-              mode_state_ ==
-              normalize_upper(
+            mode_state_observed_ &&
+            mode_state_ ==
+            normalize_upper(
                 config_.manual_mode) &&
-              mode_state_observed_at_ >=
-              requested_at &&
-              observation_fresh(
+            mode_state_observed_at_ >=
+            requested_at &&
+            observation_fresh(
                 mode_state_observed_at_,
                 now,
                 config_.observed_state_timeout_ms);
 
             const bool safety_clear =
-              safety_stop_observed_ &&
-              !safety_stop_active_ &&
-              observation_fresh(
+            safety_stop_observed_ &&
+            !safety_stop_active_ &&
+            observation_fresh(
                 safety_stop_observed_at_,
                 now,
                 config_.observed_state_timeout_ms);
 
             const bool safe_velocity_fresh =
-              safe_velocity_observed_ &&
-              observation_fresh(
+            safe_velocity_observed_ &&
+            observation_fresh(
                 safe_velocity_observed_at_,
                 now,
                 config_.observed_state_timeout_ms);
@@ -1212,14 +1313,17 @@ private:
             "bridge_teleop_manual_mode_timeout";
 
           fail_safe_stop = true;
-        } else if (
-          !runtime_allows_teleop_locked(
-            SteadyClock::now()))
-        {
-          terminal_reason =
-            "bridge_teleop_runtime_not_ready";
+        } else {
+          const bool runtime_ready =
+            runtime_allows_teleop_locked(
+            SteadyClock::now());
 
-          fail_safe_stop = true;
+          if (!runtime_ready) {
+            terminal_reason =
+              "bridge_teleop_runtime_not_ready";
+
+            fail_safe_stop = true;
+          }
         }
       }
 
@@ -1560,6 +1664,1002 @@ private:
       0U);
   }
 
+
+  [[nodiscard]] bool navigation_authorized(
+    const ValidatedCommand & command) const
+  {
+    if (
+      command.priority ==
+      CommandPriority::Emergency)
+    {
+      return false;
+    }
+
+    return
+      command.origin_agent.has_value() &&
+      command.origin_agent.value() ==
+      "navigation_agent";
+  }
+
+  [[nodiscard]] bool navigation_cancel_authorized(
+    const ValidatedCommand & command) const
+  {
+    if (!command.origin_agent.has_value()) {
+      return false;
+    }
+
+    const std::string & agent =
+      command.origin_agent.value();
+
+    return
+      agent == "navigation_agent" ||
+      agent == "safety_agent";
+  }
+
+  void join_finished_navigation_thread()
+  {
+    std::thread completed;
+
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+
+      if (
+        navigation_thread_.joinable() &&
+        !navigation_goal_active_)
+      {
+        completed =
+          std::move(navigation_thread_);
+      }
+    }
+
+    if (completed.joinable()) {
+      completed.join();
+    }
+  }
+
+  [[nodiscard]] bool navigation_baseline_ready_locked(
+    const TimePoint now) const
+  {
+    return
+      safety_stop_observed_ &&
+      observation_fresh(
+        safety_stop_observed_at_,
+        now,
+        config_.observed_state_timeout_ms) &&
+      !safety_stop_active_ &&
+      external_stop_observed_ &&
+      observation_fresh(
+        external_stop_observed_at_,
+        now,
+        config_.observed_state_timeout_ms) &&
+      safe_velocity_observed_ &&
+      observation_fresh(
+        safe_velocity_observed_at_,
+        now,
+        config_.observed_state_timeout_ms) &&
+      safe_velocity_zero_ &&
+      mode_state_observed_ &&
+      observation_fresh(
+        mode_state_observed_at_,
+        now,
+        config_.observed_state_timeout_ms);
+  }
+
+  [[nodiscard]] bool navigation_runtime_ready_locked(
+    const TimePoint now) const
+  {
+    return
+      safety_stop_observed_ &&
+      observation_fresh(
+        safety_stop_observed_at_,
+        now,
+        config_.observed_state_timeout_ms) &&
+      !safety_stop_active_ &&
+      external_stop_observed_ &&
+      observation_fresh(
+        external_stop_observed_at_,
+        now,
+        config_.observed_state_timeout_ms) &&
+      !external_stop_active_ &&
+      mode_state_observed_ &&
+      observation_fresh(
+        mode_state_observed_at_,
+        now,
+        config_.observed_state_timeout_ms) &&
+      mode_state_ ==
+      normalize_upper(config_.navigation_mode) &&
+      navigation_readiness_observed_ &&
+      observation_fresh(
+        navigation_readiness_observed_at_,
+        now,
+        config_.observed_state_timeout_ms) &&
+      navigation_readiness_ ==
+      normalize_upper(
+        config_.navigation_ready_state);
+  }
+
+  [[nodiscard]] CommandDispatchResult dispatch_navigation(
+    const ValidatedCommand & command)
+  {
+    join_finished_navigation_thread();
+
+    if (!navigation_authorized(command)) {
+      {
+        std::lock_guard<std::mutex> lock(mutex_);
+        ++rejected_command_count_;
+        last_reason_ =
+          "bridge_navigation_authority_rejected";
+      }
+
+      return rejection(
+        "bridge_navigation_authority_rejected",
+        false,
+        0U);
+    }
+
+    const auto * payload =
+      std::get_if<NavigateToLocationCommandPayload>(
+      &command.payload);
+
+    if (payload == nullptr) {
+      {
+        std::lock_guard<std::mutex> lock(mutex_);
+        ++rejected_command_count_;
+        last_reason_ =
+          "bridge_navigation_payload_type_mismatch";
+      }
+
+      return rejection(
+        "bridge_navigation_payload_type_mismatch",
+        false,
+        0U);
+    }
+
+    if (
+      config_.location_resolve_service.empty() ||
+      !location_resolve_client_)
+    {
+      {
+        std::lock_guard<std::mutex> lock(mutex_);
+        ++rejected_command_count_;
+        last_reason_ =
+          "bridge_navigation_location_service_not_configured";
+      }
+
+      return rejection(
+        "bridge_navigation_location_service_not_configured",
+        false,
+        0U);
+    }
+
+    if (
+      config_.require_active_map_context &&
+      (
+        config_.active_map_id.empty() ||
+        config_.active_map_revision == 0U
+      ))
+    {
+      {
+        std::lock_guard<std::mutex> lock(mutex_);
+        ++rejected_command_count_;
+        last_reason_ =
+          "bridge_navigation_active_map_context_missing";
+      }
+
+      return rejection(
+        "bridge_navigation_active_map_context_missing",
+        false,
+        0U);
+    }
+
+    if (
+      payload->map_id.has_value() &&
+      payload->map_id.value() !=
+      config_.active_map_id)
+    {
+      {
+        std::lock_guard<std::mutex> lock(mutex_);
+        ++rejected_command_count_;
+        last_reason_ =
+          "bridge_navigation_requested_map_mismatch";
+      }
+
+      return rejection(
+        "bridge_navigation_requested_map_mismatch",
+        false,
+        0U);
+    }
+
+    const TimePoint now = SteadyClock::now();
+
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+
+      if (shutdown_requested_) {
+        ++rejected_command_count_;
+        last_reason_ =
+          "ros_command_dispatcher_shutdown";
+
+        return rejection(
+          "ros_command_dispatcher_shutdown",
+          false,
+          0U);
+      }
+
+      if (command_active_) {
+        ++rejected_command_count_;
+        last_reason_ =
+          "bridge_command_already_active";
+
+        return rejection(
+          "bridge_command_already_active",
+          false,
+          0U);
+      }
+
+      if (!navigation_baseline_ready_locked(now)) {
+        ++rejected_command_count_;
+        last_reason_ =
+          "bridge_navigation_baseline_not_ready";
+
+        return rejection(
+          "bridge_navigation_baseline_not_ready",
+          false,
+          0U);
+      }
+
+      command_active_ = true;
+      navigation_goal_active_ = true;
+      navigation_cancel_requested_ = false;
+
+      active_command_id_ =
+        command.command_id;
+
+      active_command_type_ =
+        "navigate_to_location";
+
+      last_reason_ =
+        "bridge_navigation_admission_started";
+    }
+
+    try {
+      std::thread worker(
+        [this,
+        command_id = command.command_id,
+        navigation_payload = *payload]()
+        {
+          run_navigation(
+            command_id,
+            navigation_payload);
+        });
+
+      {
+        std::lock_guard<std::mutex> lock(mutex_);
+
+        navigation_thread_ =
+          std::move(worker);
+
+        ++accepted_command_count_;
+
+        last_reason_ =
+          "bridge_navigation_admitted";
+      }
+    } catch (...) {
+      {
+        std::lock_guard<std::mutex> lock(mutex_);
+
+        command_active_ = false;
+        navigation_goal_active_ = false;
+        navigation_cancel_requested_ = false;
+
+        active_command_id_.clear();
+        active_command_type_.clear();
+
+        last_terminal_command_id_ =
+          command.command_id;
+
+        ++rejected_command_count_;
+
+        last_reason_ =
+          "bridge_navigation_worker_start_failed";
+      }
+
+      return rejection(
+        "bridge_navigation_worker_start_failed",
+        true,
+        0U);
+    }
+
+    return acceptance(
+      "bridge_navigation_admitted",
+      0U);
+  }
+
+  [[nodiscard]] std::string resolve_failure_reason(
+    const ResolveLocation::Response & response) const
+  {
+    switch (response.result_code) {
+      case ResolveLocation::Response::RESULT_INVALID_QUERY:
+        return "bridge_navigation_location_invalid";
+      case ResolveLocation::Response::RESULT_NOT_FOUND:
+        return "bridge_navigation_location_not_found";
+      case ResolveLocation::Response::RESULT_AMBIGUOUS:
+        return "bridge_navigation_location_ambiguous";
+      case ResolveLocation::Response::RESULT_DISABLED:
+        return "bridge_navigation_location_disabled";
+      case ResolveLocation::Response::RESULT_RETIRED:
+        return "bridge_navigation_location_retired";
+      case ResolveLocation::Response::RESULT_MAP_MISMATCH:
+        return "bridge_navigation_location_map_mismatch";
+      default:
+        return "bridge_navigation_location_resolution_failed";
+    }
+  }
+
+  void finish_navigation(
+    std::string command_id,
+    std::string terminal_reason,
+    const bool fail_safe_stop) noexcept
+  {
+    std::size_t publications = 0U;
+
+    try {
+      if (fail_safe_stop) {
+        publish_external_stop(
+          true,
+          publications);
+      }
+
+      publish_mode(
+        config_.stop_mode,
+        publications);
+    } catch (...) {
+      terminal_reason =
+        "bridge_navigation_terminal_stop_failed";
+    }
+
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+
+      if (active_command_id_ == command_id) {
+        command_active_ = false;
+        navigation_goal_active_ = false;
+        navigation_cancel_requested_ = false;
+
+        active_command_id_.clear();
+        active_command_type_.clear();
+      }
+
+      navigation_goal_handle_.reset();
+
+      last_terminal_command_id_ =
+        std::move(command_id);
+
+      last_reason_ =
+        terminal_reason.empty() ?
+        "bridge_navigation_internal_error" :
+        std::move(terminal_reason);
+    }
+
+    observation_changed_.notify_all();
+  }
+
+  void run_navigation(
+    std::string command_id,
+    NavigateToLocationCommandPayload payload) noexcept
+  {
+    try {
+      if (!location_resolve_client_->wait_for_service(
+          std::chrono::milliseconds(
+            config_.location_service_timeout_ms)))
+      {
+        finish_navigation(
+          std::move(command_id),
+          "bridge_navigation_location_service_unavailable",
+          true);
+        return;
+      }
+
+      auto request =
+        std::make_shared<ResolveLocation::Request>();
+
+      request->query = payload.location_id;
+      request->enforce_map_context =
+        config_.require_active_map_context;
+      request->map_id =
+        config_.active_map_id;
+      request->map_revision =
+        config_.active_map_revision;
+
+      auto resolve_future =
+        location_resolve_client_->async_send_request(
+        request);
+
+      if (
+        resolve_future.wait_for(
+          std::chrono::milliseconds(
+            config_.location_service_timeout_ms)) !=
+        std::future_status::ready)
+      {
+        finish_navigation(
+          std::move(command_id),
+          "bridge_navigation_location_service_timeout",
+          true);
+        return;
+      }
+
+      const auto response = resolve_future.get();
+
+      if (
+        !response ||
+        !response->resolved ||
+        response->result_code !=
+        ResolveLocation::Response::RESULT_RESOLVED)
+      {
+        const std::string reason =
+          response ?
+          resolve_failure_reason(*response) :
+          "bridge_navigation_location_resolution_failed";
+
+        finish_navigation(
+          std::move(command_id),
+          reason,
+          true);
+        return;
+      }
+
+      const auto & location = response->location;
+
+      if (
+        response->match_type !=
+        ResolveLocation::Response::MATCH_LOCATION_ID ||
+        location.location_id != payload.location_id)
+      {
+        finish_navigation(
+          std::move(command_id),
+          "bridge_navigation_requires_exact_location_id",
+          true);
+        return;
+      }
+
+      if (
+        location.state !=
+        savo_msgs::msg::LocationRecord::STATE_APPROVED)
+      {
+        finish_navigation(
+          std::move(command_id),
+          "bridge_navigation_location_not_approved",
+          true);
+        return;
+      }
+
+      if (!location.enabled) {
+        finish_navigation(
+          std::move(command_id),
+          "bridge_navigation_location_disabled",
+          true);
+        return;
+      }
+
+      if (
+        config_.require_active_map_context &&
+        (
+          location.map_id != config_.active_map_id ||
+          location.map_revision !=
+          config_.active_map_revision
+        ))
+      {
+        finish_navigation(
+          std::move(command_id),
+          "bridge_navigation_location_map_mismatch",
+          true);
+        return;
+      }
+
+      if (
+        !valid_map_pose(
+          location.approach_pose,
+          config_.map_frame))
+      {
+        finish_navigation(
+          std::move(command_id),
+          "bridge_navigation_approach_pose_invalid",
+          true);
+        return;
+      }
+
+      const TimePoint transition_requested_at =
+        SteadyClock::now();
+
+      std::size_t publications = 0U;
+
+      publish_external_stop(
+        false,
+        publications);
+
+      publish_mode(
+        config_.navigation_mode,
+        publications);
+
+      const auto transition_deadline =
+        transition_requested_at +
+        std::chrono::milliseconds(
+          config_.mode_transition_timeout_ms);
+
+      bool ready_for_goal = false;
+
+      {
+        std::unique_lock<std::mutex> lock(mutex_);
+
+        ready_for_goal =
+          observation_changed_.wait_until(
+          lock,
+          transition_deadline,
+          [this, transition_requested_at]()
+          {
+            const TimePoint current =
+            SteadyClock::now();
+
+            if (
+              shutdown_requested_ ||
+              navigation_cancel_requested_)
+            {
+              return true;
+            }
+
+            return
+              navigation_runtime_ready_locked(current) &&
+              external_stop_observed_at_ >=
+              transition_requested_at &&
+              mode_state_observed_at_ >=
+              transition_requested_at &&
+              navigation_readiness_observed_at_ >=
+              transition_requested_at;
+          });
+
+        if (shutdown_requested_) {
+          lock.unlock();
+
+          finish_navigation(
+            std::move(command_id),
+            "bridge_navigation_shutdown",
+            true);
+          return;
+        }
+
+        if (navigation_cancel_requested_) {
+          lock.unlock();
+
+          finish_navigation(
+            std::move(command_id),
+            "bridge_navigation_canceled",
+            true);
+          return;
+        }
+
+        if (
+          !ready_for_goal ||
+          !navigation_runtime_ready_locked(
+            SteadyClock::now()))
+        {
+          lock.unlock();
+
+          finish_navigation(
+            std::move(command_id),
+            "bridge_navigation_readiness_timeout",
+            true);
+          return;
+        }
+      }
+
+      if (!navigation_action_client_->wait_for_action_server(
+          std::chrono::milliseconds(
+            config_.navigation_server_timeout_ms)))
+      {
+        finish_navigation(
+          std::move(command_id),
+          "bridge_navigation_action_server_unavailable",
+          true);
+        return;
+      }
+
+      NavigateToPose::Goal goal;
+      goal.pose = location.approach_pose;
+
+      rclcpp_action::Client<
+        NavigateToPose>::SendGoalOptions options;
+
+      const auto goal_future =
+        navigation_action_client_->async_send_goal(
+        goal,
+        options);
+
+      if (
+        goal_future.wait_for(
+          std::chrono::milliseconds(
+            config_.navigation_goal_response_timeout_ms)) !=
+        std::future_status::ready)
+      {
+        finish_navigation(
+          std::move(command_id),
+          "bridge_navigation_goal_response_timeout",
+          true);
+        return;
+      }
+
+      const auto goal_handle =
+        goal_future.get();
+
+      if (!goal_handle) {
+        finish_navigation(
+          std::move(command_id),
+          "bridge_navigation_goal_rejected",
+          true);
+        return;
+      }
+
+      {
+        std::lock_guard<std::mutex> lock(mutex_);
+        navigation_goal_handle_ = goal_handle;
+        last_reason_ =
+          "bridge_navigation_goal_accepted";
+      }
+
+      observation_changed_.notify_all();
+
+      const auto result_future =
+        navigation_action_client_->async_get_result(
+        goal_handle);
+
+      const TimePoint execution_deadline =
+        SteadyClock::now() +
+        std::chrono::milliseconds(
+          config_.navigation_execution_timeout_ms);
+
+      bool cancel_sent = false;
+      bool cancel_rejected = false;
+      bool execution_timed_out = false;
+      std::optional<TimePoint> cancel_deadline;
+
+      while (true) {
+        if (
+          result_future.wait_for(
+            std::chrono::milliseconds(20)) ==
+          std::future_status::ready)
+        {
+          const auto wrapped = result_future.get();
+
+          std::string terminal_reason;
+          bool fail_safe_stop = true;
+
+          if (execution_timed_out) {
+            terminal_reason =
+              "bridge_navigation_execution_timeout";
+          } else {
+            switch (wrapped.code) {
+              case rclcpp_action::ResultCode::SUCCEEDED:
+                terminal_reason =
+                  cancel_sent ?
+                  "bridge_navigation_succeeded_after_cancel" :
+                  "bridge_navigation_succeeded";
+                fail_safe_stop = cancel_sent;
+                break;
+
+              case rclcpp_action::ResultCode::CANCELED:
+                terminal_reason =
+                  "bridge_navigation_canceled";
+                break;
+
+              case rclcpp_action::ResultCode::ABORTED:
+                terminal_reason =
+                  "bridge_navigation_failed";
+                break;
+
+              default:
+                terminal_reason =
+                  "bridge_navigation_result_unknown";
+                break;
+            }
+          }
+
+          finish_navigation(
+            std::move(command_id),
+            terminal_reason,
+            fail_safe_stop);
+          return;
+        }
+
+        bool cancel_requested = false;
+        bool shutdown_requested = false;
+        bool runtime_ready = true;
+
+        {
+          std::lock_guard<std::mutex> lock(mutex_);
+
+          cancel_requested =
+            navigation_cancel_requested_;
+
+          shutdown_requested =
+            shutdown_requested_;
+
+          runtime_ready =
+            navigation_runtime_ready_locked(
+            SteadyClock::now());
+        }
+
+        if (shutdown_requested) {
+          cancel_requested = true;
+        }
+
+        if (!runtime_ready) {
+          cancel_requested = true;
+
+          {
+            std::lock_guard<std::mutex> lock(mutex_);
+            navigation_cancel_requested_ = true;
+            last_reason_ =
+              "bridge_navigation_runtime_state_lost";
+          }
+        }
+
+        if (
+          SteadyClock::now() >= execution_deadline &&
+          !execution_timed_out)
+        {
+          execution_timed_out = true;
+          cancel_requested = true;
+
+          {
+            std::lock_guard<std::mutex> lock(mutex_);
+            navigation_cancel_requested_ = true;
+            last_reason_ =
+              "bridge_navigation_execution_timeout";
+          }
+        }
+
+        if (
+          cancel_sent &&
+          cancel_rejected &&
+          !cancel_deadline.has_value() &&
+          (
+            shutdown_requested ||
+            execution_timed_out
+          ))
+        {
+          cancel_deadline =
+            SteadyClock::now() +
+            std::chrono::milliseconds(
+              config_.navigation_cancel_timeout_ms);
+        }
+
+        if (cancel_requested && !cancel_sent) {
+          const auto cancel_future =
+            navigation_action_client_->async_cancel_goal(
+            goal_handle);
+
+          if (
+            cancel_future.wait_for(
+              std::chrono::milliseconds(
+                config_.navigation_cancel_timeout_ms)) !=
+            std::future_status::ready)
+          {
+            finish_navigation(
+              std::move(command_id),
+              "bridge_navigation_cancel_response_timeout",
+              true);
+            return;
+          }
+
+          const auto cancel_response =
+            cancel_future.get();
+
+          if (
+            !cancel_response ||
+            cancel_response->goals_canceling.empty())
+          {
+            {
+              std::lock_guard<std::mutex> lock(mutex_);
+              last_reason_ =
+                "bridge_navigation_cancel_rejected";
+            }
+
+            observation_changed_.notify_all();
+            cancel_sent = true;
+            cancel_rejected = true;
+            cancel_deadline.reset();
+          } else {
+            cancel_sent = true;
+            cancel_deadline =
+              SteadyClock::now() +
+              std::chrono::milliseconds(
+                config_.navigation_cancel_timeout_ms);
+          }
+        }
+
+        if (
+          cancel_deadline.has_value() &&
+          SteadyClock::now() >=
+          cancel_deadline.value())
+        {
+          finish_navigation(
+            std::move(command_id),
+            execution_timed_out ?
+            "bridge_navigation_execution_timeout" :
+            (
+              cancel_rejected ?
+              "bridge_navigation_cancel_rejected" :
+              "bridge_navigation_cancel_terminal_timeout"
+            ),
+            true);
+          return;
+        }
+      }
+    } catch (...) {
+      finish_navigation(
+        std::move(command_id),
+        "bridge_navigation_internal_error",
+        true);
+    }
+  }
+
+  [[nodiscard]] CommandDispatchResult
+  dispatch_cancel_navigation(
+    const ValidatedCommand & command)
+  {
+    join_finished_navigation_thread();
+
+    if (!navigation_cancel_authorized(command)) {
+      {
+        std::lock_guard<std::mutex> lock(mutex_);
+        ++rejected_command_count_;
+        last_reason_ =
+          "bridge_navigation_cancel_authority_rejected";
+      }
+
+      return rejection(
+        "bridge_navigation_cancel_authority_rejected",
+        false,
+        0U);
+    }
+
+    const auto * payload =
+      std::get_if<CancelNavigationCommandPayload>(
+      &command.payload);
+
+    if (payload == nullptr) {
+      {
+        std::lock_guard<std::mutex> lock(mutex_);
+        ++rejected_command_count_;
+        last_reason_ =
+          "bridge_navigation_cancel_payload_type_mismatch";
+      }
+
+      return rejection(
+        "bridge_navigation_cancel_payload_type_mismatch",
+        false,
+        0U);
+    }
+
+    std::string target_command_id;
+
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+
+      if (
+        !command_active_ ||
+        !navigation_goal_active_)
+      {
+        ++rejected_command_count_;
+        last_reason_ =
+          "bridge_navigation_cancel_target_not_active";
+
+        return rejection(
+          "bridge_navigation_cancel_target_not_active",
+          false,
+          0U);
+      }
+
+      target_command_id =
+        active_command_id_;
+
+      if (
+        payload->target_command_id.has_value() &&
+        payload->target_command_id.value() !=
+        target_command_id)
+      {
+        ++rejected_command_count_;
+        last_reason_ =
+          "bridge_navigation_cancel_target_mismatch";
+
+        return rejection(
+          "bridge_navigation_cancel_target_mismatch",
+          false,
+          0U);
+      }
+
+      navigation_cancel_requested_ = true;
+      last_reason_ =
+        "bridge_navigation_cancel_requested";
+    }
+
+    observation_changed_.notify_all();
+
+    const TimePoint deadline =
+      SteadyClock::now() +
+      std::chrono::milliseconds(
+        config_.navigation_cancel_timeout_ms * 2);
+
+    bool target_terminal = false;
+    std::string target_terminal_reason;
+    std::thread completed_thread;
+
+    {
+      std::unique_lock<std::mutex> lock(mutex_);
+
+      target_terminal =
+        observation_changed_.wait_until(
+        lock,
+        deadline,
+        [this, &target_command_id]()
+        {
+          return
+            !navigation_goal_active_ &&
+            active_command_id_ !=
+            target_command_id;
+        });
+
+      if (target_terminal) {
+        target_terminal_reason =
+          last_reason_;
+
+        if (navigation_thread_.joinable()) {
+          completed_thread =
+            std::move(navigation_thread_);
+        }
+
+        ++accepted_command_count_;
+
+        last_reason_ =
+          target_terminal_reason ==
+          "bridge_navigation_canceled" ?
+          "bridge_navigation_cancel_confirmed" :
+          "bridge_navigation_cancel_target_terminal";
+      } else {
+        ++rejected_command_count_;
+        last_reason_ =
+          "bridge_navigation_cancel_confirmation_timeout";
+      }
+    }
+
+    if (completed_thread.joinable()) {
+      completed_thread.join();
+    }
+
+    if (!target_terminal) {
+      std::size_t publications = 0U;
+
+      publish_external_stop(
+        true,
+        publications);
+
+      publish_mode(
+        config_.stop_mode,
+        publications);
+
+      return rejection(
+        "bridge_navigation_cancel_confirmation_timeout",
+        true,
+        publications);
+    }
+
+    return acceptance(
+      target_terminal_reason ==
+      "bridge_navigation_canceled" ?
+      "bridge_navigation_cancel_confirmed" :
+      "bridge_navigation_cancel_target_terminal",
+      0U);
+  }
+
   [[nodiscard]] bool stop_authorized(
     const ValidatedCommand & command) const
   {
@@ -1637,29 +2737,29 @@ private:
           const TimePoint now = SteadyClock::now();
 
           const bool external_stop_confirmed =
-            external_stop_observed_ &&
-            external_stop_active_ &&
-            external_stop_observed_at_ >= requested_at &&
-            observation_fresh(
+          external_stop_observed_ &&
+          external_stop_active_ &&
+          external_stop_observed_at_ >= requested_at &&
+          observation_fresh(
               external_stop_observed_at_,
               now,
               config_.observed_state_timeout_ms);
 
           const bool stop_mode_confirmed =
-            mode_state_observed_ &&
-            mode_state_ ==
-            normalize_upper(config_.stop_mode) &&
-            mode_state_observed_at_ >= requested_at &&
-            observation_fresh(
+          mode_state_observed_ &&
+          mode_state_ ==
+          normalize_upper(config_.stop_mode) &&
+          mode_state_observed_at_ >= requested_at &&
+          observation_fresh(
               mode_state_observed_at_,
               now,
               config_.observed_state_timeout_ms);
 
           const bool safe_zero_confirmed =
-            safe_velocity_observed_ &&
-            safe_velocity_zero_ &&
-            safe_velocity_observed_at_ >= requested_at &&
-            observation_fresh(
+          safe_velocity_observed_ &&
+          safe_velocity_zero_ &&
+          safe_velocity_observed_at_ >= requested_at &&
+          observation_fresh(
               safe_velocity_observed_at_,
               now,
               config_.observed_state_timeout_ms);
@@ -1813,6 +2913,16 @@ private:
     "ros_command_dispatcher_not_started"};
 
   std::thread teleop_thread_;
+  std::thread navigation_thread_;
+
+  NavigationGoalHandle::SharedPtr
+    navigation_goal_handle_;
+
+  rclcpp::Client<ResolveLocation>::SharedPtr
+    location_resolve_client_;
+
+  rclcpp_action::Client<NavigateToPose>::SharedPtr
+    navigation_action_client_;
 
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr
     mode_command_publisher_;

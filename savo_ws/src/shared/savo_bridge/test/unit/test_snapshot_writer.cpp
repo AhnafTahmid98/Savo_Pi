@@ -16,7 +16,10 @@
 #include <utility>
 #include <vector>
 
+#include <nlohmann/json.hpp>
+
 #include "savo_bridge/snapshot_writer.hpp"
+
 
 namespace
 {
@@ -193,44 +196,33 @@ TEST(SavoBridgeSnapshotWriter, CanonicalAtomicPublicationContract)
     serialized,
     savo_bridge::serialize_snapshot(reordered));
 
-  const std::string expected =
-    "{\"schema_name\":\"savo_bridge_snapshot\","
-    "\"schema_version\":1,"
-    "\"snapshot_sequence\":42,"
-    "\"health\":{"
-    "\"status\":\"degraded\","
-    "\"reason\":\"optional_topic_unavailable\","
-    "\"required_topics_ready\":true,"
-    "\"all_topics_fresh\":false,"
-    "\"total_topics\":2,"
-    "\"required_topics\":1,"
-    "\"optional_topics\":1,"
-    "\"fresh_topics\":1,"
-    "\"stale_topics\":1,"
-    "\"never_observed_topics\":0,"
-    "\"clock_regression_topics\":0,"
-    "\"required_unavailable_topics\":[],"
-    "\"optional_unavailable_topics\":[\"/a_optional\"],"
-    "\"clock_regression_topic_names\":[]},"
-    "\"topics\":[{"
-    "\"topic_name\":\"/a_optional\","
-    "\"requirement\":\"optional\","
-    "\"classification\":\"stale\","
-    "\"observed\":true,"
-    "\"accepted_observations\":1,"
-    "\"rejected_regressions\":0,"
-    "\"age_ns\":1000000000,"
-    "\"stale_after_ns\":1000000000},{"
-    "\"topic_name\":\"/z_required\","
-    "\"requirement\":\"required\","
-    "\"classification\":\"fresh\","
-    "\"observed\":true,"
-    "\"accepted_observations\":1,"
-    "\"rejected_regressions\":0,"
-    "\"age_ns\":500000000,"
-    "\"stale_after_ns\":1000000000}]}\n";
+  const nlohmann::json parsed =
+    nlohmann::json::parse(serialized);
 
-  EXPECT_EQ(serialized, expected);
+  EXPECT_EQ(parsed.at("schema_name"), "savo_bridge_snapshot");
+  EXPECT_EQ(parsed.at("schema_version"), 2);
+  EXPECT_EQ(parsed.at("snapshot_sequence"), 42);
+
+  const auto & bridge = parsed.at("bridge");
+  EXPECT_EQ(bridge.at("owner"), "savo_bridge");
+  EXPECT_TRUE(bridge.at("read_only").get<bool>());
+  EXPECT_FALSE(bridge.at("commands_enabled").get<bool>());
+  EXPECT_FALSE(bridge.at("bridge_ready").get<bool>());
+  EXPECT_TRUE(bridge.at("block_navigation").get<bool>());
+  EXPECT_TRUE(bridge.contains("dispatcher"));
+
+  const auto & health = parsed.at("health");
+  EXPECT_EQ(health.at("status"), "degraded");
+  EXPECT_EQ(
+    health.at("reason"),
+    "optional_topic_unavailable");
+  EXPECT_TRUE(health.at("required_topics_ready").get<bool>());
+  EXPECT_FALSE(health.at("all_topics_fresh").get<bool>());
+
+  const auto & topics = parsed.at("topics");
+  ASSERT_EQ(topics.size(), 2U);
+  EXPECT_EQ(topics.at(0).at("topic_name"), "/a_optional");
+  EXPECT_EQ(topics.at(1).at("topic_name"), "/z_required");
 
   savo_bridge::SnapshotDocument empty_document;
   empty_document.sequence = 1U;

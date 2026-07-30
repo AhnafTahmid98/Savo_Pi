@@ -12,6 +12,7 @@
 #include <unistd.h>
 
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
@@ -696,6 +697,108 @@ TEST(SavoBridgeCommandServer, LifecycleCreatesNoBackgroundThread)
   CommandServer server{config_for(temporary.path() / "command.sock")};
   ASSERT_EQ(server.start().status, CommandServerStatus::Started);
   EXPECT_EQ(task_count(), before);
+}
+
+
+TEST(SavoBridgeCommandServer, DuplicateCommandIdReplaysWithoutRedispatch)
+{
+  TemporaryDirectory temporary;
+  const auto path = temporary.path() / "command.sock";
+
+  auto config = config_for(path);
+  config.execution_mode = "live";
+  config.command_id_cache_capacity = 8U;
+
+  std::atomic<std::size_t> dispatch_count{0U};
+
+  CommandServer server{
+    config,
+    []() {return NOW_UNIX_MS;},
+    [&dispatch_count](
+      const savo_bridge::ValidatedCommand &)
+    {
+      dispatch_count.fetch_add(1U);
+
+      savo_bridge::CommandDispatchResult result;
+      result.accepted = true;
+      result.state = "accepted";
+      result.reason = "test_live_dispatch_accepted";
+      result.dispatch_attempted = true;
+      result.ros_publications = 3U;
+      return result;
+    }};
+
+  ASSERT_EQ(
+    server.start().status,
+    CommandServerStatus::Started);
+
+  const auto first =
+    exchange(
+    server,
+    path,
+    compact_json(CANONICAL_STOP));
+
+  const auto second =
+    exchange(
+    server,
+    path,
+    compact_json(CANONICAL_STOP));
+
+  ASSERT_FALSE(first.response.empty());
+  ASSERT_FALSE(second.response.empty());
+
+  const Json first_json = Json::parse(
+    first.response.substr(
+      0U,
+      first.response.size() - 1U));
+
+  const Json second_json = Json::parse(
+    second.response.substr(
+      0U,
+      second.response.size() - 1U));
+
+  EXPECT_EQ(dispatch_count.load(), 1U);
+
+  EXPECT_EQ(
+    first.server.status,
+    CommandServerStatus::CommandAcknowledged);
+
+  EXPECT_FALSE(first.server.duplicate);
+  EXPECT_FALSE(first_json.at("duplicate").get<bool>());
+
+  EXPECT_EQ(
+    first_json.at("details").
+    at("dispatch_attempted"),
+    true);
+
+  EXPECT_EQ(
+    first_json.at("details").
+    at("ros_publications"),
+    3);
+
+  EXPECT_EQ(
+    second.server.status,
+    CommandServerStatus::CommandAcknowledged);
+
+  EXPECT_TRUE(second.server.duplicate);
+  EXPECT_TRUE(second_json.at("duplicate").get<bool>());
+
+  EXPECT_EQ(
+    second_json.at("reason"),
+    "test_live_dispatch_accepted");
+
+  EXPECT_EQ(
+    second_json.at("details").
+    at("dispatch_attempted"),
+    false);
+
+  EXPECT_EQ(
+    second_json.at("details").
+    at("ros_publications"),
+    0);
+
+  EXPECT_FALSE(second.server.dispatch_attempted);
+  EXPECT_EQ(second.server.ros_publications, 0U);
 }
 
 TEST(SavoBridgeCommandServer, TransportHasNoRosOrNodeIntegration)

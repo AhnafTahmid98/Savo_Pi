@@ -16,8 +16,12 @@
 #include <utility>
 
 #include "geometry_msgs/msg/twist.hpp"
+#include "nav2_msgs/action/navigate_to_pose.hpp"
 #include "rclcpp/executors/multi_threaded_executor.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "rclcpp_action/rclcpp_action.hpp"
+#include "savo_msgs/msg/location_record.hpp"
+#include "savo_msgs/srv/resolve_location.hpp"
 #include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/string.hpp"
 
@@ -30,6 +34,15 @@ namespace
 {
 
 using namespace std::chrono_literals;
+
+using NavigateToPose =
+  nav2_msgs::action::NavigateToPose;
+
+using NavigationServerGoalHandle =
+  rclcpp_action::ServerGoalHandle<NavigateToPose>;
+
+using ResolveLocation =
+  savo_msgs::srv::ResolveLocation;
 
 [[nodiscard]] bool twist_is_zero(
   const geometry_msgs::msg::Twist & message)
@@ -104,10 +117,25 @@ protected:
     config_.navigation_readiness_topic =
       prefix + "/navigation_readiness";
 
+    config_.navigation_action_name =
+      prefix + "/navigate_to_pose";
+
+    config_.location_resolve_service =
+      prefix + "/resolve_location";
+
+    config_.active_map_id = "test-map";
+    config_.active_map_revision = 7U;
+    config_.require_active_map_context = true;
+
     config_.observed_state_timeout_ms = 500;
     config_.mode_transition_timeout_ms = 600;
     config_.stop_confirmation_timeout_ms = 800;
+    config_.location_service_timeout_ms = 800;
+    config_.navigation_server_timeout_ms = 800;
+    config_.navigation_goal_response_timeout_ms = 800;
+    config_.navigation_execution_timeout_ms = 3000;
     config_.teleop_cancel_timeout_ms = 800;
+    config_.navigation_cancel_timeout_ms = 800;
 
     config_.maximum_teleop_duration_ms = 1000;
     config_.teleop_publish_period_ms = 20;
@@ -147,6 +175,159 @@ protected:
       geometry_msgs::msg::Twist>(
       config_.safe_velocity_topic,
       reliable_qos);
+
+    navigation_readiness_publisher_ =
+      fixture_node_->create_publisher<
+      std_msgs::msg::String>(
+      config_.navigation_readiness_topic,
+      latched_qos);
+
+    resolve_location_service_ =
+      fixture_node_->create_service<ResolveLocation>(
+      config_.location_resolve_service,
+      [this](
+        const std::shared_ptr<
+          ResolveLocation::Request> request,
+        std::shared_ptr<
+          ResolveLocation::Response> response)
+      {
+        resolve_request_count_.fetch_add(1U);
+
+        response->normalized_query =
+        request->query;
+
+        response->match_type =
+        ResolveLocation::Response::MATCH_LOCATION_ID;
+
+        if (
+          request->query != "A201" ||
+          (
+            request->enforce_map_context &&
+            (
+              request->map_id !=
+              config_.active_map_id ||
+              request->map_revision !=
+              config_.active_map_revision
+            )
+          ))
+        {
+          response->resolved = false;
+          response->result_code =
+          ResolveLocation::Response::RESULT_NOT_FOUND;
+          response->reason =
+          "test_location_not_found";
+          return;
+        }
+
+        response->resolved = true;
+        response->result_code =
+        ResolveLocation::Response::RESULT_RESOLVED;
+        response->reason =
+        "test_location_resolved";
+
+        response->location.state =
+        savo_msgs::msg::LocationRecord::STATE_APPROVED;
+
+        response->location.enabled = true;
+        response->location.location_id = "A201";
+        response->location.display_name = "Room A201";
+        response->location.map_id =
+        config_.active_map_id;
+
+        response->location.map_revision =
+        config_.active_map_revision;
+
+        response->location.approach_pose.header.frame_id =
+        config_.map_frame;
+
+        response->location.approach_pose.pose.position.x =
+        2.5;
+
+        response->location.approach_pose.pose.position.y =
+        -1.25;
+
+        response->location.approach_pose.pose.orientation.w =
+        1.0;
+      });
+
+    navigation_action_server_ =
+      rclcpp_action::create_server<NavigateToPose>(
+      fixture_node_,
+      config_.navigation_action_name,
+      [this](
+        const rclcpp_action::GoalUUID &,
+        std::shared_ptr<const NavigateToPose::Goal>)
+      {
+        navigation_goal_request_count_.fetch_add(1U);
+
+        return
+          rclcpp_action::GoalResponse::
+          ACCEPT_AND_EXECUTE;
+      },
+      [this](
+        const std::shared_ptr<
+          NavigationServerGoalHandle>)
+      {
+        navigation_cancel_request_count_.fetch_add(1U);
+
+        return
+          rclcpp_action::CancelResponse::ACCEPT;
+      },
+      [this](
+        const std::shared_ptr<
+          NavigationServerGoalHandle> goal_handle)
+      {
+        navigation_goal_pose_x_.store(
+          goal_handle->get_goal()->
+          pose.pose.position.x);
+
+        navigation_action_thread_ =
+        std::thread(
+          [this, goal_handle]()
+          {
+            const auto deadline =
+            std::chrono::steady_clock::now() +
+            std::chrono::milliseconds(
+                navigation_action_delay_ms_.load());
+
+            while (
+              std::chrono::steady_clock::now() <
+              deadline)
+            {
+              if (goal_handle->is_canceling()) {
+                auto result =
+                std::make_shared<
+                  NavigateToPose::Result>();
+
+                result->error_code =
+                NavigateToPose::Result::NONE;
+
+                navigation_canceled_count_.fetch_add(
+                  1U);
+
+                goal_handle->canceled(result);
+
+                return;
+              }
+
+              std::this_thread::sleep_for(10ms);
+            }
+
+            auto result =
+            std::make_shared<
+              NavigateToPose::Result>();
+
+            result->error_code =
+            NavigateToPose::Result::NONE;
+
+            navigation_succeeded_count_.fetch_add(
+              1U);
+
+            goal_handle->succeed(result);
+          });
+
+        navigation_goal_accept_count_.fetch_add(1U);
+      });
 
     mode_command_subscription_ =
       fixture_node_->create_subscription<
@@ -231,7 +412,7 @@ protected:
         [this]()
         {
           const auto state =
-            dispatcher_->snapshot();
+          dispatcher_->snapshot();
 
           return
             state.mode_state_observed &&
@@ -254,6 +435,10 @@ protected:
       dispatcher_.reset();
     }
 
+    if (navigation_action_thread_.joinable()) {
+      navigation_action_thread_.join();
+    }
+
     if (executor_) {
       executor_->cancel();
     }
@@ -264,6 +449,9 @@ protected:
 
     observation_timer_.reset();
 
+    navigation_action_server_.reset();
+    resolve_location_service_.reset();
+
     mode_command_subscription_.reset();
     manual_velocity_subscription_.reset();
     external_stop_subscription_.reset();
@@ -272,6 +460,7 @@ protected:
     external_stop_publisher_.reset();
     safety_stop_publisher_.reset();
     safe_velocity_publisher_.reset();
+    navigation_readiness_publisher_.reset();
 
     executor_.reset();
     dispatcher_node_.reset();
@@ -315,6 +504,12 @@ protected:
 
     safe_velocity_publisher_->publish(
       safe_velocity);
+
+    std_msgs::msg::String readiness;
+    readiness.data = "READY";
+
+    navigation_readiness_publisher_->publish(
+      readiness);
   }
 
   void publish_baseline()
@@ -328,6 +523,9 @@ protected:
     external_stop_message.data = false;
 
     geometry_msgs::msg::Twist safe_velocity;
+
+    std_msgs::msg::String readiness;
+    readiness.data = "READY";
 
     for (std::size_t index = 0U; index < 10U; ++index) {
       mode_state_publisher_->publish(
@@ -344,6 +542,9 @@ protected:
 
       safety_stop_publisher_->publish(
         safety_message);
+
+      navigation_readiness_publisher_->publish(
+        readiness);
 
       std::this_thread::sleep_for(20ms);
     }
@@ -429,17 +630,73 @@ protected:
     return command;
   }
 
+  [[nodiscard]] ValidatedCommand
+  make_navigation_command(
+    const std::string & command_id)
+  {
+    ValidatedCommand command;
+
+    command.command_id = command_id;
+    command.command_type =
+      CommandType::NavigateToLocation;
+
+    command.source = "test";
+    command.origin_agent = "navigation_agent";
+    command.priority = CommandPriority::Normal;
+    command.issued_at_unix_ms = 1;
+    command.expires_at_unix_ms = 60000;
+
+    NavigateToLocationCommandPayload payload;
+
+    payload.location_id = "A201";
+    payload.map_id = config_.active_map_id;
+
+    command.payload = std::move(payload);
+
+    return command;
+  }
+
+  [[nodiscard]] ValidatedCommand
+  make_navigation_cancel_command(
+    const std::string & command_id,
+    const std::string & target_command_id)
+  {
+    ValidatedCommand command;
+
+    command.command_id = command_id;
+    command.command_type =
+      CommandType::CancelNavigation;
+
+    command.source = "test";
+    command.origin_agent = "navigation_agent";
+    command.priority = CommandPriority::High;
+    command.issued_at_unix_ms = 1;
+    command.expires_at_unix_ms = 60000;
+
+    CancelNavigationCommandPayload payload;
+
+    payload.target_command_id =
+      target_command_id;
+
+    payload.reason =
+      "dispatcher_test_cancel_navigation";
+
+    command.payload = std::move(payload);
+
+    return command;
+  }
+
   RosCommandDispatcherConfig config_;
 
   std::shared_ptr<rclcpp::Node> fixture_node_;
   std::shared_ptr<rclcpp::Node> dispatcher_node_;
 
   std::unique_ptr<RosCommandDispatcher>
-    dispatcher_;
+  dispatcher_;
 
   std::unique_ptr<
     rclcpp::executors::MultiThreadedExecutor>
-    executor_;
+  executor_;
 
   std::thread executor_thread_;
 
@@ -458,6 +715,16 @@ protected:
   rclcpp::Publisher<
     geometry_msgs::msg::Twist>::SharedPtr
     safe_velocity_publisher_;
+
+  rclcpp::Publisher<
+    std_msgs::msg::String>::SharedPtr
+    navigation_readiness_publisher_;
+
+  rclcpp::Service<ResolveLocation>::SharedPtr
+    resolve_location_service_;
+
+  rclcpp_action::Server<NavigateToPose>::SharedPtr
+    navigation_action_server_;
 
   rclcpp::Subscription<
     std_msgs::msg::String>::SharedPtr
@@ -478,22 +745,48 @@ protected:
   std::atomic<bool> last_external_stop_{false};
 
   std::atomic<std::size_t>
-    manual_nonzero_count_{0U};
+  manual_nonzero_count_{0U};
 
   std::atomic<std::size_t>
-    manual_zero_count_{0U};
+  manual_zero_count_{0U};
 
   std::atomic<std::size_t>
-    mode_command_count_{0U};
+  mode_command_count_{0U};
 
   std::atomic<std::size_t>
-    external_stop_true_count_{0U};
+  external_stop_true_count_{0U};
 
   std::atomic<std::size_t>
-    external_stop_false_count_{0U};
+  external_stop_false_count_{0U};
+
+  std::thread navigation_action_thread_;
+
+  std::atomic<std::int64_t>
+  navigation_action_delay_ms_{100};
+
+  std::atomic<std::size_t>
+  resolve_request_count_{0U};
+
+  std::atomic<std::size_t>
+  navigation_goal_request_count_{0U};
+
+  std::atomic<std::size_t>
+  navigation_goal_accept_count_{0U};
+
+  std::atomic<std::size_t>
+  navigation_cancel_request_count_{0U};
+
+  std::atomic<std::size_t>
+  navigation_succeeded_count_{0U};
+
+  std::atomic<std::size_t>
+  navigation_canceled_count_{0U};
+
+  std::atomic<double>
+  navigation_goal_pose_x_{0.0};
 
   static std::atomic<std::uint64_t>
-    next_instance_;
+  next_instance_;
 };
 
 std::atomic<std::uint64_t>
@@ -565,7 +858,7 @@ TEST_F(
       [this]()
       {
         const auto state =
-          dispatcher_->snapshot();
+        dispatcher_->snapshot();
 
         return
           !state.teleop_active &&
@@ -620,7 +913,7 @@ TEST_F(
       [this]()
       {
         const auto state =
-          dispatcher_->snapshot();
+        dispatcher_->snapshot();
 
         return
           !state.teleop_active &&
@@ -724,6 +1017,145 @@ TEST_F(
           last_external_stop_.load();
       },
       1000ms));
+}
+
+
+TEST_F(
+  RosCommandDispatcherTest,
+  NavigationResolvesExactApprovedLocationAndUsesGuardedAction)
+{
+  const auto result =
+    dispatcher_->dispatch(
+    make_navigation_command(
+      "navigation-success-1"));
+
+  ASSERT_TRUE(result.accepted);
+  EXPECT_EQ(
+    result.reason,
+    "bridge_navigation_admitted");
+
+  ASSERT_TRUE(
+    wait_for(
+      [this]()
+      {
+        return
+          navigation_goal_accept_count_.load() > 0U;
+      },
+      2000ms))
+    << "guarded navigation action did not receive the goal";
+
+  ASSERT_TRUE(
+    wait_for(
+      [this]()
+      {
+        const auto state =
+        dispatcher_->snapshot();
+
+        return
+          !state.navigation_goal_active &&
+          !state.command_active &&
+          state.last_terminal_command_id ==
+          "navigation-success-1";
+      },
+      2500ms))
+    << "navigation did not reach a terminal result";
+
+  const auto state =
+    dispatcher_->snapshot();
+
+  EXPECT_EQ(
+    state.last_reason,
+    "bridge_navigation_succeeded");
+
+  EXPECT_EQ(
+    resolve_request_count_.load(),
+    1U);
+
+  EXPECT_EQ(
+    navigation_goal_request_count_.load(),
+    1U);
+
+  EXPECT_EQ(
+    navigation_succeeded_count_.load(),
+    1U);
+
+  EXPECT_NEAR(
+    navigation_goal_pose_x_.load(),
+    2.5,
+    1.0e-9);
+}
+
+TEST_F(
+  RosCommandDispatcherTest,
+  NavigationCancellationRequiresExactTargetAndWaitsForTerminal)
+{
+  navigation_action_delay_ms_.store(5000);
+
+  const auto navigation_result =
+    dispatcher_->dispatch(
+    make_navigation_command(
+      "navigation-cancel-target-1"));
+
+  ASSERT_TRUE(navigation_result.accepted);
+
+  ASSERT_TRUE(
+    wait_for(
+      [this]()
+      {
+        return
+          navigation_goal_accept_count_.load() > 0U &&
+          dispatcher_->snapshot().
+          navigation_goal_active;
+      },
+      2000ms))
+    << "navigation goal was not accepted";
+
+  const auto wrong_target_result =
+    dispatcher_->dispatch(
+    make_navigation_cancel_command(
+      "navigation-cancel-wrong-1",
+      "different-navigation-command"));
+
+  EXPECT_FALSE(wrong_target_result.accepted);
+
+  EXPECT_EQ(
+    wrong_target_result.reason,
+    "bridge_navigation_cancel_target_mismatch");
+
+  const auto cancel_result =
+    dispatcher_->dispatch(
+    make_navigation_cancel_command(
+      "navigation-cancel-exact-1",
+      "navigation-cancel-target-1"));
+
+  ASSERT_TRUE(cancel_result.accepted);
+
+  EXPECT_EQ(
+    cancel_result.reason,
+    "bridge_navigation_cancel_confirmed");
+
+  const auto state =
+    dispatcher_->snapshot();
+
+  EXPECT_FALSE(state.navigation_goal_active);
+  EXPECT_FALSE(state.navigation_cancel_requested);
+  EXPECT_FALSE(state.command_active);
+
+  EXPECT_EQ(
+    state.last_terminal_command_id,
+    "navigation-cancel-target-1");
+
+  EXPECT_EQ(
+    state.last_reason,
+    "bridge_navigation_cancel_confirmed");
+
+  EXPECT_GT(
+    navigation_cancel_request_count_.load(),
+    0U);
+
+  EXPECT_EQ(
+    navigation_canceled_count_.load(),
+    1U);
 }
 
 }  // namespace

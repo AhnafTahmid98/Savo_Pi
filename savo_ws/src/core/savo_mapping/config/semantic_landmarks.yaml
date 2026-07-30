@@ -1,0 +1,11 @@
+mapped_location_registration_node:
+  ros__parameters:
+    action_name: /savo_mapping/locations/register
+    head_confirmation_action: /savo_head/apriltag/confirm
+    authorization_service: /savo_supervisor/authorize_location_operation
+    registration_service: /savo_locations/candidates/register
+    default_timeout_s: 25.0
+    dependency_wait_timeout_s: 2.0
+    minimum_tag_to_approach_distance_m: 0.20
+    default_approach_distance_m: 0.80
+    derive_missing_approach_pose: true

@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: LicenseRef-Proprietary
 
 #include <chrono>
+#include <cstdint>
+#include <memory>
+#include <optional>
 #include <iomanip>
 #include <sstream>
 
@@ -10,9 +13,11 @@
 #include "diagnostic_msgs/msg/diagnostic_status.hpp"
 #include "diagnostic_msgs/msg/key_value.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "savo_msgs/srv/authorize_location_operation.hpp"
 #include "savo_supervisor/component_status.hpp"
 #include "savo_supervisor/freshness_tracker.hpp"
 #include "savo_supervisor/localization_payload_parser.hpp"
+#include "savo_supervisor/location_authorization_policy.hpp"
 #include "savo_supervisor/reason_codes.hpp"
 #include "savo_supervisor/supervisor_policy.hpp"
 #include "savo_supervisor/supervisor_state.hpp"
@@ -241,6 +246,50 @@ void append_component_diagnostic(
   array.status.push_back(status);
 }
 
+
+std::optional<svo::LocationOperation> location_operation_from_ros(
+  const std::uint8_t operation)
+{
+  using Service = savo_msgs::srv::AuthorizeLocationOperation;
+
+  switch (operation) {
+    case Service::Request::OP_REGISTER_LOCATION_CANDIDATE:
+      return svo::LocationOperation::kRegisterCandidate;
+    case Service::Request::OP_APPROVE_LOCATION:
+      return svo::LocationOperation::kApproveLocation;
+    case Service::Request::OP_NAVIGATE_TO_LOCATION:
+      return svo::LocationOperation::kNavigateToLocation;
+    case Service::Request::OP_CONFIRM_LOCATION_ARRIVAL:
+      return svo::LocationOperation::kConfirmArrival;
+    default:
+      return std::nullopt;
+  }
+}
+
+std::uint8_t location_authorization_code_to_ros(
+  const svo::LocationAuthorizationCode code)
+{
+  using Response = savo_msgs::srv::AuthorizeLocationOperation::Response;
+
+  switch (code) {
+    case svo::LocationAuthorizationCode::kAuthorized:
+      return Response::RESULT_AUTHORIZED;
+    case svo::LocationAuthorizationCode::kInvalidRequest:
+      return Response::RESULT_INVALID_REQUEST;
+    case svo::LocationAuthorizationCode::kSupervisorNotReady:
+      return Response::RESULT_SUPERVISOR_NOT_READY;
+    case svo::LocationAuthorizationCode::kHealthBlocked:
+      return Response::RESULT_HEALTH_BLOCKED;
+    case svo::LocationAuthorizationCode::kSafetyBlocked:
+      return Response::RESULT_SAFETY_BLOCKED;
+    case svo::LocationAuthorizationCode::kMapContextBlocked:
+      return Response::RESULT_MAP_CONTEXT_BLOCKED;
+    case svo::LocationAuthorizationCode::kOperationDisabled:
+      return Response::RESULT_OPERATION_DISABLED;
+  }
+  return Response::RESULT_INTERNAL_ERROR;
+}
+
 }  // namespace
 
 class SupervisorNode : public rclcpp::Node
@@ -255,6 +304,17 @@ public:
     declare_parameter<std::string>("heartbeat_topic", "/savo_supervisor/heartbeat");
     declare_parameter<std::string>("health_topic", "/savo_supervisor/health");
     declare_parameter<std::string>("events_topic", "/savo_supervisor/events");
+    declare_parameter<std::string>(
+      "location_authorization.service_name",
+      "/savo_supervisor/authorize_location_operation");
+    declare_parameter<bool>("location_authorization.allow_registration", true);
+    declare_parameter<bool>("location_authorization.allow_approval", true);
+    declare_parameter<bool>("location_authorization.allow_navigation", true);
+    declare_parameter<bool>("location_authorization.allow_arrival_confirmation", true);
+    declare_parameter<bool>("location_authorization.allow_degraded_non_motion", true);
+    declare_parameter<bool>("location_authorization.allow_degraded_motion", false);
+    declare_parameter<bool>(
+      "location_authorization.require_known_safety_for_motion", false);
 
     declare_parameter<bool>("localization.enabled", true);
     declare_parameter<bool>("localization.required", true);
@@ -273,6 +333,24 @@ public:
     heartbeat_topic_ = get_parameter("heartbeat_topic").as_string();
     health_topic_ = get_parameter("health_topic").as_string();
     events_topic_ = get_parameter("events_topic").as_string();
+    location_authorization_service_name_ = get_parameter(
+      "location_authorization.service_name").as_string();
+    location_authorization_policy_.allow_registration = get_parameter(
+      "location_authorization.allow_registration").as_bool();
+    location_authorization_policy_.allow_approval = get_parameter(
+      "location_authorization.allow_approval").as_bool();
+    location_authorization_policy_.allow_navigation = get_parameter(
+      "location_authorization.allow_navigation").as_bool();
+    location_authorization_policy_.allow_arrival_confirmation = get_parameter(
+      "location_authorization.allow_arrival_confirmation").as_bool();
+    location_authorization_policy_.allow_degraded_non_motion = get_parameter(
+      "location_authorization.allow_degraded_non_motion").as_bool();
+    location_authorization_policy_.allow_degraded_motion = get_parameter(
+      "location_authorization.allow_degraded_motion").as_bool();
+    location_authorization_policy_.require_known_safety_for_motion = get_parameter(
+      "location_authorization.require_known_safety_for_motion").as_bool();
+    location_authorization_evaluator_ =
+      svo::LocationAuthorizationEvaluator(location_authorization_policy_);
 
     localization_config_.enabled = get_parameter("localization.enabled").as_bool();
     localization_config_.required = get_parameter("localization.required").as_bool();
@@ -320,7 +398,7 @@ public:
       throw std::runtime_error("invalid startup_grace_s");
     }
     if (state_summary_topic_.empty() || heartbeat_topic_.empty() || health_topic_.empty() ||
-      events_topic_.empty())
+      events_topic_.empty() || location_authorization_service_name_.empty())
     {
       RCLCPP_FATAL(get_logger(), "supervisor output topics must be non-empty");
       throw std::runtime_error("invalid output topic");
@@ -382,6 +460,15 @@ public:
       create_publisher<std_msgs::msg::String>(
       events_topic_,
       rclcpp::QoS(10).reliable());
+
+    location_authorization_service_ = create_service<
+      savo_msgs::srv::AuthorizeLocationOperation>(
+      location_authorization_service_name_,
+      std::bind(
+        &SupervisorNode::on_location_authorization,
+        this,
+        std::placeholders::_1,
+        std::placeholders::_2));
 
     using namespace std::chrono_literals;
     timer_ = create_wall_timer(
@@ -579,6 +666,53 @@ private:
     }
   }
 
+  void on_location_authorization(
+    const std::shared_ptr<
+      savo_msgs::srv::AuthorizeLocationOperation::Request> request,
+    std::shared_ptr<
+      savo_msgs::srv::AuthorizeLocationOperation::Response> response)
+  {
+    const auto operation = location_operation_from_ros(request->operation);
+    const auto evaluation_time = now();
+    response->evaluated_at = evaluation_time;
+
+    const auto startup_age_s = (evaluation_time - startup_time_).seconds();
+    const auto summary = policy_.EvaluateComponent(
+      localization_status_, evaluation_time, startup_age_s);
+    const auto state = policy_.EvaluateSupervisor(
+      summary, evaluation_time, startup_age_s);
+
+    response->supervisor_lifecycle = svo::ToString(state.lifecycle);
+    response->supervisor_health = svo::ToString(state.health);
+    response->supervisor_safety = svo::ToString(state.safety);
+
+    if (!operation.has_value()) {
+      response->authorized = false;
+      response->result_code =
+        savo_msgs::srv::AuthorizeLocationOperation::Response::RESULT_INVALID_REQUEST;
+      response->reason = "unsupported_location_operation";
+      return;
+    }
+
+    svo::LocationAuthorizationRequest domain_request;
+    domain_request.operation = operation.value();
+    domain_request.request_id = request->request_id;
+    domain_request.actor_id = request->actor_id;
+    domain_request.candidate_id = request->candidate_id;
+    domain_request.location_id = request->location_id;
+    domain_request.map_id = request->map_id;
+    domain_request.map_revision = request->map_revision;
+    domain_request.motion_required =
+      request->motion_required ||
+      operation.value() == svo::LocationOperation::kNavigateToLocation;
+
+    const auto decision = location_authorization_evaluator_.Evaluate(
+      domain_request, state);
+    response->authorized = decision.authorized;
+    response->result_code = location_authorization_code_to_ros(decision.code);
+    response->reason = decision.reason;
+  }
+
   void on_localization_health(
     const std_msgs::msg::String::SharedPtr msg)
   {
@@ -675,17 +809,22 @@ private:
   std::string heartbeat_topic_;
   std::string health_topic_;
   std::string events_topic_;
+  std::string location_authorization_service_name_;
 
   svo::ComponentConfig localization_config_;
   svo::ComponentStatus localization_status_;
 
   svo::LocalizationPayloadParser localization_parser_{1};
   svo::SupervisorPolicy policy_;
+  svo::LocationAuthorizationPolicy location_authorization_policy_{};
+  svo::LocationAuthorizationEvaluator location_authorization_evaluator_{};
 
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr state_publisher_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr heartbeat_publisher_;
   rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr health_publisher_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr events_publisher_;
+  rclcpp::Service<savo_msgs::srv::AuthorizeLocationOperation>::SharedPtr
+    location_authorization_service_;
 
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr health_subscription_;
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr summary_subscription_;

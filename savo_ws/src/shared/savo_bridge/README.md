@@ -157,3 +157,27 @@ Phase 2B-2 remains read-only. It adds no service clients, action clients,
 navigation goals, teleoperation commands, velocity commands or movement
 authority. `bridge_ready` remains false.
 
+## Edge production runtime
+
+The production edge profile is installed with the package but remains inert
+until an operator explicitly launches it or installs and starts the systemd
+unit. The native bridge owns the ROS boundary; SavoMind communicates only
+through `/run/savo_bridge/command.sock` and the atomic schema-v2 snapshot at
+`/run/savo_bridge/snapshot.json`.
+
+The shared runtime contract uses group `savomind-bridge` with GID `10001`,
+a `0660` Unix socket, and an allow-listed SavoMind container UID of `10001`.
+Navigation resolves exact approved location IDs through
+`/savo_locations/resolve` and calls only the guarded action
+`/savo_nav/navigation/navigate_to_pose`.
+
+Install without activation:
+
+```bash
+sudo ros2 pkg prefix savo_bridge >/dev/null
+sudo "$SAVO_WORKSPACE/install/savo_bridge/lib/savo_bridge/install_edge_runtime.sh" \
+  --user "$USER" \
+  --workspace "$SAVO_WORKSPACE"
+```
+
+Add `--start` only during the later edge deployment gate.

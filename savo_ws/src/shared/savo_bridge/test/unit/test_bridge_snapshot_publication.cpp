@@ -167,11 +167,23 @@ TEST(
     std::string::npos);
 
   EXPECT_NE(
-    payload.find("\"schema_version\":1"),
+    payload.find("\"schema_version\":2"),
     std::string::npos);
 
   EXPECT_NE(
     payload.find("\"snapshot_sequence\":"),
+    std::string::npos);
+
+  EXPECT_NE(
+    payload.find("\"bridge\":{"),
+    std::string::npos);
+
+  EXPECT_NE(
+    payload.find("\"read_only\":true"),
+    std::string::npos);
+
+  EXPECT_NE(
+    payload.find("\"commands_enabled\":false"),
     std::string::npos);
 
   EXPECT_NE(

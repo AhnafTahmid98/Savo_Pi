@@ -29,6 +29,8 @@ find_package(sensor_msgs REQUIRED)
 find_package(savo_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(tf2_msgs REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
 
 add_library(
   savo_nav_core
@@ -99,6 +101,27 @@ ament_target_dependencies(
   rclcpp
   rclcpp_action
   savo_msgs
+)
+
+add_executable(
+  navigate_to_location_node
+  src/nodes/navigate_to_location_node.cpp
+)
+
+target_link_libraries(
+  navigate_to_location_node
+  savo_nav_core
+)
+
+ament_target_dependencies(
+  navigate_to_location_node
+  geometry_msgs
+  nav2_msgs
+  rclcpp
+  rclcpp_action
+  savo_msgs
+  tf2
+  tf2_geometry_msgs
 )
 
 add_executable(
@@ -195,6 +218,7 @@ install(
 install(
   TARGETS
     navigation_readiness_node
+    navigate_to_location_node
     control_recovery_guard_node
     goal_admission_gate_node
     goal_gateway_node
@@ -230,6 +254,12 @@ install(
 install(
   DIRECTORY rviz/
   DESTINATION share/${PROJECT_NAME}/rviz
+)
+
+install(
+  PROGRAMS
+    scripts/run_location_integration_smoke
+  DESTINATION lib/${PROJECT_NAME}
 )
 
 install(
@@ -402,6 +432,24 @@ if(BUILD_TESTING)
     RUNTIME DESTINATION lib/${PROJECT_NAME}
   )
 
+  add_executable(
+    fake_location_nav2_server_node
+    test/fixtures/fake_location_nav2_server_node.cpp
+  )
+
+  ament_target_dependencies(
+    fake_location_nav2_server_node
+    geometry_msgs
+    nav2_msgs
+    rclcpp
+    rclcpp_action
+  )
+
+  install(
+    TARGETS fake_location_nav2_server_node
+    RUNTIME DESTINATION lib/${PROJECT_NAME}
+  )
+
   ament_add_gtest(
     test_control_recovery
     test/unit/test_control_recovery.cpp
@@ -501,6 +549,12 @@ if(BUILD_TESTING)
   install(
     TARGETS fake_guarded_gateway_server_node
     DESTINATION lib/${PROJECT_NAME}
+  )
+
+  ament_add_pytest_test(
+    test_location_navigation_runtime_contract
+    test/contracts/test_location_navigation_runtime_contract.py
+    TIMEOUT 60
   )
 
   ament_add_pytest_test(

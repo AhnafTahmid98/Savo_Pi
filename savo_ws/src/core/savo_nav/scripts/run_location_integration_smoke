@@ -1,0 +1,620 @@
+#!/usr/bin/env python3
+# Copyright 2026 Ahnaf Tahmid
+# SPDX-License-Identifier: LicenseRef-Proprietary
+"""Robot Savo LOC-3P-C2-C5 isolated typed integration smoke test."""
+
+from __future__ import annotations
+
+import json
+import os
+import signal
+import sqlite3
+import subprocess
+import sys
+import time
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Callable
+
+import rclpy
+from action_msgs.msg import GoalStatus
+from geometry_msgs.msg import PoseStamped
+from rclpy.action import ActionClient
+from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
+
+from savo_msgs.action import NavigateToLocation, RegisterMappedLocation
+from savo_msgs.msg import AprilTagObservation
+from savo_msgs.srv import ApproveLocation, ResolveLocation, SetLocationEnabled
+
+
+HOME = Path.home()
+RUNTIME_ROOT = HOME / "Savo_Pi" / "runtime" / "savo_locations_smoke"
+ROS_DOMAIN_MIN = 100
+ROS_DOMAIN_SPAN = 120
+
+
+def allocate_ros_domain_id() -> str:
+    """Choose a per-run DDS domain to avoid stale smoke-process collisions."""
+    seed = time.time_ns() ^ os.getpid()
+    return str(ROS_DOMAIN_MIN + (seed % ROS_DOMAIN_SPAN))
+
+
+@dataclass
+class ManagedProcess:
+    name: str
+    process: subprocess.Popen[str]
+    log_handle: Any
+    log_path: Path
+
+
+class SmokeNode(Node):
+    def __init__(self) -> None:
+        super().__init__("loc3p_c2_c5_integration_smoke")
+        self.sequence = 0
+        self.publish_observations = False
+        self.active_tag_id = 27
+        self.last_navigation_goal: PoseStamped | None = None
+
+        self.observation_publisher = self.create_publisher(
+            AprilTagObservation,
+            "/savo_head/apriltag/observations",
+            10,
+        )
+        qos = QoSProfile(depth=1)
+        qos.reliability = ReliabilityPolicy.RELIABLE
+        qos.durability = DurabilityPolicy.TRANSIENT_LOCAL
+        self.goal_subscription = self.create_subscription(
+            PoseStamped,
+            "/savo_nav/test/last_location_goal",
+            self._on_navigation_goal,
+            qos,
+        )
+        self.timer = self.create_timer(0.05, self._publish_observation)
+
+        self.register_action = ActionClient(
+            self,
+            RegisterMappedLocation,
+            "/savo_mapping/locations/register",
+        )
+        self.navigate_action = ActionClient(
+            self,
+            NavigateToLocation,
+            "/savo_nav/locations/navigate",
+        )
+        self.approve_client = self.create_client(
+            ApproveLocation,
+            "/savo_locations/candidates/approve",
+        )
+        self.enable_client = self.create_client(
+            SetLocationEnabled,
+            "/savo_locations/set_enabled",
+        )
+        self.resolve_client = self.create_client(
+            ResolveLocation,
+            "/savo_locations/resolve",
+        )
+
+    def _on_navigation_goal(self, message: PoseStamped) -> None:
+        self.last_navigation_goal = message
+
+    def _publish_observation(self) -> None:
+        if not self.publish_observations:
+            return
+        self.sequence += 1
+        message = AprilTagObservation()
+        message.header.stamp = self.get_clock().now().to_msg()
+        message.header.frame_id = "map"
+        message.detector_name = "loc3p_smoke_fixture"
+        message.family = "tag36h11"
+        message.tag_id = self.active_tag_id
+        message.tag_size_m = 0.16
+        message.observation_sequence = self.sequence
+        message.image_width = 640
+        message.image_height = 480
+        message.detection_quality = 0.97
+        message.decision_margin = 80.0
+        message.hamming_distance = 0
+        message.pose_valid = True
+        message.pose.pose.position.x = 4.0
+        message.pose.pose.position.y = 2.0
+        message.pose.pose.position.z = 0.8
+        message.pose.pose.orientation.w = 1.0
+        message.pose_error = 0.01
+        self.observation_publisher.publish(message)
+
+
+def wait_future(node: Node, future: Any, timeout_s: float, label: str) -> Any:
+    deadline = time.monotonic() + timeout_s
+    while rclpy.ok() and not future.done() and time.monotonic() < deadline:
+        rclpy.spin_once(node, timeout_sec=0.05)
+    if not future.done():
+        raise RuntimeError(f"timeout waiting for {label}")
+    return future.result()
+
+
+def wait_condition(
+    node: Node,
+    condition: Callable[[], bool],
+    timeout_s: float,
+    label: str,
+) -> None:
+    deadline = time.monotonic() + timeout_s
+    while rclpy.ok() and not condition() and time.monotonic() < deadline:
+        rclpy.spin_once(node, timeout_sec=0.05)
+    if not condition():
+        raise RuntimeError(f"timeout waiting for {label}")
+
+
+def wait_dependencies(node: SmokeNode) -> None:
+    if not node.register_action.wait_for_server(timeout_sec=15.0):
+        raise RuntimeError("RegisterMappedLocation action unavailable")
+    if not node.navigate_action.wait_for_server(timeout_sec=15.0):
+        raise RuntimeError("NavigateToLocation action unavailable")
+    for client, name in (
+        (node.approve_client, "approve"),
+        (node.enable_client, "set_enabled"),
+        (node.resolve_client, "resolve"),
+    ):
+        if not client.wait_for_service(timeout_sec=15.0):
+            raise RuntimeError(f"{name} service unavailable")
+
+
+def register_candidate(node: SmokeNode) -> Any:
+    goal = RegisterMappedLocation.Goal()
+    goal.request_id = "loc3p-register-001"
+    goal.actor_id = "loc3p_smoke_operator"
+    goal.candidate_id = "candidate-loc3p-a201-27"
+    goal.expected_family = "tag36h11"
+    goal.expected_tag_id = 27
+    goal.map_id = "campus_main"
+    goal.map_revision = 7
+    goal.map_release_id = "campus-main-r7"
+    goal.suggested_location_id = "A201"
+    goal.suggested_display_name = "Room A201"
+    goal.suggested_aliases = ["A 201", "classroom A201"]
+    goal.suggested_semantic_type = "classroom"
+    goal.building = "A"
+    goal.floor = "2"
+    goal.area = "teaching"
+    goal.notes = "LOC-3P integration smoke candidate"
+    goal.source_session_id = "loc3p-smoke-map-session"
+    goal.timeout.sec = 10
+
+    node.publish_observations = True
+    send_future = node.register_action.send_goal_async(goal)
+    goal_handle = wait_future(node, send_future, 5.0, "registration goal response")
+    if not goal_handle.accepted:
+        raise RuntimeError("registration goal rejected")
+    result_response = wait_future(
+        node,
+        goal_handle.get_result_async(),
+        15.0,
+        "registration result",
+    )
+    result = result_response.result
+    if result_response.status != GoalStatus.STATUS_SUCCEEDED or not result.registered:
+        raise RuntimeError(f"registration failed: {result.reason}")
+    if result.candidate.candidate_revision != 1:
+        raise RuntimeError("registered candidate revision is not 1")
+    return result.candidate
+
+
+def approve_candidate(node: SmokeNode, candidate: Any) -> Any:
+    request = ApproveLocation.Request()
+    request.candidate_id = candidate.candidate_id
+    request.expected_candidate_revision = candidate.candidate_revision
+    request.actor_id = "loc3p_smoke_operator"
+    request.location_id = "A201"
+    request.display_name = "Room A201"
+    request.aliases = ["A 201", "classroom A201"]
+    request.semantic_type = "classroom"
+    request.approach_pose = candidate.approach_pose
+    request.confirmation_pose_valid = True
+    request.confirmation_pose = candidate.confirmation_pose
+    request.arrival_confirmation_required = True
+    request.building = candidate.building
+    request.floor = candidate.floor
+    request.area = candidate.area
+    request.notes = candidate.notes
+    response = wait_future(
+        node,
+        node.approve_client.call_async(request),
+        8.0,
+        "approval response",
+    )
+    if not response.approved:
+        raise RuntimeError(f"approval failed: {response.reason}")
+    return response.location
+
+
+def navigate(node: SmokeNode, tag_id: int = 27) -> tuple[Any, int]:
+    node.active_tag_id = tag_id
+    node.publish_observations = True
+    node.last_navigation_goal = None
+
+    goal = NavigateToLocation.Goal()
+    goal.request_id = f"loc3p-nav-{time.time_ns()}"
+    goal.actor_id = "loc3p_smoke_operator"
+    goal.query = "A 201"
+    goal.enforce_map_context = True
+    goal.map_id = "campus_main"
+    goal.map_revision = 7
+    goal.require_arrival_confirmation = True
+    goal.timeout.sec = 12
+
+    goal_handle = wait_future(
+        node,
+        node.navigate_action.send_goal_async(goal),
+        5.0,
+        "navigation goal response",
+    )
+    if not goal_handle.accepted:
+        raise RuntimeError("navigation goal rejected")
+    result_response = wait_future(
+        node,
+        goal_handle.get_result_async(),
+        15.0,
+        "navigation result",
+    )
+    return result_response.result, result_response.status
+
+
+def cancel_navigation(node: SmokeNode) -> tuple[Any, int]:
+    node.active_tag_id = 27
+    node.publish_observations = True
+    goal = NavigateToLocation.Goal()
+    goal.request_id = "loc3p-nav-cancel"
+    goal.actor_id = "loc3p_smoke_operator"
+    goal.query = "A201"
+    goal.enforce_map_context = True
+    goal.map_id = "campus_main"
+    goal.map_revision = 7
+    goal.require_arrival_confirmation = True
+    goal.timeout.sec = 12
+
+    goal_handle = wait_future(
+        node,
+        node.navigate_action.send_goal_async(goal),
+        5.0,
+        "cancel-test goal response",
+    )
+    if not goal_handle.accepted:
+        raise RuntimeError("cancel-test navigation goal rejected")
+
+    cancel_at = time.monotonic() + 0.20
+    while time.monotonic() < cancel_at:
+        rclpy.spin_once(node, timeout_sec=0.03)
+    cancel_response = wait_future(
+        node,
+        goal_handle.cancel_goal_async(),
+        5.0,
+        "navigation cancel acknowledgement",
+    )
+    if not cancel_response.goals_canceling:
+        raise RuntimeError("navigation cancel was not acknowledged")
+    result_response = wait_future(
+        node,
+        goal_handle.get_result_async(),
+        8.0,
+        "canceled navigation result",
+    )
+    return result_response.result, result_response.status
+
+
+def set_enabled(node: SmokeNode, enabled: bool, expected_revision: int) -> Any:
+    request = SetLocationEnabled.Request()
+    request.location_id = "A201"
+    request.expected_record_revision = expected_revision
+    request.enabled = enabled
+    request.actor_id = "loc3p_smoke_operator"
+    request.reason = "LOC-3P integration smoke"
+    response = wait_future(
+        node,
+        node.enable_client.call_async(request),
+        8.0,
+        "set-enabled response",
+    )
+    if not response.updated:
+        raise RuntimeError(f"set-enabled failed: {response.reason}")
+    return response.location
+
+
+def resolve(node: SmokeNode) -> Any:
+    request = ResolveLocation.Request()
+    request.query = "A201"
+    request.enforce_map_context = True
+    request.map_id = "campus_main"
+    request.map_revision = 7
+    return wait_future(
+        node,
+        node.resolve_client.call_async(request),
+        8.0,
+        "resolve response",
+    )
+
+
+def start_process(
+    run_dir: Path,
+    environment: dict[str, str],
+    name: str,
+    command: list[str],
+) -> ManagedProcess:
+    log_path = run_dir / f"{name}.log"
+    handle = log_path.open("w", encoding="utf-8")
+    process = subprocess.Popen(
+        command,
+        stdout=handle,
+        stderr=subprocess.STDOUT,
+        text=True,
+        env=environment,
+        start_new_session=True,
+    )
+    return ManagedProcess(name, process, handle, log_path)
+
+
+def signal_process_group(managed: ManagedProcess, requested_signal: int) -> None:
+    """Signal the whole ros2-run process group, including any child process."""
+    try:
+        os.killpg(managed.process.pid, requested_signal)
+    except ProcessLookupError:
+        pass
+
+
+def stop_process(managed: ManagedProcess) -> None:
+    if managed.process.poll() is None:
+        signal_process_group(managed, signal.SIGINT)
+        try:
+            managed.process.wait(timeout=4.0)
+        except subprocess.TimeoutExpired:
+            signal_process_group(managed, signal.SIGTERM)
+            try:
+                managed.process.wait(timeout=2.0)
+            except subprocess.TimeoutExpired:
+                signal_process_group(managed, signal.SIGKILL)
+                managed.process.wait(timeout=2.0)
+    managed.log_handle.close()
+
+
+def main() -> int:
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_dir = RUNTIME_ROOT / f"LOC3P_C2_C5_{stamp}"
+    run_dir.mkdir(parents=True, exist_ok=False)
+    database = run_dir / "locations.db"
+    report_path = run_dir / "smoke_report.json"
+
+    ros_domain_id = allocate_ros_domain_id()
+    os.environ["ROS_DOMAIN_ID"] = ros_domain_id
+    os.environ["ROS_AUTOMATIC_DISCOVERY_RANGE"] = "LOCALHOST"
+    os.environ.pop("ROS_LOCALHOST_ONLY", None)
+    os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
+    environment = os.environ.copy()
+
+    processes: list[ManagedProcess] = []
+    node: SmokeNode | None = None
+    report: dict[str, Any] = {
+        "run_directory": str(run_dir),
+        "database": str(database),
+        "ros_domain_id": int(ros_domain_id),
+        "checks": [],
+    }
+
+    def passed(text: str) -> None:
+        report["checks"].append({"status": "PASS", "check": text})
+        print(f"PASS: {text}")
+
+    print("=" * 66)
+    print("Robot Savo — LOC-3P-C2-C5 Typed Location Integration Smoke")
+    print("=" * 66)
+    print(f"Run directory : {run_dir}")
+    print(f"Database      : {database}")
+    print(f"ROS domain    : {ros_domain_id} (per-run isolated)")
+
+    try:
+        commands = [
+            (
+                "locations",
+                [
+                    "ros2", "run", "savo_locations", "savo_locations_node",
+                    "--ros-args",
+                    "-p", f"database_path:={database}",
+                    "-p", "create_parent_directories:=true",
+                    "-p", "enable_write_services:=true",
+                    "-p", "publish_snapshot:=true",
+                ],
+            ),
+            (
+                "supervisor",
+                [
+                    "ros2", "run", "savo_supervisor", "supervisor_node",
+                    "--ros-args",
+                    "-p", "startup_grace_s:=0.0",
+                    "-p", "localization.enabled:=false",
+                    "-p", "localization.required:=false",
+                    "-p", "location_authorization.require_known_safety_for_motion:=false",
+                ],
+            ),
+            (
+                "head_confirmation",
+                [
+                    "ros2", "run", "savo_head", "apriltag_confirmation_action_node",
+                    "--ros-args",
+                    "-p", "minimum_observations:=3",
+                    "-p", "maximum_observation_age_s:=2.0",
+                    "-p", "wrong_tag_grace_s:=0.3",
+                    "-p", "require_stationary_signal:=false",
+                    "-p", "require_localization_signal:=false",
+                ],
+            ),
+            (
+                "mapping_registration",
+                [
+                    "ros2", "run", "savo_mapping", "mapped_location_registration_node",
+                    "--ros-args",
+                    "-p", "default_approach_distance_m:=0.8",
+                    "-p", "dependency_wait_timeout_s:=3.0",
+                ],
+            ),
+            (
+                "fake_nav2",
+                [
+                    "ros2", "run", "savo_nav", "fake_location_nav2_server_node",
+                    "--ros-args",
+                    "-p", "step_count:=30",
+                    "-p", "step_delay_ms:=50",
+                ],
+            ),
+            (
+                "semantic_navigation",
+                [
+                    "ros2", "run", "savo_nav", "navigate_to_location_node",
+                    "--ros-args",
+                    "-p", "navigation_action_name:=/navigate_to_pose",
+                    "-p", "authorization_recheck_period_s:=0.2",
+                    "-p", "arrival_confirmation_timeout_s:=3.0",
+                    "-p", "dependency_wait_timeout_s:=3.0",
+                ],
+            ),
+        ]
+        for name, command in commands:
+            processes.append(start_process(run_dir, environment, name, command))
+
+        rclpy.init(args=None)
+        node = SmokeNode()
+        wait_dependencies(node)
+        passed("all typed actions and services became available")
+
+        candidate = register_candidate(node)
+        passed("mapping confirmation registered one persistent pending candidate")
+        if abs(candidate.tag_pose_map.pose.position.x - 4.0) > 1.0e-6:
+            raise RuntimeError("candidate tag pose mismatch")
+        if abs(candidate.approach_pose.pose.position.x - 3.2) > 1.0e-6:
+            raise RuntimeError("derived approach pose mismatch")
+        passed("mapping kept tag pose separate from derived approach pose")
+
+        location = approve_candidate(node, candidate)
+        if location.record_revision != 1 or not location.enabled:
+            raise RuntimeError("approved location state mismatch")
+        passed("candidate approval created enabled location revision 1")
+
+        nav_result, nav_status = navigate(node, tag_id=27)
+        if nav_status != GoalStatus.STATUS_SUCCEEDED or not nav_result.succeeded:
+            raise RuntimeError(f"semantic navigation failed: {nav_result.reason}")
+        if not nav_result.navigation_succeeded or not nav_result.arrival_confirmed:
+            raise RuntimeError("navigation or arrival confirmation flag missing")
+        wait_condition(
+            node,
+            lambda: node.last_navigation_goal is not None,
+            3.0,
+            "captured Nav2 goal",
+        )
+        assert node.last_navigation_goal is not None
+        if abs(node.last_navigation_goal.pose.position.x - 3.2) > 1.0e-6:
+            raise RuntimeError("Nav2 did not receive approved approach pose")
+        if abs(node.last_navigation_goal.pose.position.x - 4.0) < 0.05:
+            raise RuntimeError("Nav2 received forbidden tag pose")
+        passed("navigation forwarded only the approved approach pose")
+        passed("expected AprilTag confirmed exact arrival")
+
+        wrong_result, wrong_status = navigate(node, tag_id=99)
+        if wrong_status != GoalStatus.STATUS_ABORTED:
+            raise RuntimeError("wrong-tag navigation was not aborted")
+        if wrong_result.result_code != NavigateToLocation.Result.RESULT_ARRIVAL_CONFIRMATION_FAILED:
+            raise RuntimeError("wrong-tag result code mismatch")
+        passed("wrong arrival AprilTag was rejected after navigation")
+
+        canceled_result, canceled_status = cancel_navigation(node)
+        if canceled_status != GoalStatus.STATUS_CANCELED:
+            raise RuntimeError("navigation cancellation did not reach canceled state")
+        if canceled_result.result_code != NavigateToLocation.Result.RESULT_CANCELED:
+            raise RuntimeError("navigation cancellation result code mismatch")
+        passed("semantic navigation cancellation was acknowledged downstream")
+
+        disabled = set_enabled(node, False, expected_revision=1)
+        if disabled.enabled or disabled.record_revision != 2:
+            raise RuntimeError("disable state mismatch")
+        disabled_result, disabled_status = navigate(node, tag_id=27)
+        if disabled_status != GoalStatus.STATUS_ABORTED:
+            raise RuntimeError("disabled location navigation was not aborted")
+        if disabled_result.result_code != NavigateToLocation.Result.RESULT_LOCATION_DISABLED:
+            raise RuntimeError("disabled location result code mismatch")
+        passed("disabled location was blocked before motion dispatch")
+
+        resolved = resolve(node)
+        if resolved.resolved:
+            raise RuntimeError("disabled location unexpectedly resolved for navigation")
+        if resolved.result_code != ResolveLocation.Response.RESULT_DISABLED:
+            raise RuntimeError("disabled resolve result code mismatch")
+        passed("location resolver reports disabled state deterministically")
+
+        locations_process = next(item for item in processes if item.name == "locations")
+        stop_process(locations_process)
+        processes.remove(locations_process)
+        restarted = start_process(
+            run_dir,
+            environment,
+            "locations_restart",
+            [
+                "ros2", "run", "savo_locations", "savo_locations_node",
+                "--ros-args",
+                "-p", f"database_path:={database}",
+                "-p", "create_parent_directories:=true",
+                "-p", "enable_write_services:=true",
+            ],
+        )
+        processes.append(restarted)
+        if not node.resolve_client.wait_for_service(timeout_sec=10.0):
+            raise RuntimeError("resolve service unavailable after restart")
+        resolved_after_restart = resolve(node)
+        if resolved_after_restart.result_code != ResolveLocation.Response.RESULT_DISABLED:
+            raise RuntimeError("disabled state not restored after restart")
+        passed("restart restored committed candidate, location and disabled state")
+
+        connection = sqlite3.connect(database)
+        try:
+            integrity = connection.execute("PRAGMA integrity_check").fetchone()[0]
+            candidate_count = connection.execute(
+                "SELECT COUNT(*) FROM location_candidates"
+            ).fetchone()[0]
+            location_count = connection.execute(
+                "SELECT COUNT(*) FROM locations"
+            ).fetchone()[0]
+            event_count = connection.execute(
+                "SELECT COUNT(*) FROM location_events"
+            ).fetchone()[0]
+        finally:
+            connection.close()
+        if integrity != "ok" or candidate_count != 1 or location_count != 1:
+            raise RuntimeError("SQLite integrity or row counts invalid")
+        if event_count != 3:
+            raise RuntimeError(f"expected 3 committed events, got {event_count}")
+        passed("SQLite integrity and exactly three committed mutation events")
+
+        report["status"] = "PASS"
+        report["database_counts"] = {
+            "candidates": candidate_count,
+            "locations": location_count,
+            "events": event_count,
+        }
+        print("\nLOC-3P-C2-C5 INTEGRATION SMOKE TEST: PASS")
+        print(f"Permanent artifacts: {run_dir}")
+        return 0
+    except Exception as exception:  # noqa: BLE001
+        report["status"] = "FAIL"
+        report["error"] = str(exception)
+        print(f"\nLOC-3P-C2-C5 INTEGRATION SMOKE TEST: FAIL — {exception}")
+        print(f"Permanent artifacts: {run_dir}")
+        return 1
+    finally:
+        report_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+        if node is not None:
+            node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
+        for managed in reversed(processes):
+            stop_process(managed)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

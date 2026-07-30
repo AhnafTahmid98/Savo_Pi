@@ -22,8 +22,11 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(nav2_msgs REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rclcpp_action REQUIRED)
+find_package(savo_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 
 add_library(${PROJECT_NAME}_core STATIC
@@ -76,7 +79,10 @@ target_compile_features(${PROJECT_NAME}_ros
 ament_target_dependencies(${PROJECT_NAME}_ros
   diagnostic_msgs
   geometry_msgs
+  nav2_msgs
   rclcpp
+  rclcpp_action
+  savo_msgs
   std_msgs
 )
 
@@ -125,6 +131,21 @@ install(
 )
 
 install(
+  DIRECTORY
+    config
+    launch
+    systemd
+  DESTINATION share/${PROJECT_NAME}
+)
+
+install(
+  PROGRAMS
+    scripts/run_edge_bridge.sh
+    scripts/install_edge_runtime.sh
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(
   FILES
     README.md
     LICENSE
@@ -133,6 +154,13 @@ install(
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
+  find_package(ament_cmake_pytest REQUIRED)
+
+  ament_add_pytest_test(
+    test_savo_bridge_production_assets
+    test/contracts/test_production_assets.py
+    TIMEOUT 60
+  )
 
   ament_add_gtest(test_savo_bridge_version
     test/unit/test_version.cpp
@@ -194,7 +222,10 @@ if(BUILD_TESTING)
     ament_target_dependencies(
       test_savo_bridge_ros_command_dispatcher
       geometry_msgs
+      nav2_msgs
       rclcpp
+      rclcpp_action
+      savo_msgs
       std_msgs
     )
   endif()
@@ -222,6 +253,7 @@ if(BUILD_TESTING)
     ament_target_dependencies(
       test_bridge_node_command_server
       diagnostic_msgs
+      geometry_msgs
       rclcpp
       std_msgs
     )
@@ -435,8 +467,11 @@ ament_export_targets(
 ament_export_dependencies(
   diagnostic_msgs
   geometry_msgs
+  nav2_msgs
   nlohmann_json
   rclcpp
+  rclcpp_action
+  savo_msgs
   std_msgs
 )
 ament_export_include_directories(include)

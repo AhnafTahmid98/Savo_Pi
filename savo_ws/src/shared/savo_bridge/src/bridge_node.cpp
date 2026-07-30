@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cctype>
 #include <cstddef>
 #include <cstdint>
 #include <exception>
@@ -152,6 +153,7 @@ struct ObservationRuntimeState
 };
 
 [[nodiscard]] std::string make_state_json(
+  const BridgeRuntimeSnapshot & bridge,
   const GraphEvidence & evidence,
   const std::string & graph_error,
   const SnapshotPublicationState & snapshot,
@@ -162,12 +164,30 @@ struct ObservationRuntimeState
   output.reserve(2048U);
 
   output += "{\"schema_name\":\"savo_bridge_state\"";
-  output += ",\"schema_version\":1";
-  output += ",\"owner\":\"savo_bridge\"";
-  output += ",\"phase\":\"topic_observation\"";
-  output += ",\"read_only\":true";
-  output += ",\"commands_enabled\":false";
-  output += ",\"process_alive\":true";
+  output += ",\"schema_version\":2";
+  output += ",\"owner\":";
+  append_json_string(output, bridge.owner);
+  output += ",\"instance_id\":";
+  append_json_string(output, bridge.instance_id);
+  output += ",\"phase\":\"production_runtime\"";
+  output += ",\"read_only\":";
+  append_boolean(output, bridge.read_only);
+  output += ",\"commands_enabled\":";
+  append_boolean(output, bridge.commands_enabled);
+  output += ",\"process_alive\":";
+  append_boolean(output, bridge.process_alive);
+  output += ",\"bridge_ready\":";
+  append_boolean(output, bridge.bridge_ready);
+  output += ",\"validated\":";
+  append_boolean(output, bridge.validated);
+  output += ",\"dispatch_enabled\":";
+  append_boolean(output, bridge.dispatch_enabled);
+  output += ",\"navigation_bridge_validated\":";
+  append_boolean(output, bridge.navigation_bridge_validated);
+  output += ",\"block_navigation\":";
+  append_boolean(output, bridge.block_navigation);
+  output += ",\"readiness_reason\":";
+  append_json_string(output, bridge.readiness_reason);
 
   output += ",\"dds_active\":";
   append_boolean(output, evidence.dds_active);
@@ -188,7 +208,6 @@ struct ObservationRuntimeState
   output += ",\"edge_visible\":";
   append_boolean(output, evidence.edge_visible);
 
-  output += ",\"bridge_ready\":false";
 
   output += ",\"discovered_nodes\":";
   append_integer(output, evidence.discovered_nodes);
@@ -231,6 +250,21 @@ struct ObservationRuntimeState
   append_string_array(
     output,
     evidence.matched_edge_topics);
+
+  output += ",\"command_server_enabled\":";
+  append_boolean(output, bridge.command_server_enabled);
+  output += ",\"command_execution_mode\":";
+  append_json_string(output, bridge.command_execution_mode);
+  output += ",\"command_worker_fatal\":";
+  append_boolean(output, bridge.command_worker_fatal);
+  output += ",\"command_last_status\":";
+  append_json_string(output, bridge.command_last_status);
+  output += ",\"stop_ready\":";
+  append_boolean(output, bridge.stop_ready);
+  output += ",\"teleop_ready\":";
+  append_boolean(output, bridge.teleop_ready);
+  output += ",\"navigation_ready\":";
+  append_boolean(output, bridge.navigation_ready);
 
   output += ",\"graph_error\":";
   append_json_string(output, graph_error);
@@ -359,6 +393,30 @@ template<typename Value>
          status == CommandServerStatus::SocketError;
 }
 
+[[nodiscard]] bool observation_is_fresh(
+  const bool observed,
+  const std::int64_t age_ms,
+  const std::int64_t timeout_ms) noexcept
+{
+  return observed &&
+         age_ms >= 0 &&
+         timeout_ms > 0 &&
+         age_ms <= timeout_ms;
+}
+
+[[nodiscard]] std::string uppercase_ascii(std::string value)
+{
+  std::transform(
+    value.begin(),
+    value.end(),
+    value.begin(),
+    [](const unsigned char character) {
+      return static_cast<char>(std::toupper(character));
+    });
+
+  return value;
+}
+
 }  // namespace
 
 BridgeNode::BridgeNode(
@@ -485,11 +543,12 @@ BridgeNode::BridgeNode(
 
   RCLCPP_INFO(
     get_logger(),
-    "savo_bridge Phase 2B-2 topic observation started; "
+    "savo_bridge topic observation started; "
     "configured_topics=%zu snapshot_enabled=%s "
-    "commands remain disabled",
+    "command_mode=%s",
     observation_runtimes_.size(),
-    snapshot_enabled_ ? "true" : "false");
+    snapshot_enabled_ ? "true" : "false",
+    command_execution_mode_.c_str());
 }
 
 BridgeNode::~BridgeNode()
@@ -498,13 +557,19 @@ BridgeNode::~BridgeNode()
     true,
     std::memory_order_release);
 
+  if (command_server_) {
+    (void)command_server_->stop();
+  }
+
   if (command_worker_.joinable()) {
     command_worker_.join();
   }
 
-  if (command_server_) {
-    (void)command_server_->stop();
-    command_server_.reset();
+  command_server_.reset();
+
+  if (ros_command_dispatcher_) {
+    ros_command_dispatcher_->shutdown();
+    ros_command_dispatcher_.reset();
   }
 }
 
@@ -580,11 +645,28 @@ void BridgeNode::configure_command_server()
     "command_server.socket_mode",
     432);
 
+  const std::int64_t command_id_cache_capacity =
+    declare_read_only_parameter<std::int64_t>(
+    *this,
+    "command_server.command_id_cache_capacity",
+    1024);
+
+  const std::int64_t socket_gid =
+    declare_read_only_parameter<std::int64_t>(
+    *this,
+    "command_server.socket_gid",
+    -1);
+
   const std::vector<std::int64_t> allowed_peer_uids =
     declare_read_only_parameter<std::vector<std::int64_t>>(
     *this,
     "command_server.allowed_peer_uids",
     std::vector<std::int64_t>{});
+
+  command_execution_mode_ =
+    command_server_enabled_ ?
+    execution_mode :
+    "disabled";
 
   if (!command_server_enabled_) {
     command_last_status_.store(
@@ -601,16 +683,30 @@ void BridgeNode::configure_command_server()
               "command server configuration invalid");
     };
 
-  if (execution_mode != "dry_run" ||
+  if (
+    (
+      execution_mode != "dry_run" &&
+      execution_mode != "live"
+    ) ||
     max_request_bytes <= 0 ||
     max_response_bytes <= 0 ||
+    command_id_cache_capacity <= 0 ||
     static_cast<std::uintmax_t>(max_request_bytes) >
     std::numeric_limits<std::size_t>::max() ||
     static_cast<std::uintmax_t>(max_response_bytes) >
     std::numeric_limits<std::size_t>::max() ||
+    static_cast<std::uintmax_t>(
+      command_id_cache_capacity) >
+    std::numeric_limits<std::size_t>::max() ||
     socket_mode < 0 ||
     static_cast<std::uintmax_t>(socket_mode) >
-    std::numeric_limits<std::uint32_t>::max())
+    std::numeric_limits<std::uint32_t>::max() ||
+    socket_gid < -1 ||
+    (
+      socket_gid >= 0 &&
+      static_cast<std::uintmax_t>(socket_gid) >
+      std::numeric_limits<gid_t>::max()
+    ))
   {
     invalid_configuration();
   }
@@ -619,10 +715,14 @@ void BridgeNode::configure_command_server()
   config.enabled = true;
   config.socket_path = socket_path;
   config.bridge_instance_id = bridge_instance_id;
+  config.execution_mode = execution_mode;
   config.max_request_bytes =
     static_cast<std::size_t>(max_request_bytes);
   config.max_response_bytes =
     static_cast<std::size_t>(max_response_bytes);
+  config.command_id_cache_capacity =
+    static_cast<std::size_t>(
+    command_id_cache_capacity);
   config.accept_timeout_ms = accept_timeout_ms;
   config.client_read_timeout_ms =
     client_read_timeout_ms;
@@ -631,6 +731,11 @@ void BridgeNode::configure_command_server()
   config.socket_mode =
     static_cast<std::uint32_t>(socket_mode);
 
+  if (socket_gid >= 0) {
+    config.socket_gid =
+      static_cast<std::uint32_t>(socket_gid);
+  }
+
   if (!allowed_peer_uids.empty()) {
     std::set<std::uint32_t> unique_uids;
     config.allowed_peer_uids.clear();
@@ -638,7 +743,8 @@ void BridgeNode::configure_command_server()
       allowed_peer_uids.size());
 
     for (const std::int64_t uid : allowed_peer_uids) {
-      if (uid < 0 ||
+      if (
+        uid < 0 ||
         static_cast<std::uintmax_t>(uid) >
         std::numeric_limits<uid_t>::max())
       {
@@ -647,9 +753,11 @@ void BridgeNode::configure_command_server()
 
       const auto converted =
         static_cast<std::uint32_t>(uid);
+
       if (!unique_uids.insert(converted).second) {
         invalid_configuration();
       }
+
       config.allowed_peer_uids.push_back(converted);
     }
   }
@@ -657,7 +765,157 @@ void BridgeNode::configure_command_server()
   command_server_config_ =
     std::make_unique<CommandServerConfig>(
     std::move(config));
+
+  if (execution_mode != "live") {
+    return;
+  }
+
+  RosCommandDispatcherConfig dispatcher_config;
+
+  dispatcher_config.mode_command_topic =
+    declare_read_only_parameter<std::string>(
+    *this,
+    "command_dispatcher.mode_command_topic",
+    dispatcher_config.mode_command_topic);
+
+  dispatcher_config.mode_state_topic =
+    declare_read_only_parameter<std::string>(
+    *this,
+    "command_dispatcher.mode_state_topic",
+    dispatcher_config.mode_state_topic);
+
+  dispatcher_config.external_stop_topic =
+    declare_read_only_parameter<std::string>(
+    *this,
+    "command_dispatcher.external_stop_topic",
+    dispatcher_config.external_stop_topic);
+
+  dispatcher_config.safety_stop_topic =
+    declare_read_only_parameter<std::string>(
+    *this,
+    "command_dispatcher.safety_stop_topic",
+    dispatcher_config.safety_stop_topic);
+
+  dispatcher_config.manual_velocity_topic =
+    declare_read_only_parameter<std::string>(
+    *this,
+    "command_dispatcher.manual_velocity_topic",
+    dispatcher_config.manual_velocity_topic);
+
+  dispatcher_config.safe_velocity_topic =
+    declare_read_only_parameter<std::string>(
+    *this,
+    "command_dispatcher.safe_velocity_topic",
+    dispatcher_config.safe_velocity_topic);
+
+  dispatcher_config.navigation_readiness_topic =
+    declare_read_only_parameter<std::string>(
+    *this,
+    "command_dispatcher.navigation_readiness_topic",
+    dispatcher_config.navigation_readiness_topic);
+
+  dispatcher_config.navigation_action_name =
+    declare_read_only_parameter<std::string>(
+    *this,
+    "command_dispatcher.navigation_action_name",
+    dispatcher_config.navigation_action_name);
+
+  dispatcher_config.location_resolve_service =
+    declare_read_only_parameter<std::string>(
+    *this,
+    "command_dispatcher.location_resolve_service",
+    dispatcher_config.location_resolve_service);
+
+  dispatcher_config.active_map_id =
+    declare_read_only_parameter<std::string>(
+    *this,
+    "command_dispatcher.active_map_id",
+    dispatcher_config.active_map_id);
+
+  const std::int64_t active_map_revision =
+    declare_read_only_parameter<std::int64_t>(
+    *this,
+    "command_dispatcher.active_map_revision",
+    0);
+
+  dispatcher_config.require_active_map_context =
+    declare_read_only_parameter<bool>(
+    *this,
+    "command_dispatcher.require_active_map_context",
+    dispatcher_config.require_active_map_context);
+
+  dispatcher_config.observed_state_timeout_ms =
+    declare_read_only_parameter<std::int64_t>(
+    *this,
+    "command_dispatcher.observed_state_timeout_ms",
+    dispatcher_config.observed_state_timeout_ms);
+
+  dispatcher_config.mode_transition_timeout_ms =
+    declare_read_only_parameter<std::int64_t>(
+    *this,
+    "command_dispatcher.mode_transition_timeout_ms",
+    dispatcher_config.mode_transition_timeout_ms);
+
+  dispatcher_config.stop_confirmation_timeout_ms =
+    declare_read_only_parameter<std::int64_t>(
+    *this,
+    "command_dispatcher.stop_confirmation_timeout_ms",
+    dispatcher_config.stop_confirmation_timeout_ms);
+
+  dispatcher_config.location_service_timeout_ms =
+    declare_read_only_parameter<std::int64_t>(
+    *this,
+    "command_dispatcher.location_service_timeout_ms",
+    dispatcher_config.location_service_timeout_ms);
+
+  dispatcher_config.navigation_server_timeout_ms =
+    declare_read_only_parameter<std::int64_t>(
+    *this,
+    "command_dispatcher.navigation_server_timeout_ms",
+    dispatcher_config.navigation_server_timeout_ms);
+
+  dispatcher_config.navigation_goal_response_timeout_ms =
+    declare_read_only_parameter<std::int64_t>(
+    *this,
+    "command_dispatcher.navigation_goal_response_timeout_ms",
+    dispatcher_config.navigation_goal_response_timeout_ms);
+
+  dispatcher_config.navigation_execution_timeout_ms =
+    declare_read_only_parameter<std::int64_t>(
+    *this,
+    "command_dispatcher.navigation_execution_timeout_ms",
+    dispatcher_config.navigation_execution_timeout_ms);
+
+  dispatcher_config.teleop_cancel_timeout_ms =
+    declare_read_only_parameter<std::int64_t>(
+    *this,
+    "command_dispatcher.teleop_cancel_timeout_ms",
+    dispatcher_config.teleop_cancel_timeout_ms);
+
+  dispatcher_config.navigation_cancel_timeout_ms =
+    declare_read_only_parameter<std::int64_t>(
+    *this,
+    "command_dispatcher.navigation_cancel_timeout_ms",
+    dispatcher_config.navigation_cancel_timeout_ms);
+
+  if (
+    active_map_revision < 0 ||
+    static_cast<std::uintmax_t>(
+      active_map_revision) >
+    std::numeric_limits<std::uint32_t>::max())
+  {
+    invalid_configuration();
+  }
+
+  dispatcher_config.active_map_revision =
+    static_cast<std::uint32_t>(
+    active_map_revision);
+
+  ros_command_dispatcher_config_ =
+    std::make_unique<RosCommandDispatcherConfig>(
+    std::move(dispatcher_config));
 }
+
 
 void BridgeNode::start_command_server()
 {
@@ -665,9 +923,32 @@ void BridgeNode::start_command_server()
     return;
   }
 
+  CommandServer::Dispatcher dispatcher;
+
+  if (command_execution_mode_ == "live") {
+    if (!ros_command_dispatcher_config_) {
+      throw std::runtime_error(
+              "live command dispatcher configuration missing");
+    }
+
+    ros_command_dispatcher_ =
+      std::make_unique<RosCommandDispatcher>(
+      *this,
+      *ros_command_dispatcher_config_);
+
+    dispatcher =
+      [this](const ValidatedCommand & command)
+      {
+        return ros_command_dispatcher_->dispatch(
+          command);
+      };
+  }
+
   command_server_ =
     std::make_unique<CommandServer>(
-    *command_server_config_);
+    *command_server_config_,
+    CommandServer::Clock{},
+    std::move(dispatcher));
 
   const CommandServerResult start_result =
     command_server_->start();
@@ -703,7 +984,8 @@ void BridgeNode::start_command_server()
 
   RCLCPP_INFO(
     get_logger(),
-    "command server enabled in dry-run mode");
+    "command server enabled; execution_mode=%s",
+    command_execution_mode_.c_str());
 }
 
 void BridgeNode::run_command_worker() noexcept
@@ -725,8 +1007,11 @@ void BridgeNode::run_command_worker() noexcept
         continue;
       }
 
-      if (result.status ==
-        CommandServerStatus::DryRunAcknowledged)
+      if (
+        result.status ==
+        CommandServerStatus::DryRunAcknowledged ||
+        result.status ==
+        CommandServerStatus::CommandAcknowledged)
       {
         command_accepted_count_.fetch_add(
           1U,
@@ -874,6 +1159,7 @@ BridgeNode::collect_observation_snapshots(
 }
 
 void BridgeNode::publish_runtime_snapshot(
+  const BridgeRuntimeSnapshot & bridge_runtime,
   const std::vector<TopicObservation::Snapshot> &
   topic_snapshots)
 {
@@ -888,6 +1174,7 @@ void BridgeNode::publish_runtime_snapshot(
 
   SnapshotDocument document;
   document.sequence = snapshot_sequence_ + 1U;
+  document.bridge = bridge_runtime;
   document.topics = topic_snapshots;
 
   try {
@@ -945,8 +1232,6 @@ void BridgeNode::publish_status()
   const HealthEvaluation health =
     health_evaluator.evaluate(topic_snapshots);
 
-  publish_runtime_snapshot(topic_snapshots);
-
   ObservationRuntimeState observation_state;
   observation_state.configured =
     observation_runtimes_.size();
@@ -970,6 +1255,245 @@ void BridgeNode::publish_status()
     }
   }
 
+  const bool subscriptions_complete =
+    observation_state.configured > 0U &&
+    observation_state.active == observation_state.configured &&
+    observation_runtime_error.empty();
+
+  RosCommandDispatcherSnapshot dispatcher_snapshot;
+  const bool dispatcher_available =
+    static_cast<bool>(ros_command_dispatcher_);
+
+  if (dispatcher_available) {
+    dispatcher_snapshot =
+      ros_command_dispatcher_->snapshot();
+  }
+
+  BridgeRuntimeSnapshot bridge_runtime;
+
+  if (command_server_config_) {
+    bridge_runtime.instance_id =
+      command_server_config_->bridge_instance_id;
+  }
+
+  bridge_runtime.command_server_enabled =
+    command_server_enabled_;
+  bridge_runtime.command_execution_mode =
+    command_execution_mode_;
+  bridge_runtime.command_worker_fatal =
+    command_worker_fatal_.load(
+    std::memory_order_acquire);
+  bridge_runtime.command_last_status =
+    to_string(
+    command_last_status_.load(
+      std::memory_order_acquire));
+  bridge_runtime.command_accepted_count =
+    command_accepted_count_.load(
+    std::memory_order_relaxed);
+  bridge_runtime.command_rejected_count =
+    command_rejected_count_.load(
+    std::memory_order_relaxed);
+
+  bridge_runtime.dds_active = evidence.dds_active;
+  bridge_runtime.core_visible = evidence.core_visible;
+  bridge_runtime.edge_visible = evidence.edge_visible;
+  bridge_runtime.observation_subscriptions_complete =
+    subscriptions_complete;
+  bridge_runtime.required_topics_ready =
+    health.required_topics_ready;
+  bridge_runtime.all_topics_fresh =
+    health.all_topics_fresh;
+
+  bridge_runtime.location_service_configured =
+    ros_command_dispatcher_config_ &&
+    !ros_command_dispatcher_config_->
+    location_resolve_service.empty();
+
+  bridge_runtime.active_map_context_configured =
+    ros_command_dispatcher_config_ &&
+    (
+    !ros_command_dispatcher_config_->
+    require_active_map_context ||
+    (
+      !ros_command_dispatcher_config_->active_map_id.empty() &&
+      ros_command_dispatcher_config_->active_map_revision > 0U
+    )
+    );
+
+  bridge_runtime.command_active =
+    dispatcher_snapshot.command_active;
+  bridge_runtime.teleop_active =
+    dispatcher_snapshot.teleop_active;
+  bridge_runtime.navigation_goal_active =
+    dispatcher_snapshot.navigation_goal_active;
+  bridge_runtime.active_command_id =
+    dispatcher_snapshot.active_command_id;
+  bridge_runtime.active_command_type =
+    dispatcher_snapshot.active_command_type;
+  bridge_runtime.last_terminal_command_id =
+    dispatcher_snapshot.last_terminal_command_id;
+  bridge_runtime.mode_state_observed =
+    dispatcher_snapshot.mode_state_observed;
+  bridge_runtime.mode_state = dispatcher_snapshot.mode_state;
+  bridge_runtime.mode_state_age_ms =
+    dispatcher_snapshot.mode_state_age_ms;
+  bridge_runtime.external_stop_state_known =
+    dispatcher_snapshot.external_stop_observed;
+  bridge_runtime.external_stop_active =
+    dispatcher_snapshot.external_stop_active;
+  bridge_runtime.external_stop_age_ms =
+    dispatcher_snapshot.external_stop_age_ms;
+  bridge_runtime.safety_stop_state_known =
+    dispatcher_snapshot.safety_stop_observed;
+  bridge_runtime.safety_stop_active =
+    dispatcher_snapshot.safety_stop_active;
+  bridge_runtime.safety_stop_age_ms =
+    dispatcher_snapshot.safety_stop_age_ms;
+  bridge_runtime.safe_velocity_state_known =
+    dispatcher_snapshot.safe_velocity_observed;
+  bridge_runtime.safe_velocity_zero =
+    dispatcher_snapshot.safe_velocity_zero;
+  bridge_runtime.safe_velocity_age_ms =
+    dispatcher_snapshot.safe_velocity_age_ms;
+  bridge_runtime.navigation_readiness_observed =
+    dispatcher_snapshot.navigation_readiness_observed;
+  bridge_runtime.navigation_readiness =
+    dispatcher_snapshot.navigation_readiness;
+  bridge_runtime.navigation_readiness_age_ms =
+    dispatcher_snapshot.navigation_readiness_age_ms;
+  bridge_runtime.dispatcher_accepted_command_count =
+    dispatcher_snapshot.accepted_command_count;
+  bridge_runtime.dispatcher_rejected_command_count =
+    dispatcher_snapshot.rejected_command_count;
+  bridge_runtime.dispatcher_ros_publication_count =
+    dispatcher_snapshot.ros_publication_count;
+  bridge_runtime.dispatcher_last_reason =
+    dispatcher_snapshot.last_reason;
+
+  const bool live_transport_healthy =
+    command_server_enabled_ &&
+    command_execution_mode_ == "live" &&
+    !bridge_runtime.command_worker_fatal &&
+    dispatcher_available &&
+    !dispatcher_snapshot.shutdown_requested;
+
+  bridge_runtime.stop_ready = live_transport_healthy;
+
+  if (ros_command_dispatcher_config_) {
+    const std::int64_t freshness_timeout_ms =
+      ros_command_dispatcher_config_->
+      observed_state_timeout_ms;
+
+    const bool common_runtime_fresh =
+      observation_is_fresh(
+        dispatcher_snapshot.mode_state_observed,
+        dispatcher_snapshot.mode_state_age_ms,
+        freshness_timeout_ms) &&
+      observation_is_fresh(
+        dispatcher_snapshot.external_stop_observed,
+        dispatcher_snapshot.external_stop_age_ms,
+        freshness_timeout_ms) &&
+      observation_is_fresh(
+        dispatcher_snapshot.safety_stop_observed,
+        dispatcher_snapshot.safety_stop_age_ms,
+        freshness_timeout_ms) &&
+      observation_is_fresh(
+        dispatcher_snapshot.safe_velocity_observed,
+        dispatcher_snapshot.safe_velocity_age_ms,
+        freshness_timeout_ms);
+
+    bridge_runtime.teleop_ready =
+      live_transport_healthy &&
+      !dispatcher_snapshot.command_active &&
+      common_runtime_fresh &&
+      !dispatcher_snapshot.external_stop_active &&
+      !dispatcher_snapshot.safety_stop_active &&
+      dispatcher_snapshot.safe_velocity_zero;
+
+    bridge_runtime.navigation_ready =
+      bridge_runtime.teleop_ready &&
+      observation_is_fresh(
+        dispatcher_snapshot.navigation_readiness_observed,
+        dispatcher_snapshot.navigation_readiness_age_ms,
+        freshness_timeout_ms) &&
+      dispatcher_snapshot.navigation_readiness ==
+      uppercase_ascii(
+        ros_command_dispatcher_config_->navigation_ready_state);
+  }
+
+  const bool selectors_configured =
+    evidence.core_evidence_configured &&
+    evidence.edge_evidence_configured;
+
+  const bool production_dependencies_ready =
+    graph_error.empty() &&
+    observation_runtime_error.empty() &&
+    evidence.dds_active &&
+    selectors_configured &&
+    evidence.core_visible &&
+    evidence.edge_visible &&
+    subscriptions_complete &&
+    health.required_topics_ready &&
+    snapshot_enabled_ &&
+    bridge_runtime.location_service_configured &&
+    bridge_runtime.active_map_context_configured;
+
+  bridge_runtime.bridge_ready =
+    live_transport_healthy &&
+    production_dependencies_ready;
+  bridge_runtime.validated = bridge_runtime.bridge_ready;
+  bridge_runtime.dispatch_enabled = bridge_runtime.bridge_ready;
+  bridge_runtime.commands_enabled = bridge_runtime.bridge_ready;
+  bridge_runtime.read_only = !bridge_runtime.commands_enabled;
+  bridge_runtime.navigation_bridge_validated =
+    bridge_runtime.bridge_ready &&
+    bridge_runtime.navigation_ready;
+  bridge_runtime.block_navigation =
+    !bridge_runtime.navigation_bridge_validated;
+
+  if (!graph_error.empty()) {
+    bridge_runtime.readiness_reason =
+      "graph_discovery_failed";
+  } else if (!observation_runtime_error.empty()) {
+    bridge_runtime.readiness_reason =
+      "observation_runtime_failed";
+  } else if (!live_transport_healthy) {
+    bridge_runtime.readiness_reason =
+      "live_command_transport_not_ready";
+  } else if (!snapshot_enabled_) {
+    bridge_runtime.readiness_reason =
+      "snapshot_publication_disabled";
+  } else if (!evidence.dds_active) {
+    bridge_runtime.readiness_reason =
+      "local_dds_evidence_missing";
+  } else if (!selectors_configured) {
+    bridge_runtime.readiness_reason =
+      "graph_evidence_selectors_unconfigured";
+  } else if (!evidence.core_visible || !evidence.edge_visible) {
+    bridge_runtime.readiness_reason =
+      "graph_evidence_incomplete";
+  } else if (!subscriptions_complete) {
+    bridge_runtime.readiness_reason =
+      "observation_subscriptions_incomplete";
+  } else if (!health.required_topics_ready) {
+    bridge_runtime.readiness_reason =
+      "required_topic_unavailable";
+  } else if (!bridge_runtime.location_service_configured) {
+    bridge_runtime.readiness_reason =
+      "location_service_unconfigured";
+  } else if (!bridge_runtime.active_map_context_configured) {
+    bridge_runtime.readiness_reason =
+      "active_map_context_unconfigured";
+  } else {
+    bridge_runtime.readiness_reason =
+      "bridge_ready";
+  }
+
+  last_bridge_runtime_ = bridge_runtime;
+  publish_runtime_snapshot(
+    bridge_runtime,
+    topic_snapshots);
+
   const SnapshotPublicationState snapshot_state{
     snapshot_enabled_,
     snapshot_path_,
@@ -983,13 +1507,16 @@ void BridgeNode::publish_status()
   };
 
   std_msgs::msg::Bool readiness_message;
-  readiness_message.data = false;
+  readiness_message.data =
+    bridge_runtime.bridge_ready &&
+    snapshot_last_write_ok_;
   readiness_publisher_->publish(readiness_message);
 
   std_msgs::msg::String state_message;
 
   state_message.data =
     make_state_json(
+    bridge_runtime,
     evidence,
     graph_error,
     snapshot_state,
@@ -1006,12 +1533,8 @@ void BridgeNode::publish_status()
   diagnostics_message.header.stamp = now();
 
   diagnostic_msgs::msg::DiagnosticStatus status;
-  status.name = "/savo_bridge/topic_observation";
+  status.name = "/savo_bridge/runtime";
   status.hardware_id = "savo-edge";
-
-  const bool selectors_configured =
-    evidence.core_evidence_configured &&
-    evidence.edge_evidence_configured;
 
   const bool evidence_complete =
     evidence.core_visible &&
@@ -1082,23 +1605,62 @@ void BridgeNode::publish_status()
       diagnostic_msgs::msg::DiagnosticStatus::WARN;
 
     status.message = "snapshot_publication_disabled";
-  } else {
+  } else if (!bridge_runtime.bridge_ready) {
     status.level =
       diagnostic_msgs::msg::DiagnosticStatus::WARN;
 
-    status.message =
-      "observation_active_readiness_not_enabled";
+    status.message = bridge_runtime.readiness_reason;
+  } else {
+    status.level =
+      diagnostic_msgs::msg::DiagnosticStatus::OK;
+
+    status.message = "bridge_ready";
   }
 
   status.values.push_back(
     make_key_value(
       "read_only",
-      "true"));
+      boolean_string(bridge_runtime.read_only)));
 
   status.values.push_back(
     make_key_value(
       "commands_enabled",
-      "false"));
+      boolean_string(bridge_runtime.commands_enabled)));
+
+  status.values.push_back(
+    make_key_value(
+      "bridge_ready",
+      boolean_string(bridge_runtime.bridge_ready)));
+
+  status.values.push_back(
+    make_key_value(
+      "readiness_reason",
+      bridge_runtime.readiness_reason));
+
+  status.values.push_back(
+    make_key_value(
+      "command_execution_mode",
+      bridge_runtime.command_execution_mode));
+
+  status.values.push_back(
+    make_key_value(
+      "command_last_status",
+      bridge_runtime.command_last_status));
+
+  status.values.push_back(
+    make_key_value(
+      "stop_ready",
+      boolean_string(bridge_runtime.stop_ready)));
+
+  status.values.push_back(
+    make_key_value(
+      "teleop_ready",
+      boolean_string(bridge_runtime.teleop_ready)));
+
+  status.values.push_back(
+    make_key_value(
+      "navigation_ready",
+      boolean_string(bridge_runtime.navigation_ready)));
 
   status.values.push_back(
     make_key_value(

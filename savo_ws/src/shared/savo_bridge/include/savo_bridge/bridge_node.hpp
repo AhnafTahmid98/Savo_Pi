@@ -22,6 +22,7 @@
 
 #include "savo_bridge/command_server.hpp"
 #include "savo_bridge/graph_evidence.hpp"
+#include "savo_bridge/ros_command_dispatcher.hpp"
 #include "savo_bridge/snapshot_writer.hpp"
 #include "savo_bridge/topic_observation.hpp"
 
@@ -56,6 +57,7 @@ private:
   void run_command_worker() noexcept;
 
   void publish_runtime_snapshot(
+    const BridgeRuntimeSnapshot & bridge_runtime,
     const std::vector<TopicObservation::Snapshot> &
     topic_snapshots);
 
@@ -100,7 +102,16 @@ private:
   std::uint64_t heartbeat_sequence_{0U};
 
   bool command_server_enabled_{false};
+  std::string command_execution_mode_{"disabled"};
+
   std::unique_ptr<CommandServerConfig> command_server_config_;
+
+  std::unique_ptr<RosCommandDispatcherConfig>
+  ros_command_dispatcher_config_;
+
+  std::unique_ptr<RosCommandDispatcher>
+  ros_command_dispatcher_;
+
   std::unique_ptr<CommandServer> command_server_;
   std::thread command_worker_;
   std::atomic<bool> command_stop_requested_{false};
@@ -109,6 +120,8 @@ private:
   std::atomic<std::uint64_t> command_accepted_count_{0U};
   std::atomic<std::uint64_t> command_rejected_count_{0U};
   std::atomic<bool> command_worker_fatal_{false};
+
+  BridgeRuntimeSnapshot last_bridge_runtime_;
 };
 
 }  // namespace savo_bridge

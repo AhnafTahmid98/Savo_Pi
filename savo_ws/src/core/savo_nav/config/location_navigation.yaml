@@ -1,0 +1,12 @@
+navigate_to_location_node:
+  ros__parameters:
+    action_name: /savo_nav/locations/navigate
+    resolution_service: /savo_locations/resolve
+    authorization_service: /savo_supervisor/authorize_location_operation
+    navigation_action_name: /savo_nav/navigation/navigate_to_pose
+    head_confirmation_action: /savo_head/apriltag/confirm
+    direct_tag_pose_epsilon_m: 0.05
+    default_timeout_s: 120.0
+    dependency_wait_timeout_s: 2.0
+    authorization_recheck_period_s: 1.0
+    arrival_confirmation_timeout_s: 15.0

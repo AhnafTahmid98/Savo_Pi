@@ -16,6 +16,7 @@ SAVO_CORE_SHARED_PACKAGES=(
   savo_bringup
   savo_dashboard
   savo_perception
+  savo_supervisor
 )
 
 # Core-owned runtime packages.

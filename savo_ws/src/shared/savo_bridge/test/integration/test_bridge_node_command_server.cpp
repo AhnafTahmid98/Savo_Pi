@@ -11,6 +11,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cerrno>
 #include <chrono>
 #include <cstdint>
@@ -25,8 +26,12 @@
 #include <thread>
 #include <vector>
 
+#include <geometry_msgs/msg/twist.hpp>
 #include <nlohmann/json.hpp>
+#include <rclcpp/executors/multi_threaded_executor.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <std_msgs/msg/bool.hpp>
+#include <std_msgs/msg/string.hpp>
 
 #include "savo_bridge/bridge_node.hpp"
 
@@ -253,6 +258,83 @@ private:
   return options;
 }
 
+[[nodiscard]] rclcpp::NodeOptions live_enabled_options(
+  const std::filesystem::path & socket_path,
+  const std::string & prefix)
+{
+  rclcpp::NodeOptions options;
+
+  options.parameter_overrides({
+      rclcpp::Parameter("command_server.enabled", true),
+      rclcpp::Parameter(
+        "command_server.execution_mode",
+        "live"),
+      rclcpp::Parameter(
+        "command_server.socket_path",
+        socket_path.string()),
+      rclcpp::Parameter(
+        "command_server.bridge_instance_id",
+        "savo-bridge-live-integration-test"),
+      rclcpp::Parameter(
+        "command_server.accept_timeout_ms",
+        25),
+      rclcpp::Parameter(
+        "command_server.client_read_timeout_ms",
+        500),
+      rclcpp::Parameter(
+        "command_server.client_write_timeout_ms",
+        1000),
+      rclcpp::Parameter(
+        "command_server.socket_mode",
+        384),
+      rclcpp::Parameter(
+        "command_server.allowed_peer_uids",
+        std::vector<std::int64_t>{
+        static_cast<std::int64_t>(::geteuid())}),
+      rclcpp::Parameter(
+        "command_dispatcher.mode_command_topic",
+        prefix + "/mode_cmd"),
+      rclcpp::Parameter(
+        "command_dispatcher.mode_state_topic",
+        prefix + "/mode_state"),
+      rclcpp::Parameter(
+        "command_dispatcher.external_stop_topic",
+        prefix + "/external_stop"),
+      rclcpp::Parameter(
+        "command_dispatcher.safety_stop_topic",
+        prefix + "/safety_stop"),
+      rclcpp::Parameter(
+        "command_dispatcher.manual_velocity_topic",
+        prefix + "/cmd_vel_manual"),
+      rclcpp::Parameter(
+        "command_dispatcher.safe_velocity_topic",
+        prefix + "/cmd_vel_safe"),
+      rclcpp::Parameter(
+        "command_dispatcher.navigation_readiness_topic",
+        prefix + "/navigation_readiness"),
+      rclcpp::Parameter(
+        "command_dispatcher.navigation_action_name",
+        prefix + "/navigate_to_pose"),
+      rclcpp::Parameter(
+        "command_dispatcher.location_resolve_service",
+        prefix + "/resolve_location"),
+      rclcpp::Parameter(
+        "command_dispatcher.active_map_id",
+        "integration-map"),
+      rclcpp::Parameter(
+        "command_dispatcher.active_map_revision",
+        1),
+      rclcpp::Parameter(
+        "command_dispatcher.observed_state_timeout_ms",
+        500),
+      rclcpp::Parameter(
+        "command_dispatcher.stop_confirmation_timeout_ms",
+        1000),
+    });
+
+  return options;
+}
+
 [[nodiscard]] Json command_request(
   const std::string & command_id,
   const std::string & command_type)
@@ -350,6 +432,7 @@ TEST(BridgeNodeCommandServer, DefaultsAreDisabledAndReadOnly)
     "command_server.client_read_timeout_ms",
     "command_server.client_write_timeout_ms",
     "command_server.socket_mode",
+    "command_server.command_id_cache_capacity",
     "command_server.allowed_peer_uids",
   };
   for (const std::string & name : names) {
@@ -390,16 +473,17 @@ TEST(BridgeNodeCommandServer, EnabledConfigurationIsStrict)
 {
   const RclcppGuard guard;
 
-  rclcpp::NodeOptions live_options;
-  live_options.parameter_overrides({
+  rclcpp::NodeOptions invalid_mode_options;
+  invalid_mode_options.parameter_overrides({
       rclcpp::Parameter("command_server.enabled", true),
       rclcpp::Parameter(
         "command_server.execution_mode",
-        "live"),
+        "unsafe"),
     });
+
   EXPECT_THROW(
     std::make_shared<savo_bridge::BridgeNode>(
-      live_options),
+      invalid_mode_options),
     std::invalid_argument);
 
   rclcpp::NodeOptions invalid_path_options;
@@ -484,6 +568,234 @@ TEST(BridgeNodeCommandServer, EnabledNodeOwnsOneWorkerAndSocket)
     EXPECT_TRUE(S_ISSOCK(metadata.st_mode));
     EXPECT_EQ(metadata.st_mode & 0777U, 0600U);
   }
+  EXPECT_FALSE(
+    std::filesystem::exists(socket_path));
+}
+
+
+TEST(BridgeNodeCommandServer, LiveModeDispatchesStopAndReplaysDuplicate)
+{
+  const RclcppGuard guard;
+  const TemporaryDirectory temporary;
+
+  const auto socket_path =
+    temporary.path() / "command.sock";
+
+  const std::string prefix =
+    "/savo_bridge_live_command_test";
+
+  auto fixture =
+    std::make_shared<rclcpp::Node>(
+    "savo_bridge_live_command_fixture");
+
+  auto latched_qos =
+    rclcpp::QoS(rclcpp::KeepLast(1));
+
+  latched_qos.reliable();
+  latched_qos.transient_local();
+
+  auto reliable_qos =
+    rclcpp::QoS(rclcpp::KeepLast(20));
+
+  reliable_qos.reliable();
+
+  auto mode_state_publisher =
+    fixture->create_publisher<
+    std_msgs::msg::String>(
+    prefix + "/mode_state",
+    latched_qos);
+
+  auto external_stop_publisher =
+    fixture->create_publisher<
+    std_msgs::msg::Bool>(
+    prefix + "/external_stop",
+    reliable_qos);
+
+  auto safety_stop_publisher =
+    fixture->create_publisher<
+    std_msgs::msg::Bool>(
+    prefix + "/safety_stop",
+    reliable_qos);
+
+  auto safe_velocity_publisher =
+    fixture->create_publisher<
+    geometry_msgs::msg::Twist>(
+    prefix + "/cmd_vel_safe",
+    reliable_qos);
+
+  std::atomic<std::size_t>
+    mode_command_count{0U};
+
+  std::atomic<std::size_t>
+    external_stop_true_count{0U};
+
+  auto mode_command_subscription =
+    fixture->create_subscription<
+    std_msgs::msg::String>(
+    prefix + "/mode_cmd",
+    reliable_qos,
+    [&mode_state_publisher,
+    &mode_command_count](
+      const std_msgs::msg::String::SharedPtr message)
+    {
+      mode_command_count.fetch_add(1U);
+      mode_state_publisher->publish(*message);
+    });
+
+  auto external_stop_subscription =
+    fixture->create_subscription<
+    std_msgs::msg::Bool>(
+    prefix + "/external_stop",
+    reliable_qos,
+    [&external_stop_true_count](
+      const std_msgs::msg::Bool::SharedPtr message)
+    {
+      if (message->data) {
+        external_stop_true_count.fetch_add(1U);
+      }
+    });
+
+  auto observation_timer =
+    fixture->create_wall_timer(
+    std::chrono::milliseconds(20),
+    [&safety_stop_publisher,
+    &safe_velocity_publisher]()
+    {
+      std_msgs::msg::Bool safety;
+      safety.data = false;
+      safety_stop_publisher->publish(safety);
+
+      geometry_msgs::msg::Twist zero;
+      safe_velocity_publisher->publish(zero);
+    });
+
+  auto bridge_node =
+    std::make_shared<savo_bridge::BridgeNode>(
+    live_enabled_options(
+      socket_path,
+      prefix));
+
+  rclcpp::executors::MultiThreadedExecutor
+    executor(
+    rclcpp::ExecutorOptions(),
+    4U);
+
+  executor.add_node(fixture);
+  executor.add_node(bridge_node);
+
+  std::thread executor_thread(
+    [&executor]()
+    {
+      executor.spin();
+    });
+
+  ASSERT_TRUE(wait_for_socket(socket_path));
+
+  std_msgs::msg::String stop_mode;
+  stop_mode.data = "STOP";
+
+  std_msgs::msg::Bool external_clear;
+  external_clear.data = false;
+
+  for (std::size_t index = 0U; index < 20U; ++index) {
+    mode_state_publisher->publish(stop_mode);
+    external_stop_publisher->publish(external_clear);
+    std::this_thread::sleep_for(
+      std::chrono::milliseconds(20));
+  }
+
+  const std::string command_id =
+    "bridge-node-live-stop-1";
+
+  const std::string encoded_request =
+    command_request(
+    command_id,
+    "stop").dump() + "\n";
+
+  const Json first_response = Json::parse(
+    socket_exchange(
+      socket_path,
+      encoded_request));
+
+  EXPECT_EQ(
+    first_response.at("message_type"),
+    "command_acknowledgement");
+
+  EXPECT_EQ(
+    first_response.at("execution_mode"),
+    "live");
+
+  EXPECT_EQ(
+    first_response.at("accepted"),
+    true);
+
+  EXPECT_EQ(
+    first_response.at("state"),
+    "accepted");
+
+  EXPECT_EQ(
+    first_response.at("reason"),
+    "bridge_stop_confirmed");
+
+  EXPECT_EQ(
+    first_response.at("duplicate"),
+    false);
+
+  EXPECT_EQ(
+    first_response.at("details").
+    at("dispatch_attempted"),
+    true);
+
+  EXPECT_GT(
+    first_response.at("details").
+    at("ros_publications").get<std::size_t>(),
+    0U);
+
+  const Json duplicate_response = Json::parse(
+    socket_exchange(
+      socket_path,
+      encoded_request));
+
+  EXPECT_EQ(
+    duplicate_response.at("accepted"),
+    true);
+
+  EXPECT_EQ(
+    duplicate_response.at("duplicate"),
+    true);
+
+  EXPECT_EQ(
+    duplicate_response.at("reason"),
+    "bridge_stop_confirmed");
+
+  EXPECT_EQ(
+    duplicate_response.at("details").
+    at("dispatch_attempted"),
+    false);
+
+  EXPECT_EQ(
+    duplicate_response.at("details").
+    at("ros_publications"),
+    0);
+
+  EXPECT_GT(mode_command_count.load(), 0U);
+  EXPECT_GT(external_stop_true_count.load(), 0U);
+
+  executor.cancel();
+
+  if (executor_thread.joinable()) {
+    executor_thread.join();
+  }
+
+  executor.remove_node(bridge_node);
+  executor.remove_node(fixture);
+
+  bridge_node.reset();
+  observation_timer.reset();
+  external_stop_subscription.reset();
+  mode_command_subscription.reset();
+  fixture.reset();
+
   EXPECT_FALSE(
     std::filesystem::exists(socket_path));
 }
@@ -590,11 +902,11 @@ TEST(BridgeNodeCommandServer, PeerUidPolicyIsEnforced)
       {disallowed_uid}));
   ASSERT_TRUE(wait_for_socket(socket_path));
 
-  const std::string response = socket_exchange(
-    socket_path,
-    command_request(
-      "bridge-node-unauthorized",
-      "stop").dump() + "\n");
+  // Peer credentials are checked immediately after accept and before
+  // request bytes are read. Do not race the expected early close by
+  // attempting to write a command from the unauthorized client.
+  const std::string response =
+    socket_exchange(socket_path, "");
   EXPECT_TRUE(response.empty());
   EXPECT_TRUE(node->command_worker_joinable());
 }

@@ -84,6 +84,7 @@ struct RosCommandDispatcherConfig
   std::int64_t location_service_timeout_ms{1500};
   std::int64_t navigation_server_timeout_ms{1500};
   std::int64_t navigation_goal_response_timeout_ms{2000};
+  std::int64_t navigation_execution_timeout_ms{300000};
   std::int64_t teleop_cancel_timeout_ms{2000};
   std::int64_t navigation_cancel_timeout_ms{2000};
 

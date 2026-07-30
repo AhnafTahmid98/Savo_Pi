@@ -18,12 +18,15 @@
 #include <chrono>
 #include <cstdint>
 #include <cstring>
+#include <deque>
+#include <exception>
 #include <filesystem>
 #include <limits>
 #include <optional>
 #include <set>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 
 #include <nlohmann/json.hpp>
@@ -669,7 +672,8 @@ struct WriteResult
   const std::string & bridge_instance_id,
   const std::string & execution_mode,
   const CommandDispatchResult & dispatch,
-  const std::int64_t received_at_unix_ms)
+  const std::int64_t received_at_unix_ms,
+  const bool duplicate = false)
 {
   return Json{
     {"protocol_version", COMMAND_PROTOCOL_VERSION},
@@ -680,7 +684,7 @@ struct WriteResult
     {"reason", dispatch.reason},
     {"bridge_instance_id", bridge_instance_id},
     {"execution_mode", execution_mode},
-    {"duplicate", false},
+    {"duplicate", duplicate},
     {"received_at_unix_ms", received_at_unix_ms},
     {"details", response_details(
         dispatch.dispatch_attempted,
@@ -755,6 +759,16 @@ const char * to_string(const CommandServerStatus status) noexcept
 
 class CommandServer::Impl
 {
+private:
+  struct CachedAcknowledgement
+  {
+    CommandServerStatus status{
+      CommandServerStatus::CommandRejected};
+
+    CommandDispatchResult dispatch;
+    std::int64_t received_at_unix_ms{0};
+  };
+
 public:
   Impl(
     CommandServerConfig config,
@@ -1019,6 +1033,37 @@ public:
 
     result.command_id = parsed.command->command_id;
 
+    const auto cached =
+      completed_commands_.find(
+      parsed.command->command_id);
+
+    if (cached != completed_commands_.end()) {
+      CommandDispatchResult replay_dispatch =
+        cached->second.dispatch;
+
+      result.status = cached->second.status;
+      result.reason = replay_dispatch.reason;
+      result.dispatch_attempted = false;
+      result.ros_publications = 0U;
+      result.duplicate = true;
+
+      replay_dispatch.dispatch_attempted = false;
+      replay_dispatch.ros_publications = 0U;
+
+      const auto response = acknowledgement_response(
+        parsed.command.value(),
+        config_.bridge_instance_id,
+        config_.execution_mode,
+        replay_dispatch,
+        cached->second.received_at_unix_ms,
+        true);
+
+      return send_and_finish(
+        client.get(),
+        response,
+        std::move(result));
+    }
+
     CommandDispatchResult dispatch;
 
     if (config_.execution_mode == "dry_run") {
@@ -1072,6 +1117,12 @@ public:
       dispatch.dispatch_attempted;
     result.ros_publications =
       dispatch.ros_publications;
+
+    cache_acknowledgement(
+      parsed.command->command_id,
+      result.status,
+      dispatch,
+      now);
 
     const auto response = acknowledgement_response(
       parsed.command.value(),
@@ -1157,7 +1208,43 @@ private:
     if (!is_safe_identifier(config_.bridge_instance_id)) {
       return "command_server_bridge_instance_id_invalid";
     }
+    if (config_.command_id_cache_capacity == 0U) {
+      return "command_server_command_cache_capacity_invalid";
+    }
     return std::nullopt;
+  }
+
+  void cache_acknowledgement(
+    const std::string & command_id,
+    const CommandServerStatus status,
+    const CommandDispatchResult & dispatch,
+    const std::int64_t received_at_unix_ms)
+  {
+    if (
+      completed_commands_.find(command_id) !=
+      completed_commands_.end())
+    {
+      return;
+    }
+
+    while (
+      completed_command_order_.size() >=
+      config_.command_id_cache_capacity)
+    {
+      completed_commands_.erase(
+        completed_command_order_.front());
+
+      completed_command_order_.pop_front();
+    }
+
+    completed_command_order_.push_back(command_id);
+
+    completed_commands_.emplace(
+      command_id,
+      CachedAcknowledgement{
+        status,
+        dispatch,
+        received_at_unix_ms});
   }
 
   [[nodiscard]] CommandServerResult send_and_finish(
@@ -1183,6 +1270,13 @@ private:
   CommandServerConfig config_;
   Clock clock_;
   Dispatcher dispatcher_;
+
+  std::deque<std::string> completed_command_order_;
+
+  std::unordered_map<
+    std::string,
+    CachedAcknowledgement> completed_commands_;
+
   FileDescriptor listener_;
   dev_t socket_device_{0};
   ino_t socket_inode_{0};

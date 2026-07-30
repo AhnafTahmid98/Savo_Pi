@@ -1,0 +1,73 @@
+/savo_bridge/savo_bridge_node:
+  ros__parameters:
+    snapshot_enabled: true
+    snapshot_path: /run/savo_bridge/snapshot.json
+
+    core_evidence_nodes: []
+    core_evidence_topics:
+      - /savo_control/mode_state
+
+    edge_evidence_nodes: []
+    edge_evidence_topics:
+      - /savo_speech/readiness
+
+    observation_topics:
+      - /savo_control/mode_state
+      - /safety/stop
+      - /cmd_vel_safe
+      - /savo_nav/readiness
+      - /savo_locations/status
+      - /savo_speech/readiness
+
+    observation_requirements:
+      - required
+      - required
+      - required
+      - required
+      - required
+      - optional
+
+    observation_stale_after_ms:
+      - 2000
+      - 1000
+      - 1000
+      - 1000
+      - 3000
+      - 3000
+
+    command_server.enabled: true
+    command_server.execution_mode: live
+    command_server.socket_path: /run/savo_bridge/command.sock
+    command_server.bridge_instance_id: savo-bridge-edge
+    command_server.max_request_bytes: 65536
+    command_server.max_response_bytes: 65536
+    command_server.accept_timeout_ms: 250
+    command_server.client_read_timeout_ms: 1000
+    command_server.client_write_timeout_ms: 1000
+    command_server.socket_mode: 432
+    command_server.socket_gid: 10001
+    command_server.command_id_cache_capacity: 1024
+    command_server.allowed_peer_uids:
+      - 10001
+
+    command_dispatcher.mode_command_topic: /savo_control/mode_cmd
+    command_dispatcher.mode_state_topic: /savo_control/mode_state
+    command_dispatcher.external_stop_topic: /savo_control/external_stop
+    command_dispatcher.safety_stop_topic: /safety/stop
+    command_dispatcher.manual_velocity_topic: /cmd_vel_manual
+    command_dispatcher.safe_velocity_topic: /cmd_vel_safe
+    command_dispatcher.navigation_readiness_topic: /savo_nav/readiness
+    command_dispatcher.navigation_action_name: /savo_nav/navigation/navigate_to_pose
+    command_dispatcher.location_resolve_service: /savo_locations/resolve
+    command_dispatcher.active_map_id: saved_map
+    command_dispatcher.active_map_revision: 1
+    command_dispatcher.require_active_map_context: true
+    command_dispatcher.observed_state_timeout_ms: 1000
+    command_dispatcher.mode_transition_timeout_ms: 1500
+    command_dispatcher.stop_confirmation_timeout_ms: 2000
+    command_dispatcher.location_service_timeout_ms: 1500
+    command_dispatcher.navigation_server_timeout_ms: 1500
+    command_dispatcher.navigation_goal_response_timeout_ms: 2000
+    command_dispatcher.navigation_execution_timeout_ms: 300000
+    command_dispatcher.teleop_cancel_timeout_ms: 2000
+    command_dispatcher.navigation_cancel_timeout_ms: 2000

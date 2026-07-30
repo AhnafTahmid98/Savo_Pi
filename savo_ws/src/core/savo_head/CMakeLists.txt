@@ -25,6 +25,7 @@ find_package(std_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
 
 add_library(${PROJECT_NAME}_core
   src/core/head_state.cpp
@@ -63,6 +64,8 @@ function(add_savo_head_node target_name source_file)
 
   ament_target_dependencies(${target_name}
     rclcpp
+    rclcpp_action
+    savo_msgs
     diagnostic_msgs
     geometry_msgs
     sensor_msgs
@@ -70,6 +73,7 @@ function(add_savo_head_node target_name source_file)
     std_srvs
     tf2
     tf2_ros
+    tf2_geometry_msgs
   )
 
   install(TARGETS ${target_name}
@@ -83,6 +87,10 @@ add_savo_head_node(head_tf_node src/nodes/head_tf_node.cpp)
 add_savo_head_node(head_status_node src/nodes/head_status_node.cpp)
 add_savo_head_node(head_camera_status_node src/nodes/head_camera_status_node.cpp)
 add_savo_head_node(apriltag_confirm_node src/nodes/apriltag_confirm_node.cpp)
+add_savo_head_node(
+  apriltag_confirmation_action_node
+  src/nodes/apriltag_confirmation_action_node.cpp
+)
 
 ament_python_install_package(${PROJECT_NAME})
 
@@ -170,6 +178,11 @@ if(BUILD_TESTING)
   ament_add_pytest_test(
     test_apriltag_typed_contract
     test/test_apriltag_typed_contract.py
+  )
+
+  ament_add_pytest_test(
+    test_apriltag_action_runtime_contract
+    test/test_apriltag_action_runtime_contract.py
   )
 
   if(SAVO_HEAD_ENABLE_LEGACY_LINT)
