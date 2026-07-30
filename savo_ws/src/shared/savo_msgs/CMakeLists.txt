@@ -47,6 +47,8 @@ set(action_files
   "action/ConfirmAprilTag.action"
   "action/ExecuteCoveragePath.action"
   "action/RotateToHeading.action"
+  "action/RegisterMappedLocation.action"
+  "action/NavigateToLocation.action"
 )
 set(srv_files
   "srv/ResolveLocation.srv"
@@ -55,6 +57,8 @@ set(srv_files
   "srv/RegisterLocationCandidate.srv"
   "srv/ApproveLocation.srv"
   "srv/SetLocationEnabled.srv"
+  "srv/RecoverLocationStorage.srv"
+  "srv/AuthorizeLocationOperation.srv"
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}
@@ -102,6 +106,12 @@ if(BUILD_TESTING)
 ament_add_pytest_test(
     test_location_interfaces
     test/test_location_interfaces.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
+    test_location_integration_interfaces
+    test/test_location_integration_interfaces.py
     TIMEOUT 60
   )
 endif()

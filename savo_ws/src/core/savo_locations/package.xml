@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <package format="3">
   <name>savo_locations</name>
-  <version>0.10.0</version>
+  <version>0.11.0</version>
   <description>
     Authoritative semantic location registry foundation for Robot Savo.
   </description>

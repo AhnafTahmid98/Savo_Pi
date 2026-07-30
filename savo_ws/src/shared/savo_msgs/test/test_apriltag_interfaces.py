@@ -135,7 +135,7 @@ def test_package_metadata() -> None:
     root = ET.parse(ROOT / "package.xml").getroot()
 
     assert root.findtext("name") == "savo_msgs"
-    assert root.findtext("version") == "0.3.0"
+    assert root.findtext("version") == "0.5.0"
     assert root.findtext("member_of_group") == "rosidl_interface_packages"
 
     dependencies = {

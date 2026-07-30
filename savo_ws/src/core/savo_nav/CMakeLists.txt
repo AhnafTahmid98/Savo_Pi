@@ -45,6 +45,7 @@ add_library(
   src/core/goal_gateway.cpp
   src/core/goal_validator.cpp
   src/core/localization_monitor.cpp
+  src/core/location_navigation_contract.cpp
   src/core/map_context.cpp
   src/core/nav2_health_monitor.cpp
   src/core/navigation_readiness.cpp
@@ -555,6 +556,18 @@ if(BUILD_TESTING)
     test/contracts/test_phase8_costmap_sensor_contracts.py
     TIMEOUT 60
   )
+
+  ament_add_gtest(
+    test_location_navigation_contract
+    test/unit/test_location_navigation_contract.cpp
+  )
+
+  if(TARGET test_location_navigation_contract)
+    target_link_libraries(
+      test_location_navigation_contract
+      savo_nav_core
+    )
+  endif()
 
   ament_lint_auto_find_test_dependencies()
 endif()

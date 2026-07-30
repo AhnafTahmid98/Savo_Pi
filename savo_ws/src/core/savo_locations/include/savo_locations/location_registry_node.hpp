@@ -19,6 +19,7 @@
 #include "savo_msgs/srv/get_location.hpp"
 #include "savo_msgs/srv/list_locations.hpp"
 #include "savo_msgs/srv/register_location_candidate.hpp"
+#include "savo_msgs/srv/recover_location_storage.hpp"
 #include "savo_msgs/srv/resolve_location.hpp"
 #include "savo_msgs/srv/set_location_enabled.hpp"
 
@@ -62,6 +63,9 @@ private:
 
   using SetEnabledService =
     savo_msgs::srv::SetLocationEnabled;
+
+  using RecoveryService =
+    savo_msgs::srv::RecoverLocationStorage;
 
   void initialize_storage();
 
@@ -131,6 +135,12 @@ private:
     std::shared_ptr<
       SetEnabledService::Response> response);
 
+  void handle_recover_storage(
+    const std::shared_ptr<
+      RecoveryService::Request> request,
+    std::shared_ptr<
+      RecoveryService::Response> response);
+
   mutable std::shared_mutex state_mutex_;
   std::mutex mutation_mutex_;
 
@@ -195,6 +205,9 @@ private:
 
   rclcpp::Service<SetEnabledService>::SharedPtr
     set_enabled_service_;
+
+  rclcpp::Service<RecoveryService>::SharedPtr
+    recovery_service_;
 
   rclcpp::TimerBase::SharedPtr status_timer_;
   rclcpp::TimerBase::SharedPtr heartbeat_timer_;

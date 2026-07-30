@@ -16,6 +16,8 @@ find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 
 find_package(rclcpp REQUIRED)
+find_package(rclcpp_action REQUIRED)
+find_package(savo_msgs REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
@@ -163,6 +165,11 @@ if(BUILD_TESTING)
   ament_add_pytest_test(
     test_controller_diagnostic_ownership
     test/test_controller_diagnostic_ownership.py
+  )
+
+  ament_add_pytest_test(
+    test_apriltag_typed_contract
+    test/test_apriltag_typed_contract.py
   )
 
   if(SAVO_HEAD_ENABLE_LEGACY_LINT)

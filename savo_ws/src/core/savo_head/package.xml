@@ -1,4 +1,4 @@
-<?xml version="1.0"?>
+<?xml version='1.0' encoding='utf-8'?>
 <package format="3">
   <name>savo_head</name>
   <version>0.1.0</version>
@@ -6,13 +6,10 @@
     Robot Savo head package for Pi Camera 2 NoIR pan-tilt control, scan behavior,
     head TF, status aggregation, and AprilTag semantic confirmation.
   </description>
-
   <maintainer email="ahnaf.tahmid@example.com">Ahnaf Tahmid</maintainer>
   <license>Apache-2.0</license>
-
   <buildtool_depend>ament_cmake</buildtool_depend>
   <buildtool_depend>ament_cmake_python</buildtool_depend>
-
   <depend>rclcpp</depend>
   <depend>diagnostic_msgs</depend>
   <depend>geometry_msgs</depend>
@@ -21,7 +18,6 @@
   <depend>std_srvs</depend>
   <depend>tf2</depend>
   <depend>tf2_ros</depend>
-
   <exec_depend>rclpy</exec_depend>
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
@@ -29,12 +25,12 @@
   <exec_depend>python3-yaml</exec_depend>
   <exec_depend>python3-numpy</exec_depend>
   <exec_depend>python3-opencv</exec_depend>
-
+  <depend>savo_msgs</depend>
+  <depend>rclcpp_action</depend>
   <test_depend>ament_cmake_pytest</test_depend>
   <test_depend>python3-pytest</test_depend>
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
-
   <export>
     <build_type>ament_cmake</build_type>
   </export>

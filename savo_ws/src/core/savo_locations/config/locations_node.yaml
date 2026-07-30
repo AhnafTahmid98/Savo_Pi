@@ -21,3 +21,11 @@ savo_locations:
     # Transient-local JSON diagnostic snapshot. Typed access remains
     # available through the read and write service contracts.
     publish_snapshot: true
+
+
+# Fail-closed recovery is explicit. When a write transaction reports a
+# storage failure, write_ready remains false until an operator calls:
+#   /savo_locations/storage/recover
+# Recovery opens and validates a fresh SQLite connection before the
+# active repository is replaced. Read services keep the last committed
+# in-memory catalog while write readiness is degraded.

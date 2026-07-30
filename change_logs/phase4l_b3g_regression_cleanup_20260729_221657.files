@@ -1,8 +1,0 @@
-src/coverage/coverage_operation_orchestrator.cpp
-src/nodes/coverage_operation_orchestrator_node.cpp
-test/test_coverage_mapper_node_contract.py
-test/test_scan360_deployment_assets_contract.py
-test/test_scan360_mapper_node_contract.py
-test/test_scan360_orchestrator_contract.py
-test/test_scan360_rotate_action_binding_contract.py
-test/test_tf_pose_reader_contract.py

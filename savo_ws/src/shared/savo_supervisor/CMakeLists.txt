@@ -17,6 +17,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # -----------------------------------------------------------------------------
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(savo_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
 find_package(builtin_interfaces REQUIRED)
@@ -28,6 +29,7 @@ find_package(nlohmann_json REQUIRED)
 add_library(savo_supervisor_core
   src/freshness_tracker.cpp
   src/localization_payload_parser.cpp
+  src/location_authorization_policy.cpp
   src/supervisor_policy.cpp
   src/transition_tracker.cpp
 )
@@ -189,6 +191,13 @@ if(BUILD_TESTING)
     rclcpp
     builtin_interfaces
   )
+
+  ament_add_gtest(test_location_authorization_policy
+    test/test_location_authorization_policy.cpp
+  )
+  target_link_libraries(test_location_authorization_policy
+    savo_supervisor_core
+  )
 endif()
 
 ament_export_targets(
@@ -202,6 +211,7 @@ ament_export_dependencies(
   rclcpp
   builtin_interfaces
   nlohmann_json
+  savo_msgs
 )
 
 ament_package()

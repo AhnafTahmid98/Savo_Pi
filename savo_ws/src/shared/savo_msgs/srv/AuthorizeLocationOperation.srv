@@ -1,0 +1,35 @@
+# Robot Savo — supervisor-owned operation authorization.
+#
+# This service grants permission only. It never performs mapping,
+# persistence, head motion, tag confirmation, or navigation.
+
+uint8 OP_REGISTER_LOCATION_CANDIDATE=1
+uint8 OP_APPROVE_LOCATION=2
+uint8 OP_NAVIGATE_TO_LOCATION=3
+uint8 OP_CONFIRM_LOCATION_ARRIVAL=4
+
+uint8 operation
+string request_id
+string actor_id
+string candidate_id
+string location_id
+string map_id
+uint32 map_revision
+bool motion_required
+---
+uint8 RESULT_AUTHORIZED=0
+uint8 RESULT_INVALID_REQUEST=1
+uint8 RESULT_SUPERVISOR_NOT_READY=2
+uint8 RESULT_HEALTH_BLOCKED=3
+uint8 RESULT_SAFETY_BLOCKED=4
+uint8 RESULT_MAP_CONTEXT_BLOCKED=5
+uint8 RESULT_OPERATION_DISABLED=6
+uint8 RESULT_INTERNAL_ERROR=7
+
+bool authorized
+uint8 result_code
+string reason
+string supervisor_lifecycle
+string supervisor_health
+string supervisor_safety
+builtin_interfaces/Time evaluated_at

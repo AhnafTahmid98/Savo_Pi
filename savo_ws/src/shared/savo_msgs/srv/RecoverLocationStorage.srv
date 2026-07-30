@@ -1,0 +1,26 @@
+# Explicit recovery of the persistent semantic-location registry.
+#
+# Recovery is allowed only when write services are enabled. The server
+# must open a new SQLite connection, validate schema and integrity,
+# bootstrap a complete temporary catalog, and only then replace the
+# active repository and restore write readiness.
+
+string actor_id
+string reason
+---
+uint8 RESULT_RECOVERED=0
+uint8 RESULT_INVALID_REQUEST=1
+uint8 RESULT_NOT_ENABLED=2
+uint8 RESULT_STORAGE_UNAVAILABLE=3
+uint8 RESULT_INTEGRITY_FAILED=4
+uint8 RESULT_INTERNAL_ERROR=5
+
+bool recovered
+uint8 result_code
+string reason
+
+uint32 schema_version
+uint64 location_count
+uint64 candidate_count
+uint64 event_count
+uint64 last_event_sequence

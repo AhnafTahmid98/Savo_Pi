@@ -21,6 +21,7 @@ def test_location_interfaces_registered() -> None:
         "srv/RegisterLocationCandidate.srv",
         "srv/ApproveLocation.srv",
         "srv/SetLocationEnabled.srv",
+        "srv/RecoverLocationStorage.srv",
     ):
         assert f'"{path}"' in cmake
 
@@ -58,3 +59,16 @@ def test_revision_guards() -> None:
         "uint64 expected_record_revision"
         in read("srv/SetLocationEnabled.srv")
     )
+
+
+def test_storage_recovery_contract() -> None:
+    text = read("srv/RecoverLocationStorage.srv")
+
+    for token in (
+        "string actor_id",
+        "RESULT_RECOVERED=0",
+        "RESULT_NOT_ENABLED=2",
+        "RESULT_INTEGRITY_FAILED=4",
+        "uint64 last_event_sequence",
+    ):
+        assert token in text

@@ -64,6 +64,8 @@ add_library(${PROJECT_NAME}_core
   src/scan360/scan360_controller.cpp
   src/scan360/scan360_orchestrator.cpp
   src/scan360/scan360_quality.cpp
+  src/semantic/semantic_landmark.cpp
+  src/semantic/semantic_landmark_recorder.cpp
   src/session/map_session_policy.cpp
   src/session/saved_map_contract.cpp
   src/session/saved_map_quality.cpp
@@ -238,6 +240,8 @@ set(_savo_mapping_public_headers
   include/savo_mapping/scan360_orchestrator.hpp
   include/savo_mapping/scan360_quality.hpp
   include/savo_mapping/map_quality_placeholder.hpp
+  include/savo_mapping/semantic_landmark.hpp
+  include/savo_mapping/semantic_landmark_recorder.hpp
   include/savo_mapping/map_session_policy.hpp
   include/savo_mapping/mapping_mode.hpp
   include/savo_mapping/mapping_status.hpp
@@ -1529,6 +1533,15 @@ if(BUILD_TESTING)
 
   target_link_libraries(
     test_exploration_goal_handoff
+    ${PROJECT_NAME}_core
+  )
+
+  ament_add_gtest(test_semantic_landmark
+    test/test_semantic_landmark.cpp
+  )
+
+  target_link_libraries(
+    test_semantic_landmark
     ${PROJECT_NAME}_core
   )
 

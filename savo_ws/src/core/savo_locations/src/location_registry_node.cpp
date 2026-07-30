@@ -295,6 +295,16 @@ LocationRegistryNode::LocationRegistryNode(
         std::placeholders::_1,
         std::placeholders::_2));
 
+  recovery_service_ =
+    create_service<RecoveryService>(
+      std::string(
+        ::savo_locations::service_names::kRecoverStorage),
+      std::bind(
+        &LocationRegistryNode::handle_recover_storage,
+        this,
+        std::placeholders::_1,
+        std::placeholders::_2));
+
   initialize_storage();
 
   status_timer_ =
@@ -1666,6 +1676,263 @@ void LocationRegistryNode::handle_set_enabled(
     response->updated = false;
     response->result_code =
       SetEnabledService::Response::RESULT_INTERNAL_ERROR;
+    response->reason = exception.what();
+    publish_status();
+  }
+}
+
+
+void LocationRegistryNode::handle_recover_storage(
+  const std::shared_ptr<RecoveryService::Request> request,
+  std::shared_ptr<RecoveryService::Response> response)
+{
+  std::lock_guard<std::mutex> mutation_lock{
+    mutation_mutex_};
+
+  response->recovered = false;
+  response->schema_version = 0U;
+  response->location_count = 0U;
+  response->candidate_count = 0U;
+  response->event_count = 0U;
+  response->last_event_sequence = 0U;
+
+  if (request->actor_id.empty()) {
+    finish_mutation_rejected(
+      "storage recovery requires actor_id");
+
+    response->result_code =
+      RecoveryService::Response::RESULT_INVALID_REQUEST;
+    response->reason =
+      "storage recovery requires actor_id";
+    publish_status();
+    return;
+  }
+
+  if (!enable_write_services_) {
+    finish_mutation_rejected(
+      "write services are disabled");
+
+    response->result_code =
+      RecoveryService::Response::RESULT_NOT_ENABLED;
+    response->reason =
+      "write services are disabled";
+    publish_status();
+    return;
+  }
+
+  {
+    std::unique_lock<std::shared_mutex> lock{
+      state_mutex_};
+
+    mutation_in_progress_ = true;
+    last_mutation_result_ =
+      "storage_recovery:in_progress";
+  }
+
+  try {
+    auto recovered_store =
+      std::make_unique<SqliteStore>(database_path_);
+
+    const auto open_result =
+      recovered_store->open();
+
+    if (!open_result.success) {
+      finish_mutation_degraded(
+        "storage recovery open failed: " +
+        open_result.reason);
+
+      response->result_code =
+        RecoveryService::Response::
+          RESULT_STORAGE_UNAVAILABLE;
+      response->reason = open_result.reason;
+      publish_status();
+      return;
+    }
+
+    if (auto_migrate_) {
+      SchemaStatus schema_status;
+
+      const auto migration_result =
+        recovered_store->migrate(&schema_status);
+
+      if (!migration_result.success) {
+        finish_mutation_degraded(
+          "storage recovery migration failed: " +
+          migration_result.reason);
+
+        response->result_code =
+          RecoveryService::Response::
+            RESULT_STORAGE_UNAVAILABLE;
+        response->reason = migration_result.reason;
+        publish_status();
+        return;
+      }
+    } else {
+      std::uint32_t schema_version = 0U;
+
+      const auto version_result =
+        recovered_store->schema_version(
+          &schema_version);
+
+      if (
+        !version_result.success ||
+        schema_version !=
+          kSupportedSqliteSchemaVersion)
+      {
+        const std::string reason =
+          version_result.success ?
+          "database schema is not current" :
+          version_result.reason;
+
+        finish_mutation_degraded(
+          "storage recovery schema failed: " + reason);
+
+        response->result_code =
+          RecoveryService::Response::
+            RESULT_STORAGE_UNAVAILABLE;
+        response->reason = reason;
+        publish_status();
+        return;
+      }
+    }
+
+    IntegrityReport integrity;
+
+    const auto integrity_result =
+      recovered_store->integrity_check(&integrity);
+
+    if (
+      !integrity_result.success ||
+      !integrity.healthy)
+    {
+      const std::string reason =
+        integrity_result.reason.empty() ?
+        "database integrity validation failed" :
+        integrity_result.reason;
+
+      finish_mutation_degraded(
+        "storage recovery integrity failed: " + reason);
+
+      response->result_code =
+        RecoveryService::Response::
+          RESULT_INTEGRITY_FAILED;
+      response->reason = reason;
+      publish_status();
+      return;
+    }
+
+    auto recovered_repository =
+      std::make_unique<SqliteRepository>(
+        *recovered_store);
+
+    CatalogSnapshot recovered_snapshot;
+    BootstrapReport recovered_report;
+
+    const auto bootstrap_result =
+      recovered_repository->bootstrap(
+        &recovered_snapshot,
+        &recovered_report);
+
+    if (!bootstrap_result.success) {
+      finish_mutation_degraded(
+        "storage recovery bootstrap failed: " +
+        bootstrap_result.reason);
+
+      response->result_code =
+        RecoveryService::Response::
+          RESULT_STORAGE_UNAVAILABLE;
+      response->reason = bootstrap_result.reason;
+      publish_status();
+      return;
+    }
+
+    InMemoryLocationCatalog recovered_catalog;
+    std::string hydration_reason;
+
+    if (
+      !hydrate_catalog(
+        recovered_snapshot,
+        &recovered_catalog,
+        &hydration_reason))
+    {
+      finish_mutation_degraded(
+        "storage recovery hydration failed: " +
+        hydration_reason);
+
+      response->result_code =
+        RecoveryService::Response::
+          RESULT_INTEGRITY_FAILED;
+      response->reason = hydration_reason;
+      publish_status();
+      return;
+    }
+
+    std::unique_ptr<SqliteStore>
+      previous_store;
+    std::unique_ptr<SqliteRepository>
+      previous_repository;
+
+    {
+      std::unique_lock<std::shared_mutex> lock{
+        state_mutex_};
+
+      previous_repository =
+        std::move(repository_);
+      previous_store = std::move(store_);
+
+      store_ = std::move(recovered_store);
+      repository_ =
+        std::move(recovered_repository);
+
+      catalog_snapshot_ =
+        std::move(recovered_snapshot);
+      catalog_view_.replace(catalog_snapshot_);
+      bootstrap_report_ = recovered_report;
+
+      ready_ = true;
+      write_ready_ = true;
+      storage_healthy_ = true;
+      mutation_in_progress_ = false;
+      state_ = "ready";
+      reason_ =
+        "persistent read/write registry recovered";
+      last_mutation_event_sequence_ =
+        recovered_report.last_event_sequence;
+      last_mutation_result_ =
+        "storage_recovered:" + request->actor_id;
+    }
+
+    response->recovered = true;
+    response->result_code =
+      RecoveryService::Response::RESULT_RECOVERED;
+    response->reason =
+      "storage recovered after verified reload";
+    response->schema_version =
+      recovered_report.schema_version;
+    response->location_count =
+      static_cast<std::uint64_t>(
+        recovered_report.location_count);
+    response->candidate_count =
+      static_cast<std::uint64_t>(
+        recovered_report.candidate_count);
+    response->event_count =
+      recovered_report.event_count;
+    response->last_event_sequence =
+      recovered_report.last_event_sequence;
+
+    if (publish_snapshot_enabled_) {
+      publish_snapshot();
+    }
+
+    publish_status();
+  }
+  catch (const std::exception & exception) {
+    finish_mutation_degraded(
+      "storage recovery exception: " +
+      std::string(exception.what()));
+
+    response->result_code =
+      RecoveryService::Response::RESULT_INTERNAL_ERROR;
     response->reason = exception.what();
     publish_status();
   }

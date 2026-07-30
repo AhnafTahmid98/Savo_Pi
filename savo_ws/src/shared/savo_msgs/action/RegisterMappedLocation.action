@@ -1,0 +1,67 @@
+# Robot Savo — mapping-owned typed semantic-location candidate workflow.
+#
+# Ownership:
+# - savo_head confirms camera-derived AprilTag evidence.
+# - savo_mapping validates/georeferences the candidate and calls
+#   savo_locations/candidates/register.
+# - savo_locations remains the only persistent location authority.
+
+int32 ANY_TAG_ID=-1
+
+string request_id
+string actor_id
+string candidate_id
+
+string expected_family
+int32 expected_tag_id
+
+string map_id
+uint32 map_revision
+string map_release_id
+
+string suggested_location_id
+string suggested_display_name
+string[] suggested_aliases
+string suggested_semantic_type
+
+bool approach_pose_valid
+geometry_msgs/PoseStamped approach_pose
+
+bool confirmation_pose_valid
+geometry_msgs/PoseStamped confirmation_pose
+
+string building
+string floor
+string area
+string notes
+
+string source_session_id
+builtin_interfaces/Duration timeout
+---
+uint8 RESULT_REGISTERED=0
+uint8 RESULT_INVALID_REQUEST=1
+uint8 RESULT_SUPERVISOR_DENIED=2
+uint8 RESULT_HEAD_UNAVAILABLE=3
+uint8 RESULT_CONFIRMATION_FAILED=4
+uint8 RESULT_LOCATION_REGISTRY_UNAVAILABLE=5
+uint8 RESULT_REGISTRATION_REJECTED=6
+uint8 RESULT_TIMED_OUT=7
+uint8 RESULT_CANCELED=8
+uint8 RESULT_INTERNAL_ERROR=9
+
+bool registered
+uint8 result_code
+string reason
+savo_msgs/LocationCandidate candidate
+---
+uint8 STATE_VALIDATING=0
+uint8 STATE_REQUESTING_AUTHORIZATION=1
+uint8 STATE_CONFIRMING_TAG=2
+uint8 STATE_BUILDING_CANDIDATE=3
+uint8 STATE_PERSISTING_CANDIDATE=4
+
+uint8 state
+string state_text
+uint32 accepted_observations
+float32 detection_quality
+int32 current_tag_id

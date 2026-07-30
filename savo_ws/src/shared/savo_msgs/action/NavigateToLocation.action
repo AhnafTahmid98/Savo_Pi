@@ -1,0 +1,54 @@
+# Robot Savo — navigation-owned semantic destination workflow.
+#
+# The server must resolve the query through savo_locations and forward
+# only LocationRecord.approach_pose to the existing validated navigation
+# gateway. tag_pose_map is landmark evidence and is never a motion goal.
+
+string request_id
+string actor_id
+string query
+
+bool enforce_map_context
+string map_id
+uint32 map_revision
+
+bool require_arrival_confirmation
+builtin_interfaces/Duration timeout
+---
+uint8 RESULT_SUCCEEDED=0
+uint8 RESULT_INVALID_REQUEST=1
+uint8 RESULT_LOCATION_NOT_FOUND=2
+uint8 RESULT_LOCATION_AMBIGUOUS=3
+uint8 RESULT_LOCATION_DISABLED=4
+uint8 RESULT_MAP_MISMATCH=5
+uint8 RESULT_SUPERVISOR_DENIED=6
+uint8 RESULT_NAVIGATION_UNAVAILABLE=7
+uint8 RESULT_NAVIGATION_REJECTED=8
+uint8 RESULT_NAVIGATION_FAILED=9
+uint8 RESULT_HEAD_UNAVAILABLE=10
+uint8 RESULT_ARRIVAL_CONFIRMATION_FAILED=11
+uint8 RESULT_TIMED_OUT=12
+uint8 RESULT_CANCELED=13
+uint8 RESULT_INTERNAL_ERROR=14
+
+bool succeeded
+uint8 result_code
+string reason
+
+savo_msgs/LocationRecord location
+bool navigation_succeeded
+bool arrival_confirmed
+savo_msgs/AprilTagObservation final_observation
+---
+uint8 STATE_RESOLVING_LOCATION=0
+uint8 STATE_REQUESTING_AUTHORIZATION=1
+uint8 STATE_NAVIGATING_TO_APPROACH_POSE=2
+uint8 STATE_CONFIRMING_ARRIVAL=3
+uint8 STATE_COMPLETING=4
+
+uint8 state
+string state_text
+string location_id
+float32 distance_remaining_m
+uint32 navigation_recoveries
+uint32 accepted_tag_observations

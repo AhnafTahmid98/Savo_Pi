@@ -24,6 +24,9 @@ inline constexpr std::string_view kApproveCandidate{
 inline constexpr std::string_view kSetEnabled{
   "/savo_locations/set_enabled"};
 
+inline constexpr std::string_view kRecoverStorage{
+  "/savo_locations/storage/recover"};
+
 }  // namespace savo_locations::service_names
 
 #endif  // SAVO_LOCATIONS__SERVICE_NAMES_HPP_

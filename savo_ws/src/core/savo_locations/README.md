@@ -328,3 +328,17 @@ A persistence or event-journal failure disables further writes until restart
 while the last committed in-memory read view remains available. Status reports
 separate `read_ready` and `write_ready` fields so supervision can distinguish a
 readable registry from a write-degraded registry.
+
+
+## LOC-3P persistent runtime hardening
+
+A failed SQLite mutation disables further writes while preserving the
+last committed in-memory catalog for read services. Write readiness is
+restored only through `/savo_locations/storage/recover`. Recovery opens
+a new connection, validates schema and SQLite integrity, bootstraps the
+full catalog and event journal into temporary state, validates catalog
+hydration, and swaps the active repository only after all checks pass.
+
+Simultaneous mutation requests remain serialized. Concurrency tests
+require exactly one commit when two operators attempt to approve the
+same candidate revision.
