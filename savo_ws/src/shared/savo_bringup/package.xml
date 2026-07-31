@@ -1,15 +1,17 @@
 <?xml version="1.0"?>
 <package format="3">
   <name>savo_bringup</name>
-  <version>0.2.0</version>
-  <description>Production launch and deployment wiring for Robot Savo.</description>
+  <version>0.3.0</version>
+  <description>Production launch and lifecycle integration for Robot Savo.</description>
 
   <maintainer email="todo@example.com">TODO_NAME</maintainer>
   <license>MIT</license>
 
   <buildtool_depend>ament_python</buildtool_depend>
 
+  <exec_depend>action_msgs</exec_depend>
   <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
   <exec_depend>rclpy</exec_depend>

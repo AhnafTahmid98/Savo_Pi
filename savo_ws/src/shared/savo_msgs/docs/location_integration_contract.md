@@ -65,3 +65,25 @@ After Nav2 succeeds, the base remains at the approved approach pose. When confir
 ## Failure semantics
 
 Every action returns a typed result code and deterministic reason. Dependency unavailability, supervisor denial, invalid map context, disabled locations, downstream rejection, timeout and cancellation fail closed. A navigation success flag and an arrival-confirmation flag are reported separately.
+
+## Production lifecycle launch
+
+`ros2 launch savo_bringup location_integration.launch.py` is the supported
+cross-package orchestration boundary. It starts the registry, supervisor,
+AprilTag observer and confirmation action, mapped-location registration,
+authorized candidate review gateway, and semantic navigation. It does not
+start a fake navigation server and does not replace the normal Nav2 or guarded
+navigation bringup.
+
+The launch exposes bounded overrides for the persistent database path,
+supervisor localization requirement, head observation thresholds, downstream
+service timeouts, the validated navigation action name, and arrival
+confirmation timeout. Production defaults remain fail-closed; test overrides
+are explicit launch arguments.
+
+`ros2 run savo_bringup run_location_lifecycle_runtime` exercises the production
+launch with synthetic observations and a fake Nav2 server. It proves the happy
+path from fresh AprilTag evidence through candidate registration, authorized
+review, alias resolution, approach-pose navigation, and saved-tag arrival
+confirmation. The deeper `savo_nav` location integration smoke remains the
+failure-path and persistence-restart test.

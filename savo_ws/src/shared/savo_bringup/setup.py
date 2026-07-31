@@ -6,7 +6,7 @@ package_name = "savo_bringup"
 
 setup(
     name=package_name,
-    version="0.2.0",
+    version="0.3.0",
     packages=[package_name],
     data_files=[
         (
@@ -15,7 +15,7 @@ setup(
         ),
         (
             f"share/{package_name}",
-            ["package.xml"],
+            ["package.xml", "README.md"],
         ),
         (
             f"share/{package_name}/launch",
@@ -27,8 +27,16 @@ setup(
     maintainer="TODO_NAME",
     maintainer_email="todo@example.com",
     description=(
-        "Production launch and deployment wiring for Robot Savo."
+        "Production launch and lifecycle integration for Robot Savo."
     ),
     license="MIT",
     tests_require=["pytest"],
+    entry_points={
+        "console_scripts": [
+            (
+                "run_location_lifecycle_runtime = "
+                "savo_bringup.location_lifecycle_runtime:main"
+            ),
+        ],
+    },
 )
