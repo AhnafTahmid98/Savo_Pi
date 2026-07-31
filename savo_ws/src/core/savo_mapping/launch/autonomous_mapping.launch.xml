@@ -53,6 +53,19 @@
     default="$(find-pkg-share savo_mapping)/config/autonomous_mapping_orchestrator.yaml"/>
 
   <arg
+    name="scan360_params_file"
+    default="$(find-pkg-share savo_mapping)/config/scan360_mapping.yaml"/>
+
+  <arg
+    name="scan360_profile_file"
+    default="$(find-pkg-share savo_mapping)/config/profiles/scan360_real_robot.yaml"/>
+
+  <arg
+    name="scan360_use_real_robot_profile"
+    default="true"
+    description="Load conservative real-robot Scan360 timing overrides"/>
+
+  <arg
     name="map_frame"
     default="map"/>
 
@@ -198,6 +211,34 @@
     <arg
       name="manager_params_file"
       value="$(var exploration_manager_params_file)"/>
+  </include>
+
+  <include
+    file="$(find-pkg-share savo_mapping)/launch/scan360_mapping.launch.xml">
+
+    <arg
+      name="params_file"
+      value="$(var scan360_params_file)"/>
+
+    <arg
+      name="profile_file"
+      value="$(var scan360_profile_file)"/>
+
+    <arg
+      name="use_real_robot_profile"
+      value="$(var scan360_use_real_robot_profile)"/>
+
+    <arg
+      name="enabled"
+      value="true"/>
+
+    <arg
+      name="auto_start"
+      value="false"/>
+
+    <arg
+      name="use_sim_time"
+      value="$(var use_sim_time)"/>
   </include>
 
   <include

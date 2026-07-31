@@ -48,6 +48,11 @@ MissionInputs starting_inputs()
   inputs.handoff_state_received = true;
   inputs.handoff_active = false;
   inputs.handoff_state = "idle";
+
+  // AM-1 through AM-3 compatibility fixtures skip the AM-5 prelude.
+  inputs.require_start_pose_capture = false;
+  inputs.require_initial_scan360 = false;
+  inputs.require_initial_head_scan = false;
   return inputs;
 }
 
@@ -63,6 +68,271 @@ MissionInputs exploring_inputs()
 }
 
 }  // namespace
+
+
+TEST(AutonomousMappingMissionTest, SequencesStartPoseInitialScansThenFrontier)
+{
+  AutonomousMappingMission mission;
+  auto inputs = starting_inputs();
+  inputs.require_start_pose_capture = true;
+  inputs.require_initial_scan360 = true;
+  inputs.require_initial_head_scan = true;
+
+  auto decision = mission.start(valid_request(), inputs);
+  ASSERT_TRUE(decision.accepted);
+  EXPECT_TRUE(decision.request_start_session);
+
+  inputs.session_state = SessionState::Active;
+  decision = mission.observe(inputs);
+  EXPECT_EQ(decision.snapshot.state, MissionState::CapturingStartPose);
+  EXPECT_TRUE(decision.request_start_pose_capture);
+
+  inputs.start_pose_capture_started = true;
+  inputs.start_pose_capture_complete = true;
+  inputs.start_pose_valid = true;
+  inputs.start_pose_reason = "start_pose_captured";
+  inputs.start_pose_generation = 1U;
+  decision = mission.observe(inputs);
+  EXPECT_EQ(decision.snapshot.state, MissionState::InitialScan360);
+  EXPECT_TRUE(decision.request_scan360_mode);
+
+  inputs.mode = MappingMode::Autonomous;
+  inputs.exploration_mode = ExplorationMode::Scan360;
+  inputs.workflow_phase = WorkflowPhase::Scan360;
+  decision = mission.observe(inputs);
+  EXPECT_TRUE(decision.request_scan360_start);
+
+  inputs.scan360_started = true;
+  inputs.scan360_complete = true;
+  inputs.scan360_succeeded = true;
+  inputs.scan360_generation = 1U;
+  inputs.scan360_state = "complete";
+  inputs.scan360_reason = "scan360_complete";
+  decision = mission.observe(inputs);
+  EXPECT_EQ(decision.snapshot.state, MissionState::InitialHeadScan);
+  EXPECT_TRUE(decision.request_monitor_mode);
+
+  inputs.mode = MappingMode::MonitorOnly;
+  inputs.exploration_mode = ExplorationMode::Idle;
+  inputs.workflow_phase = WorkflowPhase::Idle;
+  decision = mission.observe(inputs);
+  EXPECT_TRUE(decision.request_head_scan_start);
+
+  inputs.head_scan_started = true;
+  inputs.head_scan_complete = true;
+  inputs.head_scan_succeeded = true;
+  inputs.head_scan_generation = 1U;
+  inputs.head_scan_state = "done";
+  inputs.head_scan_reason = "head_scan_complete";
+  decision = mission.observe(inputs);
+  EXPECT_EQ(decision.snapshot.state, MissionState::Starting);
+  EXPECT_TRUE(decision.request_frontier_mode);
+
+  inputs.mode = MappingMode::Autonomous;
+  inputs.exploration_mode = ExplorationMode::Frontier;
+  inputs.workflow_phase = WorkflowPhase::Exploring;
+  inputs.runtime_authorized = true;
+  decision = mission.observe(inputs);
+
+  EXPECT_EQ(decision.snapshot.state, MissionState::Exploring);
+  EXPECT_TRUE(decision.snapshot.start_pose_valid);
+  EXPECT_TRUE(decision.snapshot.initial_scan360_complete);
+  EXPECT_TRUE(decision.snapshot.initial_scan360_succeeded);
+  EXPECT_TRUE(decision.snapshot.initial_head_scan_complete);
+  EXPECT_TRUE(decision.snapshot.initial_head_scan_succeeded);
+}
+
+TEST(AutonomousMappingMissionTest, InitialScanWithoutHeadEntersFrontier)
+{
+  AutonomousMappingMission mission;
+  auto inputs = starting_inputs();
+  inputs.session_state = SessionState::Active;
+  inputs.require_initial_scan360 = true;
+
+  auto decision = mission.start(valid_request(), inputs);
+  ASSERT_EQ(decision.snapshot.state, MissionState::InitialScan360);
+  EXPECT_TRUE(decision.request_scan360_mode);
+
+  inputs.mode = MappingMode::Autonomous;
+  inputs.exploration_mode = ExplorationMode::Scan360;
+  inputs.workflow_phase = WorkflowPhase::Scan360;
+  decision = mission.observe(inputs);
+  EXPECT_TRUE(decision.request_scan360_start);
+
+  inputs.scan360_started = true;
+  inputs.scan360_complete = true;
+  inputs.scan360_succeeded = true;
+  inputs.scan360_generation = 1U;
+  inputs.scan360_state = "complete";
+  inputs.scan360_reason = "scan360_complete";
+  decision = mission.observe(inputs);
+  EXPECT_EQ(decision.snapshot.state, MissionState::Starting);
+  EXPECT_TRUE(decision.request_frontier_mode);
+
+  inputs.mode = MappingMode::Autonomous;
+  inputs.exploration_mode = ExplorationMode::Frontier;
+  inputs.workflow_phase = WorkflowPhase::Exploring;
+  inputs.runtime_authorized = true;
+  decision = mission.observe(inputs);
+  EXPECT_EQ(decision.snapshot.state, MissionState::Exploring);
+}
+
+TEST(AutonomousMappingMissionTest, InitialScanFailureIsTyped)
+{
+  AutonomousMappingMission mission;
+  auto inputs = starting_inputs();
+  inputs.require_initial_scan360 = true;
+  inputs.session_state = SessionState::Active;
+
+  auto decision = mission.start(valid_request(), inputs);
+  ASSERT_EQ(decision.snapshot.state, MissionState::InitialScan360);
+
+  inputs.mode = MappingMode::Autonomous;
+  inputs.exploration_mode = ExplorationMode::Scan360;
+  inputs.workflow_phase = WorkflowPhase::Scan360;
+  inputs.scan360_generation = 1U;
+  inputs.scan360_started = true;
+  inputs.scan360_complete = true;
+  inputs.scan360_succeeded = false;
+  inputs.scan360_state = "failed";
+  inputs.scan360_reason = "rotation_action_server_unavailable";
+  decision = mission.observe(inputs);
+
+  EXPECT_TRUE(decision.terminal);
+  EXPECT_EQ(decision.snapshot.state, MissionState::Failed);
+  EXPECT_EQ(decision.snapshot.result, MissionResult::ScanFailed);
+  EXPECT_EQ(
+    decision.snapshot.reason,
+    "rotation_action_server_unavailable");
+}
+
+TEST(AutonomousMappingMissionTest, ConditionalScanQuiescesAndResumesFrontier)
+{
+  AutonomousMappingMission mission;
+  auto inputs = exploring_inputs();
+  ASSERT_TRUE(mission.start(valid_request(), inputs).accepted);
+
+  inputs.handoff_active = true;
+  inputs.handoff_state = "executing";
+  auto decision = mission.control(
+    MissionCommand::RequestScan360,
+    "map_growth_stalled",
+    inputs);
+  EXPECT_EQ(decision.snapshot.state, MissionState::Pausing);
+  EXPECT_TRUE(decision.request_handoff_cancel);
+
+  inputs.handoff_active = false;
+  inputs.handoff_state = "canceled";
+  decision = mission.observe(inputs);
+  EXPECT_TRUE(decision.request_monitor_mode);
+
+  inputs.mode = MappingMode::MonitorOnly;
+  inputs.exploration_mode = ExplorationMode::Idle;
+  inputs.workflow_phase = WorkflowPhase::Idle;
+  inputs.runtime_authorized = false;
+  decision = mission.observe(inputs);
+  EXPECT_EQ(decision.snapshot.state, MissionState::ConditionalScan360);
+  EXPECT_TRUE(decision.request_scan360_mode);
+
+  inputs.mode = MappingMode::Autonomous;
+  inputs.exploration_mode = ExplorationMode::Scan360;
+  inputs.workflow_phase = WorkflowPhase::Scan360;
+  decision = mission.observe(inputs);
+  EXPECT_TRUE(decision.request_scan360_start);
+
+  inputs.scan360_generation = 1U;
+  inputs.scan360_started = true;
+  inputs.scan360_complete = true;
+  inputs.scan360_succeeded = true;
+  inputs.scan360_state = "complete";
+  decision = mission.observe(inputs);
+  EXPECT_EQ(decision.snapshot.state, MissionState::Resuming);
+  EXPECT_TRUE(decision.request_frontier_mode);
+
+  inputs.mode = MappingMode::Autonomous;
+  inputs.exploration_mode = ExplorationMode::Frontier;
+  inputs.workflow_phase = WorkflowPhase::Exploring;
+  inputs.runtime_authorized = true;
+  decision = mission.observe(inputs);
+
+  EXPECT_EQ(decision.snapshot.state, MissionState::Exploring);
+  EXPECT_EQ(decision.snapshot.conditional_scan360_completed, 1U);
+}
+
+TEST(AutonomousMappingMissionTest, PausedHeadScanUsesResumeBoundary)
+{
+  AutonomousMappingMission mission;
+  auto inputs = starting_inputs();
+  inputs.require_initial_head_scan = true;
+  inputs.session_state = SessionState::Active;
+
+  auto decision = mission.start(valid_request(), inputs);
+  ASSERT_EQ(decision.snapshot.state, MissionState::InitialHeadScan);
+  EXPECT_TRUE(decision.request_head_scan_start);
+
+  inputs.head_scan_generation = 1U;
+  inputs.head_scan_started = true;
+  inputs.head_scan_active = true;
+  inputs.head_scan_state = "running";
+  decision = mission.control(MissionCommand::Pause, "operator_pause", inputs);
+  EXPECT_TRUE(decision.request_head_scan_pause);
+
+  inputs.head_scan_active = false;
+  inputs.head_scan_paused = true;
+  inputs.head_scan_state = "paused";
+  decision = mission.observe(inputs);
+  ASSERT_EQ(decision.snapshot.state, MissionState::Paused);
+
+  decision = mission.control(MissionCommand::Resume, "operator_resume", inputs);
+  EXPECT_EQ(decision.snapshot.state, MissionState::InitialHeadScan);
+  EXPECT_TRUE(decision.request_head_scan_resume);
+  EXPECT_FALSE(decision.request_head_scan_start);
+}
+
+TEST(AutonomousMappingMissionTest, PausedScanRestartsFromAnewGeneration)
+{
+  AutonomousMappingMission mission;
+  auto inputs = starting_inputs();
+  inputs.require_initial_scan360 = true;
+  inputs.session_state = SessionState::Active;
+  inputs.mode = MappingMode::Autonomous;
+  inputs.exploration_mode = ExplorationMode::Scan360;
+  inputs.workflow_phase = WorkflowPhase::Scan360;
+
+  auto decision = mission.start(valid_request(), inputs);
+  ASSERT_EQ(decision.snapshot.state, MissionState::InitialScan360);
+
+  inputs.scan360_generation = 1U;
+  inputs.scan360_started = true;
+  inputs.scan360_active = true;
+  inputs.scan360_state = "rotating";
+  decision = mission.control(MissionCommand::Pause, "operator_pause", inputs);
+  EXPECT_TRUE(decision.request_scan360_cancel);
+
+  inputs.scan360_active = false;
+  inputs.scan360_complete = true;
+  inputs.scan360_succeeded = false;
+  inputs.scan360_state = "canceled";
+  decision = mission.observe(inputs);
+  EXPECT_TRUE(decision.request_monitor_mode);
+
+  inputs.mode = MappingMode::MonitorOnly;
+  inputs.exploration_mode = ExplorationMode::Idle;
+  inputs.workflow_phase = WorkflowPhase::Idle;
+  decision = mission.observe(inputs);
+  ASSERT_EQ(decision.snapshot.state, MissionState::Paused);
+
+  decision = mission.control(MissionCommand::Resume, "operator_resume", inputs);
+  EXPECT_EQ(decision.snapshot.state, MissionState::InitialScan360);
+  EXPECT_TRUE(decision.request_scan360_mode);
+
+  inputs.mode = MappingMode::Autonomous;
+  inputs.exploration_mode = ExplorationMode::Scan360;
+  inputs.workflow_phase = WorkflowPhase::Scan360;
+  decision = mission.observe(inputs);
+  EXPECT_TRUE(decision.request_scan360_start);
+  EXPECT_EQ(decision.snapshot.scan360_state, "canceled");
+}
 
 TEST(AutonomousMappingMissionTest, RejectsInvalidAndConcurrentStarts)
 {

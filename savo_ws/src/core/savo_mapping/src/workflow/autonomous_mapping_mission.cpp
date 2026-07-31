@@ -50,6 +50,30 @@ std::string_view to_string(const MissionState state)
       return "failed";
     case MissionState::CompletionPending:
       return "completion_pending";
+    case MissionState::CapturingStartPose:
+      return "capturing_start_pose";
+    case MissionState::InitialScan360:
+      return "initial_scan360";
+    case MissionState::InitialHeadScan:
+      return "initial_head_scan";
+    case MissionState::ConditionalScan360:
+      return "conditional_scan360";
+    case MissionState::CoveragePending:
+      return "coverage_pending";
+    case MissionState::Coverage:
+      return "coverage";
+    case MissionState::ReturningToStart:
+      return "returning_to_start";
+    case MissionState::FinalScan360:
+      return "final_scan360";
+    case MissionState::FinalHeadScan:
+      return "final_head_scan";
+    case MissionState::VerifyingLocations:
+      return "verifying_locations";
+    case MissionState::AwaitingApproval:
+      return "awaiting_approval";
+    case MissionState::Releasing:
+      return "releasing";
   }
 
   return "unknown";
@@ -78,6 +102,10 @@ std::string_view to_string(const MissionResult result)
       return "quality_rejected";
     case MissionResult::InternalError:
       return "internal_error";
+    case MissionResult::ScanFailed:
+      return "scan_failed";
+    case MissionResult::StartPoseUnavailable:
+      return "start_pose_unavailable";
     case MissionResult::None:
       return "not_terminal";
   }
@@ -94,6 +122,8 @@ std::string_view to_string(const MissionCommand command)
       return "resume";
     case MissionCommand::Cancel:
       return "cancel";
+    case MissionCommand::RequestScan360:
+      return "request_scan360";
   }
 
   return "unknown";
@@ -110,6 +140,14 @@ bool is_terminal(const MissionState state)
     state == MissionState::Completed ||
     state == MissionState::Canceled ||
     state == MissionState::Failed;
+}
+
+bool is_scan_state(const MissionState state)
+{
+  return
+    state == MissionState::InitialScan360 ||
+    state == MissionState::ConditionalScan360 ||
+    state == MissionState::FinalScan360;
 }
 
 bool is_valid_request(const MissionRequest & request)
@@ -168,6 +206,17 @@ MissionDecision AutonomousMappingMission::start(
   pending_terminal_result_ = MissionResult::Canceled;
   pending_terminal_reason_ = "mission_canceled";
   previous_handoff_state_ = "unavailable";
+  resume_state_ = MissionState::Starting;
+  transition_to_conditional_scan_ = false;
+
+  start_pose_generation_floor_ = inputs.start_pose_generation;
+  scan360_generation_floor_ = inputs.scan360_generation;
+  head_scan_generation_floor_ = inputs.head_scan_generation;
+
+  start_pose_captured_ = !inputs.require_start_pose_capture;
+  initial_scan360_completed_ = !inputs.require_initial_scan360;
+  initial_head_scan_completed_ = !inputs.require_initial_head_scan;
+  conditional_scan360_completed_ = 0U;
 
   return evaluate(inputs);
 }
@@ -206,7 +255,7 @@ MissionDecision AutonomousMappingMission::control(
         return rejected("mission_cancel_in_progress");
       }
 
-      enter(MissionState::Pausing, std::move(reason));
+      begin_pause(snapshot_.state, std::move(reason), false);
       break;
 
     case MissionCommand::Resume:
@@ -230,6 +279,17 @@ MissionDecision AutonomousMappingMission::control(
       }
 
       begin_stop(MissionResult::Canceled, std::move(reason));
+      break;
+
+    case MissionCommand::RequestScan360:
+      if (snapshot_.state != MissionState::Exploring) {
+        return rejected("conditional_scan360_requires_exploring_state");
+      }
+
+      begin_pause(
+        MissionState::Exploring,
+        std::move(reason),
+        true);
       break;
   }
 
@@ -289,13 +349,9 @@ MissionDecision AutonomousMappingMission::evaluate(
       inputs.session_state.has_value() &&
       inputs.session_state.value() == SessionState::Failed)
     {
-      snapshot_.state = MissionState::Failed;
-      snapshot_.result = MissionResult::InternalError;
-      snapshot_.active = false;
-      snapshot_.reason = "mapping_session_failed_during_completion";
-      output = decision(snapshot_.reason);
-      output.terminal = true;
-      return output;
+      return fail(
+        MissionResult::InternalError,
+        "mapping_session_failed_during_completion");
     }
 
     if (
@@ -312,9 +368,7 @@ MissionDecision AutonomousMappingMission::evaluate(
     }
 
     if (!inputs.completion_confirmed && workflow_is_frontier(inputs)) {
-      enter(
-        MissionState::Exploring,
-        "completion_evidence_revoked");
+      enter(MissionState::Exploring, "completion_evidence_revoked");
       return decision(snapshot_.reason);
     }
 
@@ -334,15 +388,13 @@ MissionDecision AutonomousMappingMission::evaluate(
       return output;
     }
 
-    if (!inputs.mapping_ready || inputs.safety_stop_active) {
+    if (!safe_mapping_state(inputs)) {
       snapshot_.reason = "completion_waiting_for_safe_mapping_state";
       return decision(snapshot_.reason);
     }
 
     if (snapshot_.request.auto_save) {
-      enter(
-        MissionState::Saving,
-        "automatic_map_save_requested");
+      enter(MissionState::Saving, "automatic_map_save_requested");
       return evaluate(inputs);
     }
 
@@ -370,28 +422,20 @@ MissionDecision AutonomousMappingMission::evaluate(
 
     if (!inputs.map_save_complete) {
       output.request_map_save = true;
-      output.reason = inputs.map_save_started ?
-        "automatic_map_save_in_progress" :
-        "requesting_automatic_map_save";
+      output.reason = "automatic_map_save_in_progress";
       snapshot_.reason = output.reason;
       output.snapshot = snapshot_;
       return output;
     }
 
     if (!inputs.map_save_succeeded) {
-      snapshot_.state = MissionState::Failed;
-      snapshot_.result = MissionResult::SaveFailed;
-      snapshot_.active = false;
-      snapshot_.reason = inputs.map_save_reason.empty() ?
-        "automatic_map_save_failed" : inputs.map_save_reason;
-      output = decision(snapshot_.reason);
-      output.terminal = true;
-      return output;
+      return fail(
+        MissionResult::SaveFailed,
+        inputs.map_save_reason.empty() ?
+        "automatic_map_save_failed" : inputs.map_save_reason);
     }
 
-    enter(
-      MissionState::Verifying,
-      "saved_map_verification_requested");
+    enter(MissionState::Verifying, "saved_map_verification_requested");
     return evaluate(inputs);
   }
 
@@ -412,14 +456,10 @@ MissionDecision AutonomousMappingMission::evaluate(
     }
 
     if (!inputs.verification_succeeded) {
-      snapshot_.state = MissionState::Failed;
-      snapshot_.result = MissionResult::SaveFailed;
-      snapshot_.active = false;
-      snapshot_.reason = inputs.verification_reason.empty() ?
-        "saved_map_verification_failed" : inputs.verification_reason;
-      output = decision(snapshot_.reason);
-      output.terminal = true;
-      return output;
+      return fail(
+        MissionResult::SaveFailed,
+        inputs.verification_reason.empty() ?
+        "saved_map_verification_failed" : inputs.verification_reason);
     }
 
     snapshot_.state = MissionState::Completed;
@@ -432,55 +472,28 @@ MissionDecision AutonomousMappingMission::evaluate(
     return output;
   }
 
-  if (snapshot_.state == MissionState::Exploring) {
-    const bool authority_lost =
-      !authority_inputs_complete(inputs) ||
-      !inputs.mapping_ready ||
-      inputs.safety_stop_active ||
-      !inputs.runtime_authorized ||
-      !workflow_is_frontier(inputs);
-
-    if (authority_lost) {
-      enter(
-        MissionState::Pausing,
-        "authority_lost_pause_required");
-    } else if (inputs.completion_confirmed) {
-      enter(
-        MissionState::CompletionPending,
-        inputs.completion_reason.empty() ?
-        "frontier_exhaustion_confirmed" :
-        inputs.completion_reason);
-      return evaluate(inputs);
-    }
-  }
-
-  MissionDecision output = decision(snapshot_.reason);
-
-  if (snapshot_.state == MissionState::Pausing) {
-    if (inputs.handoff_active) {
-      output.request_handoff_cancel = true;
-      output.reason = "pause_waiting_for_handoff_cancel";
-      snapshot_.reason = output.reason;
-      output.snapshot = snapshot_;
-      return output;
-    }
-
-    if (!workflow_is_monitor_only(inputs)) {
-      output.request_monitor_mode = true;
-      output.reason = "pause_requesting_monitor_mode";
-      snapshot_.reason = output.reason;
-      output.snapshot = snapshot_;
-      return output;
-    }
-
-    enter(MissionState::Paused, "mission_paused");
-    return decision(snapshot_.reason);
-  }
-
   if (snapshot_.state == MissionState::Canceling) {
+    MissionDecision output = decision(snapshot_.reason);
+
     if (inputs.handoff_active) {
       output.request_handoff_cancel = true;
       output.reason = "cancel_waiting_for_handoff_cancel";
+      snapshot_.reason = output.reason;
+      output.snapshot = snapshot_;
+      return output;
+    }
+
+    if (inputs.scan360_active) {
+      output.request_scan360_cancel = true;
+      output.reason = "cancel_waiting_for_scan360_cancel";
+      snapshot_.reason = output.reason;
+      output.snapshot = snapshot_;
+      return output;
+    }
+
+    if (inputs.head_scan_active) {
+      output.request_head_scan_pause = true;
+      output.reason = "cancel_waiting_for_head_scan_pause";
       snapshot_.reason = output.reason;
       output.snapshot = snapshot_;
       return output;
@@ -514,9 +527,205 @@ MissionDecision AutonomousMappingMission::evaluate(
     return output;
   }
 
+  if (snapshot_.state == MissionState::Pausing) {
+    MissionDecision output = decision(snapshot_.reason);
+
+    if (inputs.handoff_active) {
+      output.request_handoff_cancel = true;
+      output.reason = "pause_waiting_for_handoff_cancel";
+      snapshot_.reason = output.reason;
+      output.snapshot = snapshot_;
+      return output;
+    }
+
+    if (inputs.scan360_active) {
+      output.request_scan360_cancel = true;
+      output.reason = "pause_waiting_for_scan360_cancel";
+      snapshot_.reason = output.reason;
+      output.snapshot = snapshot_;
+      return output;
+    }
+
+    if (inputs.head_scan_active && !inputs.head_scan_paused) {
+      output.request_head_scan_pause = true;
+      output.reason = "pause_waiting_for_head_scan_pause";
+      snapshot_.reason = output.reason;
+      output.snapshot = snapshot_;
+      return output;
+    }
+
+    if (!workflow_is_monitor_only(inputs)) {
+      output.request_monitor_mode = true;
+      output.reason = "pause_requesting_monitor_mode";
+      snapshot_.reason = output.reason;
+      output.snapshot = snapshot_;
+      return output;
+    }
+
+    if (transition_to_conditional_scan_) {
+      transition_to_conditional_scan_ = false;
+      begin_scan_stage(
+        MissionState::ConditionalScan360,
+        inputs,
+        "conditional_scan360_quiesced");
+      return evaluate(inputs);
+    }
+
+    enter(MissionState::Paused, "mission_paused");
+    return decision(snapshot_.reason);
+  }
+
   if (snapshot_.state == MissionState::Paused) {
     return decision(snapshot_.reason);
   }
+
+  if (snapshot_.state == MissionState::Resuming) {
+    if (!safe_mapping_state(inputs)) {
+      snapshot_.reason = "resume_waiting_for_safe_mapping_state";
+      return decision(snapshot_.reason);
+    }
+
+    if (resume_state_ == MissionState::CapturingStartPose) {
+      start_pose_generation_floor_ = inputs.start_pose_generation;
+      enter(MissionState::CapturingStartPose, "resuming_start_pose_capture");
+      return evaluate(inputs);
+    }
+
+    if (is_scan_state(resume_state_)) {
+      begin_scan_stage(
+        resume_state_,
+        inputs,
+        "resuming_scan360_stage");
+      return evaluate(inputs);
+    }
+
+    if (resume_state_ == MissionState::InitialHeadScan) {
+      begin_head_scan_stage(
+        MissionState::InitialHeadScan,
+        inputs,
+        "resuming_initial_head_scan");
+      return evaluate(inputs);
+    }
+
+    return evaluate_frontier_entry(inputs);
+  }
+
+  if (snapshot_.state == MissionState::CapturingStartPose) {
+    if (!safe_mapping_state(inputs)) {
+      begin_pause(
+        MissionState::CapturingStartPose,
+        "start_pose_capture_authority_lost",
+        false);
+      return evaluate(inputs);
+    }
+
+    if (inputs.start_pose_generation <= start_pose_generation_floor_) {
+      MissionDecision output = decision("requesting_start_pose_capture");
+      output.request_start_pose_capture = true;
+      snapshot_.reason = output.reason;
+      output.snapshot = snapshot_;
+      return output;
+    }
+
+    if (!inputs.start_pose_capture_complete) {
+      MissionDecision output = decision("start_pose_capture_in_progress");
+      output.request_start_pose_capture = true;
+      snapshot_.reason = output.reason;
+      output.snapshot = snapshot_;
+      return output;
+    }
+
+    if (!inputs.start_pose_valid) {
+      return fail(
+        MissionResult::StartPoseUnavailable,
+        inputs.start_pose_reason.empty() ?
+        "start_pose_capture_failed" : inputs.start_pose_reason);
+    }
+
+    start_pose_captured_ = true;
+    snapshot_.start_pose_capture_complete = true;
+    snapshot_.start_pose_valid = true;
+    snapshot_.start_map_generation = inputs.frontier_map_generation;
+
+    if (!initial_scan360_completed_) {
+      begin_scan_stage(
+        MissionState::InitialScan360,
+        inputs,
+        "initial_scan360_requested");
+      return evaluate(inputs);
+    }
+
+    if (!initial_head_scan_completed_) {
+      begin_head_scan_stage(
+        MissionState::InitialHeadScan,
+        inputs,
+        "initial_head_scan_requested");
+      return evaluate(inputs);
+    }
+
+    return evaluate_frontier_entry(inputs);
+  }
+
+  if (is_scan_state(snapshot_.state)) {
+    return evaluate_scan360_stage(inputs);
+  }
+
+  if (snapshot_.state == MissionState::InitialHeadScan) {
+    return evaluate_head_scan_stage(inputs);
+  }
+
+  if (snapshot_.state == MissionState::Exploring) {
+    const bool authority_lost =
+      !authority_inputs_complete(inputs) ||
+      !safe_mapping_state(inputs) ||
+      !inputs.runtime_authorized ||
+      !workflow_is_frontier(inputs);
+
+    if (authority_lost) {
+      begin_pause(
+        MissionState::Exploring,
+        "authority_lost_pause_required",
+        false);
+      return evaluate(inputs);
+    }
+
+    if (inputs.completion_confirmed) {
+      enter(
+        MissionState::CompletionPending,
+        inputs.completion_reason.empty() ?
+        "frontier_exhaustion_confirmed" : inputs.completion_reason);
+      return evaluate(inputs);
+    }
+
+    return decision(snapshot_.reason);
+  }
+
+  if (snapshot_.state == MissionState::WaitingForAuthority) {
+    if (!session_is_active(inputs)) {
+      enter(MissionState::Starting, "mapping_session_not_active");
+      return evaluate(inputs);
+    }
+
+    if (!authority_inputs_complete(inputs) || !safe_mapping_state(inputs)) {
+      snapshot_.reason = "waiting_for_mapping_authority";
+      return decision(snapshot_.reason);
+    }
+
+    if (resume_state_ == MissionState::Exploring) {
+      return evaluate_frontier_entry(inputs);
+    }
+
+    enter(MissionState::Starting, "mapping_authority_available");
+    return evaluate(inputs);
+  }
+
+  return evaluate_start_sequence(inputs);
+}
+
+MissionDecision AutonomousMappingMission::evaluate_start_sequence(
+  const MissionInputs & inputs)
+{
+  MissionDecision output = decision(snapshot_.reason);
 
   if (!session_is_active(inputs)) {
     output.request_start_session = true;
@@ -526,11 +735,167 @@ MissionDecision AutonomousMappingMission::evaluate(
     return output;
   }
 
-  if (
-    !authority_inputs_complete(inputs) ||
-    !inputs.mapping_ready ||
-    inputs.safety_stop_active)
-  {
+  if (!authority_inputs_complete(inputs) || !safe_mapping_state(inputs)) {
+    resume_state_ = MissionState::Starting;
+    enter(MissionState::WaitingForAuthority, "waiting_for_mapping_authority");
+    return decision(snapshot_.reason);
+  }
+
+  if (!start_pose_captured_) {
+    start_pose_generation_floor_ = inputs.start_pose_generation;
+    enter(MissionState::CapturingStartPose, "start_pose_capture_requested");
+    return evaluate(inputs);
+  }
+
+  if (!initial_scan360_completed_) {
+    begin_scan_stage(
+      MissionState::InitialScan360,
+      inputs,
+      "initial_scan360_requested");
+    return evaluate(inputs);
+  }
+
+  if (!initial_head_scan_completed_) {
+    begin_head_scan_stage(
+      MissionState::InitialHeadScan,
+      inputs,
+      "initial_head_scan_requested");
+    return evaluate(inputs);
+  }
+
+  return evaluate_frontier_entry(inputs);
+}
+
+MissionDecision AutonomousMappingMission::evaluate_scan360_stage(
+  const MissionInputs & inputs)
+{
+  const MissionState stage = snapshot_.state;
+
+  if (!safe_mapping_state(inputs)) {
+    begin_pause(stage, "scan360_authority_lost", false);
+    return evaluate(inputs);
+  }
+
+  if (!workflow_is_scan360(inputs)) {
+    MissionDecision output = decision("requesting_scan360_mode");
+    output.request_scan360_mode = true;
+    snapshot_.reason = output.reason;
+    output.snapshot = snapshot_;
+    return output;
+  }
+
+  if (inputs.scan360_generation <= scan360_generation_floor_) {
+    MissionDecision output = decision("requesting_scan360_start");
+    output.request_scan360_start = true;
+    snapshot_.reason = output.reason;
+    output.snapshot = snapshot_;
+    return output;
+  }
+
+  if (!inputs.scan360_complete) {
+    snapshot_.reason = "scan360_in_progress";
+    return decision(snapshot_.reason);
+  }
+
+  if (!inputs.scan360_succeeded) {
+    return fail(
+      MissionResult::ScanFailed,
+      inputs.scan360_reason.empty() ?
+      "scan360_failed" : inputs.scan360_reason);
+  }
+
+  if (stage == MissionState::InitialScan360) {
+    initial_scan360_completed_ = true;
+    snapshot_.initial_scan360_complete = true;
+    snapshot_.initial_scan360_succeeded = true;
+
+    if (!initial_head_scan_completed_) {
+      begin_head_scan_stage(
+        MissionState::InitialHeadScan,
+        inputs,
+        "initial_head_scan_requested");
+      return evaluate(inputs);
+    }
+
+    enter(MissionState::Starting, "initial_scan360_complete");
+    return evaluate(inputs);
+  }
+
+  if (stage == MissionState::ConditionalScan360) {
+    ++conditional_scan360_completed_;
+    snapshot_.conditional_scan360_completed =
+      conditional_scan360_completed_;
+    resume_state_ = MissionState::Exploring;
+    enter(MissionState::Resuming, "conditional_scan360_complete");
+    return evaluate(inputs);
+  }
+
+  resume_state_ = MissionState::Exploring;
+  enter(MissionState::Resuming, "scan360_stage_complete");
+  return evaluate(inputs);
+}
+
+MissionDecision AutonomousMappingMission::evaluate_head_scan_stage(
+  const MissionInputs & inputs)
+{
+  if (!safe_mapping_state(inputs)) {
+    begin_pause(
+      MissionState::InitialHeadScan,
+      "head_scan_authority_lost",
+      false);
+    return evaluate(inputs);
+  }
+
+  if (!workflow_is_monitor_only(inputs)) {
+    MissionDecision output = decision("head_scan_requesting_monitor_mode");
+    output.request_monitor_mode = true;
+    snapshot_.reason = output.reason;
+    output.snapshot = snapshot_;
+    return output;
+  }
+
+  if (inputs.head_scan_paused) {
+    MissionDecision output = decision("requesting_initial_head_scan_resume");
+    output.request_head_scan_resume = true;
+    snapshot_.reason = output.reason;
+    output.snapshot = snapshot_;
+    return output;
+  }
+
+  if (inputs.head_scan_generation <= head_scan_generation_floor_) {
+    MissionDecision output = decision("requesting_initial_head_scan_start");
+    output.request_head_scan_start = true;
+    snapshot_.reason = output.reason;
+    output.snapshot = snapshot_;
+    return output;
+  }
+
+  if (!inputs.head_scan_complete) {
+    snapshot_.reason = "initial_head_scan_in_progress";
+    return decision(snapshot_.reason);
+  }
+
+  if (!inputs.head_scan_succeeded) {
+    return fail(
+      MissionResult::ScanFailed,
+      inputs.head_scan_reason.empty() ?
+      "initial_head_scan_failed" : inputs.head_scan_reason);
+  }
+
+  initial_head_scan_completed_ = true;
+  snapshot_.initial_head_scan_complete = true;
+  snapshot_.initial_head_scan_succeeded = true;
+  enter(MissionState::Starting, "initial_head_scan_complete");
+  return evaluate(inputs);
+}
+
+MissionDecision AutonomousMappingMission::evaluate_frontier_entry(
+  const MissionInputs & inputs)
+{
+  MissionDecision output = decision(snapshot_.reason);
+
+  if (!safe_mapping_state(inputs)) {
+    resume_state_ = MissionState::Exploring;
     enter(
       MissionState::WaitingForAuthority,
       "waiting_for_mapping_authority");
@@ -546,6 +911,7 @@ MissionDecision AutonomousMappingMission::evaluate(
   }
 
   if (!inputs.runtime_authorized) {
+    resume_state_ = MissionState::Exploring;
     enter(
       MissionState::WaitingForAuthority,
       "waiting_for_frontier_runtime_authority");
@@ -554,6 +920,20 @@ MissionDecision AutonomousMappingMission::evaluate(
 
   enter(MissionState::Exploring, "frontier_exploration_active");
   return decision(snapshot_.reason);
+}
+
+MissionDecision AutonomousMappingMission::fail(
+  const MissionResult result,
+  std::string reason)
+{
+  snapshot_.state = MissionState::Failed;
+  snapshot_.result = result;
+  snapshot_.active = false;
+  snapshot_.reason = std::move(reason);
+
+  MissionDecision output = decision(snapshot_.reason);
+  output.terminal = true;
+  return output;
 }
 
 void AutonomousMappingMission::update_observations(
@@ -574,6 +954,41 @@ void AutonomousMappingMission::update_observations(
   snapshot_.handoff_active =
     inputs.handoff_state_received &&
     inputs.handoff_active;
+
+  snapshot_.start_pose_capture_started =
+    inputs.start_pose_capture_started;
+  snapshot_.start_pose_capture_complete =
+    start_pose_captured_ || inputs.start_pose_capture_complete;
+  snapshot_.start_pose_valid =
+    start_pose_captured_ || inputs.start_pose_valid;
+  snapshot_.start_pose_reason = inputs.start_pose_reason;
+
+  snapshot_.initial_scan360_complete = initial_scan360_completed_;
+  snapshot_.initial_scan360_succeeded = initial_scan360_completed_;
+  snapshot_.initial_head_scan_complete = initial_head_scan_completed_;
+  snapshot_.initial_head_scan_succeeded = initial_head_scan_completed_;
+  snapshot_.conditional_scan360_completed =
+    conditional_scan360_completed_;
+
+  snapshot_.scan360_started = inputs.scan360_started;
+  snapshot_.scan360_active = inputs.scan360_active;
+  snapshot_.scan360_complete = inputs.scan360_complete;
+  snapshot_.scan360_succeeded = inputs.scan360_succeeded;
+  snapshot_.scan360_state = inputs.scan360_state;
+  snapshot_.scan360_reason = inputs.scan360_reason;
+  snapshot_.scan360_stage = is_scan_state(snapshot_.state) ?
+    std::string{to_string(snapshot_.state)} : "none";
+
+  snapshot_.head_scan_started = inputs.head_scan_started;
+  snapshot_.head_scan_active = inputs.head_scan_active;
+  snapshot_.head_scan_paused = inputs.head_scan_paused;
+  snapshot_.head_scan_complete = inputs.head_scan_complete;
+  snapshot_.head_scan_succeeded = inputs.head_scan_succeeded;
+  snapshot_.head_scan_state = inputs.head_scan_state;
+  snapshot_.head_scan_reason = inputs.head_scan_reason;
+  snapshot_.head_scan_stage =
+    snapshot_.state == MissionState::InitialHeadScan ?
+    "initial_head_scan" : "none";
 
   snapshot_.frontier_status_received =
     inputs.frontier_status_received;
@@ -600,15 +1015,12 @@ void AutonomousMappingMission::update_observations(
   snapshot_.completion_reason =
     inputs.completion_reason;
 
-  snapshot_.map_save_started =
-    inputs.map_save_started;
-  snapshot_.map_save_complete =
-    inputs.map_save_complete;
+  snapshot_.map_save_started = inputs.map_save_started;
+  snapshot_.map_save_complete = inputs.map_save_complete;
   snapshot_.map_saved =
     inputs.map_save_complete &&
     inputs.map_save_succeeded;
-  snapshot_.map_save_reason =
-    inputs.map_save_reason;
+  snapshot_.map_save_reason = inputs.map_save_reason;
   snapshot_.saved_session_directory =
     inputs.saved_session_directory;
 
@@ -672,6 +1084,14 @@ bool AutonomousMappingMission::authority_inputs_complete(
     inputs.handoff_state_received;
 }
 
+bool AutonomousMappingMission::safe_mapping_state(
+  const MissionInputs & inputs) const
+{
+  return
+    inputs.mapping_ready &&
+    !inputs.safety_stop_active;
+}
+
 bool AutonomousMappingMission::workflow_is_frontier(
   const MissionInputs & inputs) const
 {
@@ -682,6 +1102,18 @@ bool AutonomousMappingMission::workflow_is_frontier(
     inputs.mode.value() == MappingMode::Autonomous &&
     inputs.exploration_mode.value() == ExplorationMode::Frontier &&
     inputs.workflow_phase.value() == WorkflowPhase::Exploring;
+}
+
+bool AutonomousMappingMission::workflow_is_scan360(
+  const MissionInputs & inputs) const
+{
+  return
+    inputs.mode.has_value() &&
+    inputs.exploration_mode.has_value() &&
+    inputs.workflow_phase.has_value() &&
+    inputs.mode.value() == MappingMode::Autonomous &&
+    inputs.exploration_mode.value() == ExplorationMode::Scan360 &&
+    inputs.workflow_phase.value() == WorkflowPhase::Scan360;
 }
 
 bool AutonomousMappingMission::workflow_is_monitor_only(
@@ -713,6 +1145,34 @@ bool AutonomousMappingMission::session_is_terminal(
     inputs.session_state.value() == SessionState::Saved ||
     inputs.session_state.value() == SessionState::Cancelled ||
     inputs.session_state.value() == SessionState::Failed);
+}
+
+void AutonomousMappingMission::begin_scan_stage(
+  const MissionState state,
+  const MissionInputs & inputs,
+  std::string reason)
+{
+  scan360_generation_floor_ = inputs.scan360_generation;
+  enter(state, std::move(reason));
+}
+
+void AutonomousMappingMission::begin_head_scan_stage(
+  const MissionState state,
+  const MissionInputs & inputs,
+  std::string reason)
+{
+  head_scan_generation_floor_ = inputs.head_scan_generation;
+  enter(state, std::move(reason));
+}
+
+void AutonomousMappingMission::begin_pause(
+  const MissionState resume_state,
+  std::string reason,
+  const bool transition_to_conditional_scan)
+{
+  resume_state_ = resume_state;
+  transition_to_conditional_scan_ = transition_to_conditional_scan;
+  enter(MissionState::Pausing, std::move(reason));
 }
 
 MissionDecision AutonomousMappingMission::rejected(

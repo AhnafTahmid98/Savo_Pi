@@ -158,6 +158,36 @@ def generate_launch_description() -> LaunchDescription:
                 "startup_grace_s": _floating(
                     "supervisor_startup_grace_s"
                 ),
+                "base.enabled": _boolean(
+                    "supervisor_base_enabled"
+                ),
+                "base.required": _boolean(
+                    "supervisor_base_required"
+                ),
+                "control.enabled": _boolean(
+                    "supervisor_control_enabled"
+                ),
+                "control.required": _boolean(
+                    "supervisor_control_required"
+                ),
+                "perception.enabled": _boolean(
+                    "supervisor_perception_enabled"
+                ),
+                "perception.required": _boolean(
+                    "supervisor_perception_required"
+                ),
+                "lidar.enabled": _boolean(
+                    "supervisor_lidar_enabled"
+                ),
+                "lidar.required": _boolean(
+                    "supervisor_lidar_required"
+                ),
+                "power.enabled": _boolean(
+                    "supervisor_power_enabled"
+                ),
+                "power.required": _boolean(
+                    "supervisor_power_required"
+                ),
                 "localization.enabled": _boolean(
                     "supervisor_localization_enabled"
                 ),
@@ -313,6 +343,46 @@ def generate_launch_description() -> LaunchDescription:
         DeclareLaunchArgument(
             "supervisor_startup_grace_s",
             default_value="3.0",
+        ),
+        DeclareLaunchArgument(
+            "supervisor_base_enabled",
+            default_value="true",
+        ),
+        DeclareLaunchArgument(
+            "supervisor_base_required",
+            default_value="true",
+        ),
+        DeclareLaunchArgument(
+            "supervisor_control_enabled",
+            default_value="true",
+        ),
+        DeclareLaunchArgument(
+            "supervisor_control_required",
+            default_value="true",
+        ),
+        DeclareLaunchArgument(
+            "supervisor_perception_enabled",
+            default_value="true",
+        ),
+        DeclareLaunchArgument(
+            "supervisor_perception_required",
+            default_value="true",
+        ),
+        DeclareLaunchArgument(
+            "supervisor_lidar_enabled",
+            default_value="true",
+        ),
+        DeclareLaunchArgument(
+            "supervisor_lidar_required",
+            default_value="true",
+        ),
+        DeclareLaunchArgument(
+            "supervisor_power_enabled",
+            default_value="true",
+        ),
+        DeclareLaunchArgument(
+            "supervisor_power_required",
+            default_value="true",
         ),
         DeclareLaunchArgument(
             "supervisor_localization_enabled",

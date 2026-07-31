@@ -3,11 +3,12 @@
 # Starting a mission is owned by RunAutonomousMapping. This service never
 # starts a second mission and never bypasses the mapping mode manager.
 
-uint32 CONTRACT_VERSION=1
+uint32 CONTRACT_VERSION=2
 
 uint8 COMMAND_PAUSE=1
 uint8 COMMAND_RESUME=2
 uint8 COMMAND_CANCEL=3
+uint8 COMMAND_REQUEST_SCAN360=4
 
 uint32 contract_version
 string mission_id

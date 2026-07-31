@@ -10,12 +10,14 @@
 #include <nav_msgs/msg/odometry.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/string.hpp>
+#include <std_srvs/srv/trigger.hpp>
 
 #include <atomic>
 #include <chrono>
 #include <cmath>
 #include <csignal>
 #include <cstddef>
+#include <functional>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -138,6 +140,7 @@ class Scan360MapperNode final : public rclcpp::Node
 public:
   using NativeClient = Scan360RotateActionClient;
   using StringMessage = std_msgs::msg::String;
+  using Trigger = std_srvs::srv::Trigger;
 
   Scan360MapperNode()
   : Node("scan360_mapper_node")
@@ -145,6 +148,7 @@ public:
     declare_and_validate_parameters();
     create_observability();
     create_odom_subscription();
+    create_control_services();
 
     set_state(
       enabled_ ? "waiting_for_odom" : "disabled",
@@ -305,6 +309,20 @@ private:
         "state_topic",
         "/savo_mapping/scan360/state"));
 
+    start_service_name_ = require_non_empty(
+      "start_service",
+      params::declare_or_get<std::string>(
+        *this,
+        "start_service",
+        "/savo_mapping/scan360/start"));
+
+    cancel_service_name_ = require_non_empty(
+      "cancel_service",
+      params::declare_or_get<std::string>(
+        *this,
+        "cancel_service",
+        "/savo_mapping/scan360/cancel"));
+
     yaw_stale_timeout_sec_ =
       params::require_positive_parameter(
       "yaw_stale_timeout_sec",
@@ -439,6 +457,111 @@ private:
         &Scan360MapperNode::handle_odom,
         this,
         std::placeholders::_1));
+  }
+
+
+  void create_control_services()
+  {
+    start_service_ = create_service<Trigger>(
+      start_service_name_,
+      std::bind(
+        &Scan360MapperNode::handle_start_request,
+        this,
+        std::placeholders::_1,
+        std::placeholders::_2));
+
+    cancel_service_ = create_service<Trigger>(
+      cancel_service_name_,
+      std::bind(
+        &Scan360MapperNode::handle_cancel_request,
+        this,
+        std::placeholders::_1,
+        std::placeholders::_2));
+  }
+
+  void reset_scan_runtime()
+  {
+    controller_ = scan360::Scan360Controller{};
+
+    if (orchestrator_) {
+      orchestrator_->reset();
+    }
+
+    target_count_ = 0U;
+    target_yaw_rad_ = current_yaw_rad_;
+    scan_started_ = false;
+    scan_active_ = false;
+    cancellation_started_ = false;
+    settling_ = false;
+    terminal_ = false;
+    settle_deadline_ = TimePoint{};
+
+    set_state(
+      "waiting_for_odom",
+      "scan360_ready_for_explicit_start");
+  }
+
+  void handle_start_request(
+    const Trigger::Request::SharedPtr,
+    Trigger::Response::SharedPtr response)
+  {
+    if (!enabled_) {
+      response->success = false;
+      response->message = "scan360_disabled";
+      return;
+    }
+
+    if (shutdown_started_) {
+      response->success = false;
+      response->message = "scan360_shutdown_in_progress";
+      return;
+    }
+
+    if (!orchestrator_ || !native_client_) {
+      response->success = false;
+      response->message = "scan360_runtime_not_initialized";
+      return;
+    }
+
+    if (scan_started_ && !terminal_) {
+      response->success = false;
+      response->message = "scan360_already_active";
+      return;
+    }
+
+    if (!odom_is_fresh()) {
+      response->success = false;
+      response->message = odom_valid_ ?
+        "scan360_odom_stale" : odom_reason_;
+      return;
+    }
+
+    reset_scan_runtime();
+    start_scan();
+
+    response->success = scan_started_ && !terminal_;
+    response->message = response->success ?
+      "scan360_started" : last_reason_;
+  }
+
+  void handle_cancel_request(
+    const Trigger::Request::SharedPtr,
+    Trigger::Response::SharedPtr response)
+  {
+    if (!scan_started_ || terminal_) {
+      response->success = true;
+      response->message = "scan360_not_active";
+      return;
+    }
+
+    process_decisions(
+      {controller_.handle(
+          scan360::ControllerEvent::OperatorCancel)});
+
+    response->success =
+      controller_.state() != scan360::ControllerState::Failed;
+    response->message = response->success ?
+      "scan360_cancel_requested" : last_reason_;
   }
 
   void handle_odom(
@@ -905,6 +1028,8 @@ private:
   std::string odom_frame_;
   std::string status_topic_;
   std::string state_topic_;
+  std::string start_service_name_;
+  std::string cancel_service_name_;
 
   double yaw_stale_timeout_sec_{1.0};
   double settle_duration_sec_{0.5};
@@ -961,6 +1086,9 @@ private:
   rclcpp::Publisher<
     StringMessage>::SharedPtr
     status_publisher_;
+
+  rclcpp::Service<Trigger>::SharedPtr start_service_;
+  rclcpp::Service<Trigger>::SharedPtr cancel_service_;
 
   rclcpp::TimerBase::SharedPtr tick_timer_;
 };

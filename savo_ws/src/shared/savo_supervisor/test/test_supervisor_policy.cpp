@@ -193,6 +193,7 @@ TEST(SupervisorPolicy, MissingSummaryHasDistinctReason)
     stamp,
     false,
     "");
+  status.health_valid = true;
 
   const auto result =
     policy.EvaluateComponent(status, now, 5.0);
@@ -225,6 +226,8 @@ TEST(SupervisorPolicy, MissingHeartbeatHasDistinctReason)
     stamp,
     false,
     "");
+  status.health_valid = true;
+  status.summary_valid = true;
 
   const auto result =
     policy.EvaluateComponent(status, now, 5.0);
@@ -674,7 +677,7 @@ TEST(SupervisorPolicy, StateJsonNeverWritesInfinity)
   EXPECT_EQ(json.find("inf"), std::string::npos);
   EXPECT_EQ(json.find("nan"), std::string::npos);
   EXPECT_NE(
-    json.find("\"last_message_age_s\":-1.000000"),
+    json.find("\"last_message_age_s\":-1"),
     std::string::npos);
 }
 

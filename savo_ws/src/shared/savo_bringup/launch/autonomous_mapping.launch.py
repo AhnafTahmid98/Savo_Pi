@@ -40,7 +40,7 @@ def _validate_arguments(context):
     return [
         LogInfo(
             msg=(
-                "Robot Savo AM-4 launch validated: "
+                "Robot Savo AM-5 launch validated: "
                 f"map_id={map_id}, control_startup_mode={control_mode}"
             )
         ),
@@ -53,7 +53,7 @@ def _validate_arguments(context):
         ),
         LogInfo(
             msg=(
-                "savo_description is intentionally external to AM-4 until "
+                "savo_description is intentionally external to AM-5 until "
                 "AM-0B locks real dimensions, sensor transforms, and STL "
                 "meshes. Mapping readiness remains fail-closed on TF."
             )
@@ -157,6 +157,26 @@ def generate_launch_description() -> LaunchDescription:
         condition=IfCondition(LaunchConfiguration("start_supervisor")),
     )
 
+    head_launch = IncludeLaunchDescription(
+        _python_launch("savo_head", "head_bringup.launch.py"),
+        condition=IfCondition(LaunchConfiguration("start_head")),
+        launch_arguments={
+            "backend": LaunchConfiguration("head_backend"),
+            "use_python_fallback": LaunchConfiguration(
+                "head_use_python_fallback"
+            ),
+            "enable_scan": "true",
+            "enable_tf": LaunchConfiguration("head_enable_tf"),
+            "enable_status": "true",
+            "enable_apriltag_confirm": LaunchConfiguration(
+                "head_enable_apriltag_confirm"
+            ),
+            "center_on_start": "false",
+            "center_on_shutdown": "true",
+            "camera_mode": LaunchConfiguration("head_camera_mode"),
+        }.items(),
+    )
+
     navigation_launch = IncludeLaunchDescription(
         _python_launch(
             "savo_nav",
@@ -257,6 +277,7 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument(
                 "start_supervisor", default_value="true"
             ),
+            DeclareLaunchArgument("start_head", default_value="true"),
             DeclareLaunchArgument(
                 "start_navigation", default_value="true"
             ),
@@ -309,6 +330,34 @@ def generate_launch_description() -> LaunchDescription:
                 default_value="false",
             ),
             DeclareLaunchArgument(
+                "head_backend",
+                default_value="pca9685",
+            ),
+            DeclareLaunchArgument(
+                "head_use_python_fallback",
+                default_value="false",
+            ),
+            DeclareLaunchArgument(
+                "head_enable_tf",
+                default_value="false",
+                description=(
+                    "Keep head TF disabled until AM-0B locks the physical "
+                    "head and camera transforms."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "head_enable_apriltag_confirm",
+                default_value="true",
+            ),
+            DeclareLaunchArgument(
+                "head_camera_mode",
+                default_value="disabled",
+                description=(
+                    "Camera transport stays disabled until the real camera "
+                    "path is selected for hardware testing."
+                ),
+            ),
+            DeclareLaunchArgument(
                 "nav_params_file",
                 default_value=default_nav_params,
             ),
@@ -330,6 +379,7 @@ def generate_launch_description() -> LaunchDescription:
             localization_launch,
             power_launch,
             supervisor_launch,
+            head_launch,
             navigation_launch,
             mapping_launch,
         ]

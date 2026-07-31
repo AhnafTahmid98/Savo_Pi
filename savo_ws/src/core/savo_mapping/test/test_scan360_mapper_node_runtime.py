@@ -15,6 +15,7 @@ from rclpy.executors import MultiThreadedExecutor
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from savo_msgs.action import RotateToHeading
 from std_msgs.msg import String
+from std_srvs.srv import Trigger
 
 
 TIMEOUT = 8.0
@@ -147,6 +148,8 @@ class RuntimeHarness:
         self.endpoint = f'/fixture/scan360_mapper_{suffix}'
         self.odom_topic = f'/fixture/scan360_odom_{suffix}'
         self.status_topic = f'/fixture/scan360_status_{suffix}'
+        self.start_service = f'/fixture/scan360_start_{suffix}'
+        self.cancel_service = f'/fixture/scan360_cancel_{suffix}'
         self.node = rclpy.create_node(f'scan360_mapper_fixture_{suffix}')
         self.executor = MultiThreadedExecutor(num_threads=4)
         self.executor.add_node(self.node)
@@ -177,6 +180,16 @@ class RuntimeHarness:
             self.odom_topic,
             10,
         )
+        self.start_client = self.node.create_client(
+            Trigger,
+            self.start_service,
+            callback_group=ReentrantCallbackGroup(),
+        )
+        self.cancel_client = self.node.create_client(
+            Trigger,
+            self.cancel_service,
+            callback_group=ReentrantCallbackGroup(),
+        )
         self.spin_thread = threading.Thread(
             target=self.executor.spin,
             daemon=True,
@@ -191,6 +204,8 @@ class RuntimeHarness:
             'odom_frame': 'odom',
             'status_topic': self.status_topic,
             'state_topic': f'/fixture/scan360_state_{suffix}',
+            'start_service': self.start_service,
+            'cancel_service': self.cancel_service,
             'sweep_angle_rad': str(math.pi),
             'step_angle_rad': str(math.pi / 2.0),
             'settle_duration_sec': str(settle),
@@ -259,6 +274,12 @@ class RuntimeHarness:
         for _ in range(repeat):
             self.odom_publisher.publish(message)
             time.sleep(0.02)
+
+    def call_trigger(self, client):
+        assert client.wait_for_service(timeout_sec=5.0), self.output()
+        future = client.call_async(Trigger.Request())
+        assert wait_until(future.done), self.output()
+        return future.result()
 
     def output(self):
         if self.process.poll() is None or self.process.stdout is None:
@@ -406,6 +427,27 @@ def test_terminal_action_failures_send_no_followup(mode):
         assert harness.server.goal_count == 1
         time.sleep(0.3)
         assert harness.server.goal_count == 1
+    finally:
+        harness.stop()
+
+
+def test_explicit_start_service_supports_bounded_restart():
+    harness = RuntimeHarness(auto_start=False)
+    try:
+        harness.publish_odom()
+        response = harness.call_trigger(harness.start_client)
+        assert response.success, response.message
+        harness.wait_status(lambda value: value.get('state') == 'complete')
+        assert harness.server.goal_count == 2
+
+        harness.publish_odom()
+        response = harness.call_trigger(harness.start_client)
+        assert response.success, response.message
+        assert wait_until(lambda: harness.server.goal_count == 4)
+        harness.wait_status(
+            lambda value: value.get('state') == 'complete'
+            and value.get('target_count') == 2
+        )
     finally:
         harness.stop()
 

@@ -43,7 +43,7 @@ resolution, and semantic-navigation nodes are the real production nodes. It
 writes permanent logs, a SQLite database, and a JSON report under
 `~/Savo_Pi/runtime/location_lifecycle_phase2d/`.
 
-## Guarded autonomous mapping bringup (AM-4)
+## Guarded autonomous mapping bringup and sequencer (AM-5)
 
 The core-side autonomous mapping stack is composed with:
 
@@ -53,9 +53,10 @@ ros2 launch savo_bringup autonomous_mapping.launch.py \
 ```
 
 The launch starts base, LiDAR, range safety, control, localization, core power,
-supervisor, live-map Nav2 and the package-local autonomous mapping launch. It
-does not send an autonomous mission goal and defaults the control layer to
-`STOP`.
+supervisor, `savo_head`, live-map Nav2 and the package-local autonomous mapping
+launch. It does not send an autonomous mission goal and defaults the control
+layer to `STOP`. Scan360 is available through its public service but is started
+only by the typed mission sequencer.
 
 During a controlled real-robot test, first confirm mapping, navigation, safety,
 localization and power readiness. Then request `NAV` control authority and send
@@ -70,14 +71,33 @@ ros2 topic pub --once \
 ros2 action send_goal \
   /savo_mapping/autonomous/run \
   savo_msgs/action/RunAutonomousMapping \
-  "{contract_version: 1, mission_id: mission_campus_main_001, actor_id: operator_1, map_id: campus_main, map_revision: 0, strategy: 1, auto_save: true, require_quality_approval: false, mission_timeout: {sec: 0, nanosec: 0}}"
+  "{contract_version: 1, mission_id: mission_campus_main_001, actor_id: operator_1, map_id: campus_main, map_revision: 1, strategy: 1, auto_save: true, require_quality_approval: false, mission_timeout: {sec: 0, nanosec: 0}}"
 ```
 
-The action goal is the only mission start boundary. Stable frontier exhaustion
-triggers monitor-only mode, atomic map-session save, pose-graph serialization
-and committed-session verification before success is reported.
+The action goal is the only mission start boundary. AM-5 records the initial
+map-frame pose, runs an initial Scan360, switches to monitor-only for the initial
+head scan, then enters frontier exploration. A typed control request can insert
+a guarded conditional Scan360 and automatically resume frontier exploration.
+Stable frontier exhaustion still triggers monitor-only mode, atomic map-session
+save, pose-graph serialization and committed-session verification before
+success is reported.
 
-`savo_description` is intentionally not included in AM-4. AM-0B will add the
+A conditional Scan360 can be requested only while the mission is actively
+exploring:
+
+```bash
+ros2 service call \
+  /savo_mapping/autonomous/control \
+  savo_msgs/srv/ControlAutonomousMapping \
+  "{contract_version: 2, mission_id: mission_campus_main_001, actor_id: operator_1, command: 4, reason: map_growth_stalled}"
+```
+
+The sequencer first cancels or waits out the guarded navigation handoff, enters
+monitor-only, runs Scan360 through `/savo_mapping/scan360/start`, and returns to
+frontier mode. AprilTag interruption, coverage, return-to-start, final scans,
+operator approval and joint map/location release remain AM-6 through AM-8.
+
+`savo_description` is intentionally not included in AM-5. AM-0B will add the
 final robot-state-publisher and description launch after the real dimensions,
 sensor transforms and STL meshes are provided. Until then, mapping readiness
 fails closed when the required TF chain is absent.

@@ -5,8 +5,10 @@
 #include "savo_mapping/frontier_completion_detector.hpp"
 #include "savo_mapping/saved_map_contract.hpp"
 #include "savo_mapping/topic_names.hpp"
+#include "savo_mapping/tf_pose_reader.hpp"
 
 #include <builtin_interfaces/msg/duration.hpp>
+#include <geometry_msgs/msg/pose_stamped.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <savo_msgs/action/run_autonomous_mapping.hpp>
@@ -16,6 +18,8 @@
 #include <std_msgs/msg/bool.hpp>
 #include <std_msgs/msg/string.hpp>
 #include <std_srvs/srv/trigger.hpp>
+#include <tf2_ros/buffer.hpp>
+#include <tf2_ros/transform_listener.hpp>
 
 #include <chrono>
 #include <cstdint>
@@ -75,6 +79,8 @@ autonomous::MissionCommand command_from_message(const std::uint8_t command)
       return autonomous::MissionCommand::Resume;
     case ControlMission::Request::COMMAND_CANCEL:
       return autonomous::MissionCommand::Cancel;
+    case ControlMission::Request::COMMAND_REQUEST_SCAN360:
+      return autonomous::MissionCommand::RequestScan360;
     default:
       throw std::invalid_argument("unknown_autonomous_mapping_command");
   }
@@ -116,6 +122,29 @@ std::optional<std::string> saved_session_directory(
   return directory;
 }
 
+std::string state_field(const std::string & text)
+{
+  constexpr std::string_view prefix{"state="};
+  const auto start = text.find(prefix);
+  if (start == std::string::npos) {
+    return text;
+  }
+
+  const auto value_start = start + prefix.size();
+  const auto end = text.find(';', value_start);
+  return text.substr(value_start, end - value_start);
+}
+
+bool scan360_state_is_active(const std::string_view state)
+{
+  return
+    state == "ready" ||
+    state == "command_pending" ||
+    state == "rotating" ||
+    state == "settling" ||
+    state == "canceling";
+}
+
 }  // namespace
 
 class AutonomousMappingOrchestratorNode final : public rclcpp::Node
@@ -125,6 +154,7 @@ public:
   : Node("autonomous_mapping_orchestrator_node")
   {
     declare_and_validate_parameters();
+    create_pose_reader();
     create_interfaces();
 
     evaluation_timer_ = create_wall_timer(
@@ -192,6 +222,74 @@ private:
     frontier_status_topic_ = declare_parameter<std::string>(
       "frontier_status_topic",
       std::string{topics::FRONTIER_EXPLORER_STATUS});
+
+    scan360_state_topic_ = declare_parameter<std::string>(
+      "sequence.scan360_state_topic",
+      "/savo_mapping/scan360/state");
+
+    head_scan_state_topic_ = declare_parameter<std::string>(
+      "sequence.head_scan_state_topic",
+      "/savo_head/scan_state");
+
+    scan360_start_service_name_ = declare_parameter<std::string>(
+      "sequence.scan360_start_service",
+      "/savo_mapping/scan360/start");
+
+    scan360_cancel_service_name_ = declare_parameter<std::string>(
+      "sequence.scan360_cancel_service",
+      "/savo_mapping/scan360/cancel");
+
+    head_scan_start_service_name_ = declare_parameter<std::string>(
+      "sequence.head_scan_start_service",
+      "/savo_head/start_scan");
+
+    head_scan_pause_service_name_ = declare_parameter<std::string>(
+      "sequence.head_scan_pause_service",
+      "/savo_head/pause_scan");
+
+    head_scan_resume_service_name_ = declare_parameter<std::string>(
+      "sequence.head_scan_resume_service",
+      "/savo_head/resume_scan");
+
+    inputs_.require_start_pose_capture = declare_parameter<bool>(
+      "sequence.require_start_pose_capture",
+      true);
+
+    inputs_.require_initial_scan360 = declare_parameter<bool>(
+      "sequence.require_initial_scan360",
+      true);
+
+    inputs_.require_initial_head_scan = declare_parameter<bool>(
+      "sequence.require_initial_head_scan",
+      true);
+
+    start_pose_target_frame_ = declare_parameter<std::string>(
+      "sequence.start_pose_target_frame",
+      "map");
+
+    start_pose_source_frame_ = declare_parameter<std::string>(
+      "sequence.start_pose_source_frame",
+      "base_link");
+
+    start_pose_lookup_timeout_s_ = declare_parameter<double>(
+      "sequence.start_pose_lookup_timeout_s",
+      0.20);
+
+    start_pose_stale_timeout_s_ = declare_parameter<double>(
+      "sequence.start_pose_stale_timeout_s",
+      1.0);
+
+    start_pose_operation_timeout_s_ = declare_parameter<double>(
+      "sequence.start_pose_operation_timeout_s",
+      10.0);
+
+    scan360_operation_timeout_s_ = declare_parameter<double>(
+      "sequence.scan360_operation_timeout_s",
+      180.0);
+
+    head_scan_operation_timeout_s_ = declare_parameter<double>(
+      "sequence.head_scan_operation_timeout_s",
+      180.0);
 
     mode_command_topic_ = declare_parameter<std::string>(
       "mode_command_topic",
@@ -289,6 +387,15 @@ private:
       &runtime_authority_topic_,
       &handoff_state_topic_,
       &frontier_status_topic_,
+      &scan360_state_topic_,
+      &head_scan_state_topic_,
+      &scan360_start_service_name_,
+      &scan360_cancel_service_name_,
+      &head_scan_start_service_name_,
+      &head_scan_pause_service_name_,
+      &head_scan_resume_service_name_,
+      &start_pose_target_frame_,
+      &start_pose_source_frame_,
       &mode_command_topic_,
       &start_session_command_topic_,
       &cancel_session_command_topic_,
@@ -331,6 +438,38 @@ private:
       throw std::invalid_argument(
               "save_operation_timeout_s_out_of_range");
     }
+
+    if (
+      start_pose_lookup_timeout_s_ <= 0.0 ||
+      start_pose_stale_timeout_s_ < 0.0 ||
+      start_pose_operation_timeout_s_ <= 0.0 ||
+      scan360_operation_timeout_s_ <= 0.0 ||
+      head_scan_operation_timeout_s_ <= 0.0)
+    {
+      throw std::invalid_argument(
+              "autonomous_sequence_timeout_out_of_range");
+    }
+  }
+
+  void create_pose_reader()
+  {
+    if (!inputs_.require_start_pose_capture) {
+      return;
+    }
+
+    tf_buffer_ = std::make_shared<tf2_ros::Buffer>(get_clock());
+    tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+
+    TfPoseReaderOptions options;
+    options.target_frame = start_pose_target_frame_;
+    options.source_frame = start_pose_source_frame_;
+    options.lookup_timeout_sec = start_pose_lookup_timeout_s_;
+    options.stale_timeout_sec = start_pose_stale_timeout_s_;
+
+    start_pose_reader_ = std::make_unique<TfPoseReader>(
+      get_clock(),
+      tf_buffer_,
+      std::move(options));
   }
 
   void create_interfaces()
@@ -433,11 +572,42 @@ private:
         this,
         std::placeholders::_1));
 
+    scan360_state_subscription_ = create_subscription<StringMessage>(
+      scan360_state_topic_,
+      retained_qos,
+      std::bind(
+        &AutonomousMappingOrchestratorNode::handle_scan360_state,
+        this,
+        std::placeholders::_1));
+
+    head_scan_state_subscription_ = create_subscription<StringMessage>(
+      head_scan_state_topic_,
+      command_qos,
+      std::bind(
+        &AutonomousMappingOrchestratorNode::handle_head_scan_state,
+        this,
+        std::placeholders::_1));
+
     handoff_cancel_client_ = create_client<Trigger>(
       handoff_cancel_service_name_);
 
     map_save_client_ = create_client<Trigger>(
       map_save_service_name_);
+
+    scan360_start_client_ = create_client<Trigger>(
+      scan360_start_service_name_);
+
+    scan360_cancel_client_ = create_client<Trigger>(
+      scan360_cancel_service_name_);
+
+    head_scan_start_client_ = create_client<Trigger>(
+      head_scan_start_service_name_);
+
+    head_scan_pause_client_ = create_client<Trigger>(
+      head_scan_pause_service_name_);
+
+    head_scan_resume_client_ = create_client<Trigger>(
+      head_scan_resume_service_name_);
 
     control_service_ = create_service<ControlMission>(
       control_service_name_,
@@ -564,6 +734,7 @@ private:
       mission_timeout_s_ = requested_timeout_s > 0.0 ?
         requested_timeout_s : default_mission_timeout_s_;
       timeout_abort_requested_ = false;
+      reset_sequence_pipeline_locked();
       reset_save_pipeline_locked();
       completion_detector_.reset("mission_started");
       update_completion_inputs_locked(
@@ -765,6 +936,68 @@ private:
     evaluate_and_apply();
   }
 
+  void handle_scan360_state(
+    const StringMessage::ConstSharedPtr message)
+  {
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      inputs_.scan360_state = message->data;
+
+      if (scan360_start_acknowledged_) {
+        inputs_.scan360_active = scan360_state_is_active(message->data);
+
+        if (message->data == "complete") {
+          inputs_.scan360_active = false;
+          inputs_.scan360_complete = true;
+          inputs_.scan360_succeeded = true;
+          inputs_.scan360_reason = "scan360_complete";
+        }
+
+        if (
+          message->data == "failed" ||
+          message->data == "canceled")
+        {
+          inputs_.scan360_active = false;
+          inputs_.scan360_complete = true;
+          inputs_.scan360_succeeded = false;
+          inputs_.scan360_reason = "scan360_" + message->data;
+        }
+      }
+    }
+
+    evaluate_and_apply();
+  }
+
+  void handle_head_scan_state(
+    const StringMessage::ConstSharedPtr message)
+  {
+    const std::string state = state_field(message->data);
+
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      inputs_.head_scan_state = state;
+
+      if (head_scan_start_acknowledged_) {
+        inputs_.head_scan_active = state == "running";
+        inputs_.head_scan_paused = state == "paused";
+
+        if (state == "done") {
+          inputs_.head_scan_active = false;
+          inputs_.head_scan_complete = true;
+          inputs_.head_scan_succeeded = true;
+          inputs_.head_scan_reason = "head_scan_complete";
+        } else if (state == "error") {
+          inputs_.head_scan_active = false;
+          inputs_.head_scan_complete = true;
+          inputs_.head_scan_succeeded = false;
+          inputs_.head_scan_reason = "head_scan_error";
+        }
+      }
+    }
+
+    evaluate_and_apply();
+  }
+
   void handle_frontier_status(
     const FrontierStatus::ConstSharedPtr message)
   {
@@ -822,6 +1055,100 @@ private:
     inputs_.completion_reason = completion.reason;
   }
 
+  void reset_sequence_pipeline_locked()
+  {
+    inputs_.start_pose_generation = 0U;
+    inputs_.start_pose_capture_started = false;
+    inputs_.start_pose_capture_complete = false;
+    inputs_.start_pose_valid = false;
+    inputs_.start_pose_reason = "start_pose_not_requested";
+
+    inputs_.scan360_generation = 0U;
+    inputs_.scan360_started = false;
+    inputs_.scan360_active = false;
+    inputs_.scan360_complete = false;
+    inputs_.scan360_succeeded = false;
+    inputs_.scan360_state = "idle";
+    inputs_.scan360_reason = "scan360_not_requested";
+
+    inputs_.head_scan_generation = 0U;
+    inputs_.head_scan_started = false;
+    inputs_.head_scan_active = false;
+    inputs_.head_scan_paused = false;
+    inputs_.head_scan_complete = false;
+    inputs_.head_scan_succeeded = false;
+    inputs_.head_scan_state = "idle";
+    inputs_.head_scan_reason = "head_scan_not_requested";
+
+    start_pose_map_ = geometry_msgs::msg::PoseStamped{};
+    start_pose_map_.header.frame_id = start_pose_target_frame_;
+    start_pose_capture_started_at_.reset();
+    scan360_started_at_.reset();
+    head_scan_started_at_.reset();
+
+    ++scan360_operation_epoch_;
+    ++head_scan_operation_epoch_;
+    observed_sequence_state_ = autonomous::MissionState::Idle;
+
+    start_pose_capture_in_flight_ = false;
+    scan360_start_in_flight_ = false;
+    scan360_cancel_in_flight_ = false;
+    scan360_start_acknowledged_ = false;
+    head_scan_start_in_flight_ = false;
+    head_scan_pause_in_flight_ = false;
+    head_scan_resume_in_flight_ = false;
+    head_scan_start_acknowledged_ = false;
+  }
+
+  void prepare_scan360_operation_locked()
+  {
+    ++scan360_operation_epoch_;
+    inputs_.scan360_started = false;
+    inputs_.scan360_active = false;
+    inputs_.scan360_complete = false;
+    inputs_.scan360_succeeded = false;
+    inputs_.scan360_state = "idle";
+    inputs_.scan360_reason = "scan360_not_requested";
+    scan360_started_at_.reset();
+    scan360_start_in_flight_ = false;
+    scan360_cancel_in_flight_ = false;
+    scan360_start_acknowledged_ = false;
+  }
+
+  void prepare_head_scan_operation_locked(const bool preserve_paused)
+  {
+    ++head_scan_operation_epoch_;
+    inputs_.head_scan_started = preserve_paused;
+    inputs_.head_scan_active = false;
+    inputs_.head_scan_paused = preserve_paused;
+    inputs_.head_scan_complete = false;
+    inputs_.head_scan_succeeded = false;
+    inputs_.head_scan_state = preserve_paused ? "paused" : "idle";
+    inputs_.head_scan_reason = preserve_paused ?
+      "head_scan_resume_required" : "head_scan_not_requested";
+    head_scan_started_at_.reset();
+    head_scan_start_in_flight_ = false;
+    head_scan_pause_in_flight_ = false;
+    head_scan_resume_in_flight_ = false;
+    head_scan_start_acknowledged_ = false;
+  }
+
+  void refresh_sequence_stage_locked(
+    const autonomous::MissionState state)
+  {
+    if (state == observed_sequence_state_) {
+      return;
+    }
+
+    if (autonomous::is_scan_state(state)) {
+      prepare_scan360_operation_locked();
+    } else if (state == autonomous::MissionState::InitialHeadScan) {
+      prepare_head_scan_operation_locked(inputs_.head_scan_paused);
+    }
+
+    observed_sequence_state_ = state;
+  }
+
   void reset_save_pipeline_locked()
   {
     inputs_.map_save_started = false;
@@ -867,15 +1194,25 @@ private:
 
     bool publish_start_session = false;
     bool publish_frontier_mode = false;
+    bool publish_scan360_mode = false;
     bool publish_monitor_mode = false;
     bool publish_cancel_session = false;
+    bool capture_start_pose = false;
     bool dispatch_handoff_cancel = false;
+    bool dispatch_scan360_start = false;
+    bool dispatch_scan360_cancel = false;
+    bool dispatch_head_scan_start = false;
+    bool dispatch_head_scan_pause = false;
+    bool dispatch_head_scan_resume = false;
     bool dispatch_map_save = false;
     bool dispatch_verification = false;
     bool verification_started_this_cycle = false;
     std::string map_save_mission_id;
     std::string verification_directory;
     std::string verification_map_id;
+    std::string sequence_mission_id;
+    std::uint64_t scan360_dispatch_epoch = 0U;
+    std::uint64_t head_scan_dispatch_epoch = 0U;
 
     const auto current_time = std::chrono::steady_clock::now();
 
@@ -901,6 +1238,66 @@ private:
         map_save_in_flight_ = false;
       }
 
+      if (
+        inputs_.start_pose_capture_started &&
+        !inputs_.start_pose_capture_complete &&
+        start_pose_capture_started_at_.has_value() &&
+        std::chrono::duration<double>(
+          current_time - start_pose_capture_started_at_.value()).count() >=
+        start_pose_operation_timeout_s_)
+      {
+        ++inputs_.start_pose_generation;
+        inputs_.start_pose_capture_complete = true;
+        inputs_.start_pose_valid = false;
+        inputs_.start_pose_reason = "start_pose_capture_timeout";
+        start_pose_capture_in_flight_ = false;
+      }
+
+      if (
+        autonomous::is_scan_state(mission_.snapshot().state) &&
+        inputs_.scan360_started &&
+        !inputs_.scan360_complete &&
+        scan360_started_at_.has_value() &&
+        std::chrono::duration<double>(
+          current_time - scan360_started_at_.value()).count() >=
+        scan360_operation_timeout_s_)
+      {
+        ++inputs_.scan360_generation;
+        ++scan360_operation_epoch_;
+        inputs_.scan360_active = false;
+        inputs_.scan360_complete = true;
+        inputs_.scan360_succeeded = false;
+        inputs_.scan360_state = "failed";
+        inputs_.scan360_reason = "scan360_operation_timeout";
+        scan360_start_in_flight_ = false;
+        scan360_cancel_in_flight_ = false;
+        scan360_start_acknowledged_ = false;
+      }
+
+      if (
+        mission_.snapshot().state ==
+        autonomous::MissionState::InitialHeadScan &&
+        inputs_.head_scan_started &&
+        !inputs_.head_scan_complete &&
+        head_scan_started_at_.has_value() &&
+        std::chrono::duration<double>(
+          current_time - head_scan_started_at_.value()).count() >=
+        head_scan_operation_timeout_s_)
+      {
+        ++inputs_.head_scan_generation;
+        ++head_scan_operation_epoch_;
+        inputs_.head_scan_active = false;
+        inputs_.head_scan_paused = false;
+        inputs_.head_scan_complete = true;
+        inputs_.head_scan_succeeded = false;
+        inputs_.head_scan_state = "error";
+        inputs_.head_scan_reason = "head_scan_operation_timeout";
+        head_scan_start_in_flight_ = false;
+        head_scan_pause_in_flight_ = false;
+        head_scan_resume_in_flight_ = false;
+        head_scan_start_acknowledged_ = false;
+      }
+
       const auto mission_state = mission_.snapshot().state;
       if (
         autonomous::is_active(mission_state) &&
@@ -924,6 +1321,8 @@ private:
         decision = mission_.observe(inputs_);
       }
 
+      refresh_sequence_stage_locked(decision.snapshot.state);
+
       if (
         decision.request_start_session &&
         command_retry_elapsed_locked("start_session", current_time))
@@ -936,6 +1335,109 @@ private:
         command_retry_elapsed_locked("frontier_mode", current_time))
       {
         publish_frontier_mode = true;
+      }
+
+      if (
+        decision.request_scan360_mode &&
+        command_retry_elapsed_locked("scan360_mode", current_time))
+      {
+        publish_scan360_mode = true;
+      }
+
+      if (
+        decision.request_start_pose_capture &&
+        !start_pose_capture_in_flight_ &&
+        command_retry_elapsed_locked("start_pose_capture", current_time))
+      {
+        inputs_.start_pose_capture_started = true;
+        if (!start_pose_capture_started_at_.has_value()) {
+          start_pose_capture_started_at_ = current_time;
+        }
+        start_pose_capture_in_flight_ = true;
+        capture_start_pose = true;
+      }
+
+      if (decision.request_scan360_start) {
+        if (!inputs_.scan360_started) {
+          inputs_.scan360_started = true;
+          inputs_.scan360_state = "waiting_for_service";
+          inputs_.scan360_reason =
+            "waiting_for_scan360_start_service";
+          scan360_started_at_ = current_time;
+        }
+
+        if (
+          !scan360_start_in_flight_ &&
+          scan360_start_client_->service_is_ready() &&
+          command_retry_elapsed_locked("scan360_start", current_time))
+        {
+          scan360_start_in_flight_ = true;
+          sequence_mission_id = mission_.snapshot().request.mission_id;
+          scan360_dispatch_epoch = scan360_operation_epoch_;
+          dispatch_scan360_start = true;
+        }
+      }
+
+      if (
+        decision.request_scan360_cancel &&
+        !scan360_cancel_in_flight_ &&
+        scan360_cancel_client_->service_is_ready() &&
+        command_retry_elapsed_locked("scan360_cancel", current_time))
+      {
+        scan360_cancel_in_flight_ = true;
+        sequence_mission_id = mission_.snapshot().request.mission_id;
+        scan360_dispatch_epoch = scan360_operation_epoch_;
+        dispatch_scan360_cancel = true;
+      }
+
+      if (decision.request_head_scan_start) {
+        if (!inputs_.head_scan_started) {
+          inputs_.head_scan_started = true;
+          inputs_.head_scan_state = "waiting_for_service";
+          inputs_.head_scan_reason =
+            "waiting_for_head_scan_start_service";
+          head_scan_started_at_ = current_time;
+        }
+
+        if (
+          !head_scan_start_in_flight_ &&
+          head_scan_start_client_->service_is_ready() &&
+          command_retry_elapsed_locked("head_scan_start", current_time))
+        {
+          head_scan_start_in_flight_ = true;
+          sequence_mission_id = mission_.snapshot().request.mission_id;
+          head_scan_dispatch_epoch = head_scan_operation_epoch_;
+          dispatch_head_scan_start = true;
+        }
+      }
+
+      if (
+        decision.request_head_scan_pause &&
+        !head_scan_pause_in_flight_ &&
+        head_scan_pause_client_->service_is_ready() &&
+        command_retry_elapsed_locked("head_scan_pause", current_time))
+      {
+        head_scan_pause_in_flight_ = true;
+        sequence_mission_id = mission_.snapshot().request.mission_id;
+        head_scan_dispatch_epoch = head_scan_operation_epoch_;
+        dispatch_head_scan_pause = true;
+      }
+
+      if (decision.request_head_scan_resume) {
+        if (!head_scan_started_at_.has_value()) {
+          head_scan_started_at_ = current_time;
+        }
+
+        if (
+          !head_scan_resume_in_flight_ &&
+          head_scan_resume_client_->service_is_ready() &&
+          command_retry_elapsed_locked("head_scan_resume", current_time))
+        {
+          head_scan_resume_in_flight_ = true;
+          sequence_mission_id = mission_.snapshot().request.mission_id;
+          head_scan_dispatch_epoch = head_scan_operation_epoch_;
+          dispatch_head_scan_resume = true;
+        }
       }
 
       if (
@@ -1042,6 +1544,10 @@ private:
       publish_string(mode_command_publisher_, "autonomous:frontier");
     }
 
+    if (publish_scan360_mode) {
+      publish_string(mode_command_publisher_, "autonomous:scan360");
+    }
+
     if (publish_monitor_mode) {
       publish_string(mode_command_publisher_, "monitor_only");
     }
@@ -1050,8 +1556,52 @@ private:
       publish_string(cancel_session_command_publisher_, status.mission_id);
     }
 
+    if (capture_start_pose) {
+      capture_start_pose_request();
+    }
+
     if (dispatch_handoff_cancel) {
       dispatch_cancel_request();
+    }
+
+    if (dispatch_scan360_start) {
+      dispatch_sequence_trigger(
+        scan360_start_client_,
+        "scan360_start",
+        sequence_mission_id,
+        scan360_dispatch_epoch);
+    }
+
+    if (dispatch_scan360_cancel) {
+      dispatch_sequence_trigger(
+        scan360_cancel_client_,
+        "scan360_cancel",
+        sequence_mission_id,
+        scan360_dispatch_epoch);
+    }
+
+    if (dispatch_head_scan_start) {
+      dispatch_sequence_trigger(
+        head_scan_start_client_,
+        "head_scan_start",
+        sequence_mission_id,
+        head_scan_dispatch_epoch);
+    }
+
+    if (dispatch_head_scan_pause) {
+      dispatch_sequence_trigger(
+        head_scan_pause_client_,
+        "head_scan_pause",
+        sequence_mission_id,
+        head_scan_dispatch_epoch);
+    }
+
+    if (dispatch_head_scan_resume) {
+      dispatch_sequence_trigger(
+        head_scan_resume_client_,
+        "head_scan_resume",
+        sequence_mission_id,
+        head_scan_dispatch_epoch);
     }
 
     if (dispatch_map_save) {
@@ -1069,6 +1619,213 @@ private:
         terminal_handle,
         status,
         terminal_snapshot.value());
+    }
+  }
+
+  void capture_start_pose_request()
+  {
+    TfPoseSnapshot pose;
+
+    if (start_pose_reader_) {
+      pose = start_pose_reader_->read();
+    } else {
+      pose.reason = "start_pose_reader_disabled";
+    }
+
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      start_pose_capture_in_flight_ = false;
+      inputs_.start_pose_reason = pose.reason;
+
+      if (pose.valid && pose.fresh) {
+        ++inputs_.start_pose_generation;
+        inputs_.start_pose_capture_complete = true;
+        inputs_.start_pose_valid = true;
+        inputs_.start_pose_reason = "start_pose_captured";
+
+        start_pose_map_.header.stamp = pose.transform_stamp;
+        start_pose_map_.header.frame_id = pose.target_frame;
+        start_pose_map_.pose.position.x = pose.x_m;
+        start_pose_map_.pose.position.y = pose.y_m;
+        start_pose_map_.pose.position.z = pose.z_m;
+        start_pose_map_.pose.orientation.x = pose.quaternion_x;
+        start_pose_map_.pose.orientation.y = pose.quaternion_y;
+        start_pose_map_.pose.orientation.z = pose.quaternion_z;
+        start_pose_map_.pose.orientation.w = pose.quaternion_w;
+      }
+    }
+
+    evaluate_and_apply();
+  }
+
+  void dispatch_sequence_trigger(
+    const rclcpp::Client<Trigger>::SharedPtr & client,
+    const std::string & operation,
+    const std::string & mission_id,
+    const std::uint64_t operation_epoch)
+  {
+    auto request = std::make_shared<Trigger::Request>();
+
+    try {
+      client->async_send_request(
+        request,
+        [this, operation, mission_id, operation_epoch](
+          rclcpp::Client<Trigger>::SharedFuture future) {
+          bool success = false;
+          std::string reason{operation + "_empty_response"};
+
+          try {
+            const auto response = future.get();
+            if (response) {
+              success = response->success;
+              reason = response->message;
+            }
+          } catch (const std::exception & exception) {
+            reason = operation + "_response_error:" + exception.what();
+          }
+
+          {
+            std::lock_guard<std::mutex> lock(mutex_);
+
+            const bool scan_operation =
+            operation.rfind("scan360_", 0) == 0;
+            const bool head_operation =
+            operation.rfind("head_scan_", 0) == 0;
+
+            if (
+              mission_.snapshot().request.mission_id != mission_id ||
+              (scan_operation &&
+              operation_epoch != scan360_operation_epoch_) ||
+              (head_operation &&
+              operation_epoch != head_scan_operation_epoch_))
+            {
+              return;
+            }
+
+            if (operation == "scan360_start") {
+              scan360_start_in_flight_ = false;
+              ++inputs_.scan360_generation;
+              inputs_.scan360_started = true;
+              scan360_start_acknowledged_ = success;
+              inputs_.scan360_active = success;
+              inputs_.scan360_complete = !success;
+              inputs_.scan360_succeeded = false;
+              inputs_.scan360_state = success ? "starting" : "failed";
+              inputs_.scan360_reason = reason;
+              if (!success) {
+                scan360_started_at_.reset();
+              }
+            } else if (operation == "scan360_cancel") {
+              scan360_cancel_in_flight_ = false;
+              if (!success) {
+                inputs_.scan360_reason = reason;
+              }
+            } else if (operation == "head_scan_start") {
+              head_scan_start_in_flight_ = false;
+              ++inputs_.head_scan_generation;
+              inputs_.head_scan_started = true;
+              head_scan_start_acknowledged_ = success;
+              inputs_.head_scan_active = success;
+              inputs_.head_scan_paused = false;
+              inputs_.head_scan_complete = !success;
+              inputs_.head_scan_succeeded = false;
+              inputs_.head_scan_state = success ? "running" : "error";
+              inputs_.head_scan_reason = reason;
+              if (!success) {
+                head_scan_started_at_.reset();
+              }
+            } else if (operation == "head_scan_pause") {
+              head_scan_pause_in_flight_ = false;
+              if (success) {
+                inputs_.head_scan_active = false;
+                inputs_.head_scan_paused = true;
+                inputs_.head_scan_state = "paused";
+                inputs_.head_scan_reason = reason;
+              } else {
+                inputs_.head_scan_reason = reason;
+              }
+            } else if (operation == "head_scan_resume") {
+              head_scan_resume_in_flight_ = false;
+              ++inputs_.head_scan_generation;
+              head_scan_start_acknowledged_ = success;
+              inputs_.head_scan_started = true;
+              inputs_.head_scan_active = success;
+              inputs_.head_scan_paused = false;
+              inputs_.head_scan_complete = !success;
+              inputs_.head_scan_succeeded = false;
+              inputs_.head_scan_state = success ? "running" : "error";
+              inputs_.head_scan_reason = reason;
+              if (!success) {
+                head_scan_started_at_.reset();
+              }
+            }
+          }
+
+          evaluate_and_apply();
+        });
+    } catch (const std::exception & exception) {
+      {
+        std::lock_guard<std::mutex> lock(mutex_);
+
+        const bool scan_operation =
+          operation.rfind("scan360_", 0) == 0;
+        const bool head_operation =
+          operation.rfind("head_scan_", 0) == 0;
+
+        if (
+          mission_.snapshot().request.mission_id != mission_id ||
+          (scan_operation &&
+          operation_epoch != scan360_operation_epoch_) ||
+          (head_operation &&
+          operation_epoch != head_scan_operation_epoch_))
+        {
+          return;
+        }
+
+        const std::string reason =
+          operation + "_dispatch_error:" + exception.what();
+
+        if (operation == "scan360_start") {
+          scan360_start_in_flight_ = false;
+          scan360_start_acknowledged_ = false;
+          ++inputs_.scan360_generation;
+          inputs_.scan360_started = true;
+          inputs_.scan360_active = false;
+          inputs_.scan360_complete = true;
+          inputs_.scan360_succeeded = false;
+          inputs_.scan360_state = "failed";
+          inputs_.scan360_reason = reason;
+        } else if (operation == "scan360_cancel") {
+          scan360_cancel_in_flight_ = false;
+          inputs_.scan360_reason = reason;
+        } else if (operation == "head_scan_start") {
+          head_scan_start_in_flight_ = false;
+          head_scan_start_acknowledged_ = false;
+          ++inputs_.head_scan_generation;
+          inputs_.head_scan_started = true;
+          inputs_.head_scan_active = false;
+          inputs_.head_scan_complete = true;
+          inputs_.head_scan_succeeded = false;
+          inputs_.head_scan_state = "error";
+          inputs_.head_scan_reason = reason;
+        } else if (operation == "head_scan_pause") {
+          head_scan_pause_in_flight_ = false;
+          inputs_.head_scan_reason = reason;
+        } else if (operation == "head_scan_resume") {
+          head_scan_resume_in_flight_ = false;
+          head_scan_start_acknowledged_ = false;
+          ++inputs_.head_scan_generation;
+          inputs_.head_scan_started = true;
+          inputs_.head_scan_active = false;
+          inputs_.head_scan_paused = false;
+          inputs_.head_scan_complete = true;
+          inputs_.head_scan_succeeded = false;
+          inputs_.head_scan_state = "error";
+          inputs_.head_scan_reason = reason;
+        }
+      }
+
+      evaluate_and_apply();
     }
   }
 
@@ -1253,6 +2010,39 @@ private:
       snapshot.request.require_quality_approval;
     status.goals_succeeded = snapshot.goals_succeeded;
     status.goals_failed = snapshot.goals_failed;
+    status.start_pose_capture_started =
+      snapshot.start_pose_capture_started;
+    status.start_pose_capture_complete =
+      snapshot.start_pose_capture_complete;
+    status.start_pose_valid = snapshot.start_pose_valid;
+    status.start_pose_map = start_pose_map_;
+    status.start_map_generation = snapshot.start_map_generation;
+    status.start_pose_reason = snapshot.start_pose_reason;
+    status.initial_scan360_complete =
+      snapshot.initial_scan360_complete;
+    status.initial_scan360_succeeded =
+      snapshot.initial_scan360_succeeded;
+    status.initial_head_scan_complete =
+      snapshot.initial_head_scan_complete;
+    status.initial_head_scan_succeeded =
+      snapshot.initial_head_scan_succeeded;
+    status.conditional_scan360_completed =
+      snapshot.conditional_scan360_completed;
+    status.scan360_started = snapshot.scan360_started;
+    status.scan360_active = snapshot.scan360_active;
+    status.scan360_complete = snapshot.scan360_complete;
+    status.scan360_succeeded = snapshot.scan360_succeeded;
+    status.scan360_stage = snapshot.scan360_stage;
+    status.scan360_state = snapshot.scan360_state;
+    status.scan360_reason = snapshot.scan360_reason;
+    status.head_scan_started = snapshot.head_scan_started;
+    status.head_scan_active = snapshot.head_scan_active;
+    status.head_scan_paused = snapshot.head_scan_paused;
+    status.head_scan_complete = snapshot.head_scan_complete;
+    status.head_scan_succeeded = snapshot.head_scan_succeeded;
+    status.head_scan_stage = snapshot.head_scan_stage;
+    status.head_scan_state = snapshot.head_scan_state;
+    status.head_scan_reason = snapshot.head_scan_reason;
     status.frontier_status_received =
       snapshot.frontier_status_received;
     status.frontier_status_fresh = snapshot.frontier_status_fresh;
@@ -1333,6 +2123,15 @@ private:
   std::string runtime_authority_topic_;
   std::string handoff_state_topic_;
   std::string frontier_status_topic_;
+  std::string scan360_state_topic_;
+  std::string head_scan_state_topic_;
+  std::string scan360_start_service_name_;
+  std::string scan360_cancel_service_name_;
+  std::string head_scan_start_service_name_;
+  std::string head_scan_pause_service_name_;
+  std::string head_scan_resume_service_name_;
+  std::string start_pose_target_frame_;
+  std::string start_pose_source_frame_;
   std::string mode_command_topic_;
   std::string start_session_command_topic_;
   std::string cancel_session_command_topic_;
@@ -1345,12 +2144,21 @@ private:
   double default_mission_timeout_s_{0.0};
   double mission_timeout_s_{0.0};
   double map_save_operation_timeout_s_{45.0};
+  double start_pose_lookup_timeout_s_{0.20};
+  double start_pose_stale_timeout_s_{1.0};
+  double start_pose_operation_timeout_s_{10.0};
+  double scan360_operation_timeout_s_{180.0};
+  double head_scan_operation_timeout_s_{180.0};
 
   mutable std::mutex mutex_;
   autonomous::AutonomousMappingMission mission_;
   autonomous::FrontierCompletionDetector completion_detector_;
   autonomous::MissionInputs inputs_;
   std::shared_ptr<GoalHandle> goal_handle_;
+  geometry_msgs::msg::PoseStamped start_pose_map_;
+  std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
+  std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
+  std::unique_ptr<TfPoseReader> start_pose_reader_;
 
   std::optional<std::chrono::steady_clock::time_point>
   mission_started_at_;
@@ -1358,19 +2166,42 @@ private:
   last_command_attempt_;
   std::optional<std::chrono::steady_clock::time_point>
   map_save_started_at_;
+  std::optional<std::chrono::steady_clock::time_point>
+  start_pose_capture_started_at_;
+  std::optional<std::chrono::steady_clock::time_point>
+  scan360_started_at_;
+  std::optional<std::chrono::steady_clock::time_point>
+  head_scan_started_at_;
   std::string last_command_key_;
 
   bool timeout_abort_requested_{false};
   bool handoff_cancel_in_flight_{false};
+  bool start_pose_capture_in_flight_{false};
+  bool scan360_start_in_flight_{false};
+  bool scan360_cancel_in_flight_{false};
+  bool scan360_start_acknowledged_{false};
+  bool head_scan_start_in_flight_{false};
+  bool head_scan_pause_in_flight_{false};
+  bool head_scan_resume_in_flight_{false};
+  bool head_scan_start_acknowledged_{false};
   bool map_save_in_flight_{false};
   bool verification_in_flight_{false};
   bool verification_dispatch_pending_{false};
   bool goal_reserved_{false};
+  std::uint64_t scan360_operation_epoch_{0U};
+  std::uint64_t head_scan_operation_epoch_{0U};
+  autonomous::MissionState observed_sequence_state_{
+    autonomous::MissionState::Idle};
 
   rclcpp_action::Server<RunMission>::SharedPtr action_server_;
   rclcpp::Service<ControlMission>::SharedPtr control_service_;
   rclcpp::Client<Trigger>::SharedPtr handoff_cancel_client_;
   rclcpp::Client<Trigger>::SharedPtr map_save_client_;
+  rclcpp::Client<Trigger>::SharedPtr scan360_start_client_;
+  rclcpp::Client<Trigger>::SharedPtr scan360_cancel_client_;
+  rclcpp::Client<Trigger>::SharedPtr head_scan_start_client_;
+  rclcpp::Client<Trigger>::SharedPtr head_scan_pause_client_;
+  rclcpp::Client<Trigger>::SharedPtr head_scan_resume_client_;
 
   rclcpp::Publisher<MissionStatus>::SharedPtr status_publisher_;
   rclcpp::Publisher<StringMessage>::SharedPtr mode_command_publisher_;
@@ -1387,6 +2218,10 @@ private:
   rclcpp::Subscription<StringMessage>::SharedPtr handoff_state_subscription_;
   rclcpp::Subscription<FrontierStatus>::SharedPtr
     frontier_status_subscription_;
+  rclcpp::Subscription<StringMessage>::SharedPtr
+    scan360_state_subscription_;
+  rclcpp::Subscription<StringMessage>::SharedPtr
+    head_scan_state_subscription_;
   rclcpp::TimerBase::SharedPtr evaluation_timer_;
 };
 

@@ -30,6 +30,8 @@ NODE_PARAMETERS = {
     'odom_frame',
     'status_topic',
     'state_topic',
+    'start_service',
+    'cancel_service',
     'yaw_stale_timeout_sec',
     'sweep_angle_rad',
     'step_angle_rad',
@@ -46,7 +48,7 @@ NODE_PARAMETERS = {
 
 IMMUTABLE_HASHES = {
     'src/nodes/scan360_mapper_node.cpp':
-        'c75d45da89a4462a07f51c51ca9384c7b992befb415501c4747eecdd75bec899',
+        '755b0906a5f2009323b6567691f7d845bc0dc43892fd56668a19a5f4579675ab',
     'include/savo_mapping/scan360_planner.hpp':
         '304b4a06c22461f8fcc66d5858d51f13c53f8df00f70805a35babdb013bc1399',
     'src/scan360/scan360_planner.cpp':
@@ -134,6 +136,8 @@ def test_base_configuration_matches_the_real_node_contract() -> None:
     assert parameters['odom_frame'] == 'odom'
     assert parameters['status_topic'] == '/savo_mapping/scan360/status'
     assert parameters['state_topic'] == '/savo_mapping/scan360/state'
+    assert parameters['start_service'] == '/savo_mapping/scan360/start'
+    assert parameters['cancel_service'] == '/savo_mapping/scan360/cancel'
     assert parameters['direction'] in {'clockwise', 'counter_clockwise'}
 
     positive = NODE_PARAMETERS - {
@@ -144,6 +148,8 @@ def test_base_configuration_matches_the_real_node_contract() -> None:
         'odom_frame',
         'status_topic',
         'state_topic',
+        'start_service',
+        'cancel_service',
         'direction',
         'settle_duration_sec',
         'execution_grace_timeout_sec',

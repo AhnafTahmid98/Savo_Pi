@@ -28,6 +28,7 @@ find_package(nlohmann_json REQUIRED)
 # -----------------------------------------------------------------------------
 add_library(savo_supervisor_core
   src/freshness_tracker.cpp
+  src/core_payload_parser.cpp
   src/localization_payload_parser.cpp
   src/location_authorization_policy.cpp
   src/supervisor_policy.cpp
@@ -167,6 +168,27 @@ if(BUILD_TESTING)
     builtin_interfaces
   )
 
+  ament_add_gtest(test_core_payload_parser
+    test/test_core_payload_parser.cpp
+  )
+  target_link_libraries(test_core_payload_parser
+    savo_supervisor_core
+  )
+  ament_target_dependencies(test_core_payload_parser
+    builtin_interfaces
+  )
+
+  ament_add_gtest(test_core_readiness_policy
+    test/test_core_readiness_policy.cpp
+  )
+  target_link_libraries(test_core_readiness_policy
+    savo_supervisor_core
+  )
+  ament_target_dependencies(test_core_readiness_policy
+    rclcpp
+    builtin_interfaces
+  )
+
   ament_add_gtest(test_transition_tracker
     test/test_transition_tracker.cpp
   )
@@ -207,6 +229,12 @@ if(BUILD_TESTING)
   ament_add_pytest_test(
     test_location_authorization_runtime_contract
     test/test_location_authorization_runtime_contract.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
+    test_core_integration_runtime_contract
+    test/test_core_integration_runtime_contract.py
     TIMEOUT 60
   )
   target_link_libraries(test_location_authorization_policy

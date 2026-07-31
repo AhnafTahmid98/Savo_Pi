@@ -1,23 +1,84 @@
 savo_supervisor_node:
   ros__parameters:
     publish_rate_hz: 2.0
-    startup_grace_s: 3.0
+    startup_grace_s: 5.0
 
     state_summary_topic: /savo_supervisor/state_summary
     heartbeat_topic: /savo_supervisor/heartbeat
     health_topic: /savo_supervisor/health
     events_topic: /savo_supervisor/events
 
+    capabilities.manual_drive_requires_lidar: false
+    capabilities.rotate_requires_lidar: false
+    capabilities.geometric_mapping_requires_nominal_power: true
+
+    safety.stop_topic: /safety/stop
+    safety.slowdown_topic: /safety/slowdown_factor
+    safety.stop_timeout_s: 1.0
+    safety.slowdown_timeout_s: 1.0
+
+    base:
+      enabled: true
+      required: true
+      health_topic: ""
+      summary_topic: /savo_base/base_state
+      heartbeat_topic: ""
+      health_timeout_s: 1.5
+      summary_timeout_s: 1.5
+      heartbeat_timeout_s: 1.5
+      expected_schema_version: 1
+
+    control:
+      enabled: true
+      required: true
+      health_topic: /savo_control/control_status
+      summary_topic: /savo_control/twist_mux/status
+      heartbeat_topic: /savo_control/cmd_vel_shaper/status
+      health_timeout_s: 1.0
+      summary_timeout_s: 1.0
+      heartbeat_timeout_s: 1.0
+      expected_schema_version: 1
+
+    perception:
+      enabled: true
+      required: true
+      health_topic: /savo_perception/range_health
+      summary_topic: /savo_perception/safety_state
+      heartbeat_topic: /savo_perception/heartbeat
+      health_timeout_s: 1.5
+      summary_timeout_s: 1.0
+      heartbeat_timeout_s: 2.5
+      expected_schema_version: 1
+
+    lidar:
+      enabled: true
+      required: true
+      health_topic: ""
+      summary_topic: /savo_lidar/state
+      heartbeat_topic: /savo_lidar/heartbeat
+      health_timeout_s: 1.5
+      summary_timeout_s: 2.0
+      heartbeat_timeout_s: 3.0
+      expected_schema_version: 1
+
     localization:
       enabled: true
       required: true
-
       health_topic: /savo_localization/health
       summary_topic: /savo_localization/state_summary
       heartbeat_topic: /savo_localization/heartbeat
-
       health_timeout_s: 1.5
       summary_timeout_s: 1.5
       heartbeat_timeout_s: 2.5
+      expected_schema_version: 1
 
+    power:
+      enabled: true
+      required: true
+      health_topic: /savo_power/health
+      summary_topic: /savo_power/status
+      heartbeat_topic: ""
+      health_timeout_s: 3.0
+      summary_timeout_s: 3.0
+      heartbeat_timeout_s: 3.0
       expected_schema_version: 1

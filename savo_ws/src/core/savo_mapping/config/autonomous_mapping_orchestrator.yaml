@@ -21,6 +21,25 @@ autonomous_mapping_orchestrator_node:
     cancel_session_command_topic: "/savo_mapping/cancel_session_cmd"
     handoff_cancel_service: "/savo_mapping/exploration_goal/cancel"
 
+    sequence:
+      require_start_pose_capture: true
+      require_initial_scan360: true
+      require_initial_head_scan: true
+      start_pose_target_frame: "map"
+      start_pose_source_frame: "base_link"
+      start_pose_lookup_timeout_s: 0.20
+      start_pose_stale_timeout_s: 1.0
+      start_pose_operation_timeout_s: 10.0
+      scan360_state_topic: "/savo_mapping/scan360/state"
+      scan360_start_service: "/savo_mapping/scan360/start"
+      scan360_cancel_service: "/savo_mapping/scan360/cancel"
+      scan360_operation_timeout_s: 180.0
+      head_scan_state_topic: "/savo_head/scan_state"
+      head_scan_start_service: "/savo_head/start_scan"
+      head_scan_pause_service: "/savo_head/pause_scan"
+      head_scan_resume_service: "/savo_head/resume_scan"
+      head_scan_operation_timeout_s: 180.0
+
     save:
       map_session_service: "/savo_mapping/map_session/save"
       operation_timeout_s: 45.0

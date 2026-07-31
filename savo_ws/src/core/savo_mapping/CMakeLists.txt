@@ -505,6 +505,42 @@ install(
 )
 
 
+add_library(${PROJECT_NAME}_tf_pose_reader
+  src/ros/tf_pose_reader.cpp
+)
+
+target_include_directories(
+  ${PROJECT_NAME}_tf_pose_reader
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+
+target_compile_features(
+  ${PROJECT_NAME}_tf_pose_reader
+  PUBLIC
+    cxx_std_17
+)
+
+ament_target_dependencies(
+  ${PROJECT_NAME}_tf_pose_reader
+  geometry_msgs
+  rclcpp
+  tf2
+  tf2_ros
+)
+
+install(
+  TARGETS
+    ${PROJECT_NAME}_tf_pose_reader
+  EXPORT ${PROJECT_NAME}_tf_pose_reader_targets
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+  INCLUDES DESTINATION include
+)
+
+
 add_executable(autonomous_mapping_orchestrator_node
   src/nodes/autonomous_mapping_orchestrator_node.cpp
 )
@@ -518,16 +554,19 @@ target_compile_features(
 target_link_libraries(
   autonomous_mapping_orchestrator_node
   ${PROJECT_NAME}_core
+  ${PROJECT_NAME}_tf_pose_reader
 )
 
 ament_target_dependencies(
   autonomous_mapping_orchestrator_node
   builtin_interfaces
+  geometry_msgs
   rclcpp
   rclcpp_action
   savo_msgs
   std_msgs
   std_srvs
+  tf2_ros
 )
 
 install(
@@ -627,40 +666,6 @@ install(
   DESTINATION lib/${PROJECT_NAME}
 )
 
-add_library(${PROJECT_NAME}_tf_pose_reader
-  src/ros/tf_pose_reader.cpp
-)
-
-target_include_directories(
-  ${PROJECT_NAME}_tf_pose_reader
-  PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<INSTALL_INTERFACE:include>
-)
-
-target_compile_features(
-  ${PROJECT_NAME}_tf_pose_reader
-  PUBLIC
-    cxx_std_17
-)
-
-ament_target_dependencies(
-  ${PROJECT_NAME}_tf_pose_reader
-  geometry_msgs
-  rclcpp
-  tf2
-  tf2_ros
-)
-
-install(
-  TARGETS
-    ${PROJECT_NAME}_tf_pose_reader
-  EXPORT ${PROJECT_NAME}_tf_pose_reader_targets
-  ARCHIVE DESTINATION lib
-  LIBRARY DESTINATION lib
-  RUNTIME DESTINATION bin
-  INCLUDES DESTINATION include
-)
 
 add_executable(
   mapped_location_registration_node
@@ -959,6 +964,7 @@ ament_target_dependencies(
   nav_msgs
   rclcpp
   std_msgs
+  std_srvs
 )
 
 install(
@@ -1115,6 +1121,12 @@ if(BUILD_TESTING)
   )
 
   ament_add_pytest_test(
+    test_autonomous_mapping_sequencer_contract
+    test/test_autonomous_mapping_sequencer_contract.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
     test_autonomous_mapping_orchestrator_runtime
     test/test_autonomous_mapping_orchestrator_runtime.py
     TIMEOUT 180
@@ -1125,6 +1137,19 @@ if(BUILD_TESTING)
     PROPERTIES
       ENVIRONMENT
         "PYTHONDONTWRITEBYTECODE=1;ROS_LOCALHOST_ONLY=1;ROS_DOMAIN_ID=223;ROS_LOG_DIR=${_savo_mapping_autonomous_orchestrator_ros_log_dir};AUTONOMOUS_ORCHESTRATOR_EXECUTABLE=${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}/autonomous_mapping_orchestrator_node"
+  )
+
+  ament_add_pytest_test(
+    test_autonomous_mapping_sequencer_runtime
+    test/test_autonomous_mapping_sequencer_runtime.py
+    TIMEOUT 180
+  )
+
+  set_tests_properties(
+    test_autonomous_mapping_sequencer_runtime
+    PROPERTIES
+      ENVIRONMENT
+        "PYTHONDONTWRITEBYTECODE=1;ROS_LOCALHOST_ONLY=1;ROS_DOMAIN_ID=224;ROS_LOG_DIR=${_savo_mapping_autonomous_orchestrator_ros_log_dir};AUTONOMOUS_ORCHESTRATOR_EXECUTABLE=${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}/autonomous_mapping_orchestrator_node"
   )
 
   ament_add_pytest_test(

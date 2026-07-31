@@ -52,7 +52,7 @@ struct LocationAuthorizationPolicy
   bool allow_arrival_confirmation{true};
   bool allow_degraded_non_motion{true};
   bool allow_degraded_motion{false};
-  bool require_known_safety_for_motion{false};
+  bool require_known_safety_for_motion{true};
 };
 
 struct LocationAuthorizationDecision

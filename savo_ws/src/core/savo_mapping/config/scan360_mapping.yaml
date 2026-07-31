@@ -16,6 +16,8 @@ scan360_mapper_node:
 
     status_topic: "/savo_mapping/scan360/status"
     state_topic: "/savo_mapping/scan360/state"
+    start_service: "/savo_mapping/scan360/start"
+    cancel_service: "/savo_mapping/scan360/cancel"
 
     sweep_angle_rad: 6.283185307179586
     step_angle_rad: 0.5235987755982988

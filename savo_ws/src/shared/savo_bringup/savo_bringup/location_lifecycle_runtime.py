@@ -23,10 +23,15 @@ from geometry_msgs.msg import PoseStamped
 from rclpy.action import ActionClient
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
+from std_msgs.msg import Bool, Float32
 
 from savo_msgs.action import NavigateToLocation, RegisterMappedLocation
 from savo_msgs.msg import AprilTagObservation
-from savo_msgs.srv import ResolveLocation, ReviewLocationCandidate
+from savo_msgs.srv import (
+    AuthorizeLocationOperation,
+    ResolveLocation,
+    ReviewLocationCandidate,
+)
 
 
 RUNTIME_ROOT = (
@@ -73,6 +78,20 @@ class LifecycleNode(Node):
             0.05,
             self._publish_observation,
         )
+        self.safety_stop_publisher = self.create_publisher(
+            Bool,
+            "/safety/stop",
+            10,
+        )
+        self.safety_slowdown_publisher = self.create_publisher(
+            Float32,
+            "/safety/slowdown_factor",
+            10,
+        )
+        self.safety_timer = self.create_timer(
+            0.10,
+            self._publish_clear_safety,
+        )
 
         self.registration_action = ActionClient(
             self,
@@ -88,6 +107,10 @@ class LifecycleNode(Node):
             ReviewLocationCandidate,
             "/savo_mapping/locations/review",
         )
+        self.authorization_client = self.create_client(
+            AuthorizeLocationOperation,
+            "/savo_supervisor/authorize_location_operation",
+        )
         self.resolve_client = self.create_client(
             ResolveLocation,
             "/savo_locations/resolve",
@@ -95,6 +118,15 @@ class LifecycleNode(Node):
 
     def _on_navigation_goal(self, message: PoseStamped) -> None:
         self.last_navigation_goal = message
+
+    def _publish_clear_safety(self) -> None:
+        """Publish fresh clear-safety evidence for this isolated fixture."""
+        stop = Bool()
+        stop.data = False
+        slowdown = Float32()
+        slowdown.data = 1.0
+        self.safety_stop_publisher.publish(stop)
+        self.safety_slowdown_publisher.publish(slowdown)
 
     def _publish_observation(self) -> None:
         if not self.publish_observations:
@@ -206,8 +238,51 @@ def wait_dependencies(node: LifecycleNode) -> None:
         raise RuntimeError("navigation action unavailable")
     if not node.review_client.wait_for_service(timeout_sec=20.0):
         raise RuntimeError("authorized review service unavailable")
+    if not node.authorization_client.wait_for_service(timeout_sec=20.0):
+        raise RuntimeError("supervisor authorization service unavailable")
     if not node.resolve_client.wait_for_service(timeout_sec=20.0):
         raise RuntimeError("location resolution service unavailable")
+
+
+def wait_supervisor_ready(node: LifecycleNode) -> None:
+    """Wait until the supervisor can authorize non-motion registration."""
+    deadline = time.monotonic() + 10.0
+    last_reason = "supervisor_authorization_not_evaluated"
+
+    while rclpy.ok() and time.monotonic() < deadline:
+        request = AuthorizeLocationOperation.Request()
+        request.operation = (
+            AuthorizeLocationOperation.Request.OP_REGISTER_LOCATION_CANDIDATE
+        )
+        request.request_id = "phase2d-readiness-probe"
+        request.actor_id = "phase2d_operator"
+        request.candidate_id = "candidate-phase2d-readiness-probe"
+        request.map_id = "campus_main"
+        request.map_revision = 7
+        request.motion_required = False
+
+        response = wait_future(
+            node,
+            node.authorization_client.call_async(request),
+            2.0,
+            "supervisor readiness authorization",
+        )
+        if response.authorized:
+            return
+
+        last_reason = response.reason
+        if response.result_code != (
+            AuthorizeLocationOperation.Response.RESULT_SUPERVISOR_NOT_READY
+        ):
+            raise RuntimeError(
+                "supervisor readiness probe rejected: " + last_reason
+            )
+
+        rclpy.spin_once(node, timeout_sec=0.10)
+
+    raise RuntimeError(
+        "timeout waiting for supervisor readiness: " + last_reason
+    )
 
 
 def register_candidate(node: LifecycleNode) -> Any:
@@ -413,6 +488,16 @@ def run() -> int:
                     f"locations_database_path:={database}",
                     "locations_create_parent_directories:=true",
                     "supervisor_startup_grace_s:=0.0",
+                    "supervisor_base_enabled:=false",
+                    "supervisor_base_required:=false",
+                    "supervisor_control_enabled:=false",
+                    "supervisor_control_required:=false",
+                    "supervisor_perception_enabled:=false",
+                    "supervisor_perception_required:=false",
+                    "supervisor_lidar_enabled:=false",
+                    "supervisor_lidar_required:=false",
+                    "supervisor_power_enabled:=false",
+                    "supervisor_power_required:=false",
                     "supervisor_localization_enabled:=false",
                     "supervisor_localization_required:=false",
                     "head_minimum_observations:=3",
@@ -433,6 +518,9 @@ def run() -> int:
         node = LifecycleNode()
         wait_dependencies(node)
         passed("production launch exposed all public lifecycle boundaries")
+        wait_supervisor_ready(node)
+        passed("supervisor authorized non-motion location registration")
+
 
         candidate = register_candidate(node)
         passed("AprilTag evidence produced one persistent pending candidate")

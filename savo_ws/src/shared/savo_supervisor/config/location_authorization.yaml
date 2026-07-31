@@ -8,4 +8,4 @@ savo_supervisor_node:
     location_authorization.allow_arrival_confirmation: true
     location_authorization.allow_degraded_non_motion: true
     location_authorization.allow_degraded_motion: false
-    location_authorization.require_known_safety_for_motion: false
+    location_authorization.require_known_safety_for_motion: true

@@ -100,6 +100,8 @@ def test_safe_defaults_and_native_options_are_explicit() -> None:
         '"feedback_stale_timeout_sec"',
         '"cancel_timeout_sec"',
         '"execution_grace_timeout_sec"',
+        '"start_service"',
+        '"cancel_service"',
     ):
         assert token in source
 
@@ -159,6 +161,26 @@ def test_every_controller_action_is_handled_explicitly() -> None:
     assert 'kMaximumEventRounds' in source
 
 
+def test_public_start_and_cancel_services_are_guarded() -> None:
+    source = read(NODE)
+
+    for token in (
+        '#include <std_srvs/srv/trigger.hpp>',
+        'create_control_services()',
+        'create_service<Trigger>(',
+        'handle_start_request',
+        'handle_cancel_request',
+        'scan360_already_active',
+        'scan360_shutdown_in_progress',
+        'reset_scan_runtime()',
+        'scan360::ControllerEvent::OperatorCancel',
+    ):
+        assert token in source
+
+    assert '/savo_mapping/scan360/start' in source
+    assert '/savo_mapping/scan360/cancel' in source
+
+
 def test_cmake_builds_installs_and_registers_node_once() -> None:
     cmake = read(CMAKE)
 
@@ -190,6 +212,15 @@ def test_cmake_builds_installs_and_registers_node_once() -> None:
         'savo_mapping_scan360_rotate_action_binding',
     ):
         assert target in link.group('body')
+
+    dependency_block = re.search(
+        r'ament_target_dependencies\s*\(\s*scan360_mapper_node\b'
+        r'(?P<body>.*?)\)',
+        cmake,
+        flags=re.DOTALL,
+    )
+    assert dependency_block
+    assert 'std_srvs' in dependency_block.group('body')
 
     assert len(re.findall(
         r'ament_add_pytest_test\s*\(\s*'

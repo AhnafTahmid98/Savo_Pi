@@ -25,7 +25,7 @@ def test_status_contract_is_typed_and_mapping_owned() -> None:
     text = read("msg/AutonomousMappingStatus.msg")
 
     for token in (
-        "uint32 CONTRACT_VERSION=1",
+        "uint32 CONTRACT_VERSION=2",
         "uint8 STRATEGY_NONE=0",
         "uint8 STRATEGY_FRONTIER=1",
         "uint8 STATE_WAITING_FOR_AUTHORITY=2",
@@ -34,6 +34,14 @@ def test_status_contract_is_typed_and_mapping_owned() -> None:
         "uint8 STATE_CANCELING=7",
         "uint8 STATE_COMPLETED=10",
         "uint8 STATE_COMPLETION_PENDING=13",
+        "uint8 STATE_CAPTURING_START_POSE=14",
+        "uint8 STATE_INITIAL_SCAN360=15",
+        "uint8 STATE_INITIAL_HEAD_SCAN=16",
+        "uint8 STATE_CONDITIONAL_SCAN360=17",
+        "uint8 STATE_COVERAGE_PENDING=18",
+        "uint8 STATE_RELEASING=25",
+        "uint8 RESULT_SCAN_FAILED=10",
+        "uint8 RESULT_START_POSE_UNAVAILABLE=11",
         "uint8 RESULT_NOT_TERMINAL=255",
         "uint8 result_code",
         "string mission_id",
@@ -42,6 +50,16 @@ def test_status_contract_is_typed_and_mapping_owned() -> None:
         "bool handoff_active",
         "uint32 goals_succeeded",
         "uint32 goals_failed",
+        "bool start_pose_capture_started",
+        "bool start_pose_capture_complete",
+        "bool start_pose_valid",
+        "geometry_msgs/PoseStamped start_pose_map",
+        "uint64 start_map_generation",
+        "bool initial_scan360_complete",
+        "bool initial_head_scan_complete",
+        "uint32 conditional_scan360_completed",
+        "string scan360_stage",
+        "string head_scan_stage",
         "bool frontier_status_received",
         "string frontier_planning_status",
         "uint64 frontier_plan_sequence",
@@ -60,7 +78,7 @@ def test_status_contract_is_typed_and_mapping_owned() -> None:
     ):
         assert token in text
 
-    assert "geometry_msgs/Pose" not in text
+    assert "geometry_msgs/Twist" not in text
     assert "nav_msgs/Path" not in text
 
 
@@ -111,13 +129,15 @@ def test_action_starts_one_mission_and_returns_typed_status() -> None:
     assert "nav2_msgs" not in text
 
 
-def test_control_service_has_only_pause_resume_cancel() -> None:
+def test_control_service_adds_guarded_conditional_scan_request() -> None:
     text = read("srv/ControlAutonomousMapping.srv")
 
     for token in (
+        "uint32 CONTRACT_VERSION=2",
         "COMMAND_PAUSE=1",
         "COMMAND_RESUME=2",
         "COMMAND_CANCEL=3",
+        "COMMAND_REQUEST_SCAN360=4",
         "RESULT_NO_ACTIVE_MISSION=2",
         "RESULT_MISSION_MISMATCH=3",
         "RESULT_INVALID_STATE=4",
@@ -130,4 +150,4 @@ def test_control_service_has_only_pause_resume_cancel() -> None:
 
 def test_manifest_version_marks_new_interface_revision() -> None:
     root = ET.parse(ROOT / "package.xml").getroot()
-    assert root.findtext("version") == "0.8.0"
+    assert root.findtext("version") == "0.9.0"

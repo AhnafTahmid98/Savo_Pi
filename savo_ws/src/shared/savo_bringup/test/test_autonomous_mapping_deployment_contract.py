@@ -1,4 +1,4 @@
-"""Deployment contracts for the AM-4 autonomous mapping bringup."""
+"""Deployment contracts for the AM-5 autonomous mapping bringup."""
 
 import ast
 from pathlib import Path
@@ -13,7 +13,7 @@ def read(relative: str) -> str:
 
 
 def test_autonomous_mapping_launch_composes_all_core_owners() -> None:
-    """AM-4 includes each package that owns part of autonomous mapping."""
+    """AM-5 includes each package that owns part of autonomous mapping."""
     launch = read("launch/autonomous_mapping.launch.py")
 
     compile(
@@ -32,6 +32,7 @@ def test_autonomous_mapping_launch_composes_all_core_owners() -> None:
         '"savo_supervisor"',
         '"savo_nav"',
         '"savo_mapping"',
+        '"savo_head"',
     }
     for token in required_packages:
         assert token in launch
@@ -46,6 +47,7 @@ def test_autonomous_mapping_launch_composes_all_core_owners() -> None:
         '"supervisor.launch.py"',
         '"live_mapping_navigation.launch.py"',
         '"autonomous_mapping.launch.xml"',
+        '"head_bringup.launch.py"',
     }
     for token in required_launches:
         assert token in launch
@@ -71,15 +73,20 @@ def test_autonomous_mapping_launch_is_fail_closed_by_default() -> None:
     assert "ActionClient" not in launch
     assert "create_client" not in launch
     assert '_python_launch("savo_description"' not in launch
+    assert '"start_head"' in launch
+    assert '"head_enable_tf"' in launch
+    assert 'default_value="false"' in launch
+    assert '"head_camera_mode"' in launch
+    assert 'default_value="disabled"' in launch
 
 
 def test_bringup_installs_am4_and_runtime_dependencies() -> None:
-    """The installed bringup package contains AM-4 and its package owners."""
+    """The installed bringup package contains AM-5 and its package owners."""
     tree = ET.parse(ROOT / "package.xml")
     package = tree.getroot()
     setup_py = read("setup.py")
 
-    assert package.findtext("version") == "0.4.0"
+    assert package.findtext("version") == "0.5.0"
 
     dependencies = {
         element.text for element in package.findall("exec_depend")
@@ -91,6 +98,7 @@ def test_bringup_installs_am4_and_runtime_dependencies() -> None:
         "savo_lidar",
         "savo_localization",
         "savo_mapping",
+        "savo_head",
         "savo_nav",
         "savo_perception",
         "savo_power",
@@ -109,7 +117,8 @@ def test_readme_documents_two_step_motion_authority() -> None:
     readme = read("README.md")
 
     assert "autonomous_mapping.launch.py" in readme
-    assert "defaults the control layer to" in readme
+    assert "defaults the control" in readme
+    assert "layer to `STOP`." in readme
     assert "`STOP`." in readme
     assert "/savo_control/mode_cmd" in readme
     assert "/savo_mapping/autonomous/run" in readme

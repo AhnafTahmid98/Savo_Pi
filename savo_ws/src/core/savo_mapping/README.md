@@ -87,8 +87,6 @@ values remain provisional until measured on the robot.
 The following files remain non-production scaffolds and are not installed by
 the package:
 
-- unified package-level mapping bringup (`savo_bringup` will own full-system
-  orchestration later)
 - package-owned RealSense/voxel mapping monitors
 - live map-quality scoring beyond the saved-map evaluator
 - optional RViz presets that are not required on either Raspberry Pi
@@ -381,11 +379,42 @@ later phases.
 
 `autonomous_mapping.launch.xml` now composes only mapping-owned processes:
 SLAM Toolbox, mapping readiness, map-session persistence, frontier selection,
-the guarded exploration handoff, and the AM-1 through AM-3 mission
-orchestrator. Hardware drivers, control, localization, supervisor policy and
+the guarded exploration handoff, Scan360 server, and the AM-1 through AM-5
+mission orchestrator. Hardware drivers, control, localization, supervisor policy and
 Nav2 remain outside this package and are composed by `savo_bringup`.
 
 The launch starts in `monitor_only` with an idle session. The frontier node's
 static gate is enabled, but `exploration_manager_node` keeps runtime authority
 closed until the typed autonomous mission action has passed readiness and
 safety checks. Launching the stack therefore never starts robot motion.
+
+## Full autonomous mission sequencer foundation (AM-5)
+
+The production action now executes this hardware-independent prelude before
+frontier exploration:
+
+```text
+start map session
+  -> capture fresh map -> base_link starting pose
+  -> enter autonomous:scan360
+  -> start and monitor Scan360 through its public Trigger service
+  -> return to monitor_only
+  -> start and monitor the savo_head semantic scan
+  -> enter autonomous:frontier
+```
+
+`ControlAutonomousMapping.COMMAND_REQUEST_SCAN360` may insert a conditional
+Scan360 only while the mission is in `EXPLORING`. The sequencer first quiesces
+the guarded navigation handoff, switches to monitor-only, runs Scan360, and
+returns to frontier exploration. Pause, resume, cancellation, missing-service
+timeouts and stale asynchronous responses are bounded and fail closed.
+
+The orchestrator reads the initial pose through the shared `TfPoseReader`; it
+does not publish TF or control the base. Scan360 remains owned by
+`scan360_mapper_node` and rotation remains owned by `savo_control`. Head motion
+and scan state remain owned by `savo_head`.
+
+AM-5 deliberately retains the AM-3 frontier-completion save path. Continuous
+AprilTag interruption and registration is AM-6; coverage, return-to-start and
+final scans are AM-7; combined verification, approval and atomic map/location
+release are AM-8.

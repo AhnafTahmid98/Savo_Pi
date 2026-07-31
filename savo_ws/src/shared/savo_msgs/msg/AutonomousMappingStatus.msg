@@ -4,8 +4,9 @@
 # - savo_mapping owns this status and the mission lifecycle.
 # - savo_nav owns execution of each admitted exploration goal.
 # - savo_control and savo_perception remain final movement/safety authorities.
+# - savo_head owns semantic head motion and AprilTag visual confirmation.
 
-uint32 CONTRACT_VERSION=1
+uint32 CONTRACT_VERSION=2
 
 uint8 STRATEGY_NONE=0
 uint8 STRATEGY_FRONTIER=1
@@ -25,6 +26,18 @@ uint8 STATE_COMPLETED=10
 uint8 STATE_CANCELED=11
 uint8 STATE_FAILED=12
 uint8 STATE_COMPLETION_PENDING=13
+uint8 STATE_CAPTURING_START_POSE=14
+uint8 STATE_INITIAL_SCAN360=15
+uint8 STATE_INITIAL_HEAD_SCAN=16
+uint8 STATE_CONDITIONAL_SCAN360=17
+uint8 STATE_COVERAGE_PENDING=18
+uint8 STATE_COVERAGE=19
+uint8 STATE_RETURNING_TO_START=20
+uint8 STATE_FINAL_SCAN360=21
+uint8 STATE_FINAL_HEAD_SCAN=22
+uint8 STATE_VERIFYING_LOCATIONS=23
+uint8 STATE_AWAITING_APPROVAL=24
+uint8 STATE_RELEASING=25
 
 uint8 RESULT_SUCCEEDED=0
 uint8 RESULT_INVALID_REQUEST=1
@@ -36,6 +49,8 @@ uint8 RESULT_CANCELED=6
 uint8 RESULT_SAVE_FAILED=7
 uint8 RESULT_QUALITY_REJECTED=8
 uint8 RESULT_INTERNAL_ERROR=9
+uint8 RESULT_SCAN_FAILED=10
+uint8 RESULT_START_POSE_UNAVAILABLE=11
 uint8 RESULT_NOT_TERMINAL=255
 
 uint32 contract_version
@@ -60,6 +75,36 @@ bool require_quality_approval
 
 uint32 goals_succeeded
 uint32 goals_failed
+
+bool start_pose_capture_started
+bool start_pose_capture_complete
+bool start_pose_valid
+geometry_msgs/PoseStamped start_pose_map
+uint64 start_map_generation
+string start_pose_reason
+
+bool initial_scan360_complete
+bool initial_scan360_succeeded
+bool initial_head_scan_complete
+bool initial_head_scan_succeeded
+uint32 conditional_scan360_completed
+
+bool scan360_started
+bool scan360_active
+bool scan360_complete
+bool scan360_succeeded
+string scan360_stage
+string scan360_state
+string scan360_reason
+
+bool head_scan_started
+bool head_scan_active
+bool head_scan_paused
+bool head_scan_complete
+bool head_scan_succeeded
+string head_scan_stage
+string head_scan_state
+string head_scan_reason
 
 bool frontier_status_received
 bool frontier_status_fresh

@@ -49,13 +49,41 @@ def test_location_lifecycle_launch_contract() -> None:
         '"start_review_gateway"',
         '"locations_database_path"',
         '"locations_create_parent_directories"',
+        '"supervisor_base_enabled"',
+        '"supervisor_base_required"',
+        '"supervisor_control_enabled"',
+        '"supervisor_control_required"',
+        '"supervisor_perception_enabled"',
+        '"supervisor_perception_required"',
+        '"supervisor_lidar_enabled"',
+        '"supervisor_lidar_required"',
+        '"supervisor_power_enabled"',
+        '"supervisor_power_required"',
         '"supervisor_localization_enabled"',
+        '"supervisor_localization_required"',
         '"head_minimum_observations"',
         '"review_operation_timeout_s"',
         '"navigation_action_name"',
         '"arrival_confirmation_timeout_s"',
     }
     for token in required_arguments:
+        assert token in launch
+
+    production_supervisor_defaults = {
+        '"supervisor_base_enabled",\n            default_value="true"',
+        '"supervisor_base_required",\n            default_value="true"',
+        '"supervisor_control_enabled",\n            default_value="true"',
+        '"supervisor_control_required",\n            default_value="true"',
+        '"supervisor_perception_enabled",\n            default_value="true"',
+        '"supervisor_perception_required",\n            default_value="true"',
+        '"supervisor_lidar_enabled",\n            default_value="true"',
+        '"supervisor_lidar_required",\n            default_value="true"',
+        '"supervisor_power_enabled",\n            default_value="true"',
+        '"supervisor_power_required",\n            default_value="true"',
+        '"supervisor_localization_enabled",\n            default_value="true"',
+        '"supervisor_localization_required",\n            default_value="true"',
+    }
+    for token in production_supervisor_defaults:
         assert token in launch
 
     assert "fake_location_nav2_server_node" not in launch
@@ -75,7 +103,7 @@ def test_bringup_is_installable_lifecycle_package() -> None:
     root = tree.getroot()
 
     assert root.findtext("name") == "savo_bringup"
-    assert root.findtext("version") == "0.4.0"
+    assert root.findtext("version") == "0.5.0"
     assert root.findtext("buildtool_depend") == "ament_python"
     assert root.find("./export/build_type").text == "ament_python"
 
@@ -115,16 +143,28 @@ def test_runtime_uses_only_public_lifecycle_boundaries() -> None:
         "ReviewLocationCandidate",
         "ResolveLocation",
         "NavigateToLocation",
+        "AuthorizeLocationOperation",
         '"/savo_mapping/locations/register"',
         '"/savo_mapping/locations/review"',
         '"/savo_locations/resolve"',
         '"/savo_nav/locations/navigate"',
+        '"/savo_supervisor/authorize_location_operation"',
         '"location_integration.launch.py"',
         '"start_head_observer:=false"',
+        '"supervisor_base_enabled:=false"',
+        '"supervisor_control_enabled:=false"',
+        '"supervisor_perception_enabled:=false"',
+        '"supervisor_lidar_enabled:=false"',
+        '"supervisor_power_enabled:=false"',
+        '"/safety/stop"',
+        '"/safety/slowdown_factor"',
+        "_publish_clear_safety",
         '"navigation_action_name:=/navigate_to_pose"',
         "candidate.approach_pose",
         "approved.tag_pose_map",
         "arrival_confirmed",
+        "wait_supervisor_ready",
+        "RESULT_SUPERVISOR_NOT_READY",
         "PRAGMA integrity_check",
         "PHASE 2D LOCATION LIFECYCLE RUNTIME: PASS",
     }

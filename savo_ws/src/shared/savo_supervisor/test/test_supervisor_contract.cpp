@@ -116,11 +116,23 @@ TEST(SupervisorContract, RejectsDuplicateLocalizationInputs)
     "localization input topics must be unique");
 }
 
-TEST(SupervisorContract, DisabledLocalizationNeedsNoInputs)
+TEST(SupervisorContract, DisabledRequiredComponentIsRejected)
+{
+  SupervisorPolicy policy;
+  policy.localization.enabled = false;
+
+  EXPECT_FALSE(policy.Validate());
+  EXPECT_EQ(
+    policy.ValidationError(),
+    "localization cannot be required while disabled");
+}
+
+TEST(SupervisorContract, DisabledOptionalLocalizationNeedsNoInputs)
 {
   SupervisorPolicy policy;
 
   policy.localization.enabled = false;
+  policy.localization.required = false;
   policy.localization.health_topic.clear();
   policy.localization.summary_topic.clear();
   policy.localization.heartbeat_topic.clear();

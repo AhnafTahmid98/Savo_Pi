@@ -23,6 +23,8 @@ def test_orchestrator_is_registered_and_installed() -> None:
         'test_autonomous_mapping_mission',
         'test_frontier_completion_detector',
         'test_autonomous_mapping_orchestrator_runtime',
+        'test_autonomous_mapping_sequencer_runtime',
+        'test_autonomous_mapping_sequencer_contract',
     ):
         assert token in cmake
 
@@ -40,6 +42,7 @@ def test_orchestrator_uses_typed_public_boundary() -> None:
         'MissionCommand::Pause',
         'MissionCommand::Resume',
         'MissionCommand::Cancel',
+        'MissionCommand::RequestScan360',
     ):
         assert token in source
 
@@ -54,11 +57,18 @@ def test_orchestrator_uses_public_save_boundary_without_nav_bypass() -> None:
         'slam_toolbox/srv/serialize_pose_graph',
         'slam_toolbox/srv/save_map',
         'nav_msgs/msg/path.hpp',
-        'geometry_msgs/msg/pose_stamped.hpp',
     )
 
     for token in forbidden:
         assert token not in source
+
+    for token in (
+        'geometry_msgs/msg/pose_stamped.hpp',
+        'TfPoseReader',
+        'capture_start_pose_request',
+        'session::verify_saved_map_session',
+    ):
+        assert token in source
 
 
 def test_pause_and_cancel_use_existing_guarded_handoff_cancel() -> None:
@@ -83,6 +93,7 @@ def test_commands_flow_through_mapping_mode_manager_topics() -> None:
         'topics::CANCEL_SESSION_CMD',
         'publish_string(mode_command_publisher_, "autonomous:frontier")',
         'publish_string(mode_command_publisher_, "monitor_only")',
+        'publish_string(mode_command_publisher_, "autonomous:scan360")',
     ):
         assert token in source
 
@@ -142,5 +153,12 @@ def test_launch_and_config_are_nonempty_and_consistent() -> None:
         '/savo_mapping/exploration_goal/state',
         '/savo_mapping/frontier_explorer/typed_status',
         '/savo_mapping/map_session/save',
+        '/savo_mapping/scan360/state',
+        '/savo_mapping/scan360/start',
+        '/savo_mapping/scan360/cancel',
+        '/savo_head/scan_state',
+        '/savo_head/start_scan',
+        '/savo_head/pause_scan',
+        '/savo_head/resume_scan',
     ):
         assert endpoint in config

@@ -1,256 +1,99 @@
 # savo_supervisor
 
-savo_supervisor will be the high-level readiness, mode, and confidence manager for Robot Savo.
+Robot Savo's monitor-and-permission authority. The package never commands motors, plans paths, saves maps, or writes semantic locations. It observes package-owned contracts, evaluates freshness and health, publishes a truthful global readiness model, and authorizes guarded operations.
 
-This package will not directly control motors. Its job is to decide whether the robot system is ready for a requested action, such as navigation, follow mode, mapping, or interaction. Final movement authority will remain inside the safety/control stack.
+## Phase 1 scope
 
-Purpose
+The C++ supervisor now integrates the core motion stack:
 
-Robot Savo has many ROS packages running across two Raspberry Pi units:
+- `savo_base`
+- `savo_control`
+- `savo_perception`
+- `savo_lidar`
+- `savo_localization`
+- `savo_power`
 
-savo-core: base, control, LiDAR, localization, perception, safety, navigation
-savo-edge: RealSense, visual odometry, speech, UI, AI helper services
+Package-specific payloads are normalized only at the supervisor boundary. The source packages retain ownership of their detailed health policies.
 
-The supervisor will watch the system and answer:
+## Inputs
 
-Which packages/nodes should be running?
-Which topics must be fresh?
-Is the robot safe to move?
-Is navigation allowed right now?
-Is mapping allowed right now?
-Is the robot only in idle/interaction mode?
-What is the reason if something is blocked?
+| Component | Required contracts |
+|---|---|
+| Base | `/savo_base/base_state` |
+| Control | `/savo_control/control_status`, `/savo_control/twist_mux/status`, `/savo_control/cmd_vel_shaper/status` |
+| Perception | `/savo_perception/range_health`, `/savo_perception/safety_state`, `/savo_perception/heartbeat` |
+| LiDAR | `/savo_lidar/state`, `/savo_lidar/heartbeat` |
+| Localization | `/savo_localization/health`, `/savo_localization/state_summary`, `/savo_localization/heartbeat` |
+| Power | `/savo_power/status`, `/savo_power/health` |
+| Authoritative safety | `/safety/stop`, `/safety/slowdown_factor` |
 
-Location and Runtime
+Every required stream is checked for first acquisition, freshness, malformed payloads, clock regressions, reported readiness, and recovery.
 
-Package path:
+## Outputs
 
-savo_ws/src/shared/savo_supervisor
+- `/savo_supervisor/state_summary` — transient-local JSON schema version 2
+- `/savo_supervisor/heartbeat` — supervisor liveness, always published
+- `/savo_supervisor/health` — aggregate and per-component diagnostics
+- `/savo_supervisor/events` — state and recovery transitions
+- `/savo_supervisor/authorize_location_operation` — permission-only location service
 
-Runtime target:
-
-savo-core
-
-The package is placed under shared because it observes both savo-core and savo-edge, but the main supervisor should run on savo-core because savo-core owns movement authority.
-
-Ownership Boundary
-
-savo_supervisor owns:
-
-robot readiness state
-robot mode state
-health/confidence summary
-high-level action permission
-status reporting for UI, app, and LLM
-startup/readiness checks
-
-savo_supervisor does not own:
-
-motor control
-low-level safety gate
-emergency stop logic
-Nav2 planning
-SLAM/mapping logic
-sensor drivers
-
-Those remain in their own packages.
-
-Planned Robot Modes
-
-The supervisor will manage high-level modes such as:
-
-Mode Meaning
-BOOTING Robot backend is starting
-IDLE Backend is ready, robot is not moving
-INTERACT Robot is talking/listening, movement blocked
-NAVIGATE Navigation command is active
-FOLLOW Follow mode is active
-MAPPING Mapping/SLAM mode is active
-ERROR Required system is unhealthy
-ESTOP Emergency stop or hard safety stop is active
-
-Important rule:
-
-System running does not mean robot is allowed to move.
-
-Planned Readiness Checks
-
-The supervisor will calculate readiness states such as:
-
-safety_ready
-localization_ready
-navigation_ready
-mapping_ready
-speech_ready
-edge_ready
-base_ready
-can_move
-
-Example navigation readiness:
-
-navigation_ready =
-  base_ok
-  control_ok
-  safety_ok
-  lidar_ok
-  localization_ok
-  map_ok
-  battery_ok
-
-If one required system is missing or stale, navigation will be blocked and the supervisor will publish the reason.
-
-Planned Inputs
-
-The supervisor may subscribe to topics such as:
-
-/realsense/status
-/lidar/status
-/localization/status
-/savo_base/base_state
-/safety/stop
-/safety/slowdown_factor
-/cmd_vel_safe
-/savo_intent/intent_result
-/robot_status
-
-Additional edge/core health topics may be added later.
-
-Planned Outputs
-
-The supervisor may publish:
-
-/savo_supervisor/state
-/savo_supervisor/mode
-/savo_supervisor/readiness
-/savo_supervisor/events
-
-Example state output:
-
-{
-  "mode": "IDLE",
-  "navigation_ready": true,
-  "mapping_ready": true,
-  "safety_ready": true,
-  "can_move": false,
-  "reason": "Waiting for user command"
-}
-
-Example blocked state:
-
-{
-  "mode": "ERROR",
-  "navigation_ready": false,
-  "can_move": false,
-  "reason": "Localization stale"
-}
-
-Planned Services
-
-Possible services:
-
-/savo_supervisor/set_mode
-/savo_supervisor/request_navigation
-/savo_supervisor/request_mapping
-/savo_supervisor/clear_error
-
-These services will not directly drive the robot. They will approve or reject high-level actions based on readiness and safety state.
-
-Systemd and Launch Relationship
-
-systemd will start the backend services at boot.
-
-Launch files will start ROS packages.
-
-savo_supervisor will check whether the started system is healthy and ready.
-
-Expected production flow:
-
-Power on robot
--> systemd starts core/edge backend
--> launch files start packages
--> savo_supervisor checks readiness
--> robot waits in IDLE/INTERACT
--> user gives command
--> supervisor allows or blocks action
--> safety/control stack remains final movement authority
-
-Language Plan
-
-First version:
-
-Python
-
-Reason:
-
-supervisor is orchestration/status logic
-not high-rate motor/safety control
-easier to develop and debug
-
-Future hybrid version is possible if needed, but low-level safety and motion timing will remain in C++ packages such as savo_control, savo_perception, and savo_base.
-
-Development Plan
-
-Planned stages:
-
-Create package skeleton under src/shared/savo_supervisor
-Add supervisor.yaml with required topics and timeout thresholds
-Add supervisor_node.py
-Watch required topics and node health
-Publish /savo_supervisor/state
-Add mode model: BOOTING, IDLE, INTERACT, NAVIGATE, FOLLOW, MAPPING, ERROR, ESTOP
-
-# savo_supervisor_implementation
-
-`savo_supervisor` is Robot Savo's production monitor-only readiness and
-health aggregation package.
-
-The current Phase S1 implementation observes localization contracts,
-evaluates freshness and consistency, and publishes aggregate supervisor
-state, heartbeat, diagnostics, and transition events.
-
-It does not command or control the robot.
-
-## Current status
-
-The package is implemented in C++17 and has been validated through:
-
-- static compilation with ROS 2 Jazzy
-- deterministic freshness tests
-- strict JSON contract tests
-- supervisor-policy tests
-- transition-event tests
-- configuration-contract tests
-- supervisor-only runtime validation
-- healthy, stale, and recovery runtime validation
-
-The runtime sequence validated with the package-local fixture is:
+The state summary contains:
 
 ```text
-FAULTED -> RUNNING -> FAULTED -> RUNNING
-STALE   -> OK      -> STALE   -> OK
+lifecycle
+health
+safety
+component summaries
+core_health_ready
+core_safety_ready
+core_motion_ready
+can_manual_drive
+can_rotate
+can_start_geometric_mapping
 ```
 
-Add readiness logic for navigation/mapping/follow
-Connect state to UI and LLM status replies
-Add tests for readiness and mode transitions
-Integrate with final savo_bringup and systemd services
+## Safety behavior
 
-Current Status
+- Missing, stale, or malformed authoritative safety data blocks global readiness after startup grace.
+- An active safety stop does **not** falsely mark the supervisor process as failed.
+- A safety stop keeps the supervisor `RUNNING` but `DEGRADED`, and all motion capabilities become false.
+- Slowdown keeps safe motion capabilities available while global health is degraded.
+- Location motion authorization requires a known safety state by default.
 
-This package is planned but not implemented yet.
+## Capability policy
 
-It will be created after the core ownership packages are stable:
+`can_manual_drive` and `can_rotate` require available, non-inhibited base and control execution, ready perception/localization/power, and known non-stop safety. LiDAR is configurable for these capabilities and is not required by default.
 
-savo_realsense
-savo_lidar
-savo_localization
-savo_perception
-savo_control
-savo_base
+`can_start_geometric_mapping` additionally requires healthy, nominal LiDAR and—by default—nominal power. A low battery may still permit controlled manual movement while preventing a new mapping mission. A component cannot be configured as both disabled and required.
 
-Pointcloud/voxel readiness will be added later when savo_nav is implemented.
+## Launch
 
-Later, when you want to create it quickly:
+```bash
+ros2 launch savo_supervisor supervisor.launch.py
+```
 
-mkdir -p ~/Savo_Pi/savo_ws/src/shared/savo_supervisor
-nano ~/Savo_Pi/savo_ws/src/shared/savo_supervisor/README.md
+The launch loads both `supervisor.yaml` and `location_authorization.yaml`.
+
+## Build and test
+
+```bash
+cd ~/Savo_Pi/savo_ws
+source /opt/ros/jazzy/setup.bash
+
+colcon build \
+  --packages-select savo_supervisor \
+  --symlink-install \
+  --event-handlers console_direct+
+
+source install/setup.bash
+
+colcon test \
+  --packages-select savo_supervisor \
+  --event-handlers console_direct+
+
+colcon test-result --verbose
+```
+
+## Next phases
+
+Phase 2 adds high-level mission authority, mapping/navigation readiness, semantic dependencies, and active-map context. Phase 3 adds edge-computer integration, system-service supervision, deployment hardening, and real-hardware fault validation.

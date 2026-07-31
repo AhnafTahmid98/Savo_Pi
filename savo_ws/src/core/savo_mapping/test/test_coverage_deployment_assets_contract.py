@@ -72,7 +72,7 @@ IMMUTABLE_HASHES = {
     'test/test_coverage_mapper_node_runtime.py':
         'c5931b27b75b73039cfe4fd69eec2a143c40da3d3e7112fdd0127f25cedc99ae',
     'config/scan360_mapping.yaml':
-        '8e2d4d3ab9d7afd83dc2d97e655ca7dd7a2c927a1e51af91663ef0a244df1160',
+        '16f769954cc92e28e97c7347a5c649bd7261c2da28abcc7c84e30c48baaed8ed',
     'launch/scan360_mapping.launch.xml':
         'ee1d58ee2c273a4962b21f276b7cf9e9f626120f246ef6a118b165eb6a19937e',
     'rviz/scan360_mapping.rviz':

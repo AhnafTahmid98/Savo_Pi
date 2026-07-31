@@ -10,7 +10,7 @@ LAUNCH = PACKAGE / 'launch/autonomous_mapping.launch.xml'
 
 
 def test_autonomous_mapping_launch_is_valid_and_complete() -> None:
-    """The launch composes every mapping-owned AM-1 through AM-3 process."""
+    """The launch composes every mapping-owned AM-1 through AM-5 process."""
     tree = ET.parse(LAUNCH)
     root = tree.getroot()
 
@@ -29,6 +29,9 @@ def test_autonomous_mapping_launch_is_valid_and_complete() -> None:
         'handoff_params_file',
         'exploration_manager_params_file',
         'orchestrator_params_file',
+        'scan360_params_file',
+        'scan360_profile_file',
+        'scan360_use_real_robot_profile',
         'map_frame',
         'base_frame',
     }.issubset(arguments)
@@ -48,6 +51,7 @@ def test_autonomous_mapping_launch_is_valid_and_complete() -> None:
     assert any('online_async_launch.py' in value for value in includes)
     assert any('map_session_manager.launch.xml' in value for value in includes)
     assert any('frontier_mapping.launch.xml' in value for value in includes)
+    assert any('scan360_mapping.launch.xml' in value for value in includes)
     assert any(
         'autonomous_mapping_orchestrator.launch.xml' in value
         for value in includes
@@ -80,6 +84,8 @@ def test_autonomous_launch_starts_safe_and_preserves_ownership() -> None:
 
     assert '/savo_mapping/map_session/save' not in text
     assert '/navigate_to_pose' not in text
+    assert 'name="auto_start"' in text
+    assert 'value="false"' in text
 
 
 def test_all_launch_variables_are_declared() -> None:

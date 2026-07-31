@@ -9,11 +9,11 @@ from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
     package_share = FindPackageShare('savo_supervisor')
-
-    config_file = PathJoinSubstitution([
-        package_share,
-        'config',
-        'supervisor.yaml',
+    supervisor_config = PathJoinSubstitution([
+        package_share, 'config', 'supervisor.yaml',
+    ])
+    location_authorization_config = PathJoinSubstitution([
+        package_share, 'config', 'location_authorization.yaml',
     ])
 
     return LaunchDescription([
@@ -22,6 +22,6 @@ def generate_launch_description():
             executable='supervisor_node',
             name='savo_supervisor_node',
             output='screen',
-            parameters=[config_file],
+            parameters=[supervisor_config, location_authorization_config],
         ),
     ])
