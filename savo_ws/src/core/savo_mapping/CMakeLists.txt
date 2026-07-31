@@ -56,6 +56,8 @@ add_library(${PROJECT_NAME}_core
   src/workflow/manual_workflow_state.cpp
   src/workflow/workflow_authority.cpp
   src/workflow/exploration_runtime.cpp
+  src/workflow/frontier_completion_detector.cpp
+  src/workflow/autonomous_mapping_mission.cpp
   src/coverage/coverage_grid.cpp
   src/coverage/coverage_execution_handoff.cpp
   src/coverage/coverage_operation_orchestrator.cpp
@@ -232,6 +234,8 @@ set(_savo_mapping_public_headers
   include/savo_mapping/manual_workflow_state.hpp
   include/savo_mapping/workflow_authority.hpp
   include/savo_mapping/exploration_runtime.hpp
+  include/savo_mapping/frontier_completion_detector.hpp
+  include/savo_mapping/autonomous_mapping_mission.hpp
   include/savo_mapping/coverage_grid.hpp
   include/savo_mapping/coverage_execution_handoff.hpp
   include/savo_mapping/coverage_operation_orchestrator.hpp
@@ -269,6 +273,7 @@ install(
 )
 
 set(_savo_mapping_production_config
+  config/autonomous_mapping_orchestrator.yaml
   config/coverage_execution_handoff.yaml
   config/coverage_operation_orchestrator.yaml
   config/coverage_mapping.yaml
@@ -309,6 +314,8 @@ install(
 )
 
 set(_savo_mapping_production_launch
+  launch/autonomous_mapping.launch.xml
+  launch/autonomous_mapping_orchestrator.launch.xml
   launch/continued_mapping.launch.py
   launch/coverage_execution_handoff.launch.xml
   launch/coverage_operation_orchestrator.launch.xml
@@ -498,6 +505,37 @@ install(
 )
 
 
+add_executable(autonomous_mapping_orchestrator_node
+  src/nodes/autonomous_mapping_orchestrator_node.cpp
+)
+
+target_compile_features(
+  autonomous_mapping_orchestrator_node
+  PRIVATE
+    cxx_std_17
+)
+
+target_link_libraries(
+  autonomous_mapping_orchestrator_node
+  ${PROJECT_NAME}_core
+)
+
+ament_target_dependencies(
+  autonomous_mapping_orchestrator_node
+  builtin_interfaces
+  rclcpp
+  rclcpp_action
+  savo_msgs
+  std_msgs
+  std_srvs
+)
+
+install(
+  TARGETS
+    autonomous_mapping_orchestrator_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 add_executable(exploration_manager_node
   src/nodes/exploration_manager_node.cpp
 )
@@ -546,6 +584,7 @@ ament_target_dependencies(
   geometry_msgs
   nav_msgs
   rclcpp
+  savo_msgs
   std_msgs
   tf2
   tf2_ros
@@ -962,6 +1001,16 @@ if(BUILD_TESTING)
     "${_savo_mapping_location_review_ros_log_dir}"
   )
 
+  set(
+    _savo_mapping_autonomous_orchestrator_ros_log_dir
+    "${CMAKE_CURRENT_BINARY_DIR}/autonomous_orchestrator_ros_logs"
+  )
+
+  file(
+    MAKE_DIRECTORY
+    "${_savo_mapping_autonomous_orchestrator_ros_log_dir}"
+  )
+
   # Zero-byte files are deferred phase scaffolds, not implemented code.
   # As soon as a scaffold gains content, it automatically enters linting.
   file(GLOB_RECURSE _savo_mapping_lint_candidates
@@ -1036,6 +1085,8 @@ if(BUILD_TESTING)
   find_package(ament_cmake_xmllint REQUIRED)
   ament_xmllint(
     package.xml
+    launch/autonomous_mapping.launch.xml
+    launch/autonomous_mapping_orchestrator.launch.xml
     launch/coverage_execution_handoff.launch.xml
     launch/coverage_operation_orchestrator.launch.xml
     launch/coverage_mapping.launch.xml
@@ -1049,6 +1100,31 @@ if(BUILD_TESTING)
     launch/scan360_mapping.launch.xml
     launch/semantic_mapping.launch.xml
     launch/simulated_manual_mapping.launch.xml
+  )
+
+  ament_add_pytest_test(
+    test_autonomous_mapping_launch_contract
+    test/test_autonomous_mapping_launch_contract.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
+    test_autonomous_mapping_orchestrator_contract
+    test/test_autonomous_mapping_orchestrator_contract.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
+    test_autonomous_mapping_orchestrator_runtime
+    test/test_autonomous_mapping_orchestrator_runtime.py
+    TIMEOUT 180
+  )
+
+  set_tests_properties(
+    test_autonomous_mapping_orchestrator_runtime
+    PROPERTIES
+      ENVIRONMENT
+        "PYTHONDONTWRITEBYTECODE=1;ROS_LOCALHOST_ONLY=1;ROS_DOMAIN_ID=223;ROS_LOG_DIR=${_savo_mapping_autonomous_orchestrator_ros_log_dir};AUTONOMOUS_ORCHESTRATOR_EXECUTABLE=${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}/autonomous_mapping_orchestrator_node"
   )
 
   ament_add_pytest_test(
@@ -1454,6 +1530,26 @@ if(BUILD_TESTING)
     test_workflow_authority
     ${PROJECT_NAME}_core
   )
+
+  ament_add_gtest(test_autonomous_mapping_mission
+    test/test_autonomous_mapping_mission.cpp
+  )
+  if(TARGET test_autonomous_mapping_mission)
+    target_link_libraries(
+      test_autonomous_mapping_mission
+      ${PROJECT_NAME}_core
+    )
+  endif()
+
+  ament_add_gtest(test_frontier_completion_detector
+    test/test_frontier_completion_detector.cpp
+  )
+  if(TARGET test_frontier_completion_detector)
+    target_link_libraries(
+      test_frontier_completion_detector
+      ${PROJECT_NAME}_core
+    )
+  endif()
 
   ament_add_gtest(test_exploration_runtime
     test/test_exploration_runtime.cpp

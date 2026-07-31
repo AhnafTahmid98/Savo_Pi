@@ -5,6 +5,7 @@
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <nav_msgs/msg/occupancy_grid.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <savo_msgs/msg/frontier_exploration_status.hpp>
 #include <std_msgs/msg/bool.hpp>
 #include <std_msgs/msg/string.hpp>
 #include <tf2/exceptions.h>
@@ -52,6 +53,23 @@ bool is_handoff_active(const std::string & state)
 {
   return !state.empty() &&
          !handoff_allows_new_goal(state);
+}
+
+std::uint8_t exhaustion_kind_from_status(const std::string & status)
+{
+  using Status = savo_msgs::msg::FrontierExplorationStatus;
+
+  if (status == "no_frontiers") {
+    return Status::EXHAUSTION_NO_FRONTIERS;
+  }
+  if (status == "no_reachable_frontiers") {
+    return Status::EXHAUSTION_NO_REACHABLE_FRONTIERS;
+  }
+  if (status == "no_selectable_frontier") {
+    return Status::EXHAUSTION_NO_SELECTABLE_FRONTIER;
+  }
+
+  return Status::EXHAUSTION_NONE;
 }
 
 std::string json_escape(const std::string & input)
@@ -140,6 +158,11 @@ public:
       "status_topic",
       "/savo_mapping/frontier_explorer/status");
 
+    typed_status_topic_ =
+      declare_parameter<std::string>(
+      "typed_status_topic",
+      std::string{topics::FRONTIER_EXPLORER_STATUS});
+
     map_frame_ =
       declare_parameter<std::string>(
       "map_frame",
@@ -174,6 +197,11 @@ public:
       declare_parameter<double>(
       "repeat_goal_cooldown_sec",
       5.0);
+
+    exhaustion_recheck_period_sec_ =
+      declare_parameter<double>(
+      "exhaustion_recheck_period_sec",
+      2.0);
 
     map_orientation_tolerance_rad_ =
       declare_parameter<double>(
@@ -258,6 +286,12 @@ public:
         status_topic_,
         retained_qos);
 
+    typed_status_publisher_ =
+      create_publisher<
+      savo_msgs::msg::FrontierExplorationStatus>(
+        typed_status_topic_,
+        retained_qos);
+
     selected_goal_publisher_ =
       create_publisher<
       geometry_msgs::msg::PoseStamped>(
@@ -335,6 +369,7 @@ private:
       runtime_enabled_topic_.empty() ||
       state_topic_.empty() ||
       status_topic_.empty() ||
+      typed_status_topic_.empty() ||
       map_frame_.empty() ||
       base_frame_.empty())
     {
@@ -388,6 +423,14 @@ private:
     {
       throw std::invalid_argument(
               "repeat_goal_cooldown_sec_must_be_nonnegative");
+    }
+
+    if (!std::isfinite(
+        exhaustion_recheck_period_sec_) ||
+      exhaustion_recheck_period_sec_ <= 0.0)
+    {
+      throw std::invalid_argument(
+              "exhaustion_recheck_period_sec_must_be_positive");
     }
 
     if (!std::isfinite(
@@ -696,14 +739,21 @@ private:
       }
     }
 
-    if (last_planned_map_generation_ ==
-      map_generation_)
-    {
-      set_state(
-        "waiting_for_map_update",
-        "map_has_not_changed");
+    if (last_planned_map_generation_ == map_generation_) {
+      const bool exhaustion_recheck_due =
+        exhaustion_kind_from_status(last_planning_status_) !=
+        savo_msgs::msg::FrontierExplorationStatus::EXHAUSTION_NONE &&
+        last_plan_at_.has_value() &&
+        (current_time - last_plan_at_.value()).seconds() >=
+        exhaustion_recheck_period_sec_;
 
-      return;
+      if (!exhaustion_recheck_due) {
+        set_state(
+          "waiting_for_map_update",
+          "map_has_not_changed");
+
+        return;
+      }
     }
 
     try {
@@ -725,6 +775,12 @@ private:
         grid,
         robot_x_m,
         robot_y_m);
+
+      ++plan_sequence_;
+      last_plan_at_ = current_time;
+      last_planning_status_ =
+        exploration::to_string(plan.status);
+      last_planning_reason_ = plan.reason;
 
       last_detected_frontier_count_ =
         plan.detected_frontier_count;
@@ -872,6 +928,37 @@ private:
     message.data = output.str();
 
     status_publisher_->publish(message);
+
+    savo_msgs::msg::FrontierExplorationStatus typed;
+    typed.contract_version =
+      savo_msgs::msg::FrontierExplorationStatus::CONTRACT_VERSION;
+    typed.stamp = now();
+    typed.state = current_state_;
+    typed.reason = current_reason_;
+    typed.configured_enabled = enabled_;
+    typed.runtime_authority_received = runtime_enabled_received_;
+    typed.runtime_enabled = runtime_enabled_;
+    typed.enabled = effective_enabled();
+    typed.map_received = static_cast<bool>(latest_map_);
+    typed.map_generation = map_generation_;
+    typed.planned_map_generation =
+      last_planned_map_generation_ ==
+      std::numeric_limits<std::uint64_t>::max() ?
+      0U : last_planned_map_generation_;
+    typed.plan_sequence = plan_sequence_;
+    typed.planning_status = last_planning_status_;
+    typed.planning_reason = last_planning_reason_;
+    typed.exhaustion_kind =
+      exhaustion_kind_from_status(last_planning_status_);
+    typed.handoff_state = handoff_state_;
+    typed.goal_pending = goal_pending_;
+    typed.last_goal_id = last_goal_id_;
+    typed.detected_frontiers =
+      static_cast<std::uint32_t>(last_detected_frontier_count_);
+    typed.reachable_frontiers =
+      static_cast<std::uint32_t>(last_reachable_frontier_count_);
+
+    typed_status_publisher_->publish(typed);
   }
 
   bool enabled_{false};
@@ -885,6 +972,7 @@ private:
   std::string runtime_enabled_topic_;
   std::string state_topic_;
   std::string status_topic_;
+  std::string typed_status_topic_;
   std::string map_frame_;
   std::string base_frame_;
 
@@ -892,6 +980,7 @@ private:
   double goal_ack_timeout_sec_{3.0};
   double replan_delay_sec_{2.0};
   double repeat_goal_cooldown_sec_{5.0};
+  double exhaustion_recheck_period_sec_{2.0};
   double map_orientation_tolerance_rad_{1.0e-6};
 
   std::unique_ptr<
@@ -923,12 +1012,18 @@ private:
   std::optional<rclcpp::Time>
   last_goal_completed_at_;
 
+  std::optional<rclcpp::Time>
+  last_plan_at_;
+
   std::string last_goal_id_;
   std::string current_state_;
   std::string current_reason_;
 
   std::size_t last_detected_frontier_count_{0};
   std::size_t last_reachable_frontier_count_{0};
+  std::uint64_t plan_sequence_{0};
+  std::string last_planning_status_{"unavailable"};
+  std::string last_planning_reason_{"frontier_plan_not_available"};
 
   rclcpp::Publisher<
     geometry_msgs::msg::PoseStamped>::SharedPtr
@@ -941,6 +1036,10 @@ private:
   rclcpp::Publisher<
     std_msgs::msg::String>::SharedPtr
     status_publisher_;
+
+  rclcpp::Publisher<
+    savo_msgs::msg::FrontierExplorationStatus>::SharedPtr
+    typed_status_publisher_;
 
   rclcpp::Subscription<
     nav_msgs::msg::OccupancyGrid>::SharedPtr

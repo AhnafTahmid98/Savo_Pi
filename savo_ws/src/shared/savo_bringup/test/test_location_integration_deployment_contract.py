@@ -75,7 +75,7 @@ def test_bringup_is_installable_lifecycle_package() -> None:
     root = tree.getroot()
 
     assert root.findtext("name") == "savo_bringup"
-    assert root.findtext("version") == "0.3.0"
+    assert root.findtext("version") == "0.4.0"
     assert root.findtext("buildtool_depend") == "ament_python"
     assert root.find("./export/build_type").text == "ament_python"
 

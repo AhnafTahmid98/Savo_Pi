@@ -39,6 +39,10 @@ inline constexpr std::string_view EXPLORATION_RUNTIME_ENABLED =
   "/savo_mapping/exploration/runtime_enabled";
 inline constexpr std::string_view EXPLORATION_MANAGER_STATUS =
   "/savo_mapping/exploration_manager/status";
+inline constexpr std::string_view AUTONOMOUS_MISSION_STATUS =
+  "/savo_mapping/autonomous/status";
+inline constexpr std::string_view FRONTIER_EXPLORER_STATUS =
+  "/savo_mapping/frontier_explorer/typed_status";
 inline constexpr std::string_view WORKFLOW_PHASE = "/savo_mapping/workflow_phase";
 inline constexpr std::string_view SESSION_STATE = "/savo_mapping/session_state";
 inline constexpr std::string_view MAP_QUALITY = "/savo_mapping/map_quality";

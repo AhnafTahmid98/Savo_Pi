@@ -34,6 +34,12 @@ TEST(TopicNamesContract, MappingOutputTopicsAreStable)
   EXPECT_EQ(std::string{savo_mapping::topics::STATUS}, "/savo_mapping/status");
   EXPECT_EQ(std::string{savo_mapping::topics::READINESS}, "/savo_mapping/readiness");
   EXPECT_EQ(std::string{savo_mapping::topics::MODE}, "/savo_mapping/mode");
+  EXPECT_EQ(
+    std::string{savo_mapping::topics::AUTONOMOUS_MISSION_STATUS},
+    "/savo_mapping/autonomous/status");
+  EXPECT_EQ(
+    std::string{savo_mapping::topics::FRONTIER_EXPLORER_STATUS},
+    "/savo_mapping/frontier_explorer/typed_status");
   EXPECT_EQ(std::string{savo_mapping::topics::WORKFLOW_PHASE}, "/savo_mapping/workflow_phase");
   EXPECT_EQ(std::string{savo_mapping::topics::SESSION_STATE}, "/savo_mapping/session_state");
   EXPECT_EQ(std::string{savo_mapping::topics::MAP_QUALITY}, "/savo_mapping/map_quality");
@@ -133,6 +139,10 @@ TEST(TopicNamesContract, ClassifiesMappingStatusTopics)
   EXPECT_TRUE(savo_mapping::topics::is_mapping_status_topic(savo_mapping::topics::STATUS));
   EXPECT_TRUE(savo_mapping::topics::is_mapping_status_topic(savo_mapping::topics::READINESS));
   EXPECT_TRUE(savo_mapping::topics::is_mapping_status_topic(savo_mapping::topics::MODE));
+  EXPECT_TRUE(savo_mapping::topics::is_mapping_status_topic(
+    savo_mapping::topics::AUTONOMOUS_MISSION_STATUS));
+  EXPECT_TRUE(savo_mapping::topics::is_mapping_status_topic(
+    savo_mapping::topics::FRONTIER_EXPLORER_STATUS));
   EXPECT_TRUE(savo_mapping::topics::is_mapping_status_topic(savo_mapping::topics::WORKFLOW_PHASE));
   EXPECT_TRUE(savo_mapping::topics::is_mapping_status_topic(savo_mapping::topics::SESSION_STATE));
   EXPECT_TRUE(savo_mapping::topics::is_mapping_status_topic(savo_mapping::topics::MAP_QUALITY));

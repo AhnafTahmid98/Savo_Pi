@@ -1,0 +1,47 @@
+# Robot Savo — mapping-owned autonomous mapping mission action.
+#
+# The action starts one autonomous mission. Pause/resume/cancel requests use
+# ControlAutonomousMapping. ROS action cancellation is equivalent to a typed
+# cancel request. AM-1 supports the FRONTIER strategy; later phases may enable
+# additional declared strategies without changing the mission boundary.
+
+uint32 CONTRACT_VERSION=1
+
+uint8 STRATEGY_FRONTIER=1
+uint8 STRATEGY_COVERAGE=2
+
+uint32 contract_version
+string mission_id
+string actor_id
+string map_id
+uint32 map_revision
+uint8 strategy
+
+bool auto_save
+bool require_quality_approval
+
+# Zero requests the configured mission timeout. AM-2 detects stable frontier
+# exhaustion. AM-3 performs automatic save and saved-session verification.
+# Quality approval and production release remain separate later phases.
+builtin_interfaces/Duration mission_timeout
+---
+uint8 RESULT_SUCCEEDED=0
+uint8 RESULT_INVALID_REQUEST=1
+uint8 RESULT_BUSY=2
+uint8 RESULT_READINESS_LOST=3
+uint8 RESULT_NAVIGATION_FAILED=4
+uint8 RESULT_TIMED_OUT=5
+uint8 RESULT_CANCELED=6
+uint8 RESULT_SAVE_FAILED=7
+uint8 RESULT_QUALITY_REJECTED=8
+uint8 RESULT_INTERNAL_ERROR=9
+
+bool success
+uint8 result_code
+string reason
+savo_msgs/AutonomousMappingStatus final_status
+
+bool map_saved
+string map_release_id
+---
+savo_msgs/AutonomousMappingStatus status

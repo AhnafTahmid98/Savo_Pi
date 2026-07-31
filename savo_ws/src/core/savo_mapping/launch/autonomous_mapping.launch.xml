@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<launch>
+
+  <arg
+    name="map_id"
+    default=""
+    description="Stable lowercase map identifier shared by the mission and save session"/>
+
+  <arg
+    name="map_output_root"
+    default="~/Savo_Pi/runtime/maps"
+    description="Root directory for committed autonomous map sessions"/>
+
+  <arg
+    name="allow_map_overwrite"
+    default="false"
+    description="Allow replacement of an existing committed map session"/>
+
+  <arg
+    name="use_sim_time"
+    default="false"/>
+
+  <arg
+    name="slam_autostart"
+    default="true"
+    description="Configure and activate SLAM Toolbox automatically"/>
+
+  <arg
+    name="slam_params_file"
+    default="$(find-pkg-share savo_mapping)/config/slam_toolbox_mapping.yaml"
+    description="SLAM Toolbox online mapping parameters"/>
+
+  <arg
+    name="mapping_profile_file"
+    default="$(find-pkg-share savo_mapping)/config/profiles/monitor_only.yaml"
+    description="Read-only mapping-supervisor readiness profile"/>
+
+  <arg
+    name="frontier_params_file"
+    default="$(find-pkg-share savo_mapping)/config/frontier_mapping.yaml"/>
+
+  <arg
+    name="handoff_params_file"
+    default="$(find-pkg-share savo_mapping)/config/exploration_goal_handoff.yaml"/>
+
+  <arg
+    name="exploration_manager_params_file"
+    default="$(find-pkg-share savo_mapping)/config/exploration_manager.yaml"/>
+
+  <arg
+    name="orchestrator_params_file"
+    default="$(find-pkg-share savo_mapping)/config/autonomous_mapping_orchestrator.yaml"/>
+
+  <arg
+    name="map_frame"
+    default="map"/>
+
+  <arg
+    name="base_frame"
+    default="base_link"/>
+
+  <!--
+    Start in monitor-only/idle. The typed RunAutonomousMapping action owns the
+    transition to an active autonomous frontier session. Launching this file
+    never authorizes motion by itself.
+  -->
+  <node
+    pkg="savo_mapping"
+    exec="mapping_mode_manager_node"
+    name="mapping_mode_manager_node"
+    output="screen">
+
+    <param
+      from="$(find-pkg-share savo_mapping)/config/mapping_mode_manager.yaml"/>
+
+    <param
+      name="authority.initial_mode"
+      value="monitor_only"/>
+
+    <param
+      name="authority.initial_session_state"
+      value="idle"/>
+
+    <param
+      name="use_sim_time"
+      value="$(var use_sim_time)"/>
+  </node>
+
+  <node
+    pkg="savo_mapping"
+    exec="mapping_supervisor_node"
+    name="mapping_supervisor_node"
+    output="screen">
+
+    <param
+      from="$(find-pkg-share savo_mapping)/config/topics.yaml"/>
+
+    <param
+      from="$(find-pkg-share savo_mapping)/config/frames.yaml"/>
+
+    <param
+      from="$(find-pkg-share savo_mapping)/config/mapping_common.yaml"/>
+
+    <param
+      from="$(find-pkg-share savo_mapping)/config/map_session.yaml"/>
+
+    <param
+      from="$(var mapping_profile_file)"/>
+
+    <param
+      name="use_sim_time"
+      value="$(var use_sim_time)"/>
+  </node>
+
+  <include
+    file="$(find-pkg-share slam_toolbox)/launch/online_async_launch.py">
+
+    <arg
+      name="slam_params_file"
+      value="$(var slam_params_file)"/>
+
+    <arg
+      name="use_sim_time"
+      value="$(var use_sim_time)"/>
+
+    <arg
+      name="autostart"
+      value="$(var slam_autostart)"/>
+
+    <arg
+      name="use_lifecycle_manager"
+      value="false"/>
+  </include>
+
+  <node
+    pkg="savo_mapping"
+    exec="slam_lifecycle_health_bridge_node"
+    name="slam_lifecycle_health_bridge_node"
+    output="screen">
+
+    <param
+      from="$(find-pkg-share savo_mapping)/config/slam_lifecycle_health.yaml"/>
+
+    <param
+      name="use_sim_time"
+      value="$(var use_sim_time)"/>
+  </node>
+
+  <include
+    file="$(find-pkg-share savo_mapping)/launch/map_session_manager.launch.xml">
+
+    <arg
+      name="map_id"
+      value="$(var map_id)"/>
+
+    <arg
+      name="map_output_root"
+      value="$(var map_output_root)"/>
+
+    <arg
+      name="allow_map_overwrite"
+      value="$(var allow_map_overwrite)"/>
+
+    <arg
+      name="use_sim_time"
+      value="$(var use_sim_time)"/>
+  </include>
+
+  <include
+    file="$(find-pkg-share savo_mapping)/launch/frontier_mapping.launch.xml">
+
+    <!-- Static node gate is open; exploration_manager runtime authority remains closed. -->
+    <arg
+      name="enabled"
+      value="true"/>
+
+    <arg
+      name="use_sim_time"
+      value="$(var use_sim_time)"/>
+
+    <arg
+      name="map_frame"
+      value="$(var map_frame)"/>
+
+    <arg
+      name="base_frame"
+      value="$(var base_frame)"/>
+
+    <arg
+      name="frontier_params_file"
+      value="$(var frontier_params_file)"/>
+
+    <arg
+      name="handoff_params_file"
+      value="$(var handoff_params_file)"/>
+
+    <arg
+      name="manager_params_file"
+      value="$(var exploration_manager_params_file)"/>
+  </include>
+
+  <include
+    file="$(find-pkg-share savo_mapping)/launch/autonomous_mapping_orchestrator.launch.xml">
+
+    <arg
+      name="use_sim_time"
+      value="$(var use_sim_time)"/>
+
+    <arg
+      name="params_file"
+      value="$(var orchestrator_params_file)"/>
+  </include>
+
+</launch>

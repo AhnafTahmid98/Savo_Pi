@@ -6,7 +6,7 @@ package_name = "savo_bringup"
 
 setup(
     name=package_name,
-    version="0.3.0",
+    version="0.4.0",
     packages=[package_name],
     data_files=[
         (
@@ -19,17 +19,20 @@ setup(
         ),
         (
             f"share/{package_name}/launch",
-            ["launch/location_integration.launch.py"],
+            [
+                "launch/autonomous_mapping.launch.py",
+                "launch/location_integration.launch.py",
+            ],
         ),
     ],
     install_requires=["setuptools"],
     zip_safe=True,
-    maintainer="TODO_NAME",
-    maintainer_email="todo@example.com",
+    maintainer="Ahnaf Tahmid",
+    maintainer_email="tahmidahnaf998@gmail.com",
     description=(
         "Production launch and lifecycle integration for Robot Savo."
     ),
-    license="MIT",
+    license="Proprietary",
     tests_require=["pytest"],
     entry_points={
         "console_scripts": [

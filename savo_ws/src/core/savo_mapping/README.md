@@ -329,3 +329,63 @@ is omitted. The gateway rechecks that revision before authorization, so a
 candidate changed by another operator fails closed as stale. `--json` provides
 schema-versioned machine-readable service responses; usage errors remain
 non-zero process exits with a diagnostic message.
+
+## Autonomous mapping mission foundation (AM-1)
+
+`autonomous_mapping_orchestrator_node` exposes the typed
+`/savo_mapping/autonomous/run` action, the typed
+`/savo_mapping/autonomous/control` service and retained mission status. It
+coordinates the existing mapping mode manager and guarded exploration handoff;
+it does not send Nav2 goals directly. AM-3 calls only the public map-session
+save service and never calls slam_toolbox save or serialization services
+itself.
+
+AM-1 supports one frontier mission at a time. Safety or readiness loss latches
+a pause, cancels any active exploration handoff, and requires an explicit
+resume.
+
+## Stable frontier completion detection (AM-2)
+
+`frontier_explorer_node` now publishes retained typed planner evidence on
+`/savo_mapping/frontier_explorer/typed_status`. The autonomous orchestrator
+uses a pure C++ completion detector that requires distinct planner sequences,
+a configured stable duration, no pending/active handoff, fresh status,
+readiness and an inactive safety stop.
+
+Supported exhaustion evidence is `no_frontiers`,
+`no_reachable_frontiers`, and optionally `no_selectable_frontier`; the last
+is disabled by default because selector thresholds can temporarily reject
+otherwise valid frontiers. Any later `goal_selected` plan revokes a pending
+completion and returns the mission to exploration.
+
+AM-2 completion evidence is still the only path into mission completion. With
+`auto_save=false`, the mission completes successfully with an explicit
+manual-save-required reason and `map_saved=false`.
+
+## Automatic map save and verification (AM-3)
+
+With `auto_save=true`, confirmed completion first switches the workflow to
+monitor-only mode, then calls `/savo_mapping/map_session/save`. The existing
+map-session manager remains the sole owner of occupancy-grid save, pose-graph
+serialization, manifest creation, staging commit and overwrite policy.
+
+After a successful service response, the orchestrator verifies the committed
+session with the same `saved_map_contract` used by the standalone verifier.
+Mission success is reported only after the grid YAML/image, posegraph, data and
+manifest all pass verification. Save timeouts, service failures, malformed
+responses and verification failures terminate with `RESULT_SAVE_FAILED`.
+Quality evaluation, operator approval and production release remain separate
+later phases.
+
+## Package-local autonomous mapping composition (AM-4)
+
+`autonomous_mapping.launch.xml` now composes only mapping-owned processes:
+SLAM Toolbox, mapping readiness, map-session persistence, frontier selection,
+the guarded exploration handoff, and the AM-1 through AM-3 mission
+orchestrator. Hardware drivers, control, localization, supervisor policy and
+Nav2 remain outside this package and are composed by `savo_bringup`.
+
+The launch starts in `monitor_only` with an idle session. The frontier node's
+static gate is enabled, but `exploration_manager_node` keeps runtime authority
+closed until the typed autonomous mission action has passed readiness and
+safety checks. Launching the stack therefore never starts robot motion.

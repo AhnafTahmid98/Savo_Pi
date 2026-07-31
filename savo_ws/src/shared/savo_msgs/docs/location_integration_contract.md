@@ -15,7 +15,7 @@ No package other than `savo_locations` may maintain an authoritative location da
 ## Locked graph
 
 | Interface | Owner | Consumer |
-|---|---|---|
+| --- | --- | --- |
 | `/savo_head/apriltag/observations` | `savo_head` detector bridge | head confirmation action |
 | `/savo_head/apriltag/confirm` | `savo_head` | mapping and navigation |
 | `/savo_mapping/locations/register` | `savo_mapping` | operator or SavoMind workflow |

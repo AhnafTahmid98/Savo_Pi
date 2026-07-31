@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="3">
   <name>savo_bringup</name>
-  <version>0.3.0</version>
+  <version>0.4.0</version>
   <description>Production launch and lifecycle integration for Robot Savo.</description>
 
   <maintainer email="tahmidahnaf998@gmail.com">Ahnaf Tahmid</maintainer>
@@ -14,13 +14,20 @@
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
+  <exec_depend>launch_xml</exec_depend>
   <exec_depend>rclpy</exec_depend>
 
+  <exec_depend>savo_base</exec_depend>
+  <exec_depend>savo_control</exec_depend>
+  <exec_depend>savo_lidar</exec_depend>
+  <exec_depend>savo_localization</exec_depend>
   <exec_depend>savo_head</exec_depend>
   <exec_depend>savo_locations</exec_depend>
   <exec_depend>savo_mapping</exec_depend>
   <exec_depend>savo_msgs</exec_depend>
   <exec_depend>savo_nav</exec_depend>
+  <exec_depend>savo_perception</exec_depend>
+  <exec_depend>savo_power</exec_depend>
   <exec_depend>savo_supervisor</exec_depend>
 
   <test_depend>python3-pytest</test_depend>

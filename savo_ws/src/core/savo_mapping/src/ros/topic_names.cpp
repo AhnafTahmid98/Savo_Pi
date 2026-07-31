@@ -36,6 +36,8 @@ bool is_mapping_status_topic(std::string_view topic)
          topic == MODE_MANAGER_STATUS ||
          topic == EXPLORATION_RUNTIME_ENABLED ||
          topic == EXPLORATION_MANAGER_STATUS ||
+         topic == AUTONOMOUS_MISSION_STATUS ||
+         topic == FRONTIER_EXPLORER_STATUS ||
          topic == WORKFLOW_PHASE ||
          topic == SESSION_STATE ||
          topic == MAP_QUALITY ||

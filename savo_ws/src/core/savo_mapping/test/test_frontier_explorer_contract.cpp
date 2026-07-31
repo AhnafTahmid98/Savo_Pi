@@ -84,6 +84,13 @@ TEST(
     source,
     "geometry_msgs::msg::PoseStamped");
 
+  expect_contains(
+    source,
+    "savo_msgs::msg::FrontierExplorationStatus");
+
+  expect_contains(source, "plan_sequence_");
+  expect_contains(source, "last_planning_status_");
+
   expect_not_contains(source, "/cmd_vel");
   expect_not_contains(source, "rclcpp_action");
   expect_not_contains(source, "NavigateToPose");
@@ -119,6 +126,14 @@ TEST(
   expect_contains(
     config,
     "\"/savo_mapping/exploration/selected_goal\"");
+
+  expect_contains(
+    config,
+    "\"/savo_mapping/frontier_explorer/typed_status\"");
+
+  expect_contains(
+    config,
+    "exhaustion_recheck_period_sec: 2.0");
 
   expect_not_contains(config, "/cmd_vel");
   expect_not_contains(config, "/goal_pose");

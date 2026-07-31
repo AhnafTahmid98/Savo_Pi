@@ -61,6 +61,7 @@ TEST(ConfigContracts, RequiredConfigFilesExistAndAreNotEmpty)
 {
   const std::vector<std::string> filenames{
     "topics.yaml",
+    "autonomous_mapping_orchestrator.yaml",
     "frames.yaml",
     "qos.yaml",
     "mapping_common.yaml",
@@ -99,6 +100,11 @@ TEST(ConfigContracts, TopicConfigContainsOfficialInterfaces)
   expect_contains(content, "odom_filtered: \"/odometry/filtered\"");
   expect_contains(content, "status: \"/savo_mapping/status\"");
   expect_contains(content, "readiness: \"/savo_mapping/readiness\"");
+  expect_contains(content, "autonomous_mission_status: \"/savo_mapping/autonomous/status\"");
+  expect_contains(
+    content,
+    "frontier_explorer_status: "
+    "\"/savo_mapping/frontier_explorer/typed_status\"");
   expect_contains(content, "map_saved: \"/savo_mapping/map_saved\"");
   expect_contains(content, "head_confirmations: \"/savo_head/semantic_confirmations\"");
   expect_contains(content, "location_events: \"/savo_locations/events\"");
@@ -132,6 +138,12 @@ TEST(ConfigContracts, TopicConfigContainsOfficialInterfaces)
     content,
     "exploration_navigate_to_pose: "
     "\"/savo_nav/exploration/navigate_to_pose\"");
+  expect_contains(
+    content,
+    "action: \"/savo_mapping/autonomous/run\"");
+  expect_contains(
+    content,
+    "control: \"/savo_mapping/autonomous/control\"");
   expect_contains(content, "stop: \"/safety/stop\"");
 }
 
@@ -255,6 +267,7 @@ TEST(ConfigContracts, FilesParseWithRosParameterParser)
 {
   const std::vector<std::string> filenames{
     "topics.yaml",
+    "autonomous_mapping_orchestrator.yaml",
     "frames.yaml",
     "qos.yaml",
     "mapping_common.yaml",
@@ -304,6 +317,7 @@ TEST(ConfigContracts, TopicYamlCoversEveryCppTopicContract)
 
     savo_mapping::topics::STATUS,
     savo_mapping::topics::READINESS,
+    savo_mapping::topics::AUTONOMOUS_MISSION_STATUS,
     savo_mapping::topics::MODE,
     savo_mapping::topics::WORKFLOW_PHASE,
     savo_mapping::topics::SESSION_STATE,

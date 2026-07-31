@@ -1,0 +1,28 @@
+# Robot Savo — typed control of one active autonomous mapping mission.
+#
+# Starting a mission is owned by RunAutonomousMapping. This service never
+# starts a second mission and never bypasses the mapping mode manager.
+
+uint32 CONTRACT_VERSION=1
+
+uint8 COMMAND_PAUSE=1
+uint8 COMMAND_RESUME=2
+uint8 COMMAND_CANCEL=3
+
+uint32 contract_version
+string mission_id
+string actor_id
+uint8 command
+string reason
+---
+uint8 RESULT_ACCEPTED=0
+uint8 RESULT_INVALID_REQUEST=1
+uint8 RESULT_NO_ACTIVE_MISSION=2
+uint8 RESULT_MISSION_MISMATCH=3
+uint8 RESULT_INVALID_STATE=4
+uint8 RESULT_INTERNAL_ERROR=5
+
+bool accepted
+uint8 result_code
+string reason
+savo_msgs/AutonomousMappingStatus status

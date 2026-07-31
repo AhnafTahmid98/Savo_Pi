@@ -28,6 +28,8 @@
         mode_manager_status: "/savo_mapping/mode_manager/status"
         exploration_runtime_enabled: "/savo_mapping/exploration/runtime_enabled"
         exploration_manager_status: "/savo_mapping/exploration_manager/status"
+        autonomous_mission_status: "/savo_mapping/autonomous/status"
+        frontier_explorer_status: "/savo_mapping/frontier_explorer/typed_status"
         workflow_phase: "/savo_mapping/workflow_phase"
         session_state: "/savo_mapping/session_state"
         map_quality: "/savo_mapping/map_quality"
@@ -68,3 +70,9 @@
 
     actions:
       exploration_navigate_to_pose: "/savo_nav/exploration/navigate_to_pose"
+
+    autonomous_mission:
+      action: "/savo_mapping/autonomous/run"
+      control: "/savo_mapping/autonomous/control"
+      status: "/savo_mapping/autonomous/status"
+      frontier_status: "/savo_mapping/frontier_explorer/typed_status"

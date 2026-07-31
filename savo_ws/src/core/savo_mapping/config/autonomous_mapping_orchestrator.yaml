@@ -1,0 +1,41 @@
+autonomous_mapping_orchestrator_node:
+  ros__parameters:
+    use_sim_time: false
+
+    action_name: "/savo_mapping/autonomous/run"
+    control_service: "/savo_mapping/autonomous/control"
+    status_topic: "/savo_mapping/autonomous/status"
+
+    mode_topic: "/savo_mapping/mode"
+    exploration_mode_topic: "/savo_mapping/exploration_mode"
+    workflow_phase_topic: "/savo_mapping/workflow_phase"
+    session_state_topic: "/savo_mapping/session_state"
+    readiness_topic: "/savo_mapping/readiness"
+    safety_stop_topic: "/safety/stop"
+    runtime_authority_topic: "/savo_mapping/exploration/runtime_enabled"
+    handoff_state_topic: "/savo_mapping/exploration_goal/state"
+    frontier_status_topic: "/savo_mapping/frontier_explorer/typed_status"
+
+    mode_command_topic: "/savo_mapping/mode_cmd"
+    start_session_command_topic: "/savo_mapping/start_session_cmd"
+    cancel_session_command_topic: "/savo_mapping/cancel_session_cmd"
+    handoff_cancel_service: "/savo_mapping/exploration_goal/cancel"
+
+    save:
+      map_session_service: "/savo_mapping/map_session/save"
+      operation_timeout_s: 45.0
+      expected_frame: "map"
+
+    evaluation_period_ms: 250
+    command_retry_period_ms: 1000
+
+    # Zero disables the mission-level timeout.
+    default_mission_timeout_s: 0.0
+
+    completion:
+      minimum_exhaustion_observations: 3
+      minimum_stable_duration_s: 5.0
+      frontier_status_timeout_s: 3.0
+      allow_no_frontiers: true
+      allow_no_reachable_frontiers: true
+      allow_no_selectable_frontier: false

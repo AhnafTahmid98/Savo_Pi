@@ -1,5 +1,6 @@
 # Copyright 2026 Ahnaf Tahmid
 # SPDX-License-Identifier: LicenseRef-Proprietary
+# yaml-language-server: $schema=none
 
 goal_gateway_node:
   ros__parameters:

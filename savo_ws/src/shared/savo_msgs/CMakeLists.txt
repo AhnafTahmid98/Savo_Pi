@@ -41,6 +41,8 @@ set(msg_files
   "msg/LocationRecord.msg"
   "msg/LocationCandidate.msg"
   "msg/LocationEvent.msg"
+  "msg/AutonomousMappingStatus.msg"
+  "msg/FrontierExplorationStatus.msg"
 )
 
 set(action_files
@@ -49,6 +51,7 @@ set(action_files
   "action/RotateToHeading.action"
   "action/RegisterMappedLocation.action"
   "action/NavigateToLocation.action"
+  "action/RunAutonomousMapping.action"
 )
 set(srv_files
   "srv/ResolveLocation.srv"
@@ -63,6 +66,7 @@ set(srv_files
   "srv/SetLocationEnabled.srv"
   "srv/RecoverLocationStorage.srv"
   "srv/AuthorizeLocationOperation.srv"
+  "srv/ControlAutonomousMapping.srv"
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}
@@ -121,6 +125,12 @@ ament_add_pytest_test(
   ament_add_pytest_test(
     test_location_integration_interfaces
     test/test_location_integration_interfaces.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
+    test_autonomous_mapping_interfaces
+    test/test_autonomous_mapping_interfaces.py
     TIMEOUT 60
   )
 endif()

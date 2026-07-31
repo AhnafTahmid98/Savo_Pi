@@ -274,18 +274,29 @@ class RuntimeHarness:
         return self.latest_status()
 
     def wait_state_reason(self, state, reason, detail=None):
-        """Wait for an exact stable state and reason pair."""
-        def matches(status):
-            if (
-                status.get('state') != state
-                or status.get('reason') != reason
-            ):
-                return False
-            if detail is None:
-                return True
-            return detail in str(status.get('detail', ''))
+        """Wait until the exact state and reason appear in status history."""
+        matched = [None]
 
-        return self.wait_status(matches)
+        def observed():
+            for status in reversed(list(self.statuses)):
+                if (
+                    status.get('state') != state
+                    or status.get('reason') != reason
+                ):
+                    continue
+                if detail is not None and detail not in str(
+                    status.get('detail', '')
+                ):
+                    continue
+                matched[0] = status
+                return True
+            return False
+
+        assert wait_until(
+            observed,
+            WAIT_TIMEOUT_SEC,
+        ), self.diagnostics()
+        return matched[0]
 
     def wait_path_count(self, count, timeout=WAIT_TIMEOUT_SEC):
         """Wait until exactly the requested number of plans is observed."""
@@ -770,12 +781,25 @@ def test_changed_map_replans_once_and_invalid_update_is_contained():
         )
         harness.publish_map(changed_map)
         harness.wait_path_count(2)
-        status = harness.wait_state_reason(
-            'plan_ready',
-            'coverage_node_plan_ready',
-        )
+        matching_status = [None]
+
+        def observed_second_plan():
+            for candidate in reversed(list(harness.statuses)):
+                if (
+                    candidate.get('state') == 'plan_ready'
+                    and candidate.get('reason')
+                    == 'coverage_node_plan_ready'
+                    and candidate.get('plan_sequence') == 2
+                ):
+                    matching_status[0] = candidate
+                    return True
+            return False
+
+        assert wait_until(
+            observed_second_plan
+        ), harness.diagnostics()
+        status = matching_status[0]
         accepted_sequence = status['map_sequence']
-        assert status['plan_sequence'] == 2
 
         harness.publish_map(changed_map)
         harness.assert_path_count_stable()

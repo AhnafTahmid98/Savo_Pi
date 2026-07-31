@@ -35,7 +35,7 @@ TF_READER_HASHES = {
     'test/test_tf_pose_reader.cpp':
         '589e91c9b16c9100ef94f122ffcebccc334f4afbeab45917a76609199e03b374',
     'test/test_tf_pose_reader_runtime.py':
-        '8435854fd39afd426a6243a6204198832aeab05eccdd1f3f88e39b50f915d01d',
+        'ef6fdcf5a4fb369cc6de2a9864e0f63081b9aea8906eacac80f9bdc2c3df28c1',
 }
 
 MIGRATED_CONTRACT_HASHES = {

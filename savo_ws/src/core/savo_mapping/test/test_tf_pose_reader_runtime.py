@@ -167,6 +167,17 @@ class FixtureTransformStream:
         self.thread.start()
         time.sleep(0.35)
 
+    def wait_for_tf_subscriber(self, timeout_sec=3.0):
+        deadline = time.monotonic() + timeout_sec
+        while time.monotonic() < deadline:
+            if self.node.count_subscribers('/tf') > 0:
+                return
+            time.sleep(0.02)
+
+        raise AssertionError(
+            'TF listener did not discover the fixture broadcaster'
+        )
+
     def stop(self):
         self.stop_event.set()
         self.thread.join(timeout=2.0)
@@ -263,11 +274,12 @@ def test_received_transform_becomes_stale():
             source_frame,
             lookup_timeout_sec=0.15,
             stale_timeout_sec=0.20,
-            wait_sec=1.10,
+            wait_sec=4.00,
         )
     )
 
-    time.sleep(0.35)
+    stream.wait_for_tf_subscriber()
+    time.sleep(0.25)
     stream.stop()
     result, output = complete_process(process)
 

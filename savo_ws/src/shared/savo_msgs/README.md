@@ -50,3 +50,19 @@ rejection to persistent storage.
 - `ReviewLocationCandidate.srv` is the mapping-owned operator entrypoint for
   approval or rejection. The gateway must obtain supervisor authorization
   before forwarding the corresponding registry mutation.
+
+## Autonomous mapping mission interfaces
+
+- `RunAutonomousMapping.action` starts one mapping-owned autonomous mission.
+- `ControlAutonomousMapping.srv` pauses, resumes, or cancels that mission.
+- `AutonomousMappingStatus.msg` is the typed retained mission snapshot.
+- `FrontierExplorationStatus.msg` carries the latest typed frontier-planner
+  evidence used by stable completion detection.
+
+The mission contract does not carry navigation poses or paths. `savo_mapping`
+selects exploration goals, while `savo_nav` remains the only package that
+validates and executes each navigation handoff.
+
+AM-3 extends autonomous mission status with map-save and verification
+progress. Action success reports `map_saved=true` only after committed
+saved-map verification passes.
