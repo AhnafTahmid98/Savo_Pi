@@ -21,6 +21,9 @@ No package other than `savo_locations` may maintain an authoritative location da
 | `/savo_mapping/locations/register` | `savo_mapping` | operator or SavoMind workflow |
 | `/savo_supervisor/authorize_location_operation` | `savo_supervisor` | mapping and navigation |
 | `/savo_locations/candidates/register` | `savo_locations` | mapping |
+| `/savo_locations/candidates/list` | `savo_locations` | operator CLI/app (read-only) |
+| `/savo_locations/candidates/get` | `savo_locations` | mapping gateway and operator CLI (read-only) |
+| `/savo_mapping/locations/review` | `savo_mapping` | operator CLI/app |
 | `/savo_locations/resolve` | `savo_locations` | navigation |
 | `/savo_nav/locations/navigate` | `savo_nav` | operator or SavoMind workflow |
 | `/savo_nav/navigation/navigate_to_pose` | validated navigation gateway | semantic navigation |
@@ -34,6 +37,17 @@ No package other than `savo_locations` may maintain an authoritative location da
 5. Only the successful SQLite commit creates a candidate event.
 
 Cancellation is accepted before persistence begins. Once the persistent registration request is in flight, cancellation is rejected until the commit acknowledgement is known.
+
+## Candidate review transaction boundary
+
+1. An operator tool lists or inspects candidates through read-only `savo_locations` services.
+2. Approval or rejection is sent only to `/savo_mapping/locations/review` with the expected candidate revision.
+3. Mapping reloads the authoritative candidate and rejects stale or terminal state before authorization.
+4. Supervisor authorizes the matching non-motion operation using the stored map context.
+5. Mapping forwards exactly one approval or rejection mutation to `savo_locations`.
+6. Only the successful SQLite snapshot and event commit produces a completed review result.
+
+The keyboard fallback is `ros2 run savo_mapping location_review_cli`. It never calls raw approval or rejection services directly.
 
 ## Navigation safety boundary
 

@@ -1,0 +1,39 @@
+# Copyright 2026 Ahnaf Tahmid
+# SPDX-License-Identifier: LicenseRef-Proprietary
+
+# Overlay for the later D435 voxel-layer hardware-validation stage.
+# Load this instead of readiness.yaml only when the filtered obstacle cloud is
+# running and has passed the real-robot freshness/frame/self-filter checks.
+navigation_readiness_node:
+  ros__parameters:
+    publish_period_ms: 200
+
+    require_pointcloud: true
+    require_control_mode: true
+    require_safety_state: true
+    require_global_costmap: true
+    require_local_costmap: true
+
+    tf_timeout_seconds: 3.0
+    odometry_timeout_seconds: 1.0
+    lidar_timeout_seconds: 1.0
+    pointcloud_timeout_seconds: 1.0
+    costmap_timeout_seconds: 3.0
+    control_timeout_seconds: 2.0
+    safety_timeout_seconds: 1.0
+
+    accepted_control_modes:
+      - "NAV"
+
+    map_topic: "/map"
+    tf_topic: "/tf"
+    tf_static_topic: "/tf_static"
+    odometry_topic: "/odometry/filtered"
+    scan_topic: "/scan"
+    pointcloud_topic: "/savo_perception/obstacles/points"
+    global_costmap_topic: "/global_costmap/costmap"
+    local_costmap_topic: "/local_costmap/costmap"
+    control_mode_topic: "/savo_control/mode_state"
+    safety_stop_topic: "/safety/stop"
+    safety_slowdown_topic: "/safety/slowdown_factor"
+    nav2_action_name: "/navigate_to_pose"

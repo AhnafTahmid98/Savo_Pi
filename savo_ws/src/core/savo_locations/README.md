@@ -301,7 +301,7 @@ Runtime diagnostics:
 - `/savo_locations/snapshot`
 
 Status and snapshot use reliable transient-local JSON diagnostic
-messages. Typed location access remains the three `savo_msgs`
+messages. Typed location access remains the five `savo_msgs`
 read services.
 
 LOC-3A deliberately does not expose candidate registration,
@@ -315,8 +315,12 @@ LOC-3B2 exposes the persistent mutation surface:
 
 - `/savo_locations/candidates/register`;
 - `/savo_locations/candidates/approve`;
+- `/savo_locations/candidates/reject`;
 - `/savo_locations/set_enabled`;
 - `/savo_locations/events` for reliable post-commit events.
+
+Phase 2C adds `/savo_locations/candidates/list` as a read-only review
+queue; it is not part of the mutation surface.
 
 Every mutation is serialized, validated against a complete hydrated catalog,
 and committed through the dedicated atomic SQLite transaction API introduced
@@ -342,3 +346,29 @@ hydration, and swaps the active repository only after all checks pass.
 Simultaneous mutation requests remain serialized. Concurrency tests
 require exactly one commit when two operators attempt to approve the
 same candidate revision.
+
+
+## LOC-3B3 typed candidate rejection
+
+LOC-3B3 exposes the existing deterministic rejection transition through
+`/savo_locations/candidates/reject` using
+`savo_msgs/srv/RejectLocationCandidate`.
+
+A rejection requires the candidate ID, expected candidate revision,
+operator identity and a non-empty review reason. The mutation is
+optimistically revision guarded, persisted atomically with its audit event,
+and published as `EVENT_CANDIDATE_REJECTED` only after the SQLite commit
+succeeds. Rejected candidates remain available for audit but cannot be
+approved or updated.
+
+### Candidate lookup for review gateways
+
+`/savo_locations/candidates/get` is a read-only typed service that returns the
+authoritative candidate revision, state and map context. Mapping-owned review
+gateways use this service before requesting supervisor authorization. The
+lookup performs no mutation and does not grant approval or rejection authority.
+
+`/savo_locations/candidates/list` is a read-only typed review queue. It
+returns candidates in deterministic candidate-ID order and supports state and
+map-context filters. Operator tools must still use
+`/savo_mapping/locations/review` for approval or rejection.

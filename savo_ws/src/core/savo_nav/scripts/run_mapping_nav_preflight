@@ -1,0 +1,199 @@
+#!/usr/bin/env bash
+# Copyright 2026 Ahnaf Tahmid
+# SPDX-License-Identifier: LicenseRef-Proprietary
+
+set -euo pipefail
+
+MODE="live"
+EXPECT_READY="false"
+SAMPLE_TIMEOUT="3"
+
+usage() {
+  cat <<'HELP'
+Usage:
+  run_mapping_nav_preflight [--mode live|saved] [--expect-ready]
+                            [--sample-timeout SEC]
+
+This check never publishes goals, velocity, initial pose, lifecycle commands,
+or control-mode commands. It only inspects the running ROS graph.
+HELP
+}
+
+while (($# > 0)); do
+  case "$1" in
+    --mode)
+      MODE="${2:-}"
+      shift 2
+      ;;
+    --expect-ready)
+      EXPECT_READY="true"
+      shift
+      ;;
+    --sample-timeout)
+      SAMPLE_TIMEOUT="${2:-}"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "ERROR: unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [[ "$MODE" != "live" && "$MODE" != "saved" ]]; then
+  echo "ERROR: --mode must be live or saved" >&2
+  exit 2
+fi
+
+if ! [[ "$SAMPLE_TIMEOUT" =~ ^[0-9]+([.][0-9]+)?$ ]] || \
+    [[ "$SAMPLE_TIMEOUT" == "0" || "$SAMPLE_TIMEOUT" == "0.0" ]]; then
+  echo "ERROR: --sample-timeout must be a positive number" >&2
+  exit 2
+fi
+
+for command in ros2 timeout grep awk; do
+  if ! command -v "$command" >/dev/null 2>&1; then
+    echo "ERROR: required command not found: $command" >&2
+    exit 2
+  fi
+done
+
+failures=0
+
+pass() {
+  printf 'PASS  %s\n' "$1"
+}
+
+fail() {
+  printf 'FAIL  %s\n' "$1" >&2
+  failures=$((failures + 1))
+}
+
+require_topic() {
+  local topic="$1"
+  local expected_type="$2"
+  local durability="${3:-volatile}"
+  local actual_type
+  local echo_args=(topic echo --once "$topic")
+
+  if [[ "$durability" == "transient_local" ]]; then
+    echo_args+=(--qos-durability transient_local)
+  fi
+
+  actual_type="$(ros2 topic type "$topic" 2>/dev/null | head -n 1 || true)"
+  if [[ -z "$actual_type" ]]; then
+    fail "missing topic $topic"
+    return
+  fi
+
+  if [[ "$actual_type" != "$expected_type" ]]; then
+    fail "$topic type=$actual_type expected=$expected_type"
+    return
+  fi
+
+  if timeout "$SAMPLE_TIMEOUT" ros2 "${echo_args[@]}" \
+      >/dev/null 2>&1; then
+    pass "$topic [$expected_type] fresh sample"
+  else
+    fail "$topic exists but no sample arrived"
+  fi
+}
+
+require_action() {
+  local action_name="$1"
+  local expected_type="$2"
+  local actions
+
+  actions="$(ros2 action list -t 2>/dev/null || true)"
+  if grep -Fq "$action_name [$expected_type]" <<<"$actions"; then
+    pass "$action_name [$expected_type]"
+  else
+    fail "missing action $action_name [$expected_type]"
+  fi
+}
+
+nodes="$(ros2 node list 2>/dev/null || true)"
+
+if [[ "$MODE" == "live" ]]; then
+  if grep -Fxq '/amcl' <<<"$nodes"; then
+    fail "AMCL is running during live mapping"
+  else
+    pass "AMCL absent in live-mapping mode"
+  fi
+
+  if grep -Fxq '/map_server' <<<"$nodes"; then
+    fail "map_server is running during live mapping"
+  else
+    pass "map_server absent in live-mapping mode"
+  fi
+else
+  if grep -Fxq '/amcl' <<<"$nodes"; then
+    pass "AMCL present in saved-map mode"
+  else
+    fail "AMCL missing in saved-map mode"
+  fi
+
+  if grep -Fxq '/map_server' <<<"$nodes"; then
+    pass "map_server present in saved-map mode"
+  else
+    fail "map_server missing in saved-map mode"
+  fi
+fi
+
+require_topic /tf tf2_msgs/msg/TFMessage
+require_topic /tf_static tf2_msgs/msg/TFMessage transient_local
+require_topic /map nav_msgs/msg/OccupancyGrid
+require_topic /scan sensor_msgs/msg/LaserScan
+require_topic /odometry/filtered nav_msgs/msg/Odometry
+require_topic /safety/stop std_msgs/msg/Bool
+require_topic /safety/slowdown_factor std_msgs/msg/Float32
+require_topic /savo_control/mode_state std_msgs/msg/String
+require_topic /global_costmap/costmap nav_msgs/msg/OccupancyGrid
+require_topic /local_costmap/costmap nav_msgs/msg/OccupancyGrid
+require_topic /savo_nav/readiness std_msgs/msg/String
+require_topic /savo_nav/readiness_reason std_msgs/msg/String
+require_topic /savo_nav/control_recovery/allowed std_msgs/msg/Bool
+require_topic /savo_nav/goal_admission/state std_msgs/msg/String
+
+require_action /navigate_to_pose nav2_msgs/action/NavigateToPose
+require_action \
+  /savo_nav/navigation/navigate_to_pose \
+  nav2_msgs/action/NavigateToPose
+require_action \
+  /savo_nav/exploration/navigate_to_pose \
+  nav2_msgs/action/NavigateToPose
+require_action \
+  /savo_nav/coverage/execute_path \
+  savo_msgs/action/ExecuteCoveragePath
+
+readiness="$(
+  timeout "$SAMPLE_TIMEOUT" ros2 topic echo --once \
+    /savo_nav/readiness 2>/dev/null || true
+)"
+summary="$(awk -F': ' '/data:/{print $2; exit}' <<<"$readiness")"
+summary="${summary//\"/}"
+summary="${summary//\'/}"
+summary="${summary//[[:space:]]/}"
+
+if [[ "$EXPECT_READY" == "true" ]]; then
+  if [[ "$summary" == "ready" ]]; then
+    pass "navigation readiness is ready"
+  else
+    fail "navigation readiness is not ready"
+  fi
+else
+  printf 'INFO  readiness=%s\n' "${summary:-unknown}"
+fi
+
+if ((failures > 0)); then
+  printf '\nPreflight failed: %d issue(s). No motion command was sent.\n' \
+    "$failures" >&2
+  exit 1
+fi
+
+printf '\nPreflight passed. No motion command was sent.\n'

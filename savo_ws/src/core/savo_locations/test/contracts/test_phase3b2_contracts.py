@@ -37,9 +37,15 @@ def test_write_service_types_are_wired() -> None:
     for token in (
         "RegisterLocationCandidate",
         "ApproveLocation",
+        "GetLocationCandidate",
+        "ListLocationCandidates",
+        "RejectLocationCandidate",
         "SetLocationEnabled",
         "handle_register_candidate",
         "handle_approve_candidate",
+        "handle_get_candidate",
+        "handle_list_candidates",
+        "handle_reject_candidate",
         "handle_set_enabled",
     ):
         assert token in header or token in source
@@ -47,11 +53,14 @@ def test_write_service_types_are_wired() -> None:
     for service_name in (
         "kRegisterCandidate",
         "kApproveCandidate",
+        "kGetCandidate",
+        "kListCandidates",
+        "kRejectCandidate",
         "kSetEnabled",
     ):
         assert service_name in source
 
-    assert source.count("create_service<") >= 6
+    assert source.count("create_service<") >= 10
 
 
 def test_event_topic_is_typed_and_post_commit() -> None:
@@ -73,6 +82,10 @@ def test_event_topic_is_typed_and_post_commit() -> None:
         (
             "commit_candidate_approval",
             "EVENT_LOCATION_APPROVED",
+        ),
+        (
+            "commit_candidate_rejection",
+            "EVENT_CANDIDATE_REJECTED",
         ),
         (
             "commit_location_enabled",

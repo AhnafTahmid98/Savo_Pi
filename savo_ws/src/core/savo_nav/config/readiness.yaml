@@ -5,7 +5,9 @@ navigation_readiness_node:
   ros__parameters:
     publish_period_ms: 200
 
-    require_pointcloud: true
+    # LiDAR-only guarded baseline. Enable the dedicated RealSense profile
+    # only after the filtered D435 cloud is validated on the robot.
+    require_pointcloud: false
     require_control_mode: true
     require_safety_state: true
     require_global_costmap: true

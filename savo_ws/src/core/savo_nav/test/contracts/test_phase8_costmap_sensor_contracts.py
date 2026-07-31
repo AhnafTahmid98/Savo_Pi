@@ -1,7 +1,7 @@
 # Copyright 2026 Ahnaf Tahmid
 # SPDX-License-Identifier: LicenseRef-Proprietary
 
-"""Validate the safely blocked Phase 8 sensor contract."""
+"""Validate the guarded Phase 8 sensor integration contract."""
 
 from pathlib import Path
 
@@ -32,14 +32,14 @@ def costmap_parameters(document, costmap_name):
     return parameters
 
 
-def test_sensor_contract_exists_and_records_blocker():
-    """Require a nonempty, machine-readable blocked contract."""
+def test_sensor_contract_records_guarded_hardware_stage():
+    """Require the implemented producer and pending hardware gate."""
     assert SENSOR_CONTRACT.is_file()
     assert SENSOR_CONTRACT.stat().st_size > 0
     contract = load_yaml(SENSOR_CONTRACT)['costmap_sensors']
     assert (
         contract['integration_status']
-        == 'blocked_missing_filtered_realsense_producer'
+        == 'ready_for_guarded_real_d435_validation'
     )
 
 
@@ -58,8 +58,8 @@ def test_lidar_contract_matches_verified_pipeline():
     assert 'positive infinity' in lidar['infinity_evidence']
 
 
-def test_realsense_contract_is_fail_closed():
-    """Forbid integration without a verified filtered producer."""
+def test_realsense_contract_is_implemented_but_fail_closed():
+    """Record the producer without enabling an unvalidated Nav2 layer."""
     realsense = load_yaml(SENSOR_CONTRACT)[
         'costmap_sensors'
     ]['realsense']
@@ -72,12 +72,12 @@ def test_realsense_contract_is_fail_closed():
         realsense['message_type']
         == 'sensor_msgs/msg/PointCloud2'
     )
-    assert realsense['producer_verified'] is False
+    assert realsense['producer_implemented'] is True
+    assert realsense['producer_contract_verified'] is True
+    assert realsense['producer_hardware_validated'] is False
     assert realsense['clearing'] is False
     assert realsense['raw_topic_allowed_in_nav2'] is False
-    assert 'no production PointCloud2 publisher' in realsense[
-        'evidence'
-    ]
+    assert 'Real D435' in realsense['evidence']
 
 
 def test_raw_camera_cloud_is_absent_from_costmap_trees():
@@ -128,8 +128,8 @@ def test_ownership_boundaries_are_explicit():
     }
 
 
-def test_profile_records_phase8_blocked_state():
-    """Require the saved-map profile to avoid false completion."""
+def test_profile_records_pending_real_d435_validation():
+    """Keep the optional voxel layer disabled until hardware validation."""
     profile = load_yaml(PROFILE)
     assert (
         profile['phase8_costmap_sensor_integration_enabled']
@@ -137,9 +137,10 @@ def test_profile_records_phase8_blocked_state():
     )
     assert (
         profile['phase8_blocked_reason']
-        == 'filtered_realsense_producer_missing'
+        == 'real_d435_hardware_validation_pending'
     )
-    assert profile['filtered_realsense_producer_verified'] is False
+    assert profile['filtered_realsense_producer_verified'] is True
+    assert profile['filtered_realsense_hardware_validated'] is False
     assert profile['raw_realsense_cloud_for_nav2'] is False
     assert profile['lidar_required_for_navigation'] is True
     assert profile['realsense_required_for_navigation'] is False

@@ -261,6 +261,8 @@ std::optional<svo::LocationOperation> location_operation_from_ros(
       return svo::LocationOperation::kNavigateToLocation;
     case Service::Request::OP_CONFIRM_LOCATION_ARRIVAL:
       return svo::LocationOperation::kConfirmArrival;
+    case Service::Request::OP_REJECT_LOCATION_CANDIDATE:
+      return svo::LocationOperation::kRejectLocationCandidate;
     default:
       return std::nullopt;
   }
@@ -309,6 +311,7 @@ public:
       "/savo_supervisor/authorize_location_operation");
     declare_parameter<bool>("location_authorization.allow_registration", true);
     declare_parameter<bool>("location_authorization.allow_approval", true);
+    declare_parameter<bool>("location_authorization.allow_rejection", true);
     declare_parameter<bool>("location_authorization.allow_navigation", true);
     declare_parameter<bool>("location_authorization.allow_arrival_confirmation", true);
     declare_parameter<bool>("location_authorization.allow_degraded_non_motion", true);
@@ -339,6 +342,8 @@ public:
       "location_authorization.allow_registration").as_bool();
     location_authorization_policy_.allow_approval = get_parameter(
       "location_authorization.allow_approval").as_bool();
+    location_authorization_policy_.allow_rejection = get_parameter(
+      "location_authorization.allow_rejection").as_bool();
     location_authorization_policy_.allow_navigation = get_parameter(
       "location_authorization.allow_navigation").as_bool();
     location_authorization_policy_.allow_arrival_confirmation = get_parameter(

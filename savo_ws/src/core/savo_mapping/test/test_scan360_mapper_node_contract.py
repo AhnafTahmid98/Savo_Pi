@@ -10,7 +10,7 @@ CMAKE = ROOT / 'CMakeLists.txt'
 
 IMMUTABLE_HASHES = {
     'package.xml':
-        'fa2cf79fff914fa222b89038999c45a84ca296223685860578f5ff245227684a',
+        'd5151971a13db517151b2fa7014ab926cbadf8733b9281b1b39a79ba8ae261cd',
     'include/savo_mapping/scan360_planner.hpp':
         '304b4a06c22461f8fcc66d5858d51f13c53f8df00f70805a35babdb013bc1399',
     'src/scan360/scan360_planner.cpp':

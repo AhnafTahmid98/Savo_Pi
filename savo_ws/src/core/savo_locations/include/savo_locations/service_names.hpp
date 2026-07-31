@@ -12,6 +12,12 @@ inline constexpr std::string_view kResolve{
 inline constexpr std::string_view kGet{
   "/savo_locations/get"};
 
+inline constexpr std::string_view kGetCandidate{
+  "/savo_locations/candidates/get"};
+
+inline constexpr std::string_view kListCandidates{
+  "/savo_locations/candidates/list"};
+
 inline constexpr std::string_view kList{
   "/savo_locations/list"};
 
@@ -20,6 +26,9 @@ inline constexpr std::string_view kRegisterCandidate{
 
 inline constexpr std::string_view kApproveCandidate{
   "/savo_locations/candidates/approve"};
+
+inline constexpr std::string_view kRejectCandidate{
+  "/savo_locations/candidates/reject"};
 
 inline constexpr std::string_view kSetEnabled{
   "/savo_locations/set_enabled"};

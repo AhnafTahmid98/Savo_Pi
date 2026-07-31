@@ -18,6 +18,7 @@
 
       semantic:
         head_confirmations: "/savo_head/semantic_confirmations"
+        location_events: "/savo_locations/events"
 
       outputs:
         status: "/savo_mapping/status"
@@ -33,6 +34,11 @@
         map_saved: "/savo_mapping/map_saved"
         exploration_status: "/savo_mapping/exploration_status"
         semantic_events: "/savo_mapping/semantic_events"
+        semantic_status: "/savo_mapping/semantic/status"
+        semantic_heartbeat: "/savo_mapping/semantic/heartbeat"
+        location_review_status: "/savo_mapping/locations/review/status"
+        location_review_results: "/savo_mapping/locations/review/results"
+        location_review_heartbeat: "/savo_mapping/locations/review/heartbeat"
         dashboard: "/savo_mapping/dashboard"
 
       commands:

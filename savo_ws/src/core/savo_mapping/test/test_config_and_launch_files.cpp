@@ -101,6 +101,11 @@ TEST(ConfigContracts, TopicConfigContainsOfficialInterfaces)
   expect_contains(content, "readiness: \"/savo_mapping/readiness\"");
   expect_contains(content, "map_saved: \"/savo_mapping/map_saved\"");
   expect_contains(content, "head_confirmations: \"/savo_head/semantic_confirmations\"");
+  expect_contains(content, "location_events: \"/savo_locations/events\"");
+  expect_contains(content, "semantic_status: \"/savo_mapping/semantic/status\"");
+  expect_contains(
+    content,
+    "semantic_heartbeat: \"/savo_mapping/semantic/heartbeat\"");
   expect_contains(content, "status: \"/savo_nav/status\"");
   expect_contains(
     content,

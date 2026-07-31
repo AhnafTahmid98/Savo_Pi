@@ -285,6 +285,7 @@ set(_savo_mapping_production_config
   config/mapping_mode_manager.yaml
   config/qos.yaml
   config/scan360_mapping.yaml
+  config/semantic_landmarks.yaml
   config/slam_lifecycle_health.yaml
   config/slam_toolbox_mapping.yaml
   config/topics.yaml
@@ -320,6 +321,7 @@ set(_savo_mapping_production_launch
   launch/map_session_manager.launch.xml
   launch/monitor_only.launch.xml
   launch/scan360_mapping.launch.xml
+  launch/semantic_mapping.launch.xml
 )
 
 install(
@@ -653,6 +655,91 @@ install(
 )
 
 add_executable(
+  location_review_gateway_node
+  src/nodes/location_review_gateway_node.cpp
+)
+
+target_compile_features(
+  location_review_gateway_node
+  PRIVATE
+    cxx_std_17
+)
+
+target_link_libraries(
+  location_review_gateway_node
+  ${PROJECT_NAME}_core
+  nlohmann_json::nlohmann_json
+)
+
+ament_target_dependencies(
+  location_review_gateway_node
+  rclcpp
+  savo_msgs
+  std_msgs
+)
+
+install(
+  TARGETS location_review_gateway_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+add_executable(
+  location_review_cli
+  src/tools/location_review_cli.cpp
+)
+
+target_compile_features(
+  location_review_cli
+  PRIVATE
+    cxx_std_17
+)
+
+target_link_libraries(
+  location_review_cli
+  nlohmann_json::nlohmann_json
+)
+
+ament_target_dependencies(
+  location_review_cli
+  rclcpp
+  savo_msgs
+)
+
+install(
+  TARGETS location_review_cli
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+add_executable(
+  semantic_landmark_bridge_node
+  src/nodes/semantic_landmark_bridge_node.cpp
+)
+
+target_compile_features(
+  semantic_landmark_bridge_node
+  PRIVATE
+    cxx_std_17
+)
+
+target_link_libraries(
+  semantic_landmark_bridge_node
+  ${PROJECT_NAME}_core
+  nlohmann_json::nlohmann_json
+)
+
+ament_target_dependencies(
+  semantic_landmark_bridge_node
+  rclcpp
+  savo_msgs
+  std_msgs
+)
+
+install(
+  TARGETS semantic_landmark_bridge_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+add_executable(
   coverage_mapper_node
   src/nodes/coverage_mapper_node.cpp
 )
@@ -865,6 +952,16 @@ if(BUILD_TESTING)
     "${_savo_mapping_coverage_mapper_ros_log_dir}"
   )
 
+  set(
+    _savo_mapping_location_review_ros_log_dir
+    "${CMAKE_CURRENT_BINARY_DIR}/location_review_ros_logs"
+  )
+
+  file(
+    MAKE_DIRECTORY
+    "${_savo_mapping_location_review_ros_log_dir}"
+  )
+
   # Zero-byte files are deferred phase scaffolds, not implemented code.
   # As soon as a scaffold gains content, it automatically enters linting.
   file(GLOB_RECURSE _savo_mapping_lint_candidates
@@ -950,6 +1047,7 @@ if(BUILD_TESTING)
     launch/map_session_manager.launch.xml
     launch/monitor_only.launch.xml
     launch/scan360_mapping.launch.xml
+    launch/semantic_mapping.launch.xml
     launch/simulated_manual_mapping.launch.xml
   )
 
@@ -1577,6 +1675,37 @@ if(BUILD_TESTING)
     test_location_registration_runtime_contract
     test/test_location_registration_runtime_contract.py
     TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
+    test_semantic_mapping_runtime_contract
+    test/test_semantic_mapping_runtime_contract.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
+    test_location_review_gateway_contract
+    test/test_location_review_gateway_contract.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
+    test_location_review_cli_contract
+    test/test_location_review_cli_contract.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
+    test_location_review_gateway_runtime
+    test/test_location_review_gateway_runtime.py
+    TIMEOUT 180
+  )
+
+  set_tests_properties(
+    test_location_review_gateway_runtime
+    PROPERTIES
+      ENVIRONMENT
+        "PYTHONDONTWRITEBYTECODE=1;ROS_LOCALHOST_ONLY=1;ROS_DOMAIN_ID=225;ROS_LOG_DIR=${_savo_mapping_location_review_ros_log_dir};LOCATION_REVIEW_GATEWAY_EXECUTABLE=${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}/location_review_gateway_node;LOCATION_REVIEW_CLI_EXECUTABLE=${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}/location_review_cli"
   )
 
   target_link_libraries(

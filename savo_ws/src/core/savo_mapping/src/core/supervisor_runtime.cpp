@@ -30,9 +30,9 @@ std::string validate_monitor_only_policy(
     return "voxel_obstacle_monitoring_not_implemented";
   }
 
-  if (policy.semantic_mapping_enabled) {
-    return "semantic_mapping_not_implemented";
-  }
+  // Semantic mapping is a read-only integration. It may observe head
+  // confirmations and location-registry events, but it owns neither motion
+  // nor persistent location storage.
 
   return {};
 }

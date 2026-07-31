@@ -66,4 +66,40 @@ TEST(LocationAuthorizationPolicy, RejectsDegradedMotionByDefault)
     savo_supervisor::LocationAuthorizationCode::kHealthBlocked);
 }
 
+
+TEST(LocationAuthorizationPolicy, AuthorizesHealthyCandidateRejection)
+{
+  savo_supervisor::LocationAuthorizationEvaluator evaluator;
+  auto request = navigation_request();
+  request.operation =
+    savo_supervisor::LocationOperation::kRejectLocationCandidate;
+  request.location_id.clear();
+  request.candidate_id = "candidate-campus-main-27";
+  request.motion_required = false;
+
+  const auto decision = evaluator.Evaluate(
+    request, ready_state());
+
+  EXPECT_TRUE(decision.authorized);
+}
+
+TEST(LocationAuthorizationPolicy, CandidateOperationsRequireCandidateIdentity)
+{
+  savo_supervisor::LocationAuthorizationEvaluator evaluator;
+  auto request = navigation_request();
+  request.operation =
+    savo_supervisor::LocationOperation::kApproveLocation;
+  request.location_id.clear();
+  request.candidate_id.clear();
+  request.motion_required = false;
+
+  const auto decision = evaluator.Evaluate(
+    request, ready_state());
+
+  EXPECT_FALSE(decision.authorized);
+  EXPECT_EQ(
+    decision.code,
+    savo_supervisor::LocationAuthorizationCode::kInvalidRequest);
+}
+
 }  // namespace

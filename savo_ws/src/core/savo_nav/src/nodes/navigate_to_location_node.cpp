@@ -208,10 +208,10 @@ private:
             false,
             NavigateToLocation::Result::RESULT_INTERNAL_ERROR,
             std::string("navigate_to_location_exception: ") + exception.what(),
-            {},
+            savo_msgs::msg::LocationRecord{},
             false,
             false,
-            {});
+            savo_msgs::msg::AprilTagObservation{});
         }
         busy_.store(false);
       }}.detach();

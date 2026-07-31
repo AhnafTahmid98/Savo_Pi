@@ -3,6 +3,7 @@
 
 #include "savo_locations/location_registry_node.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <filesystem>
@@ -251,6 +252,26 @@ LocationRegistryNode::LocationRegistryNode(
         std::placeholders::_1,
         std::placeholders::_2));
 
+  get_candidate_service_ =
+    create_service<GetCandidateService>(
+      std::string(
+        ::savo_locations::service_names::kGetCandidate),
+      std::bind(
+        &LocationRegistryNode::handle_get_candidate,
+        this,
+        std::placeholders::_1,
+        std::placeholders::_2));
+
+  list_candidates_service_ =
+    create_service<ListCandidatesService>(
+      std::string(
+        ::savo_locations::service_names::kListCandidates),
+      std::bind(
+        &LocationRegistryNode::handle_list_candidates,
+        this,
+        std::placeholders::_1,
+        std::placeholders::_2));
+
   list_service_ =
     create_service<ListService>(
       std::string(
@@ -281,6 +302,18 @@ LocationRegistryNode::LocationRegistryNode(
       std::bind(
         &LocationRegistryNode::
           handle_approve_candidate,
+        this,
+        std::placeholders::_1,
+        std::placeholders::_2));
+
+  reject_service_ =
+    create_service<RejectService>(
+      std::string(
+        ::savo_locations::service_names::
+          kRejectCandidate),
+      std::bind(
+        &LocationRegistryNode::
+          handle_reject_candidate,
         this,
         std::placeholders::_1,
         std::placeholders::_2));
@@ -926,6 +959,132 @@ void LocationRegistryNode::handle_get(
 }
 
 
+void LocationRegistryNode::handle_get_candidate(
+  const std::shared_ptr<GetCandidateService::Request> request,
+  std::shared_ptr<GetCandidateService::Response> response)
+{
+  std::shared_lock<std::shared_mutex> lock{
+    state_mutex_};
+
+  if (!ready_) {
+    response->found = false;
+    response->result_code =
+      GetCandidateService::Response::RESULT_INTERNAL_ERROR;
+    response->reason =
+      "registry unavailable: " + reason_;
+    return;
+  }
+
+  const auto candidate_id =
+    trim_ascii(request->candidate_id);
+
+  if (candidate_id.empty()) {
+    response->found = false;
+    response->result_code =
+      GetCandidateService::Response::RESULT_INVALID_ID;
+    response->reason = "candidate ID is required";
+    return;
+  }
+
+  for (const auto & candidate : catalog_snapshot_.candidates) {
+    if (candidate.candidate.candidate_id == candidate_id) {
+      response->found = true;
+      response->result_code =
+        GetCandidateService::Response::RESULT_FOUND;
+      response->reason = "candidate found";
+      response->candidate =
+        to_ros_candidate_record(candidate);
+      return;
+    }
+  }
+
+  response->found = false;
+  response->result_code =
+    GetCandidateService::Response::RESULT_NOT_FOUND;
+  response->reason = "candidate not found";
+}
+
+
+void LocationRegistryNode::handle_list_candidates(
+  const std::shared_ptr<ListCandidatesService::Request> request,
+  std::shared_ptr<ListCandidatesService::Response> response)
+{
+  std::shared_lock<std::shared_mutex> lock{
+    state_mutex_};
+
+  if (!ready_) {
+    response->success = false;
+    response->result_code =
+      ListCandidatesService::Response::RESULT_INTERNAL_ERROR;
+    response->reason =
+      "registry unavailable: " + reason_;
+    return;
+  }
+
+  if (
+    request->state_filter >
+    ListCandidatesService::Request::STATE_FILTER_REJECTED)
+  {
+    response->success = false;
+    response->result_code =
+      ListCandidatesService::Response::RESULT_INVALID_FILTER;
+    response->reason = "candidate state filter is invalid";
+    return;
+  }
+
+  const auto map_id = trim_ascii(request->map_id);
+
+  if (
+    request->enforce_map_context &&
+    (map_id.empty() || request->map_revision == 0U))
+  {
+    response->success = false;
+    response->result_code =
+      ListCandidatesService::Response::RESULT_INVALID_FILTER;
+    response->reason =
+      "map ID and non-zero revision are required when map context is enforced";
+    return;
+  }
+
+  for (const auto & record : catalog_snapshot_.candidates) {
+    const auto state =
+      static_cast<std::uint8_t>(record.state);
+
+    if (
+      request->state_filter !=
+      ListCandidatesService::Request::STATE_FILTER_ALL &&
+      state != request->state_filter)
+    {
+      continue;
+    }
+
+    if (
+      request->enforce_map_context &&
+      (record.candidate.map.map_id != map_id ||
+      record.candidate.map.map_revision != request->map_revision))
+    {
+      continue;
+    }
+
+    response->candidates.push_back(
+      to_ros_candidate_record(record));
+  }
+
+  std::sort(
+    response->candidates.begin(),
+    response->candidates.end(),
+    [](const auto & left, const auto & right)
+    {
+      return left.candidate_id < right.candidate_id;
+    });
+
+  response->success = true;
+  response->result_code =
+    ListCandidatesService::Response::RESULT_OK;
+  response->reason = "candidate list returned";
+}
+
+
 void LocationRegistryNode::handle_list(
   const std::shared_ptr<ListService::Request> request,
   std::shared_ptr<ListService::Response> response)
@@ -1431,6 +1590,184 @@ void LocationRegistryNode::handle_approve_candidate(
     response->approved = false;
     response->result_code =
       ApproveService::Response::RESULT_INTERNAL_ERROR;
+    response->reason = exception.what();
+    publish_status();
+  }
+}
+
+
+void LocationRegistryNode::handle_reject_candidate(
+  const std::shared_ptr<RejectService::Request> request,
+  std::shared_ptr<RejectService::Response> response)
+{
+  std::lock_guard<std::mutex> serialized{
+    mutation_mutex_};
+
+  CatalogSnapshot current;
+  std::string rejection;
+
+  if (!begin_mutation(
+      "reject_candidate",
+      &current,
+      &rejection))
+  {
+    response->rejected = false;
+    response->result_code =
+      RejectService::Response::RESULT_STORAGE_UNAVAILABLE;
+    response->reason = rejection;
+    publish_status();
+    return;
+  }
+
+  try {
+    const auto actor_id =
+      collapse_ascii_whitespace(request->actor_id);
+    const auto review_reason =
+      collapse_ascii_whitespace(request->rejection_reason);
+
+    if (
+      actor_id.empty() ||
+      review_reason.empty() ||
+      trim_ascii(request->candidate_id).empty() ||
+      request->expected_candidate_revision == 0U)
+    {
+      const std::string reason =
+        "candidate ID, revision, actor and rejection reason are required";
+
+      finish_mutation_rejected(reason);
+      response->rejected = false;
+      response->result_code =
+        RejectService::Response::RESULT_INVALID_REQUEST;
+      response->reason = reason;
+      publish_status();
+      return;
+    }
+
+    InMemoryLocationCatalog catalog;
+    std::string hydration_reason;
+
+    if (!hydrate_catalog(
+        current,
+        &catalog,
+        &hydration_reason))
+    {
+      finish_mutation_degraded(
+        "catalog hydration failed: " + hydration_reason);
+      response->rejected = false;
+      response->result_code =
+        RejectService::Response::RESULT_INTERNAL_ERROR;
+      response->reason = hydration_reason;
+      publish_status();
+      return;
+    }
+
+    const auto domain_result = catalog.reject_candidate(
+      request->candidate_id,
+      request->expected_candidate_revision,
+      review_reason);
+
+    if (!domain_result.success) {
+      finish_mutation_rejected(domain_result.reason);
+      response->rejected = false;
+      response->reason = domain_result.reason;
+
+      switch (domain_result.code) {
+        case CandidateMutationCode::kNotFound:
+          response->result_code =
+            RejectService::Response::RESULT_CANDIDATE_NOT_FOUND;
+          break;
+        case CandidateMutationCode::kNotPending:
+          response->result_code =
+            RejectService::Response::RESULT_CANDIDATE_NOT_PENDING;
+          break;
+        case CandidateMutationCode::kStaleRevision:
+          response->result_code =
+            RejectService::Response::RESULT_STALE_REVISION;
+          break;
+        default:
+          response->result_code =
+            RejectService::Response::RESULT_INVALID_REQUEST;
+          break;
+      }
+
+      publish_status();
+      return;
+    }
+
+    const auto rejected_candidate =
+      domain_result.candidate.value();
+
+    CatalogSnapshot post;
+    post.locations = catalog.list_locations();
+    post.candidates = catalog.list_candidates();
+
+    CandidateRejectionCommit commit;
+    commit.candidate_id =
+      rejected_candidate.candidate.candidate_id;
+    commit.expected_candidate_revision =
+      request->expected_candidate_revision;
+    commit.actor_id = actor_id;
+    commit.reason = review_reason;
+    commit.payload_json = "{}";
+    commit.post_rejection_snapshot = post;
+
+    std::uint64_t event_sequence = 0U;
+
+    const auto persistence =
+      repository_->commit_candidate_rejection(
+        commit,
+        &event_sequence);
+
+    if (!persistence.success) {
+      finish_mutation_degraded(
+        "candidate rejection persistence failed: " +
+        persistence.reason);
+      response->rejected = false;
+      response->reason = persistence.reason;
+      response->result_code =
+        persistence.code == SnapshotCode::kStaleRevision ?
+        RejectService::Response::RESULT_STALE_REVISION :
+        RejectService::Response::RESULT_STORAGE_UNAVAILABLE;
+      publish_status();
+      return;
+    }
+
+    finish_mutation_committed(
+      std::move(post),
+      event_sequence,
+      "candidate_rejected");
+
+    publish_committed_event(
+      event_sequence,
+      savo_msgs::msg::LocationEvent::EVENT_CANDIDATE_REJECTED,
+      rejected_candidate.candidate.candidate_id,
+      "",
+      rejected_candidate.candidate_revision,
+      actor_id,
+      review_reason);
+
+    if (publish_snapshot_enabled_) {
+      publish_snapshot();
+    }
+
+    publish_status();
+
+    response->rejected = true;
+    response->result_code =
+      RejectService::Response::RESULT_REJECTED;
+    response->reason =
+      "candidate rejected; committed event_sequence=" +
+      std::to_string(event_sequence);
+    response->candidate =
+      to_ros_candidate_record(rejected_candidate);
+  }
+  catch (const std::exception & exception) {
+    finish_mutation_degraded(
+      "candidate rejection exception: " +
+      std::string(exception.what()));
+    response->rejected = false;
+    response->result_code =
+      RejectService::Response::RESULT_INTERNAL_ERROR;
     response->reason = exception.what();
     publish_status();
   }

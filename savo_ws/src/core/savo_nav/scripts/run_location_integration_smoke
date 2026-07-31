@@ -26,7 +26,11 @@ from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 
 from savo_msgs.action import NavigateToLocation, RegisterMappedLocation
 from savo_msgs.msg import AprilTagObservation
-from savo_msgs.srv import ApproveLocation, ResolveLocation, SetLocationEnabled
+from savo_msgs.srv import (
+    ResolveLocation,
+    ReviewLocationCandidate,
+    SetLocationEnabled,
+)
 
 
 HOME = Path.home()
@@ -83,9 +87,9 @@ class SmokeNode(Node):
             NavigateToLocation,
             "/savo_nav/locations/navigate",
         )
-        self.approve_client = self.create_client(
-            ApproveLocation,
-            "/savo_locations/candidates/approve",
+        self.review_client = self.create_client(
+            ReviewLocationCandidate,
+            "/savo_mapping/locations/review",
         )
         self.enable_client = self.create_client(
             SetLocationEnabled,
@@ -153,7 +157,7 @@ def wait_dependencies(node: SmokeNode) -> None:
     if not node.navigate_action.wait_for_server(timeout_sec=15.0):
         raise RuntimeError("NavigateToLocation action unavailable")
     for client, name in (
-        (node.approve_client, "approve"),
+        (node.review_client, "authorized location review"),
         (node.enable_client, "set_enabled"),
         (node.resolve_client, "resolve"),
     ):
@@ -202,10 +206,12 @@ def register_candidate(node: SmokeNode) -> Any:
 
 
 def approve_candidate(node: SmokeNode, candidate: Any) -> Any:
-    request = ApproveLocation.Request()
+    request = ReviewLocationCandidate.Request()
+    request.request_id = "loc3p-review-approve-001"
+    request.actor_id = "loc3p_smoke_operator"
+    request.decision = ReviewLocationCandidate.Request.DECISION_APPROVE
     request.candidate_id = candidate.candidate_id
     request.expected_candidate_revision = candidate.candidate_revision
-    request.actor_id = "loc3p_smoke_operator"
     request.location_id = "A201"
     request.display_name = "Room A201"
     request.aliases = ["A 201", "classroom A201"]
@@ -220,11 +226,11 @@ def approve_candidate(node: SmokeNode, candidate: Any) -> Any:
     request.notes = candidate.notes
     response = wait_future(
         node,
-        node.approve_client.call_async(request),
+        node.review_client.call_async(request),
         8.0,
-        "approval response",
+        "authorized approval response",
     )
-    if not response.approved:
+    if not response.completed or not response.approved:
         raise RuntimeError(f"approval failed: {response.reason}")
     return response.location
 
@@ -454,6 +460,15 @@ def main() -> int:
                     "--ros-args",
                     "-p", "default_approach_distance_m:=0.8",
                     "-p", "dependency_wait_timeout_s:=3.0",
+                ],
+            ),
+            (
+                "location_review_gateway",
+                [
+                    "ros2", "run", "savo_mapping", "location_review_gateway_node",
+                    "--ros-args",
+                    "-p", "dependency_wait_timeout_s:=3.0",
+                    "-p", "operation_timeout_s:=5.0",
                 ],
             ),
             (

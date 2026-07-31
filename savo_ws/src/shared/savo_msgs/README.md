@@ -33,3 +33,20 @@ Defines the two `savo_head` AprilTag confirmation duties:
 - Operator app or CLI: location naming and semantic classification.
 - `savo_locations`: persistent semantic-location storage.
 - `savo_nav`: navigation and final arrival decision.
+
+## Candidate review interfaces
+
+`RejectLocationCandidate.srv` provides the typed, revision-guarded rejection
+contract used by the authoritative location registry. Supervisor authorization
+uses `OP_REJECT_LOCATION_CANDIDATE` before the review gateway forwards a
+rejection to persistent storage.
+
+## Location candidate review gateway
+
+- `GetLocationCandidate.srv` exposes the authoritative candidate state,
+  revision and map context without mutating the registry.
+- `ListLocationCandidates.srv` exposes a read-only, deterministically ordered
+  candidate review queue with state and map-context filters.
+- `ReviewLocationCandidate.srv` is the mapping-owned operator entrypoint for
+  approval or rejection. The gateway must obtain supervisor authorization
+  before forwarding the corresponding registry mutation.

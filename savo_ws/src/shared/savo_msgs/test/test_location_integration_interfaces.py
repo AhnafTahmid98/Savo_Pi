@@ -15,6 +15,10 @@ def test_typed_location_integration_interfaces_are_registered() -> None:
         "action/RegisterMappedLocation.action",
         "action/NavigateToLocation.action",
         "srv/AuthorizeLocationOperation.srv",
+        "srv/RejectLocationCandidate.srv",
+        "srv/GetLocationCandidate.srv",
+        "srv/ListLocationCandidates.srv",
+        "srv/ReviewLocationCandidate.srv",
     ):
         assert f'"{path}"' in cmake
 
@@ -64,6 +68,7 @@ def test_supervisor_authorization_is_permission_only() -> None:
         "OP_APPROVE_LOCATION=2",
         "OP_NAVIGATE_TO_LOCATION=3",
         "OP_CONFIRM_LOCATION_ARRIVAL=4",
+        "OP_REJECT_LOCATION_CANDIDATE=5",
         "bool motion_required",
         "bool authorized",
         "RESULT_SAFETY_BLOCKED=4",

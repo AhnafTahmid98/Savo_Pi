@@ -3,7 +3,7 @@
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.actions import EmitEvent
-from launch.actions import LogError
+from launch.actions import LogInfo
 from launch.actions import RegisterEventHandler
 from launch.conditions import IfCondition
 from launch.event_handlers import OnProcessExit
@@ -20,7 +20,7 @@ def _critical_exit_handler(node: Node, label: str) -> RegisterEventHandler:
         OnProcessExit(
             target_action=node,
             on_exit=[
-                LogError(
+                LogInfo(
                     msg=(
                         f"Critical location integration process exited: "
                         f"{label}"

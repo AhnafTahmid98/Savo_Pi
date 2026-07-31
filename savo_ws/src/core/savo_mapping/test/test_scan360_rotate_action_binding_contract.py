@@ -69,7 +69,7 @@ CMAKE = ROOT / 'CMakeLists.txt'
 
 IMMUTABLE_HASHES = {
     'package.xml':
-        'fa2cf79fff914fa222b89038999c45a84ca296223685860578f5ff245227684a',
+        'd5151971a13db517151b2fa7014ab926cbadf8733b9281b1b39a79ba8ae261cd',
     'include/savo_mapping/scan360_controller.hpp':
         '409dc1bb161d720cb750b86983e14cb468259aace1abc5ff62755a5eadff41ee',
     'src/scan360/scan360_controller.cpp':
@@ -85,7 +85,7 @@ IMMUTABLE_HASHES = {
     'test/test_scan360_orchestrator.cpp':
         '156dd224a8eefb316dcd405c8434a9075d840292df4655ed254344454796888e',
     'test/test_scan360_orchestrator_contract.py':
-        '9b0edd7a5d951f7dbbe11a9e19764c676b6fb1fa4763a28a09714854e9dffcb8',
+        '6f47fe93d2ef50e5a89645d823be0165df7d68619b5a50784b171aaa13893309',
     'include/savo_mapping/scan360_rotate_action_client.hpp':
         '71d2107ea05d87071583906dc2fd3a44fb51f7fc8497fa502351ee04afe1844e',
     'src/ros/scan360_rotate_action_client.cpp':

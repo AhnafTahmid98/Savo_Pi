@@ -17,8 +17,11 @@
 #include "savo_msgs/msg/location_event.hpp"
 #include "savo_msgs/srv/approve_location.hpp"
 #include "savo_msgs/srv/get_location.hpp"
+#include "savo_msgs/srv/get_location_candidate.hpp"
+#include "savo_msgs/srv/list_location_candidates.hpp"
 #include "savo_msgs/srv/list_locations.hpp"
 #include "savo_msgs/srv/register_location_candidate.hpp"
+#include "savo_msgs/srv/reject_location_candidate.hpp"
 #include "savo_msgs/srv/recover_location_storage.hpp"
 #include "savo_msgs/srv/resolve_location.hpp"
 #include "savo_msgs/srv/set_location_enabled.hpp"
@@ -52,6 +55,12 @@ private:
   using GetService =
     savo_msgs::srv::GetLocation;
 
+  using GetCandidateService =
+    savo_msgs::srv::GetLocationCandidate;
+
+  using ListCandidatesService =
+    savo_msgs::srv::ListLocationCandidates;
+
   using ListService =
     savo_msgs::srv::ListLocations;
 
@@ -60,6 +69,9 @@ private:
 
   using ApproveService =
     savo_msgs::srv::ApproveLocation;
+
+  using RejectService =
+    savo_msgs::srv::RejectLocationCandidate;
 
   using SetEnabledService =
     savo_msgs::srv::SetLocationEnabled;
@@ -111,6 +123,18 @@ private:
     std::shared_ptr<
       GetService::Response> response);
 
+  void handle_get_candidate(
+    const std::shared_ptr<
+      GetCandidateService::Request> request,
+    std::shared_ptr<
+      GetCandidateService::Response> response);
+
+  void handle_list_candidates(
+    const std::shared_ptr<
+      ListCandidatesService::Request> request,
+    std::shared_ptr<
+      ListCandidatesService::Response> response);
+
   void handle_list(
     const std::shared_ptr<
       ListService::Request> request,
@@ -128,6 +152,12 @@ private:
       ApproveService::Request> request,
     std::shared_ptr<
       ApproveService::Response> response);
+
+  void handle_reject_candidate(
+    const std::shared_ptr<
+      RejectService::Request> request,
+    std::shared_ptr<
+      RejectService::Response> response);
 
   void handle_set_enabled(
     const std::shared_ptr<
@@ -194,6 +224,12 @@ private:
   rclcpp::Service<GetService>::SharedPtr
     get_service_;
 
+  rclcpp::Service<GetCandidateService>::SharedPtr
+    get_candidate_service_;
+
+  rclcpp::Service<ListCandidatesService>::SharedPtr
+    list_candidates_service_;
+
   rclcpp::Service<ListService>::SharedPtr
     list_service_;
 
@@ -202,6 +238,9 @@ private:
 
   rclcpp::Service<ApproveService>::SharedPtr
     approve_service_;
+
+  rclcpp::Service<RejectService>::SharedPtr
+    reject_service_;
 
   rclcpp::Service<SetEnabledService>::SharedPtr
     set_enabled_service_;

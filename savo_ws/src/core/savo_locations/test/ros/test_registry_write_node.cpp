@@ -14,8 +14,11 @@
 #include "savo_msgs/msg/location_event.hpp"
 #include "savo_msgs/srv/approve_location.hpp"
 #include "savo_msgs/srv/get_location.hpp"
+#include "savo_msgs/srv/get_location_candidate.hpp"
+#include "savo_msgs/srv/list_location_candidates.hpp"
 #include "savo_msgs/srv/list_locations.hpp"
 #include "savo_msgs/srv/register_location_candidate.hpp"
+#include "savo_msgs/srv/reject_location_candidate.hpp"
 #include "savo_msgs/srv/set_location_enabled.hpp"
 
 #include "savo_locations/location_registry_node.hpp"
@@ -233,6 +236,16 @@ TEST(RegistryWriteNode, CommitsWritesPublishesEventsAndRestarts)
       savo_msgs::srv::RegisterLocationCandidate>(
         "/savo_locations/candidates/register");
 
+  auto candidate_client =
+    client_node->create_client<
+      savo_msgs::srv::GetLocationCandidate>(
+        "/savo_locations/candidates/get");
+
+  auto candidate_list_client =
+    client_node->create_client<
+      savo_msgs::srv::ListLocationCandidates>(
+        "/savo_locations/candidates/list");
+
   auto approve_client =
     client_node->create_client<
       savo_msgs::srv::ApproveLocation>(
@@ -268,6 +281,8 @@ TEST(RegistryWriteNode, CommitsWritesPublishesEventsAndRestarts)
   executor.add_node(client_node);
 
   ASSERT_TRUE(wait_for_service(executor, register_client));
+  ASSERT_TRUE(wait_for_service(executor, candidate_client));
+  ASSERT_TRUE(wait_for_service(executor, candidate_list_client));
   ASSERT_TRUE(wait_for_service(executor, approve_client));
   ASSERT_TRUE(wait_for_service(executor, enabled_client));
   ASSERT_TRUE(wait_for_service(executor, get_client));
@@ -299,6 +314,68 @@ TEST(RegistryWriteNode, CommitsWritesPublishesEventsAndRestarts)
   EXPECT_EQ(
     register_response->stored_candidate.candidate_revision,
     1U);
+
+  auto candidate_request =
+    std::make_shared<
+      savo_msgs::srv::GetLocationCandidate::Request>();
+
+  candidate_request->candidate_id =
+    "candidate-campus-main-27";
+
+  auto candidate_future =
+    candidate_client->async_send_request(candidate_request);
+
+  ASSERT_EQ(
+    executor.spin_until_future_complete(
+      candidate_future,
+      2s),
+    rclcpp::FutureReturnCode::SUCCESS);
+
+  const auto candidate_response =
+    candidate_future.get();
+
+  ASSERT_TRUE(candidate_response->found);
+  EXPECT_EQ(
+    candidate_response->result_code,
+    savo_msgs::srv::GetLocationCandidate::
+      Response::RESULT_FOUND);
+  EXPECT_EQ(
+    candidate_response->candidate.candidate_id,
+    "candidate-campus-main-27");
+  EXPECT_EQ(candidate_response->candidate.map_id, "campus_main");
+  EXPECT_EQ(candidate_response->candidate.map_revision, 7U);
+  EXPECT_EQ(
+    candidate_response->candidate.state,
+    savo_msgs::msg::LocationCandidate::STATE_PENDING_REVIEW);
+
+  auto pending_list_request =
+    std::make_shared<
+      savo_msgs::srv::ListLocationCandidates::Request>();
+  pending_list_request->state_filter =
+    savo_msgs::srv::ListLocationCandidates::Request::
+      STATE_FILTER_PENDING;
+  pending_list_request->enforce_map_context = true;
+  pending_list_request->map_id = "campus_main";
+  pending_list_request->map_revision = 7U;
+
+  auto pending_list_future =
+    candidate_list_client->async_send_request(
+      pending_list_request);
+
+  ASSERT_EQ(
+    executor.spin_until_future_complete(
+      pending_list_future,
+      2s),
+    rclcpp::FutureReturnCode::SUCCESS);
+
+  const auto pending_list_response =
+    pending_list_future.get();
+
+  ASSERT_TRUE(pending_list_response->success);
+  ASSERT_EQ(pending_list_response->candidates.size(), 1U);
+  EXPECT_EQ(
+    pending_list_response->candidates.front().candidate_id,
+    "candidate-campus-main-27");
 
   auto duplicate_future =
     register_client->async_send_request(register_request);
@@ -343,6 +420,32 @@ TEST(RegistryWriteNode, CommitsWritesPublishesEventsAndRestarts)
   EXPECT_EQ(approve_response->location.location_id, "A201");
   EXPECT_EQ(approve_response->location.record_revision, 1U);
   EXPECT_TRUE(approve_response->location.enabled);
+
+  auto approved_list_request =
+    std::make_shared<
+      savo_msgs::srv::ListLocationCandidates::Request>();
+  approved_list_request->state_filter =
+    savo_msgs::srv::ListLocationCandidates::Request::
+      STATE_FILTER_APPROVED;
+
+  auto approved_list_future =
+    candidate_list_client->async_send_request(
+      approved_list_request);
+
+  ASSERT_EQ(
+    executor.spin_until_future_complete(
+      approved_list_future,
+      2s),
+    rclcpp::FutureReturnCode::SUCCESS);
+
+  const auto approved_list_response =
+    approved_list_future.get();
+
+  ASSERT_TRUE(approved_list_response->success);
+  ASSERT_EQ(approved_list_response->candidates.size(), 1U);
+  EXPECT_EQ(
+    approved_list_response->candidates.front().state,
+    savo_msgs::msg::LocationCandidate::STATE_APPROVED);
 
   auto disable_request =
     std::make_shared<
@@ -555,4 +658,208 @@ TEST(RegistryWriteNode, EventFailureRollsBackAndDisablesWrites)
   EXPECT_TRUE(snapshot.candidates.empty());
   EXPECT_TRUE(snapshot.locations.empty());
   EXPECT_EQ(report.event_count, 0U);
+}
+
+
+TEST(RegistryWriteNode, RejectsCandidateAndPublishesCommittedEvent)
+{
+  RclcppGuard guard;
+
+  const auto path = database_path(
+    "loc_candidate_rejection.sqlite3");
+
+  auto registry = std::make_shared<
+    savo_locations::LocationRegistryNode>(node_options(path));
+  auto client_node = std::make_shared<rclcpp::Node>(
+    "savo_locations_rejection_test_client");
+
+  auto register_client = client_node->create_client<
+    savo_msgs::srv::RegisterLocationCandidate>(
+      "/savo_locations/candidates/register");
+  auto reject_client = client_node->create_client<
+    savo_msgs::srv::RejectLocationCandidate>(
+      "/savo_locations/candidates/reject");
+  auto list_client = client_node->create_client<
+    savo_msgs::srv::ListLocationCandidates>(
+      "/savo_locations/candidates/list");
+
+  std::vector<savo_msgs::msg::LocationEvent> events;
+  auto subscription = client_node->create_subscription<
+    savo_msgs::msg::LocationEvent>(
+      "/savo_locations/events",
+      rclcpp::QoS(rclcpp::KeepLast(100)).reliable(),
+      [&events](const savo_msgs::msg::LocationEvent & event)
+      {
+        events.push_back(event);
+      });
+
+  rclcpp::executors::SingleThreadedExecutor executor;
+  executor.add_node(registry);
+  executor.add_node(client_node);
+
+  ASSERT_TRUE(wait_for_service(executor, register_client));
+  ASSERT_TRUE(wait_for_service(executor, reject_client));
+  ASSERT_TRUE(wait_for_service(executor, list_client));
+
+  auto register_request = std::make_shared<
+    savo_msgs::srv::RegisterLocationCandidate::Request>();
+  register_request->candidate = make_candidate();
+  register_request->actor_id = "mapping_operator";
+
+  auto register_future = register_client->async_send_request(
+    register_request);
+  ASSERT_EQ(
+    executor.spin_until_future_complete(register_future, 2s),
+    rclcpp::FutureReturnCode::SUCCESS);
+  ASSERT_TRUE(register_future.get()->registered);
+
+  auto reject_request = std::make_shared<
+    savo_msgs::srv::RejectLocationCandidate::Request>();
+  reject_request->candidate_id = "candidate-campus-main-27";
+  reject_request->expected_candidate_revision = 1U;
+  reject_request->actor_id = "location_operator";
+  reject_request->rejection_reason = "duplicate doorway marker";
+
+  auto reject_future = reject_client->async_send_request(
+    reject_request);
+  ASSERT_EQ(
+    executor.spin_until_future_complete(reject_future, 2s),
+    rclcpp::FutureReturnCode::SUCCESS);
+
+  const auto response = reject_future.get();
+  ASSERT_TRUE(response->rejected) << response->reason;
+  EXPECT_EQ(
+    response->result_code,
+    savo_msgs::srv::RejectLocationCandidate::Response::RESULT_REJECTED);
+  EXPECT_EQ(
+    response->candidate.state,
+    savo_msgs::msg::LocationCandidate::STATE_REJECTED);
+  EXPECT_EQ(response->candidate.candidate_revision, 2U);
+  EXPECT_EQ(
+    response->candidate.review_reason,
+    "duplicate doorway marker");
+
+  auto list_request = std::make_shared<
+    savo_msgs::srv::ListLocationCandidates::Request>();
+  list_request->state_filter =
+    savo_msgs::srv::ListLocationCandidates::Request::
+      STATE_FILTER_REJECTED;
+
+  auto list_future = list_client->async_send_request(list_request);
+  ASSERT_EQ(
+    executor.spin_until_future_complete(list_future, 2s),
+    rclcpp::FutureReturnCode::SUCCESS);
+  const auto list_response = list_future.get();
+  ASSERT_TRUE(list_response->success);
+  ASSERT_EQ(list_response->candidates.size(), 1U);
+  EXPECT_EQ(
+    list_response->candidates.front().candidate_id,
+    "candidate-campus-main-27");
+  EXPECT_EQ(
+    list_response->candidates.front().state,
+    savo_msgs::msg::LocationCandidate::STATE_REJECTED);
+
+  for (int attempt = 0; attempt < 50 && events.size() < 2U; ++attempt) {
+    executor.spin_some();
+    rclcpp::sleep_for(10ms);
+  }
+
+  ASSERT_GE(events.size(), 2U);
+  EXPECT_EQ(
+    events.back().event_type,
+    savo_msgs::msg::LocationEvent::EVENT_CANDIDATE_REJECTED);
+  EXPECT_EQ(events.back().entity_revision, 2U);
+}
+
+
+TEST(RegistryWriteNode, CandidateListFiltersAndSorts)
+{
+  RclcppGuard guard;
+
+  const auto path = database_path(
+    "loc3b2_candidate_list.sqlite3");
+
+  auto registry =
+    std::make_shared<
+      savo_locations::LocationRegistryNode>(
+        node_options(path));
+
+  auto client_node =
+    std::make_shared<rclcpp::Node>(
+      "savo_locations_candidate_list_test_client");
+
+  auto register_client =
+    client_node->create_client<
+      savo_msgs::srv::RegisterLocationCandidate>(
+        "/savo_locations/candidates/register");
+
+  auto list_client =
+    client_node->create_client<
+      savo_msgs::srv::ListLocationCandidates>(
+        "/savo_locations/candidates/list");
+
+  rclcpp::executors::SingleThreadedExecutor executor;
+  executor.add_node(registry);
+  executor.add_node(client_node);
+
+  ASSERT_TRUE(wait_for_service(executor, register_client));
+  ASSERT_TRUE(wait_for_service(executor, list_client));
+
+  auto first = make_candidate();
+  first.candidate_id = "candidate-campus-main-27";
+
+  auto second = make_candidate();
+  second.candidate_id = "candidate-campus-main-11";
+  second.tag_id = 11;
+  second.suggested_location_id = "A101";
+  second.suggested_display_name = "Room A101";
+
+  for (const auto & candidate : {first, second}) {
+    auto request = std::make_shared<
+      savo_msgs::srv::RegisterLocationCandidate::Request>();
+    request->candidate = candidate;
+    request->actor_id = "mapping_operator";
+
+    auto future = register_client->async_send_request(request);
+    ASSERT_EQ(
+      executor.spin_until_future_complete(future, 2s),
+      rclcpp::FutureReturnCode::SUCCESS);
+    ASSERT_TRUE(future.get()->registered);
+  }
+
+  auto request = std::make_shared<
+    savo_msgs::srv::ListLocationCandidates::Request>();
+  request->state_filter =
+    savo_msgs::srv::ListLocationCandidates::Request::
+      STATE_FILTER_PENDING;
+  request->enforce_map_context = true;
+  request->map_id = "campus_main";
+  request->map_revision = 7U;
+
+  auto future = list_client->async_send_request(request);
+  ASSERT_EQ(
+    executor.spin_until_future_complete(future, 2s),
+    rclcpp::FutureReturnCode::SUCCESS);
+
+  const auto response = future.get();
+  ASSERT_TRUE(response->success);
+  ASSERT_EQ(response->candidates.size(), 2U);
+  EXPECT_EQ(
+    response->candidates[0].candidate_id,
+    "candidate-campus-main-11");
+  EXPECT_EQ(
+    response->candidates[1].candidate_id,
+    "candidate-campus-main-27");
+
+  request->state_filter = 99U;
+  auto invalid_future = list_client->async_send_request(request);
+  ASSERT_EQ(
+    executor.spin_until_future_complete(invalid_future, 2s),
+    rclcpp::FutureReturnCode::SUCCESS);
+  const auto invalid_response = invalid_future.get();
+  EXPECT_FALSE(invalid_response->success);
+  EXPECT_EQ(
+    invalid_response->result_code,
+    savo_msgs::srv::ListLocationCandidates::Response::
+      RESULT_INVALID_FILTER);
 }

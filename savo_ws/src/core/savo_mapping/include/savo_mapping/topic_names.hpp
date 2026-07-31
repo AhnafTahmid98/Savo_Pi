@@ -24,6 +24,8 @@ inline constexpr std::string_view DEPTH_POINTS = "/depth/color/points";
 // Semantic input from savo_head
 inline constexpr std::string_view HEAD_SEMANTIC_CONFIRMATIONS =
   "/savo_head/semantic_confirmations";
+inline constexpr std::string_view LOCATION_EVENTS =
+  "/savo_locations/events";
 
 // Mapping status outputs
 inline constexpr std::string_view STATUS = "/savo_mapping/status";
@@ -43,6 +45,16 @@ inline constexpr std::string_view MAP_QUALITY = "/savo_mapping/map_quality";
 inline constexpr std::string_view MAP_SAVED = "/savo_mapping/map_saved";
 inline constexpr std::string_view EXPLORATION_STATUS = "/savo_mapping/exploration_status";
 inline constexpr std::string_view SEMANTIC_EVENTS = "/savo_mapping/semantic_events";
+inline constexpr std::string_view SEMANTIC_STATUS =
+  "/savo_mapping/semantic/status";
+inline constexpr std::string_view SEMANTIC_HEARTBEAT =
+  "/savo_mapping/semantic/heartbeat";
+inline constexpr std::string_view LOCATION_REVIEW_STATUS =
+  "/savo_mapping/locations/review/status";
+inline constexpr std::string_view LOCATION_REVIEW_RESULTS =
+  "/savo_mapping/locations/review/results";
+inline constexpr std::string_view LOCATION_REVIEW_HEARTBEAT =
+  "/savo_mapping/locations/review/heartbeat";
 inline constexpr std::string_view DASHBOARD = "/savo_mapping/dashboard";
 
 // Mapping command topics

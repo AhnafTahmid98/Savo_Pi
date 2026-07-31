@@ -17,9 +17,13 @@ def test_location_interfaces_registered() -> None:
         "msg/LocationEvent.msg",
         "srv/ResolveLocation.srv",
         "srv/GetLocation.srv",
+        "srv/GetLocationCandidate.srv",
+        "srv/ListLocationCandidates.srv",
         "srv/ListLocations.srv",
         "srv/RegisterLocationCandidate.srv",
         "srv/ApproveLocation.srv",
+        "srv/RejectLocationCandidate.srv",
+        "srv/ReviewLocationCandidate.srv",
         "srv/SetLocationEnabled.srv",
         "srv/RecoverLocationStorage.srv",
     ):
@@ -56,6 +60,11 @@ def test_revision_guards() -> None:
     )
 
     assert (
+        "uint64 expected_candidate_revision"
+        in read("srv/RejectLocationCandidate.srv")
+    )
+
+    assert (
         "uint64 expected_record_revision"
         in read("srv/SetLocationEnabled.srv")
     )
@@ -72,3 +81,37 @@ def test_storage_recovery_contract() -> None:
         "uint64 last_event_sequence",
     ):
         assert token in text
+
+
+def test_location_review_gateway_contract() -> None:
+    lookup = read("srv/GetLocationCandidate.srv")
+    candidate_list = read("srv/ListLocationCandidates.srv")
+    review = read("srv/ReviewLocationCandidate.srv")
+
+    for token in (
+        "string candidate_id",
+        "RESULT_FOUND=0",
+        "savo_msgs/LocationCandidate candidate",
+    ):
+        assert token in lookup
+
+    for token in (
+        "STATE_FILTER_PENDING=1",
+        "bool enforce_map_context",
+        "savo_msgs/LocationCandidate[] candidates",
+        "RESULT_INVALID_FILTER=1",
+    ):
+        assert token in candidate_list
+
+    for token in (
+        "DECISION_APPROVE=1",
+        "DECISION_REJECT=2",
+        "string request_id",
+        "uint64 expected_candidate_revision",
+        "string rejection_reason",
+        "RESULT_SUPERVISOR_DENIED=7",
+        "RESULT_STALE_REVISION=6",
+        "bool completed",
+        "savo_msgs/LocationRecord location",
+    ):
+        assert token in review

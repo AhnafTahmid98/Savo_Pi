@@ -2382,6 +2382,134 @@ SnapshotResult validate_registration_delta(
 }
 
 
+SnapshotResult validate_rejection_delta(
+  const CatalogSnapshot & current,
+  const CandidateRejectionCommit & request)
+{
+  const auto & post =
+    request.post_rejection_snapshot;
+
+  const auto * current_candidate =
+    find_candidate(
+      current,
+      request.candidate_id);
+
+  if (current_candidate == nullptr) {
+    return snapshot_failure(
+      SnapshotCode::kCandidateRejectionDeltaInvalid,
+      SQLITE_NOTFOUND,
+      "rejection candidate does not exist");
+  }
+
+  if (
+    current_candidate->state !=
+    CandidateState::kPendingReview)
+  {
+    return snapshot_failure(
+      SnapshotCode::kCandidateRejectionDeltaInvalid,
+      SQLITE_CONSTRAINT,
+      "rejection candidate is not pending");
+  }
+
+  if (
+    current_candidate->candidate_revision !=
+    request.expected_candidate_revision)
+  {
+    return snapshot_failure(
+      SnapshotCode::kStaleRevision,
+      SQLITE_BUSY,
+      "candidate revision is stale");
+  }
+
+  if (
+    post.locations.size() !=
+    current.locations.size())
+  {
+    return snapshot_failure(
+      SnapshotCode::kCandidateRejectionDeltaInvalid,
+      SQLITE_CONSTRAINT,
+      "candidate rejection changed locations");
+  }
+
+  for (const auto & previous : current.locations) {
+    const auto * next = find_location(
+      post,
+      previous.location.location_id);
+
+    if (
+      next == nullptr ||
+      !same_location_record(previous, *next))
+    {
+      return snapshot_failure(
+        SnapshotCode::kCandidateRejectionDeltaInvalid,
+        SQLITE_CONSTRAINT,
+        "candidate rejection changed an existing location");
+    }
+  }
+
+  if (
+    post.candidates.size() !=
+    current.candidates.size())
+  {
+    return snapshot_failure(
+      SnapshotCode::kCandidateRejectionDeltaInvalid,
+      SQLITE_CONSTRAINT,
+      "candidate rejection changed candidate count");
+  }
+
+  for (const auto & previous : current.candidates) {
+    const auto * next = find_candidate(
+      post,
+      previous.candidate.candidate_id);
+
+    if (next == nullptr) {
+      return snapshot_failure(
+        SnapshotCode::kCandidateRejectionDeltaInvalid,
+        SQLITE_CONSTRAINT,
+        "candidate rejection removed a candidate");
+    }
+
+    if (
+      previous.candidate.candidate_id ==
+      request.candidate_id)
+    {
+      continue;
+    }
+
+    if (!same_candidate_record(previous, *next)) {
+      return snapshot_failure(
+        SnapshotCode::kCandidateRejectionDeltaInvalid,
+        SQLITE_CONSTRAINT,
+        "candidate rejection changed an unrelated candidate");
+    }
+  }
+
+  const auto * rejected = find_candidate(
+    post,
+    request.candidate_id);
+
+  if (
+    rejected == nullptr ||
+    rejected->state != CandidateState::kRejected ||
+    rejected->candidate_revision !=
+      request.expected_candidate_revision + 1U ||
+    trim_ascii(rejected->review_reason).empty() ||
+    !rejected->approved_location_id.empty() ||
+    !same_candidate_draft(
+      current_candidate->candidate,
+      rejected->candidate))
+  {
+    return snapshot_failure(
+      SnapshotCode::kCandidateRejectionDeltaInvalid,
+      SQLITE_CONSTRAINT,
+      "candidate rejection transition is invalid");
+  }
+
+  return snapshot_success(
+    "candidate rejection delta is valid");
+}
+
+
 SnapshotResult validate_location_enabled_delta(
   const CatalogSnapshot & current,
   const LocationEnabledCommit & request)
@@ -2798,6 +2926,10 @@ std::string_view to_string(
     case SnapshotCode::
         kCandidateRegistrationDeltaInvalid:
       return "candidate_registration_delta_invalid";
+
+    case SnapshotCode::
+        kCandidateRejectionDeltaInvalid:
+      return "candidate_rejection_delta_invalid";
 
     case SnapshotCode::kApprovalDeltaInvalid:
       return "approval_delta_invalid";
@@ -3662,6 +3794,187 @@ SqliteRepository::commit_candidate_registration(
 
   return snapshot_success(
     "candidate registration persisted atomically");
+}
+
+
+SnapshotResult
+SqliteRepository::commit_candidate_rejection(
+  const CandidateRejectionCommit & request,
+  std::uint64_t * event_sequence)
+{
+  if (
+    trim_ascii(request.candidate_id).empty() ||
+    request.expected_candidate_revision == 0U ||
+    request.expected_candidate_revision ==
+      std::numeric_limits<std::uint64_t>::max() ||
+    trim_ascii(request.actor_id).empty() ||
+    trim_ascii(request.reason).empty())
+  {
+    return snapshot_failure(
+      SnapshotCode::kInvalidArgument,
+      SQLITE_MISUSE,
+      "rejection identity, incrementable revision, actor and reason are required");
+  }
+
+  const auto post_validation =
+    validate_snapshot(
+      request.post_rejection_snapshot);
+
+  if (!post_validation.success) {
+    return post_validation;
+  }
+
+  std::lock_guard<std::mutex> lock{
+    store_.mutex_};
+
+  if (store_.database_ == nullptr) {
+    return snapshot_failure(
+      SnapshotCode::kStoreNotOpen,
+      SQLITE_MISUSE,
+      "SQLite store is not open");
+  }
+
+  if (store_.transaction_active_) {
+    return snapshot_failure(
+      SnapshotCode::kTransactionActive,
+      SQLITE_BUSY,
+      "SQLite store already has an active transaction");
+  }
+
+  int code = execute_sql(
+    store_.database_,
+    "BEGIN IMMEDIATE;");
+
+  if (code != SQLITE_OK) {
+    return sqlite_failure(
+      store_.database_,
+      code,
+      "could not begin candidate rejection transaction");
+  }
+
+  store_.transaction_active_ = true;
+  store_.transaction_owner_ =
+    std::this_thread::get_id();
+
+  auto rollback =
+    [&]()
+    {
+      static_cast<void>(
+        execute_sql(
+          store_.database_,
+          "ROLLBACK;"));
+
+      store_.transaction_active_ = false;
+      store_.transaction_owner_ =
+        std::thread::id{};
+    };
+
+  CatalogSnapshot current;
+
+  auto result = read_locations(
+    store_.database_,
+    &current);
+
+  if (!result.success) {
+    rollback();
+    return result;
+  }
+
+  result = read_candidates(
+    store_.database_,
+    &current);
+
+  if (!result.success) {
+    rollback();
+    return result;
+  }
+
+  result = validate_snapshot(current);
+
+  if (!result.success) {
+    rollback();
+    result.code = SnapshotCode::kCorruptData;
+    result.sqlite_code = SQLITE_CORRUPT;
+    result.reason =
+      "persisted pre-rejection catalog is invalid: " +
+      result.reason;
+    return result;
+  }
+
+  result = validate_rejection_delta(
+    current,
+    request);
+
+  if (!result.success) {
+    rollback();
+    return result;
+  }
+
+  const std::int64_t timestamp = unix_time_ns();
+
+  code = replace_snapshot_rows(
+    store_.database_,
+    request.post_rejection_snapshot,
+    timestamp);
+
+  if (code != SQLITE_OK) {
+    rollback();
+    return sqlite_failure(
+      store_.database_,
+      code,
+      "could not persist candidate rejection");
+  }
+
+  PersistenceEvent event;
+  event.event_time_unix_ns = timestamp;
+  event.event_type =
+    PersistenceEventType::kCandidateRejected;
+  event.candidate_id = request.candidate_id;
+  event.entity_revision =
+    request.expected_candidate_revision + 1U;
+  event.actor_id = request.actor_id;
+  event.reason = request.reason;
+  event.payload_json =
+    request.payload_json.empty() ?
+      "{}" : request.payload_json;
+
+  std::uint64_t inserted_sequence = 0U;
+
+  code = insert_event_row(
+    store_.database_,
+    event,
+    &inserted_sequence);
+
+  if (code != SQLITE_OK) {
+    rollback();
+    return snapshot_failure(
+      SnapshotCode::kEventJournalError,
+      code,
+      "candidate rejection event append failed; snapshot was rolled back");
+  }
+
+  code = execute_sql(
+    store_.database_,
+    "COMMIT;");
+
+  if (code != SQLITE_OK) {
+    rollback();
+    return sqlite_failure(
+      store_.database_,
+      code,
+      "could not commit candidate rejection transaction");
+  }
+
+  store_.transaction_active_ = false;
+  store_.transaction_owner_ =
+    std::thread::id{};
+
+  if (event_sequence != nullptr) {
+    *event_sequence = inserted_sequence;
+  }
+
+  return snapshot_success(
+    "candidate rejection persisted atomically");
 }
 
 

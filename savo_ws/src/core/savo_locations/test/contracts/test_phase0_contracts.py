@@ -106,9 +106,12 @@ def test_service_and_topic_names_are_locked() -> None:
     for name in (
         "/savo_locations/resolve",
         "/savo_locations/get",
+        "/savo_locations/candidates/get",
+        "/savo_locations/candidates/list",
         "/savo_locations/list",
         "/savo_locations/candidates/register",
         "/savo_locations/candidates/approve",
+        "/savo_locations/candidates/reject",
         "/savo_locations/set_enabled",
     ):
         assert name in services

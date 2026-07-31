@@ -84,7 +84,7 @@ IMMUTABLE_HASHES = {
     'test/test_scan360_quality.cpp':
         '7075dea04abc7e737617ba3241dddc1599122c9c015970bc1f23cf37cb017c49',
     'package.xml':
-        'fa2cf79fff914fa222b89038999c45a84ca296223685860578f5ff245227684a',
+        'd5151971a13db517151b2fa7014ab926cbadf8733b9281b1b39a79ba8ae261cd',
 }
 
 

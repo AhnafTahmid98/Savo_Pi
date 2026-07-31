@@ -30,6 +30,8 @@ bool operation_enabled(
       return policy.allow_navigation;
     case LocationOperation::kConfirmArrival:
       return policy.allow_arrival_confirmation;
+    case LocationOperation::kRejectLocationCandidate:
+      return policy.allow_rejection;
   }
   return false;
 }
@@ -52,6 +54,27 @@ LocationAuthorizationDecision LocationAuthorizationEvaluator::Evaluate(
     return reject(
       LocationAuthorizationCode::kInvalidRequest,
       "request_actor_and_map_context_required");
+  }
+
+  if (
+    (request.operation == LocationOperation::kRegisterCandidate ||
+    request.operation == LocationOperation::kApproveLocation ||
+    request.operation == LocationOperation::kRejectLocationCandidate) &&
+    request.candidate_id.empty())
+  {
+    return reject(
+      LocationAuthorizationCode::kInvalidRequest,
+      "candidate_identity_required");
+  }
+
+  if (
+    (request.operation == LocationOperation::kNavigateToLocation ||
+    request.operation == LocationOperation::kConfirmArrival) &&
+    request.location_id.empty())
+  {
+    return reject(
+      LocationAuthorizationCode::kInvalidRequest,
+      "location_identity_required");
   }
 
   if (!operation_enabled(policy_, request.operation)) {

@@ -9,3 +9,37 @@ mapped_location_registration_node:
     minimum_tag_to_approach_distance_m: 0.20
     default_approach_distance_m: 0.80
     derive_missing_approach_pose: true
+
+semantic_landmark_bridge_node:
+  ros__parameters:
+    head_confirmations_topic: /savo_head/semantic_confirmations
+    location_events_topic: /savo_locations/events
+    mapping_mode_topic: /savo_mapping/mode
+    session_state_topic: /savo_mapping/session_state
+    semantic_events_topic: /savo_mapping/semantic_events
+    status_topic: /savo_mapping/semantic/status
+    heartbeat_topic: /savo_mapping/semantic/heartbeat
+    registration_action: /savo_mapping/locations/register
+
+    # The legacy head confirmation stream is an operator prompt hint only.
+    # The registration action always asks savo_head for fresh typed evidence.
+    publish_head_rejections: false
+    require_active_mapping_session: true
+    deduplication_window_s: 3.0
+    status_publish_hz: 1.0
+    heartbeat_publish_hz: 2.0
+
+location_review_gateway_node:
+  ros__parameters:
+    service_name: /savo_mapping/locations/review
+    candidate_lookup_service: /savo_locations/candidates/get
+    authorization_service: /savo_supervisor/authorize_location_operation
+    approval_service: /savo_locations/candidates/approve
+    rejection_service: /savo_locations/candidates/reject
+    status_topic: /savo_mapping/locations/review/status
+    result_topic: /savo_mapping/locations/review/results
+    heartbeat_topic: /savo_mapping/locations/review/heartbeat
+    dependency_wait_timeout_s: 2.0
+    operation_timeout_s: 5.0
+    status_publish_hz: 1.0
+    heartbeat_publish_hz: 2.0

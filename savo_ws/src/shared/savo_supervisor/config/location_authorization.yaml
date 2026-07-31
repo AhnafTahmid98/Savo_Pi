@@ -3,6 +3,7 @@ savo_supervisor_node:
     location_authorization.service_name: /savo_supervisor/authorize_location_operation
     location_authorization.allow_registration: true
     location_authorization.allow_approval: true
+    location_authorization.allow_rejection: true
     location_authorization.allow_navigation: true
     location_authorization.allow_arrival_confirmation: true
     location_authorization.allow_degraded_non_motion: true

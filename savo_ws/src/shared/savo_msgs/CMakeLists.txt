@@ -53,9 +53,13 @@ set(action_files
 set(srv_files
   "srv/ResolveLocation.srv"
   "srv/GetLocation.srv"
+  "srv/GetLocationCandidate.srv"
+  "srv/ListLocationCandidates.srv"
   "srv/ListLocations.srv"
   "srv/RegisterLocationCandidate.srv"
   "srv/ApproveLocation.srv"
+  "srv/RejectLocationCandidate.srv"
+  "srv/ReviewLocationCandidate.srv"
   "srv/SetLocationEnabled.srv"
   "srv/RecoverLocationStorage.srv"
   "srv/AuthorizeLocationOperation.srv"

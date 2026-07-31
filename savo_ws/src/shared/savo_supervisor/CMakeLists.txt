@@ -136,6 +136,12 @@ if(BUILD_TESTING)
   set(ament_cmake_copyright_FOUND TRUE)
 
   find_package(ament_lint_auto REQUIRED)
+
+  # Cppcheck 2.13 cannot parse part of this GoogleTest source.
+  # The test remains compiled and executed normally.
+  set(AMENT_LINT_AUTO_FILE_EXCLUDE
+    "test/test_location_authorization_policy.cpp"
+  )
   ament_lint_auto_find_test_dependencies()
 
   find_package(ament_cmake_gtest REQUIRED)

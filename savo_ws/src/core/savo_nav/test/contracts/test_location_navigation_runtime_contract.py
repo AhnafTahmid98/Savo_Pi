@@ -35,6 +35,10 @@ def test_semantic_navigation_runtime_is_approach_pose_only() -> None:
     assert 'navigate_to_location_node' in cmake
     assert 'fake_location_nav2_server_node' in cmake
     assert 'goal_publisher_->publish(goal_handle->get_goal()->pose)' in fixture
+    assert 'ReviewLocationCandidate' in smoke
+    assert '/savo_mapping/locations/review' in smoke
+    assert 'location_review_gateway_node' in smoke
+    assert '/savo_locations/candidates/approve' not in smoke
     assert 'LOC-3P-C2-C5 INTEGRATION SMOKE TEST: PASS' in smoke
     assert 'allocate_ros_domain_id' in smoke
     assert 'start_new_session=True' in smoke

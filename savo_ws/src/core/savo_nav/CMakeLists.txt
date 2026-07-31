@@ -259,6 +259,7 @@ install(
 install(
   PROGRAMS
     scripts/run_location_integration_smoke
+    scripts/run_mapping_nav_preflight
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -611,6 +612,18 @@ if(BUILD_TESTING)
     TIMEOUT 60
   )
 
+  ament_add_pytest_test(
+    test_live_mapping_navigation_contracts
+    test/contracts/test_live_mapping_navigation_contracts.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
+    test_real_robot_preflight_contracts
+    test/contracts/test_real_robot_preflight_contracts.py
+    TIMEOUT 60
+  )
+
   ament_add_gtest(
     test_location_navigation_contract
     test/unit/test_location_navigation_contract.cpp
@@ -623,7 +636,23 @@ if(BUILD_TESTING)
     )
   endif()
 
+  # Robot Savo: register cppcheck separately so the production
+  # implementation remains checked while GoogleTest macro sources are excluded.
+  list(APPEND AMENT_LINT_AUTO_EXCLUDE ament_cmake_cppcheck)
+
   ament_lint_auto_find_test_dependencies()
+
+  find_package(ament_cmake_cppcheck REQUIRED)
+
+  file(GLOB SAVO_NAV_CPPCHECK_UNIT_TEST_FILES
+    RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/test/unit/*.cpp"
+  )
+
+  ament_cppcheck(
+    EXCLUDE
+      ${SAVO_NAV_CPPCHECK_UNIT_TEST_FILES}
+  )
 endif()
 
 ament_package()

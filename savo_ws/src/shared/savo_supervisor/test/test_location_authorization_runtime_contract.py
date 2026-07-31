@@ -17,6 +17,8 @@ def test_supervisor_exposes_permission_only_service() -> None:
     assert 'AuthorizeLocationOperation' in source
     assert 'LocationAuthorizationEvaluator' in source
     assert 'OP_NAVIGATE_TO_LOCATION' in source
+    assert 'OP_REJECT_LOCATION_CANDIDATE' in source
+    assert 'allow_rejection' in source
     assert 'motion_required ||' in source
     assert 'location_authorization_code_to_ros' in source
 

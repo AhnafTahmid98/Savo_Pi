@@ -385,7 +385,6 @@ TEST(MonitorOnlyPolicyContract, RejectsUnsupportedOptionalFeatures)
   policy.voxel_obstacle_monitoring_enabled = false;
   policy.semantic_mapping_enabled = true;
 
-  EXPECT_EQ(
-    savo_mapping::validate_monitor_only_policy(policy),
-    "semantic_mapping_not_implemented");
+  EXPECT_TRUE(
+    savo_mapping::validate_monitor_only_policy(policy).empty());
 }

@@ -17,6 +17,7 @@ enum class LocationOperation : std::uint8_t
   kApproveLocation = 2U,
   kNavigateToLocation = 3U,
   kConfirmArrival = 4U,
+  kRejectLocationCandidate = 5U,
 };
 
 enum class LocationAuthorizationCode : std::uint8_t
@@ -46,6 +47,7 @@ struct LocationAuthorizationPolicy
 {
   bool allow_registration{true};
   bool allow_approval{true};
+  bool allow_rejection{true};
   bool allow_navigation{true};
   bool allow_arrival_confirmation{true};
   bool allow_degraded_non_motion{true};

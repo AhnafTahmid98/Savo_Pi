@@ -40,8 +40,9 @@ launch_chain_fail_closed: true
 savo_nav_control_authority: false
 savo_nav_recovery_execution_authority: false
 phase8_costmap_sensor_integration_enabled: false
-phase8_blocked_reason: filtered_realsense_producer_missing
-filtered_realsense_producer_verified: false
+phase8_blocked_reason: real_d435_hardware_validation_pending
+filtered_realsense_producer_verified: true
+filtered_realsense_hardware_validated: false
 raw_realsense_cloud_for_nav2: false
 filtered_realsense_cloud_topic: /savo_perception/obstacles/points
 realsense_global_costmap_enabled: false

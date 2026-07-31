@@ -31,6 +31,11 @@
     default="$(find-pkg-share savo_mapping)/config/slam_toolbox_mapping.yaml"
     description="Full path to the slam_toolbox mapping parameters"/>
 
+  <arg
+    name="semantic_mapping_enabled"
+    default="false"
+    description="Enable the read-only semantic mapping integration"/>
+
   <node
     pkg="savo_mapping"
     exec="mapping_mode_manager_node"
@@ -73,6 +78,10 @@
 
     <param
       from="$(find-pkg-share savo_mapping)/config/profiles/manual_mapping.yaml"/>
+
+    <param
+      name="optional_features.semantic_mapping_enabled"
+      value="$(var semantic_mapping_enabled)"/>
 
     <param
       name="use_sim_time"

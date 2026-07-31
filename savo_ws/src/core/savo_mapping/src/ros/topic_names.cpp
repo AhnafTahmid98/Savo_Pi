@@ -42,6 +42,11 @@ bool is_mapping_status_topic(std::string_view topic)
          topic == MAP_SAVED ||
          topic == EXPLORATION_STATUS ||
          topic == SEMANTIC_EVENTS ||
+         topic == SEMANTIC_STATUS ||
+         topic == SEMANTIC_HEARTBEAT ||
+         topic == LOCATION_REVIEW_STATUS ||
+         topic == LOCATION_REVIEW_RESULTS ||
+         topic == LOCATION_REVIEW_HEARTBEAT ||
          topic == DASHBOARD;
 }
 

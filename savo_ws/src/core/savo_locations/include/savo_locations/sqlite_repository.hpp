@@ -27,6 +27,7 @@ enum class SnapshotCode : std::uint8_t
   kCorruptData,
   kStaleRevision,
   kCandidateRegistrationDeltaInvalid,
+  kCandidateRejectionDeltaInvalid,
   kApprovalDeltaInvalid,
   kLocationEnabledDeltaInvalid,
   kEventJournalError,
@@ -115,6 +116,21 @@ struct CandidateRegistrationCommit
 };
 
 
+struct CandidateRejectionCommit
+{
+  std::string candidate_id;
+
+  std::uint64_t
+    expected_candidate_revision{0U};
+
+  std::string actor_id;
+  std::string reason;
+  std::string payload_json{"{}"};
+
+  CatalogSnapshot post_rejection_snapshot;
+};
+
+
 struct CandidateApprovalCommit
 {
   std::string candidate_id;
@@ -182,6 +198,11 @@ SnapshotResult list_events(
 [[nodiscard]]
 SnapshotResult commit_candidate_registration(
   const CandidateRegistrationCommit & request,
+  std::uint64_t * event_sequence);
+
+[[nodiscard]]
+SnapshotResult commit_candidate_rejection(
+  const CandidateRejectionCommit & request,
   std::uint64_t * event_sequence);
 
 [[nodiscard]]

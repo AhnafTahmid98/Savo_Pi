@@ -24,6 +24,9 @@ TEST(TopicNamesContract, EdgeAndSemanticInputTopicsAreStable)
   EXPECT_EQ(
     std::string{savo_mapping::topics::HEAD_SEMANTIC_CONFIRMATIONS},
     "/savo_head/semantic_confirmations");
+  EXPECT_EQ(
+    std::string{savo_mapping::topics::LOCATION_EVENTS},
+    "/savo_locations/events");
 }
 
 TEST(TopicNamesContract, MappingOutputTopicsAreStable)
@@ -38,6 +41,21 @@ TEST(TopicNamesContract, MappingOutputTopicsAreStable)
   EXPECT_EQ(std::string{savo_mapping::topics::EXPLORATION_STATUS},
     "/savo_mapping/exploration_status");
   EXPECT_EQ(std::string{savo_mapping::topics::SEMANTIC_EVENTS}, "/savo_mapping/semantic_events");
+  EXPECT_EQ(
+    std::string{savo_mapping::topics::SEMANTIC_STATUS},
+    "/savo_mapping/semantic/status");
+  EXPECT_EQ(
+    std::string{savo_mapping::topics::SEMANTIC_HEARTBEAT},
+    "/savo_mapping/semantic/heartbeat");
+  EXPECT_EQ(
+    std::string{savo_mapping::topics::LOCATION_REVIEW_STATUS},
+    "/savo_mapping/locations/review/status");
+  EXPECT_EQ(
+    std::string{savo_mapping::topics::LOCATION_REVIEW_RESULTS},
+    "/savo_mapping/locations/review/results");
+  EXPECT_EQ(
+    std::string{savo_mapping::topics::LOCATION_REVIEW_HEARTBEAT},
+    "/savo_mapping/locations/review/heartbeat");
   EXPECT_EQ(std::string{savo_mapping::topics::DASHBOARD}, "/savo_mapping/dashboard");
 }
 
@@ -122,6 +140,16 @@ TEST(TopicNamesContract, ClassifiesMappingStatusTopics)
   EXPECT_TRUE(savo_mapping::topics::is_mapping_status_topic(
     savo_mapping::topics::EXPLORATION_STATUS));
   EXPECT_TRUE(savo_mapping::topics::is_mapping_status_topic(savo_mapping::topics::SEMANTIC_EVENTS));
+  EXPECT_TRUE(savo_mapping::topics::is_mapping_status_topic(
+    savo_mapping::topics::SEMANTIC_STATUS));
+  EXPECT_TRUE(savo_mapping::topics::is_mapping_status_topic(
+    savo_mapping::topics::SEMANTIC_HEARTBEAT));
+  EXPECT_TRUE(savo_mapping::topics::is_mapping_status_topic(
+    savo_mapping::topics::LOCATION_REVIEW_STATUS));
+  EXPECT_TRUE(savo_mapping::topics::is_mapping_status_topic(
+    savo_mapping::topics::LOCATION_REVIEW_RESULTS));
+  EXPECT_TRUE(savo_mapping::topics::is_mapping_status_topic(
+    savo_mapping::topics::LOCATION_REVIEW_HEARTBEAT));
   EXPECT_TRUE(savo_mapping::topics::is_mapping_status_topic(savo_mapping::topics::DASHBOARD));
 
   EXPECT_FALSE(savo_mapping::topics::is_mapping_status_topic(savo_mapping::topics::SCAN));

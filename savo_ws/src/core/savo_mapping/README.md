@@ -37,7 +37,8 @@ Authority is divided as follows:
 
 - `savo_nav` owns Nav2 and navigation execution.
 - `slam_toolbox` owns map creation and `map -> odom`.
-- `savo_localization` owns `odom -> base_link`.
+- `savo_localization` owns `odom -> base_footprint`.
+- `robot_state_publisher` owns `base_footprint -> base_link`.
 - `savo_mapping` monitors inputs and controls mapping workflow only.
 - RealSense and voxel components here are for semantic mapping support and
   monitoring; they do not own the Nav2 local voxel obstacle layer.
@@ -62,26 +63,63 @@ The current implementation includes:
   rejection, abort, timeout, cancellation, retry, cancellation rejection,
   overdue cancellation, and terminal-result ownership handling.
 
-The validated baseline before Phase 4J-A3 is 352 tests with zero errors, zero
-failures, and zero skipped tests.
+## Current production-capable scope
 
-## Deferred functionality
+The package now includes C++ implementations for:
 
-Zero-byte files for unfinished features are scaffolds, not production
-implementations. Deferred areas include:
+- manual and continued SLAM Toolbox mapping
+- mapping mode and workflow authority management
+- mapping supervision and lifecycle health monitoring
+- map-session save, verification, quality evaluation, release, and cataloging
+- frontier detection, frontier selection, exploration management, and guarded
+  exploration-goal handoff to `savo_nav`
+- coverage planning, explicit execution approval, cancellation, and unified
+  operation orchestration
+- Scan360 planning and guarded rotation through `savo_control`
+- mapped-location registration and semantic landmark core contracts
+- semantic AprilTag prompt/event bridging and location-registry event mirroring
 
-- Frontier detection, selection, and exploration.
-- Exploration and mapping-mode managers.
-- Autonomous and unified mapping bringup.
-- Coverage and Scan360 mapping.
-- Semantic landmark workflow integration.
-- RealSense and voxel mapping monitors.
-- Live map-quality scoring.
-- RViz mapping configurations.
-- Real-robot strategy profiles.
+These paths are ready for staged Pi/robot validation. Hardware-specific tuning
+values remain provisional until measured on the robot.
 
-Deferred scaffolds must not be built or installed until their implementation
-phase is complete and validated.
+## Intentionally deferred or disabled paths
+
+The following files remain non-production scaffolds and are not installed by
+the package:
+
+- unified package-level mapping bringup (`savo_bringup` will own full-system
+  orchestration later)
+- package-owned RealSense/voxel mapping monitors
+- live map-quality scoring beyond the saved-map evaluator
+- optional RViz presets that are not required on either Raspberry Pi
+
+Zero-byte files must not be treated as implemented functionality.
+
+## Semantic mapping and location registration
+
+The semantic entrypoint is:
+
+```bash
+ros2 launch savo_mapping semantic_mapping.launch.xml \
+  map_id:=campus_main \
+  autostart:=true
+```
+
+It starts the normal manual SLAM workflow plus the two mapping-owned semantic
+nodes:
+
+- `semantic_landmark_bridge_node` observes `savo_head` confirmation hints and
+  authoritative `savo_locations` events, then publishes read-only operator/UI
+  events on `/savo_mapping/semantic_events`.
+- `mapped_location_registration_node` owns the typed
+  `/savo_mapping/locations/register` action. It obtains fresh AprilTag evidence
+  from `savo_head`, asks `savo_supervisor` for authorization, validates the
+  map-frame landmark and approach poses, and submits a pending candidate to
+  `savo_locations`.
+
+The bridge never persists locations and never commands motion. Legacy head
+confirmation JSON is explicitly marked as hint-only; the typed registration
+action always requests fresh confirmation evidence before persistence.
 
 ## Interface contract sources
 
@@ -235,7 +273,7 @@ The orchestrator requires both:
 Public operation interfaces:
 
 | Direction | Name | Type |
-|---|---|---|
+| --- | --- | --- |
 | Service | `/savo_mapping/coverage_operation/approve` | `std_srvs/srv/Trigger` |
 | Service | `/savo_mapping/coverage_operation/cancel` | `std_srvs/srv/Trigger` |
 | Service | `/savo_mapping/coverage_operation/reset` | `std_srvs/srv/Trigger` |
@@ -248,3 +286,46 @@ orchestrator does not subscribe to that path, own an action client, publish
 velocity commands or bypass `savo_nav`. If supervisor authorization is lost
 during an active Coverage mission, it can only request cancellation through
 the internal B3F service.
+
+### Supervisor-authorized location review gateway
+
+`location_review_gateway_node` exposes
+`/savo_mapping/locations/review` as the supported operator review boundary. It
+loads the authoritative candidate from `/savo_locations/candidates/get`, checks
+that the candidate is still pending at the expected revision, requests the
+matching non-motion authorization from `savo_supervisor`, and then forwards
+exactly one approval or rejection request to `savo_locations`.
+
+The gateway publishes transient-local status on
+`/savo_mapping/locations/review/status`, terminal JSON results on
+`/savo_mapping/locations/review/results`, and a heartbeat on
+`/savo_mapping/locations/review/heartbeat`. It owns no SQLite storage, map TF,
+head motion, navigation goal, or velocity interface. Raw registry mutation
+services remain package-internal integration boundaries; deployment-level ROS
+security permissions are still required to prevent an unauthorized ROS process
+from calling them directly.
+
+### Operator candidate review CLI
+
+`location_review_cli` is the supported keyboard/terminal fallback for location
+candidate review. It lists the pending queue through
+`/savo_locations/candidates/list`, inspects a candidate through the read-only
+`/savo_locations/candidates/get` service, and sends approval or rejection only
+to `/savo_mapping/locations/review`.
+
+Examples:
+
+```bash
+ros2 run savo_mapping location_review_cli list
+ros2 run savo_mapping location_review_cli inspect candidate-campus-main-27
+ros2 run savo_mapping location_review_cli approve candidate-campus-main-27 \
+  --actor operator-1
+ros2 run savo_mapping location_review_cli reject candidate-campus-main-27 \
+  --actor operator-1 --reason "duplicate doorway marker"
+```
+
+The CLI automatically loads the current candidate revision when `--revision`
+is omitted. The gateway rechecks that revision before authorization, so a
+candidate changed by another operator fails closed as stale. `--json` provides
+schema-versioned machine-readable service responses; usage errors remain
+non-zero process exits with a diagnostic message.

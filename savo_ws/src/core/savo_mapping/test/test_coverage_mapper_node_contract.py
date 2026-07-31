@@ -42,7 +42,7 @@ MIGRATED_CONTRACT_HASHES = {
     'test/test_coverage_core_contract.py':
         'a55b9989c2c4ceb145745a295c6ccd8d297cae389c2e8f65192cd1b8c936fe33',
     'test/test_tf_pose_reader_contract.py':
-        'c670f01568812d677e6a65c39b301afe148a997e27346740be29511b81514de9',
+        '1c06430eedb59feddd7809b0d2cd32d50cb28404c05896c52d074e3e192c6790',
 }
 
 SCAN360_HASHES = {
@@ -83,17 +83,17 @@ SCAN360_HASHES = {
     'test/test_scan360_controller.cpp':
         '46fada4afbe74ba6c3cb498a545d2661e5ab915f9bec5f6a8893aec79c5c9e72',
     'test/test_scan360_deployment_assets_contract.py':
-        '3d57f984e2118fc382da6c41d8d31173bb77507ee269c5afdafba14f5df4cb40',
+        '3d5e5bd49a53dc001e4555668c43b9c4d58f8bef7c221294e60565df24cd99a3',
     'test/test_scan360_launch_runtime.py':
         'b1dbb51a11afde97e34015d854c8b13e3ec20dcdba94a2833d35be3eb27802e9',
     'test/test_scan360_mapper_node_contract.py':
-        '12a41679779f0b39c07d1231331334a61d49775a46b0193ccc0a6a0433d0d755',
+        '954a0d6b6005849771414f0842ae587ce28a4ff86c5871bda32ea281c3b8a49c',
     'test/test_scan360_mapper_node_runtime.py':
         'a262357a208d293dc56d10f16b84fa162f4d0542b8364bab31762ea5a4626d2f',
     'test/test_scan360_orchestrator.cpp':
         '156dd224a8eefb316dcd405c8434a9075d840292df4655ed254344454796888e',
     'test/test_scan360_orchestrator_contract.py':
-        '9b0edd7a5d951f7dbbe11a9e19764c676b6fb1fa4763a28a09714854e9dffcb8',
+        '6f47fe93d2ef50e5a89645d823be0165df7d68619b5a50784b171aaa13893309',
     'test/test_scan360_planner.cpp':
         '9e927c9f9406f7a6eae567070bc03e9c82f969c94eb29cf69d2d62d6e84bca6f',
     'test/test_scan360_quality.cpp':
@@ -101,7 +101,7 @@ SCAN360_HASHES = {
     'test/test_scan360_rotate_action_binding.cpp':
         '027584eaec8187aca1ef4b92e38608447f00a6de5fa6390515ee1a65be6c2f1b',
     'test/test_scan360_rotate_action_binding_contract.py':
-        'e37d9bf4e45a64e2dc7ecef895bfc9448878de8c1e115f107259eeed468cf1b5',
+        'dfa825a6e490cff4626a31231e26722b7e73e379c258e8a67c2b97a5c9f0b727',
     'test/test_scan360_rotate_action_client_contract.py':
         '09bcfaad8f0350d22d21b2fdcdce2dfd8c725f6698e743e83dccb6e6811d816e',
     'test/test_scan360_rotate_action_client_runtime.cpp':

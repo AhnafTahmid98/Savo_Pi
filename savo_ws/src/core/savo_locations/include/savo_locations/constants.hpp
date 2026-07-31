@@ -12,7 +12,7 @@ inline constexpr std::string_view kPackageName{
   "savo_locations"};
 
 inline constexpr std::string_view kPackageVersion{
-  "0.11.0"};
+  "0.14.0"};
 
 inline constexpr std::uint32_t kSchemaVersion{1U};
 

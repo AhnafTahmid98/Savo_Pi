@@ -1,0 +1,24 @@
+# Robot Savo — read-only candidate review queue.
+#
+# This service never approves, rejects or mutates a candidate. Operator tools
+# use it to discover authoritative candidate IDs and revisions before sending a
+# review request through savo_mapping.
+
+uint8 STATE_FILTER_ALL=0
+uint8 STATE_FILTER_PENDING=1
+uint8 STATE_FILTER_APPROVED=2
+uint8 STATE_FILTER_REJECTED=3
+
+uint8 state_filter
+bool enforce_map_context
+string map_id
+uint32 map_revision
+---
+uint8 RESULT_OK=0
+uint8 RESULT_INVALID_FILTER=1
+uint8 RESULT_INTERNAL_ERROR=2
+
+bool success
+uint8 result_code
+string reason
+savo_msgs/LocationCandidate[] candidates

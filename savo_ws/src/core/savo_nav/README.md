@@ -1,376 +1,170 @@
 # savo_nav
 
-Robot Savo core-side navigation package for ROS 2 Jazzy and Nav2.
-
-## Current development phase
+`savo_nav` is Robot Savo's core-side ROS 2 Jazzy navigation package. It owns
+Nav2 orchestration, guarded goal admission, saved-map and live-mapping
+navigation, navigation readiness, bounded recovery coordination, named-location
+navigation, and coverage-path forwarding.
 
-Phase 6 — Goal gateway and Nav2 action forwarding.
+Production runtime code is C++17. Python is used only for ROS launch, tests, and
+the isolated location-integration smoke tool. The deployment target is the
+Raspberry Pi 5 ARM64 `savo-core` computer.
 
-The obsolete Python navigation scaffold has been removed. This phase establishes
-the package identity, ownership boundaries, directory layout, build conventions,
-and cross-package contracts.
+## Safety and ownership boundary
 
-No runtime navigation executable is provided in Phase 0.
+Nav2 may publish velocity only through:
 
-## Package conventions
+```text
+Nav2 -> /cmd_vel_nav -> savo_control -> /cmd_vel
+     -> savo_perception safety gate -> /cmd_vel_safe -> savo_base
+```
 
-- Package version: `0.1.0`
-- ROS distribution: ROS 2 Jazzy
-- Package format: 3
-- Build system: `ament_cmake`
-- Production language: C++17
-- Compiler warnings: `-Wall -Wextra -Wpedantic`
-- License: Proprietary
-- Runtime target: Raspberry Pi 5 ARM64 on `savo-core`
+`savo_nav` must never publish directly to `/cmd_vel`, `/cmd_vel_safe`, or
+`/cmd_vel_recovery`.
 
-## Package ownership
+The public action servers are protected by the control/recovery guard and the
+goal-admission gate. The internal gateway action names are remapped under
+`/savo_nav/_internal/...`; callers must use the public guarded interfaces.
 
-`savo_nav` owns:
+## TF authority
 
-- Nav2 orchestration
-- Navigation lifecycle integration
-- Saved-map navigation integration
-- AMCL configuration and initialization policy
-- Global path planning
-- Local path following
-- Global and local Nav2 costmaps
-- RPLIDAR obstacle integration
-- RealSense three-dimensional VoxelLayer integration
-- Validated navigation-goal execution
-- Navigation readiness and state
-- Bounded recovery coordination
-- Navigation observer topics and markers
+Saved-map navigation:
 
-`savo_nav` does not own:
+```text
+map --AMCL--> odom --savo_localization--> base_footprint
+    --robot_state_publisher--> base_link
+```
 
-- Wheel odometry
-- IMU processing
-- Visual odometry
-- EKF sensor fusion
-- Motor kinematics
-- Motor hardware
-- Command-source arbitration
-- Final velocity safety gating
-- ToF or ultrasonic safety policy
-- Map creation
-- Frontier selection
-- Named-location storage
-- AprilTag detection
-- Robot-wide mission supervision
+Live-mapping navigation:
 
-## Locked navigation command chain
+```text
+map --SLAM Toolbox--> odom --savo_localization--> base_footprint
+    --robot_state_publisher--> base_link
+```
 
-Nav2 publishes navigation velocity only to:
+AMCL and SLAM Toolbox must never publish `map -> odom` at the same time.
 
-    /cmd_vel_nav
+## Implemented runtime
 
-The complete command path is:
+The package currently provides:
 
-    Nav2
-      -> /cmd_vel_nav
-      -> savo_control
-      -> /cmd_vel
-      -> savo_perception safety gate
-      -> /cmd_vel_safe
-      -> savo_base
-      -> motor hardware
+- `navigation_readiness_node`
+- `control_recovery_guard_node`
+- `goal_admission_gate_node`
+- `goal_gateway_node`
+- `navigate_to_location_node`
+- guarded `NavigateToPose` forwarding for mission/location goals
+- guarded exploration-goal forwarding for `savo_mapping`
+- guarded coverage-path validation and Nav2 `FollowPath` forwarding
+- goal arbitration, cancellation acknowledgement, watchdogs, and late-result
+  handling
+- saved-map Nav2 bringup with AMCL and map server
+- live-mapping Nav2 bringup without AMCL or map server
 
-Direct publication from `savo_nav` to any of the following is forbidden:
+## Launch files
 
-    /cmd_vel
-    /cmd_vel_safe
-    /cmd_vel_recovery
+### Saved-map navigation
 
-## Locked TF target
+```bash
+ros2 launch savo_nav saved_map_navigation.launch.py \
+  map:=/absolute/path/to/map.yaml \
+  map_id:=campus_main \
+  autostart:=true
+```
 
-The production TF chain is:
+This launch starts map server, AMCL, planner, controller, behavior server, BT
+navigator, waypoint follower, lifecycle managers, readiness, the guarded goal
+gateway, control/recovery guard, and goal-admission gate.
 
-    map
-      -> odom
-        -> base_footprint
-          -> base_link
+### Live-mapping navigation
 
-Ownership:
+```bash
+ros2 launch savo_nav live_mapping_navigation.launch.py \
+  autostart:=true
+```
 
-- `map -> odom`: AMCL during saved-map navigation
-- `map -> odom`: SLAM Toolbox during live mapping
-- `odom -> base_footprint`: `savo_localization`
-- `base_footprint -> base_link`: `robot_state_publisher`
+Use this only while SLAM Toolbox is already publishing `/map` and `map -> odom`.
+It intentionally does not start AMCL or map server. This is the Nav2 execution
+path required by frontier exploration during an active mapping session.
 
-Only one component may publish `map -> odom` at a time.
+Before enabling motion, run the read-only graph preflight:
 
-The current localization package must be corrected from `base_link` to
-`base_footprint` before production Nav2 runtime integration.
+```bash
+ros2 run savo_nav run_mapping_nav_preflight --mode live
+```
 
-## RealSense three-dimensional obstacle path
+After deliberately changing `savo_control` to `NAV`, require the complete
+readiness chain before sending a goal:
 
-The planned production data flow is:
+```bash
+ros2 run savo_nav run_mapping_nav_preflight --mode live --expect-ready
+```
 
-    Intel RealSense D435
-      -> savo_realsense raw PointCloud2
-      -> savo_perception obstacle-cloud filtering
-      -> /savo_perception/obstacles/points
-      -> savo_nav local Nav2 VoxelLayer
+## Readiness profiles
 
-Raw RealSense point-cloud topic:
+`config/readiness.yaml` is the guarded LiDAR-only baseline used for the first
+real-robot navigation tests. It requires map, TF, fused odometry, LiDAR, Nav2,
+global/local costmaps, NAV control mode, and fresh safety state. It does not
+require the filtered D435 cloud because the active baseline costmaps do not yet
+consume that cloud.
 
-    /camera/camera/depth/color/points
+`config/readiness_realsense_voxel.yaml` requires
+`/savo_perception/obstacles/points`. Use it only after the real D435 frame,
+freshness, self-filter, floor, and obstacle tests pass and the Nav2 voxel layer
+is enabled.
 
-Production filtered obstacle-cloud topic:
+The raw RealSense topic must never be consumed directly by Nav2. The filtered
+cloud has obstacle-only semantics, so its future voxel layer must use marking
+without clearing; LiDAR remains responsible for reliable clearing.
 
-    /savo_perception/obstacles/points
+## Build and test
 
-## Mapping integration
+Development/test build:
 
-`savo_mapping` chooses exploration goals.
+```bash
+cd ~/Savo_Pi/savo_ws
+set +u
+source /opt/ros/jazzy/setup.bash
 
-It sends those goals through:
+colcon build \
+  --packages-up-to savo_nav savo_mapping \
+  --symlink-install \
+  --event-handlers console_direct+
 
-    /savo_nav/exploration/navigate_to_pose
+source install/setup.bash
 
-`savo_mapping` does not publish navigation velocity and does not bypass the
-`savo_nav` goal gateway.
+colcon test \
+  --packages-select savo_nav savo_mapping \
+  --event-handlers console_direct+
 
-## Mac RViz observer
+colcon test-result --verbose
+```
 
-RViz runs only on the MacBook Air M3 Ubuntu 24.04 ARM64 virtual machine.
+Production Pi build after the full test suite has passed elsewhere:
 
-The Mac observes:
+```bash
+colcon build \
+  --packages-up-to savo_nav savo_mapping \
+  --cmake-args -DBUILD_TESTING=OFF \
+  --event-handlers console_direct+
+```
 
-- Robot movement
-- TF
-- Wheel odometry
-- Visual odometry
-- Fused odometry
-- Localization drift
-- AMCL pose
-- Navigation goals
-- Global and local paths
-- Global and local costmaps
-- LiDAR
-- RealSense point clouds
-- Voxel obstacles
-- Mapping frontiers
-- AprilTag detections
-- Navigation readiness and state
+Disabling `BUILD_TESTING` prevents test fixtures from entering the Pi install.
 
-The Mac must not publish:
+## First guarded Pi test order
 
-- Navigation goals
-- Initial poses
-- Teleoperation commands
-- Velocity commands
-- Control-mode commands
-- Lifecycle commands
-- Safety commands
-- Robot TF
+1. Start robot description, base, localization, LiDAR, perception safety, and
+   `savo_control`.
+2. Confirm the TF chain and `/odometry/filtered` are healthy.
+3. Start manual SLAM Toolbox mapping from `savo_mapping`.
+4. Start `live_mapping_navigation.launch.py`.
+5. Change `savo_control` to `NAV` only after the area is physically secured.
+6. Confirm `/savo_nav/readiness` becomes `ready` before sending any goal.
+7. Test a short guarded exploration goal, cancellation, safety stop, and stale
+   dependency behavior before enabling autonomous frontier iteration.
 
-Neither Raspberry Pi runs RViz.
+## Remaining hardware gates
 
-## Documentation
-
-Detailed architecture and interface documentation remains in the separate
-workspace-level documentation folder.
-
-
-## Phase 0B contract files
-
-The following files freeze contract version 1:
-
-- `include/savo_nav/constants.hpp`
-- `include/savo_nav/topic_names.hpp`
-- `include/savo_nav/action_names.hpp`
-- `include/savo_nav/service_names.hpp`
-- `include/savo_nav/frame_names.hpp`
-- `config/topics.yaml`
-- `config/action_servers.yaml`
-- `config/frames.yaml`
-
-The C++ constants and YAML contracts are checked for consistency by
-`test/contracts/test_phase0_contracts.py`.
-
-## Phase 1 implementation
-
-Phase 1 adds:
-
-- `savo_nav_core`, the first hardware-independent C++ library
-- `navigation_readiness_node`, the first ROS 2 executable
-- stable navigation readiness states and result types
-- readiness and reason publication
-- heartbeat publication
-- C++ unit tests for readiness-state invariants
-
-The node remains in the `starting` state during Phase 1. Real dependency
-monitoring is implemented in the later navigation-readiness phase.
-
-## Phase 2 implementation
-
-Phase 2 adds hardware-independent contracts for:
-
-- common validation results and stable validation codes
-- navigation goal identity, source and map-frame invariants
-- saved-map and live-mapping context ownership
-- AMCL versus SLAM Toolbox `map -> odom` exclusivity
-- navigation state classification and allowed transitions
-- terminal and pending navigation-result invariants
-- cancel acknowledgement outcomes, including late success
-
-These contracts do not start Nav2, accept goals or publish velocity commands.
-
-## Phase 3 implementation
-
-Phase 3 adds a hardware-independent navigation-readiness core.
-
-Hardware and sensor ownership remains outside `savo_nav`. The readiness node
-subscribes to published ROS interfaces from mapping, localization, LiDAR,
-perception and control. It also observes the internal Nav2 action server and
-costmaps.
-
-The readiness evaluator checks:
-
-- safety stop and slowdown freshness
-- navigation control-mode permission
-- map availability
-- `map -> odom -> base_footprint -> base_link`
-- filtered localization odometry
-- LiDAR scan freshness
-- filtered RealSense obstacle-point-cloud freshness
-- Nav2 NavigateToPose action availability
-- global and local costmap freshness
-
-It does not publish motor, velocity, lifecycle or hardware commands.
-
-## Phase 4 implementation
-
-Phase 4 adds deterministic, hardware-independent goal validation and
-single-active-goal arbitration.
-
-Validation covers:
-
-- stable goal identity and source
-- sequence validity
-- map-frame enforcement
-- finite and bounded target coordinates
-- normalized target yaw
-- active-map availability
-- saved-map identity matching
-- navigation readiness permission
-- rejection of cancellation flags on new goals
-
-Arbitration covers:
-
-- exactly one active goal
-- no silent replacement or priority-based preemption
-- deterministic source priorities
-- duplicate goal-ID protection
-- per-source stale-sequence protection
-- bounded terminal-goal history
-- cancel-request ownership
-- cancel acknowledgement before release
-- late completion after a cancellation request
-
-Phase 4 does not send goals to Nav2 and does not publish velocity or hardware
-commands.
-
-## Phase 5 implementation
-
-Phase 5 adds the baseline saved-map Nav2 launch and parameter stack:
-
-- Map Server
-- AMCL with the omnidirectional motion model
-- Navfn global planner
-- holonomic DWB local controller
-- global and local LiDAR-only 2D costmaps
-- Behavior Server
-- Behavior Tree Navigator
-- Waypoint Follower
-- separate localization and navigation lifecycle managers
-- `/cmd_vel_nav` as the only Nav2 velocity output
-- lifecycle autostart disabled by default
-- isolated configure-only Nav2 dry-run validation
-
-This phase does not add the public Savo goal gateway, automatic supervisor
-activation, RealSense VoxelLayer, hardware movement or RViz ownership.
-
-The configured `robot_radius` is provisional and must be replaced with a
-measured footprint or verified radius before real-hardware navigation.
-
-## Phase 6 implementation
-
-Phase 6 adds two public `NavigateToPose` action servers:
-
-- `/savo_nav/navigation/navigate_to_pose`
-- `/savo_nav/exploration/navigate_to_pose`
-
-Both are owned by one deterministic gateway and forward to Nav2's internal
-`/navigate_to_pose` action only after readiness, map-context, pose and
-single-active-goal checks pass.
-
-The gateway forwards Nav2 feedback and terminal results to the original
-client. External cancellation is forwarded to Nav2, but ownership is retained
-until Nav2 returns a terminal result. Late success after a cancellation request
-is supported.
-
-Arbitrary behavior-tree overrides are disabled by default. Execution-time and
-stale-feedback watchdogs request Nav2 cancellation.
-
-The gateway publishes observer-only state, status, feedback and result topics.
-It does not publish velocity, lifecycle or hardware commands.
-
-## Phase 7A implementation
-
-Phase 7A adds a read-only control and recovery guard.
-
-It consumes the existing `savo_control` mode and recovery evidence and
-publishes whether navigation may be admitted. Navigation is allowed only when
-the control mode is fresh and equal to `NAV`, the recovery-active state is
-fresh, and recovery is inactive.
-
-Unknown, malformed, stale, non-NAV, or active-recovery evidence blocks new
-navigation and indicates that an existing goal should be canceled.
-
-The guard never publishes mode commands, recovery requests, velocity commands,
-lifecycle commands, or hardware commands. Supervisor and `savo_control`
-authority remain unchanged.
-
-## Phase 7B implementation
-
-Phase 7B places a fail-closed goal-admission gate in front of the Phase 6 goal
-gateway. The public navigation and exploration action names remain unchanged.
-The Phase 6 gateway is remapped behind hidden internal action names.
-
-A new goal is accepted only while the Phase 7A control/recovery permission is
-observed, fresh, and allowed. Unknown, stale, or blocked guard evidence rejects
-new goals. If permission is lost while a goal is active, the gate sends exactly
-one cancellation request to the internal gateway and waits for its terminal
-result. External cancellation is still forwarded and acknowledged normally.
-
-Guard-triggered interruption is reported to the public action client as an
-aborted goal with the deterministic guard reason. This avoids claiming a client
-cancellation that the client did not request. The gate does not publish control
-mode commands, recovery requests, velocity commands, or hardware commands.
-
-## Phase 7C fault and launch-chain validation
-
-Phase 7C validates the complete read-only chain from raw control and recovery
-evidence through the control/recovery guard and goal-admission gate to the
-hidden goal gateway. Runtime fixtures cover raw-control faults, guard process
-loss and restart, downstream gateway loss and restart, and stale evidence.
-Every fault remains fail-closed. This phase adds no control-mode, recovery,
-velocity, motion, or hardware authority to `savo_nav`.
-
-## Phase 8 costmap sensor integration
-
-Phase 8 is blocked pending a production filtered PointCloud2 publisher for
-`/savo_perception/obstacles/points`. The current global static-map plus LiDAR
-and local LiDAR baseline remains unchanged. The raw RealSense topic
-`/camera/camera/depth/color/points` is prohibited from Nav2.
-
-Workspace inspection found no filtered-cloud producer, so obstacle-only versus
-ray-preserving semantics cannot be proven and RealSense clearing is fixed to
-false in the blocked sensor contract. LiDAR remains a hard navigation
-dependency; RealSense remains optional/profile-dependent. `savo_nav` gains no
-sensor-production, control, recovery, velocity, motion, or hardware authority.
-Synthetic costmap marking validation is intentionally deferred until the real
-filtered producer exists and its frame, height, range, and ray semantics can be
-validated.
+Code readiness does not replace physical validation. Before final deployment,
+measure the actual robot footprint and validate DWB behavior, goal tolerances,
+acceleration limits, recovery distances, AMCL tuning, and the optional D435
+voxel-layer self-filter on the real floor.

@@ -76,7 +76,7 @@ def test_phase3_readiness_configuration():
         'navigation_readiness_node'
     ]['ros__parameters']
 
-    assert parameters['require_pointcloud'] is True
+    assert parameters['require_pointcloud'] is False
     assert parameters['require_control_mode'] is True
     assert parameters['require_safety_state'] is True
 

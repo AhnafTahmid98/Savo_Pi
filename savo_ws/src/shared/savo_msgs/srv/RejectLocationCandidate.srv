@@ -1,0 +1,17 @@
+string candidate_id
+uint64 expected_candidate_revision
+string actor_id
+string rejection_reason
+---
+uint8 RESULT_REJECTED=0
+uint8 RESULT_INVALID_REQUEST=1
+uint8 RESULT_CANDIDATE_NOT_FOUND=2
+uint8 RESULT_CANDIDATE_NOT_PENDING=3
+uint8 RESULT_STALE_REVISION=4
+uint8 RESULT_STORAGE_UNAVAILABLE=5
+uint8 RESULT_INTERNAL_ERROR=6
+
+bool rejected
+uint8 result_code
+string reason
+savo_msgs/LocationCandidate candidate

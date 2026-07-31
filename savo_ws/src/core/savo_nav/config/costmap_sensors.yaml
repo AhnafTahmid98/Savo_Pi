@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: LicenseRef-Proprietary
 
 costmap_sensors:
-  integration_status: blocked_missing_filtered_realsense_producer
+  integration_status: ready_for_guarded_real_d435_validation
 
   lidar:
     topic: /scan
@@ -29,14 +29,18 @@ costmap_sensors:
     layer: voxel
     marking: true
     clearing: false
-    producer_verified: false
+    producer_implemented: true
+    producer_contract_verified: true
+    producer_hardware_validated: false
+    producer_source: savo_perception/src/nodes/obstacle_cloud_filter_node.cpp
     raw_topic_allowed_in_nav2: false
+    activation_gate: real_d435_frame_freshness_and_self_filter_validation
     evidence: >-
-      Complete workspace inspection found no production PointCloud2 publisher
-      for the filtered topic. savo_realsense monitors the raw camera cloud and
-      savo_perception currently has no PointCloud2 producer. Free-space ray
-      geometry is therefore not proven, so clearing remains false and the
-      RealSense voxel layer must not be enabled.
+      savo_perception now provides the production C++ filtered PointCloud2
+      producer. Real D435 frame, freshness, self-filter and floor testing is
+      still required before enabling the Nav2 voxel layer. Clearing remains
+      false because the filtered cloud has obstacle-only semantics; LiDAR owns
+      reliable free-space clearing.
 
   ownership:
     sensor_production: false

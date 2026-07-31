@@ -3,6 +3,7 @@
 
 #include <filesystem>
 #include <string>
+#include <vector>
 
 #include "savo_locations/sqlite_repository.hpp"
 #include "savo_locations/sqlite_store.hpp"
@@ -766,4 +767,58 @@ TEST(SqliteRepository, ReasonStringsAreStable)
     to_string(
       SnapshotCode::kCorruptData),
     "corrupt_data");
+}
+
+
+TEST(SqliteRepository, CandidateRejectionCommitsSnapshotAndEventAtomically)
+{
+  savo_locations::SqliteStore store{":memory:"};
+  open_and_migrate(&store);
+
+  savo_locations::SqliteRepository repository{store};
+
+  savo_locations::CatalogSnapshot current;
+  current.candidates.push_back(make_pending_candidate());
+  ASSERT_TRUE(repository.save_snapshot(current).success);
+
+  auto rejected = current.candidates.front();
+  rejected.state = savo_locations::CandidateState::kRejected;
+  rejected.candidate_revision = 5U;
+  rejected.review_reason = "duplicate doorway marker";
+
+  savo_locations::CatalogSnapshot post;
+  post.candidates.push_back(rejected);
+
+  savo_locations::CandidateRejectionCommit commit;
+  commit.candidate_id = rejected.candidate.candidate_id;
+  commit.expected_candidate_revision = 4U;
+  commit.actor_id = "location_operator";
+  commit.reason = rejected.review_reason;
+  commit.post_rejection_snapshot = post;
+
+  std::uint64_t event_sequence = 0U;
+  const auto result = repository.commit_candidate_rejection(
+    commit, &event_sequence);
+
+  ASSERT_TRUE(result.success) << result.reason;
+  EXPECT_GT(event_sequence, 0U);
+
+  savo_locations::CatalogSnapshot loaded;
+  ASSERT_TRUE(repository.load_snapshot(&loaded).success);
+  ASSERT_EQ(loaded.candidates.size(), 1U);
+  EXPECT_EQ(
+    loaded.candidates.front().state,
+    savo_locations::CandidateState::kRejected);
+  EXPECT_EQ(loaded.candidates.front().candidate_revision, 5U);
+  EXPECT_EQ(
+    loaded.candidates.front().review_reason,
+    "duplicate doorway marker");
+
+  std::vector<savo_locations::PersistenceEvent> events;
+  ASSERT_TRUE(repository.list_events(0U, 10U, &events).success);
+  ASSERT_EQ(events.size(), 1U);
+  EXPECT_EQ(
+    events.front().event_type,
+    savo_locations::PersistenceEventType::kCandidateRejected);
+  EXPECT_EQ(events.front().entity_revision, 5U);
 }
