@@ -94,7 +94,7 @@ private:
     config_.serial.max_reconnect_delay_s =
       declare_parameter<double>("max_reconnect_delay_s", 5.0);
 
-    config_.frame_id = declare_parameter<std::string>("frame_id", "laser");
+    config_.frame_id = declare_parameter<std::string>("frame_id", "laser_frame");
     config_.scan_topic = declare_parameter<std::string>("scan_topic", "/scan");
     config_.scan_mode = declare_parameter<std::string>("scan_mode", "standard");
 

@@ -27,16 +27,19 @@ def test_normalize_frame_id_strips_slash_and_spaces():
 
 
 def test_check_frame_id_accepts_expected_frame():
-    result = check_frame_id(frame_id="/laser", expected_frame_id="laser")
+    result = check_frame_id(
+        frame_id="/laser_frame",
+        expected_frame_id="laser_frame",
+    )
 
     assert result.ok
-    assert result.frame_id == "laser"
-    assert result.expected_frame_id == "laser"
+    assert result.frame_id == "laser_frame"
+    assert result.expected_frame_id == "laser_frame"
     assert result.message == "LiDAR frame_id matches expected TF frame"
 
 
 def test_check_frame_id_rejects_empty_frame():
-    result = check_frame_id(frame_id="", expected_frame_id="laser")
+    result = check_frame_id(frame_id="", expected_frame_id="laser_frame")
 
     assert not result.ok
     assert result.frame_id == ""
@@ -44,11 +47,11 @@ def test_check_frame_id_rejects_empty_frame():
 
 
 def test_check_frame_id_rejects_wrong_frame():
-    result = check_frame_id(frame_id="base_link", expected_frame_id="laser")
+    result = check_frame_id(frame_id="base_link", expected_frame_id="laser_frame")
 
     assert not result.ok
     assert result.frame_id == "base_link"
-    assert result.expected_frame_id == "laser"
+    assert result.expected_frame_id == "laser_frame"
     assert result.message == "LiDAR frame_id does not match expected TF frame"
 
 

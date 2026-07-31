@@ -10,8 +10,8 @@
       edge_x:=-0.045
       edge_y:=-0.045
       edge_z:=0.080
-      board_size_xyz:=0.085 0.056 0.010
-      hat_size_xyz:=0.085 0.056 0.014
+      board_size_xyz:='0.085 0.056 0.010'
+      hat_size_xyz:='0.085 0.056 0.014'
       board_mass:=0.050
       hat_mass:=0.045
     ">

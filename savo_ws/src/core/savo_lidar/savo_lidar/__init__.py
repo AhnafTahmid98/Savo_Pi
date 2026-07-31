@@ -86,7 +86,7 @@ except Exception:
     NODE_NAME_LIDAR_WATCHDOG = "lidar_watchdog_node"
     NODE_NAME_LIDAR_STATE_PUBLISHER = "lidar_state_publisher_node"
 
-    DEFAULT_FRAME_ID = "laser"
+    DEFAULT_FRAME_ID = "laser_frame"
     DEFAULT_BASE_FRAME_ID = "base_link"
 
     TOPIC_SCAN = "/scan"

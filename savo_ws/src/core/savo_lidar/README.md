@@ -65,19 +65,19 @@ Consumed by downstream packages:
 The scan frame is:
 
 ```text
-laser
+laser_frame
 ```
 
 `savo_lidar` only publishes scan messages with:
 
 ```text
-frame_id: laser
+frame_id: laser_frame
 ```
 
 The physical transform must be defined in `savo_description`:
 
 ```text
-base_link -> laser
+base_link -> laser_frame
 ```
 
 Do not duplicate LiDAR position or orientation inside `savo_lidar`. The robot description package is the source of truth for fixed sensor geometry.

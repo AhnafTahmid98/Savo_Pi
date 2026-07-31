@@ -6,7 +6,7 @@ lidar_driver_node:
     backend: "dryrun"
 
     scan_topic: "/scan"
-    frame_id: "laser"
+    frame_id: "laser_frame"
 
     serial_port: "/dev/ttyUSB0"
     baudrate: 115200

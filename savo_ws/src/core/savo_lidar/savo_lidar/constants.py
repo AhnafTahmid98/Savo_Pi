@@ -32,7 +32,7 @@ NODE_NAME_LIDAR_STATE_PUBLISHER: Final[str] = "lidar_state_publisher_node"
 # =============================================================================
 # Frame Names
 # =============================================================================
-DEFAULT_FRAME_ID: Final[str] = "laser"
+DEFAULT_FRAME_ID: Final[str] = "laser_frame"
 DEFAULT_BASE_FRAME_ID: Final[str] = "base_link"
 
 

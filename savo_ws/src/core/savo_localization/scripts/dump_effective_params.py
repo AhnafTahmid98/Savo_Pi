@@ -27,7 +27,7 @@ DEFAULT_CONFIGS = (
 )
 
 DEFAULT_PROFILE = "config/profiles/robot_savo_4enc_imu_ekf.yaml"
-VO_OVERLAY = "config/vo_fusion_optional.yaml"
+VO_OVERLAY = "config/ekf_vo_input_optional.yaml"
 
 
 def main() -> int:

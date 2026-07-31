@@ -4,8 +4,8 @@
   <version>0.3.0</version>
   <description>Production launch and lifecycle integration for Robot Savo.</description>
 
-  <maintainer email="todo@example.com">TODO_NAME</maintainer>
-  <license>MIT</license>
+  <maintainer email="tahmidahnaf998@gmail.com">Ahnaf Tahmid</maintainer>
+  <license>Proprietary</license>
 
   <buildtool_depend>ament_python</buildtool_depend>
 

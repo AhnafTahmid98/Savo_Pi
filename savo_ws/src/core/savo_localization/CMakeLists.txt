@@ -257,6 +257,7 @@ if(BUILD_TESTING)
   add_pytest_if_exists(test_imu_health_check test/test_imu_health_check.py)
   add_pytest_if_exists(test_ekf_health_check test/test_ekf_health_check.py)
   add_pytest_if_exists(test_tf_check test/test_tf_check.py)
+  add_pytest_if_exists(test_config_assets test/test_config_assets.py)
   add_pytest_if_exists(
     test_localization_health_contract
     test/test_localization_health_contract.py

@@ -1,0 +1,20 @@
+# Robot Savo current description baseline.
+# Values mirror robot_savo_core.xacro and are not a substitute for the final
+# physical measurement pass before Nav2 footprint tuning.
+metadata:
+  profile: robot_savo_core_v1
+  source: current_xacro_baseline
+  final_physical_measurement_required: true
+  units: metres_and_kilograms
+
+base:
+  length_m: 0.330
+  width_m: 0.240
+  height_m: 0.060
+  base_link_z_m: 0.065
+  mass_kg: 1.20
+
+decks:
+  thickness_m: 0.004
+  spacing_m: 0.070
+  mass_each_kg: 0.20

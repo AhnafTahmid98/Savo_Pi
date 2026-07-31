@@ -21,7 +21,7 @@ struct SAVO_LIDAR_PUBLIC LidarSample
 
 struct SAVO_LIDAR_PUBLIC LidarScan
 {
-  std::string frame_id{"laser"};
+  std::string frame_id{"laser_frame"};
 
   double angle_min_rad{-3.14159265358979323846};
   double angle_max_rad{3.14159265358979323846};

@@ -39,7 +39,7 @@ struct SAVO_LIDAR_PUBLIC DriverDiagnostics
 
   std::string backend{"real"};
   std::string model{"rplidar_a1"};
-  std::string frame_id{"laser"};
+  std::string frame_id{"laser_frame"};
   std::string scan_topic{"/scan"};
   std::string serial_port{"/dev/ttyUSB0"};
 

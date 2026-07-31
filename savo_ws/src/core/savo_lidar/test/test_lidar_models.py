@@ -30,7 +30,7 @@ def test_lidar_driver_config_accepts_default_dryrun_config():
 
     assert config.backend == BACKEND_DRYRUN
     assert config.model == "rplidar_a1"
-    assert config.frame_id == "laser"
+    assert config.frame_id == "laser_frame"
     assert config.scan_topic == "/scan"
     assert config.driver_state_topic == "/savo_lidar/state"
     assert config.heartbeat_topic == "/savo_lidar/heartbeat"
@@ -74,10 +74,10 @@ def test_lidar_driver_config_rejects_invalid_heartbeat_hz():
 
 
 def test_make_driver_config_validates_overrides():
-    config = make_driver_config(backend=BACKEND_DRYRUN, frame_id="laser")
+    config = make_driver_config(backend=BACKEND_DRYRUN, frame_id="laser_frame")
 
     assert config.backend == BACKEND_DRYRUN
-    assert config.frame_id == "laser"
+    assert config.frame_id == "laser_frame"
 
 
 def test_lidar_driver_config_to_dict_contains_runtime_topics():

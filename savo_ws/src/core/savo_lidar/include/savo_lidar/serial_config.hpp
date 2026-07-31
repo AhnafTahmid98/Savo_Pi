@@ -50,7 +50,7 @@ struct SAVO_LIDAR_PUBLIC RplidarConfig
 {
   SerialConfig serial;
 
-  std::string frame_id{"laser"};
+  std::string frame_id{"laser_frame"};
   std::string scan_topic{"/scan"};
   std::string scan_mode{"standard"};
 

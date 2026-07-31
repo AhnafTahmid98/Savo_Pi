@@ -7,7 +7,7 @@ lidar_py_driver_node:
     model: "rplidar_a1"
 
     scan_topic: "/scan"
-    frame_id: "laser"
+    frame_id: "laser_frame"
 
     driver_state_topic: "/savo_lidar/state"
     heartbeat_topic: "/savo_lidar/heartbeat"

@@ -1,0 +1,22 @@
+# Robot Savo current mecanum-wheel description baseline.
+# Values mirror robot_savo_wheels.xacro. Confirm them physically before final
+# odometry and Nav2 tuning.
+metadata:
+  profile: robot_savo_core_v1
+  source: current_xacro_baseline
+  final_physical_measurement_required: true
+  units: metres_and_kilograms
+
+wheels:
+  type: mecanum
+  radius_m: 0.0325
+  width_m: 0.030
+  x_offset_m: 0.115
+  y_offset_m: 0.100
+  z_offset_m: -0.030
+  mass_each_kg: 0.12
+  frames:
+    front_left: wheel_fl_link
+    front_right: wheel_fr_link
+    rear_left: wheel_rl_link
+    rear_right: wheel_rr_link
