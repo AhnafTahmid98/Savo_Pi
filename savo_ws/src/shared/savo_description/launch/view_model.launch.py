@@ -13,7 +13,7 @@ def generate_launch_description():
 
     description_launch = PathJoinSubstitution(
         [
-            FindPackageShare("savo_description"),
+            FindPackageShare("savo_observer"),
             "launch",
             "description.launch.py",
         ]
@@ -46,15 +46,21 @@ def generate_launch_description():
                     {"use_sim_time": use_sim_time},
                 ],
             ),
-            Node(
-                package="rviz2",
-                executable="rviz2",
-                name="rviz2",
-                output="screen",
-                arguments=["-d", rviz_config],
-                parameters=[
-                    {"use_sim_time": use_sim_time},
-                ],
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    PathJoinSubstitution(
+                        [
+                            FindPackageShare("savo_observer"),
+                            "launch",
+                            "rviz_observer.launch.py",
+                        ]
+                    )
+                ),
+                launch_arguments={
+                    "view": "robot_model",
+                    "rviz_config": rviz_config,
+                    "use_sim_time": use_sim_time,
+                }.items(),
             ),
         ]
     )

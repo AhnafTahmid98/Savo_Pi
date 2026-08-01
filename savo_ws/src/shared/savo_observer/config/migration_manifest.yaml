@@ -1,0 +1,48 @@
+migrations:
+  - original: savo_description/rviz/robot_model.rviz
+    destination: savo_observer/rviz/robot_model.rviz
+    original_sha256: 41002de498fc9c908e759b71c2c049e27c87e5d01af6873bd4e2eabc7e0cd08f
+    current_sha256: 41002de498fc9c908e759b71c2c049e27c87e5d01af6873bd4e2eabc7e0cd08f
+    status: moved_unchanged
+  - original: savo_description/rviz/tf_check.rviz
+    destination: savo_observer/rviz/tf.rviz
+    original_sha256: 5c9caca68d80c0ca9f7d3bd1b7f89d96580ece6503c5107de6cbc1731f1ca81e
+    current_sha256: 5c9caca68d80c0ca9f7d3bd1b7f89d96580ece6503c5107de6cbc1731f1ca81e
+    status: moved_unchanged
+  - original: savo_description/rviz/sensors_view.rviz
+    destination: savo_observer/rviz/sensors.rviz
+    original_sha256: a36cc8c97ebf1a76122208455ac883401d054d698384e1ebaf790755504d5504
+    current_sha256: a36cc8c97ebf1a76122208455ac883401d054d698384e1ebaf790755504d5504
+    status: moved_unchanged
+  - original: savo_description/rviz/costmap_debug.rviz
+    destination: savo_observer/rviz/costmaps.rviz
+    original_sha256: 286dba2db57acc1cbfedabf476e148a204fc81ad1ac6d38f90c683af38e467a5
+    current_sha256: 3ea2e112815d59b140cd62bcfe08e0b38d4859414028aed15540ecd5f45ed2d4
+    status: moved_and_corrected
+    correction: Removed SetInitialPose and SetGoal tools to enforce read-only operation.
+  - original: savo_mapping/rviz/coverage_mapping.rviz
+    destination: savo_observer/rviz/coverage_mapping.rviz
+    original_sha256: ea36d3b3ca53737ffd49444dd42268cbf3df498dbc44e5ba2767b4ce7d098122
+    current_sha256: ea36d3b3ca53737ffd49444dd42268cbf3df498dbc44e5ba2767b4ce7d098122
+    status: moved_unchanged
+  - original: savo_mapping/rviz/scan360_mapping.rviz
+    destination: savo_observer/rviz/scan360_mapping.rviz
+    original_sha256: cfd293af6df543f886d7e4980a668502b443f7eed74d3bcdfcd93a737a8c3728
+    current_sha256: cfd293af6df543f886d7e4980a668502b443f7eed74d3bcdfcd93a737a8c3728
+    status: moved_unchanged
+  - original: savo_mapping/rviz/autonomous_mapping.rviz
+    destination: savo_observer/rviz/autonomous_mapping.rviz
+    original_sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+    status: newly_implemented_from_empty
+  - original: savo_mapping/rviz/manual_mapping.rviz
+    destination: savo_observer/rviz/manual_mapping.rviz
+    original_sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+    status: newly_implemented_from_empty
+  - original: savo_mapping/rviz/map_quality_debug.rviz
+    destination: savo_observer/rviz/map_quality.rviz
+    original_sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+    status: newly_implemented_from_empty
+  - original: savo_mapping/rviz/mapping_overview.rviz
+    destination: savo_observer/rviz/mapping_overview.rviz
+    original_sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+    status: newly_implemented_from_empty

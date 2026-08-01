@@ -1,0 +1,34 @@
+observer_inputs:
+  core: /savo_bringup/core/state
+  edge: /savo_bringup/edge/state
+  robot_mode: /savo_control/mode_state
+  safety: /savo_perception/safety_state
+  localization: /savo_localization/health
+  mapping: /savo_mapping/readiness
+  navigation: /savo_nav/readiness
+  power: /savo_power/status
+  lidar: /savo_lidar/heartbeat
+  speech: /savo_speech/state
+  bridge: /savo_bridge/state
+  active_map: /savo_mapping/active_map
+
+observer_outputs:
+  state: /savo_observer/state
+  connected: /savo_observer/connected
+  heartbeat: /savo_observer/heartbeat
+  diagnostics: /savo_observer/diagnostics
+  telemetry: /savo_observer/telemetry
+  alerts: /savo_observer/alerts
+
+spatial_topics:
+  map: /map
+  map_updates: /map_updates
+  scan: /scan
+  odometry_filtered: /odometry/filtered
+  wheel_odometry: /wheel/odom
+  global_costmap: /global_costmap/costmap
+  local_costmap: /local_costmap/costmap
+  global_plan: /plan
+  footprint: /local_costmap/published_footprint
+  realsense_points: /camera/camera/depth/color/points
+  filtered_obstacles: /savo_perception/obstacles/points

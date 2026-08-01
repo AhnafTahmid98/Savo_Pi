@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="view" default="mapping"/>
+  <arg name="profile" default="standard"/>
+  <arg name="use_sim_time" default="false"/>
+  <include file="$(find-pkg-share savo_observer)/launch/rviz_observer.launch.py">
+    <arg name="view" value="$(var view)"/>
+    <arg name="profile" value="$(var profile)"/>
+    <arg name="use_sim_time" value="$(var use_sim_time)"/>
+  </include>
+</launch>

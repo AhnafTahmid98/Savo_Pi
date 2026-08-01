@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+prefix="$(ros2 pkg prefix savo_observer)"
+share="${prefix}/share/savo_observer"
+for path in launch/observer.launch.py config/observer.yaml rviz/overview.rviz dashboard/web/index.html; do
+  [[ -s "${share}/${path}" ]] || { echo "Missing installed observer asset: ${path}" >&2; exit 1; }
+done
+[[ -x "${prefix}/lib/savo_observer/observer_telemetry_node" ]]
+[[ -x "${prefix}/lib/savo_observer/observer_dashboard_node" ]]
+echo 'savo_observer install validation: PASS'

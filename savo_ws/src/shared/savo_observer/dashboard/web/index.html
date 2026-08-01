@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <title>Robot SAVO Observer</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <header>
+      <div>
+        <p class="eyebrow">READ-ONLY TELEMETRY</p>
+        <h1>Robot SAVO</h1>
+      </div>
+      <div id="connection" class="badge stale">Connecting</div>
+    </header>
+    <main>
+      <section class="hero panel">
+        <div><span>Observer state</span><strong id="state">starting</strong></div>
+        <div><span>Snapshot sequence</span><strong id="sequence">0</strong></div>
+        <div><span>Data age</span><strong id="age">—</strong></div>
+      </section>
+      <section class="panel">
+        <h2>Subsystem freshness</h2>
+        <div id="dependencies" class="grid"></div>
+      </section>
+      <section class="panel alerts-panel">
+        <h2>Active alerts</h2>
+        <ul id="alerts"><li>Waiting for telemetry</li></ul>
+      </section>
+      <section class="panel">
+        <h2>Available numeric telemetry</h2>
+        <p id="metrics-empty" class="empty-state">No numeric telemetry currently published.</p>
+        <div id="metrics" class="grid metrics-grid"></div>
+        <canvas id="numeric-history" width="900" height="180" aria-label="Bounded numeric telemetry history"></canvas>
+        <div id="graph-legend" class="legend"></div>
+      </section>
+      <section class="panel">
+        <h2>Connection history</h2>
+        <canvas id="history" width="900" height="120"></canvas>
+      </section>
+    </main>
+    <footer>No command, navigation, approval, or emergency-reset interface is exposed.</footer>
+    <script src="/app.js"></script>
+  </body>
+</html>

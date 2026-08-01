@@ -3,7 +3,6 @@ from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 
-from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 
@@ -13,7 +12,7 @@ def generate_launch_description():
 
     description_launch = PathJoinSubstitution(
         [
-            FindPackageShare("savo_description"),
+            FindPackageShare("savo_observer"),
             "launch",
             "description.launch.py",
         ]
@@ -23,7 +22,7 @@ def generate_launch_description():
         [
             FindPackageShare("savo_description"),
             "rviz",
-            "tf_check.rviz",
+            "tf.rviz",
         ]
     )
 
@@ -37,15 +36,21 @@ def generate_launch_description():
                     "use_sim_time": use_sim_time,
                 }.items(),
             ),
-            Node(
-                package="rviz2",
-                executable="rviz2",
-                name="rviz2_tf_debug",
-                output="screen",
-                arguments=["-d", rviz_config],
-                parameters=[
-                    {"use_sim_time": use_sim_time},
-                ],
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    PathJoinSubstitution(
+                        [
+                            FindPackageShare("savo_observer"),
+                            "launch",
+                            "rviz_observer.launch.py",
+                        ]
+                    )
+                ),
+                launch_arguments={
+                    "view": "tf",
+                    "rviz_config": rviz_config,
+                    "use_sim_time": use_sim_time,
+                }.items(),
             ),
         ]
     )

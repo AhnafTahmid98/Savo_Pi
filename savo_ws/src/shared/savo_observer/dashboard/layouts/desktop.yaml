@@ -1,0 +1,9 @@
+layout:
+  name: desktop
+  responsive: true
+  columns: 3
+  panels:
+    - system
+    - subsystem_freshness
+    - alerts
+    - connection_history

@@ -1,0 +1,43 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/Map
+      Enabled: true
+      Name: Map
+      Topic: {Depth: 1, Durability Policy: Transient Local, History Policy: Keep Last, Reliability Policy: Reliable, Value: /map}
+    - Class: rviz_default_plugins/Map
+      Enabled: true
+      Name: GlobalCostmap
+      Topic: {Depth: 1, Durability Policy: Transient Local, History Policy: Keep Last, Reliability Policy: Reliable, Value: /global_costmap/costmap}
+    - Class: rviz_default_plugins/Map
+      Enabled: true
+      Name: LocalCostmap
+      Topic: {Depth: 1, Durability Policy: Transient Local, History Policy: Keep Last, Reliability Policy: Reliable, Value: /local_costmap/costmap}
+    - Class: rviz_default_plugins/Path
+      Enabled: true
+      Name: GlobalPlan
+      Topic: {Depth: 5, Durability Policy: Volatile, History Policy: Keep Last, Reliability Policy: Reliable, Value: /plan}
+    - Class: rviz_default_plugins/Polygon
+      Enabled: true
+      Name: Footprint
+      Topic: {Depth: 5, Durability Policy: Volatile, History Policy: Keep Last, Reliability Policy: Reliable, Value: /local_costmap/published_footprint}
+    - Class: rviz_default_plugins/LaserScan
+      Enabled: true
+      Name: LiDAR
+      Topic: {Depth: 5, Durability Policy: Volatile, History Policy: Keep Last, Reliability Policy: Best Effort, Value: /scan}
+  Enabled: true
+  Global Options: {Background Color: "28; 32; 38", Fixed Frame: map, Frame Rate: 20}
+  Name: root
+  Tools:
+    - Class: rviz_default_plugins/Interact
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+    - Class: rviz_default_plugins/FocusCamera
+    - Class: rviz_default_plugins/Measure
+  Transformation: {Current: {Class: rviz_default_plugins/TF}}
+  Value: true
+  Views: {Current: {Class: rviz_default_plugins/Orbit, Distance: 4.0, Name: Current View, Target Frame: base_footprint}, Saved: ~}
+Window Geometry: {Height: 900, Width: 1400, X: 80, Y: 60}

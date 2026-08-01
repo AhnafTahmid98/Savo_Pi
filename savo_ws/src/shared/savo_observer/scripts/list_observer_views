@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+printf '%s\n' overview robot_model tf sensors safety localization mapping \
+  manual_mapping autonomous_mapping coverage scan360 map_quality navigation \
+  costmaps locations full_debug

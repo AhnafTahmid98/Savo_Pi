@@ -342,6 +342,11 @@ install(
 )
 
 install(
+  FILES launch/pc_rviz_mapping.launch.xml
+  DESTINATION share/${PROJECT_NAME}/launch
+)
+
+install(
   FILES
     rviz/coverage_mapping.rviz
     rviz/scan360_mapping.rviz

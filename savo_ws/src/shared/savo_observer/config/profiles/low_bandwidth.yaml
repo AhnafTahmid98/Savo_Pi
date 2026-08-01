@@ -1,0 +1,13 @@
+/observer_telemetry_node:
+  ros__parameters:
+    publish_rate_hz: 0.5
+    freshness_timeout_ms: 8000
+    enable_edge: false
+    enable_speech: false
+    enable_bridge: false
+
+/observer_dashboard_node:
+  ros__parameters:
+    port: 8765
+    polling_interval_ms: 2000
+    history_capacity: 60

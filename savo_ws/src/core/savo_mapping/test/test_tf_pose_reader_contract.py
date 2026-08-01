@@ -67,17 +67,17 @@ SCAN360_HASHES = {
     'test/test_scan360_controller.cpp':
         '46fada4afbe74ba6c3cb498a545d2661e5ab915f9bec5f6a8893aec79c5c9e72',
     'test/test_scan360_deployment_assets_contract.py':
-        '4c4954ca71fedb5f06895af44739688d43b439db32e092c7c849d5dbbdb1a157',
+        '2d84b5d08e7ca65cf66ff15ed91e60774597f2d82f6a64d07e1ac1d63b77f485',
     'test/test_scan360_launch_runtime.py':
         'b1dbb51a11afde97e34015d854c8b13e3ec20dcdba94a2833d35be3eb27802e9',
     'test/test_scan360_mapper_node_contract.py':
-        '7027a776f37bfc609a1f74a248113f01ba6f7879d7f535b65242def252dabe40',
+        'c6a3563343e99f8b0f8dc9ac7b4131330b9e76794aebb344c00d2ba56a947726',
     'test/test_scan360_mapper_node_runtime.py':
         '705ffe5c2e0520d59bf7066cdb15faba25348be4921764ab72c8253491b68563',
     'test/test_scan360_orchestrator.cpp':
         '156dd224a8eefb316dcd405c8434a9075d840292df4655ed254344454796888e',
     'test/test_scan360_orchestrator_contract.py':
-        'dbda2bd137a6ca9928694263b9f10b0c9d0012d1b766a0830aa40f45464b264a',
+        '8c56ff3146890c3eec042a078df61936197e8828648dcf90d78c1af745f8a415',
     'test/test_scan360_planner.cpp':
         '9e927c9f9406f7a6eae567070bc03e9c82f969c94eb29cf69d2d62d6e84bca6f',
     'test/test_scan360_quality.cpp':
@@ -85,7 +85,7 @@ SCAN360_HASHES = {
     'test/test_scan360_rotate_action_binding.cpp':
         '027584eaec8187aca1ef4b92e38608447f00a6de5fa6390515ee1a65be6c2f1b',
     'test/test_scan360_rotate_action_binding_contract.py':
-        'bb9379f9f31cb4bd41445f3ce92c519634d4fbab5f0dc52b39866dcfed8109f5',
+        '5899db6454e171d91770b3826059bdd3fe96dda5db0fa2fa468890641e996d9d',
     'test/test_scan360_rotate_action_client_contract.py':
         '09bcfaad8f0350d22d21b2fdcdce2dfd8c725f6698e743e83dccb6e6811d816e',
     'test/test_scan360_rotate_action_client_runtime.cpp':

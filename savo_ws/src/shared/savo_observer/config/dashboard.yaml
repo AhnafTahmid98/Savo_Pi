@@ -1,0 +1,22 @@
+dashboard:
+  bind_address: 127.0.0.1
+  port: 8765
+  polling_interval_ms: 1000
+  history_capacity: 120
+  read_only: true
+  mobile_layout: responsive_grid
+  camera_preview_enabled: false
+  allowed_routes:
+    - /
+    - /index.html
+    - /styles.css
+    - /app.js
+    - /api/config
+    - /api/telemetry
+  denied_interfaces:
+    - /cmd_vel
+    - /goal_pose
+    - /initialpose
+    - /savo_control/mode_cmd
+    - /savo_nav/navigation/navigate_to_pose
+    - /savo_mapping/autonomous/run

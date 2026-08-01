@@ -1,0 +1,24 @@
+/observer_telemetry_node:
+  ros__parameters:
+    output_namespace: /savo_observer
+    publish_rate_hz: 1.0
+    freshness_timeout_ms: 5000
+    enable_core: true
+    require_core: true
+    enable_edge: true
+    require_edge: false
+    enable_robot_mode: true
+    enable_safety: true
+    enable_localization: true
+    enable_mapping: true
+    enable_navigation: true
+    enable_power: true
+    enable_lidar: true
+    enable_speech: true
+    enable_bridge: true
+    enable_active_map: true
+
+/observer_dashboard_node:
+  ros__parameters:
+    bind_address: 127.0.0.1
+    port: 8765

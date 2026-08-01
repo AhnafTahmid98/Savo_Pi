@@ -1,0 +1,10 @@
+layout:
+  name: mobile
+  responsive: true
+  columns: 1
+  raw_images: false
+  raw_pointclouds: false
+  panels:
+    - system
+    - subsystem_freshness
+    - alerts

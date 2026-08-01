@@ -1,0 +1,7 @@
+telemetry:
+  schema: savo_observer.telemetry.v1
+  publish_rate_hz: 1.0
+  freshness_timeout_ms: 5000
+  history_capacity: 120
+  no_sensor_republication: true
+  monotonic_clock_required: true

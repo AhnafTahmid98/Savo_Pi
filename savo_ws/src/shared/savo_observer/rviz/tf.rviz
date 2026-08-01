@@ -1,0 +1,155 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+  - Class: rviz_common/Views
+    Name: Views
+
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Alpha: 0.4
+      Cell Size: 0.25
+      Class: rviz_default_plugins/Grid
+      Color: 120; 120; 120
+      Enabled: true
+      Line Style:
+        Line Width: 0.03
+        Value: Lines
+      Name: Grid
+      Plane: XY
+      Plane Cell Count: 24
+      Reference Frame: base_footprint
+      Value: true
+
+    - Class: rviz_default_plugins/TF
+      Enabled: true
+      Frame Timeout: 15
+      Marker Scale: 0.18
+      Name: TF
+      Show Arrows: true
+      Show Axes: true
+      Show Names: true
+      Tree:
+        base_footprint:
+          base_link:
+            camera_body:
+              camera_link:
+                camera_color_frame:
+                  camera_color_optical_frame:
+                    {}
+                camera_depth_frame:
+                  camera_depth_optical_frame:
+                    {}
+            chassis_link:
+              {}
+            depth_obstacle_frame:
+              {}
+            display_link:
+              {}
+            imu_link:
+              {}
+            laser_frame:
+              {}
+            respeaker_link:
+              {}
+            savo_core_board_link:
+              savo_core_frame:
+                {}
+              savo_core_hat_link:
+                {}
+            savo_edge_board_link:
+              savo_edge_frame:
+                {}
+              savo_edge_hat_link:
+                {}
+            tof_left_link:
+              {}
+            tof_right_link:
+              {}
+            ultrasonic_front_link:
+              {}
+            wheel_fl_link:
+              {}
+            wheel_fr_link:
+              {}
+            wheel_rl_link:
+              {}
+            wheel_rr_link:
+              {}
+          footprint_debug_frame:
+            {}
+          local_costmap_frame:
+            {}
+      Update Interval: 0
+      Value: true
+
+    - Alpha: 0.45
+      Class: rviz_default_plugins/RobotModel
+      Collision Enabled: false
+      Description File: ""
+      Description Source: Topic
+      Description Topic:
+        Depth: 5
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /robot_description
+      Enabled: true
+      Links:
+        All Links Enabled: true
+        Expand Joint Details: false
+        Expand Link Details: false
+        Expand Tree: false
+        Link Tree Style: Links in Alphabetic Order
+      Mass Properties:
+        Inertia: false
+        Mass: false
+      Name: RobotModel
+      TF Prefix: ""
+      Update Interval: 0
+      Value: true
+      Visual Enabled: true
+
+  Enabled: true
+  Global Options:
+    Background Color: 35; 35; 35
+    Fixed Frame: base_footprint
+    Frame Rate: 30
+  Name: root
+  Tools:
+    - Class: rviz_default_plugins/Interact
+      Hide Inactive Objects: true
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+    - Class: rviz_default_plugins/FocusCamera
+    - Class: rviz_default_plugins/Measure
+  Transformation:
+    Current:
+      Class: rviz_default_plugins/TF
+  Value: true
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 1.4
+      Focal Point:
+        X: 0
+        Y: 0
+        Z: 0.10
+      Name: Current View
+      Pitch: 0.65
+      Target Frame: base_footprint
+      Yaw: 0.85
+    Saved: ~
+
+Window Geometry:
+  Displays:
+    collapsed: false
+  Height: 900
+  Hide Left Dock: false
+  Hide Right Dock: false
+  QMainWindow State: ""
+  Views:
+    collapsed: false
+  Width: 1400
+  X: 80
+  Y: 60

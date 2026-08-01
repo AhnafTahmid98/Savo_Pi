@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+command -v ros2 >/dev/null || { echo 'ros2 is not available; source ROS Jazzy.' >&2; exit 2; }
+
+if ! timeout 5 ros2 node list >/dev/null 2>&1; then
+  echo 'ROS daemon/graph query failed. Run: ros2 daemon stop; ros2 daemon start' >&2
+  exit 2
+fi
+
+topics="$(timeout 5 ros2 topic list 2>/dev/null || true)"
+if [[ -z "${topics}" ]]; then
+  echo 'No ROS topics discovered: check robot power, ROS_DOMAIN_ID, ROS_LOCALHOST_ONLY=0, DDS, multicast, VM bridge mode, and firewall.' >&2
+  exit 1
+fi
+
+required=(/tf /tf_static /robot_description /scan /odometry/filtered /savo_bringup/core/heartbeat)
+optional=(/savo_bringup/edge/heartbeat /camera/camera/depth/color/points /vo/odom)
+failed=0
+for topic in "${required[@]}"; do
+  if grep -Fxq "${topic}" <<<"${topics}"; then
+    printf 'required fresh candidate: %s\n' "${topic}"
+  else
+    printf 'required unavailable: %s\n' "${topic}" >&2
+    failed=1
+  fi
+done
+for topic in "${optional[@]}"; do
+  if grep -Fxq "${topic}" <<<"${topics}"; then
+    printf 'optional available: %s\n' "${topic}"
+  else
+    printf 'optional disabled or unavailable: %s\n' "${topic}"
+  fi
+done
+exit "${failed}"

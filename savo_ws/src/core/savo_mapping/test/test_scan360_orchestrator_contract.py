@@ -51,7 +51,7 @@ IMMUTABLE_HASHES = {
     'src/ros/scan360_rotate_action_client.cpp':
         '02196e5562a8f161b1bc396d0e5589020976c6e9365d0a4a0b170d5954e8a821',
     'package.xml':
-        '235cedf79a50b5e3f8b4d1477f5f8e7f0415503b0f0db775c24637007c9c34e1',
+        '3111a773efaea1e3894b35bc5c82cda866734d443930fd6aee6ae215546c5646',
     'include/savo_mapping/scan360_orchestrator.hpp':
         '1574719075f293befacea0425afe7e89a9d58144e4f2f17df2f81b245c126016',
     'src/scan360/scan360_orchestrator.cpp':

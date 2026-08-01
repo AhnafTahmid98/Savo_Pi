@@ -36,6 +36,7 @@
   <depend>yaml_cpp_vendor</depend>
   <depend>ament_index_cpp</depend>
   <exec_depend>savo_description</exec_depend>
+  <exec_depend>savo_observer</exec_depend>
   <depend>openssl</depend>
   <depend>nlohmann-json-dev</depend>
 
