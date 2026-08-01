@@ -1,0 +1,45 @@
+apriltag_detector_node:
+  ros__parameters:
+    # Production detector identity and typed ROS interfaces.
+    apriltag_enabled: true
+    apriltag_family: tag36h11
+    detector_name: apriltag3_cpp
+    image_topic: /savo_head/camera/image_raw
+    camera_info_topic: /savo_head/camera/camera_info
+    observation_topic: /savo_head/apriltag/observations
+    diagnostics_topic: /savo_head/apriltag/detector_status
+    camera_optical_frame: pi_camera_optical_frame
+
+    # The measured distance between the four AprilTag detection corners.
+    # This is not the full white paper size.
+    tag_size_m: 0.140
+    pose_estimation_enabled: true
+
+    # Empty means all non-negative tag IDs are allowed. The initial hardware
+    # profile below narrows this to the printed Robot SAVO test IDs 0 through 5.
+    allowed_tag_ids: []
+    maximum_hamming_distance: 1
+    minimum_decision_margin: 0.0
+    full_quality_decision_margin: 100.0
+    maximum_detection_distance_m: 3.0
+
+    # Raspberry Pi 5 bounded-runtime defaults. The ROS image callback only
+    # replaces a single pending frame; detection runs on a dedicated worker.
+    detector_threads: 2
+    quad_decimate: 2.0
+    quad_sigma: 0.0
+    refine_edges: true
+    decode_sharpening: 0.25
+
+    # ID detection remains available without calibration. Metric pose is only
+    # marked valid when CameraInfo contains usable intrinsics.
+    camera_info_max_age_s: 1.0
+    require_matching_camera_info_stamp: false
+    maximum_processing_latency_ms: 250.0
+    camera_stale_timeout_s: 1.0
+    diagnostics_rate_hz: 2.0
+
+    # Conservative initial covariance values. They must be reviewed after the
+    # real calibrated pose-distance test.
+    position_variance_m2: 0.0025
+    orientation_variance_rad2: 0.01

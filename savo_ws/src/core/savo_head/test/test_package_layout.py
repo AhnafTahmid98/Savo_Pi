@@ -49,6 +49,7 @@ def test_cpp_include_layout():
         "include/savo_head/core/pantilt_command.hpp",
         "include/savo_head/core/head_config.hpp",
         "include/savo_head/core/head_status.hpp",
+        "include/savo_head/core/apriltag_detector_config.hpp",
         "include/savo_head/drivers/pca9685_driver.hpp",
         "include/savo_head/drivers/pantilt_driver.hpp",
     ]:
@@ -62,6 +63,7 @@ def test_cpp_source_layout():
         "src/core/servo_calibration.cpp",
         "src/core/head_config.cpp",
         "src/core/head_status.cpp",
+        "src/core/apriltag_detector_config.cpp",
         "src/drivers/pca9685_driver.cpp",
         "src/drivers/pantilt_driver.cpp",
         "src/nodes/head_controller_node.cpp",
@@ -145,6 +147,8 @@ def test_config_layout():
         "config/head_frames.yaml",
         "config/camera_stream.yaml",
         "config/apriltag_semantics.yaml",
+        "config/apriltag_detector.yaml",
+        "config/apriltag_detector_ids_0_5.yaml",
         "config/diagnostics.yaml",
     ]:
         require_file(file_path)

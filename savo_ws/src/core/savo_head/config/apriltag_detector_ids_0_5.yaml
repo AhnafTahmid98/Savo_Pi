@@ -1,0 +1,9 @@
+apriltag_detector_node:
+  ros__parameters:
+    apriltag_enabled: true
+    apriltag_family: tag36h11
+    tag_size_m: 0.140
+    pose_estimation_enabled: true
+    allowed_tag_ids: [0, 1, 2, 3, 4, 5]
+    maximum_hamming_distance: 1
+    maximum_detection_distance_m: 3.0

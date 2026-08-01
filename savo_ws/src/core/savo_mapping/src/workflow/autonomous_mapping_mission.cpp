@@ -213,6 +213,7 @@ MissionDecision AutonomousMappingMission::start(
   scan360_generation_floor_ = inputs.scan360_generation;
   head_scan_generation_floor_ = inputs.head_scan_generation;
   coverage_plan_generation_floor_ = inputs.coverage_plan_generation;
+  completion_evidence_observation_sequence_ = 0U;
 
   start_pose_captured_ = !inputs.require_start_pose_capture;
   initial_scan360_completed_ = !inputs.require_initial_scan360;
@@ -368,9 +369,22 @@ MissionDecision AutonomousMappingMission::evaluate(
       return output;
     }
 
-    if (!inputs.completion_confirmed && workflow_is_frontier(inputs)) {
-      enter(MissionState::Exploring, "completion_evidence_revoked");
-      return decision(snapshot_.reason);
+    const bool newer_completion_evidence =
+      inputs.frontier_observation_sequence >
+      completion_evidence_observation_sequence_;
+    if (newer_completion_evidence && inputs.frontier_status_fresh) {
+      completion_evidence_observation_sequence_ =
+        inputs.frontier_observation_sequence;
+      if (!inputs.completion_confirmed) {
+        resume_state_ = MissionState::Exploring;
+        enter(
+          MissionState::WaitingForAuthority,
+          "completion_evidence_revoked");
+        MissionDecision revoked = decision(snapshot_.reason);
+        revoked.request_frontier_mode = !workflow_is_frontier(inputs);
+        revoked.snapshot = snapshot_;
+        return revoked;
+      }
     }
 
     if (inputs.handoff_active) {
@@ -511,7 +525,11 @@ MissionDecision AutonomousMappingMission::evaluate(
       return output;
     }
 
-    if (inputs.return_to_start_active) {
+    if (
+      inputs.return_to_start_active ||
+      inputs.return_goal_request_pending ||
+      inputs.return_cancel_pending)
+    {
       output.request_return_cancel = true;
       output.reason = "cancel_waiting_for_return_cancel";
       snapshot_.reason = output.reason;
@@ -585,7 +603,11 @@ MissionDecision AutonomousMappingMission::evaluate(
       return output;
     }
 
-    if (inputs.return_to_start_active) {
+    if (
+      inputs.return_to_start_active ||
+      inputs.return_goal_request_pending ||
+      inputs.return_cancel_pending)
+    {
       output.request_return_cancel = true;
       output.reason = "pause_waiting_for_return_cancel";
       snapshot_.reason = output.reason;
@@ -798,6 +820,8 @@ MissionDecision AutonomousMappingMission::evaluate(
     }
 
     if (inputs.completion_confirmed) {
+      completion_evidence_observation_sequence_ =
+        inputs.frontier_observation_sequence;
       enter(
         MissionState::CompletionPending,
         inputs.completion_reason.empty() ?
@@ -1410,6 +1434,8 @@ void AutonomousMappingMission::update_observations(
     inputs.frontier_plan_sequence;
   snapshot_.frontier_map_generation =
     inputs.frontier_map_generation;
+  snapshot_.frontier_observation_sequence =
+    inputs.frontier_observation_sequence;
   snapshot_.detected_frontiers =
     inputs.detected_frontiers;
   snapshot_.reachable_frontiers =
@@ -1434,6 +1460,10 @@ void AutonomousMappingMission::update_observations(
     inputs.coverage_plan_generation;
   snapshot_.coverage_map_generation =
     inputs.coverage_map_generation;
+  snapshot_.coverage_request_generation =
+    inputs.coverage_request_generation;
+  snapshot_.coverage_reset_generation =
+    inputs.coverage_reset_generation;
   snapshot_.coverage_total_waypoints =
     inputs.coverage_total_waypoints;
   snapshot_.coverage_execution_started =
@@ -1460,6 +1490,10 @@ void AutonomousMappingMission::update_observations(
 
   snapshot_.return_to_start_started =
     inputs.return_to_start_started;
+  snapshot_.return_goal_request_pending =
+    inputs.return_goal_request_pending;
+  snapshot_.return_cancel_pending =
+    inputs.return_cancel_pending;
   snapshot_.return_to_start_active =
     inputs.return_to_start_active;
   snapshot_.return_to_start_complete =

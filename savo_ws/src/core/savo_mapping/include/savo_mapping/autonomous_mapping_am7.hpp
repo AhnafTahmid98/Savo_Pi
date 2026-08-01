@@ -2,9 +2,25 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 
 namespace savo_mapping::autonomous
 {
+
+enum class ReturnActionLifecycle : std::uint8_t
+{
+  Idle = 0,
+  WaitingForServer = 1,
+  GoalRequestPending = 2,
+  AcceptedActive = 3,
+  CancelPending = 4,
+  Terminal = 5,
+  VerifyingProximity = 6,
+};
+
+std::string_view to_string(ReturnActionLifecycle state);
+
+bool return_goal_may_be_executing(ReturnActionLifecycle state);
 
 struct CoveragePlannerObservation
 {
@@ -15,6 +31,8 @@ struct CoveragePlannerObservation
   bool explicit_noop{false};
   bool map_valid{false};
   bool map_fresh{false};
+  std::uint64_t request_generation{0};
+  std::uint64_t reset_generation{0};
   std::uint64_t plan_generation{0};
   std::uint64_t map_generation{0};
   std::uint32_t waypoint_count{0};
@@ -28,6 +46,9 @@ struct CoverageOperationObservation
   bool supervisor_authorized{false};
   bool candidate_valid{false};
   bool approval_pending{false};
+  bool feedback_received{false};
+  std::uint64_t feedback_sequence{0};
+  double feedback_age_s{-1.0};
   std::uint64_t candidate_generation{0};
   std::string state{"unavailable"};
   std::string mission_id;

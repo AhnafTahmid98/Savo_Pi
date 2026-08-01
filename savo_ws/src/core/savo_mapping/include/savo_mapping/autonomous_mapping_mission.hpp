@@ -140,6 +140,7 @@ struct MissionInputs
 
   bool frontier_status_received{false};
   bool frontier_status_fresh{false};
+  std::uint64_t frontier_observation_sequence{0};
   std::string frontier_planning_status{"unavailable"};
   std::uint64_t frontier_plan_sequence{0};
   std::uint64_t frontier_map_generation{0};
@@ -153,6 +154,8 @@ struct MissionInputs
 
   std::uint64_t coverage_plan_generation{0};
   std::uint64_t coverage_map_generation{0};
+  std::uint64_t coverage_request_generation{0};
+  std::uint64_t coverage_reset_generation{0};
   bool coverage_planning_started{false};
   bool coverage_planning_complete{false};
   bool coverage_plan_valid{false};
@@ -175,6 +178,8 @@ struct MissionInputs
   std::uint32_t coverage_maximum_restart_attempts{2};
 
   bool return_to_start_started{false};
+  bool return_goal_request_pending{false};
+  bool return_cancel_pending{false};
   bool return_to_start_active{false};
   bool return_to_start_complete{false};
   bool return_to_start_succeeded{false};
@@ -247,6 +252,7 @@ struct MissionSnapshot
   std::string frontier_planning_status{"unavailable"};
   std::uint64_t frontier_plan_sequence{0};
   std::uint64_t frontier_map_generation{0};
+  std::uint64_t frontier_observation_sequence{0};
   std::uint32_t detected_frontiers{0};
   std::uint32_t reachable_frontiers{0};
   std::uint32_t exhaustion_observations{0};
@@ -260,6 +266,8 @@ struct MissionSnapshot
   bool coverage_plan_valid{false};
   std::uint64_t coverage_plan_generation{0};
   std::uint64_t coverage_map_generation{0};
+  std::uint64_t coverage_request_generation{0};
+  std::uint64_t coverage_reset_generation{0};
   std::uint32_t coverage_total_waypoints{0};
   bool coverage_execution_started{false};
   bool coverage_execution_active{false};
@@ -275,6 +283,8 @@ struct MissionSnapshot
   std::uint32_t coverage_restart_attempts{0};
 
   bool return_to_start_started{false};
+  bool return_goal_request_pending{false};
+  bool return_cancel_pending{false};
   bool return_to_start_active{false};
   bool return_to_start_complete{false};
   bool return_to_start_succeeded{false};
@@ -421,6 +431,7 @@ private:
   std::uint64_t scan360_generation_floor_{0};
   std::uint64_t head_scan_generation_floor_{0};
   std::uint64_t coverage_plan_generation_floor_{0};
+  std::uint64_t completion_evidence_observation_sequence_{0};
 
   bool start_pose_captured_{false};
   bool initial_scan360_completed_{false};

@@ -55,6 +55,35 @@ bool normalize_planar_quaternion(
 
 }  // namespace
 
+std::string_view to_string(const ReturnActionLifecycle state)
+{
+  switch (state) {
+    case ReturnActionLifecycle::Idle:
+      return "idle";
+    case ReturnActionLifecycle::WaitingForServer:
+      return "waiting_for_server";
+    case ReturnActionLifecycle::GoalRequestPending:
+      return "goal_request_pending";
+    case ReturnActionLifecycle::AcceptedActive:
+      return "accepted_active";
+    case ReturnActionLifecycle::CancelPending:
+      return "cancel_pending";
+    case ReturnActionLifecycle::Terminal:
+      return "terminal";
+    case ReturnActionLifecycle::VerifyingProximity:
+      return "verifying_proximity";
+  }
+  return "unknown";
+}
+
+bool return_goal_may_be_executing(const ReturnActionLifecycle state)
+{
+  return
+    state == ReturnActionLifecycle::GoalRequestPending ||
+    state == ReturnActionLifecycle::AcceptedActive ||
+    state == ReturnActionLifecycle::CancelPending;
+}
+
 CoveragePlannerObservation parse_coverage_planner_status(
   const std::string & json_text)
 {
@@ -69,6 +98,10 @@ CoveragePlannerObservation parse_coverage_planner_status(
     output.reason = value_or(status, "reason", output.reason);
     output.map_valid = value_or(status, "map_valid", false);
     output.map_fresh = value_or(status, "map_fresh", false);
+    output.request_generation = value_or<std::uint64_t>(
+      status, "request_generation", 0U);
+    output.reset_generation = value_or<std::uint64_t>(
+      status, "reset_generation", 0U);
     output.plan_generation = value_or<std::uint64_t>(
       status, "plan_sequence", 0U);
     output.map_generation = value_or<std::uint64_t>(
@@ -107,6 +140,11 @@ CoverageOperationObservation parse_coverage_operation_status(
       status, "supervisor_authorized", false);
     output.candidate_valid = value_or(status, "candidate_valid", false);
     output.approval_pending = value_or(status, "approval_pending", false);
+    output.feedback_received = value_or(
+      status, "feedback_received", false);
+    output.feedback_sequence = value_or<std::uint64_t>(
+      status, "feedback_sequence", 0U);
+    output.feedback_age_s = value_or(status, "feedback_age_s", -1.0);
     output.candidate_generation = value_or<std::uint64_t>(
       status, "candidate_generation", 0U);
     output.state = value_or(status, "state", output.state);

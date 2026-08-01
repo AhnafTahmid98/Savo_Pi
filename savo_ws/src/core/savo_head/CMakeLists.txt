@@ -35,6 +35,7 @@ add_library(${PROJECT_NAME}_core
   src/core/head_status.cpp
   src/core/camera_health.cpp
   src/core/camera_status_report.cpp
+  src/core/apriltag_detector_config.cpp
   src/drivers/pca9685_driver.cpp
   src/drivers/pantilt_driver.cpp
 )
@@ -178,6 +179,11 @@ if(BUILD_TESTING)
   ament_add_pytest_test(
     test_apriltag_typed_contract
     test/test_apriltag_typed_contract.py
+  )
+
+  ament_add_pytest_test(
+    test_apriltag_detector_config_core
+    test/test_apriltag_detector_config_core.py
   )
 
   ament_add_pytest_test(
