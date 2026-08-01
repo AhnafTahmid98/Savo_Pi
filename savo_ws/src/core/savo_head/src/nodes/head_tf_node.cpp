@@ -201,6 +201,12 @@ public:
         std::chrono::duration<double>(1.0 / status_hz)),
       std::bind(&HeadTfNode::publish_status, this));
 
+    if (!get_parameter("transforms_calibrated").as_bool()) {
+      RCLCPP_WARN(
+        get_logger(),
+        "head TF publishing is calibration-gated; physical transforms are not approved");
+    }
+
     RCLCPP_INFO(get_logger(), "head TF node started");
   }
 
@@ -212,10 +218,11 @@ private:
     declare_parameter<std::string>("dashboard_text_topic", kTopicDashboardText);
 
     declare_parameter<bool>("publish_tf", true);
+    declare_parameter<bool>("transforms_calibrated", false);
     declare_parameter<double>("tf_rate_hz", kTfHz);
     declare_parameter<double>("status_hz", kStatusHz);
 
-    declare_parameter<std::string>("base_frame", kFrameBaseLink);
+    declare_parameter<std::string>("base_frame", kFramePantiltMount);
     declare_parameter<std::string>("pan_frame", kFramePanLink);
     declare_parameter<std::string>("tilt_frame", kFrameTiltLink);
     declare_parameter<std::string>("camera_frame", kFrameCameraLink);
@@ -233,15 +240,20 @@ private:
     declare_parameter<double>("tilt_zero_deg", static_cast<double>(kTiltCenterDeg));
 
     declare_parameter<std::vector<double>>("base_to_pan_xyz_m", std::vector<double>{0.0, 0.0, 0.0});
-    declare_parameter<std::vector<double>>("base_to_pan_rpy_rad", std::vector<double>{0.0, 0.0, 0.0});
+    declare_parameter<std::vector<double>>("base_to_pan_rpy_rad",
+        std::vector<double>{0.0, 0.0, 0.0});
 
     declare_parameter<std::vector<double>>("pan_to_tilt_xyz_m", std::vector<double>{0.0, 0.0, 0.0});
-    declare_parameter<std::vector<double>>("pan_to_tilt_rpy_rad", std::vector<double>{0.0, 0.0, 0.0});
+    declare_parameter<std::vector<double>>("pan_to_tilt_rpy_rad",
+        std::vector<double>{0.0, 0.0, 0.0});
 
-    declare_parameter<std::vector<double>>("tilt_to_camera_xyz_m", std::vector<double>{0.0, 0.0, 0.0});
-    declare_parameter<std::vector<double>>("tilt_to_camera_rpy_rad", std::vector<double>{0.0, 0.0, 0.0});
+    declare_parameter<std::vector<double>>("tilt_to_camera_xyz_m",
+        std::vector<double>{0.0, 0.0, 0.0});
+    declare_parameter<std::vector<double>>("tilt_to_camera_rpy_rad",
+        std::vector<double>{0.0, 0.0, 0.0});
 
-    declare_parameter<std::vector<double>>("camera_to_optical_xyz_m", std::vector<double>{0.0, 0.0, 0.0});
+    declare_parameter<std::vector<double>>("camera_to_optical_xyz_m",
+        std::vector<double>{0.0, 0.0, 0.0});
     declare_parameter<std::vector<double>>(
       "camera_to_optical_rpy_rad",
       std::vector<double>{-1.57079632679, 0.0, -1.57079632679});
@@ -260,6 +272,11 @@ private:
   void publish_tf()
   {
     if (!get_parameter("publish_tf").as_bool()) {
+      return;
+    }
+
+    if (!get_parameter("transforms_calibrated").as_bool()) {
+      last_error_ = "physical_head_transforms_not_calibrated";
       return;
     }
 
@@ -426,6 +443,8 @@ private:
       kv("camera_frame", get_parameter("camera_frame").as_string()),
       kv("camera_optical_frame", get_parameter("camera_optical_frame").as_string()),
       kv("has_joint_state", last_joint_state_.has_value()),
+      kv("publish_tf", get_parameter("publish_tf").as_bool()),
+      kv("transforms_calibrated", get_parameter("transforms_calibrated").as_bool()),
       kv("last_state_age_s", last_state_age_s()),
       kv("last_error", last_error_.value_or(""))
     };
@@ -445,22 +464,42 @@ private:
   {
     std::vector<ComponentHealth> components;
 
-    const auto stale = check_stale(
-      now_s(),
-      last_state_s_,
-      get_parameter("stale_state_timeout_s").as_double(),
-      get_parameter("require_valid_pan_tilt_state").as_bool());
+    const auto publish_tf = get_parameter("publish_tf").as_bool();
+    const auto transforms_calibrated =
+      get_parameter("transforms_calibrated").as_bool();
 
-    auto state_health = health_from_stale_check(
-      "savo_head.tf_state",
-      stale,
-      get_parameter("require_valid_pan_tilt_state").as_bool());
+    ComponentHealth state_health;
 
-    if (last_error_.has_value() && !last_error_->empty()) {
-      state_health = error_component("savo_head.tf", *last_error_);
+    if (!transforms_calibrated) {
+      if (publish_tf) {
+        state_health = error_component(
+          "savo_head.tf",
+          "physical_head_transforms_not_calibrated");
+      } else {
+        state_health = warn_component(
+          "savo_head.tf",
+          HeadStatus::kDisabled,
+          "TF_DISABLED_PENDING_CALIBRATION");
+      }
+    } else {
+      const auto stale = check_stale(
+        now_s(),
+        last_state_s_,
+        get_parameter("stale_state_timeout_s").as_double(),
+        get_parameter("require_valid_pan_tilt_state").as_bool());
+
+      state_health = health_from_stale_check(
+        "savo_head.tf_state",
+        stale,
+        get_parameter("require_valid_pan_tilt_state").as_bool());
+
+      if (last_error_.has_value() && !last_error_->empty()) {
+        state_health = error_component("savo_head.tf", *last_error_);
+      }
     }
 
-    state_health.add_value("publish_tf", get_parameter("publish_tf").as_bool());
+    state_health.add_value("publish_tf", publish_tf);
+    state_health.add_value("transforms_calibrated", transforms_calibrated);
     state_health.add_value("last_state_age_s", last_state_age_s());
 
     components.push_back(state_health);

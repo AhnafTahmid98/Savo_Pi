@@ -76,7 +76,7 @@ struct FrameTransformSpec
 
 struct HeadFrameContract
 {
-  std::string base_frame{kFrameBaseLink};
+  std::string base_frame{kFramePantiltMount};
   std::string pan_frame{kFramePanLink};
   std::string tilt_frame{kFrameTiltLink};
   std::string camera_frame{kFrameCameraLink};
@@ -95,7 +95,7 @@ struct HeadFrameContract
   double tilt_zero_deg{static_cast<double>(kTiltCenterDeg)};
 
   FrameTransformSpec base_to_pan{
-    kFrameBaseLink,
+    kFramePantiltMount,
     kFramePanLink,
     Vec3d{0.0, 0.0, 0.0},
     Vec3d{0.0, 0.0, 0.0}

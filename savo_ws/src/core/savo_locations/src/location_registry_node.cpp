@@ -168,6 +168,11 @@ LocationRegistryNode::LocationRegistryNode(
       "database_path",
       kDefaultDatabasePath);
 
+  releases_root_ =
+    declare_parameter<std::string>(
+      "releases_root",
+      "/var/lib/robot_savo/locations/releases");
+
   create_parent_directories_ =
     declare_parameter<bool>(
       "create_parent_directories",
@@ -200,8 +205,8 @@ LocationRegistryNode::LocationRegistryNode(
 
   const auto latched_qos =
     rclcpp::QoS(rclcpp::KeepLast(1))
-      .reliable()
-      .transient_local();
+    .reliable()
+    .transient_local();
 
   status_publisher_ =
     create_publisher<std_msgs::msg::String>(
@@ -220,17 +225,17 @@ LocationRegistryNode::LocationRegistryNode(
       std::string(
         ::savo_locations::topic_names::kHeartbeat),
       rclcpp::QoS(rclcpp::KeepLast(10))
-        .reliable()
-        .durability_volatile());
+    .reliable()
+    .durability_volatile());
 
   event_publisher_ =
     create_publisher<
-      savo_msgs::msg::LocationEvent>(
+    savo_msgs::msg::LocationEvent>(
         std::string(
           ::savo_locations::topic_names::kEvents),
         rclcpp::QoS(rclcpp::KeepLast(100))
-          .reliable()
-          .durability_volatile());
+    .reliable()
+    .durability_volatile());
 
   resolve_service_ =
     create_service<ResolveService>(
@@ -286,10 +291,10 @@ LocationRegistryNode::LocationRegistryNode(
     create_service<RegisterService>(
       std::string(
         ::savo_locations::service_names::
-          kRegisterCandidate),
+      kRegisterCandidate),
       std::bind(
         &LocationRegistryNode::
-          handle_register_candidate,
+      handle_register_candidate,
         this,
         std::placeholders::_1,
         std::placeholders::_2));
@@ -298,10 +303,10 @@ LocationRegistryNode::LocationRegistryNode(
     create_service<ApproveService>(
       std::string(
         ::savo_locations::service_names::
-          kApproveCandidate),
+      kApproveCandidate),
       std::bind(
         &LocationRegistryNode::
-          handle_approve_candidate,
+      handle_approve_candidate,
         this,
         std::placeholders::_1,
         std::placeholders::_2));
@@ -310,10 +315,10 @@ LocationRegistryNode::LocationRegistryNode(
     create_service<RejectService>(
       std::string(
         ::savo_locations::service_names::
-          kRejectCandidate),
+      kRejectCandidate),
       std::bind(
         &LocationRegistryNode::
-          handle_reject_candidate,
+      handle_reject_candidate,
         this,
         std::placeholders::_1,
         std::placeholders::_2));
@@ -334,6 +339,46 @@ LocationRegistryNode::LocationRegistryNode(
         ::savo_locations::service_names::kRecoverStorage),
       std::bind(
         &LocationRegistryNode::handle_recover_storage,
+        this,
+        std::placeholders::_1,
+        std::placeholders::_2));
+
+  prepare_release_service_ =
+    create_service<PrepareReleaseService>(
+      std::string(
+        ::savo_locations::service_names::kPrepareRelease),
+      std::bind(
+        &LocationRegistryNode::handle_prepare_release,
+        this,
+        std::placeholders::_1,
+        std::placeholders::_2));
+
+  verify_release_service_ =
+    create_service<VerifyReleaseService>(
+      std::string(
+        ::savo_locations::service_names::kVerifyRelease),
+      std::bind(
+        &LocationRegistryNode::handle_verify_release,
+        this,
+        std::placeholders::_1,
+        std::placeholders::_2));
+
+  commit_release_service_ =
+    create_service<CommitReleaseService>(
+      std::string(
+        ::savo_locations::service_names::kCommitRelease),
+      std::bind(
+        &LocationRegistryNode::handle_commit_release,
+        this,
+        std::placeholders::_1,
+        std::placeholders::_2));
+
+  rollback_release_service_ =
+    create_service<RollbackReleaseService>(
+      std::string(
+        ::savo_locations::service_names::kRollbackRelease),
+      std::bind(
+        &LocationRegistryNode::handle_rollback_release,
         this,
         std::placeholders::_1,
         std::placeholders::_2));
@@ -439,9 +484,7 @@ void LocationRegistryNode::initialize_storage()
           "SQLite migration failed: " +
           migration_result.reason);
       }
-    }
-    else
-    {
+    } else {
       std::uint32_t schema_version = 0U;
 
       const auto version_result =
@@ -516,8 +559,7 @@ void LocationRegistryNode::initialize_storage()
       static_cast<unsigned long long>(
         report.event_count),
       write_ready_ ? "ready" : "disabled");
-  }
-  catch (const std::exception & exception) {
+  } catch (const std::exception & exception) {
     ready_ = false;
     write_ready_ = false;
     storage_healthy_ = false;
@@ -546,9 +588,9 @@ void LocationRegistryNode::publish_status()
       << "\"component\":\"savo_locations\","
       << "\"mode\":\""
       << (
-        enable_write_services_ ?
-        "read_write" :
-        "read_only")
+      enable_write_services_ ?
+      "read_write" :
+      "read_only")
       << "\","
       << "\"state\":\""
       << json_escape(state_)
@@ -567,9 +609,9 @@ void LocationRegistryNode::publish_status()
       << ","
       << "\"mutation_in_progress\":"
       << (
-        mutation_in_progress_ ?
-        "true" :
-        "false")
+      mutation_in_progress_ ?
+      "true" :
+      "false")
       << ","
       << "\"schema_version\":"
       << bootstrap_report_.schema_version
@@ -1152,7 +1194,7 @@ void LocationRegistryNode::handle_register_candidate(
     response->registered = false;
     response->result_code =
       RegisterService::Response::
-        RESULT_STORAGE_UNAVAILABLE;
+      RESULT_STORAGE_UNAVAILABLE;
     response->reason = rejection;
     publish_status();
     return;
@@ -1169,11 +1211,11 @@ void LocationRegistryNode::handle_register_candidate(
       actor_id.empty() ||
       (
         input.state !=
-          savo_msgs::msg::LocationCandidate::
-            STATE_UNKNOWN &&
+        savo_msgs::msg::LocationCandidate::
+        STATE_UNKNOWN &&
         input.state !=
-          savo_msgs::msg::LocationCandidate::
-            STATE_PENDING_REVIEW) ||
+        savo_msgs::msg::LocationCandidate::
+        STATE_PENDING_REVIEW) ||
       input.candidate_revision > 1U ||
       !trim_ascii(input.review_reason).empty())
     {
@@ -1184,7 +1226,7 @@ void LocationRegistryNode::handle_register_candidate(
       response->registered = false;
       response->result_code =
         RegisterService::Response::
-          RESULT_INVALID_CANDIDATE;
+        RESULT_INVALID_CANDIDATE;
       response->reason = reason;
       publish_status();
       return;
@@ -1205,7 +1247,7 @@ void LocationRegistryNode::handle_register_candidate(
       response->registered = false;
       response->result_code =
         RegisterService::Response::
-          RESULT_INTERNAL_ERROR;
+        RESULT_INTERNAL_ERROR;
       response->reason = hydration_reason;
       publish_status();
       return;
@@ -1224,29 +1266,29 @@ void LocationRegistryNode::handle_register_candidate(
 
       switch (domain_result.code) {
         case CandidateMutationCode::
-            kCandidateIdConflict:
+          kCandidateIdConflict:
           response->result_code =
             RegisterService::Response::
-              RESULT_DUPLICATE_CANDIDATE_ID;
+            RESULT_DUPLICATE_CANDIDATE_ID;
           break;
 
         case CandidateMutationCode::kTagConflict:
           response->result_code =
             RegisterService::Response::
-              RESULT_TAG_CONFLICT;
+            RESULT_TAG_CONFLICT;
           break;
 
         case CandidateMutationCode::
-            kInvalidCandidate:
+          kInvalidCandidate:
           response->result_code =
             RegisterService::Response::
-              RESULT_INVALID_CANDIDATE;
+            RESULT_INVALID_CANDIDATE;
           break;
 
         default:
           response->result_code =
             RegisterService::Response::
-              RESULT_INTERNAL_ERROR;
+            RESULT_INTERNAL_ERROR;
           break;
       }
 
@@ -1288,25 +1330,25 @@ void LocationRegistryNode::handle_register_candidate(
         case SnapshotCode::kIdentityConflict:
           response->result_code =
             RegisterService::Response::
-              RESULT_DUPLICATE_CANDIDATE_ID;
+            RESULT_DUPLICATE_CANDIDATE_ID;
           break;
 
         case SnapshotCode::kTagConflict:
           response->result_code =
             RegisterService::Response::
-              RESULT_TAG_CONFLICT;
+            RESULT_TAG_CONFLICT;
           break;
 
         case SnapshotCode::kValidationFailed:
           response->result_code =
             RegisterService::Response::
-              RESULT_INVALID_CANDIDATE;
+            RESULT_INVALID_CANDIDATE;
           break;
 
         default:
           response->result_code =
             RegisterService::Response::
-              RESULT_STORAGE_UNAVAILABLE;
+            RESULT_STORAGE_UNAVAILABLE;
           break;
       }
 
@@ -1322,7 +1364,7 @@ void LocationRegistryNode::handle_register_candidate(
     publish_committed_event(
       event_sequence,
       savo_msgs::msg::LocationEvent::
-        EVENT_CANDIDATE_REGISTERED,
+      EVENT_CANDIDATE_REGISTERED,
       stored_candidate.candidate.candidate_id,
       "",
       stored_candidate.candidate_revision,
@@ -1343,8 +1385,7 @@ void LocationRegistryNode::handle_register_candidate(
       std::to_string(event_sequence);
     response->stored_candidate =
       to_ros_candidate_record(stored_candidate);
-  }
-  catch (const std::exception & exception) {
+  } catch (const std::exception & exception) {
     finish_mutation_degraded(
       "candidate registration exception: " +
       std::string(exception.what()));
@@ -1376,7 +1417,7 @@ void LocationRegistryNode::handle_approve_candidate(
     response->approved = false;
     response->result_code =
       ApproveService::Response::
-        RESULT_STORAGE_UNAVAILABLE;
+      RESULT_STORAGE_UNAVAILABLE;
     response->reason = rejection;
     publish_status();
     return;
@@ -1399,7 +1440,7 @@ void LocationRegistryNode::handle_approve_candidate(
       response->approved = false;
       response->result_code =
         ApproveService::Response::
-          RESULT_INVALID_REQUEST;
+        RESULT_INVALID_REQUEST;
       response->reason = reason;
       publish_status();
       return;
@@ -1420,7 +1461,7 @@ void LocationRegistryNode::handle_approve_candidate(
       response->approved = false;
       response->result_code =
         ApproveService::Response::
-          RESULT_INTERNAL_ERROR;
+        RESULT_INTERNAL_ERROR;
       response->reason = hydration_reason;
       publish_status();
       return;
@@ -1443,19 +1484,19 @@ void LocationRegistryNode::handle_approve_candidate(
         case ApprovalCode::kCandidateNotFound:
           response->result_code =
             ApproveService::Response::
-              RESULT_CANDIDATE_NOT_FOUND;
+            RESULT_CANDIDATE_NOT_FOUND;
           break;
 
         case ApprovalCode::kCandidateNotPending:
           response->result_code =
             ApproveService::Response::
-              RESULT_CANDIDATE_NOT_PENDING;
+            RESULT_CANDIDATE_NOT_PENDING;
           break;
 
         case ApprovalCode::kStaleRevision:
           response->result_code =
             ApproveService::Response::
-              RESULT_STALE_REVISION;
+            RESULT_STALE_REVISION;
           break;
 
         case ApprovalCode::kLocationConflict:
@@ -1465,13 +1506,11 @@ void LocationRegistryNode::handle_approve_candidate(
           {
             response->result_code =
               ApproveService::Response::
-                RESULT_LOCATION_ID_CONFLICT;
-          }
-          else
-          {
+              RESULT_LOCATION_ID_CONFLICT;
+          } else {
             response->result_code =
               ApproveService::Response::
-                RESULT_ALIAS_CONFLICT;
+              RESULT_ALIAS_CONFLICT;
           }
           break;
 
@@ -1480,15 +1519,15 @@ void LocationRegistryNode::handle_approve_candidate(
           response->result_code =
             approval_has_approach_issue(domain_result) ?
             ApproveService::Response::
-              RESULT_INVALID_APPROACH_POSE :
+            RESULT_INVALID_APPROACH_POSE :
             ApproveService::Response::
-              RESULT_INVALID_REQUEST;
+            RESULT_INVALID_REQUEST;
           break;
 
         default:
           response->result_code =
             ApproveService::Response::
-              RESULT_INVALID_REQUEST;
+            RESULT_INVALID_REQUEST;
           break;
       }
 
@@ -1539,13 +1578,11 @@ void LocationRegistryNode::handle_approve_candidate(
       {
         response->result_code =
           ApproveService::Response::
-            RESULT_STALE_REVISION;
-      }
-      else
-      {
+          RESULT_STALE_REVISION;
+      } else {
         response->result_code =
           ApproveService::Response::
-            RESULT_STORAGE_UNAVAILABLE;
+          RESULT_STORAGE_UNAVAILABLE;
       }
 
       publish_status();
@@ -1560,7 +1597,7 @@ void LocationRegistryNode::handle_approve_candidate(
     publish_committed_event(
       event_sequence,
       savo_msgs::msg::LocationEvent::
-        EVENT_LOCATION_APPROVED,
+      EVENT_LOCATION_APPROVED,
       approved_candidate.candidate.candidate_id,
       approved_location.location.location_id,
       approved_candidate.candidate_revision,
@@ -1581,8 +1618,7 @@ void LocationRegistryNode::handle_approve_candidate(
       std::to_string(event_sequence);
     response->location =
       to_ros_location_record(approved_location);
-  }
-  catch (const std::exception & exception) {
+  } catch (const std::exception & exception) {
     finish_mutation_degraded(
       "candidate approval exception: " +
       std::string(exception.what()));
@@ -1760,8 +1796,7 @@ void LocationRegistryNode::handle_reject_candidate(
       std::to_string(event_sequence);
     response->candidate =
       to_ros_candidate_record(rejected_candidate);
-  }
-  catch (const std::exception & exception) {
+  } catch (const std::exception & exception) {
     finish_mutation_degraded(
       "candidate rejection exception: " +
       std::string(exception.what()));
@@ -1792,7 +1827,7 @@ void LocationRegistryNode::handle_set_enabled(
     response->updated = false;
     response->result_code =
       SetEnabledService::Response::
-        RESULT_STORAGE_UNAVAILABLE;
+      RESULT_STORAGE_UNAVAILABLE;
     response->reason = rejection;
     publish_status();
     return;
@@ -1820,7 +1855,7 @@ void LocationRegistryNode::handle_set_enabled(
       response->updated = false;
       response->result_code =
         SetEnabledService::Response::
-          RESULT_INVALID_REQUEST;
+        RESULT_INVALID_REQUEST;
       response->reason = reason;
       publish_status();
       return;
@@ -1841,7 +1876,7 @@ void LocationRegistryNode::handle_set_enabled(
       response->updated = false;
       response->result_code =
         SetEnabledService::Response::
-          RESULT_INTERNAL_ERROR;
+        RESULT_INTERNAL_ERROR;
       response->reason = hydration_reason;
       publish_status();
       return;
@@ -1861,7 +1896,7 @@ void LocationRegistryNode::handle_set_enabled(
       response->updated = false;
       response->result_code =
         SetEnabledService::Response::
-          RESULT_INVALID_REQUEST;
+        RESULT_INVALID_REQUEST;
       response->reason = reason;
       response->location =
         to_ros_location_record(existing.value());
@@ -1886,31 +1921,31 @@ void LocationRegistryNode::handle_set_enabled(
         case MutationCode::kNotFound:
           response->result_code =
             SetEnabledService::Response::
-              RESULT_NOT_FOUND;
+            RESULT_NOT_FOUND;
           break;
 
         case MutationCode::kRetired:
           response->result_code =
             SetEnabledService::Response::
-              RESULT_RETIRED;
+            RESULT_RETIRED;
           break;
 
         case MutationCode::kStaleRevision:
           response->result_code =
             SetEnabledService::Response::
-              RESULT_STALE_REVISION;
+            RESULT_STALE_REVISION;
           break;
 
         case MutationCode::kInvalidRecord:
           response->result_code =
             SetEnabledService::Response::
-              RESULT_INVALID_REQUEST;
+            RESULT_INVALID_REQUEST;
           break;
 
         default:
           response->result_code =
             SetEnabledService::Response::
-              RESULT_INTERNAL_ERROR;
+            RESULT_INTERNAL_ERROR;
           break;
       }
 
@@ -1957,13 +1992,11 @@ void LocationRegistryNode::handle_set_enabled(
       {
         response->result_code =
           SetEnabledService::Response::
-            RESULT_STALE_REVISION;
-      }
-      else
-      {
+          RESULT_STALE_REVISION;
+      } else {
         response->result_code =
           SetEnabledService::Response::
-            RESULT_STORAGE_UNAVAILABLE;
+          RESULT_STORAGE_UNAVAILABLE;
       }
 
       publish_status();
@@ -1981,9 +2014,9 @@ void LocationRegistryNode::handle_set_enabled(
       event_sequence,
       request->enabled ?
         savo_msgs::msg::LocationEvent::
-          EVENT_LOCATION_ENABLED :
+      EVENT_LOCATION_ENABLED :
         savo_msgs::msg::LocationEvent::
-          EVENT_LOCATION_DISABLED,
+      EVENT_LOCATION_DISABLED,
       "",
       updated_location.location.location_id,
       updated_location.record_revision,
@@ -2004,8 +2037,7 @@ void LocationRegistryNode::handle_set_enabled(
       std::to_string(event_sequence);
     response->location =
       to_ros_location_record(updated_location);
-  }
-  catch (const std::exception & exception) {
+  } catch (const std::exception & exception) {
     finish_mutation_degraded(
       "location enablement exception: " +
       std::string(exception.what()));
@@ -2080,7 +2112,7 @@ void LocationRegistryNode::handle_recover_storage(
 
       response->result_code =
         RecoveryService::Response::
-          RESULT_STORAGE_UNAVAILABLE;
+        RESULT_STORAGE_UNAVAILABLE;
       response->reason = open_result.reason;
       publish_status();
       return;
@@ -2099,7 +2131,7 @@ void LocationRegistryNode::handle_recover_storage(
 
         response->result_code =
           RecoveryService::Response::
-            RESULT_STORAGE_UNAVAILABLE;
+          RESULT_STORAGE_UNAVAILABLE;
         response->reason = migration_result.reason;
         publish_status();
         return;
@@ -2114,7 +2146,7 @@ void LocationRegistryNode::handle_recover_storage(
       if (
         !version_result.success ||
         schema_version !=
-          kSupportedSqliteSchemaVersion)
+        kSupportedSqliteSchemaVersion)
       {
         const std::string reason =
           version_result.success ?
@@ -2126,7 +2158,7 @@ void LocationRegistryNode::handle_recover_storage(
 
         response->result_code =
           RecoveryService::Response::
-            RESULT_STORAGE_UNAVAILABLE;
+          RESULT_STORAGE_UNAVAILABLE;
         response->reason = reason;
         publish_status();
         return;
@@ -2152,7 +2184,7 @@ void LocationRegistryNode::handle_recover_storage(
 
       response->result_code =
         RecoveryService::Response::
-          RESULT_INTEGRITY_FAILED;
+        RESULT_INTEGRITY_FAILED;
       response->reason = reason;
       publish_status();
       return;
@@ -2177,7 +2209,7 @@ void LocationRegistryNode::handle_recover_storage(
 
       response->result_code =
         RecoveryService::Response::
-          RESULT_STORAGE_UNAVAILABLE;
+        RESULT_STORAGE_UNAVAILABLE;
       response->reason = bootstrap_result.reason;
       publish_status();
       return;
@@ -2198,16 +2230,16 @@ void LocationRegistryNode::handle_recover_storage(
 
       response->result_code =
         RecoveryService::Response::
-          RESULT_INTEGRITY_FAILED;
+        RESULT_INTEGRITY_FAILED;
       response->reason = hydration_reason;
       publish_status();
       return;
     }
 
     std::unique_ptr<SqliteStore>
-      previous_store;
+    previous_store;
     std::unique_ptr<SqliteRepository>
-      previous_repository;
+    previous_repository;
 
     {
       std::unique_lock<std::shared_mutex> lock{
@@ -2248,10 +2280,10 @@ void LocationRegistryNode::handle_recover_storage(
       recovered_report.schema_version;
     response->location_count =
       static_cast<std::uint64_t>(
-        recovered_report.location_count);
+      recovered_report.location_count);
     response->candidate_count =
       static_cast<std::uint64_t>(
-        recovered_report.candidate_count);
+      recovered_report.candidate_count);
     response->event_count =
       recovered_report.event_count;
     response->last_event_sequence =
@@ -2262,8 +2294,7 @@ void LocationRegistryNode::handle_recover_storage(
     }
 
     publish_status();
-  }
-  catch (const std::exception & exception) {
+  } catch (const std::exception & exception) {
     finish_mutation_degraded(
       "storage recovery exception: " +
       std::string(exception.what()));

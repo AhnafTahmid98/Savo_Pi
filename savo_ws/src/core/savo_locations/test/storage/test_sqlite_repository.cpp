@@ -96,7 +96,7 @@ make_location()
     make_pose(12.8, 8.1);
 
   record.location
-    .arrival_confirmation_required =
+  .arrival_confirmation_required =
     true;
 
   record.location.building = "Main";
@@ -118,7 +118,7 @@ make_pending_candidate()
 
   record.state =
     savo_locations::CandidateState::
-      kPendingReview;
+    kPendingReview;
 
   record.candidate_revision = 4U;
 
@@ -160,7 +160,7 @@ make_pending_candidate()
     "A202";
 
   record.candidate
-    .suggested_display_name =
+  .suggested_display_name =
     "Room A202";
 
   record.candidate.suggested_aliases = {
@@ -169,7 +169,7 @@ make_pending_candidate()
   };
 
   record.candidate
-    .suggested_semantic_type =
+  .suggested_semantic_type =
     "classroom";
 
   record.candidate.building = "Main";
@@ -201,7 +201,7 @@ make_approved_candidate()
     "A201";
 
   record.candidate
-    .suggested_display_name =
+  .suggested_display_name =
     "Room A201";
 
   record.candidate.suggested_aliases = {
@@ -307,13 +307,13 @@ TEST(SqliteRepository, LocationRoundTrips)
 
   ASSERT_TRUE(
     location.location
-      .confirmation_pose
-      .has_value());
+    .confirmation_pose
+    .has_value());
 
   ASSERT_TRUE(
     location.location
-      .tag_pose_map
-      .has_value());
+    .tag_pose_map
+    .has_value());
 
   EXPECT_EQ(
     location.location.tag.id,
@@ -353,7 +353,7 @@ TEST(SqliteRepository, PendingCandidateRoundTrips)
   EXPECT_EQ(
     candidate.state,
     savo_locations::CandidateState::
-      kPendingReview);
+    kPendingReview);
 
   EXPECT_EQ(
     candidate.candidate_revision,
@@ -361,13 +361,13 @@ TEST(SqliteRepository, PendingCandidateRoundTrips)
 
   EXPECT_EQ(
     candidate.candidate
-      .suggested_aliases
-      .size(),
+    .suggested_aliases
+    .size(),
     2U);
 
   EXPECT_EQ(
     candidate.candidate
-      .source_component,
+    .source_component,
     "savo_mapping");
 }
 
@@ -407,8 +407,8 @@ TEST(SqliteRepository, ApprovedCandidateRoundTrips)
 
   EXPECT_EQ(
     output.candidates
-      .front()
-      .approved_location_id,
+    .front()
+    .approved_location_id,
     "A201");
 }
 
@@ -438,8 +438,8 @@ TEST(SqliteRepository, FileSnapshotSurvivesReopen)
 
     ASSERT_TRUE(
       repository
-        .save_snapshot(input)
-        .success);
+      .save_snapshot(input)
+      .success);
   }
 
   {
@@ -455,8 +455,8 @@ TEST(SqliteRepository, FileSnapshotSurvivesReopen)
 
     ASSERT_TRUE(
       repository
-        .load_snapshot(&output)
-        .success);
+      .load_snapshot(&output)
+      .success);
 
     EXPECT_EQ(output.locations.size(), 1U);
     EXPECT_EQ(output.candidates.size(), 1U);
@@ -481,8 +481,8 @@ TEST(SqliteRepository, InvalidSnapshotDoesNotReplaceStoredData)
 
   ASSERT_TRUE(
     repository
-      .save_snapshot(initial)
-      .success);
+    .save_snapshot(initial)
+    .success);
 
   savo_locations::CatalogSnapshot invalid;
 
@@ -501,23 +501,108 @@ TEST(SqliteRepository, InvalidSnapshotDoesNotReplaceStoredData)
   EXPECT_EQ(
     result.code,
     savo_locations::SnapshotCode::
-      kValidationFailed);
+    kValidationFailed);
 
   savo_locations::CatalogSnapshot output;
 
   ASSERT_TRUE(
     repository
-      .load_snapshot(&output)
-      .success);
+    .load_snapshot(&output)
+    .success);
 
   ASSERT_EQ(output.locations.size(), 1U);
 
   EXPECT_EQ(
     output.locations
-      .front()
-      .location
-      .location_id,
+    .front()
+    .location
+    .location_id,
     "A201");
+}
+
+TEST(SqliteRepository, LocationReleasePrepareVerifyCommitAndRollback)
+{
+  savo_locations::SqliteStore store{":memory:"};
+  open_and_migrate(&store);
+  savo_locations::SqliteRepository repository{store};
+  savo_locations::CatalogSnapshot snapshot;
+  snapshot.locations.push_back(make_location());
+  snapshot.candidates.push_back(make_approved_candidate());
+  ASSERT_TRUE(repository.save_snapshot(snapshot).success);
+
+  const auto releases_root =
+    std::filesystem::path{SAVO_LOCATIONS_TEST_DB_DIR} / "releases-success";
+  std::filesystem::remove_all(releases_root);
+  savo_locations::PrepareLocationReleaseRequest request;
+  request.release_id = "campus-main-r7";
+  request.mission_id = "mission-am8";
+  request.map_id = "campus_main";
+  request.map_revision = 7U;
+  request.actor_id = "operator";
+  request.approval_reason = "map and locations reviewed";
+  request.releases_root = releases_root.string();
+  request.require_approved_location = true;
+  savo_locations::LocationReleaseRecord release;
+  std::uint64_t event_sequence = 0U;
+
+  ASSERT_TRUE(repository.prepare_location_release(
+      request, snapshot, &release, &event_sequence).success);
+  EXPECT_EQ(release.state, "prepared");
+  EXPECT_EQ(release.location_count, 1U);
+  EXPECT_EQ(release.snapshot_sha256.size(), 64U);
+  EXPECT_TRUE(std::filesystem::is_regular_file(release.snapshot_path));
+
+  savo_locations::LocationReleaseRecord verified;
+  EXPECT_FALSE(repository.verify_location_release(
+      release.release_id, release.mission_id, release.transaction_token,
+      std::string(64U, '0'), &verified).success);
+  ASSERT_TRUE(repository.verify_location_release(
+      release.release_id, release.mission_id, release.transaction_token,
+      release.snapshot_sha256, &verified).success);
+
+  ASSERT_TRUE(repository.commit_location_release(
+      release.release_id, release.mission_id, release.transaction_token,
+      release.snapshot_sha256, "operator", &verified,
+      &event_sequence).success);
+  std::string active_release;
+  ASSERT_TRUE(repository.active_location_release_id(&active_release).success);
+  EXPECT_EQ(active_release, release.release_id);
+
+  ASSERT_TRUE(repository.rollback_location_release(
+      release.release_id, release.mission_id, release.transaction_token,
+      release.snapshot_sha256, "operator", "map promotion failed",
+      &verified, &event_sequence).success);
+  ASSERT_TRUE(repository.active_location_release_id(&active_release).success);
+  EXPECT_TRUE(active_release.empty());
+}
+
+TEST(SqliteRepository, PendingCandidatePreventsLocationReleasePreparation)
+{
+  savo_locations::SqliteStore store{":memory:"};
+  open_and_migrate(&store);
+  savo_locations::SqliteRepository repository{store};
+  savo_locations::CatalogSnapshot snapshot;
+  snapshot.locations.push_back(make_location());
+  snapshot.candidates.push_back(make_pending_candidate());
+  ASSERT_TRUE(repository.save_snapshot(snapshot).success);
+
+  savo_locations::PrepareLocationReleaseRequest request;
+  request.release_id = "campus-main-r7-pending";
+  request.mission_id = "mission-am8";
+  request.map_id = "campus_main";
+  request.map_revision = 7U;
+  request.actor_id = "operator";
+  request.approval_reason = "reviewed";
+  request.releases_root =
+    (std::filesystem::path{SAVO_LOCATIONS_TEST_DB_DIR} /
+    "releases-pending").string();
+  savo_locations::LocationReleaseRecord release;
+  std::uint64_t event_sequence = 0U;
+  const auto result = repository.prepare_location_release(
+    request, snapshot, &release, &event_sequence);
+  EXPECT_FALSE(result.success);
+  EXPECT_EQ(
+    result.code, savo_locations::SnapshotCode::kPendingCandidates);
 }
 
 
@@ -558,7 +643,7 @@ TEST(SqliteRepository, RejectsIdentityConflict)
   EXPECT_EQ(
     result.code,
     savo_locations::SnapshotCode::
-      kIdentityConflict);
+    kIdentityConflict);
 }
 
 
@@ -592,7 +677,7 @@ TEST(SqliteRepository, RejectsPendingCandidateTagConflict)
   EXPECT_EQ(
     result.code,
     savo_locations::SnapshotCode::
-      kTagConflict);
+    kTagConflict);
 }
 
 
@@ -619,7 +704,7 @@ TEST(SqliteRepository, RejectsOperationDuringStoreTransaction)
   EXPECT_EQ(
     save_result.code,
     savo_locations::SnapshotCode::
-      kTransactionActive);
+    kTransactionActive);
 
   const auto rollback_result =
     store.rollback();
@@ -650,8 +735,8 @@ TEST(SqliteRepository, DetectsCorruptPersistedLocation)
 
     ASSERT_TRUE(
       repository
-        .save_snapshot(snapshot)
-        .success);
+      .save_snapshot(snapshot)
+      .success);
   }
 
   sqlite3 * raw = nullptr;
@@ -699,7 +784,7 @@ TEST(SqliteRepository, DetectsCorruptPersistedLocation)
   EXPECT_EQ(
     result.code,
     savo_locations::SnapshotCode::
-      kCorruptData);
+    kCorruptData);
 }
 
 
@@ -741,9 +826,9 @@ TEST(SqliteRepository, NewSnapshotAtomicallyReplacesOldSnapshot)
 
   EXPECT_EQ(
     output.candidates
-      .front()
-      .candidate
-      .candidate_id,
+    .front()
+    .candidate
+    .candidate_id,
     "candidate-28");
 }
 

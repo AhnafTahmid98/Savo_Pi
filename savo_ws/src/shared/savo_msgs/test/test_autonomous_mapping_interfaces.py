@@ -17,6 +17,11 @@ def test_interfaces_are_registered() -> None:
         "msg/FrontierExplorationStatus.msg",
         "action/RunAutonomousMapping.action",
         "srv/ControlAutonomousMapping.srv",
+        "srv/ReviewAutonomousMappingRelease.srv",
+        "srv/PrepareLocationRelease.srv",
+        "srv/VerifyLocationRelease.srv",
+        "srv/CommitLocationRelease.srv",
+        "srv/RollbackLocationRelease.srv",
     ):
         assert f'"{path}"' in cmake
 
@@ -25,7 +30,7 @@ def test_status_contract_is_typed_and_mapping_owned() -> None:
     text = read("msg/AutonomousMappingStatus.msg")
 
     for token in (
-        "uint32 CONTRACT_VERSION=3",
+        "uint32 CONTRACT_VERSION=4",
         "uint8 STRATEGY_NONE=0",
         "uint8 STRATEGY_FRONTIER=1",
         "uint8 STATE_WAITING_FOR_AUTHORITY=2",
@@ -42,6 +47,11 @@ def test_status_contract_is_typed_and_mapping_owned() -> None:
         "uint8 STATE_RELEASING=25",
         "uint8 RESULT_SCAN_FAILED=10",
         "uint8 RESULT_START_POSE_UNAVAILABLE=11",
+        "uint8 RESULT_LOCATION_VERIFICATION_FAILED=12",
+        "uint8 RESULT_OPERATOR_REJECTED=13",
+        "uint8 RESULT_RELEASE_FAILED=14",
+        "uint8 RESULT_RELEASE_ROLLBACK_FAILED=15",
+        "uint8 RESULT_GEOMETRY_INVALID=16",
         "uint8 RESULT_NOT_TERMINAL=255",
         "uint8 result_code",
         "string mission_id",
@@ -85,6 +95,15 @@ def test_status_contract_is_typed_and_mapping_owned() -> None:
         "bool verification_complete",
         "bool map_verified",
         "string verification_reason",
+        "bool location_verification_started",
+        "bool location_verification_complete",
+        "bool location_verification_passed",
+        "uint64 review_generation",
+        "bool approval_recorded",
+        "bool release_succeeded",
+        "string release_id",
+        "bool rollback_required",
+        "bool joint_active_release_verified",
     ):
         assert token in text
 
@@ -117,6 +136,7 @@ def test_action_starts_one_mission_and_returns_typed_status() -> None:
     text = read("action/RunAutonomousMapping.action")
 
     for token in (
+        "uint32 CONTRACT_VERSION=2",
         "uint32 contract_version",
         "uint8 result_code",
         "string mission_id",
@@ -130,6 +150,12 @@ def test_action_starts_one_mission_and_returns_typed_status() -> None:
         "RESULT_NAVIGATION_FAILED=4",
         "RESULT_TIMED_OUT=5",
         "RESULT_SAVE_FAILED=7",
+        "RESULT_LOCATION_VERIFICATION_FAILED=12",
+        "RESULT_OPERATOR_REJECTED=13",
+        "RESULT_RELEASE_FAILED=14",
+        "RESULT_RELEASE_ROLLBACK_FAILED=15",
+        "RESULT_GEOMETRY_INVALID=16",
+        "string map_release_id",
         "savo_msgs/AutonomousMappingStatus final_status",
         "savo_msgs/AutonomousMappingStatus status",
     ):
@@ -156,6 +182,45 @@ def test_control_service_adds_guarded_conditional_scan_request() -> None:
         assert token in text
 
     assert "COMMAND_START" not in text
+
+
+def test_am8_review_and_location_release_services_are_correlated() -> None:
+    review = read("srv/ReviewAutonomousMappingRelease.srv")
+    for token in (
+        "uint32 CONTRACT_VERSION=1",
+        "uint8 DECISION_APPROVE=1",
+        "uint8 DECISION_REJECT=2",
+        "string request_id",
+        "string mission_id",
+        "string map_id",
+        "uint32 map_revision",
+        "uint64 expected_review_generation",
+        "string actor_id",
+        "string requested_release_id",
+        "uint8 RESULT_STALE_GENERATION=2",
+        "uint8 RESULT_DUPLICATE_DECISION=4",
+    ):
+        assert token in review
+
+    for path in (
+        "srv/PrepareLocationRelease.srv",
+        "srv/VerifyLocationRelease.srv",
+        "srv/CommitLocationRelease.srv",
+        "srv/RollbackLocationRelease.srv",
+    ):
+        text = read(path)
+        assert "uint32 CONTRACT_VERSION=1" in text
+        assert "string request_id" in text
+        assert "string release_id" in text
+        assert "string mission_id" in text
+    for path in (
+        "srv/VerifyLocationRelease.srv",
+        "srv/CommitLocationRelease.srv",
+        "srv/RollbackLocationRelease.srv",
+    ):
+        text = read(path)
+        assert "string transaction_token" in text
+        assert "string expected_snapshot_sha256" in text
 
 
 def test_manifest_version_marks_new_interface_revision() -> None:

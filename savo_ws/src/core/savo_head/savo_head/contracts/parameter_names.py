@@ -77,6 +77,7 @@ SEMANTIC_SCAN_RESUME_AFTER_MANUAL_S: Final[str] = (
 SEMANTIC_SCAN_CENTER_ON_STOP: Final[str] = "semantic_scan_center_on_stop"
 
 PUBLISH_TF: Final[str] = "publish_tf"
+TRANSFORMS_CALIBRATED: Final[str] = "transforms_calibrated"
 PUBLISH_JOINT_STATE: Final[str] = "publish_joint_state"
 TF_RATE_HZ: Final[str] = "tf_rate_hz"
 
@@ -338,6 +339,7 @@ class HeadParameterNames:
 
     frames: Tuple[str, ...] = (
         PUBLISH_TF,
+        TRANSFORMS_CALIBRATED,
         PUBLISH_JOINT_STATE,
         TF_RATE_HZ,
         BASE_FRAME,

@@ -110,8 +110,14 @@ def test_existing_costmaps_retain_safe_baseline():
     assert local_parameters['obstacle_layer']['scan'][
         'topic'
     ] == '/scan'
-    assert global_parameters['robot_radius'] > 0.0
-    assert local_parameters['robot_radius'] > 0.0
+    expected_footprint = (
+        '[[0.165, 0.120], [0.165, -0.120], '
+        '[-0.165, -0.120], [-0.165, 0.120]]'
+    )
+    assert global_parameters['footprint'] == expected_footprint
+    assert local_parameters['footprint'] == expected_footprint
+    assert global_parameters['footprint_padding'] > 0.0
+    assert local_parameters['footprint_padding'] > 0.0
 
 
 def test_ownership_boundaries_are_explicit():

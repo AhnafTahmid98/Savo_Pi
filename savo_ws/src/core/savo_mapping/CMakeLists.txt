@@ -16,6 +16,7 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 find_package(ament_cmake REQUIRED)
+find_package(ament_index_cpp REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(builtin_interfaces REQUIRED)
 find_package(rclcpp_action REQUIRED)
@@ -563,6 +564,7 @@ target_link_libraries(
 
 ament_target_dependencies(
   autonomous_mapping_orchestrator_node
+  ament_index_cpp
   builtin_interfaces
   geometry_msgs
   nav2_msgs
@@ -1168,6 +1170,12 @@ if(BUILD_TESTING)
   ament_add_pytest_test(
     test_autonomous_mapping_am7_contract
     test/test_autonomous_mapping_am7_contract.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
+    test_autonomous_mapping_am8_contract
+    test/test_autonomous_mapping_am8_contract.py
     TIMEOUT 60
   )
 

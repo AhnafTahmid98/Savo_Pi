@@ -5,7 +5,7 @@
 # cancel request. The production mission remains FRONTIER strategy with an
 # AM-7 post-frontier Coverage pass; standalone COVERAGE is not admitted.
 
-uint32 CONTRACT_VERSION=1
+uint32 CONTRACT_VERSION=2
 
 uint8 STRATEGY_FRONTIER=1
 uint8 STRATEGY_COVERAGE=2
@@ -24,7 +24,8 @@ bool require_quality_approval
 # exhaustion. AM-3 performs automatic save and saved-session verification.
 # AM-5 adds start-pose capture, initial Scan360 and initial head scan.
 # AM-6 semantic interruption and AM-7 Coverage, guarded return-to-start, and
-# final scans run behind this same mission boundary. Approval/release are later.
+# final scans run behind this same mission boundary. AM-8 adds explicit approval
+# and a jointly verified map/location production release.
 builtin_interfaces/Duration mission_timeout
 ---
 uint8 RESULT_SUCCEEDED=0
@@ -39,6 +40,11 @@ uint8 RESULT_QUALITY_REJECTED=8
 uint8 RESULT_INTERNAL_ERROR=9
 uint8 RESULT_SCAN_FAILED=10
 uint8 RESULT_START_POSE_UNAVAILABLE=11
+uint8 RESULT_LOCATION_VERIFICATION_FAILED=12
+uint8 RESULT_OPERATOR_REJECTED=13
+uint8 RESULT_RELEASE_FAILED=14
+uint8 RESULT_RELEASE_ROLLBACK_FAILED=15
+uint8 RESULT_GEOMETRY_INVALID=16
 
 bool success
 uint8 result_code

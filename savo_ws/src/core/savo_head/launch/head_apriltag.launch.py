@@ -116,6 +116,11 @@ def _make_nodes(context):
                 executable=f"head_tf_node{executable_suffix}",
                 name="head_tf_node",
                 output="screen",
+                parameters=[
+                    LaunchConfiguration("head_frames_config_file").perform(
+                        context
+                    )
+                ],
             )
         )
 
@@ -207,6 +212,16 @@ def generate_launch_description():
                 description=(
                     "Use Python fallback for optional legacy/status/TF "
                     "nodes. Detector and action server remain C++."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "head_frames_config_file",
+                default_value=PathJoinSubstitution(
+                    [package_share, "config", "head_frames.yaml"]
+                ),
+                description=(
+                    "Head TF parameters. Publishing remains calibration-gated "
+                    "until measured transforms are approved."
                 ),
             ),
             DeclareLaunchArgument(

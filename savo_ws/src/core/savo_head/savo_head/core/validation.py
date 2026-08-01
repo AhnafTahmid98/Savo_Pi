@@ -30,6 +30,17 @@ from savo_head.core.scan_pattern import profile_from_params
 Severity = Literal["error", "warning"]
 
 
+CONFIG_NODE_NAMES = {
+    "head_hardware.yaml": "savo_head",
+    "scan_profiles.yaml": "savo_head",
+    "head_topics.yaml": "savo_head",
+    "head_frames.yaml": "savo_head",
+    "camera_stream.yaml": "savo_head",
+    "apriltag_semantics.yaml": "apriltag_confirm_node",
+    "diagnostics.yaml": "savo_head",
+}
+
+
 @dataclass(frozen=True)
 class ValidationIssue:
     severity: Severity
@@ -94,7 +105,16 @@ def _require(params: dict[str, Any], source: str, keys: Iterable[str]) -> list[V
 
 
 def _as_params(data: dict[str, Any], node_name: str = "savo_head") -> dict[str, Any]:
-    return dict(data.get(node_name, {}).get("ros__parameters", {}) or {})
+    selected = data.get(node_name)
+    if isinstance(selected, dict) and "ros__parameters" in selected:
+        return dict(selected.get("ros__parameters", {}) or {})
+
+    if len(data) == 1:
+        selected = next(iter(data.values()))
+        if isinstance(selected, dict) and "ros__parameters" in selected:
+            return dict(selected.get("ros__parameters", {}) or {})
+
+    return {}
 
 
 def load_yaml_params(path: str | Path, node_name: str = "savo_head") -> dict[str, Any]:
@@ -254,7 +274,7 @@ def validate_head_frames_params(params: dict[str, Any], source: str = "head_fram
     issues: list[ValidationIssue] = []
 
     expected = {
-        "base_frame": FRAMES.base_link,
+        "base_frame": FRAMES.pantilt_mount_link,
         "pan_frame": FRAMES.pantilt_pan_link,
         "tilt_frame": FRAMES.pantilt_tilt_link,
         "camera_frame": FRAMES.pi_camera_link,
@@ -456,7 +476,7 @@ def validate_config_files(package_root: str | Path) -> ValidationResult:
             )
             continue
 
-        params = load_yaml_params(path)
+        params = load_yaml_params(path, node_name=CONFIG_NODE_NAMES[filename])
         result = result.merge(validator(params, source=filename))
 
     return result
@@ -466,6 +486,7 @@ __all__ = [
     "Severity",
     "ValidationIssue",
     "ValidationResult",
+    "CONFIG_NODE_NAMES",
     "load_yaml_params",
     "validate_head_hardware_params",
     "validate_scan_profile_params",

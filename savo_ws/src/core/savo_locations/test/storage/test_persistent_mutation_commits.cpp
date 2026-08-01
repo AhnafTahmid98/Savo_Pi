@@ -55,7 +55,7 @@ pending_candidate()
 
   record.state =
     savo_locations::CandidateState::
-      kPendingReview;
+    kPendingReview;
 
   record.candidate_revision = 1U;
 
@@ -97,7 +97,7 @@ location(
 
   record.state =
     savo_locations::LocationState::
-      kApproved;
+    kApproved;
 
   record.enabled = enabled;
   record.record_revision = revision;
@@ -132,7 +132,7 @@ void open_and_migrate(
   ASSERT_TRUE(
     store->migrate(&status).success);
 
-  EXPECT_EQ(status.current_version, 2U);
+  EXPECT_EQ(status.current_version, 3U);
 }
 
 
@@ -185,9 +185,9 @@ registration_request()
   request.reason = "candidate confirmed";
 
   request
-    .post_registration_snapshot
-    .candidates
-    .push_back(
+  .post_registration_snapshot
+  .candidates
+  .push_back(
       pending_candidate());
 
   return request;
@@ -197,7 +197,7 @@ registration_request()
 savo_locations::LocationEnabledCommit
 disable_request(
   const savo_locations::CatalogSnapshot &
-    current)
+  current)
 {
   savo_locations::LocationEnabledCommit request;
 
@@ -212,9 +212,9 @@ disable_request(
 
   auto & updated =
     request
-      .post_update_snapshot
-      .locations
-      .front();
+    .post_update_snapshot
+    .locations
+    .front();
 
   updated.enabled = false;
   updated.record_revision = 2U;
@@ -241,10 +241,10 @@ TEST(
 
   ASSERT_TRUE(
     repository
-      .commit_candidate_registration(
+    .commit_candidate_registration(
         registration_request(),
         &sequence)
-      .success);
+    .success);
 
   EXPECT_EQ(sequence, 1U);
 
@@ -253,10 +253,10 @@ TEST(
 
   ASSERT_TRUE(
     repository
-      .bootstrap(
+    .bootstrap(
         &snapshot,
         &report)
-      .success);
+    .success);
 
   ASSERT_EQ(snapshot.candidates.size(), 1U);
   EXPECT_EQ(report.event_count, 1U);
@@ -271,7 +271,7 @@ TEST(
   EXPECT_EQ(
     duplicate.code,
     savo_locations::SnapshotCode::
-      kCandidateRegistrationDeltaInvalid);
+    kCandidateRegistrationDeltaInvalid);
 }
 
 
@@ -310,17 +310,17 @@ TEST(
   EXPECT_EQ(
     result.code,
     savo_locations::SnapshotCode::
-      kEventJournalError);
+    kEventJournalError);
 
   savo_locations::CatalogSnapshot snapshot;
   savo_locations::BootstrapReport report;
 
   ASSERT_TRUE(
     repository
-      .bootstrap(
+    .bootstrap(
         &snapshot,
         &report)
-      .success);
+    .success);
 
   EXPECT_TRUE(snapshot.candidates.empty());
   EXPECT_EQ(report.event_count, 0U);
@@ -345,17 +345,17 @@ TEST(
 
   ASSERT_TRUE(
     repository
-      .save_snapshot(current)
-      .success);
+    .save_snapshot(current)
+    .success);
 
   std::uint64_t sequence = 0U;
 
   ASSERT_TRUE(
     repository
-      .commit_location_enabled(
+    .commit_location_enabled(
         disable_request(current),
         &sequence)
-      .success);
+    .success);
 
   EXPECT_EQ(sequence, 1U);
 
@@ -364,19 +364,19 @@ TEST(
 
   ASSERT_TRUE(
     repository
-      .bootstrap(
+    .bootstrap(
         &snapshot,
         &report)
-      .success);
+    .success);
 
   ASSERT_EQ(snapshot.locations.size(), 1U);
   EXPECT_FALSE(snapshot.locations.front().enabled);
 
   EXPECT_EQ(
     snapshot
-      .locations
-      .front()
-      .record_revision,
+    .locations
+    .front()
+    .record_revision,
     2U);
 
   EXPECT_EQ(report.event_count, 1U);
@@ -401,8 +401,8 @@ TEST(
 
   ASSERT_TRUE(
     repository
-      .save_snapshot(current)
-      .success);
+    .save_snapshot(current)
+    .success);
 
   auto stale = disable_request(current);
 
@@ -418,7 +418,7 @@ TEST(
   EXPECT_EQ(
     stale_result.code,
     savo_locations::SnapshotCode::
-      kStaleRevision);
+    kStaleRevision);
 
   savo_locations::LocationEnabledCommit no_op;
 
@@ -441,7 +441,7 @@ TEST(
   EXPECT_EQ(
     no_op_result.code,
     savo_locations::SnapshotCode::
-      kLocationEnabledDeltaInvalid);
+    kLocationEnabledDeltaInvalid);
 }
 
 
@@ -468,8 +468,8 @@ TEST(
 
     ASSERT_TRUE(
       repository
-        .save_snapshot(current)
-        .success);
+      .save_snapshot(current)
+      .success);
   }
 
   reject_event_type(path, 5);
@@ -486,8 +486,8 @@ TEST(
 
   ASSERT_TRUE(
     repository
-      .load_snapshot(&current)
-      .success);
+    .load_snapshot(&current)
+    .success);
 
   const auto result =
     repository.commit_location_enabled(
@@ -499,25 +499,25 @@ TEST(
   EXPECT_EQ(
     result.code,
     savo_locations::SnapshotCode::
-      kEventJournalError);
+    kEventJournalError);
 
   savo_locations::CatalogSnapshot snapshot;
   savo_locations::BootstrapReport report;
 
   ASSERT_TRUE(
     repository
-      .bootstrap(
+    .bootstrap(
         &snapshot,
         &report)
-      .success);
+    .success);
 
   EXPECT_TRUE(snapshot.locations.front().enabled);
 
   EXPECT_EQ(
     snapshot
-      .locations
-      .front()
-      .record_revision,
+    .locations
+    .front()
+    .record_revision,
     1U);
 
   EXPECT_EQ(report.event_count, 0U);
@@ -531,12 +531,12 @@ TEST(
   EXPECT_EQ(
     savo_locations::to_string(
       savo_locations::SnapshotCode::
-        kCandidateRegistrationDeltaInvalid),
+      kCandidateRegistrationDeltaInvalid),
     "candidate_registration_delta_invalid");
 
   EXPECT_EQ(
     savo_locations::to_string(
       savo_locations::SnapshotCode::
-        kLocationEnabledDeltaInvalid),
+      kLocationEnabledDeltaInvalid),
     "location_enabled_delta_invalid");
 }

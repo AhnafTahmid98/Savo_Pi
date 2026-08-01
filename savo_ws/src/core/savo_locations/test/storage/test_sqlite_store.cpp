@@ -89,7 +89,7 @@ TEST(SqliteStore, RejectsEmptyPath)
   EXPECT_EQ(
     result.code,
     savo_locations::StorageCode::
-      kInvalidArgument);
+    kInvalidArgument);
 }
 
 
@@ -145,7 +145,7 @@ TEST(SqliteStore, AppliesMigration001)
   EXPECT_EQ(
     status.current_version,
     savo_locations::
-      kSupportedSqliteSchemaVersion);
+    kSupportedSqliteSchemaVersion);
 
   EXPECT_TRUE(status.migration_applied);
 
@@ -157,7 +157,7 @@ TEST(SqliteStore, AppliesMigration001)
   EXPECT_EQ(
     version,
     savo_locations::
-      kSupportedSqliteSchemaVersion);
+    kSupportedSqliteSchemaVersion);
 }
 
 
@@ -232,8 +232,8 @@ TEST(SqliteStore, MigrationIsIdempotent)
       store.migrate(&status).success);
 
     EXPECT_FALSE(status.migration_applied);
-    EXPECT_EQ(status.previous_version, 2U);
-    EXPECT_EQ(status.current_version, 2U);
+    EXPECT_EQ(status.previous_version, 3U);
+    EXPECT_EQ(status.current_version, 3U);
   }
 }
 
@@ -261,7 +261,7 @@ TEST(SqliteStore, RejectsNewerSchema)
   EXPECT_EQ(
     result.code,
     savo_locations::StorageCode::
-      kSchemaTooNew);
+    kSchemaTooNew);
 
   EXPECT_EQ(status.previous_version, 99U);
 }
@@ -401,7 +401,7 @@ TEST(SqliteStore, RejectsNestedTransaction)
   EXPECT_EQ(
     nested.code,
     savo_locations::StorageCode::
-      kTransactionAlreadyActive);
+    kTransactionAlreadyActive);
 
   EXPECT_TRUE(store.rollback().success);
 }
@@ -470,12 +470,12 @@ TEST(SqliteStore, ReasonStringsAreStable)
   EXPECT_EQ(
     to_string(
       StorageCode::
-        kTransactionAlreadyActive),
+      kTransactionAlreadyActive),
     "transaction_already_active");
 
   EXPECT_EQ(
     to_string(
       StorageCode::
-        kIntegrityFailed),
+      kIntegrityFailed),
     "integrity_failed");
 }

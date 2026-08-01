@@ -36,6 +36,18 @@ inline constexpr std::string_view kSetEnabled{
 inline constexpr std::string_view kRecoverStorage{
   "/savo_locations/storage/recover"};
 
+inline constexpr std::string_view kPrepareRelease{
+  "/savo_locations/releases/prepare"};
+
+inline constexpr std::string_view kVerifyRelease{
+  "/savo_locations/releases/verify"};
+
+inline constexpr std::string_view kCommitRelease{
+  "/savo_locations/releases/commit"};
+
+inline constexpr std::string_view kRollbackRelease{
+  "/savo_locations/releases/rollback"};
+
 }  // namespace savo_locations::service_names
 
 #endif  // SAVO_LOCATIONS__SERVICE_NAMES_HPP_

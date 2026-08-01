@@ -3,6 +3,7 @@ savo_locations:
     # SQLite is the production authority. The parent directory must be
     # provisioned with ownership for the robot runtime user.
     database_path: /var/lib/robot_savo/locations/locations.db
+    releases_root: /var/lib/robot_savo/locations/releases
 
     # Production startup may apply supported forward migrations.
     auto_migrate: true

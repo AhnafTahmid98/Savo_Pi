@@ -55,6 +55,7 @@ inline constexpr const char * kTopicAprilTagDetections = "/savo_head/apriltag_de
 inline constexpr const char * kTopicSemanticConfirmations = "/savo_head/semantic_confirmations";
 
 inline constexpr const char * kFrameBaseLink = "base_link";
+inline constexpr const char * kFramePantiltMount = "pantilt_mount_link";
 inline constexpr const char * kFramePanLink = "pantilt_pan_link";
 inline constexpr const char * kFrameTiltLink = "pantilt_tilt_link";
 inline constexpr const char * kFrameCameraLink = "pi_camera_link";
@@ -310,7 +311,9 @@ struct PanTiltCommand
   return std::clamp(value, 0, 180);
 }
 
-[[nodiscard]] inline PanTiltState centered_state(double stamp_s = 0.0, std::string source = "center")
+[[nodiscard]] inline PanTiltState centered_state(
+  double stamp_s = 0.0,
+  std::string source = "center")
 {
   return PanTiltState{
     kPanCenterDeg,

@@ -23,9 +23,9 @@ export RCUTILS_LOGGING_BUFFERED_STREAM="1"
 
 LOCATION_STATE_ROOT="${SAVO_LOCATION_STATE_ROOT:-/var/lib/robot_savo/locations}"
 
-mkdir -p   "${LOCATION_STATE_ROOT}"   "${LOCATION_STATE_ROOT}/backups"   "${ROS_HOME}"   "${ROS_LOG_DIR}"
+mkdir -p   "${LOCATION_STATE_ROOT}"   "${LOCATION_STATE_ROOT}/backups"   "${LOCATION_STATE_ROOT}/releases"   "${ROS_HOME}"   "${ROS_LOG_DIR}"
 
-chmod 0750   "${LOCATION_STATE_ROOT}"   "${LOCATION_STATE_ROOT}/backups"   "${ROS_HOME}"   "${ROS_LOG_DIR}"
+chmod 0750   "${LOCATION_STATE_ROOT}"   "${LOCATION_STATE_ROOT}/backups"   "${LOCATION_STATE_ROOT}/releases"   "${ROS_HOME}"   "${ROS_LOG_DIR}"
 
 if [[ ! -w "${LOCATION_STATE_ROOT}" ]]; then
   savo_die "Location state directory is not writable: ${LOCATION_STATE_ROOT}"
@@ -43,4 +43,4 @@ savo_log "Starting typed location integration layer"
 savo_log "State root: ${LOCATION_STATE_ROOT}"
 savo_log "ROS log dir: ${ROS_LOG_DIR}"
 
-exec ros2 launch savo_bringup location_integration.launch.py   "start_locations:=${START_LOCATIONS}"   "start_supervisor:=${START_SUPERVISOR}"   "start_head_observer:=${START_HEAD_OBSERVER}"   "start_head_action:=${START_HEAD_ACTION}"   "start_registration:=${START_REGISTRATION}"   "start_navigation:=${START_NAVIGATION}"   "log_level:=${LOG_LEVEL}"
+exec ros2 launch savo_bringup location_integration.launch.py   "start_locations:=${START_LOCATIONS}"   "start_supervisor:=${START_SUPERVISOR}"   "start_head_observer:=${START_HEAD_OBSERVER}"   "start_head_action:=${START_HEAD_ACTION}"   "start_registration:=${START_REGISTRATION}"   "start_navigation:=${START_NAVIGATION}"   "locations_database_path:=${LOCATION_STATE_ROOT}/locations.db"   "locations_releases_root:=${LOCATION_STATE_ROOT}/releases"   "log_level:=${LOG_LEVEL}"

@@ -30,7 +30,8 @@ realsense2_camera:
     pointcloud__neon_.enable: false
 
     enable_sync: false
-    publish_tf: true
+    # Fixed camera TF is owned by savo_description/robot_state_publisher.
+    publish_tf: false
 
     initial_reset: false
     reconnect_timeout: 6.0

@@ -53,3 +53,17 @@ def test_legacy_config_targets_legacy_node_only() -> None:
     text = LEGACY_CONFIG.read_text(encoding="utf-8")
     assert text.startswith("apriltag_confirm_node:\n")
     assert not text.startswith("savo_head:\n")
+
+
+def test_production_detector_avoids_untyped_empty_id_override() -> None:
+    production = (
+        ROOT / "config/apriltag_detector.yaml"
+    ).read_text(encoding="utf-8")
+    printed_test_ids = (
+        ROOT / "config/apriltag_detector_ids_0_5.yaml"
+    ).read_text(encoding="utf-8")
+
+    # ROS 2 cannot infer an integer-array type from an empty YAML sequence.
+    # Omitting it preserves the node's typed empty-vector default.
+    assert "allowed_tag_ids: []" not in production
+    assert "allowed_tag_ids: [0, 1, 2, 3, 4, 5]" in printed_test_ids

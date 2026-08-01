@@ -73,7 +73,10 @@ def test_autonomous_mapping_launch_is_fail_closed_by_default() -> None:
     assert "ros2 action send_goal" not in launch
     assert "ActionClient" not in launch
     assert "create_client" not in launch
-    assert '_python_launch("savo_description"' not in launch
+    assert '_python_launch("savo_description"' in launch
+    assert '"start_description", default_value="true"' in launch
+    assert '"require_locked_geometry", default_value="true"' in launch
+    assert '"allow_provisional_geometry", default_value="false"' in launch
     assert '"start_head"' in launch
     assert '"head_enable_tf"' in launch
     assert 'default_value="false"' in launch
@@ -135,7 +138,7 @@ def test_readme_documents_two_step_motion_authority() -> None:
     assert "/savo_control/mode_cmd" in readme
     assert "/savo_mapping/autonomous/run" in readme
     assert "same map identifier" in readme
-    assert "savo_description` is intentionally not included" in readme
+    assert "`savo_description` is included" in readme
 
 
 def test_all_launch_configurations_are_declared() -> None:

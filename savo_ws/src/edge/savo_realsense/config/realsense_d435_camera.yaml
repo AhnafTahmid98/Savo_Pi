@@ -28,7 +28,8 @@
     pointcloud__neon_.ordered_pc: false
     pointcloud__neon_.pointcloud_qos: SENSOR_DATA
 
-    publish_tf: true
+    # Fixed camera TF is owned by savo_description/robot_state_publisher.
+    publish_tf: false
     tf_publish_rate: 0.0
 
     initial_reset: false

@@ -1,0 +1,25 @@
+# Robot Savo AM-8 authoritative location release rollback/abort.
+uint32 CONTRACT_VERSION=1
+
+uint32 contract_version
+string request_id
+string release_id
+string mission_id
+string transaction_token
+string expected_snapshot_sha256
+string actor_id
+string rollback_reason
+---
+uint8 RESULT_SUCCEEDED=0
+uint8 RESULT_INVALID_REQUEST=1
+uint8 RESULT_NOT_FOUND=2
+uint8 RESULT_STALE_TRANSACTION=3
+uint8 RESULT_DIGEST_MISMATCH=4
+uint8 RESULT_ROLLBACK_FAILED=5
+
+bool success
+uint8 result_code
+string reason
+string release_id
+string active_location_release_id
+string state

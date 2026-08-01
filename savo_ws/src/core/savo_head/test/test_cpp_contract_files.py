@@ -361,7 +361,7 @@ int main()
 
   const auto frames = default_head_frame_contract();
   assert(frames.valid());
-  assert(frames.base_frame == "base_link");
+  assert(frames.base_frame == "pantilt_mount_link");
   assert(frames.pan_frame == "pantilt_pan_link");
   assert(frames.tilt_frame == "pantilt_tilt_link");
   assert(frames.camera_frame == "pi_camera_link");

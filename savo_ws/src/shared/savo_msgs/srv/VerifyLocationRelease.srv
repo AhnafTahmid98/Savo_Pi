@@ -1,0 +1,26 @@
+# Robot Savo AM-8 prepared location release verification.
+uint32 CONTRACT_VERSION=1
+
+uint32 contract_version
+string request_id
+string release_id
+string mission_id
+string transaction_token
+string expected_snapshot_sha256
+---
+uint8 RESULT_SUCCEEDED=0
+uint8 RESULT_INVALID_REQUEST=1
+uint8 RESULT_NOT_FOUND=2
+uint8 RESULT_STALE_TRANSACTION=3
+uint8 RESULT_DIGEST_MISMATCH=4
+uint8 RESULT_CONTEXT_MISMATCH=5
+
+bool success
+uint8 result_code
+string reason
+string release_id
+string snapshot_path
+string snapshot_sha256
+uint32 location_count
+uint32 candidate_count
+string state

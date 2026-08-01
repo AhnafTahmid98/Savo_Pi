@@ -629,8 +629,8 @@ def test_stable_frontier_exhaustion_completes_manual_save_mission():
         harness.close()
 
 
-def test_stable_frontier_exhaustion_auto_saves_and_verifies():
-    """Confirm AM-3 reports success only after saved-session verification."""
+def test_auto_save_rejects_a_map_that_fails_the_requested_quality_gate():
+    """Confirm the requested quality gate remains fail closed before AM-8."""
     harness = RuntimeHarness()
     try:
         harness.publish_initial_state()
@@ -663,15 +663,15 @@ def test_stable_frontier_exhaustion_auto_saves_and_verifies():
         assert wait_until(result_future.done), harness.diagnostics()
 
         wrapped_result = result_future.result().result
-        assert wrapped_result.success
+        assert not wrapped_result.success
         assert wrapped_result.result_code == (
-            RunAutonomousMapping.Result.RESULT_SUCCEEDED
+            RunAutonomousMapping.Result.RESULT_QUALITY_REJECTED
         )
         assert wrapped_result.map_saved
         assert wrapped_result.final_status.map_saved
-        assert wrapped_result.final_status.map_verified
-        assert wrapped_result.final_status.verification_reason == (
-            'saved_map_valid'
+        assert not wrapped_result.final_status.map_verified
+        assert wrapped_result.final_status.verification_reason.startswith(
+            'quality_rejected:'
         )
         assert any(
             status.state == AutonomousMappingStatus.STATE_SAVING

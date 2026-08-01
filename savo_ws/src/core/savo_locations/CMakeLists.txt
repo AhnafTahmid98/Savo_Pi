@@ -11,6 +11,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 find_package(ament_cmake REQUIRED)
 find_package(savo_msgs REQUIRED)
 find_package(SQLite3 REQUIRED)
+find_package(OpenSSL REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
@@ -55,6 +56,7 @@ add_library(
   savo_locations_storage
   src/sqlite_store.cpp
   src/sqlite_repository.cpp
+  src/location_release_repository.cpp
 )
 
 add_library(
@@ -80,6 +82,7 @@ target_link_libraries(
   PUBLIC
     savo_locations_contracts
     SQLite::SQLite3
+    OpenSSL::Crypto
 )
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
@@ -149,6 +152,7 @@ add_library(
     src/read_only_catalog_view.cpp
     src/ros_conversions.cpp
     src/location_registry_node.cpp
+    src/location_release_services.cpp
 )
 
 target_compile_features(

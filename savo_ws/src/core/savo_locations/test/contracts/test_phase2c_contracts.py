@@ -40,17 +40,18 @@ def test_package_contains_loc2c_or_later() -> None:
     assert f'"{version}"' in constants
 
 
-def test_schema_version_two_is_locked() -> None:
+def test_schema_version_three_is_locked() -> None:
     schema = read(
         "include/savo_locations/sqlite_schema.hpp"
     )
 
     assert (
-        "kSupportedSqliteSchemaVersion{2U}"
+        "kSupportedSqliteSchemaVersion{3U}"
         in schema
     )
 
     assert "kMigration002Sql" in schema
+    assert "kMigration003Sql" in schema
 
     assert (
         "location_events_reject_update"
@@ -179,4 +180,3 @@ def test_loc2c_persistence_remains_ros_independent() -> None:
         "savo_msgs",
     ):
         assert forbidden not in persistence_layer
-

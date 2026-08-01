@@ -72,6 +72,11 @@ set(srv_files
   "srv/ManageSystemState.srv"
   "srv/ControlAutonomousMapping.srv"
   "srv/SubmitSemanticLocation.srv"
+  "srv/ReviewAutonomousMappingRelease.srv"
+  "srv/PrepareLocationRelease.srv"
+  "srv/VerifyLocationRelease.srv"
+  "srv/CommitLocationRelease.srv"
+  "srv/RollbackLocationRelease.srv"
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}

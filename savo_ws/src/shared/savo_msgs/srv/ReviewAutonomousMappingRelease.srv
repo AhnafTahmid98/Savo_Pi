@@ -1,0 +1,33 @@
+# Robot Savo AM-8 explicit operator release review.
+uint32 CONTRACT_VERSION=1
+uint8 DECISION_APPROVE=1
+uint8 DECISION_REJECT=2
+
+uint32 contract_version
+string request_id
+string mission_id
+string map_id
+uint32 map_revision
+uint64 expected_review_generation
+string actor_id
+uint8 decision
+string requested_release_id
+string review_reason
+---
+uint8 RESULT_ACCEPTED=0
+uint8 RESULT_INVALID_REQUEST=1
+uint8 RESULT_STALE_GENERATION=2
+uint8 RESULT_WRONG_CONTEXT=3
+uint8 RESULT_DUPLICATE_DECISION=4
+uint8 RESULT_NOT_AWAITING_APPROVAL=5
+uint8 RESULT_VERIFICATION_INCOMPLETE=6
+
+bool completed
+bool accepted
+bool approved
+bool rejected
+uint8 result_code
+string reason
+string mission_id
+string release_id
+uint64 current_review_generation

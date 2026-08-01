@@ -3,6 +3,40 @@
 
   <xacro:arg name="use_transmissions" default="false"/>
   <xacro:arg name="use_gazebo" default="false"/>
+  <xacro:arg name="base_length" default="0.330"/>
+  <xacro:arg name="base_width" default="0.240"/>
+  <xacro:arg name="base_height" default="0.060"/>
+  <xacro:arg name="base_link_z" default="0.065"/>
+  <xacro:arg name="deck_thickness" default="0.004"/>
+  <xacro:arg name="deck_spacing" default="0.070"/>
+  <xacro:arg name="base_mass" default="1.20"/>
+  <xacro:arg name="deck_mass" default="0.20"/>
+  <xacro:arg name="wheel_radius" default="0.0325"/>
+  <xacro:arg name="wheel_width" default="0.030"/>
+  <xacro:arg name="wheel_front_x" default="0.115"/>
+  <xacro:arg name="wheel_rear_x" default="-0.115"/>
+  <xacro:arg name="wheel_left_y" default="0.100"/>
+  <xacro:arg name="wheel_right_y" default="-0.100"/>
+  <xacro:arg name="wheel_z" default="-0.030"/>
+  <xacro:arg name="wheel_mass" default="0.12"/>
+  <xacro:arg name="lidar_xyz" default="0 0 0.205"/>
+  <xacro:arg name="lidar_rpy" default="0 0 0"/>
+  <xacro:arg name="imu_xyz" default="0 0 0.075"/>
+  <xacro:arg name="imu_rpy" default="0 0 0"/>
+  <xacro:arg name="camera_xyz" default="0.135 0 0.155"/>
+  <xacro:arg name="camera_rpy" default="0 0 0"/>
+  <xacro:arg name="tof_left_xyz" default="0.125 0.090 0.070"/>
+  <xacro:arg name="tof_left_rpy" default="0 0 0"/>
+  <xacro:arg name="tof_right_xyz" default="0.125 -0.090 0.070"/>
+  <xacro:arg name="tof_right_rpy" default="0 0 0"/>
+  <xacro:arg name="ultrasonic_xyz" default="0.150 0 0.070"/>
+  <xacro:arg name="ultrasonic_rpy" default="0 0 0"/>
+  <xacro:arg name="display_xyz" default="0.115 0 0.145"/>
+  <xacro:arg name="display_rpy" default="0 0 0"/>
+  <xacro:arg name="respeaker_xyz" default="0 0 0.180"/>
+  <xacro:arg name="respeaker_rpy" default="0 0 0"/>
+  <xacro:arg name="pantilt_mount_xyz" default="0 0 0"/>
+  <xacro:arg name="pantilt_mount_rpy" default="0 0 0"/>
 
   <xacro:include filename="$(find savo_description)/urdf/materials.xacro"/>
 
@@ -22,11 +56,29 @@
   <xacro:include filename="$(find savo_description)/urdf/robot_savo_transmissions.xacro"/>
   <xacro:include filename="$(find savo_description)/urdf/robot_savo_gazebo.xacro"/>
 
-  <xacro:robot_savo_core/>
+  <xacro:robot_savo_core
+    base_length="$(arg base_length)" base_width="$(arg base_width)"
+    base_height="$(arg base_height)" base_link_z="$(arg base_link_z)"
+    deck_thickness="$(arg deck_thickness)" deck_spacing="$(arg deck_spacing)"
+    base_mass="$(arg base_mass)" deck_mass="$(arg deck_mass)"/>
 
-  <xacro:robot_savo_wheels/>
+  <xacro:robot_savo_wheels
+    wheel_radius="$(arg wheel_radius)" wheel_width="$(arg wheel_width)"
+    wheel_front_x="$(arg wheel_front_x)" wheel_rear_x="$(arg wheel_rear_x)"
+    wheel_left_y="$(arg wheel_left_y)" wheel_right_y="$(arg wheel_right_y)"
+    wheel_z="$(arg wheel_z)" wheel_mass="$(arg wheel_mass)"/>
 
-  <xacro:robot_savo_sensors/>
+  <xacro:robot_savo_sensors
+    lidar_xyz="$(arg lidar_xyz)" lidar_rpy="$(arg lidar_rpy)"
+    imu_xyz="$(arg imu_xyz)" imu_rpy="$(arg imu_rpy)"
+    camera_xyz="$(arg camera_xyz)" camera_rpy="$(arg camera_rpy)"
+    tof_left_xyz="$(arg tof_left_xyz)" tof_left_rpy="$(arg tof_left_rpy)"
+    tof_right_xyz="$(arg tof_right_xyz)" tof_right_rpy="$(arg tof_right_rpy)"
+    ultrasonic_xyz="$(arg ultrasonic_xyz)" ultrasonic_rpy="$(arg ultrasonic_rpy)"
+    display_xyz="$(arg display_xyz)" display_rpy="$(arg display_rpy)"
+    respeaker_xyz="$(arg respeaker_xyz)" respeaker_rpy="$(arg respeaker_rpy)"
+    pantilt_mount_xyz="$(arg pantilt_mount_xyz)"
+    pantilt_mount_rpy="$(arg pantilt_mount_rpy)"/>
 
   <xacro:robot_savo_two_pi/>
 

@@ -6,7 +6,7 @@
 # - savo_control and savo_perception remain final movement/safety authorities.
 # - savo_head owns semantic head motion and AprilTag visual confirmation.
 
-uint32 CONTRACT_VERSION=3
+uint32 CONTRACT_VERSION=4
 
 uint8 STRATEGY_NONE=0
 uint8 STRATEGY_FRONTIER=1
@@ -51,6 +51,11 @@ uint8 RESULT_QUALITY_REJECTED=8
 uint8 RESULT_INTERNAL_ERROR=9
 uint8 RESULT_SCAN_FAILED=10
 uint8 RESULT_START_POSE_UNAVAILABLE=11
+uint8 RESULT_LOCATION_VERIFICATION_FAILED=12
+uint8 RESULT_OPERATOR_REJECTED=13
+uint8 RESULT_RELEASE_FAILED=14
+uint8 RESULT_RELEASE_ROLLBACK_FAILED=15
+uint8 RESULT_GEOMETRY_INVALID=16
 uint8 RESULT_NOT_TERMINAL=255
 
 uint32 contract_version
@@ -162,5 +167,29 @@ bool verification_started
 bool verification_complete
 bool map_verified
 string verification_reason
+
+bool location_verification_started
+bool location_verification_complete
+bool location_verification_passed
+uint32 pending_candidate_count
+uint32 approved_location_count
+string location_snapshot_digest
+
+uint64 review_generation
+bool approval_pending
+bool approval_recorded
+string approval_actor
+string approval_reason
+
+bool release_started
+bool release_complete
+bool release_succeeded
+string release_id
+string release_state
+string primary_release_reason
+bool rollback_required
+bool rollback_complete
+string rollback_reason
+bool joint_active_release_verified
 
 string reason

@@ -65,6 +65,11 @@ enum class MissionResult : std::uint8_t
   InternalError = 9,
   ScanFailed = 10,
   StartPoseUnavailable = 11,
+  LocationVerificationFailed = 12,
+  OperatorRejected = 13,
+  ReleaseFailed = 14,
+  ReleaseRollbackFailed = 15,
+  GeometryInvalid = 16,
   None = 255,
 };
 
@@ -201,6 +206,35 @@ struct MissionInputs
   bool verification_complete{false};
   bool verification_succeeded{false};
   std::string verification_reason{"verification_not_started"};
+
+  bool location_verification_started{false};
+  bool location_verification_complete{false};
+  bool location_verification_succeeded{false};
+  std::uint32_t pending_candidate_count{0U};
+  std::uint32_t approved_location_count{0U};
+  std::string location_snapshot_digest;
+  std::string location_verification_reason{"location_verification_not_started"};
+
+  std::uint64_t review_generation{0U};
+  bool approval_pending{false};
+  bool review_complete{false};
+  bool review_approved{false};
+  bool review_rejected{false};
+  std::string approval_actor;
+  std::string approval_reason;
+  std::string requested_release_id;
+
+  bool release_started{false};
+  bool release_complete{false};
+  bool release_succeeded{false};
+  bool rollback_required{false};
+  bool rollback_complete{false};
+  bool rollback_succeeded{false};
+  bool joint_active_release_verified{false};
+  std::string release_id;
+  std::string release_state{"not_started"};
+  std::string release_reason{"release_not_started"};
+  std::string rollback_reason;
 };
 
 struct MissionSnapshot
@@ -309,6 +343,31 @@ struct MissionSnapshot
   bool map_verified{false};
   std::string verification_reason{"verification_not_started"};
 
+  bool location_verification_started{false};
+  bool location_verification_complete{false};
+  bool location_verification_passed{false};
+  std::uint32_t pending_candidate_count{0U};
+  std::uint32_t approved_location_count{0U};
+  std::string location_snapshot_digest;
+  std::string location_verification_reason{"location_verification_not_started"};
+
+  std::uint64_t review_generation{0U};
+  bool approval_pending{false};
+  bool approval_recorded{false};
+  std::string approval_actor;
+  std::string approval_reason;
+
+  bool release_started{false};
+  bool release_complete{false};
+  bool release_succeeded{false};
+  std::string release_id;
+  std::string release_state{"not_started"};
+  std::string primary_release_reason{"release_not_started"};
+  bool rollback_required{false};
+  bool rollback_complete{false};
+  std::string rollback_reason;
+  bool joint_active_release_verified{false};
+
   std::string reason{"idle"};
 };
 
@@ -338,6 +397,10 @@ struct MissionDecision
   bool request_start_pose_capture{false};
   bool request_map_save{false};
   bool request_saved_map_verification{false};
+  bool request_location_verification{false};
+  bool request_operator_review{false};
+  bool request_joint_release{false};
+  bool request_release_rollback{false};
 
   MissionSnapshot snapshot;
   std::string reason{"idle"};
@@ -379,6 +442,8 @@ public:
 
 private:
   MissionDecision evaluate(const MissionInputs & inputs);
+  MissionDecision evaluate_saved_release_pipeline(
+    const MissionInputs & inputs);
   MissionDecision evaluate_start_sequence(const MissionInputs & inputs);
   MissionDecision evaluate_scan360_stage(const MissionInputs & inputs);
   MissionDecision evaluate_head_scan_stage(const MissionInputs & inputs);
@@ -437,6 +502,7 @@ private:
   bool initial_scan360_completed_{false};
   bool initial_head_scan_completed_{false};
   std::uint32_t conditional_scan360_completed_{0};
+  bool release_cancel_requested_{false};
 };
 
 }  // namespace savo_mapping::autonomous

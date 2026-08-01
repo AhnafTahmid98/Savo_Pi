@@ -1,0 +1,31 @@
+# Robot Savo AM-8 location release preparation owned by savo_locations.
+uint32 CONTRACT_VERSION=1
+
+uint32 contract_version
+string request_id
+string release_id
+string mission_id
+string map_id
+uint32 map_revision
+string actor_id
+string approval_reason
+bool require_approved_location
+---
+uint8 RESULT_SUCCEEDED=0
+uint8 RESULT_INVALID_REQUEST=1
+uint8 RESULT_STORAGE_UNAVAILABLE=2
+uint8 RESULT_PENDING_CANDIDATES=3
+uint8 RESULT_NO_APPROVED_LOCATIONS=4
+uint8 RESULT_SNAPSHOT_FAILED=5
+uint8 RESULT_CONFLICT=6
+
+bool success
+uint8 result_code
+string reason
+string release_id
+string transaction_token
+string snapshot_path
+string snapshot_sha256
+uint32 location_count
+uint32 candidate_count
+string previous_active_location_release_id

@@ -8,10 +8,11 @@ namespace savo_locations
 {
 
 inline constexpr std::uint32_t
-  kSupportedSqliteSchemaVersion{2U};
+  kSupportedSqliteSchemaVersion{3U};
 
 inline constexpr std::string_view
-  kMigration001Sql{R"SQL(
+  kMigration001Sql{
+  R"SQL(
 CREATE TABLE IF NOT EXISTS schema_migrations (
   schema_version INTEGER PRIMARY KEY
     CHECK(schema_version > 0),
@@ -333,7 +334,8 @@ ON location_events(
 )SQL"};
 
 inline constexpr std::string_view
-  kMigration002Sql{R"SQL(
+  kMigration002Sql{
+  R"SQL(
 CREATE TRIGGER IF NOT EXISTS
   location_events_reject_update
 BEFORE UPDATE ON location_events
@@ -353,6 +355,32 @@ BEGIN
     'location_events is append-only'
   );
 END;
+)SQL"};
+
+inline constexpr std::string_view
+  kMigration003Sql{
+  R"SQL(
+CREATE TABLE IF NOT EXISTS location_releases (
+  release_id TEXT PRIMARY KEY,
+  transaction_token TEXT NOT NULL UNIQUE,
+  mission_id TEXT NOT NULL,
+  map_id TEXT NOT NULL,
+  map_revision INTEGER NOT NULL CHECK(map_revision > 0),
+  state TEXT NOT NULL CHECK(state IN ('prepared', 'committed', 'rolled_back')),
+  snapshot_path TEXT NOT NULL,
+  snapshot_sha256 TEXT NOT NULL CHECK(length(snapshot_sha256) = 64),
+  location_count INTEGER NOT NULL CHECK(location_count >= 0),
+  candidate_count INTEGER NOT NULL CHECK(candidate_count >= 0),
+  approving_actor TEXT NOT NULL,
+  approval_reason TEXT NOT NULL DEFAULT '',
+  prepared_at_unix_ns INTEGER NOT NULL CHECK(prepared_at_unix_ns > 0),
+  committed_at_unix_ns INTEGER,
+  previous_active_location_release TEXT NOT NULL DEFAULT '',
+  failure_rollback_reason TEXT NOT NULL DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS idx_location_releases_state
+ON location_releases(state, prepared_at_unix_ns);
 )SQL"};
 
 

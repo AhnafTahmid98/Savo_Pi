@@ -31,6 +31,13 @@ enum class SnapshotCode : std::uint8_t
   kApprovalDeltaInvalid,
   kLocationEnabledDeltaInvalid,
   kEventJournalError,
+  kReleaseNotFound,
+  kReleaseConflict,
+  kStaleTransaction,
+  kDigestMismatch,
+  kPendingCandidates,
+  kNoApprovedLocations,
+  kFilesystemError,
 };
 
 
@@ -45,7 +52,7 @@ struct SnapshotResult
   std::string reason;
 
   std::vector<ValidationIssue>
-    validation_issues;
+  validation_issues;
 };
 
 
@@ -69,6 +76,43 @@ enum class PersistenceEventType : std::uint8_t
   kCandidateRegistered = 3U,
   kCandidateRejected = 4U,
   kLocationEnabledChanged = 5U,
+  kLocationReleasePrepared = 10U,
+  kLocationReleaseCommitted = 11U,
+  kLocationReleaseRolledBack = 12U,
+};
+
+
+struct LocationReleaseRecord
+{
+  std::string release_id;
+  std::string transaction_token;
+  std::string mission_id;
+  std::string map_id;
+  std::uint32_t map_revision{0U};
+  std::string state;
+  std::string snapshot_path;
+  std::string snapshot_sha256;
+  std::size_t location_count{0U};
+  std::size_t candidate_count{0U};
+  std::string approving_actor;
+  std::string approval_reason;
+  std::int64_t prepared_at_unix_ns{0};
+  std::int64_t committed_at_unix_ns{0};
+  std::string previous_active_location_release;
+  std::string failure_rollback_reason;
+};
+
+
+struct PrepareLocationReleaseRequest
+{
+  std::string release_id;
+  std::string mission_id;
+  std::string map_id;
+  std::uint32_t map_revision{0U};
+  std::string actor_id;
+  std::string approval_reason;
+  std::string releases_root;
+  bool require_approved_location{true};
 };
 
 
@@ -179,41 +223,81 @@ public:
   SnapshotResult load_snapshot(
     CatalogSnapshot * snapshot) const;
 
-[[nodiscard]]
-SnapshotResult bootstrap(
-  CatalogSnapshot * snapshot,
-  BootstrapReport * report) const;
+  [[nodiscard]]
+  SnapshotResult bootstrap(
+    CatalogSnapshot * snapshot,
+    BootstrapReport * report) const;
 
-[[nodiscard]]
-SnapshotResult append_event(
-  const PersistenceEvent & event,
-  std::uint64_t * sequence);
+  [[nodiscard]]
+  SnapshotResult append_event(
+    const PersistenceEvent & event,
+    std::uint64_t * sequence);
 
-[[nodiscard]]
-SnapshotResult list_events(
-  std::uint64_t after_sequence,
-  std::size_t limit,
-  std::vector<PersistenceEvent> * events) const;
+  [[nodiscard]]
+  SnapshotResult list_events(
+    std::uint64_t after_sequence,
+    std::size_t limit,
+    std::vector<PersistenceEvent> * events) const;
 
-[[nodiscard]]
-SnapshotResult commit_candidate_registration(
-  const CandidateRegistrationCommit & request,
-  std::uint64_t * event_sequence);
+  [[nodiscard]]
+  SnapshotResult commit_candidate_registration(
+    const CandidateRegistrationCommit & request,
+    std::uint64_t * event_sequence);
 
-[[nodiscard]]
-SnapshotResult commit_candidate_rejection(
-  const CandidateRejectionCommit & request,
-  std::uint64_t * event_sequence);
+  [[nodiscard]]
+  SnapshotResult commit_candidate_rejection(
+    const CandidateRejectionCommit & request,
+    std::uint64_t * event_sequence);
 
-[[nodiscard]]
-SnapshotResult commit_candidate_approval(
-  const CandidateApprovalCommit & request,
-  std::uint64_t * event_sequence);
+  [[nodiscard]]
+  SnapshotResult commit_candidate_approval(
+    const CandidateApprovalCommit & request,
+    std::uint64_t * event_sequence);
 
-[[nodiscard]]
-SnapshotResult commit_location_enabled(
-  const LocationEnabledCommit & request,
-  std::uint64_t * event_sequence);
+  [[nodiscard]]
+  SnapshotResult commit_location_enabled(
+    const LocationEnabledCommit & request,
+    std::uint64_t * event_sequence);
+
+  [[nodiscard]]
+  SnapshotResult prepare_location_release(
+    const PrepareLocationReleaseRequest & request,
+    const CatalogSnapshot & snapshot,
+    LocationReleaseRecord * release,
+    std::uint64_t * event_sequence);
+
+  [[nodiscard]]
+  SnapshotResult verify_location_release(
+    const std::string & release_id,
+    const std::string & mission_id,
+    const std::string & transaction_token,
+    const std::string & expected_digest,
+    LocationReleaseRecord * release) const;
+
+  [[nodiscard]]
+  SnapshotResult commit_location_release(
+    const std::string & release_id,
+    const std::string & mission_id,
+    const std::string & transaction_token,
+    const std::string & expected_digest,
+    const std::string & actor_id,
+    LocationReleaseRecord * release,
+    std::uint64_t * event_sequence);
+
+  [[nodiscard]]
+  SnapshotResult rollback_location_release(
+    const std::string & release_id,
+    const std::string & mission_id,
+    const std::string & transaction_token,
+    const std::string & expected_digest,
+    const std::string & actor_id,
+    const std::string & reason,
+    LocationReleaseRecord * release,
+    std::uint64_t * event_sequence);
+
+  [[nodiscard]]
+  SnapshotResult active_location_release_id(
+    std::string * release_id) const;
 
 private:
   SqliteStore & store_;

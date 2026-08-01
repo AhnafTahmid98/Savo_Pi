@@ -8,6 +8,10 @@ import yaml
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_DIR = PACKAGE_ROOT / "config"
 
+CONFIG_NODE_NAMES = {
+    "apriltag_semantics.yaml": "apriltag_confirm_node",
+}
+
 if str(PACKAGE_ROOT) not in sys.path:
     sys.path.insert(0, str(PACKAGE_ROOT))
 
@@ -16,14 +20,23 @@ def load_params(file_name: str) -> dict:
     path = CONFIG_DIR / file_name
     assert path.is_file(), f"Missing config file: {file_name}"
 
-    data = yaml.safe_load(path.read_text()) or {}
+    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     assert isinstance(data, dict), f"{file_name} root must be a YAML mapping"
 
     if "savo_head" in data:
-        return dict(data.get("savo_head", {}).get("ros__parameters", {}) or {})
+        return dict(
+            data.get("savo_head", {}).get("ros__parameters", {}) or {}
+        )
+
+    if len(data) == 1:
+        node_config = next(iter(data.values()))
+        if (
+            isinstance(node_config, dict)
+            and "ros__parameters" in node_config
+        ):
+            return dict(node_config.get("ros__parameters", {}) or {})
 
     return data
-
 
 def run_command(cmd: list[str]) -> str:
     result = subprocess.run(
@@ -109,7 +122,7 @@ def test_frame_defaults():
     params = load_params("head_frames.yaml")
 
     expected = {
-        "base_frame": "base_link",
+        "base_frame": "pantilt_mount_link",
         "pan_frame": "pantilt_pan_link",
         "tilt_frame": "pantilt_tilt_link",
         "camera_frame": "pi_camera_link",
@@ -123,6 +136,8 @@ def test_frame_defaults():
 
     assert int(params["pan_zero_deg"]) == 72
     assert int(params["tilt_zero_deg"]) == 55
+    assert params["publish_tf"] is False
+    assert params["transforms_calibrated"] is False
 
 
 def test_camera_stream_defaults():

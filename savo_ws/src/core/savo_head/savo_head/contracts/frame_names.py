@@ -9,6 +9,7 @@ from typing import Final, Tuple
 
 
 BASE_LINK: Final[str] = "base_link"
+PANTILT_MOUNT_LINK: Final[str] = "pantilt_mount_link"
 
 PANTILT_PAN_LINK: Final[str] = "pantilt_pan_link"
 PANTILT_TILT_LINK: Final[str] = "pantilt_tilt_link"
@@ -26,6 +27,7 @@ ODOM: Final[str] = "odom"
 @dataclass(frozen=True)
 class HeadFrameNames:
     base_link: str = BASE_LINK
+    pantilt_mount_link: str = PANTILT_MOUNT_LINK
 
     pantilt_pan_link: str = PANTILT_PAN_LINK
     pantilt_tilt_link: str = PANTILT_TILT_LINK
@@ -41,7 +43,7 @@ class HeadFrameNames:
 
     def tf_chain(self) -> Tuple[str, ...]:
         return (
-            self.base_link,
+            self.pantilt_mount_link,
             self.pantilt_pan_link,
             self.pantilt_tilt_link,
             self.pi_camera_link,
@@ -90,6 +92,7 @@ def is_robot_frame(frame: str) -> bool:
 
 __all__ = [
     "BASE_LINK",
+    "PANTILT_MOUNT_LINK",
     "PANTILT_PAN_LINK",
     "PANTILT_TILT_LINK",
     "PI_CAMERA_LINK",

@@ -68,6 +68,11 @@
     default="$(find-pkg-share savo_mapping)/config/coverage_operation_orchestrator.yaml"/>
   <arg name="final_scan360_required" default="true"/>
   <arg name="final_head_scan_required" default="true"/>
+  <arg
+    name="geometry_profile"
+    default="$(find-pkg-share savo_description)/config/profiles/robot_savo_core_v1.yaml"/>
+  <arg name="require_locked_geometry" default="true"/>
+  <arg name="allow_provisional_geometry" default="false"/>
 
   <arg
     name="semantic_interruption_enabled"
@@ -278,6 +283,13 @@
       name="params_file"
       value="$(var orchestrator_params_file)"/>
     <arg name="coverage_enabled" value="$(var coverage_enabled)"/>
+    <arg name="geometry_profile" value="$(var geometry_profile)"/>
+    <arg
+      name="require_locked_geometry"
+      value="$(var require_locked_geometry)"/>
+    <arg
+      name="allow_provisional_geometry"
+      value="$(var allow_provisional_geometry)"/>
     <arg
       name="final_scan360_required"
       value="$(var final_scan360_required)"/>

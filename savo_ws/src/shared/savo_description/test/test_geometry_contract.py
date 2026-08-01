@@ -63,16 +63,13 @@ def test_wheel_geometry_matches_wheel_xacro_defaults() -> None:
     data = _load_yaml("wheel_geometry.yaml")["wheels"]
     wheels = URDF_DIR / "robot_savo_wheels.xacro"
 
-    expected = {
-        "radius_m": "wheel_radius",
-        "width_m": "wheel_width",
-        "x_offset_m": "wheel_x",
-        "y_offset_m": "wheel_y",
-        "z_offset_m": "wheel_z",
-        "mass_each_kg": "wheel_mass",
-    }
-    for yaml_key, xacro_key in expected.items():
-        assert data[yaml_key] == _macro_default(wheels, xacro_key)
+    profile = _load_yaml("profiles/robot_savo_core_v1.yaml")["wheels"]
+    assert data["radius_m"] == profile["radius_m"] == _macro_default(wheels, "wheel_radius")
+    assert data["width_m"] == profile["width_m"] == _macro_default(wheels, "wheel_width")
+    assert data["x_offset_m"] == profile["front_x_m"] == _macro_default(wheels, "wheel_front_x")
+    assert data["y_offset_m"] == profile["left_y_m"] == _macro_default(wheels, "wheel_left_y")
+    assert data["z_offset_m"] == profile["z_m"] == _macro_default(wheels, "wheel_z")
+    assert data["mass_each_kg"] == profile["mass_each_kg"] == _macro_default(wheels, "wheel_mass")
 
 
 def test_lidar_mount_uses_locked_frame_and_xacro_height() -> None:
@@ -82,7 +79,9 @@ def test_lidar_mount_uses_locked_frame_and_xacro_height() -> None:
 
     assert lidar["frame"] == "laser_frame"
     assert lidar["parent"] == "base_link"
-    assert lidar["xyz_m"] == [0.0, 0.0, _macro_default(sensors, "lidar_z")]
+    profile_lidar = _load_yaml("profiles/robot_savo_core_v1.yaml")["mounts"]["lidar"]
+    assert lidar == profile_lidar
+    assert "lidar_xyz:='0 0 0.205'" in sensors.read_text()
     assert lidar["rpy_rad"] == [0.0, 0.0, 0.0]
 
 

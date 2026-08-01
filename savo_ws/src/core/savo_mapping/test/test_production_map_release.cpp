@@ -237,3 +237,58 @@ TEST(ProductionMapRelease, CreateVerifyPromoteDeactivate)
 
   fs::remove_all(root);
 }
+
+TEST(ProductionMapRelease, JointReleaseContainsLocationApprovalAndGeometry)
+{
+  const fs::path root = fs::temp_directory_path() /
+    ("savo_mapping_joint_release_test_" + std::to_string(
+      std::chrono::steady_clock::now().time_since_epoch().count()));
+  const fs::path session = create_source_session(root / "sessions", "test_map");
+  const fs::path location_snapshot = root / "locations.json";
+  const fs::path geometry_profile = root / "geometry.yaml";
+  write_text(location_snapshot, "{\"schema_version\":1,\"locations\":[]}\n");
+  write_text(
+    geometry_profile,
+    "metadata:\n  profile_id: robot_savo_core_v1\n  state: locked\n");
+  const auto source = savo_mapping::session::verify_saved_map_session(
+    session, "test_map", "map");
+  ASSERT_TRUE(source.valid) << source.reason;
+
+  savo_mapping::release::JointReleaseContext joint;
+  joint.mission_id = "mission-am8";
+  joint.map_revision = 4U;
+  joint.actor_id = "operator";
+  joint.approval_reason = "map and locations reviewed";
+  joint.approval_unix_ns = 123456U;
+  joint.location_snapshot = location_snapshot;
+  joint.location_snapshot_sha256 =
+    savo_mapping::release::file_sha256(location_snapshot);
+  joint.geometry_profile = geometry_profile;
+  joint.geometry_profile_id = "robot_savo_core_v1";
+  joint.geometry_profile_sha256 =
+    savo_mapping::release::file_sha256(geometry_profile);
+
+  const auto created = savo_mapping::release::create_joint_release(
+    source, root / "production", "test_map_am8", joint, false);
+  ASSERT_TRUE(created.valid) << created.reason;
+  const auto verified = savo_mapping::release::verify_release(
+    root / "production", "test_map_am8");
+  ASSERT_TRUE(verified.valid) << verified.reason;
+
+  bool found_locations = false;
+  bool found_location_metadata = false;
+  bool found_approval = false;
+  bool found_geometry = false;
+  for (const auto & artifact : verified.artifacts) {
+    found_locations = found_locations || artifact.role == "location_snapshot";
+    found_location_metadata = found_location_metadata ||
+      artifact.role == "location_snapshot_metadata";
+    found_approval = found_approval || artifact.role == "operator_approval";
+    found_geometry = found_geometry || artifact.role == "geometry_profile";
+  }
+  EXPECT_TRUE(found_locations);
+  EXPECT_TRUE(found_location_metadata);
+  EXPECT_TRUE(found_approval);
+  EXPECT_TRUE(found_geometry);
+  fs::remove_all(root);
+}

@@ -136,6 +136,9 @@ def generate_launch_description() -> LaunchDescription:
                 "database_path": LaunchConfiguration(
                     "locations_database_path"
                 ),
+                "releases_root": LaunchConfiguration(
+                    "locations_releases_root"
+                ),
                 "create_parent_directories": _boolean(
                     "locations_create_parent_directories"
                 ),
@@ -338,6 +341,10 @@ def generate_launch_description() -> LaunchDescription:
         DeclareLaunchArgument(
             "locations_database_path",
             default_value="/var/lib/robot_savo/locations/locations.db",
+        ),
+        DeclareLaunchArgument(
+            "locations_releases_root",
+            default_value="/var/lib/robot_savo/locations/releases",
         ),
         DeclareLaunchArgument(
             "locations_create_parent_directories",

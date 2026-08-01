@@ -6,7 +6,7 @@
     Robot Savo head package for Pi Camera 2 NoIR pan-tilt control, scan behavior,
     head TF, status aggregation, and AprilTag semantic confirmation.
   </description>
-  <maintainer email="ahnaf.tahmid@example.com">Ahnaf Tahmid</maintainer>
+  <maintainer email="tahmidahnaf998@gmail.com">Ahnaf Tahmid</maintainer>
   <license>Apache-2.0</license>
   <buildtool_depend>ament_cmake</buildtool_depend>
   <buildtool_depend>ament_cmake_python</buildtool_depend>

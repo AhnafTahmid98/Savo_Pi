@@ -51,13 +51,6 @@ def _validate_arguments(context):
                 "and the required control mode are confirmed."
             )
         ),
-        LogInfo(
-            msg=(
-                "savo_description is intentionally external to AM-7 until "
-                "AM-0B locks real dimensions, sensor transforms, and STL "
-                "meshes. Mapping readiness remains fail-closed on TF."
-            )
-        ),
     ]
 
 
@@ -83,6 +76,23 @@ def generate_launch_description() -> LaunchDescription:
     """Compose the guarded core-side autonomous frontier mapping stack."""
     use_sim_time = LaunchConfiguration("use_sim_time")
     log_level = LaunchConfiguration("log_level")
+
+    description_launch = IncludeLaunchDescription(
+        _python_launch("savo_description", "description.launch.py"),
+        condition=IfCondition(LaunchConfiguration("start_description")),
+        launch_arguments={
+            "geometry_profile": LaunchConfiguration("geometry_profile"),
+            "require_locked_geometry": LaunchConfiguration(
+                "require_locked_geometry"
+            ),
+            "allow_provisional_geometry": LaunchConfiguration(
+                "allow_provisional_geometry"
+            ),
+            "use_sim_time": use_sim_time,
+            "use_transmissions": "false",
+            "use_gazebo": "false",
+        }.items(),
+    )
 
     base_launch = IncludeLaunchDescription(
         _python_launch("savo_base", "base_bringup.launch.py"),
@@ -213,6 +223,9 @@ def generate_launch_description() -> LaunchDescription:
             "locations_database_path": LaunchConfiguration(
                 "locations_database_path"
             ),
+            "locations_releases_root": LaunchConfiguration(
+                "locations_releases_root"
+            ),
             "locations_create_parent_directories": LaunchConfiguration(
                 "locations_create_parent_directories"
             ),
@@ -237,6 +250,13 @@ def generate_launch_description() -> LaunchDescription:
                 "start_semantic_interruption"
             ),
             "coverage_enabled": LaunchConfiguration("coverage_enabled"),
+            "geometry_profile": LaunchConfiguration("geometry_profile"),
+            "require_locked_geometry": LaunchConfiguration(
+                "require_locked_geometry"
+            ),
+            "allow_provisional_geometry": LaunchConfiguration(
+                "allow_provisional_geometry"
+            ),
             "coverage_params_file": LaunchConfiguration(
                 "coverage_params_file"
             ),
@@ -267,6 +287,14 @@ def generate_launch_description() -> LaunchDescription:
             "config",
             "profiles",
             "core_real_robot_v1.yaml",
+        ]
+    )
+    default_geometry_profile = PathJoinSubstitution(
+        [
+            FindPackageShare("savo_description"),
+            "config",
+            "profiles",
+            "robot_savo_core_v1.yaml",
         ]
     )
     default_nav_params = PathJoinSubstitution(
@@ -337,6 +365,16 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument("log_level", default_value="info"),
             DeclareLaunchArgument("map_frame", default_value="map"),
             DeclareLaunchArgument("base_frame", default_value="base_link"),
+            DeclareLaunchArgument("start_description", default_value="true"),
+            DeclareLaunchArgument(
+                "geometry_profile", default_value=default_geometry_profile
+            ),
+            DeclareLaunchArgument(
+                "require_locked_geometry", default_value="true"
+            ),
+            DeclareLaunchArgument(
+                "allow_provisional_geometry", default_value="false"
+            ),
             DeclareLaunchArgument("start_base", default_value="true"),
             DeclareLaunchArgument("start_lidar", default_value="true"),
             DeclareLaunchArgument(
@@ -365,6 +403,12 @@ def generate_launch_description() -> LaunchDescription:
                 "locations_database_path",
                 default_value=(
                     "/var/lib/robot_savo/locations/locations.db"
+                ),
+            ),
+            DeclareLaunchArgument(
+                "locations_releases_root",
+                default_value=(
+                    "/var/lib/robot_savo/locations/releases"
                 ),
             ),
             DeclareLaunchArgument(
@@ -485,6 +529,7 @@ def generate_launch_description() -> LaunchDescription:
                 "final_head_scan_required", default_value="true"
             ),
             OpaqueFunction(function=_validate_arguments),
+            description_launch,
             base_launch,
             lidar_launch,
             perception_launch,

@@ -60,7 +60,7 @@ bool is_memory_database(
   return
     path == ":memory:" ||
     path.find("mode=memory") !=
-      std::string_view::npos;
+    std::string_view::npos;
 }
 
 
@@ -240,7 +240,8 @@ StorageResult SqliteStore::open()
   for (const auto sql : {
       std::string_view{"PRAGMA foreign_keys=ON;"},
       std::string_view{"PRAGMA synchronous=NORMAL;"},
-      std::string_view{"PRAGMA temp_store=MEMORY;"}})
+      std::string_view{"PRAGMA temp_store=MEMORY;"}
+    })
   {
     const auto result =
       execute_locked(sql);
@@ -304,8 +305,8 @@ StorageResult SqliteStore::open()
   {
     const int failure_code =
       foreign_key_result.success ?
-        SQLITE_ERROR :
-        foreign_key_result.sqlite_code;
+      SQLITE_ERROR :
+      foreign_key_result.sqlite_code;
 
     sqlite3_close_v2(database_);
     database_ = nullptr;
@@ -428,7 +429,7 @@ StorageResult SqliteStore::migrate(
 
   status->previous_version =
     static_cast<std::uint32_t>(
-      current_version);
+    current_version);
 
   status->current_version =
     status->previous_version;
@@ -499,8 +500,8 @@ StorageResult SqliteStore::migrate(
       "applied_at_unix_ns"
       ") VALUES("
       "1,"
-      "'001_initial_schema',"
-      + std::to_string(unix_time_ns()) +
+      "'001_initial_schema'," +
+      std::to_string(unix_time_ns()) +
       ");";
 
     const auto insert_result =
@@ -550,8 +551,8 @@ StorageResult SqliteStore::migrate(
       "applied_at_unix_ns"
       ") VALUES("
       "2,"
-      "'002_append_only_event_journal',"
-      + std::to_string(unix_time_ns()) +
+      "'002_append_only_event_journal'," +
+      std::to_string(unix_time_ns()) +
       ");";
 
     const auto insert_result =
@@ -579,6 +580,57 @@ StorageResult SqliteStore::migrate(
     }
 
     working_version = 2U;
+  }
+
+  if (working_version == 2U) {
+    const auto schema_result =
+      execute_locked(kMigration003Sql);
+
+    if (!schema_result.success) {
+      rollback_migration();
+
+      return failure(
+        StorageCode::kMigrationFailed,
+        schema_result.sqlite_code,
+        schema_result.reason);
+    }
+
+    const std::string migration_insert =
+      "INSERT INTO schema_migrations("
+      "schema_version,"
+      "migration_name,"
+      "applied_at_unix_ns"
+      ") VALUES("
+      "3,"
+      "'003_location_release_authority'," +
+      std::to_string(unix_time_ns()) +
+      ");";
+
+    const auto insert_result =
+      execute_locked(migration_insert);
+
+    if (!insert_result.success) {
+      rollback_migration();
+
+      return failure(
+        StorageCode::kMigrationFailed,
+        insert_result.sqlite_code,
+        insert_result.reason);
+    }
+
+    const auto version_update =
+      execute_locked("PRAGMA user_version=3;");
+
+    if (!version_update.success) {
+      rollback_migration();
+
+      return failure(
+        StorageCode::kMigrationFailed,
+        version_update.sqlite_code,
+        version_update.reason);
+    }
+
+    working_version = 3U;
   }
 
   if (
@@ -615,7 +667,6 @@ StorageResult SqliteStore::migrate(
 
   return success("schema migrations applied");
 }
-
 
 
 StorageResult SqliteStore::schema_version(
@@ -657,7 +708,7 @@ StorageResult SqliteStore::schema_version(
 
   *version =
     static_cast<std::uint32_t>(
-      raw_version);
+    raw_version);
 
   return success("schema version read");
 }
@@ -767,8 +818,8 @@ StorageResult SqliteStore::integrity_check(
 
     std::string message{
       table == nullptr ?
-        "unknown_table" :
-        reinterpret_cast<const char *>(table)};
+      "unknown_table" :
+      reinterpret_cast<const char *>(table)};
 
     message += ":rowid=";
     message += std::to_string(row_id);
@@ -776,8 +827,8 @@ StorageResult SqliteStore::integrity_check(
 
     message +=
       parent == nullptr ?
-        "unknown_parent" :
-        reinterpret_cast<const char *>(parent);
+      "unknown_parent" :
+      reinterpret_cast<const char *>(parent);
 
     report->foreign_key_violations.push_back(
       std::move(message));
@@ -1070,10 +1121,10 @@ StorageResult SqliteStore::get_metadata(
 
     *value =
       text == nullptr ?
-        std::string{} :
-        std::string{
-          reinterpret_cast<
-            const char *>(text)};
+      std::string{} :
+    std::string{
+      reinterpret_cast<
+        const char *>(text)};
 
     const int finalize_code =
       sqlite3_finalize(statement);
@@ -1238,8 +1289,8 @@ StorageResult SqliteStore::execute_locked(
   if (code != SQLITE_OK) {
     std::string reason{
       error_message == nullptr ?
-        sqlite3_errmsg(database_) :
-        error_message};
+      sqlite3_errmsg(database_) :
+      error_message};
 
     sqlite3_free(error_message);
 
@@ -1386,10 +1437,10 @@ SqliteStore::query_single_text_locked(
 
   *value =
     text == nullptr ?
-      std::string{} :
-      std::string{
-        reinterpret_cast<
-          const char *>(text)};
+    std::string{} :
+  std::string{
+    reinterpret_cast<
+      const char *>(text)};
 
   code = sqlite3_step(statement);
 
@@ -1430,7 +1481,7 @@ SqliteStore::check_open_locked() const
 
 StorageResult
 SqliteStore::check_transaction_owner_locked()
-  const
+const
 {
   if (!transaction_active_) {
     return success();
@@ -1442,7 +1493,7 @@ SqliteStore::check_transaction_owner_locked()
   {
     return failure(
       StorageCode::
-        kTransactionOwnerMismatch,
+      kTransactionOwnerMismatch,
       SQLITE_BUSY,
       "active transaction belongs to another thread");
   }

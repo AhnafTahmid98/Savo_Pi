@@ -327,6 +327,28 @@ TEST(AutonomousMappingMissionTest, RunsCoverageReturnFinalScansBeforeSaving)
   inputs.verification_complete = true;
   inputs.verification_succeeded = true;
   decision = mission.observe(inputs);
+  EXPECT_EQ(decision.snapshot.state, MissionState::VerifyingLocations);
+  EXPECT_TRUE(decision.request_location_verification);
+  inputs.location_verification_started = true;
+  inputs.location_verification_complete = true;
+  inputs.location_verification_succeeded = true;
+  decision = mission.observe(inputs);
+  EXPECT_EQ(decision.snapshot.state, MissionState::AwaitingApproval);
+  EXPECT_TRUE(decision.request_operator_review);
+  inputs.review_complete = true;
+  inputs.review_approved = true;
+  inputs.approval_actor = "operator";
+  inputs.approval_reason = "map reviewed";
+  inputs.requested_release_id = "campus-floor-1-r1";
+  decision = mission.observe(inputs);
+  EXPECT_EQ(decision.snapshot.state, MissionState::Releasing);
+  EXPECT_TRUE(decision.request_joint_release);
+  inputs.release_started = true;
+  inputs.release_complete = true;
+  inputs.release_succeeded = true;
+  inputs.release_id = "campus-floor-1-r1";
+  inputs.joint_active_release_verified = true;
+  decision = mission.observe(inputs);
   EXPECT_TRUE(decision.terminal);
   EXPECT_EQ(decision.snapshot.state, MissionState::Completed);
   EXPECT_EQ(decision.snapshot.result, MissionResult::Succeeded);
@@ -1240,6 +1262,28 @@ TEST(AutonomousMappingMissionTest, AutoSaveTransitionsThroughSavingAndVerificati
   inputs.verification_reason = "saved_map_valid";
   decision = mission.observe(inputs);
 
+  EXPECT_EQ(decision.snapshot.state, MissionState::VerifyingLocations);
+  EXPECT_TRUE(decision.request_location_verification);
+  inputs.location_verification_started = true;
+  inputs.location_verification_complete = true;
+  inputs.location_verification_succeeded = true;
+  inputs.approved_location_count = 2U;
+  decision = mission.observe(inputs);
+  EXPECT_EQ(decision.snapshot.state, MissionState::AwaitingApproval);
+  inputs.review_complete = true;
+  inputs.review_approved = true;
+  inputs.approval_actor = "operator";
+  inputs.approval_reason = "quality and locations reviewed";
+  inputs.requested_release_id = "campus-floor-1-r1";
+  decision = mission.observe(inputs);
+  EXPECT_EQ(decision.snapshot.state, MissionState::Releasing);
+  inputs.release_started = true;
+  inputs.release_complete = true;
+  inputs.release_succeeded = true;
+  inputs.release_id = "campus-floor-1-r1";
+  inputs.joint_active_release_verified = true;
+  decision = mission.observe(inputs);
+
   EXPECT_TRUE(decision.terminal);
   EXPECT_EQ(decision.snapshot.state, MissionState::Completed);
   EXPECT_EQ(decision.snapshot.result, MissionResult::Succeeded);
@@ -1308,4 +1352,182 @@ TEST(AutonomousMappingMissionTest, VerificationFailureTerminatesWithSaveFailed)
   EXPECT_EQ(decision.snapshot.result, MissionResult::SaveFailed);
   EXPECT_TRUE(decision.snapshot.map_saved);
   EXPECT_FALSE(decision.snapshot.map_verified);
+}
+
+TEST(AutonomousMappingMissionTest, PendingCandidateBlocksAm8Release)
+{
+  AutonomousMappingMission mission;
+  auto inputs = exploring_inputs();
+  inputs.completion_confirmed = true;
+  ASSERT_TRUE(mission.start(valid_request(), inputs).accepted);
+  mission.observe(inputs);
+  inputs.mode = MappingMode::MonitorOnly;
+  inputs.exploration_mode = ExplorationMode::Idle;
+  inputs.workflow_phase = WorkflowPhase::Idle;
+  inputs.runtime_authorized = false;
+  mission.observe(inputs);
+  inputs.map_save_started = true;
+  inputs.map_save_complete = true;
+  inputs.map_save_succeeded = true;
+  mission.observe(inputs);
+  inputs.verification_started = true;
+  inputs.verification_complete = true;
+  inputs.verification_succeeded = true;
+  mission.observe(inputs);
+  inputs.location_verification_started = true;
+  inputs.location_verification_complete = true;
+  inputs.location_verification_succeeded = true;
+  inputs.pending_candidate_count = 1U;
+  inputs.location_verification_reason = "pending_location_candidates";
+  const auto decision = mission.observe(inputs);
+  EXPECT_TRUE(decision.terminal);
+  EXPECT_EQ(decision.snapshot.result, MissionResult::LocationVerificationFailed);
+}
+
+TEST(AutonomousMappingMissionTest, OperatorRejectionTerminatesWithoutRelease)
+{
+  AutonomousMappingMission mission;
+  auto inputs = exploring_inputs();
+  inputs.completion_confirmed = true;
+  ASSERT_TRUE(mission.start(valid_request(), inputs).accepted);
+  mission.observe(inputs);
+  inputs.mode = MappingMode::MonitorOnly;
+  inputs.exploration_mode = ExplorationMode::Idle;
+  inputs.workflow_phase = WorkflowPhase::Idle;
+  inputs.runtime_authorized = false;
+  mission.observe(inputs);
+  inputs.map_save_started = true;
+  inputs.map_save_complete = true;
+  inputs.map_save_succeeded = true;
+  mission.observe(inputs);
+  inputs.verification_started = true;
+  inputs.verification_complete = true;
+  inputs.verification_succeeded = true;
+  mission.observe(inputs);
+  inputs.location_verification_started = true;
+  inputs.location_verification_complete = true;
+  inputs.location_verification_succeeded = true;
+  mission.observe(inputs);
+  inputs.review_complete = true;
+  inputs.review_rejected = true;
+  inputs.approval_reason = "operator found a bad doorway";
+  const auto decision = mission.observe(inputs);
+  EXPECT_TRUE(decision.terminal);
+  EXPECT_EQ(decision.snapshot.result, MissionResult::OperatorRejected);
+  EXPECT_FALSE(decision.snapshot.release_started);
+}
+
+TEST(AutonomousMappingMissionTest, CancellationDuringApprovalIsImmediate)
+{
+  AutonomousMappingMission mission;
+  auto inputs = exploring_inputs();
+  inputs.completion_confirmed = true;
+  ASSERT_TRUE(mission.start(valid_request(), inputs).accepted);
+  mission.observe(inputs);
+  inputs.mode = MappingMode::MonitorOnly;
+  inputs.exploration_mode = ExplorationMode::Idle;
+  inputs.workflow_phase = WorkflowPhase::Idle;
+  inputs.runtime_authorized = false;
+  mission.observe(inputs);
+  inputs.map_save_started = true;
+  inputs.map_save_complete = true;
+  inputs.map_save_succeeded = true;
+  mission.observe(inputs);
+  inputs.verification_started = true;
+  inputs.verification_complete = true;
+  inputs.verification_succeeded = true;
+  mission.observe(inputs);
+  inputs.location_verification_started = true;
+  inputs.location_verification_complete = true;
+  inputs.location_verification_succeeded = true;
+  ASSERT_EQ(
+    mission.observe(inputs).snapshot.state,
+    MissionState::AwaitingApproval);
+  const auto decision = mission.control(
+    MissionCommand::Cancel, "operator canceled", inputs);
+  EXPECT_TRUE(decision.terminal);
+  EXPECT_EQ(decision.snapshot.state, MissionState::Canceled);
+  EXPECT_EQ(decision.snapshot.result, MissionResult::Canceled);
+}
+
+TEST(AutonomousMappingMissionTest, ReleaseFailureWaitsForRollback)
+{
+  AutonomousMappingMission mission;
+  auto inputs = exploring_inputs();
+  inputs.completion_confirmed = true;
+  ASSERT_TRUE(mission.start(valid_request(), inputs).accepted);
+  mission.observe(inputs);
+  inputs.mode = MappingMode::MonitorOnly;
+  inputs.exploration_mode = ExplorationMode::Idle;
+  inputs.workflow_phase = WorkflowPhase::Idle;
+  inputs.runtime_authorized = false;
+  mission.observe(inputs);
+  inputs.map_save_started = true;
+  inputs.map_save_complete = true;
+  inputs.map_save_succeeded = true;
+  mission.observe(inputs);
+  inputs.verification_started = true;
+  inputs.verification_complete = true;
+  inputs.verification_succeeded = true;
+  mission.observe(inputs);
+  inputs.location_verification_started = true;
+  inputs.location_verification_complete = true;
+  inputs.location_verification_succeeded = true;
+  mission.observe(inputs);
+  inputs.review_complete = true;
+  inputs.review_approved = true;
+  mission.observe(inputs);
+  inputs.release_started = true;
+  inputs.release_complete = true;
+  inputs.release_succeeded = false;
+  inputs.release_reason = "map_promotion_failed";
+  inputs.rollback_required = true;
+  auto decision = mission.observe(inputs);
+  EXPECT_TRUE(decision.request_release_rollback);
+  EXPECT_FALSE(decision.terminal);
+  inputs.rollback_complete = true;
+  inputs.rollback_succeeded = true;
+  decision = mission.observe(inputs);
+  EXPECT_TRUE(decision.terminal);
+  EXPECT_EQ(decision.snapshot.result, MissionResult::ReleaseFailed);
+}
+
+TEST(AutonomousMappingMissionTest, RollbackFailureHasDistinctResult)
+{
+  AutonomousMappingMission mission;
+  auto inputs = exploring_inputs();
+  inputs.completion_confirmed = true;
+  ASSERT_TRUE(mission.start(valid_request(), inputs).accepted);
+  mission.observe(inputs);
+  inputs.mode = MappingMode::MonitorOnly;
+  inputs.exploration_mode = ExplorationMode::Idle;
+  inputs.workflow_phase = WorkflowPhase::Idle;
+  inputs.runtime_authorized = false;
+  mission.observe(inputs);
+  inputs.map_save_started = true;
+  inputs.map_save_complete = true;
+  inputs.map_save_succeeded = true;
+  mission.observe(inputs);
+  inputs.verification_started = true;
+  inputs.verification_complete = true;
+  inputs.verification_succeeded = true;
+  mission.observe(inputs);
+  inputs.location_verification_started = true;
+  inputs.location_verification_complete = true;
+  inputs.location_verification_succeeded = true;
+  mission.observe(inputs);
+  inputs.review_complete = true;
+  inputs.review_approved = true;
+  mission.observe(inputs);
+  inputs.release_started = true;
+  inputs.release_complete = true;
+  inputs.release_succeeded = false;
+  inputs.release_reason = "location_commit_failed";
+  inputs.rollback_required = true;
+  inputs.rollback_complete = true;
+  inputs.rollback_succeeded = false;
+  inputs.rollback_reason = "location_rollback_failed";
+  const auto decision = mission.observe(inputs);
+  EXPECT_TRUE(decision.terminal);
+  EXPECT_EQ(decision.snapshot.result, MissionResult::ReleaseRollbackFailed);
 }

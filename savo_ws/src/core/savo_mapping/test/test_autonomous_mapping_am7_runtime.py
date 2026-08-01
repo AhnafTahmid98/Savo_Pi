@@ -3,6 +3,7 @@
 
 """Isolated end-to-end runtime validation for the AM-7 mission sequence."""
 
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -29,6 +30,13 @@ from rclpy.qos import ReliabilityPolicy
 from savo_msgs.action import RunAutonomousMapping
 from savo_msgs.msg import AutonomousMappingStatus
 from savo_msgs.msg import FrontierExplorationStatus
+from savo_msgs.srv import CommitLocationRelease
+from savo_msgs.srv import ListLocationCandidates
+from savo_msgs.srv import ListLocations
+from savo_msgs.srv import PrepareLocationRelease
+from savo_msgs.srv import ReviewAutonomousMappingRelease
+from savo_msgs.srv import RollbackLocationRelease
+from savo_msgs.srv import VerifyLocationRelease
 from std_msgs.msg import Bool
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
@@ -111,6 +119,13 @@ class Am7RuntimeHarness:
         self.coverage_approve_service = f'{prefix}/operation/approve'
         self.coverage_cancel_service = f'{prefix}/operation/cancel'
         self.coverage_reset_service = f'{prefix}/operation/reset'
+        self.location_candidates_service = f'{prefix}/locations/candidates'
+        self.location_list_service = f'{prefix}/locations/list'
+        self.location_prepare_service = f'{prefix}/locations/prepare'
+        self.location_verify_service = f'{prefix}/locations/verify'
+        self.location_commit_service = f'{prefix}/locations/commit'
+        self.location_rollback_service = f'{prefix}/locations/rollback'
+        self.release_review_service = f'{prefix}/release/review'
 
         self.node = rclpy.create_node(f'am7_fixture_{suffix}')
         self.group = ReentrantCallbackGroup()
@@ -141,6 +156,17 @@ class Am7RuntimeHarness:
         self.map_saves = 0
         self.session_root = Path(tempfile.mkdtemp(prefix='savo_am7_runtime_'))
         self.session_directory = self._create_valid_session('campus_main')
+        self.production_map_root = self.session_root / 'production_maps'
+        self.release_journal_root = self.session_root / 'release_journals'
+        self.location_snapshot = self.session_root / 'locations.json'
+        self.location_snapshot.write_text(
+            '{"locations":[],"schema_version":1}\n', encoding='utf-8'
+        )
+        self.location_snapshot_digest = hashlib.sha256(
+            self.location_snapshot.read_bytes()
+        ).hexdigest()
+        self.location_transaction_token = f'transaction-{suffix}'
+        self.location_release_id = ''
 
         self.mode_pub = self._publisher(String, self.mode_topic, retained_qos())
         self.exploration_mode_pub = self._publisher(
@@ -213,6 +239,42 @@ class Am7RuntimeHarness:
         self._service(self.coverage_cancel_service, self._coverage_cancel)
         self._service(self.coverage_reset_service, self._accept)
         self._service(self.map_save_service, self._map_save)
+        self.node.create_service(
+            ListLocationCandidates,
+            self.location_candidates_service,
+            self._list_candidates,
+            callback_group=self.group,
+        )
+        self.node.create_service(
+            ListLocations,
+            self.location_list_service,
+            self._list_locations,
+            callback_group=self.group,
+        )
+        self.node.create_service(
+            PrepareLocationRelease,
+            self.location_prepare_service,
+            self._prepare_location_release,
+            callback_group=self.group,
+        )
+        self.node.create_service(
+            VerifyLocationRelease,
+            self.location_verify_service,
+            self._verify_location_release,
+            callback_group=self.group,
+        )
+        self.node.create_service(
+            CommitLocationRelease,
+            self.location_commit_service,
+            self._commit_location_release,
+            callback_group=self.group,
+        )
+        self.node.create_service(
+            RollbackLocationRelease,
+            self.location_rollback_service,
+            self._rollback_location_release,
+            callback_group=self.group,
+        )
 
         self.return_server = ActionServer(
             self.node,
@@ -227,6 +289,11 @@ class Am7RuntimeHarness:
             self.node,
             RunAutonomousMapping,
             self.action_name,
+            callback_group=self.group,
+        )
+        self.review_client = self.node.create_client(
+            ReviewAutonomousMappingRelease,
+            self.release_review_service,
             callback_group=self.group,
         )
         self.tf_timer = self.node.create_timer(0.05, self.publish_transform)
@@ -266,6 +333,7 @@ class Am7RuntimeHarness:
         session = self.session_root / map_id
         session.mkdir()
         base = session / map_id
+        quality_report = session / 'quality_report.yaml'
         (session / f'{map_id}.pgm').write_bytes(b'P5\n1 1\n255\nx')
         (session / f'{map_id}.posegraph').write_text('posegraph')
         (session / f'{map_id}.data').write_text('data')
@@ -273,6 +341,12 @@ class Am7RuntimeHarness:
             f'image: {map_id}.pgm\nmode: trinary\nresolution: 0.05\n'
             'origin: [0.0, 0.0, 0.0]\nnegate: 0\n'
             'occupied_thresh: 0.65\nfree_thresh: 0.25\n'
+        )
+        quality_report.write_text(
+            'schema_version: 1\n'
+            f'map_id: "{map_id}"\n'
+            'passed: true\n',
+            encoding='utf-8',
         )
         (session / 'manifest.yaml').write_text(
             'schema_version: 1\n'
@@ -286,7 +360,9 @@ class Am7RuntimeHarness:
             f'  posegraph: "{base}.posegraph"\n'
             f'  data: "{base}.data"\n'
             'map_quality:\n  structurally_valid: true\n'
-            '  evaluated: false\n'
+            '  evaluated: true\n'
+            '  passed: true\n'
+            f'  report: "{quality_report}"\n'
             'navigation_handoff_ready: false\n'
         )
         return session
@@ -313,6 +389,28 @@ class Am7RuntimeHarness:
             'handoff_cancel_service': self.handoff_cancel_service,
             'save.map_session_service': self.map_save_service,
             'save.expected_frame': self.map_frame,
+            'release.review_service': self.release_review_service,
+            'release.location_candidates_service': (
+                self.location_candidates_service
+            ),
+            'release.location_list_service': self.location_list_service,
+            'release.location_prepare_service': self.location_prepare_service,
+            'release.location_verify_service': self.location_verify_service,
+            'release.location_commit_service': self.location_commit_service,
+            'release.location_rollback_service': (
+                self.location_rollback_service
+            ),
+            'release.production_map_root': str(self.production_map_root),
+            'release.journal_root': str(self.release_journal_root),
+            'release.require_locked_geometry': 'false',
+            'release.allow_provisional_geometry': 'true',
+            'release.location_verification_timeout_s': '3.0',
+            'release.operator_approval_timeout_s': '5.0',
+            'release.location_prepare_timeout_s': '3.0',
+            'release.map_creation_verification_timeout_s': '3.0',
+            'release.location_commit_timeout_s': '3.0',
+            'release.map_promotion_timeout_s': '3.0',
+            'release.rollback_recovery_timeout_s': '3.0',
             'sequence.scan360_state_topic': self.scan_state_topic,
             'sequence.scan360_start_service': self.scan_start_service,
             'sequence.scan360_cancel_service': self.scan_cancel_service,
@@ -608,6 +706,107 @@ class Am7RuntimeHarness:
         response.message = f'map_session_saved:{self.session_directory}'
         return response
 
+    @staticmethod
+    def _list_candidates(_request, response):
+        response.success = True
+        response.result_code = ListLocationCandidates.Response.RESULT_OK
+        response.reason = 'fixture_candidates_verified'
+        response.candidates = []
+        return response
+
+    @staticmethod
+    def _list_locations(_request, response):
+        response.success = True
+        response.result_code = ListLocations.Response.RESULT_OK
+        response.reason = 'fixture_locations_verified'
+        response.locations = []
+        return response
+
+    def _prepare_location_release(self, request, response):
+        self.location_release_id = request.release_id
+        response.success = True
+        response.result_code = PrepareLocationRelease.Response.RESULT_SUCCEEDED
+        response.reason = 'fixture_location_release_prepared'
+        response.release_id = request.release_id
+        response.transaction_token = self.location_transaction_token
+        response.snapshot_path = str(self.location_snapshot)
+        response.snapshot_sha256 = self.location_snapshot_digest
+        response.location_count = 0
+        response.candidate_count = 0
+        response.previous_active_location_release_id = ''
+        return response
+
+    def _verify_location_release(self, request, response):
+        response.success = (
+            request.release_id == self.location_release_id
+            and request.transaction_token == self.location_transaction_token
+            and request.expected_snapshot_sha256
+            == self.location_snapshot_digest
+        )
+        response.result_code = VerifyLocationRelease.Response.RESULT_SUCCEEDED
+        response.reason = 'fixture_location_release_verified'
+        response.release_id = request.release_id
+        response.snapshot_path = str(self.location_snapshot)
+        response.snapshot_sha256 = self.location_snapshot_digest
+        response.location_count = 0
+        response.candidate_count = 0
+        response.state = 'prepared_verified'
+        return response
+
+    def _commit_location_release(self, request, response):
+        response.success = request.release_id == self.location_release_id
+        response.result_code = CommitLocationRelease.Response.RESULT_SUCCEEDED
+        response.reason = 'fixture_location_release_committed'
+        response.release_id = request.release_id
+        response.active_location_release_id = request.release_id
+        response.state = 'active'
+        return response
+
+    def _rollback_location_release(self, request, response):
+        response.success = True
+        response.result_code = RollbackLocationRelease.Response.RESULT_SUCCEEDED
+        response.reason = 'fixture_location_release_rolled_back'
+        response.release_id = request.release_id
+        response.active_location_release_id = ''
+        response.state = 'rolled_back'
+        return response
+
+    def approve_release(self):
+        """Approve the correlated AM-8 review after both verifications pass."""
+        assert self.review_client.wait_for_service(timeout_sec=3.0)
+        awaiting = next(
+            status
+            for status in reversed(self.statuses)
+            if status.state == AutonomousMappingStatus.STATE_AWAITING_APPROVAL
+        )
+        request = ReviewAutonomousMappingRelease.Request()
+        request.contract_version = request.CONTRACT_VERSION
+        request.request_id = 'review-am8-runtime'
+        request.mission_id = 'mission_am7_runtime'
+        request.map_id = 'campus_main'
+        request.map_revision = 1
+        request.expected_review_generation = awaiting.review_generation
+        request.actor_id = 'operator_am8_runtime'
+        request.decision = request.DECISION_APPROVE
+        request.requested_release_id = 'campus-main-r1-runtime'
+        request.review_reason = 'runtime_joint_release_approved'
+        future = self.review_client.call_async(request)
+        assert wait_until(future.done), self.diagnostics()
+        response = future.result()
+        if (
+            response.result_code
+            == ReviewAutonomousMappingRelease.Response.RESULT_STALE_GENERATION
+        ):
+            request.request_id = 'review-am8-runtime-retry'
+            request.expected_review_generation = (
+                response.current_review_generation
+            )
+            future = self.review_client.call_async(request)
+            assert wait_until(future.done), self.diagnostics()
+            response = future.result()
+        assert response.accepted and response.approved, response.reason
+        return response.release_id
+
     def publish_transform(self):
         if self.return_goal_received_at is not None:
             if self.tf_behavior == 'unavailable_after_return':
@@ -782,6 +981,8 @@ class Am7RuntimeHarness:
         self.action_client.destroy()
         self.node.destroy_node()
         self.spin_thread.join(timeout=2.0)
+        for path in self.session_root.rglob('*'):
+            path.chmod(0o700 if path.is_dir() else 0o600)
         shutil.rmtree(self.session_root)
 
 
@@ -821,6 +1022,14 @@ def test_full_am7_runtime_sequence():
         ), harness.diagnostics()
         harness.publish_workflow('monitor_only', 'idle', 'idle', False)
         assert wait_until(lambda: harness.head_starts == 2), harness.diagnostics()
+        assert wait_until(
+            lambda: any(
+                status.state
+                == AutonomousMappingStatus.STATE_AWAITING_APPROVAL
+                for status in harness.statuses
+            )
+        ), harness.diagnostics()
+        release_id = harness.approve_release()
         assert wait_until(result_future.done, timeout=20.0), harness.diagnostics()
         wrapped = result_future.result()
         assert wrapped.result.success
@@ -829,12 +1038,17 @@ def test_full_am7_runtime_sequence():
             == RunAutonomousMapping.Result.RESULT_SUCCEEDED
         )
         assert wrapped.result.map_saved
+        assert wrapped.result.map_release_id == release_id
         assert harness.map_saves == 1
         assert harness.statuses[-1].state == AutonomousMappingStatus.STATE_COMPLETED
         assert harness.statuses[-1].final_scan360_succeeded
         assert harness.statuses[-1].final_head_scan_succeeded
         assert harness.statuses[-1].return_to_start_succeeded
         assert harness.statuses[-1].return_to_start_distance_m <= 0.35
+        assert harness.statuses[-1].location_verification_passed
+        assert harness.statuses[-1].approval_recorded
+        assert harness.statuses[-1].release_succeeded
+        assert harness.statuses[-1].joint_active_release_verified
     finally:
         harness.close()
 

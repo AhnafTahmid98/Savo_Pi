@@ -56,7 +56,7 @@ make_pending_candidate()
 
   record.state =
     savo_locations::CandidateState::
-      kPendingReview;
+    kPendingReview;
 
   record.candidate_revision = 1U;
 
@@ -131,7 +131,7 @@ make_approved_location()
 
   record.state =
     savo_locations::LocationState::
-      kApproved;
+    kApproved;
 
   record.enabled = true;
   record.record_revision = 1U;
@@ -165,7 +165,7 @@ make_approved_location()
     make_pose(12.8, 8.1);
 
   record.location
-    .arrival_confirmation_required =
+  .arrival_confirmation_required =
     true;
 
   record.location.building = "Main";
@@ -201,7 +201,7 @@ make_approved_snapshot()
 
   candidate.state =
     savo_locations::CandidateState::
-      kApproved;
+    kApproved;
 
   candidate.candidate_revision = 2U;
   candidate.review_reason = "approved";
@@ -232,7 +232,7 @@ void open_and_migrate(
   EXPECT_EQ(
     status.current_version,
     savo_locations::
-      kSupportedSqliteSchemaVersion);
+    kSupportedSqliteSchemaVersion);
 }
 
 
@@ -322,7 +322,7 @@ TEST(PersistentCatalog, MigratesSchemaOneToTwo)
     store.migrate(&status).success);
 
   EXPECT_EQ(status.previous_version, 1U);
-  EXPECT_EQ(status.current_version, 2U);
+  EXPECT_EQ(status.current_version, 3U);
   EXPECT_TRUE(status.migration_applied);
 }
 
@@ -339,15 +339,15 @@ TEST(PersistentCatalog, BootstrapReportsCatalogState)
 
   ASSERT_TRUE(
     repository
-      .save_snapshot(
+    .save_snapshot(
         make_pending_snapshot())
-      .success);
+    .success);
 
   savo_locations::PersistenceEvent event;
 
   event.event_type =
     savo_locations::PersistenceEventType::
-      kCandidateRegistered;
+    kCandidateRegistered;
 
   event.candidate_id = "candidate-27";
   event.entity_revision = 1U;
@@ -356,24 +356,24 @@ TEST(PersistentCatalog, BootstrapReportsCatalogState)
 
   ASSERT_TRUE(
     repository
-      .append_event(event, nullptr)
-      .success);
+    .append_event(event, nullptr)
+    .success);
 
   savo_locations::CatalogSnapshot snapshot;
   savo_locations::BootstrapReport report;
 
   ASSERT_TRUE(
     repository
-      .bootstrap(
+    .bootstrap(
         &snapshot,
         &report)
-      .success);
+    .success);
 
   EXPECT_TRUE(report.integrity_healthy);
 
   EXPECT_EQ(
     report.schema_version,
-    2U);
+    3U);
 
   EXPECT_EQ(report.location_count, 0U);
   EXPECT_EQ(report.candidate_count, 1U);
@@ -399,7 +399,7 @@ TEST(PersistentCatalog, EventJournalIsOrdered)
 
     event.event_type =
       savo_locations::PersistenceEventType::
-        kCandidateRegistered;
+      kCandidateRegistered;
 
     event.candidate_id =
       "candidate-" +
@@ -411,8 +411,8 @@ TEST(PersistentCatalog, EventJournalIsOrdered)
 
     ASSERT_TRUE(
       repository
-        .append_event(event, nullptr)
-        .success);
+      .append_event(event, nullptr)
+      .success);
   }
 
   std::vector<
@@ -420,11 +420,11 @@ TEST(PersistentCatalog, EventJournalIsOrdered)
 
   ASSERT_TRUE(
     repository
-      .list_events(
+    .list_events(
         1U,
         2U,
         &events)
-      .success);
+    .success);
 
   ASSERT_EQ(events.size(), 2U);
   EXPECT_EQ(events[0].sequence, 2U);
@@ -451,7 +451,7 @@ TEST(PersistentCatalog, EventJournalRejectsMutation)
 
     event.event_type =
       savo_locations::PersistenceEventType::
-        kCandidateRegistered;
+      kCandidateRegistered;
 
     event.candidate_id = "candidate-27";
     event.entity_revision = 1U;
@@ -460,8 +460,8 @@ TEST(PersistentCatalog, EventJournalRejectsMutation)
 
     ASSERT_TRUE(
       repository
-        .append_event(event, nullptr)
-        .success);
+      .append_event(event, nullptr)
+      .success);
   }
 
   sqlite3 * raw = nullptr;
@@ -511,9 +511,9 @@ TEST(PersistentCatalog, ApprovalCommitsSnapshotAndEvent)
 
   ASSERT_TRUE(
     repository
-      .save_snapshot(
+    .save_snapshot(
         make_pending_snapshot())
-      .success);
+    .success);
 
   std::uint64_t sequence = 0U;
 
@@ -539,7 +539,7 @@ TEST(PersistentCatalog, ApprovalCommitsSnapshotAndEvent)
   EXPECT_EQ(
     snapshot.candidates.front().state,
     savo_locations::CandidateState::
-      kApproved);
+    kApproved);
 
   EXPECT_EQ(report.event_count, 1U);
 
@@ -557,7 +557,7 @@ TEST(PersistentCatalog, ApprovalCommitsSnapshotAndEvent)
   EXPECT_EQ(
     events.front().event_type,
     savo_locations::PersistenceEventType::
-      kCandidateApproved);
+    kCandidateApproved);
 
   EXPECT_EQ(
     events.front().location_id,
@@ -577,9 +577,9 @@ TEST(PersistentCatalog, StaleApprovalDoesNotMutateDatabase)
 
   ASSERT_TRUE(
     repository
-      .save_snapshot(
+    .save_snapshot(
         make_pending_snapshot())
-      .success);
+    .success);
 
   auto request = make_commit();
 
@@ -596,7 +596,7 @@ TEST(PersistentCatalog, StaleApprovalDoesNotMutateDatabase)
   EXPECT_EQ(
     result.code,
     savo_locations::SnapshotCode::
-      kStaleRevision);
+    kStaleRevision);
 
   savo_locations::CatalogSnapshot snapshot;
   savo_locations::BootstrapReport report;
@@ -613,7 +613,7 @@ TEST(PersistentCatalog, StaleApprovalDoesNotMutateDatabase)
   EXPECT_EQ(
     snapshot.candidates.front().state,
     savo_locations::CandidateState::
-      kPendingReview);
+    kPendingReview);
 
   EXPECT_EQ(report.event_count, 0U);
 }
@@ -631,16 +631,16 @@ TEST(PersistentCatalog, InvalidApprovalDeltaRollsBack)
 
   ASSERT_TRUE(
     repository
-      .save_snapshot(
+    .save_snapshot(
         make_pending_snapshot())
-      .success);
+    .success);
 
   auto request = make_commit();
 
   request.post_approval_snapshot
-    .locations
-    .front()
-    .record_revision = 4U;
+  .locations
+  .front()
+  .record_revision = 4U;
 
   const auto result =
     repository.commit_candidate_approval(
@@ -652,7 +652,7 @@ TEST(PersistentCatalog, InvalidApprovalDeltaRollsBack)
   EXPECT_EQ(
     result.code,
     savo_locations::SnapshotCode::
-      kApprovalDeltaInvalid);
+    kApprovalDeltaInvalid);
 
   savo_locations::CatalogSnapshot snapshot;
   savo_locations::BootstrapReport report;
@@ -684,9 +684,9 @@ TEST(PersistentCatalog, EventFailureRollsBackApproval)
 
     ASSERT_TRUE(
       repository
-        .save_snapshot(
+      .save_snapshot(
           make_pending_snapshot())
-        .success);
+      .success);
   }
 
   sqlite3 * raw = nullptr;
@@ -735,7 +735,7 @@ TEST(PersistentCatalog, EventFailureRollsBackApproval)
   EXPECT_EQ(
     result.code,
     savo_locations::SnapshotCode::
-      kEventJournalError);
+    kEventJournalError);
 
   savo_locations::CatalogSnapshot snapshot;
   savo_locations::BootstrapReport report;
@@ -752,7 +752,7 @@ TEST(PersistentCatalog, EventFailureRollsBackApproval)
   EXPECT_EQ(
     snapshot.candidates.front().state,
     savo_locations::CandidateState::
-      kPendingReview);
+    kPendingReview);
 
   EXPECT_EQ(report.event_count, 0U);
 }

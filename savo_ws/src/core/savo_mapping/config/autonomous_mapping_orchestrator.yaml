@@ -84,6 +84,29 @@ autonomous_mapping_orchestrator_node:
       operation_timeout_s: 45.0
       expected_frame: "map"
 
+    release:
+      review_service: "/savo_mapping/autonomous/review_release"
+      active_joint_release_topic: "/savo_mapping/joint_active_release"
+      location_candidates_service: "/savo_locations/candidates/list"
+      location_list_service: "/savo_locations/list"
+      location_prepare_service: "/savo_locations/releases/prepare"
+      location_verify_service: "/savo_locations/releases/verify"
+      location_commit_service: "/savo_locations/releases/commit"
+      location_rollback_service: "/savo_locations/releases/rollback"
+      production_map_root: "/var/lib/robot_savo/maps/production"
+      journal_root: "/var/lib/robot_savo/maps/release_transactions"
+      geometry_profile_id: "robot_savo_core_v1"
+      require_locked_geometry: true
+      allow_provisional_geometry: false
+      require_approved_location: false
+      location_verification_timeout_s: 15.0
+      operator_approval_timeout_s: 600.0
+      location_prepare_timeout_s: 30.0
+      map_creation_verification_timeout_s: 60.0
+      location_commit_timeout_s: 30.0
+      map_promotion_timeout_s: 30.0
+      rollback_recovery_timeout_s: 60.0
+
     evaluation_period_ms: 250
     command_retry_period_ms: 1000
 

@@ -135,8 +135,8 @@ SnapshotResult sqlite_failure(
 {
   const SnapshotCode snapshot_code =
     sqlite_constraint(code) ?
-      SnapshotCode::kIdentityConflict :
-      SnapshotCode::kSqlError;
+    SnapshotCode::kIdentityConflict :
+    SnapshotCode::kSqlError;
 
   std::string reason{operation};
 
@@ -363,8 +363,8 @@ bool column_uint32(
       index,
       &raw) ||
     raw >
-      std::numeric_limits<
-        std::uint32_t>::max())
+    std::numeric_limits<
+      std::uint32_t>::max())
   {
     return false;
   }
@@ -455,7 +455,7 @@ bool location_record_envelope_valid(
 
   if (
     record.state ==
-      LocationState::kRetired &&
+    LocationState::kRetired &&
     record.enabled)
   {
     return false;
@@ -516,7 +516,7 @@ SnapshotResult validate_snapshot(
   InMemoryRegistry registry;
 
   std::set<std::string>
-    active_location_tags;
+  active_location_tags;
 
   for (
     const auto & location :
@@ -548,9 +548,9 @@ SnapshotResult validate_snapshot(
     if (!inserted.success) {
       const SnapshotCode code =
         inserted.code ==
-          MutationCode::kTagConflict ?
-          SnapshotCode::kTagConflict :
-          SnapshotCode::kIdentityConflict;
+        MutationCode::kTagConflict ?
+        SnapshotCode::kTagConflict :
+        SnapshotCode::kIdentityConflict;
 
       return snapshot_failure(
         code,
@@ -639,7 +639,7 @@ SnapshotResult validate_snapshot(
       CandidateState::kApproved &&
       !registry.get(
         candidate.approved_location_id)
-        .has_value())
+      .has_value())
     {
       return snapshot_failure(
         SnapshotCode::kValidationFailed,
@@ -810,7 +810,7 @@ int insert_location(
       raw,
       38,
       location
-        .arrival_confirmation_required ?
+      .arrival_confirmation_required ?
         1 :
         0);
   }
@@ -948,8 +948,8 @@ int insert_location_identity(
       7,
       static_cast<sqlite3_int64>(
         record.location
-          .map
-          .map_revision));
+        .map
+        .map_revision));
   }
 
   if (code == SQLITE_OK) {
@@ -1452,8 +1452,8 @@ SnapshotResult load_candidate_aliases(
   }
 
   record->candidate
-    .suggested_aliases
-    .clear();
+  .suggested_aliases
+  .clear();
 
   while (
     (code = sqlite3_step(
@@ -1461,8 +1461,8 @@ SnapshotResult load_candidate_aliases(
     SQLITE_ROW)
   {
     record->candidate
-      .suggested_aliases
-      .push_back(
+    .suggested_aliases
+    .push_back(
         column_text(
           statement.get(),
           0));
@@ -1540,11 +1540,11 @@ SnapshotResult read_locations(
 
     if (
       state <
-        static_cast<int>(
-          LocationState::kApproved) ||
+      static_cast<int>(
+        LocationState::kApproved) ||
       state >
-        static_cast<int>(
-          LocationState::kRetired))
+      static_cast<int>(
+        LocationState::kRetired))
     {
       return snapshot_failure(
         SnapshotCode::kCorruptData,
@@ -1584,8 +1584,8 @@ SnapshotResult read_locations(
         raw,
         7,
         &record.location
-          .map
-          .map_revision))
+        .map
+        .map_revision))
     {
       return snapshot_failure(
         SnapshotCode::kCorruptData,
@@ -1618,7 +1618,7 @@ SnapshotResult read_locations(
         29);
 
     record.location
-      .arrival_confirmation_required =
+    .arrival_confirmation_required =
       sqlite3_column_int(raw, 37) != 0;
 
     record.location.building =
@@ -1725,11 +1725,11 @@ SnapshotResult read_candidates(
 
     if (
       state <
-        static_cast<int>(
-          CandidateState::kPendingReview) ||
+      static_cast<int>(
+        CandidateState::kPendingReview) ||
       state >
-        static_cast<int>(
-          CandidateState::kRejected))
+      static_cast<int>(
+        CandidateState::kRejected))
     {
       return snapshot_failure(
         SnapshotCode::kCorruptData,
@@ -1760,8 +1760,8 @@ SnapshotResult read_candidates(
         raw,
         4,
         &record.candidate
-          .map
-          .map_revision))
+        .map
+        .map_revision))
     {
       return snapshot_failure(
         SnapshotCode::kCorruptData,
@@ -1770,8 +1770,8 @@ SnapshotResult read_candidates(
     }
 
     record.candidate
-      .map
-      .map_release_id =
+    .map
+    .map_release_id =
       column_text(raw, 5);
 
     record.candidate.tag.family =
@@ -1801,7 +1801,7 @@ SnapshotResult read_candidates(
     }
 
     record.candidate
-      .accepted_observations =
+    .accepted_observations =
       observations;
 
     record.candidate.position_stddev_m =
@@ -1823,15 +1823,15 @@ SnapshotResult read_candidates(
         30);
 
     record.candidate
-      .suggested_location_id =
+    .suggested_location_id =
       column_text(raw, 38);
 
     record.candidate
-      .suggested_display_name =
+    .suggested_display_name =
       column_text(raw, 39);
 
     record.candidate
-      .suggested_semantic_type =
+    .suggested_semantic_type =
       column_text(raw, 40);
 
     record.candidate.building =
@@ -1959,7 +1959,7 @@ bool same_location_draft(
       lhs.tag_pose_map,
       rhs.tag_pose_map) &&
     lhs.arrival_confirmation_required ==
-      rhs.arrival_confirmation_required &&
+    rhs.arrival_confirmation_required &&
     lhs.building == rhs.building &&
     lhs.floor == rhs.floor &&
     lhs.area == rhs.area &&
@@ -1975,9 +1975,9 @@ bool same_location_record(
     lhs.state == rhs.state &&
     lhs.enabled == rhs.enabled &&
     lhs.record_revision ==
-      rhs.record_revision &&
+    rhs.record_revision &&
     lhs.source_candidate_id ==
-      rhs.source_candidate_id &&
+    rhs.source_candidate_id &&
     same_location_draft(
       lhs.location,
       rhs.location);
@@ -1996,13 +1996,13 @@ bool same_candidate_draft(
       lhs.tag_pose_map,
       rhs.tag_pose_map) &&
     lhs.detection_quality ==
-      rhs.detection_quality &&
+    rhs.detection_quality &&
     lhs.accepted_observations ==
-      rhs.accepted_observations &&
+    rhs.accepted_observations &&
     lhs.position_stddev_m ==
-      rhs.position_stddev_m &&
+    rhs.position_stddev_m &&
     lhs.yaw_stddev_rad ==
-      rhs.yaw_stddev_rad &&
+    rhs.yaw_stddev_rad &&
     same_optional_pose(
       lhs.approach_pose,
       rhs.approach_pose) &&
@@ -2010,21 +2010,21 @@ bool same_candidate_draft(
       lhs.confirmation_pose,
       rhs.confirmation_pose) &&
     lhs.suggested_location_id ==
-      rhs.suggested_location_id &&
+    rhs.suggested_location_id &&
     lhs.suggested_display_name ==
-      rhs.suggested_display_name &&
+    rhs.suggested_display_name &&
     lhs.suggested_aliases ==
-      rhs.suggested_aliases &&
+    rhs.suggested_aliases &&
     lhs.suggested_semantic_type ==
-      rhs.suggested_semantic_type &&
+    rhs.suggested_semantic_type &&
     lhs.building == rhs.building &&
     lhs.floor == rhs.floor &&
     lhs.area == rhs.area &&
     lhs.notes == rhs.notes &&
     lhs.source_session_id ==
-      rhs.source_session_id &&
+    rhs.source_session_id &&
     lhs.source_component ==
-      rhs.source_component;
+    rhs.source_component;
 }
 
 
@@ -2035,11 +2035,11 @@ bool same_candidate_record(
   return
     lhs.state == rhs.state &&
     lhs.candidate_revision ==
-      rhs.candidate_revision &&
+    rhs.candidate_revision &&
     lhs.review_reason ==
-      rhs.review_reason &&
+    rhs.review_reason &&
     lhs.approved_location_id ==
-      rhs.approved_location_id &&
+    rhs.approved_location_id &&
     same_candidate_draft(
       lhs.candidate,
       rhs.candidate);
@@ -2180,8 +2180,8 @@ int insert_event_row(
 
   const std::int64_t event_time =
     event.event_time_unix_ns > 0 ?
-      event.event_time_unix_ns :
-      unix_time_ns();
+    event.event_time_unix_ns :
+    unix_time_ns();
 
   int code = sqlite3_bind_int64(
     raw,
@@ -2279,7 +2279,7 @@ SnapshotResult validate_registration_delta(
   {
     return snapshot_failure(
       SnapshotCode::
-        kCandidateRegistrationDeltaInvalid,
+      kCandidateRegistrationDeltaInvalid,
       SQLITE_CONSTRAINT,
       "candidate registration ID already exists");
   }
@@ -2290,7 +2290,7 @@ SnapshotResult validate_registration_delta(
   {
     return snapshot_failure(
       SnapshotCode::
-        kCandidateRegistrationDeltaInvalid,
+      kCandidateRegistrationDeltaInvalid,
       SQLITE_CONSTRAINT,
       "candidate registration changed locations");
   }
@@ -2312,7 +2312,7 @@ SnapshotResult validate_registration_delta(
     {
       return snapshot_failure(
         SnapshotCode::
-          kCandidateRegistrationDeltaInvalid,
+        kCandidateRegistrationDeltaInvalid,
         SQLITE_CONSTRAINT,
         "candidate registration changed "
         "an existing location");
@@ -2325,7 +2325,7 @@ SnapshotResult validate_registration_delta(
   {
     return snapshot_failure(
       SnapshotCode::
-        kCandidateRegistrationDeltaInvalid,
+      kCandidateRegistrationDeltaInvalid,
       SQLITE_CONSTRAINT,
       "candidate registration must add "
       "exactly one candidate");
@@ -2348,7 +2348,7 @@ SnapshotResult validate_registration_delta(
     {
       return snapshot_failure(
         SnapshotCode::
-          kCandidateRegistrationDeltaInvalid,
+        kCandidateRegistrationDeltaInvalid,
         SQLITE_CONSTRAINT,
         "candidate registration changed "
         "an existing candidate");
@@ -2363,16 +2363,16 @@ SnapshotResult validate_registration_delta(
   if (
     registered == nullptr ||
     registered->state !=
-      CandidateState::kPendingReview ||
+    CandidateState::kPendingReview ||
     registered->candidate_revision != 1U ||
     registered->candidate.candidate_id !=
-      request.candidate_id ||
+    request.candidate_id ||
     !registered->review_reason.empty() ||
     !registered->approved_location_id.empty())
   {
     return snapshot_failure(
       SnapshotCode::
-        kCandidateRegistrationDeltaInvalid,
+      kCandidateRegistrationDeltaInvalid,
       SQLITE_CONSTRAINT,
       "registered candidate transition is invalid");
   }
@@ -2492,7 +2492,7 @@ SnapshotResult validate_rejection_delta(
     rejected == nullptr ||
     rejected->state != CandidateState::kRejected ||
     rejected->candidate_revision !=
-      request.expected_candidate_revision + 1U ||
+    request.expected_candidate_revision + 1U ||
     trim_ascii(rejected->review_reason).empty() ||
     !rejected->approved_location_id.empty() ||
     !same_candidate_draft(
@@ -2525,7 +2525,7 @@ SnapshotResult validate_location_enabled_delta(
   if (current_location == nullptr) {
     return snapshot_failure(
       SnapshotCode::
-        kLocationEnabledDeltaInvalid,
+      kLocationEnabledDeltaInvalid,
       SQLITE_NOTFOUND,
       "location does not exist");
   }
@@ -2542,11 +2542,11 @@ SnapshotResult validate_location_enabled_delta(
 
   if (
     current_location->state ==
-      LocationState::kRetired)
+    LocationState::kRetired)
   {
     return snapshot_failure(
       SnapshotCode::
-        kLocationEnabledDeltaInvalid,
+      kLocationEnabledDeltaInvalid,
       SQLITE_CONSTRAINT,
       "retired location cannot change enablement");
   }
@@ -2557,7 +2557,7 @@ SnapshotResult validate_location_enabled_delta(
   {
     return snapshot_failure(
       SnapshotCode::
-        kLocationEnabledDeltaInvalid,
+      kLocationEnabledDeltaInvalid,
       SQLITE_CONSTRAINT,
       "location already has the requested "
       "enablement state");
@@ -2570,7 +2570,7 @@ SnapshotResult validate_location_enabled_delta(
   {
     return snapshot_failure(
       SnapshotCode::
-        kLocationEnabledDeltaInvalid,
+      kLocationEnabledDeltaInvalid,
       SQLITE_CONSTRAINT,
       "location revision cannot be incremented");
   }
@@ -2581,7 +2581,7 @@ SnapshotResult validate_location_enabled_delta(
   {
     return snapshot_failure(
       SnapshotCode::
-        kLocationEnabledDeltaInvalid,
+      kLocationEnabledDeltaInvalid,
       SQLITE_CONSTRAINT,
       "enablement change modified candidates");
   }
@@ -2603,7 +2603,7 @@ SnapshotResult validate_location_enabled_delta(
     {
       return snapshot_failure(
         SnapshotCode::
-          kLocationEnabledDeltaInvalid,
+        kLocationEnabledDeltaInvalid,
         SQLITE_CONSTRAINT,
         "enablement change modified a candidate");
     }
@@ -2615,7 +2615,7 @@ SnapshotResult validate_location_enabled_delta(
   {
     return snapshot_failure(
       SnapshotCode::
-        kLocationEnabledDeltaInvalid,
+      kLocationEnabledDeltaInvalid,
       SQLITE_CONSTRAINT,
       "enablement change modified location count");
   }
@@ -2632,7 +2632,7 @@ SnapshotResult validate_location_enabled_delta(
     if (next == nullptr) {
       return snapshot_failure(
         SnapshotCode::
-          kLocationEnabledDeltaInvalid,
+        kLocationEnabledDeltaInvalid,
         SQLITE_CONSTRAINT,
         "enablement change removed a location");
     }
@@ -2651,7 +2651,7 @@ SnapshotResult validate_location_enabled_delta(
     {
       return snapshot_failure(
         SnapshotCode::
-          kLocationEnabledDeltaInvalid,
+        kLocationEnabledDeltaInvalid,
         SQLITE_CONSTRAINT,
         "enablement change modified "
         "an unrelated location");
@@ -2666,19 +2666,19 @@ SnapshotResult validate_location_enabled_delta(
   if (
     updated == nullptr ||
     updated->state !=
-      current_location->state ||
+    current_location->state ||
     updated->enabled != request.enabled ||
     updated->record_revision !=
-      request.expected_record_revision + 1U ||
+    request.expected_record_revision + 1U ||
     updated->source_candidate_id !=
-      current_location->source_candidate_id ||
+    current_location->source_candidate_id ||
     !same_location_draft(
       updated->location,
       current_location->location))
   {
     return snapshot_failure(
       SnapshotCode::
-        kLocationEnabledDeltaInvalid,
+      kLocationEnabledDeltaInvalid,
       SQLITE_CONSTRAINT,
       "location enablement transition is invalid");
   }
@@ -2741,11 +2741,11 @@ SnapshotResult validate_approval_delta(
 
   if (
     approved_candidate->state !=
-      CandidateState::kApproved ||
+    CandidateState::kApproved ||
     approved_candidate->candidate_revision !=
-      request.expected_candidate_revision + 1U ||
+    request.expected_candidate_revision + 1U ||
     approved_candidate->approved_location_id !=
-      request.approved_location_id ||
+    request.approved_location_id ||
     !same_candidate_draft(
       current_candidate->candidate,
       approved_candidate->candidate))
@@ -2852,11 +2852,11 @@ SnapshotResult validate_approval_delta(
 
   if (
     approved_location->state !=
-      LocationState::kApproved ||
+    LocationState::kApproved ||
     !approved_location->enabled ||
     approved_location->record_revision != 1U ||
     approved_location->source_candidate_id !=
-      request.candidate_id ||
+    request.candidate_id ||
     !same_map(
       approved_location->location.map,
       approved_candidate->candidate.map) ||
@@ -2864,17 +2864,17 @@ SnapshotResult validate_approval_delta(
       approved_location->location.tag,
       approved_candidate->candidate.tag) ||
     !approved_location
-      ->location
-      .tag_pose_map
-      .has_value() ||
+    ->location
+    .tag_pose_map
+    .has_value() ||
     !same_pose(
       approved_location
-        ->location
-        .tag_pose_map
-        .value(),
+      ->location
+      .tag_pose_map
+      .value(),
       approved_candidate
-        ->candidate
-        .tag_pose_map))
+      ->candidate
+      .tag_pose_map))
   {
     return snapshot_failure(
       SnapshotCode::kApprovalDeltaInvalid,
@@ -2924,22 +2924,43 @@ std::string_view to_string(
       return "stale_revision";
 
     case SnapshotCode::
-        kCandidateRegistrationDeltaInvalid:
+      kCandidateRegistrationDeltaInvalid:
       return "candidate_registration_delta_invalid";
 
     case SnapshotCode::
-        kCandidateRejectionDeltaInvalid:
+      kCandidateRejectionDeltaInvalid:
       return "candidate_rejection_delta_invalid";
 
     case SnapshotCode::kApprovalDeltaInvalid:
       return "approval_delta_invalid";
 
     case SnapshotCode::
-        kLocationEnabledDeltaInvalid:
+      kLocationEnabledDeltaInvalid:
       return "location_enabled_delta_invalid";
 
     case SnapshotCode::kEventJournalError:
       return "event_journal_error";
+
+    case SnapshotCode::kReleaseNotFound:
+      return "release_not_found";
+
+    case SnapshotCode::kReleaseConflict:
+      return "release_conflict";
+
+    case SnapshotCode::kStaleTransaction:
+      return "stale_transaction";
+
+    case SnapshotCode::kDigestMismatch:
+      return "digest_mismatch";
+
+    case SnapshotCode::kPendingCandidates:
+      return "pending_candidates";
+
+    case SnapshotCode::kNoApprovedLocations:
+      return "no_approved_locations";
+
+    case SnapshotCode::kFilesystemError:
+      return "filesystem_error";
 
     default:
       return "unknown";
@@ -3313,7 +3334,7 @@ SnapshotResult SqliteRepository::append_event(
 {
   if (
     event.event_type ==
-      PersistenceEventType::kUnknown ||
+    PersistenceEventType::kUnknown ||
     trim_ascii(event.actor_id).empty() ||
     trim_ascii(event.reason).empty())
   {
@@ -3523,13 +3544,13 @@ SnapshotResult SqliteRepository::list_events(
 
     if (
       raw_type <
-        static_cast<int>(
-          PersistenceEventType::
-            kSnapshotReplaced) ||
+      static_cast<int>(
+        PersistenceEventType::
+        kSnapshotReplaced) ||
       raw_type >
-        static_cast<int>(
-          PersistenceEventType::
-            kLocationEnabledChanged))
+      static_cast<int>(
+        PersistenceEventType::
+        kLocationEnabledChanged))
     {
       return snapshot_failure(
         SnapshotCode::kCorruptData,
@@ -3539,7 +3560,7 @@ SnapshotResult SqliteRepository::list_events(
 
     event.event_type =
       static_cast<PersistenceEventType>(
-        raw_type);
+      raw_type);
 
     event.candidate_id =
       column_text(
@@ -3739,7 +3760,7 @@ SqliteRepository::commit_candidate_registration(
 
   event.event_type =
     PersistenceEventType::
-      kCandidateRegistered;
+    kCandidateRegistered;
 
   event.candidate_id =
     request.candidate_id;
@@ -3750,8 +3771,8 @@ SqliteRepository::commit_candidate_registration(
 
   event.payload_json =
     request.payload_json.empty() ?
-      "{}" :
-      request.payload_json;
+    "{}" :
+    request.payload_json;
 
   std::uint64_t inserted_sequence = 0U;
 
@@ -3806,7 +3827,7 @@ SqliteRepository::commit_candidate_rejection(
     trim_ascii(request.candidate_id).empty() ||
     request.expected_candidate_revision == 0U ||
     request.expected_candidate_revision ==
-      std::numeric_limits<std::uint64_t>::max() ||
+    std::numeric_limits<std::uint64_t>::max() ||
     trim_ascii(request.actor_id).empty() ||
     trim_ascii(request.reason).empty())
   {
@@ -3936,7 +3957,7 @@ SqliteRepository::commit_candidate_rejection(
   event.reason = request.reason;
   event.payload_json =
     request.payload_json.empty() ?
-      "{}" : request.payload_json;
+    "{}" : request.payload_json;
 
   std::uint64_t inserted_sequence = 0U;
 
@@ -4122,7 +4143,7 @@ SqliteRepository::commit_candidate_approval(
 
   event.event_type =
     PersistenceEventType::
-      kCandidateApproved;
+    kCandidateApproved;
 
   event.candidate_id =
     request.candidate_id;
@@ -4138,8 +4159,8 @@ SqliteRepository::commit_candidate_approval(
 
   event.payload_json =
     request.payload_json.empty() ?
-      "{}" :
-      request.payload_json;
+    "{}" :
+    request.payload_json;
 
   std::uint64_t inserted_sequence = 0U;
 
@@ -4328,7 +4349,7 @@ SqliteRepository::commit_location_enabled(
 
   event.event_type =
     PersistenceEventType::
-      kLocationEnabledChanged;
+    kLocationEnabledChanged;
 
   event.location_id =
     request.location_id;
@@ -4341,8 +4362,8 @@ SqliteRepository::commit_location_enabled(
 
   event.payload_json =
     request.payload_json.empty() ?
-      "{}" :
-      request.payload_json;
+    "{}" :
+    request.payload_json;
 
   std::uint64_t inserted_sequence = 0U;
 

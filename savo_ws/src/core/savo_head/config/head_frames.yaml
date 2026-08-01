@@ -1,10 +1,12 @@
-savo_head:
+head_tf_node:
   ros__parameters:
-    publish_tf: true
+    # Dynamic head TF begins at the description-owned fixed mount frame.
+    publish_tf: false
+    transforms_calibrated: false
     publish_joint_state: true
     tf_rate_hz: 30.0
 
-    base_frame: "base_link"
+    base_frame: "pantilt_mount_link"
     pan_frame: "pantilt_pan_link"
     tilt_frame: "pantilt_tilt_link"
     camera_frame: "pi_camera_link"

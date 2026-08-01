@@ -542,6 +542,11 @@ void make_release_read_only(
 
 }  // namespace
 
+std::string file_sha256(const fs::path & path)
+{
+  return sha256_file(path);
+}
+
 bool valid_release_id(
   const std::string & release_id)
 {
@@ -581,11 +586,12 @@ bool valid_release_id(
     std::string::npos;
 }
 
-ReleaseRecord create_release(
+ReleaseRecord create_release_impl(
   const session::SavedMapVerification & source,
   const fs::path & production_root,
   const std::string & release_id,
-  const bool make_read_only)
+  const bool make_read_only,
+  const JointReleaseContext * joint)
 {
   validate_source_approval(source);
 
@@ -665,6 +671,53 @@ ReleaseRecord create_release(
       source.paths.manifest,
       release_source_manifest);
 
+    fs::path release_location_snapshot;
+    fs::path release_location_metadata;
+    fs::path release_approval;
+    fs::path release_geometry;
+    if (joint != nullptr) {
+      if (
+        joint->mission_id.empty() || joint->map_revision == 0U ||
+        joint->actor_id.empty() || joint->approval_reason.empty() ||
+        joint->approval_unix_ns == 0U ||
+        joint->location_snapshot_sha256.size() != 64U ||
+        joint->geometry_profile_id.empty() ||
+        joint->geometry_profile_sha256.size() != 64U)
+      {
+        throw std::runtime_error("invalid_joint_release_context");
+      }
+
+      release_location_snapshot = staging / "locations.json";
+      release_location_metadata = staging / "location_snapshot.yaml";
+      release_approval = staging / "operator_approval.yaml";
+      release_geometry = staging / "geometry_profile.yaml";
+      copy_required_file(joint->location_snapshot, release_location_snapshot);
+      copy_required_file(joint->geometry_profile, release_geometry);
+      if (sha256_file(release_location_snapshot) != joint->location_snapshot_sha256) {
+        throw std::runtime_error("location_snapshot_digest_mismatch");
+      }
+      if (sha256_file(release_geometry) != joint->geometry_profile_sha256) {
+        throw std::runtime_error("geometry_profile_digest_mismatch");
+      }
+
+      YAML::Node location_metadata;
+      location_metadata["schema_version"] = 1;
+      location_metadata["release_id"] = release_id;
+      location_metadata["snapshot"] = release_location_snapshot.filename().string();
+      location_metadata["sha256"] = joint->location_snapshot_sha256;
+      write_yaml_atomic(release_location_metadata, location_metadata);
+
+      YAML::Node approval;
+      approval["schema_version"] = 1;
+      approval["mission_id"] = joint->mission_id;
+      approval["release_id"] = release_id;
+      approval["actor_id"] = joint->actor_id;
+      approval["reason"] = joint->approval_reason;
+      approval["approved"] = true;
+      approval["approved_at_unix_ns"] = joint->approval_unix_ns;
+      write_yaml_atomic(release_approval, approval);
+    }
+
     YAML::Node map_yaml =
       YAML::LoadFile(
       source.paths.grid_yaml.string());
@@ -704,13 +757,19 @@ ReleaseRecord create_release(
         release_source_manifest),
     };
 
+    if (joint != nullptr) {
+      artifacts.push_back(make_artifact("location_snapshot", release_location_snapshot));
+      artifacts.push_back(make_artifact("location_snapshot_metadata", release_location_metadata));
+      artifacts.push_back(make_artifact("operator_approval", release_approval));
+      artifacts.push_back(make_artifact("geometry_profile", release_geometry));
+    }
+
     const std::uint64_t created =
       unix_now_ns();
 
     YAML::Node manifest;
 
-    manifest["schema_version"] =
-      kReleaseSchemaVersion;
+    manifest["schema_version"] = joint == nullptr ? kReleaseSchemaVersion : 2;
 
     manifest["release_id"] =
       release_id;
@@ -733,14 +792,29 @@ ReleaseRecord create_release(
     manifest["source"]["manifest"] =
       source.paths.manifest.string();
 
+    manifest["source"]["manifest_sha256"] =
+      sha256_file(release_source_manifest);
+
     manifest["quality"]["passed"] =
       true;
 
-    manifest["quality"]["operator_approved"] =
-      true;
+    manifest["quality"]["operator_approved"] = true;
 
     manifest["navigation"]["eligible"] =
       true;
+
+    if (joint != nullptr) {
+      manifest["mission_id"] = joint->mission_id;
+      manifest["map_revision"] = joint->map_revision;
+      manifest["actor_id"] = joint->actor_id;
+      manifest["approval_timestamp_unix_ns"] = joint->approval_unix_ns;
+      manifest["approval_reason"] = joint->approval_reason;
+      manifest["location_snapshot_digest"] = joint->location_snapshot_sha256;
+      manifest["geometry_profile_name"] = joint->geometry_profile_id;
+      manifest["geometry_profile_digest"] = joint->geometry_profile_sha256;
+      manifest["map_quality_result"] = "passed";
+      manifest["navigation_eligibility"] = true;
+    }
 
     manifest["artifacts"] =
       YAML::Node(
@@ -816,6 +890,27 @@ ReleaseRecord create_release(
   }
 }
 
+ReleaseRecord create_release(
+  const session::SavedMapVerification & source,
+  const fs::path & production_root,
+  const std::string & release_id,
+  const bool make_read_only)
+{
+  return create_release_impl(
+    source, production_root, release_id, make_read_only, nullptr);
+}
+
+ReleaseRecord create_joint_release(
+  const session::SavedMapVerification & source,
+  const fs::path & production_root,
+  const std::string & release_id,
+  const JointReleaseContext & joint,
+  const bool make_read_only)
+{
+  return create_release_impl(
+    source, production_root, release_id, make_read_only, &joint);
+}
+
 ReleaseRecord verify_release(
   const fs::path & production_root,
   const std::string & release_id)
@@ -855,8 +950,8 @@ ReleaseRecord verify_release(
       release.release_manifest.string());
 
     if (!manifest["schema_version"] ||
-      manifest["schema_version"].as<int>() !=
-      kReleaseSchemaVersion)
+      (manifest["schema_version"].as<int>() < kReleaseSchemaVersion ||
+      manifest["schema_version"].as<int>() > 2))
     {
       release.reason =
         "release_schema_mismatch";
@@ -996,6 +1091,31 @@ ReleaseRecord verify_release(
         "required_release_artifact_missing";
 
       return release;
+    }
+
+    if (release.schema_version == 2) {
+      const auto has_role = [&release](const std::string_view role) {
+          for (const auto & artifact : release.artifacts) {
+            if (artifact.role == role) {
+              return true;
+            }
+          }
+          return false;
+        };
+      if (
+        !manifest["mission_id"] || !manifest["map_revision"] ||
+        !manifest["actor_id"] || !manifest["approval_timestamp_unix_ns"] ||
+        !manifest["location_snapshot_digest"] ||
+        !manifest["geometry_profile_name"] ||
+        !manifest["geometry_profile_digest"] ||
+        !has_role("location_snapshot") ||
+        !has_role("location_snapshot_metadata") ||
+        !has_role("operator_approval") ||
+        !has_role("geometry_profile"))
+      {
+        release.reason = "joint_release_contract_incomplete";
+        return release;
+      }
     }
 
     const YAML::Node map_yaml =
@@ -1280,6 +1400,59 @@ ActiveMapContract read_active_map(
     exception.what();
 
     return active;
+  }
+}
+
+bool discard_unpromoted_release(
+  const fs::path & production_root,
+  const std::string & release_id,
+  std::string * reason)
+{
+  try {
+    if (!valid_release_id(release_id)) {
+      throw std::runtime_error("invalid_release_id");
+    }
+    const auto active = read_active_map(production_root);
+    if (active.active && active.release_id == release_id) {
+      throw std::runtime_error("cannot_discard_active_release");
+    }
+
+    const fs::path directory = production_root / "releases" / release_id;
+    std::error_code error;
+    fs::permissions(
+      directory,
+      fs::perms::owner_all,
+      fs::perm_options::add,
+      error);
+    error.clear();
+    fs::remove_all(directory, error);
+    if (error) {
+      throw std::runtime_error("release_discard_failed:" + error.message());
+    }
+
+    const fs::path catalog_path = production_root / "catalog.yaml";
+    if (fs::is_regular_file(catalog_path)) {
+      YAML::Node catalog = YAML::LoadFile(catalog_path.string());
+      YAML::Node retained(YAML::NodeType::Sequence);
+      for (const auto & entry : catalog["releases"]) {
+        if (!entry["release_id"] ||
+          entry["release_id"].as<std::string>() != release_id)
+        {
+          retained.push_back(entry);
+        }
+      }
+      catalog["releases"] = retained;
+      write_yaml_atomic(catalog_path, catalog);
+    }
+    if (reason != nullptr) {
+      *reason = "unpromoted release discarded";
+    }
+    return true;
+  } catch (const std::exception & exception) {
+    if (reason != nullptr) {
+      *reason = exception.what();
+    }
+    return false;
   }
 }
 

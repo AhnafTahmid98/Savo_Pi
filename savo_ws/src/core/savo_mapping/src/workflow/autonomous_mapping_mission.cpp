@@ -106,6 +106,16 @@ std::string_view to_string(const MissionResult result)
       return "scan_failed";
     case MissionResult::StartPoseUnavailable:
       return "start_pose_unavailable";
+    case MissionResult::LocationVerificationFailed:
+      return "location_verification_failed";
+    case MissionResult::OperatorRejected:
+      return "operator_rejected";
+    case MissionResult::ReleaseFailed:
+      return "release_failed";
+    case MissionResult::ReleaseRollbackFailed:
+      return "release_rollback_failed";
+    case MissionResult::GeometryInvalid:
+      return "geometry_invalid";
     case MissionResult::None:
       return "not_terminal";
   }
@@ -219,6 +229,7 @@ MissionDecision AutonomousMappingMission::start(
   initial_scan360_completed_ = !inputs.require_initial_scan360;
   initial_head_scan_completed_ = !inputs.require_initial_head_scan;
   conditional_scan360_completed_ = 0U;
+  release_cancel_requested_ = false;
 
   return evaluate(inputs);
 }
@@ -248,7 +259,10 @@ MissionDecision AutonomousMappingMission::control(
       if (
         snapshot_.state == MissionState::CompletionPending ||
         snapshot_.state == MissionState::Saving ||
-        snapshot_.state == MissionState::Verifying)
+        snapshot_.state == MissionState::Verifying ||
+        snapshot_.state == MissionState::VerifyingLocations ||
+        snapshot_.state == MissionState::AwaitingApproval ||
+        snapshot_.state == MissionState::Releasing)
       {
         return rejected("mission_completion_pipeline_in_progress");
       }
@@ -278,6 +292,26 @@ MissionDecision AutonomousMappingMission::control(
         snapshot_.state == MissionState::Verifying)
       {
         return rejected("mission_save_pipeline_in_progress");
+      }
+
+      if (
+        snapshot_.state == MissionState::VerifyingLocations ||
+        snapshot_.state == MissionState::AwaitingApproval)
+      {
+        snapshot_.state = MissionState::Canceled;
+        snapshot_.result = MissionResult::Canceled;
+        snapshot_.active = false;
+        snapshot_.approval_pending = false;
+        snapshot_.reason = std::move(reason);
+        MissionDecision output = decision(snapshot_.reason);
+        output.terminal = true;
+        return output;
+      }
+
+      if (snapshot_.state == MissionState::Releasing) {
+        release_cancel_requested_ = true;
+        snapshot_.reason = "release_cancel_waiting_for_consistent_state";
+        return evaluate(inputs);
       }
 
       begin_stop(MissionResult::Canceled, std::move(reason));
@@ -450,67 +484,14 @@ MissionDecision AutonomousMappingMission::evaluate(
     return evaluate_return_to_start(inputs);
   }
 
-  if (snapshot_.state == MissionState::Saving) {
-    MissionDecision output = decision(snapshot_.reason);
-
-    if (!inputs.map_save_started) {
-      output.request_map_save = true;
-      output.reason = "requesting_automatic_map_save";
-      snapshot_.reason = output.reason;
-      output.snapshot = snapshot_;
-      return output;
-    }
-
-    if (!inputs.map_save_complete) {
-      output.request_map_save = true;
-      output.reason = "automatic_map_save_in_progress";
-      snapshot_.reason = output.reason;
-      output.snapshot = snapshot_;
-      return output;
-    }
-
-    if (!inputs.map_save_succeeded) {
-      return fail(
-        MissionResult::SaveFailed,
-        inputs.map_save_reason.empty() ?
-        "automatic_map_save_failed" : inputs.map_save_reason);
-    }
-
-    enter(MissionState::Verifying, "saved_map_verification_requested");
-    return evaluate(inputs);
-  }
-
-  if (snapshot_.state == MissionState::Verifying) {
-    MissionDecision output = decision(snapshot_.reason);
-
-    if (!inputs.verification_started) {
-      output.request_saved_map_verification = true;
-      output.reason = "requesting_saved_map_verification";
-      snapshot_.reason = output.reason;
-      output.snapshot = snapshot_;
-      return output;
-    }
-
-    if (!inputs.verification_complete) {
-      snapshot_.reason = "saved_map_verification_in_progress";
-      return decision(snapshot_.reason);
-    }
-
-    if (!inputs.verification_succeeded) {
-      return fail(
-        MissionResult::SaveFailed,
-        inputs.verification_reason.empty() ?
-        "saved_map_verification_failed" : inputs.verification_reason);
-    }
-
-    snapshot_.state = MissionState::Completed;
-    snapshot_.result = MissionResult::Succeeded;
-    snapshot_.active = false;
-    snapshot_.reason = "automatic_map_save_verified";
-
-    output = decision(snapshot_.reason);
-    output.terminal = true;
-    return output;
+  if (
+    snapshot_.state == MissionState::Saving ||
+    snapshot_.state == MissionState::Verifying ||
+    snapshot_.state == MissionState::VerifyingLocations ||
+    snapshot_.state == MissionState::AwaitingApproval ||
+    snapshot_.state == MissionState::Releasing)
+  {
+    return evaluate_saved_release_pipeline(inputs);
   }
 
   if (snapshot_.state == MissionState::Canceling) {
@@ -854,6 +835,151 @@ MissionDecision AutonomousMappingMission::evaluate(
   }
 
   return evaluate_start_sequence(inputs);
+}
+
+MissionDecision AutonomousMappingMission::evaluate_saved_release_pipeline(
+  const MissionInputs & inputs)
+{
+  MissionDecision output = decision(snapshot_.reason);
+
+  if (snapshot_.state == MissionState::Saving) {
+    if (!inputs.map_save_started) {
+      output.request_map_save = true;
+      output.reason = "requesting_automatic_map_save";
+      snapshot_.reason = output.reason;
+      output.snapshot = snapshot_;
+      return output;
+    }
+    if (!inputs.map_save_complete) {
+      output.request_map_save = true;
+      output.reason = "automatic_map_save_in_progress";
+      snapshot_.reason = output.reason;
+      output.snapshot = snapshot_;
+      return output;
+    }
+    if (!inputs.map_save_succeeded) {
+      return fail(
+        MissionResult::SaveFailed,
+        inputs.map_save_reason.empty() ?
+        "automatic_map_save_failed" : inputs.map_save_reason);
+    }
+    enter(MissionState::Verifying, "saved_map_verification_requested");
+    return evaluate(inputs);
+  }
+
+  if (snapshot_.state == MissionState::Verifying) {
+    if (!inputs.verification_started) {
+      output.request_saved_map_verification = true;
+      output.reason = "requesting_saved_map_verification";
+      snapshot_.reason = output.reason;
+      output.snapshot = snapshot_;
+      return output;
+    }
+    if (!inputs.verification_complete) {
+      snapshot_.reason = "saved_map_verification_in_progress";
+      return decision(snapshot_.reason);
+    }
+    if (!inputs.verification_succeeded) {
+      return fail(
+        inputs.verification_reason.rfind("quality_rejected", 0U) == 0U ?
+        MissionResult::QualityRejected : MissionResult::SaveFailed,
+        inputs.verification_reason.empty() ?
+        "saved_map_verification_failed" : inputs.verification_reason);
+    }
+    enter(MissionState::VerifyingLocations, "location_verification_requested");
+    return evaluate(inputs);
+  }
+
+  if (snapshot_.state == MissionState::VerifyingLocations) {
+    if (!inputs.location_verification_started) {
+      output.request_location_verification = true;
+      output.reason = "requesting_location_verification";
+      snapshot_.reason = output.reason;
+      output.snapshot = snapshot_;
+      return output;
+    }
+    if (!inputs.location_verification_complete) {
+      snapshot_.reason = "location_verification_in_progress";
+      return decision(snapshot_.reason);
+    }
+    if (!inputs.location_verification_succeeded ||
+      inputs.pending_candidate_count != 0U)
+    {
+      return fail(
+        MissionResult::LocationVerificationFailed,
+        inputs.location_verification_reason.empty() ?
+        "location_verification_failed" : inputs.location_verification_reason);
+    }
+    enter(MissionState::AwaitingApproval, "operator_release_approval_required");
+    return evaluate(inputs);
+  }
+
+  if (snapshot_.state == MissionState::AwaitingApproval) {
+    if (!inputs.review_complete) {
+      output.request_operator_review = true;
+      output.reason = "awaiting_explicit_operator_release_review";
+      snapshot_.reason = output.reason;
+      snapshot_.approval_pending = true;
+      output.snapshot = snapshot_;
+      return output;
+    }
+    if (inputs.review_rejected || !inputs.review_approved) {
+      return fail(
+        MissionResult::OperatorRejected,
+        inputs.approval_reason.empty() ?
+        "operator_rejected_release" : inputs.approval_reason);
+    }
+    snapshot_.approval_pending = false;
+    snapshot_.approval_recorded = true;
+    enter(MissionState::Releasing, "joint_release_requested");
+    return evaluate(inputs);
+  }
+
+  if (!inputs.release_started) {
+    output.request_joint_release = true;
+    output.reason = "requesting_joint_map_location_release";
+    snapshot_.reason = output.reason;
+    output.snapshot = snapshot_;
+    return output;
+  }
+  if (!inputs.release_complete) {
+    snapshot_.reason = release_cancel_requested_ ?
+      "release_cancel_waiting_for_consistent_state" :
+      "joint_release_in_progress";
+    return decision(snapshot_.reason);
+  }
+  if (!inputs.release_succeeded) {
+    if (inputs.rollback_required && !inputs.rollback_complete) {
+      output.request_release_rollback = true;
+      output.reason = "release_failure_requires_rollback";
+      snapshot_.reason = output.reason;
+      output.snapshot = snapshot_;
+      return output;
+    }
+    return fail(
+      inputs.rollback_required && !inputs.rollback_succeeded ?
+      MissionResult::ReleaseRollbackFailed :
+      (inputs.release_reason.find("geometry_profile_invalid") !=
+      std::string::npos ?
+      MissionResult::GeometryInvalid : MissionResult::ReleaseFailed),
+      inputs.release_reason.empty() ?
+      "joint_release_failed" : inputs.release_reason);
+  }
+  if (!inputs.joint_active_release_verified || inputs.release_id.empty()) {
+    return fail(MissionResult::ReleaseFailed, "joint_active_release_not_verified");
+  }
+
+  snapshot_.state = release_cancel_requested_ ?
+    MissionState::Canceled : MissionState::Completed;
+  snapshot_.result = release_cancel_requested_ ?
+    MissionResult::Canceled : MissionResult::Succeeded;
+  snapshot_.active = false;
+  snapshot_.reason = release_cancel_requested_ ?
+    "release_consistent_after_cancellation" :
+    "joint_map_location_release_verified";
+  output = decision(snapshot_.reason);
+  output.terminal = true;
+  return output;
 }
 
 MissionDecision AutonomousMappingMission::evaluate_start_sequence(
@@ -1539,6 +1665,39 @@ void AutonomousMappingMission::update_observations(
     inputs.verification_succeeded;
   snapshot_.verification_reason =
     inputs.verification_reason;
+
+  snapshot_.location_verification_started =
+    inputs.location_verification_started;
+  snapshot_.location_verification_complete =
+    inputs.location_verification_complete;
+  snapshot_.location_verification_passed =
+    inputs.location_verification_succeeded;
+  snapshot_.pending_candidate_count =
+    inputs.pending_candidate_count;
+  snapshot_.approved_location_count =
+    inputs.approved_location_count;
+  snapshot_.location_snapshot_digest =
+    inputs.location_snapshot_digest;
+  snapshot_.location_verification_reason =
+    inputs.location_verification_reason;
+  snapshot_.review_generation = inputs.review_generation;
+  snapshot_.approval_pending =
+    inputs.approval_pending || snapshot_.approval_pending;
+  snapshot_.approval_recorded =
+    inputs.review_complete && inputs.review_approved;
+  snapshot_.approval_actor = inputs.approval_actor;
+  snapshot_.approval_reason = inputs.approval_reason;
+  snapshot_.release_started = inputs.release_started;
+  snapshot_.release_complete = inputs.release_complete;
+  snapshot_.release_succeeded = inputs.release_succeeded;
+  snapshot_.release_id = inputs.release_id;
+  snapshot_.release_state = inputs.release_state;
+  snapshot_.primary_release_reason = inputs.release_reason;
+  snapshot_.rollback_required = inputs.rollback_required;
+  snapshot_.rollback_complete = inputs.rollback_complete;
+  snapshot_.rollback_reason = inputs.rollback_reason;
+  snapshot_.joint_active_release_verified =
+    inputs.joint_active_release_verified;
 }
 
 void AutonomousMappingMission::update_handoff_counters(

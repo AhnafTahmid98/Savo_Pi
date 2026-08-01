@@ -34,6 +34,8 @@
   <depend>tf2_geometry_msgs</depend>
   <depend>slam_toolbox</depend>
   <depend>yaml_cpp_vendor</depend>
+  <depend>ament_index_cpp</depend>
+  <exec_depend>savo_description</exec_depend>
   <depend>openssl</depend>
   <depend>nlohmann-json-dev</depend>
 

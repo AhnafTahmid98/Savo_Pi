@@ -90,13 +90,37 @@ struct ActiveMapContract
   std::string release_manifest_sha256;
 };
 
+struct JointReleaseContext
+{
+  std::string mission_id;
+  std::uint32_t map_revision{0U};
+  std::string actor_id;
+  std::string approval_reason;
+  std::uint64_t approval_unix_ns{0U};
+  std::filesystem::path location_snapshot;
+  std::string location_snapshot_sha256;
+  std::filesystem::path geometry_profile;
+  std::string geometry_profile_id;
+  std::string geometry_profile_sha256;
+};
+
 bool valid_release_id(
   const std::string & release_id);
+
+std::string file_sha256(
+  const std::filesystem::path & path);
 
 ReleaseRecord create_release(
   const session::SavedMapVerification & source,
   const std::filesystem::path & production_root,
   const std::string & release_id,
+  bool make_read_only);
+
+ReleaseRecord create_joint_release(
+  const session::SavedMapVerification & source,
+  const std::filesystem::path & production_root,
+  const std::string & release_id,
+  const JointReleaseContext & joint,
   bool make_read_only);
 
 ReleaseRecord verify_release(
@@ -112,6 +136,11 @@ ActiveMapContract deactivate_active_map(
 
 ActiveMapContract read_active_map(
   const std::filesystem::path & production_root);
+
+bool discard_unpromoted_release(
+  const std::filesystem::path & production_root,
+  const std::string & release_id,
+  std::string * reason);
 
 std::string release_record_to_json(
   const ReleaseRecord & release);

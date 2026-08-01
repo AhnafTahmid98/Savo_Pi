@@ -237,6 +237,11 @@ if(BUILD_TESTING)
     test/test_apriltag_production_launch_contract.py
   )
 
+  ament_add_pytest_test(
+    test_head_tf_calibration_gate_contract
+    test/test_head_tf_calibration_gate_contract.py
+  )
+
   if(SAVO_HEAD_ENABLE_LEGACY_LINT)
     find_package(ament_lint_auto REQUIRED)
     ament_lint_auto_find_test_dependencies()

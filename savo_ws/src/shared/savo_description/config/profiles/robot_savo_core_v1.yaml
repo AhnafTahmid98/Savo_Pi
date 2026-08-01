@@ -1,0 +1,87 @@
+metadata:
+  profile_id: robot_savo_core_v1
+  schema_version: 1
+  robot_name: robot_savo
+  units: {length: m, angle: rad, mass: kg}
+  measurement_state: provisional
+  measured_by: ""
+  measurement_date: ""
+  source: current_robot_savo_xacro_baseline
+  geometry_revision: 1
+  notes: Baseline values preserved; a human physical measurement pass is required.
+
+coordinate_convention:
+  x: forward
+  y: left
+  z: up
+
+chassis:
+  length_m: 0.330
+  width_m: 0.240
+  height_m: 0.060
+  base_footprint_to_base_link_z_m: 0.065
+  mass_kg: 1.20
+  deck_thickness_m: 0.004
+  deck_spacing_m: 0.070
+  deck_mass_each_kg: 0.20
+
+wheels:
+  type: mecanum
+  radius_m: 0.0325
+  width_m: 0.030
+  front_x_m: 0.115
+  rear_x_m: -0.115
+  left_y_m: 0.100
+  right_y_m: -0.100
+  z_m: -0.030
+  mass_each_kg: 0.12
+
+mounts:
+  lidar: {parent: base_link, frame: laser_frame, xyz_m: [0.0, 0.0, 0.205], rpy_rad: [0.0, 0.0, 0.0]}
+  imu: {parent: base_link, frame: imu_link, xyz_m: [0.0, 0.0, 0.075], rpy_rad: [0.0, 0.0, 0.0]}
+  realsense_d435: {parent: base_link, frame: camera_link, xyz_m: [0.135, 0.0, 0.155], rpy_rad: [0.0, 0.0, 0.0]}
+  tof_left: {parent: base_link, frame: tof_left_link, xyz_m: [0.125, 0.090, 0.070], rpy_rad: [0.0, 0.0, 0.0]}
+  tof_right: {parent: base_link, frame: tof_right_link, xyz_m: [0.125, -0.090, 0.070], rpy_rad: [0.0, 0.0, 0.0]}
+  ultrasonic_front: {parent: base_link, frame: ultrasonic_front_link, xyz_m: [0.150, 0.0, 0.070], rpy_rad: [0.0, 0.0, 0.0]}
+  display: {parent: base_link, frame: display_link, xyz_m: [0.115, 0.0, 0.145], rpy_rad: [0.0, 0.0, 0.0]}
+  respeaker: {parent: base_link, frame: respeaker_link, xyz_m: [0.0, 0.0, 0.180], rpy_rad: [0.0, 0.0, 0.0]}
+  pantilt_mount: {parent: base_link, frame: pantilt_mount_link, xyz_m: [0.0, 0.0, 0.0], rpy_rad: [0.0, 0.0, 0.0]}
+
+head:
+  dynamic_authority: savo_head/head_tf_node
+  pan: {parent: pantilt_mount_link, frame: pantilt_pan_link, joint: head_pan_joint, axis: z, xyz_m: [0.0, 0.0, 0.0], rpy_rad: [0.0, 0.0, 0.0]}
+  tilt: {parent: pantilt_pan_link, frame: pantilt_tilt_link, joint: head_tilt_joint, axis: y, xyz_m: [0.0, 0.0, 0.0], rpy_rad: [0.0, 0.0, 0.0]}
+  pi_camera: {parent: pantilt_tilt_link, frame: pi_camera_link, xyz_m: [0.0, 0.0, 0.0], rpy_rad: [0.0, 0.0, 0.0]}
+  pi_camera_optical: {parent: pi_camera_link, frame: pi_camera_optical_frame, xyz_m: [0.0, 0.0, 0.0], rpy_rad: [-1.57079632679, 0.0, -1.57079632679]}
+
+frames:
+  map: map
+  odom: odom
+  base_footprint: base_footprint
+  base_link: base_link
+  chassis: chassis_link
+  wheel_front_left: wheel_fl_link
+  wheel_front_right: wheel_fr_link
+  wheel_rear_left: wheel_rl_link
+  wheel_rear_right: wheel_rr_link
+  lidar: laser_frame
+  imu: imu_link
+  camera: camera_link
+  camera_color: camera_color_frame
+  camera_color_optical: camera_color_optical_frame
+  camera_depth: camera_depth_frame
+  camera_depth_optical: camera_depth_optical_frame
+  tof_left: tof_left_link
+  tof_right: tof_right_link
+  ultrasonic_front: ultrasonic_front_link
+  display: display_link
+  respeaker: respeaker_link
+  pantilt_mount: pantilt_mount_link
+  pantilt_pan: pantilt_pan_link
+  pantilt_tilt: pantilt_tilt_link
+  pi_camera: pi_camera_link
+  pi_camera_optical: pi_camera_optical_frame
+
+navigation:
+  robot_base_frame: base_footprint
+  footprint_padding_m: 0.02

@@ -150,6 +150,12 @@ class HeadTfNode(Node):
         self._tf_timer = self.create_timer(tf_period, self._publish_tf)
         self._status_timer = self.create_timer(status_period, self._publish_status)
 
+        if not bool(self.get_parameter("transforms_calibrated").value):
+            self.get_logger().warning(
+                "head TF publishing is calibration-gated; "
+                "physical transforms are not approved"
+            )
+
         self.get_logger().info("head TF fallback node started")
 
     def _declare_parameters(self) -> None:
@@ -158,6 +164,7 @@ class HeadTfNode(Node):
         self.declare_parameter("dashboard_text_topic", DASHBOARD_TEXT)
 
         self.declare_parameter("publish_tf", True)
+        self.declare_parameter("transforms_calibrated", False)
         self.declare_parameter("tf_rate_hz", 30.0)
         self.declare_parameter("status_hz", 2.0)
 
@@ -203,6 +210,10 @@ class HeadTfNode(Node):
 
     def _publish_tf(self) -> None:
         if not bool(self.get_parameter("publish_tf").value):
+            return
+
+        if not bool(self.get_parameter("transforms_calibrated").value):
+            self._last_error = "physical_head_transforms_not_calibrated"
             return
 
         try:
@@ -314,7 +325,17 @@ class HeadTfNode(Node):
         status.name = "savo_head.head_tf_py"
         status.hardware_id = "savo_head"
 
-        if self._last_error:
+        publish_tf = bool(self.get_parameter("publish_tf").value)
+        transforms_calibrated = bool(
+            self.get_parameter("transforms_calibrated").value
+        )
+
+        if not transforms_calibrated:
+            status.level = (
+                DiagnosticStatus.ERROR if publish_tf else DiagnosticStatus.WARN
+            )
+            status.message = "TF_CALIBRATION_REQUIRED"
+        elif self._last_error:
             status.level = DiagnosticStatus.ERROR
             status.message = STATUS_ERROR
         elif self._is_state_stale():
@@ -332,6 +353,11 @@ class HeadTfNode(Node):
             KeyValue(
                 key="camera_optical_frame",
                 value=str(self.get_parameter("camera_optical_frame").value),
+            ),
+            KeyValue(key="publish_tf", value=str(publish_tf).lower()),
+            KeyValue(
+                key="transforms_calibrated",
+                value=str(transforms_calibrated).lower(),
             ),
             KeyValue(key="last_error", value=self._last_error),
         ]

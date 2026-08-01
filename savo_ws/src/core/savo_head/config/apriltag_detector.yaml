@@ -17,7 +17,7 @@ apriltag_detector_node:
 
     # Empty means all non-negative tag IDs are allowed. The initial hardware
     # profile below narrows this to the printed Robot SAVO test IDs 0 through 5.
-    allowed_tag_ids: []
+    # allowed_tag_ids omitted intentionally; empty default allows all non-negative IDs.
     maximum_hamming_distance: 1
     minimum_decision_margin: 0.0
     full_quality_decision_margin: 100.0

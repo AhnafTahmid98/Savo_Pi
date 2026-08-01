@@ -5,6 +5,8 @@
 #include "savo_mapping/autonomous_mapping_am7.hpp"
 #include "savo_mapping/frontier_completion_detector.hpp"
 #include "savo_mapping/saved_map_contract.hpp"
+#include "savo_mapping/saved_map_quality.hpp"
+#include "savo_mapping/production_map_release.hpp"
 #include "savo_mapping/topic_names.hpp"
 #include "savo_mapping/tf_pose_reader.hpp"
 
@@ -17,24 +19,38 @@
 #include <savo_msgs/msg/autonomous_mapping_status.hpp>
 #include <savo_msgs/msg/frontier_exploration_status.hpp>
 #include <savo_msgs/srv/control_autonomous_mapping.hpp>
+#include <savo_msgs/srv/commit_location_release.hpp>
+#include <savo_msgs/srv/list_location_candidates.hpp>
+#include <savo_msgs/srv/list_locations.hpp>
+#include <savo_msgs/srv/prepare_location_release.hpp>
+#include <savo_msgs/srv/review_autonomous_mapping_release.hpp>
+#include <savo_msgs/srv/rollback_location_release.hpp>
+#include <savo_msgs/srv/verify_location_release.hpp>
 #include <std_msgs/msg/bool.hpp>
 #include <std_msgs/msg/string.hpp>
 #include <std_srvs/srv/trigger.hpp>
 #include <tf2_ros/buffer.hpp>
 #include <tf2_ros/transform_listener.hpp>
+#include <ament_index_cpp/get_package_share_directory.hpp>
+#include <yaml-cpp/yaml.h>
 
 #include <chrono>
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <functional>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 namespace savo_mapping
 {
@@ -53,6 +69,13 @@ using NavigateToPose = nav2_msgs::action::NavigateToPose;
 using ReturnGoalHandle = rclcpp_action::ClientGoalHandle<NavigateToPose>;
 using ReturnActionClient = rclcpp_action::Client<NavigateToPose>;
 using ReturnCancelResponse = ReturnActionClient::CancelResponse;
+using ReviewRelease = savo_msgs::srv::ReviewAutonomousMappingRelease;
+using ListCandidates = savo_msgs::srv::ListLocationCandidates;
+using ListLocations = savo_msgs::srv::ListLocations;
+using PrepareLocationRelease = savo_msgs::srv::PrepareLocationRelease;
+using VerifyLocationRelease = savo_msgs::srv::VerifyLocationRelease;
+using CommitLocationRelease = savo_msgs::srv::CommitLocationRelease;
+using RollbackLocationRelease = savo_msgs::srv::RollbackLocationRelease;
 
 constexpr std::int64_t kNanosecondsPerSecond = 1000000000LL;
 
@@ -75,6 +98,25 @@ double steady_seconds(
 {
   return std::chrono::duration<double>(
     time_point.time_since_epoch()).count();
+}
+
+std::uint64_t unix_now_ns()
+{
+  return static_cast<std::uint64_t>(
+    std::chrono::duration_cast<std::chrono::nanoseconds>(
+      std::chrono::system_clock::now().time_since_epoch()).count());
+}
+
+bool finite_pose(const geometry_msgs::msg::PoseStamped & pose)
+{
+  const auto & p = pose.pose.position;
+  const auto & q = pose.pose.orientation;
+  const double norm = std::hypot(
+    std::hypot(q.x, q.y), std::hypot(q.z, q.w));
+  return pose.header.frame_id == "map" &&
+         std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z) &&
+         std::isfinite(q.x) && std::isfinite(q.y) &&
+         std::isfinite(q.z) && std::isfinite(q.w) && norm > 1.0e-12;
 }
 
 autonomous::MissionCommand command_from_message(const std::uint8_t command)
@@ -163,6 +205,7 @@ public:
     declare_and_validate_parameters();
     create_pose_reader();
     create_interfaces();
+    discover_incomplete_release_transactions();
 
     evaluation_timer_ = create_wall_timer(
       std::chrono::milliseconds(evaluation_period_ms_),
@@ -180,6 +223,176 @@ public:
   }
 
 private:
+  void discover_incomplete_release_transactions()
+  {
+    const std::filesystem::path root{joint_transaction_root_};
+    if (!std::filesystem::is_directory(root)) {
+      return;
+    }
+    for (const auto & entry : std::filesystem::directory_iterator(root)) {
+      if (!entry.is_regular_file() || entry.path().extension() != ".yaml" ||
+        entry.path().filename() == "active_joint_release.yaml")
+      {
+        continue;
+      }
+      try {
+        const YAML::Node journal = YAML::LoadFile(entry.path().string());
+        const std::string state = journal["state"].as<std::string>();
+        if (state != "complete" && state != "rolled_back" &&
+          state != "recovered_rolled_back")
+        {
+          recovery_journals_.push_back(entry.path());
+        }
+      } catch (const std::exception & error) {
+        recovery_fault_reason_ =
+          std::string{"release_recovery_journal_invalid:"} + error.what();
+      }
+    }
+    std::sort(recovery_journals_.begin(), recovery_journals_.end());
+  }
+
+  void persist_recovery_result(
+    const std::filesystem::path & path,
+    const std::string & state,
+    const std::string & reason)
+  {
+    YAML::Node journal = YAML::LoadFile(path.string());
+    journal["state"] = state;
+    journal["recovery_reason"] = reason;
+    journal["recovered_unix_ns"] = unix_now_ns();
+    const auto temporary = path.string() + ".recovery.tmp";
+    {
+      std::ofstream stream(temporary, std::ios::trunc);
+      if (!stream) {
+        throw std::runtime_error("release_recovery_journal_open_failed");
+      }
+      stream << journal;
+      stream.flush();
+      if (!stream) {
+        throw std::runtime_error("release_recovery_journal_flush_failed");
+      }
+    }
+    std::filesystem::rename(temporary, path);
+  }
+
+  void attempt_startup_release_recovery()
+  {
+    std::filesystem::path journal_path;
+    YAML::Node journal;
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      if (recovery_in_flight_ || recovery_journals_.empty() ||
+        autonomous::is_active(mission_.snapshot().state) ||
+        !location_rollback_client_->service_is_ready())
+      {
+        return;
+      }
+      journal_path = recovery_journals_.front();
+      try {
+        journal = YAML::LoadFile(journal_path.string());
+      } catch (const std::exception & error) {
+        recovery_fault_reason_ =
+          std::string{"release_recovery_journal_invalid:"} + error.what();
+        return;
+      }
+      recovery_in_flight_ = true;
+    }
+
+    const std::string release_id = journal["release_id"].as<std::string>();
+    const std::string mission_id = journal["mission_id"].as<std::string>();
+    const std::string token =
+      journal["location_transaction_token"].as<std::string>();
+    const std::string digest =
+      journal["location_snapshot_sha256"].as<std::string>();
+    const std::string previous_map =
+      journal["previous_active_map_release_id"].as<std::string>();
+    const std::string actor = journal["approval_actor"] ?
+      journal["approval_actor"].as<std::string>() : "am8_recovery";
+
+    bool map_ok = true;
+    std::string map_reason{"map_recovery_not_required"};
+    try {
+      const auto active = release::read_active_map(production_map_root_);
+      if (active.active && active.release_id == release_id) {
+        if (previous_map.empty()) {
+          const auto restored =
+            release::deactivate_active_map(production_map_root_);
+          map_ok = !restored.active;
+          map_reason = restored.reason;
+        } else {
+          const auto restored = release::promote_release(
+            production_map_root_, previous_map);
+          map_ok = restored.active && restored.release_id == previous_map;
+          map_reason = restored.reason;
+        }
+      }
+      const auto after = release::read_active_map(production_map_root_);
+      if (!after.active || after.release_id != release_id) {
+        std::string discard_reason;
+        map_ok = release::discard_unpromoted_release(
+          production_map_root_, release_id, &discard_reason) && map_ok;
+        map_reason += ";" + discard_reason;
+      }
+    } catch (const std::exception & error) {
+      map_ok = false;
+      map_reason = std::string{"map_recovery_error:"} + error.what();
+    }
+
+    auto request = std::make_shared<RollbackLocationRelease::Request>();
+    request->contract_version = RollbackLocationRelease::Request::CONTRACT_VERSION;
+    request->request_id = release_id + "-restart-recovery";
+    request->release_id = release_id;
+    request->mission_id = mission_id;
+    request->transaction_token = token;
+    request->expected_snapshot_sha256 = digest;
+    request->actor_id = actor.empty() ? "am8_recovery" : actor;
+    request->rollback_reason = "orchestrator_restart_recovery";
+    try {
+      location_rollback_client_->async_send_request(
+        request,
+        [this, journal_path, map_ok, map_reason](
+          const rclcpp::Client<RollbackLocationRelease>::SharedFuture future)
+        {
+          bool location_ok = false;
+          std::string location_reason{"location_recovery_response_invalid"};
+          try {
+            const auto response = future.get();
+            location_ok = response && response->success;
+            if (response) {
+              location_reason = response->reason;
+            }
+          } catch (const std::exception & error) {
+            location_reason =
+            std::string{"location_recovery_error:"} + error.what();
+          }
+          const bool recovered = location_ok && map_ok;
+          const std::string combined = location_reason + ";" + map_reason;
+          try {
+            persist_recovery_result(
+              journal_path,
+              recovered ? "recovered_rolled_back" : "recovery_failed",
+              combined);
+          } catch (const std::exception & error) {
+            location_reason += std::string{";journal_error:"} + error.what();
+          }
+          std::lock_guard<std::mutex> lock(mutex_);
+          recovery_in_flight_ = false;
+          if (recovered) {
+            recovery_journals_.erase(recovery_journals_.begin());
+            recovery_fault_reason_.clear();
+          } else {
+            recovery_fault_reason_ =
+            "inconsistent_release_fault:" + combined;
+          }
+        });
+    } catch (const std::exception & error) {
+      std::lock_guard<std::mutex> lock(mutex_);
+      recovery_in_flight_ = false;
+      recovery_fault_reason_ =
+        std::string{"release_recovery_dispatch_error:"} + error.what();
+    }
+  }
+
   void declare_and_validate_parameters()
   {
     action_name_ = declare_parameter<std::string>(
@@ -416,6 +629,63 @@ private:
       "save.expected_frame",
       "map");
 
+    review_service_name_ = declare_parameter<std::string>(
+      "release.review_service",
+      "/savo_mapping/autonomous/review_release");
+    joint_active_release_topic_ = declare_parameter<std::string>(
+      "release.active_joint_release_topic",
+      "/savo_mapping/joint_active_release");
+    location_candidates_service_name_ = declare_parameter<std::string>(
+      "release.location_candidates_service",
+      "/savo_locations/candidates/list");
+    location_list_service_name_ = declare_parameter<std::string>(
+      "release.location_list_service",
+      "/savo_locations/list");
+    location_prepare_service_name_ = declare_parameter<std::string>(
+      "release.location_prepare_service",
+      "/savo_locations/releases/prepare");
+    location_verify_service_name_ = declare_parameter<std::string>(
+      "release.location_verify_service",
+      "/savo_locations/releases/verify");
+    location_commit_service_name_ = declare_parameter<std::string>(
+      "release.location_commit_service",
+      "/savo_locations/releases/commit");
+    location_rollback_service_name_ = declare_parameter<std::string>(
+      "release.location_rollback_service",
+      "/savo_locations/releases/rollback");
+    production_map_root_ = declare_parameter<std::string>(
+      "release.production_map_root",
+      "/var/lib/robot_savo/maps/production");
+    joint_transaction_root_ = declare_parameter<std::string>(
+      "release.journal_root",
+      "/var/lib/robot_savo/maps/release_transactions");
+    geometry_profile_path_ = declare_parameter<std::string>(
+      "release.geometry_profile",
+      ament_index_cpp::get_package_share_directory("savo_description") +
+      "/config/profiles/robot_savo_core_v1.yaml");
+    geometry_profile_id_ = declare_parameter<std::string>(
+      "release.geometry_profile_id", "robot_savo_core_v1");
+    require_locked_geometry_ = declare_parameter<bool>(
+      "release.require_locked_geometry", true);
+    allow_provisional_geometry_ = declare_parameter<bool>(
+      "release.allow_provisional_geometry", false);
+    require_approved_location_ = declare_parameter<bool>(
+      "release.require_approved_location", false);
+    location_verification_timeout_s_ = declare_parameter<double>(
+      "release.location_verification_timeout_s", 15.0);
+    operator_approval_timeout_s_ = declare_parameter<double>(
+      "release.operator_approval_timeout_s", 600.0);
+    location_prepare_timeout_s_ = declare_parameter<double>(
+      "release.location_prepare_timeout_s", 30.0);
+    map_release_timeout_s_ = declare_parameter<double>(
+      "release.map_creation_verification_timeout_s", 60.0);
+    location_commit_timeout_s_ = declare_parameter<double>(
+      "release.location_commit_timeout_s", 30.0);
+    map_promotion_timeout_s_ = declare_parameter<double>(
+      "release.map_promotion_timeout_s", 30.0);
+    rollback_timeout_s_ = declare_parameter<double>(
+      "release.rollback_recovery_timeout_s", 60.0);
+
     evaluation_period_ms_ = declare_parameter<std::int64_t>(
       "evaluation_period_ms",
       250);
@@ -506,7 +776,19 @@ private:
       &cancel_session_command_topic_,
       &handoff_cancel_service_name_,
       &map_save_service_name_,
-      &saved_map_expected_frame_};
+      &saved_map_expected_frame_,
+      &review_service_name_,
+      &joint_active_release_topic_,
+      &location_candidates_service_name_,
+      &location_list_service_name_,
+      &location_prepare_service_name_,
+      &location_verify_service_name_,
+      &location_commit_service_name_,
+      &location_rollback_service_name_,
+      &production_map_root_,
+      &joint_transaction_root_,
+      &geometry_profile_path_,
+      &geometry_profile_id_};
 
     for (const auto * endpoint : endpoint_values) {
       if (endpoint->empty()) {
@@ -566,6 +848,16 @@ private:
     for (const double timeout : am7_positive_timeouts) {
       if (!std::isfinite(timeout) || timeout <= 0.0) {
         throw std::invalid_argument("am7_timeout_out_of_range");
+      }
+    }
+    const double am8_positive_timeouts[] = {
+      location_verification_timeout_s_, operator_approval_timeout_s_,
+      location_prepare_timeout_s_, map_release_timeout_s_,
+      location_commit_timeout_s_, map_promotion_timeout_s_,
+      rollback_timeout_s_};
+    for (const double timeout : am8_positive_timeouts) {
+      if (!std::isfinite(timeout) || timeout <= 0.0) {
+        throw std::invalid_argument("am8_timeout_out_of_range");
       }
     }
     if (!std::isfinite(return_position_tolerance_m_) ||
@@ -630,6 +922,8 @@ private:
     cancel_session_command_publisher_ = create_publisher<StringMessage>(
       cancel_session_command_topic_,
       command_qos);
+    joint_active_release_publisher_ = create_publisher<StringMessage>(
+      joint_active_release_topic_, retained_qos);
 
     mode_subscription_ = create_subscription<StringMessage>(
       mode_topic_,
@@ -741,6 +1035,19 @@ private:
     map_save_client_ = create_client<Trigger>(
       map_save_service_name_);
 
+    location_candidates_client_ = create_client<ListCandidates>(
+      location_candidates_service_name_);
+    location_list_client_ = create_client<ListLocations>(
+      location_list_service_name_);
+    location_prepare_client_ = create_client<PrepareLocationRelease>(
+      location_prepare_service_name_);
+    location_verify_client_ = create_client<VerifyLocationRelease>(
+      location_verify_service_name_);
+    location_commit_client_ = create_client<CommitLocationRelease>(
+      location_commit_service_name_);
+    location_rollback_client_ = create_client<RollbackLocationRelease>(
+      location_rollback_service_name_);
+
     scan360_start_client_ = create_client<Trigger>(
       scan360_start_service_name_);
 
@@ -773,6 +1080,14 @@ private:
       control_service_name_,
       std::bind(
         &AutonomousMappingOrchestratorNode::handle_control,
+        this,
+        std::placeholders::_1,
+        std::placeholders::_2));
+
+    review_service_ = create_service<ReviewRelease>(
+      review_service_name_,
+      std::bind(
+        &AutonomousMappingOrchestratorNode::handle_release_review,
         this,
         std::placeholders::_1,
         std::placeholders::_2));
@@ -820,6 +1135,8 @@ private:
     if (
       goal_reserved_ ||
       goal_handle_ ||
+      recovery_in_flight_ ||
+      !recovery_journals_.empty() ||
       autonomous::is_active(mission_.snapshot().state))
     {
       RCLCPP_WARN(
@@ -985,6 +1302,114 @@ private:
     }
 
     evaluate_and_apply();
+  }
+
+  void handle_release_review(
+    const ReviewRelease::Request::SharedPtr request,
+    ReviewRelease::Response::SharedPtr response)
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    const auto & snapshot = mission_.snapshot();
+    response->completed = true;
+    response->mission_id = snapshot.request.mission_id;
+    response->current_review_generation = inputs_.review_generation;
+
+    if (
+      request->contract_version != ReviewRelease::Request::CONTRACT_VERSION ||
+      request->request_id.empty() || request->actor_id.empty() ||
+      (request->decision != ReviewRelease::Request::DECISION_APPROVE &&
+      request->decision != ReviewRelease::Request::DECISION_REJECT) ||
+      (request->decision == ReviewRelease::Request::DECISION_REJECT &&
+      request->review_reason.empty()) ||
+      (request->decision == ReviewRelease::Request::DECISION_APPROVE &&
+      (!release::valid_release_id(request->requested_release_id) ||
+      request->review_reason.empty())))
+    {
+      response->result_code = ReviewRelease::Response::RESULT_INVALID_REQUEST;
+      response->reason = "invalid_release_review_request";
+      return;
+    }
+    if (review_request_ids_.count(request->request_id) != 0U ||
+      inputs_.review_complete)
+    {
+      response->result_code = ReviewRelease::Response::RESULT_DUPLICATE_DECISION;
+      response->reason = "release_review_already_recorded";
+      return;
+    }
+    if (snapshot.state != autonomous::MissionState::AwaitingApproval) {
+      response->result_code = ReviewRelease::Response::RESULT_NOT_AWAITING_APPROVAL;
+      response->reason = "mission_not_awaiting_release_approval";
+      return;
+    }
+    if (
+      request->expected_review_generation != inputs_.review_generation)
+    {
+      response->result_code = ReviewRelease::Response::RESULT_STALE_GENERATION;
+      response->reason = "stale_release_review_generation";
+      return;
+    }
+    if (
+      request->mission_id != snapshot.request.mission_id ||
+      request->map_id != snapshot.request.map_id ||
+      request->map_revision != snapshot.request.map_revision)
+    {
+      response->result_code = ReviewRelease::Response::RESULT_WRONG_CONTEXT;
+      response->reason = "release_review_context_mismatch";
+      return;
+    }
+    if (!inputs_.verification_succeeded ||
+      !inputs_.location_verification_succeeded ||
+      !inputs_.location_verification_complete)
+    {
+      response->result_code = ReviewRelease::Response::RESULT_VERIFICATION_INCOMPLETE;
+      response->reason = "combined_map_location_verification_incomplete";
+      return;
+    }
+
+    if (request->decision == ReviewRelease::Request::DECISION_APPROVE) {
+      try {
+        const auto verification = session::verify_saved_map_session(
+          inputs_.saved_session_directory,
+          snapshot.request.map_id,
+          saved_map_expected_frame_);
+        if (!verification.valid) {
+          throw std::runtime_error(verification.reason);
+        }
+        const auto handoff = quality::set_navigation_handoff(
+          verification,
+          true,
+          "am8_operator_approved:" + request->actor_id + ":" +
+          request->review_reason);
+        if (!handoff.ready || !handoff.approved) {
+          throw std::runtime_error(handoff.reason);
+        }
+      } catch (const std::exception & exception) {
+        response->result_code =
+          ReviewRelease::Response::RESULT_VERIFICATION_INCOMPLETE;
+        response->reason =
+          std::string{"navigation_handoff_approval_failed:"} + exception.what();
+        return;
+      }
+    }
+
+    review_request_ids_.insert(request->request_id);
+    inputs_.review_complete = true;
+    inputs_.review_approved =
+      request->decision == ReviewRelease::Request::DECISION_APPROVE;
+    inputs_.review_rejected = !inputs_.review_approved;
+    inputs_.approval_pending = false;
+    inputs_.approval_actor = request->actor_id;
+    inputs_.approval_reason = request->review_reason;
+    inputs_.requested_release_id = request->requested_release_id;
+    approval_unix_ns_ = unix_now_ns();
+
+    response->accepted = true;
+    response->approved = inputs_.review_approved;
+    response->rejected = inputs_.review_rejected;
+    response->result_code = ReviewRelease::Response::RESULT_ACCEPTED;
+    response->reason = inputs_.review_approved ?
+      "release_approval_recorded" : "release_rejection_recorded";
+    response->release_id = inputs_.requested_release_id;
   }
 
   void handle_mode(const StringMessage::ConstSharedPtr message)
@@ -1600,6 +2025,53 @@ private:
         autonomous::ReturnActionLifecycle::WaitingForServer;
       return_goal_handle_.reset();
     }
+    if (state == autonomous::MissionState::VerifyingLocations) {
+      ++location_verification_generation_;
+      inputs_.location_verification_started = false;
+      inputs_.location_verification_complete = false;
+      inputs_.location_verification_succeeded = false;
+      inputs_.pending_candidate_count = 0U;
+      inputs_.approved_location_count = 0U;
+      inputs_.location_snapshot_digest.clear();
+      inputs_.location_verification_reason =
+        "location_verification_not_started";
+      location_verification_started_at_ = std::chrono::steady_clock::now();
+      location_candidates_in_flight_ = false;
+      location_list_in_flight_ = false;
+    }
+    if (state == autonomous::MissionState::AwaitingApproval) {
+      ++inputs_.review_generation;
+      inputs_.approval_pending = true;
+      inputs_.review_complete = false;
+      inputs_.review_approved = false;
+      inputs_.review_rejected = false;
+      inputs_.approval_actor.clear();
+      inputs_.approval_reason.clear();
+      inputs_.requested_release_id.clear();
+      approval_started_at_ = std::chrono::steady_clock::now();
+    }
+    if (state == autonomous::MissionState::Releasing) {
+      ++release_generation_;
+      inputs_.release_started = false;
+      inputs_.release_complete = false;
+      inputs_.release_succeeded = false;
+      inputs_.release_state = "not_started";
+      inputs_.release_reason = "release_not_started";
+      inputs_.rollback_required = false;
+      inputs_.rollback_complete = false;
+      inputs_.rollback_succeeded = false;
+      inputs_.rollback_reason.clear();
+      inputs_.joint_active_release_verified = false;
+      inputs_.release_id.clear();
+      release_started_at_ = std::chrono::steady_clock::now();
+      release_phase_started_at_ = release_started_at_;
+      release_in_flight_ = false;
+      release_timeout_latched_ = false;
+      location_release_prepared_ = false;
+      location_release_committed_ = false;
+      map_release_created_ = false;
+      map_release_promoted_ = false;
+    }
 
     observed_sequence_state_ = state;
   }
@@ -1615,10 +2087,54 @@ private:
     inputs_.verification_complete = false;
     inputs_.verification_succeeded = false;
     inputs_.verification_reason = "verification_not_started";
+    inputs_.location_verification_started = false;
+    inputs_.location_verification_complete = false;
+    inputs_.location_verification_succeeded = false;
+    inputs_.pending_candidate_count = 0U;
+    inputs_.approved_location_count = 0U;
+    inputs_.location_snapshot_digest.clear();
+    inputs_.location_verification_reason = "location_verification_not_started";
+    inputs_.review_generation = 0U;
+    inputs_.approval_pending = false;
+    inputs_.review_complete = false;
+    inputs_.review_approved = false;
+    inputs_.review_rejected = false;
+    inputs_.approval_actor.clear();
+    inputs_.approval_reason.clear();
+    inputs_.requested_release_id.clear();
+    inputs_.release_started = false;
+    inputs_.release_complete = false;
+    inputs_.release_succeeded = false;
+    inputs_.rollback_required = false;
+    inputs_.rollback_complete = false;
+    inputs_.rollback_succeeded = false;
+    inputs_.joint_active_release_verified = false;
+    inputs_.release_id.clear();
+    inputs_.release_state = "not_started";
+    inputs_.release_reason = "release_not_started";
+    inputs_.rollback_reason.clear();
     map_save_in_flight_ = false;
     verification_in_flight_ = false;
     verification_dispatch_pending_ = false;
     map_save_started_at_.reset();
+    location_verification_started_at_.reset();
+    approval_started_at_.reset();
+    release_started_at_.reset();
+    release_phase_started_at_.reset();
+    review_request_ids_.clear();
+    location_candidates_in_flight_ = false;
+    location_list_in_flight_ = false;
+    release_in_flight_ = false;
+    location_release_prepared_ = false;
+    location_release_committed_ = false;
+    map_release_created_ = false;
+    map_release_promoted_ = false;
+    location_transaction_token_.clear();
+    location_snapshot_path_.clear();
+    location_snapshot_digest_.clear();
+    previous_active_location_release_.clear();
+    previous_active_map_release_.clear();
+    approval_unix_ns_ = 0U;
   }
 
   bool command_retry_elapsed_locked(
@@ -1641,6 +2157,8 @@ private:
 
   void evaluate_and_apply()
   {
+    attempt_startup_release_recovery();
+
     autonomous::MissionDecision decision;
     MissionStatus status;
     std::shared_ptr<GoalHandle> feedback_handle;
@@ -1669,10 +2187,18 @@ private:
     bool verify_return_proximity = false;
     bool dispatch_map_save = false;
     bool dispatch_verification = false;
+    bool dispatch_location_check = false;
+    bool dispatch_release = false;
+    bool dispatch_rollback = false;
     bool verification_started_this_cycle = false;
     std::string map_save_mission_id;
     std::string verification_directory;
     std::string verification_map_id;
+    std::string am8_mission_id;
+    std::string am8_map_id;
+    std::string am8_release_id;
+    std::uint32_t am8_map_revision = 0U;
+    std::uint64_t am8_generation = 0U;
     std::string sequence_mission_id;
     std::uint64_t scan360_dispatch_epoch = 0U;
     std::uint64_t head_scan_dispatch_epoch = 0U;
@@ -1707,6 +2233,50 @@ private:
         inputs_.map_save_succeeded = false;
         inputs_.map_save_reason = "automatic_map_save_timeout";
         map_save_in_flight_ = false;
+      }
+
+      if (
+        mission_.snapshot().state ==
+        autonomous::MissionState::VerifyingLocations &&
+        inputs_.location_verification_started &&
+        !inputs_.location_verification_complete &&
+        location_verification_started_at_.has_value() &&
+        std::chrono::duration<double>(
+          current_time - location_verification_started_at_.value()).count() >=
+        location_verification_timeout_s_)
+      {
+        inputs_.location_verification_complete = true;
+        inputs_.location_verification_succeeded = false;
+        inputs_.location_verification_reason =
+          "location_verification_timeout";
+        location_candidates_in_flight_ = false;
+        location_list_in_flight_ = false;
+      }
+
+      if (
+        mission_.snapshot().state == autonomous::MissionState::Releasing &&
+        inputs_.release_started && !inputs_.release_complete &&
+        release_phase_started_at_.has_value() && !release_timeout_latched_)
+      {
+        double phase_timeout = map_release_timeout_s_;
+        if (inputs_.release_state == "preparing") {
+          phase_timeout = location_prepare_timeout_s_;
+        } else if (inputs_.release_state == "committing_location_release") {
+          phase_timeout = location_commit_timeout_s_;
+        } else if (inputs_.release_state == "promoting_map_release") {
+          phase_timeout = map_promotion_timeout_s_;
+        } else if (inputs_.release_state == "rolling_back") {
+          phase_timeout = rollback_timeout_s_;
+        }
+        if (
+          std::chrono::duration<double>(
+          current_time - release_phase_started_at_.value()).count() >=
+          phase_timeout)
+        {
+          release_timeout_latched_ = true;
+          inputs_.release_reason = inputs_.release_state + "_timeout";
+          inputs_.release_state = "timeout_waiting_for_correlated_response";
+        }
       }
 
       const auto active_state = mission_.snapshot().state;
@@ -1952,6 +2522,18 @@ private:
 
       const auto mission_state = mission_.snapshot().state;
       if (
+        mission_state == autonomous::MissionState::AwaitingApproval &&
+        approval_started_at_.has_value() && !inputs_.review_complete &&
+        std::chrono::duration<double>(
+          current_time - approval_started_at_.value()).count() >=
+        operator_approval_timeout_s_)
+      {
+        timeout_abort_requested_ = true;
+        primary_failure_reason_ = "operator_release_approval_timeout";
+        decision = mission_.abort(
+          autonomous::MissionResult::TimedOut,
+          primary_failure_reason_, inputs_);
+      } else if (  // NOLINT(readability/braces)
         am7_timeout_reason.has_value())
       {
         primary_failure_reason_ = am7_timeout_reason.value();
@@ -2346,6 +2928,66 @@ private:
         verification_dispatch_pending_ = false;
       }
 
+      if (decision.request_location_verification) {
+        if (!inputs_.location_verification_started) {
+          inputs_.location_verification_started = true;
+          inputs_.location_verification_reason =
+            "waiting_for_location_authority";
+          location_verification_started_at_ = current_time;
+        }
+        if (!location_candidates_in_flight_ &&
+          !location_list_in_flight_ &&
+          location_candidates_client_->service_is_ready() &&
+          location_list_client_->service_is_ready())
+        {
+          location_candidates_in_flight_ = true;
+          inputs_.location_verification_reason =
+            "location_verification_in_progress";
+          am8_mission_id = mission_.snapshot().request.mission_id;
+          am8_map_id = mission_.snapshot().request.map_id;
+          am8_map_revision = mission_.snapshot().request.map_revision;
+          am8_generation = location_verification_generation_;
+          dispatch_location_check = true;
+        }
+      }
+
+      if (decision.request_joint_release && !release_in_flight_) {
+        if (!location_prepare_client_->service_is_ready() ||
+          !location_verify_client_->service_is_ready() ||
+          !location_commit_client_->service_is_ready() ||
+          !location_rollback_client_->service_is_ready())
+        {
+          inputs_.release_state = "waiting_for_location_release_authority";
+          inputs_.release_reason = "location_release_services_not_ready";
+        } else {
+          inputs_.release_started = true;
+          inputs_.release_id = inputs_.requested_release_id;
+          inputs_.release_state = "preparing";
+          inputs_.release_reason = "joint_release_preparing";
+          release_started_at_ = current_time;
+          release_phase_started_at_ = current_time;
+          release_in_flight_ = true;
+          am8_mission_id = mission_.snapshot().request.mission_id;
+          am8_map_id = mission_.snapshot().request.map_id;
+          am8_map_revision = mission_.snapshot().request.map_revision;
+          am8_release_id = inputs_.requested_release_id;
+          am8_generation = release_generation_;
+          dispatch_release = true;
+        }
+      }
+
+      if (decision.request_release_rollback &&
+        !inputs_.rollback_complete && !release_in_flight_)
+      {
+        release_in_flight_ = true;
+        inputs_.release_state = "rolling_back";
+        release_phase_started_at_ = current_time;
+        am8_mission_id = mission_.snapshot().request.mission_id;
+        am8_release_id = inputs_.requested_release_id;
+        am8_generation = release_generation_;
+        dispatch_rollback = true;
+      }
+
       status = make_status_locked();
       feedback_handle = goal_handle_;
 
@@ -2476,6 +3118,22 @@ private:
       run_saved_map_verification(
         verification_directory,
         verification_map_id);
+    }
+
+    if (dispatch_location_check) {
+      dispatch_location_verification(
+        am8_mission_id, am8_map_id, am8_map_revision, am8_generation);
+    }
+
+    if (dispatch_release) {
+      dispatch_joint_release(
+        am8_mission_id, am8_map_id, am8_map_revision,
+        am8_release_id, am8_generation);
+    }
+
+    if (dispatch_rollback) {
+      dispatch_release_rollback(
+        am8_mission_id, am8_release_id, am8_generation);
     }
 
     if (terminal_handle && terminal_snapshot.has_value()) {
@@ -3114,6 +3772,843 @@ private:
     }
   }
 
+  void complete_location_verification(
+    const std::string & mission_id,
+    const std::uint64_t generation,
+    const bool success,
+    const std::string & reason,
+    const std::uint32_t pending_count,
+    const std::uint32_t approved_count,
+    const std::string & digest = {})
+  {
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      if (generation != location_verification_generation_ ||
+        mission_id != mission_.snapshot().request.mission_id ||
+        mission_.snapshot().state !=
+        autonomous::MissionState::VerifyingLocations)
+      {
+        return;
+      }
+      location_candidates_in_flight_ = false;
+      location_list_in_flight_ = false;
+      inputs_.location_verification_complete = true;
+      inputs_.location_verification_succeeded = success;
+      inputs_.pending_candidate_count = pending_count;
+      inputs_.approved_location_count = approved_count;
+      inputs_.location_snapshot_digest = digest;
+      inputs_.location_verification_reason = reason;
+    }
+    evaluate_and_apply();
+  }
+
+  void dispatch_approved_location_verification(
+    const std::string & mission_id,
+    const std::string & map_id,
+    const std::uint32_t map_revision,
+    const std::uint64_t generation,
+    const std::uint32_t pending_count)
+  {
+    auto request = std::make_shared<ListLocations::Request>();
+    request->map_id = map_id;
+    request->map_revision = map_revision;
+    request->enforce_map_context = true;
+    request->state_filter = ListLocations::Request::STATE_APPROVED;
+    request->enabled_only = true;
+
+    try {
+      location_list_client_->async_send_request(
+        request,
+        [this, mission_id, map_id, map_revision, generation, pending_count](
+          const rclcpp::Client<ListLocations>::SharedFuture future)
+        {
+          bool success = false;
+          std::string reason{"approved_location_list_response_invalid"};
+          std::uint32_t approved_count = 0U;
+          std::string digest;
+          try {
+            const auto response = future.get();
+            if (!response || !response->success) {
+              reason = response ? response->reason : reason;
+            } else {
+              std::vector<std::string> canonical;
+              std::set<std::string> ids;
+              for (const auto & location : response->locations) {
+                if (location.state !=
+                savo_msgs::msg::LocationRecord::STATE_APPROVED ||
+                !location.enabled || location.location_id.empty() ||
+                location.map_id != map_id ||
+                location.map_revision != map_revision ||
+                !finite_pose(location.approach_pose) ||
+                (location.confirmation_pose_valid &&
+                !finite_pose(location.confirmation_pose)) ||
+                (location.tag_pose_map_valid &&
+                !finite_pose(location.tag_pose_map)) ||
+                !ids.insert(location.location_id).second)
+                {
+                  throw std::runtime_error(
+                          "approved_location_contract_invalid");
+                }
+                canonical.push_back(
+                  location.location_id + ":" +
+                  std::to_string(location.record_revision));
+              }
+              std::sort(canonical.begin(), canonical.end());
+              const std::filesystem::path digest_input =
+              std::filesystem::path{joint_transaction_root_} /
+              (".location-verification-" + mission_id + ".txt");
+              std::filesystem::create_directories(digest_input.parent_path());
+              {
+                std::ofstream stream(digest_input, std::ios::trunc);
+                if (!stream) {
+                  throw std::runtime_error("location_digest_write_failed");
+                }
+                stream << map_id << '\n' << map_revision << '\n';
+                for (const auto & entry : canonical) {
+                  stream << entry << '\n';
+                }
+                stream.flush();
+                if (!stream) {
+                  throw std::runtime_error("location_digest_flush_failed");
+                }
+              }
+              digest = release::file_sha256(digest_input);
+              std::error_code ignored;
+              std::filesystem::remove(digest_input, ignored);
+              approved_count =
+              static_cast<std::uint32_t>(response->locations.size());
+              if (require_approved_location_ && approved_count == 0U) {
+                reason = "no_approved_locations_for_release";
+              } else {
+                success = true;
+                reason = "location_context_verified";
+              }
+            }
+          } catch (const std::exception & error) {
+            reason = std::string{"approved_location_verification_error:"} +
+            error.what();
+          }
+          complete_location_verification(
+            mission_id, generation, success, reason, pending_count,
+            approved_count, digest);
+        });
+    } catch (const std::exception & error) {
+      complete_location_verification(
+        mission_id, generation, false,
+        std::string{"approved_location_list_dispatch_error:"} + error.what(),
+        pending_count, 0U);
+    }
+  }
+
+  void dispatch_location_verification(
+    const std::string & mission_id,
+    const std::string & map_id,
+    const std::uint32_t map_revision,
+    const std::uint64_t generation)
+  {
+    auto request = std::make_shared<ListCandidates::Request>();
+    request->state_filter = ListCandidates::Request::STATE_FILTER_ALL;
+    request->enforce_map_context = true;
+    request->map_id = map_id;
+    request->map_revision = map_revision;
+    try {
+      location_candidates_client_->async_send_request(
+        request,
+        [this, mission_id, map_id, map_revision, generation](
+          const rclcpp::Client<ListCandidates>::SharedFuture future)
+        {
+          std::uint32_t pending_count = 0U;
+          std::string failure;
+          try {
+            const auto response = future.get();
+            if (!response || !response->success) {
+              failure = response ? response->reason :
+              "location_candidate_list_response_invalid";
+            } else {
+              for (const auto & candidate : response->candidates) {
+                if (candidate.map_id != map_id ||
+                candidate.map_revision != map_revision ||
+                candidate.candidate_id.empty())
+                {
+                  failure = "location_candidate_context_mismatch";
+                  break;
+                }
+                if (candidate.state ==
+                savo_msgs::msg::LocationCandidate::STATE_PENDING_REVIEW)
+                {
+                  ++pending_count;
+                }
+              }
+              if (failure.empty() && pending_count != 0U) {
+                failure = "pending_location_candidates_block_release";
+              }
+            }
+          } catch (const std::exception & error) {
+            failure = std::string{"location_candidate_verification_error:"} +
+            error.what();
+          }
+          if (!failure.empty()) {
+            complete_location_verification(
+              mission_id, generation, false, failure, pending_count, 0U);
+            return;
+          }
+          {
+            std::lock_guard<std::mutex> lock(mutex_);
+            if (generation != location_verification_generation_ ||
+            mission_id != mission_.snapshot().request.mission_id ||
+            mission_.snapshot().state !=
+            autonomous::MissionState::VerifyingLocations)
+            {
+              return;
+            }
+            location_candidates_in_flight_ = false;
+            location_list_in_flight_ = true;
+          }
+          dispatch_approved_location_verification(
+            mission_id, map_id, map_revision, generation, pending_count);
+        });
+    } catch (const std::exception & error) {
+      complete_location_verification(
+        mission_id, generation, false,
+        std::string{"location_candidate_list_dispatch_error:"} + error.what(),
+        0U, 0U);
+    }
+  }
+
+  bool validate_geometry_profile(
+    std::string * digest,
+    std::string * reason) const
+  {
+    try {
+      const YAML::Node profile = YAML::LoadFile(geometry_profile_path_);
+      const auto metadata = profile["metadata"];
+      if (!metadata || !metadata["profile_id"] ||
+        !metadata["measurement_state"] ||
+        metadata["profile_id"].as<std::string>() != geometry_profile_id_)
+      {
+        throw std::runtime_error("geometry_profile_identity_mismatch");
+      }
+      const std::string state =
+        metadata["measurement_state"].as<std::string>();
+      if (require_locked_geometry_ && state != "locked" &&
+        !(allow_provisional_geometry_ && state == "provisional"))
+      {
+        throw std::runtime_error("geometry_profile_not_locked");
+      }
+      *digest = release::file_sha256(geometry_profile_path_);
+      *reason = "geometry_profile_verified";
+      return true;
+    } catch (const std::exception & error) {
+      *reason = std::string{"geometry_profile_invalid:"} + error.what();
+      return false;
+    }
+  }
+
+  void write_release_journal(
+    const std::string & release_id,
+    const std::string & state,
+    const std::string & reason)
+  {
+    std::filesystem::create_directories(joint_transaction_root_);
+    YAML::Node journal;
+    journal["schema_version"] = 1;
+    journal["release_id"] = release_id;
+    journal["mission_id"] = mission_.snapshot().request.mission_id;
+    journal["map_id"] = mission_.snapshot().request.map_id;
+    journal["map_revision"] = mission_.snapshot().request.map_revision;
+    journal["state"] = state;
+    journal["reason"] = reason;
+    journal["location_prepared"] = location_release_prepared_;
+    journal["location_committed"] = location_release_committed_;
+    journal["map_created"] = map_release_created_;
+    journal["map_promoted"] = map_release_promoted_;
+    journal["location_transaction_token"] = location_transaction_token_;
+    journal["location_snapshot_sha256"] = location_snapshot_digest_;
+    journal["previous_active_location_release_id"] =
+      previous_active_location_release_;
+    journal["previous_active_map_release_id"] = previous_active_map_release_;
+    journal["approval_actor"] = inputs_.approval_actor;
+    journal["updated_unix_ns"] = unix_now_ns();
+    const auto final_path = std::filesystem::path{joint_transaction_root_} /
+    (release_id + ".yaml");
+    const auto temporary_path = final_path.string() + ".tmp";
+    {
+      std::ofstream stream(temporary_path, std::ios::trunc);
+      if (!stream) {
+        throw std::runtime_error("release_journal_open_failed");
+      }
+      stream << journal;
+      stream.flush();
+      if (!stream) {
+        throw std::runtime_error("release_journal_flush_failed");
+      }
+    }
+    std::filesystem::rename(temporary_path, final_path);
+  }
+
+  void finalize_joint_active_record(const std::string & release_id)
+  {
+    const auto active_map = release::read_active_map(production_map_root_);
+    if (!active_map.active || active_map.release_id != release_id ||
+      !location_release_committed_)
+    {
+      throw std::runtime_error("joint_active_release_correlation_failed");
+    }
+    YAML::Node active;
+    active["schema_version"] = 1;
+    active["state"] = "active";
+    active["release_id"] = release_id;
+    active["mission_id"] = mission_.snapshot().request.mission_id;
+    active["map_id"] = mission_.snapshot().request.map_id;
+    active["map_revision"] = mission_.snapshot().request.map_revision;
+    active["map_release_id"] = active_map.release_id;
+    active["location_release_id"] = release_id;
+    active["location_snapshot_sha256"] = location_snapshot_digest_;
+    active["geometry_profile_id"] = geometry_profile_id_;
+    active["geometry_profile_sha256"] =
+      release::file_sha256(geometry_profile_path_);
+    active["approval_actor"] = inputs_.approval_actor;
+    active["approval_reason"] = inputs_.approval_reason;
+    active["activated_unix_ns"] = unix_now_ns();
+    const auto final_path = std::filesystem::path{joint_transaction_root_} /
+    "active_joint_release.yaml";
+    const auto temporary_path = final_path.string() + ".tmp";
+    {
+      std::ofstream stream(temporary_path, std::ios::trunc);
+      if (!stream) {
+        throw std::runtime_error("joint_active_record_open_failed");
+      }
+      stream << active;
+      stream.flush();
+      if (!stream) {
+        throw std::runtime_error("joint_active_record_flush_failed");
+      }
+    }
+    std::filesystem::rename(temporary_path, final_path);
+    StringMessage message;
+    message.data = YAML::Dump(active);
+    joint_active_release_publisher_->publish(message);
+  }
+
+  void mark_release_failure_locked(
+    const std::string & reason,
+    const bool rollback_required)
+  {
+    release_in_flight_ = false;
+    inputs_.release_complete = true;
+    inputs_.release_succeeded = false;
+    inputs_.release_state = rollback_required ? "rollback_required" : "failed";
+    inputs_.release_reason = reason;
+    inputs_.rollback_required = rollback_required;
+    if (!rollback_required) {
+      inputs_.rollback_complete = true;
+      inputs_.rollback_succeeded = true;
+    }
+  }
+
+  void dispatch_release_rollback(
+    const std::string & mission_id,
+    const std::string & release_id,
+    const std::uint64_t generation)
+  {
+    bool map_rollback_ok = true;
+    std::string map_reason{"map_rollback_not_required"};
+    try {
+      if (map_release_promoted_) {
+        if (previous_active_map_release_.empty()) {
+          const auto active = release::deactivate_active_map(production_map_root_);
+          map_rollback_ok = !active.active;
+          map_reason = active.reason;
+        } else {
+          const auto active = release::promote_release(
+            production_map_root_, previous_active_map_release_);
+          map_rollback_ok = active.active &&
+            active.release_id == previous_active_map_release_;
+          map_reason = active.reason;
+        }
+      }
+      if (map_release_created_ && !map_release_promoted_) {
+        map_rollback_ok = release::discard_unpromoted_release(
+          production_map_root_, release_id, &map_reason) && map_rollback_ok;
+      }
+    } catch (const std::exception & error) {
+      map_rollback_ok = false;
+      map_reason = std::string{"map_rollback_error:"} + error.what();
+    }
+
+    if (!location_release_prepared_) {
+      {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (generation != release_generation_ ||
+          mission_id != mission_.snapshot().request.mission_id)
+        {
+          return;
+        }
+        inputs_.rollback_complete = true;
+        inputs_.rollback_succeeded = map_rollback_ok;
+        inputs_.rollback_reason = map_reason;
+        inputs_.release_state = map_rollback_ok ? "rolled_back" :
+          "rollback_failed";
+        release_in_flight_ = false;
+      }
+      evaluate_and_apply();
+      return;
+    }
+
+    auto request = std::make_shared<RollbackLocationRelease::Request>();
+    request->contract_version = RollbackLocationRelease::Request::CONTRACT_VERSION;
+    request->request_id = release_id + "-rollback";
+    request->release_id = release_id;
+    request->mission_id = mission_id;
+    request->transaction_token = location_transaction_token_;
+    request->expected_snapshot_sha256 = location_snapshot_digest_;
+    request->actor_id = inputs_.approval_actor;
+    request->rollback_reason = inputs_.release_reason;
+    try {
+      location_rollback_client_->async_send_request(
+        request,
+        [this, mission_id, release_id, generation, map_rollback_ok, map_reason](
+          const rclcpp::Client<RollbackLocationRelease>::SharedFuture future)
+        {
+          bool location_ok = false;
+          std::string reason{"location_rollback_response_invalid"};
+          try {
+            const auto response = future.get();
+            location_ok = response && response->success &&
+            response->active_location_release_id ==
+            previous_active_location_release_;
+            if (response) {
+              reason = response->reason;
+            }
+          } catch (const std::exception & error) {
+            reason = std::string{"location_rollback_error:"} + error.what();
+          }
+          {
+            std::lock_guard<std::mutex> lock(mutex_);
+            if (generation != release_generation_ ||
+            mission_id != mission_.snapshot().request.mission_id)
+            {
+              return;
+            }
+            const bool rollback_timed_out =
+            release_phase_started_at_.has_value() &&
+            std::chrono::duration<double>(
+              std::chrono::steady_clock::now() -
+              release_phase_started_at_.value()).count() >=
+            rollback_timeout_s_;
+            inputs_.rollback_complete = true;
+            inputs_.rollback_succeeded =
+            location_ok && map_rollback_ok && !rollback_timed_out;
+            inputs_.rollback_reason = reason + ";" + map_reason;
+            if (rollback_timed_out) {
+              inputs_.rollback_reason += ";rollback_recovery_timeout";
+            }
+            inputs_.release_state = inputs_.rollback_succeeded ?
+            "rolled_back" : "rollback_failed";
+            try {
+              write_release_journal(
+                release_id, inputs_.release_state, inputs_.rollback_reason);
+            } catch (const std::exception & error) {
+              inputs_.rollback_succeeded = false;
+              inputs_.rollback_reason +=
+              std::string{";journal_error:"} + error.what();
+            }
+            release_in_flight_ = false;
+          }
+          evaluate_and_apply();
+        });
+    } catch (const std::exception & error) {
+      {
+        std::lock_guard<std::mutex> lock(mutex_);
+        inputs_.rollback_complete = true;
+        inputs_.rollback_succeeded = false;
+        inputs_.rollback_reason =
+          std::string{"location_rollback_dispatch_error:"} + error.what() +
+        ";" + map_reason;
+        inputs_.release_state = "rollback_failed";
+        release_in_flight_ = false;
+      }
+      evaluate_and_apply();
+    }
+  }
+
+  void dispatch_location_commit(
+    const std::string & mission_id,
+    const std::string & release_id,
+    const std::uint64_t generation)
+  {
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      if (generation != release_generation_ ||
+        mission_id != mission_.snapshot().request.mission_id)
+      {
+        return;
+      }
+      inputs_.release_state = "committing_location_release";
+      release_phase_started_at_ = std::chrono::steady_clock::now();
+      release_timeout_latched_ = false;
+    }
+    auto request = std::make_shared<CommitLocationRelease::Request>();
+    request->contract_version = CommitLocationRelease::Request::CONTRACT_VERSION;
+    request->request_id = release_id + "-commit";
+    request->release_id = release_id;
+    request->mission_id = mission_id;
+    request->transaction_token = location_transaction_token_;
+    request->expected_snapshot_sha256 = location_snapshot_digest_;
+    request->actor_id = inputs_.approval_actor;
+    try {
+      location_commit_client_->async_send_request(
+        request,
+        [this, mission_id, release_id, generation](
+          const rclcpp::Client<CommitLocationRelease>::SharedFuture future)
+        {
+          bool commit_ok = false;
+          std::string reason{"location_commit_response_invalid"};
+          try {
+            const auto response = future.get();
+            commit_ok = response && response->success &&
+            response->active_location_release_id == release_id;
+            if (response) {
+              reason = response->reason;
+            }
+          } catch (const std::exception & error) {
+            reason = std::string{"location_commit_error:"} + error.what();
+          }
+          if (!commit_ok) {
+            {
+              std::lock_guard<std::mutex> lock(mutex_);
+              if (generation != release_generation_ ||
+              mission_id != mission_.snapshot().request.mission_id)
+              {
+                return;
+              }
+              mark_release_failure_locked(reason, true);
+            }
+            evaluate_and_apply();
+            return;
+          }
+
+          {
+            std::lock_guard<std::mutex> lock(mutex_);
+            if (generation != release_generation_ ||
+            mission_id != mission_.snapshot().request.mission_id)
+            {
+              return;
+            }
+            location_release_committed_ = true;
+            if (release_timeout_latched_) {
+              mark_release_failure_locked(
+                "location_commit_timeout_after_correlated_response", true);
+            } else {
+              inputs_.release_state = "promoting_map_release";
+              release_phase_started_at_ = std::chrono::steady_clock::now();
+            }
+          }
+          if (release_timeout_latched_) {
+            evaluate_and_apply();
+            return;
+          }
+
+          bool map_ok = false;
+          std::string map_reason;
+          try {
+            const auto active = release::promote_release(
+              production_map_root_, release_id);
+            map_ok = active.active && active.release_id == release_id;
+            map_reason = active.reason;
+          } catch (const std::exception & error) {
+            map_reason = std::string{"map_promotion_error:"} + error.what();
+          }
+          {
+            std::lock_guard<std::mutex> lock(mutex_);
+            if (generation != release_generation_ ||
+            mission_id != mission_.snapshot().request.mission_id)
+            {
+              return;
+            }
+            location_release_committed_ = true;
+            map_release_promoted_ = map_ok;
+            const bool promotion_timed_out =
+            release_phase_started_at_.has_value() &&
+            std::chrono::duration<double>(
+              std::chrono::steady_clock::now() -
+              release_phase_started_at_.value()).count() >=
+            map_promotion_timeout_s_;
+            if (promotion_timed_out) {
+              map_ok = false;
+              map_reason = "map_promotion_timeout";
+            }
+            if (map_ok) {
+              inputs_.release_complete = true;
+              inputs_.release_succeeded = true;
+              inputs_.joint_active_release_verified = true;
+              inputs_.release_state = "active_verified";
+              inputs_.release_reason = "joint_map_location_release_active";
+              try {
+                finalize_joint_active_record(release_id);
+                write_release_journal(
+                  release_id, "complete", inputs_.release_reason);
+              } catch (const std::exception & error) {
+                mark_release_failure_locked(
+                  std::string{"release_journal_finalize_failed:"} +
+                  error.what(), true);
+              }
+            } else {
+              mark_release_failure_locked(map_reason, true);
+            }
+            release_in_flight_ = false;
+          }
+          evaluate_and_apply();
+        });
+    } catch (const std::exception & error) {
+      {
+        std::lock_guard<std::mutex> lock(mutex_);
+        mark_release_failure_locked(
+          std::string{"location_commit_dispatch_error:"} + error.what(), true);
+      }
+      evaluate_and_apply();
+    }
+  }
+
+  void dispatch_location_release_verification(
+    const std::string & mission_id,
+    const std::string & release_id,
+    const std::uint64_t generation)
+  {
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      if (generation != release_generation_ ||
+        mission_id != mission_.snapshot().request.mission_id)
+      {
+        return;
+      }
+      inputs_.release_state = "verifying_location_release";
+      release_phase_started_at_ = std::chrono::steady_clock::now();
+      release_timeout_latched_ = false;
+    }
+    auto request = std::make_shared<VerifyLocationRelease::Request>();
+    request->contract_version = VerifyLocationRelease::Request::CONTRACT_VERSION;
+    request->request_id = release_id + "-verify";
+    request->release_id = release_id;
+    request->mission_id = mission_id;
+    request->transaction_token = location_transaction_token_;
+    request->expected_snapshot_sha256 = location_snapshot_digest_;
+    try {
+      location_verify_client_->async_send_request(
+        request,
+        [this, mission_id, release_id, generation](
+          const rclcpp::Client<VerifyLocationRelease>::SharedFuture future)
+        {
+          bool verified = false;
+          std::string reason{"location_release_verify_response_invalid"};
+          try {
+            const auto response = future.get();
+            verified = response && response->success &&
+            response->snapshot_sha256 == location_snapshot_digest_;
+            if (response) {
+              reason = response->reason;
+            }
+          } catch (const std::exception & error) {
+            reason = std::string{"location_release_verify_error:"} +
+            error.what();
+          }
+          if (!verified) {
+            {
+              std::lock_guard<std::mutex> lock(mutex_);
+              if (generation != release_generation_ ||
+              mission_id != mission_.snapshot().request.mission_id)
+              {
+                return;
+              }
+              mark_release_failure_locked(reason, true);
+            }
+            evaluate_and_apply();
+            return;
+          }
+          {
+            std::lock_guard<std::mutex> lock(mutex_);
+            if (generation != release_generation_ ||
+            mission_id != mission_.snapshot().request.mission_id)
+            {
+              return;
+            }
+            if (release_timeout_latched_) {
+              mark_release_failure_locked(
+                "location_release_verification_timeout", true);
+            }
+          }
+          if (release_timeout_latched_) {
+            evaluate_and_apply();
+            return;
+          }
+          dispatch_location_commit(mission_id, release_id, generation);
+        });
+    } catch (const std::exception & error) {
+      {
+        std::lock_guard<std::mutex> lock(mutex_);
+        mark_release_failure_locked(
+          std::string{"location_verify_dispatch_error:"} + error.what(), true);
+      }
+      evaluate_and_apply();
+    }
+  }
+
+  void dispatch_joint_release(
+    const std::string & mission_id,
+    const std::string & map_id,
+    const std::uint32_t map_revision,
+    const std::string & release_id,
+    const std::uint64_t generation)
+  {
+    auto request = std::make_shared<PrepareLocationRelease::Request>();
+    request->contract_version = PrepareLocationRelease::Request::CONTRACT_VERSION;
+    request->request_id = release_id + "-prepare";
+    request->release_id = release_id;
+    request->mission_id = mission_id;
+    request->map_id = map_id;
+    request->map_revision = map_revision;
+    request->actor_id = inputs_.approval_actor;
+    request->approval_reason = inputs_.approval_reason;
+    request->require_approved_location = require_approved_location_;
+    try {
+      location_prepare_client_->async_send_request(
+        request,
+        [this, mission_id, map_id, map_revision, release_id, generation](
+          const rclcpp::Client<PrepareLocationRelease>::SharedFuture future)
+        {
+          std::shared_ptr<PrepareLocationRelease::Response> response;
+          try {
+            response = future.get();
+          } catch (const std::exception & error) {
+            std::lock_guard<std::mutex> lock(mutex_);
+            mark_release_failure_locked(
+              std::string{"location_prepare_error:"} + error.what(), false);
+          }
+          if (!response || !response->success) {
+            {
+              std::lock_guard<std::mutex> lock(mutex_);
+              if (generation != release_generation_ ||
+              mission_id != mission_.snapshot().request.mission_id)
+              {
+                return;
+              }
+              mark_release_failure_locked(
+                response ? response->reason :
+                "location_prepare_response_invalid", false);
+            }
+            evaluate_and_apply();
+            return;
+          }
+
+          {
+            std::lock_guard<std::mutex> lock(mutex_);
+            if (generation != release_generation_ ||
+            mission_id != mission_.snapshot().request.mission_id ||
+            mission_.snapshot().state != autonomous::MissionState::Releasing)
+            {
+              return;
+            }
+            location_transaction_token_ = response->transaction_token;
+            location_snapshot_path_ = response->snapshot_path;
+            location_snapshot_digest_ = response->snapshot_sha256;
+            previous_active_location_release_ =
+            response->previous_active_location_release_id;
+            location_release_prepared_ = true;
+            inputs_.location_snapshot_digest = location_snapshot_digest_;
+            if (release_timeout_latched_) {
+              mark_release_failure_locked(
+                "location_prepare_timeout_after_correlated_response", true);
+            } else {
+              inputs_.release_state = "creating_verifying_map_release";
+              release_phase_started_at_ = std::chrono::steady_clock::now();
+            }
+          }
+          if (release_timeout_latched_) {
+            evaluate_and_apply();
+            return;
+          }
+
+          std::string geometry_digest;
+          std::string failure;
+          try {
+            std::string geometry_reason;
+            if (!validate_geometry_profile(
+                &geometry_digest, &geometry_reason))
+            {
+              throw std::runtime_error(geometry_reason);
+            }
+            const auto source = session::verify_saved_map_session(
+              inputs_.saved_session_directory, map_id,
+              saved_map_expected_frame_);
+            if (!source.valid) {
+              throw std::runtime_error(source.reason);
+            }
+            release::JointReleaseContext joint;
+            joint.mission_id = mission_id;
+            joint.map_revision = map_revision;
+            joint.actor_id = inputs_.approval_actor;
+            joint.approval_reason = inputs_.approval_reason;
+            joint.approval_unix_ns = approval_unix_ns_;
+            joint.location_snapshot = response->snapshot_path;
+            joint.location_snapshot_sha256 = response->snapshot_sha256;
+            joint.geometry_profile = geometry_profile_path_;
+            joint.geometry_profile_id = geometry_profile_id_;
+            joint.geometry_profile_sha256 = geometry_digest;
+
+            const auto previous = release::read_active_map(production_map_root_);
+            previous_active_map_release_ = previous.active ?
+            previous.release_id : std::string{};
+            const auto created = release::create_joint_release(
+              source, production_map_root_, release_id, joint, true);
+            if (!created.valid) {
+              throw std::runtime_error(created.reason);
+            }
+            const auto verified = release::verify_release(
+              production_map_root_, release_id);
+            if (!verified.valid) {
+              throw std::runtime_error(verified.reason);
+            }
+            map_release_created_ = true;
+            if (release_phase_started_at_.has_value() &&
+            std::chrono::duration<double>(
+              std::chrono::steady_clock::now() -
+              release_phase_started_at_.value()).count() >=
+            map_release_timeout_s_)
+            {
+              throw std::runtime_error("map_release_creation_timeout");
+            }
+            write_release_journal(
+              release_id, "prepared_verified",
+              "map_and_location_release_prepared_verified");
+          } catch (const std::exception & error) {
+            failure = std::string{"joint_release_prepare_failed:"} + error.what();
+          }
+          if (!failure.empty()) {
+            {
+              std::lock_guard<std::mutex> lock(mutex_);
+              if (generation != release_generation_ ||
+              mission_id != mission_.snapshot().request.mission_id)
+              {
+                return;
+              }
+              mark_release_failure_locked(failure, location_release_prepared_);
+            }
+            evaluate_and_apply();
+            return;
+          }
+          dispatch_location_release_verification(
+            mission_id, release_id, generation);
+        });
+    } catch (const std::exception & error) {
+      {
+        std::lock_guard<std::mutex> lock(mutex_);
+        mark_release_failure_locked(
+          std::string{"location_prepare_dispatch_error:"} + error.what(), false);
+      }
+      evaluate_and_apply();
+    }
+  }
+
   void dispatch_map_save_request(const std::string & mission_id)
   {
     auto request = std::make_shared<Trigger::Request>();
@@ -3203,6 +4698,16 @@ private:
         saved_map_expected_frame_);
       success = verification.valid;
       reason = verification.reason;
+      if (success && mission_.snapshot().request.require_quality_approval) {
+        const auto evaluation = quality::evaluate_saved_map_session(
+          verification, quality::QualityPolicy{});
+        quality::persist_quality_evaluation(verification, evaluation);
+        success = evaluation.passed;
+        reason = success ? "saved_map_and_quality_verified" :
+          "quality_rejected:" + evaluation.reason;
+      } else if (success) {
+        reason = "saved_map_verified_quality_gate_not_requested";
+      }
     } catch (const std::exception & exception) {
       reason = std::string{"saved_map_verification_error:"} +
       exception.what();
@@ -3386,7 +4891,34 @@ private:
     status.verification_complete = snapshot.verification_complete;
     status.map_verified = snapshot.map_verified;
     status.verification_reason = snapshot.verification_reason;
-    if (!quiescence_failure_reason_.empty()) {
+    status.location_verification_started =
+      snapshot.location_verification_started;
+    status.location_verification_complete =
+      snapshot.location_verification_complete;
+    status.location_verification_passed =
+      snapshot.location_verification_passed;
+    status.pending_candidate_count = snapshot.pending_candidate_count;
+    status.approved_location_count = snapshot.approved_location_count;
+    status.location_snapshot_digest = snapshot.location_snapshot_digest;
+    status.review_generation = snapshot.review_generation;
+    status.approval_pending = snapshot.approval_pending;
+    status.approval_recorded = snapshot.approval_recorded;
+    status.approval_actor = snapshot.approval_actor;
+    status.approval_reason = snapshot.approval_reason;
+    status.release_started = snapshot.release_started;
+    status.release_complete = snapshot.release_complete;
+    status.release_succeeded = snapshot.release_succeeded;
+    status.release_id = snapshot.release_id;
+    status.release_state = snapshot.release_state;
+    status.primary_release_reason = snapshot.primary_release_reason;
+    status.rollback_required = snapshot.rollback_required;
+    status.rollback_complete = snapshot.rollback_complete;
+    status.rollback_reason = snapshot.rollback_reason;
+    status.joint_active_release_verified =
+      snapshot.joint_active_release_verified;
+    if (!recovery_fault_reason_.empty()) {
+      status.reason = recovery_fault_reason_;
+    } else if (!quiescence_failure_reason_.empty()) {
       status.reason = primary_failure_reason_.empty() ?
         quiescence_failure_reason_ :
         primary_failure_reason_ + ";" + quiescence_failure_reason_;
@@ -3411,7 +4943,9 @@ private:
     result->reason = snapshot.reason;
     result->final_status = status;
     result->map_saved = snapshot.map_saved;
-    result->map_release_id.clear();
+    result->map_release_id = result->success &&
+      snapshot.joint_active_release_verified ? snapshot.release_id :
+      std::string{};
 
     if (
       snapshot.result == autonomous::MissionResult::Canceled &&
@@ -3469,12 +5003,31 @@ private:
   std::string handoff_cancel_service_name_;
   std::string map_save_service_name_;
   std::string saved_map_expected_frame_;
+  std::string review_service_name_;
+  std::string joint_active_release_topic_;
+  std::string location_candidates_service_name_;
+  std::string location_list_service_name_;
+  std::string location_prepare_service_name_;
+  std::string location_verify_service_name_;
+  std::string location_commit_service_name_;
+  std::string location_rollback_service_name_;
+  std::string production_map_root_;
+  std::string joint_transaction_root_;
+  std::string geometry_profile_path_;
+  std::string geometry_profile_id_;
 
   std::int64_t evaluation_period_ms_{250};
   std::int64_t command_retry_period_ms_{1000};
   double default_mission_timeout_s_{0.0};
   double mission_timeout_s_{0.0};
   double map_save_operation_timeout_s_{45.0};
+  double location_verification_timeout_s_{15.0};
+  double operator_approval_timeout_s_{600.0};
+  double location_prepare_timeout_s_{30.0};
+  double map_release_timeout_s_{60.0};
+  double location_commit_timeout_s_{30.0};
+  double map_promotion_timeout_s_{30.0};
+  double rollback_timeout_s_{60.0};
   double start_pose_lookup_timeout_s_{0.20};
   double start_pose_stale_timeout_s_{1.0};
   double start_pose_operation_timeout_s_{10.0};
@@ -3501,6 +5054,9 @@ private:
   bool coverage_require_fresh_map_generation_{true};
   bool return_to_start_enabled_{true};
   bool return_require_yaw_tolerance_{false};
+  bool require_locked_geometry_{true};
+  bool allow_provisional_geometry_{false};
+  bool require_approved_location_{false};
 
   mutable std::mutex mutex_;
   autonomous::AutonomousMappingMission mission_;
@@ -3518,6 +5074,14 @@ private:
   last_command_attempt_;
   std::optional<std::chrono::steady_clock::time_point>
   map_save_started_at_;
+  std::optional<std::chrono::steady_clock::time_point>
+  location_verification_started_at_;
+  std::optional<std::chrono::steady_clock::time_point>
+  approval_started_at_;
+  std::optional<std::chrono::steady_clock::time_point>
+  release_started_at_;
+  std::optional<std::chrono::steady_clock::time_point>
+  release_phase_started_at_;
   std::optional<std::chrono::steady_clock::time_point>
   start_pose_capture_started_at_;
   std::optional<std::chrono::steady_clock::time_point>
@@ -3560,6 +5124,13 @@ private:
   std::string scan360_primary_failure_reason_;
   std::string head_scan_primary_failure_reason_;
   std::string return_primary_failure_reason_;
+  std::string location_transaction_token_;
+  std::string location_snapshot_path_;
+  std::string location_snapshot_digest_;
+  std::string previous_active_location_release_;
+  std::string previous_active_map_release_;
+  std::string recovery_fault_reason_;
+  std::vector<std::filesystem::path> recovery_journals_;
 
   bool timeout_abort_requested_{false};
   bool handoff_cancel_in_flight_{false};
@@ -3594,6 +5165,15 @@ private:
   bool map_save_in_flight_{false};
   bool verification_in_flight_{false};
   bool verification_dispatch_pending_{false};
+  bool location_candidates_in_flight_{false};
+  bool location_list_in_flight_{false};
+  bool release_in_flight_{false};
+  bool location_release_prepared_{false};
+  bool location_release_committed_{false};
+  bool map_release_created_{false};
+  bool map_release_promoted_{false};
+  bool recovery_in_flight_{false};
+  bool release_timeout_latched_{false};
   bool goal_reserved_{false};
   std::uint64_t scan360_operation_epoch_{0U};
   std::uint64_t head_scan_operation_epoch_{0U};
@@ -3609,6 +5189,10 @@ private:
   std::uint64_t coverage_map_generation_floor_{0U};
   std::uint64_t coverage_feedback_sequence_{0U};
   std::uint64_t return_operation_epoch_{0U};
+  std::uint64_t location_verification_generation_{0U};
+  std::uint64_t release_generation_{0U};
+  std::uint64_t approval_unix_ns_{0U};
+  std::set<std::string> review_request_ids_;
   autonomous::ReturnActionLifecycle return_action_lifecycle_{
     autonomous::ReturnActionLifecycle::Idle};
   std::uint32_t coverage_last_current_waypoint_{0U};
@@ -3620,8 +5204,15 @@ private:
 
   rclcpp_action::Server<RunMission>::SharedPtr action_server_;
   rclcpp::Service<ControlMission>::SharedPtr control_service_;
+  rclcpp::Service<ReviewRelease>::SharedPtr review_service_;
   rclcpp::Client<Trigger>::SharedPtr handoff_cancel_client_;
   rclcpp::Client<Trigger>::SharedPtr map_save_client_;
+  rclcpp::Client<ListCandidates>::SharedPtr location_candidates_client_;
+  rclcpp::Client<ListLocations>::SharedPtr location_list_client_;
+  rclcpp::Client<PrepareLocationRelease>::SharedPtr location_prepare_client_;
+  rclcpp::Client<VerifyLocationRelease>::SharedPtr location_verify_client_;
+  rclcpp::Client<CommitLocationRelease>::SharedPtr location_commit_client_;
+  rclcpp::Client<RollbackLocationRelease>::SharedPtr location_rollback_client_;
   rclcpp::Client<Trigger>::SharedPtr scan360_start_client_;
   rclcpp::Client<Trigger>::SharedPtr scan360_cancel_client_;
   rclcpp::Client<Trigger>::SharedPtr head_scan_start_client_;
@@ -3639,6 +5230,7 @@ private:
   rclcpp::Publisher<StringMessage>::SharedPtr mode_command_publisher_;
   rclcpp::Publisher<StringMessage>::SharedPtr start_session_command_publisher_;
   rclcpp::Publisher<StringMessage>::SharedPtr cancel_session_command_publisher_;
+  rclcpp::Publisher<StringMessage>::SharedPtr joint_active_release_publisher_;
 
   rclcpp::Subscription<StringMessage>::SharedPtr mode_subscription_;
   rclcpp::Subscription<StringMessage>::SharedPtr exploration_mode_subscription_;

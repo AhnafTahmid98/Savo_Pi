@@ -12,7 +12,7 @@ from typing import Any, Optional
 import yaml
 
 from savo_head import VERSION
-from savo_head.core.validation import validate_config_files
+from savo_head.core.validation import CONFIG_NODE_NAMES, validate_config_files
 from savo_head.contracts.parameter_names import is_known_parameter
 
 
@@ -40,10 +40,25 @@ def find_package_root(start: str | Path = ".") -> Path:
     raise FileNotFoundError("Could not find savo_head package root from current path.")
 
 
-def load_yaml_params(path: Path, node_name: str = "savo_head") -> dict[str, Any]:
-    data = yaml.safe_load(path.read_text()) or {}
-    return dict(data.get(node_name, {}).get("ros__parameters", {}) or {})
+def load_yaml_params(
+    path: Path,
+    node_name: str = "savo_head",
+) -> dict[str, Any]:
+    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
 
+    if not isinstance(data, dict):
+        return {}
+
+    selected = data.get(node_name)
+    if isinstance(selected, dict) and "ros__parameters" in selected:
+        return dict(selected.get("ros__parameters", {}) or {})
+
+    if len(data) == 1:
+        selected = next(iter(data.values()))
+        if isinstance(selected, dict) and "ros__parameters" in selected:
+            return dict(selected.get("ros__parameters", {}) or {})
+
+    return {}
 
 def load_all_params(package_root: Path) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
     config_dir = package_root / "config"
@@ -53,7 +68,7 @@ def load_all_params(package_root: Path) -> tuple[dict[str, Any], dict[str, dict[
 
     for filename in CONFIG_FILES:
         path = config_dir / filename
-        params = load_yaml_params(path)
+        params = load_yaml_params(path, node_name=CONFIG_NODE_NAMES[filename])
         by_file[filename] = params
         effective.update(params)
 

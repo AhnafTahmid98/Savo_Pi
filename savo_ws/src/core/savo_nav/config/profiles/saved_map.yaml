@@ -20,7 +20,9 @@ saved_map_profile:
   lifecycle_autostart: false
   goal_gateway_enabled: true
   hardware_test_enabled: false
-  provisional_robot_radius_m: 0.22
+  geometry_profile: robot_savo_core_v1
+  footprint_source: savo_description/config/profiles/robot_savo_core_v1.yaml
+  footprint_padding_m: 0.02
   notes:
   - Robot dimensions must be measured before hardware activation.
   - RealSense VoxelLayer is mandatory in the later real profile.

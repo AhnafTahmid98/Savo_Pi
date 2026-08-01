@@ -97,10 +97,10 @@ monitor-only, runs Scan360 through `/savo_mapping/scan360/start`, and returns to
 frontier mode. AprilTag interruption, coverage, return-to-start, final scans,
 operator approval and joint map/location release remain AM-6 through AM-8.
 
-`savo_description` is intentionally not included in AM-5. AM-0B will add the
-final robot-state-publisher and description launch after the real dimensions,
-sensor transforms and STL meshes are provided. Until then, mapping readiness
-fails closed when the required TF chain is absent.
+`savo_description` is included before motion-capable components. Production
+launch requires a locked geometry profile and fails closed on the checked-in
+provisional profile. Controlled bench tests may explicitly set
+`allow_provisional_geometry:=true`; this does not constitute a measurement lock.
 
 For a non-hardware launch inspection, each package group can be disabled with
 its `start_*` argument. The production defaults start all core-side groups.

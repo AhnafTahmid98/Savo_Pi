@@ -32,7 +32,8 @@ realsense2_camera:
     pointcloud.ordered_pc: false
 
     enable_sync: true
-    publish_tf: true
+    # Fixed camera TF is owned by savo_description/robot_state_publisher.
+    publish_tf: false
     tf_publish_rate: 0.0
 
     initial_reset: false
