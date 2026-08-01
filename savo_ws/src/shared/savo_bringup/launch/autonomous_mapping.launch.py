@@ -12,6 +12,7 @@ from launch.launch_description_sources import FrontendLaunchDescriptionSource
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch.substitutions import PathJoinSubstitution
+
 from launch_ros.substitutions import FindPackageShare
 
 
@@ -40,7 +41,7 @@ def _validate_arguments(context):
     return [
         LogInfo(
             msg=(
-                "Robot Savo AM-7 launch validated: "
+                "Robot Savo AM-7/AM-8 launch validated: "
                 f"map_id={map_id}, control_startup_mode={control_mode}"
             )
         ),
@@ -218,7 +219,7 @@ def generate_launch_description() -> LaunchDescription:
             "start_head_observer": "false",
             "start_head_action": "true",
             "start_registration": "true",
-            "start_review_gateway": "false",
+            "start_review_gateway": "true",
             "start_navigation": "false",
             "locations_database_path": LaunchConfiguration(
                 "locations_database_path"
@@ -301,8 +302,7 @@ def generate_launch_description() -> LaunchDescription:
         [
             FindPackageShare("savo_nav"),
             "config",
-            "nav2",
-            "saved_map.yaml",
+            "nav2_live_mapping.yaml",
         ]
     )
     default_nav_readiness = PathJoinSubstitution(
@@ -353,7 +353,7 @@ def generate_launch_description() -> LaunchDescription:
             ),
             DeclareLaunchArgument(
                 "map_output_root",
-                default_value="~/Savo_Pi/runtime/maps",
+                default_value="/var/lib/robot_savo/maps/sessions",
                 description="Root directory for committed map sessions.",
             ),
             DeclareLaunchArgument(

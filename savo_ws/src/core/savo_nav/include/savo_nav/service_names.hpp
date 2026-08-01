@@ -3,12 +3,12 @@
 
 #pragma once
 
+#include <string_view>
+
 namespace savo_nav::services
 {
 
-// Contract version 1 intentionally declares no service names.
-//
-// Control authority, supervisor permission, and map-context service
-// interfaces must first be finalized by their owning packages.
+inline constexpr std::string_view kUpdateSupervisorMapContext =
+  "/savo_supervisor/update_map_context";
 
 }  // namespace savo_nav::services

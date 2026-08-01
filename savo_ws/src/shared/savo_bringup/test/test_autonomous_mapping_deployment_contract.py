@@ -1,14 +1,15 @@
 """Deployment contracts for the autonomous mapping bringup."""
 
 import ast
-from pathlib import Path
 import xml.etree.ElementTree as ET
+from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def read(relative: str) -> str:
+    """Read one package-relative contract fixture."""
     return (ROOT / relative).read_text(encoding="utf-8")
 
 
@@ -95,13 +96,36 @@ def test_autonomous_mapping_launch_is_fail_closed_by_default() -> None:
     assert '"start_locations": "true"' in launch
 
 
+def test_one_launch_wires_complete_am8_release_chain() -> None:
+    """One guarded launch owns mapping, review, quality, and joint release."""
+    launch = read("launch/autonomous_mapping.launch.py")
+    readme = read("README.md")
+    mapping_launch = (
+        ROOT.parents[1]
+        / "core"
+        / "savo_mapping"
+        / "launch"
+        / "autonomous_mapping.launch.xml"
+    ).read_text(encoding="utf-8")
+
+    assert '"start_review_gateway": "true"' in launch
+    assert '"nav2_live_mapping.yaml"' in launch
+    assert '"location_integration.launch.py"' in launch
+    assert '"autonomous_mapping.launch.xml"' in launch
+    assert "autonomous_mapping_orchestrator.launch.xml" in mapping_launch
+    assert "map_session_manager.launch.xml" in mapping_launch
+    assert "contract_version: 2" in readme
+    assert "require_quality_approval: true" in readme
+
+
 def test_bringup_installs_am4_and_runtime_dependencies() -> None:
-    """The installed bringup package contains AM-7 and its package owners."""
+    """The hybrid package installs C++ authority and Python launches."""
     tree = ET.parse(ROOT / "package.xml")
     package = tree.getroot()
-    setup_py = read("setup.py")
+    cmake = read("CMakeLists.txt")
 
-    assert package.findtext("version") == "0.5.0"
+    assert package.findtext("version") == "0.6.0"
+    assert package.find("./export/build_type").text == "ament_cmake"
 
     dependencies = {
         element.text for element in package.findall("exec_depend")
@@ -120,11 +144,10 @@ def test_bringup_installs_am4_and_runtime_dependencies() -> None:
         "savo_supervisor",
     }.issubset(dependencies)
 
-    compile(setup_py, str(ROOT / "setup.py"), "exec")
-    assert "autonomous_mapping.launch.py" in setup_py
-    assert "location_integration.launch.py" in setup_py
-    assert 'maintainer="Ahnaf Tahmid"' in setup_py
-    assert 'license="Proprietary"' in setup_py
+    assert "add_executable(bringup_readiness_node" in cmake
+    assert "ament_python_install_package" in cmake
+    assert "DIRECTORY config launch params" in cmake
+    assert "scripts/run_location_lifecycle_runtime" in cmake
 
 
 def test_readme_documents_two_step_motion_authority() -> None:

@@ -1,5 +1,8 @@
+# Copyright 2026 Ahnaf Tahmid
+# SPDX-License-Identifier: LicenseRef-Proprietary
+
 live_mapping_real_robot_profile:
-  profile_version: 1
+  profile_version: 2
   mode: live_mapping
   map_to_odom_authority: slam_toolbox
   odom_to_base_footprint_authority: savo_localization
@@ -10,7 +13,9 @@ live_mapping_real_robot_profile:
   map_topic: /map
   scan_topic: /scan
   odometry_topic: /odometry/filtered
-  nav2_action: /navigate_to_pose
+  navigation_action: /savo_nav/navigation/navigate_to_pose
+  exploration_action: /savo_nav/exploration/navigate_to_pose
+  internal_nav2_action: /navigate_to_pose
   nav2_velocity_output: /cmd_vel_nav
   controller: dwb_holonomic
   local_costmap_mode: lidar_2d_guarded_baseline
@@ -18,14 +23,17 @@ live_mapping_real_robot_profile:
   goal_gateway_enabled: true
   goal_admission_gate_enabled: true
   control_recovery_guard_enabled: true
+  package_owned_behavior_trees: true
+  nav2_motion_recovery_enabled: false
   lidar_required_for_navigation: true
   realsense_required_for_navigation: false
   filtered_pointcloud_enabled: false
   voxel_layer_enabled: false
   hardware_test_enabled: true
   direct_velocity_authority: false
+  software_completion: complete
   notes:
     - SLAM Toolbox must already own map to odom.
     - AMCL and map_server must not run in this mode.
-    - The RealSense voxel layer remains disabled until guarded D435 validation.
-    - Final robot footprint dimensions require physical measurement.
+    - The filtered-D435 voxel profile remains disabled until hardware validation.
+    - Final robot footprint and DWB values require controlled real-floor tuning.

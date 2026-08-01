@@ -1,0 +1,27 @@
+# Copyright 2026 Ahnaf Tahmid
+# SPDX-License-Identifier: LicenseRef-Proprietary
+
+saved_map_realsense_voxel_profile:
+  profile_version: 1
+  mode: saved_map
+  base_profile: saved_map.yaml
+  nav2_parameters: config/nav2_saved_map_voxel.yaml
+  readiness_parameters: config/readiness_realsense_voxel.yaml
+  local_costmap_mode: lidar_clearing_plus_filtered_d435_voxel_marking
+  lidar_required_for_navigation: true
+  realsense_required_for_navigation: true
+  filtered_pointcloud_enabled: true
+  filtered_pointcloud_topic: /savo_perception/obstacles/points
+  raw_pointcloud_allowed: false
+  voxel_layer_enabled: true
+  voxel_layer_scope: local_costmap_only
+  voxel_marking: true
+  voxel_clearing: false
+  voxel_debug_publication_enabled: false
+  activation_enabled: false
+  activation_gate: real_d435_frame_freshness_self_filter_floor_and_obstacle_validation
+  software_completion: complete
+  notes:
+    - LiDAR remains the authoritative clearing source in both costmaps.
+    - The filtered D435 cloud may mark local obstacles but cannot clear space.
+    - Activate only after the complete guarded D435 hardware validation passes.

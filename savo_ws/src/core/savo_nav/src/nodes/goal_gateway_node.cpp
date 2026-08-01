@@ -211,6 +211,11 @@ public:
       "map_revision",
       1);
 
+    const std::string active_map_release_id =
+      declare_parameter<std::string>(
+      "active_map_release_id",
+      "");
+
     const int history_capacity =
       declare_parameter<int>(
       "recent_history_capacity",
@@ -230,6 +235,16 @@ public:
       declare_parameter<bool>(
       "allow_behavior_tree_override",
       false);
+
+    navigation_behavior_tree_ =
+      declare_parameter<std::string>(
+      "navigation_behavior_tree",
+      "");
+
+    exploration_behavior_tree_ =
+      declare_parameter<std::string>(
+      "exploration_behavior_tree",
+      "");
 
     execution_timeout_seconds_ =
       declare_parameter<double>(
@@ -294,6 +309,7 @@ public:
     ConfigureMapContext(
       map_mode,
       active_map_id,
+      active_map_release_id,
       map_revision);
 
     auto state_qos =
@@ -493,6 +509,7 @@ private:
   void ConfigureMapContext(
     const std::string & map_mode,
     const std::string & active_map_id,
+    const std::string & active_map_release_id,
     const int map_revision)
   {
     map_context_.frame_id = "map";
@@ -515,6 +532,7 @@ private:
         savo_nav::MapToOdomAuthority::kAmcl;
 
       map_context_.map_id = active_map_id;
+      map_context_.map_release_id = active_map_release_id;
       map_context_.mapping_active = false;
 
       return;
@@ -528,6 +546,7 @@ private:
         savo_nav::MapToOdomAuthority::kSlamToolbox;
 
       map_context_.map_id.clear();
+      map_context_.map_release_id.clear();
       map_context_.mapping_active = true;
 
       return;
@@ -724,6 +743,22 @@ private:
 
       nav2_goal =
         *goal_handle->get_goal();
+
+      if (
+        active_source_ == savo_nav::GoalSource::kNavigation &&
+        !navigation_behavior_tree_.empty())
+      {
+        nav2_goal.behavior_tree =
+          navigation_behavior_tree_;
+      }
+
+      if (
+        active_source_ == savo_nav::GoalSource::kExploration &&
+        !exploration_behavior_tree_.empty())
+      {
+        nav2_goal.behavior_tree =
+          exploration_behavior_tree_;
+      }
 
       forwarding_started_ =
         SteadyClock::now();
@@ -1330,6 +1365,8 @@ private:
     savo_nav::GoalSource::kUnknown};
 
   std::string pending_goal_id_{};
+  std::string navigation_behavior_tree_{};
+  std::string exploration_behavior_tree_{};
 
   bool allow_behavior_tree_override_{false};
   bool allow_degraded_readiness_{false};

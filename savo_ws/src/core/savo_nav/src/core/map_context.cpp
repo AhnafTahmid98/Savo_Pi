@@ -23,6 +23,7 @@ ValidationResult MapContextContract::Validate(
       context.mode == NavigationMapMode::kUnknown &&
       context.authority == MapToOdomAuthority::kNone &&
       context.map_id.empty() &&
+      context.map_release_id.empty() &&
       context.revision == 0 &&
       !context.localization_ready &&
       !context.mapping_active;

@@ -1,5 +1,8 @@
+# Copyright 2026 Ahnaf Tahmid
+# SPDX-License-Identifier: LicenseRef-Proprietary
+
 saved_map_profile:
-  profile_version: 1
+  profile_version: 2
   mode: saved_map
   map_to_odom_authority: amcl
   odom_to_base_footprint_authority: savo_localization
@@ -10,46 +13,58 @@ saved_map_profile:
   map_topic: /map
   scan_topic: /scan
   odometry_topic: /odometry/filtered
-  nav2_action: /navigate_to_pose
-  nav2_velocity_output: /cmd_vel_nav
-  controller: dwb_holonomic
-  amcl_motion_model: omnidirectional
-  local_costmap_mode: lidar_2d_baseline
-  filtered_pointcloud_enabled: false
-  voxel_layer_enabled: false
-  lifecycle_autostart: false
-  goal_gateway_enabled: true
-  hardware_test_enabled: false
-  geometry_profile: robot_savo_core_v1
-  footprint_source: savo_description/config/profiles/robot_savo_core_v1.yaml
-  footprint_padding_m: 0.02
-  notes:
-  - Robot dimensions must be measured before hardware activation.
-  - RealSense VoxelLayer is mandatory in the later real profile.
-  - Supervisor authority integration is not enabled in Phase 5.
   navigation_action: /savo_nav/navigation/navigate_to_pose
   exploration_action: /savo_nav/exploration/navigate_to_pose
   internal_nav2_action: /navigate_to_pose
+  nav2_velocity_output: /cmd_vel_nav
+  controller: dwb_holonomic
+  amcl_motion_model: omnidirectional
+  local_costmap_mode: lidar_2d_guarded_baseline
+  lifecycle_autostart: false
+  production_lifecycle_autostart: true
+  goal_gateway_enabled: true
+  goal_admission_gate_enabled: true
+  control_recovery_guard_enabled: true
+  active_release_validation_enabled: true
+  supervisor_map_context_sync_enabled: true
+  package_owned_behavior_trees: true
+  navigation_behavior_tree: navigate_to_pose.xml
+  exploration_behavior_tree: exploration_navigation.xml
   behavior_tree_override_enabled: false
-goal_gateway_enabled: true
-goal_admission_gate_enabled: true
-direct_public_goal_gateway_enabled: false
-internal_gateway_actions_hidden: true
-phase7c_fault_validation_enabled: true
-guard_process_loss_tested: true
-downstream_gateway_absence_tested: true
-launch_chain_fail_closed: true
-savo_nav_control_authority: false
-savo_nav_recovery_execution_authority: false
-phase8_costmap_sensor_integration_enabled: false
-phase8_blocked_reason: real_d435_hardware_validation_pending
-filtered_realsense_producer_verified: true
-filtered_realsense_hardware_validated: false
-raw_realsense_cloud_for_nav2: false
-filtered_realsense_cloud_topic: /savo_perception/obstacles/points
-realsense_global_costmap_enabled: false
-lidar_required_for_navigation: true
-realsense_required_for_navigation: false
-voxel_debug_publication_enabled: false
-savo_nav_sensor_production_authority: false
-savo_nav_velocity_authority: false
+  nav2_motion_recovery_enabled: false
+  direct_public_goal_gateway_enabled: false
+  internal_gateway_actions_hidden: true
+  lidar_required_for_navigation: true
+  realsense_required_for_navigation: false
+  filtered_pointcloud_enabled: false
+  voxel_layer_enabled: false
+  geometry_profile: robot_savo_core_v1
+  footprint_source: savo_description/config/profiles/robot_savo_core_v1.yaml
+  footprint_padding_m: 0.02
+  hardware_test_enabled: false
+  hardware_activation_enabled: false
+  hardware_activation_gate: locked_geometry_and_controlled_nav_tuning
+  software_completion: complete
+  ownership:
+    savo_nav_control_authority: false
+    savo_nav_recovery_execution_authority: false
+    savo_nav_sensor_production_authority: false
+    savo_nav_velocity_authority: false
+  validation:
+    fault_launch_fail_closed: true
+    guard_process_loss_tested: true
+    downstream_gateway_absence_tested: true
+    filtered_realsense_producer_verified: true
+    filtered_realsense_hardware_validated: false
+    raw_realsense_cloud_for_nav2: false
+    filtered_realsense_cloud_topic: /savo_perception/obstacles/points
+    realsense_global_costmap_enabled: false
+    voxel_debug_publication_enabled: false
+    voxel_profile_source_complete: true
+    voxel_profile_activation_enabled: false
+    voxel_profile_activation_gate: real_d435_hardware_validation_pending
+  notes:
+    - Production launch consumes and verifies the active AM-8 joint release.
+    - The baseline costmaps are LiDAR-only for first controlled navigation tests.
+    - RealSense VoxelLayer support is provided by the companion guarded profile.
+    - Actual footprint and motion tuning remain physical real-robot gates.

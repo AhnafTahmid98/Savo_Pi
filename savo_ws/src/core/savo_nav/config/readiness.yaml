@@ -22,7 +22,7 @@ navigation_readiness_node:
     safety_timeout_seconds: 1.0
 
     accepted_control_modes:
-      - "NAV"
+    - "NAV"
 
     map_topic: "/map"
     tf_topic: "/tf"
@@ -41,3 +41,10 @@ navigation_readiness_node:
     safety_slowdown_topic: "/safety/slowdown_factor"
 
     nav2_action_name: "/navigate_to_pose"
+    require_map_context_sync: false
+    map_context_timeout_seconds: 2.5
+    map_context_status_topic: /savo_nav/map_context/status
+    map_context_heartbeat_topic: /savo_nav/map_context/heartbeat
+    expected_map_id: ''
+    expected_map_revision: 0
+    expected_map_release_id: ''

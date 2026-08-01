@@ -21,6 +21,7 @@ savo_nav::MapContext MakeSavedMap()
   context.mode = Mode::kSavedMap;
   context.authority = Authority::kAmcl;
   context.map_id = "campus-main";
+  context.map_release_id = "campus-main-r3";
   context.frame_id = "map";
   context.revision = 3;
   context.available = true;

@@ -1,9 +1,9 @@
 # savo_nav
 
-`savo_nav` is Robot Savo's core-side ROS 2 Jazzy navigation package. It owns
+`savo_nav` is Robot SAVO's core-side ROS 2 Jazzy navigation package. It owns
 Nav2 orchestration, guarded goal admission, saved-map and live-mapping
-navigation, navigation readiness, bounded recovery coordination, named-location
-navigation, and coverage-path forwarding.
+navigation, production-map activation, navigation readiness, bounded recovery
+coordination, named-location navigation, and coverage-path forwarding.
 
 Production runtime code is C++17. Python is used only for ROS launch, tests, and
 the isolated location-integration smoke tool. The deployment target is the
@@ -18,12 +18,16 @@ Nav2 -> /cmd_vel_nav -> savo_control -> /cmd_vel
      -> savo_perception safety gate -> /cmd_vel_safe -> savo_base
 ```
 
-`savo_nav` must never publish directly to `/cmd_vel`, `/cmd_vel_safe`, or
+`savo_nav` never publishes directly to `/cmd_vel`, `/cmd_vel_safe`, or
 `/cmd_vel_recovery`.
 
 The public action servers are protected by the control/recovery guard and the
-goal-admission gate. The internal gateway action names are remapped under
-`/savo_nav/_internal/...`; callers must use the public guarded interfaces.
+goal-admission gate. Internal gateway actions are hidden under
+`/savo_nav/_internal/...`; callers use only the public guarded interfaces.
+
+Motion-producing recovery remains owned by `savo_control`. The package-owned
+Nav2 behavior trees may replan, clear costmaps, and wait, but do not invoke
+Nav2 `Spin`, `BackUp`, `DriveOnHeading`, or assisted-teleoperation behaviors.
 
 ## TF authority
 
@@ -41,39 +45,107 @@ map --SLAM Toolbox--> odom --savo_localization--> base_footprint
     --robot_state_publisher--> base_link
 ```
 
-AMCL and SLAM Toolbox must never publish `map -> odom` at the same time.
+AMCL and SLAM Toolbox must never publish `map -> odom` simultaneously.
 
-## Implemented runtime
+## Implemented production runtime
 
-The package currently provides:
+The package provides:
 
-- `navigation_readiness_node`
-- `control_recovery_guard_node`
-- `goal_admission_gate_node`
-- `goal_gateway_node`
-- `navigate_to_location_node`
-- guarded `NavigateToPose` forwarding for mission/location goals
-- guarded exploration-goal forwarding for `savo_mapping`
-- guarded coverage-path validation and Nav2 `FollowPath` forwarding
-- goal arbitration, cancellation acknowledgement, watchdogs, and late-result
-  handling
-- saved-map Nav2 bringup with AMCL and map server
-- live-mapping Nav2 bringup without AMCL or map server
+- `navigation_readiness_node`;
+- `active_map_context_node`;
+- `control_recovery_guard_node`;
+- `goal_admission_gate_node`;
+- `goal_gateway_node`;
+- `navigate_to_location_node`;
+- guarded mission/location and exploration `NavigateToPose` forwarding;
+- guarded coverage-path validation and Nav2 `FollowPath` forwarding;
+- goal arbitration, cancel acknowledgement, watchdogs, and stale-result handling;
+- saved-map Nav2 bringup with AMCL and map server;
+- live-mapping Nav2 bringup without AMCL or map server;
+- fail-closed startup from the active AM-8 joint release;
+- immutable release-artifact size and SHA-256 verification at every production
+  startup;
+- synchronization of the active map ID, revision, and release ID with
+  `savo_supervisor`;
+- readiness blocking while production map-context synchronization is missing,
+  mismatched, stale, or unavailable;
+- separate package-owned normal-navigation and exploration behavior trees;
+- a LiDAR-only controlled-test costmap profile; and
+- a source-complete filtered-D435 local VoxelLayer companion profile.
+
+## Behavior trees
+
+Normal saved-map and named-location goals use:
+
+```text
+behavior_trees/navigate_to_pose.xml
+```
+
+Frontier-exploration goals use:
+
+```text
+behavior_trees/exploration_navigation.xml
+```
+
+External callers cannot provide arbitrary behavior-tree paths. The gateway
+selects the correct installed tree from the trusted goal source.
 
 ## Launch files
 
-### Saved-map navigation
+### Production navigation from AM-8
+
+Use this for a released production map:
+
+```bash
+ros2 launch savo_nav production_navigation.launch.py
+```
+
+The default production root is:
+
+```text
+/var/lib/robot_savo/maps/production
+```
+
+Before Nav2 is launched, the production entry point verifies:
+
+1. `active_map.yaml` schema and active state;
+2. release directory confinement under the production root;
+3. joint release manifest schema v2 and immutable status;
+4. active map ID, frame, release ID, and positive map revision;
+5. quality pass and explicit operator approval;
+6. every required release artifact's path, size, and SHA-256;
+7. map YAML and map-image consistency;
+8. location-snapshot digest;
+9. the installed geometry profile is physically locked; and
+10. the installed and released geometry digests match.
+
+It then starts saved-map Nav2 with the verified map identity and synchronizes
+that identity with `savo_supervisor`. Production readiness remains blocked
+until the synchronization node is alive and reports the exact same map ID,
+revision, and release ID.
+
+Custom storage can be supplied explicitly:
+
+```bash
+ros2 launch savo_nav production_navigation.launch.py \
+  production_map_root:=/custom/maps/production
+```
+
+### Controlled saved-map navigation
+
+Use this for development maps that are not yet an active AM-8 release:
 
 ```bash
 ros2 launch savo_nav saved_map_navigation.launch.py \
   map:=/absolute/path/to/map.yaml \
   map_id:=campus_main \
-  autostart:=true
+  map_revision:=1 \
+  autostart:=false
 ```
 
-This launch starts map server, AMCL, planner, controller, behavior server, BT
-navigator, waypoint follower, lifecycle managers, readiness, the guarded goal
-gateway, control/recovery guard, and goal-admission gate.
+This generic launch defaults to lifecycle autostart disabled and does not
+require supervisor map-context synchronization. It is not a substitute for the
+production release entry point.
 
 ### Live-mapping navigation
 
@@ -82,11 +154,11 @@ ros2 launch savo_nav live_mapping_navigation.launch.py \
   autostart:=true
 ```
 
-Use this only while SLAM Toolbox is already publishing `/map` and `map -> odom`.
-It intentionally does not start AMCL or map server. This is the Nav2 execution
-path required by frontier exploration during an active mapping session.
+Use this only while SLAM Toolbox already publishes `/map` and `map -> odom`.
+The launch intentionally excludes AMCL and map server. This is the Nav2 path
+used by frontier exploration during an active mapping mission.
 
-Before enabling motion, run the read-only graph preflight:
+Before motion, run the read-only graph preflight:
 
 ```bash
 ros2 run savo_nav run_mapping_nav_preflight --mode live
@@ -99,26 +171,54 @@ readiness chain before sending a goal:
 ros2 run savo_nav run_mapping_nav_preflight --mode live --expect-ready
 ```
 
-## Readiness profiles
+## Costmap and readiness profiles
 
-`config/readiness.yaml` is the guarded LiDAR-only baseline used for the first
-real-robot navigation tests. It requires map, TF, fused odometry, LiDAR, Nav2,
-global/local costmaps, NAV control mode, and fresh safety state. It does not
-require the filtered D435 cloud because the active baseline costmaps do not yet
-consume that cloud.
+### Guarded LiDAR baseline
 
-`config/readiness_realsense_voxel.yaml` requires
-`/savo_perception/obstacles/points`. Use it only after the real D435 frame,
-freshness, self-filter, floor, and obstacle tests pass and the Nav2 voxel layer
-is enabled.
+Use:
 
-The raw RealSense topic must never be consumed directly by Nav2. The filtered
-cloud has obstacle-only semantics, so its future voxel layer must use marking
-without clearing; LiDAR remains responsible for reliable clearing.
+```text
+config/nav2_saved_map.yaml
+config/readiness.yaml
+```
+
+This profile requires the map, complete TF chain, fused odometry, LiDAR, Nav2
+action server, global and local costmaps, `NAV` control mode, and fresh safety
+state. It is the controlled first-test profile.
+
+Both costmaps use the generated polygon footprint from `savo_description`.
+LiDAR marks and clears obstacles in the global and local costmaps.
+
+### Filtered D435 VoxelLayer companion
+
+Use only after real D435 validation:
+
+```text
+config/nav2_saved_map_voxel.yaml
+config/readiness_realsense_voxel.yaml
+```
+
+Example production selection after validation:
+
+```bash
+ros2 launch savo_nav production_navigation.launch.py \
+  params_file:=$(ros2 pkg prefix savo_nav)/share/savo_nav/config/nav2_saved_map_voxel.yaml \
+  readiness_params:=$(ros2 pkg prefix savo_nav)/share/savo_nav/config/readiness_realsense_voxel.yaml
+```
+
+The companion profile consumes only:
+
+```text
+/savo_perception/obstacles/points
+```
+
+The raw RealSense cloud is forbidden. The filtered obstacle-only cloud marks
+local obstacles without clearing. LiDAR remains the authoritative clearing
+source, and no D435 layer is added to the global costmap.
 
 ## Build and test
 
-Development/test build:
+Development build:
 
 ```bash
 cd ~/Savo_Pi/savo_ws
@@ -126,45 +226,56 @@ set +u
 source /opt/ros/jazzy/setup.bash
 
 colcon build \
-  --packages-up-to savo_nav savo_mapping \
+  --packages-up-to savo_nav savo_mapping savo_supervisor \
   --symlink-install \
   --event-handlers console_direct+
 
 source install/setup.bash
 
 colcon test \
-  --packages-select savo_nav savo_mapping \
+  --packages-select savo_nav \
   --event-handlers console_direct+
 
 colcon test-result --verbose
 ```
 
-Production Pi build after the full test suite has passed elsewhere:
+Production Pi build after tests pass:
 
 ```bash
 colcon build \
-  --packages-up-to savo_nav savo_mapping \
+  --packages-up-to savo_nav savo_mapping savo_supervisor \
   --cmake-args -DBUILD_TESTING=OFF \
   --event-handlers console_direct+
 ```
 
 Disabling `BUILD_TESTING` prevents test fixtures from entering the Pi install.
 
-## First guarded Pi test order
+## Controlled real-robot test order
 
-1. Start robot description, base, localization, LiDAR, perception safety, and
-   `savo_control`.
-2. Confirm the TF chain and `/odometry/filtered` are healthy.
-3. Start manual SLAM Toolbox mapping from `savo_mapping`.
-4. Start `live_mapping_navigation.launch.py`.
-5. Change `savo_control` to `NAV` only after the area is physically secured.
-6. Confirm `/savo_nav/readiness` becomes `ready` before sending any goal.
-7. Test a short guarded exploration goal, cancellation, safety stop, and stale
-   dependency behavior before enabling autonomous frontier iteration.
+1. Measure, review, and lock the real geometry profile.
+2. Build and run all registered tests.
+3. Start description, base, localization, LiDAR, perception safety,
+   `savo_control`, and `savo_supervisor`.
+4. Confirm the TF chain and `/odometry/filtered` are healthy.
+5. Perform wheels-raised command-chain and stop tests.
+6. Use the LiDAR-only profile for short, low-speed saved-map goals.
+7. Validate lateral mecanum tracking, cancellation, goal tolerances, obstacle
+   stopping, stale dependencies, and recovery handoff.
+8. Run autonomous mapping and complete a real AM-8 joint release.
+9. Start `production_navigation.launch.py` and verify the same release survives
+   process restart and Pi reboot.
+10. Validate the filtered D435 producer separately before selecting the voxel
+    companion profile.
 
-## Remaining hardware gates
+## Completion boundary
 
-Code readiness does not replace physical validation. Before final deployment,
-measure the actual robot footprint and validate DWB behavior, goal tolerances,
-acceleration limits, recovery distances, AMCL tuning, and the optional D435
-voxel-layer self-filter on the real floor.
+The `savo_nav` source, contracts, production release integration, behavior-tree
+ownership, and optional D435 configuration are complete. Remaining work is
+physical validation and tuning, not missing package architecture:
+
+- lock the measured robot geometry;
+- tune DWB limits and critics on the loaded robot;
+- tune AMCL and goal tolerances on real maps;
+- validate obstacle, cancellation, and recovery behavior on the floor;
+- calibrate the filtered D435 self-filter and voxel limits; and
+- complete the real-robot production-release restart/recovery test.

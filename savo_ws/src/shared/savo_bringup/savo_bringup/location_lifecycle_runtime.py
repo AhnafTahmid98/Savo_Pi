@@ -17,14 +17,16 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
-from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus, KeyValue
-import rclpy
 from action_msgs.msg import GoalStatus
+
+from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus, KeyValue
+
 from geometry_msgs.msg import PoseStamped
+
+import rclpy
 from rclpy.action import ActionClient
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
-from std_msgs.msg import Bool, Float32, String, UInt64
 
 from savo_msgs.action import NavigateToLocation, RegisterMappedLocation
 from savo_msgs.msg import AprilTagObservation
@@ -35,6 +37,8 @@ from savo_msgs.srv import (
     ReviewLocationCandidate,
     UpdateMapContext,
 )
+
+from std_msgs.msg import Bool, Float32, String, UInt64
 
 
 RUNTIME_ROOT = (
@@ -58,6 +62,7 @@ class LifecycleNode(Node):
     """Drive the public typed APIs and synthetic AprilTag observations."""
 
     def __init__(self) -> None:
+        """Create publishers, clients, and lifecycle observations."""
         super().__init__("phase2d_location_lifecycle_runtime")
         self.sequence = 0
         self.heartbeat_sequence = 0

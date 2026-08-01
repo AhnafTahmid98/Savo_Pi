@@ -1,13 +1,14 @@
 """Contracts for the production typed location lifecycle launch."""
 
-from pathlib import Path
 import xml.etree.ElementTree as ET
+from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def read(relative: str) -> str:
+    """Read one package-relative location integration artifact."""
     return (ROOT / relative).read_text(encoding="utf-8")
 
 
@@ -94,18 +95,21 @@ def test_location_lifecycle_launch_contract() -> None:
 
 
 def test_bringup_is_installable_lifecycle_package() -> None:
-    """The package installs its launch and runtime entry point."""
+    """The hybrid package preserves the lifecycle runtime entry point."""
     package_xml = ROOT / "package.xml"
-    setup_py = read("setup.py")
-    setup_cfg = read("setup.cfg")
+    cmake = read("CMakeLists.txt")
+    wrapper = read("scripts/run_location_lifecycle_runtime")
 
     tree = ET.parse(package_xml)
     root = tree.getroot()
 
     assert root.findtext("name") == "savo_bringup"
-    assert root.findtext("version") == "0.5.0"
-    assert root.findtext("buildtool_depend") == "ament_python"
-    assert root.find("./export/build_type").text == "ament_python"
+    assert root.findtext("version") == "0.6.0"
+    buildtools = {
+        element.text for element in root.findall("buildtool_depend")
+    }
+    assert {"ament_cmake", "ament_cmake_python"} <= buildtools
+    assert root.find("./export/build_type").text == "ament_cmake"
 
     exec_dependencies = {
         element.text for element in root.findall("exec_depend")
@@ -125,13 +129,9 @@ def test_bringup_is_installable_lifecycle_package() -> None:
         "savo_supervisor",
     }.issubset(exec_dependencies)
 
-    compile(setup_py, str(ROOT / "setup.py"), "exec")
-    assert "location_integration.launch.py" in setup_py
-    assert "run_location_lifecycle_runtime" in setup_py
-    assert "location_lifecycle_runtime:main" in setup_py
-    assert "README.md" in setup_py
-    assert "script_dir=$base/lib/savo_bringup" in setup_cfg
-    assert "install_scripts=$base/lib/savo_bringup" in setup_cfg
+    assert "ament_python_install_package" in cmake
+    assert "run_location_lifecycle_runtime" in cmake
+    assert "location_lifecycle_runtime import main" in wrapper
 
 
 def test_runtime_uses_only_public_lifecycle_boundaries() -> None:

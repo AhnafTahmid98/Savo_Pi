@@ -10,8 +10,10 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 SENSOR_CONTRACT = ROOT / 'config/costmap_sensors.yaml'
-NAV2_CONFIG = ROOT / 'config/nav2/saved_map.yaml'
+NAV2_CONFIG = ROOT / 'config/nav2_saved_map.yaml'
+VOXEL_CONFIG = ROOT / 'config/nav2_saved_map_voxel.yaml'
 PROFILE = ROOT / 'config/profiles/saved_map.yaml'
+VOXEL_PROFILE = ROOT / 'config/profiles/saved_map_realsense_voxel.yaml'
 RAW_TOPIC = '/camera/camera/depth/color/points'
 
 
@@ -110,14 +112,12 @@ def test_existing_costmaps_retain_safe_baseline():
     assert local_parameters['obstacle_layer']['scan'][
         'topic'
     ] == '/scan'
-    expected_footprint = (
-        '[[0.165, 0.120], [0.165, -0.120], '
-        '[-0.165, -0.120], [-0.165, 0.120]]'
-    )
-    assert global_parameters['footprint'] == expected_footprint
-    assert local_parameters['footprint'] == expected_footprint
-    assert global_parameters['footprint_padding'] > 0.0
-    assert local_parameters['footprint_padding'] > 0.0
+    assert 'robot_radius' not in global_parameters
+    assert 'robot_radius' not in local_parameters
+    assert global_parameters['footprint'].startswith('[[0.165, 0.120]')
+    assert local_parameters['footprint'] == global_parameters['footprint']
+    assert global_parameters['footprint_padding'] == 0.02
+    assert local_parameters['footprint_padding'] == 0.02
 
 
 def test_ownership_boundaries_are_explicit():
@@ -136,19 +136,49 @@ def test_ownership_boundaries_are_explicit():
 
 def test_profile_records_pending_real_d435_validation():
     """Keep the optional voxel layer disabled until hardware validation."""
-    profile = load_yaml(PROFILE)
+    profile = load_yaml(PROFILE)['saved_map_profile']
+    validation = profile['validation']
+    ownership = profile['ownership']
+    assert validation['voxel_profile_source_complete'] is True
+    assert validation['voxel_profile_activation_enabled'] is False
     assert (
-        profile['phase8_costmap_sensor_integration_enabled']
-        is False
-    )
-    assert (
-        profile['phase8_blocked_reason']
+        validation['voxel_profile_activation_gate']
         == 'real_d435_hardware_validation_pending'
     )
-    assert profile['filtered_realsense_producer_verified'] is True
-    assert profile['filtered_realsense_hardware_validated'] is False
-    assert profile['raw_realsense_cloud_for_nav2'] is False
+    assert validation['filtered_realsense_producer_verified'] is True
+    assert validation['filtered_realsense_hardware_validated'] is False
+    assert validation['raw_realsense_cloud_for_nav2'] is False
     assert profile['lidar_required_for_navigation'] is True
     assert profile['realsense_required_for_navigation'] is False
-    assert profile['savo_nav_sensor_production_authority'] is False
-    assert profile['savo_nav_velocity_authority'] is False
+    assert ownership['savo_nav_sensor_production_authority'] is False
+    assert ownership['savo_nav_velocity_authority'] is False
+
+
+def test_guarded_voxel_companion_profile_is_source_complete():
+    """Provide a filtered-D435 local voxel profile without activating it."""
+    nav2 = load_yaml(VOXEL_CONFIG)
+    local = costmap_parameters(nav2, 'local_costmap')
+    global_costmap = costmap_parameters(nav2, 'global_costmap')
+
+    assert local['plugins'] == [
+        'obstacle_layer',
+        'voxel_layer',
+        'inflation_layer',
+    ]
+    voxel = local['voxel_layer']
+    assert voxel['plugin'] == 'nav2_costmap_2d::VoxelLayer'
+    assert voxel['publish_voxel_map'] is False
+    source = voxel['filtered_obstacles']
+    assert source['topic'] == '/savo_perception/obstacles/points'
+    assert source['data_type'] == 'PointCloud2'
+    assert source['marking'] is True
+    assert source['clearing'] is False
+    assert RAW_TOPIC not in yaml.safe_dump(nav2)
+    assert 'voxel_layer' not in global_costmap['plugins']
+
+    profile = load_yaml(VOXEL_PROFILE)[
+        'saved_map_realsense_voxel_profile'
+    ]
+    assert profile['software_completion'] == 'complete'
+    assert profile['activation_enabled'] is False
+    assert profile['realsense_required_for_navigation'] is True

@@ -72,7 +72,7 @@ planner_server:
 
     expected_planner_frequency: 5.0
     planner_plugins:
-      - "GridBased"
+    - "GridBased"
 
     GridBased:
       plugin: "nav2_navfn_planner::NavfnPlanner"
@@ -101,9 +101,9 @@ global_costmap:
       transform_tolerance: 0.50
 
       plugins:
-        - "static_layer"
-        - "obstacle_layer"
-        - "inflation_layer"
+      - "static_layer"
+      - "obstacle_layer"
+      - "inflation_layer"
 
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
@@ -115,7 +115,7 @@ global_costmap:
         enabled: true
 
         observation_sources:
-          - "scan"
+        - "scan"
 
         scan:
           topic: "/scan"
@@ -159,13 +159,13 @@ controller_server:
     failure_tolerance: 0.30
 
     progress_checker_plugins:
-      - "progress_checker"
+    - "progress_checker"
 
     goal_checker_plugins:
-      - "general_goal_checker"
+    - "general_goal_checker"
 
     controller_plugins:
-      - "FollowPath"
+    - "FollowPath"
 
     progress_checker:
       plugin: "nav2_controller::SimpleProgressChecker"
@@ -217,13 +217,13 @@ controller_server:
       stateful: true
 
       critics:
-        - "RotateToGoal"
-        - "Oscillation"
-        - "BaseObstacle"
-        - "GoalAlign"
-        - "PathAlign"
-        - "PathDist"
-        - "GoalDist"
+      - "RotateToGoal"
+      - "Oscillation"
+      - "BaseObstacle"
+      - "GoalAlign"
+      - "PathAlign"
+      - "PathDist"
+      - "GoalDist"
 
       BaseObstacle.scale: 0.02
 
@@ -264,15 +264,15 @@ local_costmap:
       transform_tolerance: 0.30
 
       plugins:
-        - "obstacle_layer"
-        - "inflation_layer"
+      - "obstacle_layer"
+      - "inflation_layer"
 
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
         enabled: true
 
         observation_sources:
-          - "scan"
+        - "scan"
 
         scan:
           topic: "/scan"
@@ -324,23 +324,9 @@ behavior_server:
     rotational_acc_lim: 1.00
 
     behavior_plugins:
-      - "spin"
-      - "backup"
-      - "drive_on_heading"
-      - "wait"
-
-    spin:
-      plugin: "nav2_behaviors::Spin"
-
-    backup:
-      plugin: "nav2_behaviors::BackUp"
-
-    drive_on_heading:
-      plugin: "nav2_behaviors::DriveOnHeading"
-
+    - wait
     wait:
-      plugin: "nav2_behaviors::Wait"
-
+      plugin: nav2_behaviors::Wait
 bt_navigator:
   ros__parameters:
     use_sim_time: false
@@ -353,6 +339,10 @@ bt_navigator:
     default_server_timeout: 20
     wait_for_service_timeout: 1000
 
+    error_code_names:
+    - compute_path_error_code
+    - follow_path_error_code
+    - wait_error_code
 waypoint_follower:
   ros__parameters:
     use_sim_time: false
@@ -375,8 +365,8 @@ lifecycle_manager_localization:
     bond_timeout: 4.0
 
     node_names:
-      - "map_server"
-      - "amcl"
+    - "map_server"
+    - "amcl"
 
 lifecycle_manager_navigation:
   ros__parameters:
@@ -386,8 +376,8 @@ lifecycle_manager_navigation:
     bond_timeout: 4.0
 
     node_names:
-      - "controller_server"
-      - "planner_server"
-      - "behavior_server"
-      - "bt_navigator"
-      - "waypoint_follower"
+    - "controller_server"
+    - "planner_server"
+    - "behavior_server"
+    - "bt_navigator"
+    - "waypoint_follower"

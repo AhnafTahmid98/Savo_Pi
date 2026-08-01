@@ -110,6 +110,59 @@ TEST(NavigationReadinessEvaluatorTest, BlocksControlMode)
   EXPECT_EQ(result.reason, "control_mode_not_navigation");
 }
 
+TEST(NavigationReadinessEvaluatorTest, BlocksMissingMapContextHeartbeat)
+{
+  auto snapshot = MakeReadySnapshot();
+  snapshot.map_context_synchronized = true;
+
+  savo_nav::NavigationReadinessPolicy policy;
+  policy.require_map_context_sync = true;
+
+  const auto result =
+    savo_nav::NavigationReadiness::Evaluate(
+    snapshot,
+    policy);
+
+  EXPECT_EQ(result.state, State::kBlocked);
+  EXPECT_EQ(result.reason, "map_context_sync_unavailable");
+}
+
+TEST(NavigationReadinessEvaluatorTest, BlocksMismatchedMapContext)
+{
+  auto snapshot = MakeReadySnapshot();
+  snapshot.map_context_heartbeat_fresh = true;
+  snapshot.map_context_synchronized = false;
+
+  savo_nav::NavigationReadinessPolicy policy;
+  policy.require_map_context_sync = true;
+
+  const auto result =
+    savo_nav::NavigationReadiness::Evaluate(
+    snapshot,
+    policy);
+
+  EXPECT_EQ(result.state, State::kBlocked);
+  EXPECT_EQ(result.reason, "map_context_not_synchronized");
+}
+
+TEST(NavigationReadinessEvaluatorTest, AcceptsSynchronizedMapContext)
+{
+  auto snapshot = MakeReadySnapshot();
+  snapshot.map_context_heartbeat_fresh = true;
+  snapshot.map_context_synchronized = true;
+
+  savo_nav::NavigationReadinessPolicy policy;
+  policy.require_map_context_sync = true;
+
+  const auto result =
+    savo_nav::NavigationReadiness::Evaluate(
+    snapshot,
+    policy);
+
+  EXPECT_EQ(result.state, State::kReady);
+  EXPECT_TRUE(result.goal_acceptance_allowed);
+}
+
 TEST(NavigationReadinessEvaluatorTest, WaitsForMap)
 {
   auto snapshot = MakeReadySnapshot();

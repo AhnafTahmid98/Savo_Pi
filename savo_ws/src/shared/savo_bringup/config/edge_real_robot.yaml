@@ -1,0 +1,23 @@
+bringup_readiness_node:
+  ros__parameters:
+    host_role: edge
+    robot_mode: diagnostics
+    bringup_profile: lidar_only
+    output_namespace: /savo_bringup/edge
+    publish_rate_hz: 2.0
+    startup_timeout_s: 45.0
+    freshness_timeout_s: 3.0
+    d435_voxel_validated: false
+    require_locked_geometry: true
+    allow_provisional_geometry: false
+    require_geometry: false
+    require_power: true
+    require_supervisor: false
+    require_supervisor_authority: false
+    require_navigation: false
+    require_bridge: true
+    require_realsense: true
+    require_vo: true
+    require_speech: false
+    require_ui: false
+    require_obstacle_cloud: false

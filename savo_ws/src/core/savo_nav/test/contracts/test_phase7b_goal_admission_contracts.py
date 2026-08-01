@@ -125,7 +125,8 @@ def test_saved_map_profile_enables_guarded_gateway():
     with path.open('r', encoding='utf-8') as stream:
         profile = yaml.safe_load(stream)
 
-    assert profile['goal_gateway_enabled'] is True
-    assert profile['goal_admission_gate_enabled'] is True
-    assert profile['direct_public_goal_gateway_enabled'] is False
-    assert profile['internal_gateway_actions_hidden'] is True
+    saved = profile['saved_map_profile']
+    assert saved['goal_gateway_enabled'] is True
+    assert saved['goal_admission_gate_enabled'] is True
+    assert saved['direct_public_goal_gateway_enabled'] is False
+    assert saved['internal_gateway_actions_hidden'] is True

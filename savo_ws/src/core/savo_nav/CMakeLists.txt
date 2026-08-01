@@ -125,6 +125,24 @@ ament_target_dependencies(
 )
 
 add_executable(
+  active_map_context_node
+  src/nodes/active_map_context_node.cpp
+)
+
+target_include_directories(
+  active_map_context_node
+  PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/include"
+)
+
+ament_target_dependencies(
+  active_map_context_node
+  rclcpp
+  savo_msgs
+  std_msgs
+)
+
+add_executable(
   navigation_readiness_node
   src/nodes/navigation_readiness_node.cpp
 )
@@ -218,6 +236,7 @@ install(
 install(
   TARGETS
     navigation_readiness_node
+    active_map_context_node
     navigate_to_location_node
     control_recovery_guard_node
     goal_admission_gate_node
@@ -609,6 +628,18 @@ if(BUILD_TESTING)
   ament_add_pytest_test(
     test_phase8_costmap_sensor_contracts
     test/contracts/test_phase8_costmap_sensor_contracts.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
+    test_behavior_tree_contracts
+    test/contracts/test_behavior_tree_contracts.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
+    test_production_navigation_contracts
+    test/contracts/test_production_navigation_contracts.py
     TIMEOUT 60
   )
 

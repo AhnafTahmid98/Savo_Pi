@@ -29,7 +29,10 @@ goal_gateway_node:
     max_abs_coordinate_m: 1000.0
 
     allow_degraded_readiness: false
+    # External callers may not choose arbitrary behavior-tree files.
     allow_behavior_tree_override: false
+    navigation_behavior_tree: ""
+    exploration_behavior_tree: ""
 
     execution_timeout_seconds: 300.0
     feedback_stale_timeout_seconds: 10.0

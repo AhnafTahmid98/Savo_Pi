@@ -71,7 +71,7 @@ ros2 topic pub --once \
 ros2 action send_goal \
   /savo_mapping/autonomous/run \
   savo_msgs/action/RunAutonomousMapping \
-  "{contract_version: 1, mission_id: mission_campus_main_001, actor_id: operator_1, map_id: campus_main, map_revision: 1, strategy: 1, auto_save: true, require_quality_approval: false, mission_timeout: {sec: 0, nanosec: 0}}"
+  "{contract_version: 2, mission_id: mission_campus_main_001, actor_id: operator_1, map_id: campus_main, map_revision: 1, strategy: 1, auto_save: true, require_quality_approval: true, mission_timeout: {sec: 0, nanosec: 0}}"
 ```
 
 The action goal is the only mission start boundary. AM-5 records the initial
@@ -95,7 +95,7 @@ ros2 service call \
 The sequencer first cancels or waits out the guarded navigation handoff, enters
 monitor-only, runs Scan360 through `/savo_mapping/scan360/start`, and returns to
 frontier mode. AprilTag interruption, coverage, return-to-start, final scans,
-operator approval and joint map/location release remain AM-6 through AM-8.
+operator approval and joint map/location release are implemented through AM-8.
 
 `savo_description` is included before motion-capable components. Production
 launch requires a locked geometry profile and fails closed on the checked-in
@@ -104,3 +104,106 @@ provisional profile. Controlled bench tests may explicitly set
 
 For a non-hardware launch inspection, each package group can be disabled with
 its `start_*` argument. The production defaults start all core-side groups.
+
+## AM-8 one-launch completion contract
+
+`autonomous_mapping.launch.py` starts the location review gateway and the
+mapping orchestrator in the same guarded stack. A production mission goal must
+use `contract_version: 2` and `require_quality_approval: true`.
+
+The required terminal path is:
+
+```text
+Mapping
+→ save
+→ map verification
+→ quality evaluation
+→ location verification
+→ correlated operator approval
+→ atomic joint map/location release
+→ real map_release_id
+```
+
+The first real navigation test uses `savo_nav/config/nav2_saved_map.yaml`.
+`nav2_saved_map_voxel.yaml` remains disabled until the filtered D435 point cloud
+is validated on Robot SAVO.
+
+## Full distributed Robot Savo bringup
+
+Production runtime nodes are C++. Python is used only for ROS 2 launch
+orchestration and the retained location-lifecycle test tool.
+
+The primary entry point is:
+
+```bash
+ros2 launch savo_bringup robot_bringup.launch.py \
+  host_role:=core \
+  robot_mode:=safe_idle \
+  bringup_profile:=lidar_only
+```
+
+Run the matching edge stack on `savo-edge`:
+
+```bash
+ros2 launch savo_bringup robot_bringup.launch.py \
+  host_role:=edge \
+  robot_mode:=safe_idle \
+  bringup_profile:=lidar_only \
+  start_speech:=false \
+  start_ui:=false
+```
+
+Supported robot modes are:
+
+| Mode | SLAM | AMCL/Nav2 | Motion startup |
+|---|---:|---:|---|
+| `safe_idle` | No | No | `STOP` |
+| `manual` | No | No | Explicit operator control |
+| `manual_mapping` | Yes | No | Explicit operator control |
+| `autonomous_mapping` | Yes | Live-map Nav2 | Typed AM action only |
+| `saved_map_navigation` | No | Verified production Nav2 | Explicit `NAV` authority |
+| `diagnostics` | No | No | Motion components suppressed |
+
+Supported profiles are `bench`, `lidar_only`, `lidar_d435_voxel`, and
+`production`. Motion-capable non-bench profiles require a locked geometry
+profile. `lidar_d435_voxel` additionally requires
+`d435_voxel_validated:=true` and an edge obstacle-cloud producer; otherwise
+launch fails before runtime nodes start.
+
+The first controlled real-robot test should use:
+
+```bash
+ros2 launch savo_bringup saved_map_navigation.launch.py \
+  bringup_profile:=lidar_only \
+  control_startup_mode:=STOP
+```
+
+The C++ `bringup_readiness_node` publishes:
+
+```text
+/savo_bringup/core/state
+/savo_bringup/core/ready
+/savo_bringup/core/heartbeat
+/savo_bringup/core/diagnostics
+
+/savo_bringup/edge/state
+/savo_bringup/edge/ready
+/savo_bringup/edge/heartbeat
+/savo_bringup/edge/diagnostics
+```
+
+It aggregates the supervisor, navigation, bridge, RealSense, VO, and speech
+readiness required by the selected host and profile. It does not replace the
+safety, supervisor, AM-8, or Nav2 authorities.
+
+Saved-map production navigation preserves the complete gate:
+
+```text
+AM-8 active release
+→ release artifact integrity verification
+→ geometry-profile verification
+→ supervisor map-context synchronization
+→ navigation readiness
+→ guarded goal admission
+→ Nav2
+```

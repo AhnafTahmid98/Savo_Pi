@@ -19,11 +19,14 @@ struct NavigationReadinessPolicy
   bool require_safety_state{true};
   bool require_global_costmap{true};
   bool require_local_costmap{true};
+  bool require_map_context_sync{false};
 };
 
 struct NavigationDependencySnapshot
 {
   bool map_available{false};
+  bool map_context_heartbeat_fresh{false};
+  bool map_context_synchronized{false};
 
   bool map_to_odom_fresh{false};
   bool odom_to_base_fresh{false};

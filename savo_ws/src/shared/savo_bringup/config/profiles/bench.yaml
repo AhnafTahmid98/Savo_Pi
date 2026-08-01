@@ -1,0 +1,8 @@
+robot_savo_bringup_profile:
+  schema_version: 1
+  profile: bench
+  require_locked_geometry: false
+  allow_provisional_geometry: true
+  navigation_profile: lidar_only
+  d435_voxel_validated: false
+  motion_scope: wheels_raised_or_controlled_bench_only

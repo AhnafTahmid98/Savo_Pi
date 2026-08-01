@@ -1,0 +1,15 @@
+# Copyright 2026 Ahnaf Tahmid
+# SPDX-License-Identifier: LicenseRef-Proprietary
+
+active_map_context_node:
+  ros__parameters:
+    supervisor_service: /savo_supervisor/update_map_context
+    actor_id: savo_nav
+    request_id: savo_nav-production-map-context
+    map_id: ""
+    map_revision: 0
+    map_release_id: ""
+    approved: true
+    retry_period_ms: 1000
+    status_topic: /savo_nav/map_context/status
+    heartbeat_topic: /savo_nav/map_context/heartbeat

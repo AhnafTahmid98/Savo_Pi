@@ -10,12 +10,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 
-NAV2_CONFIG = (
-    ROOT
-    / 'config'
-    / 'nav2'
-    / 'saved_map.yaml'
-)
+NAV2_CONFIG = ROOT / 'config' / 'nav2_saved_map.yaml'
 
 PROFILE_CONFIG = (
     ROOT

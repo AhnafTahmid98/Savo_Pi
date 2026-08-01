@@ -1,7 +1,7 @@
 # Copyright 2026 Ahnaf Tahmid
 # SPDX-License-Identifier: LicenseRef-Proprietary
 
-"""Isolated end-to-end runtime validation for the AM-7 mission sequence."""
+"""End-to-end DDS validation for the AM-7 through AM-8 mission sequence."""
 
 import hashlib
 import json
@@ -334,7 +334,10 @@ class Am7RuntimeHarness:
         session.mkdir()
         base = session / map_id
         quality_report = session / 'quality_report.yaml'
-        (session / f'{map_id}.pgm').write_bytes(b'P5\n1 1\n255\nx')
+        pixels = bytes([0] * 25 + [254] * 600)
+        (session / f'{map_id}.pgm').write_bytes(
+            b'P5\n25 25\n255\n' + pixels
+        )
         (session / f'{map_id}.posegraph').write_text('posegraph')
         (session / f'{map_id}.data').write_text('data')
         (session / f'{map_id}.yaml').write_text(
@@ -875,7 +878,7 @@ class Am7RuntimeHarness:
         goal.map_revision = 1
         goal.strategy = RunAutonomousMapping.Goal.STRATEGY_FRONTIER
         goal.auto_save = True
-        goal.require_quality_approval = False
+        goal.require_quality_approval = True
         future = self.action_client.send_goal_async(goal)
         assert wait_until(future.done), self.diagnostics()
         handle = future.result()
@@ -994,8 +997,8 @@ def ros_context():
     rclpy.shutdown()
 
 
-def test_full_am7_runtime_sequence():
-    """Drive the real C++ orchestrator through every required AM-7 stage."""
+def test_full_am7_am8_runtime_sequence():
+    """Drive the production orchestrator through AM-7 and AM-8."""
     harness = Am7RuntimeHarness()
     try:
         result_future = harness.drive_to_return()

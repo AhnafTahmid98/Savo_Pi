@@ -150,6 +150,11 @@ public:
       "require_local_costmap",
       true);
 
+    policy_.require_map_context_sync =
+      declare_parameter<bool>(
+      "require_map_context_sync",
+      false);
+
     const double tf_timeout_seconds =
       declare_parameter<double>(
       "tf_timeout_seconds",
@@ -185,6 +190,11 @@ public:
       "safety_timeout_seconds",
       1.0);
 
+    const double map_context_timeout_seconds =
+      declare_parameter<double>(
+      "map_context_timeout_seconds",
+      2.5);
+
     accepted_control_modes_ =
       declare_parameter<std::vector<std::string>>(
       "accepted_control_modes",
@@ -213,6 +223,10 @@ public:
     control_monitor_ =
       std::make_unique<savo_nav::SensorFreshnessMonitor>(
       control_timeout_seconds);
+
+    map_context_monitor_ =
+      std::make_unique<savo_nav::SensorFreshnessMonitor>(
+      map_context_timeout_seconds);
 
     localization_monitor_ =
       std::make_unique<savo_nav::LocalizationMonitor>(
@@ -286,6 +300,51 @@ public:
       "safety_slowdown_topic",
       std::string(
         savo_nav::topics::kSafetySlowdownFactor));
+
+    const std::string map_context_status_topic =
+      declare_parameter<std::string>(
+      "map_context_status_topic",
+      std::string(savo_nav::topics::kMapContextStatus));
+
+    const std::string map_context_heartbeat_topic =
+      declare_parameter<std::string>(
+      "map_context_heartbeat_topic",
+      std::string(savo_nav::topics::kMapContextHeartbeat));
+
+    const std::string expected_map_id =
+      declare_parameter<std::string>(
+      "expected_map_id",
+      "");
+
+    const int expected_map_revision =
+      declare_parameter<int>(
+      "expected_map_revision",
+      0);
+
+    const std::string expected_map_release_id =
+      declare_parameter<std::string>(
+      "expected_map_release_id",
+      "");
+
+    if (policy_.require_map_context_sync) {
+      if (
+        expected_map_id.empty() ||
+        expected_map_revision <= 0 ||
+        expected_map_release_id.empty())
+      {
+        throw std::invalid_argument(
+                "required map-context identity is incomplete");
+      }
+
+      std::ostringstream expected_status;
+      expected_status
+        << "state=synchronized"
+        << ";map_id=" << expected_map_id
+        << ";map_revision=" << expected_map_revision
+        << ";map_release_id=" << expected_map_release_id
+        << ";synchronized=true";
+      expected_map_context_status_ = expected_status.str();
+    }
 
     const std::string nav2_action_name =
       declare_parameter<std::string>(
@@ -506,6 +565,29 @@ public:
           MonotonicSeconds());
       });
 
+    map_context_status_subscription_ =
+      create_subscription<std_msgs::msg::String>(
+      map_context_status_topic,
+      state_qos,
+      [this](
+        const std_msgs::msg::String::SharedPtr message)
+      {
+        map_context_synchronized_ =
+        !expected_map_context_status_.empty() &&
+        message->data == expected_map_context_status_;
+      });
+
+    map_context_heartbeat_subscription_ =
+      create_subscription<std_msgs::msg::UInt64>(
+      map_context_heartbeat_topic,
+      heartbeat_qos,
+      [this](
+        const std_msgs::msg::UInt64::SharedPtr)
+      {
+        map_context_monitor_->MarkReceived(
+          MonotonicSeconds());
+      });
+
     nav2_client_ =
       rclcpp_action::create_client<NavigateToPose>(
       this,
@@ -582,6 +664,12 @@ private:
     savo_nav::NavigationDependencySnapshot snapshot;
 
     snapshot.map_available = map_available_;
+
+    snapshot.map_context_heartbeat_fresh =
+      map_context_monitor_->IsFresh(now);
+
+    snapshot.map_context_synchronized =
+      map_context_synchronized_;
 
     snapshot.map_to_odom_fresh =
       map_to_odom_monitor_->IsFresh(now);
@@ -724,6 +812,9 @@ private:
   std::unique_ptr<savo_nav::SensorFreshnessMonitor>
   control_monitor_;
 
+  std::unique_ptr<savo_nav::SensorFreshnessMonitor>
+  map_context_monitor_;
+
   std::unique_ptr<savo_nav::LocalizationMonitor>
   localization_monitor_;
 
@@ -741,7 +832,10 @@ private:
 
   bool control_allows_navigation_{false};
 
+  bool map_context_synchronized_{false};
+
   std::string control_mode_{};
+  std::string expected_map_context_status_{};
 
   std::uint64_t heartbeat_count_{0};
 
@@ -803,6 +897,14 @@ private:
   rclcpp::Subscription<
     std_msgs::msg::Float32>::SharedPtr
     safety_slowdown_subscription_;
+
+  rclcpp::Subscription<
+    std_msgs::msg::String>::SharedPtr
+    map_context_status_subscription_;
+
+  rclcpp::Subscription<
+    std_msgs::msg::UInt64>::SharedPtr
+    map_context_heartbeat_subscription_;
 
   rclcpp::TimerBase::SharedPtr timer_;
 };

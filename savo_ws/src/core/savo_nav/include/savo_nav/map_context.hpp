@@ -31,6 +31,7 @@ struct MapContext
   NavigationMapMode mode{NavigationMapMode::kUnknown};
   MapToOdomAuthority authority{MapToOdomAuthority::kNone};
   std::string map_id{};
+  std::string map_release_id{};
   std::string frame_id{"map"};
   std::uint64_t revision{0};
   bool available{false};

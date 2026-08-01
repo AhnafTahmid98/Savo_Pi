@@ -9,6 +9,7 @@ from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch.substitutions import PathJoinSubstitution
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
 
@@ -20,8 +21,7 @@ def generate_launch_description():
         [
             package_share,
             'config',
-            'nav2',
-            'saved_map.yaml',
+            'nav2_saved_map.yaml',
         ]
     )
 
@@ -49,8 +49,26 @@ def generate_launch_description():
         ]
     )
 
+    default_navigation_behavior_tree = PathJoinSubstitution(
+        [
+            package_share,
+            'behavior_trees',
+            'navigate_to_pose.xml',
+        ]
+    )
+
+    default_exploration_behavior_tree = PathJoinSubstitution(
+        [
+            package_share,
+            'behavior_trees',
+            'exploration_navigation.xml',
+        ]
+    )
+
     map_yaml = LaunchConfiguration('map')
     map_id = LaunchConfiguration('map_id')
+    map_revision = LaunchConfiguration('map_revision')
+    map_release_id = LaunchConfiguration('map_release_id')
 
     params_file = LaunchConfiguration('params_file')
 
@@ -75,6 +93,10 @@ def generate_launch_description():
 
     start_goal_gateway = LaunchConfiguration(
         'start_goal_gateway'
+    )
+
+    require_map_context_sync = LaunchConfiguration(
+        'require_map_context_sync'
     )
 
     log_level = LaunchConfiguration('log_level')
@@ -142,6 +164,16 @@ def generate_launch_description():
                 ),
             ),
             DeclareLaunchArgument(
+                'map_revision',
+                default_value='1',
+                description='Released map revision used by goal validation.',
+            ),
+            DeclareLaunchArgument(
+                'map_release_id',
+                default_value='',
+                description='Atomic production map release identifier.',
+            ),
+            DeclareLaunchArgument(
                 'params_file',
                 default_value=default_params,
                 description=(
@@ -190,6 +222,14 @@ def generate_launch_description():
                 'start_goal_gateway',
                 default_value='true',
                 description='Start the Savo goal gateway.',
+            ),
+            DeclareLaunchArgument(
+                'require_map_context_sync',
+                default_value='false',
+                description=(
+                    'Block readiness until the verified release identity is '
+                    'synchronized with savo_supervisor.'
+                ),
             ),
             DeclareLaunchArgument(
                 'log_level',
@@ -298,7 +338,11 @@ def generate_launch_description():
                 emulate_tty=True,
                 parameters=[
                     params_file,
-                    {'use_sim_time': use_sim_time},
+                    {
+                        'use_sim_time': use_sim_time,
+                        'default_nav_to_pose_bt_xml':
+                            default_navigation_behavior_tree,
+                    },
                 ],
                 arguments=[
                     '--ros-args',
@@ -373,7 +417,17 @@ def generate_launch_description():
                 condition=IfCondition(start_goal_gateway),
                 parameters=[
                     goal_gateway_params,
-                    {'active_map_id': map_id},
+                    {
+                        'active_map_id': map_id,
+                        'map_revision': ParameterValue(
+                            map_revision, value_type=int
+                        ),
+                        'active_map_release_id': map_release_id,
+                        'navigation_behavior_tree':
+                            default_navigation_behavior_tree,
+                        'exploration_behavior_tree':
+                            default_exploration_behavior_tree,
+                    },
                 ],
                 arguments=[
                     '--ros-args',
@@ -402,7 +456,21 @@ def generate_launch_description():
                 output='screen',
                 emulate_tty=True,
                 condition=IfCondition(start_readiness),
-                parameters=[readiness_params],
+                parameters=[
+                    readiness_params,
+                    {
+                        'require_map_context_sync': ParameterValue(
+                            require_map_context_sync,
+                            value_type=bool,
+                        ),
+                        'expected_map_id': map_id,
+                        'expected_map_revision': ParameterValue(
+                            map_revision,
+                            value_type=int,
+                        ),
+                        'expected_map_release_id': map_release_id,
+                    },
+                ],
                 arguments=[
                     '--ros-args',
                     '--log-level',

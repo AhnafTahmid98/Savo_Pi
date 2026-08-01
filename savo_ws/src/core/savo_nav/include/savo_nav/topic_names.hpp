@@ -63,6 +63,10 @@ inline constexpr std::string_view kHeartbeat =
   "/savo_nav/heartbeat";
 inline constexpr std::string_view kMarkers =
   "/savo_nav/markers";
+inline constexpr std::string_view kMapContextStatus =
+  "/savo_nav/map_context/status";
+inline constexpr std::string_view kMapContextHeartbeat =
+  "/savo_nav/map_context/heartbeat";
 
 namespace forbidden
 {

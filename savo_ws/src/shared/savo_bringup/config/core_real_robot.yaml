@@ -1,0 +1,35 @@
+bringup_readiness_node:
+  ros__parameters:
+    host_role: core
+    robot_mode: safe_idle
+    bringup_profile: lidar_only
+    output_namespace: /savo_bringup/core
+    publish_rate_hz: 2.0
+    startup_timeout_s: 45.0
+    freshness_timeout_s: 3.0
+    d435_voxel_validated: false
+    require_locked_geometry: true
+    allow_provisional_geometry: false
+    require_geometry: true
+    geometry_policy_validated: true
+    require_base: true
+    require_control: true
+    require_safety: true
+    require_lidar: true
+    require_perception: true
+    require_localization: true
+    require_power: true
+    require_supervisor: true
+    require_supervisor_authority: false
+    require_navigation: false
+    require_mapping: false
+    require_active_release: false
+    active_release_verified: false
+    require_map_context: false
+    require_goal_admission: false
+    require_bridge: false
+    require_realsense: false
+    require_vo: false
+    require_speech: false
+    require_ui: false
+    require_obstacle_cloud: false

@@ -241,17 +241,18 @@ def test_control_accepts_navigation_velocity():
     assert '/cmd_vel_nav' in control_text
 
 
-def test_no_service_contract_is_invented():
+def test_only_owned_supervisor_service_contract_is_declared():
+    """Freeze the one typed cross-package service used by savo_nav."""
     service_header = (
         INCLUDE_DIR / 'savo_nav' / 'service_names.hpp'
     ).read_text(encoding='utf-8')
 
-    assert 'std::string_view' not in service_header
-
-    assert re.search(
-        r'"/[A-Za-z0-9_/]+"',
+    services = re.findall(
+        r'"(/[A-Za-z0-9_/]+)"',
         service_header,
-    ) is None
+    )
+    assert services == ['/savo_supervisor/update_map_context']
+    assert 'kUpdateSupervisorMapContext' in service_header
 
 
 def test_contract_identity():

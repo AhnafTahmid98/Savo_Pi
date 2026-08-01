@@ -14,8 +14,8 @@ SAVO_CORE_SHARED_PACKAGES=(
   savo_msgs
   savo_description
   savo_bringup
-  savo_dashboard
   savo_perception
+  savo_power
   savo_supervisor
 )
 

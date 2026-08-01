@@ -123,6 +123,19 @@ NavigationReadinessResult NavigationReadiness::Evaluate(
 
   AddFailure(
     failures,
+    policy.require_map_context_sync &&
+    !snapshot.map_context_heartbeat_fresh,
+    "map_context_heartbeat");
+
+  AddFailure(
+    failures,
+    policy.require_map_context_sync &&
+    snapshot.map_context_heartbeat_fresh &&
+    !snapshot.map_context_synchronized,
+    "map_context_sync");
+
+  AddFailure(
+    failures,
     !snapshot.map_available,
     "map");
 
@@ -234,6 +247,28 @@ NavigationReadinessResult NavigationReadiness::Evaluate(
       NavigationReadinessState::kBlocked,
       false,
       "control_mode_not_navigation",
+      std::move(failures));
+  }
+
+  if (
+    policy.require_map_context_sync &&
+    !snapshot.map_context_heartbeat_fresh)
+  {
+    return MakeResult(
+      NavigationReadinessState::kBlocked,
+      false,
+      "map_context_sync_unavailable",
+      std::move(failures));
+  }
+
+  if (
+    policy.require_map_context_sync &&
+    !snapshot.map_context_synchronized)
+  {
+    return MakeResult(
+      NavigationReadinessState::kBlocked,
+      false,
+      "map_context_not_synchronized",
       std::move(failures));
   }
 

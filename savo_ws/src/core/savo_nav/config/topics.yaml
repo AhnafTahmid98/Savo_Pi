@@ -32,6 +32,8 @@ topics:
     recovery_state: /savo_nav/recovery_state
     heartbeat: /savo_nav/heartbeat
     markers: /savo_nav/markers
+    map_context_status: /savo_nav/map_context/status
+    map_context_heartbeat: /savo_nav/map_context/heartbeat
   forbidden_velocity_outputs:
   - /cmd_vel
   - /cmd_vel_safe

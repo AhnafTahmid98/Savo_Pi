@@ -14,14 +14,13 @@ SAVO_EDGE_SHARED_PACKAGES=(
   savo_msgs
   savo_description
   savo_bringup
-  savo_dashboard
+  savo_bridge
   savo_perception
-  savo_supervisor
+  savo_power
 )
 
 # Edge-owned runtime packages.
 SAVO_EDGE_PACKAGES=(
-  savo_intent
   savo_realsense
   savo_speech
   savo_ui

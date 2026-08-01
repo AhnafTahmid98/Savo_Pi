@@ -9,7 +9,7 @@
 
   <arg
     name="map_output_root"
-    default="~/Savo_Pi/runtime/maps"
+    default="/var/lib/robot_savo/maps/sessions"
     description="Root directory for map sessions"/>
 
   <arg

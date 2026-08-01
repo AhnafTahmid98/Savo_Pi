@@ -17,7 +17,7 @@ def generate_launch_description():
     package_share = FindPackageShare('savo_nav')
 
     default_params = PathJoinSubstitution(
-        [package_share, 'config', 'nav2', 'saved_map.yaml']
+        [package_share, 'config', 'nav2_live_mapping.yaml']
     )
     default_readiness_params = PathJoinSubstitution(
         [package_share, 'config', 'readiness.yaml']
@@ -30,6 +30,12 @@ def generate_launch_description():
     )
     default_guard_params = PathJoinSubstitution(
         [package_share, 'config', 'control_recovery_guard.yaml']
+    )
+    default_navigation_behavior_tree = PathJoinSubstitution(
+        [package_share, 'behavior_trees', 'navigate_to_pose.xml']
+    )
+    default_exploration_behavior_tree = PathJoinSubstitution(
+        [package_share, 'behavior_trees', 'exploration_navigation.xml']
     )
 
     params_file = LaunchConfiguration('params_file')
@@ -166,7 +172,11 @@ def generate_launch_description():
                 emulate_tty=True,
                 parameters=[
                     params_file,
-                    {'use_sim_time': use_sim_time},
+                    {
+                        'use_sim_time': use_sim_time,
+                        'default_nav_to_pose_bt_xml':
+                            default_navigation_behavior_tree,
+                    },
                 ],
                 arguments=common_arguments,
                 remappings=tf_remappings,
@@ -212,6 +222,10 @@ def generate_launch_description():
                     {
                         'map_mode': 'live_mapping',
                         'active_map_id': '',
+                        'navigation_behavior_tree':
+                            default_navigation_behavior_tree,
+                        'exploration_behavior_tree':
+                            default_exploration_behavior_tree,
                     },
                 ],
                 arguments=common_arguments,
