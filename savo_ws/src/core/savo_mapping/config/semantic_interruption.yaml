@@ -1,0 +1,28 @@
+semantic_interruption_coordinator_node:
+  ros__parameters:
+    enabled: true
+    expected_family: "tag36h11"
+    minimum_detection_quality: 0.70
+
+    observation_timeout_s: 0.50
+    mission_status_timeout_s: 2.0
+    pause_timeout_s: 10.0
+    semantic_input_timeout_s: 300.0
+    registration_timeout_s: 30.0
+    resume_timeout_s: 10.0
+    duplicate_cooldown_s: 30.0
+
+    # Registration failures leave the mission paused for operator inspection.
+    # The alternative is request_resume.
+    failure_policy: "remain_paused"
+
+    observation_topic: "/savo_head/apriltag/observations"
+    mission_status_topic: "/savo_mapping/autonomous/status"
+    mission_control_service: "/savo_mapping/autonomous/control"
+    registration_action: "/savo_mapping/locations/register"
+    location_events_topic: "/savo_locations/events"
+    candidates_list_service: "/savo_locations/candidates/list"
+    locations_list_service: "/savo_locations/list"
+    status_topic: "/savo_mapping/semantic_interruption/status"
+    semantic_submit_service: "/savo_mapping/semantic_interruption/submit"
+    actor_id: "savo_mapping.semantic_interruption"

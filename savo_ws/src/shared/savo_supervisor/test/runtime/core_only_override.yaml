@@ -1,0 +1,15 @@
+savo_supervisor_node:
+  ros__parameters:
+    system_authority.auto_arm: true
+    system_authority.state_path: /tmp/savo_supervisor_phase1_state.json
+
+    edge.bridge.enabled: false
+    edge.bridge.required_for_startup: false
+    edge.realsense.enabled: false
+    edge.realsense.required_for_startup: false
+    edge.speech.enabled: false
+    edge.speech.required_for_startup: false
+    edge.vo.enabled: false
+    edge.vo.required_for_startup: false
+    edge.ui.enabled: false
+    edge.ui.required_for_startup: false

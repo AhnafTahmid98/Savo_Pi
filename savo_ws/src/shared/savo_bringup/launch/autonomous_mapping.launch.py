@@ -196,6 +196,29 @@ def generate_launch_description() -> LaunchDescription:
         }.items(),
     )
 
+    location_lifecycle_launch = IncludeLaunchDescription(
+        _python_launch("savo_bringup", "location_integration.launch.py"),
+        condition=IfCondition(
+            LaunchConfiguration("start_location_lifecycle")
+        ),
+        launch_arguments={
+            "log_level": log_level,
+            "start_locations": "true",
+            "start_supervisor": "false",
+            "start_head_observer": "false",
+            "start_head_action": "true",
+            "start_registration": "true",
+            "start_review_gateway": "false",
+            "start_navigation": "false",
+            "locations_database_path": LaunchConfiguration(
+                "locations_database_path"
+            ),
+            "locations_create_parent_directories": LaunchConfiguration(
+                "locations_create_parent_directories"
+            ),
+        }.items(),
+    )
+
     mapping_launch = IncludeLaunchDescription(
         _frontend_launch("savo_mapping", "autonomous_mapping.launch.xml"),
         condition=IfCondition(LaunchConfiguration("start_mapping")),
@@ -210,6 +233,9 @@ def generate_launch_description() -> LaunchDescription:
             "slam_params_file": LaunchConfiguration("slam_params_file"),
             "map_frame": LaunchConfiguration("map_frame"),
             "base_frame": LaunchConfiguration("base_frame"),
+            "semantic_interruption_enabled": LaunchConfiguration(
+                "start_semantic_interruption"
+            ),
         }.items(),
     )
 
@@ -279,9 +305,25 @@ def generate_launch_description() -> LaunchDescription:
             ),
             DeclareLaunchArgument("start_head", default_value="true"),
             DeclareLaunchArgument(
+                "start_location_lifecycle", default_value="true"
+            ),
+            DeclareLaunchArgument(
+                "start_semantic_interruption", default_value="true"
+            ),
+            DeclareLaunchArgument(
                 "start_navigation", default_value="true"
             ),
             DeclareLaunchArgument("start_mapping", default_value="true"),
+            DeclareLaunchArgument(
+                "locations_database_path",
+                default_value=(
+                    "/var/lib/robot_savo/locations/locations.db"
+                ),
+            ),
+            DeclareLaunchArgument(
+                "locations_create_parent_directories",
+                default_value="false",
+            ),
             DeclareLaunchArgument(
                 "base_profile",
                 default_value="real_robot_v1.yaml",
@@ -380,6 +422,7 @@ def generate_launch_description() -> LaunchDescription:
             power_launch,
             supervisor_launch,
             head_launch,
+            location_lifecycle_launch,
             navigation_launch,
             mapping_launch,
         ]

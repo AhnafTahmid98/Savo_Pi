@@ -25,8 +25,9 @@ def test_supervisor_exposes_permission_only_service() -> None:
     for forbidden in (
         'RegisterLocationCandidate',
         'ResolveLocation',
-        'NavigateToPose',
-        'ConfirmAprilTag',
+        'nav2_msgs/action/navigate_to_pose',
+        'create_client<nav2_msgs',
+        'async_send_goal',
         'sqlite3_',
     ):
         assert forbidden not in source

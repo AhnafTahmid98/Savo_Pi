@@ -69,6 +69,7 @@ add_library(${PROJECT_NAME}_core
   src/scan360/scan360_quality.cpp
   src/semantic/semantic_landmark.cpp
   src/semantic/semantic_landmark_recorder.cpp
+  src/semantic/semantic_interruption.cpp
   src/session/map_session_policy.cpp
   src/session/saved_map_contract.cpp
   src/session/saved_map_quality.cpp
@@ -248,6 +249,7 @@ set(_savo_mapping_public_headers
   include/savo_mapping/map_quality_placeholder.hpp
   include/savo_mapping/semantic_landmark.hpp
   include/savo_mapping/semantic_landmark_recorder.hpp
+  include/savo_mapping/semantic_interruption.hpp
   include/savo_mapping/map_session_policy.hpp
   include/savo_mapping/mapping_mode.hpp
   include/savo_mapping/mapping_status.hpp
@@ -291,6 +293,7 @@ set(_savo_mapping_production_config
   config/qos.yaml
   config/scan360_mapping.yaml
   config/semantic_landmarks.yaml
+  config/semantic_interruption.yaml
   config/slam_lifecycle_health.yaml
   config/slam_toolbox_mapping.yaml
   config/topics.yaml
@@ -784,6 +787,35 @@ install(
 )
 
 add_executable(
+  semantic_interruption_coordinator_node
+  src/nodes/semantic_interruption_coordinator_node.cpp
+)
+
+target_compile_features(
+  semantic_interruption_coordinator_node
+  PRIVATE
+    cxx_std_17
+)
+
+target_link_libraries(
+  semantic_interruption_coordinator_node
+  ${PROJECT_NAME}_core
+)
+
+ament_target_dependencies(
+  semantic_interruption_coordinator_node
+  geometry_msgs
+  rclcpp
+  rclcpp_action
+  savo_msgs
+)
+
+install(
+  TARGETS semantic_interruption_coordinator_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+add_executable(
   coverage_mapper_node
   src/nodes/coverage_mapper_node.cpp
 )
@@ -1010,6 +1042,16 @@ if(BUILD_TESTING)
   set(
     _savo_mapping_autonomous_orchestrator_ros_log_dir
     "${CMAKE_CURRENT_BINARY_DIR}/autonomous_orchestrator_ros_logs"
+  )
+
+  set(
+    _savo_mapping_semantic_interruption_ros_log_dir
+    "${CMAKE_CURRENT_BINARY_DIR}/semantic_interruption_ros_logs"
+  )
+
+  file(
+    MAKE_DIRECTORY
+    "${_savo_mapping_semantic_interruption_ros_log_dir}"
   )
 
   file(
@@ -1792,6 +1834,15 @@ if(BUILD_TESTING)
     test/test_semantic_landmark.cpp
   )
 
+  ament_add_gtest(test_semantic_interruption
+    test/test_semantic_interruption.cpp
+  )
+
+  target_link_libraries(
+    test_semantic_interruption
+    ${PROJECT_NAME}_core
+  )
+
   ament_add_pytest_test(
     test_location_registration_runtime_contract
     test/test_location_registration_runtime_contract.py
@@ -1802,6 +1853,25 @@ if(BUILD_TESTING)
     test_semantic_mapping_runtime_contract
     test/test_semantic_mapping_runtime_contract.py
     TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
+    test_semantic_interruption_contract
+    test/test_semantic_interruption_contract.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
+    test_semantic_interruption_runtime
+    test/test_semantic_interruption_runtime.py
+    TIMEOUT 90
+  )
+
+  set_tests_properties(
+    test_semantic_interruption_runtime
+    PROPERTIES
+      ENVIRONMENT
+        "PYTHONDONTWRITEBYTECODE=1;ROS_LOCALHOST_ONLY=1;ROS_DOMAIN_ID=226;ROS_LOG_DIR=${_savo_mapping_semantic_interruption_ros_log_dir};SEMANTIC_INTERRUPTION_EXECUTABLE=${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}/semantic_interruption_coordinator_node"
   )
 
   ament_add_pytest_test(

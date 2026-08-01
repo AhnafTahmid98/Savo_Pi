@@ -1,0 +1,55 @@
+# Robot Savo — global supervisor mission authority.
+#
+# CHECK is read-only. ACQUIRE/RELEASE/PAUSE/RESUME mutate only supervisor
+# ownership state; they never command motion or start package workflows.
+
+uint8 COMMAND_CHECK=0
+uint8 COMMAND_ACQUIRE=1
+uint8 COMMAND_RELEASE=2
+uint8 COMMAND_PAUSE=3
+uint8 COMMAND_RESUME=4
+
+uint8 OP_NONE=0
+uint8 OP_ENTER_MANUAL_CONTROL=1
+uint8 OP_START_MANUAL_MAPPING=2
+uint8 OP_START_AUTONOMOUS_MAPPING=3
+uint8 OP_RUN_SCAN360=4
+uint8 OP_RUN_COVERAGE=5
+uint8 OP_NAVIGATE_TO_POSE=6
+uint8 OP_NAVIGATE_TO_LOCATION=7
+uint8 OP_REGISTER_LOCATION=8
+uint8 OP_REVIEW_LOCATION=9
+uint8 OP_CONFIRM_ARRIVAL=10
+
+uint8 command
+uint8 operation
+string request_id
+string actor_id
+string map_id
+uint32 map_revision
+string map_release_id
+bool require_semantic
+bool motion_required
+uint64 expected_generation
+---
+uint8 RESULT_AUTHORIZED=0
+uint8 RESULT_INVALID_REQUEST=1
+uint8 RESULT_NOT_READY=2
+uint8 RESULT_HEALTH_BLOCKED=3
+uint8 RESULT_SAFETY_BLOCKED=4
+uint8 RESULT_DEPENDENCY_BLOCKED=5
+uint8 RESULT_MAP_CONTEXT_BLOCKED=6
+uint8 RESULT_OPERATION_CONFLICT=7
+uint8 RESULT_OWNERSHIP_MISMATCH=8
+uint8 RESULT_OPERATION_DISABLED=9
+uint8 RESULT_INTERNAL_ERROR=10
+
+bool authorized
+uint8 result_code
+string reason
+string supervisor_mode
+string operation_state
+uint8 active_operation
+string active_request_id
+uint64 authority_generation
+builtin_interfaces/Time evaluated_at

@@ -1,0 +1,36 @@
+# Robot Savo — supervisor-owned system startup, fault-latch and shutdown authority.
+# The service never executes OS shutdown directly. It publishes the controlled
+# shutdown request for the privileged deployment layer to consume.
+
+uint8 COMMAND_STATUS=0
+uint8 COMMAND_ARM=1
+uint8 COMMAND_DISARM=2
+uint8 COMMAND_BEGIN_SHUTDOWN=3
+uint8 COMMAND_CLEAR_FAULT_LATCH=4
+
+uint8 command
+string request_id
+string actor_id
+string reason
+uint64 expected_generation
+---
+uint8 RESULT_ACCEPTED=0
+uint8 RESULT_INVALID_REQUEST=1
+uint8 RESULT_NOT_READY=2
+uint8 RESULT_ALREADY_IN_STATE=3
+uint8 RESULT_FAULT_LATCHED=4
+uint8 RESULT_UNSAFE_TO_CLEAR=5
+uint8 RESULT_GENERATION_MISMATCH=6
+uint8 RESULT_INTERNAL_ERROR=7
+
+bool accepted
+uint8 result_code
+string reason
+string system_state
+bool startup_ready
+bool system_armed
+bool fault_latched
+bool shutdown_requested
+bool remote_commands_ready
+uint64 system_generation
+builtin_interfaces/Time evaluated_at

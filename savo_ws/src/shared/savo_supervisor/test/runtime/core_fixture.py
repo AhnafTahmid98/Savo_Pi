@@ -104,12 +104,31 @@ class CoreFixture(Node):
             Bool, '/safety/stop', status_qos)
         self._slowdown_publisher = self.create_publisher(
             Float32, '/safety/slowdown_factor', status_qos)
+        self._control_subscription = self.create_subscription(
+            String,
+            '/savo_supervisor/test/control',
+            self._on_control,
+            status_qos,
+        )
 
         self._timer = self.create_timer(0.1, self._publish)
         self.get_logger().info(
             'Phase 1 core fixture started | drop_component=%s safety_stop=%s slowdown=%.2f'
             % (drop_component, safety_stop, slowdown_factor)
         )
+
+    def _on_control(self, message: String) -> None:
+        command = message.data.strip().lower()
+        if command == 'safety_stop':
+            self._safety_stop = True
+        elif command == 'safety_clear':
+            self._safety_stop = False
+        elif command.startswith('drop_core:'):
+            component = command.split(':', 1)[1]
+            if component in _COMPONENTS:
+                self._drop_component = component
+        elif command == 'restore_core':
+            self._drop_component = 'none'
 
     @staticmethod
     def _string(payload: str | dict[str, object]) -> String:

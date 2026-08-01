@@ -32,7 +32,8 @@ def test_node_observes_all_phase1_components_and_direct_safety() -> None:
         'geometry_msgs/msg/twist',
         'create_publisher<geometry_msgs',
         '/cmd_vel',
-        'NavigateToPose',
+        'nav2_msgs/action/navigate_to_pose',
+        'create_client<nav2_msgs',
     ):
         assert forbidden not in source
 

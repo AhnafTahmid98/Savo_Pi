@@ -17,20 +17,23 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
+from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus, KeyValue
 import rclpy
 from action_msgs.msg import GoalStatus
 from geometry_msgs.msg import PoseStamped
 from rclpy.action import ActionClient
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
-from std_msgs.msg import Bool, Float32
+from std_msgs.msg import Bool, Float32, String, UInt64
 
 from savo_msgs.action import NavigateToLocation, RegisterMappedLocation
 from savo_msgs.msg import AprilTagObservation
 from savo_msgs.srv import (
     AuthorizeLocationOperation,
+    ManageSystemState,
     ResolveLocation,
     ReviewLocationCandidate,
+    UpdateMapContext,
 )
 
 
@@ -57,8 +60,16 @@ class LifecycleNode(Node):
     def __init__(self) -> None:
         super().__init__("phase2d_location_lifecycle_runtime")
         self.sequence = 0
+        self.heartbeat_sequence = 0
         self.publish_observations = False
         self.last_navigation_goal: PoseStamped | None = None
+
+        status_qos = QoSProfile(depth=10)
+        status_qos.reliability = ReliabilityPolicy.RELIABLE
+        status_qos.durability = DurabilityPolicy.VOLATILE
+        retained_qos = QoSProfile(depth=1)
+        retained_qos.reliability = ReliabilityPolicy.RELIABLE
+        retained_qos.durability = DurabilityPolicy.TRANSIENT_LOCAL
 
         self.observation_publisher = self.create_publisher(
             AprilTagObservation,
@@ -92,6 +103,73 @@ class LifecycleNode(Node):
             0.10,
             self._publish_clear_safety,
         )
+        self.base_state_publisher = self.create_publisher(
+            String, "/savo_base/base_state", status_qos
+        )
+        self.control_mode_publisher = self.create_publisher(
+            String, "/savo_control/control_status", status_qos
+        )
+        self.control_mux_publisher = self.create_publisher(
+            String, "/savo_control/twist_mux/status", status_qos
+        )
+        self.control_shaper_publisher = self.create_publisher(
+            String, "/savo_control/cmd_vel_shaper/status", status_qos
+        )
+        self.perception_health_publisher = self.create_publisher(
+            String, "/savo_perception/range_health", status_qos
+        )
+        self.perception_state_publisher = self.create_publisher(
+            String, "/savo_perception/safety_state", status_qos
+        )
+        self.perception_heartbeat_publisher = self.create_publisher(
+            String, "/savo_perception/heartbeat", status_qos
+        )
+        self.lidar_state_publisher = self.create_publisher(
+            String, "/savo_lidar/state", status_qos
+        )
+        self.lidar_heartbeat_publisher = self.create_publisher(
+            String, "/savo_lidar/heartbeat", status_qos
+        )
+        self.localization_health_publisher = self.create_publisher(
+            String, "/savo_localization/health", retained_qos
+        )
+        self.localization_summary_publisher = self.create_publisher(
+            String, "/savo_localization/state_summary", retained_qos
+        )
+        self.localization_heartbeat_publisher = self.create_publisher(
+            String, "/savo_localization/heartbeat", status_qos
+        )
+        self.power_health_publisher = self.create_publisher(
+            String, "/savo_power/health", status_qos
+        )
+        self.power_status_publisher = self.create_publisher(
+            String, "/savo_power/status", status_qos
+        )
+        self.mapping_status_publisher = self.create_publisher(
+            String, "/savo_mapping/status", retained_qos
+        )
+        self.navigation_status_publisher = self.create_publisher(
+            String, "/savo_nav/status", retained_qos
+        )
+        self.navigation_heartbeat_publisher = self.create_publisher(
+            UInt64, "/savo_nav/heartbeat", status_qos
+        )
+        self.head_status_publisher = self.create_publisher(
+            DiagnosticArray, "/savo_head/status", status_qos
+        )
+        self.bridge_state_publisher = self.create_publisher(
+            String, "/savo_bridge/state", retained_qos
+        )
+        self.bridge_readiness_publisher = self.create_publisher(
+            Bool, "/savo_bridge/readiness", retained_qos
+        )
+        self.bridge_heartbeat_publisher = self.create_publisher(
+            UInt64, "/savo_bridge/heartbeat", status_qos
+        )
+        self.supervisor_dependency_timer = self.create_timer(
+            0.10,
+            self._publish_supervisor_dependencies,
+        )
 
         self.registration_action = ActionClient(
             self,
@@ -111,6 +189,14 @@ class LifecycleNode(Node):
             AuthorizeLocationOperation,
             "/savo_supervisor/authorize_location_operation",
         )
+        self.map_context_client = self.create_client(
+            UpdateMapContext,
+            "/savo_supervisor/update_map_context",
+        )
+        self.system_state_client = self.create_client(
+            ManageSystemState,
+            "/savo_supervisor/manage_system_state",
+        )
         self.resolve_client = self.create_client(
             ResolveLocation,
             "/savo_locations/resolve",
@@ -118,6 +204,166 @@ class LifecycleNode(Node):
 
     def _on_navigation_goal(self, message: PoseStamped) -> None:
         self.last_navigation_goal = message
+
+    @staticmethod
+    def _string(payload: str | dict[str, object]) -> String:
+        message = String()
+        message.data = (
+            json.dumps(payload, separators=(",", ":"), allow_nan=False)
+            if isinstance(payload, dict)
+            else payload
+        )
+        return message
+
+    @staticmethod
+    def _key_value(key: str, value: str) -> KeyValue:
+        item = KeyValue()
+        item.key = key
+        item.value = value
+        return item
+
+    def _publish_supervisor_dependencies(self) -> None:
+        """Publish deterministic healthy contracts for the isolated fixture."""
+        self.heartbeat_sequence += 1
+        stamp_s = self.get_clock().now().nanoseconds / 1_000_000_000.0
+
+        self.base_state_publisher.publish(self._string({
+            "node": "base_driver_node",
+            "status_level": "OK",
+            "backend": {"connected": True},
+            "diagnostics": {"last_board_error": ""},
+        }))
+        self.control_mode_publisher.publish(self._string(
+            "mode=STOP; previous=STOP; reason=STARTUP; source=startup; "
+            "safety_stop=false; external_stop=false; recovery_active=false; "
+            "manual_override=false; request_stale=false; mux_mode=STOP"
+        ))
+        self.control_mux_publisher.publish(self._string(
+            "mode=STOP; source=STOP; reason=stop_mode; stale=false; "
+            "safety_stop=false; recovery_active=false; last_mode_text=STOP; "
+            "now_s=1.0; vx=0.0; vy=0.0; wz=0.0"
+        ))
+        self.control_shaper_publisher.publish(self._string(
+            "reason=input_timeout; stale=true; safety_stop=false; mode=STOP; "
+            "slowdown=1.0; ignore_slowdown_in_recovery=true; "
+            "target_vx=0.0; target_vy=0.0; target_wz=0.0; "
+            "shaped_vx=0.0; shaped_vy=0.0; shaped_wz=0.0; "
+            "timed_out=true; now_s=1.0"
+        ))
+        self.perception_health_publisher.publish(self._string({
+            "overall_ok": True,
+            "overall_status": "OK",
+            "stale_required_sensors": [],
+            "error_required_sensors": [],
+        }))
+        self.perception_state_publisher.publish(self._string({
+            "update_count": self.heartbeat_sequence,
+            "stop_count": 0,
+            "clear_count": self.heartbeat_sequence,
+            "active_decision": {
+                "status": "CLEAR",
+                "stop_required": False,
+                "slowdown_factor": 1.0,
+                "reason": "fixture_clear",
+            },
+        }))
+        self.perception_heartbeat_publisher.publish(self._string({
+            "node": "range_health_node",
+            "count": self.heartbeat_sequence,
+            "ok": True,
+        }))
+        lidar = {
+            "component": "lidar_driver_node",
+            "status": "OK",
+            "message": "LiDAR driver running",
+            "hardware_ok": True,
+            "scan_ok": True,
+            "driver_running": True,
+            "scan_count": self.heartbeat_sequence,
+            "last_error": "",
+        }
+        self.lidar_state_publisher.publish(self._string(lidar))
+        self.lidar_heartbeat_publisher.publish(self._string(lidar))
+        localization = {
+            "schema_version": 1,
+            "node": "localization_health_node",
+            "state": "OK",
+            "ready": True,
+            "degraded": False,
+            "reason_code": "localization_operational",
+            "stamp_s": stamp_s,
+        }
+        self.localization_health_publisher.publish(self._string(localization))
+        self.localization_summary_publisher.publish(self._string(localization))
+        localization["alive"] = True
+        self.localization_heartbeat_publisher.publish(
+            self._string(localization)
+        )
+        self.power_status_publisher.publish(self._string(
+            "overall=OK health=OK core=OK edge=OK base=OK"
+        ))
+        self.power_health_publisher.publish(self._string(
+            "level=OK state=OK reason=power_ok"
+        ))
+
+        self.mapping_status_publisher.publish(self._string({
+            "mode": "online_async",
+            "exploration_mode": "frontier",
+            "workflow_phase": "active",
+            "session_state": "active",
+            "healthy": True,
+            "ready": True,
+            "slam_active": True,
+            "map_received": True,
+            "scan_received": True,
+            "tf_ok": True,
+            "odom_ok": True,
+            "quality_score": 1.0,
+            "heartbeat_seq": self.heartbeat_sequence,
+            "active_map_name": "campus_main",
+            "message": "ready",
+        }))
+        self.navigation_status_publisher.publish(self._string(
+            "state=READY;goal_acceptance_allowed=true;"
+            "reason=navigation_ready;failed_dependencies="
+        ))
+        heartbeat = UInt64()
+        heartbeat.data = self.heartbeat_sequence
+        self.navigation_heartbeat_publisher.publish(heartbeat)
+
+        head = DiagnosticStatus()
+        head.name = "savo_head.head_status"
+        head.hardware_id = "phase2d_lifecycle_fixture"
+        head.level = DiagnosticStatus.OK
+        head.message = "head operational"
+        head.values = [
+            self._key_value("pan_tilt_state", "OK"),
+            self._key_value("camera_stream_healthy", "true"),
+            self._key_value("camera_pose_ready", "true"),
+        ]
+        head_array = DiagnosticArray()
+        head_array.header.stamp = self.get_clock().now().to_msg()
+        head_array.status = [head]
+        self.head_status_publisher.publish(head_array)
+
+        self.bridge_state_publisher.publish(self._string({
+            "schema_name": "savo_bridge_state",
+            "schema_version": 2,
+            "process_alive": True,
+            "bridge_ready": True,
+            "commands_enabled": True,
+            "dds_active": True,
+            "core_visible": True,
+            "edge_visible": True,
+            "stop_ready": True,
+            "teleop_ready": True,
+            "navigation_ready": True,
+            "readiness_reason": "bridge_ready",
+        }))
+        bridge_ready = Bool()
+        bridge_ready.data = True
+        self.bridge_readiness_publisher.publish(bridge_ready)
+        self.bridge_heartbeat_publisher.publish(heartbeat)
 
     def _publish_clear_safety(self) -> None:
         """Publish fresh clear-safety evidence for this isolated fixture."""
@@ -240,14 +486,81 @@ def wait_dependencies(node: LifecycleNode) -> None:
         raise RuntimeError("authorized review service unavailable")
     if not node.authorization_client.wait_for_service(timeout_sec=20.0):
         raise RuntimeError("supervisor authorization service unavailable")
+    if not node.map_context_client.wait_for_service(timeout_sec=20.0):
+        raise RuntimeError("supervisor map-context service unavailable")
+    if not node.system_state_client.wait_for_service(timeout_sec=20.0):
+        raise RuntimeError("supervisor system-state service unavailable")
     if not node.resolve_client.wait_for_service(timeout_sec=20.0):
         raise RuntimeError("location resolution service unavailable")
+
+
+def update_supervisor_map_context(
+    node: LifecycleNode,
+    command: int,
+    approved: bool,
+) -> None:
+    """Set the Supervisor map context through its public authority service."""
+    request = UpdateMapContext.Request()
+    request.command = command
+    request.request_id = f"phase2d-map-context-{command}"
+    request.actor_id = "phase2d_operator"
+    request.map_id = "campus_main"
+    request.map_revision = 7
+    request.map_release_id = (
+        "campus-main-r7"
+        if command == UpdateMapContext.Request.COMMAND_SET_SAVED_RELEASE
+        else ""
+    )
+    request.mapping_session_id = "phase2d-map-session"
+    request.approved = approved
+    response = wait_future(
+        node,
+        node.map_context_client.call_async(request),
+        5.0,
+        "supervisor map-context update",
+    )
+    if not response.updated:
+        raise RuntimeError(f"map-context update failed: {response.reason}")
+
+
+def arm_supervisor(node: LifecycleNode) -> None:
+    """Arm the Phase 3 system authority after dependencies become ready."""
+    deadline = time.monotonic() + 10.0
+    last_reason = "system_arm_not_evaluated"
+    while rclpy.ok() and time.monotonic() < deadline:
+        request = ManageSystemState.Request()
+        request.command = ManageSystemState.Request.COMMAND_ARM
+        request.request_id = "phase2d-arm"
+        request.actor_id = "savo_bringup.phase2d_operator"
+        request.reason = "phase2d_location_navigation"
+        response = wait_future(
+            node,
+            node.system_state_client.call_async(request),
+            2.0,
+            "supervisor system arm",
+        )
+        if response.accepted or response.system_armed:
+            return
+        last_reason = response.reason
+        if response.result_code not in {
+            ManageSystemState.Response.RESULT_NOT_READY,
+            ManageSystemState.Response.RESULT_ALREADY_IN_STATE,
+        }:
+            raise RuntimeError(f"system arm rejected: {last_reason}")
+        rclpy.spin_once(node, timeout_sec=0.10)
+    raise RuntimeError(f"timeout waiting to arm Supervisor: {last_reason}")
 
 
 def wait_supervisor_ready(node: LifecycleNode) -> None:
     """Wait until the supervisor can authorize non-motion registration."""
     deadline = time.monotonic() + 10.0
     last_reason = "supervisor_authorization_not_evaluated"
+    retryable_results = {
+        AuthorizeLocationOperation.Response.RESULT_SUPERVISOR_NOT_READY,
+        AuthorizeLocationOperation.Response.RESULT_HEALTH_BLOCKED,
+        AuthorizeLocationOperation.Response.RESULT_SAFETY_BLOCKED,
+        AuthorizeLocationOperation.Response.RESULT_MAP_CONTEXT_BLOCKED,
+    }
 
     while rclpy.ok() and time.monotonic() < deadline:
         request = AuthorizeLocationOperation.Request()
@@ -271,9 +584,7 @@ def wait_supervisor_ready(node: LifecycleNode) -> None:
             return
 
         last_reason = response.reason
-        if response.result_code != (
-            AuthorizeLocationOperation.Response.RESULT_SUPERVISOR_NOT_READY
-        ):
+        if response.result_code not in retryable_results:
             raise RuntimeError(
                 "supervisor readiness probe rejected: " + last_reason
             )
@@ -488,18 +799,7 @@ def run() -> int:
                     f"locations_database_path:={database}",
                     "locations_create_parent_directories:=true",
                     "supervisor_startup_grace_s:=0.0",
-                    "supervisor_base_enabled:=false",
-                    "supervisor_base_required:=false",
-                    "supervisor_control_enabled:=false",
-                    "supervisor_control_required:=false",
-                    "supervisor_perception_enabled:=false",
-                    "supervisor_perception_required:=false",
-                    "supervisor_lidar_enabled:=false",
-                    "supervisor_lidar_required:=false",
-                    "supervisor_power_enabled:=false",
-                    "supervisor_power_required:=false",
-                    "supervisor_localization_enabled:=false",
-                    "supervisor_localization_required:=false",
+                    "supervisor_allow_degraded_motion:=true",
                     "head_minimum_observations:=3",
                     "head_maximum_observation_age_s:=2.0",
                     "head_wrong_tag_grace_s:=0.3",
@@ -518,9 +818,14 @@ def run() -> int:
         node = LifecycleNode()
         wait_dependencies(node)
         passed("production launch exposed all public lifecycle boundaries")
+        update_supervisor_map_context(
+            node,
+            UpdateMapContext.Request.COMMAND_SET_LIVE_MAPPING,
+            approved=False,
+        )
+        passed("supervisor accepted the live mapping context")
         wait_supervisor_ready(node)
         passed("supervisor authorized non-motion location registration")
-
 
         candidate = register_candidate(node)
         passed("AprilTag evidence produced one persistent pending candidate")
@@ -534,6 +839,14 @@ def run() -> int:
         if approved.location_id != "A201" or approved.record_revision != 1:
             raise RuntimeError("approved location record mismatch")
         passed("supervisor-authorized review created location revision 1")
+        update_supervisor_map_context(
+            node,
+            UpdateMapContext.Request.COMMAND_SET_SAVED_RELEASE,
+            approved=True,
+        )
+        passed("supervisor accepted the approved saved map release")
+        arm_supervisor(node)
+        passed("explicit Phase 3 system arm enabled navigation authority")
 
         resolved = resolve_location(node)
         if resolved.source_candidate_id != candidate.candidate_id:

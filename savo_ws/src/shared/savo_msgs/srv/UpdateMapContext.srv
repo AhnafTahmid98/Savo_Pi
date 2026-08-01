@@ -1,0 +1,30 @@
+# Robot Savo — supervisor map-context update.
+# This service stores identity/approval metadata only; it never loads a map.
+
+uint8 COMMAND_CLEAR=0
+uint8 COMMAND_SET_LIVE_MAPPING=1
+uint8 COMMAND_SET_SAVED_RELEASE=2
+
+uint8 command
+string request_id
+string actor_id
+string map_id
+uint32 map_revision
+string map_release_id
+string mapping_session_id
+bool approved
+---
+uint8 RESULT_UPDATED=0
+uint8 RESULT_INVALID_REQUEST=1
+uint8 RESULT_CONFLICT=2
+uint8 RESULT_INTERNAL_ERROR=3
+
+bool updated
+uint8 result_code
+string reason
+string context_type
+string active_map_id
+uint32 active_map_revision
+string active_map_release_id
+uint64 context_generation
+builtin_interfaces/Time evaluated_at

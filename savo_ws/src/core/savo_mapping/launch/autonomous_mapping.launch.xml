@@ -53,6 +53,15 @@
     default="$(find-pkg-share savo_mapping)/config/autonomous_mapping_orchestrator.yaml"/>
 
   <arg
+    name="semantic_interruption_enabled"
+    default="true"
+    description="Start continuous AprilTag semantic interruption coordination"/>
+
+  <arg
+    name="semantic_interruption_params_file"
+    default="$(find-pkg-share savo_mapping)/config/semantic_interruption.yaml"/>
+
+  <arg
     name="scan360_params_file"
     default="$(find-pkg-share savo_mapping)/config/scan360_mapping.yaml"/>
 
@@ -252,5 +261,16 @@
       name="params_file"
       value="$(var orchestrator_params_file)"/>
   </include>
+
+  <node
+    if="$(var semantic_interruption_enabled)"
+    pkg="savo_mapping"
+    exec="semantic_interruption_coordinator_node"
+    name="semantic_interruption_coordinator_node"
+    output="screen">
+
+    <param from="$(var semantic_interruption_params_file)"/>
+    <param name="use_sim_time" value="$(var use_sim_time)"/>
+  </node>
 
 </launch>

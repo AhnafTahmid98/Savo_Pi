@@ -82,3 +82,90 @@ savo_supervisor_node:
       summary_timeout_s: 3.0
       heartbeat_timeout_s: 3.0
       expected_schema_version: 1
+
+    # Phase 2 — mission authority and package-owned mission readiness.
+    mission_authorization.service_name: /savo_supervisor/authorize_operation
+    map_context.service_name: /savo_supervisor/update_map_context
+
+    mission_authorization.allow_manual_control: true
+    mission_authorization.allow_manual_mapping: true
+    mission_authorization.allow_autonomous_mapping: true
+    mission_authorization.allow_scan360: true
+    mission_authorization.allow_coverage: true
+    mission_authorization.allow_navigation: true
+    mission_authorization.allow_location_registration: true
+    mission_authorization.allow_location_review: true
+    mission_authorization.allow_arrival_confirmation: true
+    mission_authorization.require_semantic_autonomous_mapping: true
+    mission_authorization.require_approved_release_for_navigation: true
+
+    mission.mapping_status_topic: /savo_mapping/status
+    mission.mapping_status_timeout_s: 2.0
+    mission.navigation_status_topic: /savo_nav/status
+    mission.navigation_heartbeat_topic: /savo_nav/heartbeat
+    mission.navigation_status_timeout_s: 1.5
+    mission.navigation_heartbeat_timeout_s: 2.5
+    mission.head_status_topic: /savo_head/status
+    mission.head_status_timeout_s: 1.5
+    mission.locations_status_topic: /savo_locations/status
+    mission.locations_heartbeat_topic: /savo_locations/heartbeat
+    mission.locations_status_timeout_s: 2.0
+    mission.locations_heartbeat_timeout_s: 2.0
+
+    mission.autonomous_mapping_action: /savo_mapping/autonomous/run
+    mission.rotate_to_heading_action: /savo_control/rotate_to_heading
+    mission.coverage_action: /savo_nav/coverage/execute_path
+    mission.apriltag_confirmation_action: /savo_head/apriltag/confirm
+
+    # Phase 3 — edge integration and startup authority.
+    system_authority.service_name: /savo_supervisor/manage_system_state
+    system_authority.auto_arm: false
+    system_authority.latch_core_faults_after_arm: true
+    system_authority.state_path: /var/lib/robot_savo/supervisor/system_state.json
+    system_authority.system_ready_topic: /savo_supervisor/system_ready
+    system_authority.remote_commands_ready_topic: /savo_supervisor/remote_commands_ready
+    system_authority.shutdown_requested_topic: /savo_supervisor/shutdown_requested
+    system_authority.allowed_actor_prefixes:
+      - system_operator
+      - savo_bringup
+      - operator_app
+
+    edge.bridge.enabled: true
+    edge.bridge.required_for_startup: true
+    edge.bridge.state_topic: /savo_bridge/state
+    edge.bridge.readiness_topic: /savo_bridge/readiness
+    edge.bridge.heartbeat_topic: /savo_bridge/heartbeat
+    edge.bridge.state_timeout_s: 2.0
+    edge.bridge.heartbeat_timeout_s: 2.5
+
+    # These capabilities are production-observed but do not prevent safe local
+    # core startup unless explicitly changed to required_for_startup=true.
+    edge.realsense.enabled: true
+    edge.realsense.required_for_startup: false
+    edge.realsense.status_topic: /realsense/status
+    edge.realsense.status_timeout_s: 2.0
+
+    edge.speech.enabled: true
+    edge.speech.required_for_startup: false
+    edge.speech.readiness_topic: /savo_speech/readiness
+    edge.speech.heartbeat_topic: /savo_speech/heartbeat
+    edge.speech.readiness_timeout_s: 3.0
+    edge.speech.heartbeat_timeout_s: 3.0
+
+    edge.vo.enabled: true
+    edge.vo.required_for_startup: false
+    edge.vo.health_topic: /vo/health
+    edge.vo.health_timeout_s: 2.0
+
+    edge.ui.enabled: true
+    edge.ui.required_for_startup: false
+    edge.ui.expected_nodes:
+      - /savo_ui_node
+
+    # Actors with these prefixes are considered remote/edge command origins.
+    # Their mission leases fail closed whenever the bridge command path is not ready.
+    edge.remote_actor_prefixes:
+      - savo_bridge
+      - savomind
+      - operator_app
+      - savo_speech

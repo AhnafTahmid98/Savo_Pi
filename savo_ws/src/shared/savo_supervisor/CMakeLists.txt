@@ -17,6 +17,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # -----------------------------------------------------------------------------
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rclcpp_action REQUIRED)
 find_package(savo_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
@@ -27,11 +28,17 @@ find_package(nlohmann_json REQUIRED)
 # Library targets
 # -----------------------------------------------------------------------------
 add_library(savo_supervisor_core
+  src/edge_payload_parser.cpp
+  src/edge_supervision.cpp
   src/freshness_tracker.cpp
   src/core_payload_parser.cpp
   src/localization_payload_parser.cpp
   src/location_authorization_policy.cpp
+  src/mission_authority.cpp
+  src/mission_payload_parser.cpp
   src/supervisor_policy.cpp
+  src/system_authority.cpp
+  src/system_state_store.cpp
   src/transition_tracker.cpp
 )
 
@@ -48,6 +55,7 @@ target_compile_features(savo_supervisor_core
 
 ament_target_dependencies(savo_supervisor_core
   rclcpp
+  diagnostic_msgs
   builtin_interfaces
 )
 
@@ -73,6 +81,7 @@ target_link_libraries(supervisor_node
 
 ament_target_dependencies(supervisor_node
   rclcpp
+  rclcpp_action
   std_msgs
   diagnostic_msgs
   builtin_interfaces
@@ -112,9 +121,31 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/launch")
   )
 endif()
 
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/systemd")
+  install(DIRECTORY systemd/
+    DESTINATION share/${PROJECT_NAME}/systemd
+  )
+endif()
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/scripts")
+  install(PROGRAMS
+    scripts/install_core_runtime.sh
+    scripts/real_robot_preflight.sh
+    scripts/request_controlled_shutdown.sh
+    scripts/run_supervisor.sh
+    DESTINATION lib/${PROJECT_NAME}
+  )
+endif()
+
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resource")
   install(DIRECTORY resource/
     DESTINATION share/${PROJECT_NAME}/resource
+  )
+endif()
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/docs")
+  install(DIRECTORY docs/
+    DESTINATION share/${PROJECT_NAME}/docs
   )
 endif()
 
@@ -189,6 +220,54 @@ if(BUILD_TESTING)
     builtin_interfaces
   )
 
+  ament_add_gtest(test_mission_payload_parser
+    test/test_mission_payload_parser.cpp
+  )
+  target_link_libraries(test_mission_payload_parser
+    savo_supervisor_core
+  )
+  ament_target_dependencies(test_mission_payload_parser
+    diagnostic_msgs
+  )
+
+  ament_add_gtest(test_mission_authority
+    test/test_mission_authority.cpp
+  )
+  target_link_libraries(test_mission_authority
+    savo_supervisor_core
+  )
+  ament_target_dependencies(test_mission_authority
+    rclcpp
+  )
+
+  ament_add_gtest(test_edge_payload_parser
+    test/test_edge_payload_parser.cpp
+  )
+  target_link_libraries(test_edge_payload_parser
+    savo_supervisor_core
+  )
+
+  ament_add_gtest(test_edge_supervision
+    test/test_edge_supervision.cpp
+  )
+  target_link_libraries(test_edge_supervision
+    savo_supervisor_core
+  )
+
+  ament_add_gtest(test_system_authority
+    test/test_system_authority.cpp
+  )
+  target_link_libraries(test_system_authority
+    savo_supervisor_core
+  )
+
+  ament_add_gtest(test_system_state_store
+    test/test_system_state_store.cpp
+  )
+  target_link_libraries(test_system_state_store
+    savo_supervisor_core
+  )
+
   ament_add_gtest(test_transition_tracker
     test/test_transition_tracker.cpp
   )
@@ -237,6 +316,30 @@ if(BUILD_TESTING)
     test/test_core_integration_runtime_contract.py
     TIMEOUT 60
   )
+
+  ament_add_pytest_test(
+    test_phase2_mission_runtime_contract
+    test/test_phase2_mission_runtime_contract.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
+    test_phase2_runtime_assets_contract
+    test/test_phase2_runtime_assets_contract.py
+    TIMEOUT 60
+  )
+  ament_add_pytest_test(
+    test_phase3_runtime_contract
+    test/test_phase3_runtime_contract.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
+    test_phase3_runtime_assets_contract
+    test/test_phase3_runtime_assets_contract.py
+    TIMEOUT 60
+  )
+
   target_link_libraries(test_location_authorization_policy
     savo_supervisor_core
   )
@@ -251,6 +354,7 @@ ament_export_include_directories(include)
 
 ament_export_dependencies(
   rclcpp
+  diagnostic_msgs
   builtin_interfaces
   nlohmann_json
   savo_msgs

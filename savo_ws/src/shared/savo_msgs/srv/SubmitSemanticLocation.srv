@@ -1,0 +1,37 @@
+# Robot Savo — operator semantic submission for one paused AM interruption.
+
+uint32 CONTRACT_VERSION=1
+
+uint32 contract_version
+string mission_id
+string actor_id
+string tag_family
+int32 tag_id
+
+string suggested_location_id
+string suggested_display_name
+string[] suggested_aliases
+string suggested_semantic_type
+string building
+string floor
+string area
+string notes
+
+bool approach_pose_valid
+geometry_msgs/PoseStamped approach_pose
+bool confirmation_pose_valid
+geometry_msgs/PoseStamped confirmation_pose
+builtin_interfaces/Duration timeout
+---
+uint8 RESULT_ACCEPTED=0
+uint8 RESULT_NO_ACTIVE_INTERRUPTION=1
+uint8 RESULT_TAG_MISMATCH=2
+uint8 RESULT_MISSION_MISMATCH=3
+uint8 RESULT_INVALID_REQUEST=4
+uint8 RESULT_BUSY=5
+uint8 RESULT_REJECTED=6
+
+bool accepted
+uint8 result_code
+string reason
+string candidate_id

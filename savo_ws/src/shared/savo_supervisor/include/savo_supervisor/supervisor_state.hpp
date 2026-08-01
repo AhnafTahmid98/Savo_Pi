@@ -20,7 +20,16 @@ enum class Lifecycle
 
 enum class OperatingMode
 {
+  BOOTING,
+  IDLE,
   STOP,
+  MANUAL,
+  MAPPING,
+  NAVIGATE,
+  RECOVERY,
+  ESTOP,
+  ERROR,
+  SHUTTING_DOWN,
   UNKNOWN,
 };
 
@@ -124,7 +133,16 @@ inline const char * ToString(Lifecycle value)
 inline const char * ToString(OperatingMode value)
 {
   switch (value) {
+    case OperatingMode::BOOTING: return "BOOTING";
+    case OperatingMode::IDLE: return "IDLE";
     case OperatingMode::STOP: return "STOP";
+    case OperatingMode::MANUAL: return "MANUAL";
+    case OperatingMode::MAPPING: return "MAPPING";
+    case OperatingMode::NAVIGATE: return "NAVIGATE";
+    case OperatingMode::RECOVERY: return "RECOVERY";
+    case OperatingMode::ESTOP: return "ESTOP";
+    case OperatingMode::ERROR: return "ERROR";
+    case OperatingMode::SHUTTING_DOWN: return "SHUTTING_DOWN";
     case OperatingMode::UNKNOWN: return "UNKNOWN";
   }
   return "UNKNOWN";

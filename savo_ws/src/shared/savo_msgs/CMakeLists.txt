@@ -43,6 +43,7 @@ set(msg_files
   "msg/LocationEvent.msg"
   "msg/AutonomousMappingStatus.msg"
   "msg/FrontierExplorationStatus.msg"
+  "msg/SemanticInterruptionStatus.msg"
 )
 
 set(action_files
@@ -66,7 +67,11 @@ set(srv_files
   "srv/SetLocationEnabled.srv"
   "srv/RecoverLocationStorage.srv"
   "srv/AuthorizeLocationOperation.srv"
+  "srv/AuthorizeOperation.srv"
+  "srv/UpdateMapContext.srv"
+  "srv/ManageSystemState.srv"
   "srv/ControlAutonomousMapping.srv"
+  "srv/SubmitSemanticLocation.srv"
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}
@@ -116,7 +121,7 @@ if(BUILD_TESTING)
     test/test_execute_coverage_path_registration.py
     TIMEOUT 60
   )
-ament_add_pytest_test(
+  ament_add_pytest_test(
     test_location_interfaces
     test/test_location_interfaces.py
     TIMEOUT 60
@@ -131,6 +136,24 @@ ament_add_pytest_test(
   ament_add_pytest_test(
     test_autonomous_mapping_interfaces
     test/test_autonomous_mapping_interfaces.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
+    test_semantic_interruption_interfaces
+    test/test_semantic_interruption_interfaces.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
+    test_supervisor_phase2_interfaces
+    test/test_supervisor_phase2_interfaces.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
+    test_supervisor_phase3_interfaces
+    test/test_supervisor_phase3_interfaces.py
     TIMEOUT 60
   )
 endif()

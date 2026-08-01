@@ -66,7 +66,6 @@ TEST(LocationAuthorizationPolicy, RejectsDegradedMotionByDefault)
     savo_supervisor::LocationAuthorizationCode::kHealthBlocked);
 }
 
-
 TEST(LocationAuthorizationPolicy, AuthorizesHealthyCandidateRejection)
 {
   savo_supervisor::LocationAuthorizationEvaluator evaluator;

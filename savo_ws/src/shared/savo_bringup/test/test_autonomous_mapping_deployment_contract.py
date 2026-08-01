@@ -1,4 +1,4 @@
-"""Deployment contracts for the AM-5 autonomous mapping bringup."""
+"""Deployment contracts for the autonomous mapping bringup."""
 
 import ast
 from pathlib import Path
@@ -48,6 +48,7 @@ def test_autonomous_mapping_launch_composes_all_core_owners() -> None:
         '"live_mapping_navigation.launch.py"',
         '"autonomous_mapping.launch.xml"',
         '"head_bringup.launch.py"',
+        '"location_integration.launch.py"',
     }
     for token in required_launches:
         assert token in launch
@@ -78,6 +79,12 @@ def test_autonomous_mapping_launch_is_fail_closed_by_default() -> None:
     assert 'default_value="false"' in launch
     assert '"head_camera_mode"' in launch
     assert 'default_value="disabled"' in launch
+    assert '"start_location_lifecycle"' in launch
+    assert '"start_semantic_interruption"' in launch
+    assert '"locations_database_path"' in launch
+    assert '"start_head_action": "true"' in launch
+    assert '"start_registration": "true"' in launch
+    assert '"start_locations": "true"' in launch
 
 
 def test_bringup_installs_am4_and_runtime_dependencies() -> None:

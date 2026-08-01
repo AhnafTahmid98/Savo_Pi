@@ -158,6 +158,9 @@ def generate_launch_description() -> LaunchDescription:
                 "startup_grace_s": _floating(
                     "supervisor_startup_grace_s"
                 ),
+                "location_authorization.allow_degraded_motion": _boolean(
+                    "supervisor_allow_degraded_motion"
+                ),
                 "base.enabled": _boolean(
                     "supervisor_base_enabled"
                 ),
@@ -343,6 +346,10 @@ def generate_launch_description() -> LaunchDescription:
         DeclareLaunchArgument(
             "supervisor_startup_grace_s",
             default_value="3.0",
+        ),
+        DeclareLaunchArgument(
+            "supervisor_allow_degraded_motion",
+            default_value="false",
         ),
         DeclareLaunchArgument(
             "supervisor_base_enabled",
