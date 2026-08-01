@@ -432,5 +432,27 @@ and verification pipeline. Pausing or canceling quiesces the active Coverage,
 return, Scan360, or head-scan operation first; Coverage resume uses bounded
 fresh replanning and may revisit already-covered cells.
 
+Return actions use an explicit lifecycle: `idle`, `waiting_for_server`,
+`goal_request_pending`, `accepted_active`, `cancel_pending`, terminal, and
+bounded proximity verification. A pending goal is not reported active. If its
+acceptance arrives after a timeout or generation change, the accepted handle
+is canceled immediately and retained until cancellation and the terminal
+action result are acknowledged. The original execution failure and any later
+non-quiesced cancellation fault are reported separately; a cancellation
+timeout never permits the mission to continue.
+
+Scan360 operation timeout requests the public cancel service and waits for a
+terminal scan state. Head-scan timeout requests the public pause service and
+waits for paused, stopped, or terminal state. Both waits are bounded and latch
+an explicit non-quiesced fault if state acknowledgement never arrives.
+
+Completion evidence has an observation sequence, so fresh evidence can revoke
+frontier exhaustion even after monitor-only is requested while retained stale
+false values cannot. Coverage plans are accepted only when request, reset,
+plan, and map generations match the current mission. Coverage feedback age is
+driven by actual feedback callbacks, independently of whether numeric progress
+changed. After a successful guarded return, fresh TF is polled for a bounded
+period; delayed TF does not resend the navigation goal.
+
 AM-8 combined map/location verification, approval, and atomic release remain
 deferred. `savo_description` remains deferred until AM-0B locks real geometry.

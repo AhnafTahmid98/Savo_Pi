@@ -85,3 +85,24 @@ Final scans use new operation generations so initial or conditional scan
 completion cannot satisfy the final sequence. Timeouts, stale feedback,
 rejection, cancellation, failed proximity verification, and exhausted retry
 limits fail closed with existing typed mission results.
+
+The return action is tracked as idle, waiting for server, goal-request pending,
+accepted active, cancel pending, terminal, then (on navigation success)
+proximity verification. Only an accepted handle is active. A late accepted or
+stale-generation handle is canceled instead of discarded, and the mission
+waits for both cancellation acceptance and a terminal action result. Primary
+timeout reasons remain intact if the independent cancellation timer later
+latches a non-quiesced fault.
+
+Scan360 timeout calls the public cancel boundary and waits for terminal scan
+state. Head-scan timeout calls the public pause boundary and waits for paused,
+stopped, or terminal state. A quiescence timeout is a fail-closed fault and
+does not authorize saving or a later motion stage.
+
+Frontier completion carries an observation sequence and can be revoked by
+newer fresh evidence before Coverage starts. Coverage planning correlates the
+current reset generation, request generation, advancing plan sequence, and
+frontier map generation. Coverage feedback freshness advances only on a real
+action feedback callback; an unchanged but newly received progress sample is
+fresh, while retained status republishing is not. Return proximity uses bounded
+fresh-TF polling with distinct outside-tolerance and unverifiable outcomes.

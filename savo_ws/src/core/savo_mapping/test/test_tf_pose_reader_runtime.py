@@ -138,6 +138,7 @@ class FixtureTransformStream:
         self.target_frame = target_frame
         self.source_frame = source_frame
         self.stop_event = threading.Event()
+        self.frozen_stamp = None
         self.thread = threading.Thread(
             target=self._run,
             daemon=True,
@@ -146,7 +147,7 @@ class FixtureTransformStream:
     def _run(self):
         while not self.stop_event.is_set():
             transform = TransformStamped()
-            transform.header.stamp = (
+            transform.header.stamp = self.frozen_stamp or (
                 self.node.get_clock().now().to_msg()
             )
             transform.header.frame_id = self.target_frame
@@ -177,6 +178,10 @@ class FixtureTransformStream:
         raise AssertionError(
             'TF listener did not discover the fixture broadcaster'
         )
+
+    def freeze_timestamp(self):
+        """Keep broadcasting one old timestamp until every listener sees it."""
+        self.frozen_stamp = self.node.get_clock().now().to_msg()
 
     def stop(self):
         self.stop_event.set()
@@ -278,10 +283,12 @@ def test_received_transform_becomes_stale():
         )
     )
 
-    stream.wait_for_tf_subscriber()
-    time.sleep(0.25)
-    stream.stop()
-    result, output = complete_process(process)
+    try:
+        stream.wait_for_tf_subscriber()
+        stream.freeze_timestamp()
+        result, output = complete_process(process)
+    finally:
+        stream.stop()
 
     assert result['valid'] == '0', output
     assert result['fresh'] == '0', output

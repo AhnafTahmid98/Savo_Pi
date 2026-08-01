@@ -1,4 +1,4 @@
-savo_head:
+apriltag_confirm_node:
   ros__parameters:
     apriltag_enabled: true
     apriltag_family: tag36h11

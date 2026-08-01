@@ -19,6 +19,8 @@ import pytest
 import rclpy
 from rclpy.action import ActionClient
 from rclpy.action import ActionServer
+from rclpy.action import CancelResponse
+from rclpy.action import GoalResponse
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.qos import DurabilityPolicy
@@ -64,12 +66,21 @@ def wait_until(predicate, timeout=15.0, interval=0.02):
 class Am7RuntimeHarness:
     """Provide fake hardware boundaries around the production orchestrator."""
 
-    def __init__(self):
+    def __init__(
+        self,
+        return_behavior='succeed',
+        scan_behavior='complete',
+        head_behavior='complete',
+        coverage_behavior='complete',
+        tf_behavior='continuous',
+        parameter_overrides=None,
+    ):
         suffix = f'{os.getpid()}_{time.monotonic_ns()}'
         prefix = f'/test/am7_{suffix}'
         self.map_frame = f'map_{suffix}'
         self.base_frame = f'base_{suffix}'
         self.action_name = f'{prefix}/run'
+        self.control_service = f'{prefix}/control'
         self.return_action_name = f'{prefix}/guarded_return'
         self.status_topic = f'{prefix}/status'
         self.mode_topic = f'{prefix}/mode'
@@ -110,10 +121,23 @@ class Am7RuntimeHarness:
         self.start_commands = []
         self.statuses = []
         self.scan_starts = 0
+        self.scan_cancels = 0
         self.head_starts = 0
+        self.head_pauses = 0
+        self.scan_behavior = scan_behavior
+        self.head_behavior = head_behavior
         self.coverage_requests = 0
+        self.coverage_resets = 0
         self.coverage_approvals = 0
+        self.coverage_cancels = 0
+        self.coverage_behavior = coverage_behavior
         self.return_goals = []
+        self.return_behavior = return_behavior
+        self.return_cancel_requests = 0
+        self.tf_behavior = tf_behavior
+        self.return_goal_received_at = None
+        self.closed = False
+        self.delayed_timers = []
         self.map_saves = 0
         self.session_root = Path(tempfile.mkdtemp(prefix='savo_am7_runtime_'))
         self.session_directory = self._create_valid_session('campus_main')
@@ -179,14 +203,14 @@ class Am7RuntimeHarness:
 
         self._service(self.handoff_cancel_service, self._accept)
         self._service(self.scan_start_service, self._scan_start)
-        self._service(self.scan_cancel_service, self._accept)
+        self._service(self.scan_cancel_service, self._scan_cancel)
         self._service(self.head_start_service, self._head_start)
-        self._service(self.head_pause_service, self._accept)
+        self._service(self.head_pause_service, self._head_pause)
         self._service(self.head_resume_service, self._accept)
-        self._service(self.coverage_plan_reset_service, self._accept)
+        self._service(self.coverage_plan_reset_service, self._coverage_reset)
         self._service(self.coverage_request_service, self._coverage_request)
         self._service(self.coverage_approve_service, self._coverage_approve)
-        self._service(self.coverage_cancel_service, self._accept)
+        self._service(self.coverage_cancel_service, self._coverage_cancel)
         self._service(self.coverage_reset_service, self._accept)
         self._service(self.map_save_service, self._map_save)
 
@@ -195,6 +219,8 @@ class Am7RuntimeHarness:
             NavigateToPose,
             self.return_action_name,
             execute_callback=self._return_to_start,
+            goal_callback=self._return_goal_response,
+            cancel_callback=self._return_cancel_response,
             callback_group=self.group,
         )
         self.action_client = ActionClient(
@@ -209,7 +235,7 @@ class Am7RuntimeHarness:
             daemon=True,
         )
         self.spin_thread.start()
-        self.process = self._start_orchestrator()
+        self.process = self._start_orchestrator(parameter_overrides or {})
         assert wait_until(
             lambda: self.process.poll() is not None
             or self.action_client.server_is_ready()
@@ -265,11 +291,12 @@ class Am7RuntimeHarness:
         )
         return session
 
-    def _start_orchestrator(self):
+    def _start_orchestrator(self, parameter_overrides):
         executable = Path(os.environ['AUTONOMOUS_ORCHESTRATOR_EXECUTABLE'])
         assert executable.is_file() and os.access(executable, os.X_OK)
         parameters = {
             'action_name': self.action_name,
+            'control_service': self.control_service,
             'status_topic': self.status_topic,
             'mode_topic': self.mode_topic,
             'exploration_mode_topic': self.exploration_mode_topic,
@@ -316,6 +343,7 @@ class Am7RuntimeHarness:
             'command_retry_period_ms': '100',
             'default_mission_timeout_s': '0.0',
         }
+        parameters.update(parameter_overrides)
         command = [str(executable), '--ros-args']
         for name, value in parameters.items():
             command.extend(['-p', f'{name}:={value}'])
@@ -337,17 +365,35 @@ class Am7RuntimeHarness:
         return response
 
     def _delayed_publish(self, publisher, value, delay=0.08):
+        if self.closed:
+            return
+
+        def publish_if_open():
+            if not self.closed:
+                publisher.publish(self.string_message(value))
+
         timer = threading.Timer(
-            delay, lambda: publisher.publish(self.string_message(value))
+            delay, publish_if_open
         )
         timer.daemon = True
+        self.delayed_timers.append(timer)
         timer.start()
 
     def _scan_start(self, _request, response):
         self.scan_starts += 1
         response.success = True
         response.message = 'scan360_started'
-        self._delayed_publish(self.scan_state_pub, 'complete')
+        self._delayed_publish(self.scan_state_pub, 'rotating', delay=0.03)
+        if self.scan_behavior == 'complete':
+            self._delayed_publish(self.scan_state_pub, 'complete')
+        return response
+
+    def _scan_cancel(self, _request, response):
+        self.scan_cancels += 1
+        response.success = True
+        response.message = 'scan360_cancel_requested'
+        if self.scan_behavior == 'timeout_ack':
+            self._delayed_publish(self.scan_state_pub, 'canceled')
         return response
 
     def _head_start(self, _request, response):
@@ -355,9 +401,23 @@ class Am7RuntimeHarness:
         response.success = True
         response.message = 'head_scan_started'
         self._delayed_publish(
-            self.head_state_pub,
-            'state=done;phase=complete;reason=fixture_complete',
+            self.head_state_pub, 'state=running;phase=scan', delay=0.03
         )
+        if self.head_behavior == 'complete':
+            self._delayed_publish(
+                self.head_state_pub,
+                'state=done;phase=complete;reason=fixture_complete',
+            )
+        return response
+
+    def _head_pause(self, _request, response):
+        self.head_pauses += 1
+        response.success = True
+        response.message = 'head_scan_pause_requested'
+        if self.head_behavior == 'timeout_ack':
+            self._delayed_publish(
+                self.head_state_pub, 'state=paused;phase=paused'
+            )
         return response
 
     def _coverage_request(self, _request, response):
@@ -371,6 +431,8 @@ class Am7RuntimeHarness:
             'map_fresh': True,
             'map_sequence': 5,
             'plan_sequence': self.coverage_requests,
+            'request_generation': self.coverage_requests,
+            'reset_generation': self.coverage_resets,
             'waypoint_count': 3,
         }
         operation = {
@@ -390,6 +452,12 @@ class Am7RuntimeHarness:
             json.dumps(operation),
             delay=0.12,
         )
+        return response
+
+    def _coverage_reset(self, _request, response):
+        self.coverage_resets += 1
+        response.success = True
+        response.message = 'coverage_plan_reset'
         return response
 
     def _coverage_approve(self, _request, response):
@@ -426,20 +494,113 @@ class Am7RuntimeHarness:
         self.coverage_operation_status_pub.publish(
             self.string_message(json.dumps(executing))
         )
-        self._delayed_publish(
-            self.coverage_operation_status_pub,
-            json.dumps(succeeded),
-            delay=0.25,
-        )
+        if self.coverage_behavior == 'complete':
+            self._delayed_publish(
+                self.coverage_operation_status_pub,
+                json.dumps(succeeded),
+                delay=0.25,
+            )
+        elif self.coverage_behavior == 'fresh_feedback':
+            for sequence in range(1, 6):
+                fresh = dict(executing)
+                fresh.update(
+                    feedback_received=True,
+                    feedback_sequence=sequence,
+                    feedback_age_s=0.0,
+                )
+                self._delayed_publish(
+                    self.coverage_operation_status_pub,
+                    json.dumps(fresh),
+                    delay=0.07 * sequence,
+                )
+            self._delayed_publish(
+                self.coverage_operation_status_pub,
+                json.dumps(succeeded),
+                delay=0.42,
+            )
         response.success = True
         response.message = mission_id
         return response
 
+    def publish_coverage_terminal(self, generation, terminal_state):
+        """Publish a correlated fake public Coverage terminal status."""
+        mission_id = f'coverage-{generation}-runtime'
+        status = {
+            'state': terminal_state,
+            'supervisor_authorized': True,
+            'candidate_valid': True,
+            'candidate_generation': generation,
+            'approval_pending': False,
+            'mission_id': mission_id,
+            'terminal_state': terminal_state,
+            'result_reason': f'fixture_coverage_{terminal_state}',
+            'latest_feedback': '',
+        }
+        self.coverage_operation_status_pub.publish(
+            self.string_message(json.dumps(status))
+        )
+
+    def _coverage_cancel(self, _request, response):
+        self.coverage_cancels += 1
+        response.success = True
+        response.message = 'coverage_cancel_requested'
+        if self.coverage_behavior in ('pause_resume', 'stale_feedback'):
+            self._delayed_publish(
+                self.coverage_operation_status_pub,
+                json.dumps(
+                    {
+                        'state': 'canceled',
+                        'supervisor_authorized': True,
+                        'candidate_valid': True,
+                        'candidate_generation': self.coverage_requests,
+                        'approval_pending': False,
+                        'mission_id': (
+                            f'coverage-{self.coverage_requests}-runtime'
+                        ),
+                        'terminal_state': 'canceled',
+                        'result_reason': 'fixture_coverage_canceled',
+                        'latest_feedback': '',
+                    }
+                ),
+                delay=(
+                    0.30 if self.coverage_behavior == 'stale_feedback' else 0.08
+                ),
+            )
+        return response
+
     def _return_to_start(self, goal_handle):
         self.return_goals.append(goal_handle.request.pose)
+        self.return_goal_received_at = time.monotonic()
         result = NavigateToPose.Result()
+        if self.return_behavior in ('cancel_terminal', 'delay_accept'):
+            assert wait_until(
+                lambda: goal_handle.is_cancel_requested, timeout=3.0
+            )
+            goal_handle.canceled()
+            return result
+        if self.return_behavior in ('cancel_no_terminal', 'cancel_reject'):
+            while rclpy.ok() and not self.closed:
+                time.sleep(0.05)
+            return result
+        if self.tf_behavior in ('delayed_after_return', 'unavailable_after_return'):
+            time.sleep(0.6)
+        elif self.tf_behavior == 'outside_after_return':
+            time.sleep(0.15)
         goal_handle.succeed()
         return result
+
+    def _return_goal_response(self, _goal):
+        if self.return_behavior == 'reject':
+            return GoalResponse.REJECT
+        if self.return_behavior in ('delay_accept', 'cancel_reject'):
+            time.sleep(0.5)
+        return GoalResponse.ACCEPT
+
+    def _return_cancel_response(self, _goal_handle):
+        self.return_cancel_requests += 1
+        if self.return_behavior == 'cancel_reject':
+            return CancelResponse.REJECT
+        return CancelResponse.ACCEPT
 
     def _map_save(self, _request, response):
         self.map_saves += 1
@@ -448,11 +609,24 @@ class Am7RuntimeHarness:
         return response
 
     def publish_transform(self):
+        if self.return_goal_received_at is not None:
+            if self.tf_behavior == 'unavailable_after_return':
+                return
+            if (
+                self.tf_behavior == 'delayed_after_return'
+                and time.monotonic() - self.return_goal_received_at < 0.8
+            ):
+                return
         transform = TransformStamped()
         transform.header.stamp = self.node.get_clock().now().to_msg()
         transform.header.frame_id = self.map_frame
         transform.child_frame_id = self.base_frame
-        transform.transform.translation.x = 1.25
+        transform.transform.translation.x = (
+            2.25
+            if self.tf_behavior == 'outside_after_return'
+            and self.return_goal_received_at is not None
+            else 1.25
+        )
         transform.transform.translation.y = -0.50
         transform.transform.rotation.w = 1.0
         self.tf_broadcaster.sendTransform(transform)
@@ -512,6 +686,66 @@ class Am7RuntimeHarness:
     def latest_state(self):
         return self.statuses[-1].state if self.statuses else None
 
+    def drive_to_return(self):
+        """Drive the production mission through Coverage to return dispatch."""
+        self.publish_initial_state()
+        result_future = self.send_goal().get_result_async()
+        assert wait_until(
+            lambda: 'mission_am7_runtime' in self.start_commands
+        ), self.diagnostics()
+        self.session_state_pub.publish(self.string_message('active'))
+
+        assert wait_until(
+            lambda: 'autonomous:scan360' in self.mode_commands
+        ), self.diagnostics()
+        self.publish_workflow('autonomous', 'scan360', 'scan360', False)
+        assert wait_until(lambda: self.scan_starts == 1), self.diagnostics()
+        assert wait_until(
+            lambda: 'monitor_only' in self.mode_commands
+        ), self.diagnostics()
+        self.publish_workflow('monitor_only', 'idle', 'idle', False)
+        assert wait_until(lambda: self.head_starts == 1), self.diagnostics()
+
+        assert wait_until(
+            lambda: 'autonomous:frontier' in self.mode_commands
+        ), self.diagnostics()
+        self.publish_workflow('autonomous', 'frontier', 'exploring', True)
+        assert wait_until(
+            lambda: self.latest_state()
+            == AutonomousMappingStatus.STATE_EXPLORING
+        ), self.diagnostics()
+        self.publish_exhaustion()
+
+        previous_monitors = self.mode_commands.count('monitor_only')
+        assert wait_until(
+            lambda: self.mode_commands.count('monitor_only')
+            > previous_monitors
+        ), self.diagnostics()
+        self.publish_workflow('monitor_only', 'idle', 'idle', False)
+        assert wait_until(
+            lambda: self.coverage_approvals == 1
+            and any(
+                status.state == AutonomousMappingStatus.STATE_COVERAGE
+                for status in self.statuses
+            )
+        ), self.diagnostics()
+        return result_future
+
+    def start_initial_scan(self):
+        """Start a mission and reach the first Scan360 operation."""
+        self.publish_initial_state()
+        result_future = self.send_goal().get_result_async()
+        assert wait_until(
+            lambda: 'mission_am7_runtime' in self.start_commands
+        ), self.diagnostics()
+        self.session_state_pub.publish(self.string_message('active'))
+        assert wait_until(
+            lambda: 'autonomous:scan360' in self.mode_commands
+        ), self.diagnostics()
+        self.publish_workflow('autonomous', 'scan360', 'scan360', False)
+        assert wait_until(lambda: self.scan_starts == 1), self.diagnostics()
+        return result_future
+
     def diagnostics(self):
         output = ''
         if hasattr(self, 'process') and self.process.poll() is not None:
@@ -524,10 +758,18 @@ class Am7RuntimeHarness:
             f'approvals={self.coverage_approvals} returns={len(self.return_goals)} '
             f'saves={self.map_saves} '
             f'states={[status.state_text for status in self.statuses[-15:]]} '
+            f'reasons={[status.reason for status in self.statuses[-8:]]} '
+            f'coverage_reasons='
+            f'{[status.coverage_reason for status in self.statuses[-8:]]} '
             f'output={output}'
         )
 
     def close(self):
+        self.closed = True
+        for timer in self.delayed_timers:
+            timer.cancel()
+        for timer in self.delayed_timers:
+            timer.join(timeout=0.5)
         if self.process.poll() is None:
             os.killpg(self.process.pid, signal.SIGINT)
             try:
@@ -555,48 +797,7 @@ def test_full_am7_runtime_sequence():
     """Drive the real C++ orchestrator through every required AM-7 stage."""
     harness = Am7RuntimeHarness()
     try:
-        harness.publish_initial_state()
-        result_future = harness.send_goal().get_result_async()
-        assert wait_until(
-            lambda: 'mission_am7_runtime' in harness.start_commands
-        ), harness.diagnostics()
-        harness.session_state_pub.publish(harness.string_message('active'))
-
-        assert wait_until(
-            lambda: 'autonomous:scan360' in harness.mode_commands
-        ), harness.diagnostics()
-        harness.publish_workflow('autonomous', 'scan360', 'scan360', False)
-        assert wait_until(lambda: harness.scan_starts == 1), harness.diagnostics()
-
-        assert wait_until(
-            lambda: 'monitor_only' in harness.mode_commands
-        ), harness.diagnostics()
-        harness.publish_workflow('monitor_only', 'idle', 'idle', False)
-        assert wait_until(lambda: harness.head_starts == 1), harness.diagnostics()
-
-        assert wait_until(
-            lambda: 'autonomous:frontier' in harness.mode_commands
-        ), harness.diagnostics()
-        harness.publish_workflow('autonomous', 'frontier', 'exploring', True)
-        assert wait_until(
-            lambda: harness.latest_state()
-            == AutonomousMappingStatus.STATE_EXPLORING
-        ), harness.diagnostics()
-        harness.publish_exhaustion()
-
-        previous_monitors = harness.mode_commands.count('monitor_only')
-        assert wait_until(
-            lambda: harness.mode_commands.count('monitor_only')
-            > previous_monitors
-        ), harness.diagnostics()
-        harness.publish_workflow('monitor_only', 'idle', 'idle', False)
-        assert wait_until(
-            lambda: harness.coverage_approvals == 1
-            and any(
-                status.state == AutonomousMappingStatus.STATE_COVERAGE
-                for status in harness.statuses
-            )
-        ), harness.diagnostics()
+        result_future = harness.drive_to_return()
         assert wait_until(lambda: len(harness.return_goals) == 1), (
             harness.diagnostics()
         )
@@ -634,5 +835,400 @@ def test_full_am7_runtime_sequence():
         assert harness.statuses[-1].final_head_scan_succeeded
         assert harness.statuses[-1].return_to_start_succeeded
         assert harness.statuses[-1].return_to_start_distance_m <= 0.35
+    finally:
+        harness.close()
+
+
+def test_rejected_return_fails_without_becoming_active():
+    """A rejected guarded return is terminal and was never accepted-active."""
+    harness = Am7RuntimeHarness(
+        return_behavior='reject',
+        parameter_overrides={'return_to_start.maximum_attempts': '1'},
+    )
+    try:
+        harness.drive_to_return()
+        assert wait_until(
+            lambda: any(
+                status.return_to_start_state == 'rejected'
+                for status in harness.statuses
+            )
+        ), harness.diagnostics()
+        rejected = next(
+            status
+            for status in reversed(harness.statuses)
+            if status.return_to_start_state == 'rejected'
+        )
+        assert not rejected.return_to_start_active
+        assert rejected.return_to_start_complete
+        assert not rejected.return_to_start_succeeded
+        assert rejected.return_to_start_reason == 'guarded_return_goal_rejected'
+    finally:
+        harness.close()
+
+
+def test_late_return_acceptance_is_canceled_and_reaches_terminal():
+    """A response after the goal-response deadline is canceled immediately."""
+    harness = Am7RuntimeHarness(
+        return_behavior='delay_accept',
+        parameter_overrides={
+            'return_to_start.goal_response_timeout_s': '0.15',
+            'return_to_start.cancel_timeout_s': '1.5',
+            'return_to_start.maximum_attempts': '1',
+        },
+    )
+    try:
+        harness.drive_to_return()
+        assert wait_until(
+            lambda: harness.return_cancel_requests == 1, timeout=4.0
+        ), harness.diagnostics()
+        assert wait_until(
+            lambda: any(
+                status.return_to_start_complete
+                and status.return_to_start_reason
+                == 'return_goal_response_timeout'
+                for status in harness.statuses
+            ),
+            timeout=4.0,
+        ), harness.diagnostics()
+        assert not harness.statuses[-1].return_to_start_active
+    finally:
+        harness.close()
+
+
+def test_return_cancellation_rejection_latches_non_quiesced_fault():
+    """Cancellation rejection never advances to saving or a later scan."""
+    harness = Am7RuntimeHarness(
+        return_behavior='cancel_reject',
+        parameter_overrides={
+            'return_to_start.goal_response_timeout_s': '0.15',
+            'return_to_start.cancel_timeout_s': '1.0',
+            'return_to_start.maximum_attempts': '1',
+        },
+    )
+    try:
+        harness.drive_to_return()
+        assert wait_until(
+            lambda: any(
+                'return_non_quiesced_fault' in status.reason
+                for status in harness.statuses
+            ),
+            timeout=4.0,
+        ), harness.diagnostics()
+        assert harness.return_cancel_requests == 1
+        assert harness.scan_starts == 1
+        assert harness.map_saves == 0
+    finally:
+        harness.close()
+
+
+def test_return_cancellation_timeout_survives_primary_timeout():
+    """The independent cancel timer fires after the primary execution timeout."""
+    harness = Am7RuntimeHarness(
+        return_behavior='cancel_no_terminal',
+        parameter_overrides={
+            'return_to_start.execution_timeout_s': '0.20',
+            'return_to_start.feedback_stale_timeout_s': '5.0',
+            'return_to_start.cancel_timeout_s': '0.25',
+            'return_to_start.maximum_attempts': '1',
+        },
+    )
+    try:
+        harness.drive_to_return()
+        assert wait_until(
+            lambda: any(
+                status.return_to_start_reason.startswith(
+                    'return_execution_timeout;return_non_quiesced_fault:'
+                )
+                for status in harness.statuses
+            ),
+            timeout=4.0,
+        ), harness.diagnostics()
+        assert harness.return_cancel_requests == 1
+        assert harness.scan_starts == 1
+        assert harness.map_saves == 0
+    finally:
+        harness.close()
+
+
+def test_unchanged_but_fresh_coverage_feedback_remains_healthy():
+    """Actual feedback callbacks refresh age even without numeric progress."""
+    harness = Am7RuntimeHarness(
+        coverage_behavior='fresh_feedback',
+        parameter_overrides={'coverage.feedback_stale_timeout_s': '0.16'},
+    )
+    try:
+        harness.drive_to_return()
+        assert wait_until(lambda: len(harness.return_goals) == 1), (
+            harness.diagnostics()
+        )
+        assert not any(
+            'coverage_feedback_stale_timeout' in status.reason
+            for status in harness.statuses
+        )
+        assert harness.coverage_cancels == 0
+    finally:
+        harness.close()
+
+
+def test_no_coverage_feedback_times_out_and_still_cancels():
+    """No feedback triggers the primary stale timeout and bounded cancellation."""
+    harness = Am7RuntimeHarness(
+        coverage_behavior='stale_feedback',
+        parameter_overrides={
+            'coverage.feedback_stale_timeout_s': '0.18',
+            'coverage.cancel_timeout_s': '1.0',
+        },
+    )
+    try:
+        harness.drive_to_return()
+        assert wait_until(lambda: harness.coverage_cancels >= 1), (
+            harness.diagnostics()
+        )
+        assert wait_until(
+            lambda: any(
+                status.reason == 'coverage_feedback_stale_timeout'
+                for status in harness.statuses
+            )
+        ), harness.diagnostics()
+        assert len(harness.return_goals) == 0
+        assert harness.map_saves == 0
+    finally:
+        harness.close()
+
+
+def test_coverage_cancel_timeout_survives_feedback_timeout():
+    """Coverage quiescence timeout remains armed after its primary timeout."""
+    harness = Am7RuntimeHarness(
+        coverage_behavior='stale_feedback_no_terminal',
+        parameter_overrides={
+            'coverage.feedback_stale_timeout_s': '0.18',
+            'coverage.cancel_timeout_s': '0.22',
+        },
+    )
+    try:
+        harness.drive_to_return()
+        assert wait_until(
+            lambda: any(
+                status.coverage_reason.startswith(
+                    'coverage_feedback_stale_timeout;'
+                    'coverage_non_quiesced_fault:'
+                )
+                for status in harness.statuses
+            )
+        ), harness.diagnostics()
+        assert harness.coverage_cancels >= 1
+        assert len(harness.return_goals) == 0
+        assert harness.map_saves == 0
+    finally:
+        harness.close()
+
+
+def test_delayed_fresh_tf_verifies_without_resending_return_goal():
+    """Proximity polling accepts delayed TF without a second navigation goal."""
+    harness = Am7RuntimeHarness(
+        tf_behavior='delayed_after_return',
+        parameter_overrides={
+            'return_to_start.proximity_timeout_s': '0.8',
+            'return_to_start.proximity_poll_period_s': '0.05',
+            'sequence.start_pose_stale_timeout_s': '0.10',
+        },
+    )
+    try:
+        harness.drive_to_return()
+        assert wait_until(
+            lambda: any(
+                status.return_to_start_succeeded for status in harness.statuses
+            ),
+            timeout=4.0,
+        ), harness.diagnostics()
+        assert len(harness.return_goals) == 1
+    finally:
+        harness.close()
+
+
+def test_return_tf_outside_tolerance_fails_after_bounded_polling():
+    """Fresh poses outside tolerance fail with the specific proximity reason."""
+    harness = Am7RuntimeHarness(
+        tf_behavior='outside_after_return',
+        parameter_overrides={
+            'return_to_start.proximity_timeout_s': '0.25',
+            'return_to_start.proximity_poll_period_s': '0.05',
+            'return_to_start.maximum_attempts': '1',
+            'sequence.start_pose_stale_timeout_s': '0.10',
+        },
+    )
+    try:
+        harness.drive_to_return()
+        assert wait_until(
+            lambda: any(
+                status.return_to_start_reason
+                == 'return_to_start_outside_tolerance'
+                for status in harness.statuses
+            )
+        ), harness.diagnostics()
+        assert len(harness.return_goals) == 1
+        assert harness.scan_starts == 1
+    finally:
+        harness.close()
+
+
+def test_return_tf_unavailable_fails_after_bounded_polling():
+    """Missing fresh TF fails as unverifiable without resending navigation."""
+    harness = Am7RuntimeHarness(
+        tf_behavior='unavailable_after_return',
+        parameter_overrides={
+            'return_to_start.proximity_timeout_s': '0.25',
+            'return_to_start.proximity_poll_period_s': '0.05',
+            'return_to_start.maximum_attempts': '1',
+            'sequence.start_pose_stale_timeout_s': '0.10',
+        },
+    )
+    try:
+        harness.drive_to_return()
+        assert wait_until(
+            lambda: any(
+                status.return_to_start_reason
+                == 'return_to_start_proximity_unverifiable'
+                for status in harness.statuses
+            )
+        ), harness.diagnostics()
+        assert len(harness.return_goals) == 1
+        assert harness.scan_starts == 1
+    finally:
+        harness.close()
+
+
+def test_scan_timeout_cancels_and_waits_for_terminal_state():
+    """Scan timeout remains active until canceled state acknowledges quiescence."""
+    harness = Am7RuntimeHarness(
+        scan_behavior='timeout_ack',
+        parameter_overrides={
+            'sequence.scan360_operation_timeout_s': '0.15',
+            'sequence.scan360_cancel_timeout_s': '0.8',
+        },
+    )
+    try:
+        harness.start_initial_scan()
+        assert wait_until(lambda: harness.scan_cancels == 1), harness.diagnostics()
+        assert any(
+            status.scan360_active and not status.scan360_complete
+            for status in harness.statuses
+        )
+        assert wait_until(
+            lambda: any(
+                status.scan360_complete
+                and not status.scan360_succeeded
+                and status.scan360_reason == 'scan360_operation_timeout'
+                for status in harness.statuses
+            )
+        ), harness.diagnostics()
+        assert harness.head_starts == 0
+        assert harness.map_saves == 0
+    finally:
+        harness.close()
+
+
+def test_scan_missing_terminal_state_latches_non_quiesced_fault():
+    """A cancel service reply alone cannot claim Scan360 is stopped."""
+    harness = Am7RuntimeHarness(
+        scan_behavior='timeout_missing',
+        parameter_overrides={
+            'sequence.scan360_operation_timeout_s': '0.15',
+            'sequence.scan360_cancel_timeout_s': '0.20',
+        },
+    )
+    try:
+        harness.start_initial_scan()
+        assert wait_until(
+            lambda: any(
+                'scan360_non_quiesced_fault' in status.reason
+                for status in harness.statuses
+            )
+        ), harness.diagnostics()
+        assert harness.scan_cancels >= 1
+        assert harness.statuses[-1].scan360_active
+        assert harness.head_starts == 0
+        assert harness.map_saves == 0
+    finally:
+        harness.close()
+
+
+def test_stale_retained_scan_completion_does_not_finish_new_generation():
+    """A retained completion received before start acknowledgement is ignored."""
+    harness = Am7RuntimeHarness(
+        scan_behavior='timeout_missing',
+        parameter_overrides={
+            'sequence.scan360_operation_timeout_s': '0.15',
+            'sequence.scan360_cancel_timeout_s': '0.20',
+        },
+    )
+    try:
+        harness.scan_state_pub.publish(harness.string_message('complete'))
+        time.sleep(0.1)
+        harness.start_initial_scan()
+        assert wait_until(lambda: harness.scan_cancels == 1), harness.diagnostics()
+        assert not any(
+            status.initial_scan360_succeeded for status in harness.statuses
+        )
+    finally:
+        harness.close()
+
+
+def test_head_timeout_pauses_and_waits_for_paused_state():
+    """Head timeout uses pause and requires a state acknowledgement."""
+    harness = Am7RuntimeHarness(
+        head_behavior='timeout_ack',
+        parameter_overrides={
+            'sequence.head_scan_operation_timeout_s': '0.15',
+            'sequence.head_scan_quiescence_timeout_s': '0.8',
+        },
+    )
+    try:
+        harness.start_initial_scan()
+        assert wait_until(
+            lambda: 'monitor_only' in harness.mode_commands
+        ), harness.diagnostics()
+        harness.publish_workflow('monitor_only', 'idle', 'idle', False)
+        assert wait_until(lambda: harness.head_starts == 1), harness.diagnostics()
+        assert wait_until(lambda: harness.head_pauses == 1), harness.diagnostics()
+        assert wait_until(
+            lambda: any(
+                status.head_scan_complete
+                and not status.head_scan_succeeded
+                and status.head_scan_reason == 'head_scan_operation_timeout'
+                for status in harness.statuses
+            )
+        ), harness.diagnostics()
+        assert harness.coverage_approvals == 0
+        assert harness.map_saves == 0
+    finally:
+        harness.close()
+
+
+def test_head_missing_paused_state_latches_non_quiesced_fault():
+    """A pause service reply alone cannot claim head motion is stopped."""
+    harness = Am7RuntimeHarness(
+        head_behavior='timeout_missing',
+        parameter_overrides={
+            'sequence.head_scan_operation_timeout_s': '0.15',
+            'sequence.head_scan_quiescence_timeout_s': '0.20',
+        },
+    )
+    try:
+        harness.start_initial_scan()
+        assert wait_until(
+            lambda: 'monitor_only' in harness.mode_commands
+        ), harness.diagnostics()
+        harness.publish_workflow('monitor_only', 'idle', 'idle', False)
+        assert wait_until(lambda: harness.head_starts == 1), harness.diagnostics()
+        assert wait_until(
+            lambda: any(
+                'head_scan_non_quiesced_fault' in status.reason
+                for status in harness.statuses
+            )
+        ), harness.diagnostics()
+        assert harness.head_pauses >= 1
+        assert harness.statuses[-1].head_scan_active
+        assert harness.map_saves == 0
     finally:
         harness.close()

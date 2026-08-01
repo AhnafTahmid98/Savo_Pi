@@ -68,7 +68,7 @@ IMMUTABLE_HASHES = {
     'test/test_tf_pose_reader.cpp':
         '589e91c9b16c9100ef94f122ffcebccc334f4afbeab45917a76609199e03b374',
     'test/test_tf_pose_reader_runtime.py':
-        'ef6fdcf5a4fb369cc6de2a9864e0f63081b9aea8906eacac80f9bdc2c3df28c1',
+        'f0ccb9b044f9a56e49c4b17ff8c5c492c68d1983001891388d5edb0a817de0ab',
     'test/test_coverage_mapper_node_runtime.py':
         'c5931b27b75b73039cfe4fd69eec2a143c40da3d3e7112fdd0127f25cedc99ae',
     'config/scan360_mapping.yaml':

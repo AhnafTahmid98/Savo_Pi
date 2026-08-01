@@ -376,12 +376,14 @@ MissionDecision AutonomousMappingMission::evaluate(
       completion_evidence_observation_sequence_ =
         inputs.frontier_observation_sequence;
       if (!inputs.completion_confirmed) {
+        if (workflow_is_frontier(inputs)) {
+          enter(MissionState::Exploring, "completion_evidence_revoked");
+          return decision(snapshot_.reason);
+        }
         resume_state_ = MissionState::Exploring;
-        enter(
-          MissionState::WaitingForAuthority,
-          "completion_evidence_revoked");
+        enter(MissionState::WaitingForAuthority, "completion_evidence_revoked");
         MissionDecision revoked = decision(snapshot_.reason);
-        revoked.request_frontier_mode = !workflow_is_frontier(inputs);
+        revoked.request_frontier_mode = true;
         revoked.snapshot = snapshot_;
         return revoked;
       }
@@ -1086,6 +1088,16 @@ MissionDecision AutonomousMappingMission::evaluate_coverage_pending(
     snapshot_.reason = output.reason;
     output.snapshot = snapshot_;
     return output;
+  }
+
+  if (inputs.coverage_planning_complete &&
+    inputs.coverage_plan_generation <= coverage_plan_generation_floor_)
+  {
+    return fail(
+      MissionResult::NavigationFailed,
+      inputs.coverage_reason.empty() ||
+      inputs.coverage_reason == "coverage_not_requested" ?
+      "coverage_plan_generation_stale" : inputs.coverage_reason);
   }
 
   if (inputs.coverage_plan_generation <= coverage_plan_generation_floor_) {

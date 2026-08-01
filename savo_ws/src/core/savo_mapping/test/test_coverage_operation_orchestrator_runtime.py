@@ -92,6 +92,9 @@ class RuntimeHarness:
         self.handoff_status_pub = self.node.create_publisher(
             String, self.handoff_status_topic, state_qos()
         )
+        self.handoff_feedback_pub = self.node.create_publisher(
+            String, self.handoff_feedback_topic, status_qos()
+        )
 
         self.internal_approve_server = self.node.create_service(
             Trigger,
@@ -242,6 +245,25 @@ class RuntimeHarness:
         )
         self.handoff_status_pub.publish(status_message)
 
+    def publish_feedback(self):
+        """Publish one real, numerically unchanged handoff feedback sample."""
+        message = String()
+        message.data = json.dumps(
+            {
+                'mission_id': 'coverage-7-123456789',
+                'current_waypoint': 1,
+                'completed_waypoints': 0,
+                'total_waypoints': 4,
+                'completion_ratio': 0.0,
+                'remaining_distance_m': 2.5,
+            }
+        )
+        self.handoff_feedback_pub.publish(message)
+
+    def latest_status(self):
+        """Return the newest decoded operation status."""
+        return json.loads(self.statuses[-1]) if self.statuses else {}
+
     def call(self, client):
         assert client.wait_for_service(timeout_sec=2.0)
         future = client.call_async(Trigger.Request())
@@ -297,6 +319,19 @@ def test_two_key_approval_and_supervisor_loss_cancel():
         assert harness.approve_count == 1
 
         harness.publish_handoff('executing')
+        harness.publish_feedback()
+        assert wait_until(
+            lambda: harness.latest_status().get('feedback_sequence') == 1
+        ), harness.diagnostics()
+        assert wait_until(
+            lambda: harness.latest_status().get('feedback_age_s', 0.0) > 0.1
+        ), harness.diagnostics()
+        harness.publish_feedback()
+        assert wait_until(
+            lambda: harness.latest_status().get('feedback_sequence') == 2
+            and harness.latest_status().get('feedback_age_s', 1.0) < 0.1
+        ), harness.diagnostics()
+        assert harness.latest_status()['feedback_received']
         harness.publish_supervisor(ready=False, health='ERROR')
         assert wait_until(
             lambda: harness.cancel_count == 1,

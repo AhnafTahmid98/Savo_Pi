@@ -183,6 +183,39 @@ CoverageOperationObservation parse_coverage_operation_status(
   return output;
 }
 
+CoveragePlanCorrelationResult evaluate_coverage_plan_correlation(
+  const CoveragePlannerObservation & observation,
+  const CoveragePlanCorrelation & expected)
+{
+  CoveragePlanCorrelationResult output;
+  output.current_request = expected.expected_request_generation > 0U &&
+    observation.request_generation == expected.expected_request_generation;
+  output.current_reset = expected.expected_reset_generation > 0U &&
+    observation.reset_generation >= expected.expected_reset_generation;
+  output.current_plan =
+    observation.plan_generation > expected.plan_generation_floor;
+  output.current_map = !expected.require_fresh_map_generation ||
+    (observation.map_generation > 0U &&
+    observation.map_generation >= expected.map_generation_floor);
+
+  if (!output.current_reset) {
+    output.reason = "coverage_plan_reset_generation_stale";
+  } else if (!output.current_request) {
+    output.reason = "coverage_plan_request_generation_stale";
+  } else if (!output.current_plan) {
+    output.reason = "coverage_plan_generation_stale";
+  } else if (!output.current_map) {
+    output.reason = "coverage_plan_map_generation_stale";
+  } else if (!observation.plan_valid) {
+    output.reason = observation.reason.empty() ?
+      "coverage_plan_invalid" : observation.reason;
+  } else {
+    output.accepted = true;
+    output.reason = observation.reason;
+  }
+  return output;
+}
+
 ProximityResult evaluate_planar_proximity(
   const PlanarPose & target,
   const PlanarPose & actual,

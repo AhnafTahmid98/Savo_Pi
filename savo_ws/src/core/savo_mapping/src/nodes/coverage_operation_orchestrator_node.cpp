@@ -358,6 +358,9 @@ private:
   {
     std::lock_guard<std::mutex> lock(mutex_);
     latest_feedback_ = message->data;
+    ++feedback_sequence_;
+    feedback_received_ = true;
+    feedback_received_at_ = std::chrono::steady_clock::now();
   }
 
   double age_seconds(
@@ -526,6 +529,9 @@ private:
       approved_candidate_generation_ = 0U;
       approved_mission_id_.clear();
       supervisor_cancel_requested_ = false;
+      latest_feedback_.clear();
+      feedback_received_ = false;
+      feedback_received_at_.reset();
     }
     publish_event(
       response->success ? "operation_reset" : "reset_rejected",
@@ -647,8 +653,11 @@ private:
     std::uint64_t pending_generation = 0U;
     bool pending = false;
     bool supervisor_cancel_requested = false;
+    bool feedback_received = false;
+    std::uint64_t feedback_sequence = 0U;
     double supervisor_age = 0.0;
     double candidate_age = 0.0;
+    double feedback_age = 0.0;
 
     {
       std::lock_guard<std::mutex> lock(mutex_);
@@ -661,9 +670,12 @@ private:
       pending = approval_pending_;
       supervisor_cancel_requested =
         supervisor_cancel_requested_;
+      feedback_received = feedback_received_;
+      feedback_sequence = feedback_sequence_;
       supervisor_age = age_seconds(supervisor_received_at_);
       candidate_age = handoff.candidate_age_sec +
         age_seconds(handoff_status_received_at_);
+      feedback_age = age_seconds(feedback_received_at_);
     }
 
     const bool authorized =
@@ -673,6 +685,8 @@ private:
       std::isfinite(supervisor_age) ? supervisor_age : -1.0;
     const double candidate_age_json =
       std::isfinite(candidate_age) ? candidate_age : -1.0;
+    const double feedback_age_json =
+      std::isfinite(feedback_age) ? feedback_age : -1.0;
     const auto state =
       coverage::coverage_operation_effective_state(
       enabled_, pending, authorized, handoff);
@@ -718,6 +732,12 @@ private:
       << json_escape(handoff.result_reason) << "\""
       << ",\"supervisor_cancel_requested\":"
       << bool_text(supervisor_cancel_requested)
+      << ",\"feedback_received\":"
+      << bool_text(feedback_received)
+      << ",\"feedback_sequence\":"
+      << feedback_sequence
+      << ",\"feedback_age_s\":"
+      << feedback_age_json
       << ",\"latest_feedback\":\""
       << json_escape(feedback) << "\"}";
 
@@ -766,6 +786,8 @@ private:
   coverage::CoverageHandoffSnapshot handoff_snapshot_;
   std::string handoff_state_text_;
   std::string latest_feedback_;
+  std::uint64_t feedback_sequence_{0U};
+  bool feedback_received_{false};
   std::string last_state_;
   std::string approved_mission_id_;
   std::uint64_t approved_candidate_generation_{0U};
@@ -778,6 +800,8 @@ private:
   handoff_status_received_at_;
   std::optional<std::chrono::steady_clock::time_point>
   supervisor_loss_started_at_;
+  std::optional<std::chrono::steady_clock::time_point>
+  feedback_received_at_;
 
   rclcpp::CallbackGroup::SharedPtr callback_group_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr state_publisher_;

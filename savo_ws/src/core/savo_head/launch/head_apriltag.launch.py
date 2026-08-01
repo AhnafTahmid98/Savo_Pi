@@ -1,7 +1,19 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, OpaqueFunction
-from launch.substitutions import LaunchConfiguration
+from launch.actions import (
+    DeclareLaunchArgument,
+    IncludeLaunchDescription,
+    OpaqueFunction,
+)
+from launch.conditions import IfCondition
+from launch.launch_description_sources import (
+    PythonLaunchDescriptionSource,
+)
+from launch.substitutions import (
+    LaunchConfiguration,
+    PathJoinSubstitution,
+)
 from launch_ros.actions import Node
+from launch_ros.substitutions import FindPackageShare
 
 
 def _as_bool(value: str) -> bool:
@@ -9,64 +21,82 @@ def _as_bool(value: str) -> bool:
 
 
 def _make_nodes(context):
-    use_python_fallback = _as_bool(LaunchConfiguration("use_python_fallback").perform(context))
-    enable_tf = _as_bool(LaunchConfiguration("enable_tf").perform(context))
-    enable_status = _as_bool(LaunchConfiguration("enable_status").perform(context))
+    enable_detector = _as_bool(
+        LaunchConfiguration("enable_detector").perform(context)
+    )
+    enable_confirmation_action = _as_bool(
+        LaunchConfiguration("enable_confirmation_action").perform(context)
+    )
+    enable_legacy_semantics = _as_bool(
+        LaunchConfiguration("enable_legacy_semantics").perform(context)
+    )
+    enable_tf = _as_bool(
+        LaunchConfiguration("enable_tf").perform(context)
+    )
+    enable_status = _as_bool(
+        LaunchConfiguration("enable_status").perform(context)
+    )
+    use_python_fallback = _as_bool(
+        LaunchConfiguration("use_python_fallback").perform(context)
+    )
 
-    executable_suffix = "_py" if use_python_fallback else ""
+    nodes = []
 
-    apriltag_params = {
-        "enabled": _as_bool(LaunchConfiguration("enabled").perform(context)),
-        "family": LaunchConfiguration("family").perform(context),
-        "min_stable_frames": int(LaunchConfiguration("min_stable_frames").perform(context)),
-        "min_detection_confidence": float(
-            LaunchConfiguration("min_detection_confidence").perform(context)
-        ),
-        "max_detection_distance_m": float(
-            LaunchConfiguration("max_detection_distance_m").perform(context)
-        ),
-        "max_detection_age_s": float(
-            LaunchConfiguration("max_detection_age_s").perform(context)
-        ),
-        "require_robot_pose": _as_bool(
-            LaunchConfiguration("require_robot_pose").perform(context)
-        ),
-        "require_tf_available": _as_bool(
-            LaunchConfiguration("require_tf_available").perform(context)
-        ),
-        "require_robot_stationary": _as_bool(
-            LaunchConfiguration("require_robot_stationary").perform(context)
-        ),
-        "require_localization_ok": _as_bool(
-            LaunchConfiguration("require_localization_ok").perform(context)
-        ),
-        "require_lidar_map_pose": _as_bool(
-            LaunchConfiguration("require_lidar_map_pose").perform(context)
-        ),
-        "require_semantic_label": _as_bool(
-            LaunchConfiguration("require_semantic_label").perform(context)
-        ),
-        "allow_unknown_tags": _as_bool(
-            LaunchConfiguration("allow_unknown_tags").perform(context)
-        ),
-        "publish_rejections": _as_bool(
-            LaunchConfiguration("publish_rejections").perform(context)
-        ),
-        "registered_tag_ids_csv": LaunchConfiguration("registered_tag_ids_csv").perform(context),
-        "tag_param_prefix": LaunchConfiguration("tag_param_prefix").perform(context),
-    }
-
-    nodes = [
-        Node(
-            package="savo_head",
-            executable=f"apriltag_confirm_node{executable_suffix}",
-            name="apriltag_confirm_node",
-            output="screen",
-            parameters=[apriltag_params],
+    if enable_detector:
+        nodes.append(
+            Node(
+                package="savo_head",
+                executable="apriltag_detector_node",
+                name="apriltag_detector_node",
+                output="screen",
+                emulate_tty=True,
+                parameters=[
+                    LaunchConfiguration("detector_config_file").perform(
+                        context
+                    )
+                ],
+            )
         )
-    ]
+
+    if enable_confirmation_action:
+        nodes.append(
+            Node(
+                package="savo_head",
+                executable="apriltag_confirmation_action_node",
+                name="apriltag_confirmation_action_node",
+                output="screen",
+                emulate_tty=True,
+                parameters=[
+                    LaunchConfiguration(
+                        "confirmation_action_config_file"
+                    ).perform(context)
+                ],
+            )
+        )
+
+    # The JSON semantic bridge is retained only for compatibility with old
+    # publishers. It is not part of the default production detection path.
+    if enable_legacy_semantics:
+        executable_suffix = "_py" if use_python_fallback else ""
+        nodes.append(
+            Node(
+                package="savo_head",
+                executable=(
+                    f"apriltag_confirm_node{executable_suffix}"
+                ),
+                name="apriltag_confirm_node",
+                output="screen",
+                emulate_tty=True,
+                parameters=[
+                    LaunchConfiguration(
+                        "legacy_semantics_config_file"
+                    ).perform(context)
+                ],
+            )
+        )
 
     if enable_status:
+        executable_suffix = "_py" if use_python_fallback else ""
         nodes.append(
             Node(
                 package="savo_head",
@@ -76,7 +106,10 @@ def _make_nodes(context):
             )
         )
 
+    # Disabled by default until the measured physical head transforms replace
+    # the zero translation placeholders in head_frames.yaml.
     if enable_tf:
+        executable_suffix = "_py" if use_python_fallback else ""
         nodes.append(
             Node(
                 package="savo_head",
@@ -90,103 +123,196 @@ def _make_nodes(context):
 
 
 def generate_launch_description():
+    package_share = FindPackageShare("savo_head")
+
+    camera_stack = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            PathJoinSubstitution(
+                [
+                    package_share,
+                    "launch",
+                    "head_camera_stack.launch.py",
+                ]
+            )
+        ),
+        condition=IfCondition(LaunchConfiguration("enable_camera")),
+        launch_arguments={
+            "camera_mode": "ros",
+            "source": LaunchConfiguration("camera_source"),
+            "width": LaunchConfiguration("camera_width"),
+            "height": LaunchConfiguration("camera_height"),
+            "fps": LaunchConfiguration("camera_fps"),
+            "ros_source_format": LaunchConfiguration(
+                "camera_source_format"
+            ),
+            "camera_name": LaunchConfiguration("camera_name"),
+            "frame_id": LaunchConfiguration("camera_frame_id"),
+            "camera_info_url": LaunchConfiguration("camera_info_url"),
+            "ros_config_file": LaunchConfiguration(
+                "camera_ros_config_file"
+            ),
+            "camera_health_config_file": LaunchConfiguration(
+                "camera_health_config_file"
+            ),
+        }.items(),
+    )
+
     return LaunchDescription(
         [
             DeclareLaunchArgument(
-                "use_python_fallback",
-                default_value="false",
-                description="Use Python fallback AprilTag confirmation node instead of C++ default.",
+                "enable_camera",
+                default_value="true",
+                description=(
+                    "Start the ROS Pi Camera path required by the "
+                    "AprilTag detector. Disable when another process "
+                    "already owns the camera topics."
+                ),
             ),
             DeclareLaunchArgument(
-                "enabled",
+                "enable_detector",
                 default_value="true",
-                description="Enable AprilTag semantic confirmation.",
+                description="Start the production C++ AprilTag detector.",
+            ),
+            DeclareLaunchArgument(
+                "enable_confirmation_action",
+                default_value="true",
+                description=(
+                    "Start the typed ConfirmAprilTag action server."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "enable_legacy_semantics",
+                default_value="false",
+                description=(
+                    "Start the legacy JSON semantic bridge. It is "
+                    "disabled in the production typed path."
+                ),
             ),
             DeclareLaunchArgument(
                 "enable_tf",
                 default_value="false",
-                description="Start head TF node together with AprilTag confirmation.",
+                description=(
+                    "Start head TF publishing only after physical "
+                    "pan-tilt-camera translations are measured."
+                ),
             ),
             DeclareLaunchArgument(
                 "enable_status",
                 default_value="true",
-                description="Start head status node together with AprilTag confirmation.",
+                description="Start the head status aggregator.",
             ),
             DeclareLaunchArgument(
-                "family",
-                default_value="tag36h11",
-                description="AprilTag family used by detections.",
-            ),
-            DeclareLaunchArgument(
-                "min_stable_frames",
-                default_value="5",
-                description="Minimum stable frames before semantic confirmation.",
-            ),
-            DeclareLaunchArgument(
-                "min_detection_confidence",
-                default_value="0.70",
-                description="Minimum detection confidence.",
-            ),
-            DeclareLaunchArgument(
-                "max_detection_distance_m",
-                default_value="3.0",
-                description="Maximum accepted tag distance in meters.",
-            ),
-            DeclareLaunchArgument(
-                "max_detection_age_s",
-                default_value="0.50",
-                description="Maximum accepted detection age in seconds.",
-            ),
-            DeclareLaunchArgument(
-                "require_robot_pose",
-                default_value="true",
-                description="Require robot pose snapshot before confirmation.",
-            ),
-            DeclareLaunchArgument(
-                "require_tf_available",
-                default_value="true",
-                description="Require TF evidence before confirmation.",
-            ),
-            DeclareLaunchArgument(
-                "require_robot_stationary",
-                default_value="true",
-                description="Require robot to be stationary before confirmation.",
-            ),
-            DeclareLaunchArgument(
-                "require_localization_ok",
-                default_value="true",
-                description="Require localization quality before confirmation.",
-            ),
-            DeclareLaunchArgument(
-                "require_lidar_map_pose",
-                default_value="true",
-                description="Require LiDAR/map pose evidence before confirmation.",
-            ),
-            DeclareLaunchArgument(
-                "require_semantic_label",
-                default_value="true",
-                description="Require a semantic label such as A201.",
-            ),
-            DeclareLaunchArgument(
-                "allow_unknown_tags",
+                "use_python_fallback",
                 default_value="false",
-                description="Allow tags not listed in registered_tag_ids_csv.",
+                description=(
+                    "Use Python fallback for optional legacy/status/TF "
+                    "nodes. Detector and action server remain C++."
+                ),
             ),
             DeclareLaunchArgument(
-                "publish_rejections",
-                default_value="true",
-                description="Publish rejected confirmation attempts for diagnostics.",
+                "detector_config_file",
+                default_value=PathJoinSubstitution(
+                    [
+                        package_share,
+                        "config",
+                        "apriltag_detector.yaml",
+                    ]
+                ),
+                description="Production AprilTag detector parameters.",
             ),
             DeclareLaunchArgument(
-                "registered_tag_ids_csv",
+                "confirmation_action_config_file",
+                default_value=PathJoinSubstitution(
+                    [
+                        package_share,
+                        "config",
+                        "apriltag_confirmation_action.yaml",
+                    ]
+                ),
+                description="Typed AprilTag confirmation parameters.",
+            ),
+            DeclareLaunchArgument(
+                "legacy_semantics_config_file",
+                default_value=PathJoinSubstitution(
+                    [
+                        package_share,
+                        "config",
+                        "apriltag_semantics.yaml",
+                    ]
+                ),
+                description="Legacy JSON bridge parameters.",
+            ),
+            DeclareLaunchArgument(
+                "camera_source",
+                default_value="libcamerasrc",
+                description=(
+                    "Use libcamerasrc on Robot SAVO or videotestsrc "
+                    "for a camera-pipeline smoke test."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "camera_width",
+                default_value="640",
+                description="Camera image width.",
+            ),
+            DeclareLaunchArgument(
+                "camera_height",
+                default_value="480",
+                description="Camera image height.",
+            ),
+            DeclareLaunchArgument(
+                "camera_fps",
+                default_value="30",
+                description="Camera frame rate.",
+            ),
+            DeclareLaunchArgument(
+                "camera_source_format",
+                default_value="I420",
+                description="Raw GStreamer source format for gscam.",
+            ),
+            DeclareLaunchArgument(
+                "camera_name",
+                default_value="savo_head_camera",
+                description="Logical ROS camera name.",
+            ),
+            DeclareLaunchArgument(
+                "camera_frame_id",
+                default_value="pi_camera_optical_frame",
+                description=(
+                    "Optical frame written into Image and CameraInfo."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "camera_info_url",
                 default_value="",
-                description="Comma-separated registered tag IDs, for example: 12,13,14.",
+                description=(
+                    "Camera calibration URL. With an empty value the "
+                    "detector publishes ID-only observations."
+                ),
             ),
             DeclareLaunchArgument(
-                "tag_param_prefix",
-                default_value="tag_",
-                description="Prefix for future per-tag parameters.",
+                "camera_ros_config_file",
+                default_value=PathJoinSubstitution(
+                    [
+                        package_share,
+                        "config",
+                        "camera_ros.yaml",
+                    ]
+                ),
+                description="ROS camera driver parameters.",
             ),
+            DeclareLaunchArgument(
+                "camera_health_config_file",
+                default_value=PathJoinSubstitution(
+                    [
+                        package_share,
+                        "config",
+                        "camera_health.yaml",
+                    ]
+                ),
+                description="Camera health monitor parameters.",
+            ),
+            camera_stack,
             OpaqueFunction(function=_make_nodes),
         ]
     )

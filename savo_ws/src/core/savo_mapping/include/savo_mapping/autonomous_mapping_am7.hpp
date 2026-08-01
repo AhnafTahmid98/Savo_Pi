@@ -61,6 +61,25 @@ struct CoverageOperationObservation
   double remaining_distance_m{0.0};
 };
 
+struct CoveragePlanCorrelation
+{
+  std::uint64_t expected_request_generation{0};
+  std::uint64_t expected_reset_generation{0};
+  std::uint64_t plan_generation_floor{0};
+  std::uint64_t map_generation_floor{0};
+  bool require_fresh_map_generation{true};
+};
+
+struct CoveragePlanCorrelationResult
+{
+  bool current_request{false};
+  bool current_reset{false};
+  bool current_plan{false};
+  bool current_map{false};
+  bool accepted{false};
+  std::string reason{"coverage_plan_not_correlated"};
+};
+
 struct PlanarPose
 {
   double x_m{0.0};
@@ -83,6 +102,10 @@ CoveragePlannerObservation parse_coverage_planner_status(
 
 CoverageOperationObservation parse_coverage_operation_status(
   const std::string & json_text);
+
+CoveragePlanCorrelationResult evaluate_coverage_plan_correlation(
+  const CoveragePlannerObservation & observation,
+  const CoveragePlanCorrelation & expected);
 
 ProximityResult evaluate_planar_proximity(
   const PlanarPose & target,

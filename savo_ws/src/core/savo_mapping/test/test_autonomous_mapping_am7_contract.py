@@ -76,13 +76,50 @@ def test_am7_configuration_is_fail_closed_and_bounded() -> None:
         'execution_timeout_s:',
         'feedback_stale_timeout_s:',
         'cancel_timeout_s:',
+        'scan360_cancel_timeout_s:',
+        'head_scan_quiescence_timeout_s:',
         'maximum_restart_attempts:',
         'return_to_start:',
         'action_name: "/savo_nav/navigation/navigate_to_pose"',
         'position_tolerance_m:',
+        'proximity_timeout_s:',
+        'proximity_poll_period_s:',
         'maximum_attempts:',
         'final_sequence:',
         'require_final_scan360: true',
         'require_final_head_scan: true',
     ):
         assert token in config
+
+
+def test_am7_safety_state_and_correlation_contracts() -> None:
+    """Timeout quiescence and generation correlation remain explicit."""
+    source = read('src/nodes/autonomous_mapping_orchestrator_node.cpp')
+    helper = read('src/workflow/autonomous_mapping_am7.cpp')
+    header = read('include/savo_mapping/autonomous_mapping_am7.hpp')
+    gateway = read('src/nodes/coverage_operation_orchestrator_node.cpp')
+
+    for token in (
+        'GoalRequestPending',
+        'AcceptedActive',
+        'CancelPending',
+        'VerifyingProximity',
+        'return_goal_may_be_executing',
+    ):
+        assert token in helper or token in header or token in source
+
+    for token in (
+        'scan360_non_quiesced_fault',
+        'head_scan_non_quiesced_fault',
+        'coverage_non_quiesced_fault',
+        'return_non_quiesced_fault',
+        'coverage_plan_request_generation_stale',
+        'coverage_plan_reset_generation_stale',
+        'coverage_plan_map_generation_stale',
+        'guarded_return_dispatch_error',
+        'return_operation_epoch_',
+    ):
+        assert token in source or token in helper
+
+    for token in ('feedback_received', 'feedback_sequence', 'feedback_age_s'):
+        assert token in gateway

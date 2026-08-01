@@ -353,11 +353,28 @@ TEST(AutonomousMappingMissionTest, RejectsStaleAndMalformedCoveragePlans)
   inputs.coverage_plan_valid = true;
   inputs.coverage_total_waypoints = 10U;
   decision = mission.observe(inputs);
-  EXPECT_TRUE(decision.request_coverage_plan);
+  EXPECT_TRUE(decision.terminal);
+  EXPECT_EQ(decision.snapshot.result, MissionResult::NavigationFailed);
+  EXPECT_EQ(decision.snapshot.reason, "coverage_plan_generation_stale");
 
+  AutonomousMappingMission malformed_mission;
+  inputs = exploring_inputs();
+  inputs.require_coverage = true;
+  inputs.completion_confirmed = true;
+  inputs.coverage_plan_generation = 4U;
+  ASSERT_TRUE(malformed_mission.start(valid_request(), inputs).accepted);
+  ASSERT_TRUE(malformed_mission.observe(inputs).request_monitor_mode);
+  inputs.mode = MappingMode::MonitorOnly;
+  inputs.exploration_mode = ExplorationMode::Idle;
+  inputs.workflow_phase = WorkflowPhase::Idle;
+  ASSERT_EQ(
+    malformed_mission.observe(inputs).snapshot.state,
+    MissionState::CoveragePending);
   inputs.coverage_plan_generation = 5U;
+  inputs.coverage_planning_complete = true;
+  inputs.coverage_plan_valid = true;
   inputs.coverage_total_waypoints = 0U;
-  decision = mission.observe(inputs);
+  decision = malformed_mission.observe(inputs);
   EXPECT_TRUE(decision.terminal);
   EXPECT_EQ(decision.snapshot.result, MissionResult::NavigationFailed);
   EXPECT_EQ(decision.snapshot.reason, "coverage_plan_empty_without_noop");
@@ -1107,18 +1124,62 @@ TEST(AutonomousMappingMissionTest, NewFrontierRevokesPendingCompletion)
   auto inputs = exploring_inputs();
   ASSERT_TRUE(mission.start(valid_request(), inputs).accepted);
 
+  inputs.frontier_observation_sequence = 1U;
+  inputs.frontier_status_fresh = true;
   inputs.completion_confirmed = true;
   inputs.completion_reason = "frontier_exhaustion_confirmed:no_frontiers";
   auto decision = mission.observe(inputs);
   ASSERT_EQ(decision.snapshot.state, MissionState::CompletionPending);
 
   inputs.completion_confirmed = false;
+  inputs.frontier_observation_sequence = 2U;
   inputs.completion_candidate = false;
   inputs.frontier_planning_status = "goal_selected";
   decision = mission.observe(inputs);
 
   EXPECT_EQ(decision.snapshot.state, MissionState::Exploring);
   EXPECT_EQ(decision.reason, "completion_evidence_revoked");
+}
+
+TEST(AutonomousMappingMissionTest, StaleFalseCompletionStatusIsIgnored)
+{
+  AutonomousMappingMission mission;
+  auto inputs = exploring_inputs();
+  inputs.frontier_observation_sequence = 10U;
+  inputs.completion_confirmed = true;
+  ASSERT_TRUE(mission.start(valid_request(), inputs).accepted);
+  ASSERT_EQ(
+    mission.observe(inputs).snapshot.state,
+    MissionState::CompletionPending);
+
+  inputs.completion_confirmed = false;
+  const auto decision = mission.observe(inputs);
+  EXPECT_EQ(decision.snapshot.state, MissionState::CompletionPending);
+  EXPECT_TRUE(decision.request_monitor_mode);
+}
+
+TEST(AutonomousMappingMissionTest, FreshCompletionRevocationAfterMonitorRestoresFrontier)
+{
+  AutonomousMappingMission mission;
+  auto inputs = exploring_inputs();
+  inputs.require_coverage = true;
+  inputs.frontier_observation_sequence = 20U;
+  inputs.frontier_status_fresh = true;
+  inputs.completion_confirmed = true;
+  ASSERT_TRUE(mission.start(valid_request(), inputs).accepted);
+  ASSERT_TRUE(mission.observe(inputs).request_monitor_mode);
+
+  inputs.mode = MappingMode::MonitorOnly;
+  inputs.exploration_mode = ExplorationMode::Idle;
+  inputs.workflow_phase = WorkflowPhase::Idle;
+  inputs.runtime_authorized = false;
+  inputs.frontier_observation_sequence = 21U;
+  inputs.completion_confirmed = false;
+  const auto decision = mission.observe(inputs);
+
+  EXPECT_EQ(decision.snapshot.state, MissionState::WaitingForAuthority);
+  EXPECT_TRUE(decision.request_frontier_mode);
+  EXPECT_FALSE(decision.request_coverage_plan);
 }
 
 TEST(AutonomousMappingMissionTest, SessionFailureAbortsCompletionPending)

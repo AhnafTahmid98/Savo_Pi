@@ -1903,7 +1903,7 @@ if(BUILD_TESTING)
     test_semantic_interruption_runtime
     PROPERTIES
       ENVIRONMENT
-        "PYTHONDONTWRITEBYTECODE=1;ROS_LOCALHOST_ONLY=1;ROS_DOMAIN_ID=226;ROS_LOG_DIR=${_savo_mapping_semantic_interruption_ros_log_dir};SEMANTIC_INTERRUPTION_EXECUTABLE=${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}/semantic_interruption_coordinator_node"
+        "PYTHONDONTWRITEBYTECODE=1;ROS_LOCALHOST_ONLY=1;ROS_DOMAIN_ID=226;ROS_LOG_DIR=${_savo_mapping_semantic_interruption_ros_log_dir};SEMANTIC_INTERRUPTION_EXECUTABLE=${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}/semantic_interruption_coordinator_node;AUTONOMOUS_ORCHESTRATOR_EXECUTABLE=${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}/autonomous_mapping_orchestrator_node"
   )
 
   ament_add_pytest_test(

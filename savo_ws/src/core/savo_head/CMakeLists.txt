@@ -26,6 +26,11 @@ find_package(std_srvs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
+find_package(cv_bridge REQUIRED)
+find_package(OpenCV REQUIRED COMPONENTS core imgproc)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(APRILTAG REQUIRED IMPORTED_TARGET apriltag)
+find_package(Threads REQUIRED)
 
 add_library(${PROJECT_NAME}_core
   src/core/head_state.cpp
@@ -91,6 +96,37 @@ add_savo_head_node(apriltag_confirm_node src/nodes/apriltag_confirm_node.cpp)
 add_savo_head_node(
   apriltag_confirmation_action_node
   src/nodes/apriltag_confirmation_action_node.cpp
+)
+
+add_executable(
+  apriltag_detector_node
+  src/nodes/apriltag_detector_node.cpp
+)
+
+target_include_directories(apriltag_detector_node
+  PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${OpenCV_INCLUDE_DIRS}
+)
+
+target_link_libraries(apriltag_detector_node
+  ${PROJECT_NAME}_core
+  PkgConfig::APRILTAG
+  ${OpenCV_LIBS}
+  Threads::Threads
+)
+
+ament_target_dependencies(apriltag_detector_node
+  rclcpp
+  savo_msgs
+  diagnostic_msgs
+  sensor_msgs
+  cv_bridge
+  tf2
+)
+
+install(TARGETS apriltag_detector_node
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
 ament_python_install_package(${PROJECT_NAME})
@@ -187,8 +223,18 @@ if(BUILD_TESTING)
   )
 
   ament_add_pytest_test(
+    test_apriltag_detector_node_contract
+    test/test_apriltag_detector_node_contract.py
+  )
+
+  ament_add_pytest_test(
     test_apriltag_action_runtime_contract
     test/test_apriltag_action_runtime_contract.py
+  )
+
+  ament_add_pytest_test(
+    test_apriltag_production_launch_contract
+    test/test_apriltag_production_launch_contract.py
   )
 
   if(SAVO_HEAD_ENABLE_LEGACY_LINT)

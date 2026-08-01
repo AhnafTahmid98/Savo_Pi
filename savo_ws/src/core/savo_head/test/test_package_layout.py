@@ -70,6 +70,7 @@ def test_cpp_source_layout():
         "src/nodes/head_scan_node.cpp",
         "src/nodes/head_tf_node.cpp",
         "src/nodes/head_status_node.cpp",
+        "src/nodes/apriltag_detector_node.cpp",
         "src/nodes/apriltag_confirm_node.cpp",
     ]:
         require_file(file_path)

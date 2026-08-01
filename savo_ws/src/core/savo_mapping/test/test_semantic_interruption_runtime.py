@@ -24,6 +24,7 @@ from savo_msgs.msg import AutonomousMappingStatus
 from savo_msgs.msg import SemanticInterruptionStatus
 from savo_msgs.srv import ControlAutonomousMapping
 from savo_msgs.srv import SubmitSemanticLocation
+from test_autonomous_mapping_am7_runtime import Am7RuntimeHarness
 
 
 def wait_until(predicate, timeout=8.0, interval=0.02):
@@ -279,3 +280,176 @@ def test_detect_pause_register_and_resume_during_coverage_runtime_flow():
         assert not harness.latest_status().active
     finally:
         harness.close()
+
+
+def test_real_am7_orchestrator_pauses_replans_and_resumes_coverage():
+    """Integrate the real AM-7 and AM-6 coordinators during Coverage."""
+    am7 = Am7RuntimeHarness(
+        coverage_behavior='pause_resume',
+        parameter_overrides={
+            'coverage.execution_timeout_s': '60.0',
+            'coverage.feedback_stale_timeout_s': '60.0',
+        },
+    )
+    semantic_process = None
+    registration_server = None
+    try:
+        am7.drive_to_return()
+        assert wait_until(
+            lambda: am7.latest_state()
+            == AutonomousMappingStatus.STATE_COVERAGE
+        ), am7.diagnostics()
+
+        suffix = f'r{os.getpid()}_{time.monotonic_ns()}'
+        observation_topic = f'/test/am6_am7/{suffix}/observations'
+        semantic_status_topic = f'/test/am6_am7/{suffix}/status'
+        semantic_submit_service = f'/test/am6_am7/{suffix}/submit'
+        registration_action = f'/test/am6_am7/{suffix}/register'
+        observations = am7.node.create_publisher(
+            AprilTagObservation,
+            observation_topic,
+            QoSProfile(
+                depth=10,
+                reliability=ReliabilityPolicy.BEST_EFFORT,
+                durability=DurabilityPolicy.VOLATILE,
+            ),
+        )
+        semantic_statuses = []
+        am7.node.create_subscription(
+            SemanticInterruptionStatus,
+            semantic_status_topic,
+            semantic_statuses.append,
+            QoSProfile(
+                depth=1,
+                reliability=ReliabilityPolicy.RELIABLE,
+                durability=DurabilityPolicy.TRANSIENT_LOCAL,
+            ),
+        )
+        registrations = []
+
+        def register(goal_handle):
+            registrations.append(goal_handle.request)
+            result = RegisterMappedLocation.Result()
+            result.registered = True
+            result.result_code = RegisterMappedLocation.Result.RESULT_REGISTERED
+            result.reason = 'integrated_candidate_registered'
+            result.candidate.candidate_id = goal_handle.request.candidate_id
+            result.candidate.map_id = goal_handle.request.map_id
+            result.candidate.map_revision = goal_handle.request.map_revision
+            result.candidate.tag_family = goal_handle.request.expected_family
+            result.candidate.tag_id = goal_handle.request.expected_tag_id
+            goal_handle.succeed()
+            return result
+
+        registration_server = ActionServer(
+            am7.node,
+            RegisterMappedLocation,
+            registration_action,
+            execute_callback=register,
+            callback_group=am7.group,
+        )
+        submit_client = am7.node.create_client(
+            SubmitSemanticLocation,
+            semantic_submit_service,
+            callback_group=am7.group,
+        )
+        executable = Path(os.environ['SEMANTIC_INTERRUPTION_EXECUTABLE'])
+        semantic_process = subprocess.Popen(
+            [
+                str(executable),
+                '--ros-args',
+                '-p', f'observation_topic:={observation_topic}',
+                '-p', f'mission_status_topic:={am7.status_topic}',
+                '-p', f'mission_control_service:={am7.control_service}',
+                '-p', f'registration_action:={registration_action}',
+                '-p', f'status_topic:={semantic_status_topic}',
+                '-p', f'semantic_submit_service:={semantic_submit_service}',
+                '-p', 'semantic_input_timeout_s:=5.0',
+                '-p', 'registration_timeout_s:=5.0',
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        assert submit_client.wait_for_service(timeout_sec=5.0)
+        assert wait_until(lambda: observations.get_subscription_count() >= 1)
+        assert wait_until(
+            lambda: am7.node.count_subscribers(am7.status_topic) >= 2
+        )
+        assert wait_until(
+            lambda: am7.node.count_clients(am7.control_service) >= 1
+        )
+
+        observation = AprilTagObservation()
+        observation.header.stamp = am7.node.get_clock().now().to_msg()
+        observation.header.frame_id = 'pi_camera_optical_frame'
+        observation.detector_name = 'integrated_fixture'
+        observation.family = 'tag36h11'
+        observation.tag_id = 42
+        observation.tag_size_m = 0.16
+        observation.detection_quality = 0.95
+        observation.pose_valid = True
+        observation.pose.pose.position.z = 1.0
+        observation.pose.pose.orientation.w = 1.0
+        sequence = 1
+        observation_deadline = time.monotonic() + 8.0
+        while (
+            am7.coverage_cancels < 1
+            and time.monotonic() < observation_deadline
+        ):
+            observation.observation_sequence = sequence
+            observation.header.stamp = am7.node.get_clock().now().to_msg()
+            observations.publish(observation)
+            sequence += 1
+            time.sleep(0.10)
+
+        assert wait_until(
+            lambda: am7.coverage_cancels >= 1
+        ), am7.diagnostics()
+        assert wait_until(
+            lambda: am7.latest_state() == AutonomousMappingStatus.STATE_PAUSED
+        ), am7.diagnostics()
+
+        request = SubmitSemanticLocation.Request()
+        request.contract_version = SubmitSemanticLocation.Request.CONTRACT_VERSION
+        request.mission_id = 'mission_am7_runtime'
+        request.actor_id = 'integrated_operator'
+        request.tag_family = 'tag36h11'
+        request.tag_id = 42
+        request.suggested_location_id = 'integrated_lab'
+        request.suggested_display_name = 'Integrated Lab'
+        request.suggested_semantic_type = 'laboratory'
+        future = submit_client.call_async(request)
+        assert wait_until(future.done)
+        assert future.result().accepted
+        assert wait_until(lambda: len(registrations) == 1)
+
+        assert wait_until(
+            lambda: am7.coverage_requests >= 2
+            and am7.coverage_approvals >= 2
+            and am7.latest_state() == AutonomousMappingStatus.STATE_COVERAGE,
+            timeout=8.0,
+        ), am7.diagnostics()
+        assert am7.coverage_requests == 2
+
+        am7.publish_coverage_terminal(1, 'succeeded')
+        time.sleep(0.25)
+        assert am7.latest_state() == AutonomousMappingStatus.STATE_COVERAGE
+        assert len(am7.return_goals) == 0
+
+        am7.publish_coverage_terminal(2, 'succeeded')
+        assert wait_until(lambda: len(am7.return_goals) == 1), am7.diagnostics()
+        assert any(
+            status.state == SemanticInterruptionStatus.STATE_COMPLETED
+            for status in semantic_statuses
+        )
+    finally:
+        if semantic_process is not None:
+            semantic_process.terminate()
+            try:
+                semantic_process.wait(timeout=3.0)
+            except subprocess.TimeoutExpired:
+                semantic_process.kill()
+                semantic_process.wait(timeout=3.0)
+        if registration_server is not None:
+            registration_server.destroy()
+        am7.close()
