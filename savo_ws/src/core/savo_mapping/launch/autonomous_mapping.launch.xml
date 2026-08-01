@@ -52,6 +52,23 @@
     name="orchestrator_params_file"
     default="$(find-pkg-share savo_mapping)/config/autonomous_mapping_orchestrator.yaml"/>
 
+  <arg name="coverage_enabled" default="true"/>
+  <arg
+    name="coverage_params_file"
+    default="$(find-pkg-share savo_mapping)/config/coverage_mapping.yaml"/>
+  <arg
+    name="coverage_profile_file"
+    default="$(find-pkg-share savo_mapping)/config/profiles/coverage_mapping_real_robot.yaml"/>
+  <arg name="coverage_use_real_robot_profile" default="true"/>
+  <arg
+    name="coverage_execution_handoff_params_file"
+    default="$(find-pkg-share savo_mapping)/config/coverage_execution_handoff.yaml"/>
+  <arg
+    name="coverage_operation_params_file"
+    default="$(find-pkg-share savo_mapping)/config/coverage_operation_orchestrator.yaml"/>
+  <arg name="final_scan360_required" default="true"/>
+  <arg name="final_head_scan_required" default="true"/>
+
   <arg
     name="semantic_interruption_enabled"
     default="true"
@@ -260,6 +277,57 @@
     <arg
       name="params_file"
       value="$(var orchestrator_params_file)"/>
+    <arg name="coverage_enabled" value="$(var coverage_enabled)"/>
+    <arg
+      name="final_scan360_required"
+      value="$(var final_scan360_required)"/>
+    <arg
+      name="final_head_scan_required"
+      value="$(var final_head_scan_required)"/>
+  </include>
+
+  <include
+    file="$(find-pkg-share savo_mapping)/launch/coverage_mapping.launch.xml"
+    if="$(var coverage_enabled)">
+    <arg name="params_file" value="$(var coverage_params_file)"/>
+    <arg name="profile_file" value="$(var coverage_profile_file)"/>
+    <arg
+      name="use_real_robot_profile"
+      value="$(var coverage_use_real_robot_profile)"/>
+    <arg name="enabled" value="true"/>
+    <arg name="auto_plan" value="false"/>
+    <arg name="start_execution_handoff" value="false"/>
+    <arg name="map_frame" value="$(var map_frame)"/>
+    <arg name="base_frame" value="$(var base_frame)"/>
+    <arg name="use_sim_time" value="$(var use_sim_time)"/>
+  </include>
+
+  <include
+    file="$(find-pkg-share savo_mapping)/launch/coverage_execution_handoff.launch.xml"
+    if="$(var coverage_enabled)">
+    <arg
+      name="params_file"
+      value="$(var coverage_execution_handoff_params_file)"/>
+    <arg name="enabled" value="true"/>
+    <arg name="expected_frame" value="$(var map_frame)"/>
+    <arg
+      name="approve_service"
+      value="/savo_mapping/_internal/coverage_execution/approve"/>
+    <arg
+      name="cancel_service"
+      value="/savo_mapping/_internal/coverage_execution/cancel"/>
+    <arg
+      name="reset_service"
+      value="/savo_mapping/_internal/coverage_execution/reset"/>
+    <arg name="use_sim_time" value="$(var use_sim_time)"/>
+  </include>
+
+  <include
+    file="$(find-pkg-share savo_mapping)/launch/coverage_operation_orchestrator.launch.xml"
+    if="$(var coverage_enabled)">
+    <arg name="params_file" value="$(var coverage_operation_params_file)"/>
+    <arg name="enabled" value="true"/>
+    <arg name="use_sim_time" value="$(var use_sim_time)"/>
   </include>
 
   <node

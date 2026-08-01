@@ -15,6 +15,8 @@ coverage_mapper_node:
     path_topic: "/savo_mapping/coverage/path"
     status_topic: "/savo_mapping/coverage/status"
     state_topic: "/savo_mapping/coverage/state"
+    request_plan_service: "/savo_mapping/coverage/request_plan"
+    reset_plan_service: "/savo_mapping/coverage/reset_plan"
 
     tick_period_sec: 0.10
     map_stale_timeout_sec: 5.0

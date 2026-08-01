@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: LicenseRef-Proprietary
 
 #include "savo_mapping/autonomous_mapping_mission.hpp"
+#include "savo_mapping/autonomous_mapping_am7.hpp"
 #include "savo_mapping/frontier_completion_detector.hpp"
 #include "savo_mapping/saved_map_contract.hpp"
 #include "savo_mapping/topic_names.hpp"
@@ -9,6 +10,7 @@
 
 #include <builtin_interfaces/msg/duration.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
+#include <nav2_msgs/action/navigate_to_pose.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <savo_msgs/action/run_autonomous_mapping.hpp>
@@ -22,6 +24,7 @@
 #include <tf2_ros/transform_listener.hpp>
 
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <functional>
 #include <iostream>
@@ -46,6 +49,8 @@ using FrontierStatus = savo_msgs::msg::FrontierExplorationStatus;
 using Trigger = std_srvs::srv::Trigger;
 using StringMessage = std_msgs::msg::String;
 using BoolMessage = std_msgs::msg::Bool;
+using NavigateToPose = nav2_msgs::action::NavigateToPose;
+using ReturnGoalHandle = rclcpp_action::ClientGoalHandle<NavigateToPose>;
 
 constexpr std::int64_t kNanosecondsPerSecond = 1000000000LL;
 
@@ -291,6 +296,86 @@ private:
       "sequence.head_scan_operation_timeout_s",
       180.0);
 
+    coverage_enabled_ = declare_parameter<bool>("coverage.enabled", true);
+    coverage_required_ = declare_parameter<bool>("coverage.required", true);
+    inputs_.require_coverage = coverage_enabled_ && coverage_required_;
+    coverage_request_plan_service_name_ = declare_parameter<std::string>(
+      "coverage.request_plan_service", "/savo_mapping/coverage/request_plan");
+    coverage_reset_plan_service_name_ = declare_parameter<std::string>(
+      "coverage.reset_plan_service", "/savo_mapping/coverage/reset_plan");
+    coverage_planner_status_topic_ = declare_parameter<std::string>(
+      "coverage.planner_status_topic", "/savo_mapping/coverage/status");
+    coverage_operation_approve_service_name_ = declare_parameter<std::string>(
+      "coverage.operation_approve_service",
+      "/savo_mapping/coverage_operation/approve");
+    coverage_operation_cancel_service_name_ = declare_parameter<std::string>(
+      "coverage.operation_cancel_service",
+      "/savo_mapping/coverage_operation/cancel");
+    coverage_operation_reset_service_name_ = declare_parameter<std::string>(
+      "coverage.operation_reset_service",
+      "/savo_mapping/coverage_operation/reset");
+    coverage_operation_status_topic_ = declare_parameter<std::string>(
+      "coverage.operation_status_topic",
+      "/savo_mapping/coverage_operation/status");
+    coverage_planning_timeout_s_ = declare_parameter<double>(
+      "coverage.planning_timeout_s", 30.0);
+    coverage_approval_timeout_s_ = declare_parameter<double>(
+      "coverage.approval_timeout_s", 10.0);
+    coverage_execution_timeout_s_ = declare_parameter<double>(
+      "coverage.execution_timeout_s", 900.0);
+    coverage_feedback_stale_timeout_s_ = declare_parameter<double>(
+      "coverage.feedback_stale_timeout_s", 5.0);
+    coverage_cancel_timeout_s_ = declare_parameter<double>(
+      "coverage.cancel_timeout_s", 10.0);
+    const auto coverage_maximum_restart_attempts =
+      declare_parameter<std::int64_t>(
+      "coverage.maximum_restart_attempts", 2);
+    coverage_require_fresh_map_generation_ = declare_parameter<bool>(
+      "coverage.require_fresh_map_generation", true);
+
+    return_to_start_enabled_ = declare_parameter<bool>(
+      "return_to_start.enabled", true);
+    inputs_.require_return_to_start =
+      return_to_start_enabled_ && inputs_.require_coverage;
+    return_action_name_ = declare_parameter<std::string>(
+      "return_to_start.action_name",
+      "/savo_nav/navigation/navigate_to_pose");
+    return_server_wait_timeout_s_ = declare_parameter<double>(
+      "return_to_start.server_wait_timeout_s", 3.0);
+    return_goal_response_timeout_s_ = declare_parameter<double>(
+      "return_to_start.goal_response_timeout_s", 3.0);
+    return_execution_timeout_s_ = declare_parameter<double>(
+      "return_to_start.execution_timeout_s", 180.0);
+    return_feedback_stale_timeout_s_ = declare_parameter<double>(
+      "return_to_start.feedback_stale_timeout_s", 5.0);
+    return_cancel_timeout_s_ = declare_parameter<double>(
+      "return_to_start.cancel_timeout_s", 10.0);
+    return_position_tolerance_m_ = declare_parameter<double>(
+      "return_to_start.position_tolerance_m", 0.35);
+    return_require_yaw_tolerance_ = declare_parameter<bool>(
+      "return_to_start.require_yaw_tolerance", false);
+    return_yaw_tolerance_rad_ = declare_parameter<double>(
+      "return_to_start.yaw_tolerance_rad", 0.50);
+    const auto return_maximum_attempts = declare_parameter<std::int64_t>(
+      "return_to_start.maximum_attempts", 2);
+
+    inputs_.require_final_scan360 = declare_parameter<bool>(
+      "final_sequence.require_final_scan360", true);
+    inputs_.require_final_head_scan = declare_parameter<bool>(
+      "final_sequence.require_final_head_scan", true);
+
+    if (
+      coverage_maximum_restart_attempts < 0 ||
+      coverage_maximum_restart_attempts > 100 ||
+      return_maximum_attempts <= 0 || return_maximum_attempts > 100)
+    {
+      throw std::invalid_argument("am7_attempt_limit_out_of_range");
+    }
+    inputs_.coverage_maximum_restart_attempts =
+      static_cast<std::uint32_t>(coverage_maximum_restart_attempts);
+    inputs_.return_to_start_maximum_attempts =
+      static_cast<std::uint32_t>(return_maximum_attempts);
+
     mode_command_topic_ = declare_parameter<std::string>(
       "mode_command_topic",
       std::string{topics::MODE_CMD});
@@ -394,6 +479,14 @@ private:
       &head_scan_start_service_name_,
       &head_scan_pause_service_name_,
       &head_scan_resume_service_name_,
+      &coverage_request_plan_service_name_,
+      &coverage_reset_plan_service_name_,
+      &coverage_planner_status_topic_,
+      &coverage_operation_approve_service_name_,
+      &coverage_operation_cancel_service_name_,
+      &coverage_operation_reset_service_name_,
+      &coverage_operation_status_topic_,
+      &return_action_name_,
       &start_pose_target_frame_,
       &start_pose_source_frame_,
       &mode_command_topic_,
@@ -448,6 +541,30 @@ private:
     {
       throw std::invalid_argument(
               "autonomous_sequence_timeout_out_of_range");
+    }
+
+    const double am7_positive_timeouts[] = {
+      coverage_planning_timeout_s_, coverage_approval_timeout_s_,
+      coverage_execution_timeout_s_, coverage_feedback_stale_timeout_s_,
+      coverage_cancel_timeout_s_, return_server_wait_timeout_s_,
+      return_goal_response_timeout_s_, return_execution_timeout_s_,
+      return_feedback_stale_timeout_s_, return_cancel_timeout_s_};
+    for (const double timeout : am7_positive_timeouts) {
+      if (!std::isfinite(timeout) || timeout <= 0.0) {
+        throw std::invalid_argument("am7_timeout_out_of_range");
+      }
+    }
+    if (!std::isfinite(return_position_tolerance_m_) ||
+      return_position_tolerance_m_ <= 0.0 ||
+      !std::isfinite(return_yaw_tolerance_rad_) ||
+      return_yaw_tolerance_rad_ < 0.0)
+    {
+      throw std::invalid_argument("return_to_start_tolerance_out_of_range");
+    }
+    if (inputs_.require_return_to_start &&
+      !inputs_.require_start_pose_capture)
+    {
+      throw std::invalid_argument("return_to_start_requires_start_pose_capture");
     }
   }
 
@@ -572,6 +689,22 @@ private:
         this,
         std::placeholders::_1));
 
+    coverage_planner_status_subscription_ = create_subscription<StringMessage>(
+      coverage_planner_status_topic_,
+      retained_qos,
+      std::bind(
+        &AutonomousMappingOrchestratorNode::handle_coverage_planner_status,
+        this,
+        std::placeholders::_1));
+
+    coverage_operation_status_subscription_ = create_subscription<StringMessage>(
+      coverage_operation_status_topic_,
+      retained_qos,
+      std::bind(
+        &AutonomousMappingOrchestratorNode::handle_coverage_operation_status,
+        this,
+        std::placeholders::_1));
+
     scan360_state_subscription_ = create_subscription<StringMessage>(
       scan360_state_topic_,
       retained_qos,
@@ -608,6 +741,19 @@ private:
 
     head_scan_resume_client_ = create_client<Trigger>(
       head_scan_resume_service_name_);
+
+    coverage_request_plan_client_ = create_client<Trigger>(
+      coverage_request_plan_service_name_);
+    coverage_reset_plan_client_ = create_client<Trigger>(
+      coverage_reset_plan_service_name_);
+    coverage_operation_approve_client_ = create_client<Trigger>(
+      coverage_operation_approve_service_name_);
+    coverage_operation_cancel_client_ = create_client<Trigger>(
+      coverage_operation_cancel_service_name_);
+    coverage_operation_reset_client_ = create_client<Trigger>(
+      coverage_operation_reset_service_name_);
+    return_action_client_ = rclcpp_action::create_client<NavigateToPose>(
+      this, return_action_name_);
 
     control_service_ = create_service<ControlMission>(
       control_service_name_,
@@ -936,6 +1082,105 @@ private:
     evaluate_and_apply();
   }
 
+  void handle_coverage_planner_status(
+    const StringMessage::SharedPtr message)
+  {
+    const auto observation =
+      autonomous::parse_coverage_planner_status(message->data);
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      inputs_.coverage_planning_started = observation.planning_started;
+      inputs_.coverage_planning_complete = observation.planning_complete;
+      inputs_.coverage_plan_valid = observation.plan_valid &&
+        (!coverage_require_fresh_map_generation_ ||
+        observation.map_generation > 0U);
+      inputs_.coverage_plan_noop = observation.explicit_noop;
+      inputs_.coverage_plan_generation = observation.plan_generation;
+      inputs_.coverage_map_generation = observation.map_generation;
+      inputs_.coverage_total_waypoints = observation.waypoint_count;
+      inputs_.coverage_state = observation.state;
+      inputs_.coverage_reason = observation.reason;
+      coverage_planner_status_received_at_ = std::chrono::steady_clock::now();
+    }
+    evaluate_and_apply();
+  }
+
+  void handle_coverage_operation_status(
+    const StringMessage::SharedPtr message)
+  {
+    const auto observation =
+      autonomous::parse_coverage_operation_status(message->data);
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      coverage_candidate_generation_ = observation.candidate_generation;
+      coverage_candidate_valid_ = observation.candidate_valid;
+      inputs_.coverage_supervisor_authorized =
+        observation.supervisor_authorized;
+
+      const bool correlated =
+        coverage_expected_candidate_generation_ > 0U &&
+        observation.candidate_generation ==
+        coverage_expected_candidate_generation_;
+      if (correlated) {
+        inputs_.coverage_approval_pending = observation.approval_pending;
+        inputs_.coverage_mission_id = observation.mission_id;
+        inputs_.coverage_state = observation.state;
+        inputs_.coverage_reason = observation.reason;
+        inputs_.coverage_execution_started =
+          observation.state == "awaiting_dispatch" ||
+          observation.state == "executing" ||
+          observation.state == "canceling" ||
+          !observation.terminal_state.empty();
+        inputs_.coverage_execution_active =
+          observation.state == "awaiting_dispatch" ||
+          observation.state == "executing" ||
+          observation.state == "canceling";
+        if (inputs_.coverage_execution_active &&
+          !coverage_execution_started_at_.has_value())
+        {
+          coverage_execution_started_at_ = std::chrono::steady_clock::now();
+          coverage_feedback_received_at_ = std::chrono::steady_clock::now();
+        }
+        inputs_.coverage_execution_complete =
+          observation.terminal_state == "succeeded" ||
+          observation.terminal_state == "canceled" ||
+          observation.terminal_state == "failed" ||
+          observation.terminal_state == "rejected" ||
+          observation.terminal_state == "timed_out";
+        inputs_.coverage_execution_succeeded =
+          observation.terminal_state == "succeeded";
+        inputs_.coverage_current_waypoint = observation.current_waypoint;
+        inputs_.coverage_completed_waypoints =
+          observation.completed_waypoints;
+        if (observation.total_waypoints > 0U) {
+          inputs_.coverage_total_waypoints = observation.total_waypoints;
+        }
+        inputs_.coverage_completion_ratio = observation.completion_ratio;
+        inputs_.coverage_remaining_distance_m =
+          observation.remaining_distance_m;
+        coverage_operation_status_received_at_ =
+          std::chrono::steady_clock::now();
+        if (
+          observation.current_waypoint != coverage_last_current_waypoint_ ||
+          observation.completed_waypoints !=
+          coverage_last_completed_waypoints_ ||
+          observation.completion_ratio != coverage_last_completion_ratio_ ||
+          observation.remaining_distance_m !=
+          coverage_last_remaining_distance_m_)
+        {
+          coverage_feedback_received_at_ = std::chrono::steady_clock::now();
+          coverage_last_current_waypoint_ = observation.current_waypoint;
+          coverage_last_completed_waypoints_ =
+            observation.completed_waypoints;
+          coverage_last_completion_ratio_ = observation.completion_ratio;
+          coverage_last_remaining_distance_m_ =
+            observation.remaining_distance_m;
+        }
+      }
+    }
+    evaluate_and_apply();
+  }
+
   void handle_scan360_state(
     const StringMessage::ConstSharedPtr message)
   {
@@ -1080,14 +1325,57 @@ private:
     inputs_.head_scan_state = "idle";
     inputs_.head_scan_reason = "head_scan_not_requested";
 
+    inputs_.coverage_planning_started = false;
+    inputs_.coverage_planning_complete = false;
+    inputs_.coverage_plan_valid = false;
+    inputs_.coverage_plan_noop = false;
+    inputs_.coverage_total_waypoints = 0U;
+    inputs_.coverage_approval_pending = false;
+    inputs_.coverage_execution_started = false;
+    inputs_.coverage_execution_active = false;
+    inputs_.coverage_execution_complete = false;
+    inputs_.coverage_execution_succeeded = false;
+    inputs_.coverage_mission_id.clear();
+    inputs_.coverage_state = "idle";
+    inputs_.coverage_reason = "coverage_not_requested";
+    inputs_.coverage_current_waypoint = 0U;
+    inputs_.coverage_completed_waypoints = 0U;
+    inputs_.coverage_completion_ratio = 0.0;
+    inputs_.coverage_remaining_distance_m = 0.0;
+    inputs_.coverage_restart_attempts = 0U;
+
+    inputs_.return_to_start_started = false;
+    inputs_.return_to_start_active = false;
+    inputs_.return_to_start_complete = false;
+    inputs_.return_to_start_succeeded = false;
+    inputs_.return_proximity_verified = false;
+    inputs_.return_within_tolerance = false;
+    inputs_.return_to_start_distance_m = 0.0;
+    inputs_.return_to_start_state = "idle";
+    inputs_.return_to_start_reason = "return_not_requested";
+    inputs_.return_to_start_attempts = 0U;
+
     start_pose_map_ = geometry_msgs::msg::PoseStamped{};
     start_pose_map_.header.frame_id = start_pose_target_frame_;
     start_pose_capture_started_at_.reset();
     scan360_started_at_.reset();
     head_scan_started_at_.reset();
+    coverage_planning_started_at_.reset();
+    coverage_approval_started_at_.reset();
+    coverage_execution_started_at_.reset();
+    coverage_cancel_started_at_.reset();
+    coverage_feedback_received_at_.reset();
+    return_started_at_.reset();
+    return_goal_sent_at_.reset();
+    return_feedback_received_at_.reset();
+    return_cancel_started_at_.reset();
 
     ++scan360_operation_epoch_;
     ++head_scan_operation_epoch_;
+    ++coverage_operation_epoch_;
+    ++return_operation_epoch_;
+    coverage_candidate_generation_floor_ = coverage_candidate_generation_;
+    coverage_expected_candidate_generation_ = 0U;
     observed_sequence_state_ = autonomous::MissionState::Idle;
 
     start_pose_capture_in_flight_ = false;
@@ -1098,6 +1386,16 @@ private:
     head_scan_pause_in_flight_ = false;
     head_scan_resume_in_flight_ = false;
     head_scan_start_acknowledged_ = false;
+    coverage_plan_reset_in_flight_ = false;
+    coverage_plan_reset_done_ = false;
+    coverage_attempt_started_ = false;
+    coverage_plan_request_in_flight_ = false;
+    coverage_approve_in_flight_ = false;
+    coverage_cancel_in_flight_ = false;
+    coverage_reset_in_flight_ = false;
+    return_goal_in_flight_ = false;
+    return_cancel_in_flight_ = false;
+    return_goal_handle_.reset();
   }
 
   void prepare_scan360_operation_locked()
@@ -1142,8 +1440,60 @@ private:
 
     if (autonomous::is_scan_state(state)) {
       prepare_scan360_operation_locked();
-    } else if (state == autonomous::MissionState::InitialHeadScan) {
+    }
+    if (
+      state == autonomous::MissionState::InitialHeadScan ||
+      state == autonomous::MissionState::FinalHeadScan)
+    {
       prepare_head_scan_operation_locked(inputs_.head_scan_paused);
+    }
+    if (state == autonomous::MissionState::CoveragePending) {
+      if (coverage_attempt_started_) {
+        ++inputs_.coverage_restart_attempts;
+      }
+      coverage_attempt_started_ = true;
+      ++coverage_operation_epoch_;
+      coverage_candidate_generation_floor_ = coverage_candidate_generation_;
+      coverage_expected_candidate_generation_ = 0U;
+      inputs_.coverage_planning_started = false;
+      inputs_.coverage_planning_complete = false;
+      inputs_.coverage_plan_valid = false;
+      inputs_.coverage_plan_noop = false;
+      inputs_.coverage_approval_pending = false;
+      inputs_.coverage_execution_started = false;
+      inputs_.coverage_execution_active = false;
+      inputs_.coverage_execution_complete = false;
+      inputs_.coverage_execution_succeeded = false;
+      inputs_.coverage_mission_id.clear();
+      coverage_planning_started_at_ = std::chrono::steady_clock::now();
+      coverage_approval_started_at_.reset();
+      coverage_execution_started_at_.reset();
+      coverage_feedback_received_at_.reset();
+      coverage_cancel_started_at_.reset();
+      coverage_plan_reset_in_flight_ = false;
+      coverage_plan_reset_done_ = false;
+      coverage_plan_request_in_flight_ = false;
+      coverage_approve_in_flight_ = false;
+      coverage_cancel_in_flight_ = false;
+      coverage_reset_in_flight_ = false;
+    }
+    if (state == autonomous::MissionState::ReturningToStart) {
+      ++return_operation_epoch_;
+      inputs_.return_to_start_started = false;
+      inputs_.return_to_start_active = false;
+      inputs_.return_to_start_complete = false;
+      inputs_.return_to_start_succeeded = false;
+      inputs_.return_proximity_verified = false;
+      inputs_.return_within_tolerance = false;
+      inputs_.return_to_start_state = "idle";
+      inputs_.return_to_start_reason = "return_not_requested";
+      return_started_at_ = std::chrono::steady_clock::now();
+      return_goal_sent_at_.reset();
+      return_feedback_received_at_.reset();
+      return_cancel_started_at_.reset();
+      return_goal_in_flight_ = false;
+      return_cancel_in_flight_ = false;
+      return_goal_handle_.reset();
     }
 
     observed_sequence_state_ = state;
@@ -1204,6 +1554,13 @@ private:
     bool dispatch_head_scan_start = false;
     bool dispatch_head_scan_pause = false;
     bool dispatch_head_scan_resume = false;
+    bool dispatch_coverage_plan_reset = false;
+    bool dispatch_coverage_plan_request = false;
+    bool dispatch_coverage_approve = false;
+    bool dispatch_coverage_cancel = false;
+    bool dispatch_coverage_reset = false;
+    bool dispatch_return_goal = false;
+    bool dispatch_return_cancel = false;
     bool dispatch_map_save = false;
     bool dispatch_verification = false;
     bool verification_started_this_cycle = false;
@@ -1213,6 +1570,9 @@ private:
     std::string sequence_mission_id;
     std::uint64_t scan360_dispatch_epoch = 0U;
     std::uint64_t head_scan_dispatch_epoch = 0U;
+    std::uint64_t coverage_dispatch_epoch = 0U;
+    std::uint64_t return_dispatch_epoch = 0U;
+    std::string am7_mission_id;
 
     const auto current_time = std::chrono::steady_clock::now();
 
@@ -1236,6 +1596,102 @@ private:
         inputs_.map_save_succeeded = false;
         inputs_.map_save_reason = "automatic_map_save_timeout";
         map_save_in_flight_ = false;
+      }
+
+      std::optional<std::string> am7_timeout_reason;
+      const auto active_state = mission_.snapshot().state;
+      if (
+        (active_state == autonomous::MissionState::Pausing ||
+        active_state == autonomous::MissionState::Canceling) &&
+        !timeout_abort_requested_ &&
+        (inputs_.coverage_approval_pending ||
+        inputs_.coverage_execution_active) &&
+        coverage_cancel_started_at_.has_value() &&
+        std::chrono::duration<double>(
+          current_time - coverage_cancel_started_at_.value()).count() >=
+        coverage_cancel_timeout_s_)
+      {
+        am7_timeout_reason = "coverage_cancel_timeout";
+      } else if (  // NOLINT(readability/braces)
+        (active_state == autonomous::MissionState::Pausing ||
+        active_state == autonomous::MissionState::Canceling) &&
+        !timeout_abort_requested_ &&
+        inputs_.return_to_start_active &&
+        return_cancel_started_at_.has_value() &&
+        std::chrono::duration<double>(
+          current_time - return_cancel_started_at_.value()).count() >=
+        return_cancel_timeout_s_)
+      {
+        am7_timeout_reason = "return_cancel_timeout";
+      } else if (  // NOLINT(readability/braces)
+        active_state == autonomous::MissionState::CoveragePending &&
+        coverage_planning_started_at_.has_value() &&
+        !inputs_.coverage_planning_complete &&
+        std::chrono::duration<double>(
+          current_time - coverage_planning_started_at_.value()).count() >=
+        coverage_planning_timeout_s_)
+      {
+        am7_timeout_reason = "coverage_planning_timeout";
+      } else if (  // NOLINT(readability/braces)
+        active_state == autonomous::MissionState::CoveragePending &&
+        coverage_approval_started_at_.has_value() &&
+        !inputs_.coverage_execution_started &&
+        std::chrono::duration<double>(
+          current_time - coverage_approval_started_at_.value()).count() >=
+        coverage_approval_timeout_s_)
+      {
+        am7_timeout_reason = "coverage_approval_timeout";
+      } else if (  // NOLINT(readability/braces)
+        active_state == autonomous::MissionState::Coverage &&
+        coverage_execution_started_at_.has_value() &&
+        std::chrono::duration<double>(
+          current_time - coverage_execution_started_at_.value()).count() >=
+        coverage_execution_timeout_s_)
+      {
+        am7_timeout_reason = "coverage_execution_timeout";
+      } else if (  // NOLINT(readability/braces)
+        active_state == autonomous::MissionState::Coverage &&
+        coverage_feedback_received_at_.has_value() &&
+        std::chrono::duration<double>(
+          current_time - coverage_feedback_received_at_.value()).count() >=
+        coverage_feedback_stale_timeout_s_)
+      {
+        am7_timeout_reason = "coverage_feedback_stale_timeout";
+      } else if (  // NOLINT(readability/braces)
+        active_state == autonomous::MissionState::ReturningToStart &&
+        return_started_at_.has_value() &&
+        !inputs_.return_to_start_started &&
+        std::chrono::duration<double>(
+          current_time - return_started_at_.value()).count() >=
+        return_server_wait_timeout_s_)
+      {
+        am7_timeout_reason = "return_action_server_timeout";
+      } else if (  // NOLINT(readability/braces)
+        active_state == autonomous::MissionState::ReturningToStart &&
+        return_goal_sent_at_.has_value() &&
+        return_goal_in_flight_ &&
+        std::chrono::duration<double>(
+          current_time - return_goal_sent_at_.value()).count() >=
+        return_goal_response_timeout_s_)
+      {
+        am7_timeout_reason = "return_goal_response_timeout";
+      } else if (  // NOLINT(readability/braces)
+        active_state == autonomous::MissionState::ReturningToStart &&
+        inputs_.return_to_start_active && return_started_at_.has_value() &&
+        std::chrono::duration<double>(
+          current_time - return_started_at_.value()).count() >=
+        return_execution_timeout_s_)
+      {
+        am7_timeout_reason = "return_execution_timeout";
+      } else if (  // NOLINT(readability/braces)
+        active_state == autonomous::MissionState::ReturningToStart &&
+        inputs_.return_to_start_active &&
+        return_feedback_received_at_.has_value() &&
+        std::chrono::duration<double>(
+          current_time - return_feedback_received_at_.value()).count() >=
+        return_feedback_stale_timeout_s_)
+      {
+        am7_timeout_reason = "return_feedback_stale_timeout";
       }
 
       if (
@@ -1275,8 +1731,10 @@ private:
       }
 
       if (
+        (mission_.snapshot().state ==
+        autonomous::MissionState::InitialHeadScan ||
         mission_.snapshot().state ==
-        autonomous::MissionState::InitialHeadScan &&
+        autonomous::MissionState::FinalHeadScan) &&
         inputs_.head_scan_started &&
         !inputs_.head_scan_complete &&
         head_scan_started_at_.has_value() &&
@@ -1300,6 +1758,14 @@ private:
 
       const auto mission_state = mission_.snapshot().state;
       if (
+        am7_timeout_reason.has_value())
+      {
+        timeout_abort_requested_ = true;
+        decision = mission_.abort(
+          autonomous::MissionResult::TimedOut,
+          am7_timeout_reason.value(),
+          inputs_);
+      } else if (  // NOLINT(readability/braces)
         autonomous::is_active(mission_state) &&
         mission_state != autonomous::MissionState::Canceling &&
         mission_state != autonomous::MissionState::CompletionPending &&
@@ -1438,6 +1904,126 @@ private:
           head_scan_dispatch_epoch = head_scan_operation_epoch_;
           dispatch_head_scan_resume = true;
         }
+      }
+
+      if (
+        decision.request_coverage_plan_reset &&
+        !coverage_plan_reset_done_ &&
+        !coverage_plan_reset_in_flight_ &&
+        coverage_reset_plan_client_->service_is_ready() &&
+        command_retry_elapsed_locked("coverage_plan_reset", current_time))
+      {
+        coverage_plan_reset_in_flight_ = true;
+        coverage_dispatch_epoch = coverage_operation_epoch_;
+        am7_mission_id = mission_.snapshot().request.mission_id;
+        dispatch_coverage_plan_reset = true;
+      }
+
+      if (
+        decision.request_coverage_plan &&
+        coverage_plan_reset_done_ &&
+        !coverage_plan_request_in_flight_ &&
+        !inputs_.coverage_planning_started &&
+        coverage_request_plan_client_->service_is_ready() &&
+        command_retry_elapsed_locked("coverage_plan_request", current_time))
+      {
+        coverage_plan_request_in_flight_ = true;
+        inputs_.coverage_planning_started = true;
+        inputs_.coverage_planning_complete = false;
+        inputs_.coverage_plan_valid = false;
+        inputs_.coverage_reason = "coverage_plan_request_pending";
+        coverage_planning_started_at_ = current_time;
+        coverage_dispatch_epoch = coverage_operation_epoch_;
+        am7_mission_id = mission_.snapshot().request.mission_id;
+        dispatch_coverage_plan_request = true;
+      }
+
+      if (
+        decision.request_coverage_approve &&
+        !coverage_approval_started_at_.has_value())
+      {
+        coverage_approval_started_at_ = current_time;
+      }
+
+      if (
+        decision.request_coverage_approve &&
+        coverage_candidate_valid_ &&
+        coverage_candidate_generation_ > coverage_candidate_generation_floor_ &&
+        !inputs_.coverage_approval_pending &&
+        !coverage_approve_in_flight_ &&
+        coverage_operation_approve_client_->service_is_ready() &&
+        command_retry_elapsed_locked("coverage_approve", current_time))
+      {
+        coverage_approve_in_flight_ = true;
+        coverage_expected_candidate_generation_ =
+          coverage_candidate_generation_;
+        inputs_.coverage_approval_pending = true;
+        coverage_dispatch_epoch = coverage_operation_epoch_;
+        am7_mission_id = mission_.snapshot().request.mission_id;
+        dispatch_coverage_approve = true;
+      }
+
+      if (
+        decision.request_coverage_cancel &&
+        !coverage_cancel_in_flight_ &&
+        coverage_operation_cancel_client_->service_is_ready() &&
+        command_retry_elapsed_locked("coverage_cancel", current_time))
+      {
+        coverage_cancel_in_flight_ = true;
+        if (!coverage_cancel_started_at_.has_value()) {
+          coverage_cancel_started_at_ = current_time;
+        }
+        coverage_dispatch_epoch = coverage_operation_epoch_;
+        am7_mission_id = mission_.snapshot().request.mission_id;
+        dispatch_coverage_cancel = true;
+      }
+
+      if (
+        decision.request_coverage_reset &&
+        !coverage_reset_in_flight_ &&
+        coverage_operation_reset_client_->service_is_ready() &&
+        command_retry_elapsed_locked("coverage_reset", current_time))
+      {
+        coverage_reset_in_flight_ = true;
+        coverage_dispatch_epoch = coverage_operation_epoch_;
+        am7_mission_id = mission_.snapshot().request.mission_id;
+        dispatch_coverage_reset = true;
+      }
+
+      if (decision.request_return_to_start) {
+        if (
+          !return_goal_in_flight_ &&
+          !inputs_.return_to_start_started &&
+          return_action_client_->action_server_is_ready() &&
+          inputs_.return_to_start_attempts <
+          inputs_.return_to_start_maximum_attempts &&
+          command_retry_elapsed_locked("return_to_start", current_time))
+        {
+          ++inputs_.return_to_start_attempts;
+          inputs_.return_to_start_started = true;
+          inputs_.return_to_start_active = true;
+          inputs_.return_to_start_state = "sending";
+          inputs_.return_to_start_reason = "guarded_return_goal_sending";
+          return_goal_in_flight_ = true;
+          return_goal_sent_at_ = current_time;
+          return_dispatch_epoch = return_operation_epoch_;
+          am7_mission_id = mission_.snapshot().request.mission_id;
+          dispatch_return_goal = true;
+        }
+      }
+
+      if (
+        decision.request_return_cancel &&
+        return_goal_handle_ &&
+        !return_cancel_in_flight_)
+      {
+        return_cancel_in_flight_ = true;
+        if (!return_cancel_started_at_.has_value()) {
+          return_cancel_started_at_ = current_time;
+        }
+        return_dispatch_epoch = return_operation_epoch_;
+        am7_mission_id = mission_.snapshot().request.mission_id;
+        dispatch_return_cancel = true;
       }
 
       if (
@@ -1604,6 +2190,38 @@ private:
         head_scan_dispatch_epoch);
     }
 
+    if (dispatch_coverage_plan_reset) {
+      dispatch_am7_trigger(
+        coverage_reset_plan_client_, "coverage_plan_reset",
+        am7_mission_id, coverage_dispatch_epoch);
+    }
+    if (dispatch_coverage_plan_request) {
+      dispatch_am7_trigger(
+        coverage_request_plan_client_, "coverage_plan_request",
+        am7_mission_id, coverage_dispatch_epoch);
+    }
+    if (dispatch_coverage_approve) {
+      dispatch_am7_trigger(
+        coverage_operation_approve_client_, "coverage_approve",
+        am7_mission_id, coverage_dispatch_epoch);
+    }
+    if (dispatch_coverage_cancel) {
+      dispatch_am7_trigger(
+        coverage_operation_cancel_client_, "coverage_cancel",
+        am7_mission_id, coverage_dispatch_epoch);
+    }
+    if (dispatch_coverage_reset) {
+      dispatch_am7_trigger(
+        coverage_operation_reset_client_, "coverage_reset",
+        am7_mission_id, coverage_dispatch_epoch);
+    }
+    if (dispatch_return_goal) {
+      dispatch_return_to_start(am7_mission_id, return_dispatch_epoch);
+    }
+    if (dispatch_return_cancel) {
+      dispatch_return_cancel_request(am7_mission_id, return_dispatch_epoch);
+    }
+
     if (dispatch_map_save) {
       dispatch_map_save_request(map_save_mission_id);
     }
@@ -1619,6 +2237,269 @@ private:
         terminal_handle,
         status,
         terminal_snapshot.value());
+    }
+  }
+
+  void dispatch_am7_trigger(
+    const rclcpp::Client<Trigger>::SharedPtr & client,
+    const std::string & operation,
+    const std::string & mission_id,
+    const std::uint64_t operation_epoch)
+  {
+    auto request = std::make_shared<Trigger::Request>();
+    try {
+      client->async_send_request(
+        request,
+        [this, operation, mission_id, operation_epoch](
+          const rclcpp::Client<Trigger>::SharedFuture future)
+        {
+          bool success = false;
+          std::string reason = operation + "_response_invalid";
+          try {
+            const auto response = future.get();
+            success = response && response->success;
+            if (response && !response->message.empty()) {
+              reason = response->message;
+            }
+          } catch (const std::exception & error) {
+            reason = operation + "_response_error:" + error.what();
+          }
+
+          {
+            std::lock_guard<std::mutex> lock(mutex_);
+            if (
+              operation_epoch != coverage_operation_epoch_ ||
+              mission_id != mission_.snapshot().request.mission_id)
+            {
+              return;
+            }
+
+            if (operation == "coverage_plan_reset") {
+              coverage_plan_reset_in_flight_ = false;
+              coverage_plan_reset_done_ = success;
+            } else if (operation == "coverage_plan_request") {
+              coverage_plan_request_in_flight_ = false;
+              if (!success) {
+                ++inputs_.coverage_plan_generation;
+                inputs_.coverage_planning_complete = true;
+                inputs_.coverage_plan_valid = false;
+              }
+            } else if (operation == "coverage_approve") {
+              coverage_approve_in_flight_ = false;
+              if (!success) {
+                inputs_.coverage_approval_pending = false;
+              }
+            } else if (operation == "coverage_cancel") {
+              coverage_cancel_in_flight_ = false;
+            } else if (operation == "coverage_reset") {
+              coverage_reset_in_flight_ = false;
+            }
+            if (!success) {
+              inputs_.coverage_reason = reason;
+            }
+          }
+          evaluate_and_apply();
+        });
+    } catch (const std::exception & error) {
+      std::lock_guard<std::mutex> lock(mutex_);
+      if (operation_epoch == coverage_operation_epoch_) {
+        coverage_plan_reset_in_flight_ = false;
+        coverage_plan_request_in_flight_ = false;
+        coverage_approve_in_flight_ = false;
+        if (operation == "coverage_approve") {
+          inputs_.coverage_approval_pending = false;
+        }
+        coverage_cancel_in_flight_ = false;
+        coverage_reset_in_flight_ = false;
+        inputs_.coverage_reason = operation + "_dispatch_error:" + error.what();
+      }
+    }
+  }
+
+  void dispatch_return_to_start(
+    const std::string & mission_id,
+    const std::uint64_t operation_epoch)
+  {
+    const auto & orientation = start_pose_map_.pose.orientation;
+    const double norm = std::hypot(
+      std::hypot(orientation.x, orientation.y),
+      std::hypot(orientation.z, orientation.w));
+    if (!std::isfinite(norm) || norm <= 1.0e-12 ||
+      start_pose_map_.header.frame_id != start_pose_target_frame_)
+    {
+      {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (operation_epoch == return_operation_epoch_) {
+          return_goal_in_flight_ = false;
+          inputs_.return_to_start_active = false;
+          inputs_.return_to_start_complete = true;
+          inputs_.return_to_start_succeeded = false;
+          inputs_.return_to_start_state = "failed";
+          inputs_.return_to_start_reason = "return_start_pose_invalid";
+        }
+      }
+      evaluate_and_apply();
+      return;
+    }
+
+    NavigateToPose::Goal goal;
+    goal.pose = start_pose_map_;
+    goal.pose.header.stamp = now();
+    goal.pose.pose.orientation.x /= norm;
+    goal.pose.pose.orientation.y /= norm;
+    goal.pose.pose.orientation.z /= norm;
+    goal.pose.pose.orientation.w /= norm;
+
+    rclcpp_action::Client<NavigateToPose>::SendGoalOptions options;
+    options.goal_response_callback =
+      [this, mission_id, operation_epoch](
+      const ReturnGoalHandle::SharedPtr goal_handle)
+      {
+        {
+          std::lock_guard<std::mutex> lock(mutex_);
+          if (operation_epoch != return_operation_epoch_ ||
+            mission_id != mission_.snapshot().request.mission_id)
+          {
+            return;
+          }
+          return_goal_in_flight_ = false;
+          return_goal_handle_ = goal_handle;
+          if (!goal_handle) {
+            inputs_.return_to_start_active = false;
+            inputs_.return_to_start_complete = true;
+            inputs_.return_to_start_succeeded = false;
+            inputs_.return_to_start_state = "rejected";
+            inputs_.return_to_start_reason = "guarded_return_goal_rejected";
+          } else {
+            inputs_.return_to_start_active = true;
+            inputs_.return_to_start_state = "executing";
+            inputs_.return_to_start_reason = "guarded_return_goal_accepted";
+            return_started_at_ = std::chrono::steady_clock::now();
+            return_feedback_received_at_ = return_started_at_;
+          }
+        }
+        evaluate_and_apply();
+      };
+    options.feedback_callback =
+      [this, mission_id, operation_epoch](
+      const ReturnGoalHandle::SharedPtr,
+      const std::shared_ptr<const NavigateToPose::Feedback> feedback)
+      {
+        if (!feedback) {
+          return;
+        }
+        {
+          std::lock_guard<std::mutex> lock(mutex_);
+          if (operation_epoch != return_operation_epoch_ ||
+            mission_id != mission_.snapshot().request.mission_id)
+          {
+            return;
+          }
+          inputs_.return_to_start_distance_m = feedback->distance_remaining;
+          inputs_.return_to_start_state = "executing";
+          return_feedback_received_at_ = std::chrono::steady_clock::now();
+        }
+      };
+    options.result_callback =
+      [this, mission_id, operation_epoch](
+      const ReturnGoalHandle::WrappedResult & result)
+      {
+        TfPoseSnapshot actual_pose;
+        if (result.code == rclcpp_action::ResultCode::SUCCEEDED &&
+          start_pose_reader_)
+        {
+          actual_pose = start_pose_reader_->read();
+        }
+
+        {
+          std::lock_guard<std::mutex> lock(mutex_);
+          if (operation_epoch != return_operation_epoch_ ||
+            mission_id != mission_.snapshot().request.mission_id)
+          {
+            return;
+          }
+          return_goal_in_flight_ = false;
+          return_cancel_in_flight_ = false;
+          return_goal_handle_.reset();
+          inputs_.return_to_start_active = false;
+          inputs_.return_to_start_complete = true;
+          inputs_.return_to_start_succeeded =
+            result.code == rclcpp_action::ResultCode::SUCCEEDED;
+          inputs_.return_to_start_state =
+            inputs_.return_to_start_succeeded ? "succeeded" :
+            result.code == rclcpp_action::ResultCode::CANCELED ?
+            "canceled" : "failed";
+          inputs_.return_to_start_reason =
+            "guarded_return_" + inputs_.return_to_start_state;
+
+          if (inputs_.return_to_start_succeeded &&
+            actual_pose.valid && actual_pose.fresh)
+          {
+            const autonomous::PlanarPose target{
+              start_pose_map_.pose.position.x,
+              start_pose_map_.pose.position.y,
+              start_pose_map_.pose.orientation.z,
+              start_pose_map_.pose.orientation.w};
+            const autonomous::PlanarPose actual{
+              actual_pose.x_m, actual_pose.y_m,
+              actual_pose.quaternion_z, actual_pose.quaternion_w};
+            const auto proximity = autonomous::evaluate_planar_proximity(
+              target, actual, return_position_tolerance_m_,
+              return_require_yaw_tolerance_, return_yaw_tolerance_rad_);
+            inputs_.return_proximity_verified = proximity.valid;
+            inputs_.return_within_tolerance = proximity.within_tolerance;
+            inputs_.return_to_start_distance_m = proximity.distance_m;
+            inputs_.return_to_start_reason = proximity.reason;
+          } else if (inputs_.return_to_start_succeeded) {
+            inputs_.return_to_start_reason =
+              actual_pose.reason.empty() ?
+              "return_to_start_proximity_unverifiable" : actual_pose.reason;
+          }
+        }
+        evaluate_and_apply();
+      };
+
+    try {
+      return_action_client_->async_send_goal(goal, options);
+    } catch (const std::exception & error) {
+      {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (operation_epoch == return_operation_epoch_) {
+          return_goal_in_flight_ = false;
+          inputs_.return_to_start_complete = true;
+          inputs_.return_to_start_succeeded = false;
+          inputs_.return_to_start_state = "failed";
+          inputs_.return_to_start_reason =
+            std::string{"guarded_return_dispatch_error:"} + error.what();
+        }
+      }
+      evaluate_and_apply();
+    }
+  }
+
+  void dispatch_return_cancel_request(
+    const std::string & mission_id,
+    const std::uint64_t operation_epoch)
+  {
+    ReturnGoalHandle::SharedPtr goal_handle;
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      if (operation_epoch != return_operation_epoch_ ||
+        mission_id != mission_.snapshot().request.mission_id)
+      {
+        return;
+      }
+      goal_handle = return_goal_handle_;
+    }
+    if (goal_handle) {
+      try {
+        static_cast<void>(return_action_client_->async_cancel_goal(goal_handle));
+      } catch (const std::exception & error) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return_cancel_in_flight_ = false;
+        inputs_.return_to_start_reason =
+          std::string{"return_cancel_dispatch_error:"} + error.what();
+      }
     }
   }
 
@@ -2061,6 +2942,36 @@ private:
     status.completion_candidate = snapshot.completion_candidate;
     status.completion_confirmed = snapshot.completion_confirmed;
     status.completion_reason = snapshot.completion_reason;
+    status.coverage_planning_started = snapshot.coverage_planning_started;
+    status.coverage_planning_complete = snapshot.coverage_planning_complete;
+    status.coverage_plan_valid = snapshot.coverage_plan_valid;
+    status.coverage_plan_generation = snapshot.coverage_plan_generation;
+    status.coverage_map_generation = snapshot.coverage_map_generation;
+    status.coverage_total_waypoints = snapshot.coverage_total_waypoints;
+    status.coverage_execution_started = snapshot.coverage_execution_started;
+    status.coverage_execution_active = snapshot.coverage_execution_active;
+    status.coverage_execution_complete = snapshot.coverage_execution_complete;
+    status.coverage_execution_succeeded = snapshot.coverage_execution_succeeded;
+    status.coverage_mission_id = snapshot.coverage_mission_id;
+    status.coverage_state = snapshot.coverage_state;
+    status.coverage_reason = snapshot.coverage_reason;
+    status.coverage_current_waypoint = snapshot.coverage_current_waypoint;
+    status.coverage_completed_waypoints = snapshot.coverage_completed_waypoints;
+    status.coverage_completion_ratio = snapshot.coverage_completion_ratio;
+    status.coverage_remaining_distance_m = snapshot.coverage_remaining_distance_m;
+    status.coverage_restart_attempts = snapshot.coverage_restart_attempts;
+    status.return_to_start_started = snapshot.return_to_start_started;
+    status.return_to_start_active = snapshot.return_to_start_active;
+    status.return_to_start_complete = snapshot.return_to_start_complete;
+    status.return_to_start_succeeded = snapshot.return_to_start_succeeded;
+    status.return_to_start_distance_m = snapshot.return_to_start_distance_m;
+    status.return_to_start_state = snapshot.return_to_start_state;
+    status.return_to_start_reason = snapshot.return_to_start_reason;
+    status.return_to_start_attempts = snapshot.return_to_start_attempts;
+    status.final_scan360_complete = snapshot.final_scan360_complete;
+    status.final_scan360_succeeded = snapshot.final_scan360_succeeded;
+    status.final_head_scan_complete = snapshot.final_head_scan_complete;
+    status.final_head_scan_succeeded = snapshot.final_head_scan_succeeded;
     status.map_save_started = snapshot.map_save_started;
     status.map_save_complete = snapshot.map_save_complete;
     status.map_saved = snapshot.map_saved;
@@ -2130,6 +3041,14 @@ private:
   std::string head_scan_start_service_name_;
   std::string head_scan_pause_service_name_;
   std::string head_scan_resume_service_name_;
+  std::string coverage_request_plan_service_name_;
+  std::string coverage_reset_plan_service_name_;
+  std::string coverage_planner_status_topic_;
+  std::string coverage_operation_approve_service_name_;
+  std::string coverage_operation_cancel_service_name_;
+  std::string coverage_operation_reset_service_name_;
+  std::string coverage_operation_status_topic_;
+  std::string return_action_name_;
   std::string start_pose_target_frame_;
   std::string start_pose_source_frame_;
   std::string mode_command_topic_;
@@ -2149,6 +3068,23 @@ private:
   double start_pose_operation_timeout_s_{10.0};
   double scan360_operation_timeout_s_{180.0};
   double head_scan_operation_timeout_s_{180.0};
+  double coverage_planning_timeout_s_{30.0};
+  double coverage_approval_timeout_s_{10.0};
+  double coverage_execution_timeout_s_{900.0};
+  double coverage_feedback_stale_timeout_s_{5.0};
+  double coverage_cancel_timeout_s_{10.0};
+  double return_server_wait_timeout_s_{3.0};
+  double return_goal_response_timeout_s_{3.0};
+  double return_execution_timeout_s_{180.0};
+  double return_feedback_stale_timeout_s_{5.0};
+  double return_cancel_timeout_s_{10.0};
+  double return_position_tolerance_m_{0.35};
+  double return_yaw_tolerance_rad_{0.50};
+  bool coverage_enabled_{true};
+  bool coverage_required_{true};
+  bool coverage_require_fresh_map_generation_{true};
+  bool return_to_start_enabled_{true};
+  bool return_require_yaw_tolerance_{false};
 
   mutable std::mutex mutex_;
   autonomous::AutonomousMappingMission mission_;
@@ -2172,6 +3108,28 @@ private:
   scan360_started_at_;
   std::optional<std::chrono::steady_clock::time_point>
   head_scan_started_at_;
+  std::optional<std::chrono::steady_clock::time_point>
+  coverage_planner_status_received_at_;
+  std::optional<std::chrono::steady_clock::time_point>
+  coverage_operation_status_received_at_;
+  std::optional<std::chrono::steady_clock::time_point>
+  coverage_planning_started_at_;
+  std::optional<std::chrono::steady_clock::time_point>
+  coverage_approval_started_at_;
+  std::optional<std::chrono::steady_clock::time_point>
+  coverage_execution_started_at_;
+  std::optional<std::chrono::steady_clock::time_point>
+  coverage_feedback_received_at_;
+  std::optional<std::chrono::steady_clock::time_point>
+  coverage_cancel_started_at_;
+  std::optional<std::chrono::steady_clock::time_point>
+  return_started_at_;
+  std::optional<std::chrono::steady_clock::time_point>
+  return_goal_sent_at_;
+  std::optional<std::chrono::steady_clock::time_point>
+  return_feedback_received_at_;
+  std::optional<std::chrono::steady_clock::time_point>
+  return_cancel_started_at_;
   std::string last_command_key_;
 
   bool timeout_abort_requested_{false};
@@ -2184,12 +3142,31 @@ private:
   bool head_scan_pause_in_flight_{false};
   bool head_scan_resume_in_flight_{false};
   bool head_scan_start_acknowledged_{false};
+  bool coverage_plan_reset_in_flight_{false};
+  bool coverage_plan_reset_done_{false};
+  bool coverage_plan_request_in_flight_{false};
+  bool coverage_approve_in_flight_{false};
+  bool coverage_cancel_in_flight_{false};
+  bool coverage_reset_in_flight_{false};
+  bool coverage_attempt_started_{false};
+  bool coverage_candidate_valid_{false};
+  bool return_goal_in_flight_{false};
+  bool return_cancel_in_flight_{false};
   bool map_save_in_flight_{false};
   bool verification_in_flight_{false};
   bool verification_dispatch_pending_{false};
   bool goal_reserved_{false};
   std::uint64_t scan360_operation_epoch_{0U};
   std::uint64_t head_scan_operation_epoch_{0U};
+  std::uint64_t coverage_operation_epoch_{0U};
+  std::uint64_t coverage_candidate_generation_{0U};
+  std::uint64_t coverage_candidate_generation_floor_{0U};
+  std::uint64_t coverage_expected_candidate_generation_{0U};
+  std::uint64_t return_operation_epoch_{0U};
+  std::uint32_t coverage_last_current_waypoint_{0U};
+  std::uint32_t coverage_last_completed_waypoints_{0U};
+  double coverage_last_completion_ratio_{0.0};
+  double coverage_last_remaining_distance_m_{0.0};
   autonomous::MissionState observed_sequence_state_{
     autonomous::MissionState::Idle};
 
@@ -2202,6 +3179,13 @@ private:
   rclcpp::Client<Trigger>::SharedPtr head_scan_start_client_;
   rclcpp::Client<Trigger>::SharedPtr head_scan_pause_client_;
   rclcpp::Client<Trigger>::SharedPtr head_scan_resume_client_;
+  rclcpp::Client<Trigger>::SharedPtr coverage_request_plan_client_;
+  rclcpp::Client<Trigger>::SharedPtr coverage_reset_plan_client_;
+  rclcpp::Client<Trigger>::SharedPtr coverage_operation_approve_client_;
+  rclcpp::Client<Trigger>::SharedPtr coverage_operation_cancel_client_;
+  rclcpp::Client<Trigger>::SharedPtr coverage_operation_reset_client_;
+  rclcpp_action::Client<NavigateToPose>::SharedPtr return_action_client_;
+  ReturnGoalHandle::SharedPtr return_goal_handle_;
 
   rclcpp::Publisher<MissionStatus>::SharedPtr status_publisher_;
   rclcpp::Publisher<StringMessage>::SharedPtr mode_command_publisher_;
@@ -2218,6 +3202,10 @@ private:
   rclcpp::Subscription<StringMessage>::SharedPtr handoff_state_subscription_;
   rclcpp::Subscription<FrontierStatus>::SharedPtr
     frontier_status_subscription_;
+  rclcpp::Subscription<StringMessage>::SharedPtr
+    coverage_planner_status_subscription_;
+  rclcpp::Subscription<StringMessage>::SharedPtr
+    coverage_operation_status_subscription_;
   rclcpp::Subscription<StringMessage>::SharedPtr
     scan360_state_subscription_;
   rclcpp::Subscription<StringMessage>::SharedPtr

@@ -25,7 +25,7 @@ def test_status_contract_is_typed_and_mapping_owned() -> None:
     text = read("msg/AutonomousMappingStatus.msg")
 
     for token in (
-        "uint32 CONTRACT_VERSION=2",
+        "uint32 CONTRACT_VERSION=3",
         "uint8 STRATEGY_NONE=0",
         "uint8 STRATEGY_FRONTIER=1",
         "uint8 STATE_WAITING_FOR_AUTHORITY=2",
@@ -67,6 +67,16 @@ def test_status_contract_is_typed_and_mapping_owned() -> None:
         "bool completion_candidate",
         "bool completion_confirmed",
         "string completion_reason",
+        "bool coverage_planning_started",
+        "uint64 coverage_plan_generation",
+        "bool coverage_execution_active",
+        "string coverage_mission_id",
+        "float64 coverage_completion_ratio",
+        "bool return_to_start_started",
+        "bool return_to_start_succeeded",
+        "float64 return_to_start_distance_m",
+        "bool final_scan360_complete",
+        "bool final_head_scan_complete",
         "bool map_save_started",
         "bool map_save_complete",
         "bool map_saved",

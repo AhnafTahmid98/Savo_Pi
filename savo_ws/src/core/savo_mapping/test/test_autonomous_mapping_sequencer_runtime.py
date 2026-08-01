@@ -264,6 +264,8 @@ class SequencerHarness:
             '-p', 'sequence.start_pose_operation_timeout_s:=4.0',
             '-p', 'sequence.scan360_operation_timeout_s:=4.0',
             '-p', 'sequence.head_scan_operation_timeout_s:=4.0',
+            '-p', 'coverage.enabled:=false',
+            '-p', 'coverage.required:=false',
             '-p', 'evaluation_period_ms:=50',
             '-p', 'command_retry_period_ms:=100',
             '-p', 'default_mission_timeout_s:=0.0',

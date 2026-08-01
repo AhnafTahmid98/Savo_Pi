@@ -10,6 +10,10 @@
     name="params_file"
     default="$(find-pkg-share savo_mapping)/config/autonomous_mapping_orchestrator.yaml"/>
 
+  <arg name="coverage_enabled" default="true"/>
+  <arg name="final_scan360_required" default="true"/>
+  <arg name="final_head_scan_required" default="true"/>
+
   <node
     pkg="savo_mapping"
     exec="autonomous_mapping_orchestrator_node"
@@ -21,6 +25,15 @@
     <param
       name="use_sim_time"
       value="$(var use_sim_time)"/>
+    <param name="coverage.enabled" value="$(var coverage_enabled)"/>
+    <param name="coverage.required" value="$(var coverage_enabled)"/>
+    <param name="return_to_start.enabled" value="$(var coverage_enabled)"/>
+    <param
+      name="final_sequence.require_final_scan360"
+      value="$(var final_scan360_required)"/>
+    <param
+      name="final_sequence.require_final_head_scan"
+      value="$(var final_head_scan_required)"/>
   </node>
 
 </launch>

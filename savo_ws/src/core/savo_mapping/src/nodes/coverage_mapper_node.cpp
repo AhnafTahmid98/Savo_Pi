@@ -10,6 +10,7 @@
 #include <nav_msgs/msg/path.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/string.hpp>
+#include <std_srvs/srv/trigger.hpp>
 #include <tf2_ros/buffer.hpp>
 #include <tf2_ros/transform_listener.hpp>
 
@@ -284,6 +285,10 @@ private:
       "status_topic", "/savo_mapping/coverage/status");
     state_topic_ = declare_parameter<std::string>(
       "state_topic", "/savo_mapping/coverage/state");
+    request_plan_service_ = declare_parameter<std::string>(
+      "request_plan_service", "/savo_mapping/coverage/request_plan");
+    reset_plan_service_ = declare_parameter<std::string>(
+      "reset_plan_service", "/savo_mapping/coverage/reset_plan");
 
     tick_period_sec_ = declare_parameter<double>(
       "tick_period_sec", 0.10);
@@ -323,7 +328,7 @@ private:
       declare_parameter<std::int64_t>(
       "maximum_waypoints", 10000);
 
-    const std::array<std::pair<const char *, const std::string *>, 6>
+    const std::array<std::pair<const char *, const std::string *>, 8>
     text_parameters{{
       {"map_topic", &map_topic_},
       {"map_frame", &map_frame_},
@@ -331,6 +336,8 @@ private:
       {"path_topic", &path_topic_},
       {"status_topic", &status_topic_},
       {"state_topic", &state_topic_},
+      {"request_plan_service", &request_plan_service_},
+      {"reset_plan_service", &reset_plan_service_},
     }};
     for (const auto & [name, value] : text_parameters) {
       if (text_is_blank(*value)) {
@@ -431,6 +438,23 @@ private:
         this,
         std::placeholders::_1));
 
+    request_plan_service_server_ =
+      create_service<std_srvs::srv::Trigger>(
+      request_plan_service_,
+      std::bind(
+        &CoverageMapperNode::handle_request_plan,
+        this,
+        std::placeholders::_1,
+        std::placeholders::_2));
+    reset_plan_service_server_ =
+      create_service<std_srvs::srv::Trigger>(
+      reset_plan_service_,
+      std::bind(
+        &CoverageMapperNode::handle_reset_plan,
+        this,
+        std::placeholders::_1,
+        std::placeholders::_2));
+
     tf_buffer_ =
       std::make_shared<tf2_ros::Buffer>(
       get_clock());
@@ -459,6 +483,72 @@ private:
       std::bind(
         &CoverageMapperNode::planning_tick,
         this));
+  }
+
+  void handle_request_plan(
+    const std_srvs::srv::Trigger::Request::SharedPtr,
+    std_srvs::srv::Trigger::Response::SharedPtr response)
+  {
+    if (!enabled_) {
+      response->message = "coverage_node_disabled";
+      return;
+    }
+    if (!latest_map_input_valid_ || !valid_grid_) {
+      response->message = "coverage_node_map_unavailable";
+      return;
+    }
+    if (!map_is_fresh()) {
+      response->message = "coverage_node_map_stale";
+      return;
+    }
+    if (worker_future_.valid()) {
+      response->message = "coverage_node_worker_busy";
+      return;
+    }
+
+    planning_requested_ = true;
+    ++request_generation_;
+    successful_plan_published_ = false;
+    terminal_ = false;
+    last_attempted_map_sequence_.reset();
+    last_attempt_state_.clear();
+    last_attempt_reason_.clear();
+    last_attempt_detail_.clear();
+    reset_plan_metrics();
+    set_state("planning_requested", "coverage_node_plan_requested");
+    response->success = true;
+    response->message = "coverage_node_plan_request_accepted";
+  }
+
+  void handle_reset_plan(
+    const std_srvs::srv::Trigger::Request::SharedPtr,
+    std_srvs::srv::Trigger::Response::SharedPtr response)
+  {
+    if (worker_future_.valid()) {
+      response->message = "coverage_node_worker_busy";
+      return;
+    }
+
+    planning_requested_ = false;
+    ++reset_generation_;
+    successful_plan_published_ = false;
+    terminal_ = false;
+    deferred_plan_result_.reset();
+    last_attempted_map_sequence_.reset();
+    last_attempt_state_.clear();
+    last_attempt_reason_.clear();
+    last_attempt_detail_.clear();
+    reset_plan_metrics();
+    set_state(
+      valid_grid_ && latest_map_input_valid_ ? "ready" : "waiting_for_map",
+      "coverage_node_plan_reset");
+    response->success = true;
+    response->message = "coverage_node_plan_reset";
+  }
+
+  bool planning_enabled() const
+  {
+    return auto_plan_ || planning_requested_;
   }
 
   MapConversionResult convert_map(
@@ -700,7 +790,7 @@ private:
         "coverage_node_disabled");
       return;
     }
-    if (!auto_plan_) {
+    if (!planning_enabled()) {
       set_state(
         "ready",
         "coverage_node_auto_plan_disabled");
@@ -919,7 +1009,7 @@ private:
       result.map_sequence != map_sequence_ ||
       pending_map_input_.has_value() ||
       !enabled_ ||
-      !auto_plan_ ||
+      !planning_enabled() ||
       !latest_map_input_valid_ ||
       !map_is_fresh() ||
       !should_attempt_current_map())
@@ -1033,7 +1123,7 @@ private:
         "coverage_node_map_stale");
       return;
     }
-    if (!auto_plan_) {
+    if (!planning_enabled()) {
       set_state(
         "ready",
         "coverage_node_auto_plan_disabled");
@@ -1108,6 +1198,8 @@ private:
     const std::string & reason,
     const std::string & detail)
   {
+    planning_requested_ = false;
+    ++plan_sequence_;
     if (!successful_plan_published_) {
       reset_plan_metrics();
     }
@@ -1126,6 +1218,7 @@ private:
     nav_msgs::msg::Path path)
   {
     path_publisher_->publish(path);
+    planning_requested_ = false;
     successful_plan_published_ = true;
     last_attempted_map_sequence_ = map_sequence_;
     last_attempt_state_.clear();
@@ -1183,8 +1276,15 @@ private:
     std::ostringstream output;
     output.precision(17);
     output
-      << "{\"enabled\":" << bool_text(enabled_)
+      << "{\"schema_version\":2"
+      << ",\"enabled\":" << bool_text(enabled_)
       << ",\"auto_plan\":" << bool_text(auto_plan_)
+      << ",\"planning_requested\":"
+      << bool_text(planning_requested_)
+      << ",\"request_generation\":"
+      << request_generation_
+      << ",\"reset_generation\":"
+      << reset_generation_
       << ",\"plan_once\":" << bool_text(plan_once_)
       << ",\"replan_on_map_update\":"
       << bool_text(replan_on_map_update_)
@@ -1252,6 +1352,7 @@ private:
 
   bool enabled_{true};
   bool auto_plan_{false};
+  bool planning_requested_{false};
   bool plan_once_{true};
   bool replan_on_map_update_{false};
 
@@ -1261,6 +1362,8 @@ private:
   std::string path_topic_;
   std::string status_topic_;
   std::string state_topic_;
+  std::string request_plan_service_;
+  std::string reset_plan_service_;
 
   double tick_period_sec_{0.10};
   double map_stale_timeout_sec_{5.0};
@@ -1299,6 +1402,8 @@ private:
   bool successful_plan_published_{false};
   bool terminal_{false};
   std::uint64_t plan_sequence_{0};
+  std::uint64_t request_generation_{0};
+  std::uint64_t reset_generation_{0};
   std::size_t waypoint_count_{0};
   std::size_t reachable_cell_count_{0};
   std::size_t covered_cell_count_{0};
@@ -1318,6 +1423,10 @@ private:
   rclcpp::Subscription<
     nav_msgs::msg::OccupancyGrid>::SharedPtr
     map_subscription_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr
+    request_plan_service_server_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr
+    reset_plan_service_server_;
   rclcpp::TimerBase::SharedPtr tick_timer_;
 };
 

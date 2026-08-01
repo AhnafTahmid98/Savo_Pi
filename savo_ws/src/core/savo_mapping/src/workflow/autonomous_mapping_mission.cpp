@@ -212,6 +212,7 @@ MissionDecision AutonomousMappingMission::start(
   start_pose_generation_floor_ = inputs.start_pose_generation;
   scan360_generation_floor_ = inputs.scan360_generation;
   head_scan_generation_floor_ = inputs.head_scan_generation;
+  coverage_plan_generation_floor_ = inputs.coverage_plan_generation;
 
   start_pose_captured_ = !inputs.require_start_pose_capture;
   initial_scan360_completed_ = !inputs.require_initial_scan360;
@@ -393,6 +394,18 @@ MissionDecision AutonomousMappingMission::evaluate(
       return decision(snapshot_.reason);
     }
 
+    if (!session_is_active(inputs)) {
+      return fail(
+        MissionResult::InternalError,
+        "mapping_session_not_active_before_coverage");
+    }
+
+    if (inputs.require_coverage) {
+      coverage_plan_generation_floor_ = inputs.coverage_plan_generation;
+      enter(MissionState::CoveragePending, "coverage_plan_requested");
+      return evaluate(inputs);
+    }
+
     if (snapshot_.request.auto_save) {
       enter(MissionState::Saving, "automatic_map_save_requested");
       return evaluate(inputs);
@@ -407,6 +420,18 @@ MissionDecision AutonomousMappingMission::evaluate(
     output = decision(snapshot_.reason);
     output.terminal = true;
     return output;
+  }
+
+  if (snapshot_.state == MissionState::CoveragePending) {
+    return evaluate_coverage_pending(inputs);
+  }
+
+  if (snapshot_.state == MissionState::Coverage) {
+    return evaluate_coverage(inputs);
+  }
+
+  if (snapshot_.state == MissionState::ReturningToStart) {
+    return evaluate_return_to_start(inputs);
   }
 
   if (snapshot_.state == MissionState::Saving) {
@@ -475,6 +500,25 @@ MissionDecision AutonomousMappingMission::evaluate(
   if (snapshot_.state == MissionState::Canceling) {
     MissionDecision output = decision(snapshot_.reason);
 
+    if (
+      inputs.coverage_approval_pending ||
+      inputs.coverage_execution_active)
+    {
+      output.request_coverage_cancel = true;
+      output.reason = "cancel_waiting_for_coverage_cancel";
+      snapshot_.reason = output.reason;
+      output.snapshot = snapshot_;
+      return output;
+    }
+
+    if (inputs.return_to_start_active) {
+      output.request_return_cancel = true;
+      output.reason = "cancel_waiting_for_return_cancel";
+      snapshot_.reason = output.reason;
+      output.snapshot = snapshot_;
+      return output;
+    }
+
     if (inputs.handoff_active) {
       output.request_handoff_cancel = true;
       output.reason = "cancel_waiting_for_handoff_cancel";
@@ -529,6 +573,25 @@ MissionDecision AutonomousMappingMission::evaluate(
 
   if (snapshot_.state == MissionState::Pausing) {
     MissionDecision output = decision(snapshot_.reason);
+
+    if (
+      inputs.coverage_approval_pending ||
+      inputs.coverage_execution_active)
+    {
+      output.request_coverage_cancel = true;
+      output.reason = "pause_waiting_for_coverage_cancel";
+      snapshot_.reason = output.reason;
+      output.snapshot = snapshot_;
+      return output;
+    }
+
+    if (inputs.return_to_start_active) {
+      output.request_return_cancel = true;
+      output.reason = "pause_waiting_for_return_cancel";
+      snapshot_.reason = output.reason;
+      output.snapshot = snapshot_;
+      return output;
+    }
 
     if (inputs.handoff_active) {
       output.request_handoff_cancel = true;
@@ -607,6 +670,48 @@ MissionDecision AutonomousMappingMission::evaluate(
       return evaluate(inputs);
     }
 
+    if (resume_state_ == MissionState::FinalHeadScan) {
+      begin_head_scan_stage(
+        MissionState::FinalHeadScan,
+        inputs,
+        "resuming_final_head_scan");
+      return evaluate(inputs);
+    }
+
+    if (
+      resume_state_ == MissionState::Coverage ||
+      resume_state_ == MissionState::CoveragePending)
+    {
+      if (
+        inputs.coverage_restart_attempts >=
+        inputs.coverage_maximum_restart_attempts)
+      {
+        return fail(
+          MissionResult::NavigationFailed,
+          "coverage_restart_attempt_limit_reached");
+      }
+      coverage_plan_generation_floor_ = inputs.coverage_plan_generation;
+      enter(MissionState::CoveragePending, "coverage_replan_after_resume");
+      MissionDecision output = decision(snapshot_.reason);
+      output.request_coverage_reset = true;
+      output.request_coverage_plan_reset = true;
+      output.snapshot = snapshot_;
+      return output;
+    }
+
+    if (resume_state_ == MissionState::ReturningToStart) {
+      if (
+        inputs.return_to_start_attempts >=
+        inputs.return_to_start_maximum_attempts)
+      {
+        return fail(
+          MissionResult::NavigationFailed,
+          "return_to_start_attempt_limit_reached");
+      }
+      enter(MissionState::ReturningToStart, "resuming_return_to_start");
+      return evaluate(inputs);
+    }
+
     return evaluate_frontier_entry(inputs);
   }
 
@@ -670,7 +775,10 @@ MissionDecision AutonomousMappingMission::evaluate(
     return evaluate_scan360_stage(inputs);
   }
 
-  if (snapshot_.state == MissionState::InitialHeadScan) {
+  if (
+    snapshot_.state == MissionState::InitialHeadScan ||
+    snapshot_.state == MissionState::FinalHeadScan)
+  {
     return evaluate_head_scan_stage(inputs);
   }
 
@@ -830,6 +938,32 @@ MissionDecision AutonomousMappingMission::evaluate_scan360_stage(
     return evaluate(inputs);
   }
 
+  if (stage == MissionState::FinalScan360) {
+    snapshot_.final_scan360_complete = true;
+    snapshot_.final_scan360_succeeded = true;
+
+    if (inputs.require_final_head_scan) {
+      begin_head_scan_stage(
+        MissionState::FinalHeadScan,
+        inputs,
+        "final_head_scan_requested");
+      return evaluate(inputs);
+    }
+
+    if (snapshot_.request.auto_save) {
+      enter(MissionState::Saving, "automatic_map_save_requested");
+      return evaluate(inputs);
+    }
+
+    snapshot_.state = MissionState::Completed;
+    snapshot_.result = MissionResult::Succeeded;
+    snapshot_.active = false;
+    snapshot_.reason = "final_sequence_complete_manual_save_required";
+    MissionDecision output = decision(snapshot_.reason);
+    output.terminal = true;
+    return output;
+  }
+
   resume_state_ = MissionState::Exploring;
   enter(MissionState::Resuming, "scan360_stage_complete");
   return evaluate(inputs);
@@ -838,9 +972,11 @@ MissionDecision AutonomousMappingMission::evaluate_scan360_stage(
 MissionDecision AutonomousMappingMission::evaluate_head_scan_stage(
   const MissionInputs & inputs)
 {
+  const MissionState stage = snapshot_.state;
+
   if (!safe_mapping_state(inputs)) {
     begin_pause(
-      MissionState::InitialHeadScan,
+      stage,
       "head_scan_authority_lost",
       false);
     return evaluate(inputs);
@@ -855,7 +991,7 @@ MissionDecision AutonomousMappingMission::evaluate_head_scan_stage(
   }
 
   if (inputs.head_scan_paused) {
-    MissionDecision output = decision("requesting_initial_head_scan_resume");
+    MissionDecision output = decision("requesting_head_scan_resume");
     output.request_head_scan_resume = true;
     snapshot_.reason = output.reason;
     output.snapshot = snapshot_;
@@ -863,7 +999,7 @@ MissionDecision AutonomousMappingMission::evaluate_head_scan_stage(
   }
 
   if (inputs.head_scan_generation <= head_scan_generation_floor_) {
-    MissionDecision output = decision("requesting_initial_head_scan_start");
+    MissionDecision output = decision("requesting_head_scan_start");
     output.request_head_scan_start = true;
     snapshot_.reason = output.reason;
     output.snapshot = snapshot_;
@@ -871,7 +1007,7 @@ MissionDecision AutonomousMappingMission::evaluate_head_scan_stage(
   }
 
   if (!inputs.head_scan_complete) {
-    snapshot_.reason = "initial_head_scan_in_progress";
+    snapshot_.reason = "head_scan_in_progress";
     return decision(snapshot_.reason);
   }
 
@@ -882,11 +1018,283 @@ MissionDecision AutonomousMappingMission::evaluate_head_scan_stage(
       "initial_head_scan_failed" : inputs.head_scan_reason);
   }
 
-  initial_head_scan_completed_ = true;
-  snapshot_.initial_head_scan_complete = true;
-  snapshot_.initial_head_scan_succeeded = true;
-  enter(MissionState::Starting, "initial_head_scan_complete");
-  return evaluate(inputs);
+  if (stage == MissionState::InitialHeadScan) {
+    initial_head_scan_completed_ = true;
+    snapshot_.initial_head_scan_complete = true;
+    snapshot_.initial_head_scan_succeeded = true;
+    enter(MissionState::Starting, "initial_head_scan_complete");
+    return evaluate(inputs);
+  }
+
+  snapshot_.final_head_scan_complete = true;
+  snapshot_.final_head_scan_succeeded = true;
+  if (snapshot_.request.auto_save) {
+    enter(MissionState::Saving, "automatic_map_save_requested");
+    return evaluate(inputs);
+  }
+
+  snapshot_.state = MissionState::Completed;
+  snapshot_.result = MissionResult::Succeeded;
+  snapshot_.active = false;
+  snapshot_.reason = "final_sequence_complete_manual_save_required";
+  MissionDecision output = decision(snapshot_.reason);
+  output.terminal = true;
+  return output;
+}
+
+MissionDecision AutonomousMappingMission::evaluate_coverage_pending(
+  const MissionInputs & inputs)
+{
+  if (!session_is_active(inputs)) {
+    return fail(
+      MissionResult::InternalError,
+      "mapping_session_lost_before_coverage");
+  }
+
+  if (!safe_mapping_state(inputs)) {
+    begin_pause(MissionState::CoveragePending, "coverage_authority_lost", false);
+    return evaluate(inputs);
+  }
+
+  if (!workflow_is_monitor_only(inputs)) {
+    MissionDecision output = decision("coverage_requesting_monitor_mode");
+    output.request_monitor_mode = true;
+    snapshot_.reason = output.reason;
+    output.snapshot = snapshot_;
+    return output;
+  }
+
+  if (inputs.coverage_plan_generation <= coverage_plan_generation_floor_) {
+    MissionDecision output = decision("requesting_fresh_coverage_plan");
+    output.request_coverage_plan_reset = true;
+    output.request_coverage_plan = true;
+    snapshot_.reason = output.reason;
+    output.snapshot = snapshot_;
+    return output;
+  }
+
+  if (!inputs.coverage_planning_complete) {
+    snapshot_.reason = "coverage_planning_in_progress";
+    return decision(snapshot_.reason);
+  }
+
+  if (!inputs.coverage_plan_valid) {
+    return fail(
+      MissionResult::NavigationFailed,
+      inputs.coverage_reason.empty() ?
+      "coverage_planning_failed" : inputs.coverage_reason);
+  }
+
+  if (inputs.coverage_plan_noop) {
+    return enter_post_coverage(inputs);
+  }
+
+  if (inputs.coverage_total_waypoints == 0U) {
+    return fail(
+      MissionResult::NavigationFailed,
+      "coverage_plan_empty_without_noop");
+  }
+
+  if (!inputs.coverage_execution_started) {
+    MissionDecision output = decision(
+      "requesting_supervisor_gated_coverage_execution");
+    output.request_coverage_approve = true;
+    snapshot_.reason = output.reason;
+    output.snapshot = snapshot_;
+    return output;
+  }
+
+  if (inputs.coverage_execution_active) {
+    enter(MissionState::Coverage, "coverage_execution_active");
+    return decision(snapshot_.reason);
+  }
+
+  if (inputs.coverage_execution_complete) {
+    if (!inputs.coverage_execution_succeeded) {
+      return fail(
+        MissionResult::NavigationFailed,
+        inputs.coverage_reason.empty() ?
+        "coverage_execution_failed" : inputs.coverage_reason);
+    }
+    return enter_post_coverage(inputs);
+  }
+
+  snapshot_.reason = "coverage_waiting_for_execution_acceptance";
+  return decision(snapshot_.reason);
+}
+
+MissionDecision AutonomousMappingMission::evaluate_coverage(
+  const MissionInputs & inputs)
+{
+  if (
+    !session_is_active(inputs) ||
+    !safe_mapping_state(inputs) ||
+    !inputs.coverage_supervisor_authorized)
+  {
+    begin_pause(MissionState::Coverage, "coverage_authority_lost", false);
+    return evaluate(inputs);
+  }
+
+  if (inputs.coverage_execution_active) {
+    snapshot_.reason = "coverage_execution_active";
+    return decision(snapshot_.reason);
+  }
+
+  if (!inputs.coverage_execution_complete) {
+    snapshot_.reason = "coverage_waiting_for_terminal_result";
+    return decision(snapshot_.reason);
+  }
+
+  if (!inputs.coverage_execution_succeeded) {
+    return fail(
+      MissionResult::NavigationFailed,
+      inputs.coverage_reason.empty() ?
+      "coverage_execution_failed" : inputs.coverage_reason);
+  }
+
+  return enter_post_coverage(inputs);
+}
+
+MissionDecision AutonomousMappingMission::evaluate_return_to_start(
+  const MissionInputs & inputs)
+{
+  if (!session_is_active(inputs) || !safe_mapping_state(inputs)) {
+    begin_pause(MissionState::ReturningToStart, "return_authority_lost", false);
+    return evaluate(inputs);
+  }
+
+  if (!workflow_is_monitor_only(inputs)) {
+    MissionDecision output = decision("return_requesting_monitor_mode");
+    output.request_monitor_mode = true;
+    snapshot_.reason = output.reason;
+    output.snapshot = snapshot_;
+    return output;
+  }
+
+  if (!inputs.return_to_start_started) {
+    if (
+      inputs.return_to_start_attempts >=
+      inputs.return_to_start_maximum_attempts)
+    {
+      return fail(
+        MissionResult::NavigationFailed,
+        "return_to_start_attempt_limit_reached");
+    }
+    MissionDecision output = decision("requesting_guarded_return_to_start");
+    output.request_return_to_start = true;
+    snapshot_.reason = output.reason;
+    output.snapshot = snapshot_;
+    return output;
+  }
+
+  if (inputs.return_to_start_active) {
+    snapshot_.reason = "return_to_start_active";
+    return decision(snapshot_.reason);
+  }
+
+  if (!inputs.return_to_start_complete) {
+    snapshot_.reason = "return_to_start_waiting_for_terminal_result";
+    return decision(snapshot_.reason);
+  }
+
+  if (!inputs.return_to_start_succeeded) {
+    return fail(
+      MissionResult::NavigationFailed,
+      inputs.return_to_start_reason.empty() ?
+      "return_to_start_failed" : inputs.return_to_start_reason);
+  }
+
+  if (!inputs.return_proximity_verified) {
+    return fail(
+      MissionResult::NavigationFailed,
+      "return_to_start_proximity_unverifiable");
+  }
+
+  if (!inputs.return_within_tolerance) {
+    return fail(
+      MissionResult::NavigationFailed,
+      "return_to_start_outside_tolerance");
+  }
+
+  if (inputs.require_final_scan360) {
+    begin_scan_stage(
+      MissionState::FinalScan360,
+      inputs,
+      "final_scan360_requested");
+    return evaluate(inputs);
+  }
+
+  if (inputs.require_final_head_scan) {
+    begin_head_scan_stage(
+      MissionState::FinalHeadScan,
+      inputs,
+      "final_head_scan_requested");
+    return evaluate(inputs);
+  }
+
+  if (snapshot_.request.auto_save) {
+    enter(MissionState::Saving, "automatic_map_save_requested");
+    return evaluate(inputs);
+  }
+
+  snapshot_.state = MissionState::Completed;
+  snapshot_.result = MissionResult::Succeeded;
+  snapshot_.active = false;
+  snapshot_.reason = "return_complete_manual_save_required";
+  MissionDecision output = decision(snapshot_.reason);
+  output.terminal = true;
+  return output;
+}
+
+MissionDecision AutonomousMappingMission::enter_post_coverage(
+  const MissionInputs & inputs)
+{
+  MissionDecision output;
+  if (inputs.require_return_to_start) {
+    enter(
+      MissionState::ReturningToStart,
+      "coverage_complete_return_requested");
+    output = decision(snapshot_.reason);
+    output.request_coverage_reset = true;
+    output.snapshot = snapshot_;
+    return output;
+  }
+
+  if (inputs.require_final_scan360) {
+    begin_scan_stage(
+      MissionState::FinalScan360,
+      inputs,
+      "final_scan360_requested");
+    output = evaluate(inputs);
+    output.request_coverage_reset = true;
+    return output;
+  }
+
+  if (inputs.require_final_head_scan) {
+    begin_head_scan_stage(
+      MissionState::FinalHeadScan,
+      inputs,
+      "final_head_scan_requested");
+    output = evaluate(inputs);
+    output.request_coverage_reset = true;
+    return output;
+  }
+
+  if (snapshot_.request.auto_save) {
+    enter(MissionState::Saving, "automatic_map_save_requested");
+    output = evaluate(inputs);
+    output.request_coverage_reset = true;
+    return output;
+  }
+
+  snapshot_.state = MissionState::Completed;
+  snapshot_.result = MissionResult::Succeeded;
+  snapshot_.active = false;
+  snapshot_.reason = "coverage_complete_manual_save_required";
+  output = decision(snapshot_.reason);
+  output.terminal = true;
+  output.request_coverage_reset = true;
+  return output;
 }
 
 MissionDecision AutonomousMappingMission::evaluate_frontier_entry(
@@ -988,7 +1396,9 @@ void AutonomousMappingMission::update_observations(
   snapshot_.head_scan_reason = inputs.head_scan_reason;
   snapshot_.head_scan_stage =
     snapshot_.state == MissionState::InitialHeadScan ?
-    "initial_head_scan" : "none";
+    "initial_head_scan" :
+    snapshot_.state == MissionState::FinalHeadScan ?
+    "final_head_scan" : "none";
 
   snapshot_.frontier_status_received =
     inputs.frontier_status_received;
@@ -1014,6 +1424,56 @@ void AutonomousMappingMission::update_observations(
     inputs.completion_confirmed;
   snapshot_.completion_reason =
     inputs.completion_reason;
+
+  snapshot_.coverage_planning_started =
+    inputs.coverage_planning_started;
+  snapshot_.coverage_planning_complete =
+    inputs.coverage_planning_complete;
+  snapshot_.coverage_plan_valid = inputs.coverage_plan_valid;
+  snapshot_.coverage_plan_generation =
+    inputs.coverage_plan_generation;
+  snapshot_.coverage_map_generation =
+    inputs.coverage_map_generation;
+  snapshot_.coverage_total_waypoints =
+    inputs.coverage_total_waypoints;
+  snapshot_.coverage_execution_started =
+    inputs.coverage_execution_started;
+  snapshot_.coverage_execution_active =
+    inputs.coverage_execution_active;
+  snapshot_.coverage_execution_complete =
+    inputs.coverage_execution_complete;
+  snapshot_.coverage_execution_succeeded =
+    inputs.coverage_execution_succeeded;
+  snapshot_.coverage_mission_id = inputs.coverage_mission_id;
+  snapshot_.coverage_state = inputs.coverage_state;
+  snapshot_.coverage_reason = inputs.coverage_reason;
+  snapshot_.coverage_current_waypoint =
+    inputs.coverage_current_waypoint;
+  snapshot_.coverage_completed_waypoints =
+    inputs.coverage_completed_waypoints;
+  snapshot_.coverage_completion_ratio =
+    inputs.coverage_completion_ratio;
+  snapshot_.coverage_remaining_distance_m =
+    inputs.coverage_remaining_distance_m;
+  snapshot_.coverage_restart_attempts =
+    inputs.coverage_restart_attempts;
+
+  snapshot_.return_to_start_started =
+    inputs.return_to_start_started;
+  snapshot_.return_to_start_active =
+    inputs.return_to_start_active;
+  snapshot_.return_to_start_complete =
+    inputs.return_to_start_complete;
+  snapshot_.return_to_start_succeeded =
+    inputs.return_to_start_succeeded;
+  snapshot_.return_to_start_distance_m =
+    inputs.return_to_start_distance_m;
+  snapshot_.return_to_start_state =
+    inputs.return_to_start_state;
+  snapshot_.return_to_start_reason =
+    inputs.return_to_start_reason;
+  snapshot_.return_to_start_attempts =
+    inputs.return_to_start_attempts;
 
   snapshot_.map_save_started = inputs.map_save_started;
   snapshot_.map_save_complete = inputs.map_save_complete;

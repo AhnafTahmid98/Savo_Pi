@@ -26,6 +26,11 @@ The public mission contract never carries a Nav2 pose or path. Exploration goal
 selection remains internal to `savo_mapping`, and all movement is forwarded
 through the existing guarded `savo_nav` exploration handoff.
 
+AM-7 adds movement internally without adding poses or paths to the public
+mission request: Coverage uses the supervisor-gated public Coverage operation
+services and return-to-start uses the guarded
+`/savo_nav/navigation/navigate_to_pose` action. Raw Nav2 actions remain private.
+
 ## AM-1 behavior
 
 AM-1 supports the frontier strategy and establishes mission lifecycle control.
@@ -58,3 +63,25 @@ only when verification passes and returns `map_saved=true`.
 AM-3 does not automatically approve navigation handoff or create/promote a
 production release. Quality evaluation and operator approval remain separate
 later phases.
+
+## AM-7 post-frontier sequence
+
+The mission remains `STRATEGY_FRONTIER`. Once frontier completion is stable and
+the workflow is safely monitor-only, it runs:
+
+```text
+CoveragePending -> Coverage -> ReturningToStart
+  -> FinalScan360 -> FinalHeadScan -> Saving -> Verifying
+```
+
+Coverage planning is explicitly requested and correlated by new plan and map
+generations. Empty plans are not successful unless the planner explicitly
+marks a valid no-op. Execution is approved, canceled, and reset only through
+the public supervisor-authorized Coverage operation boundary.
+
+Return uses the captured `start_pose_map`, a normalized map-frame quaternion,
+the guarded navigation action, and a final fresh map-to-base proximity check.
+Final scans use new operation generations so initial or conditional scan
+completion cannot satisfy the final sequence. Timeouts, stale feedback,
+rejection, cancellation, failed proximity verification, and exhausted retry
+limits fail closed with existing typed mission results.

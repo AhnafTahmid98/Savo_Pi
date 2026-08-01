@@ -10,7 +10,7 @@ LAUNCH = PACKAGE / 'launch/autonomous_mapping.launch.xml'
 
 
 def test_autonomous_mapping_launch_is_valid_and_complete() -> None:
-    """The launch composes every mapping-owned AM-1 through AM-5 process."""
+    """The launch composes every mapping-owned AM-1 through AM-7 process."""
     tree = ET.parse(LAUNCH)
     root = tree.getroot()
 
@@ -29,6 +29,13 @@ def test_autonomous_mapping_launch_is_valid_and_complete() -> None:
         'handoff_params_file',
         'exploration_manager_params_file',
         'orchestrator_params_file',
+        'coverage_enabled',
+        'coverage_params_file',
+        'coverage_profile_file',
+        'coverage_execution_handoff_params_file',
+        'coverage_operation_params_file',
+        'final_scan360_required',
+        'final_head_scan_required',
         'scan360_params_file',
         'scan360_profile_file',
         'scan360_use_real_robot_profile',
@@ -52,6 +59,15 @@ def test_autonomous_mapping_launch_is_valid_and_complete() -> None:
     assert any('map_session_manager.launch.xml' in value for value in includes)
     assert any('frontier_mapping.launch.xml' in value for value in includes)
     assert any('scan360_mapping.launch.xml' in value for value in includes)
+    assert any('coverage_mapping.launch.xml' in value for value in includes)
+    assert any(
+        'coverage_execution_handoff.launch.xml' in value
+        for value in includes
+    )
+    assert any(
+        'coverage_operation_orchestrator.launch.xml' in value
+        for value in includes
+    )
     assert any(
         'autonomous_mapping_orchestrator.launch.xml' in value
         for value in includes

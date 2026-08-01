@@ -379,7 +379,8 @@ later phases.
 
 `autonomous_mapping.launch.xml` now composes only mapping-owned processes:
 SLAM Toolbox, mapping readiness, map-session persistence, frontier selection,
-the guarded exploration handoff, Scan360 server, and the AM-1 through AM-5
+the guarded exploration handoff, Coverage pipeline, Scan360 server, and the
+AM-1 through AM-7
 mission orchestrator. Hardware drivers, control, localization, supervisor policy and
 Nav2 remain outside this package and are composed by `savo_bringup`.
 
@@ -414,7 +415,22 @@ does not publish TF or control the base. Scan360 remains owned by
 `scan360_mapper_node` and rotation remains owned by `savo_control`. Head motion
 and scan state remain owned by `savo_head`.
 
-AM-5 deliberately retains the AM-3 frontier-completion save path. Continuous
-AprilTag interruption and registration is AM-6; coverage, return-to-start and
-final scans are AM-7; combined verification, approval and atomic map/location
-release are AM-8.
+## Coverage, return near start, and final scans (AM-7)
+
+After stable frontier exhaustion, the mission quiesces frontier execution and
+requests a fresh Coverage plan through
+`/savo_mapping/coverage/request_plan`. Planning remains non-automatic and does
+not authorize movement. A valid, fresh retained plan is executed only through
+the supervisor-gated `/savo_mapping/coverage_operation/approve` boundary and
+the guarded `/savo_nav/coverage/execute_path` action pipeline.
+
+After Coverage succeeds, the robot returns to the captured start pose through
+the guarded `/savo_nav/navigation/navigate_to_pose` action. Success additionally
+requires a fresh TF pose check within the configured near-start tolerance. A
+new final Scan360 and a new final head scan then run before the existing save
+and verification pipeline. Pausing or canceling quiesces the active Coverage,
+return, Scan360, or head-scan operation first; Coverage resume uses bounded
+fresh replanning and may revisit already-covered cells.
+
+AM-8 combined map/location verification, approval, and atomic release remain
+deferred. `savo_description` remains deferred until AM-0B locks real geometry.

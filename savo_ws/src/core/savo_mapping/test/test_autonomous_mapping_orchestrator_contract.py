@@ -13,6 +13,7 @@ def test_orchestrator_is_registered_and_installed() -> None:
 
     for token in (
         'src/workflow/autonomous_mapping_mission.cpp',
+        'src/workflow/autonomous_mapping_am7.cpp',
         'src/workflow/frontier_completion_detector.cpp',
         'include/savo_mapping/autonomous_mapping_mission.hpp',
         'include/savo_mapping/frontier_completion_detector.hpp',
@@ -21,6 +22,7 @@ def test_orchestrator_is_registered_and_installed() -> None:
         'config/autonomous_mapping_orchestrator.yaml',
         'launch/autonomous_mapping_orchestrator.launch.xml',
         'test_autonomous_mapping_mission',
+        'test_autonomous_mapping_am7',
         'test_frontier_completion_detector',
         'test_autonomous_mapping_orchestrator_runtime',
         'test_autonomous_mapping_sequencer_runtime',
@@ -47,11 +49,10 @@ def test_orchestrator_uses_typed_public_boundary() -> None:
         assert token in source
 
 
-def test_orchestrator_uses_public_save_boundary_without_nav_bypass() -> None:
+def test_orchestrator_uses_guarded_nav_and_public_save_boundaries() -> None:
     source = read('src/nodes/autonomous_mapping_orchestrator_node.cpp')
 
     forbidden = (
-        'nav2_msgs/action/navigate_to_pose',
         '"/navigate_to_pose"',
         '"/savo_nav/exploration/navigate_to_pose"',
         'slam_toolbox/srv/serialize_pose_graph',
@@ -66,6 +67,10 @@ def test_orchestrator_uses_public_save_boundary_without_nav_bypass() -> None:
         'geometry_msgs/msg/pose_stamped.hpp',
         'TfPoseReader',
         'capture_start_pose_request',
+        'nav2_msgs/action/navigate_to_pose.hpp',
+        '"/savo_nav/navigation/navigate_to_pose"',
+        'dispatch_return_to_start',
+        'evaluate_planar_proximity',
         'session::verify_saved_map_session',
     ):
         assert token in source
@@ -160,5 +165,11 @@ def test_launch_and_config_are_nonempty_and_consistent() -> None:
         '/savo_head/start_scan',
         '/savo_head/pause_scan',
         '/savo_head/resume_scan',
+        '/savo_mapping/coverage/request_plan',
+        '/savo_mapping/coverage/reset_plan',
+        '/savo_mapping/coverage_operation/approve',
+        '/savo_mapping/coverage_operation/cancel',
+        '/savo_mapping/coverage_operation/reset',
+        '/savo_nav/navigation/navigate_to_pose',
     ):
         assert endpoint in config

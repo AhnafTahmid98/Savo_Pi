@@ -2,8 +2,8 @@
 #
 # The action starts one autonomous mission. Pause/resume/cancel requests use
 # ControlAutonomousMapping. ROS action cancellation is equivalent to a typed
-# cancel request. AM-1 supports the FRONTIER strategy; later phases may enable
-# additional declared strategies without changing the mission boundary.
+# cancel request. The production mission remains FRONTIER strategy with an
+# AM-7 post-frontier Coverage pass; standalone COVERAGE is not admitted.
 
 uint32 CONTRACT_VERSION=1
 
@@ -23,8 +23,8 @@ bool require_quality_approval
 # Zero requests the configured mission timeout. AM-2 detects stable frontier
 # exhaustion. AM-3 performs automatic save and saved-session verification.
 # AM-5 adds start-pose capture, initial Scan360 and initial head scan.
-# Coverage, semantic interruption, return-to-start, approval and release remain
-# later phases behind the same mission boundary.
+# AM-6 semantic interruption and AM-7 Coverage, guarded return-to-start, and
+# final scans run behind this same mission boundary. Approval/release are later.
 builtin_interfaces/Duration mission_timeout
 ---
 uint8 RESULT_SUCCEEDED=0

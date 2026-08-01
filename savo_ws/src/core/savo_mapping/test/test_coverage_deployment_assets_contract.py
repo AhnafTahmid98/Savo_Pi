@@ -31,6 +31,8 @@ NODE_PARAMETERS = {
     'path_topic',
     'status_topic',
     'state_topic',
+    'request_plan_service',
+    'reset_plan_service',
     'tick_period_sec',
     'map_stale_timeout_sec',
     'tf_lookup_timeout_sec',
@@ -67,8 +69,6 @@ IMMUTABLE_HASHES = {
         '589e91c9b16c9100ef94f122ffcebccc334f4afbeab45917a76609199e03b374',
     'test/test_tf_pose_reader_runtime.py':
         'ef6fdcf5a4fb369cc6de2a9864e0f63081b9aea8906eacac80f9bdc2c3df28c1',
-    'src/nodes/coverage_mapper_node.cpp':
-        '05bcf66a5496a215b25cde601cddc490ec80023478148343773c30667c0ff636',
     'test/test_coverage_mapper_node_runtime.py':
         'c5931b27b75b73039cfe4fd69eec2a143c40da3d3e7112fdd0127f25cedc99ae',
     'config/scan360_mapping.yaml':
@@ -136,6 +136,14 @@ def test_base_config_matches_declared_node_contract_and_safe_defaults(
     assert parameters['path_topic'] == '/savo_mapping/coverage/path'
     assert parameters['status_topic'] == '/savo_mapping/coverage/status'
     assert parameters['state_topic'] == '/savo_mapping/coverage/state'
+    assert (
+        parameters['request_plan_service']
+        == '/savo_mapping/coverage/request_plan'
+    )
+    assert (
+        parameters['reset_plan_service']
+        == '/savo_mapping/coverage/reset_plan'
+    )
     assert parameters['allow_unknown'] is False
     assert parameters['connectivity'] in {'four', 'eight'}
     assert parameters['sweep_axis'] in {'automatic', 'rows', 'columns'}

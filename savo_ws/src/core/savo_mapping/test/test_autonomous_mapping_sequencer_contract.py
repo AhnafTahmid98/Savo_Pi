@@ -60,11 +60,14 @@ def test_orchestrator_uses_owned_component_boundaries() -> None:
     for forbidden in (
         'geometry_msgs/msg/twist.hpp',
         '/cmd_vel',
-        'nav2_msgs/action/navigate_to_pose',
         'slam_toolbox/srv/save_map',
         'slam_toolbox/srv/serialize_pose_graph',
     ):
         assert forbidden not in source
+
+    assert 'nav2_msgs/action/navigate_to_pose.hpp' in source
+    assert '/savo_nav/navigation/navigate_to_pose' in source
+    assert '"/navigate_to_pose"' not in source
 
 
 def test_launch_composes_scan360_without_autostart() -> None:

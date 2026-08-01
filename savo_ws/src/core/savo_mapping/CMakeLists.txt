@@ -58,6 +58,7 @@ add_library(${PROJECT_NAME}_core
   src/workflow/exploration_runtime.cpp
   src/workflow/frontier_completion_detector.cpp
   src/workflow/autonomous_mapping_mission.cpp
+  src/workflow/autonomous_mapping_am7.cpp
   src/coverage/coverage_grid.cpp
   src/coverage/coverage_execution_handoff.cpp
   src/coverage/coverage_operation_orchestrator.cpp
@@ -564,6 +565,7 @@ ament_target_dependencies(
   autonomous_mapping_orchestrator_node
   builtin_interfaces
   geometry_msgs
+  nav2_msgs
   rclcpp
   rclcpp_action
   savo_msgs
@@ -838,6 +840,7 @@ ament_target_dependencies(
   nav_msgs
   rclcpp
   std_msgs
+  std_srvs
   tf2_ros
 )
 
@@ -1163,6 +1166,12 @@ if(BUILD_TESTING)
   )
 
   ament_add_pytest_test(
+    test_autonomous_mapping_am7_contract
+    test/test_autonomous_mapping_am7_contract.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
     test_autonomous_mapping_sequencer_contract
     test/test_autonomous_mapping_sequencer_contract.py
     TIMEOUT 60
@@ -1192,6 +1201,19 @@ if(BUILD_TESTING)
     PROPERTIES
       ENVIRONMENT
         "PYTHONDONTWRITEBYTECODE=1;ROS_LOCALHOST_ONLY=1;ROS_DOMAIN_ID=224;ROS_LOG_DIR=${_savo_mapping_autonomous_orchestrator_ros_log_dir};AUTONOMOUS_ORCHESTRATOR_EXECUTABLE=${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}/autonomous_mapping_orchestrator_node"
+  )
+
+  ament_add_pytest_test(
+    test_autonomous_mapping_am7_runtime
+    test/test_autonomous_mapping_am7_runtime.py
+    TIMEOUT 180
+  )
+
+  set_tests_properties(
+    test_autonomous_mapping_am7_runtime
+    PROPERTIES
+      ENVIRONMENT
+        "PYTHONDONTWRITEBYTECODE=1;ROS_LOCALHOST_ONLY=1;ROS_DOMAIN_ID=227;ROS_LOG_DIR=${_savo_mapping_autonomous_orchestrator_ros_log_dir};AUTONOMOUS_ORCHESTRATOR_EXECUTABLE=${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}/autonomous_mapping_orchestrator_node"
   )
 
   ament_add_pytest_test(
@@ -1604,6 +1626,16 @@ if(BUILD_TESTING)
   if(TARGET test_autonomous_mapping_mission)
     target_link_libraries(
       test_autonomous_mapping_mission
+      ${PROJECT_NAME}_core
+    )
+  endif()
+
+  ament_add_gtest(test_autonomous_mapping_am7
+    test/test_autonomous_mapping_am7.cpp
+  )
+  if(TARGET test_autonomous_mapping_am7)
+    target_link_libraries(
+      test_autonomous_mapping_am7
       ${PROJECT_NAME}_core
     )
   endif()

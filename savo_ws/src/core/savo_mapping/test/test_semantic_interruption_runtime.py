@@ -186,7 +186,7 @@ class SemanticRuntimeHarness:
         elif request.command == ControlAutonomousMapping.Request.COMMAND_RESUME:
             self.resume_requests += 1
             response.status = self.mission_status(
-                AutonomousMappingStatus.STATE_EXPLORING
+                AutonomousMappingStatus.STATE_COVERAGE
             )
             self.mission_publisher.publish(response.status)
         return response
@@ -229,8 +229,8 @@ def ros_context():
     rclpy.shutdown()
 
 
-def test_detect_pause_register_and_resume_runtime_flow():
-    """Exercise the complete AM-6 typed interruption lifecycle."""
+def test_detect_pause_register_and_resume_during_coverage_runtime_flow():
+    """Exercise the AM-6 typed interruption lifecycle during Coverage."""
     harness = SemanticRuntimeHarness()
     try:
         assert harness.submit_client.wait_for_service(timeout_sec=5.0)
@@ -240,7 +240,7 @@ def test_detect_pause_register_and_resume_runtime_flow():
         for _ in range(5):
             harness.mission_publisher.publish(
                 harness.mission_status(
-                    AutonomousMappingStatus.STATE_EXPLORING
+                    AutonomousMappingStatus.STATE_COVERAGE
                 )
             )
             time.sleep(0.05)

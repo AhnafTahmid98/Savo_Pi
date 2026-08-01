@@ -6,7 +6,7 @@
 # - savo_control and savo_perception remain final movement/safety authorities.
 # - savo_head owns semantic head motion and AprilTag visual confirmation.
 
-uint32 CONTRACT_VERSION=2
+uint32 CONTRACT_VERSION=3
 
 uint8 STRATEGY_NONE=0
 uint8 STRATEGY_FRONTIER=1
@@ -118,6 +118,39 @@ float64 exhaustion_stable_duration_s
 bool completion_candidate
 bool completion_confirmed
 string completion_reason
+
+bool coverage_planning_started
+bool coverage_planning_complete
+bool coverage_plan_valid
+uint64 coverage_plan_generation
+uint64 coverage_map_generation
+uint32 coverage_total_waypoints
+bool coverage_execution_started
+bool coverage_execution_active
+bool coverage_execution_complete
+bool coverage_execution_succeeded
+string coverage_mission_id
+string coverage_state
+string coverage_reason
+uint32 coverage_current_waypoint
+uint32 coverage_completed_waypoints
+float64 coverage_completion_ratio
+float64 coverage_remaining_distance_m
+uint32 coverage_restart_attempts
+
+bool return_to_start_started
+bool return_to_start_active
+bool return_to_start_complete
+bool return_to_start_succeeded
+float64 return_to_start_distance_m
+string return_to_start_state
+string return_to_start_reason
+uint32 return_to_start_attempts
+
+bool final_scan360_complete
+bool final_scan360_succeeded
+bool final_head_scan_complete
+bool final_head_scan_succeeded
 
 bool map_save_started
 bool map_save_complete

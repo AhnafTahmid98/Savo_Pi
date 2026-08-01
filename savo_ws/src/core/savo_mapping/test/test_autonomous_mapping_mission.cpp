@@ -53,6 +53,10 @@ MissionInputs starting_inputs()
   inputs.require_start_pose_capture = false;
   inputs.require_initial_scan360 = false;
   inputs.require_initial_head_scan = false;
+  inputs.require_coverage = false;
+  inputs.require_return_to_start = false;
+  inputs.require_final_scan360 = false;
+  inputs.require_final_head_scan = false;
   return inputs;
 }
 
@@ -65,6 +69,42 @@ MissionInputs exploring_inputs()
   inputs.session_state = SessionState::Active;
   inputs.runtime_authorized = true;
   return inputs;
+}
+
+void enter_coverage_pending(
+  AutonomousMappingMission & mission,
+  MissionInputs & inputs)
+{
+  inputs = exploring_inputs();
+  inputs.require_coverage = true;
+  inputs.completion_confirmed = true;
+  ASSERT_TRUE(mission.start(valid_request(), inputs).accepted);
+  ASSERT_TRUE(mission.observe(inputs).request_monitor_mode);
+  inputs.mode = MappingMode::MonitorOnly;
+  inputs.exploration_mode = ExplorationMode::Idle;
+  inputs.workflow_phase = WorkflowPhase::Idle;
+  inputs.runtime_authorized = false;
+  ASSERT_EQ(
+    mission.observe(inputs).snapshot.state,
+    MissionState::CoveragePending);
+}
+
+void enter_coverage_active(
+  AutonomousMappingMission & mission,
+  MissionInputs & inputs)
+{
+  enter_coverage_pending(mission, inputs);
+  inputs.coverage_plan_generation = 1U;
+  inputs.coverage_planning_complete = true;
+  inputs.coverage_plan_valid = true;
+  inputs.coverage_total_waypoints = 4U;
+  ASSERT_TRUE(mission.observe(inputs).request_coverage_approve);
+  inputs.coverage_execution_started = true;
+  inputs.coverage_execution_active = true;
+  inputs.coverage_supervisor_authorized = true;
+  ASSERT_EQ(
+    mission.observe(inputs).snapshot.state,
+    MissionState::Coverage);
 }
 
 }  // namespace
@@ -175,6 +215,347 @@ TEST(AutonomousMappingMissionTest, InitialScanWithoutHeadEntersFrontier)
   inputs.runtime_authorized = true;
   decision = mission.observe(inputs);
   EXPECT_EQ(decision.snapshot.state, MissionState::Exploring);
+}
+
+TEST(AutonomousMappingMissionTest, RunsCoverageReturnFinalScansBeforeSaving)
+{
+  AutonomousMappingMission mission;
+  auto inputs = exploring_inputs();
+  inputs.require_coverage = true;
+  inputs.require_return_to_start = true;
+  inputs.require_final_scan360 = true;
+  inputs.require_final_head_scan = true;
+  ASSERT_EQ(
+    mission.start(valid_request(), inputs).snapshot.state,
+    MissionState::Exploring);
+
+  inputs.completion_confirmed = true;
+  inputs.completion_reason = "stable_frontier_exhaustion";
+  auto decision = mission.observe(inputs);
+  EXPECT_EQ(decision.snapshot.state, MissionState::CompletionPending);
+  EXPECT_TRUE(decision.request_monitor_mode);
+
+  inputs.mode = MappingMode::MonitorOnly;
+  inputs.exploration_mode = ExplorationMode::Idle;
+  inputs.workflow_phase = WorkflowPhase::Idle;
+  inputs.runtime_authorized = false;
+  decision = mission.observe(inputs);
+  EXPECT_EQ(decision.snapshot.state, MissionState::CoveragePending);
+  EXPECT_TRUE(decision.request_coverage_plan_reset);
+  EXPECT_TRUE(decision.request_coverage_plan);
+
+  inputs.coverage_plan_generation = 1U;
+  inputs.coverage_planning_started = true;
+  inputs.coverage_planning_complete = true;
+  inputs.coverage_plan_valid = true;
+  inputs.coverage_total_waypoints = 8U;
+  decision = mission.observe(inputs);
+  EXPECT_TRUE(decision.request_coverage_approve);
+
+  inputs.coverage_execution_started = true;
+  inputs.coverage_execution_active = true;
+  inputs.coverage_supervisor_authorized = true;
+  inputs.coverage_mission_id = "coverage-1-1";
+  inputs.coverage_state = "executing";
+  decision = mission.observe(inputs);
+  EXPECT_EQ(decision.snapshot.state, MissionState::Coverage);
+
+  inputs.coverage_execution_active = false;
+  inputs.coverage_execution_complete = true;
+  inputs.coverage_execution_succeeded = true;
+  inputs.coverage_state = "succeeded";
+  decision = mission.observe(inputs);
+  EXPECT_EQ(decision.snapshot.state, MissionState::ReturningToStart);
+  EXPECT_TRUE(decision.request_coverage_reset);
+
+  decision = mission.observe(inputs);
+  EXPECT_TRUE(decision.request_return_to_start);
+
+  inputs.return_to_start_started = true;
+  inputs.return_to_start_active = true;
+  decision = mission.observe(inputs);
+  EXPECT_EQ(decision.snapshot.state, MissionState::ReturningToStart);
+
+  inputs.return_to_start_active = false;
+  inputs.return_to_start_complete = true;
+  inputs.return_to_start_succeeded = true;
+  inputs.return_proximity_verified = true;
+  inputs.return_within_tolerance = true;
+  inputs.return_to_start_distance_m = 0.18;
+  decision = mission.observe(inputs);
+  EXPECT_EQ(decision.snapshot.state, MissionState::FinalScan360);
+  EXPECT_TRUE(decision.request_scan360_mode);
+
+  inputs.mode = MappingMode::Autonomous;
+  inputs.exploration_mode = ExplorationMode::Scan360;
+  inputs.workflow_phase = WorkflowPhase::Scan360;
+  decision = mission.observe(inputs);
+  EXPECT_TRUE(decision.request_scan360_start);
+
+  inputs.scan360_generation = 1U;
+  inputs.scan360_started = true;
+  inputs.scan360_complete = true;
+  inputs.scan360_succeeded = true;
+  decision = mission.observe(inputs);
+  EXPECT_EQ(decision.snapshot.state, MissionState::FinalHeadScan);
+  EXPECT_TRUE(decision.request_monitor_mode);
+  EXPECT_TRUE(decision.snapshot.final_scan360_complete);
+
+  inputs.mode = MappingMode::MonitorOnly;
+  inputs.exploration_mode = ExplorationMode::Idle;
+  inputs.workflow_phase = WorkflowPhase::Idle;
+  decision = mission.observe(inputs);
+  EXPECT_TRUE(decision.request_head_scan_start);
+
+  inputs.head_scan_generation = 1U;
+  inputs.head_scan_started = true;
+  inputs.head_scan_complete = true;
+  inputs.head_scan_succeeded = true;
+  decision = mission.observe(inputs);
+  EXPECT_EQ(decision.snapshot.state, MissionState::Saving);
+  EXPECT_TRUE(decision.request_map_save);
+  EXPECT_TRUE(decision.snapshot.final_head_scan_complete);
+
+  inputs.map_save_started = true;
+  inputs.map_save_complete = true;
+  inputs.map_save_succeeded = true;
+  decision = mission.observe(inputs);
+  EXPECT_EQ(decision.snapshot.state, MissionState::Verifying);
+  EXPECT_TRUE(decision.request_saved_map_verification);
+
+  inputs.verification_started = true;
+  inputs.verification_complete = true;
+  inputs.verification_succeeded = true;
+  decision = mission.observe(inputs);
+  EXPECT_TRUE(decision.terminal);
+  EXPECT_EQ(decision.snapshot.state, MissionState::Completed);
+  EXPECT_EQ(decision.snapshot.result, MissionResult::Succeeded);
+}
+
+TEST(AutonomousMappingMissionTest, RejectsStaleAndMalformedCoveragePlans)
+{
+  AutonomousMappingMission mission;
+  auto inputs = exploring_inputs();
+  inputs.require_coverage = true;
+  inputs.completion_confirmed = true;
+  inputs.coverage_plan_generation = 4U;
+  ASSERT_TRUE(mission.start(valid_request(), inputs).accepted);
+  ASSERT_TRUE(mission.observe(inputs).request_monitor_mode);
+
+  inputs.mode = MappingMode::MonitorOnly;
+  inputs.exploration_mode = ExplorationMode::Idle;
+  inputs.workflow_phase = WorkflowPhase::Idle;
+  auto decision = mission.observe(inputs);
+  EXPECT_EQ(decision.snapshot.state, MissionState::CoveragePending);
+  EXPECT_TRUE(decision.request_coverage_plan);
+
+  inputs.coverage_planning_complete = true;
+  inputs.coverage_plan_valid = true;
+  inputs.coverage_total_waypoints = 10U;
+  decision = mission.observe(inputs);
+  EXPECT_TRUE(decision.request_coverage_plan);
+
+  inputs.coverage_plan_generation = 5U;
+  inputs.coverage_total_waypoints = 0U;
+  decision = mission.observe(inputs);
+  EXPECT_TRUE(decision.terminal);
+  EXPECT_EQ(decision.snapshot.result, MissionResult::NavigationFailed);
+  EXPECT_EQ(decision.snapshot.reason, "coverage_plan_empty_without_noop");
+}
+
+TEST(AutonomousMappingMissionTest, PauseDuringCoverageCancelsAndReplans)
+{
+  AutonomousMappingMission mission;
+  auto inputs = exploring_inputs();
+  inputs.require_coverage = true;
+  inputs.completion_confirmed = true;
+  ASSERT_TRUE(mission.start(valid_request(), inputs).accepted);
+  ASSERT_TRUE(mission.observe(inputs).request_monitor_mode);
+  inputs.mode = MappingMode::MonitorOnly;
+  inputs.exploration_mode = ExplorationMode::Idle;
+  inputs.workflow_phase = WorkflowPhase::Idle;
+  static_cast<void>(mission.observe(inputs));
+  inputs.coverage_plan_generation = 1U;
+  inputs.coverage_planning_complete = true;
+  inputs.coverage_plan_valid = true;
+  inputs.coverage_total_waypoints = 4U;
+  static_cast<void>(mission.observe(inputs));
+  inputs.coverage_execution_started = true;
+  inputs.coverage_execution_active = true;
+  inputs.coverage_supervisor_authorized = true;
+  ASSERT_EQ(mission.observe(inputs).snapshot.state, MissionState::Coverage);
+
+  auto decision = mission.control(MissionCommand::Pause, "tag_seen", inputs);
+  EXPECT_EQ(decision.snapshot.state, MissionState::Pausing);
+  EXPECT_TRUE(decision.request_coverage_cancel);
+
+  inputs.coverage_execution_active = false;
+  decision = mission.observe(inputs);
+  EXPECT_EQ(decision.snapshot.state, MissionState::Paused);
+
+  decision = mission.control(MissionCommand::Resume, "tag_saved", inputs);
+  EXPECT_EQ(decision.snapshot.state, MissionState::CoveragePending);
+  EXPECT_TRUE(decision.request_coverage_plan_reset);
+  EXPECT_TRUE(decision.request_coverage_reset);
+}
+
+TEST(AutonomousMappingMissionTest, CancelDuringCoverageApprovalCancelsGateway)
+{
+  AutonomousMappingMission mission;
+  auto inputs = exploring_inputs();
+  inputs.require_coverage = true;
+  inputs.completion_confirmed = true;
+  ASSERT_TRUE(mission.start(valid_request(), inputs).accepted);
+  ASSERT_TRUE(mission.observe(inputs).request_monitor_mode);
+  inputs.mode = MappingMode::MonitorOnly;
+  inputs.exploration_mode = ExplorationMode::Idle;
+  inputs.workflow_phase = WorkflowPhase::Idle;
+  static_cast<void>(mission.observe(inputs));
+  inputs.coverage_plan_generation = 1U;
+  inputs.coverage_planning_complete = true;
+  inputs.coverage_plan_valid = true;
+  inputs.coverage_total_waypoints = 4U;
+  ASSERT_TRUE(mission.observe(inputs).request_coverage_approve);
+
+  inputs.coverage_approval_pending = true;
+  const auto decision = mission.control(
+    MissionCommand::Cancel, "operator_cancel", inputs);
+
+  EXPECT_EQ(decision.snapshot.state, MissionState::Canceling);
+  EXPECT_TRUE(decision.request_coverage_cancel);
+  EXPECT_EQ(decision.reason, "cancel_waiting_for_coverage_cancel");
+}
+
+TEST(AutonomousMappingMissionTest, CoverageFailureIsNavigationFailure)
+{
+  AutonomousMappingMission mission;
+  MissionInputs inputs;
+  enter_coverage_active(mission, inputs);
+  inputs.coverage_execution_active = false;
+  inputs.coverage_execution_complete = true;
+  inputs.coverage_execution_succeeded = false;
+  inputs.coverage_reason = "guarded_coverage_aborted";
+
+  const auto decision = mission.observe(inputs);
+
+  EXPECT_TRUE(decision.terminal);
+  EXPECT_EQ(decision.snapshot.result, MissionResult::NavigationFailed);
+  EXPECT_EQ(decision.reason, "guarded_coverage_aborted");
+}
+
+TEST(AutonomousMappingMissionTest, SupervisorLossCancelsCoverageBeforePause)
+{
+  AutonomousMappingMission mission;
+  MissionInputs inputs;
+  enter_coverage_active(mission, inputs);
+  inputs.coverage_supervisor_authorized = false;
+
+  const auto decision = mission.observe(inputs);
+
+  EXPECT_EQ(decision.snapshot.state, MissionState::Pausing);
+  EXPECT_TRUE(decision.request_coverage_cancel);
+  EXPECT_EQ(decision.reason, "pause_waiting_for_coverage_cancel");
+}
+
+TEST(AutonomousMappingMissionTest, ReturnOutsideToleranceFailsMission)
+{
+  AutonomousMappingMission mission;
+  MissionInputs inputs;
+  enter_coverage_active(mission, inputs);
+  inputs.require_return_to_start = true;
+  inputs.coverage_execution_active = false;
+  inputs.coverage_execution_complete = true;
+  inputs.coverage_execution_succeeded = true;
+  ASSERT_EQ(
+    mission.observe(inputs).snapshot.state,
+    MissionState::ReturningToStart);
+  inputs.return_to_start_started = true;
+  inputs.return_to_start_complete = true;
+  inputs.return_to_start_succeeded = true;
+  inputs.return_proximity_verified = true;
+  inputs.return_within_tolerance = false;
+
+  const auto decision = mission.observe(inputs);
+
+  EXPECT_TRUE(decision.terminal);
+  EXPECT_EQ(decision.snapshot.result, MissionResult::NavigationFailed);
+  EXPECT_EQ(decision.reason, "return_to_start_outside_tolerance");
+}
+
+TEST(AutonomousMappingMissionTest, ReturnAttemptLimitIsEnforced)
+{
+  AutonomousMappingMission mission;
+  MissionInputs inputs;
+  enter_coverage_active(mission, inputs);
+  inputs.require_return_to_start = true;
+  inputs.coverage_execution_active = false;
+  inputs.coverage_execution_complete = true;
+  inputs.coverage_execution_succeeded = true;
+  ASSERT_EQ(
+    mission.observe(inputs).snapshot.state,
+    MissionState::ReturningToStart);
+  inputs.return_to_start_attempts = 2U;
+  inputs.return_to_start_maximum_attempts = 2U;
+
+  const auto decision = mission.observe(inputs);
+
+  EXPECT_TRUE(decision.terminal);
+  EXPECT_EQ(decision.snapshot.result, MissionResult::NavigationFailed);
+  EXPECT_EQ(decision.reason, "return_to_start_attempt_limit_reached");
+}
+
+TEST(AutonomousMappingMissionTest, FinalScanRequiresFreshSuccessfulGeneration)
+{
+  AutonomousMappingMission mission;
+  MissionInputs inputs;
+  enter_coverage_active(mission, inputs);
+  inputs.require_final_scan360 = true;
+  inputs.scan360_generation = 4U;
+  inputs.scan360_complete = true;
+  inputs.scan360_succeeded = true;
+  inputs.coverage_execution_active = false;
+  inputs.coverage_execution_complete = true;
+  inputs.coverage_execution_succeeded = true;
+  auto decision = mission.observe(inputs);
+  ASSERT_EQ(decision.snapshot.state, MissionState::FinalScan360);
+  EXPECT_TRUE(decision.request_scan360_mode);
+
+  inputs.mode = MappingMode::Autonomous;
+  inputs.exploration_mode = ExplorationMode::Scan360;
+  inputs.workflow_phase = WorkflowPhase::Scan360;
+  decision = mission.observe(inputs);
+  EXPECT_TRUE(decision.request_scan360_start);
+
+  inputs.scan360_generation = 5U;
+  inputs.scan360_complete = true;
+  inputs.scan360_succeeded = false;
+  inputs.scan360_reason = "final_scan_fixture_failed";
+  decision = mission.observe(inputs);
+  EXPECT_TRUE(decision.terminal);
+  EXPECT_EQ(decision.snapshot.result, MissionResult::ScanFailed);
+  EXPECT_EQ(decision.reason, "final_scan_fixture_failed");
+}
+
+TEST(AutonomousMappingMissionTest, CancelDuringReturnRequestsActionCancel)
+{
+  AutonomousMappingMission mission;
+  MissionInputs inputs;
+  enter_coverage_active(mission, inputs);
+  inputs.require_return_to_start = true;
+  inputs.coverage_execution_active = false;
+  inputs.coverage_execution_complete = true;
+  inputs.coverage_execution_succeeded = true;
+  ASSERT_EQ(
+    mission.observe(inputs).snapshot.state,
+    MissionState::ReturningToStart);
+  inputs.return_to_start_started = true;
+  inputs.return_to_start_active = true;
+
+  const auto decision = mission.control(
+    MissionCommand::Cancel, "operator_cancel", inputs);
+
+  EXPECT_EQ(decision.snapshot.state, MissionState::Canceling);
+  EXPECT_TRUE(decision.request_return_cancel);
 }
 
 TEST(AutonomousMappingMissionTest, InitialScanFailureIsTyped)

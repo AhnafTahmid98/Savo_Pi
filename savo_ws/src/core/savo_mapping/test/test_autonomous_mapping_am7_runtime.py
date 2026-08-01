@@ -1,0 +1,638 @@
+# Copyright 2026 Ahnaf Tahmid
+# SPDX-License-Identifier: LicenseRef-Proprietary
+
+"""Isolated end-to-end runtime validation for the AM-7 mission sequence."""
+
+import json
+import os
+from pathlib import Path
+import shutil
+import signal
+import subprocess
+import tempfile
+import threading
+import time
+
+from geometry_msgs.msg import TransformStamped
+from nav2_msgs.action import NavigateToPose
+import pytest
+import rclpy
+from rclpy.action import ActionClient
+from rclpy.action import ActionServer
+from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.executors import MultiThreadedExecutor
+from rclpy.qos import DurabilityPolicy
+from rclpy.qos import QoSProfile
+from rclpy.qos import ReliabilityPolicy
+from savo_msgs.action import RunAutonomousMapping
+from savo_msgs.msg import AutonomousMappingStatus
+from savo_msgs.msg import FrontierExplorationStatus
+from std_msgs.msg import Bool
+from std_msgs.msg import String
+from std_srvs.srv import Trigger
+from tf2_ros import TransformBroadcaster
+
+
+def retained_qos():
+    """Return reliable transient-local state QoS."""
+    return QoSProfile(
+        depth=1,
+        reliability=ReliabilityPolicy.RELIABLE,
+        durability=DurabilityPolicy.TRANSIENT_LOCAL,
+    )
+
+
+def command_qos():
+    """Return reliable volatile command QoS."""
+    return QoSProfile(
+        depth=10,
+        reliability=ReliabilityPolicy.RELIABLE,
+        durability=DurabilityPolicy.VOLATILE,
+    )
+
+
+def wait_until(predicate, timeout=15.0, interval=0.02):
+    """Wait until a predicate succeeds."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if predicate():
+            return True
+        time.sleep(interval)
+    return False
+
+
+class Am7RuntimeHarness:
+    """Provide fake hardware boundaries around the production orchestrator."""
+
+    def __init__(self):
+        suffix = f'{os.getpid()}_{time.monotonic_ns()}'
+        prefix = f'/test/am7_{suffix}'
+        self.map_frame = f'map_{suffix}'
+        self.base_frame = f'base_{suffix}'
+        self.action_name = f'{prefix}/run'
+        self.return_action_name = f'{prefix}/guarded_return'
+        self.status_topic = f'{prefix}/status'
+        self.mode_topic = f'{prefix}/mode'
+        self.exploration_mode_topic = f'{prefix}/exploration_mode'
+        self.workflow_phase_topic = f'{prefix}/workflow_phase'
+        self.session_state_topic = f'{prefix}/session_state'
+        self.readiness_topic = f'{prefix}/readiness'
+        self.safety_stop_topic = f'{prefix}/safety_stop'
+        self.runtime_authority_topic = f'{prefix}/runtime_authority'
+        self.handoff_state_topic = f'{prefix}/handoff_state'
+        self.frontier_status_topic = f'{prefix}/frontier_status'
+        self.mode_command_topic = f'{prefix}/mode_cmd'
+        self.start_session_topic = f'{prefix}/start_session_cmd'
+        self.cancel_session_topic = f'{prefix}/cancel_session_cmd'
+        self.handoff_cancel_service = f'{prefix}/handoff_cancel'
+        self.map_save_service = f'{prefix}/map_save'
+        self.scan_state_topic = f'{prefix}/scan360/state'
+        self.scan_start_service = f'{prefix}/scan360/start'
+        self.scan_cancel_service = f'{prefix}/scan360/cancel'
+        self.head_state_topic = f'{prefix}/head/state'
+        self.head_start_service = f'{prefix}/head/start'
+        self.head_pause_service = f'{prefix}/head/pause'
+        self.head_resume_service = f'{prefix}/head/resume'
+        self.coverage_status_topic = f'{prefix}/coverage/status'
+        self.coverage_operation_status_topic = f'{prefix}/operation/status'
+        self.coverage_request_service = f'{prefix}/coverage/request'
+        self.coverage_plan_reset_service = f'{prefix}/coverage/reset'
+        self.coverage_approve_service = f'{prefix}/operation/approve'
+        self.coverage_cancel_service = f'{prefix}/operation/cancel'
+        self.coverage_reset_service = f'{prefix}/operation/reset'
+
+        self.node = rclpy.create_node(f'am7_fixture_{suffix}')
+        self.group = ReentrantCallbackGroup()
+        self.executor = MultiThreadedExecutor(num_threads=10)
+        self.executor.add_node(self.node)
+        self.tf_broadcaster = TransformBroadcaster(self.node)
+        self.mode_commands = []
+        self.start_commands = []
+        self.statuses = []
+        self.scan_starts = 0
+        self.head_starts = 0
+        self.coverage_requests = 0
+        self.coverage_approvals = 0
+        self.return_goals = []
+        self.map_saves = 0
+        self.session_root = Path(tempfile.mkdtemp(prefix='savo_am7_runtime_'))
+        self.session_directory = self._create_valid_session('campus_main')
+
+        self.mode_pub = self._publisher(String, self.mode_topic, retained_qos())
+        self.exploration_mode_pub = self._publisher(
+            String, self.exploration_mode_topic, retained_qos()
+        )
+        self.workflow_phase_pub = self._publisher(
+            String, self.workflow_phase_topic, retained_qos()
+        )
+        self.session_state_pub = self._publisher(
+            String, self.session_state_topic, retained_qos()
+        )
+        self.readiness_pub = self._publisher(
+            String, self.readiness_topic, retained_qos()
+        )
+        self.safety_stop_pub = self._publisher(
+            Bool, self.safety_stop_topic, command_qos()
+        )
+        self.runtime_authority_pub = self._publisher(
+            Bool, self.runtime_authority_topic, retained_qos()
+        )
+        self.handoff_state_pub = self._publisher(
+            String, self.handoff_state_topic, retained_qos()
+        )
+        self.frontier_status_pub = self._publisher(
+            FrontierExplorationStatus,
+            self.frontier_status_topic,
+            retained_qos(),
+        )
+        self.scan_state_pub = self._publisher(
+            String, self.scan_state_topic, retained_qos()
+        )
+        self.head_state_pub = self._publisher(
+            String, self.head_state_topic, command_qos()
+        )
+        self.coverage_status_pub = self._publisher(
+            String, self.coverage_status_topic, retained_qos()
+        )
+        self.coverage_operation_status_pub = self._publisher(
+            String, self.coverage_operation_status_topic, retained_qos()
+        )
+
+        self.node.create_subscription(
+            String,
+            self.mode_command_topic,
+            lambda msg: self.mode_commands.append(msg.data),
+            command_qos(),
+        )
+        self.node.create_subscription(
+            String,
+            self.start_session_topic,
+            lambda msg: self.start_commands.append(msg.data),
+            command_qos(),
+        )
+        self.node.create_subscription(
+            AutonomousMappingStatus,
+            self.status_topic,
+            lambda msg: self.statuses.append(msg),
+            retained_qos(),
+        )
+
+        self._service(self.handoff_cancel_service, self._accept)
+        self._service(self.scan_start_service, self._scan_start)
+        self._service(self.scan_cancel_service, self._accept)
+        self._service(self.head_start_service, self._head_start)
+        self._service(self.head_pause_service, self._accept)
+        self._service(self.head_resume_service, self._accept)
+        self._service(self.coverage_plan_reset_service, self._accept)
+        self._service(self.coverage_request_service, self._coverage_request)
+        self._service(self.coverage_approve_service, self._coverage_approve)
+        self._service(self.coverage_cancel_service, self._accept)
+        self._service(self.coverage_reset_service, self._accept)
+        self._service(self.map_save_service, self._map_save)
+
+        self.return_server = ActionServer(
+            self.node,
+            NavigateToPose,
+            self.return_action_name,
+            execute_callback=self._return_to_start,
+            callback_group=self.group,
+        )
+        self.action_client = ActionClient(
+            self.node,
+            RunAutonomousMapping,
+            self.action_name,
+            callback_group=self.group,
+        )
+        self.tf_timer = self.node.create_timer(0.05, self.publish_transform)
+        self.spin_thread = threading.Thread(
+            target=self.executor.spin,
+            daemon=True,
+        )
+        self.spin_thread.start()
+        self.process = self._start_orchestrator()
+        assert wait_until(
+            lambda: self.process.poll() is not None
+            or self.action_client.server_is_ready()
+        ), self.diagnostics()
+        assert self.process.poll() is None, self.diagnostics()
+
+    def _publisher(self, message_type, topic, qos):
+        return self.node.create_publisher(message_type, topic, qos)
+
+    def _service(self, name, callback):
+        return self.node.create_service(
+            Trigger, name, callback, callback_group=self.group
+        )
+
+    @staticmethod
+    def string_message(value):
+        message = String()
+        message.data = value
+        return message
+
+    @staticmethod
+    def bool_message(value):
+        message = Bool()
+        message.data = value
+        return message
+
+    def _create_valid_session(self, map_id):
+        session = self.session_root / map_id
+        session.mkdir()
+        base = session / map_id
+        (session / f'{map_id}.pgm').write_bytes(b'P5\n1 1\n255\nx')
+        (session / f'{map_id}.posegraph').write_text('posegraph')
+        (session / f'{map_id}.data').write_text('data')
+        (session / f'{map_id}.yaml').write_text(
+            f'image: {map_id}.pgm\nmode: trinary\nresolution: 0.05\n'
+            'origin: [0.0, 0.0, 0.0]\nnegate: 0\n'
+            'occupied_thresh: 0.65\nfree_thresh: 0.25\n'
+        )
+        (session / 'manifest.yaml').write_text(
+            'schema_version: 1\n'
+            f'map_id: "{map_id}"\n'
+            f'frame_id: "{self.map_frame}"\n'
+            f'session_directory: "{session}"\n'
+            'occupancy_grid:\n'
+            f'  yaml: "{base}.yaml"\n'
+            f'  image: "{base}.pgm"\n'
+            'pose_graph:\n'
+            f'  posegraph: "{base}.posegraph"\n'
+            f'  data: "{base}.data"\n'
+            'map_quality:\n  structurally_valid: true\n'
+            '  evaluated: false\n'
+            'navigation_handoff_ready: false\n'
+        )
+        return session
+
+    def _start_orchestrator(self):
+        executable = Path(os.environ['AUTONOMOUS_ORCHESTRATOR_EXECUTABLE'])
+        assert executable.is_file() and os.access(executable, os.X_OK)
+        parameters = {
+            'action_name': self.action_name,
+            'status_topic': self.status_topic,
+            'mode_topic': self.mode_topic,
+            'exploration_mode_topic': self.exploration_mode_topic,
+            'workflow_phase_topic': self.workflow_phase_topic,
+            'session_state_topic': self.session_state_topic,
+            'readiness_topic': self.readiness_topic,
+            'safety_stop_topic': self.safety_stop_topic,
+            'runtime_authority_topic': self.runtime_authority_topic,
+            'handoff_state_topic': self.handoff_state_topic,
+            'frontier_status_topic': self.frontier_status_topic,
+            'mode_command_topic': self.mode_command_topic,
+            'start_session_command_topic': self.start_session_topic,
+            'cancel_session_command_topic': self.cancel_session_topic,
+            'handoff_cancel_service': self.handoff_cancel_service,
+            'save.map_session_service': self.map_save_service,
+            'save.expected_frame': self.map_frame,
+            'sequence.scan360_state_topic': self.scan_state_topic,
+            'sequence.scan360_start_service': self.scan_start_service,
+            'sequence.scan360_cancel_service': self.scan_cancel_service,
+            'sequence.head_scan_state_topic': self.head_state_topic,
+            'sequence.head_scan_start_service': self.head_start_service,
+            'sequence.head_scan_pause_service': self.head_pause_service,
+            'sequence.head_scan_resume_service': self.head_resume_service,
+            'sequence.start_pose_target_frame': self.map_frame,
+            'sequence.start_pose_source_frame': self.base_frame,
+            'coverage.enabled': 'true',
+            'coverage.required': 'true',
+            'coverage.request_plan_service': self.coverage_request_service,
+            'coverage.reset_plan_service': self.coverage_plan_reset_service,
+            'coverage.planner_status_topic': self.coverage_status_topic,
+            'coverage.operation_status_topic': (
+                self.coverage_operation_status_topic
+            ),
+            'coverage.operation_approve_service': self.coverage_approve_service,
+            'coverage.operation_cancel_service': self.coverage_cancel_service,
+            'coverage.operation_reset_service': self.coverage_reset_service,
+            'return_to_start.enabled': 'true',
+            'return_to_start.action_name': self.return_action_name,
+            'final_sequence.require_final_scan360': 'true',
+            'final_sequence.require_final_head_scan': 'true',
+            'completion.minimum_exhaustion_observations': '1',
+            'completion.minimum_stable_duration_s': '0.0',
+            'evaluation_period_ms': '50',
+            'command_retry_period_ms': '100',
+            'default_mission_timeout_s': '0.0',
+        }
+        command = [str(executable), '--ros-args']
+        for name, value in parameters.items():
+            command.extend(['-p', f'{name}:={value}'])
+        environment = os.environ.copy()
+        environment['PYTHONDONTWRITEBYTECODE'] = '1'
+        environment['ROS_LOCALHOST_ONLY'] = '1'
+        return subprocess.Popen(
+            command,
+            env=environment,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            start_new_session=True,
+        )
+
+    def _accept(self, _request, response):
+        response.success = True
+        response.message = 'accepted'
+        return response
+
+    def _delayed_publish(self, publisher, value, delay=0.08):
+        timer = threading.Timer(
+            delay, lambda: publisher.publish(self.string_message(value))
+        )
+        timer.daemon = True
+        timer.start()
+
+    def _scan_start(self, _request, response):
+        self.scan_starts += 1
+        response.success = True
+        response.message = 'scan360_started'
+        self._delayed_publish(self.scan_state_pub, 'complete')
+        return response
+
+    def _head_start(self, _request, response):
+        self.head_starts += 1
+        response.success = True
+        response.message = 'head_scan_started'
+        self._delayed_publish(
+            self.head_state_pub,
+            'state=done;phase=complete;reason=fixture_complete',
+        )
+        return response
+
+    def _coverage_request(self, _request, response):
+        self.coverage_requests += 1
+        response.success = True
+        response.message = 'coverage_plan_requested'
+        plan = {
+            'state': 'plan_ready',
+            'reason': 'fixture_plan_ready',
+            'map_valid': True,
+            'map_fresh': True,
+            'map_sequence': 5,
+            'plan_sequence': self.coverage_requests,
+            'waypoint_count': 3,
+        }
+        operation = {
+            'state': 'ready_for_approval',
+            'supervisor_authorized': True,
+            'candidate_valid': True,
+            'candidate_generation': self.coverage_requests,
+            'approval_pending': False,
+            'mission_id': '',
+            'terminal_state': '',
+            'result_reason': 'fixture_ready',
+            'latest_feedback': '',
+        }
+        self._delayed_publish(self.coverage_status_pub, json.dumps(plan))
+        self._delayed_publish(
+            self.coverage_operation_status_pub,
+            json.dumps(operation),
+            delay=0.12,
+        )
+        return response
+
+    def _coverage_approve(self, _request, response):
+        self.coverage_approvals += 1
+        generation = self.coverage_requests
+        mission_id = f'coverage-{generation}-runtime'
+        feedback = json.dumps(
+            {
+                'mission_id': mission_id,
+                'current_waypoint': 2,
+                'completed_waypoints': 1,
+                'total_waypoints': 3,
+                'completion_ratio': 0.33,
+                'remaining_distance_m': 1.5,
+            }
+        )
+        executing = {
+            'state': 'executing',
+            'supervisor_authorized': True,
+            'candidate_valid': True,
+            'candidate_generation': generation,
+            'approval_pending': False,
+            'mission_id': mission_id,
+            'terminal_state': '',
+            'result_reason': 'fixture_executing',
+            'latest_feedback': feedback,
+        }
+        succeeded = dict(executing)
+        succeeded.update(
+            state='succeeded',
+            terminal_state='succeeded',
+            result_reason='fixture_coverage_complete',
+        )
+        self.coverage_operation_status_pub.publish(
+            self.string_message(json.dumps(executing))
+        )
+        self._delayed_publish(
+            self.coverage_operation_status_pub,
+            json.dumps(succeeded),
+            delay=0.25,
+        )
+        response.success = True
+        response.message = mission_id
+        return response
+
+    def _return_to_start(self, goal_handle):
+        self.return_goals.append(goal_handle.request.pose)
+        result = NavigateToPose.Result()
+        goal_handle.succeed()
+        return result
+
+    def _map_save(self, _request, response):
+        self.map_saves += 1
+        response.success = True
+        response.message = f'map_session_saved:{self.session_directory}'
+        return response
+
+    def publish_transform(self):
+        transform = TransformStamped()
+        transform.header.stamp = self.node.get_clock().now().to_msg()
+        transform.header.frame_id = self.map_frame
+        transform.child_frame_id = self.base_frame
+        transform.transform.translation.x = 1.25
+        transform.transform.translation.y = -0.50
+        transform.transform.rotation.w = 1.0
+        self.tf_broadcaster.sendTransform(transform)
+
+    def publish_initial_state(self):
+        for _ in range(8):
+            self.mode_pub.publish(self.string_message('monitor_only'))
+            self.exploration_mode_pub.publish(self.string_message('idle'))
+            self.workflow_phase_pub.publish(self.string_message('idle'))
+            self.session_state_pub.publish(self.string_message('idle'))
+            self.readiness_pub.publish(self.string_message('ready'))
+            self.safety_stop_pub.publish(self.bool_message(False))
+            self.runtime_authority_pub.publish(self.bool_message(False))
+            self.handoff_state_pub.publish(self.string_message('idle'))
+            time.sleep(0.05)
+
+    def publish_workflow(self, mode, exploration, phase, authorized):
+        self.mode_pub.publish(self.string_message(mode))
+        self.exploration_mode_pub.publish(self.string_message(exploration))
+        self.workflow_phase_pub.publish(self.string_message(phase))
+        self.runtime_authority_pub.publish(self.bool_message(authorized))
+        self.handoff_state_pub.publish(self.string_message('idle'))
+
+    def publish_exhaustion(self):
+        status = FrontierExplorationStatus()
+        status.contract_version = FrontierExplorationStatus.CONTRACT_VERSION
+        status.stamp = self.node.get_clock().now().to_msg()
+        status.enabled = True
+        status.map_received = True
+        status.map_generation = 5
+        status.planned_map_generation = 5
+        status.plan_sequence = 1
+        status.planning_status = 'no_frontiers'
+        status.handoff_state = 'idle'
+        status.goal_pending = False
+        status.detected_frontiers = 0
+        status.reachable_frontiers = 0
+        self.frontier_status_pub.publish(status)
+
+    def send_goal(self):
+        assert self.action_client.wait_for_server(timeout_sec=5.0)
+        goal = RunAutonomousMapping.Goal()
+        goal.contract_version = RunAutonomousMapping.Goal.CONTRACT_VERSION
+        goal.mission_id = 'mission_am7_runtime'
+        goal.actor_id = 'operator_am7'
+        goal.map_id = 'campus_main'
+        goal.map_revision = 1
+        goal.strategy = RunAutonomousMapping.Goal.STRATEGY_FRONTIER
+        goal.auto_save = True
+        goal.require_quality_approval = False
+        future = self.action_client.send_goal_async(goal)
+        assert wait_until(future.done), self.diagnostics()
+        handle = future.result()
+        assert handle.accepted, self.diagnostics()
+        return handle
+
+    def latest_state(self):
+        return self.statuses[-1].state if self.statuses else None
+
+    def diagnostics(self):
+        output = ''
+        if hasattr(self, 'process') and self.process.poll() is not None:
+            if self.process.stdout:
+                output = self.process.stdout.read()
+        return (
+            f'process={getattr(self, "process", None)} '
+            f'modes={self.mode_commands[-12:]} scans={self.scan_starts} '
+            f'heads={self.head_starts} plans={self.coverage_requests} '
+            f'approvals={self.coverage_approvals} returns={len(self.return_goals)} '
+            f'saves={self.map_saves} '
+            f'states={[status.state_text for status in self.statuses[-15:]]} '
+            f'output={output}'
+        )
+
+    def close(self):
+        if self.process.poll() is None:
+            os.killpg(self.process.pid, signal.SIGINT)
+            try:
+                self.process.wait(timeout=5.0)
+            except subprocess.TimeoutExpired:
+                os.killpg(self.process.pid, signal.SIGKILL)
+                self.process.wait(timeout=5.0)
+        self.return_server.destroy()
+        self.executor.shutdown(timeout_sec=2.0)
+        self.action_client.destroy()
+        self.node.destroy_node()
+        self.spin_thread.join(timeout=2.0)
+        shutil.rmtree(self.session_root)
+
+
+@pytest.fixture(autouse=True, scope='module')
+def ros_context():
+    """Initialize one isolated ROS context."""
+    rclpy.init()
+    yield
+    rclpy.shutdown()
+
+
+def test_full_am7_runtime_sequence():
+    """Drive the real C++ orchestrator through every required AM-7 stage."""
+    harness = Am7RuntimeHarness()
+    try:
+        harness.publish_initial_state()
+        result_future = harness.send_goal().get_result_async()
+        assert wait_until(
+            lambda: 'mission_am7_runtime' in harness.start_commands
+        ), harness.diagnostics()
+        harness.session_state_pub.publish(harness.string_message('active'))
+
+        assert wait_until(
+            lambda: 'autonomous:scan360' in harness.mode_commands
+        ), harness.diagnostics()
+        harness.publish_workflow('autonomous', 'scan360', 'scan360', False)
+        assert wait_until(lambda: harness.scan_starts == 1), harness.diagnostics()
+
+        assert wait_until(
+            lambda: 'monitor_only' in harness.mode_commands
+        ), harness.diagnostics()
+        harness.publish_workflow('monitor_only', 'idle', 'idle', False)
+        assert wait_until(lambda: harness.head_starts == 1), harness.diagnostics()
+
+        assert wait_until(
+            lambda: 'autonomous:frontier' in harness.mode_commands
+        ), harness.diagnostics()
+        harness.publish_workflow('autonomous', 'frontier', 'exploring', True)
+        assert wait_until(
+            lambda: harness.latest_state()
+            == AutonomousMappingStatus.STATE_EXPLORING
+        ), harness.diagnostics()
+        harness.publish_exhaustion()
+
+        previous_monitors = harness.mode_commands.count('monitor_only')
+        assert wait_until(
+            lambda: harness.mode_commands.count('monitor_only')
+            > previous_monitors
+        ), harness.diagnostics()
+        harness.publish_workflow('monitor_only', 'idle', 'idle', False)
+        assert wait_until(
+            lambda: harness.coverage_approvals == 1
+            and any(
+                status.state == AutonomousMappingStatus.STATE_COVERAGE
+                for status in harness.statuses
+            )
+        ), harness.diagnostics()
+        assert wait_until(lambda: len(harness.return_goals) == 1), (
+            harness.diagnostics()
+        )
+        return_goal = harness.return_goals[0]
+        assert return_goal.header.frame_id == harness.map_frame
+        assert return_goal.pose.position.x == pytest.approx(1.25)
+        assert return_goal.pose.position.y == pytest.approx(-0.50)
+
+        initial_scan_modes = harness.mode_commands.count('autonomous:scan360')
+        assert wait_until(
+            lambda: harness.mode_commands.count('autonomous:scan360')
+            > initial_scan_modes
+        ), harness.diagnostics()
+        harness.publish_workflow('autonomous', 'scan360', 'scan360', False)
+        assert wait_until(lambda: harness.scan_starts == 2), harness.diagnostics()
+
+        initial_monitors = harness.mode_commands.count('monitor_only')
+        assert wait_until(
+            lambda: harness.mode_commands.count('monitor_only')
+            > initial_monitors
+        ), harness.diagnostics()
+        harness.publish_workflow('monitor_only', 'idle', 'idle', False)
+        assert wait_until(lambda: harness.head_starts == 2), harness.diagnostics()
+        assert wait_until(result_future.done, timeout=20.0), harness.diagnostics()
+        wrapped = result_future.result()
+        assert wrapped.result.success
+        assert (
+            wrapped.result.result_code
+            == RunAutonomousMapping.Result.RESULT_SUCCEEDED
+        )
+        assert wrapped.result.map_saved
+        assert harness.map_saves == 1
+        assert harness.statuses[-1].state == AutonomousMappingStatus.STATE_COMPLETED
+        assert harness.statuses[-1].final_scan360_succeeded
+        assert harness.statuses[-1].final_head_scan_succeeded
+        assert harness.statuses[-1].return_to_start_succeeded
+        assert harness.statuses[-1].return_to_start_distance_m <= 0.35
+    finally:
+        harness.close()

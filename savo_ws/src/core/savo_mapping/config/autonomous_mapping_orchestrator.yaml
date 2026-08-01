@@ -40,6 +40,41 @@ autonomous_mapping_orchestrator_node:
       head_scan_resume_service: "/savo_head/resume_scan"
       head_scan_operation_timeout_s: 180.0
 
+    coverage:
+      enabled: true
+      required: true
+      request_plan_service: "/savo_mapping/coverage/request_plan"
+      reset_plan_service: "/savo_mapping/coverage/reset_plan"
+      planner_status_topic: "/savo_mapping/coverage/status"
+      operation_approve_service: "/savo_mapping/coverage_operation/approve"
+      operation_cancel_service: "/savo_mapping/coverage_operation/cancel"
+      operation_reset_service: "/savo_mapping/coverage_operation/reset"
+      operation_status_topic: "/savo_mapping/coverage_operation/status"
+      planning_timeout_s: 30.0
+      approval_timeout_s: 10.0
+      execution_timeout_s: 900.0
+      feedback_stale_timeout_s: 5.0
+      cancel_timeout_s: 10.0
+      maximum_restart_attempts: 2
+      require_fresh_map_generation: true
+
+    return_to_start:
+      enabled: true
+      action_name: "/savo_nav/navigation/navigate_to_pose"
+      server_wait_timeout_s: 3.0
+      goal_response_timeout_s: 3.0
+      execution_timeout_s: 180.0
+      feedback_stale_timeout_s: 5.0
+      cancel_timeout_s: 10.0
+      position_tolerance_m: 0.35
+      require_yaw_tolerance: false
+      yaw_tolerance_rad: 0.50
+      maximum_attempts: 2
+
+    final_sequence:
+      require_final_scan360: true
+      require_final_head_scan: true
+
     save:
       map_session_service: "/savo_mapping/map_session/save"
       operation_timeout_s: 45.0

@@ -13,7 +13,7 @@ def read(relative: str) -> str:
 
 
 def test_autonomous_mapping_launch_composes_all_core_owners() -> None:
-    """AM-5 includes each package that owns part of autonomous mapping."""
+    """AM-7 includes each package that owns part of autonomous mapping."""
     launch = read("launch/autonomous_mapping.launch.py")
 
     compile(
@@ -82,13 +82,18 @@ def test_autonomous_mapping_launch_is_fail_closed_by_default() -> None:
     assert '"start_location_lifecycle"' in launch
     assert '"start_semantic_interruption"' in launch
     assert '"locations_database_path"' in launch
+    assert '"coverage_enabled"' in launch
+    assert '"coverage_execution_handoff_params_file"' in launch
+    assert '"coverage_operation_params_file"' in launch
+    assert '"final_scan360_required"' in launch
+    assert '"final_head_scan_required"' in launch
     assert '"start_head_action": "true"' in launch
     assert '"start_registration": "true"' in launch
     assert '"start_locations": "true"' in launch
 
 
 def test_bringup_installs_am4_and_runtime_dependencies() -> None:
-    """The installed bringup package contains AM-5 and its package owners."""
+    """The installed bringup package contains AM-7 and its package owners."""
     tree = ET.parse(ROOT / "package.xml")
     package = tree.getroot()
     setup_py = read("setup.py")

@@ -491,13 +491,16 @@ def test_node_has_no_execution_or_hardware_authority() -> None:
     for forbidden in (
         'async_send_goal',
         'create_client<',
-        'create_service<',
         '/odometry/filtered',
         '/dev/',
         'serial_port',
         'libusb',
     ):
         assert forbidden not in source, forbidden
+
+    assert 'create_service<std_srvs::srv::Trigger>' in source
+    assert '/savo_mapping/coverage/request_plan' in source
+    assert '/savo_mapping/coverage/reset_plan' in source
 
     implementation_header = re.compile(
         r'#include\s*[<"]savo_(?:base|control|perception|lidar|'

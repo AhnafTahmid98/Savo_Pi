@@ -40,7 +40,7 @@ def _validate_arguments(context):
     return [
         LogInfo(
             msg=(
-                "Robot Savo AM-5 launch validated: "
+                "Robot Savo AM-7 launch validated: "
                 f"map_id={map_id}, control_startup_mode={control_mode}"
             )
         ),
@@ -53,7 +53,7 @@ def _validate_arguments(context):
         ),
         LogInfo(
             msg=(
-                "savo_description is intentionally external to AM-5 until "
+                "savo_description is intentionally external to AM-7 until "
                 "AM-0B locks real dimensions, sensor transforms, and STL "
                 "meshes. Mapping readiness remains fail-closed on TF."
             )
@@ -236,6 +236,28 @@ def generate_launch_description() -> LaunchDescription:
             "semantic_interruption_enabled": LaunchConfiguration(
                 "start_semantic_interruption"
             ),
+            "coverage_enabled": LaunchConfiguration("coverage_enabled"),
+            "coverage_params_file": LaunchConfiguration(
+                "coverage_params_file"
+            ),
+            "coverage_profile_file": LaunchConfiguration(
+                "coverage_profile_file"
+            ),
+            "coverage_use_real_robot_profile": LaunchConfiguration(
+                "coverage_use_real_robot_profile"
+            ),
+            "coverage_execution_handoff_params_file": LaunchConfiguration(
+                "coverage_execution_handoff_params_file"
+            ),
+            "coverage_operation_params_file": LaunchConfiguration(
+                "coverage_operation_params_file"
+            ),
+            "final_scan360_required": LaunchConfiguration(
+                "final_scan360_required"
+            ),
+            "final_head_scan_required": LaunchConfiguration(
+                "final_head_scan_required"
+            ),
         }.items(),
     )
 
@@ -263,6 +285,31 @@ def generate_launch_description() -> LaunchDescription:
             FindPackageShare("savo_mapping"),
             "config",
             "slam_toolbox_mapping.yaml",
+        ]
+    )
+    default_coverage_params = PathJoinSubstitution(
+        [FindPackageShare("savo_mapping"), "config", "coverage_mapping.yaml"]
+    )
+    default_coverage_profile = PathJoinSubstitution(
+        [
+            FindPackageShare("savo_mapping"),
+            "config",
+            "profiles",
+            "coverage_mapping_real_robot.yaml",
+        ]
+    )
+    default_coverage_handoff = PathJoinSubstitution(
+        [
+            FindPackageShare("savo_mapping"),
+            "config",
+            "coverage_execution_handoff.yaml",
+        ]
+    )
+    default_coverage_operation = PathJoinSubstitution(
+        [
+            FindPackageShare("savo_mapping"),
+            "config",
+            "coverage_operation_orchestrator.yaml",
         ]
     )
 
@@ -413,6 +460,30 @@ def generate_launch_description() -> LaunchDescription:
                 default_value=default_slam_params,
             ),
             DeclareLaunchArgument("slam_autostart", default_value="true"),
+            DeclareLaunchArgument("coverage_enabled", default_value="true"),
+            DeclareLaunchArgument(
+                "coverage_params_file", default_value=default_coverage_params
+            ),
+            DeclareLaunchArgument(
+                "coverage_profile_file", default_value=default_coverage_profile
+            ),
+            DeclareLaunchArgument(
+                "coverage_use_real_robot_profile", default_value="true"
+            ),
+            DeclareLaunchArgument(
+                "coverage_execution_handoff_params_file",
+                default_value=default_coverage_handoff,
+            ),
+            DeclareLaunchArgument(
+                "coverage_operation_params_file",
+                default_value=default_coverage_operation,
+            ),
+            DeclareLaunchArgument(
+                "final_scan360_required", default_value="true"
+            ),
+            DeclareLaunchArgument(
+                "final_head_scan_required", default_value="true"
+            ),
             OpaqueFunction(function=_validate_arguments),
             base_launch,
             lidar_launch,

@@ -208,6 +208,8 @@ class RuntimeHarness:
             '-p', 'sequence.require_start_pose_capture:=false',
             '-p', 'sequence.require_initial_scan360:=false',
             '-p', 'sequence.require_initial_head_scan:=false',
+            '-p', 'coverage.enabled:=false',
+            '-p', 'coverage.required:=false',
             '-p', f'mode_command_topic:={self.mode_command_topic}',
             '-p', f'start_session_command_topic:={self.start_session_topic}',
             '-p', f'cancel_session_command_topic:={self.cancel_session_topic}',

@@ -110,6 +110,10 @@ struct MissionInputs
   bool require_start_pose_capture{true};
   bool require_initial_scan360{true};
   bool require_initial_head_scan{true};
+  bool require_coverage{true};
+  bool require_return_to_start{true};
+  bool require_final_scan360{true};
+  bool require_final_head_scan{true};
 
   std::uint64_t start_pose_generation{0};
   bool start_pose_capture_started{false};
@@ -146,6 +150,41 @@ struct MissionInputs
   bool completion_candidate{false};
   bool completion_confirmed{false};
   std::string completion_reason{"completion_not_observed"};
+
+  std::uint64_t coverage_plan_generation{0};
+  std::uint64_t coverage_map_generation{0};
+  bool coverage_planning_started{false};
+  bool coverage_planning_complete{false};
+  bool coverage_plan_valid{false};
+  bool coverage_plan_noop{false};
+  std::uint32_t coverage_total_waypoints{0};
+  bool coverage_approval_pending{false};
+  bool coverage_execution_started{false};
+  bool coverage_execution_active{false};
+  bool coverage_execution_complete{false};
+  bool coverage_execution_succeeded{false};
+  bool coverage_supervisor_authorized{false};
+  std::string coverage_mission_id;
+  std::string coverage_state{"idle"};
+  std::string coverage_reason{"coverage_not_requested"};
+  std::uint32_t coverage_current_waypoint{0};
+  std::uint32_t coverage_completed_waypoints{0};
+  double coverage_completion_ratio{0.0};
+  double coverage_remaining_distance_m{0.0};
+  std::uint32_t coverage_restart_attempts{0};
+  std::uint32_t coverage_maximum_restart_attempts{2};
+
+  bool return_to_start_started{false};
+  bool return_to_start_active{false};
+  bool return_to_start_complete{false};
+  bool return_to_start_succeeded{false};
+  bool return_proximity_verified{false};
+  bool return_within_tolerance{false};
+  double return_to_start_distance_m{0.0};
+  std::string return_to_start_state{"idle"};
+  std::string return_to_start_reason{"return_not_requested"};
+  std::uint32_t return_to_start_attempts{0};
+  std::uint32_t return_to_start_maximum_attempts{2};
 
   bool map_save_started{false};
   bool map_save_complete{false};
@@ -216,6 +255,39 @@ struct MissionSnapshot
   bool completion_confirmed{false};
   std::string completion_reason{"completion_not_observed"};
 
+  bool coverage_planning_started{false};
+  bool coverage_planning_complete{false};
+  bool coverage_plan_valid{false};
+  std::uint64_t coverage_plan_generation{0};
+  std::uint64_t coverage_map_generation{0};
+  std::uint32_t coverage_total_waypoints{0};
+  bool coverage_execution_started{false};
+  bool coverage_execution_active{false};
+  bool coverage_execution_complete{false};
+  bool coverage_execution_succeeded{false};
+  std::string coverage_mission_id;
+  std::string coverage_state{"idle"};
+  std::string coverage_reason{"coverage_not_requested"};
+  std::uint32_t coverage_current_waypoint{0};
+  std::uint32_t coverage_completed_waypoints{0};
+  double coverage_completion_ratio{0.0};
+  double coverage_remaining_distance_m{0.0};
+  std::uint32_t coverage_restart_attempts{0};
+
+  bool return_to_start_started{false};
+  bool return_to_start_active{false};
+  bool return_to_start_complete{false};
+  bool return_to_start_succeeded{false};
+  double return_to_start_distance_m{0.0};
+  std::string return_to_start_state{"idle"};
+  std::string return_to_start_reason{"return_not_requested"};
+  std::uint32_t return_to_start_attempts{0};
+
+  bool final_scan360_complete{false};
+  bool final_scan360_succeeded{false};
+  bool final_head_scan_complete{false};
+  bool final_head_scan_succeeded{false};
+
   bool map_save_started{false};
   bool map_save_complete{false};
   bool map_saved{false};
@@ -245,6 +317,13 @@ struct MissionDecision
   bool request_head_scan_start{false};
   bool request_head_scan_pause{false};
   bool request_head_scan_resume{false};
+  bool request_coverage_plan_reset{false};
+  bool request_coverage_plan{false};
+  bool request_coverage_approve{false};
+  bool request_coverage_cancel{false};
+  bool request_coverage_reset{false};
+  bool request_return_to_start{false};
+  bool request_return_cancel{false};
   bool request_cancel_session{false};
   bool request_start_pose_capture{false};
   bool request_map_save{false};
@@ -294,6 +373,10 @@ private:
   MissionDecision evaluate_scan360_stage(const MissionInputs & inputs);
   MissionDecision evaluate_head_scan_stage(const MissionInputs & inputs);
   MissionDecision evaluate_frontier_entry(const MissionInputs & inputs);
+  MissionDecision evaluate_coverage_pending(const MissionInputs & inputs);
+  MissionDecision evaluate_coverage(const MissionInputs & inputs);
+  MissionDecision evaluate_return_to_start(const MissionInputs & inputs);
+  MissionDecision enter_post_coverage(const MissionInputs & inputs);
   MissionDecision fail(
     MissionResult result,
     std::string reason);
@@ -337,6 +420,7 @@ private:
   std::uint64_t start_pose_generation_floor_{0};
   std::uint64_t scan360_generation_floor_{0};
   std::uint64_t head_scan_generation_floor_{0};
+  std::uint64_t coverage_plan_generation_floor_{0};
 
   bool start_pose_captured_{false};
   bool initial_scan360_completed_{false};
