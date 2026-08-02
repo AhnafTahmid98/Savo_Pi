@@ -941,10 +941,10 @@ using ValidationResult = std::optional<ValidationFailure>;
     return error;
   }
   if (result.operation != "pause" && result.operation != "resume" &&
-    result.operation != "cancel")
+    result.operation != "cancel" && result.operation != "request_scan360")
   {
     return ValidationFailure{ErrorCode::InvalidPayload,
-      "mapping operation must be pause, resume, or cancel"};
+      "mapping operation must be pause, resume, cancel, or request_scan360"};
   }
   if (const auto error = validate_reason(result.reason)) {
     return error;

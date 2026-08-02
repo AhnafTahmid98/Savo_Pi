@@ -2,8 +2,11 @@
 #ifndef SAVO_SPEECH__SPEECH_NODE_HPP_
 #define SAVO_SPEECH__SPEECH_NODE_HPP_
 
+#include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <memory>
+#include <mutex>
 #include <string>
 
 #include "savo_speech/session/speech_error.hpp"
@@ -19,6 +22,8 @@
 #include "savo_speech/drivers/alsa_playback_stream.hpp"
 #include "savo_speech/session/completed_utterance_worker.hpp"
 #include "savo_speech/session/utterance_session_processor.hpp"
+#include "savo_speech/transport/savomind_round_trip_worker.hpp"
+#include "savo_speech/transport/savomind_transport.hpp"
 #include "savo_speech/vad/adaptive_energy_vad_backend.hpp"
 #include "savo_speech/vad/vad_processor.hpp"
 #include "savo_speech/wake_word/pocketsphinx_wake_word_backend.hpp"
@@ -149,6 +154,19 @@ private:
       utterance_serialization_maximum_wav_bytes{
       2 * 1024 * 1024};
 
+    bool savomind_enabled{true};
+    bool savomind_required{true};
+    std::string savomind_socket_path{"/run/savomind/speech.sock"};
+    std::int64_t savomind_connect_timeout_ms{1500};
+    std::int64_t savomind_io_timeout_ms{30000};
+    std::int64_t savomind_source_wait_timeout_ms{100};
+    std::int64_t savomind_playback_timeout_ms{60000};
+    std::int64_t savomind_maximum_request_bytes{2 * 1024 * 1024};
+    std::int64_t savomind_maximum_response_bytes{16 * 1024 * 1024};
+    std::int64_t savomind_maximum_text_bytes{8192};
+    bool savomind_require_server_uid{false};
+    std::int64_t savomind_server_uid{10001};
+
     double status_publish_rate_hz{2.0};
     double heartbeat_rate_hz{1.0};
   };
@@ -161,9 +179,14 @@ private:
 
   void initialize_audio_runtime();
   void shutdown_audio_runtime() noexcept;
+  void initialize_savomind_runtime();
+  void shutdown_savomind_runtime() noexcept;
+  void enqueue_savomind_event(const transport::RoundTripEvent & event);
+  void process_savomind_events();
   void refresh_runtime_state();
 
   void publish_runtime_status();
+  void publish_speech_state();
   void publish_heartbeat();
 
   [[nodiscard]] std::string readiness_text() const;
@@ -226,6 +249,16 @@ private:
     session::CompletedUtteranceWorker>
   completed_utterance_worker_;
 
+  std::unique_ptr<transport::UnixSocketSavoMindTransport>
+  savomind_transport_;
+
+  std::unique_ptr<transport::SavoMindRoundTripWorker>
+  savomind_round_trip_worker_;
+
+  mutable std::mutex savomind_event_mutex_;
+  std::deque<transport::RoundTripEvent> savomind_events_;
+  transport::RoundTripSnapshot savomind_snapshot_{};
+
   std::unique_ptr<audio::CapturedAudioProcessorChain>
   captured_audio_processor_chain_;
 
@@ -240,6 +273,19 @@ private:
 
   rclcpp::Publisher<std_msgs::msg::UInt64>::SharedPtr
     heartbeat_publisher_;
+
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr
+    state_publisher_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr
+    transcript_publisher_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr
+    response_publisher_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr
+    playback_state_publisher_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr
+    playback_finished_publisher_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr
+    result_publisher_;
 
   rclcpp::Publisher<
     diagnostic_msgs::msg::DiagnosticArray>::SharedPtr

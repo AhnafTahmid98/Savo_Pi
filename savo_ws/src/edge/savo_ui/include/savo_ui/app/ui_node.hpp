@@ -9,10 +9,15 @@
 #include <vector>
 
 #include <rclcpp/rclcpp.hpp>
+#include <savo_msgs/msg/autonomous_mapping_status.hpp>
+#include <savo_msgs/msg/location_event.hpp>
+#include <std_msgs/msg/bool.hpp>
+#include <std_msgs/msg/string.hpp>
+
 #include "savo_ui/platform/framebuffer_display.hpp"
 #include "savo_ui/render/canvas.hpp"
 #include "savo_ui/render/image_asset.hpp"
-#include <std_msgs/msg/string.hpp>
+
 
 namespace savo_ui
 {
@@ -240,8 +245,13 @@ struct UiNodeConfig
   std::string mode_state_topic{"/savo_control/mode_state"};
   std::string safety_state_topic{"/savo_perception/safety_state"};
   std::string navigation_state_topic{"/savo_nav/status"};
-  std::string mapping_state_topic{"/savo_mapping/status"};
+  std::string mapping_state_topic{"/savo_mapping/autonomous/status"};
   std::string locations_state_topic{"/savo_locations/status"};
+  std::string location_events_topic{"/savo_locations/events"};
+  std::string bridge_state_topic{"/savo_bridge/state"};
+  std::string bridge_readiness_topic{"/savo_bridge/readiness"};
+  std::string playback_state_topic{"/savo_speech/playback/state"};
+  std::string playback_finished_topic{"/savo_speech/playback/finished"};
   std::string speech_state_topic{"/savo_speech/state"};
   std::string speech_readiness_topic{"/savo_speech/readiness"};
   std::string transcript_topic{"/savo_speech/transcript"};
@@ -287,6 +297,9 @@ private:
   void configure_power_subscriptions();
   void configure_live_subscriptions();
   void update_live_state(const std::string & channel, const std::string & text);
+  void update_mapping_status(
+    const savo_msgs::msg::AutonomousMappingStatus & message);
+  void update_location_event(const savo_msgs::msg::LocationEvent & message);
 
   void update_power_source(
     PowerUiSourceState & source,
@@ -365,6 +378,12 @@ private:
     power_status_subscription_;
   std::vector<rclcpp::Subscription<std_msgs::msg::String>::SharedPtr>
   live_subscriptions_;
+  rclcpp::Subscription<savo_msgs::msg::AutonomousMappingStatus>::SharedPtr
+    mapping_status_subscription_;
+  rclcpp::Subscription<savo_msgs::msg::LocationEvent>::SharedPtr
+    location_event_subscription_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr
+    bridge_readiness_subscription_;
 
   UiScreen active_screen_{UiScreen::Intro};
   VoicePhase voice_phase_{VoicePhase::Idle};

@@ -1,5 +1,8 @@
 // Copyright 2026 Ahnaf Tahmid
+#include "savo_speech/speech_node.hpp"
+
 #include <chrono>
+#include <cinttypes>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -12,11 +15,10 @@
 #include <string_view>
 #include <utility>
 
-#include "savo_speech/speech_node.hpp"
-
 #include "ament_index_cpp/get_package_share_directory.hpp"
 #include "diagnostic_msgs/msg/diagnostic_status.hpp"
 #include "diagnostic_msgs/msg/key_value.hpp"
+
 #include "savo_speech/audio/audio_format.hpp"
 #include "savo_speech/constants.hpp"
 #include "savo_speech/ros/topic_names.hpp"
@@ -247,6 +249,19 @@ SpeechNode::SpeechNode(
     owned_string(ros::topics::kDiagnostics),
     runtime_qos());
 
+  state_publisher_ = create_publisher<std_msgs::msg::String>(
+    owned_string(ros::topics::kState), state_qos());
+  transcript_publisher_ = create_publisher<std_msgs::msg::String>(
+    owned_string(ros::topics::kTranscript), runtime_qos());
+  response_publisher_ = create_publisher<std_msgs::msg::String>(
+    owned_string(ros::topics::kResponse), runtime_qos());
+  playback_state_publisher_ = create_publisher<std_msgs::msg::String>(
+    owned_string(ros::topics::kPlaybackState), state_qos());
+  playback_finished_publisher_ = create_publisher<std_msgs::msg::String>(
+    owned_string(ros::topics::kPlaybackFinished), runtime_qos());
+  result_publisher_ = create_publisher<std_msgs::msg::String>(
+    owned_string(ros::topics::kResult), runtime_qos());
+
   configure_initial_state();
 
   status_timer_ = create_wall_timer(
@@ -280,6 +295,7 @@ SpeechNode::~SpeechNode()
   phase_ = session::SpeechPhase::ShuttingDown;
   ready_ = false;
 
+  shutdown_savomind_runtime();
   shutdown_audio_runtime();
 }
 
@@ -537,6 +553,22 @@ void SpeechNode::declare_parameters()
     "utterance_serialization.maximum_wav_bytes",
     2 * 1024 * 1024);
 
+  declare_parameter<bool>("savomind.enabled", true);
+  declare_parameter<bool>("savomind.required", true);
+  declare_parameter<std::string>(
+    "savomind.socket_path", "/run/savomind/speech.sock");
+  declare_parameter<std::int64_t>("savomind.connect_timeout_ms", 1500);
+  declare_parameter<std::int64_t>("savomind.io_timeout_ms", 30000);
+  declare_parameter<std::int64_t>("savomind.source_wait_timeout_ms", 100);
+  declare_parameter<std::int64_t>("savomind.playback_timeout_ms", 60000);
+  declare_parameter<std::int64_t>(
+    "savomind.maximum_request_bytes", 2 * 1024 * 1024);
+  declare_parameter<std::int64_t>(
+    "savomind.maximum_response_bytes", 16 * 1024 * 1024);
+  declare_parameter<std::int64_t>("savomind.maximum_text_bytes", 8192);
+  declare_parameter<bool>("savomind.require_server_uid", false);
+  declare_parameter<std::int64_t>("savomind.server_uid", 10001);
+
   declare_parameter<double>(
     "diagnostics.status_publish_rate_hz",
     constants::kDefaultStatusPublishRateHz);
@@ -782,6 +814,27 @@ void SpeechNode::load_parameters()
     get_parameter(
     "utterance_serialization.maximum_wav_bytes").
     as_int();
+
+  config_.savomind_enabled = get_parameter("savomind.enabled").as_bool();
+  config_.savomind_required = get_parameter("savomind.required").as_bool();
+  config_.savomind_socket_path = get_parameter("savomind.socket_path").as_string();
+  config_.savomind_connect_timeout_ms =
+    get_parameter("savomind.connect_timeout_ms").as_int();
+  config_.savomind_io_timeout_ms =
+    get_parameter("savomind.io_timeout_ms").as_int();
+  config_.savomind_source_wait_timeout_ms =
+    get_parameter("savomind.source_wait_timeout_ms").as_int();
+  config_.savomind_playback_timeout_ms =
+    get_parameter("savomind.playback_timeout_ms").as_int();
+  config_.savomind_maximum_request_bytes =
+    get_parameter("savomind.maximum_request_bytes").as_int();
+  config_.savomind_maximum_response_bytes =
+    get_parameter("savomind.maximum_response_bytes").as_int();
+  config_.savomind_maximum_text_bytes =
+    get_parameter("savomind.maximum_text_bytes").as_int();
+  config_.savomind_require_server_uid =
+    get_parameter("savomind.require_server_uid").as_bool();
+  config_.savomind_server_uid = get_parameter("savomind.server_uid").as_int();
 
   config_.status_publish_rate_hz =
     get_parameter(
@@ -1216,6 +1269,46 @@ void SpeechNode::validate_parameters() const
       config_.sample_rate_hz,
       config_.pre_roll_ms));
 
+  if (config_.savomind_enabled) {
+    if (!config_.utterance_serialization_enabled) {
+      throw std::invalid_argument{
+              "savomind.enabled requires utterance_serialization.enabled=true"};
+    }
+    validate_non_empty(config_.savomind_socket_path, "savomind.socket_path");
+    if (config_.savomind_socket_path.front() != '/') {
+      throw std::invalid_argument{"savomind.socket_path must be absolute"};
+    }
+    validate_integer_range(
+      config_.savomind_connect_timeout_ms, 1, 60000,
+      "savomind.connect_timeout_ms");
+    validate_integer_range(
+      config_.savomind_io_timeout_ms, 1, 300000,
+      "savomind.io_timeout_ms");
+    validate_integer_range(
+      config_.savomind_source_wait_timeout_ms, 1, 5000,
+      "savomind.source_wait_timeout_ms");
+    validate_integer_range(
+      config_.savomind_playback_timeout_ms, 1000, 600000,
+      "savomind.playback_timeout_ms");
+    validate_integer_range(
+      config_.savomind_maximum_request_bytes, 44, 64 * 1024 * 1024,
+      "savomind.maximum_request_bytes");
+    validate_integer_range(
+      config_.savomind_maximum_response_bytes, 44, 64 * 1024 * 1024,
+      "savomind.maximum_response_bytes");
+    validate_integer_range(
+      config_.savomind_maximum_text_bytes, 1, 1024 * 1024,
+      "savomind.maximum_text_bytes");
+    if (config_.savomind_maximum_text_bytes >
+      config_.savomind_maximum_response_bytes)
+    {
+      throw std::invalid_argument{
+              "savomind.maximum_text_bytes exceeds maximum_response_bytes"};
+    }
+    validate_integer_range(
+      config_.savomind_server_uid, 0, 2147483647, "savomind.server_uid");
+  }
+
   validate_rate(
     config_.status_publish_rate_hz,
     "diagnostics.status_publish_rate_hz");
@@ -1628,18 +1721,18 @@ void SpeechNode::initialize_audio_runtime()
         RCLCPP_INFO(
           get_logger(),
           "Utterance-session processor ready: "
-          "required=%s pre_roll_ms=%ld "
-          "speech_start_timeout_ms=%ld "
-          "maximum_duration_ms=%ld",
+          "required=%s pre_roll_ms=%" PRId64 " "
+          "speech_start_timeout_ms=%" PRId64 " "
+          "maximum_duration_ms=%" PRId64,
           bool_text(
             config_.
             utterance_session_required).c_str(),
-          static_cast<long>(
+          static_cast<std::int64_t>(
             config_.utterance_session_pre_roll_ms),
-          static_cast<long>(
+          static_cast<std::int64_t>(
             config_.
             utterance_session_speech_start_timeout_ms),
-          static_cast<long>(
+          static_cast<std::int64_t>(
             config_.
             utterance_session_maximum_duration_ms));
       } catch (const std::exception & exception) {
@@ -1705,19 +1798,19 @@ void SpeechNode::initialize_audio_runtime()
         RCLCPP_INFO(
           get_logger(),
           "Completed-utterance worker ready: "
-          "required=%s output_queue_capacity=%ld "
-          "source_wait_timeout_ms=%ld "
-          "maximum_wav_bytes=%ld",
+          "required=%s output_queue_capacity=%" PRId64 " "
+          "source_wait_timeout_ms=%" PRId64 " "
+          "maximum_wav_bytes=%" PRId64,
           bool_text(
             config_.
             utterance_serialization_required).c_str(),
-          static_cast<long>(
+          static_cast<std::int64_t>(
             config_.
             utterance_serialization_output_queue_capacity),
-          static_cast<long>(
+          static_cast<std::int64_t>(
             config_.
             utterance_serialization_source_wait_timeout_ms),
-          static_cast<long>(
+          static_cast<std::int64_t>(
             config_.
             utterance_serialization_maximum_wav_bytes));
       } catch (const std::exception & exception) {
@@ -1745,6 +1838,8 @@ void SpeechNode::initialize_audio_runtime()
           c_str());
       }
     }
+
+    initialize_savomind_runtime();
 
     const bool processor_chain_sealed =
       captured_audio_processor_chain_->seal();
@@ -1788,15 +1883,16 @@ void SpeechNode::initialize_audio_runtime()
     RCLCPP_INFO(
       get_logger(),
       "Audio runtime ready: capture=%s playback=%s "
-      "rate=%ld capture_channels=%ld playback_channels=%ld "
-      "selected_channel=%ld period_frames=%ld",
+      "rate=%" PRId64 " capture_channels=%" PRId64
+      " playback_channels=%" PRId64 " selected_channel=%" PRId64
+      " period_frames=%" PRId64,
       config_.capture_device.c_str(),
       config_.playback_device.c_str(),
-      static_cast<long>(config_.sample_rate_hz),
-      static_cast<long>(config_.capture_channels),
-      static_cast<long>(config_.playback_channels),
-      static_cast<long>(config_.selected_channel),
-      static_cast<long>(config_.period_frames));
+      static_cast<std::int64_t>(config_.sample_rate_hz),
+      static_cast<std::int64_t>(config_.capture_channels),
+      static_cast<std::int64_t>(config_.playback_channels),
+      static_cast<std::int64_t>(config_.selected_channel),
+      static_cast<std::int64_t>(config_.period_frames));
   } catch (const std::exception & exception) {
     shutdown_audio_runtime();
 
@@ -1817,8 +1913,205 @@ void SpeechNode::initialize_audio_runtime()
   }
 }
 
+void SpeechNode::initialize_savomind_runtime()
+{
+  shutdown_savomind_runtime();
+  savomind_initialized_ = false;
+
+  if (!config_.savomind_enabled) {
+    return;
+  }
+
+  if (!completed_utterance_worker_ || !audio_runtime_) {
+    if (config_.savomind_required) {
+      throw std::runtime_error{
+              "required SavoMind transport needs utterance serialization and audio runtime"};
+    }
+    return;
+  }
+
+  transport::UnixSocketConfig socket_config;
+  socket_config.socket_path = config_.savomind_socket_path;
+  socket_config.connect_timeout = std::chrono::milliseconds{
+    config_.savomind_connect_timeout_ms};
+  socket_config.io_timeout = std::chrono::milliseconds{
+    config_.savomind_io_timeout_ms};
+  socket_config.limits.maximum_request_bytes = static_cast<std::size_t>(
+    config_.savomind_maximum_request_bytes);
+  socket_config.limits.maximum_response_bytes = static_cast<std::size_t>(
+    config_.savomind_maximum_response_bytes);
+  socket_config.limits.maximum_text_bytes = static_cast<std::size_t>(
+    config_.savomind_maximum_text_bytes);
+  socket_config.limits.required_sample_rate_hz = static_cast<std::uint32_t>(
+    config_.sample_rate_hz);
+  socket_config.limits.required_channels = static_cast<std::uint16_t>(
+    config_.playback_channels);
+  socket_config.limits.required_bits_per_sample = 16U;
+  if (config_.savomind_require_server_uid) {
+    socket_config.required_server_uid = static_cast<std::uint32_t>(
+      config_.savomind_server_uid);
+  }
+
+  savomind_transport_ =
+    std::make_unique<transport::UnixSocketSavoMindTransport>(socket_config);
+
+  transport::RoundTripConfig worker_config;
+  worker_config.request_prefix = config_.device_id;
+  worker_config.source_wait_timeout = std::chrono::milliseconds{
+    config_.savomind_source_wait_timeout_ms};
+  worker_config.playback_completion_timeout = std::chrono::milliseconds{
+    config_.savomind_playback_timeout_ms};
+  worker_config.maximum_tts_wav_bytes = static_cast<std::size_t>(
+    config_.savomind_maximum_response_bytes);
+
+  savomind_round_trip_worker_ =
+    std::make_unique<transport::SavoMindRoundTripWorker>(
+    *completed_utterance_worker_,
+    *savomind_transport_,
+    *audio_runtime_,
+    worker_config,
+    [this](const transport::RoundTripEvent & event) {
+      enqueue_savomind_event(event);
+    });
+
+  if (!savomind_round_trip_worker_->start()) {
+    throw std::runtime_error{"SavoMind round-trip worker refused to start"};
+  }
+
+  savomind_initialized_ = savomind_transport_->healthy();
+  RCLCPP_INFO(
+    get_logger(),
+    "SavoMind speech client ready: socket=%s required=%s endpoint_present=%s",
+    config_.savomind_socket_path.c_str(),
+    bool_text(config_.savomind_required).c_str(),
+    bool_text(savomind_initialized_).c_str());
+}
+
+void SpeechNode::shutdown_savomind_runtime() noexcept
+{
+  if (savomind_round_trip_worker_) {
+    savomind_round_trip_worker_->stop();
+  }
+  savomind_round_trip_worker_.reset();
+  savomind_transport_.reset();
+  {
+    std::lock_guard<std::mutex> lock{savomind_event_mutex_};
+    savomind_events_.clear();
+  }
+  savomind_snapshot_ = transport::RoundTripSnapshot{};
+  savomind_initialized_ = false;
+}
+
+void SpeechNode::enqueue_savomind_event(
+  const transport::RoundTripEvent & event)
+{
+  std::lock_guard<std::mutex> lock{savomind_event_mutex_};
+  constexpr std::size_t maximum_events = 32U;
+  if (savomind_events_.size() >= maximum_events) {
+    savomind_events_.pop_front();
+  }
+  savomind_events_.push_back(event);
+}
+
+void SpeechNode::process_savomind_events()
+{
+  std::deque<transport::RoundTripEvent> events;
+  {
+    std::lock_guard<std::mutex> lock{savomind_event_mutex_};
+    events.swap(savomind_events_);
+  }
+
+  for (const auto & event : events) {
+    savomind_snapshot_.state = event.state;
+    savomind_snapshot_.active_request_id = event.request_id;
+    if (event.utterance_id != 0U) {
+      savomind_snapshot_.active_utterance_id = event.utterance_id;
+    } else {
+      savomind_snapshot_.active_utterance_id.reset();
+    }
+    if (!event.transcript.empty()) {
+      savomind_snapshot_.last_transcript = event.transcript;
+      std_msgs::msg::String message;
+      message.data = event.transcript;
+      transcript_publisher_->publish(message);
+    }
+    if (!event.reply.empty()) {
+      savomind_snapshot_.last_reply = event.reply;
+      std_msgs::msg::String message;
+      message.data = event.reply;
+      response_publisher_->publish(message);
+    }
+
+    std_msgs::msg::String playback;
+    playback.data = "state=" + std::string{transport::to_string(event.state)} +
+    ";request_id=" + event.request_id + ";reason=" + event.reason;
+    playback_state_publisher_->publish(playback);
+
+    switch (event.state) {
+      case transport::RoundTripState::Sending:
+      case transport::RoundTripState::AwaitingResponse:
+      case transport::RoundTripState::EnqueueingPlayback:
+      case transport::RoundTripState::AcknowledgingPlayback:
+        phase_ = session::SpeechPhase::Processing;
+        error_ = session::SpeechError::None;
+        reason_ = playback.data;
+        break;
+      case transport::RoundTripState::Playing:
+        phase_ = session::SpeechPhase::Speaking;
+        error_ = session::SpeechError::None;
+        reason_ = playback.data;
+        break;
+      case transport::RoundTripState::Completed:
+        {
+          phase_ = session::SpeechPhase::Idle;
+          error_ = session::SpeechError::None;
+          reason_ = "savomind_round_trip_completed";
+          std_msgs::msg::String finished;
+          finished.data = "request_id=" + event.request_id + ";status=completed";
+          playback_finished_publisher_->publish(finished);
+          result_publisher_->publish(finished);
+          break;
+        }
+      case transport::RoundTripState::Faulted:
+        {
+          phase_ = session::SpeechPhase::Error;
+          reason_ = event.reason.empty() ? "savomind_round_trip_failed" : event.reason;
+          if (reason_.find("timeout") != std::string::npos) {
+            error_ = session::SpeechError::SavoMindTimeout;
+          } else if (
+            reason_.find("socket") != std::string::npos ||
+            reason_.find("connect") != std::string::npos ||
+            reason_.find("unavailable") != std::string::npos)
+          {
+            error_ = session::SpeechError::SavoMindUnavailable;
+          } else {
+            error_ = session::SpeechError::SavoMindInvalidResponse;
+          }
+          std_msgs::msg::String result;
+          result.data = "request_id=" + event.request_id +
+            ";status=failed;reason=" + reason_;
+          result_publisher_->publish(result);
+          break;
+        }
+      case transport::RoundTripState::Stopped:
+      case transport::RoundTripState::Starting:
+      case transport::RoundTripState::Waiting:
+      case transport::RoundTripState::Canceling:
+        break;
+    }
+  }
+
+  if (savomind_round_trip_worker_) {
+    savomind_snapshot_ = savomind_round_trip_worker_->snapshot();
+  }
+  savomind_initialized_ =
+    !config_.savomind_enabled ||
+    (savomind_transport_ && savomind_transport_->healthy());
+}
+
 void SpeechNode::shutdown_audio_runtime() noexcept
 {
+  shutdown_savomind_runtime();
   if (capture_processing_dispatcher_) {
     capture_processing_dispatcher_->stop();
   }
@@ -1974,11 +2267,56 @@ void SpeechNode::refresh_runtime_state()
           return;
         }
 
-        ready_ = snapshot.ready;
         audio_initialized_ = snapshot.ready;
+        savomind_initialized_ =
+          !config_.savomind_enabled ||
+          (savomind_transport_ && savomind_transport_->healthy());
 
+        if (config_.savomind_required && !savomind_initialized_) {
+          ready_ = false;
+          phase_ = session::SpeechPhase::Error;
+          error_ = session::SpeechError::SavoMindUnavailable;
+          reason_ = "savomind_endpoint_unavailable";
+          return;
+        }
+
+        ready_ = snapshot.ready;
         error_ = session::SpeechError::None;
         reason_ = "audio_runtime_ready";
+
+        if (savomind_round_trip_worker_) {
+          savomind_snapshot_ = savomind_round_trip_worker_->snapshot();
+          switch (savomind_snapshot_.state) {
+            case transport::RoundTripState::Sending:
+            case transport::RoundTripState::AwaitingResponse:
+            case transport::RoundTripState::EnqueueingPlayback:
+            case transport::RoundTripState::AcknowledgingPlayback:
+              phase_ = session::SpeechPhase::Processing;
+              reason_ = "savomind_" +
+                std::string{transport::to_string(savomind_snapshot_.state)};
+              return;
+            case transport::RoundTripState::Playing:
+              phase_ = session::SpeechPhase::Speaking;
+              reason_ = "savomind_playing";
+              return;
+            case transport::RoundTripState::Canceling:
+              phase_ = session::SpeechPhase::Canceling;
+              reason_ = "savomind_canceling";
+              return;
+            case transport::RoundTripState::Faulted:
+              ready_ = false;
+              phase_ = session::SpeechPhase::Error;
+              error_ = session::SpeechError::SavoMindInvalidResponse;
+              reason_ = savomind_snapshot_.last_error.empty() ?
+                "savomind_round_trip_faulted" : savomind_snapshot_.last_error;
+              return;
+            case transport::RoundTripState::Stopped:
+            case transport::RoundTripState::Starting:
+            case transport::RoundTripState::Waiting:
+            case transport::RoundTripState::Completed:
+              break;
+          }
+        }
 
         switch (snapshot.microphone_gate.reason) {
           case audio::MicrophoneGateReason::Playback:
@@ -2061,6 +2399,7 @@ void SpeechNode::refresh_runtime_state()
 
 void SpeechNode::publish_runtime_status()
 {
+  process_savomind_events();
   refresh_runtime_state();
 
   std_msgs::msg::String readiness_message;
@@ -2071,8 +2410,22 @@ void SpeechNode::publish_runtime_status()
   dashboard_message.data = dashboard_text();
   dashboard_publisher_->publish(dashboard_message);
 
+  publish_speech_state();
+
   diagnostics_publisher_->publish(
     create_diagnostics());
+}
+
+void SpeechNode::publish_speech_state()
+{
+  std_msgs::msg::String state;
+  state.data = "phase=" + owned_string(session::to_string(phase_)) +
+    ";ready=" + bool_text(ready_) +
+    ";audio=" + bool_text(audio_initialized_) +
+    ";savomind=" + bool_text(savomind_initialized_) +
+    ";transport_state=" + std::string{transport::to_string(savomind_snapshot_.state)} +
+  ";reason=" + reason_;
+  state_publisher_->publish(state);
 }
 
 void SpeechNode::publish_heartbeat()
@@ -2482,6 +2835,39 @@ std::string SpeechNode::dashboard_text() const
       << utterance_serialization_initialization_error_;
   }
 
+  stream
+    << " savomind_transport_state="
+    << transport::to_string(savomind_snapshot_.state)
+    << " savomind_transport_healthy="
+    << bool_text(savomind_snapshot_.transport_healthy)
+    << " savomind_running="
+    << bool_text(savomind_snapshot_.running)
+    << " savomind_received="
+    << savomind_snapshot_.statistics.utterances_received
+    << " savomind_exchange_ok="
+    << savomind_snapshot_.statistics.exchanges_succeeded
+    << " savomind_exchange_failed="
+    << savomind_snapshot_.statistics.exchanges_failed
+    << " savomind_playback_enqueued="
+    << savomind_snapshot_.statistics.playback_enqueued
+    << " savomind_playback_completed="
+    << savomind_snapshot_.statistics.playback_completed
+    << " savomind_playback_failed="
+    << savomind_snapshot_.statistics.playback_failed
+    << " savomind_cancellations="
+    << savomind_snapshot_.statistics.cancellations;
+
+  if (!savomind_snapshot_.active_request_id.empty()) {
+    stream
+      << " savomind_active_request="
+      << savomind_snapshot_.active_request_id;
+  }
+  if (!savomind_snapshot_.last_error.empty()) {
+    stream
+      << " savomind_last_error="
+      << savomind_snapshot_.last_error;
+  }
+
   return stream.str();
 }
 
@@ -2570,6 +2956,76 @@ SpeechNode::create_diagnostics() const
 
   array.status.push_back(
     std::move(runtime_status));
+
+  diagnostic_msgs::msg::DiagnosticStatus savomind_status;
+  savomind_status.name = "savo_speech/savomind_transport";
+  savomind_status.hardware_id = config_.device_id;
+  savomind_status.values.push_back(
+    make_key_value("enabled", bool_text(config_.savomind_enabled)));
+  savomind_status.values.push_back(
+    make_key_value("required", bool_text(config_.savomind_required)));
+  savomind_status.values.push_back(
+    make_key_value("socket_path", config_.savomind_socket_path));
+  savomind_status.values.push_back(
+    make_key_value(
+      "protocol_version",
+      std::to_string(transport::SAVOMIND_SPEECH_PROTOCOL_VERSION)));
+  savomind_status.values.push_back(
+    make_key_value(
+      "state",
+      std::string{transport::to_string(savomind_snapshot_.state)}));
+  savomind_status.values.push_back(
+    make_key_value(
+      "transport_healthy",
+      bool_text(savomind_snapshot_.transport_healthy)));
+  savomind_status.values.push_back(
+    make_key_value(
+      "utterances_received",
+      std::to_string(savomind_snapshot_.statistics.utterances_received)));
+  savomind_status.values.push_back(
+    make_key_value(
+      "exchanges_succeeded",
+      std::to_string(savomind_snapshot_.statistics.exchanges_succeeded)));
+  savomind_status.values.push_back(
+    make_key_value(
+      "exchanges_failed",
+      std::to_string(savomind_snapshot_.statistics.exchanges_failed)));
+  savomind_status.values.push_back(
+    make_key_value(
+      "playback_completed",
+      std::to_string(savomind_snapshot_.statistics.playback_completed)));
+  savomind_status.values.push_back(
+    make_key_value(
+      "playback_failed",
+      std::to_string(savomind_snapshot_.statistics.playback_failed)));
+  savomind_status.values.push_back(
+    make_key_value(
+      "playback_acks_succeeded",
+      std::to_string(
+        savomind_snapshot_.statistics.playback_acks_succeeded)));
+  savomind_status.values.push_back(
+    make_key_value(
+      "playback_acks_failed",
+      std::to_string(
+        savomind_snapshot_.statistics.playback_acks_failed)));
+  savomind_status.values.push_back(
+    make_key_value("last_error", savomind_snapshot_.last_error));
+
+  if (!config_.savomind_enabled) {
+    savomind_status.level = diagnostic_msgs::msg::DiagnosticStatus::WARN;
+    savomind_status.message = "disabled";
+  } else if (savomind_initialized_) {
+    savomind_status.level = diagnostic_msgs::msg::DiagnosticStatus::OK;
+    savomind_status.message = "connected";
+  } else if (config_.savomind_required) {
+    savomind_status.level = diagnostic_msgs::msg::DiagnosticStatus::ERROR;
+    savomind_status.message = savomind_snapshot_.last_error.empty() ?
+      "required_endpoint_unavailable" : savomind_snapshot_.last_error;
+  } else {
+    savomind_status.level = diagnostic_msgs::msg::DiagnosticStatus::WARN;
+    savomind_status.message = "optional_endpoint_unavailable";
+  }
+  array.status.push_back(std::move(savomind_status));
 
   diagnostic_msgs::msg::DiagnosticStatus audio_status;
 

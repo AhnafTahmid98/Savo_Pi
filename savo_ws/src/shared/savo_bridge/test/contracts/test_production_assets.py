@@ -79,3 +79,13 @@ def test_launch_requires_observed_map_context() -> None:
     assert 'DeclareLaunchArgument("active_map_revision", default_value="0")' in normalized_launch
     assert 'default_value="saved_map"' not in normalized_launch
     assert 'executable="savo_bridge_node"' in normalized_launch
+
+
+def test_systemd_and_runner_do_not_invent_active_map() -> None:
+    service = read('systemd/savo_bridge.service.in')
+    runner = read('scripts/run_edge_bridge.sh')
+    assert 'SAVO_ACTIVE_MAP_ID' not in service
+    assert 'SAVO_ACTIVE_MAP_REVISION' not in service
+    assert 'saved_map' not in runner
+    assert 'active_map_id:=' not in runner
+    assert 'active_map_revision:=' not in runner

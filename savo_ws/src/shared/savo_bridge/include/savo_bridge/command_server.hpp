@@ -84,6 +84,11 @@ struct CommandDispatchResult
   std::string reason{"bridge_command_dispatch_rejected"};
   bool dispatch_attempted{false};
   std::size_t ros_publications{0U};
+
+  // Optional structured read-only result for query/status commands.
+  // The command server validates this as JSON before including it in the
+  // acknowledgement. Non-query commands normally leave it as an empty object.
+  std::string result_json{"{}"};
 };
 
 struct CommandServerResult

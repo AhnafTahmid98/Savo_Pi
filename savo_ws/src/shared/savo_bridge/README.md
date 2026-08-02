@@ -1,188 +1,95 @@
 # savo_bridge
 
-`savo_bridge` is the native C++ boundary between the Robot Savo ROS 2
-system and SavoMind.
+`savo_bridge` is the native C++ security and compatibility boundary between
+Robot SAVO ROS 2 and SavoMind. The package is stored under `src/shared` but one
+production instance runs on `savo-edge`. DDS already connects the core and edge
+computers; this package is not a network bridge between the Pis.
 
-## Runtime ownership
+## Authority boundary
 
-The package source is stored under `src/shared`, but the production
-bridge process will run once on `savo-edge`.
+The bridge never owns motors, safety, mapping, navigation, locations, or
+supervision. It validates a closed command protocol and then calls only the
+public typed interfaces owned by those packages. It has no generic ROS
+topic/service/action escape hatch.
 
-ROS 2 DDS over the direct Ethernet connection already connects
-`savo-core` and `savo-edge`. `savo_bridge` is not a separate network
-bridge between the two Raspberry Pis.
+Allowed command families are:
 
-## Responsibilities
+- emergency `stop` and active-action cancellation;
+- bounded single-axis `teleop_nudge`;
+- navigation to an approved named location and navigation cancellation;
+- read-only navigation status;
+- autonomous mapping start with `auto_save=true` and
+  `require_quality_approval=true`;
+- autonomous mapping pause, resume, cancel, and typed Scan360 request;
+- read-only mapping status including save, verification, location review, and
+  AM-8 release progress;
+- read-only supervisor status.
 
-The completed package will own:
+Manual mapping start and standalone save/release mutation are intentionally not
+exposed because the current workspace has no bridge-safe typed authority for
+them. Operator approval is never accepted from SavoMind.
 
-- verified ROS topic subscriptions
-- subscriber QoS
-- ROS graph and DDS visibility evidence
-- message validation
-- monotonic freshness tracking
-- bridge health
-- stable ROS-independent runtime snapshots for SavoMind
-- bounded command validation and typed ROS dispatch
+## Fail-closed map context
 
-Robot subsystem packages remain authoritative for their own state and
-behaviour.
+The production profile and launch defaults use an empty map ID and revision 0.
+Navigation remains blocked until a fresh `/savo_nav/map_context/status` reports
+a synchronized active map, positive revision, and real `map_release_id`. The
+service and runner do not invent `saved_map` or revision 1.
 
-## Production command boundary
+## Unix-socket command contract
 
-The live edge profile accepts only the closed command enum over its protected
-Unix socket. It supports emergency STOP, bounded single-axis teleop nudges,
-exact approved-location navigation, navigation cancellation/status, typed
-autonomous mapping start/pause/resume/cancel/status, and read-only supervisor
-status. Autonomous mapping always requests save and operator quality approval;
-the bridge cannot submit AM-8 approval.
+The protected Unix socket uses strict bounded JSON with:
 
-Manual mapping start, standalone map save/verification, and release mutation are
-not exposed because this repository has no bridge-safe typed authority for
-them. Save and verification are performed by `RunAutonomousMapping`; quality
-and release progress are observed through its typed status. Unknown commands,
-unknown fields, wrong actors, stale state, missing servers, duplicates, and
-replays fail closed. There is no generic topic/service/action escape hatch.
+- protocol and message type validation;
+- command ID, source, agent, priority, issuance time, and expiry;
+- duplicate-key and unknown-field rejection;
+- UID authentication through `SO_PEERCRED`;
+- duplicate/replay handling;
+- accepted/rejected acknowledgement;
+- dispatch evidence and typed result details;
+- bounded timeouts and cancellation correlation.
 
-The production profile leaves the static map ID/revision empty. Navigation is
-admitted only after a fresh `/savo_nav/map_context/status` reports a synchronized
-real map ID, revision, and `map_release_id`.
+STOP has the highest priority. Teleoperation remains bounded. Navigation accepts
+location IDs, not arbitrary poses. Autonomous mapping cannot disable saving or
+quality approval.
 
-## Phase 1A-1
+## Observation and snapshot
 
-Phase 1A-1 establishes only:
+The bridge observes configured topics, tracks monotonic freshness, records ROS
+graph evidence, and atomically writes the schema-v2 snapshot using a
+same-directory temporary file, `fsync`, rename, and parent-directory `fsync`.
+SavoMind must treat unavailable or stale required observations as blocked.
 
-- the native `ament_cmake` package
-- a reusable C++ core library
-- the package version contract
-- strict compiler warnings
-- C++ unit testing
-- lint integration
-- installation and export rules
+Production paths:
 
-It does not contain a ROS node, publisher, subscription, service,
-action client, runtime snapshot writer or SavoMind transport.
+```text
+/run/savo_bridge/command.sock
+/run/savo_bridge/snapshot.json
+```
 
-## Production target
+The systemd template creates `/run/savo_bridge` with group
+`savomind-bridge`, mode `0770`, and a `0660` command socket.
 
-- Ubuntu 24.04 ARM64
-- Raspberry Pi 5
-- ROS 2 Jazzy
-- modern C++
-- one native bridge process on `savo-edge`
-
-## Phase 1C graph discovery
-
-`savo_bridge` performs read-only ROS graph discovery. It does not
-subscribe to subsystem data and does not create service or action
-clients.
-
-Local DDS activity requires the bridge node and all bridge-owned
-status topics to appear in the graph. Core and edge visibility use
-explicit node and topic selector parameters:
-
-- `core_evidence_nodes`
-- `core_evidence_topics`
-- `edge_evidence_nodes`
-- `edge_evidence_topics`
-
-Selectors are empty by default. Graph presence is evidence of a
-configured public ROS entity, not proof of the physical hostname
-running that entity. Commands remain disabled and bridge readiness
-remains false during this phase.
-
-## Phase 2A runtime snapshot publication
-
-The native bridge can atomically publish a canonical read-only runtime
-snapshot for SavoMind.
-
-Parameters:
-
-- `snapshot_enabled` defaults to `false`.
-- `snapshot_path` defaults to `/run/savo_bridge/snapshot.json`.
-
-The parent directory must already exist and be writable by the native
-bridge process. The bridge does not create or change runtime-directory
-ownership.
-
-When enabled, the bridge writes once per status cycle using the tested
-same-directory temporary-file, `fsync`, atomic rename and parent
-directory `fsync` contract.
-
-During Phase 2A the snapshot contains no subsystem observations, so its
-derived health remains `unknown` with reason `no_topics`.
-`bridge_ready` remains false and commands remain disabled.
-
-## Phase 2B-1 observation configuration contract
-
-The bridge observation configuration is represented by three parallel
-parameter arrays:
-
-- observation topic names
-- observation requirements
-- stale thresholds in milliseconds
-
-The configuration contract requires equal array lengths, unique absolute
-ROS topic names, a requirement of either `required` or `optional`, and a
-strictly positive stale threshold representable by the monotonic clock.
-
-Bridge-owned `/savo_bridge/*` topics are forbidden as external
-observations. This prevents the bridge from treating its own output as
-evidence of Robot Savo subsystem health.
-
-Phase 2B-1 is ROS-independent and introduces no subscriptions, service
-clients, action clients, command topics or movement authority.
-
-## Phase 2B-2 generic serialized topic observation
-
-The bridge can resolve configured topic types from the ROS 2 graph and
-create generic serialized subscriptions without linking against Robot
-Savo implementation packages.
-
-Parameters:
-
-- `observation_topics`
-- `observation_requirements`
-- `observation_stale_after_ms`
-
-Each serialized callback ignores the payload and records only the
-monotonic receipt time. The atomic snapshot therefore exposes topic
-availability and freshness without interpreting subsystem-specific
-message contents.
-
-The observation subscriber uses best-effort, volatile QoS to remain
-compatible with both best-effort sensor publishers and reliable
-continuous status publishers.
-
-Topics that are absent from the graph remain unresolved. Topics exposing
-multiple message types are rejected as ambiguous. Existing subscriptions
-become stale naturally when publishers stop.
-
-Phase 2B-2 remains read-only. It adds no service clients, action clients,
-navigation goals, teleoperation commands, velocity commands or movement
-authority. `bridge_ready` remains false.
-
-## Edge production runtime
-
-The production edge profile is installed with the package but remains inert
-until an operator explicitly launches it or installs and starts the systemd
-unit. The native bridge owns the ROS boundary; SavoMind communicates only
-through `/run/savo_bridge/command.sock` and the atomic schema-v2 snapshot at
-`/run/savo_bridge/snapshot.json`.
-
-The shared runtime contract uses group `savomind-bridge` with GID `10001`,
-a `0660` Unix socket, and an allow-listed SavoMind container UID of `10001`.
-Navigation resolves exact approved location IDs through
-`/savo_locations/resolve` and calls only the guarded action
-`/savo_nav/navigation/navigate_to_pose`.
-
-Install without activation:
+## Build and test
 
 ```bash
-sudo ros2 pkg prefix savo_bridge >/dev/null
+cd ~/Savo_Pi/savo_ws
+source /opt/ros/jazzy/setup.bash
+colcon build --packages-up-to savo_bridge --symlink-install
+source install/setup.bash
+colcon test --packages-select savo_bridge --ctest-args --output-on-failure
+colcon test-result --verbose
+```
+
+## Edge installation
+
+Installation is inert unless `--start` is supplied:
+
+```bash
 sudo "$SAVO_WORKSPACE/install/savo_bridge/lib/savo_bridge/install_edge_runtime.sh" \
   --user "$USER" \
   --workspace "$SAVO_WORKSPACE"
 ```
 
-Add `--start` only during the later edge deployment gate.
+Add `--start` only during the guarded edge deployment gate. The real active map
+context must come from the core navigation/release pipeline.

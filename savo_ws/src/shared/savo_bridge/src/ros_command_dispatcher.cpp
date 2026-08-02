@@ -27,6 +27,7 @@
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "geometry_msgs/msg/twist.hpp"
 #include "nav2_msgs/action/navigate_to_pose.hpp"
+#include "nlohmann/json.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
 #include "savo_msgs/action/run_autonomous_mapping.hpp"
@@ -296,7 +297,8 @@ struct ParsedMapContext
 
 [[nodiscard]] CommandDispatchResult acceptance(
   std::string reason,
-  const std::size_t ros_publications)
+  const std::size_t ros_publications,
+  std::string result_json = "{}")
 {
   CommandDispatchResult result;
 
@@ -305,6 +307,7 @@ struct ParsedMapContext
   result.reason = std::move(reason);
   result.dispatch_attempted = true;
   result.ros_publications = ros_publications;
+  result.result_json = std::move(result_json);
 
   return result;
 }
@@ -507,8 +510,44 @@ public:
         mapping_status_observed_ = true;
         mapping_status_observed_at_ = SteadyClock::now();
         mapping_mission_id_ = message->mission_id;
+        mapping_map_id_ = message->map_id;
+        mapping_map_revision_ = message->map_revision;
         mapping_state_ = message->state_text;
         mapping_reason_ = message->reason;
+        mapping_active_ = message->active;
+        mapping_ready_ = message->mapping_ready;
+        mapping_safety_stop_active_ = message->safety_stop_active;
+        mapping_goals_succeeded_ = message->goals_succeeded;
+        mapping_goals_failed_ = message->goals_failed;
+        mapping_detected_frontiers_ = message->detected_frontiers;
+        mapping_reachable_frontiers_ = message->reachable_frontiers;
+        mapping_coverage_completion_ratio_ =
+        message->coverage_completion_ratio;
+        mapping_scan360_stage_ = message->scan360_stage;
+        mapping_scan360_state_ = message->scan360_state;
+        mapping_scan360_reason_ = message->scan360_reason;
+        mapping_map_save_complete_ = message->map_save_complete;
+        mapping_map_saved_ = message->map_saved;
+        mapping_map_save_reason_ = message->map_save_reason;
+        mapping_verification_complete_ = message->verification_complete;
+        mapping_map_verified_ = message->map_verified;
+        mapping_verification_reason_ = message->verification_reason;
+        mapping_location_verification_complete_ =
+        message->location_verification_complete;
+        mapping_location_verification_passed_ =
+        message->location_verification_passed;
+        mapping_pending_candidate_count_ = message->pending_candidate_count;
+        mapping_approved_location_count_ = message->approved_location_count;
+        mapping_review_generation_ = message->review_generation;
+        mapping_approval_pending_ = message->approval_pending;
+        mapping_approval_recorded_ = message->approval_recorded;
+        mapping_release_complete_ = message->release_complete;
+        mapping_release_succeeded_ = message->release_succeeded;
+        mapping_release_id_ = message->release_id;
+        mapping_release_state_ = message->release_state;
+        mapping_release_reason_ = message->primary_release_reason;
+        mapping_joint_active_release_verified_ =
+        message->joint_active_release_verified;
       });
 
     supervisor_state_subscription_ =
@@ -734,8 +773,46 @@ public:
 
     result.mapping_status_observed = mapping_status_observed_;
     result.mapping_mission_id = mapping_mission_id_;
+    result.mapping_map_id = mapping_map_id_;
+    result.mapping_map_revision = mapping_map_revision_;
     result.mapping_state = mapping_state_;
     result.mapping_reason = mapping_reason_;
+    result.mapping_active = mapping_active_;
+    result.mapping_ready = mapping_ready_;
+    result.mapping_safety_stop_active = mapping_safety_stop_active_;
+    result.mapping_goals_succeeded = mapping_goals_succeeded_;
+    result.mapping_goals_failed = mapping_goals_failed_;
+    result.mapping_detected_frontiers = mapping_detected_frontiers_;
+    result.mapping_reachable_frontiers = mapping_reachable_frontiers_;
+    result.mapping_coverage_completion_ratio =
+      mapping_coverage_completion_ratio_;
+    result.mapping_scan360_stage = mapping_scan360_stage_;
+    result.mapping_scan360_state = mapping_scan360_state_;
+    result.mapping_scan360_reason = mapping_scan360_reason_;
+    result.mapping_map_save_complete = mapping_map_save_complete_;
+    result.mapping_map_saved = mapping_map_saved_;
+    result.mapping_map_save_reason = mapping_map_save_reason_;
+    result.mapping_verification_complete = mapping_verification_complete_;
+    result.mapping_map_verified = mapping_map_verified_;
+    result.mapping_verification_reason = mapping_verification_reason_;
+    result.mapping_location_verification_complete =
+      mapping_location_verification_complete_;
+    result.mapping_location_verification_passed =
+      mapping_location_verification_passed_;
+    result.mapping_pending_candidate_count =
+      mapping_pending_candidate_count_;
+    result.mapping_approved_location_count =
+      mapping_approved_location_count_;
+    result.mapping_review_generation = mapping_review_generation_;
+    result.mapping_approval_pending = mapping_approval_pending_;
+    result.mapping_approval_recorded = mapping_approval_recorded_;
+    result.mapping_release_complete = mapping_release_complete_;
+    result.mapping_release_succeeded = mapping_release_succeeded_;
+    result.mapping_release_id = mapping_release_id_;
+    result.mapping_release_state = mapping_release_state_;
+    result.mapping_release_reason = mapping_release_reason_;
+    result.mapping_joint_active_release_verified =
+      mapping_joint_active_release_verified_;
     result.mapping_status_age_ms = observation_age_ms(
       mapping_status_observed_at_, now);
 
@@ -839,7 +916,9 @@ private:
 
     const TimePoint now = SteadyClock::now();
     std::lock_guard<std::mutex> lock(mutex_);
+    nlohmann::json result = nlohmann::json::object();
     std::string reason;
+
     if (command.command_type == CommandType::QueryNavigationState) {
       if (!navigation_readiness_observed_ ||
         !observation_fresh(
@@ -850,7 +929,22 @@ private:
         last_reason_ = "bridge_navigation_state_stale";
         return rejection(last_reason_, false, 0U);
       }
-      reason = "navigation_state:" + navigation_readiness_;
+
+      reason = "bridge_navigation_state_available";
+      result = {
+        {"readiness", navigation_readiness_},
+        {"readiness_age_ms", observation_age_ms(
+            navigation_readiness_observed_at_, now)},
+        {"map_context_observed", map_context_observed_},
+        {"map_context_synchronized", map_context_synchronized_},
+        {"active_map_id", active_map_id_},
+        {"active_map_revision", active_map_revision_},
+        {"active_map_release_id", active_map_release_id_},
+        {"map_context_age_ms", observation_age_ms(
+            map_context_observed_at_, now)},
+        {"goal_active", navigation_goal_active_},
+        {"cancel_requested", navigation_cancel_requested_},
+      };
     } else if (command.command_type == CommandType::QueryMappingState) {
       if (!mapping_status_observed_ ||
         !observation_fresh(
@@ -861,7 +955,63 @@ private:
         last_reason_ = "bridge_mapping_state_stale";
         return rejection(last_reason_, false, 0U);
       }
-      reason = "mapping_state:" + mapping_state_ + ":" + mapping_reason_;
+
+      reason = "bridge_mapping_state_available";
+      result = {
+        {"mission_id", mapping_mission_id_},
+        {"map_id", mapping_map_id_},
+        {"map_revision", mapping_map_revision_},
+        {"state", mapping_state_},
+        {"reason", mapping_reason_},
+        {"active", mapping_active_},
+        {"mapping_ready", mapping_ready_},
+        {"safety_stop_active", mapping_safety_stop_active_},
+        {"goals_succeeded", mapping_goals_succeeded_},
+        {"goals_failed", mapping_goals_failed_},
+        {"detected_frontiers", mapping_detected_frontiers_},
+        {"reachable_frontiers", mapping_reachable_frontiers_},
+        {"coverage_completion_ratio",
+          mapping_coverage_completion_ratio_},
+        {"scan360", {
+            {"stage", mapping_scan360_stage_},
+            {"state", mapping_scan360_state_},
+            {"reason", mapping_scan360_reason_},
+          }},
+        {"map_save", {
+            {"complete", mapping_map_save_complete_},
+            {"saved", mapping_map_saved_},
+            {"reason", mapping_map_save_reason_},
+          }},
+        {"verification", {
+            {"complete", mapping_verification_complete_},
+            {"passed", mapping_map_verified_},
+            {"reason", mapping_verification_reason_},
+          }},
+        {"locations", {
+            {"verification_complete",
+              mapping_location_verification_complete_},
+            {"verification_passed",
+              mapping_location_verification_passed_},
+            {"pending_candidates", mapping_pending_candidate_count_},
+            {"approved_locations", mapping_approved_location_count_},
+          }},
+        {"review", {
+            {"generation", mapping_review_generation_},
+            {"approval_pending", mapping_approval_pending_},
+            {"approval_recorded", mapping_approval_recorded_},
+          }},
+        {"release", {
+            {"complete", mapping_release_complete_},
+            {"succeeded", mapping_release_succeeded_},
+            {"release_id", mapping_release_id_},
+            {"state", mapping_release_state_},
+            {"reason", mapping_release_reason_},
+            {"joint_active_release_verified",
+              mapping_joint_active_release_verified_},
+          }},
+        {"status_age_ms", observation_age_ms(
+            mapping_status_observed_at_, now)},
+      };
     } else {
       if (!supervisor_state_observed_ ||
         !observation_fresh(
@@ -872,15 +1022,19 @@ private:
         last_reason_ = "bridge_supervisor_state_stale";
         return rejection(last_reason_, false, 0U);
       }
-      reason = "supervisor_state:" + supervisor_state_;
+
+      reason = "bridge_supervisor_state_available";
+      result = {
+        {"summary", supervisor_state_},
+        {"age_ms", observation_age_ms(
+            supervisor_state_observed_at_, now)},
+      };
     }
-    if (reason.size() > 768U) {
-      reason.resize(768U);
-    }
+
     ++accepted_command_count_;
     last_terminal_command_id_ = command.command_id;
     last_reason_ = reason;
-    return acceptance(reason, 0U);
+    return acceptance(reason, 0U, result.dump());
   }
 
   [[nodiscard]] bool mapping_authorized(
@@ -984,6 +1138,9 @@ private:
       request->command = ControlAutonomousMapping::Request::COMMAND_PAUSE;
     } else if (payload->operation == "resume") {
       request->command = ControlAutonomousMapping::Request::COMMAND_RESUME;
+    } else if (payload->operation == "request_scan360") {
+      request->command =
+        ControlAutonomousMapping::Request::COMMAND_REQUEST_SCAN360;
     } else {
       request->command = ControlAutonomousMapping::Request::COMMAND_CANCEL;
     }
@@ -3323,8 +3480,40 @@ private:
 
   bool mapping_status_observed_{false};
   std::string mapping_mission_id_;
+  std::string mapping_map_id_;
+  std::uint32_t mapping_map_revision_{0U};
   std::string mapping_state_;
   std::string mapping_reason_;
+  bool mapping_active_{false};
+  bool mapping_ready_{false};
+  bool mapping_safety_stop_active_{false};
+  std::uint32_t mapping_goals_succeeded_{0U};
+  std::uint32_t mapping_goals_failed_{0U};
+  std::uint32_t mapping_detected_frontiers_{0U};
+  std::uint32_t mapping_reachable_frontiers_{0U};
+  double mapping_coverage_completion_ratio_{0.0};
+  std::string mapping_scan360_stage_;
+  std::string mapping_scan360_state_;
+  std::string mapping_scan360_reason_;
+  bool mapping_map_save_complete_{false};
+  bool mapping_map_saved_{false};
+  std::string mapping_map_save_reason_;
+  bool mapping_verification_complete_{false};
+  bool mapping_map_verified_{false};
+  std::string mapping_verification_reason_;
+  bool mapping_location_verification_complete_{false};
+  bool mapping_location_verification_passed_{false};
+  std::uint32_t mapping_pending_candidate_count_{0U};
+  std::uint32_t mapping_approved_location_count_{0U};
+  std::uint64_t mapping_review_generation_{0U};
+  bool mapping_approval_pending_{false};
+  bool mapping_approval_recorded_{false};
+  bool mapping_release_complete_{false};
+  bool mapping_release_succeeded_{false};
+  std::string mapping_release_id_;
+  std::string mapping_release_state_;
+  std::string mapping_release_reason_;
+  bool mapping_joint_active_release_verified_{false};
   TimePoint mapping_status_observed_at_{};
 
   bool supervisor_state_observed_{false};

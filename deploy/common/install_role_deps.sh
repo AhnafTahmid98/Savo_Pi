@@ -60,4 +60,9 @@ else
 fi
 cd "$SAVO_WS"
 colcon build --packages-up-to "${packages[@]}" --symlink-install --event-handlers console_direct+
+if [[ "$role" == edge ]]; then
+  sudo "$SAVO_ROOT/deploy/edge/prepare_runtime_sockets.sh" \
+    --user "${SUDO_USER:-${USER}}" \
+    --install-tmpfiles
+fi
 echo "Dependency installation and role build completed: $role"

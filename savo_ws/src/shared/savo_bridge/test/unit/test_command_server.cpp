@@ -725,6 +725,7 @@ TEST(SavoBridgeCommandServer, DuplicateCommandIdReplaysWithoutRedispatch)
       result.reason = "test_live_dispatch_accepted";
       result.dispatch_attempted = true;
       result.ros_publications = 3U;
+      result.result_json = R"json({"scope":"mapping","active":true})json";
       return result;
     }};
 
@@ -775,6 +776,8 @@ TEST(SavoBridgeCommandServer, DuplicateCommandIdReplaysWithoutRedispatch)
     first_json.at("details").
     at("ros_publications"),
     3);
+  EXPECT_EQ(first_json.at("details").at("result").at("scope"), "mapping");
+  EXPECT_TRUE(first_json.at("details").at("result").at("active").get<bool>());
 
   EXPECT_EQ(
     second.server.status,
@@ -796,6 +799,9 @@ TEST(SavoBridgeCommandServer, DuplicateCommandIdReplaysWithoutRedispatch)
     second_json.at("details").
     at("ros_publications"),
     0);
+  EXPECT_EQ(
+    second_json.at("details").at("result"),
+    first_json.at("details").at("result"));
 
   EXPECT_FALSE(second.server.dispatch_attempted);
   EXPECT_EQ(second.server.ros_publications, 0U);

@@ -17,3 +17,15 @@ savo_ui_node:
     enable_framebuffer: false
     enable_touch: false
     export_preview_frames: true
+    # Read-only production ROS integration.
+    mapping_state_topic: "/savo_mapping/autonomous/status"
+    locations_state_topic: "/savo_locations/status"
+    location_events_topic: "/savo_locations/events"
+    bridge_state_topic: "/savo_bridge/state"
+    bridge_readiness_topic: "/savo_bridge/readiness"
+    speech_state_topic: "/savo_speech/state"
+    speech_readiness_topic: "/savo_speech/readiness"
+    playback_state_topic: "/savo_speech/playback/state"
+    playback_finished_topic: "/savo_speech/playback/finished"
+    transcript_topic: "/savo_speech/transcript"
+    response_topic: "/savo_speech/response"

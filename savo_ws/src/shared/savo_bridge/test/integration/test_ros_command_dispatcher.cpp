@@ -17,10 +17,14 @@
 
 #include "geometry_msgs/msg/twist.hpp"
 #include "nav2_msgs/action/navigate_to_pose.hpp"
+#include "nlohmann/json.hpp"
 #include "rclcpp/executors/multi_threaded_executor.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
+#include "savo_msgs/action/run_autonomous_mapping.hpp"
+#include "savo_msgs/msg/autonomous_mapping_status.hpp"
 #include "savo_msgs/msg/location_record.hpp"
+#include "savo_msgs/srv/control_autonomous_mapping.hpp"
 #include "savo_msgs/srv/resolve_location.hpp"
 #include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/string.hpp"
@@ -43,6 +47,15 @@ using NavigationServerGoalHandle =
 
 using ResolveLocation =
   savo_msgs::srv::ResolveLocation;
+
+using RunAutonomousMapping =
+  savo_msgs::action::RunAutonomousMapping;
+
+using MappingServerGoalHandle =
+  rclcpp_action::ServerGoalHandle<RunAutonomousMapping>;
+
+using ControlAutonomousMapping =
+  savo_msgs::srv::ControlAutonomousMapping;
 
 [[nodiscard]] bool twist_is_zero(
   const geometry_msgs::msg::Twist & message)
@@ -123,6 +136,21 @@ protected:
     config_.location_resolve_service =
       prefix + "/resolve_location";
 
+    config_.map_context_status_topic =
+      prefix + "/map_context";
+
+    config_.mapping_action_name =
+      prefix + "/run_mapping";
+
+    config_.mapping_control_service =
+      prefix + "/control_mapping";
+
+    config_.mapping_status_topic =
+      prefix + "/mapping_status";
+
+    config_.supervisor_state_topic =
+      prefix + "/supervisor_state";
+
     config_.active_map_id = "test-map";
     config_.active_map_revision = 7U;
     config_.require_active_map_context = true;
@@ -136,6 +164,8 @@ protected:
     config_.navigation_execution_timeout_ms = 3000;
     config_.teleop_cancel_timeout_ms = 800;
     config_.navigation_cancel_timeout_ms = 800;
+    config_.mapping_server_timeout_ms = 800;
+    config_.mapping_control_timeout_ms = 800;
 
     config_.maximum_teleop_duration_ms = 1000;
     config_.teleop_publish_period_ms = 20;
@@ -181,6 +211,52 @@ protected:
       std_msgs::msg::String>(
       config_.navigation_readiness_topic,
       latched_qos);
+
+    map_context_publisher_ =
+      fixture_node_->create_publisher<
+      std_msgs::msg::String>(
+      config_.map_context_status_topic,
+      latched_qos);
+
+    mapping_status_publisher_ =
+      fixture_node_->create_publisher<
+      savo_msgs::msg::AutonomousMappingStatus>(
+      config_.mapping_status_topic,
+      latched_qos);
+
+    supervisor_state_publisher_ =
+      fixture_node_->create_publisher<
+      std_msgs::msg::String>(
+      config_.supervisor_state_topic,
+      latched_qos);
+
+    mapping_status_message_.contract_version =
+      savo_msgs::msg::AutonomousMappingStatus::CONTRACT_VERSION;
+    mapping_status_message_.mission_id = "mission-test-1";
+    mapping_status_message_.map_id = "mapping-test-map";
+    mapping_status_message_.map_revision = 3U;
+    mapping_status_message_.state =
+      savo_msgs::msg::AutonomousMappingStatus::STATE_AWAITING_APPROVAL;
+    mapping_status_message_.state_text = "awaiting_approval";
+    mapping_status_message_.reason = "test_waiting_for_operator";
+    mapping_status_message_.active = true;
+    mapping_status_message_.mapping_ready = true;
+    mapping_status_message_.goals_succeeded = 4U;
+    mapping_status_message_.detected_frontiers = 2U;
+    mapping_status_message_.reachable_frontiers = 1U;
+    mapping_status_message_.coverage_completion_ratio = 0.75;
+    mapping_status_message_.scan360_stage = "conditional";
+    mapping_status_message_.scan360_state = "complete";
+    mapping_status_message_.map_save_complete = true;
+    mapping_status_message_.map_saved = true;
+    mapping_status_message_.verification_complete = true;
+    mapping_status_message_.map_verified = true;
+    mapping_status_message_.location_verification_complete = true;
+    mapping_status_message_.location_verification_passed = true;
+    mapping_status_message_.approved_location_count = 2U;
+    mapping_status_message_.review_generation = 8U;
+    mapping_status_message_.approval_pending = true;
+    mapping_status_message_.release_state = "awaiting_approval";
 
     resolve_location_service_ =
       fixture_node_->create_service<ResolveLocation>(
@@ -329,6 +405,60 @@ protected:
         navigation_goal_accept_count_.fetch_add(1U);
       });
 
+    mapping_control_service_ =
+      fixture_node_->create_service<ControlAutonomousMapping>(
+      config_.mapping_control_service,
+      [this](
+        const std::shared_ptr<
+          ControlAutonomousMapping::Request> request,
+        std::shared_ptr<
+          ControlAutonomousMapping::Response> response)
+      {
+        mapping_control_request_count_.fetch_add(1U);
+        last_mapping_control_command_.store(request->command);
+        response->accepted = true;
+        response->result_code =
+        ControlAutonomousMapping::Response::RESULT_ACCEPTED;
+        response->reason = "test_mapping_control_accepted";
+        response->status = mapping_status_message_;
+      });
+
+    mapping_action_server_ =
+      rclcpp_action::create_server<RunAutonomousMapping>(
+      fixture_node_,
+      config_.mapping_action_name,
+      [this](
+        const rclcpp_action::GoalUUID &,
+        std::shared_ptr<const RunAutonomousMapping::Goal> goal)
+      {
+        mapping_goal_request_count_.fetch_add(1U);
+        last_mapping_goal_auto_save_.store(goal->auto_save);
+        last_mapping_goal_requires_approval_.store(
+          goal->require_quality_approval);
+        return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
+      },
+      [](const std::shared_ptr<MappingServerGoalHandle>)
+      {
+        return rclcpp_action::CancelResponse::ACCEPT;
+      },
+      [this](const std::shared_ptr<MappingServerGoalHandle> goal_handle)
+      {
+        mapping_action_thread_ = std::thread(
+          [this, goal_handle]()
+          {
+            mapping_goal_accept_count_.fetch_add(1U);
+            auto result = std::make_shared<RunAutonomousMapping::Result>();
+            result->success = true;
+            result->result_code =
+            RunAutonomousMapping::Result::RESULT_SUCCEEDED;
+            result->reason = "test_mapping_succeeded";
+            result->map_saved = true;
+            result->map_release_id = "release-test-1";
+            result->final_status = mapping_status_message_;
+            goal_handle->succeed(result);
+          });
+      });
+
     mode_command_subscription_ =
       fixture_node_->create_subscription<
       std_msgs::msg::String>(
@@ -439,6 +569,10 @@ protected:
       navigation_action_thread_.join();
     }
 
+    if (mapping_action_thread_.joinable()) {
+      mapping_action_thread_.join();
+    }
+
     if (executor_) {
       executor_->cancel();
     }
@@ -450,6 +584,8 @@ protected:
     observation_timer_.reset();
 
     navigation_action_server_.reset();
+    mapping_action_server_.reset();
+    mapping_control_service_.reset();
     resolve_location_service_.reset();
 
     mode_command_subscription_.reset();
@@ -461,6 +597,9 @@ protected:
     safety_stop_publisher_.reset();
     safe_velocity_publisher_.reset();
     navigation_readiness_publisher_.reset();
+    map_context_publisher_.reset();
+    mapping_status_publisher_.reset();
+    supervisor_state_publisher_.reset();
 
     executor_.reset();
     dispatcher_node_.reset();
@@ -510,6 +649,15 @@ protected:
 
     navigation_readiness_publisher_->publish(
       readiness);
+
+    mapping_status_publisher_->publish(
+      mapping_status_message_);
+
+    std_msgs::msg::String supervisor;
+    supervisor.data =
+      "state=READY;startup_ready=true;system_armed=false;"
+      "fault_latched=false;remote_commands_ready=true";
+    supervisor_state_publisher_->publish(supervisor);
   }
 
   void publish_baseline()
@@ -545,6 +693,21 @@ protected:
 
       navigation_readiness_publisher_->publish(
         readiness);
+
+      std_msgs::msg::String map_context;
+      map_context.data =
+        "state=synchronized;map_id=test-map;map_revision=7;"
+        "map_release_id=release-test-map;synchronized=true";
+      map_context_publisher_->publish(map_context);
+
+      mapping_status_publisher_->publish(
+        mapping_status_message_);
+
+      std_msgs::msg::String supervisor;
+      supervisor.data =
+        "state=READY;startup_ready=true;system_armed=false;"
+        "fault_latched=false;remote_commands_ready=true";
+      supervisor_state_publisher_->publish(supervisor);
 
       std::this_thread::sleep_for(20ms);
     }
@@ -686,6 +849,74 @@ protected:
     return command;
   }
 
+  [[nodiscard]] ValidatedCommand make_start_mapping_command(
+    const std::string & command_id)
+  {
+    ValidatedCommand command;
+    command.command_id = command_id;
+    command.command_type = CommandType::StartAutonomousMapping;
+    command.source = "test";
+    command.origin_agent = "mapping_agent";
+    command.request_id = "mapping-start-request";
+    command.priority = CommandPriority::Normal;
+    command.issued_at_unix_ms = 1;
+    command.expires_at_unix_ms = 60000;
+
+    StartAutonomousMappingCommandPayload payload;
+    payload.mission_id = "mission-test-1";
+    payload.map_id = "mapping-test-map";
+    payload.map_revision = 3U;
+    payload.mission_timeout_ms = 5000;
+    payload.auto_save = true;
+    payload.require_quality_approval = true;
+    command.payload = std::move(payload);
+    return command;
+  }
+
+  [[nodiscard]] ValidatedCommand make_mapping_control_command(
+    const std::string & command_id,
+    const std::string & operation)
+  {
+    ValidatedCommand command;
+    command.command_id = command_id;
+    command.command_type = CommandType::ControlMapping;
+    command.source = "test";
+    command.origin_agent = "mapping_agent";
+    command.request_id = "mapping-control-request";
+    command.priority = CommandPriority::Normal;
+    command.issued_at_unix_ms = 1;
+    command.expires_at_unix_ms = 60000;
+
+    ControlMappingCommandPayload payload;
+    payload.operation = operation;
+    payload.mission_id = "mission-test-1";
+    payload.reason = "dispatcher_mapping_control_test";
+    command.payload = std::move(payload);
+    return command;
+  }
+
+  [[nodiscard]] ValidatedCommand make_query_command(
+    const std::string & command_id,
+    const CommandType type,
+    const std::string & agent,
+    const std::string & scope)
+  {
+    ValidatedCommand command;
+    command.command_id = command_id;
+    command.command_type = type;
+    command.source = "test";
+    command.origin_agent = agent;
+    command.request_id = "query-request";
+    command.priority = CommandPriority::Normal;
+    command.issued_at_unix_ms = 1;
+    command.expires_at_unix_ms = 60000;
+
+    QueryStateCommandPayload payload;
+    payload.scope = scope;
+    command.payload = std::move(payload);
+    return command;
+  }
+
   RosCommandDispatcherConfig config_;
 
   std::shared_ptr<rclcpp::Node> fixture_node_;
@@ -720,11 +951,29 @@ protected:
     std_msgs::msg::String>::SharedPtr
     navigation_readiness_publisher_;
 
+  rclcpp::Publisher<
+    std_msgs::msg::String>::SharedPtr
+    map_context_publisher_;
+
+  rclcpp::Publisher<
+    savo_msgs::msg::AutonomousMappingStatus>::SharedPtr
+    mapping_status_publisher_;
+
+  rclcpp::Publisher<
+    std_msgs::msg::String>::SharedPtr
+    supervisor_state_publisher_;
+
   rclcpp::Service<ResolveLocation>::SharedPtr
     resolve_location_service_;
 
   rclcpp_action::Server<NavigateToPose>::SharedPtr
     navigation_action_server_;
+
+  rclcpp::Service<ControlAutonomousMapping>::SharedPtr
+    mapping_control_service_;
+
+  rclcpp_action::Server<RunAutonomousMapping>::SharedPtr
+    mapping_action_server_;
 
   rclcpp::Subscription<
     std_msgs::msg::String>::SharedPtr
@@ -759,7 +1008,17 @@ protected:
   std::atomic<std::size_t>
   external_stop_false_count_{0U};
 
+  savo_msgs::msg::AutonomousMappingStatus mapping_status_message_;
+
   std::thread navigation_action_thread_;
+  std::thread mapping_action_thread_;
+
+  std::atomic<std::size_t> mapping_control_request_count_{0U};
+  std::atomic<std::uint8_t> last_mapping_control_command_{0U};
+  std::atomic<std::size_t> mapping_goal_request_count_{0U};
+  std::atomic<std::size_t> mapping_goal_accept_count_{0U};
+  std::atomic<bool> last_mapping_goal_auto_save_{false};
+  std::atomic<bool> last_mapping_goal_requires_approval_{false};
 
   std::atomic<std::int64_t>
   navigation_action_delay_ms_{100};
@@ -876,9 +1135,16 @@ TEST_F(
     state.last_reason,
     "bridge_teleop_completed");
 
-  EXPECT_GE(
-    manual_zero_count_.load(),
-    config_.final_zero_publication_count);
+  ASSERT_TRUE(
+    wait_for(
+      [this]()
+      {
+        return
+          manual_zero_count_.load() >=
+          config_.final_zero_publication_count;
+      },
+      1200ms))
+    << "final zero manual-velocity publications were not observed";
 
   EXPECT_GT(
     mode_command_count_.load(),
@@ -1156,6 +1422,107 @@ TEST_F(
   EXPECT_EQ(
     navigation_canceled_count_.load(),
     1U);
+}
+
+
+TEST_F(
+  RosCommandDispatcherTest,
+  AutonomousMappingUsesTypedActionAndKeepsApprovalRequired)
+{
+  const auto result = dispatcher_->dispatch(
+    make_start_mapping_command("mapping-start-dispatch-1"));
+
+  ASSERT_TRUE(result.accepted) << result.reason;
+  EXPECT_EQ(result.reason, "bridge_mapping_goal_accepted");
+  EXPECT_TRUE(result.dispatch_attempted);
+
+  ASSERT_TRUE(wait_for(
+      [this]()
+      {
+        return mapping_goal_accept_count_.load() == 1U;
+      },
+      1500ms));
+
+  EXPECT_EQ(mapping_goal_request_count_.load(), 1U);
+  EXPECT_TRUE(last_mapping_goal_auto_save_.load());
+  EXPECT_TRUE(last_mapping_goal_requires_approval_.load());
+}
+
+TEST_F(
+  RosCommandDispatcherTest,
+  MappingScan360UsesTypedControlService)
+{
+  const auto result = dispatcher_->dispatch(
+    make_mapping_control_command(
+      "mapping-scan360-dispatch-1",
+      "request_scan360"));
+
+  ASSERT_TRUE(result.accepted) << result.reason;
+  EXPECT_EQ(
+    result.reason,
+    "bridge_mapping_control_accepted:test_mapping_control_accepted");
+  EXPECT_EQ(mapping_control_request_count_.load(), 1U);
+  EXPECT_EQ(
+    last_mapping_control_command_.load(),
+    ControlAutonomousMapping::Request::COMMAND_REQUEST_SCAN360);
+}
+
+TEST_F(
+  RosCommandDispatcherTest,
+  MappingQueryReturnsStructuredAm8State)
+{
+  ASSERT_TRUE(wait_for(
+      [this]()
+      {
+        return dispatcher_->snapshot().mapping_status_observed;
+      },
+      1000ms));
+
+  const auto result = dispatcher_->dispatch(
+    make_query_command(
+      "mapping-query-dispatch-1",
+      CommandType::QueryMappingState,
+      "mapping_agent",
+      "mapping"));
+
+  ASSERT_TRUE(result.accepted) << result.reason;
+  EXPECT_EQ(result.reason, "bridge_mapping_state_available");
+
+  const auto document = nlohmann::json::parse(result.result_json);
+  EXPECT_EQ(document.at("mission_id"), "mission-test-1");
+  EXPECT_EQ(document.at("state"), "awaiting_approval");
+  EXPECT_TRUE(document.at("map_save").at("saved"));
+  EXPECT_TRUE(document.at("verification").at("passed"));
+  EXPECT_TRUE(document.at("review").at("approval_pending"));
+  EXPECT_EQ(document.at("review").at("generation"), 8U);
+  EXPECT_EQ(document.at("release").at("state"), "awaiting_approval");
+  EXPECT_FALSE(
+    document.at("release").at("joint_active_release_verified"));
+}
+
+TEST_F(
+  RosCommandDispatcherTest,
+  SupervisorQueryReturnsStructuredReadOnlySummary)
+{
+  ASSERT_TRUE(wait_for(
+      [this]()
+      {
+        return dispatcher_->snapshot().supervisor_state_observed;
+      },
+      1000ms));
+
+  const auto result = dispatcher_->dispatch(
+    make_query_command(
+      "supervisor-query-dispatch-1",
+      CommandType::QuerySupervisorState,
+      "supervisor_agent",
+      "supervisor"));
+
+  ASSERT_TRUE(result.accepted) << result.reason;
+  const auto document = nlohmann::json::parse(result.result_json);
+  EXPECT_NE(
+    document.at("summary").get<std::string>().find("startup_ready=true"),
+    std::string::npos);
 }
 
 }  // namespace

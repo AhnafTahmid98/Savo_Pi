@@ -17,6 +17,9 @@ __pycache__/
 venv/
 env/
 
+
+.ruff-cache
+
 # Python tooling caches
 .mypy_cache/
 .pytest_cache/
@@ -67,6 +70,7 @@ models/checkpoints/
 .vscode/
 .idea/
 *.iml
+.ruff-cache
 
 .DS_Store
 Thumbs.db

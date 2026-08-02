@@ -466,6 +466,11 @@ void UiNode::declare_parameters()
   declare_parameter<std::string>("navigation_state_topic", config_.navigation_state_topic);
   declare_parameter<std::string>("mapping_state_topic", config_.mapping_state_topic);
   declare_parameter<std::string>("locations_state_topic", config_.locations_state_topic);
+  declare_parameter<std::string>("location_events_topic", config_.location_events_topic);
+  declare_parameter<std::string>("bridge_state_topic", config_.bridge_state_topic);
+  declare_parameter<std::string>("bridge_readiness_topic", config_.bridge_readiness_topic);
+  declare_parameter<std::string>("playback_state_topic", config_.playback_state_topic);
+  declare_parameter<std::string>("playback_finished_topic", config_.playback_finished_topic);
   declare_parameter<std::string>("speech_state_topic", config_.speech_state_topic);
   declare_parameter<std::string>("speech_readiness_topic", config_.speech_readiness_topic);
   declare_parameter<std::string>("transcript_topic", config_.transcript_topic);
@@ -516,6 +521,11 @@ void UiNode::load_parameters()
   config_.navigation_state_topic = get_parameter("navigation_state_topic").as_string();
   config_.mapping_state_topic = get_parameter("mapping_state_topic").as_string();
   config_.locations_state_topic = get_parameter("locations_state_topic").as_string();
+  config_.location_events_topic = get_parameter("location_events_topic").as_string();
+  config_.bridge_state_topic = get_parameter("bridge_state_topic").as_string();
+  config_.bridge_readiness_topic = get_parameter("bridge_readiness_topic").as_string();
+  config_.playback_state_topic = get_parameter("playback_state_topic").as_string();
+  config_.playback_finished_topic = get_parameter("playback_finished_topic").as_string();
   config_.speech_state_topic = get_parameter("speech_state_topic").as_string();
   config_.speech_readiness_topic = get_parameter("speech_readiness_topic").as_string();
   config_.transcript_topic = get_parameter("transcript_topic").as_string();
@@ -1933,16 +1943,18 @@ void UiNode::configure_live_subscriptions()
   qos.best_effort();
   qos.durability_volatile();
 
-  const std::array<std::pair<std::string, std::string>, 11> feeds{{
+  const std::array<std::pair<std::string, std::string>, 13> feeds{{
     {"core", config_.core_state_topic},
     {"edge", config_.edge_state_topic},
     {"mode", config_.mode_state_topic},
     {"safety", config_.safety_state_topic},
     {"navigation", config_.navigation_state_topic},
-    {"mapping", config_.mapping_state_topic},
     {"locations", config_.locations_state_topic},
+    {"bridge", config_.bridge_state_topic},
     {"speech", config_.speech_state_topic},
     {"speech_readiness", config_.speech_readiness_topic},
+    {"playback", config_.playback_state_topic},
+    {"playback_finished", config_.playback_finished_topic},
     {"transcript", config_.transcript_topic},
     {"response", config_.response_topic},
   }};
@@ -1960,7 +1972,79 @@ void UiNode::configure_live_subscriptions()
           update_live_state(channel, message->data);
         }));
   }
-  RCLCPP_INFO(get_logger(), "configured %zu read-only live UI subscriptions", feeds.size());
+  auto state_qos = rclcpp::QoS(rclcpp::KeepLast(10)).reliable();
+  mapping_status_subscription_ =
+    create_subscription<savo_msgs::msg::AutonomousMappingStatus>(
+    config_.mapping_state_topic,
+    state_qos,
+    [this](const savo_msgs::msg::AutonomousMappingStatus::SharedPtr message) {
+      update_mapping_status(*message);
+    });
+  location_event_subscription_ =
+    create_subscription<savo_msgs::msg::LocationEvent>(
+    config_.location_events_topic,
+    state_qos,
+    [this](const savo_msgs::msg::LocationEvent::SharedPtr message) {
+      update_location_event(*message);
+    });
+  bridge_readiness_subscription_ =
+    create_subscription<std_msgs::msg::Bool>(
+    config_.bridge_readiness_topic,
+    state_qos,
+    [this](const std_msgs::msg::Bool::SharedPtr message) {
+      system_seen_ = true;
+      last_system_update_ = std::chrono::steady_clock::now();
+      status_ui_.link_state = message->data ? "READY" : "BLOCKED";
+      status_ui_.savomind_state = message->data ? "ONLINE" : "UNAVAILABLE";
+    });
+
+  RCLCPP_INFO(
+    get_logger(),
+    "configured %zu string feeds and typed mapping/location feeds",
+    feeds.size());
+}
+
+void UiNode::update_mapping_status(
+  const savo_msgs::msg::AutonomousMappingStatus & message)
+{
+  mapping_seen_ = true;
+  last_mapping_update_ = std::chrono::steady_clock::now();
+  const std::string summary = mapping_summary(
+    message.state_text,
+    message.active,
+    message.coverage_completion_ratio,
+    message.scan360_stage,
+    message.scan360_state,
+    message.pending_candidate_count,
+    message.approval_pending,
+    message.release_state,
+    message.release_id,
+    message.reason);
+  status_ui_.mapping_state = uppercase_copy(summary);
+  if (message.approval_pending) {
+    status_ui_.active_alert = "Mapping approval required";
+  } else if (!message.release_id.empty()) {
+    status_ui_.active_alert = "Map release " + bounded_ui_text(message.release_id, 32U);
+  }
+  navigation_ui_.message = summary;
+  if (message.active && active_screen_ == UiScreen::Home) {transition_to(UiScreen::Map);}
+}
+
+void UiNode::update_location_event(const savo_msgs::msg::LocationEvent & message)
+{
+  mapping_seen_ = true;
+  last_mapping_update_ = std::chrono::steady_clock::now();
+  const std::string summary = location_event_summary(
+    message.event_type, message.candidate_id, message.location_id, message.reason);
+  navigation_ui_.message = summary;
+  if (message.event_type == savo_msgs::msg::LocationEvent::EVENT_CANDIDATE_REGISTERED) {
+    status_ui_.active_alert = "Location review: " +
+      bounded_ui_text(message.candidate_id, 40U);
+  } else if (
+    message.event_type == savo_msgs::msg::LocationEvent::EVENT_STORAGE_DEGRADED)
+  {
+    status_ui_.active_alert = "Location storage degraded";
+  }
 }
 
 void UiNode::update_live_state(const std::string & channel, const std::string & text)
@@ -2044,12 +2128,6 @@ void UiNode::update_live_state(const std::string & channel, const std::string & 
     }
     return;
   }
-  if (channel == "mapping") {
-    mapping_seen_ = true;
-    last_mapping_update_ = now;
-    status_ui_.mapping_state = upper;
-    return;
-  }
   if (channel == "locations") {
     last_mapping_update_ = now;
     mapping_seen_ = true;
@@ -2057,6 +2135,23 @@ void UiNode::update_live_state(const std::string & channel, const std::string & 
     if (!candidate.empty()) {
       navigation_ui_.message = "Location review: " + bounded_ui_text(candidate, 40U);
     }
+    return;
+  }
+  if (channel == "bridge") {
+    system_seen_ = true;
+    last_system_update_ = now;
+    status_ui_.link_state = upper;
+    status_ui_.savomind_state =
+      upper.find("READY") != std::string::npos ||
+      upper.find("CONNECTED") != std::string::npos ? "ONLINE" : upper;
+    return;
+  }
+  if (channel == "playback" || channel == "playback_finished") {
+    speech_seen_ = true;
+    last_speech_update_ = now;
+    voice_ui_.playback_state = upper;
+    status_ui_.playback_state = upper;
+    if (channel == "playback_finished") {handle_tts_finished();}
     return;
   }
   if (channel == "transcript") {
@@ -2455,9 +2550,7 @@ void UiNode::render_home()
     RCLCPP_WARN(get_logger(), "failed to draw generated home frame");
   }
   draw_live_top_bar_overlay(canvas_);
-
 }
-
 
 void UiNode::render_home_glow()
 {

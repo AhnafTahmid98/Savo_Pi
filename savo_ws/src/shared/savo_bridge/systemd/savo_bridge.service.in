@@ -14,8 +14,6 @@ UMask=0007
 Environment=ROS_DISTRO=jazzy
 Environment=SAVO_WORKSPACE=@WORKSPACE@
 Environment=SAVO_BRIDGE_CONFIG=@WORKSPACE@/install/savo_bridge/share/savo_bridge/config/savo_bridge.edge.yaml
-Environment=SAVO_ACTIVE_MAP_ID=saved_map
-Environment=SAVO_ACTIVE_MAP_REVISION=1
 ExecStart=@WORKSPACE@/install/savo_bridge/lib/savo_bridge/run_edge_bridge.sh
 Restart=on-failure
 RestartSec=3

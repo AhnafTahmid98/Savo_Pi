@@ -103,6 +103,37 @@ def run(
     return {"PASS": 0, "FAIL": 1, "BLOCKED": 2}[status]
 
 
+
+def emit_result(
+    diagnostic: str,
+    status: str,
+    reason: str,
+    details: dict[str, object],
+    *,
+    output: Path | None,
+    started: float,
+    started_utc: str,
+    command: Sequence[str] = (),
+) -> int:
+    if status not in {"PASS", "FAIL", "BLOCKED"}:
+        raise ValueError("invalid diagnostic status")
+    result = Result(
+        status=status,
+        diagnostic=diagnostic,
+        reason=reason,
+        started_utc=started_utc,
+        duration_s=round(time.monotonic() - started, 3),
+        command=list(command),
+        details=details,
+    )
+    encoded = json.dumps(asdict(result), indent=2) + "\n"
+    if output:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(encoded, encoding="utf-8")
+    print(encoded, end="")
+    return {"PASS": 0, "FAIL": 1, "BLOCKED": 2}[status]
+
+
 def topic_once(
     diagnostic: str,
     topic: str,

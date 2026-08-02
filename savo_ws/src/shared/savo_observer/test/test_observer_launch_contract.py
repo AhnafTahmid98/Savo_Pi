@@ -32,7 +32,15 @@ def test_canonical_defaults_and_modes_are_stable():
 
 
 def test_launches_contain_only_observer_and_rviz_processes():
-    source = '\n'.join(path.read_text(encoding='utf-8') for path in LAUNCH.glob('*'))
+    launch_files = (
+        path
+        for path in LAUNCH.glob('*')
+        if path.is_file() and path.suffix != '.pyc'
+    )
+    source = '\n'.join(
+        path.read_text(encoding='utf-8')
+        for path in launch_files
+    )
     for forbidden in (
         'nav2_bringup', 'slam_toolbox', 'savo_base', 'savo_control',
         'savo_supervisor', 'savo_mapping', 'savo_lidar', 'savo_realsense',

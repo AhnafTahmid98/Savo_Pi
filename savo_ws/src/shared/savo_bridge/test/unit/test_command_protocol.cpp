@@ -671,6 +671,25 @@ TEST(SavoBridgeCommandProtocol, ParsesAuthorizedWholePlanMappingCommands)
   ASSERT_TRUE(control.succeeded());
   EXPECT_EQ(control.command->command_type,
     savo_bridge::CommandType::ControlMapping);
+
+  const auto scan360 = savo_bridge::parse_command_request(
+    R"json({
+      "command_id":"mapping-scan360-1",
+      "command_type":"control_mapping",
+      "expires_at_unix_ms":1800000001000,
+      "issued_at_unix_ms":1800000000000,
+      "origin_agent":"mapping_agent",
+      "request_id":"mapping-request-3",
+      "payload":{"mission_id":"mission-1","operation":"request_scan360"},
+      "source":"savomind"
+    })json",
+    NOW_UNIX_MS);
+  ASSERT_TRUE(scan360.succeeded());
+  const auto * scan_payload =
+    std::get_if<savo_bridge::ControlMappingCommandPayload>(
+    &scan360.command->payload);
+  ASSERT_NE(scan_payload, nullptr);
+  EXPECT_EQ(scan_payload->operation, "request_scan360");
 }
 
 TEST(SavoBridgeCommandProtocol, MappingCannotDisableSaveOrOperatorApproval)

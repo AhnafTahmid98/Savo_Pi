@@ -1,0 +1,11 @@
+contract_version: 2
+transport: unix_stream
+socket_path: /run/savomind/speech.sock
+speech_request_magic: SAVOSPRQ
+speech_response_magic: SAVOSPRS
+playback_ack_magic: SAVOSPAK
+playback_ack_response_magic: SAVOSPAR
+physical_playback_ack_required_for_pending_navigation: true
+server_implementation: SavoMind/app/speech/transport/unix_speech_server.py
+client_implementation: savo_speech/transport/UnixSocketSavoMindTransport
+network_exposure_allowed: false

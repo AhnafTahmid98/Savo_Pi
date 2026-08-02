@@ -29,3 +29,24 @@ TEST(LiveState, FailsStale)
   EXPECT_TRUE(savo_ui::feed_is_stale(true, now - std::chrono::seconds(6), now,
     std::chrono::seconds(5)));
 }
+
+TEST(LiveState, FormatsTypedMappingWithoutInventingAuthority)
+{
+  const auto text = savo_ui::mapping_summary(
+    "awaiting_approval", true, 0.75, "final", "complete", 2U, true,
+    "prepared", "release-7", "operator_review_required");
+  EXPECT_NE(text.find("coverage=75%"), std::string::npos);
+  EXPECT_NE(text.find("pending_tags=2"), std::string::npos);
+  EXPECT_NE(text.find("approval=required"), std::string::npos);
+  EXPECT_NE(text.find("release=prepared:release-7"), std::string::npos);
+}
+
+TEST(LiveState, FormatsLocationEvent)
+{
+  EXPECT_EQ(
+    savo_ui::location_event_summary(1U, "candidate-2", "", "tag_seen"),
+    "candidate_registered candidate=candidate-2 reason=tag_seen");
+  EXPECT_EQ(
+    savo_ui::location_event_summary(11U, "", "A201", "committed"),
+    "release_committed location=A201 reason=committed");
+}

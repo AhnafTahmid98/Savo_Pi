@@ -675,6 +675,20 @@ struct WriteResult
   const std::int64_t received_at_unix_ms,
   const bool duplicate = false)
 {
+  Json result = Json::object();
+  if (!dispatch.result_json.empty()) {
+    Json parsed = Json::parse(
+      dispatch.result_json, nullptr, false, true);
+    if (!parsed.is_discarded() && parsed.is_object()) {
+      result = std::move(parsed);
+    }
+  }
+
+  Json details = response_details(
+    dispatch.dispatch_attempted,
+    dispatch.ros_publications);
+  details["result"] = std::move(result);
+
   return Json{
     {"protocol_version", COMMAND_PROTOCOL_VERSION},
     {"message_type", "command_acknowledgement"},
@@ -686,9 +700,7 @@ struct WriteResult
     {"execution_mode", execution_mode},
     {"duplicate", duplicate},
     {"received_at_unix_ms", received_at_unix_ms},
-    {"details", response_details(
-        dispatch.dispatch_attempted,
-        dispatch.ros_publications)},
+    {"details", std::move(details)},
   };
 }
 

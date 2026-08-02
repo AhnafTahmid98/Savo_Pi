@@ -14,9 +14,18 @@ PROHIBITED = {
 def test_runtime_has_no_service_action_or_unsafe_rviz_api():
     for directory in RUNTIME:
         for path in directory.rglob('*'):
-            if not path.is_file():
+            if (
+                not path.is_file()
+                or '__pycache__' in path.parts
+                or path.suffix in {'.pyc', '.pyo'}
+            ):
                 continue
-            source = path.read_text(encoding='utf-8')
+
+            try:
+                source = path.read_text(encoding='utf-8')
+            except UnicodeDecodeError:
+                continue
+
             for token in PROHIBITED:
                 assert token not in source, (path, token)
 

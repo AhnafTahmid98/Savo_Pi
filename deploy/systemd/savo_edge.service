@@ -9,6 +9,7 @@ StartLimitBurst=5
 Type=simple
 User=@SAVO_USER@
 Group=@SAVO_GROUP@
+SupplementaryGroups=savomind-bridge
 WorkingDirectory=@SAVO_ROOT@
 EnvironmentFile=-/etc/robot-savo/robot-savo.env
 Environment=SAVO_ROBOT_MODE=safe_idle

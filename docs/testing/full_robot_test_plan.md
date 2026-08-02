@@ -17,7 +17,7 @@ or abort blocks every later stage until reviewed.
 | 9 | Power validation | UPS/base telemetry; meter | `python3 tools/diag/power/current_draw_logger.py` | All required rails and telemetry present | Undervoltage, excess current, overheating | Remove drive power; save trace |
 | 10 | Audio validation | ReSpeaker and speaker; quiet area | Follow `docs/testing/speech_test_plan.md` | Capture/playback works with no feedback loop | Sustained feedback, clipping, missing gate | Mute speaker; save audio metadata only |
 | 11 | UI validation | Edge display/touch | `python3 tools/diag/ui/screen_ui_test.py` | Live/stale states match ROS state | UI implies readiness when data is stale | Stop UI; save screenshots/logs |
-| 12 | Wheels-raised motor validation | Geometry locked; robot secured on stands; two operators | Follow `docs/testing/base_test_plan.md --allow-motion` steps | Correct wheel direction at bounded command | Robot shifts, wrong wheel, STOP not immediate | E-stop, remove motor power, record video |
+| 12 | Wheels-raised motor validation | Geometry locked; robot secured on stands; two operators | Follow `docs/testing/base_test_plan.md`; run `motor_direction_test.py --allow-motion --wheels-raised` one direction at a time | Correct wheel direction at bounded command | Robot shifts, wrong wheel, STOP not immediate | E-stop, remove motor power, record video |
 | 13 | Safety-stop validation | Stage 12 passed; obstacle fixtures | Run safety plan with drive raised | Every stop path forces zero output | Any nonzero gated velocity after stop | E-stop and remove power; save traces |
 | 14 | Short guarded floor movement | Clear taped zone; spotter; E-stop | Approved bounded control test only | Slow commanded motion matches direction | Person enters zone, drift, localization jump | E-stop; return robot manually |
 | 15 | Manual mapping | Stages 7–14 passed | `ros2 launch savo_bringup manual_mapping.launch.py` | Map session records and saves without bypass | Localization/safety/release error | Cancel mapping; preserve session logs |
@@ -31,3 +31,18 @@ or abort blocks every later stage until reviewed.
 | 23 | Optional voxel profile validation | Stage 22 signed off; geometry locked | Explicit validated voxel profile only | Obstacles affect costmap without false blocks | Any unsafe clearing/marking or overload | Disable voxel profile and revert to LiDAR |
 
 The plan never grants approval to lock geometry or AM-8 automatically.
+
+## Hardware-free software gate
+
+Before copying the workspace to either Pi, run the complete affected-package
+build and test gate on the ROS 2 Jazzy development PC:
+
+```bash
+cd ~/Savo_Pi
+deploy/common/run_pre_real_test_regression.sh --clean-affected
+```
+
+This command performs source validation, dependency checking, affected-package
+builds/tests, and launch-argument generation. It never launches robot nodes. A
+`BLOCKED` readiness result caused only by provisional geometry or other physical
+prerequisites is expected; any repository `FAIL` must be corrected first.

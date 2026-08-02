@@ -5,6 +5,27 @@ archive=""
 state_root="${SAVO_STATE_ROOT:-/var/lib/robot_savo}"
 config_root="${SAVO_CONFIG_ROOT:-/etc/robot-savo}"
 overwrite=false
+
+sqlite_integrity_check() {
+  local database="$1"
+  if command -v sqlite3 >/dev/null 2>&1; then
+    [[ "$(sqlite3 "$database" 'PRAGMA integrity_check;')" == ok ]]
+    return
+  fi
+  if command -v python3 >/dev/null 2>&1; then
+    python3 - "$database" <<'PYSQL'
+import sqlite3
+import sys
+with sqlite3.connect(sys.argv[1]) as connection:
+    row = connection.execute("PRAGMA integrity_check").fetchone()
+raise SystemExit(0 if row and row[0] == "ok" else 1)
+PYSQL
+    return
+  fi
+  echo "sqlite3 CLI or Python sqlite3 module is required to validate $database" >&2
+  return 2
+}
+
 while (($#)); do
   case "$1" in
     --archive) archive="${2:-}"; shift 2 ;;
@@ -45,8 +66,14 @@ for required in maps locations supervisor; do
   [[ -d "$payload/state/$required" ]] || { echo "Missing payload directory: $required" >&2; exit 1; }
 done
 while IFS= read -r -d '' database; do
-  command -v sqlite3 >/dev/null 2>&1 || { echo "sqlite3 is required to validate $database" >&2; exit 2; }
-  [[ "$(sqlite3 "$database" 'PRAGMA integrity_check;')" == ok ]] || { echo "SQLite integrity failed: $database" >&2; exit 1; }
+  if ! sqlite_integrity_check "$database"; then
+    code=$?
+    if [[ "$code" -eq 2 ]]; then
+      exit 2
+    fi
+    echo "SQLite integrity failed: $database" >&2
+    exit 1
+  fi
 done < <(find "$payload/state" -type f -name '*.db' -print0)
 while IFS= read -r -d '' sums; do (cd "$(dirname "$sums")" && sha256sum -c "$(basename "$sums")"); done \
   < <(find "$payload/state" -type f -name '*.sha256' -print0)

@@ -20,9 +20,9 @@ inline constexpr std::string_view kHeartbeat{
 inline constexpr std::string_view kDiagnostics{
   "/diagnostics"};
 
-// Reserved production speech topics.
-// These constants are locked now, but publishers will be introduced only
-// after the corresponding savo_msgs interfaces are finalized.
+// Production speech lifecycle topics. State, transcript, response and
+// playback events are privacy-bounded std_msgs strings; raw audio is never
+// published continuously.
 inline constexpr std::string_view kState{
   "/savo_speech/state"};
 

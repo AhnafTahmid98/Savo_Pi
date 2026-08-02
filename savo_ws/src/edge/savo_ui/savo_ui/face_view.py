@@ -16,7 +16,7 @@ This module draws a friendly robot face:
 - Date & time in the top-left corner.
 
 Important:
-----------
+---------
 - We IGNORE status_text and subtitle_text on purpose.
 - Only the small clock text is rendered; no bottom text is drawn.
 

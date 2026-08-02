@@ -162,6 +162,12 @@ if(BUILD_TESTING)
     TIMEOUT 60
   )
 
+  ament_add_pytest_test(
+    test_savo_bridge_command_boundary_contract
+    test/contracts/test_command_boundary_contract.py
+    TIMEOUT 60
+  )
+
   ament_add_gtest(test_savo_bridge_version
     test/unit/test_version.cpp
   )
@@ -217,6 +223,7 @@ if(BUILD_TESTING)
       test_savo_bridge_ros_command_dispatcher
       ${PROJECT_NAME}_ros
       ${PROJECT_NAME}_core
+      nlohmann_json::nlohmann_json
     )
 
     ament_target_dependencies(
