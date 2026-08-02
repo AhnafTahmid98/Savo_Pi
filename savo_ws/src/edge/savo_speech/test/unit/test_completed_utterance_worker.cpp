@@ -1,3 +1,4 @@
+// Copyright 2026 Ahnaf Tahmid
 #include <chrono>
 #include <condition_variable>
 #include <cstddef>
@@ -11,7 +12,6 @@
 #include <utility>
 
 #include "gtest/gtest.h"
-
 #include "savo_speech/audio/audio_buffer.hpp"
 #include "savo_speech/audio/wav_reader.hpp"
 #include "savo_speech/session/completed_utterance.hpp"
@@ -24,8 +24,8 @@ namespace
 
 using namespace std::chrono_literals;
 
-class ScriptedCompletedUtteranceSource final :
-  public savo_speech::session::
+class ScriptedCompletedUtteranceSource final
+  : public savo_speech::session::
   CompletedUtteranceSource
 {
 public:
@@ -64,7 +64,7 @@ public:
 
   void push(
     savo_speech::session::CompletedUtterance
-      utterance)
+    utterance)
   {
     {
       const std::scoped_lock lock{mutex_};
@@ -94,7 +94,7 @@ private:
 
   std::deque<
     savo_speech::session::CompletedUtterance>
-    utterances_;
+  utterances_;
 
   bool fail_waits_{false};
 
@@ -224,8 +224,8 @@ TEST(
     static_cast<void>(
       savo_speech::session::
       CompletedUtteranceWorker{
-        source,
-        config}),
+    source,
+    config}),
     std::invalid_argument);
 
   config = make_worker_config();
@@ -235,8 +235,8 @@ TEST(
     static_cast<void>(
       savo_speech::session::
       CompletedUtteranceWorker{
-        source,
-        config}),
+    source,
+    config}),
     std::invalid_argument);
 
   config = make_worker_config();
@@ -246,8 +246,8 @@ TEST(
     static_cast<void>(
       savo_speech::session::
       CompletedUtteranceWorker{
-        source,
-        config}),
+    source,
+    config}),
     std::invalid_argument);
 }
 

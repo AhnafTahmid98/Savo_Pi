@@ -1,0 +1,23 @@
+[Unit]
+Description=Robot SAVO edge framebuffer UI
+Wants=network-online.target
+After=network-online.target
+Conflicts=savo_edge.service
+
+[Service]
+Type=simple
+User=@SAVO_USER@
+Group=@SAVO_GROUP@
+WorkingDirectory=@SAVO_ROOT@
+EnvironmentFile=-/etc/robot-savo/robot-savo.env
+ExecStart=/bin/bash -lc 'source /opt/ros/jazzy/setup.bash && source "@SAVO_WS@/install/setup.bash" && exec ros2 launch savo_ui ui_bringup.launch.py profile:=pi'
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGINT
+TimeoutStopSec=20
+KillMode=control-group
+UMask=0027
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

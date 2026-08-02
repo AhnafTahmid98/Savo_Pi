@@ -1,12 +1,13 @@
+// Copyright 2026 Ahnaf Tahmid
+#include <span>
+
 #include <cstddef>
 #include <cstdint>
 #include <functional>
-#include <span>
 #include <stdexcept>
 #include <vector>
 
 #include "gtest/gtest.h"
-
 #include "savo_speech/audio/audio_buffer.hpp"
 #include "savo_speech/audio/microphone_gate.hpp"
 #include "savo_speech/audio/playback_controller.hpp"
@@ -15,8 +16,8 @@
 namespace
 {
 
-class FakePlaybackSink final :
-  public savo_speech::audio::PlaybackSink
+class FakePlaybackSink final
+  : public savo_speech::audio::PlaybackSink
 {
 public:
   explicit FakePlaybackSink(

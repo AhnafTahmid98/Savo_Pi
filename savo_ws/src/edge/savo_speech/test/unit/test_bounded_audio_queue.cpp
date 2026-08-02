@@ -1,9 +1,9 @@
+// Copyright 2026 Ahnaf Tahmid
 #include <chrono>
 #include <cstdint>
 #include <stdexcept>
 
 #include "gtest/gtest.h"
-
 #include "savo_speech/audio/bounded_audio_queue.hpp"
 
 namespace

@@ -1,3 +1,4 @@
+// Copyright 2026 Ahnaf Tahmid
 #ifndef SAVO_SPEECH__SPEECH_NODE_HPP_
 #define SAVO_SPEECH__SPEECH_NODE_HPP_
 
@@ -5,11 +6,11 @@
 #include <memory>
 #include <string>
 
+#include "savo_speech/session/speech_error.hpp"
+#include "savo_speech/session/speech_phase.hpp"
+
 #include "diagnostic_msgs/msg/diagnostic_array.hpp"
 #include "rclcpp/rclcpp.hpp"
-#include "std_msgs/msg/string.hpp"
-#include "std_msgs/msg/u_int64.hpp"
-
 #include "savo_speech/audio/audio_activity_monitor.hpp"
 #include "savo_speech/audio/audio_runtime.hpp"
 #include "savo_speech/audio/capture_processing_dispatcher.hpp"
@@ -17,13 +18,13 @@
 #include "savo_speech/drivers/alsa_capture_stream.hpp"
 #include "savo_speech/drivers/alsa_playback_stream.hpp"
 #include "savo_speech/session/completed_utterance_worker.hpp"
-#include "savo_speech/session/speech_error.hpp"
-#include "savo_speech/session/speech_phase.hpp"
 #include "savo_speech/session/utterance_session_processor.hpp"
 #include "savo_speech/vad/adaptive_energy_vad_backend.hpp"
 #include "savo_speech/vad/vad_processor.hpp"
 #include "savo_speech/wake_word/pocketsphinx_wake_word_backend.hpp"
 #include "savo_speech/wake_word/wake_word_processor.hpp"
+#include "std_msgs/msg/string.hpp"
+#include "std_msgs/msg/u_int64.hpp"
 
 namespace savo_speech
 {
@@ -193,43 +194,43 @@ private:
   std::uint64_t heartbeat_count_{0U};
 
   std::unique_ptr<drivers::AlsaCaptureStream>
-    capture_stream_;
+  capture_stream_;
 
   std::unique_ptr<drivers::AlsaPlaybackStream>
-    playback_stream_;
+  playback_stream_;
 
   std::unique_ptr<audio::AudioRuntime>
-    audio_runtime_;
+  audio_runtime_;
 
   std::unique_ptr<audio::AudioActivityMonitor>
-    audio_activity_monitor_;
+  audio_activity_monitor_;
 
   std::unique_ptr<
     wake_word::PocketSphinxWakeWordBackend>
-    wake_word_backend_;
+  wake_word_backend_;
 
   std::unique_ptr<wake_word::WakeWordProcessor>
-    wake_word_processor_;
+  wake_word_processor_;
 
   std::unique_ptr<vad::AdaptiveEnergyVadBackend>
-    vad_backend_;
+  vad_backend_;
 
   std::unique_ptr<vad::VadProcessor>
-    vad_processor_;
+  vad_processor_;
 
   std::unique_ptr<
     session::UtteranceSessionProcessor>
-    utterance_session_processor_;
+  utterance_session_processor_;
 
   std::unique_ptr<
     session::CompletedUtteranceWorker>
-    completed_utterance_worker_;
+  completed_utterance_worker_;
 
   std::unique_ptr<audio::CapturedAudioProcessorChain>
-    captured_audio_processor_chain_;
+  captured_audio_processor_chain_;
 
   std::unique_ptr<audio::CaptureProcessingDispatcher>
-    capture_processing_dispatcher_;
+  capture_processing_dispatcher_;
 
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr
     readiness_publisher_;

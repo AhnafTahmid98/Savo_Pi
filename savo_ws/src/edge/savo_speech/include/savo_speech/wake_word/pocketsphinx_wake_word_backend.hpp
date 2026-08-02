@@ -1,3 +1,4 @@
+// Copyright 2026 Ahnaf Tahmid
 #ifndef SAVO_SPEECH__WAKE_WORD__POCKETSPHINX_WAKE_WORD_BACKEND_HPP_
 #define SAVO_SPEECH__WAKE_WORD__POCKETSPHINX_WAKE_WORD_BACKEND_HPP_
 
@@ -56,8 +57,8 @@ struct PocketSphinxWakeWordBackendSnapshot
   PocketSphinxWakeWordBackendStatistics statistics{};
 };
 
-class PocketSphinxWakeWordBackend final :
-  public WakeWordBackend
+class PocketSphinxWakeWordBackend final
+  : public WakeWordBackend
 {
 public:
   explicit PocketSphinxWakeWordBackend(

@@ -1,3 +1,4 @@
+// Copyright 2026 Ahnaf Tahmid
 #ifndef SAVO_SPEECH__AUDIO__MICROPHONE_GATE_HPP_
 #define SAVO_SPEECH__AUDIO__MICROPHONE_GATE_HPP_
 

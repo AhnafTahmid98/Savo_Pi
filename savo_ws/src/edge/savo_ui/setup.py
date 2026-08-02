@@ -1,6 +1,8 @@
-from setuptools import setup, find_packages
+# Copyright 2026 Ahnaf Tahmid
 from glob import glob
 import os
+
+from setuptools import find_packages, setup
 
 # ============================================================================
 # Robot Savo — savo_ui setup.py
@@ -25,11 +27,11 @@ import os
 #   (even empty is fine). It registers the package in the ament index.
 # ============================================================================
 
-package_name = "savo_ui"
+package_name = 'savo_ui'
 
 setup(
     name=package_name,
-    version="0.1.0",
+    version='0.1.0',
     # Discover Python packages (should find the `savo_ui` directory)
     packages=find_packages(),
     # ----------------------------------------------------------------------
@@ -38,61 +40,56 @@ setup(
     data_files=[
         # Register package with ament so `ros2 pkg` can find it
         (
-            os.path.join("share", "ament_index", "resource_index", "packages"),
-            [os.path.join("resource", package_name)],
+            os.path.join('share', 'ament_index', 'resource_index', 'packages'),
+            [os.path.join('resource', package_name)],
         ),
         # Install package.xml
         (
-            os.path.join("share", package_name),
-            ["package.xml"],
+            os.path.join('share', package_name),
+            ['package.xml'],
         ),
         # Install config files (ui_params.yaml, etc.) if present
         (
-            os.path.join("share", package_name, "config"),
-            glob("config/*.yaml"),
+            os.path.join('share', package_name, 'config'),
+            glob('config/*.yaml'),
         ),
         # Install launch files (savo_ui_bringup.launch.py, etc.) if present
         (
-            os.path.join("share", package_name, "launch"),
-            glob("launch/*.py"),
+            os.path.join('share', package_name, 'launch'),
+            glob('launch/*.py'),
         ),
     ],
     # ----------------------------------------------------------------------
     # Core Python packaging metadata
     # ----------------------------------------------------------------------
-    install_requires=["setuptools"],
+    install_requires=['setuptools'],
     zip_safe=True,
-    maintainer="Ahnaf Tahmid",
-    maintainer_email="tahmidahnaf998@gmail.com",
+    maintainer='Ahnaf Tahmid',
+    maintainer_email='tahmidahnaf998@gmail.com',
     description=(
         'Robot Savo UI stack: drives the 7" DFRobot DSI display with '
-        "INTERACT (face), NAVIGATE (camera + overlay), and MAP modes."
+        'INTERACT (face), NAVIGATE (camera + overlay), and MAP modes.'
     ),
-    license="Proprietary",
-    tests_require=["pytest"],
+    license='Proprietary',
+    tests_require=['pytest'],
     # ----------------------------------------------------------------------
     # Entry points: ROS 2 nodes exposed as console_scripts
     # ----------------------------------------------------------------------
     entry_points={
-        "console_scripts": [
+        'console_scripts': [
             # Full-screen display manager (Pygame, face + camera views)
-            "display_manager_node = savo_ui.display_manager_node:main",
-
+            'display_manager_node = savo_ui.display_manager_node:main',
             # UI mode router (optional, future):
             # maps intents / Nav2 state → /savo_ui/mode + /savo_ui/status_text
-            "ui_mode_router_node = savo_ui.ui_mode_router_node:main",
-
+            'ui_mode_router_node = savo_ui.ui_mode_router_node:main',
             # Simple debug driver (optional, future):
             # can cycle modes, set fake mouth_level, etc.
-            "ui_debug_node = savo_ui.ui_debug_node:main",
-
+            'ui_debug_node = savo_ui.ui_debug_node:main',
             # Fake camera publisher for NAVIGATE testing (gradient video on
             # /camera/image_rect so the UI can be tested without a real camera).
-            "fake_cam_node = savo_ui.fake_cam_node:main",
-
+            'fake_cam_node = savo_ui.fake_cam_node:main',
             # Real Pi camera publisher → /camera/image_rect
-            "real_cam_node = savo_ui.real_cam_node:main",
-            
+            'real_cam_node = savo_ui.real_cam_node:main',
         ],
     },
 )

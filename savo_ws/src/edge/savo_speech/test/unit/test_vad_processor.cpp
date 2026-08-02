@@ -1,3 +1,4 @@
+// Copyright 2026 Ahnaf Tahmid
 #include <chrono>
 #include <cstdint>
 #include <deque>
@@ -5,7 +6,6 @@
 #include <stdexcept>
 
 #include "gtest/gtest.h"
-
 #include "savo_speech/vad/vad_processor.hpp"
 
 namespace
@@ -13,8 +13,8 @@ namespace
 
 using namespace std::chrono_literals;
 
-class FakeVadBackend final :
-  public savo_speech::vad::VadBackend
+class FakeVadBackend final
+  : public savo_speech::vad::VadBackend
 {
 public:
   [[nodiscard]]
@@ -66,7 +66,7 @@ public:
 private:
   std::deque<
     savo_speech::vad::VadBackendResult>
-    results_{};
+  results_{};
 
   bool throw_on_analyze_{false};
 
@@ -84,7 +84,7 @@ make_frame(
 
   frame.captured_at =
     savo_speech::audio::AudioFrame::Clock::time_point{} +
-    offset;
+  offset;
 
   frame.format = {
     16000U,
@@ -131,8 +131,8 @@ TEST(VadProcessor, RejectsInvalidConfiguration)
   EXPECT_THROW(
     static_cast<void>(
       savo_speech::vad::VadProcessor{
-        backend,
-        config}),
+    backend,
+    config}),
     std::invalid_argument);
 
   config = make_config();
@@ -141,8 +141,8 @@ TEST(VadProcessor, RejectsInvalidConfiguration)
   EXPECT_THROW(
     static_cast<void>(
       savo_speech::vad::VadProcessor{
-        backend,
-        config}),
+    backend,
+    config}),
     std::invalid_argument);
 
   config = make_config();
@@ -151,8 +151,8 @@ TEST(VadProcessor, RejectsInvalidConfiguration)
   EXPECT_THROW(
     static_cast<void>(
       savo_speech::vad::VadProcessor{
-        backend,
-        config}),
+    backend,
+    config}),
     std::invalid_argument);
 }
 

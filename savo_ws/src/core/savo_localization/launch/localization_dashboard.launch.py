@@ -18,7 +18,6 @@ def generate_launch_description() -> LaunchDescription:
     topics_config = LaunchConfiguration("topics_config")
     frames_config = LaunchConfiguration("frames_config")
     diagnostics_config = LaunchConfiguration("diagnostics_config")
-    dashboard_config = LaunchConfiguration("dashboard_config")
     profile_config = LaunchConfiguration("profile_config")
 
     return LaunchDescription(
@@ -45,13 +44,6 @@ def generate_launch_description() -> LaunchDescription:
                 description="Localization diagnostic behavior config.",
             ),
             DeclareLaunchArgument(
-                "dashboard_config",
-                default_value=PathJoinSubstitution(
-                    [package_share, "config", "localization_dashboard.yaml"]
-                ),
-                description="Localization dashboard display config.",
-            ),
-            DeclareLaunchArgument(
                 "profile_config",
                 default_value=PathJoinSubstitution(
                     [
@@ -65,15 +57,13 @@ def generate_launch_description() -> LaunchDescription:
             ),
             Node(
                 package="savo_localization",
-                executable="localization_dashboard.py",
-                name="localization_dashboard",
+                executable="localization_health_node",
+                name="localization_health_node",
                 output="screen",
-                emulate_tty=True,
                 parameters=[
                     topics_config,
                     frames_config,
                     diagnostics_config,
-                    dashboard_config,
                     profile_config,
                 ],
             ),

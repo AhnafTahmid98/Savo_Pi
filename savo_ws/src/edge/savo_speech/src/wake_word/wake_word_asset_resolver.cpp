@@ -1,9 +1,10 @@
-#include "savo_speech/wake_word/wake_word_asset_resolver.hpp"
-
+// Copyright 2026 Ahnaf Tahmid
 #include <filesystem>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+
+#include "savo_speech/wake_word/wake_word_asset_resolver.hpp"
 
 namespace savo_speech::wake_word
 {

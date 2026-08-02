@@ -1,12 +1,14 @@
+// Copyright 2026 Ahnaf Tahmid
 #ifndef SAVO_SPEECH__SESSION__COMPLETED_UTTERANCE_WORKER_HPP_
 #define SAVO_SPEECH__SESSION__COMPLETED_UTTERANCE_WORKER_HPP_
+
+#include <stop_token>
 
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <mutex>
 #include <optional>
-#include <stop_token>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -111,7 +113,7 @@ public:
   CompletedUtteranceWorker(
     CompletedUtteranceSource & source,
     CompletedUtteranceWorkerConfig config =
-      CompletedUtteranceWorkerConfig{});
+    CompletedUtteranceWorkerConfig{});
 
   ~CompletedUtteranceWorker();
 

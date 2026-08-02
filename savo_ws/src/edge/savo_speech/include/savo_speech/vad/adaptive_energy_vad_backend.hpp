@@ -1,3 +1,4 @@
+// Copyright 2026 Ahnaf Tahmid
 #ifndef SAVO_SPEECH__VAD__ADAPTIVE_ENERGY_VAD_BACKEND_HPP_
 #define SAVO_SPEECH__VAD__ADAPTIVE_ENERGY_VAD_BACKEND_HPP_
 
@@ -69,13 +70,13 @@ struct AdaptiveEnergyVadSnapshot
   std::string last_error{};
 };
 
-class AdaptiveEnergyVadBackend final :
-  public VadBackend
+class AdaptiveEnergyVadBackend final
+  : public VadBackend
 {
 public:
   explicit AdaptiveEnergyVadBackend(
     AdaptiveEnergyVadConfig config =
-      AdaptiveEnergyVadConfig{});
+    AdaptiveEnergyVadConfig{});
 
   ~AdaptiveEnergyVadBackend() override = default;
 

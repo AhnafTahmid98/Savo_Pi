@@ -1,0 +1,12 @@
+/var/log/robot_savo/*.log /var/log/robot_savo/*/*.log {
+    daily
+    rotate 14
+    size 20M
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+    su robot-savo robot-savo
+    create 0640 robot-savo robot-savo
+}

@@ -1,10 +1,11 @@
-#include "savo_speech/audio/playback_worker.hpp"
-
+// Copyright 2026 Ahnaf Tahmid
 #include <algorithm>
 #include <exception>
 #include <stdexcept>
 #include <string>
 #include <utility>
+
+#include "savo_speech/audio/playback_worker.hpp"
 
 namespace savo_speech::audio
 {

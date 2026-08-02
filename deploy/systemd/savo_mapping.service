@@ -1,0 +1,24 @@
+[Unit]
+Description=Robot SAVO explicitly enabled manual mapping
+Wants=network-online.target
+After=network-online.target savo_core.service
+ConditionPathExists=/etc/robot-savo/enable-mapping-service
+
+[Service]
+Type=simple
+User=@SAVO_USER@
+Group=@SAVO_GROUP@
+WorkingDirectory=@SAVO_ROOT@
+EnvironmentFile=-/etc/robot-savo/robot-savo.env
+Environment=SAVO_CONTROL_STARTUP_MODE=STOP
+ExecStart=@SAVO_ROOT@/deploy/core/run_mapping_service.sh
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGINT
+TimeoutStopSec=30
+KillMode=control-group
+UMask=0027
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

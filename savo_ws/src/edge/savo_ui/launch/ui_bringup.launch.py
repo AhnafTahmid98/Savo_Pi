@@ -1,11 +1,10 @@
+# Copyright 2026 Ahnaf Tahmid
 from pathlib import Path
 
 from ament_index_python.packages import get_package_share_directory
-
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
-
 from launch_ros.actions import Node
 
 
@@ -50,11 +49,13 @@ def launch_setup(context, *args, **kwargs):
 
 
 def generate_launch_description():
-    return LaunchDescription([
-        DeclareLaunchArgument(
-            'profile',
-            default_value='pi',
-            description='savo_ui runtime profile: pi or dryrun',
-        ),
-        OpaqueFunction(function=launch_setup),
-    ])
+    return LaunchDescription(
+        [
+            DeclareLaunchArgument(
+                'profile',
+                default_value='pi',
+                description='savo_ui runtime profile: pi or dryrun',
+            ),
+            OpaqueFunction(function=launch_setup),
+        ]
+    )

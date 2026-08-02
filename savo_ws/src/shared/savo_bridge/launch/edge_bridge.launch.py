@@ -19,8 +19,8 @@ def generate_launch_description() -> LaunchDescription:
     return LaunchDescription(
         [
             DeclareLaunchArgument('config_file', default_value=default_config),
-            DeclareLaunchArgument('active_map_id', default_value='saved_map'),
-            DeclareLaunchArgument('active_map_revision', default_value='1'),
+            DeclareLaunchArgument('active_map_id', default_value=''),
+            DeclareLaunchArgument('active_map_revision', default_value='0'),
             Node(
                 package='savo_bridge',
                 executable='savo_bridge_node',

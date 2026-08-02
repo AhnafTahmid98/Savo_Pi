@@ -1,5 +1,6 @@
+# Copyright 2026 Ahnaf Tahmid
 """
-Robot Savo — UI package
+Robot Savo — UI package.
 
 This package contains the screen user interface for Robot Savo.
 It is responsible for driving the 7" DFRobot DSI display on the Pi and
@@ -34,7 +35,7 @@ from __future__ import annotations
 
 from importlib.metadata import PackageNotFoundError, version
 
-__all__ = ["__version__"]
+__all__ = ['__version__']
 
 
 def _detect_version() -> str:
@@ -47,10 +48,10 @@ def _detect_version() -> str:
     """
     try:
         # The distribution name must match the one defined in setup.cfg
-        return version("savo_ui")
+        return version('savo_ui')
     except PackageNotFoundError:
         # Fallback for devel runs where the package is not installed as a wheel
-        return "0.0.0.dev0"
+        return '0.0.0.dev0'
 
 
 __version__: str = _detect_version()

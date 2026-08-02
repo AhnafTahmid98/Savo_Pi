@@ -1,6 +1,10 @@
-#include "savo_ui/app/ui_node.hpp"
-#include "savo_ui/render/preview_writer.hpp"
-#include "savo_ui/render/font.hpp"
+// Copyright 2026 Ahnaf Tahmid
+#include <arpa/inet.h>
+#include <fcntl.h>
+#include <ifaddrs.h>
+#include <linux/input.h>
+#include <net/if.h>
+#include <unistd.h>
 
 #include <algorithm>
 #include <cerrno>
@@ -8,25 +12,21 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <ctime>
 #include <filesystem>
 #include <functional>
-#include <stdexcept>
-#include <string>
-#include <vector>
-
-#include <fcntl.h>
-#include <linux/input.h>
-#include <unistd.h>
-
-#include <arpa/inet.h>
-#include <ifaddrs.h>
-#include <net/if.h>
-
-#include <chrono>
-#include <ctime>
 #include <iomanip>
 #include <sstream>
+#include <stdexcept>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include "savo_ui/app/ui_node.hpp"
+
+#include "savo_ui/app/live_state.hpp"
+#include "savo_ui/render/font.hpp"
+#include "savo_ui/render/preview_writer.hpp"
 
 
 namespace
@@ -410,6 +410,7 @@ UiNode::UiNode(const rclcpp::NodeOptions & options)
   configure_display();
   configure_touch();
   configure_power_subscriptions();
+  configure_live_subscriptions();
   present_if_enabled();
 
   configure_runtime();
@@ -458,6 +459,17 @@ void UiNode::declare_parameters()
   declare_parameter<std::string>(
     "power_status_topic",
     config_.power_status_topic);
+  declare_parameter<std::string>("core_state_topic", config_.core_state_topic);
+  declare_parameter<std::string>("edge_state_topic", config_.edge_state_topic);
+  declare_parameter<std::string>("mode_state_topic", config_.mode_state_topic);
+  declare_parameter<std::string>("safety_state_topic", config_.safety_state_topic);
+  declare_parameter<std::string>("navigation_state_topic", config_.navigation_state_topic);
+  declare_parameter<std::string>("mapping_state_topic", config_.mapping_state_topic);
+  declare_parameter<std::string>("locations_state_topic", config_.locations_state_topic);
+  declare_parameter<std::string>("speech_state_topic", config_.speech_state_topic);
+  declare_parameter<std::string>("speech_readiness_topic", config_.speech_readiness_topic);
+  declare_parameter<std::string>("transcript_topic", config_.transcript_topic);
+  declare_parameter<std::string>("response_topic", config_.response_topic);
 
   declare_parameter<int>("screen_width", config_.screen_width);
   declare_parameter<int>("screen_height", config_.screen_height);
@@ -474,6 +486,7 @@ void UiNode::declare_parameters()
   declare_parameter<double>(
     "power_stale_timeout_s",
     config_.power_stale_timeout_s);
+  declare_parameter<double>("live_state_stale_timeout_s", config_.live_state_stale_timeout_s);
 
   declare_parameter<bool>("enable_framebuffer", config_.enable_framebuffer);
   declare_parameter<bool>("enable_touch", config_.enable_touch);
@@ -496,6 +509,17 @@ void UiNode::load_parameters()
     get_parameter("power_base_topic").as_string();
   config_.power_status_topic =
     get_parameter("power_status_topic").as_string();
+  config_.core_state_topic = get_parameter("core_state_topic").as_string();
+  config_.edge_state_topic = get_parameter("edge_state_topic").as_string();
+  config_.mode_state_topic = get_parameter("mode_state_topic").as_string();
+  config_.safety_state_topic = get_parameter("safety_state_topic").as_string();
+  config_.navigation_state_topic = get_parameter("navigation_state_topic").as_string();
+  config_.mapping_state_topic = get_parameter("mapping_state_topic").as_string();
+  config_.locations_state_topic = get_parameter("locations_state_topic").as_string();
+  config_.speech_state_topic = get_parameter("speech_state_topic").as_string();
+  config_.speech_readiness_topic = get_parameter("speech_readiness_topic").as_string();
+  config_.transcript_topic = get_parameter("transcript_topic").as_string();
+  config_.response_topic = get_parameter("response_topic").as_string();
 
   config_.screen_width = clamp_int(get_parameter("screen_width").as_int(), 320, 3840);
   config_.screen_height = clamp_int(get_parameter("screen_height").as_int(), 240, 2160);
@@ -516,6 +540,8 @@ void UiNode::load_parameters()
       get_parameter("power_stale_timeout_s").as_double(),
       1.0,
       60.0);
+  config_.live_state_stale_timeout_s = clamp_double(
+    get_parameter("live_state_stale_timeout_s").as_double(), 1.0, 60.0);
 
   config_.enable_framebuffer = get_parameter("enable_framebuffer").as_bool();
   config_.enable_touch = get_parameter("enable_touch").as_bool();
@@ -643,14 +669,13 @@ bool UiNode::load_robot360_frames()
 }
 
 
-
 bool UiNode::load_page_shells()
 {
   auto load_shell =
     [this](
-      const std::string & file_name,
-      const std::string & page_name,
-      ImageAsset * shell) -> bool
+    const std::string & file_name,
+    const std::string & page_name,
+    ImageAsset * shell) -> bool
     {
       if (shell == nullptr) {
         RCLCPP_ERROR(
@@ -707,15 +732,14 @@ bool UiNode::load_page_shells()
 }
 
 
-
 bool UiNode::load_runtime_font_atlases()
 {
   auto load_font =
     [this](
-      const std::string & file_name,
-      const int expected_width,
-      const int expected_height,
-      ImageAsset * destination) -> bool
+    const std::string & file_name,
+    const int expected_width,
+    const int expected_height,
+    ImageAsset * destination) -> bool
     {
       if (destination == nullptr) {
         return false;
@@ -803,7 +827,7 @@ void UiNode::configure_home_idle_sequence()
 }
 
 
-void UiNode::export_preview_frames()
+void UiNode::export_preview_frames()  // NOLINT(readability/fn_size)
 {
   if (!config_.export_preview_frames) {
     RCLCPP_INFO(
@@ -884,8 +908,8 @@ void UiNode::export_preview_frames()
 
   auto export_voice_phase =
     [this](
-      const VoicePhase phase,
-      const std::string & file_name)
+    const VoicePhase phase,
+    const std::string & file_name)
     {
       seed_voice_preview_data(phase);
       render_voice_page(phase);
@@ -985,7 +1009,7 @@ void UiNode::export_preview_frames()
         voice_ui_.playback_progress =
           static_cast<double>(frame) /
           static_cast<double>(
-            voice_frames_per_phase - 1);
+          voice_frames_per_phase - 1);
       }
 
       render_voice_page(phase);
@@ -1051,8 +1075,8 @@ void UiNode::export_preview_frames()
 
   auto export_navigation_phase =
     [this](
-      const NavigationPhase phase,
-      const std::string & file_name)
+    const NavigationPhase phase,
+    const std::string & file_name)
     {
       seed_navigation_preview_data(phase);
       render_navigation_page(phase);
@@ -1262,8 +1286,8 @@ void UiNode::export_preview_frames()
 
   auto export_status_view =
     [this](
-      const StatusView view,
-      const std::string & file_name)
+    const StatusView view,
+    const std::string & file_name)
     {
       status_view_ = view;
       render_status_page();
@@ -1903,6 +1927,191 @@ void UiNode::configure_power_subscriptions()
     config_.power_status_topic.c_str());
 }
 
+void UiNode::configure_live_subscriptions()
+{
+  auto qos = rclcpp::QoS(rclcpp::KeepLast(10));
+  qos.best_effort();
+  qos.durability_volatile();
+
+  const std::array<std::pair<std::string, std::string>, 11> feeds{{
+    {"core", config_.core_state_topic},
+    {"edge", config_.edge_state_topic},
+    {"mode", config_.mode_state_topic},
+    {"safety", config_.safety_state_topic},
+    {"navigation", config_.navigation_state_topic},
+    {"mapping", config_.mapping_state_topic},
+    {"locations", config_.locations_state_topic},
+    {"speech", config_.speech_state_topic},
+    {"speech_readiness", config_.speech_readiness_topic},
+    {"transcript", config_.transcript_topic},
+    {"response", config_.response_topic},
+  }};
+
+  live_subscriptions_.reserve(feeds.size());
+  for (const auto & [channel, topic] : feeds) {
+    if (topic.empty()) {
+      throw std::runtime_error("live UI topic cannot be empty: " + channel);
+    }
+    live_subscriptions_.push_back(
+      create_subscription<std_msgs::msg::String>(
+        topic,
+        qos,
+        [this, channel](const std_msgs::msg::String::SharedPtr message) {
+          update_live_state(channel, message->data);
+        }));
+  }
+  RCLCPP_INFO(get_logger(), "configured %zu read-only live UI subscriptions", feeds.size());
+}
+
+void UiNode::update_live_state(const std::string & channel, const std::string & text)
+{
+  const auto now = std::chrono::steady_clock::now();
+  const std::string bounded = bounded_ui_text(trim_copy(text), 160U);
+  const std::string upper = uppercase_copy(bounded);
+
+  if (channel == "core") {
+    system_seen_ = true;
+    last_system_update_ = now;
+    status_ui_.core_computer_state = bounded;
+    status_ui_.robot_state = "CORE LIVE";
+    status_ui_.live = true;
+    return;
+  }
+  if (channel == "edge") {
+    system_seen_ = true;
+    last_system_update_ = now;
+    status_ui_.edge_computer_state = bounded;
+    status_ui_.core_edge_state = "CONNECTED";
+    status_ui_.connectivity_state = "LIVE";
+    status_ui_.live = true;
+    return;
+  }
+  if (channel == "mode") {
+    system_seen_ = true;
+    last_system_update_ = now;
+    status_ui_.operating_mode = upper;
+    status_ui_.control_mode = upper;
+    status_ui_.control_state = "LIVE";
+    status_ui_.live = true;
+    return;
+  }
+  if (channel == "safety") {
+    safety_seen_ = true;
+    last_safety_update_ = now;
+    status_ui_.safety_state = upper;
+    status_ui_.slowdown = status_field(text, "slowdown");
+    status_ui_.safety_gate = status_field(text, "gate");
+    const bool stopped = upper.find("STOP") != std::string::npos ||
+      upper.find("UNSAFE") != std::string::npos;
+    if (stopped) {
+      transition_to(UiScreen::SafetyStop);
+    } else if (active_screen_ == UiScreen::SafetyStop) {
+      transition_to(UiScreen::Home);
+    }
+    return;
+  }
+  if (channel == "navigation") {
+    navigation_seen_ = true;
+    last_navigation_update_ = now;
+    navigation_ui_.live = true;
+    navigation_ui_.state = upper;
+    navigation_ui_.message = bounded;
+    status_ui_.navigation_state = upper;
+    status_ui_.nav_state = upper;
+    const auto goal = status_field(text, "location_id");
+    if (!goal.empty()) {
+      navigation_destination_ = bounded_ui_text(goal, 48U);
+      status_ui_.navigation_goal = navigation_destination_;
+    }
+    const std::string lower = lowercase_copy(text);
+    if (lower.find("arriv") != std::string::npos || lower.find("succeed") != std::string::npos) {
+      navigation_phase_ = NavigationPhase::Arrived;
+    } else if (lower.find("pause") != std::string::npos ||
+      lower.find("cancel") != std::string::npos)
+    {
+      navigation_phase_ = NavigationPhase::Paused;
+    } else if (lower.find("fail") != std::string::npos ||
+      lower.find("error") != std::string::npos)
+    {
+      navigation_phase_ = NavigationPhase::Error;
+      navigation_ui_.error_message = bounded;
+    } else if (lower.find("navigat") != std::string::npos ||
+      lower.find("active") != std::string::npos)
+    {
+      navigation_phase_ = NavigationPhase::Navigating;
+    } else {
+      navigation_phase_ = NavigationPhase::Idle;
+    }
+    return;
+  }
+  if (channel == "mapping") {
+    mapping_seen_ = true;
+    last_mapping_update_ = now;
+    status_ui_.mapping_state = upper;
+    return;
+  }
+  if (channel == "locations") {
+    last_mapping_update_ = now;
+    mapping_seen_ = true;
+    const auto candidate = status_field(text, "candidate_id");
+    if (!candidate.empty()) {
+      navigation_ui_.message = "Location review: " + bounded_ui_text(candidate, 40U);
+    }
+    return;
+  }
+  if (channel == "transcript") {
+    speech_seen_ = true;
+    last_speech_update_ = now;
+    voice_transcript_ = bounded_ui_text(text, 120U);
+    voice_ui_.transcript = voice_transcript_;
+    return;
+  }
+  if (channel == "response") {
+    speech_seen_ = true;
+    last_speech_update_ = now;
+    voice_response_ = bounded_ui_text(text, 120U);
+    voice_ui_.reply = voice_response_;
+    return;
+  }
+
+  speech_seen_ = true;
+  last_speech_update_ = now;
+  voice_ui_.live = true;
+  voice_ui_.speech_link_state = channel == "speech_readiness" ? upper : "ONLINE";
+  status_ui_.speech_state = upper;
+  status_ui_.savomind_state = text.find("savomind=true") !=
+    std::string::npos ? "ONLINE" : "UNAVAILABLE";
+  const auto lifecycle = classify_speech_lifecycle(text);
+  voice_ui_.playback_state = lifecycle_label(lifecycle);
+  switch (lifecycle) {
+    case SpeechLifecycle::Listening:
+    case SpeechLifecycle::Recording:
+      voice_phase_ = VoicePhase::Listening;
+      transition_to(UiScreen::Listening);
+      break;
+    case SpeechLifecycle::Sending:
+    case SpeechLifecycle::Thinking:
+      voice_phase_ = VoicePhase::Thinking;
+      transition_to(UiScreen::Thinking);
+      break;
+    case SpeechLifecycle::Playing:
+      voice_phase_ = VoicePhase::Speaking;
+      transition_to(UiScreen::Speaking);
+      break;
+    case SpeechLifecycle::Failed:
+      voice_phase_ = VoicePhase::Error;
+      voice_ui_.error_message = bounded;
+      break;
+    case SpeechLifecycle::Completed:
+    case SpeechLifecycle::Canceled:
+      if (voice_phase_ != VoicePhase::Idle) {handle_tts_finished();}
+      break;
+    case SpeechLifecycle::Waiting:
+      voice_phase_ = VoicePhase::Idle;
+      break;
+  }
+}
+
 void UiNode::update_power_source(
   PowerUiSourceState & source,
   const std::string & text,
@@ -2015,6 +2224,32 @@ void UiNode::update_runtime(const double dt_seconds)
   status_animation_time_seconds_ += animation_dt;
   power_animation_time_seconds_ += animation_dt;
 
+  const auto now = std::chrono::steady_clock::now();
+  const auto timeout = std::chrono::milliseconds{
+    static_cast<std::int64_t>(config_.live_state_stale_timeout_s * 1000.0)};
+  if (feed_is_stale(system_seen_, last_system_update_, now, timeout)) {
+    status_ui_.live = false;
+    status_ui_.connectivity_state = "STALE";
+    status_ui_.core_edge_state = "STALE";
+  }
+  if (feed_is_stale(safety_seen_, last_safety_update_, now, timeout)) {
+    status_ui_.safety_state = "STALE";
+    status_ui_.safety_gate = "BLOCKED";
+  }
+  if (feed_is_stale(navigation_seen_, last_navigation_update_, now, timeout)) {
+    navigation_ui_.live = false;
+    navigation_ui_.state = "STALE";
+    status_ui_.navigation_state = "STALE";
+  }
+  if (feed_is_stale(mapping_seen_, last_mapping_update_, now, timeout)) {
+    status_ui_.mapping_state = "STALE";
+  }
+  if (feed_is_stale(speech_seen_, last_speech_update_, now, timeout)) {
+    voice_ui_.live = false;
+    voice_ui_.speech_link_state = "STALE";
+    status_ui_.speech_state = "STALE";
+  }
+
   poll_touch_input();
 
   home_glow_elapsed_seconds_ += dt_seconds;
@@ -2085,6 +2320,18 @@ void UiNode::render_current_screen()
       render_power_page();
       break;
 
+    case UiScreen::Map:
+      render_placeholder_screen("MAPPING", status_ui_.mapping_state);
+      break;
+
+    case UiScreen::Diagnostics:
+      render_status_page();
+      break;
+
+    case UiScreen::SafetyStop:
+      render_placeholder_screen("SAFETY STOP", status_ui_.safety_state);
+      break;
+
     default:
       render_home();
       break;
@@ -2102,7 +2349,7 @@ void UiNode::render_intro()
 
   const float progress =
     static_cast<float>(
-      std::clamp(intro_elapsed_seconds_ / config_.intro_seconds, 0.0, 1.0));
+    std::clamp(intro_elapsed_seconds_ / config_.intro_seconds, 0.0, 1.0));
 
   render_intro_overlay(progress);
 }
@@ -2246,7 +2493,8 @@ void UiNode::render_home_dashboard()
   render_home_status_panel();
 
   Font::draw_text(canvas_, 126, 96, "SAVO", ColorRgb{190U, 230U, 255U}, 7, 0.95F);
-  Font::draw_text(canvas_, 128, 152, "AUTONOMOUS GUIDE ROBOT", ColorRgb{230U, 240U, 250U}, 2, 0.80F);
+  Font::draw_text(canvas_, 128, 152, "AUTONOMOUS GUIDE ROBOT", ColorRgb{230U, 240U, 250U}, 2,
+      0.80F);
   Font::draw_text(canvas_, 156, 198, "READY TO ASSIST", ColorRgb{70U, 235U, 255U}, 3, 0.92F);
 }
 
@@ -2301,11 +2549,11 @@ void UiNode::render_home_status_panel()
   int row_y = y + 58;
 
   auto status_row = [&](const std::string & label, const std::string & value) {
-    canvas_.blend_rect(row_x, row_y, w - 36, 42, ColorRgb{0U, 22U, 48U}, 0.62F);
-    Font::draw_text(canvas_, row_x + 12, row_y + 14, label, ColorRgb{240U, 250U, 255U}, 2, 0.84F);
-    Font::draw_text(canvas_, row_x + 96, row_y + 14, value, ColorRgb{50U, 235U, 255U}, 2, 0.95F);
-    row_y += 48;
-  };
+      canvas_.blend_rect(row_x, row_y, w - 36, 42, ColorRgb{0U, 22U, 48U}, 0.62F);
+      Font::draw_text(canvas_, row_x + 12, row_y + 14, label, ColorRgb{240U, 250U, 255U}, 2, 0.84F);
+      Font::draw_text(canvas_, row_x + 96, row_y + 14, value, ColorRgb{50U, 235U, 255U}, 2, 0.95F);
+      row_y += 48;
+    };
 
   status_row("MODE", "IDLE");
   status_row("VOICE", "READY");
@@ -2334,9 +2582,7 @@ void UiNode::render_page_shell(
 }
 
 
-
-
-void UiNode::render_voice_page(const VoicePhase phase)
+void UiNode::render_voice_page(const VoicePhase phase)  // NOLINT(readability/fn_size)
 {
   if (phase != rendered_voice_phase_) {
     rendered_voice_phase_ = phase;
@@ -2355,12 +2601,12 @@ void UiNode::render_voice_page(const VoicePhase phase)
 
   auto draw_voice_text =
     [this](
-      const int x,
-      const int y,
-      const std::string & value,
-      const ColorRgb color,
-      const bool medium,
-      const float alpha = 1.0F)
+    const int x,
+    const int y,
+    const std::string & value,
+    const ColorRgb color,
+    const bool medium,
+    const float alpha = 1.0F)
     {
       if (medium) {
         Font::draw_atlas_text(
@@ -2394,8 +2640,8 @@ void UiNode::render_voice_page(const VoicePhase phase)
 
   auto voice_text_width =
     [this](
-      const std::string & value,
-      const bool medium) -> int
+    const std::string & value,
+    const bool medium) -> int
     {
       if (medium) {
         return Font::atlas_text_width(
@@ -2416,8 +2662,8 @@ void UiNode::render_voice_page(const VoicePhase phase)
 
   auto fit_text =
     [&](std::string value,
-      const int maximum_width,
-      const bool medium) -> std::string
+    const int maximum_width,
+    const bool medium) -> std::string
     {
       if (voice_text_width(value, medium) <= maximum_width) {
         return value;
@@ -2437,11 +2683,11 @@ void UiNode::render_voice_page(const VoicePhase phase)
 
   auto centered_text =
     [&](const int center_x,
-      const int y,
-      const std::string & value,
-      const ColorRgb color,
-      const bool medium,
-      const float alpha = 1.0F)
+    const int y,
+    const std::string & value,
+    const ColorRgb color,
+    const bool medium,
+    const float alpha = 1.0F)
     {
       const int width =
         voice_text_width(value, medium);
@@ -2544,7 +2790,7 @@ void UiNode::render_voice_page(const VoicePhase phase)
 
   const int thinking_active_block =
     static_cast<int>(
-      std::fmod(
+    std::fmod(
         voice_animation_time_seconds_ * 4.0,
         5.0));
 
@@ -2753,7 +2999,7 @@ void UiNode::render_voice_page(const VoicePhase phase)
         std::max(
           4,
           static_cast<int>(
-            std::lround(
+          std::lround(
               normalized *
               static_cast<double>(maximum_height))));
 
@@ -2951,7 +3197,7 @@ void UiNode::render_voice_page(const VoicePhase phase)
         playback_active ?
         5 +
         static_cast<int>(
-          std::lround(
+        std::lround(
             18.0 * wave)) :
         4;
 
@@ -3048,9 +3294,9 @@ void UiNode::render_voice_page(const VoicePhase phase)
 
   auto draw_metric =
     [&](const int x,
-      const std::string & label,
-      const std::string & value,
-      const ColorRgb value_color)
+    const std::string & label,
+    const std::string & value,
+    const ColorRgb value_color)
     {
       draw_voice_text(
         x,
@@ -3317,12 +3563,12 @@ void UiNode::render_navigation_page(
 
   auto draw_navigation_text =
     [this](
-      const int x,
-      const int y,
-      const std::string & value,
-      const ColorRgb color,
-      const bool medium,
-      const float alpha = 1.0F)
+    const int x,
+    const int y,
+    const std::string & value,
+    const ColorRgb color,
+    const bool medium,
+    const float alpha = 1.0F)
     {
       if (medium) {
         Font::draw_atlas_text(
@@ -3356,8 +3602,8 @@ void UiNode::render_navigation_page(
 
   auto navigation_text_width =
     [this](
-      const std::string & value,
-      const bool medium) -> int
+    const std::string & value,
+    const bool medium) -> int
     {
       if (medium) {
         return Font::atlas_text_width(
@@ -3378,11 +3624,11 @@ void UiNode::render_navigation_page(
 
   auto centered_text =
     [&](const int center_x,
-      const int y,
-      const std::string & value,
-      const ColorRgb color,
-      const bool medium,
-      const float alpha = 1.0F)
+    const int y,
+    const std::string & value,
+    const ColorRgb color,
+    const bool medium,
+    const float alpha = 1.0F)
     {
       draw_navigation_text(
         center_x -
@@ -3396,10 +3642,10 @@ void UiNode::render_navigation_page(
 
   auto draw_filled_circle =
     [&](const int center_x,
-      const int center_y,
-      const int radius,
-      const ColorRgb color,
-      const float alpha)
+    const int center_y,
+    const int radius,
+    const ColorRgb color,
+    const float alpha)
     {
       const int radius_squared =
         radius * radius;
@@ -3430,14 +3676,14 @@ void UiNode::render_navigation_page(
 
   auto draw_arc =
     [&](const int center_x,
-      const int center_y,
-      const int radius_x,
-      const int radius_y,
-      const double start_angle,
-      const double end_angle,
-      const ColorRgb color,
-      const float alpha,
-      const int thickness)
+    const int center_y,
+    const int radius_x,
+    const int radius_y,
+    const double start_angle,
+    const double end_angle,
+    const ColorRgb color,
+    const float alpha,
+    const int thickness)
     {
       constexpr int segments = 72;
 
@@ -3454,14 +3700,14 @@ void UiNode::render_navigation_page(
         const int x =
           center_x +
           static_cast<int>(
-            std::lround(
+          std::lround(
               std::cos(angle) *
               static_cast<double>(radius_x)));
 
         const int y =
           center_y +
           static_cast<int>(
-            std::lround(
+          std::lround(
               std::sin(angle) *
               static_cast<double>(radius_y)));
 
@@ -3656,8 +3902,8 @@ void UiNode::render_navigation_page(
 
   const float glow_alpha =
     static_cast<float>(
-      0.18 +
-      0.24 * pulse);
+    0.18 +
+    0.24 * pulse);
 
   canvas_.draw_circle_ring(
     face_center_x,
@@ -3718,9 +3964,9 @@ void UiNode::render_navigation_page(
   const bool blinking =
     blink_position >
     (
-      phase == NavigationPhase::Navigating ?
-      3.02 :
-      4.02
+    phase == NavigationPhase::Navigating ?
+    3.02 :
+    4.02
     );
 
   int eye_offset_x = 0;
@@ -3999,7 +4245,7 @@ void UiNode::seed_navigation_preview_data(
   }
 }
 
-void UiNode::render_status_page()
+void UiNode::render_status_page()  // NOLINT(readability/fn_size)
 {
   render_page_shell(status_shell_, "Status");
 
@@ -4020,19 +4266,19 @@ void UiNode::render_status_page()
 
   const float status_live_alpha =
     static_cast<float>(
-      0.68 +
-      0.32 * status_pulse);
+    0.68 +
+    0.32 * status_pulse);
 
   const float status_tab_alpha =
     static_cast<float>(
-      0.84 +
-      0.12 * status_pulse);
+    0.84 +
+    0.12 * status_pulse);
 
   const float status_alert_alpha =
     status_ui_.alert_count > 0 ?
     static_cast<float>(
-      0.58 +
-      0.42 * status_pulse) :
+    0.58 +
+    0.42 * status_pulse) :
     0.98F;
   const ColorRgb good{75U, 235U, 175U};
   const ColorRgb warning{255U, 190U, 70U};
@@ -4041,12 +4287,12 @@ void UiNode::render_status_page()
 
   auto draw_status_text =
     [this](
-      const int x,
-      const int y,
-      const std::string & value,
-      const ColorRgb color,
-      const bool medium,
-      const float alpha = 1.0F)
+    const int x,
+    const int y,
+    const std::string & value,
+    const ColorRgb color,
+    const bool medium,
+    const float alpha = 1.0F)
     {
       if (medium) {
         Font::draw_atlas_text(
@@ -4080,8 +4326,8 @@ void UiNode::render_status_page()
 
   auto status_text_width =
     [this](
-      const std::string & value,
-      const bool medium) -> int
+    const std::string & value,
+    const bool medium) -> int
     {
       if (medium) {
         return Font::atlas_text_width(
@@ -4166,8 +4412,8 @@ void UiNode::render_status_page()
 
   auto combined_state =
     [&](const std::string & first,
-      const std::string & second,
-      const std::string & healthy_text) -> std::string
+    const std::string & second,
+    const std::string & healthy_text) -> std::string
     {
       const int first_severity = status_severity(first);
       const int second_severity = status_severity(second);
@@ -4392,10 +4638,10 @@ void UiNode::render_status_page()
 
     auto draw_domain_card =
       [&](const int x,
-        const int y,
-        const std::string & title,
-        const std::string & state,
-        const std::array<std::string, 5> & lines)
+      const int y,
+      const std::string & title,
+      const std::string & state,
+      const std::array<std::string, 5> & lines)
       {
         constexpr int width = 302;
         constexpr int height = 118;
@@ -4799,9 +5045,9 @@ void UiNode::render_status_page()
   if (status_view_ == StatusView::AiLink) {
     auto draw_section =
       [&](const int x,
-        const std::string & title,
-        const std::array<std::string, 4> & labels,
-        const std::array<std::string, 4> & values)
+      const std::string & title,
+      const std::array<std::string, 4> & labels,
+      const std::array<std::string, 4> & values)
       {
         constexpr int y = 122;
         constexpr int width = 202;
@@ -5043,21 +5289,21 @@ void UiNode::render_status_page()
     status_ui_.core_computer_state,
     status_ui_.edge_computer_state,
     std::to_string(status_ui_.ros_nodes_ready) +
-      " / " +
-      std::to_string(status_ui_.ros_nodes_total),
+    " / " +
+    std::to_string(status_ui_.ros_nodes_total),
     status_ui_.critical_nodes_state,
     std::to_string(status_ui_.stale_publishers),
     format_temperature(status_ui_.core_cpu_temp_c) +
-      " / " +
-      format_temperature(status_ui_.edge_cpu_temp_c),
+    " / " +
+    format_temperature(status_ui_.edge_cpu_temp_c),
     std::to_string(status_ui_.core_memory_percent) +
-      "% / " +
-      std::to_string(status_ui_.edge_memory_percent) +
-      "%",
+    "% / " +
+    std::to_string(status_ui_.edge_memory_percent) +
+    "%",
     std::to_string(status_ui_.core_storage_percent) +
-      "% / " +
-      std::to_string(status_ui_.edge_storage_percent) +
-      "%",
+    "% / " +
+    std::to_string(status_ui_.edge_storage_percent) +
+    "%",
   }};
 
   const std::array<int, 8> system_rows{
@@ -5180,7 +5426,7 @@ void UiNode::seed_status_preview_data()
 }
 
 
-void UiNode::render_power_page()
+void UiNode::render_power_page()  // NOLINT(readability/fn_size)
 {
   render_page_shell(power_shell_, "Power");
 
@@ -5205,17 +5451,17 @@ void UiNode::render_power_page()
 
   const float power_live_alpha =
     static_cast<float>(
-      0.68 +
-      0.32 * power_pulse);
+    0.68 +
+    0.32 * power_pulse);
 
   auto draw_power_text =
     [this](
-      const int x,
-      const int y,
-      const std::string & value,
-      const ColorRgb color,
-      const int scale,
-      const float alpha)
+    const int x,
+    const int y,
+    const std::string & value,
+    const ColorRgb color,
+    const int scale,
+    const float alpha)
     {
       if (scale >= 3) {
         Font::draw_atlas_text(
@@ -5249,8 +5495,8 @@ void UiNode::render_power_page()
 
   auto power_text_width =
     [this](
-      const std::string & value,
-      const int scale) -> int
+    const std::string & value,
+    const int scale) -> int
     {
       if (scale >= 3) {
         return Font::atlas_text_width(
@@ -5443,8 +5689,8 @@ void UiNode::render_power_page()
   // --------------------------------------------------------------
   auto draw_source_card =
     [&](const int x,
-      const std::string & title,
-      const PowerUiSourceState & source)
+    const std::string & title,
+    const PowerUiSourceState & source)
     {
       const int y = 184;
       const int w = 194;
@@ -5464,8 +5710,8 @@ void UiNode::render_power_page()
       const float source_activity_alpha =
         source_live ?
         static_cast<float>(
-          0.62 +
-          0.30 * power_pulse) :
+        0.62 +
+        0.30 * power_pulse) :
         0.85F;
 
       canvas_.blend_rect(
@@ -5638,11 +5884,11 @@ void UiNode::render_power_page()
 
   auto draw_line =
     [&](int x0,
-      int y0,
-      const int x1,
-      const int y1,
-      const ColorRgb color,
-      const float alpha)
+    int y0,
+    const int x1,
+    const int y1,
+    const ColorRgb color,
+    const float alpha)
     {
       const int dx = std::abs(x1 - x0);
       const int sx = x0 < x1 ? 1 : -1;
@@ -5674,12 +5920,12 @@ void UiNode::render_power_page()
 
   auto draw_voltage_series =
     [&](const PowerUiSourceState & source,
-      const std::string & label,
-      const double min_voltage,
-      const double max_voltage,
-      const double low_voltage,
-      const int row_y,
-      const ColorRgb line_color)
+    const std::string & label,
+    const double min_voltage,
+    const double max_voltage,
+    const double low_voltage,
+    const int row_y,
+    const ColorRgb line_color)
     {
       const int label_x = graph_panel_x + 14;
       const int value_x = graph_panel_x + 82;
@@ -5723,15 +5969,15 @@ void UiNode::render_power_page()
 
       const double low_normalized =
         std::clamp(
-          (low_voltage - min_voltage) /
-          (max_voltage - min_voltage),
+        (low_voltage - min_voltage) /
+        (max_voltage - min_voltage),
           0.0,
           1.0);
 
       const int low_y =
         plot_y + plot_h - 3 -
         static_cast<int>(
-          std::lround(
+        std::lround(
             low_normalized *
             static_cast<double>(plot_h - 6)));
 
@@ -5762,8 +6008,8 @@ void UiNode::render_power_page()
       for (std::size_t i = 0; i < history.size(); ++i) {
         const double normalized =
           std::clamp(
-            (history[i] - min_voltage) /
-            (max_voltage - min_voltage),
+          (history[i] - min_voltage) /
+          (max_voltage - min_voltage),
             0.0,
             1.0);
 
@@ -5772,14 +6018,14 @@ void UiNode::render_power_page()
           plot_x + plot_w - 2 :
           plot_x +
           static_cast<int>(
-            (static_cast<double>(i) /
-            static_cast<double>(history.size() - 1U)) *
-            static_cast<double>(plot_w - 2));
+          (static_cast<double>(i) /
+          static_cast<double>(history.size() - 1U)) *
+          static_cast<double>(plot_w - 2));
 
         const int y =
           plot_y + plot_h - 3 -
           static_cast<int>(
-            std::lround(
+          std::lround(
               normalized *
               static_cast<double>(plot_h - 6)));
 
@@ -5840,19 +6086,19 @@ void UiNode::render_power_page()
   // one fresh real voltage source exists.
   const bool voltage_graph_live =
     (
-      core_power_.seen &&
-      core_power_.has_voltage &&
-      !power_source_is_stale(core_power_)
+    core_power_.seen &&
+    core_power_.has_voltage &&
+    !power_source_is_stale(core_power_)
     ) ||
     (
-      edge_power_.seen &&
-      edge_power_.has_voltage &&
-      !power_source_is_stale(edge_power_)
+    edge_power_.seen &&
+    edge_power_.has_voltage &&
+    !power_source_is_stale(edge_power_)
     ) ||
     (
-      base_power_.seen &&
-      base_power_.has_voltage &&
-      !power_source_is_stale(base_power_)
+    base_power_.seen &&
+    base_power_.has_voltage &&
+    !power_source_is_stale(base_power_)
     );
 
   if (voltage_graph_live) {

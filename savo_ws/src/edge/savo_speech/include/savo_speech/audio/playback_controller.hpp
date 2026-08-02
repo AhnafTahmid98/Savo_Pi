@@ -1,3 +1,4 @@
+// Copyright 2026 Ahnaf Tahmid
 #ifndef SAVO_SPEECH__AUDIO__PLAYBACK_CONTROLLER_HPP_
 #define SAVO_SPEECH__AUDIO__PLAYBACK_CONTROLLER_HPP_
 
@@ -5,9 +6,10 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "savo_speech/audio/playback_sink.hpp"
+
 #include "savo_speech/audio/audio_buffer.hpp"
 #include "savo_speech/audio/microphone_gate.hpp"
-#include "savo_speech/audio/playback_sink.hpp"
 
 namespace savo_speech::audio
 {

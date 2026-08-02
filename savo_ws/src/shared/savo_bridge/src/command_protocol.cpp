@@ -328,6 +328,26 @@ using ValidationResult = std::optional<ValidationFailure>;
     return CommandType::CancelNavigation;
   }
 
+  if (value == "query_navigation_state") {
+    return CommandType::QueryNavigationState;
+  }
+
+  if (value == "start_autonomous_mapping") {
+    return CommandType::StartAutonomousMapping;
+  }
+
+  if (value == "control_mapping") {
+    return CommandType::ControlMapping;
+  }
+
+  if (value == "query_mapping_state") {
+    return CommandType::QueryMappingState;
+  }
+
+  if (value == "query_supervisor_state") {
+    return CommandType::QuerySupervisorState;
+  }
+
   return std::nullopt;
 }
 
@@ -801,6 +821,138 @@ using ValidationResult = std::optional<ValidationFailure>;
   return std::nullopt;
 }
 
+[[nodiscard]] ValidationResult parse_query_payload(
+  const Json & payload,
+  const std::string & expected_scope,
+  CommandPayload & output)
+{
+  if (const auto error = reject_unknown_fields(
+      payload, {"scope"}, ErrorCode::UnknownPayloadField,
+      "unknown query payload field"))
+  {
+    return error;
+  }
+  QueryStateCommandPayload result{expected_scope};
+  if (payload.contains("scope")) {
+    if (const auto error = read_required_string(payload, "scope", result.scope)) {
+      return error;
+    }
+  }
+  if (result.scope != expected_scope) {
+    return ValidationFailure{ErrorCode::InvalidPayload, "query scope does not match command type"};
+  }
+  output = std::move(result);
+  return std::nullopt;
+}
+
+[[nodiscard]] ValidationResult parse_start_mapping_payload(
+  const Json & payload,
+  CommandPayload & output)
+{
+  const std::set<std::string> allowed{
+    "auto_save", "map_id", "map_revision", "mission_id",
+    "mission_timeout_ms", "require_quality_approval"};
+  if (const auto error = reject_unknown_fields(
+      payload, allowed, ErrorCode::UnknownPayloadField,
+      "unknown start_autonomous_mapping payload field"))
+  {
+    return error;
+  }
+  if (const auto error = require_fields(
+      payload, {"map_id", "map_revision", "mission_id"}))
+  {
+    return error;
+  }
+  StartAutonomousMappingCommandPayload result;
+  if (const auto error = read_required_string(payload, "mission_id", result.mission_id)) {
+    return error;
+  }
+  if (const auto error = read_required_string(payload, "map_id", result.map_id)) {
+    return error;
+  }
+  if (const auto error = validate_identifier(result.mission_id, "mission_id")) {
+    return error;
+  }
+  if (const auto error = validate_identifier(result.map_id, "map_id")) {
+    return error;
+  }
+  std::int64_t revision = 0;
+  if (!read_integer(payload.at("map_revision"), revision) || revision <= 0 ||
+    static_cast<std::uint64_t>(revision) > std::numeric_limits<std::uint32_t>::max())
+  {
+    return ValidationFailure{ErrorCode::InvalidPayload, "map_revision must be a positive uint32"};
+  }
+  result.map_revision = static_cast<std::uint32_t>(revision);
+  if (payload.contains("mission_timeout_ms")) {
+    if (!read_integer(payload.at("mission_timeout_ms"), result.mission_timeout_ms) ||
+      result.mission_timeout_ms < 0 || result.mission_timeout_ms > 86400000)
+    {
+      return ValidationFailure{ErrorCode::InvalidPayload,
+        "mission_timeout_ms must be 0 through 86400000"};
+    }
+  }
+  for (const std::string field : {"auto_save", "require_quality_approval"}) {
+    if (payload.contains(field) && !payload.at(field).is_boolean()) {
+      return ValidationFailure{ErrorCode::InvalidFieldType, field + " must be boolean"};
+    }
+  }
+  if (payload.contains("auto_save")) {
+    result.auto_save = payload.at("auto_save").get<bool>();
+  }
+  if (payload.contains("require_quality_approval")) {
+    result.require_quality_approval = payload.at("require_quality_approval").get<bool>();
+  }
+  if (!result.auto_save || !result.require_quality_approval) {
+    return ValidationFailure{
+      ErrorCode::InvalidPayload,
+      "autonomous mapping requires auto_save and operator quality approval"};
+  }
+  output = std::move(result);
+  return std::nullopt;
+}
+
+[[nodiscard]] ValidationResult parse_control_mapping_payload(
+  const Json & payload,
+  CommandPayload & output)
+{
+  if (const auto error = reject_unknown_fields(
+      payload, {"mission_id", "operation", "reason"},
+      ErrorCode::UnknownPayloadField, "unknown control_mapping payload field"))
+  {
+    return error;
+  }
+  if (const auto error = require_fields(payload, {"mission_id", "operation"})) {
+    return error;
+  }
+  ControlMappingCommandPayload result;
+  result.reason = "savomind_mapping_control";
+  if (const auto error = read_required_string(payload, "mission_id", result.mission_id)) {
+    return error;
+  }
+  if (const auto error = read_required_string(payload, "operation", result.operation)) {
+    return error;
+  }
+  if (payload.contains("reason")) {
+    if (const auto error = read_required_string(payload, "reason", result.reason)) {
+      return error;
+    }
+  }
+  if (const auto error = validate_identifier(result.mission_id, "mission_id")) {
+    return error;
+  }
+  if (result.operation != "pause" && result.operation != "resume" &&
+    result.operation != "cancel")
+  {
+    return ValidationFailure{ErrorCode::InvalidPayload,
+      "mapping operation must be pause, resume, or cancel"};
+  }
+  if (const auto error = validate_reason(result.reason)) {
+    return error;
+  }
+  output = std::move(result);
+  return std::nullopt;
+}
+
 [[nodiscard]] ValidationResult parse_payload(
   const CommandType type,
   const Json & payload,
@@ -824,6 +976,16 @@ using ValidationResult = std::optional<ValidationFailure>;
       return parse_navigation_payload(payload, output);
     case CommandType::CancelNavigation:
       return parse_cancel_navigation_payload(payload, output);
+    case CommandType::QueryNavigationState:
+      return parse_query_payload(payload, "navigation", output);
+    case CommandType::StartAutonomousMapping:
+      return parse_start_mapping_payload(payload, output);
+    case CommandType::ControlMapping:
+      return parse_control_mapping_payload(payload, output);
+    case CommandType::QueryMappingState:
+      return parse_query_payload(payload, "mapping", output);
+    case CommandType::QuerySupervisorState:
+      return parse_query_payload(payload, "supervisor", output);
   }
 
   return ValidationFailure{
@@ -1045,6 +1207,23 @@ using ValidationResult = std::optional<ValidationFailure>;
     }
   }
 
+  const bool whole_plan_command =
+    command.command_type == CommandType::QueryNavigationState ||
+    command.command_type == CommandType::StartAutonomousMapping ||
+    command.command_type == CommandType::ControlMapping ||
+    command.command_type == CommandType::QueryMappingState ||
+    command.command_type == CommandType::QuerySupervisorState;
+  if (whole_plan_command && !command.request_id.has_value()) {
+    return failure(
+      ErrorCode::MissingRequiredField,
+      "whole-plan commands require request_id");
+  }
+  if (whole_plan_command && !command.origin_agent.has_value()) {
+    return failure(
+      ErrorCode::MissingRequiredField,
+      "whole-plan commands require origin_agent");
+  }
+
   if (const auto error = read_optional_string(
       document,
       "conversation_id",
@@ -1171,6 +1350,16 @@ std::string_view to_string(
       return "navigate_to_location";
     case CommandType::CancelNavigation:
       return "cancel_navigation";
+    case CommandType::QueryNavigationState:
+      return "query_navigation_state";
+    case CommandType::StartAutonomousMapping:
+      return "start_autonomous_mapping";
+    case CommandType::ControlMapping:
+      return "control_mapping";
+    case CommandType::QueryMappingState:
+      return "query_mapping_state";
+    case CommandType::QuerySupervisorState:
+      return "query_supervisor_state";
   }
 
   return "unknown";

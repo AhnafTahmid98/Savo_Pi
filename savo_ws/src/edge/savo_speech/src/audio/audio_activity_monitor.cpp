@@ -1,9 +1,9 @@
-#include "savo_speech/audio/audio_activity_monitor.hpp"
-
+// Copyright 2026 Ahnaf Tahmid
 #include <algorithm>
 #include <cstdint>
 #include <stdexcept>
 
+#include "savo_speech/audio/audio_activity_monitor.hpp"
 #include "savo_speech/audio/audio_level_meter.hpp"
 
 namespace savo_speech::audio

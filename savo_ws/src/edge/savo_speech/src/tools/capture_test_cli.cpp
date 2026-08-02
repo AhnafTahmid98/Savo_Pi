@@ -1,3 +1,4 @@
+// Copyright 2026 Ahnaf Tahmid
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -86,7 +87,7 @@ void print_usage(const char * executable)
 {
   std::size_t consumed{0U};
 
-  const unsigned long long parsed =
+  const std::uint64_t parsed =
     std::stoull(value, &consumed, 10);
 
   if (consumed != value.size()) {
@@ -394,8 +395,8 @@ int main(int argc, char * argv[])
       << output_audio.frame_count() << '\n'
       << "Duration:        "
       << static_cast<double>(
-        output_audio.duration().count()) /
-        1000000000.0
+      output_audio.duration().count()) /
+      1000000000.0
       << " seconds\n"
       << "RMS level:       "
       << level.rms << '\n'

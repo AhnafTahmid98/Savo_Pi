@@ -1,4 +1,5 @@
-#include "savo_speech/audio/wav_reader.hpp"
+// Copyright 2026 Ahnaf Tahmid
+#include <span>
 
 #include <array>
 #include <cstddef>
@@ -6,11 +7,12 @@
 #include <fstream>
 #include <iterator>
 #include <limits>
-#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <vector>
+
+#include "savo_speech/audio/wav_reader.hpp"
 
 namespace savo_speech::audio
 {
@@ -57,7 +59,7 @@ namespace
     static_cast<std::uint16_t>(bytes[offset]) |
     static_cast<std::uint16_t>(
       static_cast<std::uint16_t>(bytes[offset + 1U])
-      << 8U));
+        << 8U));
 }
 
 [[nodiscard]] std::uint32_t read_u32_le(
@@ -128,7 +130,7 @@ void validate_format(
 
   const std::uint16_t expected_block_align =
     static_cast<std::uint16_t>(
-      format.channels * sizeof(std::int16_t));
+    format.channels * sizeof(std::int16_t));
 
   if (format.block_align != expected_block_align) {
     throw std::invalid_argument{

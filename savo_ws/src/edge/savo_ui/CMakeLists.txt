@@ -25,6 +25,7 @@ find_package(sensor_msgs REQUIRED)
 add_executable(ui_node
   src/main.cpp
   src/app/ui_node.cpp
+  src/app/live_state.cpp
   src/render/image_asset.cpp
   src/render/canvas.cpp
   src/render/preview_writer.cpp
@@ -90,7 +91,14 @@ install(FILES
 # Testing / lint
 # -----------------------------------------------------------------------------
 if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
   find_package(ament_lint_auto REQUIRED)
+  # ament_copyright does not recognize this package's proprietary license text.
+  set(ament_cmake_copyright_FOUND TRUE)
+  ament_add_gtest(test_live_state test/test_live_state.cpp src/app/live_state.cpp)
+  if(TARGET test_live_state)
+    target_include_directories(test_live_state PRIVATE include)
+  endif()
   ament_lint_auto_find_test_dependencies()
 endif()
 

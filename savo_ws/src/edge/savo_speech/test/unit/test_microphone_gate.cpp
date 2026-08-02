@@ -1,8 +1,8 @@
+// Copyright 2026 Ahnaf Tahmid
 #include <chrono>
 #include <stdexcept>
 
 #include "gtest/gtest.h"
-
 #include "savo_speech/audio/microphone_gate.hpp"
 
 TEST(MicrophoneGate, RejectsNegativeHoldDuration)

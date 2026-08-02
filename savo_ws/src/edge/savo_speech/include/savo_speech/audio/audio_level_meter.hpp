@@ -1,9 +1,11 @@
+// Copyright 2026 Ahnaf Tahmid
 #ifndef SAVO_SPEECH__AUDIO__AUDIO_LEVEL_METER_HPP_
 #define SAVO_SPEECH__AUDIO__AUDIO_LEVEL_METER_HPP_
 
+#include <span>
+
 #include <cstddef>
 #include <cstdint>
-#include <span>
 
 namespace savo_speech::audio
 {

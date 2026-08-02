@@ -1,3 +1,4 @@
+// Copyright 2026 Ahnaf Tahmid
 #ifndef SAVO_SPEECH__WAKE_WORD__WAKE_WORD_EVENT_HPP_
 #define SAVO_SPEECH__WAKE_WORD__WAKE_WORD_EVENT_HPP_
 

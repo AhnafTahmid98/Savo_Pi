@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
+# Copyright 2026 Ahnaf Tahmid
 """
-Robot Savo — Fake camera node for NAVIGATE UI testing
+Robot Savo — Fake camera node for NAVIGATE UI testing.
 
 Publishes a synthetic animated RGB image on /camera/image_rect so that the
 NAVIGATE mode of display_manager_node can be tested without a real camera.
@@ -16,10 +17,8 @@ import math
 from typing import Optional
 
 import numpy as np
-
 import rclpy
 from rclpy.node import Node
-
 from sensor_msgs.msg import Image
 
 
@@ -27,37 +26,29 @@ class FakeCamNode(Node):
     """Simple fake camera node producing an animated color gradient."""
 
     def __init__(self) -> None:
-        super().__init__("fake_cam_node")
+        super().__init__('fake_cam_node')
 
         # ------------------------------------------------------------------
         # Parameters
         # ------------------------------------------------------------------
-        self.declare_parameter("width", 800)
-        self.declare_parameter("height", 480)
-        self.declare_parameter("fps", 15.0)
-        self.declare_parameter("frame_id", "nav_cam")
+        self.declare_parameter('width', 800)
+        self.declare_parameter('height', 480)
+        self.declare_parameter('fps', 15.0)
+        self.declare_parameter('frame_id', 'nav_cam')
 
-        self.width: int = (
-            self.get_parameter("width").get_parameter_value().integer_value
-        )
-        self.height: int = (
-            self.get_parameter("height").get_parameter_value().integer_value
-        )
-        self.fps: float = (
-            self.get_parameter("fps").get_parameter_value().double_value
-        )
+        self.width: int = self.get_parameter('width').get_parameter_value().integer_value
+        self.height: int = self.get_parameter('height').get_parameter_value().integer_value
+        self.fps: float = self.get_parameter('fps').get_parameter_value().double_value
         if self.fps <= 0.0:
-            self.get_logger().warn("fps <= 0, clamping to 15.0")
+            self.get_logger().warn('fps <= 0, clamping to 15.0')
             self.fps = 15.0
 
-        self.frame_id: str = (
-            self.get_parameter("frame_id").get_parameter_value().string_value
-        )
+        self.frame_id: str = self.get_parameter('frame_id').get_parameter_value().string_value
 
         # ------------------------------------------------------------------
         # Publisher
         # ------------------------------------------------------------------
-        self.pub_image = self.create_publisher(Image, "/camera/image_rect", 10)
+        self.pub_image = self.create_publisher(Image, '/camera/image_rect', 10)
 
         # Precompute static coordinate grids for gradient (H x W)
         # Note: y varies along height (rows), x along width (cols)
@@ -73,7 +64,7 @@ class FakeCamNode(Node):
         self._timer = self.create_timer(period, self._on_timer)
 
         self.get_logger().info(
-            f"FakeCamNode started: {self.width}x{self.height} @ {self.fps:.1f} FPS"
+            f'FakeCamNode started: {self.width}x{self.height} @ {self.fps:.1f} FPS'
         )
 
     # ======================================================================
@@ -112,7 +103,7 @@ class FakeCamNode(Node):
 
         msg.height = self.height
         msg.width = self.width
-        msg.encoding = "rgb8"
+        msg.encoding = 'rgb8'
         msg.is_bigendian = 0
         msg.step = self.width * 3  # 3 bytes per pixel (R,G,B)
 
@@ -128,11 +119,11 @@ def main(argv: Optional[list] = None) -> None:
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
-        node.get_logger().info("KeyboardInterrupt, shutting down FakeCamNode.")
+        node.get_logger().info('KeyboardInterrupt, shutting down FakeCamNode.')
     finally:
         node.destroy_node()
         rclpy.shutdown()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

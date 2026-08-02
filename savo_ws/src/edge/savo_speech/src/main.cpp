@@ -1,8 +1,8 @@
+// Copyright 2026 Ahnaf Tahmid
 #include <exception>
 #include <memory>
 
 #include "rclcpp/rclcpp.hpp"
-
 #include "savo_speech/speech_node.hpp"
 
 int main(int argc, char * argv[])

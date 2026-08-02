@@ -1,5 +1,4 @@
-#include "savo_speech/speech_node.hpp"
-
+// Copyright 2026 Ahnaf Tahmid
 #include <chrono>
 #include <cmath>
 #include <cstddef>
@@ -13,10 +12,11 @@
 #include <string_view>
 #include <utility>
 
+#include "savo_speech/speech_node.hpp"
+
 #include "ament_index_cpp/get_package_share_directory.hpp"
 #include "diagnostic_msgs/msg/diagnostic_status.hpp"
 #include "diagnostic_msgs/msg/key_value.hpp"
-
 #include "savo_speech/audio/audio_format.hpp"
 #include "savo_speech/constants.hpp"
 #include "savo_speech/ros/topic_names.hpp"
@@ -1271,11 +1271,11 @@ void SpeechNode::initialize_audio_runtime()
 
     capture_config.period_frames =
       static_cast<std::size_t>(
-        config_.period_frames);
+      config_.period_frames);
 
     capture_config.periods =
       static_cast<std::size_t>(
-        config_.periods);
+      config_.periods);
 
     capture_config.require_exact_sample_rate =
       config_.require_exact_sample_rate;
@@ -1295,11 +1295,11 @@ void SpeechNode::initialize_audio_runtime()
 
     playback_config.period_frames =
       static_cast<std::size_t>(
-        config_.period_frames);
+      config_.period_frames);
 
     playback_config.periods =
       static_cast<std::size_t>(
-        config_.periods);
+      config_.periods);
 
     playback_config.require_exact_sample_rate =
       config_.require_exact_sample_rate;
@@ -1321,7 +1321,7 @@ void SpeechNode::initialize_audio_runtime()
 
     runtime_config.capture_pipeline.selected_channel =
       static_cast<std::uint16_t>(
-        config_.selected_channel);
+      config_.selected_channel);
 
     runtime_config.capture_pipeline.pre_roll_samples =
       pre_roll_samples(
@@ -1331,7 +1331,7 @@ void SpeechNode::initialize_audio_runtime()
     runtime_config.capture_pipeline.
     queue_capacity_frames =
       static_cast<std::size_t>(
-        config_.capture_queue_capacity_frames);
+      config_.capture_queue_capacity_frames);
 
     runtime_config.capture_pipeline.
     queue_overflow_policy =
@@ -1339,11 +1339,11 @@ void SpeechNode::initialize_audio_runtime()
 
     runtime_config.playback_worker.queue_capacity =
       static_cast<std::size_t>(
-        config_.playback_queue_capacity);
+      config_.playback_queue_capacity);
 
     runtime_config.playback_worker.chunk_frames =
       static_cast<std::size_t>(
-        config_.chunk_frames);
+      config_.chunk_frames);
 
     audio_runtime_ =
       std::make_unique<audio::AudioRuntime>(
@@ -1877,149 +1877,149 @@ void SpeechNode::refresh_runtime_state()
 
   switch (snapshot.state) {
     case audio::AudioRuntimeState::Running:
-    {
-      if (
-        !capture_processing_dispatcher_ ||
-        !audio_activity_monitor_)
       {
-        ready_ = false;
+        if (
+          !capture_processing_dispatcher_ ||
+          !audio_activity_monitor_)
+        {
+          ready_ = false;
+          audio_initialized_ = snapshot.ready;
+
+          phase_ = session::SpeechPhase::Error;
+          error_ =
+            session::SpeechError::AudioProcessingFailed;
+
+          reason_ =
+            "capture_processing_not_constructed";
+
+          return;
+        }
+
+        const auto processing =
+          capture_processing_dispatcher_->
+          health_snapshot();
+
+        if (
+          processing.state ==
+          audio::CaptureProcessingState::Faulted)
+        {
+          ready_ = false;
+          audio_initialized_ = snapshot.ready;
+
+          phase_ = session::SpeechPhase::Error;
+          error_ =
+            session::SpeechError::AudioProcessingFailed;
+
+          reason_ =
+            processing.last_error.empty() ?
+            "capture_processing_faulted" :
+            processing.last_error;
+
+          return;
+        }
+
+        if (
+          processing.state !=
+          audio::CaptureProcessingState::Running)
+        {
+          ready_ = false;
+          audio_initialized_ = snapshot.ready;
+
+          phase_ =
+            session::SpeechPhase::WaitingForAudio;
+
+          error_ =
+            session::SpeechError::AudioNotInitialized;
+
+          reason_ =
+            "capture_processing_not_running";
+
+          return;
+        }
+
+        if (
+          processing.statistics.frames_processed == 0U)
+        {
+          ready_ = false;
+          audio_initialized_ = snapshot.ready;
+
+          phase_ =
+            session::SpeechPhase::WaitingForAudio;
+
+          error_ =
+            session::SpeechError::AudioNotInitialized;
+
+          reason_ =
+            "waiting_for_first_processed_audio_frame";
+
+          return;
+        }
+
+        const bool processing_freshness_suspended =
+          snapshot.microphone_gate.gated;
+
+        if (
+          !processing.fresh &&
+          !processing_freshness_suspended)
+        {
+          ready_ = false;
+          audio_initialized_ = snapshot.ready;
+
+          phase_ = session::SpeechPhase::Error;
+          error_ =
+            session::SpeechError::AudioProcessingFailed;
+
+          reason_ = "capture_processing_stale";
+
+          return;
+        }
+
+        ready_ = snapshot.ready;
         audio_initialized_ = snapshot.ready;
 
-        phase_ = session::SpeechPhase::Error;
-        error_ =
-          session::SpeechError::AudioProcessingFailed;
+        error_ = session::SpeechError::None;
+        reason_ = "audio_runtime_ready";
 
-        reason_ =
-          "capture_processing_not_constructed";
-
-        return;
-      }
-
-      const auto processing =
-        capture_processing_dispatcher_->
-        health_snapshot();
-
-      if (
-        processing.state ==
-        audio::CaptureProcessingState::Faulted)
-      {
-        ready_ = false;
-        audio_initialized_ = snapshot.ready;
-
-        phase_ = session::SpeechPhase::Error;
-        error_ =
-          session::SpeechError::AudioProcessingFailed;
-
-        reason_ =
-          processing.last_error.empty() ?
-          "capture_processing_faulted" :
-          processing.last_error;
-
-        return;
-      }
-
-      if (
-        processing.state !=
-        audio::CaptureProcessingState::Running)
-      {
-        ready_ = false;
-        audio_initialized_ = snapshot.ready;
-
-        phase_ =
-          session::SpeechPhase::WaitingForAudio;
-
-        error_ =
-          session::SpeechError::AudioNotInitialized;
-
-        reason_ =
-          "capture_processing_not_running";
-
-        return;
-      }
-
-      if (
-        processing.statistics.frames_processed == 0U)
-      {
-        ready_ = false;
-        audio_initialized_ = snapshot.ready;
-
-        phase_ =
-          session::SpeechPhase::WaitingForAudio;
-
-        error_ =
-          session::SpeechError::AudioNotInitialized;
-
-        reason_ =
-          "waiting_for_first_processed_audio_frame";
-
-        return;
-      }
-
-      const bool processing_freshness_suspended =
-        snapshot.microphone_gate.gated;
-
-      if (
-        !processing.fresh &&
-        !processing_freshness_suspended)
-      {
-        ready_ = false;
-        audio_initialized_ = snapshot.ready;
-
-        phase_ = session::SpeechPhase::Error;
-        error_ =
-          session::SpeechError::AudioProcessingFailed;
-
-        reason_ = "capture_processing_stale";
-
-        return;
-      }
-
-      ready_ = snapshot.ready;
-      audio_initialized_ = snapshot.ready;
-
-      error_ = session::SpeechError::None;
-      reason_ = "audio_runtime_ready";
-
-      switch (snapshot.microphone_gate.reason) {
-        case audio::MicrophoneGateReason::Playback:
-          phase_ = session::SpeechPhase::Speaking;
-          break;
-
-        case audio::MicrophoneGateReason::Manual:
-          phase_ = session::SpeechPhase::Muted;
-          break;
-
-        case audio::MicrophoneGateReason::Open:
-        case audio::MicrophoneGateReason::
-          PostPlaybackHold:
-        case audio::MicrophoneGateReason::Shutdown:
-          if (!utterance_session_processor_) {
-            phase_ = session::SpeechPhase::Idle;
+        switch (snapshot.microphone_gate.reason) {
+          case audio::MicrophoneGateReason::Playback:
+            phase_ = session::SpeechPhase::Speaking;
             break;
-          }
 
-          switch (
-            utterance_session_processor_->
-            snapshot().session.state)
-          {
-            case session::UtteranceSessionState::Idle:
+          case audio::MicrophoneGateReason::Manual:
+            phase_ = session::SpeechPhase::Muted;
+            break;
+
+          case audio::MicrophoneGateReason::Open:
+          case audio::MicrophoneGateReason::
+            PostPlaybackHold:
+          case audio::MicrophoneGateReason::Shutdown:
+            if (!utterance_session_processor_) {
               phase_ = session::SpeechPhase::Idle;
               break;
+            }
 
-            case session::UtteranceSessionState::Armed:
-              phase_ = session::SpeechPhase::Listening;
-              break;
+            switch (
+              utterance_session_processor_->
+              snapshot().session.state)
+            {
+              case session::UtteranceSessionState::Idle:
+                phase_ = session::SpeechPhase::Idle;
+                break;
 
-            case session::UtteranceSessionState::Recording:
-              phase_ = session::SpeechPhase::Recording;
-              break;
-          }
+              case session::UtteranceSessionState::Armed:
+                phase_ = session::SpeechPhase::Listening;
+                break;
 
-          break;
+              case session::UtteranceSessionState::Recording:
+                phase_ = session::SpeechPhase::Recording;
+                break;
+            }
+
+            break;
+        }
+
+        return;
       }
-
-      return;
-    }
 
     case audio::AudioRuntimeState::Starting:
       ready_ = false;
@@ -2197,13 +2197,13 @@ std::string SpeechNode::dashboard_text() const
       << chain.statistics.frames_failed
       << " chain_optional_failure_frames="
       << chain.statistics.
-        frames_with_optional_failures
+      frames_with_optional_failures
       << " chain_required_failures="
       << chain.statistics.
-        required_processor_failures
+      required_processor_failures
       << " chain_optional_failures="
       << chain.statistics.
-        optional_processor_failures;
+      optional_processor_failures;
   }
 
   if (audio_activity_monitor_) {
@@ -2349,9 +2349,9 @@ std::string SpeechNode::dashboard_text() const
     const std::string last_completion =
       utterance.session.last_completion_reason.has_value() ?
       std::string{
-        session::to_string(
+      session::to_string(
           *utterance.session.last_completion_reason)} :
-      std::string{"none"};
+    std::string{"none"};
 
     stream
       << " utterance_state="
@@ -2727,7 +2727,7 @@ SpeechNode::create_diagnostics() const
     std::move(audio_status));
 
   diagnostic_msgs::msg::DiagnosticStatus
-  processing_status;
+    processing_status;
 
   processing_status.name =
     "savo_speech/processing";
@@ -2795,7 +2795,7 @@ SpeechNode::create_diagnostics() const
         processing.last_error;
     } else if (
       processing.state ==
-        audio::CaptureProcessingState::Running &&
+      audio::CaptureProcessingState::Running &&
       processing.statistics.frames_processed == 0U)
     {
       processing_status.level =
@@ -2805,7 +2805,7 @@ SpeechNode::create_diagnostics() const
         "waiting_for_first_frame";
     } else if (
       processing.state ==
-        audio::CaptureProcessingState::Running &&
+      audio::CaptureProcessingState::Running &&
       (processing.fresh || microphone_gated))
     {
       processing_status.level =
@@ -3084,11 +3084,11 @@ SpeechNode::create_diagnostics() const
       diagnostic_msgs::msg::
       DiagnosticStatus::OK :
       (
-        config_.wake_word_required ?
-        diagnostic_msgs::msg::
-        DiagnosticStatus::ERROR :
-        diagnostic_msgs::msg::
-        DiagnosticStatus::WARN
+      config_.wake_word_required ?
+      diagnostic_msgs::msg::
+      DiagnosticStatus::ERROR :
+      diagnostic_msgs::msg::
+      DiagnosticStatus::WARN
       );
 
     wake_word_status.message =
@@ -3353,7 +3353,7 @@ SpeechNode::create_diagnostics() const
       make_key_value(
         "state",
         std::string{
-          vad::to_string(processor.state)}));
+        vad::to_string(processor.state)}));
 
     vad_status.values.push_back(
       make_key_value(
@@ -3493,15 +3493,15 @@ SpeechNode::create_diagnostics() const
     const std::string last_completion =
       utterance.session.last_completion_reason.has_value() ?
       std::string{
-        session::to_string(
+      session::to_string(
           *utterance.session.last_completion_reason)} :
-      std::string{"none"};
+    std::string{"none"};
 
     utterance_status.values.push_back(
       make_key_value(
         "state",
         std::string{
-          session::to_string(
+        session::to_string(
             utterance.session.state)}));
 
     utterance_status.values.push_back(
@@ -3652,9 +3652,9 @@ SpeechNode::create_diagnostics() const
       make_key_value(
         "last_cancellation_reason",
         std::string{
-          session::to_string(
+        session::to_string(
             utterance.session.
-            last_cancellation_reason)}));
+          last_cancellation_reason)}));
 
     utterance_status.values.push_back(
       make_key_value(
@@ -3788,7 +3788,7 @@ SpeechNode::create_diagnostics() const
       make_key_value(
         "state",
         std::string{
-          session::to_string(serialization.state)}));
+        session::to_string(serialization.state)}));
 
     serialization_status.values.push_back(
       make_key_value(

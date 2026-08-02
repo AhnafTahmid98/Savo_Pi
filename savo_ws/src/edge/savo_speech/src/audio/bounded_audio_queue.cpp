@@ -1,10 +1,11 @@
-#include "savo_speech/audio/bounded_audio_queue.hpp"
-
+// Copyright 2026 Ahnaf Tahmid
 #include <chrono>
 #include <cstddef>
 #include <optional>
 #include <stdexcept>
 #include <utility>
+
+#include "savo_speech/audio/bounded_audio_queue.hpp"
 
 namespace savo_speech::audio
 {

@@ -1,5 +1,5 @@
+// Copyright 2026 Ahnaf Tahmid
 #include "gtest/gtest.h"
-
 #include "savo_speech/drivers/alsa_playback_stream.hpp"
 
 TEST(AlsaPlaybackConfig, DefaultConfigurationNeedsDeviceName)

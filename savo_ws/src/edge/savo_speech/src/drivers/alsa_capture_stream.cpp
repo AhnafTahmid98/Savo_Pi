@@ -1,4 +1,5 @@
-#include "savo_speech/drivers/alsa_capture_stream.hpp"
+// Copyright 2026 Ahnaf Tahmid
+#include <alsa/asoundlib.h>
 
 #include <cerrno>
 #include <chrono>
@@ -10,8 +11,7 @@
 #include <utility>
 #include <vector>
 
-#include <alsa/asoundlib.h>
-
+#include "savo_speech/drivers/alsa_capture_stream.hpp"
 #include "savo_speech/drivers/alsa_error.hpp"
 
 namespace savo_speech::drivers

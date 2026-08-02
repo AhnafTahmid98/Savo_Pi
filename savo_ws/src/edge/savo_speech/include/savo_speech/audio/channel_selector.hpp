@@ -1,8 +1,10 @@
+// Copyright 2026 Ahnaf Tahmid
 #ifndef SAVO_SPEECH__AUDIO__CHANNEL_SELECTOR_HPP_
 #define SAVO_SPEECH__AUDIO__CHANNEL_SELECTOR_HPP_
 
-#include <cstdint>
 #include <span>
+
+#include <cstdint>
 #include <vector>
 
 namespace savo_speech::audio

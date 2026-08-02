@@ -1,3 +1,4 @@
+// Copyright 2026 Ahnaf Tahmid
 #ifndef SAVO_SPEECH__VAD__VAD_PROCESSOR_HPP_
 #define SAVO_SPEECH__VAD__VAD_PROCESSOR_HPP_
 
@@ -10,9 +11,10 @@
 #include <optional>
 #include <string>
 
-#include "savo_speech/audio/captured_audio_processor.hpp"
 #include "savo_speech/vad/vad_backend.hpp"
 #include "savo_speech/vad/vad_event.hpp"
+
+#include "savo_speech/audio/captured_audio_processor.hpp"
 
 namespace savo_speech::vad
 {
@@ -74,14 +76,14 @@ struct VadProcessorSnapshot
   std::string last_error{};
 };
 
-class VadProcessor final :
-  public audio::CapturedAudioProcessor
+class VadProcessor final
+  : public audio::CapturedAudioProcessor
 {
 public:
   VadProcessor(
     VadBackend & backend,
     VadProcessorConfig config =
-      VadProcessorConfig{});
+    VadProcessorConfig{});
 
   ~VadProcessor() override = default;
 

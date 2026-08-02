@@ -1,11 +1,5 @@
+// Copyright 2026 Ahnaf Tahmid
 #pragma once
-
-#include "savo_ui/platform/framebuffer_display.hpp"
-#include "savo_ui/render/canvas.hpp"
-#include "savo_ui/render/image_asset.hpp"
-
-#include <rclcpp/rclcpp.hpp>
-#include <std_msgs/msg/string.hpp>
 
 #include <array>
 #include <chrono>
@@ -13,6 +7,12 @@
 #include <optional>
 #include <string>
 #include <vector>
+
+#include <rclcpp/rclcpp.hpp>
+#include "savo_ui/platform/framebuffer_display.hpp"
+#include "savo_ui/render/canvas.hpp"
+#include "savo_ui/render/image_asset.hpp"
+#include <std_msgs/msg/string.hpp>
 
 namespace savo_ui
 {
@@ -235,6 +235,17 @@ struct UiNodeConfig
   std::string power_edge_topic{"/savo_power/edge/ups"};
   std::string power_base_topic{"/savo_power/base/battery"};
   std::string power_status_topic{"/savo_power/status"};
+  std::string core_state_topic{"/savo_bringup/core/state"};
+  std::string edge_state_topic{"/savo_bringup/edge/state"};
+  std::string mode_state_topic{"/savo_control/mode_state"};
+  std::string safety_state_topic{"/savo_perception/safety_state"};
+  std::string navigation_state_topic{"/savo_nav/status"};
+  std::string mapping_state_topic{"/savo_mapping/status"};
+  std::string locations_state_topic{"/savo_locations/status"};
+  std::string speech_state_topic{"/savo_speech/state"};
+  std::string speech_readiness_topic{"/savo_speech/readiness"};
+  std::string transcript_topic{"/savo_speech/transcript"};
+  std::string response_topic{"/savo_speech/response"};
 
   int screen_width{800};
   int screen_height{480};
@@ -243,6 +254,7 @@ struct UiNodeConfig
   double intro_seconds{4.0};
   double robot360_seconds_per_frame{0.75};
   double power_stale_timeout_s{5.0};
+  double live_state_stale_timeout_s{5.0};
 
   int preview_animation_frames{24};
   int power_history_samples{120};
@@ -273,6 +285,8 @@ private:
   void close_touch();
   void configure_runtime();
   void configure_power_subscriptions();
+  void configure_live_subscriptions();
+  void update_live_state(const std::string & channel, const std::string & text);
 
   void update_power_source(
     PowerUiSourceState & source,
@@ -349,6 +363,8 @@ private:
     power_base_subscription_;
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr
     power_status_subscription_;
+  std::vector<rclcpp::Subscription<std_msgs::msg::String>::SharedPtr>
+  live_subscriptions_;
 
   UiScreen active_screen_{UiScreen::Intro};
   VoicePhase voice_phase_{VoicePhase::Idle};
@@ -392,6 +408,16 @@ private:
 
   std::chrono::steady_clock::time_point power_status_last_update_{};
   std::chrono::steady_clock::time_point last_power_preview_export_{};
+  std::chrono::steady_clock::time_point last_system_update_{};
+  std::chrono::steady_clock::time_point last_safety_update_{};
+  std::chrono::steady_clock::time_point last_navigation_update_{};
+  std::chrono::steady_clock::time_point last_mapping_update_{};
+  std::chrono::steady_clock::time_point last_speech_update_{};
+  bool system_seen_{false};
+  bool safety_seen_{false};
+  bool navigation_seen_{false};
+  bool mapping_seen_{false};
+  bool speech_seen_{false};
 
   bool first_tick_logged_{false};
 

@@ -1,3 +1,6 @@
+// Copyright 2026 Ahnaf Tahmid
+#include <span>
+
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
@@ -6,13 +9,11 @@
 #include <functional>
 #include <limits>
 #include <mutex>
-#include <span>
 #include <stdexcept>
 #include <string>
 #include <thread>
 
 #include "gtest/gtest.h"
-
 #include "savo_speech/audio/audio_runtime.hpp"
 
 namespace
@@ -20,8 +21,8 @@ namespace
 
 using namespace std::chrono_literals;
 
-class RuntimeCaptureSource final :
-  public savo_speech::audio::CaptureSource
+class RuntimeCaptureSource final
+  : public savo_speech::audio::CaptureSource
 {
 public:
   explicit RuntimeCaptureSource(
@@ -114,8 +115,8 @@ private:
   std::atomic_uint64_t sequence_{0U};
 };
 
-class RuntimePlaybackSink final :
-  public savo_speech::audio::PlaybackSink
+class RuntimePlaybackSink final
+  : public savo_speech::audio::PlaybackSink
 {
 public:
   RuntimePlaybackSink()

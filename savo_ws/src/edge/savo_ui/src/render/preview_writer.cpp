@@ -1,8 +1,9 @@
-#include "savo_ui/render/preview_writer.hpp"
-
+// Copyright 2026 Ahnaf Tahmid
 #include <filesystem>
 #include <fstream>
 #include <string>
+
+#include "savo_ui/render/preview_writer.hpp"
 
 namespace savo_ui
 {

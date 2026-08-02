@@ -1,14 +1,15 @@
+// Copyright 2026 Ahnaf Tahmid
+#include <span>
+
 #include <chrono>
 #include <condition_variable>
 #include <cstddef>
 #include <cstdint>
 #include <mutex>
-#include <span>
 #include <stdexcept>
 #include <thread>
 
 #include "gtest/gtest.h"
-
 #include "savo_speech/audio/audio_buffer.hpp"
 #include "savo_speech/audio/microphone_gate.hpp"
 #include "savo_speech/audio/playback_sink.hpp"
@@ -19,8 +20,8 @@ namespace
 
 using namespace std::chrono_literals;
 
-class ControlledPlaybackSink final :
-  public savo_speech::audio::PlaybackSink
+class ControlledPlaybackSink final
+  : public savo_speech::audio::PlaybackSink
 {
 public:
   ControlledPlaybackSink()

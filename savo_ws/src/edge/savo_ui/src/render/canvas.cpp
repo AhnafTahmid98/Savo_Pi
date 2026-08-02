@@ -1,9 +1,10 @@
-#include "savo_ui/render/canvas.hpp"
-
+// Copyright 2026 Ahnaf Tahmid
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <fstream>
+
+#include "savo_ui/render/canvas.hpp"
 
 namespace savo_ui
 {
@@ -95,12 +96,12 @@ void Canvas::blend_pixel(const int x, const int y, const ColorRgb color, const f
     3U;
 
   const auto blend_channel = [a](const std::uint8_t dst, const std::uint8_t src) {
-    const float value =
-      static_cast<float>(dst) * (1.0F - a) +
-      static_cast<float>(src) * a;
+      const float value =
+        static_cast<float>(dst) * (1.0F - a) +
+        static_cast<float>(src) * a;
 
-    return static_cast<std::uint8_t>(std::clamp(value, 0.0F, 255.0F));
-  };
+      return static_cast<std::uint8_t>(std::clamp(value, 0.0F, 255.0F));
+    };
 
   pixels_rgb_[index] = blend_channel(pixels_rgb_[index], color.r);
   pixels_rgb_[index + 1U] = blend_channel(pixels_rgb_[index + 1U], color.g);

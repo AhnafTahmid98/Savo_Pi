@@ -1,8 +1,10 @@
+// Copyright 2026 Ahnaf Tahmid
 #ifndef SAVO_SPEECH__DRIVERS__ALSA_ERROR_HPP_
 #define SAVO_SPEECH__DRIVERS__ALSA_ERROR_HPP_
 
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 namespace savo_speech::drivers
 {

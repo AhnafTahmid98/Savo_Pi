@@ -25,8 +25,6 @@ def generate_launch_description() -> LaunchDescription:
 
     use_vo = LaunchConfiguration("use_vo")
     use_health = LaunchConfiguration("use_health")
-    use_dashboard = LaunchConfiguration("use_dashboard")
-    use_state_publisher = LaunchConfiguration("use_state_publisher")
 
     return LaunchDescription(
         [
@@ -87,16 +85,6 @@ def generate_launch_description() -> LaunchDescription:
                 default_value="false",
                 description="Start localization_health_node.",
             ),
-            DeclareLaunchArgument(
-                "use_dashboard",
-                default_value="false",
-                description="Start localization_dashboard.",
-            ),
-            DeclareLaunchArgument(
-                "use_state_publisher",
-                default_value="false",
-                description="Start ekf_state_publisher_node.",
-            ),
             Node(
                 package="robot_localization",
                 executable="ekf_node",
@@ -136,33 +124,6 @@ def generate_launch_description() -> LaunchDescription:
                 name="localization_health_node",
                 output="screen",
                 condition=IfCondition(use_health),
-                parameters=[
-                    topics_config,
-                    frames_config,
-                    diagnostics_config,
-                    profile_config,
-                ],
-            ),
-            Node(
-                package="savo_localization",
-                executable="ekf_state_publisher_node.py",
-                name="ekf_state_publisher_node",
-                output="screen",
-                condition=IfCondition(use_state_publisher),
-                parameters=[
-                    topics_config,
-                    frames_config,
-                    diagnostics_config,
-                    profile_config,
-                ],
-            ),
-            Node(
-                package="savo_localization",
-                executable="localization_dashboard.py",
-                name="localization_dashboard",
-                output="screen",
-                emulate_tty=True,
-                condition=IfCondition(use_dashboard),
                 parameters=[
                     topics_config,
                     frames_config,

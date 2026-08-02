@@ -1,8 +1,9 @@
-#include "savo_speech/audio/channel_selector.hpp"
-
+// Copyright 2026 Ahnaf Tahmid
 #include <cstddef>
 #include <stdexcept>
 #include <vector>
+
+#include "savo_speech/audio/channel_selector.hpp"
 
 namespace savo_speech::audio
 {
@@ -38,7 +39,7 @@ std::vector<std::int16_t> ChannelSelector::extract(
 
   for (
     std::size_t index =
-      static_cast<std::size_t>(channel_index);
+    static_cast<std::size_t>(channel_index);
     index < interleaved_samples.size();
     index += channels)
   {

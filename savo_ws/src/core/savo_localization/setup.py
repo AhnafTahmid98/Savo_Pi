@@ -27,12 +27,5 @@ setup(
     ),
     license="Proprietary",
     tests_require=["pytest"],
-    entry_points={
-        "console_scripts": [
-            "localization_dashboard = savo_localization.nodes.localization_dashboard:main",
-            "localization_health_node = savo_localization.nodes.localization_health_node:main",
-            "ekf_state_publisher_node = savo_localization.nodes.ekf_state_publisher_node:main",
-            "wheel_odom_fallback_node = savo_localization.nodes.wheel_odom_fallback_node:main",
-        ],
-    },
+    entry_points={"console_scripts": []},
 )

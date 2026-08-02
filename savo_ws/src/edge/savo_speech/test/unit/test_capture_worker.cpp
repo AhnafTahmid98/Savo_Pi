@@ -1,3 +1,4 @@
+// Copyright 2026 Ahnaf Tahmid
 #include <atomic>
 #include <chrono>
 #include <cstddef>
@@ -9,7 +10,6 @@
 #include <thread>
 
 #include "gtest/gtest.h"
-
 #include "savo_speech/audio/capture_pipeline.hpp"
 #include "savo_speech/audio/capture_source.hpp"
 #include "savo_speech/audio/capture_worker.hpp"
@@ -20,13 +20,13 @@ namespace
 
 using namespace std::chrono_literals;
 
-class FakeCaptureSource final :
-  public savo_speech::audio::CaptureSource
+class FakeCaptureSource final
+  : public savo_speech::audio::CaptureSource
 {
 public:
   explicit FakeCaptureSource(
     const std::size_t fail_after_reads =
-      std::numeric_limits<std::size_t>::max())
+    std::numeric_limits<std::size_t>::max())
   : fail_after_reads_{fail_after_reads}
   {
   }

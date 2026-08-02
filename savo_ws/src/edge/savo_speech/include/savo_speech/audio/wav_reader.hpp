@@ -1,10 +1,12 @@
+// Copyright 2026 Ahnaf Tahmid
 #ifndef SAVO_SPEECH__AUDIO__WAV_READER_HPP_
 #define SAVO_SPEECH__AUDIO__WAV_READER_HPP_
+
+#include <span>
 
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
-#include <span>
 
 #include "savo_speech/audio/audio_buffer.hpp"
 

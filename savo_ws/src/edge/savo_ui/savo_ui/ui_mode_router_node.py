@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Copyright 2026 Ahnaf Tahmid
 """Route display mode from mapping state and the latest intent result."""
 
 from __future__ import annotations
@@ -8,76 +9,59 @@ from typing import Optional
 
 import rclpy
 from rclpy.node import Node
-
-from std_msgs.msg import String, Bool
 from savo_msgs.msg import IntentResult  # requires savo_ui to depend on savo_msgs
+from std_msgs.msg import Bool, String
 
 
 class UIModeRouterNode(Node):
     """Router that chooses UI mode based on mapping + LLM intent result."""
 
     def __init__(self) -> None:
-        super().__init__("savo_ui_mode_router")
+        super().__init__('savo_ui_mode_router')
 
         # ------------------------------------------------------------------
         # Parameters
         # ------------------------------------------------------------------
-        self.declare_parameter("robot_id", "robot_savo_pi")
-        self.declare_parameter("mapping_active_topic", "/savo_mapping/mapping_active")
-        self.declare_parameter("idle_status_text", "Hello, I am Robot Savo!")
+        self.declare_parameter('robot_id', 'robot_savo_pi')
+        self.declare_parameter('mapping_active_topic', '/savo_mapping/mapping_active')
+        self.declare_parameter('idle_status_text', 'Hello, I am Robot Savo!')
         self.declare_parameter(
-            "mapping_status_text",
-            "Mapping in progress, please keep distance.",
+            'mapping_status_text',
+            'Mapping in progress, please keep distance.',
         )
-        self.declare_parameter("stopped_status_text", "Stopped here.")
-        self.declare_parameter("status_from_reply", True)
-        self.declare_parameter("nav_mode_timeout_s", 20.0)
-        self.declare_parameter("stopped_mode_timeout_s", 10.0)
+        self.declare_parameter('stopped_status_text', 'Stopped here.')
+        self.declare_parameter('status_from_reply', True)
+        self.declare_parameter('nav_mode_timeout_s', 20.0)
+        self.declare_parameter('stopped_mode_timeout_s', 10.0)
 
-        self.robot_id: str = (
-            self.get_parameter("robot_id").get_parameter_value().string_value
-        )
+        self.robot_id: str = self.get_parameter('robot_id').get_parameter_value().string_value
         self.mapping_active_topic: str = (
-            self.get_parameter("mapping_active_topic")
-            .get_parameter_value()
-            .string_value
+            self.get_parameter('mapping_active_topic').get_parameter_value().string_value
         )
         self.idle_status_text: str = (
-            self.get_parameter("idle_status_text")
-            .get_parameter_value()
-            .string_value
+            self.get_parameter('idle_status_text').get_parameter_value().string_value
         )
         self.mapping_status_text: str = (
-            self.get_parameter("mapping_status_text")
-            .get_parameter_value()
-            .string_value
+            self.get_parameter('mapping_status_text').get_parameter_value().string_value
         )
         self.stopped_status_text: str = (
-            self.get_parameter("stopped_status_text")
-            .get_parameter_value()
-            .string_value
+            self.get_parameter('stopped_status_text').get_parameter_value().string_value
         )
         self.status_from_reply: bool = (
-            self.get_parameter("status_from_reply")
-            .get_parameter_value()
-            .bool_value
+            self.get_parameter('status_from_reply').get_parameter_value().bool_value
         )
         self.nav_mode_timeout_s: float = (
-            self.get_parameter("nav_mode_timeout_s")
-            .get_parameter_value()
-            .double_value
+            self.get_parameter('nav_mode_timeout_s').get_parameter_value().double_value
         )
         self.stopped_mode_timeout_s: float = (
-            self.get_parameter("stopped_mode_timeout_s")
-            .get_parameter_value()
-            .double_value
+            self.get_parameter('stopped_mode_timeout_s').get_parameter_value().double_value
         )
 
         # ------------------------------------------------------------------
         # Publishers
         # ------------------------------------------------------------------
-        self.pub_mode = self.create_publisher(String, "/savo_ui/mode", 10)
-        self.pub_status = self.create_publisher(String, "/savo_ui/status_text", 10)
+        self.pub_mode = self.create_publisher(String, '/savo_ui/mode', 10)
+        self.pub_status = self.create_publisher(String, '/savo_ui/status_text', 10)
 
         # ------------------------------------------------------------------
         # Subscriptions
@@ -91,7 +75,7 @@ class UIModeRouterNode(Node):
 
         self.create_subscription(
             IntentResult,
-            "/savo_intent/intent_result",
+            '/savo_intent/intent_result',
             self._on_intent_result,
             10,
         )
@@ -101,13 +85,13 @@ class UIModeRouterNode(Node):
         # ------------------------------------------------------------------
         self._mapping_active: bool = False
 
-        self._last_intent: str = ""      # NAVIGATE/FOLLOW/STOP/STATUS/CHATBOT
-        self._last_nav_goal: str = ""    # from nav_goal in IntentResult
-        self._last_reply_text: str = ""  # from reply_text in IntentResult
+        self._last_intent: str = ''  # NAVIGATE/FOLLOW/STOP/STATUS/CHATBOT
+        self._last_nav_goal: str = ''  # from nav_goal in IntentResult
+        self._last_reply_text: str = ''  # from reply_text in IntentResult
         self._last_event_time_s: float = 0.0  # last time we got any intent
-        self._last_stop_time_s: float = 0.0   # last STOP
+        self._last_stop_time_s: float = 0.0  # last STOP
 
-        self._current_mode: str = "INTERACT"
+        self._current_mode: str = 'INTERACT'
         self._current_status: str = self.idle_status_text
 
         # Evaluate mode at 5 Hz
@@ -115,15 +99,15 @@ class UIModeRouterNode(Node):
         self._timer = self.create_timer(self._timer_dt, self._on_timer)
 
         self.get_logger().info(
-            "UIModeRouterNode started with:\n"
-            f"  robot_id                = {self.robot_id}\n"
-            f"  mapping_active_topic    = {self.mapping_active_topic}\n"
-            f"  idle_status_text        = {self.idle_status_text}\n"
-            f"  mapping_status_text     = {self.mapping_status_text}\n"
-            f"  stopped_status_text     = {self.stopped_status_text}\n"
-            f"  status_from_reply       = {self.status_from_reply}\n"
-            f"  nav_mode_timeout_s      = {self.nav_mode_timeout_s:.1f}\n"
-            f"  stopped_mode_timeout_s  = {self.stopped_mode_timeout_s:.1f}"
+            'UIModeRouterNode started with:\n'
+            f'  robot_id                = {self.robot_id}\n'
+            f'  mapping_active_topic    = {self.mapping_active_topic}\n'
+            f'  idle_status_text        = {self.idle_status_text}\n'
+            f'  mapping_status_text     = {self.mapping_status_text}\n'
+            f'  stopped_status_text     = {self.stopped_status_text}\n'
+            f'  status_from_reply       = {self.status_from_reply}\n'
+            f'  nav_mode_timeout_s      = {self.nav_mode_timeout_s:.1f}\n'
+            f'  stopped_mode_timeout_s  = {self.stopped_mode_timeout_s:.1f}'
         )
 
     # ------------------------------------------------------------------
@@ -133,22 +117,20 @@ class UIModeRouterNode(Node):
         self._mapping_active = bool(msg.data)
 
     def _on_intent_result(self, msg: IntentResult) -> None:
-        """
-        Track latest intent for this robot_id and when it happened.
-        """
+        """Track latest intent for this robot_id and when it happened."""
         if self.robot_id:
             if msg.robot_id and msg.robot_id != self.robot_id:
                 # Ignore intents for other robots
                 return
 
-        intent = (msg.intent or "").strip().upper()
+        intent = (msg.intent or '').strip().upper()
         self._last_intent = intent
-        self._last_nav_goal = (msg.nav_goal or "").strip()
-        self._last_reply_text = (msg.reply_text or "").strip()
+        self._last_nav_goal = (msg.nav_goal or '').strip()
+        self._last_reply_text = (msg.reply_text or '').strip()
 
         now = self._now_s()
         self._last_event_time_s = now
-        if intent == "STOP":
+        if intent == 'STOP':
             self._last_stop_time_s = now
 
     # ------------------------------------------------------------------
@@ -161,7 +143,7 @@ class UIModeRouterNode(Node):
 
         # 1) Mapping has highest priority
         if self._mapping_active:
-            new_mode = "MAP"
+            new_mode = 'MAP'
             new_status = self.mapping_status_text
 
         else:
@@ -171,42 +153,37 @@ class UIModeRouterNode(Node):
 
             # 2) Recent NAVIGATE/FOLLOW intent → NAVIGATE mode
             if (
-                self._last_intent in ("NAVIGATE", "FOLLOW")
+                self._last_intent in ('NAVIGATE', 'FOLLOW')
                 and dt_since_event <= self.nav_mode_timeout_s
             ):
-                new_mode = "NAVIGATE"
+                new_mode = 'NAVIGATE'
 
                 # Build status text
                 if self.status_from_reply and self._last_reply_text:
                     # Use LLM reply_text, truncated to something safe
                     txt = self._last_reply_text
                     if len(txt) > 120:
-                        txt = txt[:117] + "..."
+                        txt = txt[:117] + '...'
                     new_status = txt
                 else:
                     if self._last_nav_goal:
-                        new_status = f"Guiding to: {self._last_nav_goal}"
+                        new_status = f'Guiding to: {self._last_nav_goal}'
                     else:
-                        new_status = "Guiding…"
+                        new_status = 'Guiding…'
 
             # 3) Recent STOP → INTERACT with stopped text
-            elif (
-                self._last_intent == "STOP"
-                and dt_since_stop <= self.stopped_mode_timeout_s
-            ):
-                new_mode = "INTERACT"
+            elif self._last_intent == 'STOP' and dt_since_stop <= self.stopped_mode_timeout_s:
+                new_mode = 'INTERACT'
                 new_status = self.stopped_status_text
 
             # 4) Otherwise, idle INTERACT
             else:
-                new_mode = "INTERACT"
+                new_mode = 'INTERACT'
                 new_status = self.idle_status_text
 
         # Only publish when something changed
         if new_mode != self._current_mode:
-            self.get_logger().info(
-                f"UI mode router: {self._current_mode} -> {new_mode}"
-            )
+            self.get_logger().info(f'UI mode router: {self._current_mode} -> {new_mode}')
             self._publish_mode(new_mode)
             self._current_mode = new_mode
 
@@ -236,17 +213,18 @@ class UIModeRouterNode(Node):
 # main()
 # ======================================================================#
 
+
 def main(argv: Optional[list] = None) -> None:
     rclpy.init(args=argv)
     node = UIModeRouterNode()
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
-        node.get_logger().info("KeyboardInterrupt, shutting down UIModeRouterNode.")
+        node.get_logger().info('KeyboardInterrupt, shutting down UIModeRouterNode.')
     finally:
         node.destroy_node()
         rclpy.shutdown()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main(sys.argv)

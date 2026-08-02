@@ -1,10 +1,11 @@
+// Copyright 2026 Ahnaf Tahmid
 #pragma once
+
+#include <string>
 
 #include "savo_ui/render/canvas.hpp"
 #include "savo_ui/render/color.hpp"
 #include "savo_ui/render/image_asset.hpp"
-
-#include <string>
 
 namespace savo_ui
 {

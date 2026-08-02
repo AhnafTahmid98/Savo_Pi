@@ -1,0 +1,18 @@
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    "@EDGE_ETH_IFACE@":
+      dhcp4: false
+      dhcp6: false
+      addresses:
+        - "@EDGE_ETH_IP@/@LINK_PREFIX@"
+      optional: true
+      link-local: []
+  wifis:
+    "@EDGE_WIFI_IFACE@":
+      dhcp4: true
+      optional: true
+      access-points:
+        "@WIFI_SSID@":
+          password: "@WIFI_PASSWORD@"

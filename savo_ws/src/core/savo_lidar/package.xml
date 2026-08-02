@@ -14,10 +14,9 @@
   <maintainer email="tahmidahnaf998@gmail.com">Ahnaf Tahmid</maintainer>
   <license>Proprietary</license>
 
-  <!-- Hybrid build: C++ capable (ament_cmake) + Python package/nodes (ament_python) -->
+  <!-- Hybrid build: ament_cmake with ament_cmake_python packaging. -->
   <buildtool_depend>ament_cmake</buildtool_depend>
   <buildtool_depend>ament_cmake_python</buildtool_depend>
-  <buildtool_depend>ament_python</buildtool_depend>
 
   <!-- Core ROS dependencies -->
   <depend>rclcpp</depend>

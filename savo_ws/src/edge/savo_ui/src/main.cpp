@@ -1,8 +1,8 @@
-#include "savo_ui/app/ui_node.hpp"
+// Copyright 2026 Ahnaf Tahmid
+#include <memory>
 
 #include <rclcpp/rclcpp.hpp>
-
-#include <memory>
+#include "savo_ui/app/ui_node.hpp"
 
 int main(int argc, char ** argv)
 {

@@ -1,4 +1,5 @@
-#include "savo_speech/drivers/alsa_device_resolver.hpp"
+// Copyright 2026 Ahnaf Tahmid
+#include <alsa/asoundlib.h>
 
 #include <algorithm>
 #include <array>
@@ -9,8 +10,7 @@
 #include <string_view>
 #include <utility>
 
-#include <alsa/asoundlib.h>
-
+#include "savo_speech/drivers/alsa_device_resolver.hpp"
 #include "savo_speech/drivers/alsa_error.hpp"
 
 namespace savo_speech::drivers

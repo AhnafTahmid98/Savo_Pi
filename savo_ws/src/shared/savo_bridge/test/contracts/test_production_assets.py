@@ -22,8 +22,9 @@ def test_edge_configuration_uses_guarded_authority() -> None:
         '- 10001',
         'command_dispatcher.navigation_action_name: /savo_nav/navigation/navigate_to_pose',
         'command_dispatcher.location_resolve_service: /savo_locations/resolve',
-        'command_dispatcher.active_map_id: saved_map',
-        'command_dispatcher.active_map_revision: 1',
+        'command_dispatcher.active_map_id: ""',
+        'command_dispatcher.active_map_revision: 0',
+        'command_dispatcher.require_active_map_context: true',
         'snapshot_path: /run/savo_bridge/snapshot.json',
     )
     for marker in required:
@@ -71,9 +72,10 @@ def test_systemd_runtime_contract_is_shared_and_fail_closed() -> None:
     assert 'ExecStartPre=' not in service
 
 
-def test_launch_defaults_to_saved_map_context() -> None:
+def test_launch_requires_observed_map_context() -> None:
     launch = read('launch/edge_bridge.launch.py')
     normalized_launch = launch.replace(chr(39), chr(34))
-    assert 'default_value="saved_map"' in normalized_launch
-    assert 'default_value="1"' in normalized_launch
+    assert 'DeclareLaunchArgument("active_map_id", default_value="")' in normalized_launch
+    assert 'DeclareLaunchArgument("active_map_revision", default_value="0")' in normalized_launch
+    assert 'default_value="saved_map"' not in normalized_launch
     assert 'executable="savo_bridge_node"' in normalized_launch

@@ -27,15 +27,10 @@
   <depend>diagnostic_msgs</depend>
 
   <build_depend>libasound2-dev</build_depend>
-  <exec_depend>libasound2</exec_depend>
 
   <build_depend>pkg-config</build_depend>
-  <build_depend>libpocketsphinx-dev</build_depend>
-  <build_depend>libsphinxbase-dev</build_depend>
-
-  <exec_depend>libpocketsphinx3</exec_depend>
-  <exec_depend>libsphinxbase3</exec_depend>
-  <exec_depend>pocketsphinx-en-us</exec_depend>
+  <!-- PocketSphinx/SphinxBase and language assets are Ubuntu target packages
+       without Noble rosdep keys. The edge dependency installer owns them. -->
 
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>

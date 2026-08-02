@@ -1,3 +1,4 @@
+// Copyright 2026 Ahnaf Tahmid
 #include <cstdlib>
 #include <exception>
 #include <iostream>
@@ -5,8 +6,9 @@
 #include <string_view>
 #include <vector>
 
-#include "savo_speech/drivers/alsa_device_resolver.hpp"
 #include "savo_speech/drivers/audio_device_descriptor.hpp"
+
+#include "savo_speech/drivers/alsa_device_resolver.hpp"
 
 namespace
 {

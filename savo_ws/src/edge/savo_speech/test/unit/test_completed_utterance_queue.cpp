@@ -1,10 +1,10 @@
+// Copyright 2026 Ahnaf Tahmid
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <stdexcept>
 
 #include "gtest/gtest.h"
-
 #include "savo_speech/audio/audio_buffer.hpp"
 #include "savo_speech/audio/wav_writer.hpp"
 #include "savo_speech/session/completed_utterance_queue.hpp"

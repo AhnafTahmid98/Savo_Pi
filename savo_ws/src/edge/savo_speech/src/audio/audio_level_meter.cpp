@@ -1,8 +1,9 @@
-#include "savo_speech/audio/audio_level_meter.hpp"
-
+// Copyright 2026 Ahnaf Tahmid
 #include <cmath>
 #include <cstdint>
 #include <stdexcept>
+
+#include "savo_speech/audio/audio_level_meter.hpp"
 
 namespace savo_speech::audio
 {

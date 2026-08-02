@@ -814,6 +814,12 @@ void BridgeNode::configure_command_server()
     "command_dispatcher.navigation_readiness_topic",
     dispatcher_config.navigation_readiness_topic);
 
+  dispatcher_config.map_context_status_topic =
+    declare_read_only_parameter<std::string>(
+    *this,
+    "command_dispatcher.map_context_status_topic",
+    dispatcher_config.map_context_status_topic);
+
   dispatcher_config.navigation_action_name =
     declare_read_only_parameter<std::string>(
     *this,
@@ -825,6 +831,23 @@ void BridgeNode::configure_command_server()
     *this,
     "command_dispatcher.location_resolve_service",
     dispatcher_config.location_resolve_service);
+
+  dispatcher_config.mapping_action_name =
+    declare_read_only_parameter<std::string>(
+    *this, "command_dispatcher.mapping_action_name",
+    dispatcher_config.mapping_action_name);
+  dispatcher_config.mapping_control_service =
+    declare_read_only_parameter<std::string>(
+    *this, "command_dispatcher.mapping_control_service",
+    dispatcher_config.mapping_control_service);
+  dispatcher_config.mapping_status_topic =
+    declare_read_only_parameter<std::string>(
+    *this, "command_dispatcher.mapping_status_topic",
+    dispatcher_config.mapping_status_topic);
+  dispatcher_config.supervisor_state_topic =
+    declare_read_only_parameter<std::string>(
+    *this, "command_dispatcher.supervisor_state_topic",
+    dispatcher_config.supervisor_state_topic);
 
   dispatcher_config.active_map_id =
     declare_read_only_parameter<std::string>(
@@ -897,6 +920,15 @@ void BridgeNode::configure_command_server()
     *this,
     "command_dispatcher.navigation_cancel_timeout_ms",
     dispatcher_config.navigation_cancel_timeout_ms);
+
+  dispatcher_config.mapping_server_timeout_ms =
+    declare_read_only_parameter<std::int64_t>(
+    *this, "command_dispatcher.mapping_server_timeout_ms",
+    dispatcher_config.mapping_server_timeout_ms);
+  dispatcher_config.mapping_control_timeout_ms =
+    declare_read_only_parameter<std::int64_t>(
+    *this, "command_dispatcher.mapping_control_timeout_ms",
+    dispatcher_config.mapping_control_timeout_ms);
 
   if (
     active_map_revision < 0 ||

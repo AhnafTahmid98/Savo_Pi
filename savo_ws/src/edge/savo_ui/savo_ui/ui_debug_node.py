@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
+# Copyright 2026 Ahnaf Tahmid
 """
-Robot Savo — UI debug driver node (status text blank)
+Robot Savo — UI debug driver node (status text blank).
 
 This version still cycles modes and mouth, but publishes an EMPTY
 /savo_ui/status_text so nothing appears even with older displays.
@@ -14,88 +15,69 @@ from typing import Optional
 
 import rclpy
 from rclpy.node import Node
-
-from std_msgs.msg import String, Bool, Float32
+from std_msgs.msg import Bool, Float32, String
 
 
 class UIDebugNode(Node):
     """Debug node that drives UI topics for visual testing."""
 
     def __init__(self) -> None:
-        super().__init__("savo_ui_debug")
+        super().__init__('savo_ui_debug')
 
         # ------------------------------------------------------------------
         # Parameters
         # ------------------------------------------------------------------
-        self.declare_parameter("robot_id", "robot_savo_pi")
-        self.declare_parameter("cycle_interval_s", 10.0)
-        self.declare_parameter("enable_fake_mouth", False)
-        self.declare_parameter("mouth_wave_freq_hz", 1.2)
-        self.declare_parameter("publish_face_state", True)
+        self.declare_parameter('robot_id', 'robot_savo_pi')
+        self.declare_parameter('cycle_interval_s', 10.0)
+        self.declare_parameter('enable_fake_mouth', False)
+        self.declare_parameter('mouth_wave_freq_hz', 1.2)
+        self.declare_parameter('publish_face_state', True)
 
-        self.robot_id: str = (
-            self.get_parameter("robot_id").get_parameter_value().string_value
-        )
+        self.robot_id: str = self.get_parameter('robot_id').get_parameter_value().string_value
         self.cycle_interval_s: float = (
-            self.get_parameter("cycle_interval_s")
-            .get_parameter_value()
-            .double_value
+            self.get_parameter('cycle_interval_s').get_parameter_value().double_value
         )
         self.enable_fake_mouth: bool = (
-            self.get_parameter("enable_fake_mouth")
-            .get_parameter_value()
-            .bool_value
+            self.get_parameter('enable_fake_mouth').get_parameter_value().bool_value
         )
         self.mouth_wave_freq_hz: float = (
-            self.get_parameter("mouth_wave_freq_hz")
-            .get_parameter_value()
-            .double_value
+            self.get_parameter('mouth_wave_freq_hz').get_parameter_value().double_value
         )
         self.publish_face_state: bool = (
-            self.get_parameter("publish_face_state")
-            .get_parameter_value()
-            .bool_value
+            self.get_parameter('publish_face_state').get_parameter_value().bool_value
         )
 
         if self.cycle_interval_s <= 0.0:
-            self.get_logger().warn(
-                "cycle_interval_s must be > 0.0, using 10.0 instead."
-            )
+            self.get_logger().warn('cycle_interval_s must be > 0.0, using 10.0 instead.')
             self.cycle_interval_s = 10.0
 
         # ------------------------------------------------------------------
         # Publishers
         # ------------------------------------------------------------------
-        self.pub_mode = self.create_publisher(String, "/savo_ui/mode", 10)
-        self.pub_status = self.create_publisher(String, "/savo_ui/status_text", 10)
+        self.pub_mode = self.create_publisher(String, '/savo_ui/mode', 10)
+        self.pub_status = self.create_publisher(String, '/savo_ui/status_text', 10)
 
-        self.pub_mouth_open = self.create_publisher(
-            Bool, "/savo_speech/mouth_open", 10
-        )
-        self.pub_mouth_level = self.create_publisher(
-            Float32, "/savo_speech/mouth_level", 10
-        )
-        self.pub_face_state = self.create_publisher(
-            String, "/savo_ui/face_state", 10
-        )
+        self.pub_mouth_open = self.create_publisher(Bool, '/savo_speech/mouth_open', 10)
+        self.pub_mouth_level = self.create_publisher(Float32, '/savo_speech/mouth_level', 10)
+        self.pub_face_state = self.create_publisher(String, '/savo_ui/face_state', 10)
 
         # ------------------------------------------------------------------
         # Internal state
         # ------------------------------------------------------------------
         self._time_s: float = 0.0
-        self._last_mode: str = ""
-        self._last_status: str = ""
+        self._last_mode: str = ''
+        self._last_status: str = ''
 
         self._dt = 0.05
         self._timer = self.create_timer(self._dt, self._on_timer)
 
         self.get_logger().info(
-            "UIDebugNode started (status text BLANK version).\n"
-            f"  robot_id           = {self.robot_id}\n"
-            f"  cycle_interval_s   = {self.cycle_interval_s:.2f}\n"
-            f"  enable_fake_mouth  = {self.enable_fake_mouth}\n"
-            f"  mouth_wave_freq_hz = {self.mouth_wave_freq_hz:.2f}\n"
-            f"  publish_face_state = {self.publish_face_state}"
+            'UIDebugNode started (status text BLANK version).\n'
+            f'  robot_id           = {self.robot_id}\n'
+            f'  cycle_interval_s   = {self.cycle_interval_s:.2f}\n'
+            f'  enable_fake_mouth  = {self.enable_fake_mouth}\n'
+            f'  mouth_wave_freq_hz = {self.mouth_wave_freq_hz:.2f}\n'
+            f'  publish_face_state = {self.publish_face_state}'
         )
 
     # ------------------------------------------------------------------
@@ -109,17 +91,17 @@ class UIDebugNode(Node):
         segment = self.cycle_interval_s / 3.0
 
         if t_mod < segment:
-            mode = "INTERACT"
+            mode = 'INTERACT'
         elif t_mod < 2.0 * segment:
-            mode = "NAVIGATE"
+            mode = 'NAVIGATE'
         else:
-            mode = "MAP"
+            mode = 'MAP'
 
         # BLANK status string (was "[DEBUG] Mode = ...")
-        status = ""
+        status = ''
 
         if mode != self._last_mode:
-            self.get_logger().info(f"[DEBUG] Switching UI mode to: {mode}")
+            self.get_logger().info(f'[DEBUG] Switching UI mode to: {mode}')
             self._publish_mode(mode)
             self._last_mode = mode
 
@@ -165,13 +147,13 @@ class UIDebugNode(Node):
     def _compute_face_state(self) -> str:
         frac = (self._time_s % self.cycle_interval_s) / self.cycle_interval_s
         if frac < 0.25:
-            return "idle"
+            return 'idle'
         elif frac < 0.50:
-            return "listening"
+            return 'listening'
         elif frac < 0.75:
-            return "thinking"
+            return 'thinking'
         else:
-            return "speaking"
+            return 'speaking'
 
     def _publish_face_state(self, state: str) -> None:
         msg = String()
@@ -185,7 +167,7 @@ def main(argv: Optional[list] = None) -> None:
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
-        node.get_logger().info("KeyboardInterrupt, shutting down UIDebugNode.")
+        node.get_logger().info('KeyboardInterrupt, shutting down UIDebugNode.')
     finally:
         node.destroy_node()
         try:
@@ -194,5 +176,5 @@ def main(argv: Optional[list] = None) -> None:
             pass
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main(sys.argv)

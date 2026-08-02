@@ -1,17 +1,17 @@
+// Copyright 2026 Ahnaf Tahmid
 #include <cstdint>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
 #include "gtest/gtest.h"
-
 #include "savo_speech/audio/captured_audio_processor_chain.hpp"
 
 namespace
 {
 
-class RecordingProcessor final :
-  public savo_speech::audio::CapturedAudioProcessor
+class RecordingProcessor final
+  : public savo_speech::audio::CapturedAudioProcessor
 {
 public:
   RecordingProcessor(

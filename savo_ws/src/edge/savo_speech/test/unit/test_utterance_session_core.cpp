@@ -1,3 +1,4 @@
+// Copyright 2026 Ahnaf Tahmid
 #include <chrono>
 #include <cstdint>
 #include <stdexcept>
@@ -5,7 +6,6 @@
 #include <vector>
 
 #include "gtest/gtest.h"
-
 #include "savo_speech/session/utterance_session_core.hpp"
 
 namespace

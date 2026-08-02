@@ -1,3 +1,4 @@
+// Copyright 2026 Ahnaf Tahmid
 #ifndef SAVO_SPEECH__AUDIO__CAPTURE_PROCESSING_DISPATCHER_HPP_
 #define SAVO_SPEECH__AUDIO__CAPTURE_PROCESSING_DISPATCHER_HPP_
 
@@ -108,7 +109,7 @@ public:
     CapturedFrameSource & source,
     CapturedAudioProcessor & processor,
     CaptureProcessingConfig config =
-      CaptureProcessingConfig{});
+    CaptureProcessingConfig{});
 
   ~CaptureProcessingDispatcher();
 

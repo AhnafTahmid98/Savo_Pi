@@ -57,12 +57,26 @@ struct RosCommandDispatcherConfig
   std::string navigation_readiness_topic{
     "/savo_nav/readiness"};
 
+  // Retained status published only after savo_nav synchronizes an active
+  // AM-8 map release with savo_supervisor.
+  std::string map_context_status_topic{
+    "/savo_nav/map_context/status"};
+
   std::string navigation_action_name{
     "/savo_nav/navigation/navigate_to_pose"};
 
   // This must be supplied from the authoritative savo_locations
   // runtime contract. An empty value fails navigation closed.
   std::string location_resolve_service{};
+
+  std::string mapping_action_name{
+    "/savo_mapping/autonomous/run"};
+  std::string mapping_control_service{
+    "/savo_mapping/autonomous/control"};
+  std::string mapping_status_topic{
+    "/savo_mapping/autonomous/status"};
+  std::string supervisor_state_topic{
+    "/savo_supervisor/state_summary"};
 
   // Canonical state values.
   std::string stop_mode{"STOP"};
@@ -87,6 +101,8 @@ struct RosCommandDispatcherConfig
   std::int64_t navigation_execution_timeout_ms{300000};
   std::int64_t teleop_cancel_timeout_ms{2000};
   std::int64_t navigation_cancel_timeout_ms{2000};
+  std::int64_t mapping_server_timeout_ms{2000};
+  std::int64_t mapping_control_timeout_ms{2000};
 
   // Teleoperation execution bounds. Protocol parsing already applies
   // the same or stricter limits; the dispatcher validates again.
@@ -136,6 +152,23 @@ struct RosCommandDispatcherSnapshot
   bool navigation_readiness_observed{false};
   std::string navigation_readiness{};
   std::int64_t navigation_readiness_age_ms{-1};
+
+  bool map_context_observed{false};
+  bool map_context_synchronized{false};
+  std::string active_map_id{};
+  std::uint32_t active_map_revision{0U};
+  std::string active_map_release_id{};
+  std::int64_t map_context_age_ms{-1};
+
+  bool mapping_status_observed{false};
+  std::string mapping_mission_id{};
+  std::string mapping_state{};
+  std::string mapping_reason{};
+  std::int64_t mapping_status_age_ms{-1};
+
+  bool supervisor_state_observed{false};
+  std::string supervisor_state{};
+  std::int64_t supervisor_state_age_ms{-1};
 
   std::uint64_t accepted_command_count{0U};
   std::uint64_t rejected_command_count{0U};

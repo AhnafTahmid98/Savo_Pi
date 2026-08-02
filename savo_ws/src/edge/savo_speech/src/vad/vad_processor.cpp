@@ -1,10 +1,11 @@
-#include "savo_speech/vad/vad_processor.hpp"
-
+// Copyright 2026 Ahnaf Tahmid
 #include <cmath>
 #include <exception>
 #include <stdexcept>
 #include <string>
 #include <utility>
+
+#include "savo_speech/vad/vad_processor.hpp"
 
 namespace savo_speech::vad
 {

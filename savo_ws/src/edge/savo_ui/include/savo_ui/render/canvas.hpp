@@ -1,11 +1,12 @@
+// Copyright 2026 Ahnaf Tahmid
 #pragma once
-
-#include "savo_ui/render/color.hpp"
-#include "savo_ui/render/image_asset.hpp"
 
 #include <cstdint>
 #include <string>
 #include <vector>
+
+#include "savo_ui/render/color.hpp"
+#include "savo_ui/render/image_asset.hpp"
 
 namespace savo_ui
 {

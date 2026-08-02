@@ -1,8 +1,8 @@
+// Copyright 2026 Ahnaf Tahmid
 #include <chrono>
 #include <cstdint>
 
 #include "gtest/gtest.h"
-
 #include "savo_speech/audio/audio_buffer.hpp"
 
 TEST(AudioBuffer, ReportsFramesAndDuration)

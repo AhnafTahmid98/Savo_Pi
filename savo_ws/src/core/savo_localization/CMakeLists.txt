@@ -171,10 +171,6 @@ function(install_program_if_exists program_path)
   endif()
 endfunction()
 
-install_program_if_exists(savo_localization/nodes/localization_dashboard.py)
-install_program_if_exists(savo_localization/nodes/ekf_state_publisher_node.py)
-install_program_if_exists(savo_localization/nodes/wheel_odom_fallback_node.py)
-
 install_program_if_exists(scripts/imu_smoke_test_cli.py)
 install_program_if_exists(scripts/encoder_smoke_test_cli.py)
 install_program_if_exists(scripts/encoder_direction_test_cli.py)
@@ -258,6 +254,10 @@ if(BUILD_TESTING)
   add_pytest_if_exists(test_ekf_health_check test/test_ekf_health_check.py)
   add_pytest_if_exists(test_tf_check test/test_tf_check.py)
   add_pytest_if_exists(test_config_assets test/test_config_assets.py)
+  add_pytest_if_exists(
+    test_diagnostics_launch_closure
+    test/test_diagnostics_launch_closure.py
+  )
   add_pytest_if_exists(
     test_localization_health_contract
     test/test_localization_health_contract.py

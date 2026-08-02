@@ -1,9 +1,9 @@
+// Copyright 2026 Ahnaf Tahmid
 #include <cstdint>
 #include <stdexcept>
 #include <vector>
 
 #include "gtest/gtest.h"
-
 #include "savo_speech/audio/audio_ring_buffer.hpp"
 
 TEST(AudioRingBuffer, RejectsZeroCapacity)

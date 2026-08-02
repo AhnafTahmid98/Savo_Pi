@@ -1,3 +1,4 @@
+// Copyright 2026 Ahnaf Tahmid
 #ifndef SAVO_SPEECH__SESSION__UTTERANCE_SESSION_PROCESSOR_HPP_
 #define SAVO_SPEECH__SESSION__UTTERANCE_SESSION_PROCESSOR_HPP_
 
@@ -8,11 +9,12 @@
 #include <optional>
 #include <string>
 
+#include "savo_speech/session/utterance_session_core.hpp"
+#include "savo_speech/session/utterance_session_event.hpp"
+
 #include "savo_speech/audio/captured_audio_processor.hpp"
 #include "savo_speech/session/completed_utterance.hpp"
 #include "savo_speech/session/completed_utterance_source.hpp"
-#include "savo_speech/session/utterance_session_core.hpp"
-#include "savo_speech/session/utterance_session_event.hpp"
 #include "savo_speech/vad/vad_processor.hpp"
 #include "savo_speech/wake_word/wake_word_processor.hpp"
 
@@ -48,8 +50,8 @@ struct UtteranceSessionProcessorSnapshot
   std::string last_error{};
 };
 
-class UtteranceSessionProcessor final :
-  public audio::CapturedAudioProcessor,
+class UtteranceSessionProcessor final
+  : public audio::CapturedAudioProcessor,
   public CompletedUtteranceSource
 {
 public:
@@ -57,7 +59,7 @@ public:
     wake_word::WakeWordProcessor & wake_word_processor,
     vad::VadProcessor & vad_processor,
     UtteranceSessionConfig session_config =
-      UtteranceSessionConfig{});
+    UtteranceSessionConfig{});
 
   ~UtteranceSessionProcessor() override = default;
 
@@ -78,8 +80,8 @@ public:
 
   [[nodiscard]] bool cancel(
     UtteranceCancellationReason reason =
-      UtteranceCancellationReason::
-      ExplicitCancellation);
+    UtteranceCancellationReason::
+    ExplicitCancellation);
 
   [[nodiscard]] std::optional<CompletedUtterance>
   try_pop_completed();
@@ -95,10 +97,10 @@ public:
 
 private:
   wake_word::WakeWordProcessor &
-    wake_word_processor_;
+  wake_word_processor_;
 
   vad::VadProcessor &
-    vad_processor_;
+  vad_processor_;
 
   UtteranceSessionCore session_core_;
 

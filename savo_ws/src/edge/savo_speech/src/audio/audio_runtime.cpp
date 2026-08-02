@@ -1,11 +1,12 @@
-#include "savo_speech/audio/audio_runtime.hpp"
-
+// Copyright 2026 Ahnaf Tahmid
 #include <chrono>
 #include <exception>
 #include <optional>
 #include <stdexcept>
 #include <string>
 #include <utility>
+
+#include "savo_speech/audio/audio_runtime.hpp"
 
 namespace savo_speech::audio
 {

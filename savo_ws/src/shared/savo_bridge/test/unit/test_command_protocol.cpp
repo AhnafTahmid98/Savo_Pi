@@ -631,6 +631,85 @@ TEST(SavoBridgeCommandProtocol, NonObjectJsonRejected)
     CommandProtocolErrorCode::TopLevelNotObject);
 }
 
+TEST(SavoBridgeCommandProtocol, ParsesAuthorizedWholePlanMappingCommands)
+{
+  const auto start = savo_bridge::parse_command_request(
+    R"json({
+      "command_id":"mapping-start-1",
+      "command_type":"start_autonomous_mapping",
+      "expires_at_unix_ms":1800000001000,
+      "issued_at_unix_ms":1800000000000,
+      "origin_agent":"mapping_agent",
+      "request_id":"mapping-request-1",
+      "payload":{"mission_id":"mission-1","map_id":"map-1","map_revision":1,
+        "auto_save":true,"require_quality_approval":true},
+      "source":"savomind"
+    })json",
+    NOW_UNIX_MS);
+  ASSERT_TRUE(start.succeeded());
+  EXPECT_EQ(start.command->command_type,
+    savo_bridge::CommandType::StartAutonomousMapping);
+  const auto * start_payload =
+    std::get_if<savo_bridge::StartAutonomousMappingCommandPayload>(
+    &start.command->payload);
+  ASSERT_NE(start_payload, nullptr);
+  EXPECT_TRUE(start_payload->auto_save);
+  EXPECT_TRUE(start_payload->require_quality_approval);
+
+  const auto control = savo_bridge::parse_command_request(
+    R"json({
+      "command_id":"mapping-pause-1",
+      "command_type":"control_mapping",
+      "expires_at_unix_ms":1800000001000,
+      "issued_at_unix_ms":1800000000000,
+      "origin_agent":"mapping_agent",
+      "request_id":"mapping-request-2",
+      "payload":{"mission_id":"mission-1","operation":"pause"},
+      "source":"savomind"
+    })json",
+    NOW_UNIX_MS);
+  ASSERT_TRUE(control.succeeded());
+  EXPECT_EQ(control.command->command_type,
+    savo_bridge::CommandType::ControlMapping);
+}
+
+TEST(SavoBridgeCommandProtocol, MappingCannotDisableSaveOrOperatorApproval)
+{
+  const auto result = savo_bridge::parse_command_request(
+    R"json({
+      "command_id":"mapping-unsafe-1",
+      "command_type":"start_autonomous_mapping",
+      "expires_at_unix_ms":1800000001000,
+      "issued_at_unix_ms":1800000000000,
+      "origin_agent":"mapping_agent",
+      "request_id":"mapping-request-unsafe",
+      "payload":{"mission_id":"mission-1","map_id":"map-1","map_revision":1,
+        "auto_save":true,"require_quality_approval":false},
+      "source":"savomind"
+    })json",
+    NOW_UNIX_MS);
+  ASSERT_FALSE(result.succeeded());
+  ASSERT_TRUE(result.error.has_value());
+  EXPECT_EQ(result.error->code, CommandProtocolErrorCode::InvalidPayload);
+}
+
+TEST(SavoBridgeCommandProtocol, WholePlanQueriesRequireCorrelationAndActor)
+{
+  const auto result = savo_bridge::parse_command_request(
+    R"json({
+      "command_id":"query-1",
+      "command_type":"query_supervisor_state",
+      "expires_at_unix_ms":1800000001000,
+      "issued_at_unix_ms":1800000000000,
+      "payload":{"scope":"supervisor"},
+      "source":"savomind"
+    })json",
+    NOW_UNIX_MS);
+  ASSERT_FALSE(result.succeeded());
+  ASSERT_TRUE(result.error.has_value());
+  EXPECT_EQ(result.error->code, CommandProtocolErrorCode::MissingRequiredField);
+}
+
 TEST(SavoBridgeCommandProtocol, ErrorCodesHaveStableStrings)
 {
   EXPECT_EQ(

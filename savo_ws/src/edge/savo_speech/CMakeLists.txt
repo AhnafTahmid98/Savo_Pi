@@ -115,6 +115,15 @@ add_library(savo_speech_audio_core STATIC
   src/wake_word/wake_word_asset_resolver.cpp
 )
 
+add_library(savo_speech_transport_core STATIC
+  src/transport/savomind_transport.cpp
+)
+
+target_include_directories(savo_speech_transport_core PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
 target_include_directories(savo_speech_audio_core
   PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -193,6 +202,7 @@ target_link_libraries(savo_speech_node
   savo_speech_audio_core
   savo_speech_audio_device
   savo_speech_wake_word_pocketsphinx
+  savo_speech_transport_core
 )
 
 # ------------------------------------------------------------------------------
@@ -344,6 +354,7 @@ if(BUILD_TESTING)
     test/unit/test_capture_worker.cpp
     test/unit/test_channel_selector.cpp
     test/unit/test_wav_codec.cpp
+    test/unit/test_savomind_transport.cpp
   )
 
   target_include_directories(test_audio_primitives
@@ -354,6 +365,7 @@ if(BUILD_TESTING)
   target_link_libraries(test_audio_primitives
     savo_speech_audio_core
     savo_speech_wake_word_pocketsphinx
+    savo_speech_transport_core
   )
 
   target_compile_definitions(
@@ -363,6 +375,8 @@ if(BUILD_TESTING)
   )
 
   find_package(ament_lint_auto REQUIRED)
+  # ament_copyright does not recognize this package's proprietary license text.
+  set(ament_cmake_copyright_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
 

@@ -27,6 +27,11 @@ enum class CommandType
   TeleopNudge,
   NavigateToLocation,
   CancelNavigation,
+  QueryNavigationState,
+  StartAutonomousMapping,
+  ControlMapping,
+  QueryMappingState,
+  QuerySupervisorState,
 };
 
 enum class CommandPriority
@@ -106,12 +111,37 @@ struct CancelNavigationCommandPayload
   std::string reason;
 };
 
+struct QueryStateCommandPayload
+{
+  std::string scope;
+};
+
+struct StartAutonomousMappingCommandPayload
+{
+  std::string mission_id;
+  std::string map_id;
+  std::uint32_t map_revision{0U};
+  std::int64_t mission_timeout_ms{0};
+  bool auto_save{true};
+  bool require_quality_approval{true};
+};
+
+struct ControlMappingCommandPayload
+{
+  std::string operation;
+  std::string mission_id;
+  std::string reason;
+};
+
 using CommandPayload = std::variant<
   StopCommandPayload,
   CancelActionCommandPayload,
   TeleopNudgeCommandPayload,
   NavigateToLocationCommandPayload,
-  CancelNavigationCommandPayload>;
+  CancelNavigationCommandPayload,
+  QueryStateCommandPayload,
+  StartAutonomousMappingCommandPayload,
+  ControlMappingCommandPayload>;
 
 struct ValidatedCommand
 {

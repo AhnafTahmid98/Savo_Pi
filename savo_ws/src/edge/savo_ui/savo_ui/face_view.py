@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
+# Copyright 2026 Ahnaf Tahmid
 """
-Robot Savo — Face view renderer (INTERACT / MAP modes, v3 — text-less)
+Robot Savo — Face view renderer (INTERACT / MAP modes, v3 — text-less).
 
 This module draws a friendly robot face:
 
@@ -14,15 +15,17 @@ This module draws a friendly robot face:
   with a small extra boost in "speaking" state.
 - Date & time in the top-left corner.
 
-IMPORTANT:
+Important:
+----------
 - We IGNORE status_text and subtitle_text on purpose.
 - Only the small clock text is rendered; no bottom text is drawn.
+
 """
 
 from __future__ import annotations
 
-from typing import Dict, Tuple
 import datetime
+from typing import Dict, Tuple
 
 import pygame
 
@@ -61,18 +64,19 @@ def draw_face_view(
         Dict with keys "bg", "text_main", "text_status", "text_subtitle".
     screen_size:
         (width, height) of the display.
+
     """
     width, height = screen_size
 
     # ------------------------------------------------------------------ #
     # Fonts & colors
     # ------------------------------------------------------------------ #
-    font_main: pygame.font.Font | None = fonts.get("main")
-    font_status: pygame.font.Font | None = fonts.get("status", font_main)
-    font_subtitle: pygame.font.Font | None = fonts.get("subtitle", font_main)
+    font_main: pygame.font.Font | None = fonts.get('main')
+    font_status: pygame.font.Font | None = fonts.get('status', font_main)
+    font_subtitle: pygame.font.Font | None = fonts.get('subtitle', font_main)
 
-    color_bg: RGB = colors.get("bg", (0, 0, 0))
-    color_text_status: RGB = colors.get("text_status", (240, 240, 240))
+    color_bg: RGB = colors.get('bg', (0, 0, 0))
+    color_text_status: RGB = colors.get('text_status', (240, 240, 240))
 
     # Base face palette
     eye_white: RGB = (245, 245, 245)
@@ -84,30 +88,30 @@ def draw_face_view(
     # ------------------------------------------------------------------ #
     # Face state configuration
     # ------------------------------------------------------------------ #
-    state = (face_state or "idle").strip().lower()
-    if state not in ("idle", "listening", "thinking", "speaking"):
-        state = "idle"
+    state = (face_state or 'idle').strip().lower()
+    if state not in ('idle', 'listening', 'thinking', 'speaking'):
+        state = 'idle'
 
     # Small style tweaks per state
-    if state == "idle":
+    if state == 'idle':
         eye_open_factor_base = 1.0
-        pupil_vert_offset_factor = 0.0        # neutral
-        mouth_boost = 0.05                    # a tiny, relaxed open
+        pupil_vert_offset_factor = 0.0  # neutral
+        mouth_boost = 0.05  # a tiny, relaxed open
         iris_tint: RGB = (0, 190, 255)
-    elif state == "listening":
-        eye_open_factor_base = 1.05           # slightly more open
-        pupil_vert_offset_factor = -0.10      # looking a bit up
+    elif state == 'listening':
+        eye_open_factor_base = 1.05  # slightly more open
+        pupil_vert_offset_factor = -0.10  # looking a bit up
         mouth_boost = 0.08
         iris_tint = (0, 255, 210)
-    elif state == "thinking":
-        eye_open_factor_base = 0.80           # slightly squinted
-        pupil_vert_offset_factor = -0.18      # looking more up
+    elif state == 'thinking':
+        eye_open_factor_base = 0.80  # slightly squinted
+        pupil_vert_offset_factor = -0.18  # looking more up
         mouth_boost = 0.02
         iris_tint = (120, 210, 255)
     else:  # "speaking"
-        eye_open_factor_base = 1.08           # a bit excited
+        eye_open_factor_base = 1.08  # a bit excited
         pupil_vert_offset_factor = -0.04
-        mouth_boost = 0.20                    # talky mouth
+        mouth_boost = 0.20  # talky mouth
         iris_tint = (0, 255, 180)
 
     # Effective mouth open (clamped)
@@ -121,7 +125,7 @@ def draw_face_view(
     dt_seconds = now.timestamp()
 
     # Example: "Sat 29 Nov 14:32"
-    dt_str = now.strftime("%a %d %b %H:%M")
+    dt_str = now.strftime('%a %d %b %H:%M')
 
     # Simple blink: every ~4 seconds, blink for ~0.15 s
     blink_cycle_s = 4.0
@@ -140,8 +144,8 @@ def draw_face_view(
     # ------------------------------------------------------------------ #
     cx = width // 2
 
-    eye_center_y = int(height * 0.40)   # eyes a bit below center
-    mouth_center_y = int(height * 0.66) # mouth lower
+    eye_center_y = int(height * 0.40)  # eyes a bit below center
+    mouth_center_y = int(height * 0.66)  # mouth lower
 
     # ------------------------------------------------------------------ #
     # Subtle face "plate" behind the eyes/mouth (just a rounded rect)
@@ -246,13 +250,13 @@ def draw_face_view(
     brow_thickness = 3
 
     # Brow vertical offset per state (small tweaks)
-    if state == "idle":
+    if state == 'idle':
         brow_offset_y = -int(eye_h_eff * 0.55)
         brow_curve = 0.0
-    elif state == "listening":
+    elif state == 'listening':
         brow_offset_y = -int(eye_h_eff * 0.70)
         brow_curve = -0.04
-    elif state == "thinking":
+    elif state == 'thinking':
         brow_offset_y = -int(eye_h_eff * 0.60)
         brow_curve = 0.08  # inward slight frown
     else:  # speaking
@@ -284,9 +288,7 @@ def draw_face_view(
     mouth_height_max = int(height * 0.16)
     mouth_height_min = int(height * 0.02)
 
-    open_height = int(
-        mouth_height_min + (mouth_height_max - mouth_height_min) * m_clamped
-    )
+    open_height = int(mouth_height_min + (mouth_height_max - mouth_height_min) * m_clamped)
 
     mouth_rect = pygame.Rect(
         cx - mouth_width // 2,
@@ -300,7 +302,7 @@ def draw_face_view(
 
     # Smile strength: more smile when mouth is more open or in "speaking".
     smile_strength = 0.25 + 0.75 * m_clamped
-    if state == "speaking":
+    if state == 'speaking':
         smile_strength = min(1.0, smile_strength + 0.15)
 
     smile_color = (

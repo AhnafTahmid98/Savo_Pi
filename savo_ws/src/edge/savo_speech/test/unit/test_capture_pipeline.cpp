@@ -1,10 +1,10 @@
+// Copyright 2026 Ahnaf Tahmid
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <stdexcept>
 
 #include "gtest/gtest.h"
-
 #include "savo_speech/audio/capture_pipeline.hpp"
 
 namespace

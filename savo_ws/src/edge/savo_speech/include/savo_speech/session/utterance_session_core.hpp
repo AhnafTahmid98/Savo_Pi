@@ -1,3 +1,4 @@
+// Copyright 2026 Ahnaf Tahmid
 #ifndef SAVO_SPEECH__SESSION__UTTERANCE_SESSION_CORE_HPP_
 #define SAVO_SPEECH__SESSION__UTTERANCE_SESSION_CORE_HPP_
 
@@ -10,13 +11,15 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
+
+#include "savo_speech/session/utterance_session_event.hpp"
 
 #include "savo_speech/audio/audio_format.hpp"
 #include "savo_speech/audio/audio_frame.hpp"
 #include "savo_speech/audio/audio_ring_buffer.hpp"
 #include "savo_speech/session/completed_utterance.hpp"
-#include "savo_speech/session/utterance_session_event.hpp"
 #include "savo_speech/vad/vad_event.hpp"
 #include "savo_speech/wake_word/wake_word_event.hpp"
 
@@ -114,7 +117,7 @@ public:
 
   explicit UtteranceSessionCore(
     UtteranceSessionConfig config =
-      UtteranceSessionConfig{});
+    UtteranceSessionConfig{});
 
   ~UtteranceSessionCore() = default;
 
@@ -144,8 +147,8 @@ public:
 
   [[nodiscard]] bool cancel(
     UtteranceCancellationReason reason =
-      UtteranceCancellationReason::
-      ExplicitCancellation);
+    UtteranceCancellationReason::
+    ExplicitCancellation);
 
   [[nodiscard]] std::optional<CompletedUtterance>
   try_pop_completed();
@@ -217,27 +220,27 @@ private:
   std::optional<audio::AudioFormat> audio_format_{};
 
   std::unique_ptr<audio::AudioRingBuffer>
-    pre_roll_buffer_;
+  pre_roll_buffer_;
 
   std::deque<FrameSpan> pre_roll_spans_{};
 
   std::optional<std::uint64_t>
-    last_audio_sequence_{};
+  last_audio_sequence_{};
 
   std::optional<Clock::time_point>
-    last_audio_captured_at_{};
+  last_audio_captured_at_{};
 
   std::optional<Clock::time_point>
-    last_advanced_time_{};
+  last_advanced_time_{};
 
   std::optional<wake_word::WakeWordEvent>
-    active_wake_event_{};
+  active_wake_event_{};
 
   std::optional<vad::VadEvent>
-    active_speech_start_{};
+  active_speech_start_{};
 
   std::optional<vad::VadEvent>
-    pending_speech_end_{};
+  pending_speech_end_{};
 
   std::uint64_t active_utterance_id_{0U};
 
@@ -247,14 +250,14 @@ private:
   std::size_t active_pre_roll_samples_{0U};
 
   std::deque<CompletedUtterance>
-    completed_utterances_{};
+  completed_utterances_{};
 
   UtteranceCancellationReason
     last_cancellation_reason_{
     UtteranceCancellationReason::None};
 
   std::optional<UtteranceCompletionReason>
-    last_completion_reason_{};
+  last_completion_reason_{};
 
   std::string last_error_{};
 };

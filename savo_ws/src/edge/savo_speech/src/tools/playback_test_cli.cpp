@@ -1,3 +1,4 @@
+// Copyright 2026 Ahnaf Tahmid
 #include <chrono>
 #include <cstddef>
 #include <cstdlib>
@@ -8,9 +9,10 @@
 #include <string>
 #include <string_view>
 
+#include "savo_speech/audio/playback_controller.hpp"
+
 #include "savo_speech/audio/audio_level_meter.hpp"
 #include "savo_speech/audio/microphone_gate.hpp"
-#include "savo_speech/audio/playback_controller.hpp"
 #include "savo_speech/audio/wav_reader.hpp"
 #include "savo_speech/drivers/alsa_playback_stream.hpp"
 
@@ -66,7 +68,7 @@ void print_usage(const char * executable)
 {
   std::size_t consumed{0U};
 
-  const unsigned long long parsed =
+  const std::uint64_t parsed =
     std::stoull(value, &consumed, 10);
 
   if (consumed != value.size()) {
@@ -210,7 +212,7 @@ int main(int argc, char * argv[])
       << audio.frame_count() << '\n'
       << "Duration:        "
       << static_cast<double>(audio.duration().count()) /
-        1000000000.0
+      1000000000.0
       << " seconds\n"
       << "RMS level:       "
       << level.rms << '\n'
@@ -244,9 +246,9 @@ int main(int argc, char * argv[])
       << execution.chunks_submitted << '\n'
       << "Outcome:         "
       << (
-        execution.outcome ==
-        savo_speech::audio::PlaybackOutcome::Completed ?
-        "completed" : "cancelled")
+      execution.outcome ==
+      savo_speech::audio::PlaybackOutcome::Completed ?
+      "completed" : "cancelled")
       << '\n'
       << "Microphone gate: "
       << savo_speech::audio::to_string(gate_state.reason)

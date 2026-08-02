@@ -1,10 +1,11 @@
-#include "savo_speech/vad/adaptive_energy_vad_backend.hpp"
-
+// Copyright 2026 Ahnaf Tahmid
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
 #include <string>
 #include <utility>
+
+#include "savo_speech/vad/adaptive_energy_vad_backend.hpp"
 
 #include "savo_speech/audio/audio_level_meter.hpp"
 
@@ -272,8 +273,7 @@ AdaptiveEnergyVadBackend::snapshot() const noexcept
   return snapshot;
 }
 
-double AdaptiveEnergyVadBackend::
-calculate_snr_db_locked(
+double AdaptiveEnergyVadBackend::calculate_snr_db_locked(
   const double rms) const noexcept
 {
   const double effective_noise_floor =
@@ -293,8 +293,7 @@ calculate_snr_db_locked(
     effective_noise_floor);
 }
 
-void AdaptiveEnergyVadBackend::
-update_noise_floor_locked(
+void AdaptiveEnergyVadBackend::update_noise_floor_locked(
   const double rms) noexcept
 {
   const double bounded_rms =
@@ -305,8 +304,8 @@ update_noise_floor_locked(
 
   noise_floor_rms_ =
     (
-      1.0 -
-      config_.noise_floor_update_alpha
+    1.0 -
+    config_.noise_floor_update_alpha
     ) *
     noise_floor_rms_ +
     config_.noise_floor_update_alpha *

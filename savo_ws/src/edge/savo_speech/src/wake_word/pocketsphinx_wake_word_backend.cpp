@@ -1,4 +1,7 @@
-#include "savo_speech/wake_word/pocketsphinx_wake_word_backend.hpp"
+// Copyright 2026 Ahnaf Tahmid
+#include <cmd_ln.h>
+#include <pocketsphinx.h>
+#include <ps_search.h>
 
 #include <algorithm>
 #include <cctype>
@@ -10,9 +13,7 @@
 #include <string_view>
 #include <utility>
 
-#include <cmd_ln.h>
-#include <pocketsphinx.h>
-#include <ps_search.h>
+#include "savo_speech/wake_word/pocketsphinx_wake_word_backend.hpp"
 
 #include "savo_speech/audio/audio_format.hpp"
 
@@ -299,8 +300,7 @@ struct PocketSphinxWakeWordBackend::Impl
   std::string last_error{};
 };
 
-PocketSphinxWakeWordBackend::
-PocketSphinxWakeWordBackend(
+PocketSphinxWakeWordBackend::PocketSphinxWakeWordBackend(
   PocketSphinxWakeWordBackendConfig config)
 : impl_{std::make_unique<Impl>(std::move(config))}
 {

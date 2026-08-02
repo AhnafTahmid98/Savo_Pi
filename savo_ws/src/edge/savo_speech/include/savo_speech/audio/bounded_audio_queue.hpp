@@ -1,3 +1,4 @@
+// Copyright 2026 Ahnaf Tahmid
 #ifndef SAVO_SPEECH__AUDIO__BOUNDED_AUDIO_QUEUE_HPP_
 #define SAVO_SPEECH__AUDIO__BOUNDED_AUDIO_QUEUE_HPP_
 
@@ -47,7 +48,7 @@ public:
   explicit BoundedAudioQueue(
     std::size_t capacity,
     QueueOverflowPolicy overflow_policy =
-      QueueOverflowPolicy::DropOldest);
+    QueueOverflowPolicy::DropOldest);
 
   BoundedAudioQueue(const BoundedAudioQueue &) = delete;
   BoundedAudioQueue & operator=(const BoundedAudioQueue &) = delete;

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
+# Copyright 2026 Ahnaf Tahmid
 """
-Robot Savo — Navigation camera view renderer (NAVIGATE mode)
+Robot Savo — Navigation camera view renderer (NAVIGATE mode).
 
 This module draws the NAVIGATE UI:
 
@@ -19,7 +20,7 @@ Camera input:
 
 from __future__ import annotations
 
-from typing import Dict, Tuple, Any
+from typing import Any, Dict, Tuple
 
 import numpy as np
 import pygame
@@ -40,6 +41,7 @@ def _render_multiline_text(
 ) -> int:
     """
     Render text as multiple lines within max_width.
+
     Returns the y-coordinate after the last rendered line.
     """
     if not text or font is None:
@@ -53,17 +55,17 @@ def _render_multiline_text(
     current: list[str] = []
 
     for w in words:
-        trial = " ".join(current + [w]) if current else w
+        trial = ' '.join(current + [w]) if current else w
         width, _ = font.size(trial)
         if width <= max_width:
             current.append(w)
         else:
             if current:
-                lines.append(" ".join(current))
+                lines.append(' '.join(current))
             current = [w]
 
     if current:
-        lines.append(" ".join(current))
+        lines.append(' '.join(current))
 
     y = start_y
     for line in lines:
@@ -114,19 +116,19 @@ def _blit_camera_frame(
         frame = frame[:, :, :3]
 
         frame_bytes = frame.tobytes()
-        img_surface = pygame.image.frombuffer(frame_bytes, (width, height), "RGB")
+        img_surface = pygame.image.frombuffer(frame_bytes, (width, height), 'RGB')
 
     # -------------------------------------------------------------
     # Case 2: ROS Image (rgb8 / bgr8)
     # -------------------------------------------------------------
     else:
-        if not hasattr(camera_frame, "encoding"):
+        if not hasattr(camera_frame, 'encoding'):
             return
 
         msg: RosImage = camera_frame  # type: ignore[assignment]
 
-        encoding = (msg.encoding or "").lower()
-        if encoding not in ("rgb8", "bgr8"):
+        encoding = (msg.encoding or '').lower()
+        if encoding not in ('rgb8', 'bgr8'):
             return
 
         width = msg.width
@@ -146,11 +148,11 @@ def _blit_camera_frame(
         except Exception:
             return
 
-        if encoding == "bgr8":
+        if encoding == 'bgr8':
             frame = frame[:, :, ::-1]  # BGR → RGB
 
         frame_bytes = frame.tobytes()
-        img_surface = pygame.image.frombuffer(frame_bytes, (width, height), "RGB")
+        img_surface = pygame.image.frombuffer(frame_bytes, (width, height), 'RGB')
 
     # -------------------------------------------------------------
     # Letterbox into cam_rect while preserving aspect ratio
@@ -195,7 +197,8 @@ def _draw_mini_face_same_style(
     mouth_level: float,
 ) -> None:
     """
-    Draw a small Robot Savo face in the top-left of the camera panel,
+    Draw a small Robot Savo face in the top-left of the camera panel.
+
     using the same eye + mouth style as face_view (scaled to this rect).
     """
     m = max(0.0, min(1.0, float(mouth_level)))
@@ -288,9 +291,7 @@ def _draw_mini_face_same_style(
     mouth_height_max = int(height * 0.40)
     mouth_height_min = max(2, int(height * 0.06))
 
-    open_height = int(
-        mouth_height_min + (mouth_height_max - mouth_height_min) * m
-    )
+    open_height = int(mouth_height_min + (mouth_height_max - mouth_height_min) * m)
 
     mouth_rect = pygame.Rect(
         cx - mouth_width // 2,
@@ -340,19 +341,17 @@ def draw_navigation_view(
     camera_ready: bool,
     camera_frame: Any = None,  # numpy array or RosImage
 ) -> None:
-    """
-    Draw the NAVIGATE mode view.
-    """
+    """Draw the NAVIGATE mode view."""
     width, height = screen_size
 
-    font_main = fonts.get("main")
-    font_status = fonts.get("status", font_main)
-    font_subtitle = fonts.get("subtitle", font_main)
+    font_main = fonts.get('main')
+    font_status = fonts.get('status', font_main)
+    font_subtitle = fonts.get('subtitle', font_main)
 
-    color_bg: RGB = colors.get("bg", (0, 0, 0))
-    color_text_main: RGB = colors.get("text_main", (255, 255, 255))
-    color_text_status: RGB = colors.get("text_status", (240, 240, 240))
-    color_text_subtitle: RGB = colors.get("text_subtitle", (210, 210, 210))
+    color_bg: RGB = colors.get('bg', (0, 0, 0))
+    color_text_main: RGB = colors.get('text_main', (255, 255, 255))
+    color_text_status: RGB = colors.get('text_status', (240, 240, 240))
+    color_text_subtitle: RGB = colors.get('text_subtitle', (210, 210, 210))
 
     cam_border_color: RGB = (40, 120, 200)
     cam_inner_color: RGB = (10, 20, 40)
@@ -382,7 +381,7 @@ def draw_navigation_view(
         _blit_camera_frame(surface, cam_rect, camera_frame)
     else:
         if font_status is not None:
-            msg = "Starting camera…" if not camera_ready else "Camera active"
+            msg = 'Starting camera…' if not camera_ready else 'Camera active'
             cam_text = font_status.render(msg, True, color_text_main)
             cam_text_rect = cam_text.get_rect(center=cam_rect.center)
             surface.blit(cam_text, cam_text_rect)
@@ -395,13 +394,15 @@ def draw_navigation_view(
 
     # top-left
     pygame.draw.line(
-        surface, cam_border_color,
+        surface,
+        cam_border_color,
         (cam_left, cam_top),
         (cam_left + corner_len, cam_top),
         thickness,
     )
     pygame.draw.line(
-        surface, cam_border_color,
+        surface,
+        cam_border_color,
         (cam_left, cam_top),
         (cam_left, cam_top + corner_len),
         thickness,
@@ -409,13 +410,15 @@ def draw_navigation_view(
 
     # top-right
     pygame.draw.line(
-        surface, cam_border_color,
+        surface,
+        cam_border_color,
         (cam_right, cam_top),
         (cam_right - corner_len, cam_top),
         thickness,
     )
     pygame.draw.line(
-        surface, cam_border_color,
+        surface,
+        cam_border_color,
         (cam_right, cam_top),
         (cam_right, cam_top + corner_len),
         thickness,
@@ -423,13 +426,15 @@ def draw_navigation_view(
 
     # bottom-left
     pygame.draw.line(
-        surface, cam_border_color,
+        surface,
+        cam_border_color,
         (cam_left, cam_bottom),
         (cam_left + corner_len, cam_bottom),
         thickness,
     )
     pygame.draw.line(
-        surface, cam_border_color,
+        surface,
+        cam_border_color,
         (cam_left, cam_bottom),
         (cam_left, cam_bottom - corner_len),
         thickness,
@@ -437,13 +442,15 @@ def draw_navigation_view(
 
     # bottom-right
     pygame.draw.line(
-        surface, cam_border_color,
+        surface,
+        cam_border_color,
         (cam_right, cam_bottom),
         (cam_right - corner_len, cam_bottom),
         thickness,
     )
     pygame.draw.line(
-        surface, cam_border_color,
+        surface,
+        cam_border_color,
         (cam_right, cam_bottom),
         (cam_right, cam_bottom - corner_len),
         thickness,
@@ -462,7 +469,7 @@ def draw_navigation_view(
 
     _render_multiline_text(
         surface=surface,
-        text=status_text or "Guiding…",
+        text=status_text or 'Guiding…',
         font=font_status,
         color=color_text_status,
         max_width=max_status_width,
@@ -478,7 +485,7 @@ def draw_navigation_view(
 
     _render_multiline_text(
         surface=surface,
-        text=subtitle_text or "",
+        text=subtitle_text or '',
         font=font_subtitle,
         color=color_text_subtitle,
         max_width=max_subtitle_width,

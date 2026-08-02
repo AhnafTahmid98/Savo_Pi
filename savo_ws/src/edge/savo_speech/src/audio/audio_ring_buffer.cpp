@@ -1,10 +1,11 @@
-#include "savo_speech/audio/audio_ring_buffer.hpp"
-
+// Copyright 2026 Ahnaf Tahmid
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <stdexcept>
 #include <vector>
+
+#include "savo_speech/audio/audio_ring_buffer.hpp"
 
 namespace savo_speech::audio
 {

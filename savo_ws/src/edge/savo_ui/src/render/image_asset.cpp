@@ -1,5 +1,4 @@
-#include "savo_ui/render/image_asset.hpp"
-
+// Copyright 2026 Ahnaf Tahmid
 #include <cctype>
 #include <cstdint>
 #include <fstream>
@@ -7,6 +6,8 @@
 #include <sstream>
 #include <string>
 #include <vector>
+
+#include "savo_ui/render/image_asset.hpp"
 
 namespace savo_ui
 {
@@ -59,7 +60,7 @@ bool parse_positive_int(const std::string & token, int & value)
 {
   try {
     std::size_t parsed_chars = 0;
-    const long parsed = std::stol(token, &parsed_chars, 10);
+    const std::int64_t parsed = std::stoll(token, &parsed_chars, 10);
 
     if (parsed_chars != token.size()) {
       return false;

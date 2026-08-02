@@ -1,9 +1,11 @@
+// Copyright 2026 Ahnaf Tahmid
 #ifndef SAVO_SPEECH__AUDIO__CAPTURE_WORKER_HPP_
 #define SAVO_SPEECH__AUDIO__CAPTURE_WORKER_HPP_
 
+#include <stop_token>
+
 #include <cstdint>
 #include <mutex>
-#include <stop_token>
 #include <string>
 #include <string_view>
 #include <thread>

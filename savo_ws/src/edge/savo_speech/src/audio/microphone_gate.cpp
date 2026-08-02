@@ -1,7 +1,8 @@
-#include "savo_speech/audio/microphone_gate.hpp"
-
+// Copyright 2026 Ahnaf Tahmid
 #include <chrono>
 #include <stdexcept>
+
+#include "savo_speech/audio/microphone_gate.hpp"
 
 namespace savo_speech::audio
 {

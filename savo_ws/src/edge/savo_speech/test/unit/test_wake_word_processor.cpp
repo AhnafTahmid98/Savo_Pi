@@ -1,3 +1,4 @@
+// Copyright 2026 Ahnaf Tahmid
 #include <chrono>
 #include <cstdint>
 #include <deque>
@@ -6,7 +7,6 @@
 #include <utility>
 
 #include "gtest/gtest.h"
-
 #include "savo_speech/wake_word/wake_word_processor.hpp"
 
 namespace
@@ -14,8 +14,8 @@ namespace
 
 using namespace std::chrono_literals;
 
-class FakeWakeWordBackend final :
-  public savo_speech::wake_word::WakeWordBackend
+class FakeWakeWordBackend final
+  : public savo_speech::wake_word::WakeWordBackend
 {
 public:
   [[nodiscard]]
@@ -79,7 +79,7 @@ make_frame(
 
   frame.captured_at =
     savo_speech::audio::AudioFrame::Clock::time_point{} +
-    offset;
+  offset;
 
   frame.format = {
     16000U,

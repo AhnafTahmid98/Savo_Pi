@@ -1,16 +1,16 @@
-#include "savo_speech/audio/capture_processing_dispatcher.hpp"
-
+// Copyright 2026 Ahnaf Tahmid
 #include <chrono>
 #include <exception>
 #include <stdexcept>
 #include <string>
 #include <utility>
 
+#include "savo_speech/audio/capture_processing_dispatcher.hpp"
+
 namespace savo_speech::audio
 {
 
-CaptureProcessingDispatcher::
-CaptureProcessingDispatcher(
+CaptureProcessingDispatcher::CaptureProcessingDispatcher(
   CapturedFrameSource & source,
   CapturedAudioProcessor & processor,
   const CaptureProcessingConfig config)
@@ -209,7 +209,7 @@ void CaptureProcessingDispatcher::run(
           statistics_.last_sequence)
         {
           ++statistics_.out_of_order_frames;
-        } else if (
+        } else if (  // NOLINT(readability/braces)
           frame->sequence >
           statistics_.last_sequence + 1U)
         {
@@ -259,8 +259,7 @@ void CaptureProcessingDispatcher::record_source_failure(
   ++statistics_.faults;
 }
 
-void CaptureProcessingDispatcher::
-record_processor_failure(
+void CaptureProcessingDispatcher::record_processor_failure(
   const std::string & error) noexcept
 {
   const std::scoped_lock lock{mutex_};

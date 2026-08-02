@@ -40,14 +40,21 @@ ROS 2 Jazzy C++ package responsible for Robot Savo's physical speech interface.
 - ALSA audio backend
 - HTTP communication with SavoMind
 
-## Current implementation phase
+## Current implementation status
 
-Phase 1 provides the package foundation, startup configuration,
-readiness, dashboard, heartbeat, and diagnostics.
+The C++ runtime implements ALSA capture/playback workers, wake-word and VAD
+processing, bounded utterance sessions, WAV serialization, playback queueing,
+microphone gating, diagnostics, and privacy-safe transcript/response topics.
 
-Audio capture and playback are not implemented yet, so the node
-intentionally reports:
+The inspected `~/SavoMind` API is not yet a complete robot round-trip contract:
+`POST /speech/stt` accepts only a shared-host `audio_path`; `POST /chat` returns
+correlated response text; `POST /speech/tts` deliberately serializes with
+`include_audio=False` and sets `audio_path=None`. Therefore Robot SAVO cannot
+retrieve validated TTS bytes for the C++ playback queue. The node continues to
+report `savomind_initialized=false` and must not claim end-to-end readiness.
 
-```text
-waiting_for_audio
-```
+`savo_speech_transport_core` now defines the bounded/cancelable transport
+boundary and validates request IDs plus PCM WAV sample rate, channel count, and
+sample width. It is intentionally not wired to an invented HTTP protocol. The
+external SavoMind contract must add a bounded audio response (or an authenticated
+temporary-file handoff) before the runtime can safely complete the round trip.

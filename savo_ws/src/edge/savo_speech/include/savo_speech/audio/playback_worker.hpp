@@ -1,5 +1,8 @@
+// Copyright 2026 Ahnaf Tahmid
 #ifndef SAVO_SPEECH__AUDIO__PLAYBACK_WORKER_HPP_
 #define SAVO_SPEECH__AUDIO__PLAYBACK_WORKER_HPP_
+
+#include <stop_token>
 
 #include <chrono>
 #include <condition_variable>
@@ -8,15 +11,15 @@
 #include <deque>
 #include <mutex>
 #include <optional>
-#include <stop_token>
 #include <string>
 #include <string_view>
 #include <thread>
 
-#include "savo_speech/audio/audio_buffer.hpp"
-#include "savo_speech/audio/microphone_gate.hpp"
 #include "savo_speech/audio/playback_controller.hpp"
 #include "savo_speech/audio/playback_sink.hpp"
+
+#include "savo_speech/audio/audio_buffer.hpp"
+#include "savo_speech/audio/microphone_gate.hpp"
 
 namespace savo_speech::audio
 {

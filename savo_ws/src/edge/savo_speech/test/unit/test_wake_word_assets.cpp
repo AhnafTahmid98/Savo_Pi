@@ -1,3 +1,4 @@
+// Copyright 2026 Ahnaf Tahmid
 #include <algorithm>
 #include <cctype>
 #include <filesystem>
@@ -11,7 +12,6 @@
 #include <vector>
 
 #include "gtest/gtest.h"
-
 #include "savo_speech/wake_word/pocketsphinx_wake_word_backend.hpp"
 
 #ifndef SAVO_SPEECH_SOURCE_DIR

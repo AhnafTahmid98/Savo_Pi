@@ -5,6 +5,7 @@
 #include "savo_bridge/ros_command_dispatcher.hpp"
 
 #include <algorithm>
+#include <charconv>
 #include <chrono>
 #include <cmath>
 #include <condition_variable>
@@ -28,7 +29,10 @@
 #include "nav2_msgs/action/navigate_to_pose.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
+#include "savo_msgs/action/run_autonomous_mapping.hpp"
+#include "savo_msgs/msg/autonomous_mapping_status.hpp"
 #include "savo_msgs/msg/location_record.hpp"
+#include "savo_msgs/srv/control_autonomous_mapping.hpp"
 #include "savo_msgs/srv/resolve_location.hpp"
 #include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/string.hpp"
@@ -202,6 +206,78 @@ using TimePoint = SteadyClock::time_point;
     std::numeric_limits<std::int32_t>::max();
 }
 
+struct ParsedMapContext
+{
+  std::string map_id;
+  std::uint32_t map_revision{0U};
+  std::string map_release_id;
+  bool synchronized{false};
+};
+
+[[nodiscard]] std::optional<ParsedMapContext> parse_map_context(
+  const std::string_view encoded) noexcept
+{
+  ParsedMapContext result;
+  bool state_synchronized = false;
+  bool have_map = false;
+  bool have_revision = false;
+  bool have_release = false;
+  bool have_synchronized = false;
+  std::size_t begin = 0U;
+
+  while (begin <= encoded.size()) {
+    const std::size_t end = encoded.find(';', begin);
+    const std::string_view field = encoded.substr(
+      begin,
+      end == std::string_view::npos ? encoded.size() - begin : end - begin);
+    const std::size_t separator = field.find('=');
+    if (separator == std::string_view::npos || separator == 0U) {
+      return std::nullopt;
+    }
+
+    const std::string_view key = field.substr(0U, separator);
+    const std::string_view value = field.substr(separator + 1U);
+    if (key == "state") {
+      state_synchronized = value == "synchronized";
+    } else if (key == "map_id") {
+      result.map_id.assign(value);
+      have_map = !result.map_id.empty();
+    } else if (key == "map_revision") {
+      std::uint32_t revision = 0U;
+      const auto converted = std::from_chars(
+        value.data(), value.data() + value.size(), revision);
+      if (converted.ec != std::errc{} ||
+        converted.ptr != value.data() + value.size())
+      {
+        return std::nullopt;
+      }
+      result.map_revision = revision;
+      have_revision = revision > 0U;
+    } else if (key == "map_release_id") {
+      result.map_release_id.assign(value);
+      have_release = !result.map_release_id.empty();
+    } else if (key == "synchronized") {
+      if (value != "true" && value != "false") {
+        return std::nullopt;
+      }
+      result.synchronized = value == "true";
+      have_synchronized = true;
+    }
+
+    if (end == std::string_view::npos) {
+      break;
+    }
+    begin = end + 1U;
+  }
+
+  if (!state_synchronized || !have_map || !have_revision || !have_release ||
+    !have_synchronized || !result.synchronized)
+  {
+    return std::nullopt;
+  }
+  return result;
+}
+
 [[nodiscard]] CommandDispatchResult rejection(
   std::string reason,
   const bool dispatch_attempted = true,
@@ -246,6 +322,12 @@ private:
 
   using ResolveLocation =
     savo_msgs::srv::ResolveLocation;
+
+  using RunAutonomousMapping =
+    savo_msgs::action::RunAutonomousMapping;
+
+  using ControlAutonomousMapping =
+    savo_msgs::srv::ControlAutonomousMapping;
 
 public:
   Impl(
@@ -389,6 +471,58 @@ public:
         observation_changed_.notify_all();
       });
 
+    map_context_subscription_ =
+      node_.create_subscription<std_msgs::msg::String>(
+      config_.map_context_status_topic,
+      latched_state_qos,
+      [this](const std_msgs::msg::String::SharedPtr message)
+      {
+        const TimePoint now = SteadyClock::now();
+        const auto parsed = parse_map_context(message->data);
+        {
+          std::lock_guard<std::mutex> lock(mutex_);
+          map_context_observed_ = true;
+          map_context_observed_at_ = now;
+          map_context_synchronized_ = parsed.has_value();
+          if (parsed) {
+            active_map_id_ = parsed->map_id;
+            active_map_revision_ = parsed->map_revision;
+            active_map_release_id_ = parsed->map_release_id;
+          } else {
+            active_map_id_.clear();
+            active_map_revision_ = 0U;
+            active_map_release_id_.clear();
+          }
+        }
+        observation_changed_.notify_all();
+      });
+
+    mapping_status_subscription_ =
+      node_.create_subscription<savo_msgs::msg::AutonomousMappingStatus>(
+      config_.mapping_status_topic,
+      latched_state_qos,
+      [this](const savo_msgs::msg::AutonomousMappingStatus::SharedPtr message)
+      {
+        std::lock_guard<std::mutex> lock(mutex_);
+        mapping_status_observed_ = true;
+        mapping_status_observed_at_ = SteadyClock::now();
+        mapping_mission_id_ = message->mission_id;
+        mapping_state_ = message->state_text;
+        mapping_reason_ = message->reason;
+      });
+
+    supervisor_state_subscription_ =
+      node_.create_subscription<std_msgs::msg::String>(
+      config_.supervisor_state_topic,
+      latched_state_qos,
+      [this](const std_msgs::msg::String::SharedPtr message)
+      {
+        std::lock_guard<std::mutex> lock(mutex_);
+        supervisor_state_observed_ = true;
+        supervisor_state_observed_at_ = SteadyClock::now();
+        supervisor_state_ = message->data.substr(0U, 512U);
+      });
+
     if (!config_.location_resolve_service.empty()) {
       location_resolve_client_ =
         node_.create_client<ResolveLocation>(
@@ -402,6 +536,18 @@ public:
       node_.get_node_logging_interface(),
       node_.get_node_waitables_interface(),
       config_.navigation_action_name);
+
+    mapping_control_client_ =
+      node_.create_client<ControlAutonomousMapping>(
+      config_.mapping_control_service);
+
+    mapping_action_client_ =
+      rclcpp_action::create_client<RunAutonomousMapping>(
+      node_.get_node_base_interface(),
+      node_.get_node_graph_interface(),
+      node_.get_node_logging_interface(),
+      node_.get_node_waitables_interface(),
+      config_.mapping_action_name);
 
     {
       std::lock_guard<std::mutex> lock(mutex_);
@@ -454,6 +600,21 @@ public:
       CommandType::CancelNavigation)
     {
       return dispatch_cancel_navigation(command);
+    }
+
+    if (command.command_type == CommandType::QueryNavigationState ||
+      command.command_type == CommandType::QueryMappingState ||
+      command.command_type == CommandType::QuerySupervisorState)
+    {
+      return dispatch_query(command);
+    }
+
+    if (command.command_type == CommandType::StartAutonomousMapping) {
+      return dispatch_start_mapping(command);
+    }
+
+    if (command.command_type == CommandType::ControlMapping) {
+      return dispatch_mapping_control(command);
     }
 
     {
@@ -563,6 +724,26 @@ public:
       navigation_readiness_observed_at_,
       now);
 
+    result.map_context_observed = map_context_observed_;
+    result.map_context_synchronized = map_context_synchronized_;
+    result.active_map_id = active_map_id_;
+    result.active_map_revision = active_map_revision_;
+    result.active_map_release_id = active_map_release_id_;
+    result.map_context_age_ms = observation_age_ms(
+      map_context_observed_at_, now);
+
+    result.mapping_status_observed = mapping_status_observed_;
+    result.mapping_mission_id = mapping_mission_id_;
+    result.mapping_state = mapping_state_;
+    result.mapping_reason = mapping_reason_;
+    result.mapping_status_age_ms = observation_age_ms(
+      mapping_status_observed_at_, now);
+
+    result.supervisor_state_observed = supervisor_state_observed_;
+    result.supervisor_state = supervisor_state_;
+    result.supervisor_state_age_ms = observation_age_ms(
+      supervisor_state_observed_at_, now);
+
     result.accepted_command_count =
       accepted_command_count_;
 
@@ -637,6 +818,200 @@ public:
   }
 
 private:
+  [[nodiscard]] bool query_authorized(
+    const ValidatedCommand & command) const
+  {
+    return command.origin_agent.has_value() &&
+           (command.origin_agent.value() == "navigation_agent" ||
+           command.origin_agent.value() == "mapping_agent" ||
+           command.origin_agent.value() == "supervisor_agent");
+  }
+
+  [[nodiscard]] CommandDispatchResult dispatch_query(
+    const ValidatedCommand & command)
+  {
+    if (!query_authorized(command)) {
+      std::lock_guard<std::mutex> lock(mutex_);
+      ++rejected_command_count_;
+      last_reason_ = "bridge_query_authority_rejected";
+      return rejection(last_reason_, false, 0U);
+    }
+
+    const TimePoint now = SteadyClock::now();
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::string reason;
+    if (command.command_type == CommandType::QueryNavigationState) {
+      if (!navigation_readiness_observed_ ||
+        !observation_fresh(
+          navigation_readiness_observed_at_, now,
+          config_.observed_state_timeout_ms))
+      {
+        ++rejected_command_count_;
+        last_reason_ = "bridge_navigation_state_stale";
+        return rejection(last_reason_, false, 0U);
+      }
+      reason = "navigation_state:" + navigation_readiness_;
+    } else if (command.command_type == CommandType::QueryMappingState) {
+      if (!mapping_status_observed_ ||
+        !observation_fresh(
+          mapping_status_observed_at_, now,
+          config_.observed_state_timeout_ms))
+      {
+        ++rejected_command_count_;
+        last_reason_ = "bridge_mapping_state_stale";
+        return rejection(last_reason_, false, 0U);
+      }
+      reason = "mapping_state:" + mapping_state_ + ":" + mapping_reason_;
+    } else {
+      if (!supervisor_state_observed_ ||
+        !observation_fresh(
+          supervisor_state_observed_at_, now,
+          config_.observed_state_timeout_ms))
+      {
+        ++rejected_command_count_;
+        last_reason_ = "bridge_supervisor_state_stale";
+        return rejection(last_reason_, false, 0U);
+      }
+      reason = "supervisor_state:" + supervisor_state_;
+    }
+    if (reason.size() > 768U) {
+      reason.resize(768U);
+    }
+    ++accepted_command_count_;
+    last_terminal_command_id_ = command.command_id;
+    last_reason_ = reason;
+    return acceptance(reason, 0U);
+  }
+
+  [[nodiscard]] bool mapping_authorized(
+    const ValidatedCommand & command) const
+  {
+    return command.priority != CommandPriority::Emergency &&
+           command.origin_agent.has_value() &&
+           command.origin_agent.value() == "mapping_agent";
+  }
+
+  [[nodiscard]] CommandDispatchResult dispatch_start_mapping(
+    const ValidatedCommand & command)
+  {
+    if (!mapping_authorized(command)) {
+      std::lock_guard<std::mutex> lock(mutex_);
+      ++rejected_command_count_;
+      last_reason_ = "bridge_mapping_authority_rejected";
+      return rejection(last_reason_, false, 0U);
+    }
+    const auto * payload = std::get_if<StartAutonomousMappingCommandPayload>(
+      &command.payload);
+    if (payload == nullptr || !payload->auto_save ||
+      !payload->require_quality_approval)
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      ++rejected_command_count_;
+      last_reason_ = "bridge_mapping_payload_invalid";
+      return rejection(last_reason_, false, 0U);
+    }
+    if (!mapping_action_client_->wait_for_action_server(
+        std::chrono::milliseconds(config_.mapping_server_timeout_ms)))
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      ++rejected_command_count_;
+      last_reason_ = "bridge_mapping_action_unavailable";
+      return rejection(last_reason_, true, 0U);
+    }
+
+    RunAutonomousMapping::Goal goal;
+    goal.contract_version = RunAutonomousMapping::Goal::CONTRACT_VERSION;
+    goal.mission_id = payload->mission_id;
+    goal.actor_id = "savo_bridge:" + command.origin_agent.value();
+    goal.map_id = payload->map_id;
+    goal.map_revision = payload->map_revision;
+    goal.strategy = RunAutonomousMapping::Goal::STRATEGY_FRONTIER;
+    goal.auto_save = true;
+    goal.require_quality_approval = true;
+    goal.mission_timeout.sec = static_cast<std::int32_t>(
+      payload->mission_timeout_ms / 1000);
+    goal.mission_timeout.nanosec = static_cast<std::uint32_t>(
+      (payload->mission_timeout_ms % 1000) * 1000000);
+
+    auto future = mapping_action_client_->async_send_goal(goal);
+    if (future.wait_for(
+        std::chrono::milliseconds(config_.mapping_server_timeout_ms)) !=
+      std::future_status::ready || !future.get())
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      ++rejected_command_count_;
+      last_reason_ = "bridge_mapping_goal_rejected_or_timed_out";
+      return rejection(last_reason_, true, 0U);
+    }
+    std::lock_guard<std::mutex> lock(mutex_);
+    ++accepted_command_count_;
+    last_terminal_command_id_ = command.command_id;
+    last_reason_ = "bridge_mapping_goal_accepted";
+    return acceptance(last_reason_, 0U);
+  }
+
+  [[nodiscard]] CommandDispatchResult dispatch_mapping_control(
+    const ValidatedCommand & command)
+  {
+    if (!mapping_authorized(command)) {
+      std::lock_guard<std::mutex> lock(mutex_);
+      ++rejected_command_count_;
+      last_reason_ = "bridge_mapping_authority_rejected";
+      return rejection(last_reason_, false, 0U);
+    }
+    const auto * payload = std::get_if<ControlMappingCommandPayload>(
+      &command.payload);
+    if (payload == nullptr) {
+      std::lock_guard<std::mutex> lock(mutex_);
+      ++rejected_command_count_;
+      last_reason_ = "bridge_mapping_control_payload_invalid";
+      return rejection(last_reason_, false, 0U);
+    }
+    if (!mapping_control_client_->wait_for_service(
+        std::chrono::milliseconds(config_.mapping_control_timeout_ms)))
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      ++rejected_command_count_;
+      last_reason_ = "bridge_mapping_control_unavailable";
+      return rejection(last_reason_, true, 0U);
+    }
+    auto request = std::make_shared<ControlAutonomousMapping::Request>();
+    request->contract_version = ControlAutonomousMapping::Request::CONTRACT_VERSION;
+    request->mission_id = payload->mission_id;
+    request->actor_id = "savo_bridge:" + command.origin_agent.value();
+    request->reason = payload->reason;
+    if (payload->operation == "pause") {
+      request->command = ControlAutonomousMapping::Request::COMMAND_PAUSE;
+    } else if (payload->operation == "resume") {
+      request->command = ControlAutonomousMapping::Request::COMMAND_RESUME;
+    } else {
+      request->command = ControlAutonomousMapping::Request::COMMAND_CANCEL;
+    }
+    auto future = mapping_control_client_->async_send_request(request);
+    if (future.wait_for(
+        std::chrono::milliseconds(config_.mapping_control_timeout_ms)) !=
+      std::future_status::ready)
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      ++rejected_command_count_;
+      last_reason_ = "bridge_mapping_control_timeout";
+      return rejection(last_reason_, true, 0U);
+    }
+    const auto response = future.get();
+    std::lock_guard<std::mutex> lock(mutex_);
+    last_terminal_command_id_ = command.command_id;
+    if (!response || !response->accepted) {
+      ++rejected_command_count_;
+      last_reason_ = response ?
+        "bridge_mapping_control_rejected:" + response->reason :
+        "bridge_mapping_control_rejected";
+      return rejection(last_reason_, true, 0U);
+    }
+    ++accepted_command_count_;
+    last_reason_ = "bridge_mapping_control_accepted:" + response->reason;
+    return acceptance(last_reason_, 0U);
+  }
+
   void validate_config()
   {
     const std::string topics[] = {
@@ -647,6 +1022,9 @@ private:
       config_.manual_velocity_topic,
       config_.safe_velocity_topic,
       config_.navigation_readiness_topic,
+      config_.map_context_status_topic,
+      config_.mapping_status_topic,
+      config_.supervisor_state_topic,
     };
 
     for (const std::string & topic : topics) {
@@ -659,6 +1037,13 @@ private:
     if (!valid_topic(config_.navigation_action_name)) {
       throw std::invalid_argument(
               "ros_command_dispatcher_navigation_action_invalid");
+    }
+
+    if (!valid_topic(config_.mapping_action_name) ||
+      !valid_topic(config_.mapping_control_service))
+    {
+      throw std::invalid_argument(
+              "ros_command_dispatcher_mapping_interface_invalid");
     }
 
     if (
@@ -704,7 +1089,9 @@ private:
       !valid_timeout(config_.navigation_server_timeout_ms) ||
       !valid_timeout(config_.navigation_goal_response_timeout_ms) ||
       !valid_timeout(config_.navigation_execution_timeout_ms) ||
-      !valid_timeout(config_.navigation_cancel_timeout_ms))
+      !valid_timeout(config_.navigation_cancel_timeout_ms) ||
+      !valid_timeout(config_.mapping_server_timeout_ms) ||
+      !valid_timeout(config_.mapping_control_timeout_ms))
     {
       throw std::invalid_argument(
               "ros_command_dispatcher_timeout_invalid");
@@ -1832,12 +2219,28 @@ private:
         0U);
     }
 
-    if (
-      config_.require_active_map_context &&
-      (
-        config_.active_map_id.empty() ||
-        config_.active_map_revision == 0U
-      ))
+    std::string active_map_id;
+    std::uint32_t active_map_revision = 0U;
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      const TimePoint context_now = SteadyClock::now();
+      if (map_context_synchronized_ &&
+        observation_fresh(
+          map_context_observed_at_, context_now,
+          config_.observed_state_timeout_ms))
+      {
+        active_map_id = active_map_id_;
+        active_map_revision = active_map_revision_;
+      } else {
+        // Explicit overrides are retained for isolated fixtures. The
+        // production profile leaves both empty and therefore fails closed.
+        active_map_id = config_.active_map_id;
+        active_map_revision = config_.active_map_revision;
+      }
+    }
+
+    if (config_.require_active_map_context &&
+      (active_map_id.empty() || active_map_revision == 0U))
     {
       {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -1855,7 +2258,7 @@ private:
     if (
       payload->map_id.has_value() &&
       payload->map_id.value() !=
-      config_.active_map_id)
+      active_map_id)
     {
       {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -1926,11 +2329,15 @@ private:
       std::thread worker(
         [this,
         command_id = command.command_id,
-        navigation_payload = *payload]()
+        navigation_payload = *payload,
+        active_map_id,
+        active_map_revision]()
         {
           run_navigation(
             command_id,
-            navigation_payload);
+            navigation_payload,
+            active_map_id,
+            active_map_revision);
         });
 
       {
@@ -2046,7 +2453,9 @@ private:
 
   void run_navigation(
     std::string command_id,
-    NavigateToLocationCommandPayload payload) noexcept
+    NavigateToLocationCommandPayload payload,
+    std::string active_map_id,
+    const std::uint32_t active_map_revision) noexcept
   {
     try {
       if (!location_resolve_client_->wait_for_service(
@@ -2067,9 +2476,9 @@ private:
       request->enforce_map_context =
         config_.require_active_map_context;
       request->map_id =
-        config_.active_map_id;
+        active_map_id;
       request->map_revision =
-        config_.active_map_revision;
+        active_map_revision;
 
       auto resolve_future =
         location_resolve_client_->async_send_request(
@@ -2144,9 +2553,9 @@ private:
       if (
         config_.require_active_map_context &&
         (
-          location.map_id != config_.active_map_id ||
+          location.map_id != active_map_id ||
           location.map_revision !=
-          config_.active_map_revision
+          active_map_revision
         ))
       {
         finish_navigation(
@@ -2905,6 +3314,23 @@ private:
   std::string navigation_readiness_;
   TimePoint navigation_readiness_observed_at_{};
 
+  bool map_context_observed_{false};
+  bool map_context_synchronized_{false};
+  std::string active_map_id_;
+  std::uint32_t active_map_revision_{0U};
+  std::string active_map_release_id_;
+  TimePoint map_context_observed_at_{};
+
+  bool mapping_status_observed_{false};
+  std::string mapping_mission_id_;
+  std::string mapping_state_;
+  std::string mapping_reason_;
+  TimePoint mapping_status_observed_at_{};
+
+  bool supervisor_state_observed_{false};
+  std::string supervisor_state_;
+  TimePoint supervisor_state_observed_at_{};
+
   std::uint64_t accepted_command_count_{0U};
   std::uint64_t rejected_command_count_{0U};
   std::uint64_t ros_publication_count_{0U};
@@ -2923,6 +3349,12 @@ private:
 
   rclcpp_action::Client<NavigateToPose>::SharedPtr
     navigation_action_client_;
+
+  rclcpp::Client<ControlAutonomousMapping>::SharedPtr
+    mapping_control_client_;
+
+  rclcpp_action::Client<RunAutonomousMapping>::SharedPtr
+    mapping_action_client_;
 
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr
     mode_command_publisher_;
@@ -2953,6 +3385,18 @@ private:
   rclcpp::Subscription<
     std_msgs::msg::String>::SharedPtr
     navigation_readiness_subscription_;
+
+  rclcpp::Subscription<
+    std_msgs::msg::String>::SharedPtr
+    map_context_subscription_;
+
+  rclcpp::Subscription<
+    savo_msgs::msg::AutonomousMappingStatus>::SharedPtr
+    mapping_status_subscription_;
+
+  rclcpp::Subscription<
+    std_msgs::msg::String>::SharedPtr
+    supervisor_state_subscription_;
 };
 
 RosCommandDispatcher::RosCommandDispatcher(

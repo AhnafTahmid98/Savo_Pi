@@ -1,17 +1,17 @@
-#include "savo_speech/drivers/alsa_playback_stream.hpp"
+// Copyright 2026 Ahnaf Tahmid
+#include <alsa/asoundlib.h>
+#include <span>
 
 #include <cerrno>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
-#include <span>
 #include <stdexcept>
 #include <string>
 #include <utility>
 
-#include <alsa/asoundlib.h>
-
 #include "savo_speech/drivers/alsa_error.hpp"
+#include "savo_speech/drivers/alsa_playback_stream.hpp"
 
 namespace savo_speech::drivers
 {

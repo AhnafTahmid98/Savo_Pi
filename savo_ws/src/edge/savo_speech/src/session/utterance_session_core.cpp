@@ -1,11 +1,12 @@
-#include "savo_speech/session/utterance_session_core.hpp"
-
+// Copyright 2026 Ahnaf Tahmid
 #include <algorithm>
 #include <cmath>
 #include <limits>
 #include <stdexcept>
 #include <string>
 #include <utility>
+
+#include "savo_speech/session/utterance_session_core.hpp"
 
 namespace savo_speech::session
 {
@@ -500,8 +501,7 @@ void UtteranceSessionCore::reset() noexcept
   last_error_.clear();
 }
 
-void UtteranceSessionCore::
-initialize_audio_format_locked(
+void UtteranceSessionCore::initialize_audio_format_locked(
   const audio::AudioFormat & format)
 {
   const std::uint64_t sample_rate =
@@ -534,8 +534,7 @@ initialize_audio_format_locked(
       capacity_samples));
 }
 
-bool UtteranceSessionCore::
-same_audio_format_locked(
+bool UtteranceSessionCore::same_audio_format_locked(
   const audio::AudioFormat & format) const noexcept
 {
   if (!audio_format_.has_value()) {
@@ -549,8 +548,7 @@ same_audio_format_locked(
     format.channels;
 }
 
-void UtteranceSessionCore::
-append_pre_roll_locked(
+void UtteranceSessionCore::append_pre_roll_locked(
   const audio::AudioFrame & frame)
 {
   if (!pre_roll_buffer_) {
@@ -616,8 +614,7 @@ append_pre_roll_locked(
     frame.interleaved_samples);
 }
 
-void UtteranceSessionCore::
-start_recording_locked(
+void UtteranceSessionCore::start_recording_locked(
   const vad::VadEvent & event)
 {
   state_ = UtteranceSessionState::Recording;
@@ -655,8 +652,7 @@ start_recording_locked(
   last_error_.clear();
 }
 
-void UtteranceSessionCore::
-append_active_frame_locked(
+void UtteranceSessionCore::append_active_frame_locked(
   const audio::AudioFrame & frame)
 {
   active_samples_.insert(
@@ -671,8 +667,7 @@ append_active_frame_locked(
       frame.captured_at});
 }
 
-void UtteranceSessionCore::
-trim_active_after_sequence_locked(
+void UtteranceSessionCore::trim_active_after_sequence_locked(
   const std::uint64_t sequence)
 {
   while (
@@ -897,8 +892,7 @@ bool UtteranceSessionCore::cancel_locked(
   return true;
 }
 
-void UtteranceSessionCore::
-clear_active_session_locked() noexcept
+void UtteranceSessionCore::clear_active_session_locked() noexcept
 {
   state_ = UtteranceSessionState::Idle;
 
@@ -914,8 +908,7 @@ clear_active_session_locked() noexcept
   active_pre_roll_samples_ = 0U;
 }
 
-void UtteranceSessionCore::
-enqueue_completed_locked(
+void UtteranceSessionCore::enqueue_completed_locked(
   CompletedUtterance utterance)
 {
   if (
@@ -933,8 +926,7 @@ enqueue_completed_locked(
 }
 
 std::pair<std::uint64_t, std::uint64_t>
-UtteranceSessionCore::
-active_gap_metadata_locked() const noexcept
+UtteranceSessionCore::active_gap_metadata_locked() const noexcept
 {
   std::uint64_t gap_count{0U};
   std::uint64_t missing_frames{0U};

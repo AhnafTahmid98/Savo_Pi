@@ -1,10 +1,11 @@
-#include "savo_speech/audio/captured_audio_processor_chain.hpp"
-
+// Copyright 2026 Ahnaf Tahmid
 #include <algorithm>
 #include <exception>
 #include <stdexcept>
 #include <string>
 #include <utility>
+
+#include "savo_speech/audio/captured_audio_processor_chain.hpp"
 
 namespace savo_speech::audio
 {
@@ -244,8 +245,7 @@ void CapturedAudioProcessorChain::reset_statistics() noexcept
   }
 }
 
-void CapturedAudioProcessorChain::
-record_processor_success(
+void CapturedAudioProcessorChain::record_processor_success(
   const std::size_t index,
   const std::uint64_t sequence) noexcept
 {
@@ -260,8 +260,7 @@ record_processor_success(
   ++statistics_.processor_successes;
 }
 
-bool CapturedAudioProcessorChain::
-record_processor_failure(
+bool CapturedAudioProcessorChain::record_processor_failure(
   const std::size_t index,
   const std::uint64_t sequence,
   const std::string & error) noexcept

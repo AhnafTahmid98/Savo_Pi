@@ -1,3 +1,4 @@
+// Copyright 2026 Ahnaf Tahmid
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -12,6 +13,7 @@
 #include <thread>
 
 #include "savo_speech/audio/audio_runtime.hpp"
+
 #include "savo_speech/audio/wav_reader.hpp"
 #include "savo_speech/drivers/alsa_capture_stream.hpp"
 #include "savo_speech/drivers/alsa_playback_stream.hpp"
@@ -84,14 +86,14 @@ void print_usage(const char * executable)
 {
   std::size_t consumed{0U};
 
-  const unsigned long long parsed =
+  const std::uint64_t parsed =
     std::stoull(value, &consumed, 10);
 
   if (
     consumed != value.size() ||
     (!allow_zero && parsed == 0U) ||
     parsed >
-    static_cast<unsigned long long>(
+    static_cast<std::uint64_t>(
       std::numeric_limits<std::size_t>::max()))
   {
     throw std::invalid_argument{
@@ -277,7 +279,7 @@ int main(int argc, char * argv[])
       1000000000.0;
 
     savo_speech::drivers::AlsaCaptureConfig
-    capture_config;
+      capture_config;
 
     capture_config.device_name =
       options.capture_device;
@@ -296,7 +298,7 @@ int main(int argc, char * argv[])
     capture_config.require_exact_sample_rate = true;
 
     savo_speech::drivers::AlsaPlaybackConfig
-    playback_config;
+      playback_config;
 
     playback_config.device_name =
       options.playback_device;
@@ -311,13 +313,13 @@ int main(int argc, char * argv[])
     playback_config.require_exact_sample_rate = true;
 
     savo_speech::drivers::AlsaCaptureStream
-    capture_stream{capture_config};
+      capture_stream{capture_config};
 
     savo_speech::drivers::AlsaPlaybackStream
-    playback_stream{playback_config};
+      playback_stream{playback_config};
 
     savo_speech::audio::AudioRuntimeConfig
-    runtime_config;
+      runtime_config;
 
     runtime_config.microphone_gate.
     post_playback_hold =
@@ -399,7 +401,7 @@ int main(int argc, char * argv[])
       << options.chunk_frames << '\n'
       << "Warmup accepted: "
       << warmup_snapshot.
-        capture_worker_statistics.accepted_frames
+      capture_worker_statistics.accepted_frames
       << '\n';
 
     const auto completion =
@@ -449,27 +451,27 @@ int main(int argc, char * argv[])
       << '\n'
       << "Capture accepted:"
       << ' ' << completion_snapshot.
-        capture_worker_statistics.accepted_frames
+      capture_worker_statistics.accepted_frames
       << '\n'
       << "Capture gated:   "
       << completion_snapshot.
-        capture_worker_statistics.gated_frames
+      capture_worker_statistics.gated_frames
       << '\n'
       << "Gate flushes:    "
       << completion_snapshot.
-        capture_pipeline_statistics.gate_flushes
+      capture_pipeline_statistics.gate_flushes
       << '\n'
       << "Accepted resumed:"
       << ' ' << resumed_snapshot.
-        capture_worker_statistics.accepted_frames
+      capture_worker_statistics.accepted_frames
       << '\n'
       << "Worker completed:"
       << ' ' << completion_snapshot.
-        playback_worker_statistics.completed_requests
+      playback_worker_statistics.completed_requests
       << '\n'
       << "Worker failed:   "
       << completion_snapshot.
-        playback_worker_statistics.failed_requests
+      playback_worker_statistics.failed_requests
       << '\n';
 
     if (

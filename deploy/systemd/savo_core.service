@@ -1,11 +1,27 @@
 [Unit]
-Description=Savo Core Service
-After=network.target
+Description=Robot SAVO core safe bringup
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/env bash /home/ahnaf-tahmid/Savo_Pi/tools/scripts/run_core.sh
+User=@SAVO_USER@
+Group=@SAVO_GROUP@
+WorkingDirectory=@SAVO_ROOT@
+EnvironmentFile=-/etc/robot-savo/robot-savo.env
+Environment=SAVO_ROBOT_MODE=safe_idle
+Environment=SAVO_BRINGUP_PROFILE=lidar_only
+Environment=SAVO_CONTROL_STARTUP_MODE=STOP
+ExecStart=@SAVO_ROOT@/deploy/core/run_core.sh
 Restart=on-failure
+RestartSec=5
+KillSignal=SIGINT
+TimeoutStopSec=30
+KillMode=control-group
+UMask=0027
+NoNewPrivileges=true
 
 [Install]
 WantedBy=multi-user.target

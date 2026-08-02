@@ -1,5 +1,4 @@
-#include "savo_ui/platform/framebuffer_display.hpp"
-
+// Copyright 2026 Ahnaf Tahmid
 #include <fcntl.h>
 #include <linux/fb.h>
 #include <sys/ioctl.h>
@@ -9,6 +8,8 @@
 #include <cerrno>
 #include <cstring>
 #include <string>
+
+#include "savo_ui/platform/framebuffer_display.hpp"
 
 namespace savo_ui
 {

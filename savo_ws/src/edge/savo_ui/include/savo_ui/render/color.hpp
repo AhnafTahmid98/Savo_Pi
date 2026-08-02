@@ -1,3 +1,4 @@
+// Copyright 2026 Ahnaf Tahmid
 #pragma once
 
 #include <cstdint>

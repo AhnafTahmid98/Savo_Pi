@@ -23,25 +23,30 @@ The completed package will own:
 - monotonic freshness tracking
 - bridge health
 - stable ROS-independent runtime snapshots for SavoMind
-- later command validation and ROS clients in separately approved phases
+- bounded command validation and typed ROS dispatch
 
 Robot subsystem packages remain authoritative for their own state and
 behaviour.
 
-## Initial safety boundary
+## Production command boundary
 
-The initial bridge is strictly read-only.
+The live edge profile accepts only the closed command enum over its protected
+Unix socket. It supports emergency STOP, bounded single-axis teleop nudges,
+exact approved-location navigation, navigation cancellation/status, typed
+autonomous mapping start/pause/resume/cancel/status, and read-only supervisor
+status. Autonomous mapping always requests save and operator quality approval;
+the bridge cannot submit AM-8 approval.
 
-These paths remain disabled:
+Manual mapping start, standalone map save/verification, and release mutation are
+not exposed because this repository has no bridge-safe typed authority for
+them. Save and verification are performed by `RunAutonomousMapping`; quality
+and release progress are observed through its typed status. Unknown commands,
+unknown fields, wrong actors, stale state, missing servers, duplicates, and
+replays fail closed. There is no generic topic/service/action escape hatch.
 
-- movement dispatch
-- teleoperation dispatch
-- navigation dispatch
-- mapping commands
-- direct motor commands
-- behaviour-changing service calls
-- ROS action-goal dispatch
-- SavoMind command processing
+The production profile leaves the static map ID/revision empty. Navigation is
+admitted only after a fresh `/savo_nav/map_context/status` reports a synchronized
+real map ID, revision, and `map_release_id`.
 
 ## Phase 1A-1
 

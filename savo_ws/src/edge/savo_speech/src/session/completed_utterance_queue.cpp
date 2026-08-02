@@ -1,8 +1,9 @@
-#include "savo_speech/session/completed_utterance_queue.hpp"
-
+// Copyright 2026 Ahnaf Tahmid
 #include <algorithm>
 #include <stdexcept>
 #include <utility>
+
+#include "savo_speech/session/completed_utterance_queue.hpp"
 
 namespace savo_speech::session
 {

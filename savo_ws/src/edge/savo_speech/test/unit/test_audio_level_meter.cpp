@@ -1,8 +1,8 @@
+// Copyright 2026 Ahnaf Tahmid
 #include <cstdint>
 #include <vector>
 
 #include "gtest/gtest.h"
-
 #include "savo_speech/audio/audio_level_meter.hpp"
 
 TEST(AudioLevelMeter, EmptyInputProducesZeroLevel)

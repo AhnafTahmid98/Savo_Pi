@@ -57,10 +57,15 @@
     command_dispatcher.manual_velocity_topic: /cmd_vel_manual
     command_dispatcher.safe_velocity_topic: /cmd_vel_safe
     command_dispatcher.navigation_readiness_topic: /savo_nav/readiness
+    command_dispatcher.map_context_status_topic: /savo_nav/map_context/status
     command_dispatcher.navigation_action_name: /savo_nav/navigation/navigate_to_pose
     command_dispatcher.location_resolve_service: /savo_locations/resolve
-    command_dispatcher.active_map_id: saved_map
-    command_dispatcher.active_map_revision: 1
+    command_dispatcher.mapping_action_name: /savo_mapping/autonomous/run
+    command_dispatcher.mapping_control_service: /savo_mapping/autonomous/control
+    command_dispatcher.mapping_status_topic: /savo_mapping/autonomous/status
+    command_dispatcher.supervisor_state_topic: /savo_supervisor/state_summary
+    command_dispatcher.active_map_id: ""
+    command_dispatcher.active_map_revision: 0
     command_dispatcher.require_active_map_context: true
     command_dispatcher.observed_state_timeout_ms: 1000
     command_dispatcher.mode_transition_timeout_ms: 1500
@@ -71,3 +76,5 @@
     command_dispatcher.navigation_execution_timeout_ms: 300000
     command_dispatcher.teleop_cancel_timeout_ms: 2000
     command_dispatcher.navigation_cancel_timeout_ms: 2000
+    command_dispatcher.mapping_server_timeout_ms: 2000
+    command_dispatcher.mapping_control_timeout_ms: 2000

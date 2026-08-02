@@ -1,8 +1,10 @@
+// Copyright 2026 Ahnaf Tahmid
 #ifndef SAVO_SPEECH__AUDIO__PLAYBACK_SINK_HPP_
 #define SAVO_SPEECH__AUDIO__PLAYBACK_SINK_HPP_
 
-#include <cstdint>
 #include <span>
+
+#include <cstdint>
 
 #include "savo_speech/audio/audio_format.hpp"
 

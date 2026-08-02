@@ -1,11 +1,12 @@
-#include "savo_speech/audio/capture_pipeline.hpp"
-
+// Copyright 2026 Ahnaf Tahmid
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <stdexcept>
 #include <utility>
+
+#include "savo_speech/audio/capture_pipeline.hpp"
 
 #include "savo_speech/audio/channel_selector.hpp"
 
@@ -108,39 +109,39 @@ CapturePipelineResult CapturePipeline::process(
 
   switch (push_result) {
     case QueuePushResult::Accepted:
-    {
-      const std::scoped_lock lock{state_mutex_};
-      ++statistics_.accepted_frames;
+      {
+        const std::scoped_lock lock{state_mutex_};
+        ++statistics_.accepted_frames;
 
-      return CapturePipelineResult::Accepted;
-    }
+        return CapturePipelineResult::Accepted;
+      }
 
     case QueuePushResult::AcceptedAfterDroppingOldest:
-    {
-      const std::scoped_lock lock{state_mutex_};
+      {
+        const std::scoped_lock lock{state_mutex_};
 
-      ++statistics_.accepted_frames;
-      ++statistics_.queue_drop_events;
+        ++statistics_.accepted_frames;
+        ++statistics_.queue_drop_events;
 
-      return CapturePipelineResult::
-             AcceptedAfterDroppingOldest;
-    }
+        return CapturePipelineResult::
+               AcceptedAfterDroppingOldest;
+      }
 
     case QueuePushResult::RejectedFull:
-    {
-      const std::scoped_lock lock{state_mutex_};
-      ++statistics_.queue_rejections;
+      {
+        const std::scoped_lock lock{state_mutex_};
+        ++statistics_.queue_rejections;
 
-      return CapturePipelineResult::RejectedQueueFull;
-    }
+        return CapturePipelineResult::RejectedQueueFull;
+      }
 
     case QueuePushResult::RejectedClosed:
-    {
-      const std::scoped_lock lock{state_mutex_};
-      ++statistics_.queue_rejections;
+      {
+        const std::scoped_lock lock{state_mutex_};
+        ++statistics_.queue_rejections;
 
-      return CapturePipelineResult::RejectedQueueClosed;
-    }
+        return CapturePipelineResult::RejectedQueueClosed;
+      }
   }
 
   throw std::logic_error{

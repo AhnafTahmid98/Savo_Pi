@@ -1,10 +1,12 @@
+// Copyright 2026 Ahnaf Tahmid
 #ifndef SAVO_SPEECH__AUDIO__AUDIO_RING_BUFFER_HPP_
 #define SAVO_SPEECH__AUDIO__AUDIO_RING_BUFFER_HPP_
+
+#include <span>
 
 #include <cstddef>
 #include <cstdint>
 #include <mutex>
-#include <span>
 #include <vector>
 
 namespace savo_speech::audio

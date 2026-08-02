@@ -1,16 +1,16 @@
+// Copyright 2026 Ahnaf Tahmid
 #include <filesystem>
 #include <fstream>
 #include <string>
 
 #include "gtest/gtest.h"
-
 #include "savo_speech/wake_word/pocketsphinx_wake_word_backend.hpp"
 
 namespace
 {
 
-class PocketSphinxWakeWordBackendTest :
-  public ::testing::Test
+class PocketSphinxWakeWordBackendTest
+  : public ::testing::Test
 {
 protected:
   void SetUp() override
@@ -113,7 +113,7 @@ TEST_F(
     static_cast<void>(
       savo_speech::wake_word::
       PocketSphinxWakeWordBackend{
-        make_config()}),
+    make_config()}),
     std::invalid_argument);
 }
 
@@ -130,7 +130,7 @@ TEST_F(
     static_cast<void>(
       savo_speech::wake_word::
       PocketSphinxWakeWordBackend{
-        make_config()}),
+    make_config()}),
     std::invalid_argument);
 }
 
@@ -147,6 +147,6 @@ TEST_F(
     static_cast<void>(
       savo_speech::wake_word::
       PocketSphinxWakeWordBackend{
-        make_config()}),
+    make_config()}),
     std::invalid_argument);
 }

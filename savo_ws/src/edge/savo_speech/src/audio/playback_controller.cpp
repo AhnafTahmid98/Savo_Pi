@@ -1,10 +1,12 @@
-#include "savo_speech/audio/playback_controller.hpp"
+// Copyright 2026 Ahnaf Tahmid
+#include <span>
 
 #include <algorithm>
 #include <cstddef>
 #include <limits>
-#include <span>
 #include <stdexcept>
+
+#include "savo_speech/audio/playback_controller.hpp"
 
 namespace savo_speech::audio
 {

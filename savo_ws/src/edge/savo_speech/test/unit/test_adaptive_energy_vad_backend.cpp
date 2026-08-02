@@ -1,9 +1,9 @@
+// Copyright 2026 Ahnaf Tahmid
 #include <cmath>
 #include <cstdint>
 #include <vector>
 
 #include "gtest/gtest.h"
-
 #include "savo_speech/vad/adaptive_energy_vad_backend.hpp"
 
 namespace
@@ -169,8 +169,8 @@ TEST(
 
   const double expected_average =
     (
-      normalized_sample(328) +
-      normalized_sample(655)
+    normalized_sample(328) +
+    normalized_sample(655)
     ) /
     2.0;
 

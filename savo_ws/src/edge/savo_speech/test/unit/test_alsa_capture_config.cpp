@@ -1,5 +1,5 @@
+// Copyright 2026 Ahnaf Tahmid
 #include "gtest/gtest.h"
-
 #include "savo_speech/drivers/alsa_capture_stream.hpp"
 
 TEST(AlsaCaptureConfig, DefaultConfigurationNeedsDeviceName)

@@ -1,3 +1,4 @@
+// Copyright 2026 Ahnaf Tahmid
 #include <chrono>
 #include <cstdint>
 #include <deque>
@@ -7,7 +8,6 @@
 #include <vector>
 
 #include "gtest/gtest.h"
-
 #include "savo_speech/session/utterance_session_processor.hpp"
 #include "savo_speech/vad/vad_backend.hpp"
 #include "savo_speech/wake_word/wake_word_backend.hpp"
@@ -33,8 +33,8 @@ using CancellationReason =
   savo_speech::session::
   UtteranceCancellationReason;
 
-class ScriptedWakeWordBackend final :
-  public savo_speech::wake_word::WakeWordBackend
+class ScriptedWakeWordBackend final
+  : public savo_speech::wake_word::WakeWordBackend
 {
 public:
   [[nodiscard]]
@@ -80,8 +80,8 @@ private:
     WakeWordBackendResult> results_{};
 };
 
-class ScriptedVadBackend final :
-  public savo_speech::vad::VadBackend
+class ScriptedVadBackend final
+  : public savo_speech::vad::VadBackend
 {
 public:
   [[nodiscard]]
@@ -175,7 +175,7 @@ time_at(const std::int64_t milliseconds)
     savo_speech::audio::AudioFrame::
     Clock::time_point{} +
     std::chrono::milliseconds{
-    milliseconds};
+      milliseconds};
 }
 
 [[nodiscard]]
@@ -210,7 +210,7 @@ struct Harness
   explicit Harness(
     savo_speech::session::
     UtteranceSessionConfig session_config =
-      make_session_config())
+    make_session_config())
   : wake_processor{
       wake_backend,
       make_wake_config()},

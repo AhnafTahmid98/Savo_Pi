@@ -1,3 +1,4 @@
+// Copyright 2026 Ahnaf Tahmid
 #ifndef SAVO_SPEECH__WAKE_WORD__WAKE_WORD_PROCESSOR_HPP_
 #define SAVO_SPEECH__WAKE_WORD__WAKE_WORD_PROCESSOR_HPP_
 
@@ -10,9 +11,10 @@
 #include <optional>
 #include <string>
 
-#include "savo_speech/audio/captured_audio_processor.hpp"
 #include "savo_speech/wake_word/wake_word_backend.hpp"
 #include "savo_speech/wake_word/wake_word_event.hpp"
+
+#include "savo_speech/audio/captured_audio_processor.hpp"
 
 namespace savo_speech::wake_word
 {
@@ -65,14 +67,14 @@ struct WakeWordProcessorSnapshot
   std::string last_error{};
 };
 
-class WakeWordProcessor final :
-  public audio::CapturedAudioProcessor
+class WakeWordProcessor final
+  : public audio::CapturedAudioProcessor
 {
 public:
   WakeWordProcessor(
     WakeWordBackend & backend,
     WakeWordProcessorConfig config =
-      WakeWordProcessorConfig{});
+    WakeWordProcessorConfig{});
 
   ~WakeWordProcessor() override = default;
 

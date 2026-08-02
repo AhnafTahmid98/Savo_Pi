@@ -1,3 +1,4 @@
+// Copyright 2026 Ahnaf Tahmid
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -9,8 +10,9 @@
 #include <string>
 #include <string_view>
 
-#include "savo_speech/audio/microphone_gate.hpp"
 #include "savo_speech/audio/playback_worker.hpp"
+
+#include "savo_speech/audio/microphone_gate.hpp"
 #include "savo_speech/audio/wav_reader.hpp"
 #include "savo_speech/drivers/alsa_playback_stream.hpp"
 
@@ -67,7 +69,7 @@ void print_usage(const char * executable)
 {
   std::size_t consumed{0U};
 
-  const unsigned long long parsed =
+  const std::uint64_t parsed =
     std::stoull(value, &consumed, 10);
 
   if (

@@ -1,3 +1,4 @@
+// Copyright 2026 Ahnaf Tahmid
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
@@ -9,7 +10,6 @@
 #include <thread>
 
 #include "gtest/gtest.h"
-
 #include "savo_speech/audio/capture_processing_dispatcher.hpp"
 
 namespace
@@ -17,8 +17,8 @@ namespace
 
 using namespace std::chrono_literals;
 
-class FakeCapturedFrameSource final :
-  public savo_speech::audio::CapturedFrameSource
+class FakeCapturedFrameSource final
+  : public savo_speech::audio::CapturedFrameSource
 {
 public:
   [[nodiscard]] std::optional<
@@ -63,8 +63,8 @@ private:
   frames_;
 };
 
-class FakeCapturedAudioProcessor final :
-  public savo_speech::audio::CapturedAudioProcessor
+class FakeCapturedAudioProcessor final
+  : public savo_speech::audio::CapturedAudioProcessor
 {
 public:
   void process(
@@ -180,7 +180,7 @@ TEST(CaptureProcessingDispatcher, ProcessesFramesAndBecomesReady)
   FakeCapturedAudioProcessor processor;
 
   savo_speech::audio::CaptureProcessingDispatcher
-  dispatcher{
+    dispatcher{
     source,
     processor,
     make_config()};
@@ -220,7 +220,7 @@ TEST(CaptureProcessingDispatcher, DetectsSequenceGap)
   FakeCapturedAudioProcessor processor;
 
   savo_speech::audio::CaptureProcessingDispatcher
-  dispatcher{
+    dispatcher{
     source,
     processor,
     make_config()};
@@ -255,7 +255,7 @@ TEST(CaptureProcessingDispatcher, ProcessorFailureFaultsWorker)
   processor.set_throw_on_process(true);
 
   savo_speech::audio::CaptureProcessingDispatcher
-  dispatcher{
+    dispatcher{
     source,
     processor,
     make_config()};
@@ -296,7 +296,7 @@ TEST(CaptureProcessingDispatcher, ReportsStaleProcessing)
   config.freshness_timeout = 15ms;
 
   savo_speech::audio::CaptureProcessingDispatcher
-  dispatcher{
+    dispatcher{
     source,
     processor,
     config};

@@ -1,8 +1,8 @@
+// Copyright 2026 Ahnaf Tahmid
 #include <cstdint>
 #include <stdexcept>
 
 #include "gtest/gtest.h"
-
 #include "savo_speech/audio/audio_activity_monitor.hpp"
 
 namespace

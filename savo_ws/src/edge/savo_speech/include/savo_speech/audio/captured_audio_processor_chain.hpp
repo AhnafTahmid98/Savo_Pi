@@ -1,3 +1,4 @@
+// Copyright 2026 Ahnaf Tahmid
 #ifndef SAVO_SPEECH__AUDIO__CAPTURED_AUDIO_PROCESSOR_CHAIN_HPP_
 #define SAVO_SPEECH__AUDIO__CAPTURED_AUDIO_PROCESSOR_CHAIN_HPP_
 
@@ -52,13 +53,13 @@ struct CapturedAudioProcessorChainSnapshot
   CapturedAudioProcessorChainStatistics statistics{};
 
   std::vector<CapturedAudioProcessorStatistics>
-    processors{};
+  processors{};
 
   std::string last_error{};
 };
 
-class CapturedAudioProcessorChain final :
-  public CapturedAudioProcessor
+class CapturedAudioProcessorChain final
+  : public CapturedAudioProcessor
 {
 public:
   CapturedAudioProcessorChain() = default;

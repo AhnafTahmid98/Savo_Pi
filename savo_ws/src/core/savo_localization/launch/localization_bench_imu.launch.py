@@ -24,7 +24,6 @@ def generate_launch_description() -> LaunchDescription:
 
     use_imu = LaunchConfiguration("use_imu")
     use_health = LaunchConfiguration("use_health")
-    use_dashboard = LaunchConfiguration("use_dashboard")
 
     return LaunchDescription(
         [
@@ -73,11 +72,6 @@ def generate_launch_description() -> LaunchDescription:
                 default_value="false",
                 description="Start localization_health_node for IMU checks.",
             ),
-            DeclareLaunchArgument(
-                "use_dashboard",
-                default_value="false",
-                description="Start localization_dashboard for terminal monitoring.",
-            ),
             Node(
                 package="savo_localization",
                 executable="imu_node",
@@ -97,20 +91,6 @@ def generate_launch_description() -> LaunchDescription:
                 name="localization_health_node",
                 output="screen",
                 condition=IfCondition(use_health),
-                parameters=[
-                    topics_config,
-                    frames_config,
-                    diagnostics_config,
-                    profile_config,
-                ],
-            ),
-            Node(
-                package="savo_localization",
-                executable="localization_dashboard.py",
-                name="localization_dashboard",
-                output="screen",
-                emulate_tty=True,
-                condition=IfCondition(use_dashboard),
                 parameters=[
                     topics_config,
                     frames_config,

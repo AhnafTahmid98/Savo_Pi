@@ -1,8 +1,9 @@
-#include "savo_speech/session/utterance_session_processor.hpp"
-
+// Copyright 2026 Ahnaf Tahmid
 #include <stdexcept>
 #include <string>
 #include <utility>
+
+#include "savo_speech/session/utterance_session_processor.hpp"
 
 namespace savo_speech::session
 {
@@ -23,8 +24,7 @@ struct DrainedEventCounts
 
 }  // namespace
 
-UtteranceSessionProcessor::
-UtteranceSessionProcessor(
+UtteranceSessionProcessor::UtteranceSessionProcessor(
   wake_word::WakeWordProcessor & wake_word_processor,
   vad::VadProcessor & vad_processor,
   UtteranceSessionConfig session_config)

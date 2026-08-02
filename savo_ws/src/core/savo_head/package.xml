@@ -20,7 +20,8 @@
   <depend>tf2</depend>
   <depend>tf2_ros</depend>
   <depend>tf2_geometry_msgs</depend>
-  <depend>libapriltag-dev</depend>
+  <!-- libapriltag-dev is an Ubuntu target package without a Noble rosdep key;
+       deploy/core/install_core_deps.sh installs it explicitly. -->
   <depend>libopencv-dev</depend>
   <build_depend>pkg-config</build_depend>
   <exec_depend>rclpy</exec_depend>

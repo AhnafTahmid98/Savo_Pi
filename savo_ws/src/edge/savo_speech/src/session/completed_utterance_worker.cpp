@@ -1,9 +1,10 @@
-#include "savo_speech/session/completed_utterance_worker.hpp"
-
+// Copyright 2026 Ahnaf Tahmid
 #include <exception>
 #include <stdexcept>
 #include <string>
 #include <utility>
+
+#include "savo_speech/session/completed_utterance_worker.hpp"
 
 #include "savo_speech/audio/wav_writer.hpp"
 

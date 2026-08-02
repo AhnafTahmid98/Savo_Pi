@@ -1,3 +1,4 @@
+// Copyright 2026 Ahnaf Tahmid
 #ifndef SAVO_SPEECH__AUDIO__AUDIO_RUNTIME_HPP_
 #define SAVO_SPEECH__AUDIO__AUDIO_RUNTIME_HPP_
 
@@ -10,6 +11,7 @@
 #include <string_view>
 
 #include "savo_speech/audio/audio_frame.hpp"
+
 #include "savo_speech/audio/capture_pipeline.hpp"
 #include "savo_speech/audio/capture_source.hpp"
 #include "savo_speech/audio/capture_worker.hpp"

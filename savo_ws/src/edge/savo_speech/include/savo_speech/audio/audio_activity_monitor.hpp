@@ -1,3 +1,4 @@
+// Copyright 2026 Ahnaf Tahmid
 #ifndef SAVO_SPEECH__AUDIO__AUDIO_ACTIVITY_MONITOR_HPP_
 #define SAVO_SPEECH__AUDIO__AUDIO_ACTIVITY_MONITOR_HPP_
 
@@ -20,8 +21,8 @@ struct AudioActivitySnapshot
   double maximum_peak{0.0};
 };
 
-class AudioActivityMonitor final :
-  public CapturedAudioProcessor
+class AudioActivityMonitor final
+  : public CapturedAudioProcessor
 {
 public:
   AudioActivityMonitor() = default;

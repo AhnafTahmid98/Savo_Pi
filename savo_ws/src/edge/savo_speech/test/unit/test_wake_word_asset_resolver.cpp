@@ -1,16 +1,16 @@
+// Copyright 2026 Ahnaf Tahmid
 #include <filesystem>
 #include <fstream>
 #include <string>
 
 #include "gtest/gtest.h"
-
 #include "savo_speech/wake_word/wake_word_asset_resolver.hpp"
 
 namespace
 {
 
-class WakeWordAssetResolverTest :
-  public ::testing::Test
+class WakeWordAssetResolverTest
+  : public ::testing::Test
 {
 protected:
   void SetUp() override
@@ -84,7 +84,7 @@ TEST(
   RecognizesSupportedProfiles)
 {
   using savo_speech::wake_word::
-    is_supported_wake_word_profile;
+  is_supported_wake_word_profile;
 
   EXPECT_TRUE(
     is_supported_wake_word_profile("default"));

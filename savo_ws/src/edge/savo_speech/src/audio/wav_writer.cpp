@@ -1,5 +1,4 @@
-#include "savo_speech/audio/wav_writer.hpp"
-
+// Copyright 2026 Ahnaf Tahmid
 #include <cstddef>
 #include <cstdint>
 #include <fstream>
@@ -7,6 +6,8 @@
 #include <stdexcept>
 #include <string_view>
 #include <vector>
+
+#include "savo_speech/audio/wav_writer.hpp"
 
 namespace savo_speech::audio
 {
@@ -103,8 +104,8 @@ std::vector<std::uint8_t> WavWriter::encode(
 
   const std::uint16_t block_align =
     static_cast<std::uint16_t>(
-      audio.format.channels *
-      static_cast<std::uint16_t>(sizeof(std::int16_t)));
+    audio.format.channels *
+    static_cast<std::uint16_t>(sizeof(std::int16_t)));
 
   const std::uint64_t byte_rate_wide =
     static_cast<std::uint64_t>(audio.format.sample_rate_hz) *
