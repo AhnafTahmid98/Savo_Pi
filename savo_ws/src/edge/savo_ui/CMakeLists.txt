@@ -89,6 +89,13 @@ install(FILES
   DESTINATION share/${PROJECT_NAME}
 )
 
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/systemd/savo-ui.service")
+  install(FILES
+    systemd/savo-ui.service
+    DESTINATION share/${PROJECT_NAME}/systemd
+  )
+endif()
+
 # -----------------------------------------------------------------------------
 # Testing / lint
 # -----------------------------------------------------------------------------

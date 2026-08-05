@@ -140,7 +140,7 @@ def generate_launch_description() -> LaunchDescription:
     """Declare the role-selecting distributed Robot Savo launch."""
     description_share = FindPackageShare("savo_description")
     perception_share = FindPackageShare("savo_perception")
-    speech_share = FindPackageShare("savo_speech")
+
     return LaunchDescription(
         [
             DeclareLaunchArgument("host_role", default_value="core"),
@@ -218,14 +218,7 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument("ui_profile", default_value="pi"),
             DeclareLaunchArgument(
                 "speech_params_file",
-                default_value=PathJoinSubstitution(
-                    [
-                        speech_share,
-                        "config",
-                        "profiles",
-                        "edge_real_robot_v1.yaml",
-                    ]
-                ),
+                default_value="",
             ),
             DeclareLaunchArgument("active_map_id", default_value="saved_map"),
             DeclareLaunchArgument("active_map_revision", default_value="1"),

@@ -239,6 +239,7 @@ set(_savo_mapping_public_headers
   include/savo_mapping/exploration_runtime.hpp
   include/savo_mapping/frontier_completion_detector.hpp
   include/savo_mapping/autonomous_mapping_mission.hpp
+  include/savo_mapping/autonomous_mapping_am7.hpp
   include/savo_mapping/coverage_grid.hpp
   include/savo_mapping/coverage_execution_handoff.hpp
   include/savo_mapping/coverage_operation_orchestrator.hpp
@@ -348,7 +349,11 @@ install(
 
 install(
   FILES
+    rviz/autonomous_mapping.rviz
     rviz/coverage_mapping.rviz
+    rviz/manual_mapping.rviz
+    rviz/map_quality_debug.rviz
+    rviz/mapping_overview.rviz
     rviz/scan360_mapping.rviz
   DESTINATION share/${PROJECT_NAME}/rviz
 )
