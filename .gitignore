@@ -115,3 +115,10 @@ tools/scripts/env_robot_server.sh
 # Docker / container cache
 # -----------------------------------------------------------------------------
 .cache/
+
+# -----------------------------------------------------------------------------
+# Staged Robot Savo deployment releases and rollback installations
+# -----------------------------------------------------------------------------
+savo_ws/.releases/
+savo_ws/install.previous.*/
+savo_ws/.install.next.*
