@@ -271,11 +271,6 @@ install(
 )
 
 install(
-  DIRECTORY rviz/
-  DESTINATION share/${PROJECT_NAME}/rviz
-)
-
-install(
   PROGRAMS
     scripts/run_location_integration_smoke
     scripts/run_mapping_nav_preflight

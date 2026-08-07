@@ -114,6 +114,7 @@ def test_bringup_is_installable_lifecycle_package() -> None:
     exec_dependencies = {
         element.text for element in root.findall("exec_depend")
     }
+
     assert {
         "action_msgs",
         "ament_index_python",
@@ -121,13 +122,29 @@ def test_bringup_is_installable_lifecycle_package() -> None:
         "launch",
         "launch_ros",
         "rclpy",
+        "savo_msgs",
+    }.issubset(exec_dependencies)
+
+    # The shared bringup package must remain installable on either Pi.
+    # Core-only and Edge-only runtime packages are selected externally by
+    # role-specific deployment/build logic.
+    role_private_dependencies = {
+        "savo_base",
+        "savo_bridge",
+        "savo_control",
         "savo_head",
+        "savo_lidar",
+        "savo_localization",
         "savo_locations",
         "savo_mapping",
-        "savo_msgs",
         "savo_nav",
+        "savo_realsense",
+        "savo_speech",
         "savo_supervisor",
-    }.issubset(exec_dependencies)
+        "savo_ui",
+        "savo_vo",
+    }
+    assert exec_dependencies.isdisjoint(role_private_dependencies)
 
     assert "ament_python_install_package" in cmake
     assert "run_location_lifecycle_runtime" in cmake

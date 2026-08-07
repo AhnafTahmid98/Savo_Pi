@@ -130,19 +130,35 @@ def test_bringup_installs_am4_and_runtime_dependencies() -> None:
     dependencies = {
         element.text for element in package.findall("exec_depend")
     }
+
+    # savo_bringup is shared by Core and Edge, so its manifest must stay
+    # role-neutral. Role-private packages are selected by the deployment
+    # scripts and launch-time host_role logic instead.
     assert {
         "launch_xml",
-        "savo_base",
-        "savo_control",
-        "savo_lidar",
-        "savo_localization",
-        "savo_mapping",
-        "savo_head",
-        "savo_nav",
+        "savo_description",
+        "savo_msgs",
         "savo_perception",
         "savo_power",
-        "savo_supervisor",
     }.issubset(dependencies)
+
+    role_private_dependencies = {
+        "savo_base",
+        "savo_bridge",
+        "savo_control",
+        "savo_head",
+        "savo_lidar",
+        "savo_localization",
+        "savo_locations",
+        "savo_mapping",
+        "savo_nav",
+        "savo_realsense",
+        "savo_speech",
+        "savo_supervisor",
+        "savo_ui",
+        "savo_vo",
+    }
+    assert dependencies.isdisjoint(role_private_dependencies)
 
     assert "add_executable(bringup_readiness_node" in cmake
     assert "ament_python_install_package" in cmake
