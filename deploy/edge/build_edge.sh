@@ -52,12 +52,17 @@ main() {
     --symlink-install \
     --packages-select "${SAVO_EDGE_BUILD_PACKAGES[@]}"
 
+  # Colcon-generated setup scripts may reference optional variables such as
+  # COLCON_TRACE. Temporarily disable nounset while sourcing the overlay.
   # shellcheck disable=SC1091
+  set +u
   source "${SAVO_WS}/install/setup.bash"
+  set -u
 
   if [[ "${RUN_TESTS}" == "1" ]]; then
     colcon test \
       --packages-select "${SAVO_EDGE_BUILD_PACKAGES[@]}" \
+      --return-code-on-test-failure \
       --event-handlers console_direct+
     colcon test-result --verbose
   fi
