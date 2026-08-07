@@ -93,7 +93,10 @@ def test_detector_dependencies_and_target_are_declared() -> None:
     }
     assert {
         "cv_bridge",
-        "libapriltag-dev",
         "libopencv-dev",
         "pkg-config",
     } <= dependencies
+
+    # libapriltag-dev is the Ubuntu system package used on the target,
+    # but it is not declared as a ROS dependency key in package.xml.
+    # CMake validates the native dependency through PkgConfig::APRILTAG.
