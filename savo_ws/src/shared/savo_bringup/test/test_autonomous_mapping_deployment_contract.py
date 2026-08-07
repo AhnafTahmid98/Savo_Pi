@@ -162,7 +162,7 @@ def test_bringup_installs_am4_and_runtime_dependencies() -> None:
 
     assert "add_executable(bringup_readiness_node" in cmake
     assert "ament_python_install_package" in cmake
-    assert "DIRECTORY config launch params" in cmake
+    assert "DIRECTORY config launch" in cmake
     assert "scripts/run_location_lifecycle_runtime" in cmake
 
 
