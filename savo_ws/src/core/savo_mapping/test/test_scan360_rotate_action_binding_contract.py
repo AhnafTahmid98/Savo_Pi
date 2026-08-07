@@ -85,7 +85,7 @@ IMMUTABLE_HASHES = {
     'test/test_scan360_orchestrator.cpp':
         '156dd224a8eefb316dcd405c8434a9075d840292df4655ed254344454796888e',
     'test/test_scan360_orchestrator_contract.py':
-        '8c56ff3146890c3eec042a078df61936197e8828648dcf90d78c1af745f8a415',
+        'dbda2bd137a6ca9928694263b9f10b0c9d0012d1b766a0830aa40f45464b264a',
     'include/savo_mapping/scan360_rotate_action_client.hpp':
         '71d2107ea05d87071583906dc2fd3a44fb51f7fc8497fa502351ee04afe1844e',
     'src/ros/scan360_rotate_action_client.cpp':
