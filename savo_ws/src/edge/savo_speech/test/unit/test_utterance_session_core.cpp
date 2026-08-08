@@ -130,6 +130,7 @@ void complete_one_utterance(
   const std::uint64_t first_sequence,
   const std::int64_t base_time)
 {
+  // Wake frame: activation only.
   core.process_audio_frame(
     make_frame(
       first_sequence,
@@ -143,21 +144,22 @@ void complete_one_utterance(
         first_sequence,
         base_time)));
 
-  ASSERT_TRUE(
-    core.handle_vad_event(
-      make_vad(
-        vad_start_id,
-        segment_id,
-        first_sequence,
-        base_time,
-        savo_speech::vad::VadEventType::
-        SpeechStarted)));
-
+  // First post-wake command frame.
   core.process_audio_frame(
     make_frame(
       first_sequence + 1U,
       200,
       base_time + 20));
+
+  ASSERT_TRUE(
+    core.handle_vad_event(
+      make_vad(
+        vad_start_id,
+        segment_id,
+        first_sequence + 1U,
+        base_time + 20,
+        savo_speech::vad::VadEventType::
+        SpeechStarted)));
 
   ASSERT_TRUE(
     core.handle_vad_event(
@@ -212,6 +214,37 @@ TEST(UtteranceSessionCore, WakeWordArmsIdleSession)
   EXPECT_EQ(snapshot.state, State::Armed);
   EXPECT_EQ(snapshot.active_wake_phrase, "hey savo");
   EXPECT_EQ(snapshot.statistics.sessions_armed, 1U);
+}
+
+TEST(UtteranceSessionCore, RejectsVadStartOnWakeFrame)
+{
+  Core core{make_config()};
+
+  core.process_audio_frame(
+    make_frame(1U, 100, 0));
+
+  ASSERT_TRUE(
+    core.handle_wake_word_event(
+      make_wake(1U, 1U, 0)));
+
+  EXPECT_FALSE(
+    core.handle_vad_event(
+      make_vad(
+        1U,
+        1U,
+        1U,
+        0,
+        savo_speech::vad::VadEventType::
+        SpeechStarted)));
+
+  const auto snapshot = core.snapshot();
+
+  EXPECT_EQ(snapshot.state, State::Armed);
+  EXPECT_EQ(snapshot.active_audio_samples, 0U);
+  EXPECT_EQ(snapshot.pre_roll_samples, 0U);
+
+  EXPECT_FALSE(
+    core.try_pop_completed().has_value());
 }
 
 TEST(UtteranceSessionCore, RejectsDuplicateWakeEvent)
@@ -292,12 +325,13 @@ TEST(UtteranceSessionCore, VadStartBeginsRecording)
   core.process_audio_frame(
     make_frame(2U, 200, 20));
 
-  core.process_audio_frame(
-    make_frame(3U, 300, 40));
-
   ASSERT_TRUE(
     core.handle_wake_word_event(
       make_wake(1U, 2U, 20)));
+
+  // First command frame after the wake boundary.
+  core.process_audio_frame(
+    make_frame(3U, 300, 40));
 
   ASSERT_TRUE(
     core.handle_vad_event(
@@ -313,16 +347,20 @@ TEST(UtteranceSessionCore, VadStartBeginsRecording)
 
   EXPECT_EQ(snapshot.state, State::Recording);
   EXPECT_EQ(snapshot.active_vad_segment_id, 7U);
-  EXPECT_EQ(snapshot.active_audio_samples, 12U);
+
+  // Frames 1 and 2 were pre-wake/wake audio and were discarded.
+  EXPECT_EQ(snapshot.active_audio_samples, 4U);
 }
 
-TEST(UtteranceSessionCore, PrependsChronologicalPreRoll)
+TEST(UtteranceSessionCore, RetainsOnlyPostWakePreRoll)
 {
   Core core{make_config()};
 
+  // Ambient/pre-wake audio.
   core.process_audio_frame(
     make_frame(1U, 100, 0));
 
+  // Wake phrase frame.
   core.process_audio_frame(
     make_frame(2U, 200, 20));
 
@@ -330,26 +368,33 @@ TEST(UtteranceSessionCore, PrependsChronologicalPreRoll)
     core.handle_wake_word_event(
       make_wake(1U, 2U, 20)));
 
+  // Post-wake command onset enters pre-roll.
+  core.process_audio_frame(
+    make_frame(3U, 300, 40));
+
+  core.process_audio_frame(
+    make_frame(4U, 400, 60));
+
   ASSERT_TRUE(
     core.handle_vad_event(
       make_vad(
         1U,
         1U,
-        3U,
-        40,
+        4U,
+        60,
         savo_speech::vad::VadEventType::
         SpeechStarted)));
 
   core.process_audio_frame(
-    make_frame(3U, 300, 40));
+    make_frame(5U, 500, 80));
 
   ASSERT_TRUE(
     core.handle_vad_event(
       make_vad(
         2U,
         1U,
-        3U,
-        40,
+        5U,
+        80,
         savo_speech::vad::VadEventType::
         SpeechEnded)));
 
@@ -359,15 +404,16 @@ TEST(UtteranceSessionCore, PrependsChronologicalPreRoll)
   ASSERT_TRUE(completed.has_value());
 
   const std::vector<std::int16_t> expected{
-    100, 100, 100, 100,
-    200, 200, 200, 200,
-    300, 300, 300, 300};
+    300, 300, 300, 300,
+    400, 400, 400, 400,
+    500, 500, 500, 500};
 
   EXPECT_EQ(
     completed->audio.interleaved_samples,
     expected);
 
-  EXPECT_EQ(completed->pre_roll_samples, 8U);
+  // Only frame 3 occurred before the detected speech-start frame.
+  EXPECT_EQ(completed->pre_roll_samples, 4U);
 }
 
 TEST(UtteranceSessionCore, RecordingAppendsLaterFrames)
@@ -381,25 +427,25 @@ TEST(UtteranceSessionCore, RecordingAppendsLaterFrames)
     core.handle_wake_word_event(
       make_wake(1U, 1U, 0)));
 
+  core.process_audio_frame(
+    make_frame(2U, 200, 20));
+
   ASSERT_TRUE(
     core.handle_vad_event(
       make_vad(
         1U,
         1U,
-        1U,
-        0,
+        2U,
+        20,
         savo_speech::vad::VadEventType::
         SpeechStarted)));
-
-  core.process_audio_frame(
-    make_frame(2U, 200, 20));
 
   core.process_audio_frame(
     make_frame(3U, 300, 40));
 
   EXPECT_EQ(
     core.snapshot().active_audio_samples,
-    12U);
+    8U);
 }
 
 TEST(UtteranceSessionCore, SpeechEndCompletesUtterance)
@@ -417,26 +463,29 @@ TEST(UtteranceSessionCore, SpeechEndCompletesUtterance)
         0,
         "hi savo")));
 
-  ASSERT_TRUE(
-    core.handle_vad_event(
-      make_vad(
-        1U,
-        4U,
-        1U,
-        0,
-        savo_speech::vad::VadEventType::
-        SpeechStarted)));
-
   core.process_audio_frame(
     make_frame(2U, 200, 20));
 
   ASSERT_TRUE(
     core.handle_vad_event(
       make_vad(
-        2U,
+        1U,
         4U,
         2U,
         20,
+        savo_speech::vad::VadEventType::
+        SpeechStarted)));
+
+  core.process_audio_frame(
+    make_frame(3U, 300, 40));
+
+  ASSERT_TRUE(
+    core.handle_vad_event(
+      make_vad(
+        2U,
+        4U,
+        3U,
+        40,
         savo_speech::vad::VadEventType::
         SpeechEnded)));
 
@@ -503,20 +552,20 @@ TEST(UtteranceSessionCore, MaximumDurationCompletesRecording)
     core.handle_wake_word_event(
       make_wake(1U, 1U, 0)));
 
+  core.process_audio_frame(
+    make_frame(2U, 200, 20));
+
   ASSERT_TRUE(
     core.handle_vad_event(
       make_vad(
         1U,
         1U,
-        1U,
-        0,
+        2U,
+        20,
         savo_speech::vad::VadEventType::
         SpeechStarted)));
 
-  core.process_audio_frame(
-    make_frame(2U, 200, 20));
-
-  core.advance_time(time_at(100));
+  core.advance_time(time_at(120));
 
   const auto completed =
     core.try_pop_completed();
@@ -614,26 +663,30 @@ TEST(UtteranceSessionCore, RecordsSequenceGapMetadata)
     core.handle_wake_word_event(
       make_wake(1U, 1U, 0)));
 
+  core.process_audio_frame(
+    make_frame(2U, 200, 20));
+
   ASSERT_TRUE(
     core.handle_vad_event(
       make_vad(
         1U,
         1U,
-        1U,
-        0,
+        2U,
+        20,
         savo_speech::vad::VadEventType::
         SpeechStarted)));
 
+  // Sequence 3 is intentionally missing.
   core.process_audio_frame(
-    make_frame(3U, 300, 20));
+    make_frame(4U, 400, 40));
 
   ASSERT_TRUE(
     core.handle_vad_event(
       make_vad(
         2U,
         1U,
-        3U,
-        20,
+        4U,
+        40,
         savo_speech::vad::VadEventType::
         SpeechEnded)));
 
@@ -659,8 +712,8 @@ TEST(UtteranceSessionCore, RejectsStaleVadEvent)
       make_vad(
         2U,
         1U,
-        1U,
-        0,
+        2U,
+        20,
         savo_speech::vad::VadEventType::
         SpeechStarted)));
 
@@ -669,8 +722,8 @@ TEST(UtteranceSessionCore, RejectsStaleVadEvent)
       make_vad(
         1U,
         1U,
-        1U,
-        0,
+        2U,
+        20,
         savo_speech::vad::VadEventType::
         SpeechEnded)));
 
@@ -834,17 +887,18 @@ TEST(UtteranceSessionCore, MaximumDurationWithoutAudioCancels)
     core.handle_wake_word_event(
       make_wake(1U, 1U, 0)));
 
+  // Post-wake VAD starts, but no corresponding audio frame arrives.
   ASSERT_TRUE(
     core.handle_vad_event(
       make_vad(
         1U,
         1U,
-        1U,
-        0,
+        2U,
+        20,
         savo_speech::vad::VadEventType::
         SpeechStarted)));
 
-  core.advance_time(time_at(100));
+  core.advance_time(time_at(120));
 
   const auto snapshot = core.snapshot();
 

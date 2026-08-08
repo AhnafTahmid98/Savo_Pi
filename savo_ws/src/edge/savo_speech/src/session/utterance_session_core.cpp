@@ -213,6 +213,16 @@ bool UtteranceSessionCore::handle_wake_word_event(
 
   active_wake_event_ = event;
 
+  // The wake phrase is only an activation trigger. The current
+  // audio frame has already entered pre-roll before wake events
+  // are consumed, so discard the wake frame and all pre-wake
+  // audio here. Only post-wake audio may become user utterance
+  // audio.
+  if (pre_roll_buffer_) {
+    pre_roll_buffer_->clear();
+  }
+  pre_roll_spans_.clear();
+
   state_ = UtteranceSessionState::Armed;
 
   last_cancellation_reason_ =
@@ -265,7 +275,7 @@ bool UtteranceSessionCore::handle_vad_event(
     }
 
     if (
-      event.frame_sequence <
+      event.frame_sequence <=
       active_wake_event_->frame_sequence ||
       event.occurred_at <
       active_wake_event_->detected_at)
