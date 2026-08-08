@@ -410,9 +410,14 @@ TEST(
   ASSERT_TRUE(
     wait_until(
       [&worker]() {
+        const auto snapshot = worker.snapshot();
+
         return
-          worker.snapshot().
-          statistics.utterances_received >= 4U;
+          snapshot.statistics.utterances_received >= 4U &&
+          snapshot.statistics.duplicate_or_out_of_order_ids >= 2U &&
+          snapshot.statistics.utterances_serialized >= 2U &&
+          snapshot.last_seen_utterance_id ==
+          std::optional<std::uint64_t>{11U};
       }));
 
   const auto snapshot = worker.snapshot();
