@@ -102,14 +102,34 @@ if(BUILD_TESTING)
   target_link_libraries(test_bringup_contract savo_bringup_contract)
   target_include_directories(test_bringup_contract PRIVATE include)
 
+  # The location lifecycle runtime exercises Core-only packages such as
+  # savo_locations, savo_mapping, savo_nav, and savo_supervisor. Keep shared
+  # bringup tests role-neutral by registering that integration test only when
+  # this package is configured as part of the Core role build.
+  set(SAVO_BRINGUP_TEST_ROLE "$ENV{SAVO_ROLE}")
+  if(SAVO_BRINGUP_TEST_ROLE STREQUAL "")
+    set(SAVO_BRINGUP_TEST_ROLE "unspecified")
+  endif()
+
   file(GLOB SAVO_BRINGUP_PYTEST_FILES test/test_*.py)
   foreach(test_file ${SAVO_BRINGUP_PYTEST_FILES})
     get_filename_component(test_name ${test_file} NAME_WE)
-    ament_add_pytest_test(${test_name} ${test_file}
-      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-      APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}
-      TIMEOUT 120
+
+    if(
+      "${test_name}" STREQUAL "test_location_lifecycle_runtime"
+      AND NOT "${SAVO_BRINGUP_TEST_ROLE}" STREQUAL "core"
     )
+      message(
+        STATUS
+        "Skipping Core-only ${test_name} for role=${SAVO_BRINGUP_TEST_ROLE}"
+      )
+    else()
+      ament_add_pytest_test(${test_name} ${test_file}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}
+        TIMEOUT 120
+      )
+    endif()
   endforeach()
 
   ament_lint_auto_find_test_dependencies()
