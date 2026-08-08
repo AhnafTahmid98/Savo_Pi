@@ -956,8 +956,7 @@ bool UtteranceSessionCore::cancel_locked(
   return true;
 }
 
-void UtteranceSessionCore::
-clear_active_utterance_locked() noexcept
+void UtteranceSessionCore::clear_active_utterance_locked() noexcept
 {
   active_speech_start_.reset();
   pending_speech_end_.reset();
@@ -970,8 +969,7 @@ clear_active_utterance_locked() noexcept
   active_pre_roll_samples_ = 0U;
 }
 
-void UtteranceSessionCore::
-clear_conversation_locked() noexcept
+void UtteranceSessionCore::clear_conversation_locked() noexcept
 {
   state_ = UtteranceSessionState::Idle;
 

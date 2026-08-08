@@ -1979,10 +1979,10 @@ void SpeechNode::initialize_savomind_runtime()
         utterance_session_processor_)
       {
         const bool follow_up_started =
-          utterance_session_processor_->
-          begin_follow_up(
-            session::UtteranceSessionCore::
-            Clock::now());
+        utterance_session_processor_->
+        begin_follow_up(
+          session::UtteranceSessionCore::
+          Clock::now());
 
         if (!follow_up_started) {
           RCLCPP_WARN(
