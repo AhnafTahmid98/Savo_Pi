@@ -11,6 +11,6 @@ PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_xmllint() -> None:
-    """Run XML lint checker independent of working directory."""
+    """Run XML lint checker independent of the current working directory."""
     rc = main(argv=[str(PACKAGE_ROOT / "package.xml")])
     assert rc == 0

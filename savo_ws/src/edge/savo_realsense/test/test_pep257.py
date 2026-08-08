@@ -11,7 +11,7 @@ PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_pep257() -> None:
-    """Run pep257 on Python source files independent of working directory."""
+    """Run pep257 independent of the current working directory."""
     rc = main(
         argv=[
             str(PACKAGE_ROOT / "savo_realsense"),
