@@ -232,7 +232,7 @@ struct UiNodeConfig
 {
   std::string robot_name{"SAVO"};
   std::string framebuffer_device{"/dev/fb0"};
-  std::string touch_device{"/dev/input/event1"};
+  std::string touch_device{"/dev/input/by-path/platform-1f00088000.i2c-event"};
   std::string asset_root{""};
   std::string preview_output_dir{"/tmp/savo_ui_preview"};
 

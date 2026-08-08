@@ -2,7 +2,7 @@ savo_ui_node:
   ros__parameters:
     robot_name: "SAVO"
     framebuffer_device: "/dev/fb0"
-    touch_device: "/dev/input/event1"
+    touch_device: "/dev/input/by-path/platform-1f00088000.i2c-event"
     asset_root: ""
     preview_output_dir: "/tmp/savo_ui_preview"
 
