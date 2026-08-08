@@ -12,7 +12,8 @@ enum class UtteranceSessionState : std::uint8_t
 {
   Idle = 0U,
   Armed,
-  Recording
+  Recording,
+  AwaitingResponse
 };
 
 [[nodiscard]] constexpr std::string_view to_string(
@@ -27,6 +28,9 @@ enum class UtteranceSessionState : std::uint8_t
 
     case UtteranceSessionState::Recording:
       return "recording";
+
+    case UtteranceSessionState::AwaitingResponse:
+      return "awaiting_response";
   }
 
   return "unknown";

@@ -353,7 +353,6 @@ TEST(
 
   ASSERT_TRUE(completed.has_value());
 
-  // Wake frame 1 is deliberately absent.
   const std::vector<std::int16_t> expected{
     200, 200, 200, 200,
     300, 300, 300, 300,
@@ -370,7 +369,77 @@ TEST(
   EXPECT_EQ(
     harness.session_processor.
     snapshot().session.state,
-    SessionState::Idle);
+    SessionState::AwaitingResponse);
+}
+
+TEST(
+  UtteranceSessionProcessor,
+  ForwardsFollowUpActivationWithoutNewWake)
+{
+  Harness harness;
+
+  start_session(harness);
+
+  harness.vad_backend.push_score(0.10);
+
+  harness.process_all(
+    make_frame(4U, 400, 60));
+
+  const auto first =
+    harness.session_processor.
+    try_pop_completed();
+
+  ASSERT_TRUE(first.has_value());
+
+  ASSERT_EQ(
+    harness.session_processor.
+    snapshot().session.state,
+    SessionState::AwaitingResponse);
+
+  ASSERT_TRUE(
+    harness.session_processor.
+    begin_follow_up(
+      time_at(1000)));
+
+  ASSERT_EQ(
+    harness.session_processor.
+    snapshot().session.state,
+    SessionState::Armed);
+
+  // No new wake-word detection is injected here.
+  harness.vad_backend.push_score(0.90);
+
+  harness.process_all(
+    make_frame(5U, 500, 1020));
+
+  ASSERT_EQ(
+    harness.session_processor.
+    snapshot().session.state,
+    SessionState::Recording);
+
+  harness.vad_backend.push_score(0.10);
+
+  harness.process_all(
+    make_frame(6U, 600, 1040));
+
+  const auto second =
+    harness.session_processor.
+    try_pop_completed();
+
+  ASSERT_TRUE(second.has_value());
+
+  EXPECT_EQ(
+    second->utterance_id,
+    2U);
+
+  EXPECT_EQ(
+    second->wake_event_id,
+    first->wake_event_id);
+
+  EXPECT_EQ(
+    harness.session_processor.
+    snapshot().session.state,
+    SessionState::AwaitingResponse);
 }
 
 TEST(

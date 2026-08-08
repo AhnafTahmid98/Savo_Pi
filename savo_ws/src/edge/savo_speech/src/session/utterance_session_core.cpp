@@ -223,6 +223,12 @@ bool UtteranceSessionCore::handle_wake_word_event(
   }
   pre_roll_spans_.clear();
 
+  listening_boundary_sequence_ =
+    event.frame_sequence;
+
+  listening_started_at_ =
+    event.detected_at;
+
   state_ = UtteranceSessionState::Armed;
 
   last_cancellation_reason_ =
@@ -268,7 +274,9 @@ bool UtteranceSessionCore::handle_vad_event(
   if (event.type == vad::VadEventType::SpeechStarted) {
     if (
       state_ != UtteranceSessionState::Armed ||
-      !active_wake_event_.has_value())
+      !active_wake_event_.has_value() ||
+      !listening_boundary_sequence_.has_value() ||
+      !listening_started_at_.has_value())
     {
       ++statistics_.invalid_vad_transitions;
       return false;
@@ -276,9 +284,9 @@ bool UtteranceSessionCore::handle_vad_event(
 
     if (
       event.frame_sequence <=
-      active_wake_event_->frame_sequence ||
+      *listening_boundary_sequence_ ||
       event.occurred_at <
-      active_wake_event_->detected_at)
+      *listening_started_at_)
     {
       ++statistics_.stale_vad_events;
       return false;
@@ -337,6 +345,42 @@ bool UtteranceSessionCore::handle_vad_event(
   if (notify) {
     condition_.notify_one();
   }
+
+  return true;
+}
+
+bool UtteranceSessionCore::begin_follow_up(
+  const Clock::time_point now)
+{
+  const std::scoped_lock lock{mutex_};
+
+  if (
+    state_ !=
+    UtteranceSessionState::AwaitingResponse ||
+    !active_wake_event_.has_value())
+  {
+    return false;
+  }
+
+  // Audio accumulated while SavoMind was processing or while
+  // playback was active must never become follow-up command audio.
+  if (pre_roll_buffer_) {
+    pre_roll_buffer_->clear();
+  }
+  pre_roll_spans_.clear();
+
+  listening_boundary_sequence_ =
+    last_audio_sequence_.value_or(
+    active_wake_event_->frame_sequence);
+
+  listening_started_at_ = now;
+
+  state_ = UtteranceSessionState::Armed;
+
+  last_cancellation_reason_ =
+    UtteranceCancellationReason::None;
+
+  last_error_.clear();
 
   return true;
 }
@@ -499,7 +543,7 @@ void UtteranceSessionCore::reset() noexcept
   last_audio_captured_at_.reset();
   last_advanced_time_.reset();
 
-  clear_active_session_locked();
+  clear_conversation_locked();
 
   completed_utterances_.clear();
 
@@ -815,7 +859,16 @@ bool UtteranceSessionCore::finalize_locked(
   enqueue_completed_locked(
     std::move(utterance));
 
-  clear_active_session_locked();
+  // The user turn is complete, but the wake conversation remains
+  // active until playback completes and the follow-up window is
+  // explicitly opened.
+  clear_active_utterance_locked();
+
+  listening_boundary_sequence_.reset();
+  listening_started_at_.reset();
+
+  state_ =
+    UtteranceSessionState::AwaitingResponse;
 
   return true;
 }
@@ -825,10 +878,11 @@ bool UtteranceSessionCore::check_timeouts_locked(
 {
   if (
     state_ == UtteranceSessionState::Armed &&
-    active_wake_event_.has_value())
+    active_wake_event_.has_value() &&
+    listening_started_at_.has_value())
   {
     const auto deadline =
-      active_wake_event_->detected_at +
+      *listening_started_at_ +
       config_.speech_start_timeout;
 
     if (now >= deadline) {
@@ -897,16 +951,14 @@ bool UtteranceSessionCore::cancel_locked(
 
   last_cancellation_reason_ = reason;
 
-  clear_active_session_locked();
+  clear_conversation_locked();
 
   return true;
 }
 
-void UtteranceSessionCore::clear_active_session_locked() noexcept
+void UtteranceSessionCore::
+clear_active_utterance_locked() noexcept
 {
-  state_ = UtteranceSessionState::Idle;
-
-  active_wake_event_.reset();
   active_speech_start_.reset();
   pending_speech_end_.reset();
 
@@ -916,6 +968,19 @@ void UtteranceSessionCore::clear_active_session_locked() noexcept
   active_spans_.clear();
 
   active_pre_roll_samples_ = 0U;
+}
+
+void UtteranceSessionCore::
+clear_conversation_locked() noexcept
+{
+  state_ = UtteranceSessionState::Idle;
+
+  active_wake_event_.reset();
+
+  listening_boundary_sequence_.reset();
+  listening_started_at_.reset();
+
+  clear_active_utterance_locked();
 }
 
 void UtteranceSessionCore::enqueue_completed_locked(

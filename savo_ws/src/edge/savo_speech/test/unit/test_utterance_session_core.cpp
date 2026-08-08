@@ -121,19 +121,18 @@ make_config()
   return config;
 }
 
-void complete_one_utterance(
+void complete_initial_utterance(
   Core & core,
   const std::uint64_t wake_id,
   const std::uint64_t vad_start_id,
   const std::uint64_t vad_end_id,
   const std::uint64_t segment_id,
-  const std::uint64_t first_sequence,
+  const std::uint64_t wake_sequence,
   const std::int64_t base_time)
 {
-  // Wake frame: activation only.
   core.process_audio_frame(
     make_frame(
-      first_sequence,
+      wake_sequence,
       100,
       base_time));
 
@@ -141,13 +140,12 @@ void complete_one_utterance(
     core.handle_wake_word_event(
       make_wake(
         wake_id,
-        first_sequence,
+        wake_sequence,
         base_time)));
 
-  // First post-wake command frame.
   core.process_audio_frame(
     make_frame(
-      first_sequence + 1U,
+      wake_sequence + 1U,
       200,
       base_time + 20));
 
@@ -156,7 +154,7 @@ void complete_one_utterance(
       make_vad(
         vad_start_id,
         segment_id,
-        first_sequence + 1U,
+        wake_sequence + 1U,
         base_time + 20,
         savo_speech::vad::VadEventType::
         SpeechStarted)));
@@ -166,10 +164,65 @@ void complete_one_utterance(
       make_vad(
         vad_end_id,
         segment_id,
-        first_sequence + 1U,
+        wake_sequence + 1U,
         base_time + 20,
         savo_speech::vad::VadEventType::
         SpeechEnded)));
+
+  ASSERT_EQ(
+    core.snapshot().state,
+    State::AwaitingResponse);
+}
+
+void complete_follow_up_utterance(
+  Core & core,
+  const std::uint64_t vad_start_id,
+  const std::uint64_t vad_end_id,
+  const std::uint64_t segment_id,
+  const std::uint64_t frame_sequence,
+  const std::int64_t follow_up_started_at)
+{
+  ASSERT_EQ(
+    core.snapshot().state,
+    State::AwaitingResponse);
+
+  ASSERT_TRUE(
+    core.begin_follow_up(
+      time_at(follow_up_started_at)));
+
+  ASSERT_EQ(
+    core.snapshot().state,
+    State::Armed);
+
+  core.process_audio_frame(
+    make_frame(
+      frame_sequence,
+      300,
+      follow_up_started_at + 20));
+
+  ASSERT_TRUE(
+    core.handle_vad_event(
+      make_vad(
+        vad_start_id,
+        segment_id,
+        frame_sequence,
+        follow_up_started_at + 20,
+        savo_speech::vad::VadEventType::
+        SpeechStarted)));
+
+  ASSERT_TRUE(
+    core.handle_vad_event(
+      make_vad(
+        vad_end_id,
+        segment_id,
+        frame_sequence,
+        follow_up_started_at + 20,
+        savo_speech::vad::VadEventType::
+        SpeechEnded)));
+
+  ASSERT_EQ(
+    core.snapshot().state,
+    State::AwaitingResponse);
 }
 
 }  // namespace
@@ -495,6 +548,7 @@ TEST(UtteranceSessionCore, SpeechEndCompletesUtterance)
   ASSERT_TRUE(completed.has_value());
 
   EXPECT_EQ(completed->utterance_id, 1U);
+  EXPECT_EQ(completed->wake_event_id, 1U);
   EXPECT_EQ(completed->wake_phrase, "hi savo");
   EXPECT_EQ(completed->vad_segment_id, 4U);
 
@@ -502,15 +556,27 @@ TEST(UtteranceSessionCore, SpeechEndCompletesUtterance)
     completed->completion_reason,
     CompletionReason::SpeechEnded);
 
-  EXPECT_TRUE(completed->audio.is_consistent());
-  EXPECT_EQ(core.snapshot().state, State::Idle);
+  EXPECT_TRUE(
+    completed->audio.is_consistent());
+
+  const auto snapshot = core.snapshot();
+
+  EXPECT_EQ(
+    snapshot.state,
+    State::AwaitingResponse);
+
+  EXPECT_EQ(
+    snapshot.active_wake_phrase,
+    "hi savo");
 }
 
-TEST(UtteranceSessionCore, AssignsStableUtteranceIds)
+TEST(
+  UtteranceSessionCore,
+  AwaitingResponseDoesNotConsumeListeningTimeout)
 {
   Core core{make_config()};
 
-  complete_one_utterance(
+  complete_initial_utterance(
     core,
     1U,
     1U,
@@ -519,9 +585,197 @@ TEST(UtteranceSessionCore, AssignsStableUtteranceIds)
     1U,
     0);
 
-  complete_one_utterance(
+  // Simulate a long SavoMind/TTS operation. The listening timeout
+  // must not run while the robot is processing or speaking.
+  core.advance_time(
+    time_at(5000));
+
+  EXPECT_EQ(
+    core.snapshot().state,
+    State::AwaitingResponse);
+
+  EXPECT_EQ(
+    core.snapshot().statistics.
+    speech_start_timeouts,
+    0U);
+}
+
+TEST(
+  UtteranceSessionCore,
+  FollowUpTimeoutStartsAfterPlaybackCompletion)
+{
+  Core core{make_config()};
+
+  complete_initial_utterance(
     core,
+    1U,
+    1U,
     2U,
+    1U,
+    1U,
+    0);
+
+  ASSERT_TRUE(
+    core.begin_follow_up(
+      time_at(1000)));
+
+  EXPECT_EQ(
+    core.snapshot().state,
+    State::Armed);
+
+  core.advance_time(
+    time_at(1099));
+
+  EXPECT_EQ(
+    core.snapshot().state,
+    State::Armed);
+
+  core.advance_time(
+    time_at(1100));
+
+  const auto snapshot =
+    core.snapshot();
+
+  EXPECT_EQ(
+    snapshot.state,
+    State::Idle);
+
+  EXPECT_EQ(
+    snapshot.last_cancellation_reason,
+    CancellationReason::SpeechStartTimeout);
+
+  EXPECT_TRUE(
+    snapshot.active_wake_phrase.empty());
+}
+
+TEST(
+  UtteranceSessionCore,
+  FollowUpPreservesWakeConversationAndClearsOldAudio)
+{
+  Core core{make_config()};
+
+  complete_initial_utterance(
+    core,
+    1U,
+    1U,
+    2U,
+    1U,
+    1U,
+    0);
+
+  const auto first =
+    core.try_pop_completed();
+
+  ASSERT_TRUE(first.has_value());
+
+  // Audio received while SavoMind is processing must not leak into
+  // the next user command.
+  core.process_audio_frame(
+    make_frame(
+      3U,
+      999,
+      500));
+
+  ASSERT_TRUE(
+    core.begin_follow_up(
+      time_at(1000)));
+
+  core.process_audio_frame(
+    make_frame(
+      4U,
+      400,
+      1020));
+
+  ASSERT_TRUE(
+    core.handle_vad_event(
+      make_vad(
+        3U,
+        2U,
+        4U,
+        1020,
+        savo_speech::vad::VadEventType::
+        SpeechStarted)));
+
+  ASSERT_TRUE(
+    core.handle_vad_event(
+      make_vad(
+        4U,
+        2U,
+        4U,
+        1020,
+        savo_speech::vad::VadEventType::
+        SpeechEnded)));
+
+  const auto second =
+    core.try_pop_completed();
+
+  ASSERT_TRUE(second.has_value());
+
+  EXPECT_EQ(
+    second->utterance_id,
+    2U);
+
+  EXPECT_EQ(
+    second->wake_event_id,
+    first->wake_event_id);
+
+  EXPECT_EQ(
+    second->wake_phrase,
+    first->wake_phrase);
+
+  const std::vector<std::int16_t> expected{
+    400, 400, 400, 400};
+
+  EXPECT_EQ(
+    second->audio.interleaved_samples,
+    expected);
+
+  EXPECT_EQ(
+    core.snapshot().state,
+    State::AwaitingResponse);
+}
+
+TEST(
+  UtteranceSessionCore,
+  RejectsFollowUpOutsideAwaitingResponse)
+{
+  Core core{make_config()};
+
+  EXPECT_FALSE(
+    core.begin_follow_up(
+      time_at(0)));
+
+  ASSERT_TRUE(
+    core.handle_wake_word_event(
+      make_wake(
+        1U,
+        1U,
+        0)));
+
+  EXPECT_FALSE(
+    core.begin_follow_up(
+      time_at(20)));
+
+  EXPECT_EQ(
+    core.snapshot().state,
+    State::Armed);
+}
+
+TEST(UtteranceSessionCore, AssignsStableUtteranceIds)
+{
+  Core core{make_config()};
+
+  complete_initial_utterance(
+    core,
+    1U,
+    1U,
+    2U,
+    1U,
+    1U,
+    0);
+
+  complete_follow_up_utterance(
+    core,
     3U,
     4U,
     2U,
@@ -539,6 +793,15 @@ TEST(UtteranceSessionCore, AssignsStableUtteranceIds)
 
   EXPECT_EQ(first->utterance_id, 1U);
   EXPECT_EQ(second->utterance_id, 2U);
+
+  // Both turns belong to the same wake conversation.
+  EXPECT_EQ(
+    first->wake_event_id,
+    second->wake_event_id);
+
+  EXPECT_EQ(
+    first->wake_phrase,
+    second->wake_phrase);
 }
 
 TEST(UtteranceSessionCore, MaximumDurationCompletesRecording)
@@ -770,14 +1033,30 @@ TEST(UtteranceSessionCore, DropsOldestCompletedUtterance)
 {
   Core core{make_config()};
 
-  complete_one_utterance(
-    core, 1U, 1U, 2U, 1U, 1U, 0);
+  complete_initial_utterance(
+    core,
+    1U,
+    1U,
+    2U,
+    1U,
+    1U,
+    0);
 
-  complete_one_utterance(
-    core, 2U, 3U, 4U, 2U, 3U, 100);
+  complete_follow_up_utterance(
+    core,
+    3U,
+    4U,
+    2U,
+    3U,
+    100);
 
-  complete_one_utterance(
-    core, 3U, 5U, 6U, 3U, 5U, 200);
+  complete_follow_up_utterance(
+    core,
+    5U,
+    6U,
+    3U,
+    4U,
+    200);
 
   const auto first =
     core.try_pop_completed();
@@ -790,6 +1069,16 @@ TEST(UtteranceSessionCore, DropsOldestCompletedUtterance)
 
   EXPECT_EQ(first->utterance_id, 2U);
   EXPECT_EQ(second->utterance_id, 3U);
+
+  // Queueing multiple follow-up turns must not create new wake
+  // conversations.
+  EXPECT_EQ(
+    first->wake_event_id,
+    1U);
+
+  EXPECT_EQ(
+    second->wake_event_id,
+    1U);
 
   const auto statistics =
     core.snapshot().statistics;

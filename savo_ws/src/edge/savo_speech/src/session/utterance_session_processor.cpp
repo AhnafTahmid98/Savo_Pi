@@ -198,6 +198,15 @@ bool UtteranceSessionProcessor::cancel(
   return session_core_.cancel(reason);
 }
 
+bool UtteranceSessionProcessor::begin_follow_up(
+  const UtteranceSessionCore::Clock::time_point now)
+{
+  const std::scoped_lock lock{
+    operation_mutex_};
+
+  return session_core_.begin_follow_up(now);
+}
+
 std::optional<CompletedUtterance>
 UtteranceSessionProcessor::try_pop_completed()
 {

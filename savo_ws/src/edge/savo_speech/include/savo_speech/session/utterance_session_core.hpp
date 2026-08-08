@@ -142,6 +142,9 @@ public:
   [[nodiscard]] bool handle_vad_event(
     const vad::VadEvent & event);
 
+  [[nodiscard]] bool begin_follow_up(
+    Clock::time_point now);
+
   void advance_time(
     Clock::time_point now);
 
@@ -199,7 +202,8 @@ private:
   [[nodiscard]] bool cancel_locked(
     UtteranceCancellationReason reason);
 
-  void clear_active_session_locked() noexcept;
+  void clear_active_utterance_locked() noexcept;
+  void clear_conversation_locked() noexcept;
 
   void enqueue_completed_locked(
     CompletedUtterance utterance);
@@ -232,6 +236,15 @@ private:
 
   std::optional<Clock::time_point>
   last_advanced_time_{};
+
+  // The listening boundary is independent from the original
+  // wake event. Initial listening begins at wake detection;
+  // follow-up listening begins only after playback completes.
+  std::optional<std::uint64_t>
+  listening_boundary_sequence_{};
+
+  std::optional<Clock::time_point>
+  listening_started_at_{};
 
   std::optional<wake_word::WakeWordEvent>
   active_wake_event_{};

@@ -1971,6 +1971,40 @@ void SpeechNode::initialize_savomind_runtime()
     *audio_runtime_,
     worker_config,
     [this](const transport::RoundTripEvent & event) {
+      // A follow-up window starts only after physical playback
+      // completed and its acknowledgement succeeded.
+      if (
+        event.state ==
+        transport::RoundTripState::Completed &&
+        utterance_session_processor_)
+      {
+        const bool follow_up_started =
+          utterance_session_processor_->
+          begin_follow_up(
+            session::UtteranceSessionCore::
+            Clock::now());
+
+        if (!follow_up_started) {
+          RCLCPP_WARN(
+            get_logger(),
+            "SavoMind playback completed but "
+            "follow-up listening could not be armed");
+        }
+      }
+
+      // A failed round trip ends the active conversation instead
+      // of leaving Savo permanently waiting for a follow-up.
+      if (
+        event.state ==
+        transport::RoundTripState::Faulted &&
+        utterance_session_processor_)
+      {
+        static_cast<void>(
+          utterance_session_processor_->cancel(
+            session::UtteranceCancellationReason::
+            ExplicitCancellation));
+      }
+
       enqueue_savomind_event(event);
     });
 
@@ -2063,9 +2097,9 @@ void SpeechNode::process_savomind_events()
         break;
       case transport::RoundTripState::Completed:
         {
-          phase_ = session::SpeechPhase::Idle;
+          phase_ = session::SpeechPhase::Listening;
           error_ = session::SpeechError::None;
-          reason_ = "savomind_round_trip_completed";
+          reason_ = "follow_up_listening";
           std_msgs::msg::String finished;
           finished.data = "request_id=" + event.request_id + ";status=completed";
           playback_finished_publisher_->publish(finished);
@@ -2350,6 +2384,10 @@ void SpeechNode::refresh_runtime_state()
 
               case session::UtteranceSessionState::Recording:
                 phase_ = session::SpeechPhase::Recording;
+                break;
+
+              case session::UtteranceSessionState::AwaitingResponse:
+                phase_ = session::SpeechPhase::Processing;
                 break;
             }
 

@@ -83,6 +83,9 @@ public:
     UtteranceCancellationReason::
     ExplicitCancellation);
 
+  [[nodiscard]] bool begin_follow_up(
+    UtteranceSessionCore::Clock::time_point now);
+
   [[nodiscard]] std::optional<CompletedUtterance>
   try_pop_completed();
 
