@@ -247,29 +247,63 @@ struct Harness
 void start_session(
   Harness & harness)
 {
+  // The wake phrase activates the session but must not become
+  // command audio.
   harness.wake_backend.push_detection();
   harness.vad_backend.push_score(0.90);
 
   harness.process_all(
     make_frame(1U, 100, 0));
+
+  ASSERT_EQ(
+    harness.session_processor.
+    snapshot().session.state,
+    SessionState::Armed);
+
+  // End the wake phrase's VAD segment. The session remains armed
+  // and waits for a separate post-wake command.
+  harness.vad_backend.push_score(0.10);
+
+  harness.process_all(
+    make_frame(2U, 200, 20));
+
+  ASSERT_EQ(
+    harness.session_processor.
+    snapshot().session.state,
+    SessionState::Armed);
+
+  // The actual user command begins after the wake boundary.
+  harness.vad_backend.push_score(0.90);
+
+  harness.process_all(
+    make_frame(3U, 300, 40));
+
+  ASSERT_EQ(
+    harness.session_processor.
+    snapshot().session.state,
+    SessionState::Recording);
 }
 
 }  // namespace
 
 TEST(
   UtteranceSessionProcessor,
-  RoutesWakeAndVadStartFromSameFrame)
+  WakeFrameArmsSessionAndRejectsVadStart)
 {
   Harness harness;
 
-  start_session(harness);
+  harness.wake_backend.push_detection();
+  harness.vad_backend.push_score(0.90);
+
+  harness.process_all(
+    make_frame(1U, 100, 0));
 
   const auto snapshot =
     harness.session_processor.snapshot();
 
   EXPECT_EQ(
     snapshot.session.state,
-    SessionState::Recording);
+    SessionState::Armed);
 
   EXPECT_EQ(
     snapshot.statistics.frames_completed,
@@ -289,7 +323,15 @@ TEST(
 
   EXPECT_EQ(
     snapshot.statistics.vad_events_accepted,
+    0U);
+
+  EXPECT_EQ(
+    snapshot.statistics.vad_events_rejected,
     1U);
+
+  EXPECT_FALSE(
+    harness.session_processor.
+    try_pop_completed().has_value());
 }
 
 TEST(
@@ -303,7 +345,7 @@ TEST(
   harness.vad_backend.push_score(0.10);
 
   harness.process_all(
-    make_frame(2U, 200, 20));
+    make_frame(4U, 400, 60));
 
   const auto completed =
     harness.session_processor.
@@ -311,9 +353,11 @@ TEST(
 
   ASSERT_TRUE(completed.has_value());
 
+  // Wake frame 1 is deliberately absent.
   const std::vector<std::int16_t> expected{
-    100, 100, 100, 100,
-    200, 200, 200, 200};
+    200, 200, 200, 200,
+    300, 300, 300, 300,
+    400, 400, 400, 400};
 
   EXPECT_EQ(
     completed->audio.interleaved_samples,
@@ -392,7 +436,7 @@ TEST(
 
 TEST(
   UtteranceSessionProcessor,
-  DrainsQueuedEventsInDeterministicOrder)
+  DrainsQueuedWakeSegmentEventsInDeterministicOrder)
 {
   Harness harness;
 
@@ -412,6 +456,7 @@ TEST(
 
   harness.wake_processor.process(second);
 
+  // These VAD transitions belong to the wake phrase itself.
   harness.vad_backend.push_score(0.90);
   harness.vad_processor.process(first);
 
@@ -439,14 +484,23 @@ TEST(
     snapshot.statistics.vad_events_drained,
     2U);
 
+  // Neither wake-segment VAD transition is command speech.
   EXPECT_EQ(
     snapshot.statistics.vad_events_accepted,
+    0U);
+
+  EXPECT_EQ(
+    snapshot.statistics.vad_events_rejected,
     2U);
 
   EXPECT_EQ(
     snapshot.session.statistics.
     utterances_completed,
-    1U);
+    0U);
+
+  EXPECT_EQ(
+    snapshot.session.state,
+    SessionState::Armed);
 }
 
 TEST(
@@ -460,7 +514,7 @@ TEST(
   harness.vad_backend.push_score(0.10);
 
   harness.process_all(
-    make_frame(2U, 200, 20));
+    make_frame(4U, 400, 60));
 
   const auto completed =
     harness.session_processor.
@@ -600,8 +654,10 @@ TEST(
 
   start_session(harness);
 
+  // Command speech began at 40 ms. Reaching 140 ms therefore
+  // reaches the configured 100 ms maximum duration.
   harness.session_processor.process(
-    make_frame(2U, 200, 100));
+    make_frame(4U, 400, 140));
 
   const auto completed =
     harness.session_processor.
