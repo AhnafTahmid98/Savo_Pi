@@ -83,7 +83,7 @@ SCAN360_HASHES = {
     'test/test_scan360_controller.cpp':
         '46fada4afbe74ba6c3cb498a545d2661e5ab915f9bec5f6a8893aec79c5c9e72',
     'test/test_scan360_deployment_assets_contract.py':
-        '2d84b5d08e7ca65cf66ff15ed91e60774597f2d82f6a64d07e1ac1d63b77f485',
+        '4c4954ca71fedb5f06895af44739688d43b439db32e092c7c849d5dbbdb1a157',
     'test/test_scan360_launch_runtime.py':
         'b1dbb51a11afde97e34015d854c8b13e3ec20dcdba94a2833d35be3eb27802e9',
     'test/test_scan360_mapper_node_contract.py':
