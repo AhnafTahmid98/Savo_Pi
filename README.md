@@ -195,7 +195,7 @@ Package-local `README.md` files document implementation details. Cross-package d
 
 ## Project status
 
-The source tree has completed its pre-real-test closure and passes the full-bringup and observer source validators. The current exported snapshot still requires target dependency resolution, clean role-specific builds/tests, locked physical geometry, and staged hardware validation before production motion.
+The source tree has completed its pre-real-test closure and Phase 3 package-documentation reconciliation. All 20 ROS 2 packages now have central source-backed integration pages. The current checkout still requires target dependency resolution, clean role-specific builds/tests, locked physical geometry, and staged hardware validation before production motion.
 
 See [Current system status](docs/status/current_system_status.md) for the evidence, blockers, and next gate.
 

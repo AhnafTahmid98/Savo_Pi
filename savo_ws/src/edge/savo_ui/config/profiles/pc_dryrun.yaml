@@ -1,0 +1,12 @@
+# =============================================================================
+# Robot Savo — UI V2 PC Dry-Run Profile
+#
+# Software-only validation profile.
+# The physical framebuffer is not opened.
+# Representative Voice and Navigation frames are exported for inspection.
+# =============================================================================
+
+savo_ui_v2_node:
+  ros__parameters:
+    enable_framebuffer: false
+    export_preview_frames: true

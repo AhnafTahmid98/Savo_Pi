@@ -1,0 +1,28 @@
+savo_ui_v2_node:
+  ros__parameters:
+    framebuffer_device: "/dev/fb0"
+    preview_output_dir: "/tmp/savo_ui_v2_preview"
+
+    # auto: voice wins while listening/thinking/speaking; navigation wins while active.
+    # voice/navigation: useful for isolated display testing.
+    page_mode: "auto"
+
+    screen_width: 800
+    screen_height: 480
+    loop_hz: 30.0
+    arrived_hold_seconds: 4.0
+
+    enable_framebuffer: false
+    export_preview_frames: true
+
+    # Voice: read-only subscriptions to the existing production speech package.
+    speech_state_topic: "/savo_speech/state"
+    speech_dashboard_topic: "/savo_speech/dashboard"
+    playback_state_topic: "/savo_speech/playback/state"
+
+    # Navigation: phase-6 goal-gateway observer topics plus legacy status fallback.
+    navigation_state_topic: "/savo_nav/navigation/state"
+    navigation_status_topic: "/savo_nav/navigation/status"
+    navigation_feedback_topic: "/savo_nav/navigation/feedback"
+    navigation_result_topic: "/savo_nav/navigation/result"
+    navigation_legacy_status_topic: "/savo_nav/status"

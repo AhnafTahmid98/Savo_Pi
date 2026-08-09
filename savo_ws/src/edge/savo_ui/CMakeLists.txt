@@ -51,6 +51,68 @@ ament_target_dependencies(ui_node
   savo_msgs
 )
 
+# Alternative UI v2. The existing ui_node target above remains unchanged.
+add_executable(ui_v2_node
+  src/v2/main_ui_v2.cpp
+  src/v2/ui_v2_node.cpp
+  src/v2/graphics.cpp
+  src/v2/voice_face_animation.cpp
+  src/v2/voice_face_renderer.cpp
+  src/v2/navigation_renderer.cpp
+  src/render/canvas.cpp
+  src/render/font.cpp
+  src/render/image_asset.cpp
+  src/platform/framebuffer_display.cpp
+)
+
+target_include_directories(ui_v2_node
+  PRIVATE
+    include
+)
+
+target_compile_features(ui_v2_node
+  PRIVATE
+    cxx_std_17
+)
+
+ament_target_dependencies(ui_v2_node
+  rclcpp
+  std_msgs
+)
+
+install(TARGETS
+  ui_v2_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+# PC-only visual animation preview for UI v2.
+# It reuses the real v2 renderers but does not access /dev/fb0 or ROS topics.
+add_executable(ui_v2_animation_preview
+  src/v2/ui_v2_animation_preview.cpp
+  src/v2/graphics.cpp
+  src/v2/voice_face_animation.cpp
+  src/v2/voice_face_renderer.cpp
+  src/v2/navigation_renderer.cpp
+  src/render/canvas.cpp
+  src/render/image_asset.cpp
+)
+
+target_include_directories(ui_v2_animation_preview
+  PRIVATE
+    include
+)
+
+target_compile_features(ui_v2_animation_preview
+  PRIVATE
+    cxx_std_17
+)
+
+install(TARGETS
+  ui_v2_animation_preview
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+
 install(TARGETS
   ui_node
   DESTINATION lib/${PROJECT_NAME}
@@ -113,6 +175,10 @@ if(BUILD_TESTING)
   ament_add_pytest_test(
     test_ui_integration_contract
     test/test_ui_integration_contract.py
+  )
+  ament_add_pytest_test(
+    test_ui_v2_contract
+    test/test_ui_v2_contract.py
   )
   ament_lint_auto_find_test_dependencies()
 

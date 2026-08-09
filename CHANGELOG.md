@@ -4,6 +4,27 @@ All notable changes to the Robot Savo repository should be recorded in this file
 
 The project does not yet use tagged semantic releases consistently. Entries are therefore grouped by date. This initial changelog was reconstructed from dated repository documents and the current source snapshot because the inspected exported ZIP does not contain Git history.
 
+## 2026-08-09 — Phase 3 package documentation
+
+### Added — central package pages
+
+* Completed one source-reconciled central integration page for each of the 20 real ROS 2 packages under `docs/packages/`.
+* Added the previously missing pages for bridge, head, LiDAR, locations, messages, observer, power, RealSense, and supervisor.
+
+### Changed — package documentation reconciliation
+
+* Replaced package placeholders and the contaminated visual-odometry page with implementation-specific deployment, node, interface, TF, safety, persistence, build, and validation documentation.
+* Reconciled stale package claims against current C++/Python authority paths, launch/configuration, deployment arrays, interface definitions, and validators.
+* Normalized Core/Edge/observer ownership and permission-versus-execution boundaries; preserved operator-only release/location approval and the fail-closed motion chain.
+* Restored `docs/README.md` from a concatenated file dump to a navigable documentation index.
+* Corrected the non-package `future/` staging-tree description and recorded the current optional UI v2 workspace path without changing its classic production default.
+
+### Validation
+
+* Confirmed exact coverage: 20 package manifests and 20 matching central pages, with no `savo_intent` page.
+* Checked repository Markdown relative links and required source validators; detailed results are reported with the Phase 3 handoff.
+* Ran `git diff --check` and audited all package pages for interface, authority, TF, deployment, and validation terminology consistency.
+
 ## 2026-08-06 — Documentation foundation and role truth
 
 ### Added
@@ -24,7 +45,7 @@ The project does not yet use tagged semantic releases consistently. Entries are 
 
 * Removed the obsolete `docs/packages/savo_intent.md` page. There is no `savo_intent` ROS package in the current workspace; intent/LLM reasoning belongs to SavoMind and approved robot requests cross through `savo_bridge`.
 
-### Validation
+### Validation — 2026-08-06 inspection
 
 * `deploy/common/validate_full_bringup.sh`: PASS.
 * `deploy/observer/validate_observer.sh`: PASS.

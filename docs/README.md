@@ -1,429 +1,119 @@
-# Robot Savo Package Ownership Matrix
-
-**Snapshot date:** 2026-08-06
-**Workspace:** ROS 2 Jazzy
-**Package count:** 20
-
-This document defines package placement, deployment membership, primary runtime host, and authority boundaries for the current `Savo_Pi` workspace.
-
-The authoritative build membership is implemented in:
-
-* `deploy/core/env_core.sh`
-* `deploy/edge/env_edge.sh`
-
-Package manifests, launch files, CMake/setup files, and runtime code define the implementation. This matrix is the cross-package reference for maintainers and deployment tooling.
-
-## Source layout
-
-```text
-savo_ws/src/
-├── core/
-│   ├── savo_base
-│   ├── savo_control
-│   ├── savo_head
-│   ├── savo_lidar
-│   ├── savo_localization
-│   ├── savo_locations
-│   ├── savo_mapping
-│   └── savo_nav
-├── edge/
-│   ├── savo_realsense
-│   ├── savo_speech
-│   ├── savo_ui
-│   └── savo_vo
-└── shared/
-    ├── savo_bridge
-    ├── savo_bringup
-    ├── savo_description
-    ├── savo_msgs
-    ├── savo_observer
-    ├── savo_perception
-    ├── savo_power
-    └── savo_supervisor
-```
-
-Folder placement describes ownership and reuse; it does not by itself mean that a package runs on both Pis. Runtime membership is controlled by the role arrays and launch arguments.
-
-## Deployment sets
-
-### Core build set
-
-`SAVO_CORE_BUILD_PACKAGES` contains 14 packages:
-
-```text
-savo_msgs
-savo_description
-savo_bringup
-savo_perception
-savo_power
-savo_supervisor
-savo_base
-savo_control
-savo_lidar
-savo_localization
-savo_locations
-savo_mapping
-savo_nav
-savo_head
-```
-
-### Edge build set
-
-`SAVO_EDGE_BUILD_PACKAGES` contains 10 packages:
-
-```text
-savo_msgs
-savo_description
-savo_bringup
-savo_bridge
-savo_perception
-savo_power
-savo_realsense
-savo_speech
-savo_ui
-savo_vo
-```
-
-### Observer build set
-
-The observer workstation builds through:
-
-```bash
-colcon build --packages-up-to savo_observer --symlink-install
-```
-
-`savo_observer` is intentionally not part of the Core or Edge production role arrays. It is a read-only operator surface.
-
-## Complete ownership matrix
-
-| Package                                                                   | Version | Source folder | Production deployment               | Primary ownership                                                                                                                                           |
-| ------------------------------------------------------------------------- | ------: | ------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`savo_base`](../../savo_ws/src/core/savo_base/README.md)                 |   0.1.0 | `core/`       | Core                                | Final drivetrain execution, mecanum mixing, motor-board access, command watchdog, base state, and base diagnostics                                          |
-| [`savo_control`](../../savo_ws/src/core/savo_control/README.md)           |   0.1.0 | `core/`       | Core                                | Control mode, command selection/shaping, bounded rotation and approach control, stuck detection, and recovery coordination                                  |
-| [`savo_head`](../../savo_ws/src/core/savo_head/README.md)                 |   0.1.0 | `core/`       | Core                                | Pan/tilt actuation, Pi Camera stream ownership, head scan behavior, dynamic head TF, and AprilTag confirmation                                              |
-| [`savo_lidar`](../../savo_ws/src/core/savo_lidar/README.md)               |   0.1.0 | `core/`       | Core                                | RPLIDAR A1 serial ownership, `/scan` production, filtering, watchdogs, health, and mapping/navigation-ready scan output                                     |
-| [`savo_localization`](../../savo_ws/src/core/savo_localization/README.md) |   0.1.0 | `core/`       | Core                                | BNO055 IMU, four-wheel encoder odometry, EKF integration, localization state, and localization health                                                       |
-| [`savo_locations`](../../savo_ws/src/core/savo_locations/README.md)       |  0.14.0 | `core/`       | Core                                | Authoritative semantic-location registry, candidate lifecycle, SQLite persistence, release identity, and typed location services                            |
-| [`savo_mapping`](../../savo_ws/src/core/savo_mapping/README.md)           |   0.1.0 | `core/`       | Core                                | Mapping modes, SLAM workflow, exploration/coverage orchestration, map saving, quality evaluation, semantic registration, and production-map release         |
-| [`savo_nav`](../../savo_ws/src/core/savo_nav/README.md)                   |   0.1.0 | `core/`       | Core                                | Nav2 orchestration, production-map activation, readiness, goal admission, named-location navigation, and controlled recovery integration                    |
-| [`savo_realsense`](../../savo_ws/src/edge/savo_realsense/README.md)       |   0.1.0 | `edge/`       | Edge                                | Intel RealSense D435 launch/configuration, stream health, camera topic monitoring, and front-depth extraction                                               |
-| [`savo_speech`](../../savo_ws/src/edge/savo_speech/README.md)             |   0.1.0 | `edge/`       | Edge, optional at startup           | ReSpeaker capture, wake/VAD/utterance handling, bounded SavoMind speech transport, returned-audio validation, playback, microphone gating, and speech state |
-| [`savo_ui`](../../savo_ws/src/edge/savo_ui/README.md)                     |   0.1.0 | `edge/`       | Edge, optional at startup           | Read-only 800×480 framebuffer UI for robot state, safety, navigation, mapping, locations, speech, and power presentation                                    |
-| [`savo_vo`](../../savo_ws/src/edge/savo_vo/README.md)                     |   0.1.0 | `edge/`       | Edge                                | RGB-D visual odometry production, VO health, diagnostics, and odometry republishing                                                                         |
-| [`savo_bridge`](../../savo_ws/src/shared/savo_bridge/README.md)           |   0.1.0 | `shared/`     | Edge                                | Typed and bounded ROS 2 ↔ SavoMind observation/command boundary; fail-closed STOP, cancellation, teleoperation, navigation, mapping, and query adapters     |
-| [`savo_bringup`](../../savo_ws/src/shared/savo_bringup/README.md)         |   0.6.0 | `shared/`     | Core and Edge                       | Distributed launch orchestration, role selection, mode/profile validation, and independent Core/Edge readiness aggregation                                  |
-| [`savo_description`](../../savo_ws/src/shared/savo_description/README.md) |   0.1.0 | `shared/`     | Core and Edge; observer dependency  | URDF/Xacro, fixed robot TF, geometry profile, wheel/sensor frames, generated footprint, RViz assets, and geometry validation                                |
-| [`savo_msgs`](../../savo_ws/src/shared/savo_msgs/README.md)               |   0.9.0 | `shared/`     | Core and Edge; interface dependency | Shared ROS 2 messages, services, and actions for status, navigation, AprilTags, locations, mapping missions, authority, and release contracts               |
-| [`savo_observer`](../../savo_ws/src/shared/savo_observer/README.md)       |   0.1.0 | `shared/`     | Operator workstation                | Read-only telemetry, browser dashboard, RViz profiles, connection checks, and bounded observer views                                                        |
-| [`savo_perception`](../../savo_ws/src/shared/savo_perception/README.md)   |   0.1.0 | `shared/`     | Core and Edge                       | Core: ToF/ultrasonic safety fusion and command gate. Edge: optional filtered D435 obstacle-cloud producer. C++ is the production path                       |
-| [`savo_power`](../../savo_ws/src/shared/savo_power/README.md)             |   0.1.0 | `shared/`     | Core and Edge                       | Role-specific UPS monitoring, base-battery monitoring, aggregate power state, health, diagnostics, and shutdown requests                                    |
-| [`savo_supervisor`](../../savo_ws/src/shared/savo_supervisor/README.md)   |   0.1.0 | `shared/`     | Core                                | Robot-wide readiness, mission authority, startup arming, fault latching, persistent system state, map-context authorization, and controlled shutdown        |
-
-## Authority boundaries
-
-### Motion execution
-
-```text
-Approved command source
-        ↓
-savo_control
-        ↓
-savo_perception command safety gate
-        ↓
-/cmd_vel_safe
-        ↓
-savo_base
-        ↓
-drivetrain hardware
-```
-
-Only `savo_base` executes drivetrain output. No Edge package, SavoMind component, UI, observer, mapper, or supervisor may write directly to the motor hardware.
-
-### Permission versus execution
-
-`savo_supervisor` owns permission and system-state authority. It does not:
-
-* command motors;
-* select frontiers;
-* plan or execute Nav2 paths;
-* save maps;
-* approve semantic locations on behalf of an operator;
-* bypass package-owned readiness checks.
-
-The package that owns an operation remains responsible for executing it and for revalidating supervisor authority during operation.
-
-### Edge command boundary
-
-`savo_bridge` is deployed on Edge because SavoMind uses local Unix-domain sockets there. The bridge may expose only explicitly typed operations. It must fail closed on stale state, invalid map context, missing authority, malformed input, unavailable services/actions, or timeout.
-
-The bridge is not allowed to provide:
-
-* arbitrary topic publication;
-* generic service or action forwarding;
-* shell execution;
-* direct motor access;
-* operator approval of map or location releases;
-* supervisor or navigation-readiness bypasses.
-
-### Presentation surfaces
-
-`savo_ui` and `savo_observer` are read-only. They may subscribe, aggregate, format, and display state, but they must not acquire motion or mission authority.
-
-### Interface package
-
-`savo_msgs` contains generated interface definitions only. It has no independent runtime node and does not own behavior.
-
-## Shared-package deployment details
-
-| Shared package     | Core | Edge |  Observer workstation  | Notes                              |
-| ------------------ | :--: | :--: | :--------------------: | ---------------------------------- |
-| `savo_msgs`        |  Yes |  Yes | Dependency as required | Generated interfaces               |
-| `savo_description` |  Yes |  Yes |           Yes          | Shared physical and TF contract    |
-| `savo_bringup`     |  Yes |  Yes |           No           | Role-selecting production launch   |
-| `savo_perception`  |  Yes |  Yes |           No           | Different role-specific components |
-| `savo_power`       |  Yes |  Yes |    Observed remotely   | Separate Core and Edge launches    |
-| `savo_supervisor`  |  Yes |  No  |    Observed remotely   | Core authority only                |
-| `savo_bridge`      |  No  |  Yes |           No           | Edge-local SavoMind boundary       |
-| `savo_observer`    |  No  |  No  |           Yes          | Read-only operator tooling         |
-
-## Production startup defaults
-
-The distributed entry point is:
-
-```bash
-ros2 launch savo_bringup robot_bringup.launch.py host_role:=core
-ros2 launch savo_bringup robot_bringup.launch.py host_role:=edge
-```
-
-The deployment wrappers preserve these defaults:
-
-* `robot_mode=safe_idle`;
-* `bringup_profile=lidar_only`;
-* Core control mode `STOP`;
-* provisional geometry not allowed for motion;
-* D435 VoxelLayer validation `false`;
-* Edge bridge enabled;
-* Edge speech and UI disabled until explicitly enabled;
-* optional Edge obstacle cloud disabled until hardware validation.
-
-## Retired or non-existent package names
-
-The following names are not packages in the current workspace and must not be added to role arrays or production launch files:
-
-| Name             | Current disposition                                                                                                                                      |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `savo_intent`    | No ROS package. Intent/LLM reasoning belongs to SavoMind; approved robot actions cross through `savo_bridge`                                             |
-| `savo_dashboard` | No ROS package. Operator telemetry belongs to `savo_observer`; robot display belongs to `savo_ui`; package-specific diagnostics remain with their owners |
-| `savo_uwb`       | No current package. Any future UWB work requires an explicit package proposal and ownership review                                                       |
-| `future/`        | No current source directory. Planned work must not be represented as an installed package                                                                |
-
-The obsolete central page `docs/packages/savo_intent.md` was removed during the Phase 1 documentation correction.
-
-## Change-control rules
-
-A package-role change must update and validate all of the following in the same change:
-
-1. `deploy/core/env_core.sh` or `deploy/edge/env_edge.sh`;
-2. package dependencies and installation rules;
-3. role build and dependency-install tests;
-4. distributed bringup requirements;
-5. systemd/runtime preparation when applicable;
-6. this ownership matrix;
-7. the current system status and affected package documentation.
-
-Do not maintain independent package lists in additional scripts. Deployment commands must consume the authoritative role arrays.
-
-==================== END FILE: docs/packages/package_ownership_matrix.md ====================
-
-==================== BEGIN FILE: docs/status/current_system_status.md ====================
-
-## Robot Savo Current System Status
-
-**Status date:** 2026-08-06
-**Inspected artifact:** `Savo_Pi_2026-08-06_01-12-38(1).zip`
-**Scope:** `Savo_Pi` ROS 2 repository only
-
-## Executive status
-
-The current source snapshot is suitable for the next validation stage: **clean role-specific build and test on the Core and Edge target environments**.
-
-It is **not authorized for production motion**.
-
-The repository passes the dedicated full-bringup and observer source validators. The aggregate pre-real-test validator reports `BLOCKED`, not `FAIL`. The two current environment blockers are:
-
-1. Git metadata is absent from the exported ZIP, so `git diff --check` cannot run against the live checkout.
-2. `rosdep` is unavailable in the inspection environment, so target dependency resolution cannot be verified here.
-
-Independent motion gates remain closed because:
-
-* the active geometry profile is marked `measurement_state: provisional`;
-* production launch requires locked geometry by default;
-* the D435 voxel path defaults to unvalidated and disabled;
-* clean Core and Edge role builds/tests are not recorded in this exported snapshot;
-* staged safe-idle, sensor, actuator, authority, mapping, and navigation validation is still required for the current source revision.
-
-An earlier Robot Savo snapshot was exercised on the physical robot. That history is useful baseline evidence, but it does not replace regression testing of this newer source snapshot.
-
-## Status interpretation
-
-| Level                        | Meaning in this report                                                       |
-| ---------------------------- | ---------------------------------------------------------------------------- |
-| Implemented                  | The required source/configuration/interface exists in the inspected snapshot |
-| Source-validated             | Static validators or source-contract checks passed                           |
-| PC-validated                 | A retained log or dated audit records successful development-PC build/tests  |
-| Target validation required   | The current Core Pi, Edge Pi, or observer host must build/test the source    |
-| Hardware validation required | The current source must be exercised through the staged physical procedure   |
-| Blocked for motion           | A fail-closed prerequisite prevents motion authorization                     |
-
-## Validation executed during this inspection
-
-### Full distributed bringup validator
-
-```bash
-bash deploy/common/validate_full_bringup.sh
-```
-
-**Result:** `PASS`
-
-The validator confirmed required bringup files, launch/config parsing, role scripts, retired-package exclusion from deployment arrays, production map paths, AM-8 release wiring, and absence of `/tmp` production-state defaults.
-
-### Observer validator
-
-```bash
-bash deploy/observer/validate_observer.sh
-```
-
-**Result:** `PASS`
-
-The observer source validation confirms that the desktop/browser observer remains read-only and that its required source assets are present.
-
-### Aggregate pre-real-test validator
-
-```bash
-bash deploy/common/validate_pre_real_test_readiness.sh
-```
-
-**Result:** `BLOCKED` with no failed checks
-
-| Check                        | Result  | Inspection finding                                                              |
-| ---------------------------- | ------- | ------------------------------------------------------------------------------- |
-| Required files               | PASS    | All required files are non-empty                                                |
-| Git whitespace check         | BLOCKED | Exported ZIP has no `.git` metadata                                             |
-| Runtime zero-byte policy     | PASS    | No empty runtime-required files; 22 intentional ROS/package marker files        |
-| Launch executable references | PASS    | No removed or empty localization executables referenced                         |
-| YAML parsing                 | PASS    | All non-empty YAML parsed                                                       |
-| XML parsing                  | PASS    | All non-empty XML parsed                                                        |
-| Python parsing               | PASS    | All non-empty Python parsed                                                     |
-| Shell syntax                 | PASS    | 40 shell scripts passed `bash -n`                                               |
-| Netplan render               | PASS    | Core and Edge templates rendered without applying changes                       |
-| Systemd render/verify        | PASS    | Units rendered and passed `systemd-analyze verify`                              |
-| Backup/restore               | PASS    | Integrity, restoration, and overwrite refusal passed                            |
-| `rosdep check`               | BLOCKED | `rosdep` unavailable in this environment                                        |
-| Observer read-only boundary  | PASS    | Observer source validator passed                                                |
-| Control startup              | PASS    | Deployment default remains `STOP`                                               |
-| Geometry gate                | PASS    | Validator truthfully reports `BLOCKED_FOR_MOTION: geometry_not_locked`          |
-| D435 voxel default           | PASS    | Hardware-validation flag defaults to `false`                                    |
-| AM-8 release requirements    | PASS    | Quality approval, review gateway, and contract v2 are present                   |
-| Diagnostic motion safety     | PASS    | Moving diagnostics require approved ROS paths and explicit physical opt-in      |
-| UI authority                 | PASS    | Mapping, location, speech, and system feeds remain read-only                    |
-| Bridge boundary              | PASS    | Typed STOP/teleop/navigation/mapping/query boundary; operator approval excluded |
-| Speech transport v2          | PASS    | Bounded authenticated transport and playback acknowledgement contract present   |
-
-## Retained validation evidence
-
-The repository contains the following PC-validation logs:
-
-| Package             | Evidence                                                       | Recorded result                                                                              |
-| ------------------- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `savo_base`         | `docs/logs/pc_validation/savo_base_colcon_test_pc.txt`         | Package test run passed; retained summary reports 403 tests, 0 errors, 0 failures, 0 skipped |
-| `savo_localization` | `docs/logs/pc_validation/savo_localization_colcon_test_pc.txt` | Package test run passed; retained summary reports 403 tests, 0 errors, 0 failures, 0 skipped |
-| `savo_realsense`    | `docs/logs/pc_validation/savo_realsense_pc_validation.txt`     | Build and tests passed; 86 tests, 0 errors, 0 failures, 0 skipped                            |
-
-The dated pre-real-test completion audit additionally records:
-
-* 25 focused Robot source-contract tests passed;
-* 362 SavoMind regression tests passed;
-* a cross-repository speech protocol v2 smoke test passed;
-* backup/restore, systemd rendering, Netplan rendering, and strict C++ checks passed in that audit environment.
-
-These are historical snapshot records. Re-run the relevant suites after source changes and on the intended target environment.
-
-## Subsystem status
-
-| Subsystem           | Current source state                                                                                             | Current validation boundary                                                               | Next required gate                                                                             |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| Distributed bringup | Implemented and source-validated                                                                                 | Role-selecting Core/Edge orchestration, readiness aggregation, safe defaults, AM-8 wiring | Clean target builds; safe-idle launch on both Pis                                              |
-| Base execution      | Production C++ drivetrain path present; Python fallback/diagnostics separated                                    | PC test evidence retained; earlier hardware baseline exists                               | Wheels-raised regression, watchdog, direction, STOP, and stale-command tests on current source |
-| Control             | C++ control/mode/recovery implementation present                                                                 | Source package and extensive tests present; current target run not retained here          | Target build/test, command arbitration, shaping, mode, and recovery integration                |
-| Near-field safety   | C++ ToF/ultrasonic fusion and `/cmd_vel_safe` gate present                                                       | Source contracts pass; hardware thresholds require staged confirmation                    | Live sensor health, stop/slow zones, stale input, and command-gate tests                       |
-| LiDAR               | RPLIDAR ownership, scan, filtering, health, and watchdog source present                                          | Package README validation status is stale and requires reconciliation                     | Target build plus live A1 scan/rate/frame/mapping-ready verification                           |
-| Localization        | C++ IMU, encoder odometry, EKF bringup, and health source present                                                | Retained PC tests pass; current full robot integration not established                    | Live IMU/encoder sign, TF, covariance, EKF, drift, and stale-input validation                  |
-| Robot description   | URDF/Xacro, frames, footprint generation, and geometry validator present                                         | Source parses; geometry profile is explicitly provisional                                 | Physically measure, review, lock, regenerate, and verify TF/footprint                          |
-| Mapping             | Production C++ workflow, exploration, coverage, saving, quality, semantic, and release source present            | Source-level architecture complete; strategy tuning and real mission evidence pending     | Manual map, save/verify, guarded autonomous mission, review, and AM-8 release                  |
-| Navigation          | Nav2 orchestration, readiness, goal admission, production release verification, and recovery integration present | Source marked complete; physical tuning pending                                           | Navigate only from a verified production map after localization/safety gates pass              |
-| Semantic locations  | Persistent registry, review lifecycle, typed services, and release source present                                | Source implementation present; full physical lifecycle not recorded here                  | Candidate capture, operator review, release, restart persistence, and named navigation         |
-| Supervisor          | Readiness, mission authority, arming, latching, persistence, and shutdown source present                         | Source and runtime fixtures present; package requires staged physical validation          | Core/Edge startup, arm/disarm, fault latch, recovery, authority revoke/resume tests            |
-| Head and Pi Camera  | Pan/tilt, scan, head TF, camera and AprilTag source present                                                      | Package notes validate GStreamer `libcamerasrc`; other camera paths are not approved      | Current-source pan/tilt limits, camera stream, TF, scan, and AprilTag integration              |
-| RealSense           | D435 ownership, stream monitoring, health, and depth extraction present                                          | Retained PC validation passed                                                             | Live USB3, stream rate, frame, restart, depth, and thermal/bandwidth tests on Edge             |
-| Visual odometry     | C++ RGB-D odometry, health, diagnostics, and republisher present                                                 | Standalone source/test structure present; EKF fusion intentionally gated                  | Stable live `/vo/odom`, covariance, dropout/recovery, then guarded EKF integration             |
-| D435 obstacle cloud | Filtered obstacle-cloud source and Nav2 companion profile present                                                | Synthetic/source validation only                                                          | Measure self-filter bounds and validate live cloud before enabling voxel profile               |
-| Speech              | C++ audio runtime and protocol v2 SavoMind round trip present                                                    | Source contract and dated cross-repository smoke evidence                                 | ReSpeaker/speaker device, wake/VAD, playback, gating, cancel, recovery, and latency tests      |
-| UI                  | Read-only C++ framebuffer UI and live state subscriptions present                                                | Source integration passes; camera preview disabled by default                             | 800×480 display/touch/freshness/safety-overlay validation on Edge                              |
-| SavoMind bridge     | Typed bounded observation and command adapters present                                                           | Source boundary validation passes; no generic authority exposed                           | Live Edge socket ownership, peer credentials, timeout, stale-state, and command tests          |
-| Power               | Core UPS, Edge UPS, base battery, aggregate state, health, and shutdown source present                           | Source and tests present; percentage validity remains calibration-dependent               | Live readings, calibration validity, low-power policy, fault, and shutdown validation          |
-| Observer            | Browser/RViz/telemetry source present and source-validated                                                       | Read-only validator passes                                                                | Build and connect from the actual operator workstation over the production network             |
-| Deployment/recovery | Role installers/builds, staged updates, services, storage, backups, and network renderers present                | Static validation and backup/restore test pass                                            | Run dependency resolution, role build/test, service install, restart, and rollback on targets  |
-
-## Motion blockers
-
-Production motion must remain blocked until all applicable items are closed:
-
-1. The live Git checkout passes `git diff --check` and identifies the exact revision under test.
-2. `rosdep` resolves all selected role dependencies on the target operating system.
-3. Core and Edge complete clean role-specific builds and tests.
-4. The physical geometry profile changes from provisional to measured/reviewed/locked.
-5. Generated footprint and fixed TF are regenerated from the locked profile and verified.
-6. Both Pis pass safe-idle bringup with Core control in `STOP`.
-7. Motor, encoder, IMU, LiDAR, near-field sensors, power, network, and time synchronization pass their component stages.
-8. Supervisor arming, fault latching, authorization revocation, and controlled shutdown pass.
-9. Motion begins with wheels raised and an operator at the physical emergency stop.
-10. Manual mapping and production map verification pass before autonomous mapping or saved-map navigation.
-11. The D435 VoxelLayer remains disabled until its independent hardware-validation procedure passes.
-
-## Immediate next phase
-
-Run Phase 1 target builds without launching motion:
-
-### Core Pi
-
-```bash
-cd ~/Savo_Pi
-bash deploy/core/build_core.sh --clean --test
-```
-
-Expected gate:
-
-* all 14 Core role packages are present;
-* clean build completes;
-* selected package tests complete with zero failures;
-* no robot launch is started by the build script.
-
-### Edge Pi
-
-```bash
-cd ~/Savo_Pi
-bash deploy/edge/build_edge.sh --clean --test
-```
-
-Expected gate:
-
-* all 10 Edge role packages are present;
-* clean build completes;
-* selected package tests complete with zero failures;
-* no camera, audio, display, bridge, or robot launch is started by the build script.
-
-After both build gates pass, continue with the safe-idle target and hardware stages in `docs/testing/full_robot_test_plan.md`.
-
-## Documentation debt identified in Phase 1
-
-The package list and deployment matrix are now corrected. Several older detailed documents still contain stale planning-era content, including references to retired package names or incomplete package status. Those files must be reconciled during the architecture, package, deployment, and test documentation phases before they are treated as production procedures.
+# Robot Savo documentation
+
+This directory contains the current system-integration, deployment, hardware, package, and validation documentation for the Robot Savo ROS 2 Jazzy workspace.
+
+## Source of truth
+
+When records disagree, use this order:
+
+1. current source and ROS interface definitions;
+2. current launch/configuration;
+3. manifests and build/install rules;
+4. deployment role arrays and scripts;
+5. validators and tests;
+6. current status and ownership documents;
+7. package-local READMEs;
+8. older architecture, test, audit, and historical records.
+
+An earlier Robot Savo source baseline was exercised on physical hardware. That is valuable baseline evidence, but current source/configuration changes still require regression. Source validation is not motion authorization.
+
+## Start here
+
+- [Repository overview](../README.md)
+- [Current system status](status/current_system_status.md)
+- [Package ownership matrix](packages/package_ownership_matrix.md)
+- [System overview](architecture/system_overview.md)
+- [Two-Pi architecture](architecture/two_pi_architecture.md)
+- [Production startup](deployment/production_startup.md)
+- [Full robot test plan](testing/full_robot_test_plan.md)
+
+## Package documentation
+
+Exactly one central page exists for each of the 20 ROS packages:
+
+| Package | Primary deployment | Documentation |
+| --- | --- | --- |
+| `savo_base` | Core | [Base](packages/savo_base.md) |
+| `savo_bringup` | Core and Edge | [Bringup](packages/savo_bringup.md) |
+| `savo_bridge` | Edge | [Bridge](packages/savo_bridge.md) |
+| `savo_control` | Core | [Control](packages/savo_control.md) |
+| `savo_description` | Core, Edge, observer dependency | [Description](packages/savo_description.md) |
+| `savo_head` | Core | [Head](packages/savo_head.md) |
+| `savo_lidar` | Core | [LiDAR](packages/savo_lidar.md) |
+| `savo_localization` | Core | [Localization](packages/savo_localization.md) |
+| `savo_locations` | Core | [Locations](packages/savo_locations.md) |
+| `savo_mapping` | Core | [Mapping](packages/savo_mapping.md) |
+| `savo_msgs` | Interface dependency | [Messages/interfaces](packages/savo_msgs.md) |
+| `savo_nav` | Core | [Navigation](packages/savo_nav.md) |
+| `savo_observer` | Operator workstation | [Observer](packages/savo_observer.md) |
+| `savo_perception` | Core and optional Edge path | [Perception](packages/savo_perception.md) |
+| `savo_power` | Core and Edge | [Power](packages/savo_power.md) |
+| `savo_realsense` | Edge | [RealSense](packages/savo_realsense.md) |
+| `savo_speech` | Edge, optional startup | [Speech](packages/savo_speech.md) |
+| `savo_supervisor` | Core | [Supervisor](packages/savo_supervisor.md) |
+| `savo_ui` | Edge, optional startup | [UI](packages/savo_ui.md) |
+| `savo_vo` | Edge | [Visual odometry](packages/savo_vo.md) |
+
+There is no `savo_intent` package or central page. SavoMind reasoning is external and approved typed operations cross `savo_bridge`.
+
+## Architecture
+
+- [Core architecture](architecture/savo_core_architecture.md)
+- [Edge architecture](architecture/savo_edge_architecture.md)
+- [Shared packages](architecture/shared_packages_architecture.md)
+- [Motion authority](architecture/motion_authority_model.md)
+- [Safety](architecture/safety_architecture.md)
+- [Localization](architecture/localization_architecture.md)
+- [Mapping and navigation](architecture/mapping_navigation_architecture.md)
+- [Perception](architecture/perception_architecture.md)
+- [ROS topic contracts](architecture/ros2_topic_contracts.md)
+- [Network](architecture/network_architecture.md)
+- [Speech/SavoMind flow](architecture/speech_intent_flow.md)
+
+## Deployment and operations
+
+- [Role-based builds](deployment/role_based_builds.md)
+- [Core deployment](deployment/deploy_savo_core.md)
+- [Edge deployment](deployment/deploy_savo_edge.md)
+- [Systemd services](deployment/systemd_services.md)
+- [Release checklist](deployment/release_checklist.md)
+- [Recovery operations](deployment/recovery_operations.md)
+
+## Hardware and setup
+
+- [Wiring overview](hardware/wiring_overview.md)
+- [GPIO/I2C map](hardware/gpio_i2c_map.md)
+- [Measurement checklist](hardware/measurement_checklist.md)
+- [Sensor mounting](hardware/sensor_mounting.md)
+- [Power architecture](hardware/power_architecture.md)
+- [Core setup](setup/savo_core_setup.md)
+- [Edge setup](setup/savo_edge_setup.md)
+- [Dependency matrix](setup/dependency_matrix.md)
+- [Core–Edge Ethernet](setup/ethernet_core_edge_setup.md)
+- [ROS networking](setup/ros_domain_networking.md)
+- [Time synchronization](setup/time_sync.md)
+- [RealSense setup](setup/realsense_setup.md)
+- [Audio setup](setup/audio_setup.md)
+
+## Testing and evidence
+
+- [Component validation overview](testing/component_validation_overview.md)
+- [Core component validation](testing/savo_core_component_validation.md)
+- [Edge component validation](testing/savo_edge_component_validation.md)
+- [Real-robot acceptance checklist](testing/real_robot_acceptance_checklist.md)
+- [Pre-real-test completion audit](audits/pre_real_test_completion_2026-08-02.md)
+
+Package-specific test plans are linked from each package page.
+
+## Validation terminology
+
+- **Implemented:** source/config/interface exists.
+- **Source-validated:** static/source-contract checks passed.
+- **PC-validated:** build/tests ran successfully on a development PC.
+- **Target-validated:** build/tests ran on the intended Core, Edge, or observer host.
+- **Hardware-validated:** behavior was exercised on physical hardware.
+- **Integration-validated:** multiple production components were tested together.
+- **Blocked:** a required external dependency, measurement, environment, authorization, or earlier gate is missing.
+- **Deferred:** intentionally outside current production scope.
+
+Retain exact commands, environment, revision, profile, result, and evidence location for validation claims.

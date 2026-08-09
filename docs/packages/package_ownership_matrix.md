@@ -1,6 +1,6 @@
 # Robot Savo Package Ownership Matrix
 
-**Snapshot date:** 2026-08-06
+**Snapshot date:** 2026-08-09
 **Workspace:** ROS 2 Jazzy
 **Package count:** 20
 
@@ -214,10 +214,12 @@ The following names are not packages in the current workspace and must not be ad
 | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `savo_intent`    | No ROS package. Intent/LLM reasoning belongs to SavoMind; approved robot actions cross through `savo_bridge`                                             |
 | `savo_dashboard` | No ROS package. Operator telemetry belongs to `savo_observer`; robot display belongs to `savo_ui`; package-specific diagnostics remain with their owners |
-| `savo_uwb`       | No current package. Any future UWB work requires an explicit package proposal and ownership review                                                       |
-| `future/`        | No current source directory. Planned work must not be represented as an installed package                                                                |
+| `savo_uwb`       | No current ROS package manifest. A staging directory exists under `savo_ws/src/future/`; promotion requires an explicit package and ownership review       |
+| `future/`        | Non-package staging content exists but contains no `package.xml`; it is excluded from the 20-package workspace and production role arrays                  |
 
 The obsolete central page `docs/packages/savo_intent.md` was removed during the Phase 1 documentation correction.
+
+All 20 current packages now have source-reconciled central pages in this directory. Package-local README links in the matrix remain implementation references; the [documentation index](../README.md) links the central integration pages.
 
 ## Change-control rules
 

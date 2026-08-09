@@ -79,7 +79,7 @@ The script creates the controlled runtime structure under:
 
 Persistent state includes maps, release transactions, semantic locations, backups, supervisor state, and ROS-owned runtime data. Do not replace these directories with `/tmp` paths.
 
-### Verify
+### Verify storage preparation
 
 ```bash
 find /var/lib/robot_savo -maxdepth 3 -type d -printf '%M %u:%g %p\n'

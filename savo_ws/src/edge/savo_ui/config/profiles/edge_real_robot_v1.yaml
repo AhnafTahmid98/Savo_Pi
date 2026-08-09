@@ -1,0 +1,14 @@
+# =============================================================================
+# Robot Savo — UI V2 Edge Real-Robot Profile
+#
+# Raspberry Pi 5 Edge runtime profile.
+# The V2 UI owns /dev/fb0 while this profile is active.
+#
+# IMPORTANT:
+# Only one Savo UI process may own the framebuffer at a time.
+# =============================================================================
+
+savo_ui_v2_node:
+  ros__parameters:
+    enable_framebuffer: true
+    export_preview_frames: false
