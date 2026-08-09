@@ -107,14 +107,12 @@ Create a backup before planned deployment or destructive maintenance:
 
 ```bash
 cd ~/Savo_Pi
-sudo bash deploy/common/backup_robot_state.sh
+sudo bash deploy/common/backup_robot_state.sh \
+  --output <backup-directory>/robot-savo-state-<UTC-timestamp>.tar.gz
 ```
 
-Review the script options when using a non-default state root or backup destination:
-
-```bash
-bash deploy/common/backup_robot_state.sh --help
-```
+`--output` is required. Optional `--state-root` and `--config-root` arguments
+select non-default roots. The script does not implement a `--help` option.
 
 The backup workflow includes metadata and SHA-256 integrity information for maps, locations, supervisor state, and optional configuration.
 
@@ -127,15 +125,20 @@ A backup is accepted only when:
 
 ## Restore persistent state
 
-Stop all Robot Savo services before restore. Inspect the restore command:
+Stop all Robot Savo services before restore. Supply the selected archive:
 
 ```bash
-bash deploy/common/restore_robot_state.sh --help
+sudo bash deploy/common/restore_robot_state.sh \
+  --archive <backup-archive>
 ```
 
 The restore workflow rejects path traversal, symbolic-link payloads, hash mismatch, invalid SQLite state, and accidental overwrite of non-empty state. Use `--overwrite` only after reviewing the existing state and confirming the backup identity.
 
-The restore process preserves the previous state root as a timestamped pre-restore copy when overwrite is authorized.
+The restore process preserves the previous state root as a timestamped
+pre-restore copy when overwrite is authorized. It then overlays restored state
+and configuration; unrelated stale files are not removed. Inspect for stale
+artifacts and use a separately reviewed recovery plan when exact replacement is
+required.
 
 After restore:
 

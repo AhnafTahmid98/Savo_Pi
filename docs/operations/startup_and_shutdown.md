@@ -31,6 +31,7 @@ developer work.
 
    ```bash
    ros2 topic echo --once /savo_bringup/core/state
+   ros2 topic echo --once /savo_bringup/core/ready
    ros2 topic echo --once /savo_control/mode_state
    ros2 topic echo --once /safety/stop
    ```
@@ -40,6 +41,7 @@ developer work.
    ```bash
    systemctl status savo_edge.service --no-pager
    ros2 topic echo --once /savo_bringup/edge/state
+   ros2 topic echo --once /savo_bringup/edge/ready
    ```
 
 7. Verify distributed network/time, required sensor health, power, and the
@@ -96,4 +98,3 @@ failed cancellation, electrical hazard, collision risk, or loss of software
 control. After a forced power loss, do not resume until filesystem, map/location
 state, supervisor state, batteries, and hardware are inspected and evidence is
 collected.
-

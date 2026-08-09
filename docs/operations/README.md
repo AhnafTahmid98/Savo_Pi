@@ -65,4 +65,3 @@ See the [current system status](../status/current_system_status.md),
 [real-robot acceptance checklist](../testing/real_robot_acceptance_checklist.md)
 for release gates. Prior physical baseline evidence does not replace regression
 of the current source and configuration.
-

@@ -34,6 +34,18 @@ require drivetrain power isolation.
 Do not trust charge percentage until calibrated. Use power health, raw voltage,
 UPS state, measurement validity, and shutdown-request state together.
 
+Power response is fail-closed:
+
+- For a low/critical state or shutdown request, cancel motion, select `STOP`,
+  and perform controlled shutdown; do not begin another mission.
+- For an invalid or stale reading, block motion until a maintainer verifies the
+  source and the physical supply. An estimated percentage alone is not enough.
+- For UPS fault, voltage sag, swelling, heat, smell, or damaged wiring, isolate
+  power and escalate without repeated restart attempts.
+- Loss of Core requires immediate physical motion isolation. Loss of Edge
+  removes its sensing/interaction scope; cancel autonomous work and keep or
+  return Core to `STOP` rather than assuming the remaining host is sufficient.
+
 ## Software checks
 
 On the applicable host, source ROS and the installed workspace, then collect:
@@ -48,6 +60,7 @@ ros2 topic echo --once /savo_control/mode_state
 ros2 topic echo --once /savo_perception/safety_state
 ros2 topic echo --once /savo_localization/health
 ros2 topic echo --once /savo_power/health
+ros2 topic echo --once /savo_power/shutdown_request
 ros2 run tf2_ros tf2_echo odom base_footprint
 ```
 
@@ -67,4 +80,3 @@ UI/administration workflow.
 
 Retain the checklist, commit, hardware revision, geometry digest, mode/profile,
 map/location release when applicable, and anomalies.
-

@@ -1,7 +1,5 @@
 # Copyright 2026 Ahnaf Tahmid
-"""
-Static contracts for the always-on hybrid Savo UI runtime.
-"""
+"""Static contracts for the always-on hybrid Savo UI runtime."""
 
 from pathlib import Path
 

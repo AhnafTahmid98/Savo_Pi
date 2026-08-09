@@ -54,4 +54,3 @@ the drivetrain during the immediate response.
 
 Safety review is mandatory for uncommanded motion, collision/near miss, failure
 to stop, emergency control failure, safety bypass, or unauthorized authority.
-

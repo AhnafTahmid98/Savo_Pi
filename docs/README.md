@@ -86,6 +86,26 @@ There is no `savo_intent` package or central page. SavoMind reasoning is externa
 - [Release checklist](deployment/release_checklist.md)
 - [Recovery operations](deployment/recovery_operations.md)
 
+## Production operations
+
+Start at the [operations index](operations/README.md). The main reading paths
+are:
+
+- Daily operator: [quick start](operations/operator_quick_start.md),
+  [pre-operation inspection](operations/pre_operation_inspection.md), and
+  [startup/shutdown](operations/startup_and_shutdown.md)
+- Motion operation: [manual drive](operations/manual_drive_procedure.md),
+  [mapping](operations/mapping_operation.md), or
+  [navigation](operations/navigation_operation.md)
+- Maintainer: [troubleshooting](operations/troubleshooting.md),
+  [log collection](operations/log_collection.md),
+  [maintenance](operations/maintenance_schedule.md), and
+  [backup/restore/rollback](operations/backup_restore_and_rollback.md)
+- Emergency and incident:
+  [immediate stop/recovery](operations/emergency_stop_and_recovery.md),
+  [incident response](operations/incident_response.md), and the
+  [incident report template](operations/incident_report_template.md)
+
 ## Hardware and setup
 
 - [Bill of materials](hardware/bill_of_materials.md)

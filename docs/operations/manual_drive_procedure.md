@@ -78,4 +78,3 @@ failed safety sensing, unexpected mode/source, duplicate publisher, obstacle
 gate failure, power fault, service restart, poor traction, person/property
 risk, or failure of keyboard release to zero motion. Use the emergency runbook
 if normal STOP is not immediate and confirmed.
-

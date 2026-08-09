@@ -11,11 +11,13 @@ This is a trained-operator checklist, not a commissioning procedure.
 - [ ] Complete the [pre-operation inspection](pre_operation_inspection.md).
 - [ ] Power Core and Edge using the approved installed power controls.
 - [ ] On Core, verify `savo_core.service` is active.
-- [ ] Confirm `/savo_bringup/core/state` reports the intended role/profile and
-  does not report `blocked`.
+- [ ] Confirm `/savo_bringup/core/state` reports `safe_idle`, the intended
+  profile, and no blocked required dependency; confirm `/savo_bringup/core/ready`
+  is true for the selected scope.
 - [ ] Confirm `/savo_control/mode_state` is `STOP`.
 - [ ] On Edge, verify `savo_edge.service` is active.
-- [ ] Confirm `/savo_bringup/edge/state` is current for required Edge features.
+- [ ] Confirm `/savo_bringup/edge/state` is current and
+  `/savo_bringup/edge/ready` is true for required Edge features.
 - [ ] Confirm safety, localization, power, TF, and applicable map readiness.
 - [ ] Confirm optional bridge, speech, and UI show current—not stale—state.
 - [ ] Select only a released operation covered by its specific runbook.
@@ -26,6 +28,7 @@ Useful local checks after sourcing the installed workspace:
 ```bash
 systemctl status savo_core.service --no-pager
 ros2 topic echo --once /savo_bringup/core/state
+ros2 topic echo --once /savo_bringup/core/ready
 ros2 topic echo --once /savo_control/mode_state
 ros2 topic echo --once /safety/stop
 ros2 topic echo --once /savo_power/health
@@ -48,4 +51,3 @@ Run Edge service/state checks on Edge with `savo_edge.service` and
 
 Record date, operator, robot/release identity, selected mode/profile, inspection
 result, and any deviation. A `BLOCKED` result is not a pass.
-

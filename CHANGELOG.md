@@ -4,6 +4,32 @@ All notable changes to the Robot Savo repository should be recorded in this file
 
 The project does not yet use tagged semantic releases consistently. Entries are therefore grouped by date. This initial changelog was reconstructed from dated repository documents and the current source snapshot because the inspected exported ZIP does not contain Git history.
 
+## 2026-08-09 — Phase 5 operations documentation
+
+### Added — production operations runbooks
+
+* Added the 16-document production operations set covering the operator quick
+  start, pre-operation inspection, startup/shutdown, emergency response,
+  manual drive, mapping, navigation, speech/UI, and map/location administration.
+* Added source-backed log collection, symptom-oriented troubleshooting,
+  maintenance, backup/restore/rollback, incident response, and a directly
+  usable incident report template.
+
+### Changed — operational safety and recovery guidance
+
+* Formalized motion warnings, STOP/abort criteria, safe-idle/readiness checks,
+  evidence preservation, role boundaries, and explicit escalation rules.
+* Reconciled backup and restore examples with their required current flags and
+  kept internal motion, Nav2, release, SQLite, and bridge bypasses out of
+  routine operator procedures.
+* Documented only installed command-line surfaces; unsupported operator
+  clients remain explicitly identified instead of being invented.
+
+### Safety and behavior
+
+* No motion authority, safety gate, configuration, or production runtime
+  behavior was changed by Phase 5 documentation.
+
 ## 2026-08-09 — Phase 4 architecture and hardware documentation
 
 ### Added — architecture and hardware registries

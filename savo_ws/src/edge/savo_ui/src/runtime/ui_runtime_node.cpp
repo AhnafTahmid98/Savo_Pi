@@ -421,6 +421,15 @@ UiRuntimeNode::UiRuntimeNode(const rclcpp::NodeOptions & options)
   configure_live_subscriptions();
   present_if_enabled();
 
+  // Start the interactive runtime clock only after all startup work has
+  // completed. Preview generation and device initialization must not consume
+  // the configured Intro display duration.
+  if (active_screen_ == UiScreen::Intro) {
+    intro_elapsed_seconds_ = 0.0;
+  }
+
+  last_loop_time_ = std::chrono::steady_clock::now();
+
   configure_runtime();
 
   RCLCPP_INFO(
@@ -2786,7 +2795,6 @@ void UiRuntimeNode::render_voice_page(
 }
 
 
-
 void UiRuntimeNode::seed_voice_preview_data(const VoicePhase phase)
 {
   voice_ui_ = VoiceUiState{};
@@ -2899,7 +2907,6 @@ void UiRuntimeNode::render_navigation_page(
     state,
     navigation_animation_time_seconds_);
 }
-
 
 
 void UiRuntimeNode::seed_navigation_preview_data(
@@ -5263,7 +5270,9 @@ void UiRuntimeNode::loop_callback()
   }
 }
 
-double UiRuntimeNode::clamp_double(const double value, const double min_value, const double max_value)
+double UiRuntimeNode::clamp_double(
+  const double value, const double min_value,
+  const double max_value)
 {
   return std::clamp(value, min_value, max_value);
 }
