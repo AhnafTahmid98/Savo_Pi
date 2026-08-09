@@ -1,48 +1,23 @@
-# savo-edge Component Validation
+# Savo Edge Component Validation Status
 
-Standalone hardware validation for every physical component on `savo-edge` before ROS 2 integration.
+This is a status index. Execute the detailed plans and retain revision-bound evidence; device screenshots alone do not establish current package or integration PASS.
 
-Follow the process in [`component_validation_overview.md`](component_validation_overview.md).
+| Component | Owner/interface | Required plan evidence | Current status |
+| --- | --- | --- | --- |
+| Edge UPS | `savo_power`; I2C bus 1, `0x36` | PWR-001–008 | Historical device evidence; current calibration/fault regression required |
+| RealSense D435 | `savo_realsense`; USB3/bound serial | RLS-001–007 | `NOT RUN` for current source |
+| Visual odometry | `savo_vo`; D435 RGB-D input | VO-001–009 using `vo_bringup.launch.py` | `NOT RUN`; Core fusion remains off |
+| ReSpeaker and speaker | `savo_speech`; configured ALSA devices | SPH-001–010 | `NOT RUN`; repository ALSA alias deployment gap remains |
+| Display/touch | `savo_ui`; framebuffer/input | UI-001–007 | `NOT RUN` on current target |
+| Typed SavoMind boundary | `savo_bridge` and speech socket | BRD-001–009, SPH-003/004/006/009 | Source/protocol baseline; target ownership/integration required |
+| Edge service graph | `savo_bringup`/systemd | BRG-005/008–010 | UI companion-unit ownership decision unresolved |
 
-## Validation table
+STT/LLM/TTS inference belongs to external SavoMind, not an Edge ROS component. Generic Docker health is therefore not a substitute for the typed bridge/speech protocol tests.
 
-| Component                  | Interface         | Standalone test                                               | Expected result                                                 | Status      |
-| -------------------------- | ----------------- | ------------------------------------------------------------- | --------------------------------------------------------------- | ----------- |
-| UPS HAT                    | I2C-1 `0x36`      | `i2cdetect -y 1`, `bat.py`                                    | `0x36` visible; voltage and capacity printed                    | Not started |
-| RealSense D435             | USB 3.0           | `rs-enumerate-devices`, `realsense-viewer`                    | Device listed; colour and depth streams visible in viewer       | Not started |
-| ReSpeaker mic array        | USB               | `arecord -l`, `arecord -D plughw:<N>,0 -f S16_LE -r 16000 test.wav` | Device listed; recording captures audio without clipping | Not started |
-| Speaker / audio output     | USB or 3.5 mm     | `aplay -l`, `aplay test.wav`                                  | Device listed; audio plays back clearly                         | Not started |
-| STT (speech-to-text)       | Mic + model       | Run STT pipeline standalone; speak a phrase                   | Transcription output matches spoken phrase                      | Not started |
-| TTS (text-to-speech)       | Speaker + model   | Run TTS pipeline standalone; pass test sentence               | Synthesised speech plays through speaker                        | Not started |
-| Visual odometry            | RealSense D435    | `ros2 launch savo_vo savo_vo.launch.py`; move camera slowly  | `/vo/odom` or equivalent topic publishes; pose increments with motion | Not started |
-| Docker Robot Savo Server   | Network / Docker  | `docker compose up`; check service health endpoints           | All containers start; health endpoints return 200               | Not started |
-| UI / display (if used)     | HDMI / USB-C DP   | Boot to desktop or launch UI node                             | Display renders without artefacts; touch or input responds      | Not started |
+## Historical media
 
-## Validation evidence
+Existing UPS/fan screenshots under `docs/assets/hardware` are contextual historical evidence only unless a test record supplies date, revision, configuration and reviewer. They are not current-source `HARDWARE_PASS`.
 
-### Pi 5 fan profile
+## Evidence record
 
-![Pi 5 fan profile](../assets/hardware/pi5_fan_profile.png)
-
-This screenshot shows the Raspberry Pi 5 active cooler profile added under `/boot/firmware/config.txt`. The fan profile starts at 45°C and increases fan speed at 55°C, 65°C, and 75°C.
-
-### UPS HAT validation
-
-![UPS HAT validation](../assets/hardware/ups_hat.png)
-
-This screenshot confirms:
-
-* UPS HAT detected on I²C bus 1 at `0x36`
-* EEPROM power settings are correct:
-
-  * `POWER_OFF_ON_HALT=1`
-  * `PSU_MAX_CURRENT=5000`
-* UPS monitor is working through `/opt/x120x/qtx120xTerminal.py`
-* Battery percentage, UPS voltage, input voltage, CPU temperature, fan RPM, AC power, and power adapter status are visible
-
-## Notes
-
-- Validate audio input and output separately before testing STT/TTS end-to-end.
-- RealSense must pass `rs-enumerate-devices` before VO testing begins.
-- Docker Robot Savo Server requires network access; confirm Tailscale or LAN connectivity first.
-- Visual odometry validation uses slow manual movement to avoid tracking loss during initial test.
+Use [the result template](test_result_template.md). No physical Edge device or service was started by the Phase 7 documentation audit.

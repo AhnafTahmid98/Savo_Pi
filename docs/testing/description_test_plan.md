@@ -1,5 +1,7 @@
 # Robot Description and Geometry Test Plan
 
+Stable identifiers map to the detailed stages: `DSC-001`=D0, `DSC-002`=D1, `DSC-003`=D2, `DSC-004`=D3, `DSC-005`=D4, `DSC-006`=D5, `DSC-007`=D6, `DSC-008`=D7, `DSC-009`=D8, and `DSC-010`=D9. D0–D3/D6–D8 are `STATIC`, `UNIT`, `PC`, or `HARDWARE-NON-ACTUATING`; D4–D6 include reviewed `PERSISTENT-STATE`; D9 is `INTEGRATION`. All are `NO-MOTION`.
+
 ## Objective
 
 Validate the Robot Savo physical model, fixed TF contract, dynamic-head boundary, Nav2 footprint, coordinate conventions, and geometry-lock process before any motion-capable production mode is authorized.
@@ -302,3 +304,5 @@ Retain:
 ## Acceptance
 
 The description is accepted for motion only when the profile is physically measured, independently reviewed, marked locked, validates with `--require-locked`, produces a correct URDF/TF tree, and yields a footprint that safely encloses the real robot.
+
+The current profile is provisional, so DSC-004–010 physical/locked acceptance remains `BLOCKED`/`NOT RUN` for current-source release even where source validators pass. See [regression matrix](regression_matrix.md), [TF authority](../architecture/tf_frame_authority.md), and [measurement checklist](../hardware/measurement_checklist.md).

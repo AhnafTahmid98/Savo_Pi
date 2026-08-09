@@ -13,11 +13,14 @@ Robot Savo uses systemd to start approved production roles with deterministic en
 | `savo.service` | Either Pi | Generic role-selected wrapper using `SAVO_ROLE`; alternative to role-specific units |
 | `savo_mapping.service` | Core Pi | Explicitly enabled manual-mapping entry point with an external marker gate |
 | `savo-location-stack@.service` | Core Pi | Typed location integration stack for a named deployment user |
+| `savo-ui-runtime.service` | Edge Pi | Always-on UI runtime currently ordered before `savo_edge.service`; ownership decision remains unresolved |
 | `savo-ui.service` | Edge Pi | Optional standalone UI service supplied by `savo_ui` |
 | `savo_bridge.service` | Edge Pi | Optional standalone bridge service supplied by `savo_bridge` |
 | `savo-supervisor.service` | Core Pi | Optional standalone supervisor service supplied by `savo_supervisor` |
 
-The last three units are package-local deployment options. They must not run when the same node is already started by distributed role bringup.
+The last four units are package-local deployment options. They must not run when the same node is already started by distributed role bringup.
+
+The current renderer also emits `savo-ui-runtime.service`. `savo_edge.service` declares `Wants=` and `After=` on that unit while setting `SAVO_START_UI=false`; the fresh-install Edge procedure does not install the companion automatically. This is an unresolved deployment ownership decision, not a reason to install both UI paths. Reconcile and validate the intended UI owner before production enablement.
 
 ## One-owner rule
 
@@ -29,6 +32,7 @@ Do not enable these combinations:
 - `savo_edge.service` and `savo.service` with `SAVO_ROLE=edge`
 - Edge bringup with `SAVO_START_BRIDGE=true` and standalone `savo_bridge.service`
 - Edge bringup with `SAVO_START_UI=true` and standalone `savo-ui.service`
+- `savo-ui-runtime.service` with any other UI service/launch that owns the same framebuffer or UI node graph
 - Core bringup and standalone supervisor service when both start the same supervisor node
 - The normal Core role and an overlapping manual mapping stack without following the mapping-service procedure
 

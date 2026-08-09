@@ -4,6 +4,40 @@ All notable changes to the Robot Savo repository should be recorded in this file
 
 The project does not yet use tagged semantic releases consistently. Entries are therefore grouped by date. This initial changelog was reconstructed from dated repository documents and the current source snapshot because the inspected exported ZIP does not contain Git history.
 
+## 2026-08-09 — Phase 7 verification, traceability, regression, evidence and final audit
+
+### Added — complete verification system
+
+* Completed stable-ID test-plan coverage for all production subsystem areas and
+  retained explicit `savo_msgs` interface-generation/compatibility coverage.
+* Added the 54-requirement implementation/test/evidence traceability matrix and
+  change-triggered R0–R5 regression matrix.
+* Added the test evidence standard, copyable result template, and centralized
+  failure/abort/return-to-service criteria.
+* Added the final repository documentation audit covering packages, automated
+  tests, public interfaces, TF, hardware, storage, systemd, commands, links,
+  placeholders and stale references.
+
+### Changed — source-reconciled testing and operations documentation
+
+* Replaced skeletal mapping/navigation/localization/perception/VO plans and
+  stale Core/Edge component sheets with staged, source-backed procedures.
+* Removed stale `savo_vo.launch.py`, direct motor-write, ungated `/cmd_vel`, and
+  legacy `/e_stop` test guidance; supported tests retain the production command
+  and safety boundaries.
+* Documented the previously omitted `savo-ui-runtime.service` and its unresolved
+  Edge role-service ownership/dependency interaction.
+
+### Validation and limits — Phase 7
+
+* Full-bringup, observer, aggregate readiness, Markdown link, command existence,
+  package/test-plan coverage and whitespace checks passed.
+* The affected-package hardware-free regression was attempted but is BLOCKED in
+  the managed sandbox by denied DDS/network discovery, Unix sockets/default ROS
+  logging, and external XML schema access; target/unrestricted rerun is required.
+* No physical motion or hardware actuation was executed. Documentation completion
+  does not constitute target, hardware, integration, or acceptance validation.
+
 ## 2026-08-09 — Phase 6 installation and commissioning documentation
 
 ### Added — fresh installation paths
@@ -23,6 +57,8 @@ The project does not yet use tagged semantic releases consistently. Entries are 
 * Documented the hard-bound D435 serial, missing repository-provided ALSA alias
   configuration and general hardware udev policy, and the distributed Edge
   bridge runtime-directory requirement as explicit deployment findings.
+* Recorded the current Edge role-unit dependency on the separately rendered UI
+  runtime unit as an ownership decision that still requires reconciliation.
 
 ### Safety and behavior — Phase 6
 

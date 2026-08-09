@@ -141,12 +141,19 @@ are:
 ## Testing and evidence
 
 - [Component validation overview](testing/component_validation_overview.md)
+- [Full staged robot plan](testing/full_robot_test_plan.md)
+- [Real-robot acceptance checklist](testing/real_robot_acceptance_checklist.md)
+- [Requirements traceability matrix](testing/requirements_traceability_matrix.md)
+- [Change-triggered regression matrix](testing/regression_matrix.md)
+- [Test evidence guidelines](testing/test_evidence_guidelines.md)
+- [Copyable test result template](testing/test_result_template.md)
+- [Failure and abort criteria](testing/failure_and_abort_criteria.md)
 - [Core component validation](testing/savo_core_component_validation.md)
 - [Edge component validation](testing/savo_edge_component_validation.md)
-- [Real-robot acceptance checklist](testing/real_robot_acceptance_checklist.md)
+- [Final documentation audit](audits/final_documentation_audit_2026-08-09.md)
 - [Pre-real-test completion audit](audits/pre_real_test_completion_2026-08-02.md)
 
-Package-specific test plans are linked from each package page.
+One stable-ID subsystem plan exists for every actuating/runtime package area. `savo_msgs` is covered by interface generation/build/consumer compatibility rather than an artificial physical-subsystem plan. Package-specific plans are linked from each package page and the traceability matrix.
 
 ## Validation terminology
 

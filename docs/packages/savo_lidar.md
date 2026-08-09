@@ -124,6 +124,6 @@ Device identity, frame, offset/inversion, filters, and stale/reconnect limits af
 
 - [Implementation README](../../savo_ws/src/core/savo_lidar/README.md)
 - [Perception architecture](../architecture/perception_architecture.md)
+- [LiDAR test plan](../testing/lidar_test_plan.md)
 - [Full robot test plan](../testing/full_robot_test_plan.md)
 - [Ownership matrix](package_ownership_matrix.md)
-

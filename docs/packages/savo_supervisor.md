@@ -124,5 +124,5 @@ Required-source lists, timeouts, authorization policy, persistent schema, cancel
 - [Implementation README](../../savo_ws/src/shared/savo_supervisor/README.md)
 - [Safety architecture](../architecture/safety_architecture.md)
 - [Motion authority model](../architecture/motion_authority_model.md)
+- [Supervisor test plan](../testing/supervisor_test_plan.md)
 - [Ownership matrix](package_ownership_matrix.md)
-

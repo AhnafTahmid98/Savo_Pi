@@ -129,5 +129,5 @@ Channels, limits, camera pipeline, frames, tag thresholds, and scan behavior are
 - [Implementation README](../../savo_ws/src/core/savo_head/README.md)
 - [Sensor mounting](../hardware/sensor_mounting.md)
 - [Mapping/navigation architecture](../architecture/mapping_navigation_architecture.md)
+- [Head test plan](../testing/head_test_plan.md)
 - [Ownership matrix](package_ownership_matrix.md)
-

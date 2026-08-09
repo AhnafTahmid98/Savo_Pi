@@ -127,5 +127,5 @@ Serial, streams, alignment, TF policy, QoS, ROI, or pointcloud enablement affect
 - [Implementation README](../../savo_ws/src/edge/savo_realsense/README.md)
 - [RealSense setup](../setup/realsense_setup.md)
 - [Edge architecture](../architecture/savo_edge_architecture.md)
+- [RealSense test plan](../testing/realsense_test_plan.md)
 - [Ownership matrix](package_ownership_matrix.md)
-

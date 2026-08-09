@@ -122,5 +122,6 @@ Any mutation tool/client is an architecture violation and requires explicit auth
 
 - [Implementation README](../../savo_ws/src/shared/savo_observer/README.md)
 - [Network architecture](../architecture/network_architecture.md)
+- [Observer test plan](../testing/observer_test_plan.md)
 - [Ownership matrix](package_ownership_matrix.md)
 - [Current status](../status/current_system_status.md)

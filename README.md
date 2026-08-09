@@ -183,7 +183,9 @@ Start with:
 8. [Operator quick start](docs/operations/operator_quick_start.md)
 9. [Emergency stop and recovery](docs/operations/emergency_stop_and_recovery.md)
 10. [Full robot test plan](docs/testing/full_robot_test_plan.md)
-11. [Pre-real-test completion report](docs/audits/pre_real_test_completion_2026-08-02.md)
+11. [Requirements traceability](docs/testing/requirements_traceability_matrix.md)
+12. [Regression matrix](docs/testing/regression_matrix.md)
+13. [Final documentation audit](docs/audits/final_documentation_audit_2026-08-09.md)
 
 Package-local `README.md` files document implementation details. Cross-package documents in `docs/` describe system contracts, deployment, and validation. Where a dated audit and the current source disagree, the current source and its validators take precedence.
 
@@ -199,7 +201,7 @@ Package-local `README.md` files document implementation details. Cross-package d
 
 ## Project status
 
-The source tree has completed its pre-real-test closure, Phase 3 package-documentation reconciliation, and Phase 4 architecture/hardware reconciliation. All 20 ROS 2 packages have central source-backed integration pages, supported by 18 architecture and 11 hardware engineering pages. The current checkout still requires target dependency resolution, clean role-specific builds/tests, locked physical geometry, and staged hardware validation before production motion.
+The source tree has completed its pre-real-test closure and the Phase 3–7 documentation system: all 20 ROS 2 packages have central source-backed pages, all applicable subsystems have stable-ID test plans, and requirements/evidence/regression governance is in place. The current checkout still requires clean unrestricted target builds/tests, locked physical geometry, and staged hardware/integration acceptance before production motion.
 
 See [Current system status](docs/status/current_system_status.md) for the evidence, blockers, and next gate.
 

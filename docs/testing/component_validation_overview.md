@@ -1,73 +1,40 @@
 # Component Validation Overview
 
-Robot Savo validates each physical component in isolation before integrating it into a ROS 2 package. This catches wiring faults, wrong I2C addresses, driver incompatibilities, and misconfigured peripherals before they become harder-to-debug ROS issues.
+## Purpose
 
-## Process
+Robot Savo validates each component from source/static checks through non-actuating detection and only then controlled hardware integration. Direct hardware tools are permitted only where the owning test plan identifies them, the component is physically isolated, and the tool cannot bypass a production safety boundary.
 
-### 1. Test hardware alone first
+Test existence is not PASS. Use [test evidence guidelines](test_evidence_guidelines.md), the [result template](test_result_template.md), and [failure/abort criteria](failure_and_abort_criteria.md).
 
-Run a standalone script or CLI tool that talks directly to the hardware over the relevant interface (I2C, GPIO, USB, audio, serial). No ROS, no launch files.
+## Required order
 
-The goal is to confirm the physical component works and the interface is wired correctly.
+1. Record commit, host, hardware/config/geometry identity and test IDs.
+2. Run package source/unit/PC checks.
+3. Inspect wiring/permissions and detect the device with actuators de-energized.
+4. Verify non-actuating ROS data, frames, timestamps, freshness and fault state.
+5. Pass the owning subsystem prerequisites.
+6. Perform controlled hardware tests at minimum safe ranges.
+7. Integrate producers/consumers and test disconnect/restart/recovery.
+8. Review evidence before allowing a dependent stage.
 
-Examples:
+Motor and servo discovery does not authorize raw output. Drivetrain testing uses `/cmd_vel_manual -> savo_control -> savo_perception -> /cmd_vel_safe -> savo_base`; head motion uses its bounded controller. Keep control `STOP` during sensor tests.
 
-| Component          | Standalone test                          |
-| ------------------ | ---------------------------------------- |
-| BNO055 IMU         | `tools/diag/sensors/imu_test.py`         |
-| Wheel encoders     | `tools/diag/motion/encoders_test.py`     |
-| RPLIDAR A1         | `rplidar_ros` driver, `ros2 topic echo`  |
-| UPS HAT            | `bat.py`, `i2cdetect -y 1`               |
-| RealSense D435     | `realsense-viewer` or `rs-enumerate-devices` |
-| ReSpeaker mic      | `arecord -l`, `aplay` passthrough        |
+## Device and owner map
 
-### 2. Confirm the interface works
+| Component | Owner | Host | Detailed plan | Phase 7 status |
+| --- | --- | --- | --- | --- |
+| PCA9685/motors | `savo_base` (chip initialization interaction with head requires review) | Core | [Base](base_test_plan.md) | Current hardware regression required |
+| Four encoders/BNO055 | `savo_localization` | Core | [Localization](localization_test_plan.md) | Current hardware regression required |
+| RPLIDAR A1 | `savo_lidar` | Core | [LiDAR](lidar_test_plan.md) | Current hardware regression required |
+| ToFs/TCA9548A/ultrasonic | `savo_perception` | Core | [Perception](perception_test_plan.md) | Threshold/identity regression required |
+| Pan/tilt/Pi Camera | `savo_head` | Core | [Head](head_test_plan.md) | Limits/mount/camera regression required |
+| Core/Edge UPS and base ADC | `savo_power` | Both | [Power](power_test_plan.md) | Calibration/fault testing required |
+| RealSense D435 | `savo_realsense` | Edge | [RealSense](realsense_test_plan.md) | USB/profile/restart required |
+| ReSpeaker/speaker | `savo_speech` | Edge | [Speech](speech_test_plan.md) | ALSA/acoustic validation required |
+| Display/touch | `savo_ui` | Edge | [UI](ui_test_plan.md) | Framebuffer/touch validation required |
 
-Check that the host can see the device:
+## Evidence
 
-- I2C: `sudo i2cdetect -y 1` shows the correct address
-- USB: `lsusb` shows the device
-- GPIO: pins claimed without error, signal readable
-- Audio: device appears in `arecord -l` / `aplay -l`
+Retain terminal logs, device identity, configuration, frame/rate/timestamp samples, measurements/instrument identity, fault/restart results and physical media where useful. Small reviewed artifacts may live under `docs/assets/testing`; large/sensitive bags/audio/video belong in controlled external storage with a digest manifest.
 
-### 3. Save command output or screenshot
-
-Record proof before moving on. Store in `docs/assets/`:
-
-```
-docs/assets/hardware/        ← photos, wiring, HAT photos
-docs/assets/testing/         ← terminal output screenshots, RViz captures
-docs/assets/screenshots/     ← UI or tool screenshots
-```
-
-Paste key output lines into the relevant validation table (see below).
-
-### 4. Integrate into the ROS 2 package
-
-Only after standalone validation passes, wire the component into the relevant ROS 2 package:
-
-- Add the driver node or hardware interface
-- Write or update the launch file
-- Publish to the correct topic
-
-### 5. Test package-level behaviour
-
-Confirm the ROS 2 package publishes correct data:
-
-```bash
-ros2 topic echo /topic_name
-ros2 topic hz /topic_name
-```
-
-Check message content, frame IDs, and publish rate against the expected values in the package test plan.
-
-## Validation tables
-
-Component-level validation status lives in two separate files:
-
-| File | Covers |
-| ---- | ------ |
-| [`savo_core_component_validation.md`](savo_core_component_validation.md) | `savo-core` hardware: motors, encoders, IMU, LiDAR, ToF, UPS |
-| [`savo_edge_component_validation.md`](savo_edge_component_validation.md) | `savo-edge` hardware: RealSense, mic, speaker, STT, TTS, VO, Docker |
-
-Package-level test plans live in the same `testing/` folder, named per package.
+The older [Core](savo_core_component_validation.md) and [Edge](savo_edge_component_validation.md) sheets are status summaries only. The detailed plans are authoritative.

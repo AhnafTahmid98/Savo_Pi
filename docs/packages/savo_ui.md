@@ -127,4 +127,5 @@ Preserve read-only contract; selector/default, framebuffer/touch devices, freshn
 - [Implementation README](../../savo_ws/src/edge/savo_ui/README.md)
 - [Edge architecture](../architecture/savo_edge_architecture.md)
 - [Edge component validation](../testing/savo_edge_component_validation.md)
+- [UI test plan](../testing/ui_test_plan.md)
 - [Ownership matrix](package_ownership_matrix.md)

@@ -37,9 +37,32 @@ Reviewer:
 | PASS | Requirement executed successfully with evidence |
 | BLOCKED | Prerequisite or authorization is missing; test was not executed |
 | FAIL | Requirement was executed and did not meet criteria |
+| NOT RUN | In scope but not yet executed |
 | N/A | Outside the explicitly approved acceptance scope, with written rationale |
 
 Any safety-critical FAIL blocks motion acceptance. A BLOCKED item may permit only a narrower non-motion scope when that limitation is explicitly approved.
+
+## Component evidence map
+
+The checklist summarizes evidence; it does not duplicate component cases. Attach results for these IDs before marking the corresponding gate PASS:
+
+| Acceptance gate | Required detailed evidence |
+| --- | --- |
+| A–B repository/build | BRG-001–006, OBS-001–004, SYS-001–002 and affected package test output |
+| C power/physical | PWR-004–008 and approved physical inspection record |
+| D geometry/TF | DSC-001–010 and live TF owner audit |
+| E network/storage/services | BRG-009/010, BRD-004/008, LCT-003/009, SUP-007/008, OBS-005/007 |
+| F safe-idle | BRG-007–010, SUP-003/009 |
+| G base/encoders | BAS-005–009, LOC-005 |
+| H control/authority | CTL-001–010, SUP-004/005/010 |
+| I near-field safety | PER-001–006/010 |
+| J LiDAR/localization | LID-001–007, LOC-001–008 |
+| K Edge/bridge | RLS-001–007, VO-001–009, SPH-001–010, UI-001–007, BRD-001–009 |
+| L supervisor/power | SUP-001–010, PWR-001–008 |
+| M floor motion | SYS-007–008 |
+| N mapping/release | MAP-001–014, LCT-001–010 |
+| O navigation/locations | NAV-001–014, LCT-010 |
+| P recovery/return | SYS-015–016 and incident/rollback evidence |
 
 ## Gate A — repository and release identity
 
@@ -490,18 +513,18 @@ Expiry/retest date:
 
 ## Final acceptance decision
 
-| Scope | PASS | BLOCKED | FAIL | N/A |
-| --- | --- | --- | --- | --- |
-| Source and target builds | [ ] | [ ] | [ ] | [ ] |
-| Safe-idle distributed system | [ ] | [ ] | [ ] | [ ] |
-| Wheels-raised motion | [ ] | [ ] | [ ] | [ ] |
-| Guarded manual floor motion | [ ] | [ ] | [ ] | [ ] |
-| Manual mapping and release | [ ] | [ ] | [ ] | [ ] |
-| Autonomous mapping | [ ] | [ ] | [ ] | [ ] |
-| Production navigation | [ ] | [ ] | [ ] | [ ] |
-| Speech/UI/SavoMind integration | [ ] | [ ] | [ ] | [ ] |
-| D435 voxel navigation | [ ] | [ ] | [ ] | [ ] |
-| Recovery and rollback | [ ] | [ ] | [ ] | [ ] |
+| Scope | PASS | BLOCKED | FAIL | NOT RUN | N/A |
+| --- | --- | --- | --- | --- | --- |
+| Source and target builds | [ ] | [ ] | [ ] | [ ] | [ ] |
+| Safe-idle distributed system | [ ] | [ ] | [ ] | [ ] | [ ] |
+| Wheels-raised motion | [ ] | [ ] | [ ] | [ ] | [ ] |
+| Guarded manual floor motion | [ ] | [ ] | [ ] | [ ] | [ ] |
+| Manual mapping and release | [ ] | [ ] | [ ] | [ ] | [ ] |
+| Autonomous mapping | [ ] | [ ] | [ ] | [ ] | [ ] |
+| Production navigation | [ ] | [ ] | [ ] | [ ] | [ ] |
+| Speech/UI/SavoMind integration | [ ] | [ ] | [ ] | [ ] | [ ] |
+| D435 voxel navigation | [ ] | [ ] | [ ] | [ ] | [ ] |
+| Recovery and rollback | [ ] | [ ] | [ ] | [ ] | [ ] |
 
 Approved operating envelope:
 
@@ -527,4 +550,6 @@ Safety reviewer:
 Project owner:
 Decision date/time:
 Overall decision: ACCEPTED / CONDITIONALLY ACCEPTED / BLOCKED / REJECTED
+Explicit return-to-service authorization: YES / NO
+Authorization record:
 ```

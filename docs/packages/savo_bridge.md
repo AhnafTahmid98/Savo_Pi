@@ -119,5 +119,5 @@ Every new command requires explicit schema, bounds, freshness/authority tests, a
 - [Implementation README](../../savo_ws/src/shared/savo_bridge/README.md)
 - [Speech/intent flow](../architecture/speech_intent_flow.md)
 - [Edge architecture](../architecture/savo_edge_architecture.md)
+- [Bridge test plan](../testing/bridge_test_plan.md)
 - [Ownership matrix](package_ownership_matrix.md)
-

@@ -119,4 +119,5 @@ Role membership, defaults, required-component policy, path forwarding, and inclu
 - [Implementation README](../../savo_ws/src/shared/savo_bringup/README.md)
 - [Full bringup closure](../FULL_BRINGUP_CLOSURE_2026-08-01.md)
 - [Production startup](../deployment/production_startup.md)
+- [Bringup test plan](../testing/bringup_test_plan.md)
 - [Ownership matrix](package_ownership_matrix.md)

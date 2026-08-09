@@ -1,102 +1,86 @@
-# Base test plan
+# Base Test Plan
+
+## Objective
+
+Verify the production C++ `savo_base` path is the sole drivetrain executor and fails closed for zero, STOP, stale/invalid commands, publisher loss, board errors, and shutdown before any guarded floor use.
+
+## Scope
+
+Configuration parsing, PCA9685 ownership, mecanum mixing/sign/inversion, `/cmd_vel_safe`, clamp/breakaway behavior, watchdog, diagnostic state, hardware initialization/write failure, wheel-raised directions, and guarded floor behavior.
+
+## Test ownership
+
+Base maintainer owns BAS-001–004. Hardware stages require a motion-test lead, emergency-stop operator, and floor-test observer.
+
+## Safety classification
+
+BAS-001–004 are `STATIC`, `UNIT`, `PC`, or `TARGET-NON-HARDWARE` / `NO-MOTION`; BAS-005–008 are `HARDWARE-NON-ACTUATING` or `HARDWARE-ACTUATING` / `WHEELS-RAISED` then `GUARDED-FLOOR-MOTION`; BAS-009 is `FAULT-INJECTION`/`RECOVERY`.
 
 ## Preconditions
 
-Do not run a movement test until all of the following are true:
+- Geometry is measured/reviewed/locked for motion stages.
+- Wiring, power, E-stop and stands are approved; all wheels clear the floor for BAS-006–007.
+- Core safe-idle reports control `STOP`; perception and base watchdog are fresh.
+- Four encoder signs are observed by localization, though base does not own encoders.
+- PCA9685 chip-wide initialization sharing with head has an approved single-owner/concurrency decision.
 
-- physical geometry is measured, reviewed, and locked;
-- the drivetrain wiring inspection is complete;
-- the base battery is charged and its current/voltage telemetry is healthy;
-- the physical E-stop is reachable and already tested;
-- two operators are present;
-- the robot is secured on rated stands with every wheel clear of the floor;
-- the exclusion zone is clear;
-- core bringup is running with control initially in `STOP`;
-- LiDAR, perception safety, base watchdog, and control health are fresh.
+## Required hardware
 
-Required hardware is the complete drivetrain, four encoder channels, base power
-monitor, rated stands, and physical E-stop.
+Core Pi, PCA9685/Freenove motor interface, four motors/wheels, base battery/current observation, rated stands and physical emergency stop. Four encoders are required for correlated direction evidence.
 
-## Non-moving checks
+## Required software / configuration
 
-From the repository root:
+ROS 2 Jazzy; base board/driver/kinematics/topics/watchdog YAML; dry-run backend; supported `motor_direction_test.py` and odometry diagnostics. Raw board writes are not a routine test interface.
 
-```bash
-python3 tools/diag/motion/odom_test.py \
-  --timeout 5 \
-  --output log/diag/odom_stationary.json
-```
+## Interfaces under test
 
-Expected result: wheel odometry is available at a plausible rate and stationary
-drift remains within the diagnostic threshold. Missing or stale odometry is
-`BLOCKED`; invalid data or excessive drift is `FAIL`.
+Input `/cmd_vel_safe`, `/safety/stop`, `/safety/slowdown_factor`; base/watchdog/state/heartbeat/diagnostic outputs. No service/action or TF is owned.
 
-## Wheels-raised direction test
+## Test stages
 
-The operator must explicitly place the approved control system in `MANUAL`.
-The diagnostic publishes only to `/cmd_vel_manual`; it never accesses motor
-hardware directly and always sends five zero commands during cleanup.
+| Test ID | Stage / class | Verification and acceptance |
+| --- | --- | --- |
+| BAS-001 | T0 `STATIC` | Confirm production C++ driver, sole `/cmd_vel_safe` input, board bus/address/channels, current all-wheel inversions, configured `max_duty`, reversal quench, finite watchdog and zero-on-shutdown. Compare wheelbase/track/radius with locked geometry. |
+| BAS-002 | T1 `UNIT`/`PC` | Build/tests pass for configuration, mecanum mix, wheel commands, clamp/scaling, dry-run, topics and watchdog logic. Test existence is not physical validation. |
+| BAS-003 | T2 `TARGET-NON-HARDWARE` | Run dry-run backend with drivetrain power isolated: zero/startup/STOP, forward/reverse/strafe/yaw mixes, clamp, slowdown, reversal quench, publisher loss, shutdown and diagnostics match active config. |
+| BAS-004 | T6 `FAULT-INJECTION` | In dry-run/source-supported injection, NaN/non-finite/invalid slowdown (where implemented), board init/write failure and stale commands produce zero/unhealthy state. Record unsupported injection as N/A, not PASS. |
+| BAS-005 | T3 `HARDWARE-NON-ACTUATING` | Detect/configure PCA9685 with motor power isolated; confirm one owner, startup zero, board health, channel map, and no output after shutdown. |
+| BAS-006 | T4 `HARDWARE-ACTUATING` | Wheels raised: use the supported `/cmd_vel_manual -> control -> perception -> /cmd_vel_safe` path and `motor_direction_test.py --allow-motion --wheels-raised` at its approved minimum. Verify each FL/FR/RL/RR sign and encoder sign one direction at a time. |
+| BAS-007 | T4 `HARDWARE-ACTUATING` | Wheels raised: verify forward/reverse/left/right/yaw patterns, breakaway/minimum useful command, output clamp, slowdown/STOP, command release, publisher loss/watchdog, and shutdown zeroing. |
+| BAS-008 | T5 `INTEGRATION` | After all earlier physical gates pass, guarded floor tests verify low-speed direction, mecanum strafe/yaw and measured response/stop behavior inside the approved envelope. No threshold is invented if the repository lacks one. |
+| BAS-009 | T6/T7 `FAULT-INJECTION`/`RECOVERY` | Safely interrupt publisher, safety input, or driver process in wheels-raised setup; output becomes zero and restart remains STOP with no replay. Hardware failure injection is only performed if electrically safe and supported. |
 
-Run one direction at a time:
+## Pass criteria
 
-```bash
-python3 tools/diag/motion/motor_direction_test.py \
-  --allow-motion \
-  --wheels-raised \
-  --direction forward \
-  --speed 0.08 \
-  --duration 0.5 \
-  --output log/diag/motor_forward.json
-```
+Only the C++ driver executes motors; all wheel/encoder signs match; output is bounded; STOP/watchdog/publisher loss/shutdown zero every channel; failures are diagnostic and fail closed; guarded behavior matches the approved envelope.
 
-Valid directions are:
+## Blocked criteria
 
-```text
-forward
-backward
-left
-right
-rotate_left
-rotate_right
-```
+Provisional/inconsistent geometry, unresolved shared PCA9685 ownership, missing E-stop/stands/operators/power evidence, target dependency/build unavailable, or no approved stop-distance/breakaway criterion for acceptance.
 
-Repeat only after the previous result and physical wheel direction have been
-reviewed. The accepted diagnostic bounds are 0.04–0.12 for speed and 0.1–1.0
-seconds for duration.
+## Failure criteria
 
-Expected result: wheels follow the documented mecanum direction, safety remains
-clear, releasing the command returns gated velocity to zero, and STOP remains
-immediately available. Wrong direction, encoder loss, safety activation,
-unexpected movement, or nonzero safe velocity after cleanup is `FAIL`.
+Nonzero startup/shutdown/stale output, wrong wheel sign/channel, bypass input, watchdog miss, unclamped output, unsafe board recovery, or hardware initialization falsely healthy.
 
-## Odometry calibration recording
+## Abort criteria
 
-This diagnostic does not command motion. An operator performs one measured,
-slow, approved movement while the tool records odometry:
+Immediately E-stop and remove drive power for uncommanded motion, inability to stop, stand movement, wrong wheel, motor stall/heat/smell, electrical fault, person entering zone, stale safety/localization, or unexpected command owner.
 
-```bash
-python3 tools/diag/motion/odom_calibration.py \
-  --allow-motion \
-  --timeout 20 \
-  --expected-distance-m 1.0 \
-  --output log/diag/odom_one_metre.json
-```
+## Evidence to retain
 
-For an approved rotation, use `--expected-yaw-rad` instead. Compare measured
-odometry with the independently measured physical distance or angle; do not
-change calibration automatically from one run.
+Commit/host/config/geometry, board/channel/owner inspection, input/mux/safe/output/watchdog traces, current/temperature if available, each wheel/encoder direction result and video, stop/publisher-loss timings, floor measurements, operators/reviewer.
 
-## Abort and cleanup
+## Regression triggers
 
-Abort immediately if a person enters the exclusion zone, the chassis shifts on
-its stands, temperature/current exceeds the hardware limit, telemetry becomes
-stale, a wheel behaves unexpectedly, or STOP is not immediate.
+Base source; motor board/GPIO/PWM/channel/address; inversion/sign; radius/wheelbase/track; clamp/breakaway/watchdog/quench; `/cmd_vel_safe`; power/wiring; PCA ownership; controller/perception contract.
 
-Cleanup:
+## Current validation status
 
-1. engage STOP and, when needed, the physical E-stop;
-2. verify `/cmd_vel_safe` is zero;
-3. remove drivetrain power before touching hardware;
-4. save JSON results, current logs, encoder plots, operator names, timestamps,
-   and video;
-5. mark the result `PASS`, `FAIL`, or `BLOCKED` honestly.
+Automated source tests and a historical physical baseline exist. Current-source geometry, shared PCA initialization, wheel polarity, breakaway, watchdog/STOP and floor response require physical regression.
+
+## Related documentation
+
+- [Base package](../packages/savo_base.md)
+- [Control plan](control_test_plan.md)
+- [Perception plan](perception_test_plan.md)
+- [Abort criteria](failure_and_abort_criteria.md)

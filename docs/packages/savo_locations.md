@@ -143,5 +143,5 @@ Schema, normalization/identity, uniqueness, pose/map rules, service names, write
 - [Implementation README](../../savo_ws/src/core/savo_locations/README.md)
 - [Mapping/navigation architecture](../architecture/mapping_navigation_architecture.md)
 - [Recovery operations](../deployment/recovery_operations.md)
+- [Locations test plan](../testing/locations_test_plan.md)
 - [Ownership matrix](package_ownership_matrix.md)
-

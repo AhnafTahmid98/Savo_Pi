@@ -1,48 +1,49 @@
-# Full Robot SAVO staged test plan
+# Full Robot Staged Test Plan
 
-No stage may be skipped. Record operator, UTC time, software revision, profile,
-hardware serials, commands, logs, PASS/FAIL/BLOCKED, and abort reason. A failure
-or abort blocks every later stage until reviewed.
+## Purpose and authority
 
-| # | Stage | Prerequisites and hardware | Exact command or action | Expected result | Failure / abort condition | Cleanup and record |
-| ---: | --- | --- | --- | --- | --- | --- |
-| 1 | Static inspection | Repository checkout; no robot power | `deploy/common/validate_pre_real_test_readiness.sh` | Software report is PASS or physical-only BLOCKED | Any FAIL | Save JSON and human report |
-| 2 | Power-off wiring inspection | Robot unpowered; wiring diagram; meter | Follow `docs/hardware/measurement_checklist.md` | Polarity, fusing, strain relief match drawings | Unknown polarity, short, loose wire | Keep power off; photograph and record |
-| 3 | Core safe-idle boot | Core Pi only; E-stop accessible | `SAVO_ROBOT_MODE=safe_idle deploy/core/run_core.sh` | Control remains STOP; no motor motion | Any wheel motion, smoke, overcurrent, STOP missing | E-stop and remove drive power; save logs |
-| 4 | Edge safe-idle boot | Edge Pi, display, camera, audio | `SAVO_ROBOT_MODE=safe_idle SAVO_START_UI=false deploy/edge/run_edge.sh` | Edge starts with optional devices honest/stale | Unexpected actuation or restart loop | Stop with Ctrl+C; save logs |
-| 5 | Core-edge DDS discovery | Direct Ethernet; matching domain/RMW | `ros2 node list` on both Pis | Required peer nodes visible | Flapping discovery or wrong domain | Stop bringups; capture network state |
-| 6 | Observer discovery | Trusted observer computer | `deploy/observer/run_observer.sh` | Read-only graph/dashboard connects | Observer publishes control topics | Stop observer; retain graph report |
-| 7 | TF validation | Both Pis; sensors stationary | `python3 tools/diag/infra/tf_tree_check.py` | Required frames are connected and fresh | Missing looped or jumping transform | Stop test; save JSON |
-| 8 | Sensor validation | LiDAR, IMU, encoders, range sensors, D435 | Run nonmoving sensor diagnostics individually | Real samples, timestamps, frames valid | Missing/stale/implausible data | Stop sensor nodes; save results |
-| 9 | Power validation | UPS/base telemetry; meter | `python3 tools/diag/power/current_draw_logger.py` | All required rails and telemetry present | Undervoltage, excess current, overheating | Remove drive power; save trace |
-| 10 | Audio validation | ReSpeaker and speaker; quiet area | Follow `docs/testing/speech_test_plan.md` | Capture/playback works with no feedback loop | Sustained feedback, clipping, missing gate | Mute speaker; save audio metadata only |
-| 11 | UI validation | Edge display/touch | `python3 tools/diag/ui/screen_ui_test.py` | Live/stale states match ROS state | UI implies readiness when data is stale | Stop UI; save screenshots/logs |
-| 12 | Wheels-raised motor validation | Geometry locked; robot secured on stands; two operators | Follow `docs/testing/base_test_plan.md`; run `motor_direction_test.py --allow-motion --wheels-raised` one direction at a time | Correct wheel direction at bounded command | Robot shifts, wrong wheel, STOP not immediate | E-stop, remove motor power, record video |
-| 13 | Safety-stop validation | Stage 12 passed; obstacle fixtures | Run safety plan with drive raised | Every stop path forces zero output | Any nonzero gated velocity after stop | E-stop and remove power; save traces |
-| 14 | Short guarded floor movement | Clear taped zone; spotter; E-stop | Approved bounded control test only | Slow commanded motion matches direction | Person enters zone, drift, localization jump | E-stop; return robot manually |
-| 15 | Manual mapping | Stages 7–14 passed | `ros2 launch savo_bringup manual_mapping.launch.py` | Map session records and saves without bypass | Localization/safety/release error | Cancel mapping; preserve session logs |
-| 16 | Map save and verification | Completed manual session | Use typed map save and verification interfaces | Artifacts and hashes verify | Missing artifact/hash/quality report | Do not promote; archive failure |
-| 17 | Autonomous mapping | Manual flow proven; guarded area | `ros2 launch savo_bringup autonomous_mapping.launch.py` | Authorized mission completes/cancels safely | Safety, localization, coverage, timeout fault | STOP/cancel; retain recovery journal |
-| 18 | AprilTag registration and review | Verified map; physical tags | Use mapped-location registration and operator review | Candidate correlates to tag/map/session | Ambiguous tag or unreviewed candidate | Reject candidate; save evidence |
-| 19 | AM-8 approval and release | All AM-8 inputs valid; authorized operator | Use documented correlated review CLI | Real release ID and atomic active context | Any gate missing or mismatched correlation | Do not retry blindly; preserve journal |
-| 20 | Saved-map LiDAR-only navigation | Approved release; AMCL ready | Launch production navigation with voxel disabled | Named approved goal admitted and reached | Wrong map/release, safety/readiness loss | Cancel/STOP; save Nav2 and supervisor logs |
-| 21 | Cancellation and recovery tests | Stage 20 passed | Cancel typed navigation at defined points | Zero motion and recoverable STOP state | Continued motion or stale active command | E-stop; save correlation IDs |
-| 22 | D435 filtering validation | LiDAR navigation proven | Enable obstacle-cloud producer, not voxel layer | Filtered points/frames/bandwidth meet limits | Floor/self points or stale cloud | Disable D435 producer; retain bag/log |
-| 23 | Optional voxel profile validation | Stage 22 signed off; geometry locked | Explicit validated voxel profile only | Obstacles affect costmap without false blocks | Any unsafe clearing/marking or overload | Disable voxel profile and revert to LiDAR |
+This is the dependency-ordered integration sequence for Robot Savo. It does not replace component plans or authorize motion. A `FAIL` or unresolved prerequisite `BLOCKED` prevents every dependent later stage. Use the exact result vocabulary and evidence rules in [test evidence guidelines](test_evidence_guidelines.md).
 
-The plan never grants approval to lock geometry or AM-8 automatically.
+Physical procedures are written here but were not executed during the Phase 7 documentation audit.
 
-## Hardware-free software gate
+## Test ownership and safety
 
-Before copying the workspace to either Pi, run the complete affected-package
-build and test gate on the ROS 2 Jazzy development PC:
+The test lead owns the run record; package owners own component results; an emergency-stop operator and independent reviewer are mandatory for actuating stages. Follow [universal failure and abort criteria](failure_and_abort_criteria.md). `SYS-001`–`SYS-006` are `NO-MOTION`; `SYS-007` begins `WHEELS-RAISED`; `SYS-008` onward may use `GUARDED-FLOOR-MOTION` only after explicit reauthorization.
+
+## Staged sequence
+
+| Test ID | Gate | Required prerequisite evidence | Minimum procedure / acceptance | Later scope blocked on FAIL/BLOCKED |
+| --- | --- | --- | --- | --- |
+| SYS-001 | Source/static validation | Exact commit/worktree | Run the three repository validators, package/interface/link/command audits and `git diff --check`; no repository FAIL or unexplained mismatch | All target work |
+| SYS-002 | Clean PC/role builds | SYS-001 PASS; ROS 2 Jazzy environment | Run hardware-free regression where supported, then clean Core/Edge/observer builds/tests; retain `colcon test-result --verbose` | Target commissioning |
+| SYS-003 | Fresh-install commissioning | SYS-002 PASS; target identity | Follow setup checklists for OS/ROS/dependencies/permissions/network/time/storage/systemd without starting motion | Distributed runtime |
+| SYS-004 | Safe-idle distributed bringup | BRG-001–010 applicable PASS; Core STOP | Start Core then Edge with approved safe-idle/profile; one owner per component; readiness/heartbeat/stale/shutdown/restart evidence | Live hardware tests |
+| SYS-005 | Non-actuating hardware | Description measurement process and electrical inspection | Run DSC, LID, LOC stationary, RLS, PWR, HED camera, SPH devices, UI and observer non-actuating cases; lock geometry only after review | Actuator tests |
+| SYS-006 | Safety/authority non-motion integration | SYS-005 applicable PASS | Run CTL/PER/BAS dry-run, SUP/BRD/locations persistence/fault cases; prove STOP, stale, authority, socket, backup and release rejection | Motion authority |
+| SYS-007 | Wheels-raised base/control/perception | Locked geometry; E-stop/stands/operators; BAS/CTL/PER prerequisites PASS | Execute BAS-006/007, CTL-009 and PER-005 one bounded direction/case at a time; include encoder signs, STOP/watchdog and publisher loss | Floor motion |
+| SYS-008 | Guarded floor/localization | SYS-007 PASS; clear course | Execute BAS-008, CTL-010, PER-006 and LOC-006; measure direction, stop behavior, scale/drift and safety envelope; missing approved thresholds keep acceptance BLOCKED | Mapping/nav |
+| SYS-009 | Manual mapping and map verification | SYS-008 and LiDAR/localization PASS | Execute MAP-008–010: manual mapping first, save, verify artifacts/hash/quality; do not promote automatically | Release/nav/autonomous mapping |
+| SYS-010 | Operator map/location release | Verified map, quality and reviewer | Execute MAP-013/014 and LCT-007/010 as applicable; explicit operator review; immutable map/location/geometry context and rollback evidence | Production navigation |
+| SYS-011 | LiDAR-only navigation and named locations | SYS-010 PASS; supervisor ready | Execute NAV-009–013 using reduced guarded limits; validate goal admission, routes, cancel/revoke/recovery and named destinations | Optional voxel/acceptance |
+| SYS-012 | Autonomous mapping | Manual workflow and guarded nav/control behavior proven | Execute MAP-011/012 and fault/cancel cases in controlled area; semantic candidates remain operator-reviewed | System interaction acceptance |
+| SYS-013 | Edge/SavoMind interaction | Speech/UI/bridge component cases PASS | Execute SPH-006–010, UI-006/007 and BRD-007–009; typed operations remain subject to Core readiness/authority | Full integration |
+| SYS-014 | Optional D435 voxel | RLS/VO stream evidence, PER-008 reviewed, LiDAR-only nav PASS | Execute PER-009/010 and NAV-014; self/floor/freshness/performance/costmap evidence. On failure disable voxel and retain LiDAR-only profile | Voxel release only |
+| SYS-015 | Failure/recovery/rollback | All affected normal paths PASS | Exercise approved non-destructive failure, cancellation, restart, backup/restore and rollback cases; no unsafe replay; incidents resolved | Acceptance |
+| SYS-016 | Real-robot acceptance | All requested-scope component/system IDs PASS; blockers/deviations closed/approved | Complete the [acceptance checklist](real_robot_acceptance_checklist.md), record operating envelope and explicit return-to-service authority | Production operation |
+
+## Hardware-free regression gate
+
+The repository script is hardware-free: it validates source, checks dependencies, builds/tests its explicit affected-package list, generates launch arguments, and runs readiness validation. It never launches robot nodes or publishes commands.
 
 ```bash
 cd ~/Savo_Pi
-deploy/common/run_pre_real_test_regression.sh --clean-affected
+bash deploy/common/run_pre_real_test_regression.sh --clean-affected
 ```
 
-This command performs source validation, dependency checking, affected-package
-builds/tests, and launch-argument generation. It never launches robot nodes. A
-`BLOCKED` readiness result caused only by provisional geometry or other physical
-prerequisites is expected; any repository `FAIL` must be corrected first.
+Run it only on a supported ROS 2 Jazzy PC after reviewing its current source. Its affected-package list is not all 20 packages and therefore does not replace clean role builds. A physical-prerequisite BLOCKED result may remain, but any repository FAIL blocks SYS-003.
+
+## Stage evidence and release decision
+
+Each SYS result links the underlying component IDs, commit/hosts/config/hardware/geometry/map/location identity, raw artifacts, measurements, deviations and reviewer. A narrower scope may mark unrelated optional stages N/A with rationale; no motion-related prerequisite may be waived silently.
+
+Successful documentation, source validation or safe-idle bringup is not production acceptance. SYS-016 alone records the requested operating envelope and return-to-service decision.

@@ -1,5 +1,7 @@
 # Savo Control Test Plan
 
+Test identifiers map to the existing detailed stages: `CTL-001`=C0, `CTL-002`=C1, `CTL-003`=C2, `CTL-004`=C3, `CTL-005`=C4, `CTL-006`=C5, `CTL-007`=C6, `CTL-008`=C7, `CTL-009`=C8, and `CTL-010`=C9. C0–C7 are `STATIC`/`UNIT`/`SOURCE-CONTRACT`/`PC`/`TARGET-NON-HARDWARE` and `NO-MOTION`; C8 is `HARDWARE-ACTUATING`/`WHEELS-RAISED`; C9 is `INTEGRATION`/`GUARDED-FLOOR-MOTION`.
+
 ## Objective
 
 Validate that `savo_control` owns command selection and shaping correctly, starts in `STOP`, routes only the authorized command source, responds to external safety stops, and coordinates bounded recovery without bypassing `savo_perception` or `savo_base`.
@@ -323,3 +325,11 @@ Retain:
 ## Acceptance
 
 `savo_control` is accepted for the tested scope only when all required stages pass, every command source remains within the authority model, STOP is fail-closed, stale commands decay to zero, and physical behavior matches the configured limits.
+
+## Blocked criteria and current validation status
+
+A missing target build, locked geometry, base/perception/localization prerequisite, E-stop/operators, or approved physical acceptance threshold is `BLOCKED`. Automated source tests exist; CTL-009/010 require current hardware evidence and are `NOT RUN` unless a dated result is linked. Historical physical evidence is a baseline, not current-source PASS.
+
+## Regression triggers and related documentation
+
+Retest for mode/mux priority, lane/topic, timeout, shaper cap/slew, external stop, recovery/stuck/approach/rotate behavior, action interface, supervisor authority or downstream safety/base changes. See [regression matrix](regression_matrix.md), [motion authority](../architecture/motion_authority_model.md), and [base plan](base_test_plan.md).

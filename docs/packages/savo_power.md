@@ -130,5 +130,5 @@ Addresses/channels, calibration curves, thresholds, expected-source policy, and 
 - [Implementation README](../../savo_ws/src/shared/savo_power/README.md)
 - [Power architecture](../hardware/power_architecture.md)
 - [UPS setup](../setup/ups_hat_setup.md)
+- [Power test plan](../testing/power_test_plan.md)
 - [Ownership matrix](package_ownership_matrix.md)
-

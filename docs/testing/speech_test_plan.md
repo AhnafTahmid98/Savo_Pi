@@ -1,128 +1,83 @@
-# Speech test plan
+# Speech Test Plan
+
+## Objective
+
+Verify Edge physical speech I/O, wake/VAD/session bounding, WAV serialization, correlated SavoMind protocol-v2 transport, validated/cancelable playback, microphone gating and honest health. STT/LLM/TTS inference belongs to SavoMind, not `savo_speech`.
+
+## Scope
+
+ALSA discovery/capture/playback, wake word, VAD/segmentation, request/session identity, Unix socket bounds/credentials/timeouts, malformed responses, WAV validation, playback queue/cancel/mic gate/echo prevention, SavoMind/socket loss and recovery.
+
+## Test ownership
+
+Speech maintainer owns SPH-001–006; Edge audio/operator/privacy reviewer owns SPH-007–010; SavoMind owner participates in SPH-006/010.
+
+## Safety classification
+
+All tests are `STATIC`, `UNIT`, `PC`, `TARGET-NON-HARDWARE`, `HARDWARE-NON-ACTUATING`, `INTEGRATION`, `FAULT-INJECTION`, or `RECOVERY` / `NO-MOTION`.
 
 ## Preconditions
 
-- edge safe-idle is running and robot motion remains `STOP`;
-- ReSpeaker capture and speaker playback ALSA devices are confirmed;
-- the room is quiet enough for wake/VAD testing;
-- speaker volume starts low;
-- privacy approval is established;
-- `/run/savomind/speech.sock` is owned by the expected deployment user/group
-  for production testing.
+Edge safe-idle and robot STOP; approved ALSA aliases/devices; low initial speaker volume; representative rooms; privacy approval; production `/run/savomind/speech.sock` owner/group/peer policy recorded.
 
-Required hardware is the ReSpeaker microphone array and the 3.5 mm speaker.
+## Required hardware
 
-## Source and protocol validation
+ReSpeaker capture device, speaker/output path and Edge Pi. No drivetrain actuation is required.
 
-Build and test `savo_speech` first:
+## Required software / configuration
 
-```bash
-cd ~/Savo_Pi/savo_ws
-source /opt/ros/jazzy/setup.bash
-colcon build --packages-up-to savo_speech --symlink-install
-source install/setup.bash
-colcon test --packages-select savo_speech --ctest-args --output-on-failure
-colcon test-result --verbose
-```
+ALSA/PocketSphinx, speech real-robot profile, protocol-v2 docs, fake server for bench only, and production SavoMind endpoint for final integration.
 
-The bounded Unix-socket contract is documented in:
+## Interfaces under test
 
-```text
-savo_speech/docs/savomind_speech_transport_v2.md
-```
+Speech readiness/dashboard/state/transcript/response/playback/result/heartbeat/diagnostics; protocol-v2 Unix socket and PCM/WAV payloads. No ROS command service/action or inference ownership.
 
-## Bench fake-server validation
+## Test stages
 
-The fake server validates framing, request correlation, returned-WAV checks,
-cancellation, playback integration, and restart behavior. It is not STT, LLM,
-or TTS inference and must never be presented as production SavoMind.
+| Test ID | Stage / class | Verification and acceptance |
+| --- | --- | --- |
+| SPH-001 | T0 `STATIC` | Verify audio format/devices, wake/VAD/session/queue/protocol bounds, endpoint/timeouts/optional UID policy, privacy outputs, mic-gate and no motion/inference dispatch. |
+| SPH-002 | T1 `UNIT`/`PC` | Build/tests pass for ALSA configs, buffers/queues, wake/VAD/utterance, WAV, framing/correlation/credentials/timeouts, transport, playback/cancel/mic gate, health and round-trip contract. |
+| SPH-003 | T2 `TARGET-NON-HARDWARE` | Use the package fake server at an explicitly overridden test socket; test lifecycle, request/session correlation, valid mono PCM16 16 kHz return, playback token/ack and cleanup. Fake-server PASS is not production inference evidence. |
+| SPH-004 | T6 `FAULT-INJECTION` | Bench-test missing socket/server, wrong peer where enabled, malformed/oversized/mismatched/late response, invalid WAV/text, timeout, disconnect and unbounded-retry prevention; all fail closed. |
+| SPH-005 | T2/T3 `HARDWARE-NON-ACTUATING` | Enumerate/open intended capture/playback devices; record sample format/channels/rate, levels/clipping, clean close and device contention. |
+| SPH-006 | T5 `INTEGRATION` | Against the exact production SavoMind protocol/version, verify bounded request/session identity, transcript/response correlation, returned WAV validation, playback acknowledgement and that inference remains external. |
+| SPH-007 | T4 `HARDWARE-NON-ACTUATING` | Validate wake word, VAD, pre-roll/utterance segmentation/session timeout in approved quiet/noisy/accent/distance cases. If no formal threshold exists, record measurements and leave acceptance BLOCKED. |
+| SPH-008 | T4 `HARDWARE-NON-ACTUATING` | Validate playback queue/order, cancel at each state, volume bounds, mic gated during playback, no echo/feedback loop and privacy-safe ROS output. |
+| SPH-009 | T6/T7 `FAULT-INJECTION`/`RECOVERY` | Disconnect/reconnect mic/speaker/socket/SavoMind and restart speech; state/readiness becomes unavailable, I/O/playback cancels boundedly, fresh devices/session are required after recovery. |
+| SPH-010 | T5 `INTEGRATION` | UI/bridge/supervisor observe fresh speech state; pending navigation acknowledgement, if selected, remains correlated and still passes bridge/Core admission. Speech never dispatches motor/nav commands directly. |
 
-Terminal 1:
+## Pass criteria
 
-```bash
-source ~/Savo_Pi/savo_ws/install/setup.bash
-ros2 run savo_speech fake_savomind_speech_server.py \
-  --socket /tmp/savomind-speech-test.sock
-```
+Intended devices are stable; wake/VAD/session are bounded; every response matches request/session and valid WAV constraints; playback/cancel/mic gate prevent feedback; failures/restart are honest and bounded; inference/authority remain external.
 
-Launch speech in a bench configuration that explicitly overrides the socket to
-`/tmp/savomind-speech-test.sock` and keeps `savomind.required:=true`. Speak one
-bounded test utterance after the wake word.
+## Blocked criteria
 
-Expected lifecycle:
+Missing ALSA alias/device/privacy approval, SavoMind protocol endpoint/version unavailable, peer policy unresolved, or wake/VAD/latency/accuracy acceptance thresholds not approved.
 
-```text
-listening → recording → sending → transcribing → thinking
-→ synthesizing → playing → completed
-```
+## Failure criteria
 
-The transcript and reply must carry the same request/session correlation and the
-returned audio must be mono PCM16 at 16 kHz. A missing endpoint, wrong request
-ID, malformed frame, oversized response, invalid WAV, timeout, or late response
-must fail closed.
+Wrong device, unbounded capture/session/retry, mismatched/invalid response played, cancellation ignored, mic active causing feedback, raw/private audio exposed, false readiness, or direct robot command path.
 
-## Physical diagnostics
+## Abort criteria
 
-Microphone readiness:
+Mute/cancel/stop on acoustic feedback, clipping, unsafe volume, privacy breach, runaway retry, playback that cannot stop, device heat/electrical issue, or unexpected robot command.
 
-```bash
-cd ~/Savo_Pi
-python3 tools/diag/voice/audio_mic_test.py \
-  --timeout 5 \
-  --output log/diag/audio_mic.json
-```
+## Evidence to retain
 
-Observe one privacy-filtered transcript during an approved utterance:
+Commit/profile/device list/audio metadata (not content unless approved), protocol/server version, correlation IDs/state/latency/reason codes, malformed/timeout cases, wake/VAD measurement table, playback/cancel/mic-gate evidence, restart logs and reviewer.
 
-```bash
-python3 tools/diag/voice/asr_topic_test.py \
-  --timeout 20 \
-  --output log/diag/speech_transcript.json
-```
+## Regression triggers
 
-Observe one response:
+Audio hardware/alias/format, wake/VAD/session/queue/volume, endpoint/credentials/protocol/schema/limits/timeouts, WAV validation/playback/cancel/mic gate, SavoMind model/provider behavior, UI/bridge acknowledgement.
 
-```bash
-python3 tools/diag/voice/tts_topic_test.py \
-  --timeout 20 \
-  --output log/diag/speech_response.json
-```
+## Current validation status
 
-Observe playback completion while another approved component requests the
-utterance; this diagnostic never requests speech itself:
+Automated protocol/audio-runtime coverage and prior protocol-v2 smoke evidence exist. Current ALSA aliases/devices, acoustics, wake/VAD, feedback, latency, recovery and production SavoMind round-trip require Edge validation.
 
-```bash
-python3 tools/diag/voice/audio_speaker_test.py \
-  --expect-playback \
-  --timeout 30 \
-  --output log/diag/audio_playback.json
-```
+## Related documentation
 
-## Production SavoMind gate
-
-Production speech remains `BLOCKED` until the separate SavoMind application
-runs the exact authenticated v2 Unix-socket server and returns:
-
-- matching request ID;
-- bounded transcript;
-- bounded reply;
-- valid mono PCM16 16 kHz TTS WAV bytes;
-- a correlated playback token when pending navigation requires acknowledgement.
-
-After physical playback, `savo_speech` must send the v2 acknowledgement frame.
-SavoMind may revalidate and dispatch pending navigation only after accepting it.
-
-Do not substitute an undocumented HTTP response, filesystem path, or raw Docker
-mount for the agreed contract.
-
-## Expected result, abort, and cleanup
-
-Expected result: capture, wake, VAD, utterance bounds, request correlation,
-returned audio, mic gate, playback, cancellation, and restart behavior all pass.
-Raw continuous microphone audio is not published.
-
-Abort on acoustic feedback, clipping, privacy breach, runaway volume, unbounded
-retry, stale cancellation, or playback that cannot be stopped. Cleanup cancels
-active transport/playback, mutes output, restores mic state, removes temporary
-audio according to policy, and records states, latencies, reason codes, and JSON
-results—not speech content unless explicitly approved.
+- [Speech package](../packages/savo_speech.md)
+- [Speech flow](../architecture/speech_intent_flow.md)
+- [Audio setup](../setup/audio_setup.md)
+- [Bridge plan](bridge_test_plan.md)

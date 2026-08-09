@@ -87,6 +87,13 @@ sudo systemctl daemon-reload
 
 Do not also enable generic `savo.service`, standalone UI, or standalone bridge when distributed bringup owns the same component.
 
+The current `savo_edge.service` also declares `Wants=`/`After=` on
+`savo-ui-runtime.service`, while its distributed launch environment keeps
+`SAVO_START_UI=false`. The renderer emits both units, but this fresh-install
+procedure intentionally does not install the UI runtime unit automatically.
+Resolve and validate the intended UI ownership before installing that companion
+unit; do not install it merely to silence a dependency warning.
+
 ## Safe-idle commissioning
 
 The current Edge defaults are:
