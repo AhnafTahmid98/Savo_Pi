@@ -13,7 +13,6 @@ Full bringup source validation             PASS
 Observer source validation                 PASS
 Pre-real-test readiness                    PASS
 rosdep dependency check                    PASS
-Git whitespace check                       PASS
 
 Aggregate test result: 6189 tests, 0 errors, 0 failures, 384 skipped
 Cppcheck policy: repository default; ament skips known-problematic cppcheck 2.13
