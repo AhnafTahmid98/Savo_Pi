@@ -1,16 +1,54 @@
 Robot Savo PC validation — Git identity
-Run ID: 20260809T021142Z
-Date: 2026-08-09T05:11:42+03:00
+Run ID: 20260809T063128Z
+Date: 2026-08-09T09:31:28+03:00
 Host: ahnaf-tahmid-B760M-PG-SONIC-WiFi
 
 Commit:
-eb71c26ac7dfbeaf9c2e44df3ba9f79117c7d4b6
+fa8053a58514451d97fb2eb151b8a2842db57104
 
 Branch:
 master
 
-Status:
-?? docs/logs/
+Remote master:
+fa8053a58514451d97fb2eb151b8a2842db57104
+
+Status before evidence generation:
+ D docs/logs/validation/PC/colcon_build_all.txt
+ D docs/logs/validation/PC/colcon_test_all.txt
+ D docs/logs/validation/PC/colcon_test_result_all.txt
+ D docs/logs/validation/PC/diagnostics/am3_runtime_repeat.txt
+ D docs/logs/validation/PC/diagnostics/am7_runtime_repeat.txt
+ D docs/logs/validation/PC/full_bringup_validation.txt
+ D docs/logs/validation/PC/git_diff_check.txt
+ M docs/logs/validation/PC/git_revision.txt
+ D docs/logs/validation/PC/hardware_free_regression.txt
+ D docs/logs/validation/PC/observer_validation.txt
+ D docs/logs/validation/PC/package_inventory.txt
+ D docs/logs/validation/PC/packages/savo_base_colcon_test.txt
+ D docs/logs/validation/PC/packages/savo_bridge_colcon_test.txt
+ D docs/logs/validation/PC/packages/savo_bringup_colcon_test.txt
+ D docs/logs/validation/PC/packages/savo_control_colcon_test.txt
+ D docs/logs/validation/PC/packages/savo_description_colcon_test.txt
+ D docs/logs/validation/PC/packages/savo_head_colcon_test.txt
+ D docs/logs/validation/PC/packages/savo_lidar_colcon_test.txt
+ D docs/logs/validation/PC/packages/savo_localization_colcon_test.txt
+ D docs/logs/validation/PC/packages/savo_locations_colcon_test.txt
+ D docs/logs/validation/PC/packages/savo_mapping_colcon_test.txt
+ D docs/logs/validation/PC/packages/savo_msgs_colcon_test.txt
+ D docs/logs/validation/PC/packages/savo_nav_colcon_test.txt
+ D docs/logs/validation/PC/packages/savo_observer_colcon_test.txt
+ D docs/logs/validation/PC/packages/savo_perception_colcon_test.txt
+ D docs/logs/validation/PC/packages/savo_power_colcon_test.txt
+ D docs/logs/validation/PC/packages/savo_realsense_colcon_test.txt
+ D docs/logs/validation/PC/packages/savo_speech_colcon_test.txt
+ D docs/logs/validation/PC/packages/savo_supervisor_colcon_test.txt
+ D docs/logs/validation/PC/packages/savo_ui_colcon_test.txt
+ D docs/logs/validation/PC/packages/savo_vo_colcon_test.txt
+ D docs/logs/validation/PC/pre_real_test_readiness.txt
+ D docs/logs/validation/PC/ros_environment.txt
+ D docs/logs/validation/PC/rosdep_check.txt
+ D docs/logs/validation/PC/system_info.txt
+ D docs/logs/validation/PC/validation_summary.txt
 
 Latest commit:
-eb71c26  savo
+fa8053a  savo

@@ -1,17 +1,19 @@
-Robot Savo package PC validation
-Run ID: 20260809T021142Z
-Package: savo_lidar
-Date: 2026-08-09T05:21:53+03:00
+Robot Savo PC validation
+Run ID: 20260809T063128Z
+Step: package test savo_lidar
+Date: 2026-08-09T09:31:28+03:00
 Host: ahnaf-tahmid-B760M-PG-SONIC-WiFi
-Commit: eb71c26ac7dfbeaf9c2e44df3ba9f79117c7d4b6
-
+Commit: fa8053a58514451d97fb2eb151b8a2842db57104
+Executor: sequential
+Cppcheck policy: repository default; ament skips known-problematic cppcheck 2.13
+Output:
 Starting >>> savo_lidar
 UpdateCTestConfiguration  from :/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_lidar/CTestConfiguration.ini
 Parse Config file:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_lidar/CTestConfiguration.ini
    Site: ahnaf-tahmid-B760M-PG-SONIC-WiFi
    Build name: (empty)
  Add coverage exclude regular expressions.
-Create new tag: 20260809-0221 - Experimental
+Create new tag: 20260809-0648 - Experimental
 UpdateCTestConfiguration  from :/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_lidar/CTestConfiguration.ini
 Parse Config file:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_lidar/CTestConfiguration.ini
 Test project /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_lidar
@@ -35,14 +37,14 @@ test 1
 1: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_lidar
 1: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 1: collected 18 items
-1: 
+1:
 1: ../../src/core/savo_lidar/test/test_angle_filter.py ..................   [100%]
-1: 
+1:
 1: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_lidar/test_results/savo_lidar/test_angle_filter.xunit.xml -
 1: ============================== 18 passed in 0.03s ==============================
 1: -- run_test.py: return code 0
 1: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_lidar/test_results/savo_lidar/test_angle_filter.xunit.xml'
- 1/16 Test  #1: test_angle_filter ................   Passed    0.34 sec
+ 1/16 Test  #1: test_angle_filter ................   Passed    0.38 sec
 test 2
       Start  2: test_range_filter
 
@@ -57,14 +59,14 @@ test 2
 2: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_lidar
 2: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 2: collected 17 items
-2: 
+2:
 2: ../../src/core/savo_lidar/test/test_range_filter.py .................    [100%]
-2: 
+2:
 2: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_lidar/test_results/savo_lidar/test_range_filter.xunit.xml -
-2: ============================== 17 passed in 0.02s ==============================
+2: ============================== 17 passed in 0.03s ==============================
 2: -- run_test.py: return code 0
 2: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_lidar/test_results/savo_lidar/test_range_filter.xunit.xml'
- 2/16 Test  #2: test_range_filter ................   Passed    0.34 sec
+ 2/16 Test  #2: test_range_filter ................   Passed    0.37 sec
 test 3
       Start  3: test_scan_rate_filter
 
@@ -79,14 +81,14 @@ test 3
 3: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_lidar
 3: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 3: collected 16 items
-3: 
+3:
 3: ../../src/core/savo_lidar/test/test_scan_rate_filter.py ................ [100%]
-3: 
+3:
 3: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_lidar/test_results/savo_lidar/test_scan_rate_filter.xunit.xml -
 3: ============================== 16 passed in 0.03s ==============================
 3: -- run_test.py: return code 0
 3: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_lidar/test_results/savo_lidar/test_scan_rate_filter.xunit.xml'
- 3/16 Test  #3: test_scan_rate_filter ............   Passed    0.35 sec
+ 3/16 Test  #3: test_scan_rate_filter ............   Passed    0.40 sec
 test 4
       Start  4: test_sector_extractor
 
@@ -101,14 +103,14 @@ test 4
 4: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_lidar
 4: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 4: collected 10 items
-4: 
+4:
 4: ../../src/core/savo_lidar/test/test_sector_extractor.py ..........       [100%]
-4: 
+4:
 4: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_lidar/test_results/savo_lidar/test_sector_extractor.xunit.xml -
-4: ============================== 10 passed in 0.02s ==============================
+4: ============================== 10 passed in 0.03s ==============================
 4: -- run_test.py: return code 0
 4: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_lidar/test_results/savo_lidar/test_sector_extractor.xunit.xml'
- 4/16 Test  #4: test_sector_extractor ............   Passed    0.34 sec
+ 4/16 Test  #4: test_sector_extractor ............   Passed    0.39 sec
 test 5
       Start  5: test_scan_watchdog
 
@@ -123,14 +125,14 @@ test 5
 5: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_lidar
 5: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 5: collected 15 items
-5: 
+5:
 5: ../../src/core/savo_lidar/test/test_scan_watchdog.py ...............     [100%]
-5: 
+5:
 5: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_lidar/test_results/savo_lidar/test_scan_watchdog.xunit.xml -
-5: ============================== 15 passed in 0.07s ==============================
+5: ============================== 15 passed in 0.08s ==============================
 5: -- run_test.py: return code 0
 5: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_lidar/test_results/savo_lidar/test_scan_watchdog.xunit.xml'
- 5/16 Test  #5: test_scan_watchdog ...............   Passed    0.38 sec
+ 5/16 Test  #5: test_scan_watchdog ...............   Passed    0.43 sec
 test 6
       Start  6: test_stale_scan_policy
 
@@ -145,14 +147,14 @@ test 6
 6: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_lidar
 6: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 6: collected 11 items
-6: 
+6:
 6: ../../src/core/savo_lidar/test/test_stale_scan_policy.py ...........     [100%]
-6: 
+6:
 6: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_lidar/test_results/savo_lidar/test_stale_scan_policy.xunit.xml -
-6: ============================== 11 passed in 0.06s ==============================
+6: ============================== 11 passed in 0.07s ==============================
 6: -- run_test.py: return code 0
 6: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_lidar/test_results/savo_lidar/test_stale_scan_policy.xunit.xml'
- 6/16 Test  #6: test_stale_scan_policy ...........   Passed    0.38 sec
+ 6/16 Test  #6: test_stale_scan_policy ...........   Passed    0.41 sec
 test 7
       Start  7: test_topic_names
 
@@ -167,15 +169,15 @@ test 7
 7: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_lidar
 7: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 7: collected 22 items
-7: 
+7:
 7: ../../src/core/savo_lidar/test/test_topic_names.py ..................... [ 95%]
 7: .                                                                        [100%]
-7: 
+7:
 7: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_lidar/test_results/savo_lidar/test_topic_names.xunit.xml -
-7: ============================== 22 passed in 0.24s ==============================
+7: ============================== 22 passed in 0.27s ==============================
 7: -- run_test.py: return code 0
 7: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_lidar/test_results/savo_lidar/test_topic_names.xunit.xml'
- 7/16 Test  #7: test_topic_names .................   Passed    0.58 sec
+ 7/16 Test  #7: test_topic_names .................   Passed    0.66 sec
 test 8
       Start  8: test_param_loader
 
@@ -190,15 +192,15 @@ test 8
 8: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_lidar
 8: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 8: collected 28 items
-8: 
+8:
 8: ../../src/core/savo_lidar/test/test_param_loader.py .................... [ 71%]
 8: ........                                                                 [100%]
-8: 
+8:
 8: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_lidar/test_results/savo_lidar/test_param_loader.xunit.xml -
-8: ============================== 28 passed in 0.41s ==============================
+8: ============================== 28 passed in 0.44s ==============================
 8: -- run_test.py: return code 0
 8: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_lidar/test_results/savo_lidar/test_param_loader.xunit.xml'
- 8/16 Test  #8: test_param_loader ................   Passed    0.85 sec
+ 8/16 Test  #8: test_param_loader ................   Passed    0.95 sec
 test 9
       Start  9: test_driver_dryrun
 
@@ -213,14 +215,14 @@ test 9
 9: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_lidar
 9: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 9: collected 12 items
-9: 
+9:
 9: ../../src/core/savo_lidar/test/test_driver_dryrun.py ............        [100%]
-9: 
+9:
 9: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_lidar/test_results/savo_lidar/test_driver_dryrun.xunit.xml -
 9: ============================== 12 passed in 0.08s ==============================
 9: -- run_test.py: return code 0
 9: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_lidar/test_results/savo_lidar/test_driver_dryrun.xunit.xml'
- 9/16 Test  #9: test_driver_dryrun ...............   Passed    0.41 sec
+ 9/16 Test  #9: test_driver_dryrun ...............   Passed    0.47 sec
 test 10
       Start 10: test_lidar_models
 
@@ -235,15 +237,15 @@ test 10
 10: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_lidar
 10: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 10: collected 24 items
-10: 
+10:
 10: ../../src/core/savo_lidar/test/test_lidar_models.py .................... [ 83%]
 10: ....                                                                     [100%]
-10: 
+10:
 10: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_lidar/test_results/savo_lidar/test_lidar_models.xunit.xml -
 10: ============================== 24 passed in 0.03s ==============================
 10: -- run_test.py: return code 0
 10: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_lidar/test_results/savo_lidar/test_lidar_models.xunit.xml'
-10/16 Test #10: test_lidar_models ................   Passed    0.35 sec
+10/16 Test #10: test_lidar_models ................   Passed    0.39 sec
 test 11
       Start 11: test_frame_contract
 
@@ -258,14 +260,14 @@ test 11
 11: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_lidar
 11: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 11: collected 4 items
-11: 
+11:
 11: ../../src/core/savo_lidar/test/test_frame_contract.py ....               [100%]
-11: 
+11:
 11: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_lidar/test_results/savo_lidar/test_frame_contract.xunit.xml -
 11: ============================== 4 passed in 0.03s ===============================
 11: -- run_test.py: return code 0
 11: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_lidar/test_results/savo_lidar/test_frame_contract.xunit.xml'
-11/16 Test #11: test_frame_contract ..............   Passed    0.35 sec
+11/16 Test #11: test_frame_contract ..............   Passed    0.47 sec
 test 12
       Start 12: cppcheck
 
@@ -277,7 +279,7 @@ test 12
 12: cppcheck 2.13.0 has known performance issues and therefore will not be used, set the AMENT_CPPCHECK_ALLOW_SLOW_VERSIONS environment variable to override this.
 12: -- run_test.py: return code 0
 12: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_lidar/test_results/savo_lidar/cppcheck.xunit.xml'
-12/16 Test #12: cppcheck .........................   Passed    0.12 sec
+12/16 Test #12: cppcheck .........................   Passed    0.14 sec
 test 13
       Start 13: lint_cmake
 
@@ -286,11 +288,11 @@ test 13
 13: Test timeout computed to be: 60
 13: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_lidar':
 13:  - /opt/ros/jazzy/bin/ament_lint_cmake --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_lidar/test_results/savo_lidar/lint_cmake.xunit.xml
-13: 
+13:
 13: No problems found
 13: -- run_test.py: return code 0
 13: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_lidar/test_results/savo_lidar/lint_cmake.xunit.xml'
-13/16 Test #13: lint_cmake .......................   Passed    0.12 sec
+13/16 Test #13: lint_cmake .......................   Passed    0.13 sec
 test 14
       Start 14: pep257
 
@@ -385,7 +387,7 @@ test 14
 14: No problems found
 14: -- run_test.py: return code 0
 14: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_lidar/test_results/savo_lidar/pep257.xunit.xml'
-14/16 Test #14: pep257 ...........................   Passed    0.35 sec
+14/16 Test #14: pep257 ...........................   Passed    0.38 sec
 test 15
       Start 15: uncrustify
 
@@ -395,37 +397,37 @@ test 15
 15: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_lidar':
 15:  - /opt/ros/jazzy/bin/ament_uncrustify --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_lidar/test_results/savo_lidar/uncrustify.xunit.xml
 15: No code style divergence in file 'include/savo_lidar/diagnostics.hpp'
-15: 
+15:
 15: No code style divergence in file 'include/savo_lidar/rplidar_driver.hpp'
-15: 
+15:
 15: No code style divergence in file 'include/savo_lidar/rplidar_protocol.hpp'
-15: 
+15:
 15: No code style divergence in file 'include/savo_lidar/scan_publisher.hpp'
-15: 
+15:
 15: No code style divergence in file 'include/savo_lidar/scan_types.hpp'
-15: 
+15:
 15: No code style divergence in file 'include/savo_lidar/serial_config.hpp'
-15: 
+15:
 15: No code style divergence in file 'include/savo_lidar/serial_port.hpp'
-15: 
+15:
 15: No code style divergence in file 'include/savo_lidar/visibility_control.hpp'
-15: 
+15:
 15: No code style divergence in file 'src/drivers/rplidar_driver.cpp'
-15: 
+15:
 15: No code style divergence in file 'src/drivers/rplidar_protocol.cpp'
-15: 
+15:
 15: No code style divergence in file 'src/drivers/serial_port.cpp'
-15: 
+15:
 15: No code style divergence in file 'src/nodes/lidar_driver_node.cpp'
-15: 
+15:
 15: No code style divergence in file 'src/ros/diagnostics.cpp'
-15: 
+15:
 15: No code style divergence in file 'src/ros/scan_publisher.cpp'
-15: 
+15:
 15: No problems found
 15: -- run_test.py: return code 0
 15: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_lidar/test_results/savo_lidar/uncrustify.xunit.xml'
-15/16 Test #15: uncrustify .......................   Passed    0.15 sec
+15/16 Test #15: uncrustify .......................   Passed    0.17 sec
 test 16
       Start 16: xmllint
 
@@ -435,35 +437,30 @@ test 16
 16: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_lidar':
 16:  - /opt/ros/jazzy/bin/ament_xmllint --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_lidar/test_results/savo_lidar/xmllint.xunit.xml
 16: File 'package.xml' is valid
-16: 
+16:
 16: No problems found
 16: -- run_test.py: return code 0
 16: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_lidar/test_results/savo_lidar/xmllint.xunit.xml'
-16/16 Test #16: xmllint ..........................   Passed    0.12 sec
+16/16 Test #16: xmllint ..........................   Passed    0.13 sec
 
 100% tests passed, 0 tests failed out of 16
 
 Label Time Summary:
-cppcheck      =   0.12 sec*proc (1 test)
-lint_cmake    =   0.12 sec*proc (1 test)
-linter        =   0.86 sec*proc (5 tests)
-pep257        =   0.35 sec*proc (1 test)
-pytest        =   4.68 sec*proc (11 tests)
-uncrustify    =   0.15 sec*proc (1 test)
-xmllint       =   0.12 sec*proc (1 test)
+cppcheck      =   0.14 sec*proc (1 test)
+lint_cmake    =   0.13 sec*proc (1 test)
+linter        =   0.96 sec*proc (5 tests)
+pep257        =   0.38 sec*proc (1 test)
+pytest        =   5.31 sec*proc (11 tests)
+uncrustify    =   0.17 sec*proc (1 test)
+xmllint       =   0.13 sec*proc (1 test)
 
-Total Test time (real) =   5.54 sec
-Finished <<< savo_lidar [5.56s]
+Total Test time (real) =   6.28 sec
+Finished <<< savo_lidar [6.31s]
 
-Summary: 1 package finished [5.72s]
-
-============================================================
- COLCON TEST RESULT
-============================================================
+Summary: 1 package finished [6.46s]
 Summary: 306 tests, 0 errors, 0 failures, 14 skipped
-
 ------------------------------------------------------------
 PACKAGE_RESULT: PASS
-COLCON_TEST_EXIT: 0
-TEST_RESULT_EXIT: 0
+COLCON_TEST_EXIT_STATUS: 0
+TEST_RESULT_EXIT_STATUS: 0
 ------------------------------------------------------------

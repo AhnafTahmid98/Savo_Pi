@@ -1,81 +1,12 @@
 Robot Savo PC validation
-Run ID: 20260809T021142Z
+Run ID: 20260809T063128Z
 Step: PC full colcon test-result
-Date: 2026-08-09T05:18:28+03:00
+Date: 2026-08-09T09:31:28+03:00
 Host: ahnaf-tahmid-B760M-PG-SONIC-WiFi
-Commit: eb71c26ac7dfbeaf9c2e44df3ba9f79117c7d4b6
-
-build/savo_mapping/Testing/20260809-0216/Test.xml: 85 tests, 0 errors, 1 failure, 0 skipped
-- test_autonomous_mapping_orchestrator_runtime
-  <<< failure message
-    -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping':
-     - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_autonomous_mapping_orchestrator_runtime.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/ament_cmake_pytest/test_autonomous_mapping_orchestrator_runtime/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_autonomous_mapping_orchestrator_runtime.xunit.xml --junit-prefix=savo_mapping
-    ============================= test session starts ==============================
-    platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
-    cachedir: build/savo_mapping/ament_cmake_pytest/test_autonomous_mapping_orchestrator_runtime/.cache
-    rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
-    plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
-    collected 4 items
-    
-    ../../src/core/savo_mapping/test/test_autonomous_mapping_orchestrator_runtime.py . [ 25%]
-    ..F                                                                      [100%]
-    
-    =================================== FAILURES ===================================
-    ___________ test_auto_save_failure_returns_typed_save_failed_result ____________
-    
-        def test_auto_save_failure_returns_typed_save_failed_result():
-            """Confirm a public save-service failure cannot report mission success."""
-            harness = RuntimeHarness()
-            harness.save_success = False
-            try:
-                harness.publish_initial_state()
-    >           goal_handle = harness.send_goal(auto_save=True)
-    
-    ../../src/core/savo_mapping/test/test_autonomous_mapping_orchestrator_runtime.py:694: 
-    _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-    
-    self = <test_autonomous_mapping_orchestrator_runtime.RuntimeHarness object at 0x7c0a6c23f470>
-    auto_save = True
-    
-        def send_goal(self, auto_save=True):
-            """Start one typed frontier mission."""
-            goal = RunAutonomousMapping.Goal()
-            goal.contract_version = RunAutonomousMapping.Goal.CONTRACT_VERSION
-            goal.mission_id = 'mission-am3-runtime'
-            goal.actor_id = 'runtime-operator'
-            goal.map_id = 'campus_main'
-            goal.map_revision = 1
-            goal.strategy = RunAutonomousMapping.Goal.STRATEGY_FRONTIER
-            goal.auto_save = auto_save
-            goal.require_quality_approval = True
-        
-            future = self.action_client.send_goal_async(goal)
-    >       assert wait_until(future.done), self.diagnostics()
-    E       AssertionError: poll=None modes=[] starts=[] cancels=[] handoff_cancels=0 map_saves=0 states=['idle', 'idle', 'idle', 'idle', 'idle', 'idle', 'idle', 'idle'] completion=[(False, False), (False, False), (False, False), (False, False), (False, False), (False, False), (False, False), (False, False)] output=
-    E       assert False
-    E        +  where False = wait_until(<bound method Future.done of <rclpy.task.Future object at 0x7c0a6c250800>>)
-    E        +    where <bound method Future.done of <rclpy.task.Future object at 0x7c0a6c250800>> = <rclpy.task.Future object at 0x7c0a6c250800>.done
-    
-    ../../src/core/savo_mapping/test/test_autonomous_mapping_orchestrator_runtime.py:397: AssertionError
-    - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_autonomous_mapping_orchestrator_runtime.xunit.xml -
-    =========================== short test summary info ============================
-    FAILED ../../src/core/savo_mapping/test/test_autonomous_mapping_orchestrator_runtime.py::test_auto_save_failure_returns_typed_save_failed_result
-    ========================= 1 failed, 3 passed in 11.57s =========================
-    -- run_test.py: return code 1
-    -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_autonomous_mapping_orchestrator_runtime.xunit.xml'
-  >>>
-build/savo_mapping/test_results/savo_mapping/test_autonomous_mapping_orchestrator_runtime.xunit.xml: 4 tests, 0 errors, 1 failure, 0 skipped
-- savo_mapping.src.core.savo_mapping.test.test_autonomous_mapping_orchestrator_runtime test_auto_save_failure_returns_typed_save_failed_result
-  <<< failure message
-    AssertionError: poll=None modes=[] starts=[] cancels=[] handoff_cancels=0 map_saves=0 states=['idle', 'idle', 'idle', 'idle', 'idle', 'idle', 'idle', 'idle'] completion=[(False, False), (False, False), (False, False), (False, False), (False, False), (False, False), (False, False), (False, False)] output=
-    assert False
-     +  where False = wait_until(<bound method Future.done of <rclpy.task.Future object at 0x7c0a6c250800>>)
-     +    where <bound method Future.done of <rclpy.task.Future object at 0x7c0a6c250800>> = <rclpy.task.Future object at 0x7c0a6c250800>.done
-  >>>
-
-Summary: 6189 tests, 0 errors, 2 failures, 384 skipped
-
+Commit: fa8053a58514451d97fb2eb151b8a2842db57104
+Output:
+Summary: 6189 tests, 0 errors, 0 failures, 384 skipped
 ------------------------------------------------------------
-RESULT: FAIL
-EXIT_STATUS: 1
+RESULT: PASS
+EXIT_STATUS: 0
 ------------------------------------------------------------

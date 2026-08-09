@@ -1,17 +1,19 @@
-Robot Savo package PC validation
-Run ID: 20260809T021142Z
-Package: savo_base
-Date: 2026-08-09T05:20:59+03:00
+Robot Savo PC validation
+Run ID: 20260809T063128Z
+Step: package test savo_base
+Date: 2026-08-09T09:31:28+03:00
 Host: ahnaf-tahmid-B760M-PG-SONIC-WiFi
-Commit: eb71c26ac7dfbeaf9c2e44df3ba9f79117c7d4b6
-
+Commit: fa8053a58514451d97fb2eb151b8a2842db57104
+Executor: sequential
+Cppcheck policy: repository default; ament skips known-problematic cppcheck 2.13
+Output:
 Starting >>> savo_base
 UpdateCTestConfiguration  from :/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/CTestConfiguration.ini
 Parse Config file:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/CTestConfiguration.ini
    Site: ahnaf-tahmid-B760M-PG-SONIC-WiFi
    Build name: (empty)
  Add coverage exclude regular expressions.
-Create new tag: 20260809-0220 - Experimental
+Create new tag: 20260809-0647 - Experimental
 UpdateCTestConfiguration  from :/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/CTestConfiguration.ini
 Parse Config file:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/CTestConfiguration.ini
 Test project /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base
@@ -29,12 +31,12 @@ test 1
 1: Test timeout computed to be: 60
 1: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_base':
 1:  - /opt/ros/jazzy/bin/ament_flake8 --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/flake8.xunit.xml --config /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_base/setup.cfg
-1: 
+1:
 1: 71 files checked
 1: No problems found
-1: 
+1:
 1: Checked files:
-1: 
+1:
 1: * ./setup.py
 1: * ./savo_base/constants.py
 1: * ./savo_base/__init__.py
@@ -108,7 +110,7 @@ test 1
 1: * ./launch/base_dryrun_test.launch.py
 1: -- run_test.py: return code 0
 1: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/flake8.xunit.xml'
-1/8 Test #1: flake8 ...........................   Passed    0.76 sec
+1/8 Test #1: flake8 ...........................   Passed    0.91 sec
 test 2
     Start 2: test_mecanum_mix
 
@@ -123,14 +125,14 @@ test 2
 2: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_base
 2: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 2: collected 2 items
-2: 
+2:
 2: ../../src/core/savo_base/test/test_mecanum_mix.py ..                     [100%]
-2: 
+2:
 2: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_mecanum_mix.xunit.xml -
 2: ============================== 2 passed in 0.02s ===============================
 2: -- run_test.py: return code 0
 2: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_mecanum_mix.xunit.xml'
-2/8 Test #2: test_mecanum_mix .................   Passed    0.35 sec
+2/8 Test #2: test_mecanum_mix .................   Passed    0.36 sec
 test 3
     Start 3: test_wheel_command
 
@@ -145,14 +147,14 @@ test 3
 3: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_base
 3: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 3: collected 1 item
-3: 
+3:
 3: ../../src/core/savo_base/test/test_wheel_command.py .                    [100%]
-3: 
+3:
 3: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_wheel_command.xunit.xml -
 3: ============================== 1 passed in 0.02s ===============================
 3: -- run_test.py: return code 0
 3: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_wheel_command.xunit.xml'
-3/8 Test #3: test_wheel_command ...............   Passed    0.34 sec
+3/8 Test #3: test_wheel_command ...............   Passed    0.38 sec
 test 4
     Start 4: test_clamp_and_scaling
 
@@ -167,14 +169,14 @@ test 4
 4: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_base
 4: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 4: collected 2 items
-4: 
+4:
 4: ../../src/core/savo_base/test/test_clamp_and_scaling.py ..               [100%]
-4: 
+4:
 4: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_clamp_and_scaling.xunit.xml -
 4: ============================== 2 passed in 0.02s ===============================
 4: -- run_test.py: return code 0
 4: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_clamp_and_scaling.xunit.xml'
-4/8 Test #4: test_clamp_and_scaling ...........   Passed    0.34 sec
+4/8 Test #4: test_clamp_and_scaling ...........   Passed    0.36 sec
 test 5
     Start 5: test_timeout_watchdog_logic
 
@@ -189,14 +191,14 @@ test 5
 5: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_base
 5: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 5: collected 1 item
-5: 
+5:
 5: ../../src/core/savo_base/test/test_timeout_watchdog_logic.py .           [100%]
-5: 
+5:
 5: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_timeout_watchdog_logic.xunit.xml -
 5: ============================== 1 passed in 0.01s ===============================
 5: -- run_test.py: return code 0
 5: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_timeout_watchdog_logic.xunit.xml'
-5/8 Test #5: test_timeout_watchdog_logic ......   Passed    0.32 sec
+5/8 Test #5: test_timeout_watchdog_logic ......   Passed    0.37 sec
 test 6
     Start 6: test_topic_names
 
@@ -211,14 +213,14 @@ test 6
 6: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_base
 6: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 6: collected 1 item
-6: 
+6:
 6: ../../src/core/savo_base/test/test_topic_names.py .                      [100%]
-6: 
+6:
 6: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_topic_names.xunit.xml -
 6: ============================== 1 passed in 0.01s ===============================
 6: -- run_test.py: return code 0
 6: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_topic_names.xunit.xml'
-6/8 Test #6: test_topic_names .................   Passed    0.33 sec
+6/8 Test #6: test_topic_names .................   Passed    0.38 sec
 test 7
     Start 7: test_param_loader
 
@@ -233,14 +235,14 @@ test 7
 7: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_base
 7: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 7: collected 1 item
-7: 
+7:
 7: ../../src/core/savo_base/test/test_param_loader.py .                     [100%]
-7: 
+7:
 7: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_param_loader.xunit.xml -
 7: ============================== 1 passed in 0.01s ===============================
 7: -- run_test.py: return code 0
 7: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_param_loader.xunit.xml'
-7/8 Test #7: test_param_loader ................   Passed    0.33 sec
+7/8 Test #7: test_param_loader ................   Passed    0.37 sec
 test 8
     Start 8: test_driver_dryrun
 
@@ -255,34 +257,29 @@ test 8
 8: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_base
 8: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 8: collected 1 item
-8: 
+8:
 8: ../../src/core/savo_base/test/test_driver_dryrun.py .                    [100%]
-8: 
+8:
 8: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_driver_dryrun.xunit.xml -
 8: ============================== 1 passed in 0.02s ===============================
 8: -- run_test.py: return code 0
 8: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_base/test_results/savo_base/test_driver_dryrun.xunit.xml'
-8/8 Test #8: test_driver_dryrun ...............   Passed    0.34 sec
+8/8 Test #8: test_driver_dryrun ...............   Passed    0.36 sec
 
 100% tests passed, 0 tests failed out of 8
 
 Label Time Summary:
-flake8    =   0.76 sec*proc (1 test)
-linter    =   0.76 sec*proc (1 test)
-pytest    =   2.35 sec*proc (7 tests)
+flake8    =   0.91 sec*proc (1 test)
+linter    =   0.91 sec*proc (1 test)
+pytest    =   2.58 sec*proc (7 tests)
 
-Total Test time (real) =   3.11 sec
-Finished <<< savo_base [3.14s]
+Total Test time (real) =   3.49 sec
+Finished <<< savo_base [3.52s]
 
-Summary: 1 package finished [3.29s]
-
-============================================================
- COLCON TEST RESULT
-============================================================
+Summary: 1 package finished [3.68s]
 Summary: 18 tests, 0 errors, 0 failures, 0 skipped
-
 ------------------------------------------------------------
 PACKAGE_RESULT: PASS
-COLCON_TEST_EXIT: 0
-TEST_RESULT_EXIT: 0
+COLCON_TEST_EXIT_STATUS: 0
+TEST_RESULT_EXIT_STATUS: 0
 ------------------------------------------------------------

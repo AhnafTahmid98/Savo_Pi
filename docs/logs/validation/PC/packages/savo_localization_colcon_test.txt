@@ -1,17 +1,19 @@
-Robot Savo package PC validation
-Run ID: 20260809T021142Z
-Package: savo_localization
-Date: 2026-08-09T05:21:59+03:00
+Robot Savo PC validation
+Run ID: 20260809T063128Z
+Step: package test savo_localization
+Date: 2026-08-09T09:31:28+03:00
 Host: ahnaf-tahmid-B760M-PG-SONIC-WiFi
-Commit: eb71c26ac7dfbeaf9c2e44df3ba9f79117c7d4b6
-
+Commit: fa8053a58514451d97fb2eb151b8a2842db57104
+Executor: sequential
+Cppcheck policy: repository default; ament skips known-problematic cppcheck 2.13
+Output:
 Starting >>> savo_localization
 UpdateCTestConfiguration  from :/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/CTestConfiguration.ini
 Parse Config file:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/CTestConfiguration.ini
    Site: ahnaf-tahmid-B760M-PG-SONIC-WiFi
    Build name: (empty)
  Add coverage exclude regular expressions.
-Create new tag: 20260809-0221 - Experimental
+Create new tag: 20260809-0648 - Experimental
 UpdateCTestConfiguration  from :/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/CTestConfiguration.ini
 Parse Config file:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/CTestConfiguration.ini
 Test project /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization
@@ -29,12 +31,12 @@ test 1
 1: Test timeout computed to be: 60
 1: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_localization':
 1:  - /opt/ros/jazzy/bin/ament_flake8 --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/flake8.xunit.xml --config /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_localization/setup.cfg
-1: 
+1:
 1: 80 files checked
 1: No problems found
-1: 
+1:
 1: Checked files:
-1: 
+1:
 1: * ./setup.py
 1: * ./savo_localization/constants.py
 1: * ./savo_localization/__init__.py
@@ -117,7 +119,7 @@ test 1
 1: * ./launch/wheel_odom.launch.py
 1: -- run_test.py: return code 0
 1: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/flake8.xunit.xml'
- 1/20 Test  #1: flake8 ............................   Passed    0.62 sec
+ 1/20 Test  #1: flake8 ............................   Passed    0.71 sec
 test 2
       Start  2: test_localization_health_core
 
@@ -171,14 +173,14 @@ test 2
 2: [ RUN      ] LocalizationHealthCoreTest.DisabledSourcesDoNotAffectReadiness
 2: [       OK ] LocalizationHealthCoreTest.DisabledSourcesDoNotAffectReadiness (0 ms)
 2: [----------] 20 tests from LocalizationHealthCoreTest (0 ms total)
-2: 
+2:
 2: [----------] Global test environment tear-down
 2: [==========] 20 tests from 1 test suite ran. (0 ms total)
 2: [  PASSED  ] 20 tests.
 2: -- run_test.py: return code 0
 2: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/test_localization_health_core.gtest.xml'
 2: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/test_localization_health_core.gtest.xml'
- 2/20 Test  #2: test_localization_health_core .....   Passed    0.05 sec
+ 2/20 Test  #2: test_localization_health_core .....   Passed    0.06 sec
 test 3
       Start  3: test_angle_math
 
@@ -193,15 +195,15 @@ test 3
 3: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_localization
 3: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 3: collected 24 items
-3: 
+3:
 3: ../../src/core/savo_localization/test/test_angle_math.py ............... [ 62%]
 3: .........                                                                [100%]
-3: 
+3:
 3: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/test_angle_math.xunit.xml -
 3: ============================== 24 passed in 0.03s ==============================
 3: -- run_test.py: return code 0
 3: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/test_angle_math.xunit.xml'
- 3/20 Test  #3: test_angle_math ...................   Passed    0.34 sec
+ 3/20 Test  #3: test_angle_math ...................   Passed    0.41 sec
 test 4
       Start  4: test_encoder_math
 
@@ -216,15 +218,15 @@ test 4
 4: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_localization
 4: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 4: collected 15 items
-4: 
+4:
 4: ../../src/core/savo_localization/test/test_encoder_math.py ............. [ 86%]
 4: ..                                                                       [100%]
-4: 
+4:
 4: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/test_encoder_math.xunit.xml -
 4: ============================== 15 passed in 0.02s ==============================
 4: -- run_test.py: return code 0
 4: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/test_encoder_math.xunit.xml'
- 4/20 Test  #4: test_encoder_math .................   Passed    0.33 sec
+ 4/20 Test  #4: test_encoder_math .................   Passed    0.38 sec
 test 5
       Start  5: test_mecanum_kinematics
 
@@ -239,15 +241,15 @@ test 5
 5: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_localization
 5: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 5: collected 12 items
-5: 
+5:
 5: ../../src/core/savo_localization/test/test_mecanum_kinematics.py ....... [ 58%]
 5: .....                                                                    [100%]
-5: 
+5:
 5: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/test_mecanum_kinematics.xunit.xml -
-5: ============================== 12 passed in 0.02s ==============================
+5: ============================== 12 passed in 0.03s ==============================
 5: -- run_test.py: return code 0
 5: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/test_mecanum_kinematics.xunit.xml'
- 5/20 Test  #5: test_mecanum_kinematics ...........   Passed    0.34 sec
+ 5/20 Test  #5: test_mecanum_kinematics ...........   Passed    0.41 sec
 test 6
       Start  6: test_covariance
 
@@ -262,14 +264,14 @@ test 6
 6: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_localization
 6: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 6: collected 15 items
-6: 
+6:
 6: ../../src/core/savo_localization/test/test_covariance.py ............... [100%]
-6: 
+6:
 6: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/test_covariance.xunit.xml -
-6: ============================== 15 passed in 0.02s ==============================
+6: ============================== 15 passed in 0.03s ==============================
 6: -- run_test.py: return code 0
 6: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/test_covariance.xunit.xml'
- 6/20 Test  #6: test_covariance ...................   Passed    0.34 sec
+ 6/20 Test  #6: test_covariance ...................   Passed    0.40 sec
 test 7
       Start  7: test_odom_math
 
@@ -284,15 +286,15 @@ test 7
 7: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_localization
 7: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 7: collected 19 items
-7: 
+7:
 7: ../../src/core/savo_localization/test/test_odom_math.py ................ [ 84%]
 7: ...                                                                      [100%]
-7: 
+7:
 7: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/test_odom_math.xunit.xml -
-7: ============================== 19 passed in 0.02s ==============================
+7: ============================== 19 passed in 0.03s ==============================
 7: -- run_test.py: return code 0
 7: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/test_odom_math.xunit.xml'
- 7/20 Test  #7: test_odom_math ....................   Passed    0.36 sec
+ 7/20 Test  #7: test_odom_math ....................   Passed    0.39 sec
 test 8
       Start  8: test_frames
 
@@ -307,15 +309,15 @@ test 8
 8: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_localization
 8: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 8: collected 22 items
-8: 
+8:
 8: ../../src/core/savo_localization/test/test_frames.py ................... [ 86%]
 8: ...                                                                      [100%]
-8: 
+8:
 8: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/test_frames.xunit.xml -
-8: ============================== 22 passed in 0.02s ==============================
+8: ============================== 22 passed in 0.03s ==============================
 8: -- run_test.py: return code 0
 8: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/test_frames.xunit.xml'
- 8/20 Test  #8: test_frames .......................   Passed    0.34 sec
+ 8/20 Test  #8: test_frames .......................   Passed    0.40 sec
 test 9
       Start  9: test_topic_contract
 
@@ -330,15 +332,15 @@ test 9
 9: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_localization
 9: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 9: collected 25 items
-9: 
+9:
 9: ../../src/core/savo_localization/test/test_topic_contract.py ........... [ 44%]
 9: ..............                                                           [100%]
-9: 
+9:
 9: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/test_topic_contract.xunit.xml -
-9: ============================== 25 passed in 0.29s ==============================
+9: ============================== 25 passed in 0.32s ==============================
 9: -- run_test.py: return code 0
 9: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/test_topic_contract.xunit.xml'
- 9/20 Test  #9: test_topic_contract ...............   Passed    0.63 sec
+ 9/20 Test  #9: test_topic_contract ...............   Passed    0.70 sec
 test 10
       Start 10: test_param_loader
 
@@ -353,15 +355,15 @@ test 10
 10: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_localization
 10: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 10: collected 18 items
-10: 
+10:
 10: ../../src/core/savo_localization/test/test_param_loader.py ............. [ 72%]
 10: .....                                                                    [100%]
-10: 
+10:
 10: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/test_param_loader.xunit.xml -
 10: ============================== 18 passed in 0.03s ==============================
 10: -- run_test.py: return code 0
 10: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/test_param_loader.xunit.xml'
-10/20 Test #10: test_param_loader .................   Passed    0.34 sec
+10/20 Test #10: test_param_loader .................   Passed    0.38 sec
 test 11
       Start 11: test_encoder_models
 
@@ -376,15 +378,15 @@ test 11
 11: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_localization
 11: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 11: collected 28 items
-11: 
+11:
 11: ../../src/core/savo_localization/test/test_encoder_models.py ........... [ 39%]
 11: .................                                                        [100%]
-11: 
+11:
 11: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/test_encoder_models.xunit.xml -
-11: ============================== 28 passed in 0.05s ==============================
+11: ============================== 28 passed in 0.06s ==============================
 11: -- run_test.py: return code 0
 11: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/test_encoder_models.xunit.xml'
-11/20 Test #11: test_encoder_models ...............   Passed    0.37 sec
+11/20 Test #11: test_encoder_models ...............   Passed    0.42 sec
 test 12
       Start 12: test_encoder_health_check
 
@@ -399,15 +401,15 @@ test 12
 12: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_localization
 12: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 12: collected 21 items
-12: 
+12:
 12: ../../src/core/savo_localization/test/test_encoder_health_check.py ..... [ 23%]
 12: ................                                                         [100%]
-12: 
+12:
 12: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/test_encoder_health_check.xunit.xml -
 12: ============================== 21 passed in 0.07s ==============================
 12: -- run_test.py: return code 0
 12: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/test_encoder_health_check.xunit.xml'
-12/20 Test #12: test_encoder_health_check .........   Passed    0.39 sec
+12/20 Test #12: test_encoder_health_check .........   Passed    0.45 sec
 test 13
       Start 13: test_wheel_odom_models
 
@@ -422,15 +424,15 @@ test 13
 13: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_localization
 13: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 13: collected 22 items
-13: 
+13:
 13: ../../src/core/savo_localization/test/test_wheel_odom_models.py ........ [ 36%]
 13: ..............                                                           [100%]
-13: 
+13:
 13: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/test_wheel_odom_models.xunit.xml -
 13: ============================== 22 passed in 0.05s ==============================
 13: -- run_test.py: return code 0
 13: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/test_wheel_odom_models.xunit.xml'
-13/20 Test #13: test_wheel_odom_models ............   Passed    0.37 sec
+13/20 Test #13: test_wheel_odom_models ............   Passed    0.39 sec
 test 14
       Start 14: test_odom_sanity_check
 
@@ -445,15 +447,15 @@ test 14
 14: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_localization
 14: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 14: collected 34 items
-14: 
+14:
 14: ../../src/core/savo_localization/test/test_odom_sanity_check.py ........ [ 23%]
 14: ..........................                                               [100%]
-14: 
+14:
 14: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/test_odom_sanity_check.xunit.xml -
 14: ============================== 34 passed in 0.07s ==============================
 14: -- run_test.py: return code 0
 14: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/test_odom_sanity_check.xunit.xml'
-14/20 Test #14: test_odom_sanity_check ............   Passed    0.40 sec
+14/20 Test #14: test_odom_sanity_check ............   Passed    0.41 sec
 test 15
       Start 15: test_imu_models
 
@@ -468,15 +470,15 @@ test 15
 15: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_localization
 15: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 15: collected 34 items
-15: 
+15:
 15: ../../src/core/savo_localization/test/test_imu_models.py ............... [ 44%]
 15: ...................                                                      [100%]
-15: 
+15:
 15: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/test_imu_models.xunit.xml -
-15: ============================== 34 passed in 0.05s ==============================
+15: ============================== 34 passed in 0.06s ==============================
 15: -- run_test.py: return code 0
 15: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/test_imu_models.xunit.xml'
-15/20 Test #15: test_imu_models ...................   Passed    0.37 sec
+15/20 Test #15: test_imu_models ...................   Passed    0.41 sec
 test 16
       Start 16: test_imu_health_check
 
@@ -491,15 +493,15 @@ test 16
 16: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_localization
 16: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 16: collected 23 items
-16: 
+16:
 16: ../../src/core/savo_localization/test/test_imu_health_check.py ......... [ 39%]
 16: ..............                                                           [100%]
-16: 
+16:
 16: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/test_imu_health_check.xunit.xml -
-16: ============================== 23 passed in 0.06s ==============================
+16: ============================== 23 passed in 0.07s ==============================
 16: -- run_test.py: return code 0
 16: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/test_imu_health_check.xunit.xml'
-16/20 Test #16: test_imu_health_check .............   Passed    0.38 sec
+16/20 Test #16: test_imu_health_check .............   Passed    0.42 sec
 test 17
       Start 17: test_ekf_health_check
 
@@ -514,15 +516,15 @@ test 17
 17: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_localization
 17: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 17: collected 33 items
-17: 
+17:
 17: ../../src/core/savo_localization/test/test_ekf_health_check.py ......... [ 27%]
 17: ........................                                                 [100%]
-17: 
+17:
 17: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/test_ekf_health_check.xunit.xml -
-17: ============================== 33 passed in 0.07s ==============================
+17: ============================== 33 passed in 0.08s ==============================
 17: -- run_test.py: return code 0
 17: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/test_ekf_health_check.xunit.xml'
-17/20 Test #17: test_ekf_health_check .............   Passed    0.40 sec
+17/20 Test #17: test_ekf_health_check .............   Passed    0.43 sec
 test 18
       Start 18: test_tf_check
 
@@ -537,15 +539,15 @@ test 18
 18: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_localization
 18: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 18: collected 22 items
-18: 
+18:
 18: ../../src/core/savo_localization/test/test_tf_check.py ................. [ 77%]
 18: .....                                                                    [100%]
-18: 
+18:
 18: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/test_tf_check.xunit.xml -
-18: ============================== 22 passed in 0.06s ==============================
+18: ============================== 22 passed in 0.07s ==============================
 18: -- run_test.py: return code 0
 18: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/test_tf_check.xunit.xml'
-18/20 Test #18: test_tf_check .....................   Passed    0.37 sec
+18/20 Test #18: test_tf_check .....................   Passed    0.43 sec
 test 19
       Start 19: test_config_assets
 
@@ -560,14 +562,14 @@ test 19
 19: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_localization
 19: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 19: collected 3 items
-19: 
+19:
 19: ../../src/core/savo_localization/test/test_config_assets.py ...          [100%]
-19: 
+19:
 19: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/test_config_assets.xunit.xml -
-19: ============================== 3 passed in 0.01s ===============================
+19: ============================== 3 passed in 0.02s ===============================
 19: -- run_test.py: return code 0
 19: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/test_config_assets.xunit.xml'
-19/20 Test #19: test_config_assets ................   Passed    0.33 sec
+19/20 Test #19: test_config_assets ................   Passed    0.37 sec
 test 20
       Start 20: test_diagnostics_launch_closure
 
@@ -582,36 +584,31 @@ test 20
 20: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_localization
 20: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 20: collected 3 items
-20: 
+20:
 20: ../../src/core/savo_localization/test/test_diagnostics_launch_closure.py . [ 33%]
 20: ..                                                                       [100%]
-20: 
+20:
 20: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/test_diagnostics_launch_closure.xunit.xml -
 20: ============================== 3 passed in 0.01s ===============================
 20: -- run_test.py: return code 0
 20: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_localization/test_results/savo_localization/test_diagnostics_launch_closure.xunit.xml'
-20/20 Test #20: test_diagnostics_launch_closure ...   Passed    0.32 sec
+20/20 Test #20: test_diagnostics_launch_closure ...   Passed    0.36 sec
 
 100% tests passed, 0 tests failed out of 20
 
 Label Time Summary:
-flake8    =   0.62 sec*proc (1 test)
-gtest     =   0.05 sec*proc (1 test)
-linter    =   0.62 sec*proc (1 test)
-pytest    =   6.73 sec*proc (18 tests)
+flake8    =   0.71 sec*proc (1 test)
+gtest     =   0.06 sec*proc (1 test)
+linter    =   0.71 sec*proc (1 test)
+pytest    =   7.54 sec*proc (18 tests)
 
-Total Test time (real) =   7.41 sec
-Finished <<< savo_localization [7.43s]
+Total Test time (real) =   8.31 sec
+Finished <<< savo_localization [8.34s]
 
-Summary: 1 package finished [7.57s]
-
-============================================================
- COLCON TEST RESULT
-============================================================
+Summary: 1 package finished [8.51s]
 Summary: 414 tests, 0 errors, 0 failures, 0 skipped
-
 ------------------------------------------------------------
 PACKAGE_RESULT: PASS
-COLCON_TEST_EXIT: 0
-TEST_RESULT_EXIT: 0
+COLCON_TEST_EXIT_STATUS: 0
+TEST_RESULT_EXIT_STATUS: 0
 ------------------------------------------------------------

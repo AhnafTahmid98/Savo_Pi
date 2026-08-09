@@ -1,17 +1,19 @@
-Robot Savo package PC validation
-Run ID: 20260809T021142Z
-Package: savo_observer
-Date: 2026-08-09T05:24:37+03:00
+Robot Savo PC validation
+Run ID: 20260809T063128Z
+Step: package test savo_observer
+Date: 2026-08-09T09:31:28+03:00
 Host: ahnaf-tahmid-B760M-PG-SONIC-WiFi
-Commit: eb71c26ac7dfbeaf9c2e44df3ba9f79117c7d4b6
-
+Commit: fa8053a58514451d97fb2eb151b8a2842db57104
+Executor: sequential
+Cppcheck policy: repository default; ament skips known-problematic cppcheck 2.13
+Output:
 Starting >>> savo_observer
 UpdateCTestConfiguration  from :/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_observer/CTestConfiguration.ini
 Parse Config file:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_observer/CTestConfiguration.ini
    Site: ahnaf-tahmid-B760M-PG-SONIC-WiFi
    Build name: (empty)
  Add coverage exclude regular expressions.
-Create new tag: 20260809-0224 - Experimental
+Create new tag: 20260809-0651 - Experimental
 UpdateCTestConfiguration  from :/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_observer/CTestConfiguration.ini
 Parse Config file:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_observer/CTestConfiguration.ini
 Test project /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_observer
@@ -40,14 +42,14 @@ test 1
 1: [ RUN      ] ObserverContract.PublicationsStayInObserverNamespace
 1: [       OK ] ObserverContract.PublicationsStayInObserverNamespace (0 ms)
 1: [----------] 3 tests from ObserverContract (0 ms total)
-1: 
+1:
 1: [----------] Global test environment tear-down
 1: [==========] 3 tests from 1 test suite ran. (0 ms total)
 1: [  PASSED  ] 3 tests.
 1: -- run_test.py: return code 0
 1: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_observer/test_results/savo_observer/test_observer_contract.gtest.xml'
 1: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_observer/test_results/savo_observer/test_observer_contract.gtest.xml'
- 1/15 Test  #1: test_observer_contract ...........   Passed    0.05 sec
+ 1/15 Test  #1: test_observer_contract ...........   Passed    0.06 sec
 test 2
       Start  2: test_telemetry_freshness
 
@@ -69,14 +71,14 @@ test 2
 2: [ RUN      ] TelemetryFreshness.RejectsInvalidPolicies
 2: [       OK ] TelemetryFreshness.RejectsInvalidPolicies (0 ms)
 2: [----------] 4 tests from TelemetryFreshness (0 ms total)
-2: 
+2:
 2: [----------] Global test environment tear-down
 2: [==========] 4 tests from 1 test suite ran. (0 ms total)
 2: [  PASSED  ] 4 tests.
 2: -- run_test.py: return code 0
 2: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_observer/test_results/savo_observer/test_telemetry_freshness.gtest.xml'
 2: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_observer/test_results/savo_observer/test_telemetry_freshness.gtest.xml'
- 2/15 Test  #2: test_telemetry_freshness .........   Passed    0.05 sec
+ 2/15 Test  #2: test_telemetry_freshness .........   Passed    0.06 sec
 test 3
       Start  3: test_telemetry_snapshot
 
@@ -98,14 +100,14 @@ test 3
 3: [ RUN      ] TelemetrySnapshot.ClockReversalFailsClosed
 3: [       OK ] TelemetrySnapshot.ClockReversalFailsClosed (0 ms)
 3: [----------] 4 tests from TelemetrySnapshot (0 ms total)
-3: 
+3:
 3: [----------] Global test environment tear-down
 3: [==========] 4 tests from 1 test suite ran. (0 ms total)
 3: [  PASSED  ] 4 tests.
 3: -- run_test.py: return code 0
 3: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_observer/test_results/savo_observer/test_telemetry_snapshot.gtest.xml'
 3: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_observer/test_results/savo_observer/test_telemetry_snapshot.gtest.xml'
- 3/15 Test  #3: test_telemetry_snapshot ..........   Passed    0.05 sec
+ 3/15 Test  #3: test_telemetry_snapshot ..........   Passed    0.06 sec
 test 4
       Start  4: test_dashboard_contract
 
@@ -120,14 +122,14 @@ test 4
 4: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_observer
 4: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 4: collected 4 items
-4: 
+4:
 4: test/test_dashboard_contract.py ....                                     [100%]
-4: 
+4:
 4: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_observer/test_results/savo_observer/test_dashboard_contract.xunit.xml -
 4: ============================== 4 passed in 0.01s ===============================
 4: -- run_test.py: return code 0
 4: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_observer/test_results/savo_observer/test_dashboard_contract.xunit.xml'
- 4/15 Test  #4: test_dashboard_contract ..........   Passed    0.33 sec
+ 4/15 Test  #4: test_dashboard_contract ..........   Passed    0.38 sec
 test 5
       Start  5: test_migration_contract
 
@@ -142,14 +144,14 @@ test 5
 5: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_observer
 5: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 5: collected 2 items
-5: 
+5:
 5: test/test_migration_contract.py ..                                       [100%]
-5: 
+5:
 5: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_observer/test_results/savo_observer/test_migration_contract.xunit.xml -
 5: ============================== 2 passed in 0.01s ===============================
 5: -- run_test.py: return code 0
 5: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_observer/test_results/savo_observer/test_migration_contract.xunit.xml'
- 5/15 Test  #5: test_migration_contract ..........   Passed    0.33 sec
+ 5/15 Test  #5: test_migration_contract ..........   Passed    0.38 sec
 test 6
       Start  6: test_observer_launch_contract
 
@@ -164,14 +166,14 @@ test 6
 6: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_observer
 6: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 6: collected 3 items
-6: 
+6:
 6: test/test_observer_launch_contract.py ...                                [100%]
-6: 
+6:
 6: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_observer/test_results/savo_observer/test_observer_launch_contract.xunit.xml -
 6: ============================== 3 passed in 0.01s ===============================
 6: -- run_test.py: return code 0
 6: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_observer/test_results/savo_observer/test_observer_launch_contract.xunit.xml'
- 6/15 Test  #6: test_observer_launch_contract ....   Passed    0.33 sec
+ 6/15 Test  #6: test_observer_launch_contract ....   Passed    0.38 sec
 test 7
       Start  7: test_read_only_contract
 
@@ -186,14 +188,14 @@ test 7
 7: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_observer
 7: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 7: collected 2 items
-7: 
+7:
 7: test/test_read_only_contract.py ..                                       [100%]
-7: 
+7:
 7: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_observer/test_results/savo_observer/test_read_only_contract.xunit.xml -
 7: ============================== 2 passed in 0.01s ===============================
 7: -- run_test.py: return code 0
 7: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_observer/test_results/savo_observer/test_read_only_contract.xunit.xml'
- 7/15 Test  #7: test_read_only_contract ..........   Passed    0.34 sec
+ 7/15 Test  #7: test_read_only_contract ..........   Passed    0.37 sec
 test 8
       Start  8: test_rviz_configs
 
@@ -208,14 +210,14 @@ test 8
 8: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_observer
 8: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 8: collected 3 items
-8: 
+8:
 8: test/test_rviz_configs.py ...                                            [100%]
-8: 
+8:
 8: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_observer/test_results/savo_observer/test_rviz_configs.xunit.xml -
-8: ============================== 3 passed in 0.15s ===============================
+8: ============================== 3 passed in 0.16s ===============================
 8: -- run_test.py: return code 0
 8: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_observer/test_results/savo_observer/test_rviz_configs.xunit.xml'
- 8/15 Test  #8: test_rviz_configs ................   Passed    0.50 sec
+ 8/15 Test  #8: test_rviz_configs ................   Passed    0.52 sec
 test 9
       Start  9: cppcheck
 
@@ -227,7 +229,7 @@ test 9
 9: cppcheck 2.13.0 has known performance issues and therefore will not be used, set the AMENT_CPPCHECK_ALLOW_SLOW_VERSIONS environment variable to override this.
 9: -- run_test.py: return code 0
 9: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_observer/test_results/savo_observer/cppcheck.xunit.xml'
- 9/15 Test  #9: cppcheck .........................   Passed    0.13 sec
+ 9/15 Test  #9: cppcheck .........................   Passed    0.14 sec
 test 10
       Start 10: cpplint
 
@@ -237,39 +239,39 @@ test 10
 10: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_observer':
 10:  - /opt/ros/jazzy/bin/ament_cpplint --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_observer/test_results/savo_observer/cpplint.xunit.xml
 10: Using '--root=/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_observer/include' argument
-10: 
+10:
 10: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_observer/include/savo_observer/observer_contract.hpp
-10: 
+10:
 10: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_observer/include/savo_observer/telemetry_freshness.hpp
-10: 
+10:
 10: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_observer/include/savo_observer/telemetry_snapshot.hpp
-10: 
+10:
 10: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_observer/include/savo_observer/topic_contract.hpp
-10: 
+10:
 10: Using '--root=/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_observer/src' argument
-10: 
+10:
 10: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_observer/src/nodes/observer_dashboard_node.cpp
-10: 
+10:
 10: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_observer/src/nodes/observer_telemetry_node.cpp
-10: 
+10:
 10: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_observer/src/observer_contract.cpp
-10: 
+10:
 10: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_observer/src/telemetry_freshness.cpp
-10: 
+10:
 10: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_observer/src/telemetry_snapshot.cpp
-10: 
+10:
 10: Using '--root=/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_observer/test' argument
-10: 
+10:
 10: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_observer/test/test_observer_contract.cpp
-10: 
+10:
 10: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_observer/test/test_telemetry_freshness.cpp
-10: 
+10:
 10: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_observer/test/test_telemetry_snapshot.cpp
-10: 
+10:
 10: No problems found
 10: -- run_test.py: return code 0
 10: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_observer/test_results/savo_observer/cpplint.xunit.xml'
-10/15 Test #10: cpplint ..........................   Passed    0.35 sec
+10/15 Test #10: cpplint ..........................   Passed    0.32 sec
 test 11
       Start 11: flake8
 
@@ -278,12 +280,12 @@ test 11
 11: Test timeout computed to be: 60
 11: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_observer':
 11:  - /opt/ros/jazzy/bin/ament_flake8 --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_observer/test_results/savo_observer/flake8.xunit.xml
-11: 
+11:
 11: 10 files checked
 11: No problems found
-11: 
+11:
 11: Checked files:
-11: 
+11:
 11: * ./test/test_dashboard_contract.py
 11: * ./test/test_read_only_contract.py
 11: * ./test/test_observer_launch_contract.py
@@ -296,7 +298,7 @@ test 11
 11: * ./launch/full_observer.launch.py
 11: -- run_test.py: return code 0
 11: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_observer/test_results/savo_observer/flake8.xunit.xml'
-11/15 Test #11: flake8 ...........................   Passed    0.25 sec
+11/15 Test #11: flake8 ...........................   Passed    0.28 sec
 test 12
       Start 12: lint_cmake
 
@@ -305,11 +307,11 @@ test 12
 12: Test timeout computed to be: 60
 12: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_observer':
 12:  - /opt/ros/jazzy/bin/ament_lint_cmake --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_observer/test_results/savo_observer/lint_cmake.xunit.xml
-12: 
+12:
 12: No problems found
 12: -- run_test.py: return code 0
 12: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_observer/test_results/savo_observer/lint_cmake.xunit.xml'
-12/15 Test #12: lint_cmake .......................   Passed    0.11 sec
+12/15 Test #12: lint_cmake .......................   Passed    0.13 sec
 test 13
       Start 13: pep257
 
@@ -331,7 +333,7 @@ test 13
 13: No problems found
 13: -- run_test.py: return code 0
 13: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_observer/test_results/savo_observer/pep257.xunit.xml'
-13/15 Test #13: pep257 ...........................   Passed    0.16 sec
+13/15 Test #13: pep257 ...........................   Passed    0.19 sec
 test 14
       Start 14: uncrustify
 
@@ -341,33 +343,33 @@ test 14
 14: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_observer':
 14:  - /opt/ros/jazzy/bin/ament_uncrustify --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_observer/test_results/savo_observer/uncrustify.xunit.xml
 14: No code style divergence in file 'include/savo_observer/observer_contract.hpp'
-14: 
+14:
 14: No code style divergence in file 'include/savo_observer/telemetry_freshness.hpp'
-14: 
+14:
 14: No code style divergence in file 'include/savo_observer/telemetry_snapshot.hpp'
-14: 
+14:
 14: No code style divergence in file 'include/savo_observer/topic_contract.hpp'
-14: 
+14:
 14: No code style divergence in file 'src/nodes/observer_dashboard_node.cpp'
-14: 
+14:
 14: No code style divergence in file 'src/nodes/observer_telemetry_node.cpp'
-14: 
+14:
 14: No code style divergence in file 'src/observer_contract.cpp'
-14: 
+14:
 14: No code style divergence in file 'src/telemetry_freshness.cpp'
-14: 
+14:
 14: No code style divergence in file 'src/telemetry_snapshot.cpp'
-14: 
+14:
 14: No code style divergence in file 'test/test_observer_contract.cpp'
-14: 
+14:
 14: No code style divergence in file 'test/test_telemetry_freshness.cpp'
-14: 
+14:
 14: No code style divergence in file 'test/test_telemetry_snapshot.cpp'
-14: 
+14:
 14: No problems found
 14: -- run_test.py: return code 0
 14: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_observer/test_results/savo_observer/uncrustify.xunit.xml'
-14/15 Test #14: uncrustify .......................   Passed    0.14 sec
+14/15 Test #14: uncrustify .......................   Passed    0.16 sec
 test 15
       Start 15: xmllint
 
@@ -377,38 +379,33 @@ test 15
 15: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_observer':
 15:  - /opt/ros/jazzy/bin/ament_xmllint --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_observer/test_results/savo_observer/xmllint.xunit.xml
 15: File 'package.xml' is valid
-15: 
+15:
 15: No problems found
 15: -- run_test.py: return code 0
 15: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_observer/test_results/savo_observer/xmllint.xunit.xml'
-15/15 Test #15: xmllint ..........................   Passed    0.12 sec
+15/15 Test #15: xmllint ..........................   Passed    0.14 sec
 
 100% tests passed, 0 tests failed out of 15
 
 Label Time Summary:
-cppcheck      =   0.13 sec*proc (1 test)
-cpplint       =   0.35 sec*proc (1 test)
-flake8        =   0.25 sec*proc (1 test)
-gtest         =   0.16 sec*proc (3 tests)
-lint_cmake    =   0.11 sec*proc (1 test)
-linter        =   1.25 sec*proc (7 tests)
-pep257        =   0.16 sec*proc (1 test)
-pytest        =   1.83 sec*proc (5 tests)
-uncrustify    =   0.14 sec*proc (1 test)
-xmllint       =   0.12 sec*proc (1 test)
+cppcheck      =   0.14 sec*proc (1 test)
+cpplint       =   0.32 sec*proc (1 test)
+flake8        =   0.28 sec*proc (1 test)
+gtest         =   0.18 sec*proc (3 tests)
+lint_cmake    =   0.13 sec*proc (1 test)
+linter        =   1.36 sec*proc (7 tests)
+pep257        =   0.19 sec*proc (1 test)
+pytest        =   2.03 sec*proc (5 tests)
+uncrustify    =   0.16 sec*proc (1 test)
+xmllint       =   0.14 sec*proc (1 test)
 
-Total Test time (real) =   3.25 sec
-Finished <<< savo_observer [3.28s]
+Total Test time (real) =   3.58 sec
+Finished <<< savo_observer [3.61s]
 
-Summary: 1 package finished [3.42s]
-
-============================================================
- COLCON TEST RESULT
-============================================================
+Summary: 1 package finished [3.76s]
 Summary: 89 tests, 0 errors, 0 failures, 12 skipped
-
 ------------------------------------------------------------
 PACKAGE_RESULT: PASS
-COLCON_TEST_EXIT: 0
-TEST_RESULT_EXIT: 0
+COLCON_TEST_EXIT_STATUS: 0
+TEST_RESULT_EXIT_STATUS: 0
 ------------------------------------------------------------

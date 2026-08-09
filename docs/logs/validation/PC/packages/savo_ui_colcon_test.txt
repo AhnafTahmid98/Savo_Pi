@@ -1,17 +1,19 @@
-Robot Savo package PC validation
-Run ID: 20260809T021142Z
-Package: savo_ui
-Date: 2026-08-09T05:25:13+03:00
+Robot Savo PC validation
+Run ID: 20260809T063128Z
+Step: package test savo_ui
+Date: 2026-08-09T09:31:28+03:00
 Host: ahnaf-tahmid-B760M-PG-SONIC-WiFi
-Commit: eb71c26ac7dfbeaf9c2e44df3ba9f79117c7d4b6
-
+Commit: fa8053a58514451d97fb2eb151b8a2842db57104
+Executor: sequential
+Cppcheck policy: repository default; ament skips known-problematic cppcheck 2.13
+Output:
 Starting >>> savo_ui
 UpdateCTestConfiguration  from :/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_ui/CTestConfiguration.ini
 Parse Config file:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_ui/CTestConfiguration.ini
    Site: ahnaf-tahmid-B760M-PG-SONIC-WiFi
    Build name: (empty)
  Add coverage exclude regular expressions.
-Create new tag: 20260809-0225 - Experimental
+Create new tag: 20260809-0652 - Experimental
 UpdateCTestConfiguration  from :/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_ui/CTestConfiguration.ini
 Parse Config file:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_ui/CTestConfiguration.ini
 Test project /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_ui
@@ -44,7 +46,7 @@ test 1
 1: [ RUN      ] LiveState.FormatsLocationEvent
 1: [       OK ] LiveState.FormatsLocationEvent (0 ms)
 1: [----------] 5 tests from LiveState (0 ms total)
-1: 
+1:
 1: [----------] Global test environment tear-down
 1: [==========] 5 tests from 1 test suite ran. (0 ms total)
 1: [  PASSED  ] 5 tests.
@@ -67,17 +69,17 @@ test 2
 2: configfile: setup.cfg
 2: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 2: collecting ... collected 4 items
-2: 
+2:
 2: ../../src/edge/savo_ui/test/test_ui_integration_contract.py::test_ui_uses_typed_mapping_and_location_contracts PASSED [ 25%]
 2: ../../src/edge/savo_ui/test/test_ui_integration_contract.py::test_ui_subscribes_to_live_speech_and_bridge_state PASSED [ 50%]
 2: ../../src/edge/savo_ui/test/test_ui_integration_contract.py::test_ui_remains_read_only PASSED [ 75%]
 2: ../../src/edge/savo_ui/test/test_ui_integration_contract.py::test_ui_camera_is_explicitly_optional_until_validated PASSED [100%]
-2: 
+2:
 2: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_ui/test_results/savo_ui/test_ui_integration_contract.xunit.xml -
-2: ============================== 4 passed in 0.02s ===============================
+2: ============================== 4 passed in 0.01s ===============================
 2: -- run_test.py: return code 0
 2: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_ui/test_results/savo_ui/test_ui_integration_contract.xunit.xml'
- 2/11 Test  #2: test_ui_integration_contract .....   Passed    0.41 sec
+ 2/11 Test  #2: test_ui_integration_contract .....   Passed    0.37 sec
 test 3
       Start  3: test_ui_v2_contract
 
@@ -93,19 +95,19 @@ test 3
 3: configfile: setup.cfg
 3: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 3: collecting ... collected 6 items
-3: 
+3:
 3: ../../src/edge/savo_ui/test/test_ui_v2_contract.py::test_ui_v2_new_files_exist PASSED [ 16%]
 3: ../../src/edge/savo_ui/test/test_ui_v2_contract.py::test_ui_v2_is_read_only_ros_observer PASSED [ 33%]
 3: ../../src/edge/savo_ui/test/test_ui_v2_contract.py::test_ui_v2_voice_and_navigation_topics_are_production_topics PASSED [ 50%]
 3: ../../src/edge/savo_ui/test/test_ui_v2_contract.py::test_ui_v2_profiles_are_non_destructive PASSED [ 66%]
 3: ../../src/edge/savo_ui/test/test_ui_v2_contract.py::test_ui_v2_launch_uses_base_and_profile_configuration PASSED [ 83%]
 3: ../../src/edge/savo_ui/test/test_ui_v2_contract.py::test_ui_selector_defaults_to_classic_and_can_select_v2 PASSED [100%]
-3: 
+3:
 3: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_ui/test_results/savo_ui/test_ui_v2_contract.xunit.xml -
 3: ============================== 6 passed in 0.01s ===============================
 3: -- run_test.py: return code 0
 3: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_ui/test_results/savo_ui/test_ui_v2_contract.xunit.xml'
- 3/11 Test  #3: test_ui_v2_contract ..............   Passed    0.34 sec
+ 3/11 Test  #3: test_ui_v2_contract ..............   Passed    0.37 sec
 test 4
       Start  4: test_ui_runtime_contract
 
@@ -121,18 +123,18 @@ test 4
 4: configfile: setup.cfg
 4: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 4: collecting ... collected 5 items
-4: 
+4:
 4: ../../src/edge/savo_ui/test/test_ui_runtime_contract.py::test_runtime_variant_is_separate_from_classic_ui PASSED [ 20%]
 4: ../../src/edge/savo_ui/test/test_ui_runtime_contract.py::test_runtime_uses_v2_for_interaction_only PASSED [ 40%]
 4: ../../src/edge/savo_ui/test/test_ui_runtime_contract.py::test_voice_completion_policy PASSED [ 60%]
 4: ../../src/edge/savo_ui/test/test_ui_runtime_contract.py::test_intro_launch_uses_one_runtime_process PASSED [ 80%]
 4: ../../src/edge/savo_ui/test/test_ui_runtime_contract.py::test_system_service_uses_intro_entrypoint PASSED [100%]
-4: 
+4:
 4: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_ui/test_results/savo_ui/test_ui_runtime_contract.xunit.xml -
 4: ============================== 5 passed in 0.01s ===============================
 4: -- run_test.py: return code 0
 4: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_ui/test_results/savo_ui/test_ui_runtime_contract.xunit.xml'
- 4/11 Test  #4: test_ui_runtime_contract .........   Passed    0.33 sec
+ 4/11 Test  #4: test_ui_runtime_contract .........   Passed    0.36 sec
 test 5
       Start  5: cpplint
 
@@ -142,81 +144,81 @@ test 5
 5: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui':
 5:  - /opt/ros/jazzy/bin/ament_cpplint --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_ui/test_results/savo_ui/cpplint.xunit.xml --filters=-readability/fn_size,-readability/braces
 5: Using '--root=/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui/include' argument
-5: 
+5:
 5: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui/include/savo_ui/app/live_state.hpp
-5: 
+5:
 5: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui/include/savo_ui/app/ui_node.hpp
-5: 
+5:
 5: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui/include/savo_ui/platform/framebuffer_display.hpp
-5: 
+5:
 5: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui/include/savo_ui/render/canvas.hpp
-5: 
+5:
 5: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui/include/savo_ui/render/color.hpp
-5: 
+5:
 5: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui/include/savo_ui/render/font.hpp
-5: 
+5:
 5: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui/include/savo_ui/render/image_asset.hpp
-5: 
+5:
 5: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui/include/savo_ui/render/preview_writer.hpp
-5: 
+5:
 5: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui/include/savo_ui/runtime/ui_runtime_node.hpp
-5: 
+5:
 5: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui/include/savo_ui/v2/graphics.hpp
-5: 
+5:
 5: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui/include/savo_ui/v2/navigation_renderer.hpp
-5: 
+5:
 5: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui/include/savo_ui/v2/ui_v2_node.hpp
-5: 
+5:
 5: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui/include/savo_ui/v2/ui_v2_types.hpp
-5: 
+5:
 5: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui/include/savo_ui/v2/voice_face_animation.hpp
-5: 
+5:
 5: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui/include/savo_ui/v2/voice_face_renderer.hpp
-5: 
+5:
 5: Using '--root=/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui/src' argument
-5: 
+5:
 5: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui/src/app/live_state.cpp
-5: 
+5:
 5: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui/src/app/ui_node.cpp
-5: 
+5:
 5: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui/src/main.cpp
-5: 
+5:
 5: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui/src/platform/framebuffer_display.cpp
-5: 
+5:
 5: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui/src/render/canvas.cpp
-5: 
+5:
 5: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui/src/render/font.cpp
-5: 
+5:
 5: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui/src/render/image_asset.cpp
-5: 
+5:
 5: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui/src/render/preview_writer.cpp
-5: 
+5:
 5: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui/src/runtime/main_ui_runtime.cpp
-5: 
+5:
 5: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui/src/runtime/ui_runtime_node.cpp
-5: 
+5:
 5: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui/src/v2/graphics.cpp
-5: 
+5:
 5: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui/src/v2/main_ui_v2.cpp
-5: 
+5:
 5: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui/src/v2/navigation_renderer.cpp
-5: 
+5:
 5: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui/src/v2/ui_v2_animation_preview.cpp
-5: 
+5:
 5: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui/src/v2/ui_v2_node.cpp
-5: 
+5:
 5: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui/src/v2/voice_face_animation.cpp
-5: 
+5:
 5: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui/src/v2/voice_face_renderer.cpp
-5: 
+5:
 5: Using '--root=/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui/test' argument
-5: 
+5:
 5: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui/test/test_live_state.cpp
-5: 
+5:
 5: No problems found
 5: -- run_test.py: return code 0
 5: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_ui/test_results/savo_ui/cpplint.xunit.xml'
- 5/11 Test  #5: cpplint ..........................   Passed    1.54 sec
+ 5/11 Test  #5: cpplint ..........................   Passed    1.52 sec
 test 6
       Start  6: cppcheck
 
@@ -228,7 +230,7 @@ test 6
 6: cppcheck 2.13.0 has known performance issues and therefore will not be used, set the AMENT_CPPCHECK_ALLOW_SLOW_VERSIONS environment variable to override this.
 6: -- run_test.py: return code 0
 6: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_ui/test_results/savo_ui/cppcheck.xunit.xml'
- 6/11 Test  #6: cppcheck .........................   Passed    0.13 sec
+ 6/11 Test  #6: cppcheck .........................   Passed    0.14 sec
 test 7
       Start  7: flake8
 
@@ -237,12 +239,12 @@ test 7
 7: Test timeout computed to be: 60
 7: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui':
 7:  - /opt/ros/jazzy/bin/ament_flake8 --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_ui/test_results/savo_ui/flake8.xunit.xml
-7: 
+7:
 7: 21 files checked
 7: No problems found
-7: 
+7:
 7: Checked files:
-7: 
+7:
 7: * ./setup.py
 7: * ./test/test_ui_integration_contract.py
 7: * ./test/test_ui_runtime_contract.py
@@ -266,7 +268,7 @@ test 7
 7: * ./launch/ui_v2_bringup.launch.py
 7: -- run_test.py: return code 0
 7: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_ui/test_results/savo_ui/flake8.xunit.xml'
- 7/11 Test  #7: flake8 ...........................   Passed    0.41 sec
+ 7/11 Test  #7: flake8 ...........................   Passed    0.43 sec
 test 8
       Start  8: lint_cmake
 
@@ -275,7 +277,7 @@ test 8
 8: Test timeout computed to be: 60
 8: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui':
 8:  - /opt/ros/jazzy/bin/ament_lint_cmake --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_ui/test_results/savo_ui/lint_cmake.xunit.xml
-8: 
+8:
 8: No problems found
 8: -- run_test.py: return code 0
 8: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_ui/test_results/savo_ui/lint_cmake.xunit.xml'
@@ -322,75 +324,75 @@ test 10
 10: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui':
 10:  - /opt/ros/jazzy/bin/ament_uncrustify --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_ui/test_results/savo_ui/uncrustify.xunit.xml
 10: No code style divergence in file 'include/savo_ui/app/live_state.hpp'
-10: 
+10:
 10: No code style divergence in file 'include/savo_ui/app/ui_node.hpp'
-10: 
+10:
 10: No code style divergence in file 'include/savo_ui/platform/framebuffer_display.hpp'
-10: 
+10:
 10: No code style divergence in file 'include/savo_ui/render/canvas.hpp'
-10: 
+10:
 10: No code style divergence in file 'include/savo_ui/render/color.hpp'
-10: 
+10:
 10: No code style divergence in file 'include/savo_ui/render/font.hpp'
-10: 
+10:
 10: No code style divergence in file 'include/savo_ui/render/image_asset.hpp'
-10: 
+10:
 10: No code style divergence in file 'include/savo_ui/render/preview_writer.hpp'
-10: 
+10:
 10: No code style divergence in file 'include/savo_ui/runtime/ui_runtime_node.hpp'
-10: 
+10:
 10: No code style divergence in file 'include/savo_ui/v2/graphics.hpp'
-10: 
+10:
 10: No code style divergence in file 'include/savo_ui/v2/navigation_renderer.hpp'
-10: 
+10:
 10: No code style divergence in file 'include/savo_ui/v2/ui_v2_node.hpp'
-10: 
+10:
 10: No code style divergence in file 'include/savo_ui/v2/ui_v2_types.hpp'
-10: 
+10:
 10: No code style divergence in file 'include/savo_ui/v2/voice_face_animation.hpp'
-10: 
+10:
 10: No code style divergence in file 'include/savo_ui/v2/voice_face_renderer.hpp'
-10: 
+10:
 10: No code style divergence in file 'src/app/live_state.cpp'
-10: 
+10:
 10: No code style divergence in file 'src/app/ui_node.cpp'
-10: 
+10:
 10: No code style divergence in file 'src/main.cpp'
-10: 
+10:
 10: No code style divergence in file 'src/platform/framebuffer_display.cpp'
-10: 
+10:
 10: No code style divergence in file 'src/render/canvas.cpp'
-10: 
+10:
 10: No code style divergence in file 'src/render/font.cpp'
-10: 
+10:
 10: No code style divergence in file 'src/render/image_asset.cpp'
-10: 
+10:
 10: No code style divergence in file 'src/render/preview_writer.cpp'
-10: 
+10:
 10: No code style divergence in file 'src/runtime/main_ui_runtime.cpp'
-10: 
+10:
 10: No code style divergence in file 'src/runtime/ui_runtime_node.cpp'
-10: 
+10:
 10: No code style divergence in file 'src/v2/graphics.cpp'
-10: 
+10:
 10: No code style divergence in file 'src/v2/main_ui_v2.cpp'
-10: 
+10:
 10: No code style divergence in file 'src/v2/navigation_renderer.cpp'
-10: 
+10:
 10: No code style divergence in file 'src/v2/ui_v2_animation_preview.cpp'
-10: 
+10:
 10: No code style divergence in file 'src/v2/ui_v2_node.cpp'
-10: 
+10:
 10: No code style divergence in file 'src/v2/voice_face_animation.cpp'
-10: 
+10:
 10: No code style divergence in file 'src/v2/voice_face_renderer.cpp'
-10: 
+10:
 10: No code style divergence in file 'test/test_live_state.cpp'
-10: 
+10:
 10: No problems found
 10: -- run_test.py: return code 0
 10: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_ui/test_results/savo_ui/uncrustify.xunit.xml'
-10/11 Test #10: uncrustify .......................   Passed    0.59 sec
+10/11 Test #10: uncrustify .......................   Passed    0.76 sec
 test 11
       Start 11: xmllint
 
@@ -400,38 +402,33 @@ test 11
 11: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_ui':
 11:  - /opt/ros/jazzy/bin/ament_xmllint --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_ui/test_results/savo_ui/xmllint.xunit.xml
 11: File 'package.xml' is valid
-11: 
+11:
 11: No problems found
 11: -- run_test.py: return code 0
 11: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_ui/test_results/savo_ui/xmllint.xunit.xml'
-11/11 Test #11: xmllint ..........................   Passed    0.12 sec
+11/11 Test #11: xmllint ..........................   Passed    0.13 sec
 
 100% tests passed, 0 tests failed out of 11
 
 Label Time Summary:
-cppcheck      =   0.13 sec*proc (1 test)
-cpplint       =   1.54 sec*proc (1 test)
-flake8        =   0.41 sec*proc (1 test)
+cppcheck      =   0.14 sec*proc (1 test)
+cpplint       =   1.52 sec*proc (1 test)
+flake8        =   0.43 sec*proc (1 test)
 gtest         =   0.05 sec*proc (1 test)
 lint_cmake    =   0.12 sec*proc (1 test)
-linter        =   3.17 sec*proc (7 tests)
+linter        =   3.36 sec*proc (7 tests)
 pep257        =   0.27 sec*proc (1 test)
-pytest        =   1.08 sec*proc (3 tests)
-uncrustify    =   0.59 sec*proc (1 test)
-xmllint       =   0.12 sec*proc (1 test)
+pytest        =   1.10 sec*proc (3 tests)
+uncrustify    =   0.76 sec*proc (1 test)
+xmllint       =   0.13 sec*proc (1 test)
 
-Total Test time (real) =   4.31 sec
-Finished <<< savo_ui [4.34s]
+Total Test time (real) =   4.51 sec
+Finished <<< savo_ui [4.54s]
 
-Summary: 1 package finished [4.55s]
-
-============================================================
- COLCON TEST RESULT
-============================================================
+Summary: 1 package finished [4.69s]
 Summary: 154 tests, 0 errors, 0 failures, 33 skipped
-
 ------------------------------------------------------------
 PACKAGE_RESULT: PASS
-COLCON_TEST_EXIT: 0
-TEST_RESULT_EXIT: 0
+COLCON_TEST_EXIT_STATUS: 0
+TEST_RESULT_EXIT_STATUS: 0
 ------------------------------------------------------------

@@ -1,16 +1,26 @@
-ROS 2 Jazzy environment                    PASS
-git diff --check                           PASS (exit 0)
-Full bringup source validation             PASS (exit 0)
-Observer source validation                 PASS (exit 0)
-Pre-real-test readiness                    PASS (exit 0)
-rosdep dependency check                    PASS (exit 0)
-PC full colcon build                       PASS (exit 0)
-PC full colcon test                        FAIL (exit 1)
-PC full colcon test-result                 FAIL (exit 1)
-Hardware-free pre-real-test regression     FAIL (exit 1)
+Robot Savo PC validation summary
+Run ID: 20260809T063128Z
+Date: 2026-08-09T09:31:28+03:00
+Host: ahnaf-tahmid-B760M-PG-SONIC-WiFi
+Validated commit: fa8053a58514451d97fb2eb151b8a2842db57104
+
+PC full colcon build                       PASS
+PC full colcon test                        PASS
+PC full colcon test-result                 PASS
+Hardware-free pre-real-test regression     PASS
+
+Full bringup source validation             PASS
+Observer source validation                 PASS
+Pre-real-test readiness                    PASS
+rosdep dependency check                    PASS
+Git whitespace check                       PASS
+
+Aggregate test result: 6189 tests, 0 errors, 0 failures, 384 skipped
+Cppcheck policy: repository default; ament skips known-problematic cppcheck 2.13
+
 savo_base                                  PASS
-savo_bringup                               PASS
 savo_bridge                                PASS
+savo_bringup                               PASS
 savo_control                               PASS
 savo_description                           PASS
 savo_head                                  PASS
@@ -29,14 +39,5 @@ savo_supervisor                            PASS
 savo_ui                                    PASS
 savo_vo                                    PASS
 
-============================================================
- FINAL REPOSITORY STATUS
-============================================================
-
-?? docs/logs/
-
-Evidence directory:
-/home/ahnaf-tahmid/Savo_Pi/docs/logs/validation/PC
-
-Run ID:
-20260809T021142Z
+Package evidence files: 20/20 present and passing
+Overall result: PASS

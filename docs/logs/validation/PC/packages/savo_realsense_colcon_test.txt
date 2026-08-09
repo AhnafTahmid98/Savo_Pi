@@ -1,17 +1,19 @@
-Robot Savo package PC validation
-Run ID: 20260809T021142Z
-Package: savo_realsense
-Date: 2026-08-09T05:24:52+03:00
+Robot Savo PC validation
+Run ID: 20260809T063128Z
+Step: package test savo_realsense
+Date: 2026-08-09T09:31:28+03:00
 Host: ahnaf-tahmid-B760M-PG-SONIC-WiFi
-Commit: eb71c26ac7dfbeaf9c2e44df3ba9f79117c7d4b6
-
+Commit: fa8053a58514451d97fb2eb151b8a2842db57104
+Executor: sequential
+Cppcheck policy: repository default; ament skips known-problematic cppcheck 2.13
+Output:
 Starting >>> savo_realsense
 UpdateCTestConfiguration  from :/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense/CTestConfiguration.ini
 Parse Config file:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense/CTestConfiguration.ini
    Site: ahnaf-tahmid-B760M-PG-SONIC-WiFi
    Build name: (empty)
  Add coverage exclude regular expressions.
-Create new tag: 20260809-0224 - Experimental
+Create new tag: 20260809-0651 - Experimental
 UpdateCTestConfiguration  from :/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense/CTestConfiguration.ini
 Parse Config file:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense/CTestConfiguration.ini
 Test project /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense
@@ -35,14 +37,14 @@ test 1
 1: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_realsense
 1: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 1: collected 8 items
-1: 
+1:
 1: ../../src/edge/savo_realsense/test/test_camera_checks.py ........        [100%]
-1: 
+1:
 1: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense/test_results/savo_realsense/test_camera_checks.xunit.xml -
 1: ============================== 8 passed in 0.07s ===============================
 1: -- run_test.py: return code 0
 1: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense/test_results/savo_realsense/test_camera_checks.xunit.xml'
- 1/17 Test  #1: test_camera_checks ...............   Passed    0.39 sec
+ 1/17 Test  #1: test_camera_checks ...............   Passed    0.42 sec
 test 2
       Start  2: test_camera_status
 
@@ -57,14 +59,14 @@ test 2
 2: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_realsense
 2: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 2: collected 7 items
-2: 
+2:
 2: ../../src/edge/savo_realsense/test/test_camera_status.py .......         [100%]
-2: 
+2:
 2: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense/test_results/savo_realsense/test_camera_status.xunit.xml -
 2: ============================== 7 passed in 0.01s ===============================
 2: -- run_test.py: return code 0
 2: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense/test_results/savo_realsense/test_camera_status.xunit.xml'
- 2/17 Test  #2: test_camera_status ...............   Passed    0.32 sec
+ 2/17 Test  #2: test_camera_status ...............   Passed    0.36 sec
 test 3
       Start  3: test_copyright
 
@@ -79,14 +81,14 @@ test 3
 3: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_realsense
 3: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 3: collected 1 item
-3: 
+3:
 3: ../../src/edge/savo_realsense/test/test_copyright.py .                   [100%]
-3: 
+3:
 3: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense/test_results/savo_realsense/test_copyright.xunit.xml -
 3: ============================== 1 passed in 0.01s ===============================
 3: -- run_test.py: return code 0
 3: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense/test_results/savo_realsense/test_copyright.xunit.xml'
- 3/17 Test  #3: test_copyright ...................   Passed    0.33 sec
+ 3/17 Test  #3: test_copyright ...................   Passed    0.35 sec
 test 4
       Start  4: test_cpp_default_nodes
 
@@ -101,14 +103,14 @@ test 4
 4: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_realsense
 4: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 4: collected 2 items
-4: 
+4:
 4: ../../src/edge/savo_realsense/test/test_cpp_default_nodes.py ..          [100%]
-4: 
+4:
 4: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense/test_results/savo_realsense/test_cpp_default_nodes.xunit.xml -
 4: ============================== 2 passed in 0.01s ===============================
 4: -- run_test.py: return code 0
 4: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense/test_results/savo_realsense/test_cpp_default_nodes.xunit.xml'
- 4/17 Test  #4: test_cpp_default_nodes ...........   Passed    0.32 sec
+ 4/17 Test  #4: test_cpp_default_nodes ...........   Passed    0.37 sec
 test 5
       Start  5: test_depth_image
 
@@ -123,14 +125,14 @@ test 5
 5: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_realsense
 5: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 5: collected 8 items
-5: 
+5:
 5: ../../src/edge/savo_realsense/test/test_depth_image.py ........          [100%]
-5: 
+5:
 5: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense/test_results/savo_realsense/test_depth_image.xunit.xml -
-5: ============================== 8 passed in 0.06s ===============================
+5: ============================== 8 passed in 0.07s ===============================
 5: -- run_test.py: return code 0
 5: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense/test_results/savo_realsense/test_depth_image.xunit.xml'
- 5/17 Test  #5: test_depth_image .................   Passed    0.38 sec
+ 5/17 Test  #5: test_depth_image .................   Passed    0.45 sec
 test 6
       Start  6: test_diagnostics
 
@@ -145,15 +147,15 @@ test 6
 6: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_realsense
 6: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 6: collected 19 items
-6: 
+6:
 6: ../../src/edge/savo_realsense/test/test_diagnostics.py ................. [ 89%]
 6: ..                                                                       [100%]
-6: 
+6:
 6: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense/test_results/savo_realsense/test_diagnostics.xunit.xml -
 6: ============================== 19 passed in 0.13s ==============================
 6: -- run_test.py: return code 0
 6: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense/test_results/savo_realsense/test_diagnostics.xunit.xml'
- 6/17 Test  #6: test_diagnostics .................   Passed    0.47 sec
+ 6/17 Test  #6: test_diagnostics .................   Passed    0.49 sec
 test 7
       Start  7: test_flake8
 
@@ -168,14 +170,14 @@ test 7
 7: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_realsense
 7: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 7: collected 1 item
-7: 
+7:
 7: ../../src/edge/savo_realsense/test/test_flake8.py .                      [100%]
-7: 
+7:
 7: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense/test_results/savo_realsense/test_flake8.xunit.xml -
-7: ============================== 1 passed in 0.18s ===============================
+7: ============================== 1 passed in 0.20s ===============================
 7: -- run_test.py: return code 0
 7: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense/test_results/savo_realsense/test_flake8.xunit.xml'
- 7/17 Test  #7: test_flake8 ......................   Passed    0.53 sec
+ 7/17 Test  #7: test_flake8 ......................   Passed    0.56 sec
 test 8
       Start  8: test_frame_names
 
@@ -190,14 +192,14 @@ test 8
 8: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_realsense
 8: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 8: collected 7 items
-8: 
+8:
 8: ../../src/edge/savo_realsense/test/test_frame_names.py .......           [100%]
-8: 
+8:
 8: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense/test_results/savo_realsense/test_frame_names.xunit.xml -
-8: ============================== 7 passed in 0.11s ===============================
+8: ============================== 7 passed in 0.12s ===============================
 8: -- run_test.py: return code 0
 8: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense/test_results/savo_realsense/test_frame_names.xunit.xml'
- 8/17 Test  #8: test_frame_names .................   Passed    0.44 sec
+ 8/17 Test  #8: test_frame_names .................   Passed    0.50 sec
 test 9
       Start  9: test_imports
 
@@ -212,14 +214,14 @@ test 9
 9: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_realsense
 9: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 9: collected 5 items
-9: 
+9:
 9: ../../src/edge/savo_realsense/test/test_imports.py .....                 [100%]
-9: 
+9:
 9: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense/test_results/savo_realsense/test_imports.xunit.xml -
-9: ============================== 5 passed in 0.11s ===============================
+9: ============================== 5 passed in 0.12s ===============================
 9: -- run_test.py: return code 0
 9: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense/test_results/savo_realsense/test_imports.xunit.xml'
- 9/17 Test  #9: test_imports .....................   Passed    0.45 sec
+ 9/17 Test  #9: test_imports .....................   Passed    0.49 sec
 test 10
       Start 10: test_param_loader
 
@@ -234,14 +236,14 @@ test 10
 10: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_realsense
 10: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 10: collected 9 items
-10: 
+10:
 10: ../../src/edge/savo_realsense/test/test_param_loader.py .........        [100%]
-10: 
+10:
 10: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense/test_results/savo_realsense/test_param_loader.xunit.xml -
-10: ============================== 9 passed in 0.06s ===============================
+10: ============================== 9 passed in 0.07s ===============================
 10: -- run_test.py: return code 0
 10: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense/test_results/savo_realsense/test_param_loader.xunit.xml'
-10/17 Test #10: test_param_loader ................   Passed    0.38 sec
+10/17 Test #10: test_param_loader ................   Passed    0.42 sec
 test 11
       Start 11: test_pep257
 
@@ -256,14 +258,14 @@ test 11
 11: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_realsense
 11: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 11: collected 1 item
-11: 
+11:
 11: ../../src/edge/savo_realsense/test/test_pep257.py .                      [100%]
-11: 
+11:
 11: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense/test_results/savo_realsense/test_pep257.xunit.xml -
-11: ============================== 1 passed in 0.11s ===============================
+11: ============================== 1 passed in 0.12s ===============================
 11: -- run_test.py: return code 0
 11: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense/test_results/savo_realsense/test_pep257.xunit.xml'
-11/17 Test #11: test_pep257 ......................   Passed    0.43 sec
+11/17 Test #11: test_pep257 ......................   Passed    0.48 sec
 test 12
       Start 12: test_pointcloud_profile
 
@@ -278,14 +280,14 @@ test 12
 12: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_realsense
 12: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 12: collected 5 items
-12: 
+12:
 12: ../../src/edge/savo_realsense/test/test_pointcloud_profile.py .....      [100%]
-12: 
+12:
 12: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense/test_results/savo_realsense/test_pointcloud_profile.xunit.xml -
-12: ============================== 5 passed in 0.03s ===============================
+12: ============================== 5 passed in 0.02s ===============================
 12: -- run_test.py: return code 0
 12: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense/test_results/savo_realsense/test_pointcloud_profile.xunit.xml'
-12/17 Test #12: test_pointcloud_profile ..........   Passed    0.36 sec
+12/17 Test #12: test_pointcloud_profile ..........   Passed    0.37 sec
 test 13
       Start 13: test_serial_binding
 
@@ -300,14 +302,14 @@ test 13
 13: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_realsense
 13: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 13: collected 3 items
-13: 
+13:
 13: ../../src/edge/savo_realsense/test/test_serial_binding.py ...            [100%]
-13: 
+13:
 13: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense/test_results/savo_realsense/test_serial_binding.xunit.xml -
 13: ============================== 3 passed in 0.02s ===============================
 13: -- run_test.py: return code 0
 13: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense/test_results/savo_realsense/test_serial_binding.xunit.xml'
-13/17 Test #13: test_serial_binding ..............   Passed    0.34 sec
+13/17 Test #13: test_serial_binding ..............   Passed    0.38 sec
 test 14
       Start 14: test_stream_status
 
@@ -322,14 +324,14 @@ test 14
 14: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_realsense
 14: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 14: collected 7 items
-14: 
+14:
 14: ../../src/edge/savo_realsense/test/test_stream_status.py .......         [100%]
-14: 
+14:
 14: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense/test_results/savo_realsense/test_stream_status.xunit.xml -
 14: ============================== 7 passed in 0.01s ===============================
 14: -- run_test.py: return code 0
 14: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense/test_results/savo_realsense/test_stream_status.xunit.xml'
-14/17 Test #14: test_stream_status ...............   Passed    0.38 sec
+14/17 Test #14: test_stream_status ...............   Passed    0.37 sec
 test 15
       Start 15: test_timing
 
@@ -344,14 +346,14 @@ test 15
 15: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_realsense
 15: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 15: collected 7 items
-15: 
+15:
 15: ../../src/edge/savo_realsense/test/test_timing.py .......                [100%]
-15: 
+15:
 15: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense/test_results/savo_realsense/test_timing.xunit.xml -
 15: ============================== 7 passed in 0.07s ===============================
 15: -- run_test.py: return code 0
 15: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense/test_results/savo_realsense/test_timing.xunit.xml'
-15/17 Test #15: test_timing ......................   Passed    0.40 sec
+15/17 Test #15: test_timing ......................   Passed    0.42 sec
 test 16
       Start 16: test_topic_names
 
@@ -366,14 +368,14 @@ test 16
 16: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_realsense
 16: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 16: collected 6 items
-16: 
+16:
 16: ../../src/edge/savo_realsense/test/test_topic_names.py ......            [100%]
-16: 
+16:
 16: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense/test_results/savo_realsense/test_topic_names.xunit.xml -
-16: ============================== 6 passed in 0.10s ===============================
+16: ============================== 6 passed in 0.11s ===============================
 16: -- run_test.py: return code 0
 16: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense/test_results/savo_realsense/test_topic_names.xunit.xml'
-16/17 Test #16: test_topic_names .................   Passed    0.44 sec
+16/17 Test #16: test_topic_names .................   Passed    0.51 sec
 test 17
       Start 17: test_xmllint
 
@@ -388,32 +390,27 @@ test 17
 17: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_realsense
 17: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 17: collected 1 item
-17: 
+17:
 17: ../../src/edge/savo_realsense/test/test_xmllint.py .                     [100%]
-17: 
+17:
 17: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense/test_results/savo_realsense/test_xmllint.xunit.xml -
 17: ============================== 1 passed in 0.02s ===============================
 17: -- run_test.py: return code 0
 17: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_realsense/test_results/savo_realsense/test_xmllint.xunit.xml'
-17/17 Test #17: test_xmllint .....................   Passed    0.36 sec
+17/17 Test #17: test_xmllint .....................   Passed    0.42 sec
 
 100% tests passed, 0 tests failed out of 17
 
 Label Time Summary:
-pytest    =   6.73 sec*proc (17 tests)
+pytest    =   7.36 sec*proc (17 tests)
 
-Total Test time (real) =   6.73 sec
-Finished <<< savo_realsense [6.76s]
+Total Test time (real) =   7.37 sec
+Finished <<< savo_realsense [7.40s]
 
-Summary: 1 package finished [6.90s]
-
-============================================================
- COLCON TEST RESULT
-============================================================
+Summary: 1 package finished [7.55s]
 Summary: 114 tests, 0 errors, 0 failures, 0 skipped
-
 ------------------------------------------------------------
 PACKAGE_RESULT: PASS
-COLCON_TEST_EXIT: 0
-TEST_RESULT_EXIT: 0
+COLCON_TEST_EXIT_STATUS: 0
+TEST_RESULT_EXIT_STATUS: 0
 ------------------------------------------------------------

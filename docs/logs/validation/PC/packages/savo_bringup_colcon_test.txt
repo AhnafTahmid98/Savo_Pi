@@ -1,17 +1,19 @@
-Robot Savo package PC validation
-Run ID: 20260809T021142Z
-Package: savo_bringup
-Date: 2026-08-09T05:21:02+03:00
+Robot Savo PC validation
+Run ID: 20260809T063128Z
+Step: package test savo_bringup
+Date: 2026-08-09T09:31:28+03:00
 Host: ahnaf-tahmid-B760M-PG-SONIC-WiFi
-Commit: eb71c26ac7dfbeaf9c2e44df3ba9f79117c7d4b6
-
+Commit: fa8053a58514451d97fb2eb151b8a2842db57104
+Executor: sequential
+Cppcheck policy: repository default; ament skips known-problematic cppcheck 2.13
+Output:
 Starting >>> savo_bringup
 UpdateCTestConfiguration  from :/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bringup/CTestConfiguration.ini
 Parse Config file:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bringup/CTestConfiguration.ini
    Site: ahnaf-tahmid-B760M-PG-SONIC-WiFi
    Build name: (empty)
  Add coverage exclude regular expressions.
-Create new tag: 20260809-0221 - Experimental
+Create new tag: 20260809-0648 - Experimental
 UpdateCTestConfiguration  from :/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bringup/CTestConfiguration.ini
 Parse Config file:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bringup/CTestConfiguration.ini
 Test project /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bringup
@@ -54,14 +56,14 @@ test 1
 1: [ RUN      ] BringupContract.ReadinessCoversReadyWaitingStaleBlockedAndDegraded
 1: [       OK ] BringupContract.ReadinessCoversReadyWaitingStaleBlockedAndDegraded (0 ms)
 1: [----------] 10 tests from BringupContract (0 ms total)
-1: 
+1:
 1: [----------] Global test environment tear-down
 1: [==========] 10 tests from 1 test suite ran. (0 ms total)
 1: [  PASSED  ] 10 tests.
 1: -- run_test.py: return code 0
 1: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bringup/test_results/savo_bringup/test_bringup_contract.gtest.xml'
 1: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bringup/test_results/savo_bringup/test_bringup_contract.gtest.xml'
- 1/11 Test  #1: test_bringup_contract ...........................   Passed    0.05 sec
+ 1/11 Test  #1: test_bringup_contract ...........................   Passed    0.06 sec
 test 2
       Start  2: test_autonomous_mapping_deployment_contract
 
@@ -78,14 +80,14 @@ test 2
 2: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bringup
 2: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 2: collected 6 items
-2: 
+2:
 2: test/test_autonomous_mapping_deployment_contract.py ......               [100%]
-2: 
+2:
 2: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bringup/test_results/savo_bringup/test_autonomous_mapping_deployment_contract.xunit.xml -
 2: ============================== 6 passed in 0.02s ===============================
 2: -- run_test.py: return code 0
 2: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bringup/test_results/savo_bringup/test_autonomous_mapping_deployment_contract.xunit.xml'
- 2/11 Test  #2: test_autonomous_mapping_deployment_contract .....   Passed    0.35 sec
+ 2/11 Test  #2: test_autonomous_mapping_deployment_contract .....   Passed    0.37 sec
 test 3
       Start  3: test_full_bringup_contract
 
@@ -102,14 +104,14 @@ test 3
 3: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bringup
 3: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 3: collected 12 items
-3: 
+3:
 3: test/test_full_bringup_contract.py ............                          [100%]
-3: 
+3:
 3: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bringup/test_results/savo_bringup/test_full_bringup_contract.xunit.xml -
-3: ============================== 12 passed in 0.03s ==============================
+3: ============================== 12 passed in 0.04s ==============================
 3: -- run_test.py: return code 0
 3: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bringup/test_results/savo_bringup/test_full_bringup_contract.xunit.xml'
- 3/11 Test  #3: test_full_bringup_contract ......................   Passed    0.36 sec
+ 3/11 Test  #3: test_full_bringup_contract ......................   Passed    0.40 sec
 test 4
       Start  4: test_location_integration_deployment_contract
 
@@ -126,14 +128,14 @@ test 4
 4: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bringup
 4: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 4: collected 3 items
-4: 
+4:
 4: test/test_location_integration_deployment_contract.py ...                [100%]
-4: 
+4:
 4: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bringup/test_results/savo_bringup/test_location_integration_deployment_contract.xunit.xml -
 4: ============================== 3 passed in 0.01s ===============================
 4: -- run_test.py: return code 0
 4: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bringup/test_results/savo_bringup/test_location_integration_deployment_contract.xunit.xml'
- 4/11 Test  #4: test_location_integration_deployment_contract ...   Passed    0.34 sec
+ 4/11 Test  #4: test_location_integration_deployment_contract ...   Passed    0.37 sec
 test 5
       Start  5: cppcheck
 
@@ -155,19 +157,19 @@ test 6
 6: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bringup':
 6:  - /opt/ros/jazzy/bin/ament_cpplint --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bringup/test_results/savo_bringup/cpplint.xunit.xml
 6: Using '--root=/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bringup/include' argument
-6: 
+6:
 6: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bringup/include/savo_bringup/bringup_contract.hpp
-6: 
+6:
 6: Using '--root=/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bringup/src' argument
-6: 
+6:
 6: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bringup/src/bringup_contract.cpp
-6: 
+6:
 6: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bringup/src/nodes/bringup_readiness_node.cpp
-6: 
+6:
 6: Using '--root=/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bringup/test' argument
-6: 
+6:
 6: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bringup/test/test_bringup_contract.cpp
-6: 
+6:
 6: No problems found
 6: -- run_test.py: return code 0
 6: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bringup/test_results/savo_bringup/cpplint.xunit.xml'
@@ -180,12 +182,12 @@ test 7
 7: Test timeout computed to be: 60
 7: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bringup':
 7:  - /opt/ros/jazzy/bin/ament_flake8 --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bringup/test_results/savo_bringup/flake8.xunit.xml --config /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bringup/.flake8
-7: 
+7:
 7: 25 files checked
 7: No problems found
-7: 
+7:
 7: Checked files:
-7: 
+7:
 7: * ./test/test_full_bringup_contract.py
 7: * ./test/test_autonomous_mapping_deployment_contract.py
 7: * ./test/test_location_integration_deployment_contract.py
@@ -213,7 +215,7 @@ test 7
 7: * ./launch/saved_map_navigation.launch.py
 7: -- run_test.py: return code 0
 7: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bringup/test_results/savo_bringup/flake8.xunit.xml'
- 7/11 Test  #7: flake8 ..........................................   Passed    0.40 sec
+ 7/11 Test  #7: flake8 ..........................................   Passed    0.41 sec
 test 8
       Start  8: lint_cmake
 
@@ -222,7 +224,7 @@ test 8
 8: Test timeout computed to be: 60
 8: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bringup':
 8:  - /opt/ros/jazzy/bin/ament_lint_cmake --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bringup/test_results/savo_bringup/lint_cmake.xunit.xml
-8: 
+8:
 8: No problems found
 8: -- run_test.py: return code 0
 8: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bringup/test_results/savo_bringup/lint_cmake.xunit.xml'
@@ -273,17 +275,17 @@ test 10
 10: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bringup':
 10:  - /opt/ros/jazzy/bin/ament_uncrustify --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bringup/test_results/savo_bringup/uncrustify.xunit.xml
 10: No code style divergence in file 'include/savo_bringup/bringup_contract.hpp'
-10: 
+10:
 10: No code style divergence in file 'src/bringup_contract.cpp'
-10: 
+10:
 10: No code style divergence in file 'src/nodes/bringup_readiness_node.cpp'
-10: 
+10:
 10: No code style divergence in file 'test/test_bringup_contract.cpp'
-10: 
+10:
 10: No problems found
 10: -- run_test.py: return code 0
 10: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bringup/test_results/savo_bringup/uncrustify.xunit.xml'
-10/11 Test #10: uncrustify ......................................   Passed    0.16 sec
+10/11 Test #10: uncrustify ......................................   Passed    0.17 sec
 test 11
       Start 11: xmllint
 
@@ -293,7 +295,7 @@ test 11
 11: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bringup':
 11:  - /opt/ros/jazzy/bin/ament_xmllint --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bringup/test_results/savo_bringup/xmllint.xunit.xml
 11: File 'package.xml' is valid
-11: 
+11:
 11: No problems found
 11: -- run_test.py: return code 0
 11: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bringup/test_results/savo_bringup/xmllint.xunit.xml'
@@ -304,27 +306,22 @@ test 11
 Label Time Summary:
 cppcheck      =   0.13 sec*proc (1 test)
 cpplint       =   0.28 sec*proc (1 test)
-flake8        =   0.40 sec*proc (1 test)
-gtest         =   0.05 sec*proc (1 test)
+flake8        =   0.41 sec*proc (1 test)
+gtest         =   0.06 sec*proc (1 test)
 lint_cmake    =   0.12 sec*proc (1 test)
-linter        =   1.46 sec*proc (7 tests)
+linter        =   1.48 sec*proc (7 tests)
 pep257        =   0.24 sec*proc (1 test)
-pytest        =   1.05 sec*proc (3 tests)
-uncrustify    =   0.16 sec*proc (1 test)
+pytest        =   1.15 sec*proc (3 tests)
+uncrustify    =   0.17 sec*proc (1 test)
 xmllint       =   0.13 sec*proc (1 test)
 
-Total Test time (real) =   2.56 sec
-Finished <<< savo_bringup [2.59s]
+Total Test time (real) =   2.69 sec
+Finished <<< savo_bringup [2.72s]
 
-Summary: 1 package finished [2.74s]
-
-============================================================
- COLCON TEST RESULT
-============================================================
+Summary: 1 package finished [2.89s]
 Summary: 82 tests, 0 errors, 0 failures, 4 skipped
-
 ------------------------------------------------------------
 PACKAGE_RESULT: PASS
-COLCON_TEST_EXIT: 0
-TEST_RESULT_EXIT: 0
+COLCON_TEST_EXIT_STATUS: 0
+TEST_RESULT_EXIT_STATUS: 0
 ------------------------------------------------------------

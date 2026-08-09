@@ -1,17 +1,19 @@
-Robot Savo package PC validation
-Run ID: 20260809T021142Z
-Package: savo_mapping
-Date: 2026-08-09T05:22:13+03:00
+Robot Savo PC validation
+Run ID: 20260809T063128Z
+Step: package test savo_mapping
+Date: 2026-08-09T09:31:28+03:00
 Host: ahnaf-tahmid-B760M-PG-SONIC-WiFi
-Commit: eb71c26ac7dfbeaf9c2e44df3ba9f79117c7d4b6
-
+Commit: fa8053a58514451d97fb2eb151b8a2842db57104
+Executor: sequential
+Cppcheck policy: repository default; ament skips known-problematic cppcheck 2.13
+Output:
 Starting >>> savo_mapping
 UpdateCTestConfiguration  from :/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/CTestConfiguration.ini
 Parse Config file:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/CTestConfiguration.ini
    Site: ahnaf-tahmid-B760M-PG-SONIC-WiFi
    Build name: (empty)
  Add coverage exclude regular expressions.
-Create new tag: 20260809-0222 - Experimental
+Create new tag: 20260809-0649 - Experimental
 UpdateCTestConfiguration  from :/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/CTestConfiguration.ini
 Parse Config file:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/CTestConfiguration.ini
 Test project /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping
@@ -26,7 +28,7 @@ test 1
 
 1: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/cppcheck.xunit.xml" "--package-name" "savo_mapping" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/ament_cppcheck/cppcheck.txt" "--command" "/opt/ros/jazzy/bin/ament_cppcheck" "--xunit-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/cppcheck.xunit.xml" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/autonomous_mapping_am7.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/autonomous_mapping_mission.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/coverage_execution_handoff.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/coverage_grid.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/coverage_mission.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/coverage_operation_orchestrator.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/coverage_planner.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/exploration_goal.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/exploration_goal_handoff.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/exploration_mode.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/exploration_planner.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/exploration_runtime.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/frontier_completion_detector.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/frontier_detector.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/frontier_selector.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/manual_workflow_state.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/map_quality_placeholder.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/map_session_policy.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/mapping_mode.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/mapping_status.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/mapping_types.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/parameter_utils.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/production_map_release.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/qos_profiles.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/saved_map_contract.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/saved_map_quality.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/scan360_controller.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/scan360_orchestrator.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/scan360_planner.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/scan360_quality.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/scan360_rotate_action_binding.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/scan360_rotate_action_client.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/semantic_interruption.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/semantic_landmark.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/semantic_landmark_recorder.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/session_state.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/simulated_scan_model.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/slam_contract.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/slam_lifecycle_topics.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/supervisor_runtime.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/tf_pose_reader.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/topic_names.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/version.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/workflow_authority.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/workflow_phase.hpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/core/exploration_goal_handoff.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/core/exploration_mode.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/core/mapping_mode.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/core/mapping_status.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/core/mapping_types.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/core/session_state.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/core/supervisor_runtime.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/core/version.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/core/workflow_phase.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/coverage/coverage_execution_handoff.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/coverage/coverage_grid.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/coverage/coverage_mission.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/coverage/coverage_operation_orchestrator.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/coverage/coverage_planner.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/exploration/exploration_goal.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/exploration/exploration_planner.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/frontier/frontier_detector.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/frontier/frontier_selector.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/autonomous_mapping_orchestrator_node.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/coverage_execution_handoff_node.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/coverage_mapper_node.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/coverage_operation_orchestrator_node.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/exploration_goal_handoff_node.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/exploration_manager_node.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/first_map_validator_node.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/frontier_explorer_node.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/location_review_gateway_node.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/map_catalog_manager_node.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/map_quality_evaluator_node.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/map_session_manager_node.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/mapped_location_registration_node.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/mapping_mode_manager_node.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/mapping_supervisor_node.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/saved_map_verifier_node.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/scan360_mapper_node.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/semantic_interruption_coordinator_node.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/semantic_landmark_bridge_node.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/simulated_slam_input_node.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/slam_lifecycle_health_bridge_node.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/quality/map_quality_placeholder.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/ros/parameter_utils.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/ros/qos_profiles.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/ros/scan360_rotate_action_binding.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/ros/scan360_rotate_action_client.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/ros/tf_pose_reader.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/ros/topic_names.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/scan360/scan360_controller.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/scan360/scan360_orchestrator.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/scan360/scan360_planner.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/scan360/scan360_quality.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/semantic/semantic_interruption.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/semantic/semantic_landmark.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/semantic/semantic_landmark_recorder.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/session/map_session_policy.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/session/production_map_release.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/session/saved_map_contract.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/session/saved_map_quality.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/slam/simulated_scan_model.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/slam/slam_contract.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/tools/location_review_cli.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/workflow/autonomous_mapping_am7.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/workflow/autonomous_mapping_mission.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/workflow/exploration_runtime.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/workflow/frontier_completion_detector.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/workflow/manual_workflow_state.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/workflow/workflow_authority.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/nodes/fake_savo_nav_exploration_server_node.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_autonomous_mapping_am7.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_autonomous_mapping_mission.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_config_and_launch_files.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_coverage_execution_handoff.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_coverage_grid.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_coverage_mission.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_coverage_operation_orchestrator.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_coverage_planner.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_exploration_goal_handoff.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_exploration_manager_contract.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_exploration_mode.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_exploration_planner.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_exploration_runtime.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_frontier_completion_detector.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_frontier_detector.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_frontier_explorer_contract.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_frontier_selector.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_manual_workflow_state.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_map_session_policy.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_mapping_mode.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_mapping_mode_manager_contract.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_mapping_status.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_mapping_supervisor_runtime.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_mapping_types.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_parameter_utils.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_production_map_release.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_qos_profiles.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_saved_map_contract.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_saved_map_quality.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_scan360_controller.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_scan360_orchestrator.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_scan360_planner.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_scan360_quality.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_scan360_rotate_action_binding.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_scan360_rotate_action_client_runtime.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_semantic_interruption.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_semantic_landmark.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_session_state.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_simulated_scan_model.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_slam_contract.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_tf_pose_reader.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_topic_names.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_version.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_workflow_authority.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_workflow_phase.cpp" "--exclude" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_scan360_rotate_action_binding.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_scan360_rotate_action_client_runtime.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_coverage_mission.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_coverage_execution_handoff.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_coverage_operation_orchestrator.cpp" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_tf_pose_reader.cpp" "--language" "c++" "--include_dirs" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include"
 1: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping
-1: Environment variables: 
+1: Environment variables:
 1:  AMENT_CPPCHECK_ALLOW_SLOW_VERSIONS=1
 1: Test timeout computed to be: 300
 1: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping':
@@ -34,7 +36,7 @@ test 1
 1: No problems found
 1: -- run_test.py: return code 0
 1: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/cppcheck.xunit.xml'
- 1/85 Test  #1: cppcheck ........................................   Passed    1.34 sec
+ 1/85 Test  #1: cppcheck ........................................   Passed    1.33 sec
 test 2
       Start  2: cpplint
 
@@ -44,329 +46,329 @@ test 2
 2: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping':
 2:  - /opt/ros/jazzy/bin/ament_cpplint --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/cpplint.xunit.xml --filters=-build/include_order,-legal/copyright /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/autonomous_mapping_am7.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/autonomous_mapping_mission.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/coverage_execution_handoff.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/coverage_grid.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/coverage_mission.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/coverage_operation_orchestrator.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/coverage_planner.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/exploration_goal.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/exploration_goal_handoff.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/exploration_mode.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/exploration_planner.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/exploration_runtime.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/frontier_completion_detector.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/frontier_detector.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/frontier_selector.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/manual_workflow_state.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/map_quality_placeholder.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/map_session_policy.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/mapping_mode.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/mapping_status.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/mapping_types.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/parameter_utils.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/production_map_release.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/qos_profiles.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/saved_map_contract.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/saved_map_quality.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/scan360_controller.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/scan360_orchestrator.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/scan360_planner.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/scan360_quality.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/scan360_rotate_action_binding.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/scan360_rotate_action_client.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/semantic_interruption.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/semantic_landmark.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/semantic_landmark_recorder.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/session_state.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/simulated_scan_model.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/slam_contract.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/slam_lifecycle_topics.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/supervisor_runtime.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/tf_pose_reader.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/topic_names.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/version.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/workflow_authority.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/workflow_phase.hpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/core/exploration_goal_handoff.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/core/exploration_mode.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/core/mapping_mode.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/core/mapping_status.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/core/mapping_types.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/core/session_state.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/core/supervisor_runtime.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/core/version.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/core/workflow_phase.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/coverage/coverage_execution_handoff.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/coverage/coverage_grid.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/coverage/coverage_mission.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/coverage/coverage_operation_orchestrator.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/coverage/coverage_planner.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/exploration/exploration_goal.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/exploration/exploration_planner.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/frontier/frontier_detector.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/frontier/frontier_selector.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/autonomous_mapping_orchestrator_node.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/coverage_execution_handoff_node.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/coverage_mapper_node.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/coverage_operation_orchestrator_node.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/exploration_goal_handoff_node.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/exploration_manager_node.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/first_map_validator_node.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/frontier_explorer_node.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/location_review_gateway_node.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/map_catalog_manager_node.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/map_quality_evaluator_node.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/map_session_manager_node.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/mapped_location_registration_node.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/mapping_mode_manager_node.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/mapping_supervisor_node.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/saved_map_verifier_node.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/scan360_mapper_node.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/semantic_interruption_coordinator_node.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/semantic_landmark_bridge_node.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/simulated_slam_input_node.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/slam_lifecycle_health_bridge_node.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/quality/map_quality_placeholder.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/ros/parameter_utils.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/ros/qos_profiles.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/ros/scan360_rotate_action_binding.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/ros/scan360_rotate_action_client.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/ros/tf_pose_reader.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/ros/topic_names.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/scan360/scan360_controller.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/scan360/scan360_orchestrator.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/scan360/scan360_planner.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/scan360/scan360_quality.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/semantic/semantic_interruption.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/semantic/semantic_landmark.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/semantic/semantic_landmark_recorder.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/session/map_session_policy.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/session/production_map_release.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/session/saved_map_contract.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/session/saved_map_quality.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/slam/simulated_scan_model.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/slam/slam_contract.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/tools/location_review_cli.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/workflow/autonomous_mapping_am7.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/workflow/autonomous_mapping_mission.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/workflow/exploration_runtime.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/workflow/frontier_completion_detector.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/workflow/manual_workflow_state.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/workflow/workflow_authority.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/nodes/fake_savo_nav_exploration_server_node.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_autonomous_mapping_am7.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_autonomous_mapping_mission.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_config_and_launch_files.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_coverage_execution_handoff.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_coverage_grid.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_coverage_mission.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_coverage_operation_orchestrator.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_coverage_planner.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_exploration_goal_handoff.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_exploration_manager_contract.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_exploration_mode.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_exploration_planner.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_exploration_runtime.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_frontier_completion_detector.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_frontier_detector.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_frontier_explorer_contract.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_frontier_selector.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_manual_workflow_state.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_map_session_policy.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_mapping_mode.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_mapping_mode_manager_contract.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_mapping_status.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_mapping_supervisor_runtime.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_mapping_types.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_parameter_utils.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_production_map_release.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_qos_profiles.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_saved_map_contract.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_saved_map_quality.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_scan360_controller.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_scan360_orchestrator.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_scan360_planner.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_scan360_quality.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_scan360_rotate_action_binding.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_scan360_rotate_action_client_runtime.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_semantic_interruption.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_semantic_landmark.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_session_state.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_simulated_scan_model.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_slam_contract.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_tf_pose_reader.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_topic_names.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_version.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_workflow_authority.cpp /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_workflow_phase.cpp
 2: Using '--root=/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include' argument
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/autonomous_mapping_am7.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/autonomous_mapping_mission.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/coverage_execution_handoff.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/coverage_grid.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/coverage_mission.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/coverage_operation_orchestrator.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/coverage_planner.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/exploration_goal.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/exploration_goal_handoff.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/exploration_mode.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/exploration_planner.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/exploration_runtime.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/frontier_completion_detector.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/frontier_detector.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/frontier_selector.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/manual_workflow_state.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/map_quality_placeholder.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/map_session_policy.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/mapping_mode.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/mapping_status.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/mapping_types.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/parameter_utils.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/production_map_release.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/qos_profiles.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/saved_map_contract.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/saved_map_quality.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/scan360_controller.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/scan360_orchestrator.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/scan360_planner.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/scan360_quality.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/scan360_rotate_action_binding.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/scan360_rotate_action_client.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/semantic_interruption.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/semantic_landmark.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/semantic_landmark_recorder.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/session_state.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/simulated_scan_model.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/slam_contract.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/slam_lifecycle_topics.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/supervisor_runtime.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/tf_pose_reader.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/topic_names.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/version.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/workflow_authority.hpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/include/savo_mapping/workflow_phase.hpp
-2: 
+2:
 2: Using '--root=/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src' argument
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/core/exploration_goal_handoff.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/core/exploration_mode.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/core/mapping_mode.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/core/mapping_status.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/core/mapping_types.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/core/session_state.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/core/supervisor_runtime.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/core/version.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/core/workflow_phase.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/coverage/coverage_execution_handoff.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/coverage/coverage_grid.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/coverage/coverage_mission.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/coverage/coverage_operation_orchestrator.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/coverage/coverage_planner.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/exploration/exploration_goal.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/exploration/exploration_planner.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/frontier/frontier_detector.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/frontier/frontier_selector.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/autonomous_mapping_orchestrator_node.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/coverage_execution_handoff_node.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/coverage_mapper_node.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/coverage_operation_orchestrator_node.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/exploration_goal_handoff_node.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/exploration_manager_node.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/first_map_validator_node.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/frontier_explorer_node.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/location_review_gateway_node.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/map_catalog_manager_node.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/map_quality_evaluator_node.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/map_session_manager_node.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/mapped_location_registration_node.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/mapping_mode_manager_node.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/mapping_supervisor_node.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/saved_map_verifier_node.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/scan360_mapper_node.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/semantic_interruption_coordinator_node.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/semantic_landmark_bridge_node.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/simulated_slam_input_node.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/nodes/slam_lifecycle_health_bridge_node.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/quality/map_quality_placeholder.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/ros/parameter_utils.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/ros/qos_profiles.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/ros/scan360_rotate_action_binding.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/ros/scan360_rotate_action_client.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/ros/tf_pose_reader.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/ros/topic_names.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/scan360/scan360_controller.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/scan360/scan360_orchestrator.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/scan360/scan360_planner.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/scan360/scan360_quality.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/semantic/semantic_interruption.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/semantic/semantic_landmark.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/semantic/semantic_landmark_recorder.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/session/map_session_policy.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/session/production_map_release.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/session/saved_map_contract.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/session/saved_map_quality.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/slam/simulated_scan_model.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/slam/slam_contract.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/tools/location_review_cli.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/workflow/autonomous_mapping_am7.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/workflow/autonomous_mapping_mission.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/workflow/exploration_runtime.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/workflow/frontier_completion_detector.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/workflow/manual_workflow_state.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/src/workflow/workflow_authority.cpp
-2: 
+2:
 2: Using '--root=/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test' argument
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/nodes/fake_savo_nav_exploration_server_node.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_autonomous_mapping_am7.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_autonomous_mapping_mission.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_config_and_launch_files.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_coverage_execution_handoff.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_coverage_grid.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_coverage_mission.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_coverage_operation_orchestrator.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_coverage_planner.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_exploration_goal_handoff.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_exploration_manager_contract.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_exploration_mode.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_exploration_planner.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_exploration_runtime.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_frontier_completion_detector.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_frontier_detector.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_frontier_explorer_contract.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_frontier_selector.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_manual_workflow_state.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_map_session_policy.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_mapping_mode.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_mapping_mode_manager_contract.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_mapping_status.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_mapping_supervisor_runtime.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_mapping_types.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_parameter_utils.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_production_map_release.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_qos_profiles.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_saved_map_contract.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_saved_map_quality.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_scan360_controller.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_scan360_orchestrator.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_scan360_planner.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_scan360_quality.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_scan360_rotate_action_binding.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_scan360_rotate_action_client_runtime.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_semantic_interruption.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_semantic_landmark.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_session_state.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_simulated_scan_model.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_slam_contract.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_tf_pose_reader.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_topic_names.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_version.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_workflow_authority.cpp
-2: 
+2:
 2: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_workflow_phase.cpp
-2: 
+2:
 2: No problems found
 2: -- run_test.py: return code 0
 2: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/cpplint.xunit.xml'
- 2/85 Test  #2: cpplint .........................................   Passed    5.40 sec
+ 2/85 Test  #2: cpplint .........................................   Passed    5.44 sec
 test 3
       Start  3: xmllint
 
@@ -376,41 +378,41 @@ test 3
 3: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping':
 3:  - /opt/ros/jazzy/bin/ament_xmllint --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/xmllint.xunit.xml package.xml launch/autonomous_mapping.launch.xml launch/autonomous_mapping_orchestrator.launch.xml launch/coverage_execution_handoff.launch.xml launch/coverage_operation_orchestrator.launch.xml launch/coverage_mapping.launch.xml launch/exploration_goal_handoff.launch.xml launch/frontier_mapping.launch.xml launch/manual_mapping.launch.xml launch/map_catalog_manager.launch.xml launch/map_quality_evaluator.launch.xml launch/map_session_manager.launch.xml launch/monitor_only.launch.xml launch/scan360_mapping.launch.xml launch/semantic_mapping.launch.xml launch/simulated_manual_mapping.launch.xml
 3: File 'package.xml' is valid
-3: 
+3:
 3: File 'launch/autonomous_mapping.launch.xml' is valid
-3: 
+3:
 3: File 'launch/autonomous_mapping_orchestrator.launch.xml' is valid
-3: 
+3:
 3: File 'launch/coverage_execution_handoff.launch.xml' is valid
-3: 
+3:
 3: File 'launch/coverage_operation_orchestrator.launch.xml' is valid
-3: 
+3:
 3: File 'launch/coverage_mapping.launch.xml' is valid
-3: 
+3:
 3: File 'launch/exploration_goal_handoff.launch.xml' is valid
-3: 
+3:
 3: File 'launch/frontier_mapping.launch.xml' is valid
-3: 
+3:
 3: File 'launch/manual_mapping.launch.xml' is valid
-3: 
+3:
 3: File 'launch/map_catalog_manager.launch.xml' is valid
-3: 
+3:
 3: File 'launch/map_quality_evaluator.launch.xml' is valid
-3: 
+3:
 3: File 'launch/map_session_manager.launch.xml' is valid
-3: 
+3:
 3: File 'launch/monitor_only.launch.xml' is valid
-3: 
+3:
 3: File 'launch/scan360_mapping.launch.xml' is valid
-3: 
+3:
 3: File 'launch/semantic_mapping.launch.xml' is valid
-3: 
+3:
 3: File 'launch/simulated_manual_mapping.launch.xml' is valid
-3: 
+3:
 3: No problems found
 3: -- run_test.py: return code 0
 3: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/xmllint.xunit.xml'
- 3/85 Test  #3: xmllint .........................................   Passed    0.54 sec
+ 3/85 Test  #3: xmllint .........................................   Passed    0.41 sec
 test 4
       Start  4: test_autonomous_mapping_launch_contract
 
@@ -425,15 +427,15 @@ test 4
 4: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 4: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 4: collected 3 items
-4: 
+4:
 4: ../../src/core/savo_mapping/test/test_autonomous_mapping_launch_contract.py . [ 33%]
 4: ..                                                                       [100%]
-4: 
+4:
 4: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_autonomous_mapping_launch_contract.xunit.xml -
 4: ============================== 3 passed in 0.01s ===============================
 4: -- run_test.py: return code 0
 4: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_autonomous_mapping_launch_contract.xunit.xml'
- 4/85 Test  #4: test_autonomous_mapping_launch_contract .........   Passed    0.38 sec
+ 4/85 Test  #4: test_autonomous_mapping_launch_contract .........   Passed    0.37 sec
 test 5
       Start  5: test_autonomous_mapping_orchestrator_contract
 
@@ -448,15 +450,15 @@ test 5
 5: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 5: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 5: collected 8 items
-5: 
+5:
 5: ../../src/core/savo_mapping/test/test_autonomous_mapping_orchestrator_contract.py . [ 12%]
 5: .......                                                                  [100%]
-5: 
+5:
 5: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_autonomous_mapping_orchestrator_contract.xunit.xml -
 5: ============================== 8 passed in 0.01s ===============================
 5: -- run_test.py: return code 0
 5: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_autonomous_mapping_orchestrator_contract.xunit.xml'
- 5/85 Test  #5: test_autonomous_mapping_orchestrator_contract ...   Passed    0.40 sec
+ 5/85 Test  #5: test_autonomous_mapping_orchestrator_contract ...   Passed    0.38 sec
 test 6
       Start  6: test_autonomous_mapping_am7_contract
 
@@ -471,15 +473,15 @@ test 6
 6: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 6: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 6: collected 5 items
-6: 
+6:
 6: ../../src/core/savo_mapping/test/test_autonomous_mapping_am7_contract.py . [ 20%]
 6: ....                                                                     [100%]
-6: 
+6:
 6: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_autonomous_mapping_am7_contract.xunit.xml -
 6: ============================== 5 passed in 0.01s ===============================
 6: -- run_test.py: return code 0
 6: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_autonomous_mapping_am7_contract.xunit.xml'
- 6/85 Test  #6: test_autonomous_mapping_am7_contract ............   Passed    0.35 sec
+ 6/85 Test  #6: test_autonomous_mapping_am7_contract ............   Passed    0.38 sec
 test 7
       Start  7: test_autonomous_mapping_am8_contract
 
@@ -494,15 +496,15 @@ test 7
 7: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 7: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 7: collected 4 items
-7: 
+7:
 7: ../../src/core/savo_mapping/test/test_autonomous_mapping_am8_contract.py . [ 25%]
 7: ...                                                                      [100%]
-7: 
+7:
 7: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_autonomous_mapping_am8_contract.xunit.xml -
 7: ============================== 4 passed in 0.01s ===============================
 7: -- run_test.py: return code 0
 7: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_autonomous_mapping_am8_contract.xunit.xml'
- 7/85 Test  #7: test_autonomous_mapping_am8_contract ............   Passed    0.34 sec
+ 7/85 Test  #7: test_autonomous_mapping_am8_contract ............   Passed    0.37 sec
 test 8
       Start  8: test_autonomous_mapping_sequencer_contract
 
@@ -517,21 +519,21 @@ test 8
 8: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 8: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 8: collected 4 items
-8: 
+8:
 8: ../../src/core/savo_mapping/test/test_autonomous_mapping_sequencer_contract.py . [ 25%]
 8: ...                                                                      [100%]
-8: 
+8:
 8: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_autonomous_mapping_sequencer_contract.xunit.xml -
 8: ============================== 4 passed in 0.01s ===============================
 8: -- run_test.py: return code 0
 8: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_autonomous_mapping_sequencer_contract.xunit.xml'
- 8/85 Test  #8: test_autonomous_mapping_sequencer_contract ......   Passed    0.35 sec
+ 8/85 Test  #8: test_autonomous_mapping_sequencer_contract ......   Passed    0.36 sec
 test 9
       Start  9: test_autonomous_mapping_orchestrator_runtime
 
 9: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_autonomous_mapping_orchestrator_runtime.xunit.xml" "--package-name" "savo_mapping" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/ament_cmake_pytest/test_autonomous_mapping_orchestrator_runtime.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_autonomous_mapping_orchestrator_runtime.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/ament_cmake_pytest/test_autonomous_mapping_orchestrator_runtime/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_autonomous_mapping_orchestrator_runtime.xunit.xml" "--junit-prefix=savo_mapping"
 9: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping
-9: Environment variables: 
+9: Environment variables:
 9:  PYTHONDONTWRITEBYTECODE=1
 9:  ROS_LOCALHOST_ONLY=1
 9:  ROS_DOMAIN_ID=223
@@ -546,21 +548,21 @@ test 9
 9: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 9: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 9: collected 4 items
-9: 
+9:
 9: ../../src/core/savo_mapping/test/test_autonomous_mapping_orchestrator_runtime.py . [ 25%]
 9: ...                                                                      [100%]
-9: 
+9:
 9: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_autonomous_mapping_orchestrator_runtime.xunit.xml -
-9: ============================== 4 passed in 4.15s ===============================
+9: ============================== 4 passed in 4.23s ===============================
 9: -- run_test.py: return code 0
 9: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_autonomous_mapping_orchestrator_runtime.xunit.xml'
- 9/85 Test  #9: test_autonomous_mapping_orchestrator_runtime ....   Passed    4.63 sec
+ 9/85 Test  #9: test_autonomous_mapping_orchestrator_runtime ....   Passed    4.73 sec
 test 10
       Start 10: test_autonomous_mapping_sequencer_runtime
 
 10: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_autonomous_mapping_sequencer_runtime.xunit.xml" "--package-name" "savo_mapping" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/ament_cmake_pytest/test_autonomous_mapping_sequencer_runtime.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_autonomous_mapping_sequencer_runtime.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/ament_cmake_pytest/test_autonomous_mapping_sequencer_runtime/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_autonomous_mapping_sequencer_runtime.xunit.xml" "--junit-prefix=savo_mapping"
 10: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping
-10: Environment variables: 
+10: Environment variables:
 10:  PYTHONDONTWRITEBYTECODE=1
 10:  ROS_LOCALHOST_ONLY=1
 10:  ROS_DOMAIN_ID=224
@@ -575,20 +577,20 @@ test 10
 10: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 10: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 10: collected 1 item
-10: 
+10:
 10: ../../src/core/savo_mapping/test/test_autonomous_mapping_sequencer_runtime.py . [100%]
-10: 
+10:
 10: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_autonomous_mapping_sequencer_runtime.xunit.xml -
-10: ============================== 1 passed in 1.88s ===============================
+10: ============================== 1 passed in 1.98s ===============================
 10: -- run_test.py: return code 0
 10: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_autonomous_mapping_sequencer_runtime.xunit.xml'
-10/85 Test #10: test_autonomous_mapping_sequencer_runtime .......   Passed    2.36 sec
+10/85 Test #10: test_autonomous_mapping_sequencer_runtime .......   Passed    2.49 sec
 test 11
       Start 11: test_autonomous_mapping_am7_runtime
 
 11: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_autonomous_mapping_am7_runtime.xunit.xml" "--package-name" "savo_mapping" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/ament_cmake_pytest/test_autonomous_mapping_am7_runtime.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_autonomous_mapping_am7_runtime.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/ament_cmake_pytest/test_autonomous_mapping_am7_runtime/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_autonomous_mapping_am7_runtime.xunit.xml" "--junit-prefix=savo_mapping"
 11: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping
-11: Environment variables: 
+11: Environment variables:
 11:  PYTHONDONTWRITEBYTECODE=1
 11:  ROS_LOCALHOST_ONLY=1
 11:  ROS_DOMAIN_ID=227
@@ -603,16 +605,15 @@ test 11
 11: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 11: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 11: collected 16 items
-11: 
+11:
 11: ../../src/core/savo_mapping/test/test_autonomous_mapping_am7_runtime.py . [  6%]
 11: ...............                                                          [100%]
-[Processing: savo_mapping]
-11: 
+11:
 11: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_autonomous_mapping_am7_runtime.xunit.xml -
-11: ============================= 16 passed in 27.78s ==============================
+11: ============================= 16 passed in 25.78s ==============================
 11: -- run_test.py: return code 0
 11: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_autonomous_mapping_am7_runtime.xunit.xml'
-11/85 Test #11: test_autonomous_mapping_am7_runtime .............   Passed   28.30 sec
+11/85 Test #11: test_autonomous_mapping_am7_runtime .............   Passed   26.30 sec
 test 12
       Start 12: test_scan360_rotate_action_client_contract
 
@@ -627,21 +628,21 @@ test 12
 12: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 12: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 12: collected 20 items
-12: 
+12:
 12: ../../src/core/savo_mapping/test/test_scan360_rotate_action_client_contract.py . [  5%]
 12: ...................                                                      [100%]
-12: 
+12:
 12: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_scan360_rotate_action_client_contract.xunit.xml -
 12: ============================== 20 passed in 0.02s ==============================
 12: -- run_test.py: return code 0
 12: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_scan360_rotate_action_client_contract.xunit.xml'
-12/85 Test #12: test_scan360_rotate_action_client_contract ......   Passed    0.37 sec
+12/85 Test #12: test_scan360_rotate_action_client_contract ......   Passed    0.40 sec
 test 13
       Start 13: test_tf_pose_reader_runtime
 
 13: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_tf_pose_reader_runtime.xunit.xml" "--package-name" "savo_mapping" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/ament_cmake_pytest/test_tf_pose_reader_runtime.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_tf_pose_reader_runtime.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/ament_cmake_pytest/test_tf_pose_reader_runtime/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_tf_pose_reader_runtime.xunit.xml" "--junit-prefix=savo_mapping"
 13: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping
-13: Environment variables: 
+13: Environment variables:
 13:  PYTHONDONTWRITEBYTECODE=1
 13:  ROS_LOCALHOST_ONLY=1
 13:  ROS_DOMAIN_ID=220
@@ -656,14 +657,14 @@ test 13
 13: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 13: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 13: collected 4 items
-13: 
+13:
 13: ../../src/core/savo_mapping/test/test_tf_pose_reader_runtime.py ....     [100%]
-13: 
+13:
 13: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_tf_pose_reader_runtime.xunit.xml -
 13: ============================== 4 passed in 6.37s ===============================
 13: -- run_test.py: return code 0
 13: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_tf_pose_reader_runtime.xunit.xml'
-13/85 Test #13: test_tf_pose_reader_runtime .....................   Passed    6.82 sec
+13/85 Test #13: test_tf_pose_reader_runtime .....................   Passed    6.85 sec
 test 14
       Start 14: test_tf_pose_reader_contract
 
@@ -678,21 +679,21 @@ test 14
 14: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 14: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 14: collected 10 items
-14: 
+14:
 14: ../../src/core/savo_mapping/test/test_tf_pose_reader_contract.py ....... [ 70%]
 14: ...                                                                      [100%]
-14: 
+14:
 14: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_tf_pose_reader_contract.xunit.xml -
-14: ============================== 10 passed in 0.01s ==============================
+14: ============================== 10 passed in 0.02s ==============================
 14: -- run_test.py: return code 0
 14: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_tf_pose_reader_contract.xunit.xml'
-14/85 Test #14: test_tf_pose_reader_contract ....................   Passed    0.33 sec
+14/85 Test #14: test_tf_pose_reader_contract ....................   Passed    0.36 sec
 test 15
       Start 15: test_coverage_mapper_node_runtime
 
 15: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_coverage_mapper_node_runtime.xunit.xml" "--package-name" "savo_mapping" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/ament_cmake_pytest/test_coverage_mapper_node_runtime.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_coverage_mapper_node_runtime.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/ament_cmake_pytest/test_coverage_mapper_node_runtime/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_coverage_mapper_node_runtime.xunit.xml" "--junit-prefix=savo_mapping"
 15: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping
-15: Environment variables: 
+15: Environment variables:
 15:  PYTHONDONTWRITEBYTECODE=1
 15:  ROS_LOCALHOST_ONLY=1
 15:  ROS_DOMAIN_ID=221
@@ -707,16 +708,15 @@ test 15
 15: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 15: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 15: collected 9 items
-15: 
+15:
 15: ../../src/core/savo_mapping/test/test_coverage_mapper_node_runtime.py .. [ 22%]
 15: .......                                                                  [100%]
-[Processing: savo_mapping]
-15: 
+15:
 15: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_coverage_mapper_node_runtime.xunit.xml -
-15: ============================== 9 passed in 17.40s ==============================
+15: ============================== 9 passed in 17.02s ==============================
 15: -- run_test.py: return code 0
 15: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_coverage_mapper_node_runtime.xunit.xml'
-15/85 Test #15: test_coverage_mapper_node_runtime ...............   Passed   17.85 sec
+15/85 Test #15: test_coverage_mapper_node_runtime ...............   Passed   17.52 sec
 test 16
       Start 16: test_coverage_mapper_node_contract
 
@@ -731,15 +731,15 @@ test 16
 16: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 16: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 16: collected 14 items
-16: 
+16:
 16: ../../src/core/savo_mapping/test/test_coverage_mapper_node_contract.py . [  7%]
 16: .............                                                            [100%]
-16: 
+16:
 16: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_coverage_mapper_node_contract.xunit.xml -
-16: ============================== 14 passed in 0.02s ==============================
+16: ============================== 14 passed in 0.03s ==============================
 16: -- run_test.py: return code 0
 16: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_coverage_mapper_node_contract.xunit.xml'
-16/85 Test #16: test_coverage_mapper_node_contract ..............   Passed    0.34 sec
+16/85 Test #16: test_coverage_mapper_node_contract ..............   Passed    0.45 sec
 test 17
       Start 17: test_coverage_deployment_assets_contract
 
@@ -754,21 +754,21 @@ test 17
 17: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 17: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 17: collected 9 items
-17: 
+17:
 17: ../../src/core/savo_mapping/test/test_coverage_deployment_assets_contract.py . [ 11%]
 17: ........                                                                 [100%]
-17: 
+17:
 17: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_coverage_deployment_assets_contract.xunit.xml -
-17: ============================== 9 passed in 0.02s ===============================
+17: ============================== 9 passed in 0.03s ===============================
 17: -- run_test.py: return code 0
 17: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_coverage_deployment_assets_contract.xunit.xml'
-17/85 Test #17: test_coverage_deployment_assets_contract ........   Passed    0.34 sec
+17/85 Test #17: test_coverage_deployment_assets_contract ........   Passed    0.37 sec
 test 18
       Start 18: test_coverage_launch_runtime
 
 18: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_coverage_launch_runtime.xunit.xml" "--package-name" "savo_mapping" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/ament_cmake_pytest/test_coverage_launch_runtime.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_coverage_launch_runtime.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/ament_cmake_pytest/test_coverage_launch_runtime/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_coverage_launch_runtime.xunit.xml" "--junit-prefix=savo_mapping"
 18: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping
-18: Environment variables: 
+18: Environment variables:
 18:  PYTHONDONTWRITEBYTECODE=1
 18:  ROS_LOCALHOST_ONLY=1
 18:  ROS_DOMAIN_ID=222
@@ -782,14 +782,14 @@ test 18
 18: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 18: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 18: collected 2 items
-18: 
+18:
 18: ../../src/core/savo_mapping/test/test_coverage_launch_runtime.py ..      [100%]
-18: 
+18:
 18: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_coverage_launch_runtime.xunit.xml -
-18: ============================== 2 passed in 2.58s ===============================
+18: ============================== 2 passed in 2.69s ===============================
 18: -- run_test.py: return code 0
 18: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_coverage_launch_runtime.xunit.xml'
-18/85 Test #18: test_coverage_launch_runtime ....................   Passed    3.05 sec
+18/85 Test #18: test_coverage_launch_runtime ....................   Passed    3.19 sec
 test 19
       Start 19: test_scan360_orchestrator_contract
 
@@ -804,15 +804,15 @@ test 19
 19: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 19: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 19: collected 12 items
-19: 
+19:
 19: ../../src/core/savo_mapping/test/test_scan360_orchestrator_contract.py . [  8%]
 19: ...........                                                              [100%]
-19: 
+19:
 19: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_scan360_orchestrator_contract.xunit.xml -
 19: ============================== 12 passed in 0.02s ==============================
 19: -- run_test.py: return code 0
 19: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_scan360_orchestrator_contract.xunit.xml'
-19/85 Test #19: test_scan360_orchestrator_contract ..............   Passed    0.33 sec
+19/85 Test #19: test_scan360_orchestrator_contract ..............   Passed    0.38 sec
 test 20
       Start 20: test_scan360_rotate_action_binding_contract
 
@@ -827,21 +827,21 @@ test 20
 20: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 20: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 20: collected 14 items
-20: 
+20:
 20: ../../src/core/savo_mapping/test/test_scan360_rotate_action_binding_contract.py . [  7%]
 20: .............                                                            [100%]
-20: 
+20:
 20: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_scan360_rotate_action_binding_contract.xunit.xml -
-20: ============================== 14 passed in 0.02s ==============================
+20: ============================== 14 passed in 0.03s ==============================
 20: -- run_test.py: return code 0
 20: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_scan360_rotate_action_binding_contract.xunit.xml'
-20/85 Test #20: test_scan360_rotate_action_binding_contract .....   Passed    0.34 sec
+20/85 Test #20: test_scan360_rotate_action_binding_contract .....   Passed    0.40 sec
 test 21
       Start 21: test_scan360_mapper_node_runtime
 
 21: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_scan360_mapper_node_runtime.xunit.xml" "--package-name" "savo_mapping" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/ament_cmake_pytest/test_scan360_mapper_node_runtime.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_scan360_mapper_node_runtime.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/ament_cmake_pytest/test_scan360_mapper_node_runtime/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_scan360_mapper_node_runtime.xunit.xml" "--junit-prefix=savo_mapping"
 21: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping
-21: Environment variables: 
+21: Environment variables:
 21:  PYTHONDONTWRITEBYTECODE=1
 21:  ROS_LOCALHOST_ONLY=1
 21:  ROS_DOMAIN_ID=217
@@ -854,15 +854,15 @@ test 21
 21: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 21: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 21: collected 8 items
-21: 
+21:
 21: ../../src/core/savo_mapping/test/test_scan360_mapper_node_runtime.py ... [ 37%]
 21: .....                                                                    [100%]
-21: 
+21:
 21: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_scan360_mapper_node_runtime.xunit.xml -
-21: ============================== 8 passed in 10.39s ==============================
+21: ============================== 8 passed in 10.46s ==============================
 21: -- run_test.py: return code 0
 21: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_scan360_mapper_node_runtime.xunit.xml'
-21/85 Test #21: test_scan360_mapper_node_runtime ................   Passed   10.86 sec
+21/85 Test #21: test_scan360_mapper_node_runtime ................   Passed   10.97 sec
 test 22
       Start 22: test_scan360_mapper_node_contract
 
@@ -877,15 +877,15 @@ test 22
 22: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 22: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 22: collected 9 items
-22: 
+22:
 22: ../../src/core/savo_mapping/test/test_scan360_mapper_node_contract.py .. [ 22%]
 22: .......                                                                  [100%]
-22: 
+22:
 22: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_scan360_mapper_node_contract.xunit.xml -
-22: ============================== 9 passed in 0.01s ===============================
+22: ============================== 9 passed in 0.02s ===============================
 22: -- run_test.py: return code 0
 22: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_scan360_mapper_node_contract.xunit.xml'
-22/85 Test #22: test_scan360_mapper_node_contract ...............   Passed    0.34 sec
+22/85 Test #22: test_scan360_mapper_node_contract ...............   Passed    0.37 sec
 test 23
       Start 23: test_scan360_deployment_assets_contract
 
@@ -900,21 +900,21 @@ test 23
 23: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 23: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 23: collected 9 items
-23: 
+23:
 23: ../../src/core/savo_mapping/test/test_scan360_deployment_assets_contract.py . [ 11%]
 23: ........                                                                 [100%]
-23: 
+23:
 23: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_scan360_deployment_assets_contract.xunit.xml -
 23: ============================== 9 passed in 0.02s ===============================
 23: -- run_test.py: return code 0
 23: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_scan360_deployment_assets_contract.xunit.xml'
-23/85 Test #23: test_scan360_deployment_assets_contract .........   Passed    0.35 sec
+23/85 Test #23: test_scan360_deployment_assets_contract .........   Passed    0.37 sec
 test 24
       Start 24: test_scan360_launch_runtime
 
 24: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_scan360_launch_runtime.xunit.xml" "--package-name" "savo_mapping" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/ament_cmake_pytest/test_scan360_launch_runtime.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_scan360_launch_runtime.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/ament_cmake_pytest/test_scan360_launch_runtime/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_scan360_launch_runtime.xunit.xml" "--junit-prefix=savo_mapping"
 24: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping
-24: Environment variables: 
+24: Environment variables:
 24:  PYTHONDONTWRITEBYTECODE=1
 24:  ROS_LOCALHOST_ONLY=1
 24:  ROS_DOMAIN_ID=218
@@ -927,20 +927,20 @@ test 24
 24: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 24: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 24: collected 1 item
-24: 
+24:
 24: ../../src/core/savo_mapping/test/test_scan360_launch_runtime.py .        [100%]
-24: 
+24:
 24: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_scan360_launch_runtime.xunit.xml -
-24: ============================== 1 passed in 1.00s ===============================
+24: ============================== 1 passed in 1.11s ===============================
 24: -- run_test.py: return code 0
 24: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_scan360_launch_runtime.xunit.xml'
-24/85 Test #24: test_scan360_launch_runtime .....................   Passed    1.50 sec
+24/85 Test #24: test_scan360_launch_runtime .....................   Passed    1.59 sec
 test 25
       Start 25: test_tf_pose_reader
 
 25: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_tf_pose_reader.gtest.xml" "--package-name" "savo_mapping" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/ament_cmake_gtest/test_tf_pose_reader.txt" "--command" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_tf_pose_reader" "--gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_tf_pose_reader.gtest.xml"
 25: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping
-25: Environment variables: 
+25: Environment variables:
 25:  ROS_LOCALHOST_ONLY=1
 25:  ROS_DOMAIN_ID=220
 25:  ROS_LOG_DIR=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/tf_pose_reader_ros_logs
@@ -1028,14 +1028,14 @@ test 25
 25: [ RUN      ] TfPoseReaderTest.ReaderOwnsNoNodeOrRosEndpoints
 25: [       OK ] TfPoseReaderTest.ReaderOwnsNoNodeOrRosEndpoints (0 ms)
 25: [----------] 38 tests from TfPoseReaderTest (9 ms total)
-25: 
+25:
 25: [----------] Global test environment tear-down
 25: [==========] 38 tests from 1 test suite ran. (9 ms total)
 25: [  PASSED  ] 38 tests.
 25: -- run_test.py: return code 0
 25: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_tf_pose_reader.gtest.xml'
 25: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_tf_pose_reader.gtest.xml'
-25/85 Test #25: test_tf_pose_reader .............................   Passed    0.07 sec
+25/85 Test #25: test_tf_pose_reader .............................   Passed    0.08 sec
 test 26
       Start 26: test_scan360_rotate_action_client_runtime
 
@@ -1049,32 +1049,32 @@ test 26
 26: [----------] Global test environment set-up.
 26: [----------] 9 tests from Scan360RotateActionClientRuntimeTest
 26: [ RUN      ] Scan360RotateActionClientRuntimeTest.RejectsInvalidRequestsAndNormalizesYaw
-26: [       OK ] Scan360RotateActionClientRuntimeTest.RejectsInvalidRequestsAndNormalizesYaw (13 ms)
+26: [       OK ] Scan360RotateActionClientRuntimeTest.RejectsInvalidRequestsAndNormalizesYaw (14 ms)
 26: [ RUN      ] Scan360RotateActionClientRuntimeTest.TimesOutWhenActionServerIsUnavailable
-26: [       OK ] Scan360RotateActionClientRuntimeTest.TimesOutWhenActionServerIsUnavailable (126 ms)
+26: [       OK ] Scan360RotateActionClientRuntimeTest.TimesOutWhenActionServerIsUnavailable (127 ms)
 26: [ RUN      ] Scan360RotateActionClientRuntimeTest.ReportsRejectedGoal
-26: [       OK ] Scan360RotateActionClientRuntimeTest.ReportsRejectedGoal (30 ms)
+26: [       OK ] Scan360RotateActionClientRuntimeTest.ReportsRejectedGoal (15 ms)
 26: [ RUN      ] Scan360RotateActionClientRuntimeTest.PropagatesFeedbackAndSuccessfulResult
-26: [       OK ] Scan360RotateActionClientRuntimeTest.PropagatesFeedbackAndSuccessfulResult (73 ms)
+26: [       OK ] Scan360RotateActionClientRuntimeTest.PropagatesFeedbackAndSuccessfulResult (69 ms)
 26: [ RUN      ] Scan360RotateActionClientRuntimeTest.EnforcesSingleOwnerAndAcknowledgesCancel
-26: [       OK ] Scan360RotateActionClientRuntimeTest.EnforcesSingleOwnerAndAcknowledgesCancel (17 ms)
+26: [       OK ] Scan360RotateActionClientRuntimeTest.EnforcesSingleOwnerAndAcknowledgesCancel (18 ms)
 26: [ RUN      ] Scan360RotateActionClientRuntimeTest.ExecutionTimeoutUsesNativeCancellation
-26: [       OK ] Scan360RotateActionClientRuntimeTest.ExecutionTimeoutUsesNativeCancellation (135 ms)
+26: [       OK ] Scan360RotateActionClientRuntimeTest.ExecutionTimeoutUsesNativeCancellation (136 ms)
 26: [ RUN      ] Scan360RotateActionClientRuntimeTest.FeedbackStaleUsesNativeCancellation
-26: [       OK ] Scan360RotateActionClientRuntimeTest.FeedbackStaleUsesNativeCancellation (142 ms)
+26: [       OK ] Scan360RotateActionClientRuntimeTest.FeedbackStaleUsesNativeCancellation (137 ms)
 26: [ RUN      ] Scan360RotateActionClientRuntimeTest.RejectedCancelEndsInCancelTimeout
 26: [       OK ] Scan360RotateActionClientRuntimeTest.RejectedCancelEndsInCancelTimeout (169 ms)
 26: [ RUN      ] Scan360RotateActionClientRuntimeTest.PropagatesAbortedActionReason
-26: [       OK ] Scan360RotateActionClientRuntimeTest.PropagatesAbortedActionReason (59 ms)
-26: [----------] 9 tests from Scan360RotateActionClientRuntimeTest (770 ms total)
-26: 
+26: [       OK ] Scan360RotateActionClientRuntimeTest.PropagatesAbortedActionReason (52 ms)
+26: [----------] 9 tests from Scan360RotateActionClientRuntimeTest (742 ms total)
+26:
 26: [----------] Global test environment tear-down
-26: [==========] 9 tests from 1 test suite ran. (775 ms total)
+26: [==========] 9 tests from 1 test suite ran. (747 ms total)
 26: [  PASSED  ] 9 tests.
 26: -- run_test.py: return code 0
 26: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_scan360_rotate_action_client_runtime.gtest.xml'
 26: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_scan360_rotate_action_client_runtime.gtest.xml'
-26/85 Test #26: test_scan360_rotate_action_client_runtime .......   Passed    0.94 sec
+26/85 Test #26: test_scan360_rotate_action_client_runtime .......   Passed    0.92 sec
 test 27
       Start 27: test_scan360_rotate_action_binding
 
@@ -1094,22 +1094,22 @@ test 27
 27: [ RUN      ] Scan360RotateActionBindingTest.NativeReasonIsPreservedExactly
 27: [       OK ] Scan360RotateActionBindingTest.NativeReasonIsPreservedExactly (0 ms)
 27: [ RUN      ] Scan360RotateActionBindingTest.CallbacksRetainNativeClientLifetime
-27: [       OK ] Scan360RotateActionBindingTest.CallbacksRetainNativeClientLifetime (13 ms)
+27: [       OK ] Scan360RotateActionBindingTest.CallbacksRetainNativeClientLifetime (14 ms)
 27: [ RUN      ] Scan360RotateActionBindingTest.RotationAndCancellationRequestsAreForwarded
-27: [       OK ] Scan360RotateActionBindingTest.RotationAndCancellationRequestsAreForwarded (18 ms)
+27: [       OK ] Scan360RotateActionBindingTest.RotationAndCancellationRequestsAreForwarded (19 ms)
 27: [ RUN      ] Scan360RotateActionBindingTest.TickIsForwardedToNativeClient
-27: [       OK ] Scan360RotateActionBindingTest.TickIsForwardedToNativeClient (87 ms)
+27: [       OK ] Scan360RotateActionBindingTest.TickIsForwardedToNativeClient (84 ms)
 27: [ RUN      ] Scan360RotateActionBindingTest.BindingAddsNoControllerEventOrdering
 27: [       OK ] Scan360RotateActionBindingTest.BindingAddsNoControllerEventOrdering (0 ms)
-27: [----------] 7 tests from Scan360RotateActionBindingTest (120 ms total)
-27: 
+27: [----------] 7 tests from Scan360RotateActionBindingTest (119 ms total)
+27:
 27: [----------] Global test environment tear-down
-27: [==========] 7 tests from 1 test suite ran. (125 ms total)
+27: [==========] 7 tests from 1 test suite ran. (124 ms total)
 27: [  PASSED  ] 7 tests.
 27: -- run_test.py: return code 0
 27: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_scan360_rotate_action_binding.gtest.xml'
 27: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_scan360_rotate_action_binding.gtest.xml'
-27/85 Test #27: test_scan360_rotate_action_binding ..............   Passed    0.31 sec
+27/85 Test #27: test_scan360_rotate_action_binding ..............   Passed    0.30 sec
 test 28
       Start 28: test_version
 
@@ -1127,14 +1127,14 @@ test 28
 28: [ RUN      ] VersionContract.VersionStringMatchesTuple
 28: [       OK ] VersionContract.VersionStringMatchesTuple (0 ms)
 28: [----------] 2 tests from VersionContract (0 ms total)
-28: 
+28:
 28: [----------] Global test environment tear-down
 28: [==========] 2 tests from 1 test suite ran. (0 ms total)
 28: [  PASSED  ] 2 tests.
 28: -- run_test.py: return code 0
 28: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_version.gtest.xml'
 28: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_version.gtest.xml'
-28/85 Test #28: test_version ....................................   Passed    0.09 sec
+28/85 Test #28: test_version ....................................   Passed    0.06 sec
 test 29
       Start 29: test_mapping_mode
 
@@ -1160,7 +1160,7 @@ test 29
 29: [ RUN      ] MappingModeContract.ClassifiesSemanticMode
 29: [       OK ] MappingModeContract.ClassifiesSemanticMode (0 ms)
 29: [----------] 6 tests from MappingModeContract (0 ms total)
-29: 
+29:
 29: [----------] Global test environment tear-down
 29: [==========] 6 tests from 1 test suite ran. (0 ms total)
 29: [  PASSED  ] 6 tests.
@@ -1195,7 +1195,7 @@ test 30
 30: [ RUN      ] ExplorationModeContract.ClassifiesActiveExplorationModes
 30: [       OK ] ExplorationModeContract.ClassifiesActiveExplorationModes (0 ms)
 30: [----------] 7 tests from ExplorationModeContract (0 ms total)
-30: 
+30:
 30: [----------] Global test environment tear-down
 30: [==========] 7 tests from 1 test suite ran. (0 ms total)
 30: [  PASSED  ] 7 tests.
@@ -1238,14 +1238,14 @@ test 31
 31: [ RUN      ] FrontierDetector.ReturnsClustersInDeterministicRowMajorOrder
 31: [       OK ] FrontierDetector.ReturnsClustersInDeterministicRowMajorOrder (0 ms)
 31: [----------] 11 tests from FrontierDetector (0 ms total)
-31: 
+31:
 31: [----------] Global test environment tear-down
 31: [==========] 11 tests from 1 test suite ran. (0 ms total)
 31: [  PASSED  ] 11 tests.
 31: -- run_test.py: return code 0
 31: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_frontier_detector.gtest.xml'
 31: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_frontier_detector.gtest.xml'
-31/85 Test #31: test_frontier_detector ..........................   Passed    0.05 sec
+31/85 Test #31: test_frontier_detector ..........................   Passed    0.06 sec
 test 32
       Start 32: test_frontier_selector
 
@@ -1279,14 +1279,14 @@ test 32
 32: [ RUN      ] FrontierSelector.ExactDuplicateTieUsesInputIndex
 32: [       OK ] FrontierSelector.ExactDuplicateTieUsesInputIndex (0 ms)
 32: [----------] 10 tests from FrontierSelector (0 ms total)
-32: 
+32:
 32: [----------] Global test environment tear-down
 32: [==========] 10 tests from 1 test suite ran. (0 ms total)
 32: [  PASSED  ] 10 tests.
 32: -- run_test.py: return code 0
 32: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_frontier_selector.gtest.xml'
 32: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_frontier_selector.gtest.xml'
-32/85 Test #32: test_frontier_selector ..........................   Passed    0.05 sec
+32/85 Test #32: test_frontier_selector ..........................   Passed    0.06 sec
 test 33
       Start 33: test_exploration_planner
 
@@ -1304,7 +1304,7 @@ test 33
 33: [ RUN      ] ExplorationGoal.ValidatesGoalFields
 33: [       OK ] ExplorationGoal.ValidatesGoalFields (0 ms)
 33: [----------] 2 tests from ExplorationGoal (0 ms total)
-33: 
+33:
 33: [----------] 11 tests from ExplorationPlanner
 33: [ RUN      ] ExplorationPlanner.RejectsInvalidConfiguration
 33: [       OK ] ExplorationPlanner.RejectsInvalidConfiguration (0 ms)
@@ -1329,14 +1329,14 @@ test 33
 33: [ RUN      ] ExplorationPlanner.ChoosesNearestReachableApproachDeterministically
 33: [       OK ] ExplorationPlanner.ChoosesNearestReachableApproachDeterministically (0 ms)
 33: [----------] 11 tests from ExplorationPlanner (0 ms total)
-33: 
+33:
 33: [----------] Global test environment tear-down
 33: [==========] 13 tests from 2 test suites ran. (0 ms total)
 33: [  PASSED  ] 13 tests.
 33: -- run_test.py: return code 0
 33: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_exploration_planner.gtest.xml'
 33: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_exploration_planner.gtest.xml'
-33/85 Test #33: test_exploration_planner ........................   Passed    0.05 sec
+33/85 Test #33: test_exploration_planner ........................   Passed    0.06 sec
 test 34
       Start 34: test_workflow_phase
 
@@ -1364,14 +1364,14 @@ test 34
 34: [ RUN      ] WorkflowPhaseContract.ClassifiesMapOutputPhases
 34: [       OK ] WorkflowPhaseContract.ClassifiesMapOutputPhases (0 ms)
 34: [----------] 7 tests from WorkflowPhaseContract (0 ms total)
-34: 
+34:
 34: [----------] Global test environment tear-down
 34: [==========] 7 tests from 1 test suite ran. (0 ms total)
 34: [  PASSED  ] 7 tests.
 34: -- run_test.py: return code 0
 34: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_workflow_phase.gtest.xml'
 34: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_workflow_phase.gtest.xml'
-34/85 Test #34: test_workflow_phase .............................   Passed    0.05 sec
+34/85 Test #34: test_workflow_phase .............................   Passed    0.06 sec
 test 35
       Start 35: test_session_state
 
@@ -1403,14 +1403,14 @@ test 35
 35: [ RUN      ] SessionStateContract.ClassifiesCancelPermission
 35: [       OK ] SessionStateContract.ClassifiesCancelPermission (0 ms)
 35: [----------] 9 tests from SessionStateContract (0 ms total)
-35: 
+35:
 35: [----------] Global test environment tear-down
 35: [==========] 9 tests from 1 test suite ran. (0 ms total)
 35: [  PASSED  ] 9 tests.
 35: -- run_test.py: return code 0
 35: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_session_state.gtest.xml'
 35: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_session_state.gtest.xml'
-35/85 Test #35: test_session_state ..............................   Passed    0.05 sec
+35/85 Test #35: test_session_state ..............................   Passed    0.06 sec
 test 36
       Start 36: test_mapping_types
 
@@ -1440,7 +1440,7 @@ test 36
 36: [ RUN      ] MappingTypesContract.SemanticLandmarkRejectsInvalidConfidence
 36: [       OK ] MappingTypesContract.SemanticLandmarkRejectsInvalidConfidence (0 ms)
 36: [----------] 8 tests from MappingTypesContract (0 ms total)
-36: 
+36:
 36: [----------] Global test environment tear-down
 36: [==========] 8 tests from 1 test suite ran. (0 ms total)
 36: [  PASSED  ] 8 tests.
@@ -1481,14 +1481,14 @@ test 37
 37: [ RUN      ] MappingStatusContract.StatusJsonEscapesTextFields
 37: [       OK ] MappingStatusContract.StatusJsonEscapesTextFields (0 ms)
 37: [----------] 10 tests from MappingStatusContract (0 ms total)
-37: 
+37:
 37: [----------] Global test environment tear-down
 37: [==========] 10 tests from 1 test suite ran. (0 ms total)
 37: [  PASSED  ] 10 tests.
 37: -- run_test.py: return code 0
 37: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_mapping_status.gtest.xml'
 37: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_mapping_status.gtest.xml'
-37/85 Test #37: test_mapping_status .............................   Passed    0.05 sec
+37/85 Test #37: test_mapping_status .............................   Passed    0.06 sec
 test 38
       Start 38: test_topic_names
 
@@ -1524,14 +1524,14 @@ test 38
 38: [ RUN      ] TopicNamesContract.ClassifiesNavigationAndSafetyTopics
 38: [       OK ] TopicNamesContract.ClassifiesNavigationAndSafetyTopics (0 ms)
 38: [----------] 11 tests from TopicNamesContract (0 ms total)
-38: 
+38:
 38: [----------] Global test environment tear-down
 38: [==========] 11 tests from 1 test suite ran. (0 ms total)
 38: [  PASSED  ] 11 tests.
 38: -- run_test.py: return code 0
 38: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_topic_names.gtest.xml'
 38: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_topic_names.gtest.xml'
-38/85 Test #38: test_topic_names ................................   Passed    0.05 sec
+38/85 Test #38: test_topic_names ................................   Passed    0.06 sec
 test 39
       Start 39: test_qos_profiles
 
@@ -1561,14 +1561,14 @@ test 39
 39: [ RUN      ] QosProfilesContract.ContractDepthsArePositive
 39: [       OK ] QosProfilesContract.ContractDepthsArePositive (0 ms)
 39: [----------] 8 tests from QosProfilesContract (0 ms total)
-39: 
+39:
 39: [----------] Global test environment tear-down
 39: [==========] 8 tests from 1 test suite ran. (0 ms total)
 39: [  PASSED  ] 8 tests.
 39: -- run_test.py: return code 0
 39: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_qos_profiles.gtest.xml'
 39: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_qos_profiles.gtest.xml'
-39/85 Test #39: test_qos_profiles ...............................   Passed    0.06 sec
+39/85 Test #39: test_qos_profiles ...............................   Passed    0.07 sec
 test 40
       Start 40: test_parameter_utils
 
@@ -1590,18 +1590,18 @@ test 40
 40: [ RUN      ] ParameterUtilsContract.ValidatesIntegerValues
 40: [       OK ] ParameterUtilsContract.ValidatesIntegerValues (0 ms)
 40: [----------] 4 tests from ParameterUtilsContract (0 ms total)
-40: 
+40:
 40: [----------] 3 tests from ParameterUtilsRosTest
 40: [ RUN      ] ParameterUtilsRosTest.DeclaresDefaultAndReturnsExistingValue
-40: [       OK ] ParameterUtilsRosTest.DeclaresDefaultAndReturnsExistingValue (8 ms)
+40: [       OK ] ParameterUtilsRosTest.DeclaresDefaultAndReturnsExistingValue (9 ms)
 40: [ RUN      ] ParameterUtilsRosTest.HonoursParameterOverrides
 40: [       OK ] ParameterUtilsRosTest.HonoursParameterOverrides (3 ms)
 40: [ RUN      ] ParameterUtilsRosTest.RejectsBlankDeclarationName
 40: [       OK ] ParameterUtilsRosTest.RejectsBlankDeclarationName (3 ms)
-40: [----------] 3 tests from ParameterUtilsRosTest (15 ms total)
-40: 
+40: [----------] 3 tests from ParameterUtilsRosTest (16 ms total)
+40:
 40: [----------] Global test environment tear-down
-40: [==========] 7 tests from 2 test suites ran. (19 ms total)
+40: [==========] 7 tests from 2 test suites ran. (20 ms total)
 40: [  PASSED  ] 7 tests.
 40: -- run_test.py: return code 0
 40: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_parameter_utils.gtest.xml'
@@ -1664,7 +1664,7 @@ test 41
 41: [ RUN      ] ConfigContracts.LifecycleBridgeUsesMapSessionState
 41: [       OK ] ConfigContracts.LifecycleBridgeUsesMapSessionState (0 ms)
 41: [----------] 22 tests from ConfigContracts (1 ms total)
-41: 
+41:
 41: [----------] 18 tests from LaunchContracts
 41: [ RUN      ] LaunchContracts.MonitorOnlyLaunchExistsAndIsNotEmpty
 41: [       OK ] LaunchContracts.MonitorOnlyLaunchExistsAndIsNotEmpty (0 ms)
@@ -1703,7 +1703,7 @@ test 41
 41: [ RUN      ] LaunchContracts.ContinuedMappingUsesSavedMapPreflight
 41: [       OK ] LaunchContracts.ContinuedMappingUsesSavedMapPreflight (0 ms)
 41: [----------] 18 tests from LaunchContracts (0 ms total)
-41: 
+41:
 41: [----------] 4 tests from OwnershipContracts
 41: [ RUN      ] OwnershipContracts.LifecycleBridgeIsReadOnly
 41: [       OK ] OwnershipContracts.LifecycleBridgeIsReadOnly (0 ms)
@@ -1714,7 +1714,7 @@ test 41
 41: [ RUN      ] OwnershipContracts.SavedMapVerifierHasNoRobotControl
 41: [       OK ] OwnershipContracts.SavedMapVerifierHasNoRobotControl (0 ms)
 41: [----------] 4 tests from OwnershipContracts (0 ms total)
-41: 
+41:
 41: [----------] Global test environment tear-down
 41: [==========] 44 tests from 3 test suites ran. (1 ms total)
 41: [  PASSED  ] 44 tests.
@@ -1747,14 +1747,14 @@ test 42
 42: [ RUN      ] MappingModeManagerContract.CMakeBuildsInstallsAndTestsManager
 42: [       OK ] MappingModeManagerContract.CMakeBuildsInstallsAndTestsManager (0 ms)
 42: [----------] 6 tests from MappingModeManagerContract (0 ms total)
-42: 
+42:
 42: [----------] Global test environment tear-down
 42: [==========] 6 tests from 1 test suite ran. (0 ms total)
 42: [  PASSED  ] 6 tests.
 42: -- run_test.py: return code 0
 42: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_mapping_mode_manager_contract.gtest.xml'
 42: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_mapping_mode_manager_contract.gtest.xml'
-42/85 Test #42: test_mapping_mode_manager_contract ..............   Passed    0.07 sec
+42/85 Test #42: test_mapping_mode_manager_contract ..............   Passed    0.06 sec
 test 43
       Start 43: test_mapping_supervisor_runtime
 
@@ -1784,7 +1784,7 @@ test 43
 43: [ RUN      ] SupervisorRuntimeContract.OptionalInputsDoNotBlockReadiness
 43: [       OK ] SupervisorRuntimeContract.OptionalInputsDoNotBlockReadiness (0 ms)
 43: [----------] 8 tests from SupervisorRuntimeContract (0 ms total)
-43: 
+43:
 43: [----------] 5 tests from MapQualityPlaceholderContract
 43: [ RUN      ] MapQualityPlaceholderContract.ValidMapProducesStructuralMetrics
 43: [       OK ] MapQualityPlaceholderContract.ValidMapProducesStructuralMetrics (0 ms)
@@ -1797,7 +1797,7 @@ test 43
 43: [ RUN      ] MapQualityPlaceholderContract.JsonStatesPlaceholderIsNotEvaluated
 43: [       OK ] MapQualityPlaceholderContract.JsonStatesPlaceholderIsNotEvaluated (0 ms)
 43: [----------] 5 tests from MapQualityPlaceholderContract (0 ms total)
-43: 
+43:
 43: [----------] 5 tests from MonitorOnlyPolicyContract
 43: [ RUN      ] MonitorOnlyPolicyContract.SafePolicyPasses
 43: [       OK ] MonitorOnlyPolicyContract.SafePolicyPasses (0 ms)
@@ -1810,14 +1810,14 @@ test 43
 43: [ RUN      ] MonitorOnlyPolicyContract.RejectsUnsupportedOptionalFeatures
 43: [       OK ] MonitorOnlyPolicyContract.RejectsUnsupportedOptionalFeatures (0 ms)
 43: [----------] 5 tests from MonitorOnlyPolicyContract (0 ms total)
-43: 
+43:
 43: [----------] Global test environment tear-down
 43: [==========] 18 tests from 3 test suites ran. (0 ms total)
 43: [  PASSED  ] 18 tests.
 43: -- run_test.py: return code 0
 43: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_mapping_supervisor_runtime.gtest.xml'
 43: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_mapping_supervisor_runtime.gtest.xml'
-43/85 Test #43: test_mapping_supervisor_runtime .................   Passed    0.08 sec
+43/85 Test #43: test_mapping_supervisor_runtime .................   Passed    0.06 sec
 test 44
       Start 44: test_slam_contract
 
@@ -1853,14 +1853,14 @@ test 44
 44: [ RUN      ] SlamContract.NavigationHandoffRemainsDisabled
 44: [       OK ] SlamContract.NavigationHandoffRemainsDisabled (0 ms)
 44: [----------] 11 tests from SlamContract (0 ms total)
-44: 
+44:
 44: [----------] Global test environment tear-down
 44: [==========] 11 tests from 1 test suite ran. (0 ms total)
 44: [  PASSED  ] 11 tests.
 44: -- run_test.py: return code 0
 44: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_slam_contract.gtest.xml'
 44: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_slam_contract.gtest.xml'
-44/85 Test #44: test_slam_contract ..............................   Passed    0.05 sec
+44/85 Test #44: test_slam_contract ..............................   Passed    0.06 sec
 test 45
       Start 45: test_simulated_scan_model
 
@@ -1888,14 +1888,14 @@ test 45
 45: [ RUN      ] SimulatedScanModel.InvalidGenerationThrows
 45: [       OK ] SimulatedScanModel.InvalidGenerationThrows (0 ms)
 45: [----------] 7 tests from SimulatedScanModel (0 ms total)
-45: 
+45:
 45: [----------] Global test environment tear-down
 45: [==========] 7 tests from 1 test suite ran. (0 ms total)
 45: [  PASSED  ] 7 tests.
 45: -- run_test.py: return code 0
 45: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_simulated_scan_model.gtest.xml'
 45: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_simulated_scan_model.gtest.xml'
-45/85 Test #45: test_simulated_scan_model .......................   Passed    0.05 sec
+45/85 Test #45: test_simulated_scan_model .......................   Passed    0.06 sec
 test 46
       Start 46: test_manual_workflow_state
 
@@ -1931,14 +1931,14 @@ test 46
 46: [ RUN      ] ManualWorkflowState.RejectsFinalizedLifecycle
 46: [       OK ] ManualWorkflowState.RejectsFinalizedLifecycle (0 ms)
 46: [----------] 11 tests from ManualWorkflowState (0 ms total)
-46: 
+46:
 46: [----------] Global test environment tear-down
 46: [==========] 11 tests from 1 test suite ran. (0 ms total)
 46: [  PASSED  ] 11 tests.
 46: -- run_test.py: return code 0
 46: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_manual_workflow_state.gtest.xml'
 46: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_manual_workflow_state.gtest.xml'
-46/85 Test #46: test_manual_workflow_state ......................   Passed    0.05 sec
+46/85 Test #46: test_manual_workflow_state ......................   Passed    0.06 sec
 test 47
       Start 47: test_workflow_authority
 
@@ -1976,14 +1976,14 @@ test 47
 47: [ RUN      ] WorkflowAuthorityContract.SessionOrReadinessLossCancelsActiveGoal
 47: [       OK ] WorkflowAuthorityContract.SessionOrReadinessLossCancelsActiveGoal (0 ms)
 47: [----------] 12 tests from WorkflowAuthorityContract (0 ms total)
-47: 
+47:
 47: [----------] Global test environment tear-down
 47: [==========] 12 tests from 1 test suite ran. (0 ms total)
 47: [  PASSED  ] 12 tests.
 47: -- run_test.py: return code 0
 47: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_workflow_authority.gtest.xml'
 47: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_workflow_authority.gtest.xml'
-47/85 Test #47: test_workflow_authority .........................   Passed    0.07 sec
+47/85 Test #47: test_workflow_authority .........................   Passed    0.06 sec
 test 48
       Start 48: test_autonomous_mapping_mission
 
@@ -2080,8 +2080,8 @@ test 48
 48: [       OK ] AutonomousMappingMissionTest.ReleaseFailureWaitsForRollback (0 ms)
 48: [ RUN      ] AutonomousMappingMissionTest.RollbackFailureHasDistinctResult
 48: [       OK ] AutonomousMappingMissionTest.RollbackFailureHasDistinctResult (0 ms)
-48: [----------] 42 tests from AutonomousMappingMissionTest (0 ms total)
-48: 
+48: [----------] 42 tests from AutonomousMappingMissionTest (1 ms total)
+48:
 48: [----------] Global test environment tear-down
 48: [==========] 42 tests from 1 test suite ran. (1 ms total)
 48: [  PASSED  ] 42 tests.
@@ -2098,7 +2098,6 @@ test 49
 49: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping':
 49:  - /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_autonomous_mapping_am7 --gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_autonomous_mapping_am7.gtest.xml
 49: Running main() from /opt/ros/jazzy/src/gtest_vendor/src/gtest_main.cc
-[Processing: savo_mapping]
 49: [==========] Running 8 tests from 1 test suite.
 49: [----------] Global test environment set-up.
 49: [----------] 8 tests from AutonomousMappingAm7
@@ -2119,7 +2118,7 @@ test 49
 49: [ RUN      ] AutonomousMappingAm7.EvaluatesReturnNearStartTolerance
 49: [       OK ] AutonomousMappingAm7.EvaluatesReturnNearStartTolerance (0 ms)
 49: [----------] 8 tests from AutonomousMappingAm7 (0 ms total)
-49: 
+49:
 49: [----------] Global test environment tear-down
 49: [==========] 8 tests from 1 test suite ran. (0 ms total)
 49: [  PASSED  ] 8 tests.
@@ -2158,7 +2157,7 @@ test 50
 50: [ RUN      ] FrontierCompletionDetectorTest.NoSelectableIsDisabledByDefault
 50: [       OK ] FrontierCompletionDetectorTest.NoSelectableIsDisabledByDefault (0 ms)
 50: [----------] 9 tests from FrontierCompletionDetectorTest (0 ms total)
-50: 
+50:
 50: [----------] Global test environment tear-down
 50: [==========] 9 tests from 1 test suite ran. (0 ms total)
 50: [  PASSED  ] 9 tests.
@@ -2201,7 +2200,7 @@ test 51
 51: [ RUN      ] ExplorationRuntimeContract.ActiveHandoffRemainsValidWhenAuthorized
 51: [       OK ] ExplorationRuntimeContract.ActiveHandoffRemainsValidWhenAuthorized (0 ms)
 51: [----------] 11 tests from ExplorationRuntimeContract (0 ms total)
-51: 
+51:
 51: [----------] Global test environment tear-down
 51: [==========] 11 tests from 1 test suite ran. (0 ms total)
 51: [  PASSED  ] 11 tests.
@@ -2286,14 +2285,14 @@ test 52
 52: [ RUN      ] CoverageGrid.RejectsNonFiniteWorldCoordinates
 52: [       OK ] CoverageGrid.RejectsNonFiniteWorldCoordinates (0 ms)
 52: [----------] 32 tests from CoverageGrid (0 ms total)
-52: 
+52:
 52: [----------] Global test environment tear-down
 52: [==========] 32 tests from 1 test suite ran. (0 ms total)
 52: [  PASSED  ] 32 tests.
 52: -- run_test.py: return code 0
 52: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_coverage_grid.gtest.xml'
 52: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_coverage_grid.gtest.xml'
-52/85 Test #52: test_coverage_grid ..............................   Passed    0.05 sec
+52/85 Test #52: test_coverage_grid ..............................   Passed    0.06 sec
 test 53
       Start 53: test_coverage_planner
 
@@ -2371,7 +2370,7 @@ test 53
 53: [ RUN      ] CoveragePlanner.CorePlanContainsOnlyDataAndNoExecutionHooks
 53: [       OK ] CoveragePlanner.CorePlanContainsOnlyDataAndNoExecutionHooks (0 ms)
 53: [----------] 32 tests from CoveragePlanner (0 ms total)
-53: 
+53:
 53: [----------] Global test environment tear-down
 53: [==========] 32 tests from 1 test suite ran. (0 ms total)
 53: [  PASSED  ] 32 tests.
@@ -2393,14 +2392,14 @@ test 54
 54: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 54: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 54: collected 6 items
-54: 
+54:
 54: ../../src/core/savo_mapping/test/test_coverage_core_contract.py ......   [100%]
-54: 
+54:
 54: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_coverage_core_contract.xunit.xml -
-54: ============================== 6 passed in 0.01s ===============================
+54: ============================== 6 passed in 0.02s ===============================
 54: -- run_test.py: return code 0
 54: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_coverage_core_contract.xunit.xml'
-54/85 Test #54: test_coverage_core_contract .....................   Passed    0.33 sec
+54/85 Test #54: test_coverage_core_contract .....................   Passed    0.37 sec
 test 55
       Start 55: test_scan360_planner
 
@@ -2426,14 +2425,14 @@ test 55
 55: [ RUN      ] Scan360PlannerContract.NormalizeYawUsesRosYawRange
 55: [       OK ] Scan360PlannerContract.NormalizeYawUsesRosYawRange (0 ms)
 55: [----------] 6 tests from Scan360PlannerContract (0 ms total)
-55: 
+55:
 55: [----------] Global test environment tear-down
 55: [==========] 6 tests from 1 test suite ran. (0 ms total)
 55: [  PASSED  ] 6 tests.
 55: -- run_test.py: return code 0
 55: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_scan360_planner.gtest.xml'
 55: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_scan360_planner.gtest.xml'
-55/85 Test #55: test_scan360_planner ............................   Passed    0.05 sec
+55/85 Test #55: test_scan360_planner ............................   Passed    0.06 sec
 test 56
       Start 56: test_scan360_controller
 
@@ -2461,14 +2460,14 @@ test 56
 56: [ RUN      ] Scan360ControllerContract.EmptyPlanIsRejected
 56: [       OK ] Scan360ControllerContract.EmptyPlanIsRejected (0 ms)
 56: [----------] 7 tests from Scan360ControllerContract (0 ms total)
-56: 
+56:
 56: [----------] Global test environment tear-down
 56: [==========] 7 tests from 1 test suite ran. (0 ms total)
 56: [  PASSED  ] 7 tests.
 56: -- run_test.py: return code 0
 56: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_scan360_controller.gtest.xml'
 56: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_scan360_controller.gtest.xml'
-56/85 Test #56: test_scan360_controller .........................   Passed    0.08 sec
+56/85 Test #56: test_scan360_controller .........................   Passed    0.06 sec
 test 57
       Start 57: test_scan360_orchestrator
 
@@ -2510,14 +2509,14 @@ test 57
 57: [ RUN      ] Scan360OrchestratorContract.ResetClearsQueuedAndTerminalState
 57: [       OK ] Scan360OrchestratorContract.ResetClearsQueuedAndTerminalState (0 ms)
 57: [----------] 14 tests from Scan360OrchestratorContract (0 ms total)
-57: 
+57:
 57: [----------] Global test environment tear-down
 57: [==========] 14 tests from 1 test suite ran. (0 ms total)
 57: [  PASSED  ] 14 tests.
 57: -- run_test.py: return code 0
 57: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_scan360_orchestrator.gtest.xml'
 57: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_scan360_orchestrator.gtest.xml'
-57/85 Test #57: test_scan360_orchestrator .......................   Passed    0.05 sec
+57/85 Test #57: test_scan360_orchestrator .......................   Passed    0.06 sec
 test 58
       Start 58: test_scan360_quality
 
@@ -2559,7 +2558,7 @@ test 58
 58: [ RUN      ] Scan360QualityContract.InvalidThresholdsAreRejected
 58: [       OK ] Scan360QualityContract.InvalidThresholdsAreRejected (0 ms)
 58: [----------] 14 tests from Scan360QualityContract (0 ms total)
-58: 
+58:
 58: [----------] Global test environment tear-down
 58: [==========] 14 tests from 1 test suite ran. (0 ms total)
 58: [  PASSED  ] 14 tests.
@@ -2594,14 +2593,14 @@ test 59
 59: [ RUN      ] MapSessionPolicy.ValidatesRequiredArtifacts
 59: [       OK ] MapSessionPolicy.ValidatesRequiredArtifacts (0 ms)
 59: [----------] 7 tests from MapSessionPolicy (0 ms total)
-59: 
+59:
 59: [----------] Global test environment tear-down
 59: [==========] 7 tests from 1 test suite ran. (0 ms total)
 59: [  PASSED  ] 7 tests.
 59: -- run_test.py: return code 0
 59: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_map_session_policy.gtest.xml'
 59: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_map_session_policy.gtest.xml'
-59/85 Test #59: test_map_session_policy .........................   Passed    0.05 sec
+59/85 Test #59: test_map_session_policy .........................   Passed    0.06 sec
 test 60
       Start 60: test_saved_map_contract
 
@@ -2623,7 +2622,7 @@ test 60
 60: [ RUN      ] SavedMapContract.RejectsWrongFrame
 60: [       OK ] SavedMapContract.RejectsWrongFrame (0 ms)
 60: [----------] 4 tests from SavedMapContract (1 ms total)
-60: 
+60:
 60: [----------] Global test environment tear-down
 60: [==========] 4 tests from 1 test suite ran. (1 ms total)
 60: [  PASSED  ] 4 tests.
@@ -2650,7 +2649,7 @@ test 61
 61: [ RUN      ] SavedMapQuality.InvalidDataSizeFails
 61: [       OK ] SavedMapQuality.InvalidDataSizeFails (0 ms)
 61: [----------] 3 tests from SavedMapQuality (0 ms total)
-61: 
+61:
 61: [----------] Global test environment tear-down
 61: [==========] 3 tests from 1 test suite ran. (0 ms total)
 61: [  PASSED  ] 3 tests.
@@ -2675,18 +2674,18 @@ test 62
 62: [ RUN      ] ProductionMapRelease.InvalidReleaseIdentifiers
 62: [       OK ] ProductionMapRelease.InvalidReleaseIdentifiers (0 ms)
 62: [ RUN      ] ProductionMapRelease.CreateVerifyPromoteDeactivate
-62: [       OK ] ProductionMapRelease.CreateVerifyPromoteDeactivate (5 ms)
+62: [       OK ] ProductionMapRelease.CreateVerifyPromoteDeactivate (6 ms)
 62: [ RUN      ] ProductionMapRelease.JointReleaseContainsLocationApprovalAndGeometry
 62: [       OK ] ProductionMapRelease.JointReleaseContainsLocationApprovalAndGeometry (4 ms)
 62: [----------] 4 tests from ProductionMapRelease (10 ms total)
-62: 
+62:
 62: [----------] Global test environment tear-down
 62: [==========] 4 tests from 1 test suite ran. (10 ms total)
 62: [  PASSED  ] 4 tests.
 62: -- run_test.py: return code 0
 62: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_production_map_release.gtest.xml'
 62: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_production_map_release.gtest.xml'
-62/85 Test #62: test_production_map_release .....................   Passed    0.06 sec
+62/85 Test #62: test_production_map_release .....................   Passed    0.07 sec
 test 63
       Start 63: test_exploration_manager_contract
 
@@ -2714,7 +2713,7 @@ test 63
 63: [ RUN      ] ExplorationManagerContract.CMakeBuildsAndInstallsD3BFiles
 63: [       OK ] ExplorationManagerContract.CMakeBuildsAndInstallsD3BFiles (0 ms)
 63: [----------] 7 tests from ExplorationManagerContract (0 ms total)
-63: 
+63:
 63: [----------] Global test environment tear-down
 63: [==========] 7 tests from 1 test suite ran. (0 ms total)
 63: [  PASSED  ] 7 tests.
@@ -2741,14 +2740,14 @@ test 64
 64: [ RUN      ] FrontierExplorerContract.LaunchStartsExplorerThroughHandoffBoundary
 64: [       OK ] FrontierExplorerContract.LaunchStartsExplorerThroughHandoffBoundary (0 ms)
 64: [----------] 3 tests from FrontierExplorerContract (0 ms total)
-64: 
+64:
 64: [----------] Global test environment tear-down
 64: [==========] 3 tests from 1 test suite ran. (0 ms total)
 64: [  PASSED  ] 3 tests.
 64: -- run_test.py: return code 0
 64: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_frontier_explorer_contract.gtest.xml'
 64: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_frontier_explorer_contract.gtest.xml'
-64/85 Test #64: test_frontier_explorer_contract .................   Passed    0.08 sec
+64/85 Test #64: test_frontier_explorer_contract .................   Passed    0.06 sec
 test 65
       Start 65: test_coverage_execution_handoff
 
@@ -2772,14 +2771,14 @@ test 65
 65: [ RUN      ] CoverageExecutionHandoffTest.RejectsInvalidMissionIdInputs
 65: [       OK ] CoverageExecutionHandoffTest.RejectsInvalidMissionIdInputs (0 ms)
 65: [----------] 5 tests from CoverageExecutionHandoffTest (0 ms total)
-65: 
+65:
 65: [----------] Global test environment tear-down
 65: [==========] 5 tests from 1 test suite ran. (0 ms total)
 65: [  PASSED  ] 5 tests.
 65: -- run_test.py: return code 0
 65: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_coverage_execution_handoff.gtest.xml'
 65: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_coverage_execution_handoff.gtest.xml'
-65/85 Test #65: test_coverage_execution_handoff .................   Passed    0.08 sec
+65/85 Test #65: test_coverage_execution_handoff .................   Passed    0.07 sec
 test 66
       Start 66: test_phase4l_b3f_contract
 
@@ -2794,20 +2793,20 @@ test 66
 66: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 66: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 66: collected 6 items
-66: 
+66:
 66: ../../src/core/savo_mapping/test/test_phase4l_b3f_contract.py ......     [100%]
-66: 
+66:
 66: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_phase4l_b3f_contract.xunit.xml -
 66: ============================== 6 passed in 0.01s ===============================
 66: -- run_test.py: return code 0
 66: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_phase4l_b3f_contract.xunit.xml'
-66/85 Test #66: test_phase4l_b3f_contract .......................   Passed    0.34 sec
+66/85 Test #66: test_phase4l_b3f_contract .......................   Passed    0.37 sec
 test 67
       Start 67: test_coverage_execution_handoff_runtime
 
 67: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_coverage_execution_handoff_runtime.xunit.xml" "--package-name" "savo_mapping" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/ament_cmake_pytest/test_coverage_execution_handoff_runtime.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_coverage_execution_handoff_runtime.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/ament_cmake_pytest/test_coverage_execution_handoff_runtime/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_coverage_execution_handoff_runtime.xunit.xml" "--junit-prefix=savo_mapping"
 67: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping
-67: Environment variables: 
+67: Environment variables:
 67:  PYTHONDONTWRITEBYTECODE=1
 67:  ROS_LOCALHOST_ONLY=1
 67:  ROS_DOMAIN_ID=223
@@ -2821,15 +2820,15 @@ test 67
 67: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 67: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 67: collected 2 items
-67: 
+67:
 67: ../../src/core/savo_mapping/test/test_coverage_execution_handoff_runtime.py . [ 50%]
 67: .                                                                        [100%]
-67: 
+67:
 67: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_coverage_execution_handoff_runtime.xunit.xml -
-67: ============================== 2 passed in 2.83s ===============================
+67: ============================== 2 passed in 2.43s ===============================
 67: -- run_test.py: return code 0
 67: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_coverage_execution_handoff_runtime.xunit.xml'
-67/85 Test #67: test_coverage_execution_handoff_runtime .........   Passed    3.28 sec
+67/85 Test #67: test_coverage_execution_handoff_runtime .........   Passed    2.92 sec
 test 68
       Start 68: test_coverage_operation_orchestrator
 
@@ -2861,14 +2860,14 @@ test 68
 68: [ RUN      ] CoverageOperationOrchestratorTest.MapsReadyState
 68: [       OK ] CoverageOperationOrchestratorTest.MapsReadyState (0 ms)
 68: [----------] 9 tests from CoverageOperationOrchestratorTest (0 ms total)
-68: 
+68:
 68: [----------] Global test environment tear-down
 68: [==========] 9 tests from 1 test suite ran. (0 ms total)
 68: [  PASSED  ] 9 tests.
 68: -- run_test.py: return code 0
 68: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_coverage_operation_orchestrator.gtest.xml'
 68: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_coverage_operation_orchestrator.gtest.xml'
-68/85 Test #68: test_coverage_operation_orchestrator ............   Passed    0.07 sec
+68/85 Test #68: test_coverage_operation_orchestrator ............   Passed    0.06 sec
 test 69
       Start 69: test_phase4l_b3g_contract
 
@@ -2883,20 +2882,20 @@ test 69
 69: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 69: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 69: collected 8 items
-69: 
+69:
 69: ../../src/core/savo_mapping/test/test_phase4l_b3g_contract.py ........   [100%]
-69: 
+69:
 69: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_phase4l_b3g_contract.xunit.xml -
 69: ============================== 8 passed in 0.01s ===============================
 69: -- run_test.py: return code 0
 69: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_phase4l_b3g_contract.xunit.xml'
-69/85 Test #69: test_phase4l_b3g_contract .......................   Passed    0.32 sec
+69/85 Test #69: test_phase4l_b3g_contract .......................   Passed    0.35 sec
 test 70
       Start 70: test_coverage_operation_orchestrator_runtime
 
 70: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_coverage_operation_orchestrator_runtime.xunit.xml" "--package-name" "savo_mapping" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/ament_cmake_pytest/test_coverage_operation_orchestrator_runtime.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_coverage_operation_orchestrator_runtime.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/ament_cmake_pytest/test_coverage_operation_orchestrator_runtime/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_coverage_operation_orchestrator_runtime.xunit.xml" "--junit-prefix=savo_mapping"
 70: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping
-70: Environment variables: 
+70: Environment variables:
 70:  PYTHONDONTWRITEBYTECODE=1
 70:  ROS_LOCALHOST_ONLY=1
 70:  ROS_DOMAIN_ID=224
@@ -2910,15 +2909,15 @@ test 70
 70: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 70: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 70: collected 2 items
-70: 
+70:
 70: ../../src/core/savo_mapping/test/test_coverage_operation_orchestrator_runtime.py . [ 50%]
 70: .                                                                        [100%]
-70: 
+70:
 70: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_coverage_operation_orchestrator_runtime.xunit.xml -
-70: ============================== 2 passed in 2.08s ===============================
+70: ============================== 2 passed in 1.75s ===============================
 70: -- run_test.py: return code 0
 70: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_coverage_operation_orchestrator_runtime.xunit.xml'
-70/85 Test #70: test_coverage_operation_orchestrator_runtime ....   Passed    2.58 sec
+70/85 Test #70: test_coverage_operation_orchestrator_runtime ....   Passed    2.25 sec
 test 71
       Start 71: test_coverage_mission
 
@@ -2958,14 +2957,14 @@ test 71
 71: [ RUN      ] CoverageMissionTest.RejectsInvalidTransitions
 71: [       OK ] CoverageMissionTest.RejectsInvalidTransitions (0 ms)
 71: [----------] 13 tests from CoverageMissionTest (0 ms total)
-71: 
+71:
 71: [----------] Global test environment tear-down
 71: [==========] 13 tests from 1 test suite ran. (0 ms total)
 71: [  PASSED  ] 13 tests.
 71: -- run_test.py: return code 0
 71: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_coverage_mission.gtest.xml'
 71: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_coverage_mission.gtest.xml'
-71/85 Test #71: test_coverage_mission ...........................   Passed    0.09 sec
+71/85 Test #71: test_coverage_mission ...........................   Passed    0.06 sec
 test 72
       Start 72: test_exploration_goal_handoff
 
@@ -3013,14 +3012,14 @@ test 72
 72: [ RUN      ] ExplorationGoalHandoff.SequenceIncrements
 72: [       OK ] ExplorationGoalHandoff.SequenceIncrements (0 ms)
 72: [----------] 17 tests from ExplorationGoalHandoff (0 ms total)
-72: 
+72:
 72: [----------] Global test environment tear-down
 72: [==========] 17 tests from 1 test suite ran. (0 ms total)
 72: [  PASSED  ] 17 tests.
 72: -- run_test.py: return code 0
 72: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_exploration_goal_handoff.gtest.xml'
 72: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_exploration_goal_handoff.gtest.xml'
-72/85 Test #72: test_exploration_goal_handoff ...................   Passed    0.05 sec
+72/85 Test #72: test_exploration_goal_handoff ...................   Passed    0.06 sec
 test 73
       Start 73: test_semantic_landmark
 
@@ -3040,14 +3039,14 @@ test 73
 73: [ RUN      ] SemanticLandmarkRecorder.AllowsPendingCandidateWithoutApproachPose
 73: [       OK ] SemanticLandmarkRecorder.AllowsPendingCandidateWithoutApproachPose (0 ms)
 73: [----------] 3 tests from SemanticLandmarkRecorder (0 ms total)
-73: 
+73:
 73: [----------] Global test environment tear-down
 73: [==========] 3 tests from 1 test suite ran. (0 ms total)
 73: [  PASSED  ] 3 tests.
 73: -- run_test.py: return code 0
 73: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_semantic_landmark.gtest.xml'
 73: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_semantic_landmark.gtest.xml'
-73/85 Test #73: test_semantic_landmark ..........................   Passed    0.05 sec
+73/85 Test #73: test_semantic_landmark ..........................   Passed    0.06 sec
 test 74
       Start 74: test_semantic_interruption
 
@@ -3079,7 +3078,7 @@ test 74
 74: [ RUN      ] SemanticInterruption.FailurePolicyCanRequestTypedResume
 74: [       OK ] SemanticInterruption.FailurePolicyCanRequestTypedResume (0 ms)
 74: [----------] 9 tests from SemanticInterruption (0 ms total)
-74: 
+74:
 74: [----------] Global test environment tear-down
 74: [==========] 9 tests from 1 test suite ran. (0 ms total)
 74: [  PASSED  ] 9 tests.
@@ -3101,14 +3100,14 @@ test 75
 75: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 75: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 75: collected 1 item
-75: 
+75:
 75: ../../src/core/savo_mapping/test/test_location_registration_runtime_contract.py . [100%]
-75: 
+75:
 75: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_location_registration_runtime_contract.xunit.xml -
 75: ============================== 1 passed in 0.01s ===============================
 75: -- run_test.py: return code 0
 75: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_location_registration_runtime_contract.xunit.xml'
-75/85 Test #75: test_location_registration_runtime_contract .....   Passed    0.35 sec
+75/85 Test #75: test_location_registration_runtime_contract .....   Passed    0.37 sec
 test 76
       Start 76: test_semantic_mapping_runtime_contract
 
@@ -3123,15 +3122,15 @@ test 76
 76: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 76: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 76: collected 3 items
-76: 
+76:
 76: ../../src/core/savo_mapping/test/test_semantic_mapping_runtime_contract.py . [ 33%]
 76: ..                                                                       [100%]
-76: 
+76:
 76: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_semantic_mapping_runtime_contract.xunit.xml -
 76: ============================== 3 passed in 0.01s ===============================
 76: -- run_test.py: return code 0
 76: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_semantic_mapping_runtime_contract.xunit.xml'
-76/85 Test #76: test_semantic_mapping_runtime_contract ..........   Passed    0.32 sec
+76/85 Test #76: test_semantic_mapping_runtime_contract ..........   Passed    0.38 sec
 test 77
       Start 77: test_semantic_interruption_contract
 
@@ -3146,21 +3145,21 @@ test 77
 77: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 77: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 77: collected 5 items
-77: 
+77:
 77: ../../src/core/savo_mapping/test/test_semantic_interruption_contract.py . [ 20%]
 77: ....                                                                     [100%]
-77: 
+77:
 77: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_semantic_interruption_contract.xunit.xml -
 77: ============================== 5 passed in 0.01s ===============================
 77: -- run_test.py: return code 0
 77: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_semantic_interruption_contract.xunit.xml'
-77/85 Test #77: test_semantic_interruption_contract .............   Passed    0.32 sec
+77/85 Test #77: test_semantic_interruption_contract .............   Passed    0.35 sec
 test 78
       Start 78: test_semantic_interruption_runtime
 
 78: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_semantic_interruption_runtime.xunit.xml" "--package-name" "savo_mapping" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/ament_cmake_pytest/test_semantic_interruption_runtime.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_semantic_interruption_runtime.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/ament_cmake_pytest/test_semantic_interruption_runtime/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_semantic_interruption_runtime.xunit.xml" "--junit-prefix=savo_mapping"
 78: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping
-78: Environment variables: 
+78: Environment variables:
 78:  PYTHONDONTWRITEBYTECODE=1
 78:  ROS_LOCALHOST_ONLY=1
 78:  ROS_DOMAIN_ID=226
@@ -3176,15 +3175,15 @@ test 78
 78: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 78: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 78: collected 2 items
-78: 
+78:
 78: ../../src/core/savo_mapping/test/test_semantic_interruption_runtime.py . [ 50%]
 78: .                                                                        [100%]
-78: 
+78:
 78: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_semantic_interruption_runtime.xunit.xml -
-78: ============================== 2 passed in 6.00s ===============================
+78: ============================== 2 passed in 6.03s ===============================
 78: -- run_test.py: return code 0
 78: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_semantic_interruption_runtime.xunit.xml'
-78/85 Test #78: test_semantic_interruption_runtime ..............   Passed    6.49 sec
+78/85 Test #78: test_semantic_interruption_runtime ..............   Passed    6.53 sec
 test 79
       Start 79: test_location_review_gateway_contract
 
@@ -3199,15 +3198,15 @@ test 79
 79: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 79: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 79: collected 3 items
-79: 
+79:
 79: ../../src/core/savo_mapping/test/test_location_review_gateway_contract.py . [ 33%]
 79: ..                                                                       [100%]
-79: 
+79:
 79: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_location_review_gateway_contract.xunit.xml -
 79: ============================== 3 passed in 0.01s ===============================
 79: -- run_test.py: return code 0
 79: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_location_review_gateway_contract.xunit.xml'
-79/85 Test #79: test_location_review_gateway_contract ...........   Passed    0.34 sec
+79/85 Test #79: test_location_review_gateway_contract ...........   Passed    0.37 sec
 test 80
       Start 80: test_location_review_cli_contract
 
@@ -3222,21 +3221,21 @@ test 80
 80: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 80: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 80: collected 3 items
-80: 
+80:
 80: ../../src/core/savo_mapping/test/test_location_review_cli_contract.py .. [ 66%]
 80: .                                                                        [100%]
-80: 
+80:
 80: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_location_review_cli_contract.xunit.xml -
 80: ============================== 3 passed in 0.01s ===============================
 80: -- run_test.py: return code 0
 80: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_location_review_cli_contract.xunit.xml'
-80/85 Test #80: test_location_review_cli_contract ...............   Passed    0.36 sec
+80/85 Test #80: test_location_review_cli_contract ...............   Passed    0.37 sec
 test 81
       Start 81: test_location_review_gateway_runtime
 
 81: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_location_review_gateway_runtime.xunit.xml" "--package-name" "savo_mapping" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/ament_cmake_pytest/test_location_review_gateway_runtime.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_location_review_gateway_runtime.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/ament_cmake_pytest/test_location_review_gateway_runtime/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_location_review_gateway_runtime.xunit.xml" "--junit-prefix=savo_mapping"
 81: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping
-81: Environment variables: 
+81: Environment variables:
 81:  PYTHONDONTWRITEBYTECODE=1
 81:  ROS_LOCALHOST_ONLY=1
 81:  ROS_DOMAIN_ID=225
@@ -3252,16 +3251,16 @@ test 81
 81: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 81: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 81: collected 10 items
-81: 
+81:
 81: ../../src/core/savo_mapping/test/test_location_review_gateway_runtime.py . [ 10%]
 81: .........                                                                [100%]
-81: 
+81:
 81: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_location_review_gateway_runtime.xunit.xml -
-81: ============================== 10 passed in 9.31s ==============================
+81: ============================== 10 passed in 9.03s ==============================
 81: The following exception was never retrieved: cannot use Destroyable because destruction was requested
 81: -- run_test.py: return code 0
 81: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_location_review_gateway_runtime.xunit.xml'
-81/85 Test #81: test_location_review_gateway_runtime ............   Passed    9.79 sec
+81/85 Test #81: test_location_review_gateway_runtime ............   Passed    9.52 sec
 test 82
       Start 82: flake8
 
@@ -3270,12 +3269,12 @@ test 82
 82: Test timeout computed to be: 60
 82: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping':
 82:  - /opt/ros/jazzy/bin/ament_flake8 --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/flake8.xunit.xml
-82: 
+82:
 82: 34 files checked
 82: No problems found
-82: 
+82:
 82: Checked files:
-82: 
+82:
 82: * ./test/test_autonomous_mapping_orchestrator_contract.py
 82: * ./test/test_coverage_execution_handoff_runtime.py
 82: * ./test/test_tf_pose_reader_runtime.py
@@ -3312,7 +3311,7 @@ test 82
 82: * ./launch/continued_mapping.launch.py
 82: -- run_test.py: return code 0
 82: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/flake8.xunit.xml'
-82/85 Test #82: flake8 ..........................................   Passed    0.56 sec
+82/85 Test #82: flake8 ..........................................   Passed    0.58 sec
 test 83
       Start 83: lint_cmake
 
@@ -3321,11 +3320,11 @@ test 83
 83: Test timeout computed to be: 60
 83: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping':
 83:  - /opt/ros/jazzy/bin/ament_lint_cmake --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/lint_cmake.xunit.xml
-83: 
+83:
 83: No problems found
 83: -- run_test.py: return code 0
 83: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/lint_cmake.xunit.xml'
-83/85 Test #83: lint_cmake ......................................   Passed    0.13 sec
+83/85 Test #83: lint_cmake ......................................   Passed    0.14 sec
 test 84
       Start 84: pep257
 
@@ -3371,7 +3370,7 @@ test 84
 84: No problems found
 84: -- run_test.py: return code 0
 84: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/pep257.xunit.xml'
-84/85 Test #84: pep257 ..........................................   Passed    0.41 sec
+84/85 Test #84: pep257 ..........................................   Passed    0.45 sec
 test 85
       Start 85: uncrustify
 
@@ -3381,350 +3380,345 @@ test 85
 85: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping':
 85:  - /opt/ros/jazzy/bin/ament_uncrustify --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/uncrustify.xunit.xml
 85: No code style divergence in file 'include/savo_mapping/autonomous_mapping_am7.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/autonomous_mapping_mission.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/coverage_execution_handoff.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/coverage_grid.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/coverage_mission.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/coverage_operation_orchestrator.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/coverage_planner.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/exploration_goal.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/exploration_goal_handoff.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/exploration_mode.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/exploration_planner.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/exploration_runtime.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/frontier_completion_detector.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/frontier_detector.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/frontier_selector.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/manual_workflow_state.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/map_quality_placeholder.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/map_session_policy.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/mapping_mode.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/mapping_status.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/mapping_types.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/parameter_utils.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/production_map_release.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/qos_profiles.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/saved_map_contract.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/saved_map_quality.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/scan360_controller.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/scan360_orchestrator.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/scan360_planner.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/scan360_quality.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/scan360_rotate_action_binding.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/scan360_rotate_action_client.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/semantic_interruption.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/semantic_landmark.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/semantic_landmark_recorder.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/session_state.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/simulated_scan_model.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/slam_contract.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/slam_lifecycle_topics.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/supervisor_runtime.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/tf_pose_reader.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/topic_names.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/version.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/workflow_authority.hpp'
-85: 
+85:
 85: No code style divergence in file 'include/savo_mapping/workflow_phase.hpp'
-85: 
+85:
 85: No code style divergence in file 'src/core/exploration_goal_handoff.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/core/exploration_mode.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/core/mapping_mode.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/core/mapping_status.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/core/mapping_types.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/core/session_state.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/core/supervisor_runtime.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/core/version.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/core/workflow_phase.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/coverage/coverage_execution_handoff.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/coverage/coverage_grid.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/coverage/coverage_mission.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/coverage/coverage_operation_orchestrator.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/coverage/coverage_planner.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/exploration/exploration_goal.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/exploration/exploration_planner.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/frontier/frontier_detector.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/frontier/frontier_selector.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/nodes/autonomous_mapping_orchestrator_node.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/nodes/coverage_execution_handoff_node.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/nodes/coverage_mapper_node.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/nodes/coverage_operation_orchestrator_node.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/nodes/exploration_goal_handoff_node.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/nodes/exploration_manager_node.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/nodes/first_map_validator_node.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/nodes/frontier_explorer_node.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/nodes/location_review_gateway_node.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/nodes/map_catalog_manager_node.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/nodes/map_quality_evaluator_node.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/nodes/map_session_manager_node.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/nodes/mapped_location_registration_node.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/nodes/mapping_mode_manager_node.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/nodes/mapping_supervisor_node.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/nodes/saved_map_verifier_node.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/nodes/scan360_mapper_node.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/nodes/semantic_interruption_coordinator_node.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/nodes/semantic_landmark_bridge_node.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/nodes/simulated_slam_input_node.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/nodes/slam_lifecycle_health_bridge_node.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/quality/map_quality_placeholder.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/ros/parameter_utils.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/ros/qos_profiles.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/ros/scan360_rotate_action_binding.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/ros/scan360_rotate_action_client.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/ros/tf_pose_reader.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/ros/topic_names.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/scan360/scan360_controller.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/scan360/scan360_orchestrator.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/scan360/scan360_planner.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/scan360/scan360_quality.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/semantic/semantic_interruption.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/semantic/semantic_landmark.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/semantic/semantic_landmark_recorder.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/session/map_session_policy.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/session/production_map_release.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/session/saved_map_contract.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/session/saved_map_quality.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/slam/simulated_scan_model.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/slam/slam_contract.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/tools/location_review_cli.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/workflow/autonomous_mapping_am7.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/workflow/autonomous_mapping_mission.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/workflow/exploration_runtime.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/workflow/frontier_completion_detector.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/workflow/manual_workflow_state.cpp'
-85: 
+85:
 85: No code style divergence in file 'src/workflow/workflow_authority.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/nodes/fake_savo_nav_exploration_server_node.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_autonomous_mapping_am7.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_autonomous_mapping_mission.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_config_and_launch_files.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_coverage_execution_handoff.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_coverage_grid.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_coverage_mission.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_coverage_operation_orchestrator.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_coverage_planner.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_exploration_goal_handoff.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_exploration_manager_contract.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_exploration_mode.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_exploration_planner.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_exploration_runtime.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_frontier_completion_detector.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_frontier_detector.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_frontier_explorer_contract.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_frontier_selector.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_manual_workflow_state.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_map_session_policy.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_mapping_mode.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_mapping_mode_manager_contract.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_mapping_status.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_mapping_supervisor_runtime.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_mapping_types.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_parameter_utils.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_production_map_release.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_qos_profiles.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_saved_map_contract.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_saved_map_quality.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_scan360_controller.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_scan360_orchestrator.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_scan360_planner.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_scan360_quality.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_scan360_rotate_action_binding.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_scan360_rotate_action_client_runtime.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_semantic_interruption.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_semantic_landmark.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_session_state.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_simulated_scan_model.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_slam_contract.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_tf_pose_reader.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_topic_names.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_version.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_workflow_authority.cpp'
-85: 
+85:
 85: No code style divergence in file 'test/test_workflow_phase.cpp'
-85: 
+85:
 85: No problems found
 85: -- run_test.py: return code 0
 85: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/uncrustify.xunit.xml'
-85/85 Test #85: uncrustify ......................................   Passed    1.10 sec
+85/85 Test #85: uncrustify ......................................   Passed    1.34 sec
 
 100% tests passed, 0 tests failed out of 85
 
 Label Time Summary:
-cppcheck      =   1.34 sec*proc (1 test)
-cpplint       =   5.40 sec*proc (1 test)
-flake8        =   0.56 sec*proc (1 test)
-gtest         =   4.00 sec*proc (45 tests)
-lint_cmake    =   0.13 sec*proc (1 test)
-linter        =   9.48 sec*proc (7 tests)
-pep257        =   0.41 sec*proc (1 test)
-pytest        = 104.77 sec*proc (33 tests)
-uncrustify    =   1.10 sec*proc (1 test)
-xmllint       =   0.54 sec*proc (1 test)
+cppcheck      =   1.33 sec*proc (1 test)
+cpplint       =   5.44 sec*proc (1 test)
+flake8        =   0.58 sec*proc (1 test)
+gtest         =   3.91 sec*proc (45 tests)
+lint_cmake    =   0.14 sec*proc (1 test)
+linter        =   9.69 sec*proc (7 tests)
+pep257        =   0.45 sec*proc (1 test)
+pytest        = 102.77 sec*proc (33 tests)
+uncrustify    =   1.34 sec*proc (1 test)
+xmllint       =   0.41 sec*proc (1 test)
 
-Total Test time (real) = 118.28 sec
-Finished <<< savo_mapping [1min 58s]
+Total Test time (real) = 116.39 sec
+Finished <<< savo_mapping [1min 56s]
 
-Summary: 1 package finished [1min 58s]
-
-============================================================
- COLCON TEST RESULT
-============================================================
+Summary: 1 package finished [1min 57s]
 Summary: 1356 tests, 0 errors, 0 failures, 0 skipped
-
 ------------------------------------------------------------
 PACKAGE_RESULT: PASS
-COLCON_TEST_EXIT: 0
-TEST_RESULT_EXIT: 0
+COLCON_TEST_EXIT_STATUS: 0
+TEST_RESULT_EXIT_STATUS: 0
 ------------------------------------------------------------

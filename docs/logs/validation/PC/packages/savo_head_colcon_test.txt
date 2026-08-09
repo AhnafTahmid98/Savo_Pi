@@ -1,17 +1,19 @@
-Robot Savo package PC validation
-Run ID: 20260809T021142Z
-Package: savo_head
-Date: 2026-08-09T05:21:46+03:00
+Robot Savo PC validation
+Run ID: 20260809T063128Z
+Step: package test savo_head
+Date: 2026-08-09T09:31:28+03:00
 Host: ahnaf-tahmid-B760M-PG-SONIC-WiFi
-Commit: eb71c26ac7dfbeaf9c2e44df3ba9f79117c7d4b6
-
+Commit: fa8053a58514451d97fb2eb151b8a2842db57104
+Executor: sequential
+Cppcheck policy: repository default; ament skips known-problematic cppcheck 2.13
+Output:
 Starting >>> savo_head
 UpdateCTestConfiguration  from :/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_head/CTestConfiguration.ini
 Parse Config file:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_head/CTestConfiguration.ini
    Site: ahnaf-tahmid-B760M-PG-SONIC-WiFi
    Build name: (empty)
  Add coverage exclude regular expressions.
-Create new tag: 20260809-0221 - Experimental
+Create new tag: 20260809-0648 - Experimental
 UpdateCTestConfiguration  from :/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_head/CTestConfiguration.ini
 Parse Config file:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_head/CTestConfiguration.ini
 Test project /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_head
@@ -35,14 +37,14 @@ test 1
 1: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_head
 1: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 1: collected 2 items
-1: 
+1:
 1: ../../src/core/savo_head/test/test_camera_health_core.py ..              [100%]
-1: 
+1:
 1: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_head/test_results/savo_head/test_camera_health_core.xunit.xml -
-1: ============================== 2 passed in 0.58s ===============================
+1: ============================== 2 passed in 0.59s ===============================
 1: -- run_test.py: return code 0
 1: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_head/test_results/savo_head/test_camera_health_core.xunit.xml'
- 1/12 Test  #1: test_camera_health_core .....................   Passed    0.90 sec
+ 1/12 Test  #1: test_camera_health_core .....................   Passed    0.94 sec
 test 2
       Start  2: test_camera_status_node_contract
 
@@ -57,14 +59,14 @@ test 2
 2: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_head
 2: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 2: collected 5 items
-2: 
+2:
 2: ../../src/core/savo_head/test/test_camera_status_node_contract.py .....  [100%]
-2: 
+2:
 2: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_head/test_results/savo_head/test_camera_status_node_contract.xunit.xml -
 2: ============================== 5 passed in 0.01s ===============================
 2: -- run_test.py: return code 0
 2: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_head/test_results/savo_head/test_camera_status_node_contract.xunit.xml'
- 2/12 Test  #2: test_camera_status_node_contract ............   Passed    0.36 sec
+ 2/12 Test  #2: test_camera_status_node_contract ............   Passed    0.35 sec
 test 3
       Start  3: test_camera_status_report_core
 
@@ -79,14 +81,14 @@ test 3
 3: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_head
 3: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 3: collected 1 item
-3: 
+3:
 3: ../../src/core/savo_head/test/test_camera_status_report_core.py .        [100%]
-3: 
+3:
 3: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_head/test_results/savo_head/test_camera_status_report_core.xunit.xml -
-3: ============================== 1 passed in 0.76s ===============================
+3: ============================== 1 passed in 0.83s ===============================
 3: -- run_test.py: return code 0
 3: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_head/test_results/savo_head/test_camera_status_report_core.xunit.xml'
- 3/12 Test  #3: test_camera_status_report_core ..............   Passed    1.08 sec
+ 3/12 Test  #3: test_camera_status_report_core ..............   Passed    1.18 sec
 test 4
       Start  4: test_head_status_camera_severity_contract
 
@@ -101,15 +103,15 @@ test 4
 4: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_head
 4: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 4: collected 3 items
-4: 
+4:
 4: ../../src/core/savo_head/test/test_head_status_camera_severity_contract.py . [ 33%]
 4: ..                                                                       [100%]
-4: 
+4:
 4: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_head/test_results/savo_head/test_head_status_camera_severity_contract.xunit.xml -
 4: ============================== 3 passed in 0.01s ===============================
 4: -- run_test.py: return code 0
 4: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_head/test_results/savo_head/test_head_status_camera_severity_contract.xunit.xml'
- 4/12 Test  #4: test_head_status_camera_severity_contract ...   Passed    0.32 sec
+ 4/12 Test  #4: test_head_status_camera_severity_contract ...   Passed    0.36 sec
 test 5
       Start  5: test_camera_launch_integration
 
@@ -124,9 +126,9 @@ test 5
 5: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_head
 5: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 5: collected 5 items
-5: 
+5:
 5: ../../src/core/savo_head/test/test_camera_launch_integration.py .....    [100%]
-5: 
+5:
 5: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_head/test_results/savo_head/test_camera_launch_integration.xunit.xml -
 5: ============================== 5 passed in 0.01s ===============================
 5: -- run_test.py: return code 0
@@ -146,15 +148,15 @@ test 6
 6: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_head
 6: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 6: collected 6 items
-6: 
+6:
 6: ../../src/core/savo_head/test/test_controller_diagnostic_ownership.py .. [ 33%]
 6: ....                                                                     [100%]
-6: 
+6:
 6: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_head/test_results/savo_head/test_controller_diagnostic_ownership.xunit.xml -
-6: ============================== 6 passed in 0.01s ===============================
+6: ============================== 6 passed in 0.02s ===============================
 6: -- run_test.py: return code 0
 6: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_head/test_results/savo_head/test_controller_diagnostic_ownership.xunit.xml'
- 6/12 Test  #6: test_controller_diagnostic_ownership ........   Passed    0.34 sec
+ 6/12 Test  #6: test_controller_diagnostic_ownership ........   Passed    0.37 sec
 test 7
       Start  7: test_apriltag_typed_contract
 
@@ -169,14 +171,14 @@ test 7
 7: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_head
 7: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 7: collected 2 items
-7: 
+7:
 7: ../../src/core/savo_head/test/test_apriltag_typed_contract.py ..         [100%]
-7: 
+7:
 7: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_head/test_results/savo_head/test_apriltag_typed_contract.xunit.xml -
 7: ============================== 2 passed in 0.01s ===============================
 7: -- run_test.py: return code 0
 7: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_head/test_results/savo_head/test_apriltag_typed_contract.xunit.xml'
- 7/12 Test  #7: test_apriltag_typed_contract ................   Passed    0.34 sec
+ 7/12 Test  #7: test_apriltag_typed_contract ................   Passed    0.37 sec
 test 8
       Start  8: test_apriltag_detector_config_core
 
@@ -191,14 +193,14 @@ test 8
 8: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_head
 8: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 8: collected 1 item
-8: 
+8:
 8: ../../src/core/savo_head/test/test_apriltag_detector_config_core.py .    [100%]
-8: 
+8:
 8: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_head/test_results/savo_head/test_apriltag_detector_config_core.xunit.xml -
-8: ============================== 1 passed in 0.58s ===============================
+8: ============================== 1 passed in 0.61s ===============================
 8: -- run_test.py: return code 0
 8: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_head/test_results/savo_head/test_apriltag_detector_config_core.xunit.xml'
- 8/12 Test  #8: test_apriltag_detector_config_core ..........   Passed    0.90 sec
+ 8/12 Test  #8: test_apriltag_detector_config_core ..........   Passed    0.95 sec
 test 9
       Start  9: test_apriltag_detector_node_contract
 
@@ -213,15 +215,15 @@ test 9
 9: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_head
 9: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 9: collected 5 items
-9: 
+9:
 9: ../../src/core/savo_head/test/test_apriltag_detector_node_contract.py .. [ 40%]
 9: ...                                                                      [100%]
-9: 
+9:
 9: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_head/test_results/savo_head/test_apriltag_detector_node_contract.xunit.xml -
 9: ============================== 5 passed in 0.01s ===============================
 9: -- run_test.py: return code 0
 9: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_head/test_results/savo_head/test_apriltag_detector_node_contract.xunit.xml'
- 9/12 Test  #9: test_apriltag_detector_node_contract ........   Passed    0.34 sec
+ 9/12 Test  #9: test_apriltag_detector_node_contract ........   Passed    0.35 sec
 test 10
       Start 10: test_apriltag_action_runtime_contract
 
@@ -236,14 +238,14 @@ test 10
 10: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_head
 10: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 10: collected 1 item
-10: 
+10:
 10: ../../src/core/savo_head/test/test_apriltag_action_runtime_contract.py . [100%]
-10: 
+10:
 10: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_head/test_results/savo_head/test_apriltag_action_runtime_contract.xunit.xml -
 10: ============================== 1 passed in 0.01s ===============================
 10: -- run_test.py: return code 0
 10: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_head/test_results/savo_head/test_apriltag_action_runtime_contract.xunit.xml'
-10/12 Test #10: test_apriltag_action_runtime_contract .......   Passed    0.32 sec
+10/12 Test #10: test_apriltag_action_runtime_contract .......   Passed    0.35 sec
 test 11
       Start 11: test_apriltag_production_launch_contract
 
@@ -258,15 +260,15 @@ test 11
 11: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_head
 11: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 11: collected 4 items
-11: 
+11:
 11: ../../src/core/savo_head/test/test_apriltag_production_launch_contract.py . [ 25%]
 11: ...                                                                      [100%]
-11: 
+11:
 11: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_head/test_results/savo_head/test_apriltag_production_launch_contract.xunit.xml -
 11: ============================== 4 passed in 0.01s ===============================
 11: -- run_test.py: return code 0
 11: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_head/test_results/savo_head/test_apriltag_production_launch_contract.xunit.xml'
-11/12 Test #11: test_apriltag_production_launch_contract ....   Passed    0.33 sec
+11/12 Test #11: test_apriltag_production_launch_contract ....   Passed    0.38 sec
 test 12
       Start 12: test_head_tf_calibration_gate_contract
 
@@ -281,33 +283,28 @@ test 12
 12: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_head
 12: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 12: collected 4 items
-12: 
+12:
 12: ../../src/core/savo_head/test/test_head_tf_calibration_gate_contract.py . [ 25%]
 12: ...                                                                      [100%]
-12: 
+12:
 12: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_head/test_results/savo_head/test_head_tf_calibration_gate_contract.xunit.xml -
 12: ============================== 4 passed in 0.01s ===============================
 12: -- run_test.py: return code 0
 12: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_head/test_results/savo_head/test_head_tf_calibration_gate_contract.xunit.xml'
-12/12 Test #12: test_head_tf_calibration_gate_contract ......   Passed    0.33 sec
+12/12 Test #12: test_head_tf_calibration_gate_contract ......   Passed    0.39 sec
 
 100% tests passed, 0 tests failed out of 12
 
 Label Time Summary:
-pytest    =   5.89 sec*proc (12 tests)
+pytest    =   6.34 sec*proc (12 tests)
 
-Total Test time (real) =   5.90 sec
-Finished <<< savo_head [5.92s]
+Total Test time (real) =   6.34 sec
+Finished <<< savo_head [6.37s]
 
-Summary: 1 package finished [6.07s]
-
-============================================================
- COLCON TEST RESULT
-============================================================
+Summary: 1 package finished [6.53s]
 Summary: 51 tests, 0 errors, 0 failures, 0 skipped
-
 ------------------------------------------------------------
 PACKAGE_RESULT: PASS
-COLCON_TEST_EXIT: 0
-TEST_RESULT_EXIT: 0
+COLCON_TEST_EXIT_STATUS: 0
+TEST_RESULT_EXIT_STATUS: 0
 ------------------------------------------------------------

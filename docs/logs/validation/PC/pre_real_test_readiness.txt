@@ -1,10 +1,10 @@
 Robot Savo PC validation
-Run ID: 20260809T021142Z
+Run ID: 20260809T063128Z
 Step: Pre-real-test readiness
-Date: 2026-08-09T05:11:43+03:00
+Date: 2026-08-09T09:31:28+03:00
 Host: ahnaf-tahmid-B760M-PG-SONIC-WiFi
-Commit: eb71c26ac7dfbeaf9c2e44df3ba9f79117c7d4b6
-
+Commit: fa8053a58514451d97fb2eb151b8a2842db57104
+Output:
 PASS
 PASS    required_files: all required files are nonempty
 PASS    git_diff_whitespace: ok
@@ -15,16 +15,18 @@ PASS    xml_parse: all nonempty xml parsed
 PASS    python_parse: all nonempty python parsed
 PASS    bash_syntax: 40 shell scripts parsed
 PASS    netplan_core: Rendered configuration only; nothing was applied.
+BLOCKED: netplan schema generator requires a system D-Bus in this environment
 PASS    netplan_edge: Rendered configuration only; nothing was applied.
+BLOCKED: netplan schema generator requires a system D-Bus in this environment
 PASS    systemd_render: Rendered units only; nothing was installed or enabled.
 PASS    systemd_verify: ok
-PASS    backup_restore: PASS backup=/tmp/tmp.2MBOA26jZL/state.tar.gz
-/tmp/tmp.2MBOA26jZL/state.tar.gz: OK
+PASS    backup_restore: PASS backup=/tmp/tmp.qEBic622FS/state.tar.gz
+/tmp/tmp.qEBic622FS/state.tar.gz: OK
 config/robot-savo.env: OK
 state/locations/locations.db: OK
 state/maps/active.yaml: OK
-PASS restored_state=/tmp/tmp.2MBOA26jZL/restored restored_config=/tmp/tmp.2MBOA26jZL/restored-config owner=ahnaf-tahmid:ahnaf-tahmid
-/tmp/tmp.2MBOA26jZL/state.tar.gz: OK
+PASS restored_state=/tmp/tmp.qEBic622FS/restored restored_config=/tmp/tmp.qEBic622FS/restored-config owner=ahnaf-tahmid:ahnaf-tahmid
+/tmp/tmp.qEBic622FS/state.tar.gz: OK
 config/robot-savo.env: OK
 state/locations/locations.db: OK
 state/maps/active.yaml: OK
@@ -42,7 +44,6 @@ PASS    diagnostic_motion_safety: moving diagnostics use approved ROS boundaries
 PASS    ui_read_only_integration: typed mapping/location and live speech/system feeds are read-only
 PASS    bridge_command_boundary: typed STOP/teleop/navigation/mapping/query boundary present; approval remains operator-only
 PASS    savomind_speech_contract_v2: bounded authenticated v2 speech and physical-playback acknowledgement contract present
-
 ------------------------------------------------------------
 RESULT: PASS
 EXIT_STATUS: 0

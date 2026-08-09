@@ -1,17 +1,19 @@
-Robot Savo package PC validation
-Run ID: 20260809T021142Z
-Package: savo_bridge
-Date: 2026-08-09T05:21:06+03:00
+Robot Savo PC validation
+Run ID: 20260809T063128Z
+Step: package test savo_bridge
+Date: 2026-08-09T09:31:28+03:00
 Host: ahnaf-tahmid-B760M-PG-SONIC-WiFi
-Commit: eb71c26ac7dfbeaf9c2e44df3ba9f79117c7d4b6
-
+Commit: fa8053a58514451d97fb2eb151b8a2842db57104
+Executor: sequential
+Cppcheck policy: repository default; ament skips known-problematic cppcheck 2.13
+Output:
 Starting >>> savo_bridge
 UpdateCTestConfiguration  from :/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/CTestConfiguration.ini
 Parse Config file:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/CTestConfiguration.ini
    Site: ahnaf-tahmid-B760M-PG-SONIC-WiFi
    Build name: (empty)
  Add coverage exclude regular expressions.
-Create new tag: 20260809-0221 - Experimental
+Create new tag: 20260809-0647 - Experimental
 UpdateCTestConfiguration  from :/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/CTestConfiguration.ini
 Parse Config file:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/CTestConfiguration.ini
 Test project /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge
@@ -35,15 +37,15 @@ test 1
 1: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 1: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 1: collected 6 items
-1: 
+1:
 1: ../../src/shared/savo_bridge/test/contracts/test_production_assets.py .. [ 33%]
 1: ....                                                                     [100%]
-1: 
+1:
 1: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/test_savo_bridge_production_assets.xunit.xml -
 1: ============================== 6 passed in 0.01s ===============================
 1: -- run_test.py: return code 0
 1: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/test_savo_bridge_production_assets.xunit.xml'
- 1/25 Test  #1: test_savo_bridge_production_assets ...........   Passed    0.34 sec
+ 1/25 Test  #1: test_savo_bridge_production_assets ...........   Passed    0.36 sec
 test 2
       Start  2: test_savo_bridge_command_boundary_contract
 
@@ -58,15 +60,15 @@ test 2
 2: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 2: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 2: collected 4 items
-2: 
+2:
 2: ../../src/shared/savo_bridge/test/contracts/test_command_boundary_contract.py . [ 25%]
 2: ...                                                                      [100%]
-2: 
+2:
 2: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/test_savo_bridge_command_boundary_contract.xunit.xml -
 2: ============================== 4 passed in 0.01s ===============================
 2: -- run_test.py: return code 0
 2: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/test_savo_bridge_command_boundary_contract.xunit.xml'
- 2/25 Test  #2: test_savo_bridge_command_boundary_contract ...   Passed    0.34 sec
+ 2/25 Test  #2: test_savo_bridge_command_boundary_contract ...   Passed    0.35 sec
 test 3
       Start  3: test_savo_bridge_version
 
@@ -82,7 +84,7 @@ test 3
 3: [ RUN      ] SavoBridgeVersion.PackageVersionContract
 3: [       OK ] SavoBridgeVersion.PackageVersionContract (0 ms)
 3: [----------] 1 test from SavoBridgeVersion (0 ms total)
-3: 
+3:
 3: [----------] Global test environment tear-down
 3: [==========] 1 test from 1 test suite ran. (0 ms total)
 3: [  PASSED  ] 1 test.
@@ -183,16 +185,16 @@ test 4
 4: [ RUN      ] SavoBridgeCommandProtocol.ErrorCodesHaveStableStrings
 4: [       OK ] SavoBridgeCommandProtocol.ErrorCodesHaveStableStrings (0 ms)
 4: [ RUN      ] SavoBridgeCommandProtocol.ParserHasNoRosPublicationSocketOrPhysicalDispatch
-4: [       OK ] SavoBridgeCommandProtocol.ParserHasNoRosPublicationSocketOrPhysicalDispatch (1 ms)
-4: [----------] 41 tests from SavoBridgeCommandProtocol (6 ms total)
-4: 
+4: [       OK ] SavoBridgeCommandProtocol.ParserHasNoRosPublicationSocketOrPhysicalDispatch (2 ms)
+4: [----------] 41 tests from SavoBridgeCommandProtocol (8 ms total)
+4:
 4: [----------] Global test environment tear-down
-4: [==========] 41 tests from 1 test suite ran. (6 ms total)
+4: [==========] 41 tests from 1 test suite ran. (8 ms total)
 4: [  PASSED  ] 41 tests.
 4: -- run_test.py: return code 0
 4: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/test_savo_bridge_command_protocol.gtest.xml'
 4: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/test_savo_bridge_command_protocol.gtest.xml'
- 4/25 Test  #4: test_savo_bridge_command_protocol ............   Passed    0.06 sec
+ 4/25 Test  #4: test_savo_bridge_command_protocol ............   Passed    0.07 sec
 test 5
       Start  5: test_savo_bridge_stop_command_adapter
 
@@ -246,14 +248,14 @@ test 5
 5: [ RUN      ] StopAdapterControllerTest.ProductionSourceHasNoWorkersOrTransports
 5: [       OK ] StopAdapterControllerTest.ProductionSourceHasNoWorkersOrTransports (0 ms)
 5: [----------] 20 tests from StopAdapterControllerTest (0 ms total)
-5: 
+5:
 5: [----------] Global test environment tear-down
 5: [==========] 20 tests from 1 test suite ran. (0 ms total)
 5: [  PASSED  ] 20 tests.
 5: -- run_test.py: return code 0
 5: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/test_savo_bridge_stop_command_adapter.gtest.xml'
 5: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/test_savo_bridge_stop_command_adapter.gtest.xml'
- 5/25 Test  #5: test_savo_bridge_stop_command_adapter ........   Passed    0.05 sec
+ 5/25 Test  #5: test_savo_bridge_stop_command_adapter ........   Passed    0.06 sec
 test 6
       Start  6: test_savo_bridge_ros_command_dispatcher
 
@@ -267,44 +269,44 @@ test 6
 6: [----------] Global test environment set-up.
 6: [----------] 10 tests from RosCommandDispatcherTest
 6: [ RUN      ] RosCommandDispatcherTest.StopRequiresFreshDownstreamConfirmation
-6: [INFO] [1786242067.252790496] [savo_bridge_dispatcher_under_test_1]: ROS command dispatcher created; STOP, bounded teleop and guarded navigation enabled
-6: [       OK ] RosCommandDispatcherTest.StopRequiresFreshDownstreamConfirmation (347 ms)
+6: [INFO] [1786258078.941854549] [savo_bridge_dispatcher_under_test_1]: ROS command dispatcher created; STOP, bounded teleop and guarded navigation enabled
+6: [       OK ] RosCommandDispatcherTest.StopRequiresFreshDownstreamConfirmation (348 ms)
 6: [ RUN      ] RosCommandDispatcherTest.TeleopPublishesBoundedManualCommandAndFinalZero
-6: [INFO] [1786242067.595300963] [savo_bridge_dispatcher_under_test_2]: ROS command dispatcher created; STOP, bounded teleop and guarded navigation enabled
-6: [       OK ] RosCommandDispatcherTest.TeleopPublishesBoundedManualCommandAndFinalZero (629 ms)
+6: [INFO] [1786258079.279936997] [savo_bridge_dispatcher_under_test_2]: ROS command dispatcher created; STOP, bounded teleop and guarded navigation enabled
+6: [       OK ] RosCommandDispatcherTest.TeleopPublishesBoundedManualCommandAndFinalZero (623 ms)
 6: [ RUN      ] RosCommandDispatcherTest.TeleopRuntimeSafetyLossForcesExternalStop
-6: [INFO] [1786242068.214776673] [savo_bridge_dispatcher_under_test_3]: ROS command dispatcher created; STOP, bounded teleop and guarded navigation enabled
-6: [       OK ] RosCommandDispatcherTest.TeleopRuntimeSafetyLossForcesExternalStop (349 ms)
+6: [INFO] [1786258079.898724930] [savo_bridge_dispatcher_under_test_3]: ROS command dispatcher created; STOP, bounded teleop and guarded navigation enabled
+6: [       OK ] RosCommandDispatcherTest.TeleopRuntimeSafetyLossForcesExternalStop (346 ms)
 6: [ RUN      ] RosCommandDispatcherTest.CancelActionRequiresExactActiveTeleopCommandId
-6: [INFO] [1786242068.565257251] [savo_bridge_dispatcher_under_test_4]: ROS command dispatcher created; STOP, bounded teleop and guarded navigation enabled
-6: [       OK ] RosCommandDispatcherTest.CancelActionRequiresExactActiveTeleopCommandId (344 ms)
+6: [INFO] [1786258080.246630693] [savo_bridge_dispatcher_under_test_4]: ROS command dispatcher created; STOP, bounded teleop and guarded navigation enabled
+6: [       OK ] RosCommandDispatcherTest.CancelActionRequiresExactActiveTeleopCommandId (340 ms)
 6: [ RUN      ] RosCommandDispatcherTest.NavigationResolvesExactApprovedLocationAndUsesGuardedAction
-6: [INFO] [1786242068.915843880] [savo_bridge_dispatcher_under_test_5]: ROS command dispatcher created; STOP, bounded teleop and guarded navigation enabled
-6: [       OK ] RosCommandDispatcherTest.NavigationResolvesExactApprovedLocationAndUsesGuardedAction (455 ms)
+6: [INFO] [1786258080.586067983] [savo_bridge_dispatcher_under_test_5]: ROS command dispatcher created; STOP, bounded teleop and guarded navigation enabled
+6: [       OK ] RosCommandDispatcherTest.NavigationResolvesExactApprovedLocationAndUsesGuardedAction (438 ms)
 6: [ RUN      ] RosCommandDispatcherTest.NavigationCancellationRequiresExactTargetAndWaitsForTerminal
-6: [INFO] [1786242069.363309715] [savo_bridge_dispatcher_under_test_6]: ROS command dispatcher created; STOP, bounded teleop and guarded navigation enabled
-6: [       OK ] RosCommandDispatcherTest.NavigationCancellationRequiresExactTargetAndWaitsForTerminal (353 ms)
+6: [INFO] [1786258081.025223555] [savo_bridge_dispatcher_under_test_6]: ROS command dispatcher created; STOP, bounded teleop and guarded navigation enabled
+6: [       OK ] RosCommandDispatcherTest.NavigationCancellationRequiresExactTargetAndWaitsForTerminal (364 ms)
 6: [ RUN      ] RosCommandDispatcherTest.AutonomousMappingUsesTypedActionAndKeepsApprovalRequired
-6: [INFO] [1786242069.717007509] [savo_bridge_dispatcher_under_test_7]: ROS command dispatcher created; STOP, bounded teleop and guarded navigation enabled
-6: [       OK ] RosCommandDispatcherTest.AutonomousMappingUsesTypedActionAndKeepsApprovalRequired (328 ms)
+6: [INFO] [1786258081.389163066] [savo_bridge_dispatcher_under_test_7]: ROS command dispatcher created; STOP, bounded teleop and guarded navigation enabled
+6: [       OK ] RosCommandDispatcherTest.AutonomousMappingUsesTypedActionAndKeepsApprovalRequired (326 ms)
 6: [ RUN      ] RosCommandDispatcherTest.MappingScan360UsesTypedControlService
-6: [INFO] [1786242070.045259080] [savo_bridge_dispatcher_under_test_8]: ROS command dispatcher created; STOP, bounded teleop and guarded navigation enabled
-6: [       OK ] RosCommandDispatcherTest.MappingScan360UsesTypedControlService (326 ms)
+6: [INFO] [1786258081.715736176] [savo_bridge_dispatcher_under_test_8]: ROS command dispatcher created; STOP, bounded teleop and guarded navigation enabled
+6: [       OK ] RosCommandDispatcherTest.MappingScan360UsesTypedControlService (317 ms)
 6: [ RUN      ] RosCommandDispatcherTest.MappingQueryReturnsStructuredAm8State
-6: [INFO] [1786242070.372685791] [savo_bridge_dispatcher_under_test_9]: ROS command dispatcher created; STOP, bounded teleop and guarded navigation enabled
-6: [       OK ] RosCommandDispatcherTest.MappingQueryReturnsStructuredAm8State (321 ms)
+6: [INFO] [1786258082.033343919] [savo_bridge_dispatcher_under_test_9]: ROS command dispatcher created; STOP, bounded teleop and guarded navigation enabled
+6: [       OK ] RosCommandDispatcherTest.MappingQueryReturnsStructuredAm8State (316 ms)
 6: [ RUN      ] RosCommandDispatcherTest.SupervisorQueryReturnsStructuredReadOnlySummary
-6: [INFO] [1786242070.693000847] [savo_bridge_dispatcher_under_test_10]: ROS command dispatcher created; STOP, bounded teleop and guarded navigation enabled
-6: [       OK ] RosCommandDispatcherTest.SupervisorQueryReturnsStructuredReadOnlySummary (320 ms)
-6: [----------] 10 tests from RosCommandDispatcherTest (3775 ms total)
-6: 
+6: [INFO] [1786258082.350664532] [savo_bridge_dispatcher_under_test_10]: ROS command dispatcher created; STOP, bounded teleop and guarded navigation enabled
+6: [       OK ] RosCommandDispatcherTest.SupervisorQueryReturnsStructuredReadOnlySummary (318 ms)
+6: [----------] 10 tests from RosCommandDispatcherTest (3741 ms total)
+6:
 6: [----------] Global test environment tear-down
-6: [==========] 10 tests from 1 test suite ran. (3781 ms total)
+6: [==========] 10 tests from 1 test suite ran. (3748 ms total)
 6: [  PASSED  ] 10 tests.
 6: -- run_test.py: return code 0
 6: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/test_savo_bridge_ros_command_dispatcher.gtest.xml'
 6: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/test_savo_bridge_ros_command_dispatcher.gtest.xml'
- 6/25 Test  #6: test_savo_bridge_ros_command_dispatcher ......   Passed    3.95 sec
+ 6/25 Test  #6: test_savo_bridge_ros_command_dispatcher ......   Passed    3.92 sec
 test 7
       Start  7: test_savo_bridge_command_server
 
@@ -374,27 +376,27 @@ test 7
 7: [ RUN      ] SavoBridgeCommandServer.LifecycleCreatesNoBackgroundThread
 7: [       OK ] SavoBridgeCommandServer.LifecycleCreatesNoBackgroundThread (0 ms)
 7: [ RUN      ] SavoBridgeCommandServer.DuplicateCommandIdReplaysWithoutRedispatch
-7: [       OK ] SavoBridgeCommandServer.DuplicateCommandIdReplaysWithoutRedispatch (2 ms)
+7: [       OK ] SavoBridgeCommandServer.DuplicateCommandIdReplaysWithoutRedispatch (0 ms)
 7: [ RUN      ] SavoBridgeCommandServer.TransportHasNoRosOrNodeIntegration
-7: [       OK ] SavoBridgeCommandServer.TransportHasNoRosOrNodeIntegration (4 ms)
-7: [----------] 30 tests from SavoBridgeCommandServer (70 ms total)
-7: 
+7: [       OK ] SavoBridgeCommandServer.TransportHasNoRosOrNodeIntegration (1 ms)
+7: [----------] 30 tests from SavoBridgeCommandServer (65 ms total)
+7:
 7: [----------] 3 tests from CanonicalCommands/CanonicalRequestTest
 7: [ RUN      ] CanonicalCommands/CanonicalRequestTest.ReceivesDryRunAcknowledgement/0
-7: [       OK ] CanonicalCommands/CanonicalRequestTest.ReceivesDryRunAcknowledgement/0 (1 ms)
+7: [       OK ] CanonicalCommands/CanonicalRequestTest.ReceivesDryRunAcknowledgement/0 (0 ms)
 7: [ RUN      ] CanonicalCommands/CanonicalRequestTest.ReceivesDryRunAcknowledgement/1
-7: [       OK ] CanonicalCommands/CanonicalRequestTest.ReceivesDryRunAcknowledgement/1 (1 ms)
+7: [       OK ] CanonicalCommands/CanonicalRequestTest.ReceivesDryRunAcknowledgement/1 (0 ms)
 7: [ RUN      ] CanonicalCommands/CanonicalRequestTest.ReceivesDryRunAcknowledgement/2
-7: [       OK ] CanonicalCommands/CanonicalRequestTest.ReceivesDryRunAcknowledgement/2 (1 ms)
-7: [----------] 3 tests from CanonicalCommands/CanonicalRequestTest (4 ms total)
-7: 
+7: [       OK ] CanonicalCommands/CanonicalRequestTest.ReceivesDryRunAcknowledgement/2 (0 ms)
+7: [----------] 3 tests from CanonicalCommands/CanonicalRequestTest (1 ms total)
+7:
 7: [----------] Global test environment tear-down
-7: [==========] 33 tests from 2 test suites ran. (75 ms total)
+7: [==========] 33 tests from 2 test suites ran. (66 ms total)
 7: [  PASSED  ] 33 tests.
 7: -- run_test.py: return code 0
 7: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/test_savo_bridge_command_server.gtest.xml'
 7: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/test_savo_bridge_command_server.gtest.xml'
- 7/25 Test  #7: test_savo_bridge_command_server ..............   Passed    0.14 sec
+ 7/25 Test  #7: test_savo_bridge_command_server ..............   Passed    0.13 sec
 test 8
       Start  8: test_bridge_node_command_server
 
@@ -408,55 +410,55 @@ test 8
 8: [----------] Global test environment set-up.
 8: [----------] 10 tests from BridgeNodeCommandServer
 8: [ RUN      ] BridgeNodeCommandServer.DefaultsAreDisabledAndReadOnly
-8: [INFO] [1786242071.333339549] [savo_bridge.savo_bridge_node]: savo_bridge topic observation started; configured_topics=0 snapshot_enabled=false command_mode=disabled
-8: [       OK ] BridgeNodeCommandServer.DefaultsAreDisabledAndReadOnly (16 ms)
+8: [INFO] [1786258082.977857790] [savo_bridge.savo_bridge_node]: savo_bridge topic observation started; configured_topics=0 snapshot_enabled=false command_mode=disabled
+8: [       OK ] BridgeNodeCommandServer.DefaultsAreDisabledAndReadOnly (19 ms)
 8: [ RUN      ] BridgeNodeCommandServer.DisabledInvalidPathIsNeverInspected
-8: [INFO] [1786242071.337812963] [savo_bridge.savo_bridge_node]: savo_bridge topic observation started; configured_topics=0 snapshot_enabled=false command_mode=disabled
-8: [       OK ] BridgeNodeCommandServer.DisabledInvalidPathIsNeverInspected (3 ms)
+8: [INFO] [1786258082.983223813] [savo_bridge.savo_bridge_node]: savo_bridge topic observation started; configured_topics=0 snapshot_enabled=false command_mode=disabled
+8: [       OK ] BridgeNodeCommandServer.DisabledInvalidPathIsNeverInspected (4 ms)
 8: [ RUN      ] BridgeNodeCommandServer.EnabledConfigurationIsStrict
-8: [ERROR] [1786242071.341251836] [savo_bridge.savo_bridge_node]: command server configuration rejected
-8: [ERROR] [1786242071.344647949] [savo_bridge.savo_bridge_node]: command server startup failed: command_server_parent_directory_unsafe
-8: [ERROR] [1786242071.347868728] [savo_bridge.savo_bridge_node]: command server configuration rejected
-8: [ERROR] [1786242071.350989932] [savo_bridge.savo_bridge_node]: command server configuration rejected
-8: [ERROR] [1786242071.354285198] [savo_bridge.savo_bridge_node]: command server configuration rejected
-8: [       OK ] BridgeNodeCommandServer.EnabledConfigurationIsStrict (19 ms)
+8: [ERROR] [1786258082.987544258] [savo_bridge.savo_bridge_node]: command server configuration rejected
+8: [ERROR] [1786258082.991424294] [savo_bridge.savo_bridge_node]: command server startup failed: command_server_parent_directory_unsafe
+8: [ERROR] [1786258082.995531041] [savo_bridge.savo_bridge_node]: command server configuration rejected
+8: [ERROR] [1786258082.999653013] [savo_bridge.savo_bridge_node]: command server configuration rejected
+8: [ERROR] [1786258083.003604724] [savo_bridge.savo_bridge_node]: command server configuration rejected
+8: [       OK ] BridgeNodeCommandServer.EnabledConfigurationIsStrict (23 ms)
 8: [ RUN      ] BridgeNodeCommandServer.EnabledNodeOwnsOneWorkerAndSocket
-8: [INFO] [1786242071.361291628] [savo_bridge.savo_bridge_node]: command server enabled; execution_mode=dry_run
-8: [INFO] [1786242071.361311205] [savo_bridge.savo_bridge_node]: savo_bridge topic observation started; configured_topics=0 snapshot_enabled=false command_mode=dry_run
-8: [       OK ] BridgeNodeCommandServer.EnabledNodeOwnsOneWorkerAndSocket (28 ms)
+8: [INFO] [1786258083.011135219] [savo_bridge.savo_bridge_node]: command server enabled; execution_mode=dry_run
+8: [INFO] [1786258083.011168193] [savo_bridge.savo_bridge_node]: savo_bridge topic observation started; configured_topics=0 snapshot_enabled=false command_mode=dry_run
+8: [       OK ] BridgeNodeCommandServer.EnabledNodeOwnsOneWorkerAndSocket (29 ms)
 8: [ RUN      ] BridgeNodeCommandServer.LiveModeDispatchesStopAndReplaysDuplicate
-8: [INFO] [1786242071.402283754] [savo_bridge.savo_bridge_node]: ROS command dispatcher created; STOP, bounded teleop and guarded navigation enabled
-8: [INFO] [1786242071.402421272] [savo_bridge.savo_bridge_node]: command server enabled; execution_mode=live
-8: [INFO] [1786242071.402428816] [savo_bridge.savo_bridge_node]: savo_bridge topic observation started; configured_topics=0 snapshot_enabled=false command_mode=live
-8: [       OK ] BridgeNodeCommandServer.LiveModeDispatchesStopAndReplaysDuplicate (460 ms)
+8: [INFO] [1786258083.053008696] [savo_bridge.savo_bridge_node]: ROS command dispatcher created; STOP, bounded teleop and guarded navigation enabled
+8: [INFO] [1786258083.053166153] [savo_bridge.savo_bridge_node]: command server enabled; execution_mode=live
+8: [INFO] [1786258083.053174822] [savo_bridge.savo_bridge_node]: savo_bridge topic observation started; configured_topics=0 snapshot_enabled=false command_mode=live
+8: [       OK ] BridgeNodeCommandServer.LiveModeDispatchesStopAndReplaysDuplicate (454 ms)
 8: [ RUN      ] BridgeNodeCommandServer.SemanticCommandsRemainDryRunOnly
-8: [INFO] [1786242071.857083061] [savo_bridge.savo_bridge_node]: command server enabled; execution_mode=dry_run
-8: [INFO] [1786242071.857111926] [savo_bridge.savo_bridge_node]: savo_bridge topic observation started; configured_topics=0 snapshot_enabled=false command_mode=dry_run
-8: [       OK ] BridgeNodeCommandServer.SemanticCommandsRemainDryRunOnly (37 ms)
+8: [INFO] [1786258083.494812086] [savo_bridge.savo_bridge_node]: command server enabled; execution_mode=dry_run
+8: [INFO] [1786258083.494834822] [savo_bridge.savo_bridge_node]: savo_bridge topic observation started; configured_topics=0 snapshot_enabled=false command_mode=dry_run
+8: [       OK ] BridgeNodeCommandServer.SemanticCommandsRemainDryRunOnly (30 ms)
 8: [ RUN      ] BridgeNodeCommandServer.InvalidClientsDoNotStopWorker
-8: [INFO] [1786242071.887379030] [savo_bridge.savo_bridge_node]: command server enabled; execution_mode=dry_run
-8: [INFO] [1786242071.887397734] [savo_bridge.savo_bridge_node]: savo_bridge topic observation started; configured_topics=0 snapshot_enabled=false command_mode=dry_run
-8: [       OK ] BridgeNodeCommandServer.InvalidClientsDoNotStopWorker (29 ms)
+8: [INFO] [1786258083.526219867] [savo_bridge.savo_bridge_node]: command server enabled; execution_mode=dry_run
+8: [INFO] [1786258083.526246173] [savo_bridge.savo_bridge_node]: savo_bridge topic observation started; configured_topics=0 snapshot_enabled=false command_mode=dry_run
+8: [       OK ] BridgeNodeCommandServer.InvalidClientsDoNotStopWorker (30 ms)
 8: [ RUN      ] BridgeNodeCommandServer.PeerUidPolicyIsEnforced
-8: [INFO] [1786242071.917211238] [savo_bridge.savo_bridge_node]: command server enabled; execution_mode=dry_run
-8: [INFO] [1786242071.917230908] [savo_bridge.savo_bridge_node]: savo_bridge topic observation started; configured_topics=0 snapshot_enabled=false command_mode=dry_run
-8: [       OK ] BridgeNodeCommandServer.PeerUidPolicyIsEnforced (35 ms)
+8: [INFO] [1786258083.555877079] [savo_bridge.savo_bridge_node]: command server enabled; execution_mode=dry_run
+8: [INFO] [1786258083.555896458] [savo_bridge.savo_bridge_node]: savo_bridge topic observation started; configured_topics=0 snapshot_enabled=false command_mode=dry_run
+8: [       OK ] BridgeNodeCommandServer.PeerUidPolicyIsEnforced (29 ms)
 8: [ RUN      ] BridgeNodeCommandServer.ReplacedSocketPathIsPreserved
-8: [INFO] [1786242071.957301736] [savo_bridge.savo_bridge_node]: command server enabled; execution_mode=dry_run
-8: [INFO] [1786242071.957326593] [savo_bridge.savo_bridge_node]: savo_bridge topic observation started; configured_topics=0 snapshot_enabled=false command_mode=dry_run
-8: [       OK ] BridgeNodeCommandServer.ReplacedSocketPathIsPreserved (33 ms)
+8: [INFO] [1786258083.585833361] [savo_bridge.savo_bridge_node]: command server enabled; execution_mode=dry_run
+8: [INFO] [1786258083.585854142] [savo_bridge.savo_bridge_node]: savo_bridge topic observation started; configured_topics=0 snapshot_enabled=false command_mode=dry_run
+8: [       OK ] BridgeNodeCommandServer.ReplacedSocketPathIsPreserved (29 ms)
 8: [ RUN      ] BridgeNodeCommandServer.NoCommandRosInterfacesAreCreated
-8: [INFO] [1786242071.986172960] [savo_bridge.savo_bridge_node]: savo_bridge topic observation started; configured_topics=0 snapshot_enabled=false command_mode=disabled
+8: [INFO] [1786258083.614857308] [savo_bridge.savo_bridge_node]: savo_bridge topic observation started; configured_topics=0 snapshot_enabled=false command_mode=disabled
 8: [       OK ] BridgeNodeCommandServer.NoCommandRosInterfacesAreCreated (4 ms)
-8: [----------] 10 tests from BridgeNodeCommandServer (669 ms total)
-8: 
+8: [----------] 10 tests from BridgeNodeCommandServer (655 ms total)
+8:
 8: [----------] Global test environment tear-down
-8: [==========] 10 tests from 1 test suite ran. (669 ms total)
+8: [==========] 10 tests from 1 test suite ran. (655 ms total)
 8: [  PASSED  ] 10 tests.
 8: -- run_test.py: return code 0
 8: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/test_bridge_node_command_server.gtest.xml'
 8: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/test_bridge_node_command_server.gtest.xml'
- 8/25 Test  #8: test_bridge_node_command_server ..............   Passed    0.84 sec
+ 8/25 Test  #8: test_bridge_node_command_server ..............   Passed    0.83 sec
 test 9
       Start  9: test_savo_bridge_freshness
 
@@ -472,14 +474,14 @@ test 9
 9: [ RUN      ] SavoBridgeFreshness.MonotonicFreshnessContract
 9: [       OK ] SavoBridgeFreshness.MonotonicFreshnessContract (0 ms)
 9: [----------] 1 test from SavoBridgeFreshness (0 ms total)
-9: 
+9:
 9: [----------] Global test environment tear-down
 9: [==========] 1 test from 1 test suite ran. (0 ms total)
 9: [  PASSED  ] 1 test.
 9: -- run_test.py: return code 0
 9: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/test_savo_bridge_freshness.gtest.xml'
 9: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/test_savo_bridge_freshness.gtest.xml'
- 9/25 Test  #9: test_savo_bridge_freshness ...................   Passed    0.06 sec
+ 9/25 Test  #9: test_savo_bridge_freshness ...................   Passed    0.07 sec
 test 10
       Start 10: test_savo_bridge_graph_evidence
 
@@ -495,14 +497,14 @@ test 10
 10: [ RUN      ] SavoBridgeGraphEvidence.DeterministicEvidenceContract
 10: [       OK ] SavoBridgeGraphEvidence.DeterministicEvidenceContract (0 ms)
 10: [----------] 1 test from SavoBridgeGraphEvidence (0 ms total)
-10: 
+10:
 10: [----------] Global test environment tear-down
 10: [==========] 1 test from 1 test suite ran. (0 ms total)
 10: [  PASSED  ] 1 test.
 10: -- run_test.py: return code 0
 10: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/test_savo_bridge_graph_evidence.gtest.xml'
 10: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/test_savo_bridge_graph_evidence.gtest.xml'
-10/25 Test #10: test_savo_bridge_graph_evidence ..............   Passed    0.05 sec
+10/25 Test #10: test_savo_bridge_graph_evidence ..............   Passed    0.06 sec
 test 11
       Start 11: test_savo_bridge_ros_graph_discovery
 
@@ -516,11 +518,11 @@ test 11
 11: [----------] Global test environment set-up.
 11: [----------] 1 test from SavoBridgeRosGraphDiscovery
 11: [ RUN      ] SavoBridgeRosGraphDiscovery.DiscoversConfiguredDdsEvidence
-11: [       OK ] SavoBridgeRosGraphDiscovery.DiscoversConfiguredDdsEvidence (18 ms)
-11: [----------] 1 test from SavoBridgeRosGraphDiscovery (18 ms total)
-11: 
+11: [       OK ] SavoBridgeRosGraphDiscovery.DiscoversConfiguredDdsEvidence (23 ms)
+11: [----------] 1 test from SavoBridgeRosGraphDiscovery (23 ms total)
+11:
 11: [----------] Global test environment tear-down
-11: [==========] 1 test from 1 test suite ran. (18 ms total)
+11: [==========] 1 test from 1 test suite ran. (23 ms total)
 11: [  PASSED  ] 1 test.
 11: -- run_test.py: return code 0
 11: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/test_savo_bridge_ros_graph_discovery.gtest.xml'
@@ -539,17 +541,17 @@ test 12
 12: [----------] Global test environment set-up.
 12: [----------] 1 test from SavoBridgeSnapshotPublication
 12: [ RUN      ] SavoBridgeSnapshotPublication.PublishesCanonicalEmptyObservationSnapshot
-12: [INFO] [1786242072.472325619] [savo_bridge.savo_bridge_node]: savo_bridge topic observation started; configured_topics=0 snapshot_enabled=true command_mode=disabled
-12: [       OK ] SavoBridgeSnapshotPublication.PublishesCanonicalEmptyObservationSnapshot (1029 ms)
-12: [----------] 1 test from SavoBridgeSnapshotPublication (1029 ms total)
-12: 
+12: [INFO] [1786258084.121972830] [savo_bridge.savo_bridge_node]: savo_bridge topic observation started; configured_topics=0 snapshot_enabled=true command_mode=disabled
+12: [       OK ] SavoBridgeSnapshotPublication.PublishesCanonicalEmptyObservationSnapshot (1030 ms)
+12: [----------] 1 test from SavoBridgeSnapshotPublication (1030 ms total)
+12:
 12: [----------] Global test environment tear-down
-12: [==========] 1 test from 1 test suite ran. (1029 ms total)
+12: [==========] 1 test from 1 test suite ran. (1030 ms total)
 12: [  PASSED  ] 1 test.
 12: -- run_test.py: return code 0
 12: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/test_savo_bridge_snapshot_publication.gtest.xml'
 12: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/test_savo_bridge_snapshot_publication.gtest.xml'
-12/25 Test #12: test_savo_bridge_snapshot_publication ........   Passed    1.19 sec
+12/25 Test #12: test_savo_bridge_snapshot_publication ........   Passed    1.20 sec
 test 13
       Start 13: test_savo_bridge_generic_topic_observation
 
@@ -563,17 +565,17 @@ test 13
 13: [----------] Global test environment set-up.
 13: [----------] 1 test from GenericTopicObservation
 13: [ RUN      ] GenericTopicObservation.PublishesFreshThenStaleRequiredTopic
-13: [INFO] [1786242073.664316581] [savo_bridge.savo_bridge_node]: savo_bridge topic observation started; configured_topics=1 snapshot_enabled=true command_mode=disabled
-13: [       OK ] GenericTopicObservation.PublishesFreshThenStaleRequiredTopic (3039 ms)
-13: [----------] 1 test from GenericTopicObservation (3039 ms total)
-13: 
+13: [INFO] [1786258085.324891063] [savo_bridge.savo_bridge_node]: savo_bridge topic observation started; configured_topics=1 snapshot_enabled=true command_mode=disabled
+13: [       OK ] GenericTopicObservation.PublishesFreshThenStaleRequiredTopic (3040 ms)
+13: [----------] 1 test from GenericTopicObservation (3040 ms total)
+13:
 13: [----------] Global test environment tear-down
-13: [==========] 1 test from 1 test suite ran. (3039 ms total)
+13: [==========] 1 test from 1 test suite ran. (3040 ms total)
 13: [  PASSED  ] 1 test.
 13: -- run_test.py: return code 0
 13: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/test_savo_bridge_generic_topic_observation.gtest.xml'
 13: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/test_savo_bridge_generic_topic_observation.gtest.xml'
-13/25 Test #13: test_savo_bridge_generic_topic_observation ...   Passed    3.22 sec
+13/25 Test #13: test_savo_bridge_generic_topic_observation ...   Passed    3.21 sec
 test 14
       Start 14: test_savo_bridge_observation_config
 
@@ -611,7 +613,7 @@ test 14
 14: [ RUN      ] ObservationConfig.RejectsInvalidForbiddenTopic
 14: [       OK ] ObservationConfig.RejectsInvalidForbiddenTopic (0 ms)
 14: [----------] 12 tests from ObservationConfig (0 ms total)
-14: 
+14:
 14: [----------] Global test environment tear-down
 14: [==========] 12 tests from 1 test suite ran. (0 ms total)
 14: [  PASSED  ] 12 tests.
@@ -634,14 +636,14 @@ test 15
 15: [ RUN      ] SavoBridgeHealthEvaluator.DeterministicHealthContract
 15: [       OK ] SavoBridgeHealthEvaluator.DeterministicHealthContract (0 ms)
 15: [----------] 1 test from SavoBridgeHealthEvaluator (0 ms total)
-15: 
+15:
 15: [----------] Global test environment tear-down
 15: [==========] 1 test from 1 test suite ran. (0 ms total)
 15: [  PASSED  ] 1 test.
 15: -- run_test.py: return code 0
 15: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/test_savo_bridge_health_evaluator.gtest.xml'
 15: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/test_savo_bridge_health_evaluator.gtest.xml'
-15/25 Test #15: test_savo_bridge_health_evaluator ............   Passed    0.05 sec
+15/25 Test #15: test_savo_bridge_health_evaluator ............   Passed    0.06 sec
 test 16
       Start 16: test_savo_bridge_snapshot_writer
 
@@ -655,11 +657,11 @@ test 16
 16: [----------] Global test environment set-up.
 16: [----------] 1 test from SavoBridgeSnapshotWriter
 16: [ RUN      ] SavoBridgeSnapshotWriter.CanonicalAtomicPublicationContract
-16: [       OK ] SavoBridgeSnapshotWriter.CanonicalAtomicPublicationContract (11 ms)
-16: [----------] 1 test from SavoBridgeSnapshotWriter (11 ms total)
-16: 
+16: [       OK ] SavoBridgeSnapshotWriter.CanonicalAtomicPublicationContract (12 ms)
+16: [----------] 1 test from SavoBridgeSnapshotWriter (12 ms total)
+16:
 16: [----------] Global test environment tear-down
-16: [==========] 1 test from 1 test suite ran. (11 ms total)
+16: [==========] 1 test from 1 test suite ran. (12 ms total)
 16: [  PASSED  ] 1 test.
 16: -- run_test.py: return code 0
 16: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/test_savo_bridge_snapshot_writer.gtest.xml'
@@ -680,14 +682,14 @@ test 17
 17: [ RUN      ] SavoBridgeTopicObservation.DeterministicClassificationContract
 17: [       OK ] SavoBridgeTopicObservation.DeterministicClassificationContract (0 ms)
 17: [----------] 1 test from SavoBridgeTopicObservation (0 ms total)
-17: 
+17:
 17: [----------] Global test environment tear-down
 17: [==========] 1 test from 1 test suite ran. (0 ms total)
 17: [  PASSED  ] 1 test.
 17: -- run_test.py: return code 0
 17: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/test_savo_bridge_topic_observation.gtest.xml'
 17: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/test_savo_bridge_topic_observation.gtest.xml'
-17/25 Test #17: test_savo_bridge_topic_observation ...........   Passed    0.05 sec
+17/25 Test #17: test_savo_bridge_topic_observation ...........   Passed    0.06 sec
 test 18
       Start 18: test_savo_bridge_qos
 
@@ -703,20 +705,20 @@ test 18
 18: [ RUN      ] SavoBridgeQos.OwnedTopicProfiles
 18: [       OK ] SavoBridgeQos.OwnedTopicProfiles (0 ms)
 18: [----------] 1 test from SavoBridgeQos (0 ms total)
-18: 
+18:
 18: [----------] Global test environment tear-down
 18: [==========] 1 test from 1 test suite ran. (0 ms total)
 18: [  PASSED  ] 1 test.
 18: -- run_test.py: return code 0
 18: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/test_savo_bridge_qos.gtest.xml'
 18: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/test_savo_bridge_qos.gtest.xml'
-18/25 Test #18: test_savo_bridge_qos .........................   Passed    0.06 sec
+18/25 Test #18: test_savo_bridge_qos .........................   Passed    0.07 sec
 test 19
       Start 19: cppcheck
 
 19: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/cppcheck.xunit.xml" "--package-name" "savo_bridge" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/ament_cppcheck/cppcheck.txt" "--command" "/opt/ros/jazzy/bin/ament_cppcheck" "--xunit-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/cppcheck.xunit.xml" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/include" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/src" "--include_dirs" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/include"
 19: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge
-19: Environment variables: 
+19: Environment variables:
 19:  AMENT_CPPCHECK_ALLOW_SLOW_VERSIONS=1
 19: Test timeout computed to be: 300
 19: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge':
@@ -724,7 +726,7 @@ test 19
 19: No problems found
 19: -- run_test.py: return code 0
 19: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/cppcheck.xunit.xml'
-19/25 Test #19: cppcheck .....................................   Passed    0.80 sec
+19/25 Test #19: cppcheck .....................................   Passed    0.83 sec
 test 20
       Start 20: cpplint
 
@@ -734,111 +736,111 @@ test 20
 20: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge':
 20:  - /opt/ros/jazzy/bin/ament_cpplint --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/cpplint.xunit.xml
 20: Using '--root=/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/include' argument
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/include/savo_bridge/bridge_node.hpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/include/savo_bridge/command_protocol.hpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/include/savo_bridge/command_server.hpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/include/savo_bridge/freshness_tracker.hpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/include/savo_bridge/graph_evidence.hpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/include/savo_bridge/health_evaluator.hpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/include/savo_bridge/observation_config.hpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/include/savo_bridge/qos_profiles.hpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/include/savo_bridge/ros_command_dispatcher.hpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/include/savo_bridge/ros_graph_discovery.hpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/include/savo_bridge/snapshot_writer.hpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/include/savo_bridge/stop_command_adapter.hpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/include/savo_bridge/topic_observation.hpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/include/savo_bridge/version.hpp
-20: 
+20:
 20: Using '--root=/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/src' argument
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/src/bridge_node.cpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/src/command_protocol.cpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/src/command_server.cpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/src/freshness_tracker.cpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/src/graph_evidence.cpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/src/health_evaluator.cpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/src/main.cpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/src/observation_config.cpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/src/qos_profiles.cpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/src/ros_command_dispatcher.cpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/src/ros_graph_discovery.cpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/src/snapshot_writer.cpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/src/stop_command_adapter.cpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/src/topic_observation.cpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/src/version.cpp
-20: 
+20:
 20: Using '--root=/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/test' argument
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/test/fixture/command_server_fixture.cpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/test/fixture/stop_command_adapter_fixture.cpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/test/integration/test_bridge_node_command_server.cpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/test/integration/test_ros_command_dispatcher.cpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/test/support/recording_stop_adapter.hpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/test/unit/test_bridge_snapshot_publication.cpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/test/unit/test_command_protocol.cpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/test/unit/test_command_server.cpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/test/unit/test_freshness_tracker.cpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/test/unit/test_generic_topic_observation.cpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/test/unit/test_graph_evidence.cpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/test/unit/test_health_evaluator.cpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/test/unit/test_observation_config.cpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/test/unit/test_qos_profiles.cpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/test/unit/test_ros_graph_discovery.cpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/test/unit/test_snapshot_writer.cpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/test/unit/test_stop_command_adapter.cpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/test/unit/test_topic_observation.cpp
-20: 
+20:
 20: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge/test/unit/test_version.cpp
-20: 
+20:
 20: No problems found
 20: -- run_test.py: return code 0
 20: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/cpplint.xunit.xml'
-20/25 Test #20: cpplint ......................................   Passed    1.87 sec
+20/25 Test #20: cpplint ......................................   Passed    1.86 sec
 test 21
       Start 21: flake8
 
@@ -847,18 +849,18 @@ test 21
 21: Test timeout computed to be: 60
 21: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge':
 21:  - /opt/ros/jazzy/bin/ament_flake8 --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/flake8.xunit.xml
-21: 
+21:
 21: 3 files checked
 21: No problems found
-21: 
+21:
 21: Checked files:
-21: 
+21:
 21: * ./test/contracts/test_production_assets.py
 21: * ./test/contracts/test_command_boundary_contract.py
 21: * ./launch/edge_bridge.launch.py
 21: -- run_test.py: return code 0
 21: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/flake8.xunit.xml'
-21/25 Test #21: flake8 .......................................   Passed    0.24 sec
+21/25 Test #21: flake8 .......................................   Passed    0.28 sec
 test 22
       Start 22: lint_cmake
 
@@ -867,11 +869,11 @@ test 22
 22: Test timeout computed to be: 60
 22: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge':
 22:  - /opt/ros/jazzy/bin/ament_lint_cmake --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/lint_cmake.xunit.xml
-22: 
+22:
 22: No problems found
 22: -- run_test.py: return code 0
 22: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/lint_cmake.xunit.xml'
-22/25 Test #22: lint_cmake ...................................   Passed    0.12 sec
+22/25 Test #22: lint_cmake ...................................   Passed    0.14 sec
 test 23
       Start 23: pep257
 
@@ -886,7 +888,7 @@ test 23
 23: No problems found
 23: -- run_test.py: return code 0
 23: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/pep257.xunit.xml'
-23/25 Test #23: pep257 .......................................   Passed    0.15 sec
+23/25 Test #23: pep257 .......................................   Passed    0.17 sec
 test 24
       Start 24: uncrustify
 
@@ -896,105 +898,105 @@ test 24
 24: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge':
 24:  - /opt/ros/jazzy/bin/ament_uncrustify --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/uncrustify.xunit.xml
 24: No code style divergence in file 'include/savo_bridge/bridge_node.hpp'
-24: 
+24:
 24: No code style divergence in file 'include/savo_bridge/command_protocol.hpp'
-24: 
+24:
 24: No code style divergence in file 'include/savo_bridge/command_server.hpp'
-24: 
+24:
 24: No code style divergence in file 'include/savo_bridge/freshness_tracker.hpp'
-24: 
+24:
 24: No code style divergence in file 'include/savo_bridge/graph_evidence.hpp'
-24: 
+24:
 24: No code style divergence in file 'include/savo_bridge/health_evaluator.hpp'
-24: 
+24:
 24: No code style divergence in file 'include/savo_bridge/observation_config.hpp'
-24: 
+24:
 24: No code style divergence in file 'include/savo_bridge/qos_profiles.hpp'
-24: 
+24:
 24: No code style divergence in file 'include/savo_bridge/ros_command_dispatcher.hpp'
-24: 
+24:
 24: No code style divergence in file 'include/savo_bridge/ros_graph_discovery.hpp'
-24: 
+24:
 24: No code style divergence in file 'include/savo_bridge/snapshot_writer.hpp'
-24: 
+24:
 24: No code style divergence in file 'include/savo_bridge/stop_command_adapter.hpp'
-24: 
+24:
 24: No code style divergence in file 'include/savo_bridge/topic_observation.hpp'
-24: 
+24:
 24: No code style divergence in file 'include/savo_bridge/version.hpp'
-24: 
+24:
 24: No code style divergence in file 'src/bridge_node.cpp'
-24: 
+24:
 24: No code style divergence in file 'src/command_protocol.cpp'
-24: 
+24:
 24: No code style divergence in file 'src/command_server.cpp'
-24: 
+24:
 24: No code style divergence in file 'src/freshness_tracker.cpp'
-24: 
+24:
 24: No code style divergence in file 'src/graph_evidence.cpp'
-24: 
+24:
 24: No code style divergence in file 'src/health_evaluator.cpp'
-24: 
+24:
 24: No code style divergence in file 'src/main.cpp'
-24: 
+24:
 24: No code style divergence in file 'src/observation_config.cpp'
-24: 
+24:
 24: No code style divergence in file 'src/qos_profiles.cpp'
-24: 
+24:
 24: No code style divergence in file 'src/ros_command_dispatcher.cpp'
-24: 
+24:
 24: No code style divergence in file 'src/ros_graph_discovery.cpp'
-24: 
+24:
 24: No code style divergence in file 'src/snapshot_writer.cpp'
-24: 
+24:
 24: No code style divergence in file 'src/stop_command_adapter.cpp'
-24: 
+24:
 24: No code style divergence in file 'src/topic_observation.cpp'
-24: 
+24:
 24: No code style divergence in file 'src/version.cpp'
-24: 
+24:
 24: No code style divergence in file 'test/fixture/command_server_fixture.cpp'
-24: 
+24:
 24: No code style divergence in file 'test/fixture/stop_command_adapter_fixture.cpp'
-24: 
+24:
 24: No code style divergence in file 'test/integration/test_bridge_node_command_server.cpp'
-24: 
+24:
 24: No code style divergence in file 'test/integration/test_ros_command_dispatcher.cpp'
-24: 
+24:
 24: No code style divergence in file 'test/support/recording_stop_adapter.hpp'
-24: 
+24:
 24: No code style divergence in file 'test/unit/test_bridge_snapshot_publication.cpp'
-24: 
+24:
 24: No code style divergence in file 'test/unit/test_command_protocol.cpp'
-24: 
+24:
 24: No code style divergence in file 'test/unit/test_command_server.cpp'
-24: 
+24:
 24: No code style divergence in file 'test/unit/test_freshness_tracker.cpp'
-24: 
+24:
 24: No code style divergence in file 'test/unit/test_generic_topic_observation.cpp'
-24: 
+24:
 24: No code style divergence in file 'test/unit/test_graph_evidence.cpp'
-24: 
+24:
 24: No code style divergence in file 'test/unit/test_health_evaluator.cpp'
-24: 
+24:
 24: No code style divergence in file 'test/unit/test_observation_config.cpp'
-24: 
+24:
 24: No code style divergence in file 'test/unit/test_qos_profiles.cpp'
-24: 
+24:
 24: No code style divergence in file 'test/unit/test_ros_graph_discovery.cpp'
-24: 
+24:
 24: No code style divergence in file 'test/unit/test_snapshot_writer.cpp'
-24: 
+24:
 24: No code style divergence in file 'test/unit/test_stop_command_adapter.cpp'
-24: 
+24:
 24: No code style divergence in file 'test/unit/test_topic_observation.cpp'
-24: 
+24:
 24: No code style divergence in file 'test/unit/test_version.cpp'
-24: 
+24:
 24: No problems found
 24: -- run_test.py: return code 0
 24: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/uncrustify.xunit.xml'
-24/25 Test #24: uncrustify ...................................   Passed    0.49 sec
+24/25 Test #24: uncrustify ...................................   Passed    0.52 sec
 test 25
       Start 25: xmllint
 
@@ -1004,38 +1006,33 @@ test 25
 25: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_bridge':
 25:  - /opt/ros/jazzy/bin/ament_xmllint --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/xmllint.xunit.xml
 25: File 'package.xml' is valid
-25: 
+25:
 25: No problems found
 25: -- run_test.py: return code 0
 25: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_bridge/test_results/savo_bridge/xmllint.xunit.xml'
-25/25 Test #25: xmllint ......................................   Passed    0.37 sec
+25/25 Test #25: xmllint ......................................   Passed    0.52 sec
 
 100% tests passed, 0 tests failed out of 25
 
 Label Time Summary:
-cppcheck      =   0.80 sec*proc (1 test)
-cpplint       =   1.87 sec*proc (1 test)
-flake8        =   0.24 sec*proc (1 test)
+cppcheck      =   0.83 sec*proc (1 test)
+cpplint       =   1.86 sec*proc (1 test)
+flake8        =   0.28 sec*proc (1 test)
 gtest         =  10.10 sec*proc (16 tests)
-lint_cmake    =   0.12 sec*proc (1 test)
-linter        =   4.03 sec*proc (7 tests)
-pep257        =   0.15 sec*proc (1 test)
-pytest        =   0.68 sec*proc (2 tests)
-uncrustify    =   0.49 sec*proc (1 test)
-xmllint       =   0.37 sec*proc (1 test)
+lint_cmake    =   0.14 sec*proc (1 test)
+linter        =   4.32 sec*proc (7 tests)
+pep257        =   0.17 sec*proc (1 test)
+pytest        =   0.71 sec*proc (2 tests)
+uncrustify    =   0.52 sec*proc (1 test)
+xmllint       =   0.52 sec*proc (1 test)
 
-Total Test time (real) =  14.82 sec
-Finished <<< savo_bridge [14.8s]
+Total Test time (real) =  15.13 sec
+Finished <<< savo_bridge [15.2s]
 
-Summary: 1 package finished [15.0s]
-
-============================================================
- COLCON TEST RESULT
-============================================================
+Summary: 1 package finished [15.3s]
 Summary: 302 tests, 0 errors, 0 failures, 0 skipped
-
 ------------------------------------------------------------
 PACKAGE_RESULT: PASS
-COLCON_TEST_EXIT: 0
-TEST_RESULT_EXIT: 0
+COLCON_TEST_EXIT_STATUS: 0
+TEST_RESULT_EXIT_STATUS: 0
 ------------------------------------------------------------

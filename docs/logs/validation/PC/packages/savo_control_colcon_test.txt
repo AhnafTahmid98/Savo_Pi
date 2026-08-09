@@ -1,17 +1,19 @@
-Robot Savo package PC validation
-Run ID: 20260809T021142Z
-Package: savo_control
-Date: 2026-08-09T05:21:21+03:00
+Robot Savo PC validation
+Run ID: 20260809T063128Z
+Step: package test savo_control
+Date: 2026-08-09T09:31:28+03:00
 Host: ahnaf-tahmid-B760M-PG-SONIC-WiFi
-Commit: eb71c26ac7dfbeaf9c2e44df3ba9f79117c7d4b6
-
+Commit: fa8053a58514451d97fb2eb151b8a2842db57104
+Executor: sequential
+Cppcheck policy: repository default; ament skips known-problematic cppcheck 2.13
+Output:
 Starting >>> savo_control
 UpdateCTestConfiguration  from :/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/CTestConfiguration.ini
 Parse Config file:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/CTestConfiguration.ini
    Site: ahnaf-tahmid-B760M-PG-SONIC-WiFi
    Build name: (empty)
  Add coverage exclude regular expressions.
-Create new tag: 20260809-0221 - Experimental
+Create new tag: 20260809-0648 - Experimental
 UpdateCTestConfiguration  from :/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/CTestConfiguration.ini
 Parse Config file:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/CTestConfiguration.ini
 Test project /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control
@@ -37,15 +39,15 @@ test 1
 1: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 1: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 1: collected 38 items
-1: 
+1:
 1: ../../src/core/savo_control/test/test_angle_wrap.py .................... [ 52%]
 1: ..................                                                       [100%]
-1: 
+1:
 1: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_angle_wrap.xunit.xml -
 1: ============================== 38 passed in 0.03s ==============================
 1: -- run_test.py: return code 0
 1: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_angle_wrap.xunit.xml'
- 1/53 Test  #1: test_angle_wrap .................................   Passed    0.34 sec
+ 1/53 Test  #1: test_angle_wrap .................................   Passed    0.39 sec
 test 2
       Start  2: test_command_limiter
 
@@ -62,12 +64,12 @@ test 2
 2: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 2: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 2: collected 48 items
-2: 
+2:
 2: ../../src/core/savo_control/test/test_command_limiter.py ............... [ 31%]
 2: .................................                                        [100%]
-2: 
+2:
 2: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_command_limiter.xunit.xml -
-2: ============================== 48 passed in 0.03s ==============================
+2: ============================== 48 passed in 0.04s ==============================
 2: -- run_test.py: return code 0
 2: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_command_limiter.xunit.xml'
  2/53 Test  #2: test_command_limiter ............................   Passed    0.38 sec
@@ -87,14 +89,14 @@ test 3
 3: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 3: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 3: collected 16 items
-3: 
+3:
 3: ../../src/core/savo_control/test/test_pid_math.py ................       [100%]
-3: 
+3:
 3: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_pid_math.xunit.xml -
 3: ============================== 16 passed in 0.03s ==============================
 3: -- run_test.py: return code 0
 3: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_pid_math.xunit.xml'
- 3/53 Test  #3: test_pid_math ...................................   Passed    0.36 sec
+ 3/53 Test  #3: test_pid_math ...................................   Passed    0.37 sec
 test 4
       Start  4: test_package_identity
 
@@ -111,14 +113,14 @@ test 4
 4: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 4: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 4: collected 4 items
-4: 
+4:
 4: ../../src/core/savo_control/test/test_package_identity.py ....           [100%]
-4: 
+4:
 4: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_package_identity.xunit.xml -
 4: ============================== 4 passed in 0.01s ===============================
 4: -- run_test.py: return code 0
 4: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_package_identity.xunit.xml'
- 4/53 Test  #4: test_package_identity ...........................   Passed    0.34 sec
+ 4/53 Test  #4: test_package_identity ...........................   Passed    0.36 sec
 test 5
       Start  5: test_package_metadata
 
@@ -135,14 +137,14 @@ test 5
 5: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 5: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 5: collected 11 items
-5: 
+5:
 5: ../../src/core/savo_control/test/test_package_metadata.py ...........    [100%]
-5: 
+5:
 5: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_package_metadata.xunit.xml -
 5: ============================== 11 passed in 0.02s ==============================
 5: -- run_test.py: return code 0
 5: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_package_metadata.xunit.xml'
- 5/53 Test  #5: test_package_metadata ...........................   Passed    0.33 sec
+ 5/53 Test  #5: test_package_metadata ...........................   Passed    0.37 sec
 test 6
       Start  6: test_control_modes_interface
 
@@ -159,15 +161,15 @@ test 6
 6: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 6: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 6: collected 15 items
-6: 
+6:
 6: ../../src/core/savo_control/test/test_control_modes_interface.py ....... [ 46%]
 6: ........                                                                 [100%]
-6: 
+6:
 6: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_control_modes_interface.xunit.xml -
-6: ============================== 15 passed in 0.02s ==============================
+6: ============================== 15 passed in 0.03s ==============================
 6: -- run_test.py: return code 0
 6: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_control_modes_interface.xunit.xml'
- 6/53 Test  #6: test_control_modes_interface ....................   Passed    0.36 sec
+ 6/53 Test  #6: test_control_modes_interface ....................   Passed    0.38 sec
 test 7
       Start  7: test_distance_pid_controller
 
@@ -184,15 +186,15 @@ test 7
 7: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 7: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 7: collected 25 items
-7: 
+7:
 7: ../../src/core/savo_control/test/test_distance_pid_controller.py ....... [ 28%]
 7: ..................                                                       [100%]
-7: 
+7:
 7: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_distance_pid_controller.xunit.xml -
-7: ============================== 25 passed in 0.03s ==============================
+7: ============================== 25 passed in 0.04s ==============================
 7: -- run_test.py: return code 0
 7: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_distance_pid_controller.xunit.xml'
- 7/53 Test  #7: test_distance_pid_controller ....................   Passed    0.35 sec
+ 7/53 Test  #7: test_distance_pid_controller ....................   Passed    0.43 sec
 test 8
       Start  8: test_heading_pid_controller
 
@@ -209,15 +211,15 @@ test 8
 8: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 8: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 8: collected 25 items
-8: 
+8:
 8: ../../src/core/savo_control/test/test_heading_pid_controller.py ........ [ 32%]
 8: .................                                                        [100%]
-8: 
+8:
 8: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_heading_pid_controller.xunit.xml -
-8: ============================== 25 passed in 0.03s ==============================
+8: ============================== 25 passed in 0.04s ==============================
 8: -- run_test.py: return code 0
 8: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_heading_pid_controller.xunit.xml'
- 8/53 Test  #8: test_heading_pid_controller .....................   Passed    0.35 sec
+ 8/53 Test  #8: test_heading_pid_controller .....................   Passed    0.40 sec
 test 9
       Start  9: test_rotate_to_heading_contract
 
@@ -234,10 +236,10 @@ test 9
 9: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 9: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 9: collected 8 items
-9: 
+9:
 9: ../../src/core/savo_control/test/test_rotate_to_heading_contract.py .... [ 50%]
 9: ....                                                                     [100%]
-9: 
+9:
 9: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_rotate_to_heading_contract.xunit.xml -
 9: ============================== 8 passed in 0.02s ===============================
 9: -- run_test.py: return code 0
@@ -259,15 +261,15 @@ test 10
 10: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 10: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 10: collected 6 items
-10: 
+10:
 10: ../../src/core/savo_control/test/test_rotate_to_heading_action_plumbing.py . [ 16%]
 10: .....                                                                    [100%]
-10: 
+10:
 10: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_rotate_to_heading_action_plumbing.xunit.xml -
 10: ============================== 6 passed in 0.01s ===============================
 10: -- run_test.py: return code 0
 10: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_rotate_to_heading_action_plumbing.xunit.xml'
-10/53 Test #10: test_rotate_to_heading_action_plumbing ..........   Passed    0.37 sec
+10/53 Test #10: test_rotate_to_heading_action_plumbing ..........   Passed    0.39 sec
 test 11
       Start 11: test_rotate_to_heading_action_server_contract
 
@@ -284,12 +286,12 @@ test 11
 11: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 11: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 11: collected 13 items
-11: 
+11:
 11: ../../src/core/savo_control/test/test_rotate_to_heading_action_server_contract.py . [  7%]
 11: ............                                                             [100%]
-11: 
+11:
 11: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_rotate_to_heading_action_server_contract.xunit.xml -
-11: ============================== 13 passed in 0.02s ==============================
+11: ============================== 13 passed in 0.01s ==============================
 11: -- run_test.py: return code 0
 11: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_rotate_to_heading_action_server_contract.xunit.xml'
 11/53 Test #11: test_rotate_to_heading_action_server_contract ...   Passed    0.37 sec
@@ -309,15 +311,15 @@ test 12
 12: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 12: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 12: collected 5 items
-12: 
+12:
 12: ../../src/core/savo_control/test/test_rotate_to_heading_action_runtime.py . [ 20%]
 12: ....                                                                     [100%]
-12: 
+12:
 12: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_rotate_to_heading_action_runtime.xunit.xml -
-12: ============================== 5 passed in 2.02s ===============================
+12: ============================== 5 passed in 1.90s ===============================
 12: -- run_test.py: return code 0
 12: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_rotate_to_heading_action_runtime.xunit.xml'
-12/53 Test #12: test_rotate_to_heading_action_runtime ...........   Passed    2.48 sec
+12/53 Test #12: test_rotate_to_heading_action_runtime ...........   Passed    2.38 sec
 test 13
       Start 13: test_pid_controller
 
@@ -334,15 +336,15 @@ test 13
 13: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 13: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 13: collected 28 items
-13: 
+13:
 13: ../../src/core/savo_control/test/test_pid_controller.py ................ [ 57%]
 13: ............                                                             [100%]
-13: 
+13:
 13: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_pid_controller.xunit.xml -
 13: ============================== 28 passed in 0.04s ==============================
 13: -- run_test.py: return code 0
 13: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_pid_controller.xunit.xml'
-13/53 Test #13: test_pid_controller .............................   Passed    0.36 sec
+13/53 Test #13: test_pid_controller .............................   Passed    0.38 sec
 test 14
       Start 14: test_control_status_node_helpers
 
@@ -359,15 +361,15 @@ test 14
 14: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 14: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 14: collected 18 items
-14: 
+14:
 14: ../../src/core/savo_control/test/test_control_status_node_helpers.py ... [ 16%]
 14: ...............                                                          [100%]
-14: 
+14:
 14: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_control_status_node_helpers.xunit.xml -
 14: ============================== 18 passed in 0.03s ==============================
 14: -- run_test.py: return code 0
 14: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_control_status_node_helpers.xunit.xml'
-14/53 Test #14: test_control_status_node_helpers ................   Passed    0.35 sec
+14/53 Test #14: test_control_status_node_helpers ................   Passed    0.40 sec
 test 15
       Start 15: test_recovery_status_node_compile
 
@@ -384,15 +386,15 @@ test 15
 15: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 15: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 15: collected 3 items
-15: 
+15:
 15: ../../src/core/savo_control/test/test_recovery_status_node_compile.py .. [ 66%]
 15: .                                                                        [100%]
-15: 
+15:
 15: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_recovery_status_node_compile.xunit.xml -
-15: ============================== 3 passed in 0.02s ===============================
+15: ============================== 3 passed in 0.03s ===============================
 15: -- run_test.py: return code 0
 15: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_recovery_status_node_compile.xunit.xml'
-15/53 Test #15: test_recovery_status_node_compile ...............   Passed    0.34 sec
+15/53 Test #15: test_recovery_status_node_compile ...............   Passed    0.38 sec
 test 16
       Start 16: test_control_dashboard_node_compile
 
@@ -409,15 +411,15 @@ test 16
 16: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 16: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 16: collected 3 items
-16: 
+16:
 16: ../../src/core/savo_control/test/test_control_dashboard_node_compile.py . [ 33%]
 16: ..                                                                       [100%]
-16: 
+16:
 16: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_control_dashboard_node_compile.xunit.xml -
 16: ============================== 3 passed in 0.03s ===============================
 16: -- run_test.py: return code 0
 16: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_control_dashboard_node_compile.xunit.xml'
-16/53 Test #16: test_control_dashboard_node_compile .............   Passed    0.38 sec
+16/53 Test #16: test_control_dashboard_node_compile .............   Passed    0.41 sec
 test 17
       Start 17: test_distance_pid_test_node_compile
 
@@ -434,15 +436,15 @@ test 17
 17: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 17: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 17: collected 2 items
-17: 
+17:
 17: ../../src/core/savo_control/test/test_distance_pid_test_node_compile.py . [ 50%]
 17: .                                                                        [100%]
-17: 
+17:
 17: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_distance_pid_test_node_compile.xunit.xml -
 17: ============================== 2 passed in 0.02s ===============================
 17: -- run_test.py: return code 0
 17: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_distance_pid_test_node_compile.xunit.xml'
-17/53 Test #17: test_distance_pid_test_node_compile .............   Passed    0.34 sec
+17/53 Test #17: test_distance_pid_test_node_compile .............   Passed    0.39 sec
 test 18
       Start 18: test_keyboard_teleop_helpers
 
@@ -459,10 +461,10 @@ test 18
 18: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 18: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 18: collected 31 items
-18: 
+18:
 18: ../../src/core/savo_control/test/test_keyboard_teleop_helpers.py ....... [ 22%]
 18: ........................                                                 [100%]
-18: 
+18:
 18: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_keyboard_teleop_helpers.xunit.xml -
 18: ============================== 31 passed in 0.03s ==============================
 18: -- run_test.py: return code 0
@@ -484,15 +486,15 @@ test 19
 19: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 19: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 19: collected 3 items
-19: 
+19:
 19: ../../src/core/savo_control/test/test_keyboard_teleop_node_compile.py .. [ 66%]
 19: .                                                                        [100%]
-19: 
+19:
 19: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_keyboard_teleop_node_compile.xunit.xml -
-19: ============================== 3 passed in 0.03s ===============================
+19: ============================== 3 passed in 0.04s ===============================
 19: -- run_test.py: return code 0
 19: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_keyboard_teleop_node_compile.xunit.xml'
-19/53 Test #19: test_keyboard_teleop_node_compile ...............   Passed    0.35 sec
+19/53 Test #19: test_keyboard_teleop_node_compile ...............   Passed    0.41 sec
 test 20
       Start 20: test_auto_test_helpers
 
@@ -509,15 +511,15 @@ test 20
 20: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 20: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 20: collected 30 items
-20: 
+20:
 20: ../../src/core/savo_control/test/test_auto_test_helpers.py ............. [ 43%]
 20: .................                                                        [100%]
-20: 
+20:
 20: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_auto_test_helpers.xunit.xml -
 20: ============================== 30 passed in 0.04s ==============================
 20: -- run_test.py: return code 0
 20: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_auto_test_helpers.xunit.xml'
-20/53 Test #20: test_auto_test_helpers ..........................   Passed    0.36 sec
+20/53 Test #20: test_auto_test_helpers ..........................   Passed    0.38 sec
 test 21
       Start 21: test_auto_test_manager_node_compile
 
@@ -534,15 +536,15 @@ test 21
 21: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 21: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 21: collected 3 items
-21: 
+21:
 21: ../../src/core/savo_control/test/test_auto_test_manager_node_compile.py . [ 33%]
 21: ..                                                                       [100%]
-21: 
+21:
 21: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_auto_test_manager_node_compile.xunit.xml -
 21: ============================== 3 passed in 0.04s ===============================
 21: -- run_test.py: return code 0
 21: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_auto_test_manager_node_compile.xunit.xml'
-21/53 Test #21: test_auto_test_manager_node_compile .............   Passed    0.36 sec
+21/53 Test #21: test_auto_test_manager_node_compile .............   Passed    0.47 sec
 test 22
       Start 22: test_recovery_test_helpers
 
@@ -559,15 +561,15 @@ test 22
 22: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 22: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 22: collected 30 items
-22: 
+22:
 22: ../../src/core/savo_control/test/test_recovery_test_helpers.py ......... [ 30%]
 22: .....................                                                    [100%]
-22: 
+22:
 22: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_recovery_test_helpers.xunit.xml -
 22: ============================== 30 passed in 0.04s ==============================
 22: -- run_test.py: return code 0
 22: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_recovery_test_helpers.xunit.xml'
-22/53 Test #22: test_recovery_test_helpers ......................   Passed    0.36 sec
+22/53 Test #22: test_recovery_test_helpers ......................   Passed    0.39 sec
 test 23
       Start 23: test_recovery_test_manager_node_compile
 
@@ -584,15 +586,15 @@ test 23
 23: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 23: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 23: collected 3 items
-23: 
+23:
 23: ../../src/core/savo_control/test/test_recovery_test_manager_node_compile.py . [ 33%]
 23: ..                                                                       [100%]
-23: 
+23:
 23: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_recovery_test_manager_node_compile.xunit.xml -
-23: ============================== 3 passed in 0.04s ===============================
+23: ============================== 3 passed in 0.05s ===============================
 23: -- run_test.py: return code 0
 23: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_recovery_test_manager_node_compile.xunit.xml'
-23/53 Test #23: test_recovery_test_manager_node_compile .........   Passed    0.37 sec
+23/53 Test #23: test_recovery_test_manager_node_compile .........   Passed    0.40 sec
 test 24
       Start 24: test_straight_line_test_helpers
 
@@ -609,15 +611,15 @@ test 24
 24: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 24: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 24: collected 24 items
-24: 
+24:
 24: ../../src/core/savo_control/test/test_straight_line_test_helpers.py .... [ 16%]
 24: ....................                                                     [100%]
-24: 
+24:
 24: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_straight_line_test_helpers.xunit.xml -
 24: ============================== 24 passed in 0.04s ==============================
 24: -- run_test.py: return code 0
 24: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_straight_line_test_helpers.xunit.xml'
-24/53 Test #24: test_straight_line_test_helpers .................   Passed    0.36 sec
+24/53 Test #24: test_straight_line_test_helpers .................   Passed    0.40 sec
 test 25
       Start 25: test_straight_line_pid_test_node
 
@@ -634,14 +636,14 @@ test 25
 25: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 25: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 25: collected 3 items
-25: 
+25:
 25: ../../src/core/savo_control/test/test_straight_line_pid_test_node.py ... [100%]
-25: 
+25:
 25: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_straight_line_pid_test_node.xunit.xml -
 25: ============================== 3 passed in 0.05s ===============================
 25: -- run_test.py: return code 0
 25: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_straight_line_pid_test_node.xunit.xml'
-25/53 Test #25: test_straight_line_pid_test_node ................   Passed    0.39 sec
+25/53 Test #25: test_straight_line_pid_test_node ................   Passed    0.42 sec
 test 26
       Start 26: test_launch_files
 
@@ -658,14 +660,14 @@ test 26
 26: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 26: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 26: collected 9 items
-26: 
+26:
 26: ../../src/core/savo_control/test/test_launch_files.py .........          [100%]
-26: 
+26:
 26: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_launch_files.xunit.xml -
 26: ============================== 9 passed in 0.02s ===============================
 26: -- run_test.py: return code 0
 26: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_launch_files.xunit.xml'
-26/53 Test #26: test_launch_files ...............................   Passed    0.35 sec
+26/53 Test #26: test_launch_files ...............................   Passed    0.37 sec
 test 27
       Start 27: test_config_files
 
@@ -682,14 +684,14 @@ test 27
 27: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 27: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 27: collected 13 items
-27: 
+27:
 27: ../../src/core/savo_control/test/test_config_files.py .............      [100%]
-27: 
+27:
 27: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_config_files.xunit.xml -
 27: ============================== 13 passed in 0.08s ==============================
 27: -- run_test.py: return code 0
 27: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_config_files.xunit.xml'
-27/53 Test #27: test_config_files ...............................   Passed    0.41 sec
+27/53 Test #27: test_config_files ...............................   Passed    0.42 sec
 test 28
       Start 28: test_control_mode_model
 
@@ -706,14 +708,14 @@ test 28
 28: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 28: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 28: collected 12 items
-28: 
+28:
 28: ../../src/core/savo_control/test/test_control_mode_model.py ............ [100%]
-28: 
+28:
 28: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_control_mode_model.xunit.xml -
-28: ============================== 12 passed in 0.02s ==============================
+28: ============================== 12 passed in 0.03s ==============================
 28: -- run_test.py: return code 0
 28: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_control_mode_model.xunit.xml'
-28/53 Test #28: test_control_mode_model .........................   Passed    0.36 sec
+28/53 Test #28: test_control_mode_model .........................   Passed    0.39 sec
 test 29
       Start 29: test_topic_names
 
@@ -730,14 +732,14 @@ test 29
 29: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 29: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 29: collected 9 items
-29: 
+29:
 29: ../../src/core/savo_control/test/test_topic_names.py .........           [100%]
-29: 
+29:
 29: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_topic_names.xunit.xml -
 29: ============================== 9 passed in 0.02s ===============================
 29: -- run_test.py: return code 0
 29: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_topic_names.xunit.xml'
-29/53 Test #29: test_topic_names ................................   Passed    0.33 sec
+29/53 Test #29: test_topic_names ................................   Passed    0.36 sec
 test 30
       Start 30: test_diagnostics_helpers
 
@@ -754,15 +756,15 @@ test 30
 30: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 30: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 30: collected 12 items
-30: 
+30:
 30: ../../src/core/savo_control/test/test_diagnostics_helpers.py ........... [ 91%]
 30: .                                                                        [100%]
-30: 
+30:
 30: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_diagnostics_helpers.xunit.xml -
 30: ============================== 12 passed in 0.02s ==============================
 30: -- run_test.py: return code 0
 30: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_diagnostics_helpers.xunit.xml'
-30/53 Test #30: test_diagnostics_helpers ........................   Passed    0.34 sec
+30/53 Test #30: test_diagnostics_helpers ........................   Passed    0.37 sec
 test 31
       Start 31: test_time_utils
 
@@ -779,14 +781,14 @@ test 31
 31: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 31: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 31: collected 10 items
-31: 
+31:
 31: ../../src/core/savo_control/test/test_time_utils.py ..........           [100%]
-31: 
+31:
 31: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_time_utils.xunit.xml -
-31: ============================== 10 passed in 0.01s ==============================
+31: ============================== 10 passed in 0.02s ==============================
 31: -- run_test.py: return code 0
 31: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_time_utils.xunit.xml'
-31/53 Test #31: test_time_utils .................................   Passed    0.34 sec
+31/53 Test #31: test_time_utils .................................   Passed    0.37 sec
 test 32
       Start 32: test_scripts
 
@@ -803,14 +805,14 @@ test 32
 32: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 32: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 32: collected 16 items
-32: 
+32:
 32: ../../src/core/savo_control/test/test_scripts.py ................        [100%]
-32: 
+32:
 32: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_scripts.xunit.xml -
-32: ============================== 16 passed in 0.80s ==============================
+32: ============================== 16 passed in 0.85s ==============================
 32: -- run_test.py: return code 0
 32: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_scripts.xunit.xml'
-32/53 Test #32: test_scripts ....................................   Passed    1.13 sec
+32/53 Test #32: test_scripts ....................................   Passed    1.20 sec
 test 33
       Start 33: test_twist_adapter
 
@@ -827,14 +829,14 @@ test 33
 33: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 33: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 33: collected 10 items
-33: 
+33:
 33: ../../src/core/savo_control/test/test_twist_adapter.py ..........        [100%]
-33: 
+33:
 33: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_twist_adapter.xunit.xml -
 33: ============================== 10 passed in 0.03s ==============================
 33: -- run_test.py: return code 0
 33: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_twist_adapter.xunit.xml'
-33/53 Test #33: test_twist_adapter ..............................   Passed    0.36 sec
+33/53 Test #33: test_twist_adapter ..............................   Passed    0.40 sec
 test 34
       Start 34: test_twist_command_model
 
@@ -851,10 +853,10 @@ test 34
 34: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 34: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 34: collected 13 items
-34: 
+34:
 34: ../../src/core/savo_control/test/test_twist_command_model.py ........... [ 84%]
 34: ..                                                                       [100%]
-34: 
+34:
 34: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_twist_command_model.xunit.xml -
 34: ============================== 13 passed in 0.02s ==============================
 34: -- run_test.py: return code 0
@@ -876,15 +878,15 @@ test 35
 35: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 35: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 35: collected 19 items
-35: 
+35:
 35: ../../src/core/savo_control/test/test_command_source_model.py .......... [ 52%]
 35: .........                                                                [100%]
-35: 
+35:
 35: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_command_source_model.xunit.xml -
 35: ============================== 19 passed in 0.03s ==============================
 35: -- run_test.py: return code 0
 35: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_command_source_model.xunit.xml'
-35/53 Test #35: test_command_source_model .......................   Passed    0.34 sec
+35/53 Test #35: test_command_source_model .......................   Passed    0.37 sec
 test 36
       Start 36: test_distance_approach_model
 
@@ -901,15 +903,15 @@ test 36
 36: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 36: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 36: collected 19 items
-36: 
+36:
 36: ../../src/core/savo_control/test/test_distance_approach_model.py ....... [ 36%]
 36: ............                                                             [100%]
-36: 
+36:
 36: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_distance_approach_model.xunit.xml -
 36: ============================== 19 passed in 0.03s ==============================
 36: -- run_test.py: return code 0
 36: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_distance_approach_model.xunit.xml'
-36/53 Test #36: test_distance_approach_model ....................   Passed    0.35 sec
+36/53 Test #36: test_distance_approach_model ....................   Passed    0.39 sec
 test 37
       Start 37: test_param_utils
 
@@ -926,14 +928,14 @@ test 37
 37: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 37: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 37: collected 18 items
-37: 
+37:
 37: ../../src/core/savo_control/test/test_param_utils.py ..................  [100%]
-37: 
+37:
 37: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_param_utils.xunit.xml -
 37: ============================== 18 passed in 0.02s ==============================
 37: -- run_test.py: return code 0
 37: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_param_utils.xunit.xml'
-37/53 Test #37: test_param_utils ................................   Passed    0.36 sec
+37/53 Test #37: test_param_utils ................................   Passed    0.37 sec
 test 38
       Start 38: test_math_utils
 
@@ -950,14 +952,14 @@ test 38
 38: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 38: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 38: collected 17 items
-38: 
+38:
 38: ../../src/core/savo_control/test/test_math_utils.py .................    [100%]
-38: 
+38:
 38: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_math_utils.xunit.xml -
 38: ============================== 17 passed in 0.02s ==============================
 38: -- run_test.py: return code 0
 38: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_math_utils.xunit.xml'
-38/53 Test #38: test_math_utils .................................   Passed    0.34 sec
+38/53 Test #38: test_math_utils .................................   Passed    0.39 sec
 test 39
       Start 39: test_validation_utils
 
@@ -974,14 +976,14 @@ test 39
 39: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 39: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 39: collected 12 items
-39: 
+39:
 39: ../../src/core/savo_control/test/test_validation_utils.py ............   [100%]
-39: 
+39:
 39: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_validation_utils.xunit.xml -
 39: ============================== 12 passed in 0.02s ==============================
 39: -- run_test.py: return code 0
 39: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_validation_utils.xunit.xml'
-39/53 Test #39: test_validation_utils ...........................   Passed    0.34 sec
+39/53 Test #39: test_validation_utils ...........................   Passed    0.37 sec
 test 40
       Start 40: test_control_status_model
 
@@ -998,15 +1000,15 @@ test 40
 40: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 40: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 40: collected 12 items
-40: 
+40:
 40: ../../src/core/savo_control/test/test_control_status_model.py .......... [ 83%]
 40: ..                                                                       [100%]
-40: 
+40:
 40: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_control_status_model.xunit.xml -
 40: ============================== 12 passed in 0.02s ==============================
 40: -- run_test.py: return code 0
 40: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_control_status_model.xunit.xml'
-40/53 Test #40: test_control_status_model .......................   Passed    0.36 sec
+40/53 Test #40: test_control_status_model .......................   Passed    0.37 sec
 test 41
       Start 41: test_recovery_state_model
 
@@ -1023,15 +1025,15 @@ test 41
 41: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 41: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 41: collected 20 items
-41: 
+41:
 41: ../../src/core/savo_control/test/test_recovery_state_model.py .......... [ 50%]
 41: ..........                                                               [100%]
-41: 
+41:
 41: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_recovery_state_model.xunit.xml -
 41: ============================== 20 passed in 0.03s ==============================
 41: -- run_test.py: return code 0
 41: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_recovery_state_model.xunit.xml'
-41/53 Test #41: test_recovery_state_model .......................   Passed    0.34 sec
+41/53 Test #41: test_recovery_state_model .......................   Passed    0.37 sec
 test 42
       Start 42: test_stuck_state_model
 
@@ -1048,15 +1050,15 @@ test 42
 42: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 42: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 42: collected 26 items
-42: 
+42:
 42: ../../src/core/savo_control/test/test_stuck_state_model.py ............. [ 50%]
 42: .............                                                            [100%]
-42: 
+42:
 42: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_stuck_state_model.xunit.xml -
 42: ============================== 26 passed in 0.03s ==============================
 42: -- run_test.py: return code 0
 42: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_stuck_state_model.xunit.xml'
-42/53 Test #42: test_stuck_state_model ..........................   Passed    0.34 sec
+42/53 Test #42: test_stuck_state_model ..........................   Passed    0.37 sec
 test 43
       Start 43: test_qos_profiles
 
@@ -1073,14 +1075,14 @@ test 43
 43: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 43: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 43: collected 9 items
-43: 
+43:
 43: ../../src/core/savo_control/test/test_qos_profiles.py .........          [100%]
-43: 
+43:
 43: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_qos_profiles.xunit.xml -
 43: ============================== 9 passed in 0.02s ===============================
 43: -- run_test.py: return code 0
 43: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_qos_profiles.xunit.xml'
-43/53 Test #43: test_qos_profiles ...............................   Passed    0.33 sec
+43/53 Test #43: test_qos_profiles ...............................   Passed    0.38 sec
 test 44
       Start 44: test_message_utils
 
@@ -1097,14 +1099,14 @@ test 44
 44: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 44: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 44: collected 13 items
-44: 
+44:
 44: ../../src/core/savo_control/test/test_message_utils.py .............     [100%]
-44: 
+44:
 44: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_message_utils.xunit.xml -
 44: ============================== 13 passed in 0.02s ==============================
 44: -- run_test.py: return code 0
 44: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_message_utils.xunit.xml'
-44/53 Test #44: test_message_utils ..............................   Passed    0.34 sec
+44/53 Test #44: test_message_utils ..............................   Passed    0.36 sec
 test 45
       Start 45: test_status_adapter
 
@@ -1121,14 +1123,14 @@ test 45
 45: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 45: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 45: collected 15 items
-45: 
+45:
 45: ../../src/core/savo_control/test/test_status_adapter.py ...............  [100%]
-45: 
+45:
 45: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_status_adapter.xunit.xml -
 45: ============================== 15 passed in 0.03s ==============================
 45: -- run_test.py: return code 0
 45: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_status_adapter.xunit.xml'
-45/53 Test #45: test_status_adapter .............................   Passed    0.35 sec
+45/53 Test #45: test_status_adapter .............................   Passed    0.37 sec
 test 46
       Start 46: test_config_adapter
 
@@ -1145,15 +1147,15 @@ test 46
 46: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 46: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 46: collected 17 items
-46: 
+46:
 46: ../../src/core/savo_control/test/test_config_adapter.py ................ [ 94%]
 46: .                                                                        [100%]
-46: 
+46:
 46: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_config_adapter.xunit.xml -
-46: ============================== 17 passed in 0.03s ==============================
+46: ============================== 17 passed in 0.04s ==============================
 46: -- run_test.py: return code 0
 46: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_config_adapter.xunit.xml'
-46/53 Test #46: test_config_adapter .............................   Passed    0.34 sec
+46/53 Test #46: test_config_adapter .............................   Passed    0.39 sec
 test 47
       Start 47: test_health_helpers
 
@@ -1170,15 +1172,15 @@ test 47
 47: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 47: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 47: collected 21 items
-47: 
+47:
 47: ../../src/core/savo_control/test/test_health_helpers.py ................ [ 76%]
 47: .....                                                                    [100%]
-47: 
+47:
 47: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_health_helpers.xunit.xml -
-47: ============================== 21 passed in 0.02s ==============================
+47: ============================== 21 passed in 0.03s ==============================
 47: -- run_test.py: return code 0
 47: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_health_helpers.xunit.xml'
-47/53 Test #47: test_health_helpers .............................   Passed    0.33 sec
+47/53 Test #47: test_health_helpers .............................   Passed    0.37 sec
 test 48
       Start 48: test_topic_probe
 
@@ -1195,10 +1197,10 @@ test 48
 48: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 48: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 48: collected 23 items
-48: 
+48:
 48: ../../src/core/savo_control/test/test_topic_probe.py ................... [ 82%]
 48: ....                                                                     [100%]
-48: 
+48:
 48: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_topic_probe.xunit.xml -
 48: ============================== 23 passed in 0.03s ==============================
 48: -- run_test.py: return code 0
@@ -1220,14 +1222,14 @@ test 49
 49: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control
 49: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 49: collected 15 items
-49: 
+49:
 49: ../../src/core/savo_control/test/test_file_utils.py ...............      [100%]
-49: 
+49:
 49: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_file_utils.xunit.xml -
 49: ============================== 15 passed in 0.02s ==============================
 49: -- run_test.py: return code 0
 49: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/test_file_utils.xunit.xml'
-49/53 Test #49: test_file_utils .................................   Passed    0.36 sec
+49/53 Test #49: test_file_utils .................................   Passed    0.39 sec
 test 50
       Start 50: cppcheck
 
@@ -1239,7 +1241,7 @@ test 50
 50: cppcheck 2.13.0 has known performance issues and therefore will not be used, set the AMENT_CPPCHECK_ALLOW_SLOW_VERSIONS environment variable to override this.
 50: -- run_test.py: return code 0
 50: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/cppcheck.xunit.xml'
-50/53 Test #50: cppcheck ........................................   Passed    0.14 sec
+50/53 Test #50: cppcheck ........................................   Passed    0.13 sec
 test 51
       Start 51: lint_cmake
 
@@ -1248,7 +1250,7 @@ test 51
 51: Test timeout computed to be: 60
 51: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control':
 51:  - /opt/ros/jazzy/bin/ament_lint_cmake --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/lint_cmake.xunit.xml
-51: 
+51:
 51: No problems found
 51: -- run_test.py: return code 0
 51: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/lint_cmake.xunit.xml'
@@ -1262,69 +1264,69 @@ test 52
 52: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control':
 52:  - /opt/ros/jazzy/bin/ament_uncrustify --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/uncrustify.xunit.xml
 52: No code style divergence in file 'include/savo_control/command_limiter.hpp'
-52: 
+52:
 52: No code style divergence in file 'include/savo_control/control_math.hpp'
-52: 
+52:
 52: No code style divergence in file 'include/savo_control/control_mode.hpp'
-52: 
+52:
 52: No code style divergence in file 'include/savo_control/control_mode_manager.hpp'
-52: 
+52:
 52: No code style divergence in file 'include/savo_control/distance_pid.hpp'
-52: 
+52:
 52: No code style divergence in file 'include/savo_control/heading_controller.hpp'
-52: 
+52:
 52: No code style divergence in file 'include/savo_control/heading_pid.hpp'
-52: 
+52:
 52: No code style divergence in file 'include/savo_control/pid.hpp'
-52: 
+52:
 52: No code style divergence in file 'include/savo_control/recovery_manager.hpp'
-52: 
+52:
 52: No code style divergence in file 'include/savo_control/recovery_types.hpp'
-52: 
+52:
 52: No code style divergence in file 'include/savo_control/stuck_detector.hpp'
-52: 
+52:
 52: No code style divergence in file 'include/savo_control/topic_names.hpp'
-52: 
+52:
 52: No code style divergence in file 'include/savo_control/velocity_smoother.hpp'
-52: 
+52:
 52: No code style divergence in file 'include/savo_control/watchdog.hpp'
-52: 
+52:
 52: No code style divergence in file 'src/controllers/heading_controller.cpp'
-52: 
+52:
 52: No code style divergence in file 'src/controllers/pid.cpp'
-52: 
+52:
 52: No code style divergence in file 'src/filters/command_limiter.cpp'
-52: 
+52:
 52: No code style divergence in file 'src/nodes/backup_escape_node.cpp'
-52: 
+52:
 52: No code style divergence in file 'src/nodes/cmd_vel_shaper_node.cpp'
-52: 
+52:
 52: No code style divergence in file 'src/nodes/control_mode_manager_node.cpp'
-52: 
+52:
 52: No code style divergence in file 'src/nodes/distance_approach_node.cpp'
-52: 
+52:
 52: No code style divergence in file 'src/nodes/heading_pid_node.cpp'
-52: 
+52:
 52: No code style divergence in file 'src/nodes/recovery_manager_node.cpp'
-52: 
+52:
 52: No code style divergence in file 'src/nodes/rotate_to_heading_node.cpp'
-52: 
+52:
 52: No code style divergence in file 'src/nodes/stuck_detector_node.cpp'
-52: 
+52:
 52: No code style divergence in file 'src/nodes/twist_mux_node.cpp'
-52: 
+52:
 52: No code style divergence in file 'src/nodes/velocity_test_pattern_node.cpp'
-52: 
+52:
 52: No code style divergence in file 'src/recovery/recovery_manager.cpp'
-52: 
+52:
 52: No code style divergence in file 'src/recovery/stuck_detector.cpp'
-52: 
+52:
 52: No code style divergence in file 'src/utils/control_math.cpp'
-52: 
+52:
 52: No problems found
 52: -- run_test.py: return code 0
 52: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/uncrustify.xunit.xml'
-52/53 Test #52: uncrustify ......................................   Passed    0.30 sec
+52/53 Test #52: uncrustify ......................................   Passed    0.31 sec
 test 53
       Start 53: xmllint
 
@@ -1334,7 +1336,7 @@ test 53
 53: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_control':
 53:  - /opt/ros/jazzy/bin/ament_xmllint --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/xmllint.xunit.xml
 53: File 'package.xml' is valid
-53: 
+53:
 53: No problems found
 53: -- run_test.py: return code 0
 53: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_control/test_results/savo_control/xmllint.xunit.xml'
@@ -1343,25 +1345,20 @@ test 53
 100% tests passed, 0 tests failed out of 53
 
 Label Time Summary:
-cppcheck      =   0.14 sec*proc (1 test)
+cppcheck      =   0.13 sec*proc (1 test)
 lint_cmake    =   0.12 sec*proc (1 test)
-linter        =   0.93 sec*proc (4 tests)
-pytest        =  20.34 sec*proc (49 tests)
-uncrustify    =   0.30 sec*proc (1 test)
+linter        =   0.94 sec*proc (4 tests)
+pytest        =  21.67 sec*proc (49 tests)
+uncrustify    =   0.31 sec*proc (1 test)
 xmllint       =   0.37 sec*proc (1 test)
 
-Total Test time (real) =  21.28 sec
-Finished <<< savo_control [21.3s]
+Total Test time (real) =  22.62 sec
+Finished <<< savo_control [22.7s]
 
-Summary: 1 package finished [21.5s]
-
-============================================================
- COLCON TEST RESULT
-============================================================
+Summary: 1 package finished [22.8s]
 Summary: 870 tests, 0 errors, 0 failures, 30 skipped
-
 ------------------------------------------------------------
 PACKAGE_RESULT: PASS
-COLCON_TEST_EXIT: 0
-TEST_RESULT_EXIT: 0
+COLCON_TEST_EXIT_STATUS: 0
+TEST_RESULT_EXIT_STATUS: 0
 ------------------------------------------------------------

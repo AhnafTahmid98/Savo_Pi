@@ -1,17 +1,19 @@
-Robot Savo package PC validation
-Run ID: 20260809T021142Z
-Package: savo_supervisor
-Date: 2026-08-09T05:25:07+03:00
+Robot Savo PC validation
+Run ID: 20260809T063128Z
+Step: package test savo_supervisor
+Date: 2026-08-09T09:31:28+03:00
 Host: ahnaf-tahmid-B760M-PG-SONIC-WiFi
-Commit: eb71c26ac7dfbeaf9c2e44df3ba9f79117c7d4b6
-
+Commit: fa8053a58514451d97fb2eb151b8a2842db57104
+Executor: sequential
+Cppcheck policy: repository default; ament skips known-problematic cppcheck 2.13
+Output:
 Starting >>> savo_supervisor
 UpdateCTestConfiguration  from :/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/CTestConfiguration.ini
 Parse Config file:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/CTestConfiguration.ini
    Site: ahnaf-tahmid-B760M-PG-SONIC-WiFi
    Build name: (empty)
  Add coverage exclude regular expressions.
-Create new tag: 20260809-0225 - Experimental
+Create new tag: 20260809-0652 - Experimental
 UpdateCTestConfiguration  from :/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/CTestConfiguration.ini
 Parse Config file:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/CTestConfiguration.ini
 Test project /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor
@@ -64,7 +66,7 @@ test 1
 1: [ RUN      ] FreshnessTracker.InvalidTimeoutIsRejected
 1: [       OK ] FreshnessTracker.InvalidTimeoutIsRejected (0 ms)
 1: [----------] 15 tests from FreshnessTracker (0 ms total)
-1: 
+1:
 1: [----------] Global test environment tear-down
 1: [==========] 15 tests from 1 test suite ran. (0 ms total)
 1: [  PASSED  ] 15 tests.
@@ -123,7 +125,7 @@ test 2
 2: [ RUN      ] LocalizationPayloadParser.AdditionalFieldsAreAllowed
 2: [       OK ] LocalizationPayloadParser.AdditionalFieldsAreAllowed (0 ms)
 2: [----------] 19 tests from LocalizationPayloadParser (0 ms total)
-2: 
+2:
 2: [----------] Global test environment tear-down
 2: [==========] 19 tests from 1 test suite ran. (0 ms total)
 2: [  PASSED  ] 19 tests.
@@ -162,14 +164,14 @@ test 3
 3: [ RUN      ] CorePayloadParser.CriticalPowerBlocksReadiness
 3: [       OK ] CorePayloadParser.CriticalPowerBlocksReadiness (0 ms)
 3: [----------] 9 tests from CorePayloadParser (0 ms total)
-3: 
+3:
 3: [----------] Global test environment tear-down
 3: [==========] 9 tests from 1 test suite ran. (0 ms total)
 3: [  PASSED  ] 9 tests.
 3: -- run_test.py: return code 0
 3: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/test_results/savo_supervisor/test_core_payload_parser.gtest.xml'
 3: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/test_results/savo_supervisor/test_core_payload_parser.gtest.xml'
- 3/27 Test  #3: test_core_payload_parser .......................   Passed    0.05 sec
+ 3/27 Test  #3: test_core_payload_parser .......................   Passed    0.06 sec
 test 4
       Start  4: test_core_readiness_policy
 
@@ -199,7 +201,7 @@ test 4
 4: [ RUN      ] CoreReadinessPolicy.ControlInhibitionRevokesMotionCapability
 4: [       OK ] CoreReadinessPolicy.ControlInhibitionRevokesMotionCapability (0 ms)
 4: [----------] 8 tests from CoreReadinessPolicy (0 ms total)
-4: 
+4:
 4: [----------] Global test environment tear-down
 4: [==========] 8 tests from 1 test suite ran. (0 ms total)
 4: [  PASSED  ] 8 tests.
@@ -232,14 +234,14 @@ test 5
 5: [ RUN      ] MissionPayloadParser.StaleHeadDiagnosticIsNotOperational
 5: [       OK ] MissionPayloadParser.StaleHeadDiagnosticIsNotOperational (0 ms)
 5: [----------] 6 tests from MissionPayloadParser (0 ms total)
-5: 
+5:
 5: [----------] Global test environment tear-down
 5: [==========] 6 tests from 1 test suite ran. (0 ms total)
 5: [  PASSED  ] 6 tests.
 5: -- run_test.py: return code 0
 5: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/test_results/savo_supervisor/test_mission_payload_parser.gtest.xml'
 5: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/test_results/savo_supervisor/test_mission_payload_parser.gtest.xml'
- 5/27 Test  #5: test_mission_payload_parser ....................   Passed    0.05 sec
+ 5/27 Test  #5: test_mission_payload_parser ....................   Passed    0.06 sec
 test 6
       Start  6: test_mission_authority
 
@@ -271,7 +273,7 @@ test 6
 6: [ RUN      ] MissionAuthority.BridgeLossRevokesOnlyRemoteOriginLease
 6: [       OK ] MissionAuthority.BridgeLossRevokesOnlyRemoteOriginLease (0 ms)
 6: [----------] 9 tests from MissionAuthority (0 ms total)
-6: 
+6:
 6: [----------] Global test environment tear-down
 6: [==========] 9 tests from 1 test suite ran. (0 ms total)
 6: [  PASSED  ] 9 tests.
@@ -302,14 +304,14 @@ test 7
 7: [ RUN      ] EdgePayloadParser.ParsesVoHealthLevels
 7: [       OK ] EdgePayloadParser.ParsesVoHealthLevels (0 ms)
 7: [----------] 5 tests from EdgePayloadParser (0 ms total)
-7: 
+7:
 7: [----------] Global test environment tear-down
 7: [==========] 5 tests from 1 test suite ran. (0 ms total)
 7: [  PASSED  ] 5 tests.
 7: -- run_test.py: return code 0
 7: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/test_results/savo_supervisor/test_edge_payload_parser.gtest.xml'
 7: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/test_results/savo_supervisor/test_edge_payload_parser.gtest.xml'
- 7/27 Test  #7: test_edge_payload_parser .......................   Passed    0.05 sec
+ 7/27 Test  #7: test_edge_payload_parser .......................   Passed    0.07 sec
 test 8
       Start  8: test_edge_supervision
 
@@ -333,14 +335,14 @@ test 8
 8: [ RUN      ] EdgeSupervision.StopTransportIsRequiredForRemoteCommandPath
 8: [       OK ] EdgeSupervision.StopTransportIsRequiredForRemoteCommandPath (0 ms)
 8: [----------] 5 tests from EdgeSupervision (0 ms total)
-8: 
+8:
 8: [----------] Global test environment tear-down
 8: [==========] 5 tests from 1 test suite ran. (0 ms total)
 8: [  PASSED  ] 5 tests.
 8: -- run_test.py: return code 0
 8: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/test_results/savo_supervisor/test_edge_supervision.gtest.xml'
 8: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/test_results/savo_supervisor/test_edge_supervision.gtest.xml'
- 8/27 Test  #8: test_edge_supervision ..........................   Passed    0.05 sec
+ 8/27 Test  #8: test_edge_supervision ..........................   Passed    0.06 sec
 test 9
       Start  9: test_system_authority
 
@@ -374,7 +376,7 @@ test 9
 9: [ RUN      ] SystemAuthority.RestartNeverRestoresStaleArmedReason
 9: [       OK ] SystemAuthority.RestartNeverRestoresStaleArmedReason (0 ms)
 9: [----------] 10 tests from SystemAuthority (0 ms total)
-9: 
+9:
 9: [----------] Global test environment tear-down
 9: [==========] 10 tests from 1 test suite ran. (0 ms total)
 9: [  PASSED  ] 10 tests.
@@ -399,14 +401,14 @@ test 10
 10: [ RUN      ] SystemStateStore.MalformedStateFailsClosedWithoutThrowing
 10: [       OK ] SystemStateStore.MalformedStateFailsClosedWithoutThrowing (0 ms)
 10: [----------] 2 tests from SystemStateStore (0 ms total)
-10: 
+10:
 10: [----------] Global test environment tear-down
 10: [==========] 2 tests from 1 test suite ran. (0 ms total)
 10: [  PASSED  ] 2 tests.
 10: -- run_test.py: return code 0
 10: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/test_results/savo_supervisor/test_system_state_store.gtest.xml'
 10: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/test_results/savo_supervisor/test_system_state_store.gtest.xml'
-10/27 Test #10: test_system_state_store ........................   Passed    0.07 sec
+10/27 Test #10: test_system_state_store ........................   Passed    0.06 sec
 test 11
       Start 11: test_transition_tracker
 
@@ -442,14 +444,14 @@ test 11
 11: [ RUN      ] TransitionTracker.ResetAllowsNewStartedEvent
 11: [       OK ] TransitionTracker.ResetAllowsNewStartedEvent (0 ms)
 11: [----------] 11 tests from TransitionTracker (0 ms total)
-11: 
+11:
 11: [----------] Global test environment tear-down
 11: [==========] 11 tests from 1 test suite ran. (0 ms total)
 11: [  PASSED  ] 11 tests.
 11: -- run_test.py: return code 0
 11: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/test_results/savo_supervisor/test_transition_tracker.gtest.xml'
 11: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/test_results/savo_supervisor/test_transition_tracker.gtest.xml'
-11/27 Test #11: test_transition_tracker ........................   Passed    0.06 sec
+11/27 Test #11: test_transition_tracker ........................   Passed    0.07 sec
 test 12
       Start 12: test_supervisor_policy
 
@@ -507,14 +509,14 @@ test 12
 12: [ RUN      ] SupervisorPolicy.HonorsConfiguredStartupGrace
 12: [       OK ] SupervisorPolicy.HonorsConfiguredStartupGrace (0 ms)
 12: [----------] 22 tests from SupervisorPolicy (0 ms total)
-12: 
+12:
 12: [----------] Global test environment tear-down
 12: [==========] 22 tests from 1 test suite ran. (0 ms total)
 12: [  PASSED  ] 22 tests.
 12: -- run_test.py: return code 0
 12: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/test_results/savo_supervisor/test_supervisor_policy.gtest.xml'
 12: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/test_results/savo_supervisor/test_supervisor_policy.gtest.xml'
-12/27 Test #12: test_supervisor_policy .........................   Passed    0.06 sec
+12/27 Test #12: test_supervisor_policy .........................   Passed    0.07 sec
 test 13
       Start 13: test_supervisor_contract
 
@@ -550,7 +552,7 @@ test 13
 13: [ RUN      ] SupervisorContract.DisabledOptionalLocalizationNeedsNoInputs
 13: [       OK ] SupervisorContract.DisabledOptionalLocalizationNeedsNoInputs (0 ms)
 13: [----------] 11 tests from SupervisorContract (0 ms total)
-13: 
+13:
 13: [----------] Global test environment tear-down
 13: [==========] 11 tests from 1 test suite ran. (0 ms total)
 13: [  PASSED  ] 11 tests.
@@ -581,7 +583,7 @@ test 14
 14: [ RUN      ] LocationAuthorizationPolicy.CandidateOperationsRequireCandidateIdentity
 14: [       OK ] LocationAuthorizationPolicy.CandidateOperationsRequireCandidateIdentity (0 ms)
 14: [----------] 5 tests from LocationAuthorizationPolicy (0 ms total)
-14: 
+14:
 14: [----------] Global test environment tear-down
 14: [==========] 5 tests from 1 test suite ran. (0 ms total)
 14: [  PASSED  ] 5 tests.
@@ -603,14 +605,14 @@ test 15
 15: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 15: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 15: collected 1 item
-15: 
+15:
 15: ../../src/shared/savo_supervisor/test/test_location_authorization_runtime_contract.py . [100%]
-15: 
+15:
 15: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/test_results/savo_supervisor/test_location_authorization_runtime_contract.xunit.xml -
 15: ============================== 1 passed in 0.01s ===============================
 15: -- run_test.py: return code 0
 15: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/test_results/savo_supervisor/test_location_authorization_runtime_contract.xunit.xml'
-15/27 Test #15: test_location_authorization_runtime_contract ...   Passed    0.35 sec
+15/27 Test #15: test_location_authorization_runtime_contract ...   Passed    0.39 sec
 test 16
       Start 16: test_core_integration_runtime_contract
 
@@ -625,15 +627,15 @@ test 16
 16: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 16: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 16: collected 3 items
-16: 
+16:
 16: ../../src/shared/savo_supervisor/test/test_core_integration_runtime_contract.py . [ 33%]
 16: ..                                                                       [100%]
-16: 
+16:
 16: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/test_results/savo_supervisor/test_core_integration_runtime_contract.xunit.xml -
 16: ============================== 3 passed in 0.01s ===============================
 16: -- run_test.py: return code 0
 16: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/test_results/savo_supervisor/test_core_integration_runtime_contract.xunit.xml'
-16/27 Test #16: test_core_integration_runtime_contract .........   Passed    0.34 sec
+16/27 Test #16: test_core_integration_runtime_contract .........   Passed    0.37 sec
 test 17
       Start 17: test_phase2_mission_runtime_contract
 
@@ -648,15 +650,15 @@ test 17
 17: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 17: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 17: collected 2 items
-17: 
+17:
 17: ../../src/shared/savo_supervisor/test/test_phase2_mission_runtime_contract.py . [ 50%]
 17: .                                                                        [100%]
-17: 
+17:
 17: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/test_results/savo_supervisor/test_phase2_mission_runtime_contract.xunit.xml -
 17: ============================== 2 passed in 0.01s ===============================
 17: -- run_test.py: return code 0
 17: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/test_results/savo_supervisor/test_phase2_mission_runtime_contract.xunit.xml'
-17/27 Test #17: test_phase2_mission_runtime_contract ...........   Passed    0.35 sec
+17/27 Test #17: test_phase2_mission_runtime_contract ...........   Passed    0.37 sec
 test 18
       Start 18: test_phase2_runtime_assets_contract
 
@@ -671,14 +673,14 @@ test 18
 18: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 18: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 18: collected 1 item
-18: 
+18:
 18: ../../src/shared/savo_supervisor/test/test_phase2_runtime_assets_contract.py . [100%]
-18: 
+18:
 18: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/test_results/savo_supervisor/test_phase2_runtime_assets_contract.xunit.xml -
 18: ============================== 1 passed in 0.01s ===============================
 18: -- run_test.py: return code 0
 18: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/test_results/savo_supervisor/test_phase2_runtime_assets_contract.xunit.xml'
-18/27 Test #18: test_phase2_runtime_assets_contract ............   Passed    0.35 sec
+18/27 Test #18: test_phase2_runtime_assets_contract ............   Passed    0.36 sec
 test 19
       Start 19: test_phase3_runtime_contract
 
@@ -693,15 +695,15 @@ test 19
 19: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 19: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 19: collected 5 items
-19: 
+19:
 19: ../../src/shared/savo_supervisor/test/test_phase3_runtime_contract.py .. [ 40%]
 19: ...                                                                      [100%]
-19: 
+19:
 19: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/test_results/savo_supervisor/test_phase3_runtime_contract.xunit.xml -
 19: ============================== 5 passed in 0.01s ===============================
 19: -- run_test.py: return code 0
 19: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/test_results/savo_supervisor/test_phase3_runtime_contract.xunit.xml'
-19/27 Test #19: test_phase3_runtime_contract ...................   Passed    0.34 sec
+19/27 Test #19: test_phase3_runtime_contract ...................   Passed    0.36 sec
 test 20
       Start 20: test_phase3_runtime_assets_contract
 
@@ -716,15 +718,15 @@ test 20
 20: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 20: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 20: collected 2 items
-20: 
+20:
 20: ../../src/shared/savo_supervisor/test/test_phase3_runtime_assets_contract.py . [ 50%]
 20: .                                                                        [100%]
-20: 
+20:
 20: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/test_results/savo_supervisor/test_phase3_runtime_assets_contract.xunit.xml -
-20: ============================== 2 passed in 0.01s ===============================
+20: ============================== 2 passed in 0.02s ===============================
 20: -- run_test.py: return code 0
 20: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/test_results/savo_supervisor/test_phase3_runtime_assets_contract.xunit.xml'
-20/27 Test #20: test_phase3_runtime_assets_contract ............   Passed    0.36 sec
+20/27 Test #20: test_phase3_runtime_assets_contract ............   Passed    0.38 sec
 test 21
       Start 21: cppcheck
 
@@ -736,7 +738,7 @@ test 21
 21: cppcheck 2.13.0 has known performance issues and therefore will not be used, set the AMENT_CPPCHECK_ALLOW_SLOW_VERSIONS environment variable to override this.
 21: -- run_test.py: return code 0
 21: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/test_results/savo_supervisor/cppcheck.xunit.xml'
-21/27 Test #21: cppcheck .......................................   Passed    0.13 sec
+21/27 Test #21: cppcheck .......................................   Passed    0.14 sec
 test 22
       Start 22: cpplint
 
@@ -746,97 +748,97 @@ test 22
 22: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor':
 22:  - /opt/ros/jazzy/bin/ament_cpplint --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/test_results/savo_supervisor/cpplint.xunit.xml --exclude test/test_location_authorization_policy.cpp
 22: Using '--root=/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/include' argument
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/include/savo_supervisor/component_status.hpp
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/include/savo_supervisor/core_payload_parser.hpp
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/include/savo_supervisor/edge_payload_parser.hpp
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/include/savo_supervisor/edge_supervision.hpp
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/include/savo_supervisor/freshness_tracker.hpp
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/include/savo_supervisor/localization_payload_parser.hpp
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/include/savo_supervisor/location_authorization_policy.hpp
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/include/savo_supervisor/mission_authority.hpp
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/include/savo_supervisor/mission_payload_parser.hpp
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/include/savo_supervisor/reason_codes.hpp
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/include/savo_supervisor/supervisor_policy.hpp
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/include/savo_supervisor/supervisor_state.hpp
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/include/savo_supervisor/system_authority.hpp
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/include/savo_supervisor/system_state_store.hpp
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/include/savo_supervisor/transition_tracker.hpp
-22: 
+22:
 22: Using '--root=/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/src' argument
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/src/core_payload_parser.cpp
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/src/edge_payload_parser.cpp
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/src/edge_supervision.cpp
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/src/freshness_tracker.cpp
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/src/localization_payload_parser.cpp
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/src/location_authorization_policy.cpp
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/src/mission_authority.cpp
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/src/mission_payload_parser.cpp
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/src/supervisor_node.cpp
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/src/supervisor_policy.cpp
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/src/system_authority.cpp
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/src/system_state_store.cpp
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/src/transition_tracker.cpp
-22: 
+22:
 22: Using '--root=/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/test' argument
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/test/test_core_payload_parser.cpp
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/test/test_core_readiness_policy.cpp
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/test/test_edge_payload_parser.cpp
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/test/test_edge_supervision.cpp
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/test/test_freshness_tracker.cpp
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/test/test_localization_payload_parser.cpp
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/test/test_mission_authority.cpp
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/test/test_mission_payload_parser.cpp
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/test/test_supervisor_contract.cpp
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/test/test_supervisor_policy.cpp
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/test/test_system_authority.cpp
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/test/test_system_state_store.cpp
-22: 
+22:
 22: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor/test/test_transition_tracker.cpp
-22: 
+22:
 22: No problems found
 22: -- run_test.py: return code 0
 22: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/test_results/savo_supervisor/cpplint.xunit.xml'
-22/27 Test #22: cpplint ........................................   Passed    1.31 sec
+22/27 Test #22: cpplint ........................................   Passed    1.19 sec
 test 23
       Start 23: flake8
 
@@ -845,12 +847,12 @@ test 23
 23: Test timeout computed to be: 60
 23: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor':
 23:  - /opt/ros/jazzy/bin/ament_flake8 --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/test_results/savo_supervisor/flake8.xunit.xml --exclude test/test_location_authorization_policy.cpp
-23: 
+23:
 23: 14 files checked
 23: No problems found
-23: 
+23:
 23: Checked files:
-23: 
+23:
 23: * ./test/test_phase3_runtime_assets_contract.py
 23: * ./test/test_core_integration_runtime_contract.py
 23: * ./test/test_location_authorization_runtime_contract.py
@@ -867,7 +869,7 @@ test 23
 23: * ./launch/supervisor.launch.py
 23: -- run_test.py: return code 0
 23: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/test_results/savo_supervisor/flake8.xunit.xml'
-23/27 Test #23: flake8 .........................................   Passed    0.30 sec
+23/27 Test #23: flake8 .........................................   Passed    0.34 sec
 test 24
       Start 24: lint_cmake
 
@@ -876,7 +878,7 @@ test 24
 24: Test timeout computed to be: 60
 24: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor':
 24:  - /opt/ros/jazzy/bin/ament_lint_cmake --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/test_results/savo_supervisor/lint_cmake.xunit.xml
-24: 
+24:
 24: No problems found
 24: -- run_test.py: return code 0
 24: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/test_results/savo_supervisor/lint_cmake.xunit.xml'
@@ -906,7 +908,7 @@ test 25
 25: No problems found
 25: -- run_test.py: return code 0
 25: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/test_results/savo_supervisor/pep257.xunit.xml'
-25/27 Test #25: pep257 .........................................   Passed    0.23 sec
+25/27 Test #25: pep257 .........................................   Passed    0.20 sec
 test 26
       Start 26: uncrustify
 
@@ -916,91 +918,91 @@ test 26
 26: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor':
 26:  - /opt/ros/jazzy/bin/ament_uncrustify --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/test_results/savo_supervisor/uncrustify.xunit.xml --exclude test/test_location_authorization_policy.cpp
 26: No code style divergence in file 'include/savo_supervisor/component_status.hpp'
-26: 
+26:
 26: No code style divergence in file 'include/savo_supervisor/core_payload_parser.hpp'
-26: 
+26:
 26: No code style divergence in file 'include/savo_supervisor/edge_payload_parser.hpp'
-26: 
+26:
 26: No code style divergence in file 'include/savo_supervisor/edge_supervision.hpp'
-26: 
+26:
 26: No code style divergence in file 'include/savo_supervisor/freshness_tracker.hpp'
-26: 
+26:
 26: No code style divergence in file 'include/savo_supervisor/localization_payload_parser.hpp'
-26: 
+26:
 26: No code style divergence in file 'include/savo_supervisor/location_authorization_policy.hpp'
-26: 
+26:
 26: No code style divergence in file 'include/savo_supervisor/mission_authority.hpp'
-26: 
+26:
 26: No code style divergence in file 'include/savo_supervisor/mission_payload_parser.hpp'
-26: 
+26:
 26: No code style divergence in file 'include/savo_supervisor/reason_codes.hpp'
-26: 
+26:
 26: No code style divergence in file 'include/savo_supervisor/supervisor_policy.hpp'
-26: 
+26:
 26: No code style divergence in file 'include/savo_supervisor/supervisor_state.hpp'
-26: 
+26:
 26: No code style divergence in file 'include/savo_supervisor/system_authority.hpp'
-26: 
+26:
 26: No code style divergence in file 'include/savo_supervisor/system_state_store.hpp'
-26: 
+26:
 26: No code style divergence in file 'include/savo_supervisor/transition_tracker.hpp'
-26: 
+26:
 26: No code style divergence in file 'src/core_payload_parser.cpp'
-26: 
+26:
 26: No code style divergence in file 'src/edge_payload_parser.cpp'
-26: 
+26:
 26: No code style divergence in file 'src/edge_supervision.cpp'
-26: 
+26:
 26: No code style divergence in file 'src/freshness_tracker.cpp'
-26: 
+26:
 26: No code style divergence in file 'src/localization_payload_parser.cpp'
-26: 
+26:
 26: No code style divergence in file 'src/location_authorization_policy.cpp'
-26: 
+26:
 26: No code style divergence in file 'src/mission_authority.cpp'
-26: 
+26:
 26: No code style divergence in file 'src/mission_payload_parser.cpp'
-26: 
+26:
 26: No code style divergence in file 'src/supervisor_node.cpp'
-26: 
+26:
 26: No code style divergence in file 'src/supervisor_policy.cpp'
-26: 
+26:
 26: No code style divergence in file 'src/system_authority.cpp'
-26: 
+26:
 26: No code style divergence in file 'src/system_state_store.cpp'
-26: 
+26:
 26: No code style divergence in file 'src/transition_tracker.cpp'
-26: 
+26:
 26: No code style divergence in file 'test/test_core_payload_parser.cpp'
-26: 
+26:
 26: No code style divergence in file 'test/test_core_readiness_policy.cpp'
-26: 
+26:
 26: No code style divergence in file 'test/test_edge_payload_parser.cpp'
-26: 
+26:
 26: No code style divergence in file 'test/test_edge_supervision.cpp'
-26: 
+26:
 26: No code style divergence in file 'test/test_freshness_tracker.cpp'
-26: 
+26:
 26: No code style divergence in file 'test/test_localization_payload_parser.cpp'
-26: 
+26:
 26: No code style divergence in file 'test/test_mission_authority.cpp'
-26: 
+26:
 26: No code style divergence in file 'test/test_mission_payload_parser.cpp'
-26: 
+26:
 26: No code style divergence in file 'test/test_supervisor_contract.cpp'
-26: 
+26:
 26: No code style divergence in file 'test/test_supervisor_policy.cpp'
-26: 
+26:
 26: No code style divergence in file 'test/test_system_authority.cpp'
-26: 
+26:
 26: No code style divergence in file 'test/test_system_state_store.cpp'
-26: 
+26:
 26: No code style divergence in file 'test/test_transition_tracker.cpp'
-26: 
+26:
 26: No problems found
 26: -- run_test.py: return code 0
 26: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/test_results/savo_supervisor/uncrustify.xunit.xml'
-26/27 Test #26: uncrustify .....................................   Passed    0.34 sec
+26/27 Test #26: uncrustify .....................................   Passed    0.37 sec
 test 27
       Start 27: xmllint
 
@@ -1010,38 +1012,33 @@ test 27
 27: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_supervisor':
 27:  - /opt/ros/jazzy/bin/ament_xmllint --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/test_results/savo_supervisor/xmllint.xunit.xml
 27: File 'package.xml' is valid
-27: 
+27:
 27: No problems found
 27: -- run_test.py: return code 0
 27: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_supervisor/test_results/savo_supervisor/xmllint.xunit.xml'
-27/27 Test #27: xmllint ........................................   Passed    0.12 sec
+27/27 Test #27: xmllint ........................................   Passed    0.13 sec
 
 100% tests passed, 0 tests failed out of 27
 
 Label Time Summary:
-cppcheck      =   0.13 sec*proc (1 test)
-cpplint       =   1.31 sec*proc (1 test)
-flake8        =   0.30 sec*proc (1 test)
-gtest         =   0.81 sec*proc (14 tests)
+cppcheck      =   0.14 sec*proc (1 test)
+cpplint       =   1.19 sec*proc (1 test)
+flake8        =   0.34 sec*proc (1 test)
+gtest         =   0.86 sec*proc (14 tests)
 lint_cmake    =   0.13 sec*proc (1 test)
-linter        =   2.56 sec*proc (7 tests)
-pep257        =   0.23 sec*proc (1 test)
-pytest        =   2.09 sec*proc (6 tests)
-uncrustify    =   0.34 sec*proc (1 test)
-xmllint       =   0.12 sec*proc (1 test)
+linter        =   2.49 sec*proc (7 tests)
+pep257        =   0.20 sec*proc (1 test)
+pytest        =   2.24 sec*proc (6 tests)
+uncrustify    =   0.37 sec*proc (1 test)
+xmllint       =   0.13 sec*proc (1 test)
 
-Total Test time (real) =   5.47 sec
-Finished <<< savo_supervisor [5.49s]
+Total Test time (real) =   5.59 sec
+Finished <<< savo_supervisor [5.63s]
 
-Summary: 1 package finished [5.68s]
-
-============================================================
- COLCON TEST RESULT
-============================================================
+Summary: 1 package finished [5.78s]
 Summary: 319 tests, 0 errors, 0 failures, 42 skipped
-
 ------------------------------------------------------------
 PACKAGE_RESULT: PASS
-COLCON_TEST_EXIT: 0
-TEST_RESULT_EXIT: 0
+COLCON_TEST_EXIT_STATUS: 0
+TEST_RESULT_EXIT_STATUS: 0
 ------------------------------------------------------------

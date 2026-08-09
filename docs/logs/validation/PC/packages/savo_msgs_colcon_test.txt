@@ -1,17 +1,19 @@
-Robot Savo package PC validation
-Run ID: 20260809T021142Z
-Package: savo_msgs
-Date: 2026-08-09T05:24:12+03:00
+Robot Savo PC validation
+Run ID: 20260809T063128Z
+Step: package test savo_msgs
+Date: 2026-08-09T09:31:28+03:00
 Host: ahnaf-tahmid-B760M-PG-SONIC-WiFi
-Commit: eb71c26ac7dfbeaf9c2e44df3ba9f79117c7d4b6
-
+Commit: fa8053a58514451d97fb2eb151b8a2842db57104
+Executor: sequential
+Cppcheck policy: repository default; ament skips known-problematic cppcheck 2.13
+Output:
 Starting >>> savo_msgs
 UpdateCTestConfiguration  from :/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_msgs/CTestConfiguration.ini
 Parse Config file:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_msgs/CTestConfiguration.ini
    Site: ahnaf-tahmid-B760M-PG-SONIC-WiFi
    Build name: (empty)
  Add coverage exclude regular expressions.
-Create new tag: 20260809-0224 - Experimental
+Create new tag: 20260809-0651 - Experimental
 UpdateCTestConfiguration  from :/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_msgs/CTestConfiguration.ini
 Parse Config file:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_msgs/CTestConfiguration.ini
 Test project /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_msgs
@@ -35,14 +37,14 @@ test 1
 1: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 1: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 1: collected 7 items
-1: 
+1:
 1: ../../src/shared/savo_msgs/test/test_apriltag_interfaces.py .......      [100%]
-1: 
+1:
 1: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_msgs/test_results/savo_msgs/test_apriltag_interfaces.xunit.xml -
 1: ============================== 7 passed in 0.01s ===============================
 1: -- run_test.py: return code 0
 1: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_msgs/test_results/savo_msgs/test_apriltag_interfaces.xunit.xml'
- 1/11 Test  #1: test_apriltag_interfaces .....................   Passed    0.32 sec
+ 1/11 Test  #1: test_apriltag_interfaces .....................   Passed    0.38 sec
 test 2
       Start  2: test_rotate_to_heading_action_contract
 
@@ -57,15 +59,15 @@ test 2
 2: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 2: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 2: collected 8 items
-2: 
+2:
 2: ../../src/shared/savo_msgs/test/test_rotate_to_heading_action_contract.py . [ 12%]
 2: .......                                                                  [100%]
-2: 
+2:
 2: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_msgs/test_results/savo_msgs/test_rotate_to_heading_action_contract.xunit.xml -
-2: ============================== 8 passed in 0.01s ===============================
+2: ============================== 8 passed in 0.02s ===============================
 2: -- run_test.py: return code 0
 2: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_msgs/test_results/savo_msgs/test_rotate_to_heading_action_contract.xunit.xml'
- 2/11 Test  #2: test_rotate_to_heading_action_contract .......   Passed    0.36 sec
+ 2/11 Test  #2: test_rotate_to_heading_action_contract .......   Passed    0.38 sec
 test 3
       Start  3: test_rotate_to_heading_registration
 
@@ -80,10 +82,10 @@ test 3
 3: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 3: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 3: collected 4 items
-3: 
+3:
 3: ../../src/shared/savo_msgs/test/test_rotate_to_heading_registration.py . [ 25%]
 3: ...                                                                      [100%]
-3: 
+3:
 3: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_msgs/test_results/savo_msgs/test_rotate_to_heading_registration.xunit.xml -
 3: ============================== 4 passed in 0.01s ===============================
 3: -- run_test.py: return code 0
@@ -103,15 +105,15 @@ test 4
 4: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 4: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 4: collected 6 items
-4: 
+4:
 4: ../../src/shared/savo_msgs/test/test_execute_coverage_path_action_contract.py . [ 16%]
 4: .....                                                                    [100%]
-4: 
+4:
 4: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_msgs/test_results/savo_msgs/test_execute_coverage_path_action_contract.xunit.xml -
 4: ============================== 6 passed in 0.01s ===============================
 4: -- run_test.py: return code 0
 4: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_msgs/test_results/savo_msgs/test_execute_coverage_path_action_contract.xunit.xml'
- 4/11 Test  #4: test_execute_coverage_path_action_contract ...   Passed    0.34 sec
+ 4/11 Test  #4: test_execute_coverage_path_action_contract ...   Passed    0.36 sec
 test 5
       Start  5: test_execute_coverage_path_registration
 
@@ -126,15 +128,15 @@ test 5
 5: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 5: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 5: collected 4 items
-5: 
+5:
 5: ../../src/shared/savo_msgs/test/test_execute_coverage_path_registration.py . [ 25%]
 5: ...                                                                      [100%]
-5: 
+5:
 5: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_msgs/test_results/savo_msgs/test_execute_coverage_path_registration.xunit.xml -
 5: ============================== 4 passed in 0.01s ===============================
 5: -- run_test.py: return code 0
 5: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_msgs/test_results/savo_msgs/test_execute_coverage_path_registration.xunit.xml'
- 5/11 Test  #5: test_execute_coverage_path_registration ......   Passed    0.33 sec
+ 5/11 Test  #5: test_execute_coverage_path_registration ......   Passed    0.37 sec
 test 6
       Start  6: test_location_interfaces
 
@@ -149,14 +151,14 @@ test 6
 6: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 6: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 6: collected 6 items
-6: 
+6:
 6: ../../src/shared/savo_msgs/test/test_location_interfaces.py ......       [100%]
-6: 
+6:
 6: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_msgs/test_results/savo_msgs/test_location_interfaces.xunit.xml -
 6: ============================== 6 passed in 0.01s ===============================
 6: -- run_test.py: return code 0
 6: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_msgs/test_results/savo_msgs/test_location_interfaces.xunit.xml'
- 6/11 Test  #6: test_location_interfaces .....................   Passed    0.35 sec
+ 6/11 Test  #6: test_location_interfaces .....................   Passed    0.38 sec
 test 7
       Start  7: test_location_integration_interfaces
 
@@ -171,15 +173,15 @@ test 7
 7: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 7: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 7: collected 4 items
-7: 
+7:
 7: ../../src/shared/savo_msgs/test/test_location_integration_interfaces.py . [ 25%]
 7: ...                                                                      [100%]
-7: 
+7:
 7: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_msgs/test_results/savo_msgs/test_location_integration_interfaces.xunit.xml -
 7: ============================== 4 passed in 0.01s ===============================
 7: -- run_test.py: return code 0
 7: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_msgs/test_results/savo_msgs/test_location_integration_interfaces.xunit.xml'
- 7/11 Test  #7: test_location_integration_interfaces .........   Passed    0.33 sec
+ 7/11 Test  #7: test_location_integration_interfaces .........   Passed    0.38 sec
 test 8
       Start  8: test_autonomous_mapping_interfaces
 
@@ -194,15 +196,15 @@ test 8
 8: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 8: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 8: collected 7 items
-8: 
+8:
 8: ../../src/shared/savo_msgs/test/test_autonomous_mapping_interfaces.py .. [ 28%]
 8: .....                                                                    [100%]
-8: 
+8:
 8: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_msgs/test_results/savo_msgs/test_autonomous_mapping_interfaces.xunit.xml -
 8: ============================== 7 passed in 0.01s ===============================
 8: -- run_test.py: return code 0
 8: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_msgs/test_results/savo_msgs/test_autonomous_mapping_interfaces.xunit.xml'
- 8/11 Test  #8: test_autonomous_mapping_interfaces ...........   Passed    0.34 sec
+ 8/11 Test  #8: test_autonomous_mapping_interfaces ...........   Passed    0.37 sec
 test 9
       Start  9: test_semantic_interruption_interfaces
 
@@ -217,15 +219,15 @@ test 9
 9: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 9: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 9: collected 4 items
-9: 
+9:
 9: ../../src/shared/savo_msgs/test/test_semantic_interruption_interfaces.py . [ 25%]
 9: ...                                                                      [100%]
-9: 
+9:
 9: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_msgs/test_results/savo_msgs/test_semantic_interruption_interfaces.xunit.xml -
 9: ============================== 4 passed in 0.01s ===============================
 9: -- run_test.py: return code 0
 9: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_msgs/test_results/savo_msgs/test_semantic_interruption_interfaces.xunit.xml'
- 9/11 Test  #9: test_semantic_interruption_interfaces ........   Passed    0.35 sec
+ 9/11 Test  #9: test_semantic_interruption_interfaces ........   Passed    0.37 sec
 test 10
       Start 10: test_supervisor_phase2_interfaces
 
@@ -240,14 +242,14 @@ test 10
 10: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 10: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 10: collected 3 items
-10: 
+10:
 10: ../../src/shared/savo_msgs/test/test_supervisor_phase2_interfaces.py ... [100%]
-10: 
+10:
 10: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_msgs/test_results/savo_msgs/test_supervisor_phase2_interfaces.xunit.xml -
 10: ============================== 3 passed in 0.01s ===============================
 10: -- run_test.py: return code 0
 10: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_msgs/test_results/savo_msgs/test_supervisor_phase2_interfaces.xunit.xml'
-10/11 Test #10: test_supervisor_phase2_interfaces ............   Passed    0.33 sec
+10/11 Test #10: test_supervisor_phase2_interfaces ............   Passed    0.38 sec
 test 11
       Start 11: test_supervisor_phase3_interfaces
 
@@ -262,9 +264,9 @@ test 11
 11: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
 11: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
 11: collected 2 items
-11: 
+11:
 11: ../../src/shared/savo_msgs/test/test_supervisor_phase3_interfaces.py ..  [100%]
-11: 
+11:
 11: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_msgs/test_results/savo_msgs/test_supervisor_phase3_interfaces.xunit.xml -
 11: ============================== 2 passed in 0.01s ===============================
 11: -- run_test.py: return code 0
@@ -274,20 +276,15 @@ test 11
 100% tests passed, 0 tests failed out of 11
 
 Label Time Summary:
-pytest    =   3.79 sec*proc (11 tests)
+pytest    =   4.10 sec*proc (11 tests)
 
-Total Test time (real) =   3.80 sec
-Finished <<< savo_msgs [3.82s]
+Total Test time (real) =   4.10 sec
+Finished <<< savo_msgs [4.13s]
 
-Summary: 1 package finished [3.96s]
-
-============================================================
- COLCON TEST RESULT
-============================================================
+Summary: 1 package finished [4.31s]
 Summary: 66 tests, 0 errors, 0 failures, 0 skipped
-
 ------------------------------------------------------------
 PACKAGE_RESULT: PASS
-COLCON_TEST_EXIT: 0
-TEST_RESULT_EXIT: 0
+COLCON_TEST_EXIT_STATUS: 0
+TEST_RESULT_EXIT_STATUS: 0
 ------------------------------------------------------------
