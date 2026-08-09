@@ -5257,6 +5257,35 @@ void UiRuntimeNode::loop_callback()
 
   update_runtime(dt);
   render_current_screen();
+
+  // PC dry-run live mirror.
+  //
+  // The production Pi framebuffer path is unchanged. When framebuffer output
+  // is disabled and preview export is enabled, publish an atomic PPM snapshot
+  // of the current runtime canvas for a desktop viewer.
+  static unsigned int live_preview_frame = 0U;
+  ++live_preview_frame;
+
+  if (
+    config_.export_preview_frames &&
+    !config_.enable_framebuffer &&
+    (live_preview_frame % 2U) == 0U)
+  {
+    const std::string live_temp =
+      config_.preview_output_dir +
+      "/runtime_live.tmp.ppm";
+
+    const std::string live_path =
+      config_.preview_output_dir +
+      "/runtime_live.ppm";
+
+    if (canvas_.write_ppm(live_temp)) {
+      (void)std::rename(
+        live_temp.c_str(),
+        live_path.c_str());
+    }
+  }
+
   maybe_export_power_live_preview();
   present_if_enabled();
 

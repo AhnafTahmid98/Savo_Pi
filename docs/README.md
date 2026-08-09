@@ -86,6 +86,24 @@ There is no `savo_intent` package or central page. SavoMind reasoning is externa
 - [Release checklist](deployment/release_checklist.md)
 - [Recovery operations](deployment/recovery_operations.md)
 
+## Setup and commissioning
+
+Begin a fresh installation at the [setup index](setup/README.md), then follow the
+machine-specific path:
+
+- [First-installation checklist](setup/first_installation_checklist.md)
+- [Core fresh installation](setup/savo_core_setup.md)
+- [Edge fresh installation](setup/savo_edge_setup.md)
+- [Observer workstation](setup/observer_pc_setup.md)
+- [SavoMind Edge integration](setup/savomind_edge_setup.md)
+- [Network and time](setup/network_and_time_setup.md)
+- [Device permissions](setup/device_permissions_and_udev.md)
+- [Environment and secrets](setup/environment_and_secrets.md)
+- [Safe-idle commissioning gate](setup/commissioning_checklist.md)
+
+Setup establishes a reproducible host and commissioning proves safe-idle
+startup. Neither authorizes motion or replaces formal hardware acceptance.
+
 ## Production operations
 
 Start at the [operations index](operations/README.md). The main reading paths
@@ -106,7 +124,7 @@ are:
   [incident response](operations/incident_response.md), and the
   [incident report template](operations/incident_report_template.md)
 
-## Hardware and setup
+## Hardware
 
 - [Bill of materials](hardware/bill_of_materials.md)
 - [Wiring overview](hardware/wiring_overview.md)
@@ -119,14 +137,6 @@ are:
 - [Sensor mounting](hardware/sensor_mounting.md)
 - [Power architecture](hardware/power_architecture.md)
 - [Hardware revision history](hardware/hardware_revision_history.md)
-- [Core setup](setup/savo_core_setup.md)
-- [Edge setup](setup/savo_edge_setup.md)
-- [Dependency matrix](setup/dependency_matrix.md)
-- [Core–Edge Ethernet](setup/ethernet_core_edge_setup.md)
-- [ROS networking](setup/ros_domain_networking.md)
-- [Time synchronization](setup/time_sync.md)
-- [RealSense setup](setup/realsense_setup.md)
-- [Audio setup](setup/audio_setup.md)
 
 ## Testing and evidence
 

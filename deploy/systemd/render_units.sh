@@ -27,6 +27,7 @@ templates=(
   "$script_dir/savo_edge.service"
   "$script_dir/savo.service"
   "$script_dir/savo_mapping.service"
+  "$root/savo_ws/src/edge/savo_ui/systemd/savo-ui-runtime.service"
   "$root/savo_ws/src/edge/savo_ui/systemd/savo-ui.service"
 )
 for template in "${templates[@]}"; do

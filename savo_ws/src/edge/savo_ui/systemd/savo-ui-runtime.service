@@ -1,7 +1,7 @@
 [Unit]
 Description=Robot SAVO always-on Intro, dashboard and V2 interaction UI
-Wants=network-online.target
 After=local-fs.target
+Before=savo_edge.service
 Conflicts=savo-ui.service
 StartLimitIntervalSec=60
 StartLimitBurst=10

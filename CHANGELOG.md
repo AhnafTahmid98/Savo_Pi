@@ -4,6 +4,30 @@ All notable changes to the Robot Savo repository should be recorded in this file
 
 The project does not yet use tagged semantic releases consistently. Entries are therefore grouped by date. This initial changelog was reconstructed from dated repository documents and the current source snapshot because the inspected exported ZIP does not contain Git history.
 
+## 2026-08-09 — Phase 6 installation and commissioning documentation
+
+### Added — fresh installation paths
+
+* Completed the 15-document setup set for fresh Core, Edge, observer, and
+  Robot Savo-side SavoMind installation.
+* Added source-backed ROS domain, dedicated network, Chrony, device permission,
+  environment/secret, RealSense, audio, UPS, and development procedures.
+* Added a non-actuating safe-idle commissioning gate that distinguishes setup
+  readiness from formal hardware and motion acceptance.
+
+### Changed — corrected setup guidance
+
+* Replaced placeholders and stale dependency, Ethernet, Tailscale, time-sync,
+  Edge hardware, and external UPS-service guidance with current role scripts,
+  package tools, runtime paths, and one-owner service rules.
+* Documented the hard-bound D435 serial, missing repository-provided ALSA alias
+  configuration and general hardware udev policy, and the distributed Edge
+  bridge runtime-directory requirement as explicit deployment findings.
+
+### Safety and behavior — Phase 6
+
+* No production motion authority was changed by this documentation phase.
+
 ## 2026-08-09 — Phase 5 operations documentation
 
 ### Added — production operations runbooks

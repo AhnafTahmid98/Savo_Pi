@@ -174,15 +174,16 @@ The production service units are rendered from the templates in `deploy/systemd/
 Start with:
 
 1. [Documentation index](docs/README.md)
-2. [Current system status](docs/status/current_system_status.md)
-3. [Package ownership matrix](docs/packages/package_ownership_matrix.md)
-4. [System overview](docs/architecture/system_overview.md)
-5. [Two-Pi architecture](docs/architecture/two_pi_architecture.md)
-6. [Production operations](docs/operations/README.md)
-7. [Operator quick start](docs/operations/operator_quick_start.md)
-8. [Emergency stop and recovery](docs/operations/emergency_stop_and_recovery.md)
-9. [Full robot test plan](docs/testing/full_robot_test_plan.md)
-10. [Pre-real-test completion report](docs/audits/pre_real_test_completion_2026-08-02.md)
+2. [Fresh installation and commissioning](docs/setup/README.md)
+3. [Current system status](docs/status/current_system_status.md)
+4. [Package ownership matrix](docs/packages/package_ownership_matrix.md)
+5. [System overview](docs/architecture/system_overview.md)
+6. [Two-Pi architecture](docs/architecture/two_pi_architecture.md)
+7. [Production operations](docs/operations/README.md)
+8. [Operator quick start](docs/operations/operator_quick_start.md)
+9. [Emergency stop and recovery](docs/operations/emergency_stop_and_recovery.md)
+10. [Full robot test plan](docs/testing/full_robot_test_plan.md)
+11. [Pre-real-test completion report](docs/audits/pre_real_test_completion_2026-08-02.md)
 
 Package-local `README.md` files document implementation details. Cross-package documents in `docs/` describe system contracts, deployment, and validation. Where a dated audit and the current source disagree, the current source and its validators take precedence.
 
