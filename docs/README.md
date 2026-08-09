@@ -58,17 +58,24 @@ There is no `savo_intent` package or central page. SavoMind reasoning is externa
 
 ## Architecture
 
+- [System overview](architecture/system_overview.md)
+- [Two-Pi architecture](architecture/two_pi_architecture.md)
 - [Core architecture](architecture/savo_core_architecture.md)
 - [Edge architecture](architecture/savo_edge_architecture.md)
 - [Shared packages](architecture/shared_packages_architecture.md)
+- [Bringup readiness state machine](architecture/bringup_readiness_state_machine.md)
 - [Motion authority](architecture/motion_authority_model.md)
 - [Safety](architecture/safety_architecture.md)
 - [Localization](architecture/localization_architecture.md)
 - [Mapping and navigation](architecture/mapping_navigation_architecture.md)
 - [Perception](architecture/perception_architecture.md)
 - [ROS topic contracts](architecture/ros2_topic_contracts.md)
+- [TF frame authority](architecture/tf_frame_authority.md)
 - [Network](architecture/network_architecture.md)
 - [Speech/SavoMind flow](architecture/speech_intent_flow.md)
+- [SavoMind–ROS boundary](architecture/savomind_ros_boundary.md)
+- [Data storage and artifacts](architecture/data_storage_and_artifacts.md)
+- [Diagnostics and observability](architecture/diagnostics_and_observability.md)
 
 ## Deployment and operations
 
@@ -81,11 +88,17 @@ There is no `savo_intent` package or central page. SavoMind reasoning is externa
 
 ## Hardware and setup
 
+- [Bill of materials](hardware/bill_of_materials.md)
 - [Wiring overview](hardware/wiring_overview.md)
+- [Cable and connector map](hardware/cable_and_connector_map.md)
 - [GPIO/I2C map](hardware/gpio_i2c_map.md)
 - [Measurement checklist](hardware/measurement_checklist.md)
+- [Calibration register](hardware/calibration_register.md)
+- [Mechanical notes](hardware/mechanical_notes.md)
+- [Robot layer layout](hardware/robot_layer_layout.md)
 - [Sensor mounting](hardware/sensor_mounting.md)
 - [Power architecture](hardware/power_architecture.md)
+- [Hardware revision history](hardware/hardware_revision_history.md)
 - [Core setup](setup/savo_core_setup.md)
 - [Edge setup](setup/savo_edge_setup.md)
 - [Dependency matrix](setup/dependency_matrix.md)

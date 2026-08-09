@@ -1,0 +1,26 @@
+[Unit]
+Description=Robot SAVO always-on Intro, dashboard and V2 interaction UI
+Wants=network-online.target
+After=local-fs.target
+Conflicts=savo-ui.service
+StartLimitIntervalSec=60
+StartLimitBurst=10
+
+[Service]
+Type=simple
+User=@SAVO_USER@
+Group=@SAVO_GROUP@
+WorkingDirectory=@SAVO_ROOT@
+EnvironmentFile=-/etc/robot-savo/robot-savo.env
+ExecStartPre=/bin/bash -lc 'for i in $(seq 1 50); do [ -e /dev/fb0 ] && exit 0; sleep 0.2; done; echo "/dev/fb0 not ready" >&2; exit 1'
+ExecStart=/bin/bash -lc 'source /opt/ros/jazzy/setup.bash && source "@SAVO_WS@/install/setup.bash" && exec ros2 launch savo_ui ui_intro.launch.py profile:=pi loop_hz:=30.0 intro_seconds:=4.0'
+Restart=always
+RestartSec=2
+KillSignal=SIGINT
+TimeoutStopSec=20
+KillMode=control-group
+UMask=0027
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

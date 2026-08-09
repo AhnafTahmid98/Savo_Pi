@@ -1,39 +1,21 @@
 # Power Architecture
 
-Power distribution, voltage rails, protection, battery, and shutdown behaviour.
+## Monitored domains
 
-## UPS HAT power architecture
+Robot Savo models three power domains: Core UPS, Edge UPS, and the base/drivetrain battery. Each Pi reads its own UPS at I2C bus 1 address `0x36`; Core reads base voltage through ADS7830 `0x48`, channel 2. `savo_power` publishes per-domain status and Core aggregate health/shutdown request.
 
-Both `savo-core` and `savo-edge` use the same UPS HAT style and configuration on their respective Raspberry Pi 5 units.
+The physical upstream topology, battery chemistry/capacity, fuse ratings, wire gauges, converters, switch, grounding, and charging interlocks are not proven by current source and remain measurement/inspection items. Software monitoring is not a substitute for over-current, undervoltage, reverse-polarity, or emergency isolation hardware.
 
-### Power path
+## Configured thresholds
 
-```
-Power adapter (USB-C or barrel)
-        │
-        ▼
-  UPS HAT input
-  ┌─────────────┐
-  │  Battery     │  ← 18650 cells, on-board charge management
-  │  management  │
-  └──────┬──────┘
-         │
-         ▼
-  GPIO header → Raspberry Pi 5 (5V rail)
-```
+| Domain | Configured value | Status |
+| --- | ---: | --- |
+| UPS low / critical | `3.40 / 3.20 V` | Software default; calibrate per HAT |
+| Base empty / low / full | `6.40 / 7.20 / 8.40 V` | Software mapping; chemistry must be verified |
+| Base low / full SOC | `20 / 95%` | Derived display/control thresholds |
+| Sample/publish rate | `1 Hz` | Configured |
+| Stale timeout | `5 s` | Configured |
 
-The HAT sits in-line between the wall adapter and the Pi. When wall power is present, the HAT charges the battery and powers the Pi. When wall power is lost, the battery takes over with no observable dropout on the Pi.
+Automatic shutdown execution is disabled in package configuration. The monitor may request shutdown; privileged deployment owns actual OS poweroff policy. A low-power event must not create a new motion authority, and shutdown must first converge on stopped/unauthorized state.
 
-### Key properties
-
-- Fuel gauge chip at I2C address `0x36` — voltage, capacity, and charge state readable in software
-- `POWER_OFF_ON_HALT=1` ensures a Pi `shutdown` command also cuts HAT output, preventing idle battery drain
-- `PSU_MAX_CURRENT=5000` (5 A) supports Pi 5 plus all attached peripherals
-
-### Validation image
-
-![UPS HAT validation](../assets/hardware/ups_hat.png)
-
-### Setup reference
-
-See [`../setup/ups_hat_setup.md`](../setup/ups_hat_setup.md) for full installation, I2C check, EEPROM configuration, and fan profile steps.
+Validate ADC scale/offset against a calibrated meter at several loads, UPS telemetry against each board, sag during motor stall/start, brownout behavior, charger isolation, ground noise, fuse protection, cable heating, runtime, low/critical transitions, stale telemetry, and controlled shutdown/restart. Record calibrated coefficients and equipment in the [calibration register](calibration_register.md).

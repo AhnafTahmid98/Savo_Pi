@@ -26,4 +26,3 @@ The Ethernet is a trusted robot segment. Wi-Fi/Tailscale may provide SSH adminis
 Loss of the link makes remote inputs stale. Bridge actions must fail closed, Core readiness applies its configured required dependencies, and local Core command/safety watchdogs remain authoritative. Network restoration does not itself re-arm the robot.
 
 Validate rendered Netplan without applying it first, then verify interface addresses/routes, `ping`, `ros2` discovery, Chrony tracking/sources, firewall rules, middleware identity, throughput for selected RGB-D flows, link loss, and reconnect while Core remains in `STOP`. Repository render/health validators are source-level evidence; the actual two-Pi network remains target-dependent.
-

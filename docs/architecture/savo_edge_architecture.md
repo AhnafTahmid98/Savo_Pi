@@ -26,4 +26,3 @@ Default Edge deployment starts the bridge, RealSense, and VO; speech, UI, and D4
 Bridge snapshots and sockets are volatile under `/run/savo_bridge`. Speech uses `/run/savomind/speech.sock`. ROS logs default to the Edge user's ROS log tree unless the deployed service overrides it. No authoritative map, location, supervisor, or approval state is stored on Edge.
 
 Source-contract tests cover bridge and speech boundaries, UI mutation rejection, and Edge launch membership. Live D435 USB/RGB-D/VO quality, ReSpeaker/playback, display/touch, socket permissions, time sync, and two-host failure behavior remain hardware/integration gates.
-

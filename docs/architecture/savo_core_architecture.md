@@ -34,4 +34,3 @@ Core bringup validates role/mode/profile, geometry policy, required component fr
 Persistent Core artifacts live under `/var/lib/robot_savo`; logs live under `/var/log/robot_savo`. The production wrapper prepares map sessions/releases, location state, supervisor state, ROS home, and log directories.
 
 Source validators cover the launch/authority contracts. Remaining gates include locked geometry, the wheel-geometry/kinematics discrepancy, shared-PCA9685 integration, sensor polarity/rates, motor watchdog, power calibration, and guarded real-robot regression.
-

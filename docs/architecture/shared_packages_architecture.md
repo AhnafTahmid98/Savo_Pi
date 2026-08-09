@@ -18,4 +18,3 @@ Interfaces in `savo_msgs` carry data but do not own behavior. The producer/consu
 Core and Edge use different launch branches for perception and power. Core range fusion may stop motion; Edge obstacle-cloud filtering cannot replace the Core near-field gate. Edge UPS telemetry crosses ROS to the Core aggregate, but each UPS is on its host's independent I2C bus.
 
 No shared package may become a shortcut around the ownership matrix. Role changes require deployment-array, dependency, launch, test, status, and documentation updates together. Validation is provided by package contract tests and role validators; distributed runtime behavior still requires two-host regression.
-

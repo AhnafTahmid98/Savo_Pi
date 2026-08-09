@@ -10,7 +10,7 @@
 
 The repository is ready for the next gate: clean role-specific build/test on the intended Core and Edge targets followed by safe-idle and staged hardware regression. It is **not authorized for production motion**.
 
-Phase 3 package documentation is complete. The live checkout contains exactly 20 ROS package manifests and 20 matching central pages. The full-bringup, observer, and aggregate pre-real-test validators pass in the current development environment.
+Phase 3 package documentation and Phase 4 architecture/hardware documentation are complete. The live checkout contains exactly 20 ROS package manifests and central pages, 18 architecture pages, and 11 hardware pages. The full-bringup, observer, and aggregate pre-real-test validators pass in the current development environment.
 
 Motion remains blocked because the active geometry profile is provisional, production requires locked geometry, the D435 voxel profile defaults unvalidated, and current-source target/hardware regression is not recorded. An earlier Robot Savo baseline was exercised on physical hardware; that evidence does not replace regression of this source/configuration.
 
@@ -31,6 +31,7 @@ Motion remains blocked because the active geometry profile is provisional, produ
 | Check | Result | Finding |
 | --- | --- | --- |
 | Package coverage | PASS | 20 manifests and 20 corresponding central pages; no `savo_intent` page |
+| Architecture/hardware coverage | PASS | Exactly 18 architecture and 11 hardware Markdown pages |
 | Markdown relative links | PASS | No broken relative link in `README.md` or `docs/**/*.md` |
 | `deploy/common/validate_full_bringup.sh` | PASS | Required launch/config/deploy contracts valid |
 | `deploy/observer/validate_observer.sh` | PASS | Required assets present; observer remains read-only |
@@ -99,6 +100,11 @@ Production motion remains blocked until applicable gates close:
 7. Complete manual mapping and verified production release before autonomous mapping or saved-map navigation.
 8. Keep D435 voxel disabled until its separate real-hardware validation passes.
 
+Two additional Phase 4 findings require closure during geometry and hardware integration:
+
+- base/localization kinematics use `0.165 m` wheelbase and track while provisional URDF wheel centres imply `0.230 m` and `0.200 m`;
+- base and head drivers separately initialize the same PCA9685 at Core bus 1 address `0x40`; channels do not overlap, but chip-wide initialization and concurrent access require validation.
+
 ## Source/documentation discrepancies requiring follow-up
 
 - `savo_perception/config/topics.yaml` retains `savo_dashboard` in descriptive consumer metadata, although that package does not exist.
@@ -127,4 +133,4 @@ Then follow the [full robot test plan](../testing/full_robot_test_plan.md), begi
 
 ## Package documentation status
 
-All 20 source-reconciled pages are indexed in [the documentation index](../README.md). Older architecture, deployment, hardware, and testing documents remain subordinate to current source and may require their own phase-specific reconciliation before production use.
+All 20 package pages, 18 architecture pages, and 11 hardware pages are indexed in [the documentation index](../README.md). Deployment and testing records remain subordinate to current source and require target/hardware evidence before production use.

@@ -2,186 +2,205 @@
 
 ## Purpose
 
-Robot Savo uses one ROS 2 workspace on multiple computers, but each computer builds only the packages assigned to its deployment role. The role build scripts are the supported build entry points for the Core Pi and Edge Pi.
+Robot Savo uses one ROS 2 workspace on multiple computers, but each computer
+builds only the packages assigned to its deployment role. The Core and Edge
+role scripts are the supported target build entry points.
 
-The authoritative package lists are defined in:
+The authoritative package arrays are defined in:
 
-deploy/core/env_core.sh
-deploy/edge/env_edge.sh
+- `deploy/core/env_core.sh` — `SAVO_CORE_BUILD_PACKAGES`
+- `deploy/edge/env_edge.sh` — `SAVO_EDGE_BUILD_PACKAGES`
 
-Do not maintain independent package lists in documentation, CI scripts, or local helper scripts. Changes to role membership must be made in the corresponding environment file and validated through the normal role build.
+Do not maintain an independent package list in documentation, CI, or local
+helpers. Change role membership in the applicable environment file, then run
+the role validators and build. The [package ownership matrix](../packages/package_ownership_matrix.md)
+is the human-readable snapshot of those arrays.
 
-Supported targets
+## Supported targets
 
-| Role | Expected hostnames | Build script | Package count |
-| --- | --- | --- | --- |
-| Core | core, savo-core | deploy/core/build_core.sh | 14 |
-| Edge | edge, savo-edge | deploy/edge/build_edge.sh | 10 |
-| Observer | Operator workstation | deploy/observer/build_observer.sh or package-up-to build | Separate |
+| Role | Host constraint | Script under `deploy/` | Count |
+| --- | --- | --- | ---: |
+| Core | `core` or `savo-core` | `core/build_core.sh` | 14 |
+| Edge | `edge` or `savo-edge` | `edge/build_edge.sh` | 10 |
+| Observer | Workstation; no check | `observer/build_observer.sh` | Separate |
 
-The hostname checks are intentional safeguards. They reduce the chance of installing hardware-facing packages on the wrong computer.
+Core and Edge hostname checks are intentional safeguards against running
+hardware-facing target builds on the wrong computer. The observer build is a
+workstation workflow and builds through `--packages-up-to savo_observer`.
 
-Prerequisites
+## Prerequisites
 
-Before building either role:
+Before a target role build:
 
-Use Ubuntu 24.04 with ROS 2 Jazzy installed.
-Clone the repository to the intended SAVO_ROOT location.
-Confirm at least 8 GiB of free disk space.
-Install the role dependencies.
-Confirm the workspace contains every package required by the role.
-Stop any manual ROS sessions that source a different workspace overlay.
+1. Use Ubuntu 24.04 and ROS 2 Jazzy.
+2. Place the repository at the configured `SAVO_ROOT` and workspace at
+   `SAVO_WS`.
+3. Confirm at least 8 GiB of free space for dependency installation or staged
+   update.
+4. Confirm every package required by the selected role is present.
+5. Stop manual ROS sessions that source a conflicting overlay.
+6. Install dependencies and perform the installer-managed initial role build.
 
-Install dependencies with:
+For Core:
 
+```bash
 cd ~/Savo_Pi
 bash deploy/common/install_role_deps.sh --role core
+```
 
-or:
+For Edge:
 
+```bash
 cd ~/Savo_Pi
 bash deploy/common/install_role_deps.sh --role edge
+```
 
-The dependency installer:
+`install_role_deps.sh`:
 
-requires Ubuntu 24.04;
-expects ARM64 unless SAVO_ALLOW_PC_INSTALL=true is intentionally set for a development computer;
-installs common deployment tools and role-specific system packages;
-initializes or updates rosdep as needed;
-runs rosdep install only for the source paths used by the selected role;
-prepares Edge runtime socket directories when the Edge role is selected;
-writes deployment logs under ${SAVO_ROOT}/log/deploy unless overridden.
-Core build
+- requires Ubuntu 24.04;
+- requires ARM64 unless `SAVO_ALLOW_PC_INSTALL=true` is deliberately set on a
+  development computer;
+- reads the selected role array from `env_core.sh` or `env_edge.sh`;
+- installs common and role-specific operating-system packages;
+- initializes or updates `rosdep` and installs dependencies only for selected
+  role package paths;
+- runs a `colcon build --packages-select ... --symlink-install` for the role;
+- prepares Edge runtime socket directories after a successful Edge build; and
+- writes an install log under `${SAVO_DEPLOY_LOG_DIR}` or, by default,
+  `${SAVO_ROOT}/log/deploy`.
+
+Use `--dry-run` to print the selected APT packages, role packages, and planned
+ROS dependency/build scope without installing or building.
+
+## Core build
 
 Run on the Core Pi:
 
+```bash
 cd ~/Savo_Pi
 bash deploy/core/build_core.sh --clean --test
+```
 
-The Core script builds the package set from SAVO_CORE_BUILD_PACKAGES:
-
-savo_msgs
-savo_description
-savo_bringup
-savo_perception
-savo_power
-savo_supervisor
-savo_base
-savo_control
-savo_lidar
-savo_localization
-savo_locations
-savo_mapping
-savo_nav
-savo_head
-Core options
+The script consumes `SAVO_CORE_BUILD_PACKAGES` directly.
 
 | Option | Behavior |
 | --- | --- |
-| --clean | Removes build/, install/, and log/ before building |
-| --test or --tests | Runs colcon test and prints the complete test-result summary |
-| --allow-missing | Skips missing packages; permitted only for staged development, never for release qualification |
+| `--clean` | Removes `savo_ws/build`, `install`, and `log` before building |
+| `--test` or `--tests` | Runs tests and prints the verbose result summary |
+| `--allow-missing` | Omits missing packages for staged development only |
 
-A production or release build must not use --allow-missing.
+Never use `--allow-missing` for production or release qualification. Without
+that option, one missing Core package fails the build before `colcon build`.
 
-Edge build
+## Edge build
 
 Run on the Edge Pi:
 
+```bash
 cd ~/Savo_Pi
 bash deploy/edge/build_edge.sh --clean --test
+```
 
-The Edge script builds the package set from SAVO_EDGE_BUILD_PACKAGES:
+The script consumes `SAVO_EDGE_BUILD_PACKAGES` directly. Every required Edge
+package must exist; the script has no `--allow-missing` mode.
 
-savo_msgs
-savo_description
-savo_bringup
-savo_bridge
-savo_perception
-savo_power
-savo_realsense
-savo_speech
-savo_ui
-savo_vo
+## Build behavior
 
-The Edge script fails if any required package is absent. It does not provide an --allow-missing mode.
+Both target scripts:
 
-Build behavior
+- source the configured ROS 2 distribution;
+- enforce the applicable Core or Edge short hostname;
+- inspect the workspace with `colcon list`;
+- build only the authoritative role array with `--symlink-install`;
+- source the completed role overlay before requested tests; and
+- return non-zero for unknown arguments, missing prerequisites or packages,
+  build failures, and test failures.
 
-Both role scripts:
+The scripts do not launch Robot Savo, install or enable systemd units, apply
+network configuration, arm the supervisor, or authorize motion.
 
-source the configured ROS 2 distribution;
-verify the expected target hostname;
-inspect the workspace with colcon list;
-build only the packages assigned to the role;
-use --symlink-install for the normal development/target workflow;
-source the completed role install before tests;
-return a non-zero status when a required command, directory, package, build, or test fails.
+## Pass criteria
 
-The build scripts do not launch the robot, enable systemd services, apply network changes, or authorize motion.
+A target role build passes only when:
 
-Pass criteria
+1. The hostname check succeeds.
+2. Every required role package is present.
+3. `colcon build` exits successfully.
+4. When tests are requested, `colcon test` exits successfully and
+   `colcon test-result --verbose` reports zero errors and failures.
+5. No package was omitted through `--allow-missing`.
+6. No safety gate or production default was weakened to obtain the result.
 
-A role build passes only when:
+Retain the terminal output together with the source revision, hostname, date,
+timezone, and selected role.
 
-the hostname check passes;
-every required role package is present;
-colcon build exits successfully;
-all requested tests complete;
-colcon test-result --verbose reports zero errors and zero failures;
-no package was silently omitted;
-the build did not require removing a safety gate or changing a production default.
-
-Retain the terminal output with the source revision, host identity, date, and role.
-
-Failure handling
+## Failure handling
 
 If a build fails:
 
-do not launch the role from the partial install;
-record the first build or test failure, not only the final colcon summary;
-correct dependency or source issues in the repository;
-rerun with --clean --test;
-do not use --allow-missing to qualify an incomplete Core build;
-do not copy build artifacts from another computer as a substitute for a target build.
-Staged release builds
+1. Do not launch from the partial install.
+2. Record the first build or test failure, not only the final summary.
+3. Correct the dependency or source issue in the repository.
+4. Rerun the target build with `--clean --test`.
+5. Do not use `--allow-missing` to qualify an incomplete Core build.
+6. Do not copy another host's `build`, `install`, or `log` trees as a
+   substitute for a target build.
 
-For an already deployed target, use the staged update workflow rather than overwriting the active install in place:
+## Staged target updates
 
+For an already deployed target, use the staged updater instead of overwriting
+the active install in place:
+
+```bash
 cd ~/Savo_Pi
 bash deploy/common/update_role.sh --role core --pull
+```
 
 or:
 
+```bash
 cd ~/Savo_Pi
 bash deploy/common/update_role.sh --role edge --pull
+```
 
-The staged updater:
+The updater:
 
-verifies the Git checkout and available disk space;
-refuses a dirty tree unless explicitly allowed for a build-only operation;
-uses fast-forward-only Git updates;
-verifies the full package set before stopping the active service;
-builds and tests in savo_ws/.releases/;
-activates the new install only after all tests pass;
-retains the previous install as install.previous.release-timestamp;
-restarts a previously active role service unless --no-restart is supplied.
+- requires a Git checkout, ROS workspace, `colcon`, and at least 8 GiB free;
+- rejects a dirty checkout by default;
+- uses `git fetch` plus a fast-forward-only merge for `--ref`, or
+  `git pull --ff-only` otherwise;
+- reads the same authoritative role arrays as normal builds;
+- verifies the entire role package set before stopping an active service;
+- stages build, install, and tests under `savo_ws/.releases/`;
+- activates the staged install only after build and tests succeed;
+- retains the prior install as `savo_ws/install.previous.<UTC timestamp>`; and
+- restarts a previously active `savo_core.service` or `savo_edge.service`
+  unless `--no-restart` is supplied.
 
-See Production startup, Systemd services, and Recovery operations before using staged deployment on a robot.
+`--allow-dirty` cannot be combined with `--pull`. Despite the current error
+message calling it a "build-only update", the implementation still proceeds
+to service stop, staged build/test, install activation, and optional restart.
+Treat it as a development escape hatch, not a release-qualification path.
 
-Evidence record
+Review [production startup](production_startup.md),
+[systemd services](systemd_services.md), and
+[recovery operations](recovery_operations.md) before updating a robot.
 
-For every target build, record:
+## Evidence record
 
+Record the following for every target build:
+
+```text
 Date and timezone:
 Host and role:
-Operating system:
+Operating system and architecture:
 ROS distribution:
 Repository commit:
-Build command:
 Dependency-install command:
-Packages selected:
+Build command:
+Packages selected from the role array:
 Build result:
-Test summary:
+Test-result summary:
 Operator:
 Notes or deviations:
+```

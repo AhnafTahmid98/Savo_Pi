@@ -118,6 +118,45 @@ install(TARGETS
   DESTINATION lib/${PROJECT_NAME}
 )
 
+# Always-on hybrid runtime.
+# Existing ui_node and ui_v2_node remain available.
+add_executable(ui_runtime_node
+  src/runtime/main_ui_runtime.cpp
+  src/runtime/ui_runtime_node.cpp
+  src/app/live_state.cpp
+  src/v2/graphics.cpp
+  src/v2/voice_face_animation.cpp
+  src/v2/voice_face_renderer.cpp
+  src/v2/navigation_renderer.cpp
+  src/render/image_asset.cpp
+  src/render/canvas.cpp
+  src/render/preview_writer.cpp
+  src/render/font.cpp
+  src/platform/framebuffer_display.cpp
+)
+
+target_include_directories(ui_runtime_node
+  PRIVATE
+    include
+)
+
+target_compile_features(ui_runtime_node
+  PRIVATE
+    cxx_std_17
+)
+
+ament_target_dependencies(ui_runtime_node
+  rclcpp
+  std_msgs
+  sensor_msgs
+  savo_msgs
+)
+
+install(TARGETS
+  ui_runtime_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 install(DIRECTORY include/
   DESTINATION include
 )
@@ -158,6 +197,13 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/systemd/savo-ui.service")
   )
 endif()
 
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/systemd/savo-ui-runtime.service")
+  install(FILES
+    systemd/savo-ui-runtime.service
+    DESTINATION share/${PROJECT_NAME}/systemd
+  )
+endif()
+
 # -----------------------------------------------------------------------------
 # Testing / lint
 # -----------------------------------------------------------------------------
@@ -179,6 +225,10 @@ if(BUILD_TESTING)
   ament_add_pytest_test(
     test_ui_v2_contract
     test/test_ui_v2_contract.py
+  )
+  ament_add_pytest_test(
+    test_ui_runtime_contract
+    test/test_ui_runtime_contract.py
   )
   ament_lint_auto_find_test_dependencies()
 

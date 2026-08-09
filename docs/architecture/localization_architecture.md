@@ -1,101 +1,30 @@
 # Localization Architecture
 
-Localization architecture, frame ownership, odometry sources, and state-estimation boundaries.
+Core owns the authoritative local odometry chain; Edge can contribute optional visual odometry.
 
-## Overview
+## Data and TF flow
 
-`savo-core` owns all localization. It fuses multiple odometry sources into a single filtered pose estimate using robot_localization EKF, then publishes the authoritative robot position for Nav2 and mapping.
+```text
+four GPIO encoders -> /wheel/odometry --+
+BNO055 IMU --------> /imu/data ---------+-> robot_localization EKF
+optional Edge VO --> /vo/odom ----------+        |
+                                                  +-> /odometry/filtered
+                                                  +-> odom -> base_footprint
 
-`savo-edge` contributes visual odometry (`/vo/odom`) as one input to the EKF over the shared ROS 2 network.
+SLAM (mapping) or AMCL (saved map) -> map -> odom
+robot_state_publisher              -> base_footprint -> fixed robot frames
+```
 
-## Odometry sources
+Wheel odometry is configured for `30 Hz`, `0.065 m` wheel diameter, `0.165 m` wheelbase, `0.165 m` track, and `0.5 s` encoder timeout. Encoder GPIO pairs are FL `20/21`, FR `13/25`, RL `23/24`, and RR `12/26`; configured CPR is 20 with x4 decoding. The BNO055 uses Core I2C bus 1 at `0x28`, NDOF mode, `25 Hz`.
 
-| Source             | Topic              | Type                    | Owner        | Notes                                   |
-| ------------------ | ------------------ | ----------------------- | ------------ | --------------------------------------- |
-| Wheel odometry     | `/odom`            | `nav_msgs/Odometry`     | `savo-core`  | From four mecanum encoders in savo_base |
-| IMU                | `/imu/data`        | `sensor_msgs/Imu`       | `savo-core`  | From IMU hardware on savo_base          |
-| Visual odometry    | `/vo/odom`         | `nav_msgs/Odometry`     | `savo-edge`  | From rtabmap RGBD + savo_vo republisher |
+The EKF runs at `30 Hz`, uses a `0.2 s` sensor timeout, operates in 2D, publishes `/odometry/filtered`, and is the sole `odom -> base_footprint` TF authority. Wheel odometry has `publish_tf=false`. VO fusion is `false` by default; when enabled, `/vo/odom` must use the configured `odom` and `base_footprint` frames and validated covariance/timestamps.
 
-LiDAR scan data from `/scan` feeds SLAM (slam_toolbox) during mapping, not the EKF directly.
+## Mode ownership
 
-## /vo/odom fusion plan
+Live mapping starts SLAM as `map -> odom` owner. Saved-map navigation starts AMCL as that owner. They must never publish the same transform concurrently. The description owns fixed `base_footprint -> base_link -> sensor/wheel` transforms.
 
-`/vo/odom` is published by `savo_vo` on `savo-edge` and consumed by the EKF on `savo-core` over the ROS 2 network.
+## Known geometry blocker
 
-### What the EKF expects from /vo/odom
+The description places wheel centers at x `+/-0.115 m` and y `+/-0.100 m`, implying `0.230 m` longitudinal separation and `0.200 m` lateral separation, while base/localization kinematics are configured as `0.165/0.165 m`. All values are provisional. The discrepancy must be measured and reconciled before locking geometry or tuning odometry.
 
-| Field                  | Expected value                                    |
-| ---------------------- | ------------------------------------------------- |
-| `header.frame_id`      | `odom`                                            |
-| `child_frame_id`       | `camera_link`                                     |
-| Message type           | `nav_msgs/Odometry`                               |
-| Rate                   | 10–15 Hz (governed by rtabmap RGBD odometry)      |
-| Covariance             | Non-zero; reflects visual confidence              |
-
-### Fusion strategy
-
-The EKF fuses position and velocity estimates from all sources. VO supplements wheel + IMU by providing drift correction in the XY plane and some yaw correction, particularly useful in featureless corridors where wheel slip accumulates.
-
-Recommended fusion configuration:
-
-| Source       | EKF role                                | Primary correction axes |
-| ------------ | --------------------------------------- | ----------------------- |
-| Wheel odom   | Primary position source, high weight    | X, Y, Yaw              |
-| IMU          | Orientation and angular rate, high rate | Roll, Pitch, Yaw rate   |
-| VO           | Drift correction supplement, lower rate | X, Y, Yaw              |
-
-VO is weighted lower than wheel odometry by default. It should help, not dominate the pose estimate.
-
-### What happens when /vo/odom is absent
-
-The EKF should be configured with a timeout so that if `/vo/odom` stops arriving (RealSense disconnect, savo-edge crash), the EKF continues fusing wheel + IMU without blocking or crashing.
-
-VO loss causes:
-
-- Slightly higher drift in long corridors
-- No change to safety stop behavior
-- Nav2 continues using the filtered estimate
-
-The robot must navigate safely without VO. VO is a quality improvement, not a hard dependency.
-
-## EKF output
-
-| Topic                  | Type                  | Description                                     |
-| ---------------------- | --------------------- | ----------------------------------------------- |
-| `/odometry/filtered`   | `nav_msgs/Odometry`   | Fused pose estimate for Nav2 and mapping        |
-| `/tf`                  | TF2 broadcast         | `odom → base_link` transform                   |
-
-Nav2 and slam_toolbox subscribe to `/odometry/filtered` and the `odom → base_link` TF.
-
-## Frame ownership
-
-| Frame                     | Owner                  | Notes                                           |
-| ------------------------- | ---------------------- | ----------------------------------------------- |
-| `map`                     | slam_toolbox / AMCL    | Established during mapping or localization      |
-| `odom`                    | robot_localization EKF | Published by savo_localization on savo-core     |
-| `base_link`               | savo_base              | Robot center frame; origin of physical model    |
-| `camera_link`             | savo_description URDF  | Fixed transform from base_link                  |
-| `camera_color_optical_frame` | savo_description     | Optical frame for color image                   |
-| `camera_depth_optical_frame` | savo_description     | Optical frame for depth image                   |
-
-The `odom → base_link` transform is published by the EKF. No other node should publish this transform.
-
-The `base_link → camera_link` transform is published by `robot_state_publisher` using the URDF from `savo_description`.
-
-## SLAM vs localization-only mode
-
-| Mode              | Map source                       | Pose method                            |
-| ----------------- | -------------------------------- | -------------------------------------- |
-| Mapping mode      | slam_toolbox builds map live     | SLAM internal pose + EKF               |
-| Localization mode | Pre-built map loaded from disk   | AMCL or slam_toolbox localization-only |
-
-During mapping, the EKF still runs. SLAM uses the filtered odometry as its motion model.
-
-## Related documents
-
-- [`two_pi_architecture.md`](two_pi_architecture.md)
-- [`savo_edge_architecture.md`](savo_edge_architecture.md)
-- [`ros2_topic_contracts.md`](ros2_topic_contracts.md)
-- [`packages/savo_vo.md`](../packages/savo_vo.md)
-- [`packages/savo_localization.md`](../packages/savo_localization.md)
-- [`testing/vo_test_plan.md`](../testing/vo_test_plan.md)
+Source tests validate frames, configuration, and health contracts. Hardware work remains for encoder pin/polarity/counts, wheel effective radius, track/wheelbase, IMU axis/calibration, covariance, EKF drift, VO scale/latency, TF uniqueness, and transitions between SLAM and AMCL.

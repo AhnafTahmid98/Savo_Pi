@@ -32,4 +32,3 @@ Each Pi uses the same role-selecting `robot_bringup.launch.py` with its own `hos
 Validation requires separate role builds, two-host discovery/time checks, independent readiness namespaces, Edge-loss tests, command freshness tests, and confirmation that Core remains stopped. Current source validators cover role membership and launch contracts; target and physical two-Pi regression remain required.
 
 Related: [Core](savo_core_architecture.md), [Edge](savo_edge_architecture.md), [network](network_architecture.md), and [motion authority](motion_authority_model.md).
-

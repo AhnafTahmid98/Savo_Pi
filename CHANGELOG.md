@@ -4,6 +4,30 @@ All notable changes to the Robot Savo repository should be recorded in this file
 
 The project does not yet use tagged semantic releases consistently. Entries are therefore grouped by date. This initial changelog was reconstructed from dated repository documents and the current source snapshot because the inspected exported ZIP does not contain Git history.
 
+## 2026-08-09 — Phase 4 architecture and hardware documentation
+
+### Added — architecture and hardware registries
+
+* Added bringup-readiness, SavoMind boundary, TF-authority, persistent-storage, and diagnostics architecture pages, completing the 18-document architecture set.
+* Added a source-derived bill of materials, calibration register, cable/connector map, and hardware revision history, completing the 11-document hardware set.
+
+### Changed — source reconciliation
+
+* Rewrote the existing architecture pages around the current two-Pi roles, fail-closed motion chain, permission-versus-execution boundary, distributed interfaces, storage, degraded behavior, and validation gates.
+* Rewrote the existing hardware pages as serviceable engineering records, explicitly distinguishing source configuration from physical measurement and historical evidence.
+* Centralized TF ownership and documented the mode-exclusive `map -> odom`, EKF-owned `odom -> base_footprint`, URDF fixed-frame, disabled RealSense TF, and uncalibrated/disabled head-TF contracts.
+
+### Safety and production findings
+
+* Recorded the mismatch between configured `0.165/0.165 m` kinematic wheelbase/track and the provisional URDF wheel-centre layout implying `0.230/0.200 m`; no software value was guessed or changed.
+* Recorded that base and head drivers share and initialize the same Core PCA9685 at `0x40`; channel allocation is non-overlapping but startup/reset/concurrency requires target validation.
+* Preserved provisional-geometry, D435 voxel, operator-approval, Core motion-authority, UI/observer read-only, and hardware-regression gates.
+
+### Validation — Phase 4
+
+* Confirmed exact documentation coverage: 18 architecture pages and 11 hardware pages.
+* Checked Markdown links, placeholders/stale package references, whitespace, role/bringup validators, and aggregate pre-real-test readiness; detailed results are reported in the Phase 4 handoff.
+
 ## 2026-08-09 — Phase 3 package documentation
 
 ### Added — central package pages
@@ -19,7 +43,7 @@ The project does not yet use tagged semantic releases consistently. Entries are 
 * Restored `docs/README.md` from a concatenated file dump to a navigable documentation index.
 * Corrected the non-package `future/` staging-tree description and recorded the current optional UI v2 workspace path without changing its classic production default.
 
-### Validation
+### Validation — Phase 3
 
 * Confirmed exact coverage: 20 package manifests and 20 matching central pages, with no `savo_intent` page.
 * Checked repository Markdown relative links and required source validators; detailed results are reported with the Phase 3 handoff.
