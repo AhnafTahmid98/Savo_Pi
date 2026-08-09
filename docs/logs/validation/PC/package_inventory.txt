@@ -1,0 +1,24 @@
+Robot Savo package inventory
+Run ID: 20260809T021142Z
+Commit: eb71c26ac7dfbeaf9c2e44df3ba9f79117c7d4b6
+
+savo_base	src/core/savo_base	(ros.ament_cmake)
+savo_bridge	src/shared/savo_bridge	(ros.ament_cmake)
+savo_bringup	src/shared/savo_bringup	(ros.ament_cmake)
+savo_control	src/core/savo_control	(ros.ament_cmake)
+savo_description	src/shared/savo_description	(ros.ament_cmake)
+savo_head	src/core/savo_head	(ros.ament_cmake)
+savo_lidar	src/core/savo_lidar	(ros.ament_cmake)
+savo_localization	src/core/savo_localization	(ros.ament_cmake)
+savo_locations	src/core/savo_locations	(ros.ament_cmake)
+savo_mapping	src/core/savo_mapping	(ros.ament_cmake)
+savo_msgs	src/shared/savo_msgs	(ros.ament_cmake)
+savo_nav	src/core/savo_nav	(ros.ament_cmake)
+savo_observer	src/shared/savo_observer	(ros.ament_cmake)
+savo_perception	src/shared/savo_perception	(ros.ament_cmake)
+savo_power	src/shared/savo_power	(ros.ament_cmake)
+savo_realsense	src/edge/savo_realsense	(ros.ament_cmake)
+savo_speech	src/edge/savo_speech	(ros.ament_cmake)
+savo_supervisor	src/shared/savo_supervisor	(ros.ament_cmake)
+savo_ui	src/edge/savo_ui	(ros.ament_cmake)
+savo_vo	src/edge/savo_vo	(ros.ament_cmake)

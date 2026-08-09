@@ -1,0 +1,809 @@
+Robot Savo package PC validation
+Run ID: 20260809T021142Z
+Package: savo_locations
+Date: 2026-08-09T05:22:07+03:00
+Host: ahnaf-tahmid-B760M-PG-SONIC-WiFi
+Commit: eb71c26ac7dfbeaf9c2e44df3ba9f79117c7d4b6
+
+Starting >>> savo_locations
+UpdateCTestConfiguration  from :/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/CTestConfiguration.ini
+Parse Config file:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/CTestConfiguration.ini
+   Site: ahnaf-tahmid-B760M-PG-SONIC-WiFi
+   Build name: (empty)
+ Add coverage exclude regular expressions.
+Create new tag: 20260809-0222 - Experimental
+UpdateCTestConfiguration  from :/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/CTestConfiguration.ini
+Parse Config file:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/CTestConfiguration.ini
+Test project /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations
+Constructing a list of tests
+Done constructing a list of tests
+Updating test list for fixtures
+Added 0 tests to meet fixture requirements
+Checking test dependency graph...
+Checking test dependency graph end
+test 1
+      Start  1: test_location_types
+
+1: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_location_types.gtest.xml" "--package-name" "savo_locations" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_gtest/test_location_types.txt" "--command" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_location_types" "--gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_location_types.gtest.xml"
+1: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations
+1: Test timeout computed to be: 60
+1: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations':
+1:  - /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_location_types --gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_location_types.gtest.xml
+1: Running main() from /opt/ros/jazzy/src/gtest_vendor/src/gtest_main.cc
+1: [==========] Running 5 tests from 1 test suite.
+1: [----------] Global test environment set-up.
+1: [----------] 5 tests from LocationTypes
+1: [ RUN      ] LocationTypes.CandidateStateStringsAreStable
+1: [       OK ] LocationTypes.CandidateStateStringsAreStable (0 ms)
+1: [ RUN      ] LocationTypes.CandidateTerminalPolicyIsStable
+1: [       OK ] LocationTypes.CandidateTerminalPolicyIsStable (0 ms)
+1: [ RUN      ] LocationTypes.NavigationRequiresApprovalAndEnablement
+1: [       OK ] LocationTypes.NavigationRequiresApprovalAndEnablement (0 ms)
+1: [ RUN      ] LocationTypes.SemanticTypesRoundTrip
+1: [       OK ] LocationTypes.SemanticTypesRoundTrip (0 ms)
+1: [ RUN      ] LocationTypes.ContractNamesAreAbsolute
+1: [       OK ] LocationTypes.ContractNamesAreAbsolute (0 ms)
+1: [----------] 5 tests from LocationTypes (0 ms total)
+1: 
+1: [----------] Global test environment tear-down
+1: [==========] 5 tests from 1 test suite ran. (0 ms total)
+1: [  PASSED  ] 5 tests.
+1: -- run_test.py: return code 0
+1: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_location_types.gtest.xml'
+1: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_location_types.gtest.xml'
+ 1/24 Test  #1: test_location_types ................   Passed    0.05 sec
+test 2
+      Start  2: test_location_normalization
+
+2: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_location_normalization.gtest.xml" "--package-name" "savo_locations" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_gtest/test_location_normalization.txt" "--command" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_location_normalization" "--gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_location_normalization.gtest.xml"
+2: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations
+2: Test timeout computed to be: 60
+2: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations':
+2:  - /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_location_normalization --gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_location_normalization.gtest.xml
+2: Running main() from /opt/ros/jazzy/src/gtest_vendor/src/gtest_main.cc
+2: [==========] Running 6 tests from 1 test suite.
+2: [----------] Global test environment set-up.
+2: [----------] 6 tests from LocationNormalization
+2: [ RUN      ] LocationNormalization.TrimsAsciiWhitespace
+2: [       OK ] LocationNormalization.TrimsAsciiWhitespace (0 ms)
+2: [ RUN      ] LocationNormalization.CollapsesWhitespace
+2: [       OK ] LocationNormalization.CollapsesWhitespace (0 ms)
+2: [ RUN      ] LocationNormalization.BuildsStableLookupKeys
+2: [       OK ] LocationNormalization.BuildsStableLookupKeys (0 ms)
+2: [ RUN      ] LocationNormalization.CanonicalizesLocationIds
+2: [       OK ] LocationNormalization.CanonicalizesLocationIds (0 ms)
+2: [ RUN      ] LocationNormalization.ValidatesCanonicalIds
+2: [       OK ] LocationNormalization.ValidatesCanonicalIds (0 ms)
+2: [ RUN      ] LocationNormalization.PreservesUtf8Bytes
+2: [       OK ] LocationNormalization.PreservesUtf8Bytes (0 ms)
+2: [----------] 6 tests from LocationNormalization (0 ms total)
+2: 
+2: [----------] Global test environment tear-down
+2: [==========] 6 tests from 1 test suite ran. (0 ms total)
+2: [  PASSED  ] 6 tests.
+2: -- run_test.py: return code 0
+2: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_location_normalization.gtest.xml'
+2: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_location_normalization.gtest.xml'
+ 2/24 Test  #2: test_location_normalization ........   Passed    0.06 sec
+test 3
+      Start  3: test_location_validation
+
+3: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_location_validation.gtest.xml" "--package-name" "savo_locations" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_gtest/test_location_validation.txt" "--command" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_location_validation" "--gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_location_validation.gtest.xml"
+3: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations
+3: Test timeout computed to be: 60
+3: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations':
+3:  - /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_location_validation --gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_location_validation.gtest.xml
+3: Running main() from /opt/ros/jazzy/src/gtest_vendor/src/gtest_main.cc
+3: [==========] Running 10 tests from 1 test suite.
+3: [----------] Global test environment set-up.
+3: [----------] 10 tests from LocationValidation
+3: [ RUN      ] LocationValidation.AcceptsValidLocation
+3: [       OK ] LocationValidation.AcceptsValidLocation (0 ms)
+3: [ RUN      ] LocationValidation.RejectsNonCanonicalId
+3: [       OK ] LocationValidation.RejectsNonCanonicalId (0 ms)
+3: [ RUN      ] LocationValidation.RejectsZeroMapRevision
+3: [       OK ] LocationValidation.RejectsZeroMapRevision (0 ms)
+3: [ RUN      ] LocationValidation.RejectsWrongPoseFrame
+3: [       OK ] LocationValidation.RejectsWrongPoseFrame (0 ms)
+3: [ RUN      ] LocationValidation.RejectsInvalidQuaternion
+3: [       OK ] LocationValidation.RejectsInvalidQuaternion (0 ms)
+3: [ RUN      ] LocationValidation.RejectsDuplicateAliasKeys
+3: [       OK ] LocationValidation.RejectsDuplicateAliasKeys (0 ms)
+3: [ RUN      ] LocationValidation.RejectsNonFinitePose
+3: [       OK ] LocationValidation.RejectsNonFinitePose (0 ms)
+3: [ RUN      ] LocationValidation.AcceptsValidCandidate
+3: [       OK ] LocationValidation.AcceptsValidCandidate (0 ms)
+3: [ RUN      ] LocationValidation.RejectsInvalidCandidateQuality
+3: [       OK ] LocationValidation.RejectsInvalidCandidateQuality (0 ms)
+3: [ RUN      ] LocationValidation.ReasonStringsAreStable
+3: [       OK ] LocationValidation.ReasonStringsAreStable (0 ms)
+3: [----------] 10 tests from LocationValidation (0 ms total)
+3: 
+3: [----------] Global test environment tear-down
+3: [==========] 10 tests from 1 test suite ran. (0 ms total)
+3: [  PASSED  ] 10 tests.
+3: -- run_test.py: return code 0
+3: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_location_validation.gtest.xml'
+3: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_location_validation.gtest.xml'
+ 3/24 Test  #3: test_location_validation ...........   Passed    0.05 sec
+test 4
+      Start  4: test_location_registry
+
+4: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_location_registry.gtest.xml" "--package-name" "savo_locations" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_gtest/test_location_registry.txt" "--command" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_location_registry" "--gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_location_registry.gtest.xml"
+4: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations
+4: Test timeout computed to be: 60
+4: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations':
+4:  - /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_location_registry --gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_location_registry.gtest.xml
+4: Running main() from /opt/ros/jazzy/src/gtest_vendor/src/gtest_main.cc
+4: [==========] Running 16 tests from 1 test suite.
+4: [----------] Global test environment set-up.
+4: [----------] 16 tests from LocationRegistry
+4: [ RUN      ] LocationRegistry.InsertsAndGetsRecord
+4: [       OK ] LocationRegistry.InsertsAndGetsRecord (0 ms)
+4: [ RUN      ] LocationRegistry.ResolvesExactId
+4: [       OK ] LocationRegistry.ResolvesExactId (0 ms)
+4: [ RUN      ] LocationRegistry.ResolvesDisplayNameAndAlias
+4: [       OK ] LocationRegistry.ResolvesDisplayNameAndAlias (0 ms)
+4: [ RUN      ] LocationRegistry.RejectsSameMapIdentityConflict
+4: [       OK ] LocationRegistry.RejectsSameMapIdentityConflict (0 ms)
+4: [ RUN      ] LocationRegistry.RejectsSameMapTagConflict
+4: [       OK ] LocationRegistry.RejectsSameMapTagConflict (0 ms)
+4: [ RUN      ] LocationRegistry.AllowsIdentityAcrossMaps
+4: [       OK ] LocationRegistry.AllowsIdentityAcrossMaps (0 ms)
+4: [ RUN      ] LocationRegistry.ReportsMapMismatch
+4: [       OK ] LocationRegistry.ReportsMapMismatch (0 ms)
+4: [ RUN      ] LocationRegistry.ReportsDisabledLocation
+4: [       OK ] LocationRegistry.ReportsDisabledLocation (0 ms)
+4: [ RUN      ] LocationRegistry.ReportsRetiredLocation
+4: [       OK ] LocationRegistry.ReportsRetiredLocation (0 ms)
+4: [ RUN      ] LocationRegistry.RejectsStaleReplacement
+4: [       OK ] LocationRegistry.RejectsStaleReplacement (0 ms)
+4: [ RUN      ] LocationRegistry.EnforcesRevisionSequence
+4: [       OK ] LocationRegistry.EnforcesRevisionSequence (0 ms)
+4: [ RUN      ] LocationRegistry.ReplacesRecordSafely
+4: [       OK ] LocationRegistry.ReplacesRecordSafely (0 ms)
+4: [ RUN      ] LocationRegistry.SetEnabledIncrementsRevision
+4: [       OK ] LocationRegistry.SetEnabledIncrementsRevision (0 ms)
+4: [ RUN      ] LocationRegistry.ListIsDeterministic
+4: [       OK ] LocationRegistry.ListIsDeterministic (0 ms)
+4: [ RUN      ] LocationRegistry.ClearRemovesAllRecords
+4: [       OK ] LocationRegistry.ClearRemovesAllRecords (0 ms)
+4: [ RUN      ] LocationRegistry.ResultStringsAreStable
+4: [       OK ] LocationRegistry.ResultStringsAreStable (0 ms)
+4: [----------] 16 tests from LocationRegistry (0 ms total)
+4: 
+4: [----------] Global test environment tear-down
+4: [==========] 16 tests from 1 test suite ran. (0 ms total)
+4: [  PASSED  ] 16 tests.
+4: -- run_test.py: return code 0
+4: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_location_registry.gtest.xml'
+4: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_location_registry.gtest.xml'
+ 4/24 Test  #4: test_location_registry .............   Passed    0.05 sec
+test 5
+      Start  5: test_location_catalog
+
+5: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_location_catalog.gtest.xml" "--package-name" "savo_locations" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_gtest/test_location_catalog.txt" "--command" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_location_catalog" "--gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_location_catalog.gtest.xml"
+5: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations
+5: Test timeout computed to be: 60
+5: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations':
+5:  - /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_location_catalog --gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_location_catalog.gtest.xml
+5: Running main() from /opt/ros/jazzy/src/gtest_vendor/src/gtest_main.cc
+5: [==========] Running 21 tests from 1 test suite.
+5: [----------] Global test environment set-up.
+5: [----------] 21 tests from LocationCatalog
+5: [ RUN      ] LocationCatalog.RegistersCandidate
+5: [       OK ] LocationCatalog.RegistersCandidate (0 ms)
+5: [ RUN      ] LocationCatalog.RejectsDuplicateCandidateId
+5: [       OK ] LocationCatalog.RejectsDuplicateCandidateId (0 ms)
+5: [ RUN      ] LocationCatalog.RejectsPendingTagConflict
+5: [       OK ] LocationCatalog.RejectsPendingTagConflict (0 ms)
+5: [ RUN      ] LocationCatalog.AllowsSameTagAcrossMaps
+5: [       OK ] LocationCatalog.AllowsSameTagAcrossMaps (0 ms)
+5: [ RUN      ] LocationCatalog.RejectsTagUsedByLocation
+5: [       OK ] LocationCatalog.RejectsTagUsedByLocation (0 ms)
+5: [ RUN      ] LocationCatalog.ReplacesPendingCandidate
+5: [       OK ] LocationCatalog.ReplacesPendingCandidate (0 ms)
+5: [ RUN      ] LocationCatalog.RejectsStaleCandidateUpdate
+5: [       OK ] LocationCatalog.RejectsStaleCandidateUpdate (0 ms)
+5: [ RUN      ] LocationCatalog.RejectsCandidateWithReason
+5: [       OK ] LocationCatalog.RejectsCandidateWithReason (0 ms)
+5: [ RUN      ] LocationCatalog.RequiresRejectionReason
+5: [       OK ] LocationCatalog.RequiresRejectionReason (0 ms)
+5: [ RUN      ] LocationCatalog.CannotApproveRejectedCandidate
+5: [       OK ] LocationCatalog.CannotApproveRejectedCandidate (0 ms)
+5: [ RUN      ] LocationCatalog.ApprovesCandidateAtomically
+5: [       OK ] LocationCatalog.ApprovesCandidateAtomically (0 ms)
+5: [ RUN      ] LocationCatalog.CandidateOwnsMapAndTagOnApproval
+5: [       OK ] LocationCatalog.CandidateOwnsMapAndTagOnApproval (0 ms)
+5: [ RUN      ] LocationCatalog.ExplicitRedundantAliasRemainsInvalid
+5: [       OK ] LocationCatalog.ExplicitRedundantAliasRemainsInvalid (0 ms)
+5: [ RUN      ] LocationCatalog.ApprovalRequiresApproachPose
+5: [       OK ] LocationCatalog.ApprovalRequiresApproachPose (0 ms)
+5: [ RUN      ] LocationCatalog.ApprovalRejectsStaleRevision
+5: [       OK ] LocationCatalog.ApprovalRejectsStaleRevision (0 ms)
+5: [ RUN      ] LocationCatalog.FailedApprovalLeavesCandidatePending
+5: [       OK ] LocationCatalog.FailedApprovalLeavesCandidatePending (0 ms)
+5: [ RUN      ] LocationCatalog.CandidateListIsDeterministic
+5: [       OK ] LocationCatalog.CandidateListIsDeterministic (0 ms)
+5: [ RUN      ] LocationCatalog.RestoresPersistedCandidateStates
+5: [       OK ] LocationCatalog.RestoresPersistedCandidateStates (0 ms)
+5: [ RUN      ] LocationCatalog.RestoreRejectsInvalidEnvelope
+5: [       OK ] LocationCatalog.RestoreRejectsInvalidEnvelope (0 ms)
+5: [ RUN      ] LocationCatalog.ClearRemovesAllEntities
+5: [       OK ] LocationCatalog.ClearRemovesAllEntities (0 ms)
+5: [ RUN      ] LocationCatalog.ResultStringsAreStable
+5: [       OK ] LocationCatalog.ResultStringsAreStable (0 ms)
+5: [----------] 21 tests from LocationCatalog (0 ms total)
+5: 
+5: [----------] Global test environment tear-down
+5: [==========] 21 tests from 1 test suite ran. (0 ms total)
+5: [  PASSED  ] 21 tests.
+5: -- run_test.py: return code 0
+5: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_location_catalog.gtest.xml'
+5: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_location_catalog.gtest.xml'
+ 5/24 Test  #5: test_location_catalog ..............   Passed    0.05 sec
+test 6
+      Start  6: test_sqlite_store
+
+6: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_sqlite_store.gtest.xml" "--package-name" "savo_locations" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_gtest/test_sqlite_store.txt" "--command" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_sqlite_store" "--gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_sqlite_store.gtest.xml"
+6: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations
+6: Test timeout computed to be: 60
+6: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations':
+6:  - /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_sqlite_store --gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_sqlite_store.gtest.xml
+6: Running main() from /opt/ros/jazzy/src/gtest_vendor/src/gtest_main.cc
+6: [==========] Running 12 tests from 1 test suite.
+6: [----------] Global test environment set-up.
+6: [----------] 12 tests from SqliteStore
+6: [ RUN      ] SqliteStore.RejectsEmptyPath
+6: [       OK ] SqliteStore.RejectsEmptyPath (0 ms)
+6: [ RUN      ] SqliteStore.OpensFileDatabaseWithSafePolicy
+6: [       OK ] SqliteStore.OpensFileDatabaseWithSafePolicy (6 ms)
+6: [ RUN      ] SqliteStore.AppliesMigration001
+6: [       OK ] SqliteStore.AppliesMigration001 (18 ms)
+6: [ RUN      ] SqliteStore.MigrationCreatesRequiredTables
+6: [       OK ] SqliteStore.MigrationCreatesRequiredTables (28 ms)
+6: [ RUN      ] SqliteStore.MigrationIsIdempotent
+6: [       OK ] SqliteStore.MigrationIsIdempotent (32 ms)
+6: [ RUN      ] SqliteStore.RejectsNewerSchema
+6: [       OK ] SqliteStore.RejectsNewerSchema (22 ms)
+6: [ RUN      ] SqliteStore.IntegrityCheckPasses
+6: [       OK ] SqliteStore.IntegrityCheckPasses (27 ms)
+6: [ RUN      ] SqliteStore.TransactionRollbackIsAtomic
+6: [       OK ] SqliteStore.TransactionRollbackIsAtomic (1 ms)
+6: [ RUN      ] SqliteStore.TransactionCommitPersists
+6: [       OK ] SqliteStore.TransactionCommitPersists (1 ms)
+6: [ RUN      ] SqliteStore.RejectsNestedTransaction
+6: [       OK ] SqliteStore.RejectsNestedTransaction (0 ms)
+6: [ RUN      ] SqliteStore.CloseRollsBackActiveTransaction
+6: [       OK ] SqliteStore.CloseRollsBackActiveTransaction (28 ms)
+6: [ RUN      ] SqliteStore.ReasonStringsAreStable
+6: [       OK ] SqliteStore.ReasonStringsAreStable (0 ms)
+6: [----------] 12 tests from SqliteStore (166 ms total)
+6: 
+6: [----------] Global test environment tear-down
+6: [==========] 12 tests from 1 test suite ran. (166 ms total)
+6: [  PASSED  ] 12 tests.
+6: -- run_test.py: return code 0
+6: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_sqlite_store.gtest.xml'
+6: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_sqlite_store.gtest.xml'
+ 6/24 Test  #6: test_sqlite_store ..................   Passed    0.23 sec
+test 7
+      Start  7: test_sqlite_repository
+
+7: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_sqlite_repository.gtest.xml" "--package-name" "savo_locations" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_gtest/test_sqlite_repository.txt" "--command" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_sqlite_repository" "--gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_sqlite_repository.gtest.xml"
+7: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations
+7: Test timeout computed to be: 60
+7: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations':
+7:  - /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_sqlite_repository --gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_sqlite_repository.gtest.xml
+7: Running main() from /opt/ros/jazzy/src/gtest_vendor/src/gtest_main.cc
+7: [==========] Running 15 tests from 1 test suite.
+7: [----------] Global test environment set-up.
+7: [----------] 15 tests from SqliteRepository
+7: [ RUN      ] SqliteRepository.EmptySnapshotRoundTrips
+7: [       OK ] SqliteRepository.EmptySnapshotRoundTrips (1 ms)
+7: [ RUN      ] SqliteRepository.LocationRoundTrips
+7: [       OK ] SqliteRepository.LocationRoundTrips (1 ms)
+7: [ RUN      ] SqliteRepository.PendingCandidateRoundTrips
+7: [       OK ] SqliteRepository.PendingCandidateRoundTrips (1 ms)
+7: [ RUN      ] SqliteRepository.ApprovedCandidateRoundTrips
+7: [       OK ] SqliteRepository.ApprovedCandidateRoundTrips (1 ms)
+7: [ RUN      ] SqliteRepository.FileSnapshotSurvivesReopen
+7: [       OK ] SqliteRepository.FileSnapshotSurvivesReopen (16 ms)
+7: [ RUN      ] SqliteRepository.InvalidSnapshotDoesNotReplaceStoredData
+7: [       OK ] SqliteRepository.InvalidSnapshotDoesNotReplaceStoredData (1 ms)
+7: [ RUN      ] SqliteRepository.LocationReleasePrepareVerifyCommitAndRollback
+7: [       OK ] SqliteRepository.LocationReleasePrepareVerifyCommitAndRollback (2 ms)
+7: [ RUN      ] SqliteRepository.PendingCandidatePreventsLocationReleasePreparation
+7: [       OK ] SqliteRepository.PendingCandidatePreventsLocationReleasePreparation (1 ms)
+7: [ RUN      ] SqliteRepository.RejectsIdentityConflict
+7: [       OK ] SqliteRepository.RejectsIdentityConflict (0 ms)
+7: [ RUN      ] SqliteRepository.RejectsPendingCandidateTagConflict
+7: [       OK ] SqliteRepository.RejectsPendingCandidateTagConflict (0 ms)
+7: [ RUN      ] SqliteRepository.RejectsOperationDuringStoreTransaction
+7: [       OK ] SqliteRepository.RejectsOperationDuringStoreTransaction (0 ms)
+7: [ RUN      ] SqliteRepository.DetectsCorruptPersistedLocation
+7: [       OK ] SqliteRepository.DetectsCorruptPersistedLocation (28 ms)
+7: [ RUN      ] SqliteRepository.NewSnapshotAtomicallyReplacesOldSnapshot
+7: [       OK ] SqliteRepository.NewSnapshotAtomicallyReplacesOldSnapshot (1 ms)
+7: [ RUN      ] SqliteRepository.ReasonStringsAreStable
+7: [       OK ] SqliteRepository.ReasonStringsAreStable (0 ms)
+7: [ RUN      ] SqliteRepository.CandidateRejectionCommitsSnapshotAndEventAtomically
+7: [       OK ] SqliteRepository.CandidateRejectionCommitsSnapshotAndEventAtomically (1 ms)
+7: [----------] 15 tests from SqliteRepository (59 ms total)
+7: 
+7: [----------] Global test environment tear-down
+7: [==========] 15 tests from 1 test suite ran. (59 ms total)
+7: [  PASSED  ] 15 tests.
+7: -- run_test.py: return code 0
+7: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_sqlite_repository.gtest.xml'
+7: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_sqlite_repository.gtest.xml'
+ 7/24 Test  #7: test_sqlite_repository .............   Passed    0.12 sec
+test 8
+      Start  8: test_persistent_catalog
+
+8: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_persistent_catalog.gtest.xml" "--package-name" "savo_locations" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_gtest/test_persistent_catalog.txt" "--command" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_persistent_catalog" "--gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_persistent_catalog.gtest.xml"
+8: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations
+8: Test timeout computed to be: 60
+8: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations':
+8:  - /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_persistent_catalog --gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_persistent_catalog.gtest.xml
+8: Running main() from /opt/ros/jazzy/src/gtest_vendor/src/gtest_main.cc
+8: [==========] Running 9 tests from 1 test suite.
+8: [----------] Global test environment set-up.
+8: [----------] 9 tests from PersistentCatalog
+8: [ RUN      ] PersistentCatalog.MigratesSchemaOneToTwo
+8: [       OK ] PersistentCatalog.MigratesSchemaOneToTwo (160 ms)
+8: [ RUN      ] PersistentCatalog.BootstrapReportsCatalogState
+8: [       OK ] PersistentCatalog.BootstrapReportsCatalogState (2 ms)
+8: [ RUN      ] PersistentCatalog.EventJournalIsOrdered
+8: [       OK ] PersistentCatalog.EventJournalIsOrdered (2 ms)
+8: [ RUN      ] PersistentCatalog.EventJournalRejectsMutation
+8: [       OK ] PersistentCatalog.EventJournalRejectsMutation (21 ms)
+8: [ RUN      ] PersistentCatalog.ApprovalCommitsSnapshotAndEvent
+8: [       OK ] PersistentCatalog.ApprovalCommitsSnapshotAndEvent (1 ms)
+8: [ RUN      ] PersistentCatalog.StaleApprovalDoesNotMutateDatabase
+8: [       OK ] PersistentCatalog.StaleApprovalDoesNotMutateDatabase (1 ms)
+8: [ RUN      ] PersistentCatalog.InvalidApprovalDeltaRollsBack
+8: [       OK ] PersistentCatalog.InvalidApprovalDeltaRollsBack (1 ms)
+8: [ RUN      ] PersistentCatalog.EventFailureRollsBackApproval
+8: [       OK ] PersistentCatalog.EventFailureRollsBackApproval (43 ms)
+8: [ RUN      ] PersistentCatalog.ResultStringsAreStable
+8: [       OK ] PersistentCatalog.ResultStringsAreStable (0 ms)
+8: [----------] 9 tests from PersistentCatalog (233 ms total)
+8: 
+8: [----------] Global test environment tear-down
+8: [==========] 9 tests from 1 test suite ran. (233 ms total)
+8: [  PASSED  ] 9 tests.
+8: -- run_test.py: return code 0
+8: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_persistent_catalog.gtest.xml'
+8: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_persistent_catalog.gtest.xml'
+ 8/24 Test  #8: test_persistent_catalog ............   Passed    0.29 sec
+test 9
+      Start  9: test_persistent_mutation_commits
+
+9: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_persistent_mutation_commits.gtest.xml" "--package-name" "savo_locations" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_gtest/test_persistent_mutation_commits.txt" "--command" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_persistent_mutation_commits" "--gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_persistent_mutation_commits.gtest.xml"
+9: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations
+9: Test timeout computed to be: 60
+9: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations':
+9:  - /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_persistent_mutation_commits --gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_persistent_mutation_commits.gtest.xml
+9: Running main() from /opt/ros/jazzy/src/gtest_vendor/src/gtest_main.cc
+9: [==========] Running 6 tests from 1 test suite.
+9: [----------] Global test environment set-up.
+9: [----------] 6 tests from PersistentMutationCommits
+9: [ RUN      ] PersistentMutationCommits.RegistrationCommitsSnapshotAndEvent
+9: [       OK ] PersistentMutationCommits.RegistrationCommitsSnapshotAndEvent (1 ms)
+9: [ RUN      ] PersistentMutationCommits.RegistrationEventFailureRollsBack
+9: [       OK ] PersistentMutationCommits.RegistrationEventFailureRollsBack (40 ms)
+9: [ RUN      ] PersistentMutationCommits.EnablementCommitsSnapshotAndEvent
+9: [       OK ] PersistentMutationCommits.EnablementCommitsSnapshotAndEvent (1 ms)
+9: [ RUN      ] PersistentMutationCommits.EnablementRejectsStaleAndNoOp
+9: [       OK ] PersistentMutationCommits.EnablementRejectsStaleAndNoOp (1 ms)
+9: [ RUN      ] PersistentMutationCommits.EnablementEventFailureRollsBack
+9: [       OK ] PersistentMutationCommits.EnablementEventFailureRollsBack (27 ms)
+9: [ RUN      ] PersistentMutationCommits.ResultStringsAreStable
+9: [       OK ] PersistentMutationCommits.ResultStringsAreStable (0 ms)
+9: [----------] 6 tests from PersistentMutationCommits (72 ms total)
+9: 
+9: [----------] Global test environment tear-down
+9: [==========] 6 tests from 1 test suite ran. (72 ms total)
+9: [  PASSED  ] 6 tests.
+9: -- run_test.py: return code 0
+9: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_persistent_mutation_commits.gtest.xml'
+9: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_persistent_mutation_commits.gtest.xml'
+ 9/24 Test  #9: test_persistent_mutation_commits ...   Passed    0.14 sec
+test 10
+      Start 10: test_phase0_contracts
+
+10: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase0_contracts.xunit.xml" "--package-name" "savo_locations" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_pytest/test_phase0_contracts.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_locations/test/contracts/test_phase0_contracts.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_pytest/test_phase0_contracts/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase0_contracts.xunit.xml" "--junit-prefix=savo_locations"
+10: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations
+10: Test timeout computed to be: 60
+10: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations':
+10:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_locations/test/contracts/test_phase0_contracts.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_pytest/test_phase0_contracts/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase0_contracts.xunit.xml --junit-prefix=savo_locations
+10: ============================= test session starts ==============================
+10: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+10: cachedir: build/savo_locations/ament_cmake_pytest/test_phase0_contracts/.cache
+10: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+10: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+10: collected 6 items
+10: 
+10: ../../src/core/savo_locations/test/contracts/test_phase0_contracts.py .. [ 33%]
+10: ....                                                                     [100%]
+10: 
+10: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase0_contracts.xunit.xml -
+10: ============================== 6 passed in 0.01s ===============================
+10: -- run_test.py: return code 0
+10: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase0_contracts.xunit.xml'
+10/24 Test #10: test_phase0_contracts ..............   Passed    0.34 sec
+test 11
+      Start 11: test_phase1a_contracts
+
+11: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase1a_contracts.xunit.xml" "--package-name" "savo_locations" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_pytest/test_phase1a_contracts.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_locations/test/contracts/test_phase1a_contracts.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_pytest/test_phase1a_contracts/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase1a_contracts.xunit.xml" "--junit-prefix=savo_locations"
+11: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations
+11: Test timeout computed to be: 60
+11: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations':
+11:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_locations/test/contracts/test_phase1a_contracts.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_pytest/test_phase1a_contracts/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase1a_contracts.xunit.xml --junit-prefix=savo_locations
+11: ============================= test session starts ==============================
+11: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+11: cachedir: build/savo_locations/ament_cmake_pytest/test_phase1a_contracts/.cache
+11: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+11: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+11: collected 6 items
+11: 
+11: ../../src/core/savo_locations/test/contracts/test_phase1a_contracts.py . [ 16%]
+11: .....                                                                    [100%]
+11: 
+11: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase1a_contracts.xunit.xml -
+11: ============================== 6 passed in 0.01s ===============================
+11: -- run_test.py: return code 0
+11: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase1a_contracts.xunit.xml'
+11/24 Test #11: test_phase1a_contracts .............   Passed    0.32 sec
+test 12
+      Start 12: test_phase1b_contracts
+
+12: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase1b_contracts.xunit.xml" "--package-name" "savo_locations" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_pytest/test_phase1b_contracts.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_locations/test/contracts/test_phase1b_contracts.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_pytest/test_phase1b_contracts/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase1b_contracts.xunit.xml" "--junit-prefix=savo_locations"
+12: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations
+12: Test timeout computed to be: 60
+12: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations':
+12:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_locations/test/contracts/test_phase1b_contracts.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_pytest/test_phase1b_contracts/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase1b_contracts.xunit.xml --junit-prefix=savo_locations
+12: ============================= test session starts ==============================
+12: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+12: cachedir: build/savo_locations/ament_cmake_pytest/test_phase1b_contracts/.cache
+12: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+12: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+12: collected 7 items
+12: 
+12: ../../src/core/savo_locations/test/contracts/test_phase1b_contracts.py . [ 14%]
+12: ......                                                                   [100%]
+12: 
+12: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase1b_contracts.xunit.xml -
+12: ============================== 7 passed in 0.01s ===============================
+12: -- run_test.py: return code 0
+12: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase1b_contracts.xunit.xml'
+12/24 Test #12: test_phase1b_contracts .............   Passed    0.33 sec
+test 13
+      Start 13: test_phase1c_contracts
+
+13: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase1c_contracts.xunit.xml" "--package-name" "savo_locations" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_pytest/test_phase1c_contracts.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_locations/test/contracts/test_phase1c_contracts.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_pytest/test_phase1c_contracts/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase1c_contracts.xunit.xml" "--junit-prefix=savo_locations"
+13: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations
+13: Test timeout computed to be: 60
+13: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations':
+13:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_locations/test/contracts/test_phase1c_contracts.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_pytest/test_phase1c_contracts/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase1c_contracts.xunit.xml --junit-prefix=savo_locations
+13: ============================= test session starts ==============================
+13: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+13: cachedir: build/savo_locations/ament_cmake_pytest/test_phase1c_contracts/.cache
+13: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+13: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+13: collected 7 items
+13: 
+13: ../../src/core/savo_locations/test/contracts/test_phase1c_contracts.py . [ 14%]
+13: ......                                                                   [100%]
+13: 
+13: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase1c_contracts.xunit.xml -
+13: ============================== 7 passed in 0.01s ===============================
+13: -- run_test.py: return code 0
+13: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase1c_contracts.xunit.xml'
+13/24 Test #13: test_phase1c_contracts .............   Passed    0.33 sec
+test 14
+      Start 14: test_phase2a_contracts
+
+14: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase2a_contracts.xunit.xml" "--package-name" "savo_locations" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_pytest/test_phase2a_contracts.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_locations/test/contracts/test_phase2a_contracts.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_pytest/test_phase2a_contracts/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase2a_contracts.xunit.xml" "--junit-prefix=savo_locations"
+14: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations
+14: Test timeout computed to be: 60
+14: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations':
+14:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_locations/test/contracts/test_phase2a_contracts.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_pytest/test_phase2a_contracts/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase2a_contracts.xunit.xml --junit-prefix=savo_locations
+14: ============================= test session starts ==============================
+14: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+14: cachedir: build/savo_locations/ament_cmake_pytest/test_phase2a_contracts/.cache
+14: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+14: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+14: collected 8 items
+14: 
+14: ../../src/core/savo_locations/test/contracts/test_phase2a_contracts.py . [ 12%]
+14: .......                                                                  [100%]
+14: 
+14: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase2a_contracts.xunit.xml -
+14: ============================== 8 passed in 0.01s ===============================
+14: -- run_test.py: return code 0
+14: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase2a_contracts.xunit.xml'
+14/24 Test #14: test_phase2a_contracts .............   Passed    0.33 sec
+test 15
+      Start 15: test_phase2b_contracts
+
+15: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase2b_contracts.xunit.xml" "--package-name" "savo_locations" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_pytest/test_phase2b_contracts.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_locations/test/contracts/test_phase2b_contracts.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_pytest/test_phase2b_contracts/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase2b_contracts.xunit.xml" "--junit-prefix=savo_locations"
+15: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations
+15: Test timeout computed to be: 60
+15: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations':
+15:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_locations/test/contracts/test_phase2b_contracts.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_pytest/test_phase2b_contracts/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase2b_contracts.xunit.xml --junit-prefix=savo_locations
+15: ============================= test session starts ==============================
+15: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+15: cachedir: build/savo_locations/ament_cmake_pytest/test_phase2b_contracts/.cache
+15: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+15: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+15: collected 9 items
+15: 
+15: ../../src/core/savo_locations/test/contracts/test_phase2b_contracts.py . [ 11%]
+15: ........                                                                 [100%]
+15: 
+15: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase2b_contracts.xunit.xml -
+15: ============================== 9 passed in 0.01s ===============================
+15: -- run_test.py: return code 0
+15: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase2b_contracts.xunit.xml'
+15/24 Test #15: test_phase2b_contracts .............   Passed    0.32 sec
+test 16
+      Start 16: test_phase2c_contracts
+
+16: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase2c_contracts.xunit.xml" "--package-name" "savo_locations" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_pytest/test_phase2c_contracts.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_locations/test/contracts/test_phase2c_contracts.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_pytest/test_phase2c_contracts/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase2c_contracts.xunit.xml" "--junit-prefix=savo_locations"
+16: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations
+16: Test timeout computed to be: 60
+16: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations':
+16:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_locations/test/contracts/test_phase2c_contracts.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_pytest/test_phase2c_contracts/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase2c_contracts.xunit.xml --junit-prefix=savo_locations
+16: ============================= test session starts ==============================
+16: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+16: cachedir: build/savo_locations/ament_cmake_pytest/test_phase2c_contracts/.cache
+16: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+16: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+16: collected 8 items
+16: 
+16: ../../src/core/savo_locations/test/contracts/test_phase2c_contracts.py . [ 12%]
+16: .......                                                                  [100%]
+16: 
+16: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase2c_contracts.xunit.xml -
+16: ============================== 8 passed in 0.01s ===============================
+16: -- run_test.py: return code 0
+16: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase2c_contracts.xunit.xml'
+16/24 Test #16: test_phase2c_contracts .............   Passed    0.33 sec
+test 17
+      Start 17: test_read_only_catalog_view
+
+17: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_read_only_catalog_view.gtest.xml" "--package-name" "savo_locations" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_gtest/test_read_only_catalog_view.txt" "--command" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_read_only_catalog_view" "--gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_read_only_catalog_view.gtest.xml"
+17: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations
+17: Test timeout computed to be: 60
+17: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations':
+17:  - /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_read_only_catalog_view --gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_read_only_catalog_view.gtest.xml
+17: Running main() from /opt/ros/jazzy/src/gtest_vendor/src/gtest_main.cc
+17: [==========] Running 8 tests from 1 test suite.
+17: [----------] Global test environment set-up.
+17: [----------] 8 tests from ReadOnlyCatalogView
+17: [ RUN      ] ReadOnlyCatalogView.ResolvesExactId
+17: [       OK ] ReadOnlyCatalogView.ResolvesExactId (0 ms)
+17: [ RUN      ] ReadOnlyCatalogView.ResolvesAlias
+17: [       OK ] ReadOnlyCatalogView.ResolvesAlias (0 ms)
+17: [ RUN      ] ReadOnlyCatalogView.ReportsAmbiguityAcrossMaps
+17: [       OK ] ReadOnlyCatalogView.ReportsAmbiguityAcrossMaps (0 ms)
+17: [ RUN      ] ReadOnlyCatalogView.MapContextDisambiguates
+17: [       OK ] ReadOnlyCatalogView.MapContextDisambiguates (0 ms)
+17: [ RUN      ] ReadOnlyCatalogView.DisabledResolveIsFailClosed
+17: [       OK ] ReadOnlyCatalogView.DisabledResolveIsFailClosed (0 ms)
+17: [ RUN      ] ReadOnlyCatalogView.GetHonoursDisabledPolicy
+17: [       OK ] ReadOnlyCatalogView.GetHonoursDisabledPolicy (0 ms)
+17: [ RUN      ] ReadOnlyCatalogView.ListFiltersMapAndEnabled
+17: [       OK ] ReadOnlyCatalogView.ListFiltersMapAndEnabled (0 ms)
+17: [ RUN      ] ReadOnlyCatalogView.RejectsInvalidListContext
+17: [       OK ] ReadOnlyCatalogView.RejectsInvalidListContext (0 ms)
+17: [----------] 8 tests from ReadOnlyCatalogView (0 ms total)
+17: 
+17: [----------] Global test environment tear-down
+17: [==========] 8 tests from 1 test suite ran. (0 ms total)
+17: [  PASSED  ] 8 tests.
+17: -- run_test.py: return code 0
+17: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_read_only_catalog_view.gtest.xml'
+17: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_read_only_catalog_view.gtest.xml'
+17/24 Test #17: test_read_only_catalog_view ........   Passed    0.05 sec
+test 18
+      Start 18: test_registry_node
+
+18: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_registry_node.gtest.xml" "--package-name" "savo_locations" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_gtest/test_registry_node.txt" "--command" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_registry_node" "--gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_registry_node.gtest.xml"
+18: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations
+18: Test timeout computed to be: 60
+18: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations':
+18:  - /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_registry_node --gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_registry_node.gtest.xml
+18: Running main() from /opt/ros/jazzy/src/gtest_vendor/src/gtest_main.cc
+18: [==========] Running 1 test from 1 test suite.
+18: [----------] Global test environment set-up.
+18: [----------] 1 test from RegistryNode
+18: [ RUN      ] RegistryNode.BootstrapsAndServesReads
+18: [INFO] [1786242130.889951427] [savo_locations]: savo_locations ready: locations=1, candidates=0, events=0, writes=ready
+18: [       OK ] RegistryNode.BootstrapsAndServesReads (120 ms)
+18: [----------] 1 test from RegistryNode (120 ms total)
+18: 
+18: [----------] Global test environment tear-down
+18: [==========] 1 test from 1 test suite ran. (120 ms total)
+18: [  PASSED  ] 1 test.
+18: -- run_test.py: return code 0
+18: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_registry_node.gtest.xml'
+18: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_registry_node.gtest.xml'
+18/24 Test #18: test_registry_node .................   Passed    0.29 sec
+test 19
+      Start 19: test_registry_write_node
+
+19: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_registry_write_node.gtest.xml" "--package-name" "savo_locations" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_gtest/test_registry_write_node.txt" "--command" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_registry_write_node" "--gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_registry_write_node.gtest.xml"
+19: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations
+19: Test timeout computed to be: 60
+19: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations':
+19:  - /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_registry_write_node --gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_registry_write_node.gtest.xml
+19: Running main() from /opt/ros/jazzy/src/gtest_vendor/src/gtest_main.cc
+19: [==========] Running 4 tests from 1 test suite.
+19: [----------] Global test environment set-up.
+19: [----------] 4 tests from RegistryWriteNode
+19: [ RUN      ] RegistryWriteNode.CommitsWritesPublishesEventsAndRestarts
+19: [INFO] [1786242131.170916427] [savo_locations]: savo_locations ready: locations=0, candidates=0, events=0, writes=ready
+19: [INFO] [1786242131.190933040] [savo_locations]: savo_locations ready: locations=1, candidates=1, events=3, writes=ready
+19: [       OK ] RegistryWriteNode.CommitsWritesPublishesEventsAndRestarts (52 ms)
+19: [ RUN      ] RegistryWriteNode.EventFailureRollsBackAndDisablesWrites
+19: [INFO] [1786242131.210199238] [savo_locations]: savo_locations ready: locations=0, candidates=0, events=0, writes=ready
+19: [       OK ] RegistryWriteNode.EventFailureRollsBackAndDisablesWrites (29 ms)
+19: [ RUN      ] RegistryWriteNode.RejectsCandidateAndPublishesCommittedEvent
+19: [INFO] [1786242131.239916878] [savo_locations]: savo_locations ready: locations=0, candidates=0, events=0, writes=ready
+19: [       OK ] RegistryWriteNode.RejectsCandidateAndPublishesCommittedEvent (30 ms)
+19: [ RUN      ] RegistryWriteNode.CandidateListFiltersAndSorts
+19: [INFO] [1786242131.270178063] [savo_locations]: savo_locations ready: locations=0, candidates=0, events=0, writes=ready
+19: [       OK ] RegistryWriteNode.CandidateListFiltersAndSorts (28 ms)
+19: [----------] 4 tests from RegistryWriteNode (141 ms total)
+19: 
+19: [----------] Global test environment tear-down
+19: [==========] 4 tests from 1 test suite ran. (141 ms total)
+19: [  PASSED  ] 4 tests.
+19: -- run_test.py: return code 0
+19: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_registry_write_node.gtest.xml'
+19: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_registry_write_node.gtest.xml'
+19/24 Test #19: test_registry_write_node ...........   Passed    0.31 sec
+test 20
+      Start 20: test_phase3a_contracts
+
+20: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase3a_contracts.xunit.xml" "--package-name" "savo_locations" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_pytest/test_phase3a_contracts.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_locations/test/contracts/test_phase3a_contracts.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_pytest/test_phase3a_contracts/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase3a_contracts.xunit.xml" "--junit-prefix=savo_locations"
+20: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations
+20: Test timeout computed to be: 60
+20: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations':
+20:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_locations/test/contracts/test_phase3a_contracts.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_pytest/test_phase3a_contracts/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase3a_contracts.xunit.xml --junit-prefix=savo_locations
+20: ============================= test session starts ==============================
+20: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+20: cachedir: build/savo_locations/ament_cmake_pytest/test_phase3a_contracts/.cache
+20: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+20: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+20: collected 9 items
+20: 
+20: ../../src/core/savo_locations/test/contracts/test_phase3a_contracts.py . [ 11%]
+20: ........                                                                 [100%]
+20: 
+20: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase3a_contracts.xunit.xml -
+20: ============================== 9 passed in 0.01s ===============================
+20: -- run_test.py: return code 0
+20: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase3a_contracts.xunit.xml'
+20/24 Test #20: test_phase3a_contracts .............   Passed    0.37 sec
+test 21
+      Start 21: test_phase3b1_contracts
+
+21: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase3b1_contracts.xunit.xml" "--package-name" "savo_locations" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_pytest/test_phase3b1_contracts.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_locations/test/contracts/test_phase3b1_contracts.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_pytest/test_phase3b1_contracts/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase3b1_contracts.xunit.xml" "--junit-prefix=savo_locations"
+21: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations
+21: Test timeout computed to be: 60
+21: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations':
+21:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_locations/test/contracts/test_phase3b1_contracts.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_pytest/test_phase3b1_contracts/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase3b1_contracts.xunit.xml --junit-prefix=savo_locations
+21: ============================= test session starts ==============================
+21: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+21: cachedir: build/savo_locations/ament_cmake_pytest/test_phase3b1_contracts/.cache
+21: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+21: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+21: collected 7 items
+21: 
+21: ../../src/core/savo_locations/test/contracts/test_phase3b1_contracts.py . [ 14%]
+21: ......                                                                   [100%]
+21: 
+21: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase3b1_contracts.xunit.xml -
+21: ============================== 7 passed in 0.02s ===============================
+21: -- run_test.py: return code 0
+21: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase3b1_contracts.xunit.xml'
+21/24 Test #21: test_phase3b1_contracts ............   Passed    0.38 sec
+test 22
+      Start 22: test_phase3b2_contracts
+
+22: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase3b2_contracts.xunit.xml" "--package-name" "savo_locations" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_pytest/test_phase3b2_contracts.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_locations/test/contracts/test_phase3b2_contracts.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_pytest/test_phase3b2_contracts/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase3b2_contracts.xunit.xml" "--junit-prefix=savo_locations"
+22: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations
+22: Test timeout computed to be: 60
+22: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations':
+22:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_locations/test/contracts/test_phase3b2_contracts.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_pytest/test_phase3b2_contracts/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase3b2_contracts.xunit.xml --junit-prefix=savo_locations
+22: ============================= test session starts ==============================
+22: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+22: cachedir: build/savo_locations/ament_cmake_pytest/test_phase3b2_contracts/.cache
+22: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+22: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+22: collected 7 items
+22: 
+22: ../../src/core/savo_locations/test/contracts/test_phase3b2_contracts.py . [ 14%]
+22: ......                                                                   [100%]
+22: 
+22: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase3b2_contracts.xunit.xml -
+22: ============================== 7 passed in 0.01s ===============================
+22: -- run_test.py: return code 0
+22: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase3b2_contracts.xunit.xml'
+22/24 Test #22: test_phase3b2_contracts ............   Passed    0.34 sec
+test 23
+      Start 23: test_registry_hardening_node
+
+23: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_registry_hardening_node.gtest.xml" "--package-name" "savo_locations" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_gtest/test_registry_hardening_node.txt" "--command" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_registry_hardening_node" "--gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_registry_hardening_node.gtest.xml"
+23: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations
+23: Test timeout computed to be: 60
+23: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations':
+23:  - /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_registry_hardening_node --gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_registry_hardening_node.gtest.xml
+23: Running main() from /opt/ros/jazzy/src/gtest_vendor/src/gtest_main.cc
+23: [==========] Running 2 tests from 1 test suite.
+23: [----------] Global test environment set-up.
+23: [----------] 2 tests from RegistryHardeningNode
+23: [ RUN      ] RegistryHardeningNode.ConcurrentApprovalsCommitExactlyOnce
+23: [INFO] [1786242132.570445446] [savo_locations]: savo_locations ready: locations=0, candidates=0, events=0, writes=ready
+23: [       OK ] RegistryHardeningNode.ConcurrentApprovalsCommitExactlyOnce (44 ms)
+23: [ RUN      ] RegistryHardeningNode.VerifiedRecoveryRestoresWritesAfterRollback
+23: [INFO] [1786242132.602062472] [savo_locations]: savo_locations ready: locations=0, candidates=0, events=0, writes=ready
+23: [       OK ] RegistryHardeningNode.VerifiedRecoveryRestoresWritesAfterRollback (44 ms)
+23: [----------] 2 tests from RegistryHardeningNode (88 ms total)
+23: 
+23: [----------] Global test environment tear-down
+23: [==========] 2 tests from 1 test suite ran. (88 ms total)
+23: [  PASSED  ] 2 tests.
+23: -- run_test.py: return code 0
+23: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_registry_hardening_node.gtest.xml'
+23: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_registry_hardening_node.gtest.xml'
+23/24 Test #23: test_registry_hardening_node .......   Passed    0.26 sec
+test 24
+      Start 24: test_phase3p_hardening_contracts
+
+24: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase3p_hardening_contracts.xunit.xml" "--package-name" "savo_locations" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_pytest/test_phase3p_hardening_contracts.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_locations/test/contracts/test_phase3p_hardening_contracts.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_pytest/test_phase3p_hardening_contracts/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase3p_hardening_contracts.xunit.xml" "--junit-prefix=savo_locations"
+24: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations
+24: Test timeout computed to be: 60
+24: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations':
+24:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_locations/test/contracts/test_phase3p_hardening_contracts.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/ament_cmake_pytest/test_phase3p_hardening_contracts/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase3p_hardening_contracts.xunit.xml --junit-prefix=savo_locations
+24: ============================= test session starts ==============================
+24: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+24: cachedir: build/savo_locations/ament_cmake_pytest/test_phase3p_hardening_contracts/.cache
+24: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+24: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+24: collected 4 items
+24: 
+24: ../../src/core/savo_locations/test/contracts/test_phase3p_hardening_contracts.py . [ 25%]
+24: ...                                                                      [100%]
+24: 
+24: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase3p_hardening_contracts.xunit.xml -
+24: ============================== 4 passed in 0.01s ===============================
+24: -- run_test.py: return code 0
+24: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_locations/test_results/savo_locations/test_phase3p_hardening_contracts.xunit.xml'
+24/24 Test #24: test_phase3p_hardening_contracts ...   Passed    0.33 sec
+
+100% tests passed, 0 tests failed out of 24
+
+Label Time Summary:
+gtest     =   1.95 sec*proc (13 tests)
+pytest    =   3.70 sec*proc (11 tests)
+
+Total Test time (real) =   5.66 sec
+Finished <<< savo_locations [5.69s]
+
+Summary: 1 package finished [5.83s]
+
+============================================================
+ COLCON TEST RESULT
+============================================================
+Summary: 217 tests, 0 errors, 0 failures, 0 skipped
+
+------------------------------------------------------------
+PACKAGE_RESULT: PASS
+COLCON_TEST_EXIT: 0
+TEST_RESULT_EXIT: 0
+------------------------------------------------------------

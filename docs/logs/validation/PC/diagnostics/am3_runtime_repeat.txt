@@ -1,0 +1,113 @@
+===== AM3 ITERATION 1 =====
+Internal ctest changing into directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping
+Test project /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping
+    Start 9: test_autonomous_mapping_orchestrator_runtime
+1/1 Test #9: test_autonomous_mapping_orchestrator_runtime ...   Passed    4.40 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Label Time Summary:
+pytest    =   4.40 sec*proc (1 test)
+
+Total Test time (real) =   4.41 sec
+AM3 iteration 1 exit=0
+===== AM3 ITERATION 2 =====
+Internal ctest changing into directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping
+Test project /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping
+    Start 9: test_autonomous_mapping_orchestrator_runtime
+1/1 Test #9: test_autonomous_mapping_orchestrator_runtime ...   Passed    4.72 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Label Time Summary:
+pytest    =   4.72 sec*proc (1 test)
+
+Total Test time (real) =   4.72 sec
+AM3 iteration 2 exit=0
+===== AM3 ITERATION 3 =====
+Internal ctest changing into directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping
+Test project /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping
+    Start 9: test_autonomous_mapping_orchestrator_runtime
+1/1 Test #9: test_autonomous_mapping_orchestrator_runtime ...   Passed    4.21 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Label Time Summary:
+pytest    =   4.21 sec*proc (1 test)
+
+Total Test time (real) =   4.22 sec
+AM3 iteration 3 exit=0
+===== AM3 ITERATION 4 =====
+Internal ctest changing into directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping
+Test project /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping
+    Start 9: test_autonomous_mapping_orchestrator_runtime
+1/1 Test #9: test_autonomous_mapping_orchestrator_runtime ...***Failed   12.06 sec
+-- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping':
+ - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_mapping/test/test_autonomous_mapping_orchestrator_runtime.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/ament_cmake_pytest/test_autonomous_mapping_orchestrator_runtime/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_autonomous_mapping_orchestrator_runtime.xunit.xml --junit-prefix=savo_mapping
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+cachedir: build/savo_mapping/ament_cmake_pytest/test_autonomous_mapping_orchestrator_runtime/.cache
+rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+collected 4 items
+
+../../src/core/savo_mapping/test/test_autonomous_mapping_orchestrator_runtime.py . [ 25%]
+..F                                                                      [100%]
+
+=================================== FAILURES ===================================
+___________ test_auto_save_failure_returns_typed_save_failed_result ____________
+
+    def test_auto_save_failure_returns_typed_save_failed_result():
+        """Confirm a public save-service failure cannot report mission success."""
+        harness = RuntimeHarness()
+        harness.save_success = False
+        try:
+            harness.publish_initial_state()
+>           goal_handle = harness.send_goal(auto_save=True)
+
+../../src/core/savo_mapping/test/test_autonomous_mapping_orchestrator_runtime.py:694: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <test_autonomous_mapping_orchestrator_runtime.RuntimeHarness object at 0x763ff0386480>
+auto_save = True
+
+    def send_goal(self, auto_save=True):
+        """Start one typed frontier mission."""
+        goal = RunAutonomousMapping.Goal()
+        goal.contract_version = RunAutonomousMapping.Goal.CONTRACT_VERSION
+        goal.mission_id = 'mission-am3-runtime'
+        goal.actor_id = 'runtime-operator'
+        goal.map_id = 'campus_main'
+        goal.map_revision = 1
+        goal.strategy = RunAutonomousMapping.Goal.STRATEGY_FRONTIER
+        goal.auto_save = auto_save
+        goal.require_quality_approval = True
+    
+        future = self.action_client.send_goal_async(goal)
+>       assert wait_until(future.done), self.diagnostics()
+E       AssertionError: poll=None modes=[] starts=[] cancels=[] handoff_cancels=0 map_saves=0 states=['idle', 'idle', 'idle', 'idle', 'idle', 'idle', 'idle', 'idle'] completion=[(False, False), (False, False), (False, False), (False, False), (False, False), (False, False), (False, False), (False, False)] output=
+E       assert False
+E        +  where False = wait_until(<bound method Future.done of <rclpy.task.Future object at 0x763fe8143530>>)
+E        +    where <bound method Future.done of <rclpy.task.Future object at 0x763fe8143530>> = <rclpy.task.Future object at 0x763fe8143530>.done
+
+../../src/core/savo_mapping/test/test_autonomous_mapping_orchestrator_runtime.py:397: AssertionError
+- generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_autonomous_mapping_orchestrator_runtime.xunit.xml -
+=========================== short test summary info ============================
+FAILED ../../src/core/savo_mapping/test/test_autonomous_mapping_orchestrator_runtime.py::test_auto_save_failure_returns_typed_save_failed_result
+========================= 1 failed, 3 passed in 11.60s =========================
+-- run_test.py: return code 1
+-- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_mapping/test_results/savo_mapping/test_autonomous_mapping_orchestrator_runtime.xunit.xml'
+
+
+0% tests passed, 1 tests failed out of 1
+
+Label Time Summary:
+pytest    =  12.06 sec*proc (1 test)
+
+Total Test time (real) =  12.06 sec
+
+The following tests FAILED:
+	  9 - test_autonomous_mapping_orchestrator_runtime (Failed)
+Errors while running CTest
+AM3 iteration 4 exit=8
+AM3 FAILED on iteration 4

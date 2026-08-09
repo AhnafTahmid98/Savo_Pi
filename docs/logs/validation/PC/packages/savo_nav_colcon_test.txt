@@ -1,0 +1,1674 @@
+Robot Savo package PC validation
+Run ID: 20260809T021142Z
+Package: savo_nav
+Date: 2026-08-09T05:24:16+03:00
+Host: ahnaf-tahmid-B760M-PG-SONIC-WiFi
+Commit: eb71c26ac7dfbeaf9c2e44df3ba9f79117c7d4b6
+
+Starting >>> savo_nav
+UpdateCTestConfiguration  from :/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/CTestConfiguration.ini
+Parse Config file:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/CTestConfiguration.ini
+   Site: ahnaf-tahmid-B760M-PG-SONIC-WiFi
+   Build name: (empty)
+ Add coverage exclude regular expressions.
+Create new tag: 20260809-0224 - Experimental
+UpdateCTestConfiguration  from :/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/CTestConfiguration.ini
+Parse Config file:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/CTestConfiguration.ini
+Test project /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav
+Constructing a list of tests
+Done constructing a list of tests
+Updating test list for fixtures
+Added 0 tests to meet fixture requirements
+Checking test dependency graph...
+Checking test dependency graph end
+test 1
+      Start  1: test_navigation_readiness
+
+1: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_navigation_readiness.gtest.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_gtest/test_navigation_readiness.txt" "--command" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_navigation_readiness" "--gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_navigation_readiness.gtest.xml"
+1: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav
+1: Test timeout computed to be: 60
+1: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav':
+1:  - /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_navigation_readiness --gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_navigation_readiness.gtest.xml
+1: Running main() from /opt/ros/jazzy/src/gtest_vendor/src/gtest_main.cc
+1: [==========] Running 7 tests from 1 test suite.
+1: [----------] Global test environment set-up.
+1: [----------] 7 tests from NavigationReadinessTest
+1: [ RUN      ] NavigationReadinessTest.StartsInStartingState
+1: [       OK ] NavigationReadinessTest.StartsInStartingState (0 ms)
+1: [ RUN      ] NavigationReadinessTest.ConvertsEveryStateToStableString
+1: [       OK ] NavigationReadinessTest.ConvertsEveryStateToStableString (0 ms)
+1: [ RUN      ] NavigationReadinessTest.AcceptsValidReadyState
+1: [       OK ] NavigationReadinessTest.AcceptsValidReadyState (0 ms)
+1: [ RUN      ] NavigationReadinessTest.RejectsReadyStateWithFailures
+1: [       OK ] NavigationReadinessTest.RejectsReadyStateWithFailures (0 ms)
+1: [ RUN      ] NavigationReadinessTest.RejectsBlockedStateThatAllowsGoals
+1: [       OK ] NavigationReadinessTest.RejectsBlockedStateThatAllowsGoals (0 ms)
+1: [ RUN      ] NavigationReadinessTest.AcceptsExplicitDegradedPolicy
+1: [       OK ] NavigationReadinessTest.AcceptsExplicitDegradedPolicy (0 ms)
+1: [ RUN      ] NavigationReadinessTest.RejectsEmptyReason
+1: [       OK ] NavigationReadinessTest.RejectsEmptyReason (0 ms)
+1: [----------] 7 tests from NavigationReadinessTest (0 ms total)
+1: 
+1: [----------] Global test environment tear-down
+1: [==========] 7 tests from 1 test suite ran. (0 ms total)
+1: [  PASSED  ] 7 tests.
+1: -- run_test.py: return code 0
+1: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_navigation_readiness.gtest.xml'
+1: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_navigation_readiness.gtest.xml'
+ 1/39 Test  #1: test_navigation_readiness .................................   Passed    0.06 sec
+test 2
+      Start  2: test_static_contracts
+
+2: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_static_contracts.gtest.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_gtest/test_static_contracts.txt" "--command" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_static_contracts" "--gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_static_contracts.gtest.xml"
+2: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav
+2: Test timeout computed to be: 60
+2: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav':
+2:  - /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_static_contracts --gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_static_contracts.gtest.xml
+2: Running main() from /opt/ros/jazzy/src/gtest_vendor/src/gtest_main.cc
+2: [==========] Running 37 tests from 5 test suites.
+2: [----------] Global test environment set-up.
+2: [----------] 7 tests from GoalContextTest
+2: [ RUN      ] GoalContextTest.AcceptsValidGoal
+2: [       OK ] GoalContextTest.AcceptsValidGoal (0 ms)
+2: [ RUN      ] GoalContextTest.RejectsEmptyGoalId
+2: [       OK ] GoalContextTest.RejectsEmptyGoalId (0 ms)
+2: [ RUN      ] GoalContextTest.RejectsWhitespaceInGoalId
+2: [       OK ] GoalContextTest.RejectsWhitespaceInGoalId (0 ms)
+2: [ RUN      ] GoalContextTest.RejectsUnknownSource
+2: [       OK ] GoalContextTest.RejectsUnknownSource (0 ms)
+2: [ RUN      ] GoalContextTest.RejectsNonMapTargetFrame
+2: [       OK ] GoalContextTest.RejectsNonMapTargetFrame (0 ms)
+2: [ RUN      ] GoalContextTest.RejectsZeroSequence
+2: [       OK ] GoalContextTest.RejectsZeroSequence (0 ms)
+2: [ RUN      ] GoalContextTest.ConvertsEveryGoalSource
+2: [       OK ] GoalContextTest.ConvertsEveryGoalSource (0 ms)
+2: [----------] 7 tests from GoalContextTest (0 ms total)
+2: 
+2: [----------] 10 tests from MapContextTest
+2: [ RUN      ] MapContextTest.AcceptsCleanUnavailableContext
+2: [       OK ] MapContextTest.AcceptsCleanUnavailableContext (0 ms)
+2: [ RUN      ] MapContextTest.AcceptsSavedMapContext
+2: [       OK ] MapContextTest.AcceptsSavedMapContext (0 ms)
+2: [ RUN      ] MapContextTest.AcceptsLiveMappingContext
+2: [       OK ] MapContextTest.AcceptsLiveMappingContext (0 ms)
+2: [ RUN      ] MapContextTest.RejectsSavedMapWithoutMapId
+2: [       OK ] MapContextTest.RejectsSavedMapWithoutMapId (0 ms)
+2: [ RUN      ] MapContextTest.RejectsSimultaneousSavedMapMapping
+2: [       OK ] MapContextTest.RejectsSimultaneousSavedMapMapping (0 ms)
+2: [ RUN      ] MapContextTest.RejectsSavedMapWithSlamAuthority
+2: [       OK ] MapContextTest.RejectsSavedMapWithSlamAuthority (0 ms)
+2: [ RUN      ] MapContextTest.RejectsLiveMapWithAmclAuthority
+2: [       OK ] MapContextTest.RejectsLiveMapWithAmclAuthority (0 ms)
+2: [ RUN      ] MapContextTest.RejectsAvailableUnknownMapMode
+2: [       OK ] MapContextTest.RejectsAvailableUnknownMapMode (0 ms)
+2: [ RUN      ] MapContextTest.ConvertsMapModes
+2: [       OK ] MapContextTest.ConvertsMapModes (0 ms)
+2: [ RUN      ] MapContextTest.ConvertsAuthorities
+2: [       OK ] MapContextTest.ConvertsAuthorities (0 ms)
+2: [----------] 10 tests from MapContextTest (0 ms total)
+2: 
+2: [----------] 8 tests from NavigationResultTest
+2: [ RUN      ] NavigationResultTest.DefaultResultIsValidPendingState
+2: [       OK ] NavigationResultTest.DefaultResultIsValidPendingState (0 ms)
+2: [ RUN      ] NavigationResultTest.CreatesValidPendingResult
+2: [       OK ] NavigationResultTest.CreatesValidPendingResult (0 ms)
+2: [ RUN      ] NavigationResultTest.CreatesValidSuccessResult
+2: [       OK ] NavigationResultTest.CreatesValidSuccessResult (0 ms)
+2: [ RUN      ] NavigationResultTest.CreatesValidFailureResult
+2: [       OK ] NavigationResultTest.CreatesValidFailureResult (0 ms)
+2: [ RUN      ] NavigationResultTest.RejectsSuccessFlagOnFailure
+2: [       OK ] NavigationResultTest.RejectsSuccessFlagOnFailure (0 ms)
+2: [ RUN      ] NavigationResultTest.RejectsEmptyTerminalGoalId
+2: [       OK ] NavigationResultTest.RejectsEmptyTerminalGoalId (0 ms)
+2: [ RUN      ] NavigationResultTest.RejectsNoneAsTerminalCode
+2: [       OK ] NavigationResultTest.RejectsNoneAsTerminalCode (0 ms)
+2: [ RUN      ] NavigationResultTest.ConvertsEveryResultCode
+2: [       OK ] NavigationResultTest.ConvertsEveryResultCode (0 ms)
+2: [----------] 8 tests from NavigationResultTest (0 ms total)
+2: 
+2: [----------] 9 tests from NavigationStateTest
+2: [ RUN      ] NavigationStateTest.OnlyIdleAcceptsNewGoals
+2: [       OK ] NavigationStateTest.OnlyIdleAcceptsNewGoals (0 ms)
+2: [ RUN      ] NavigationStateTest.ActiveGoalStatesAreExplicit
+2: [       OK ] NavigationStateTest.ActiveGoalStatesAreExplicit (0 ms)
+2: [ RUN      ] NavigationStateTest.TerminalStatesAreExplicit
+2: [       OK ] NavigationStateTest.TerminalStatesAreExplicit (0 ms)
+2: [ RUN      ] NavigationStateTest.AllowsNormalNavigationSequence
+2: [       OK ] NavigationStateTest.AllowsNormalNavigationSequence (0 ms)
+2: [ RUN      ] NavigationStateTest.AllowsRecoveryLoop
+2: [       OK ] NavigationStateTest.AllowsRecoveryLoop (0 ms)
+2: [ RUN      ] NavigationStateTest.AllowsCancelAcknowledgementOutcomes
+2: [       OK ] NavigationStateTest.AllowsCancelAcknowledgementOutcomes (0 ms)
+2: [ RUN      ] NavigationStateTest.RejectsUnsafeGoalReplacement
+2: [       OK ] NavigationStateTest.RejectsUnsafeGoalReplacement (0 ms)
+2: [ RUN      ] NavigationStateTest.AllowsIdempotentPublication
+2: [       OK ] NavigationStateTest.AllowsIdempotentPublication (0 ms)
+2: [ RUN      ] NavigationStateTest.ConvertsEveryState
+2: [       OK ] NavigationStateTest.ConvertsEveryState (0 ms)
+2: [----------] 9 tests from NavigationStateTest (0 ms total)
+2: 
+2: [----------] 3 tests from ValidationTypesTest
+2: [ RUN      ] ValidationTypesTest.DefaultResultIsValid
+2: [       OK ] ValidationTypesTest.DefaultResultIsValid (0 ms)
+2: [ RUN      ] ValidationTypesTest.ConvertsEveryValidationCode
+2: [       OK ] ValidationTypesTest.ConvertsEveryValidationCode (0 ms)
+2: [ RUN      ] ValidationTypesTest.FailureResultIsNotValid
+2: [       OK ] ValidationTypesTest.FailureResultIsNotValid (0 ms)
+2: [----------] 3 tests from ValidationTypesTest (0 ms total)
+2: 
+2: [----------] Global test environment tear-down
+2: [==========] 37 tests from 5 test suites ran. (0 ms total)
+2: [  PASSED  ] 37 tests.
+2: -- run_test.py: return code 0
+2: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_static_contracts.gtest.xml'
+2: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_static_contracts.gtest.xml'
+ 2/39 Test  #2: test_static_contracts .....................................   Passed    0.05 sec
+test 3
+      Start  3: test_readiness_core
+
+3: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_readiness_core.gtest.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_gtest/test_readiness_core.txt" "--command" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_readiness_core" "--gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_readiness_core.gtest.xml"
+3: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav
+3: Test timeout computed to be: 60
+3: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav':
+3:  - /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_readiness_core --gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_readiness_core.gtest.xml
+3: Running main() from /opt/ros/jazzy/src/gtest_vendor/src/gtest_main.cc
+3: [==========] Running 28 tests from 5 test suites.
+3: [----------] Global test environment set-up.
+3: [----------] 1 test from LocalizationMonitorTest
+3: [ RUN      ] LocalizationMonitorTest.TracksFilteredOdometry
+3: [       OK ] LocalizationMonitorTest.TracksFilteredOdometry (0 ms)
+3: [----------] 1 test from LocalizationMonitorTest (0 ms total)
+3: 
+3: [----------] 3 tests from SafetyStateMonitorTest
+3: [ RUN      ] SafetyStateMonitorTest.RequiresBothSafetyTopics
+3: [       OK ] SafetyStateMonitorTest.RequiresBothSafetyTopics (0 ms)
+3: [ RUN      ] SafetyStateMonitorTest.DetectsInvalidSlowdown
+3: [       OK ] SafetyStateMonitorTest.DetectsInvalidSlowdown (0 ms)
+3: [ RUN      ] SafetyStateMonitorTest.PreservesSafetyStop
+3: [       OK ] SafetyStateMonitorTest.PreservesSafetyStop (0 ms)
+3: [----------] 3 tests from SafetyStateMonitorTest (0 ms total)
+3: 
+3: [----------] 2 tests from Nav2HealthMonitorTest
+3: [ RUN      ] Nav2HealthMonitorTest.TracksServerAndCostmaps
+3: [       OK ] Nav2HealthMonitorTest.TracksServerAndCostmaps (0 ms)
+3: [ RUN      ] Nav2HealthMonitorTest.CostmapsExpire
+3: [       OK ] Nav2HealthMonitorTest.CostmapsExpire (0 ms)
+3: [----------] 2 tests from Nav2HealthMonitorTest (0 ms total)
+3: 
+3: [----------] 17 tests from NavigationReadinessEvaluatorTest
+3: [ RUN      ] NavigationReadinessEvaluatorTest.AcceptsReadySnapshot
+3: [       OK ] NavigationReadinessEvaluatorTest.AcceptsReadySnapshot (0 ms)
+3: [ RUN      ] NavigationReadinessEvaluatorTest.BlocksMissingSafetyState
+3: [       OK ] NavigationReadinessEvaluatorTest.BlocksMissingSafetyState (0 ms)
+3: [ RUN      ] NavigationReadinessEvaluatorTest.BlocksSafetyStop
+3: [       OK ] NavigationReadinessEvaluatorTest.BlocksSafetyStop (0 ms)
+3: [ RUN      ] NavigationReadinessEvaluatorTest.BlocksInvalidSlowdown
+3: [       OK ] NavigationReadinessEvaluatorTest.BlocksInvalidSlowdown (0 ms)
+3: [ RUN      ] NavigationReadinessEvaluatorTest.BlocksControlMode
+3: [       OK ] NavigationReadinessEvaluatorTest.BlocksControlMode (0 ms)
+3: [ RUN      ] NavigationReadinessEvaluatorTest.BlocksMissingMapContextHeartbeat
+3: [       OK ] NavigationReadinessEvaluatorTest.BlocksMissingMapContextHeartbeat (0 ms)
+3: [ RUN      ] NavigationReadinessEvaluatorTest.BlocksMismatchedMapContext
+3: [       OK ] NavigationReadinessEvaluatorTest.BlocksMismatchedMapContext (0 ms)
+3: [ RUN      ] NavigationReadinessEvaluatorTest.AcceptsSynchronizedMapContext
+3: [       OK ] NavigationReadinessEvaluatorTest.AcceptsSynchronizedMapContext (0 ms)
+3: [ RUN      ] NavigationReadinessEvaluatorTest.WaitsForMap
+3: [       OK ] NavigationReadinessEvaluatorTest.WaitsForMap (0 ms)
+3: [ RUN      ] NavigationReadinessEvaluatorTest.WaitsForTfChain
+3: [       OK ] NavigationReadinessEvaluatorTest.WaitsForTfChain (0 ms)
+3: [ RUN      ] NavigationReadinessEvaluatorTest.WaitsForLocalization
+3: [       OK ] NavigationReadinessEvaluatorTest.WaitsForLocalization (0 ms)
+3: [ RUN      ] NavigationReadinessEvaluatorTest.WaitsForLidar
+3: [       OK ] NavigationReadinessEvaluatorTest.WaitsForLidar (0 ms)
+3: [ RUN      ] NavigationReadinessEvaluatorTest.WaitsForPointCloud
+3: [       OK ] NavigationReadinessEvaluatorTest.WaitsForPointCloud (0 ms)
+3: [ RUN      ] NavigationReadinessEvaluatorTest.AllowsOptionalPointCloud
+3: [       OK ] NavigationReadinessEvaluatorTest.AllowsOptionalPointCloud (0 ms)
+3: [ RUN      ] NavigationReadinessEvaluatorTest.WaitsForNav2
+3: [       OK ] NavigationReadinessEvaluatorTest.WaitsForNav2 (0 ms)
+3: [ RUN      ] NavigationReadinessEvaluatorTest.WaitsForCostmaps
+3: [       OK ] NavigationReadinessEvaluatorTest.WaitsForCostmaps (0 ms)
+3: [ RUN      ] NavigationReadinessEvaluatorTest.ReportsAllFailures
+3: [       OK ] NavigationReadinessEvaluatorTest.ReportsAllFailures (0 ms)
+3: [----------] 17 tests from NavigationReadinessEvaluatorTest (0 ms total)
+3: 
+3: [----------] 5 tests from SensorFreshnessMonitorTest
+3: [ RUN      ] SensorFreshnessMonitorTest.RejectsInvalidTimeout
+3: [       OK ] SensorFreshnessMonitorTest.RejectsInvalidTimeout (0 ms)
+3: [ RUN      ] SensorFreshnessMonitorTest.StartsWithoutData
+3: [       OK ] SensorFreshnessMonitorTest.StartsWithoutData (0 ms)
+3: [ RUN      ] SensorFreshnessMonitorTest.MarksAndExpiresData
+3: [       OK ] SensorFreshnessMonitorTest.MarksAndExpiresData (0 ms)
+3: [ RUN      ] SensorFreshnessMonitorTest.RejectsClockReversal
+3: [       OK ] SensorFreshnessMonitorTest.RejectsClockReversal (0 ms)
+3: [ RUN      ] SensorFreshnessMonitorTest.ResetRemovesReceipt
+3: [       OK ] SensorFreshnessMonitorTest.ResetRemovesReceipt (0 ms)
+3: [----------] 5 tests from SensorFreshnessMonitorTest (0 ms total)
+3: 
+3: [----------] Global test environment tear-down
+3: [==========] 28 tests from 5 test suites ran. (0 ms total)
+3: [  PASSED  ] 28 tests.
+3: -- run_test.py: return code 0
+3: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_readiness_core.gtest.xml'
+3: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_readiness_core.gtest.xml'
+ 3/39 Test  #3: test_readiness_core .......................................   Passed    0.08 sec
+test 4
+      Start  4: test_coverage_path_validator
+
+4: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_coverage_path_validator.gtest.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_gtest/test_coverage_path_validator.txt" "--command" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_coverage_path_validator" "--gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_coverage_path_validator.gtest.xml"
+4: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav
+4: Test timeout computed to be: 60
+4: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav':
+4:  - /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_coverage_path_validator --gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_coverage_path_validator.gtest.xml
+4: Running main() from /opt/ros/jazzy/src/gtest_vendor/src/gtest_main.cc
+4: [==========] Running 21 tests from 1 test suite.
+4: [----------] Global test environment set-up.
+4: [----------] 21 tests from CoveragePathValidatorTest
+4: [ RUN      ] CoveragePathValidatorTest.AcceptsValidPath
+4: [       OK ] CoveragePathValidatorTest.AcceptsValidPath (0 ms)
+4: [ RUN      ] CoveragePathValidatorTest.AcceptsConfiguredDefaultTimeout
+4: [       OK ] CoveragePathValidatorTest.AcceptsConfiguredDefaultTimeout (0 ms)
+4: [ RUN      ] CoveragePathValidatorTest.RejectsContractMismatch
+4: [       OK ] CoveragePathValidatorTest.RejectsContractMismatch (0 ms)
+4: [ RUN      ] CoveragePathValidatorTest.RejectsEmptyMissionId
+4: [       OK ] CoveragePathValidatorTest.RejectsEmptyMissionId (0 ms)
+4: [ RUN      ] CoveragePathValidatorTest.RejectsWhitespaceMissionId
+4: [       OK ] CoveragePathValidatorTest.RejectsWhitespaceMissionId (0 ms)
+4: [ RUN      ] CoveragePathValidatorTest.RejectsMissionIdLengthLimit
+4: [       OK ] CoveragePathValidatorTest.RejectsMissionIdLengthLimit (0 ms)
+4: [ RUN      ] CoveragePathValidatorTest.RejectsNonMapPathFrame
+4: [       OK ] CoveragePathValidatorTest.RejectsNonMapPathFrame (0 ms)
+4: [ RUN      ] CoveragePathValidatorTest.RejectsEmptyPath
+4: [       OK ] CoveragePathValidatorTest.RejectsEmptyPath (0 ms)
+4: [ RUN      ] CoveragePathValidatorTest.RejectsWaypointLimit
+4: [       OK ] CoveragePathValidatorTest.RejectsWaypointLimit (0 ms)
+4: [ RUN      ] CoveragePathValidatorTest.RejectsWaypointFrameMismatch
+4: [       OK ] CoveragePathValidatorTest.RejectsWaypointFrameMismatch (0 ms)
+4: [ RUN      ] CoveragePathValidatorTest.RejectsNonfiniteWaypoint
+4: [       OK ] CoveragePathValidatorTest.RejectsNonfiniteWaypoint (0 ms)
+4: [ RUN      ] CoveragePathValidatorTest.RejectsCoordinateLimit
+4: [       OK ] CoveragePathValidatorTest.RejectsCoordinateLimit (0 ms)
+4: [ RUN      ] CoveragePathValidatorTest.RejectsNonPlanarOrientation
+4: [       OK ] CoveragePathValidatorTest.RejectsNonPlanarOrientation (0 ms)
+4: [ RUN      ] CoveragePathValidatorTest.RejectsUnnormalizedOrientation
+4: [       OK ] CoveragePathValidatorTest.RejectsUnnormalizedOrientation (0 ms)
+4: [ RUN      ] CoveragePathValidatorTest.RejectsDistanceLimit
+4: [       OK ] CoveragePathValidatorTest.RejectsDistanceLimit (0 ms)
+4: [ RUN      ] CoveragePathValidatorTest.RejectsUnavailableMap
+4: [       OK ] CoveragePathValidatorTest.RejectsUnavailableMap (0 ms)
+4: [ RUN      ] CoveragePathValidatorTest.RejectsBlockedReadiness
+4: [       OK ] CoveragePathValidatorTest.RejectsBlockedReadiness (0 ms)
+4: [ RUN      ] CoveragePathValidatorTest.AllowsExplicitDegradedPolicy
+4: [       OK ] CoveragePathValidatorTest.AllowsExplicitDegradedPolicy (0 ms)
+4: [ RUN      ] CoveragePathValidatorTest.RejectsNegativeTimeout
+4: [       OK ] CoveragePathValidatorTest.RejectsNegativeTimeout (0 ms)
+4: [ RUN      ] CoveragePathValidatorTest.RejectsTimeoutAboveLimit
+4: [       OK ] CoveragePathValidatorTest.RejectsTimeoutAboveLimit (0 ms)
+4: [ RUN      ] CoveragePathValidatorTest.RejectsInvalidPolicy
+4: [       OK ] CoveragePathValidatorTest.RejectsInvalidPolicy (0 ms)
+4: [----------] 21 tests from CoveragePathValidatorTest (0 ms total)
+4: 
+4: [----------] Global test environment tear-down
+4: [==========] 21 tests from 1 test suite ran. (0 ms total)
+4: [  PASSED  ] 21 tests.
+4: -- run_test.py: return code 0
+4: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_coverage_path_validator.gtest.xml'
+4: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_coverage_path_validator.gtest.xml'
+ 4/39 Test  #4: test_coverage_path_validator ..............................   Passed    0.06 sec
+test 5
+      Start  5: test_coverage_progress_tracker
+
+5: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_coverage_progress_tracker.gtest.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_gtest/test_coverage_progress_tracker.txt" "--command" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_coverage_progress_tracker" "--gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_coverage_progress_tracker.gtest.xml"
+5: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav
+5: Test timeout computed to be: 60
+5: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav':
+5:  - /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_coverage_progress_tracker --gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_coverage_progress_tracker.gtest.xml
+5: Running main() from /opt/ros/jazzy/src/gtest_vendor/src/gtest_main.cc
+5: [==========] Running 9 tests from 1 test suite.
+5: [----------] Global test environment set-up.
+5: [----------] 9 tests from CoverageProgressTrackerTest
+5: [ RUN      ] CoverageProgressTrackerTest.RejectsEmptyPath
+5: [       OK ] CoverageProgressTrackerTest.RejectsEmptyPath (0 ms)
+5: [ RUN      ] CoverageProgressTrackerTest.StartsConfiguredPath
+5: [       OK ] CoverageProgressTrackerTest.StartsConfiguredPath (0 ms)
+5: [ RUN      ] CoverageProgressTrackerTest.CalculatesProgress
+5: [       OK ] CoverageProgressTrackerTest.CalculatesProgress (0 ms)
+5: [ RUN      ] CoverageProgressTrackerTest.ProgressDoesNotRegress
+5: [       OK ] CoverageProgressTrackerTest.ProgressDoesNotRegress (0 ms)
+5: [ RUN      ] CoverageProgressTrackerTest.RejectsClockReversal
+5: [       OK ] CoverageProgressTrackerTest.RejectsClockReversal (0 ms)
+5: [ RUN      ] CoverageProgressTrackerTest.RejectsInvalidDistance
+5: [       OK ] CoverageProgressTrackerTest.RejectsInvalidDistance (0 ms)
+5: [ RUN      ] CoverageProgressTrackerTest.SuccessCompletesPath
+5: [       OK ] CoverageProgressTrackerTest.SuccessCompletesPath (0 ms)
+5: [ RUN      ] CoverageProgressTrackerTest.HandlesZeroDistancePath
+5: [       OK ] CoverageProgressTrackerTest.HandlesZeroDistancePath (0 ms)
+5: [ RUN      ] CoverageProgressTrackerTest.ResetReturnsToIdle
+5: [       OK ] CoverageProgressTrackerTest.ResetReturnsToIdle (0 ms)
+5: [----------] 9 tests from CoverageProgressTrackerTest (0 ms total)
+5: 
+5: [----------] Global test environment tear-down
+5: [==========] 9 tests from 1 test suite ran. (0 ms total)
+5: [  PASSED  ] 9 tests.
+5: -- run_test.py: return code 0
+5: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_coverage_progress_tracker.gtest.xml'
+5: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_coverage_progress_tracker.gtest.xml'
+ 5/39 Test  #5: test_coverage_progress_tracker ............................   Passed    0.05 sec
+test 6
+      Start  6: test_coverage_execution_model
+
+6: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_coverage_execution_model.gtest.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_gtest/test_coverage_execution_model.txt" "--command" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_coverage_execution_model" "--gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_coverage_execution_model.gtest.xml"
+6: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav
+6: Test timeout computed to be: 60
+6: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav':
+6:  - /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_coverage_execution_model --gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_coverage_execution_model.gtest.xml
+6: Running main() from /opt/ros/jazzy/src/gtest_vendor/src/gtest_main.cc
+6: [==========] Running 11 tests from 1 test suite.
+6: [----------] Global test environment set-up.
+6: [----------] 11 tests from CoverageExecutionModelTest
+6: [ RUN      ] CoverageExecutionModelTest.ResolvesDefaultTimeout
+6: [       OK ] CoverageExecutionModelTest.ResolvesDefaultTimeout (0 ms)
+6: [ RUN      ] CoverageExecutionModelTest.CapsRequestedTimeout
+6: [       OK ] CoverageExecutionModelTest.CapsRequestedTimeout (0 ms)
+6: [ RUN      ] CoverageExecutionModelTest.MarksBackendExecuting
+6: [       OK ] CoverageExecutionModelTest.MarksBackendExecuting (0 ms)
+6: [ RUN      ] CoverageExecutionModelTest.ExecutionTimeoutRequestsCancel
+6: [       OK ] CoverageExecutionModelTest.ExecutionTimeoutRequestsCancel (0 ms)
+6: [ RUN      ] CoverageExecutionModelTest.FeedbackStaleRequestsCancel
+6: [       OK ] CoverageExecutionModelTest.FeedbackStaleRequestsCancel (0 ms)
+6: [ RUN      ] CoverageExecutionModelTest.ExternalCancelAcknowledges
+6: [       OK ] CoverageExecutionModelTest.ExternalCancelAcknowledges (0 ms)
+6: [ RUN      ] CoverageExecutionModelTest.TimeoutCancelMapsToTimedOut
+6: [       OK ] CoverageExecutionModelTest.TimeoutCancelMapsToTimedOut (0 ms)
+6: [ RUN      ] CoverageExecutionModelTest.CancelTimeoutQuarantinesOwnership
+6: [       OK ] CoverageExecutionModelTest.CancelTimeoutQuarantinesOwnership (0 ms)
+6: [ RUN      ] CoverageExecutionModelTest.LateSuccessAfterCancelWins
+6: [       OK ] CoverageExecutionModelTest.LateSuccessAfterCancelWins (0 ms)
+6: [ RUN      ] CoverageExecutionModelTest.FailsBeforeBackend
+6: [       OK ] CoverageExecutionModelTest.FailsBeforeBackend (0 ms)
+6: [ RUN      ] CoverageExecutionModelTest.ResetReturnsIdle
+6: [       OK ] CoverageExecutionModelTest.ResetReturnsIdle (0 ms)
+6: [----------] 11 tests from CoverageExecutionModelTest (0 ms total)
+6: 
+6: [----------] Global test environment tear-down
+6: [==========] 11 tests from 1 test suite ran. (0 ms total)
+6: [  PASSED  ] 11 tests.
+6: -- run_test.py: return code 0
+6: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_coverage_execution_model.gtest.xml'
+6: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_coverage_execution_model.gtest.xml'
+ 6/39 Test  #6: test_coverage_execution_model .............................   Passed    0.06 sec
+test 7
+      Start  7: test_coverage_action_adapter
+
+7: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_coverage_action_adapter.gtest.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_gtest/test_coverage_action_adapter.txt" "--command" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_coverage_action_adapter" "--gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_coverage_action_adapter.gtest.xml"
+7: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav
+7: Test timeout computed to be: 60
+7: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav':
+7:  - /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_coverage_action_adapter --gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_coverage_action_adapter.gtest.xml
+7: Running main() from /opt/ros/jazzy/src/gtest_vendor/src/gtest_main.cc
+7: [==========] Running 8 tests from 1 test suite.
+7: [----------] Global test environment set-up.
+7: [----------] 8 tests from CoverageActionAdapterTest
+7: [ RUN      ] CoverageActionAdapterTest.AdaptsValidGoal
+7: [       OK ] CoverageActionAdapterTest.AdaptsValidGoal (0 ms)
+7: [ RUN      ] CoverageActionAdapterTest.UsesDefaultTimeout
+7: [       OK ] CoverageActionAdapterTest.UsesDefaultTimeout (0 ms)
+7: [ RUN      ] CoverageActionAdapterTest.CapsTimeout
+7: [       OK ] CoverageActionAdapterTest.CapsTimeout (0 ms)
+7: [ RUN      ] CoverageActionAdapterTest.RejectsNegativeTimeout
+7: [       OK ] CoverageActionAdapterTest.RejectsNegativeTimeout (0 ms)
+7: [ RUN      ] CoverageActionAdapterTest.RejectsInvalidPath
+7: [       OK ] CoverageActionAdapterTest.RejectsInvalidPath (0 ms)
+7: [ RUN      ] CoverageActionAdapterTest.MakesExecutingFeedback
+7: [       OK ] CoverageActionAdapterTest.MakesExecutingFeedback (0 ms)
+7: [ RUN      ] CoverageActionAdapterTest.MakesSuccessResult
+7: [       OK ] CoverageActionAdapterTest.MakesSuccessResult (0 ms)
+7: [ RUN      ] CoverageActionAdapterTest.MapsTimeoutResult
+7: [       OK ] CoverageActionAdapterTest.MapsTimeoutResult (0 ms)
+7: [----------] 8 tests from CoverageActionAdapterTest (0 ms total)
+7: 
+7: [----------] Global test environment tear-down
+7: [==========] 8 tests from 1 test suite ran. (0 ms total)
+7: [  PASSED  ] 8 tests.
+7: -- run_test.py: return code 0
+7: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_coverage_action_adapter.gtest.xml'
+7: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_coverage_action_adapter.gtest.xml'
+ 7/39 Test  #7: test_coverage_action_adapter ..............................   Passed    0.07 sec
+test 8
+      Start  8: test_goal_validation_arbitration
+
+8: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_goal_validation_arbitration.gtest.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_gtest/test_goal_validation_arbitration.txt" "--command" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_goal_validation_arbitration" "--gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_goal_validation_arbitration.gtest.xml"
+8: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav
+8: Test timeout computed to be: 60
+8: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav':
+8:  - /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_goal_validation_arbitration --gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_goal_validation_arbitration.gtest.xml
+8: Running main() from /opt/ros/jazzy/src/gtest_vendor/src/gtest_main.cc
+8: [==========] Running 32 tests from 2 test suites.
+8: [----------] Global test environment set-up.
+8: [----------] 19 tests from GoalArbiterTest
+8: [ RUN      ] GoalArbiterTest.RejectsZeroHistoryCapacity
+8: [       OK ] GoalArbiterTest.RejectsZeroHistoryCapacity (0 ms)
+8: [ RUN      ] GoalArbiterTest.AcceptsFirstValidatedGoal
+8: [       OK ] GoalArbiterTest.AcceptsFirstValidatedGoal (0 ms)
+8: [ RUN      ] GoalArbiterTest.RejectsInvalidGoal
+8: [       OK ] GoalArbiterTest.RejectsInvalidGoal (0 ms)
+8: [ RUN      ] GoalArbiterTest.RejectsDuplicateActiveGoal
+8: [       OK ] GoalArbiterTest.RejectsDuplicateActiveGoal (0 ms)
+8: [ RUN      ] GoalArbiterTest.RejectsBusyWithoutReplacement
+8: [       OK ] GoalArbiterTest.RejectsBusyWithoutReplacement (0 ms)
+8: [ RUN      ] GoalArbiterTest.SupervisorCannotSilentlyPreempt
+8: [       OK ] GoalArbiterTest.SupervisorCannotSilentlyPreempt (0 ms)
+8: [ RUN      ] GoalArbiterTest.RejectsStaleSequencePerSource
+8: [       OK ] GoalArbiterTest.RejectsStaleSequencePerSource (0 ms)
+8: [ RUN      ] GoalArbiterTest.SequenceTrackingIsPerSource
+8: [       OK ] GoalArbiterTest.SequenceTrackingIsPerSource (0 ms)
+8: [ RUN      ] GoalArbiterTest.CancelRequestRetainsOwnership
+8: [       OK ] GoalArbiterTest.CancelRequestRetainsOwnership (0 ms)
+8: [ RUN      ] GoalArbiterTest.DuplicateCancelIsRejected
+8: [       OK ] GoalArbiterTest.DuplicateCancelIsRejected (0 ms)
+8: [ RUN      ] GoalArbiterTest.CancelMismatchDoesNotReleaseGoal
+8: [       OK ] GoalArbiterTest.CancelMismatchDoesNotReleaseGoal (0 ms)
+8: [ RUN      ] GoalArbiterTest.CancellationNeedsAcknowledgement
+8: [       OK ] GoalArbiterTest.CancellationNeedsAcknowledgement (0 ms)
+8: [ RUN      ] GoalArbiterTest.RejectsCancelAckWithoutRequest
+8: [       OK ] GoalArbiterTest.RejectsCancelAckWithoutRequest (0 ms)
+8: [ RUN      ] GoalArbiterTest.LateSuccessAfterCancelCanComplete
+8: [       OK ] GoalArbiterTest.LateSuccessAfterCancelCanComplete (0 ms)
+8: [ RUN      ] GoalArbiterTest.CompletionMismatchIsRejected
+8: [       OK ] GoalArbiterTest.CompletionMismatchIsRejected (0 ms)
+8: [ RUN      ] GoalArbiterTest.CompletedGoalIdCannotBeReused
+8: [       OK ] GoalArbiterTest.CompletedGoalIdCannotBeReused (0 ms)
+8: [ RUN      ] GoalArbiterTest.RecentHistoryIsBounded
+8: [       OK ] GoalArbiterTest.RecentHistoryIsBounded (0 ms)
+8: [ RUN      ] GoalArbiterTest.SourcePrioritiesAreDeterministic
+8: [       OK ] GoalArbiterTest.SourcePrioritiesAreDeterministic (0 ms)
+8: [ RUN      ] GoalArbiterTest.ConvertsArbitrationCodes
+8: [       OK ] GoalArbiterTest.ConvertsArbitrationCodes (0 ms)
+8: [----------] 19 tests from GoalArbiterTest (0 ms total)
+8: 
+8: [----------] 13 tests from GoalValidatorTest
+8: [ RUN      ] GoalValidatorTest.AcceptsValidSavedMapGoal
+8: [       OK ] GoalValidatorTest.AcceptsValidSavedMapGoal (0 ms)
+8: [ RUN      ] GoalValidatorTest.RejectsNonfinitePosition
+8: [       OK ] GoalValidatorTest.RejectsNonfinitePosition (0 ms)
+8: [ RUN      ] GoalValidatorTest.RejectsCoordinateLimit
+8: [       OK ] GoalValidatorTest.RejectsCoordinateLimit (0 ms)
+8: [ RUN      ] GoalValidatorTest.RejectsUnnormalizedYaw
+8: [       OK ] GoalValidatorTest.RejectsUnnormalizedYaw (0 ms)
+8: [ RUN      ] GoalValidatorTest.RejectsUnavailableMap
+8: [       OK ] GoalValidatorTest.RejectsUnavailableMap (0 ms)
+8: [ RUN      ] GoalValidatorTest.RejectsNotReadyState
+8: [       OK ] GoalValidatorTest.RejectsNotReadyState (0 ms)
+8: [ RUN      ] GoalValidatorTest.RejectsSavedMapMismatch
+8: [       OK ] GoalValidatorTest.RejectsSavedMapMismatch (0 ms)
+8: [ RUN      ] GoalValidatorTest.RejectsMissingSavedMapId
+8: [       OK ] GoalValidatorTest.RejectsMissingSavedMapId (0 ms)
+8: [ RUN      ] GoalValidatorTest.RejectsCancelFlagOnNewGoal
+8: [       OK ] GoalValidatorTest.RejectsCancelFlagOnNewGoal (0 ms)
+8: [ RUN      ] GoalValidatorTest.RejectsInvalidSourceValue
+8: [       OK ] GoalValidatorTest.RejectsInvalidSourceValue (0 ms)
+8: [ RUN      ] GoalValidatorTest.AcceptsLiveMappingWithoutMapId
+8: [       OK ] GoalValidatorTest.AcceptsLiveMappingWithoutMapId (0 ms)
+8: [ RUN      ] GoalValidatorTest.DegradedRequiresExplicitPolicy
+8: [       OK ] GoalValidatorTest.DegradedRequiresExplicitPolicy (0 ms)
+8: [ RUN      ] GoalValidatorTest.RejectsInvalidPolicy
+8: [       OK ] GoalValidatorTest.RejectsInvalidPolicy (0 ms)
+8: [----------] 13 tests from GoalValidatorTest (0 ms total)
+8: 
+8: [----------] Global test environment tear-down
+8: [==========] 32 tests from 2 test suites ran. (0 ms total)
+8: [  PASSED  ] 32 tests.
+8: -- run_test.py: return code 0
+8: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_goal_validation_arbitration.gtest.xml'
+8: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_goal_validation_arbitration.gtest.xml'
+ 8/39 Test  #8: test_goal_validation_arbitration ..........................   Passed    0.05 sec
+test 9
+      Start  9: test_goal_gateway
+
+9: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_goal_gateway.gtest.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_gtest/test_goal_gateway.txt" "--command" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_goal_gateway" "--gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_goal_gateway.gtest.xml"
+9: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav
+9: Test timeout computed to be: 60
+9: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav':
+9:  - /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_goal_gateway --gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_goal_gateway.gtest.xml
+9: Running main() from /opt/ros/jazzy/src/gtest_vendor/src/gtest_main.cc
+9: [==========] Running 12 tests from 1 test suite.
+9: [----------] Global test environment set-up.
+9: [----------] 12 tests from GoalGatewayTest
+9: [ RUN      ] GoalGatewayTest.StartsIdle
+9: [       OK ] GoalGatewayTest.StartsIdle (0 ms)
+9: [ RUN      ] GoalGatewayTest.AdmitsValidGoal
+9: [       OK ] GoalGatewayTest.AdmitsValidGoal (0 ms)
+9: [ RUN      ] GoalGatewayTest.RejectsInvalidGoal
+9: [       OK ] GoalGatewayTest.RejectsInvalidGoal (0 ms)
+9: [ RUN      ] GoalGatewayTest.ForwardsAndActivates
+9: [       OK ] GoalGatewayTest.ForwardsAndActivates (0 ms)
+9: [ RUN      ] GoalGatewayTest.EnforcesSingleGoal
+9: [       OK ] GoalGatewayTest.EnforcesSingleGoal (0 ms)
+9: [ RUN      ] GoalGatewayTest.CancelKeepsOwnershipUntilAck
+9: [       OK ] GoalGatewayTest.CancelKeepsOwnershipUntilAck (0 ms)
+9: [ RUN      ] GoalGatewayTest.LateSuccessAfterCancelCompletes
+9: [       OK ] GoalGatewayTest.LateSuccessAfterCancelCompletes (0 ms)
+9: [ RUN      ] GoalGatewayTest.AdmitsPrevalidatedCoverageGoal
+9: [       OK ] GoalGatewayTest.AdmitsPrevalidatedCoverageGoal (0 ms)
+9: [ RUN      ] GoalGatewayTest.RejectsInvalidPrevalidatedCoverageGoal
+9: [       OK ] GoalGatewayTest.RejectsInvalidPrevalidatedCoverageGoal (0 ms)
+9: [ RUN      ] GoalGatewayTest.RejectsInvalidCoverageContext
+9: [       OK ] GoalGatewayTest.RejectsInvalidCoverageContext (0 ms)
+9: [ RUN      ] GoalGatewayTest.CoverageSharesSingleActiveSlot
+9: [       OK ] GoalGatewayTest.CoverageSharesSingleActiveSlot (0 ms)
+9: [ RUN      ] GoalGatewayTest.ConvertsEveryState
+9: [       OK ] GoalGatewayTest.ConvertsEveryState (0 ms)
+9: [----------] 12 tests from GoalGatewayTest (0 ms total)
+9: 
+9: [----------] Global test environment tear-down
+9: [==========] 12 tests from 1 test suite ran. (0 ms total)
+9: [  PASSED  ] 12 tests.
+9: -- run_test.py: return code 0
+9: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_goal_gateway.gtest.xml'
+9: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_goal_gateway.gtest.xml'
+ 9/39 Test  #9: test_goal_gateway .........................................   Passed    0.05 sec
+test 10
+      Start 10: test_control_recovery
+
+10: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_control_recovery.gtest.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_gtest/test_control_recovery.txt" "--command" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_control_recovery" "--gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_control_recovery.gtest.xml"
+10: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav
+10: Test timeout computed to be: 60
+10: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav':
+10:  - /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_control_recovery --gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_control_recovery.gtest.xml
+10: Running main() from /opt/ros/jazzy/src/gtest_vendor/src/gtest_main.cc
+10: [==========] Running 13 tests from 3 test suites.
+10: [----------] Global test environment set-up.
+10: [----------] 6 tests from ControlModeClientTest
+10: [ RUN      ] ControlModeClientTest.ParsesSupportedModes
+10: [       OK ] ControlModeClientTest.ParsesSupportedModes (0 ms)
+10: [ RUN      ] ControlModeClientTest.StartsBlocked
+10: [       OK ] ControlModeClientTest.StartsBlocked (0 ms)
+10: [ RUN      ] ControlModeClientTest.NavModeAllowsNavigation
+10: [       OK ] ControlModeClientTest.NavModeAllowsNavigation (0 ms)
+10: [ RUN      ] ControlModeClientTest.StopModeBlocksNavigation
+10: [       OK ] ControlModeClientTest.StopModeBlocksNavigation (0 ms)
+10: [ RUN      ] ControlModeClientTest.StaleModeBlocksNavigation
+10: [       OK ] ControlModeClientTest.StaleModeBlocksNavigation (0 ms)
+10: [ RUN      ] ControlModeClientTest.RejectsInvalidTimestamp
+10: [       OK ] ControlModeClientTest.RejectsInvalidTimestamp (0 ms)
+10: [----------] 6 tests from ControlModeClientTest (0 ms total)
+10: 
+10: [----------] 4 tests from RecoveryBridgeTest
+10: [ RUN      ] RecoveryBridgeTest.StartsBlocked
+10: [       OK ] RecoveryBridgeTest.StartsBlocked (0 ms)
+10: [ RUN      ] RecoveryBridgeTest.FreshInactiveRecoveryAllowsNavigation
+10: [       OK ] RecoveryBridgeTest.FreshInactiveRecoveryAllowsNavigation (0 ms)
+10: [ RUN      ] RecoveryBridgeTest.ActiveRecoveryBlocksNavigation
+10: [       OK ] RecoveryBridgeTest.ActiveRecoveryBlocksNavigation (0 ms)
+10: [ RUN      ] RecoveryBridgeTest.StaleRecoveryBlocksNavigation
+10: [       OK ] RecoveryBridgeTest.StaleRecoveryBlocksNavigation (0 ms)
+10: [----------] 4 tests from RecoveryBridgeTest (0 ms total)
+10: 
+10: [----------] 3 tests from ControlRecoveryGuardTest
+10: [ RUN      ] ControlRecoveryGuardTest.RequiresBothInputs
+10: [       OK ] ControlRecoveryGuardTest.RequiresBothInputs (0 ms)
+10: [ RUN      ] ControlRecoveryGuardTest.ControlBlockHasPriority
+10: [       OK ] ControlRecoveryGuardTest.ControlBlockHasPriority (0 ms)
+10: [ RUN      ] ControlRecoveryGuardTest.RecoveryBlocksNavMode
+10: [       OK ] ControlRecoveryGuardTest.RecoveryBlocksNavMode (0 ms)
+10: [----------] 3 tests from ControlRecoveryGuardTest (0 ms total)
+10: 
+10: [----------] Global test environment tear-down
+10: [==========] 13 tests from 3 test suites ran. (0 ms total)
+10: [  PASSED  ] 13 tests.
+10: -- run_test.py: return code 0
+10: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_control_recovery.gtest.xml'
+10: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_control_recovery.gtest.xml'
+10/39 Test #10: test_control_recovery .....................................   Passed    0.05 sec
+test 11
+      Start 11: test_phase7_control_recovery_contracts
+
+11: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase7_control_recovery_contracts.xunit.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_phase7_control_recovery_contracts.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/contracts/test_phase7_control_recovery_contracts.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_phase7_control_recovery_contracts/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase7_control_recovery_contracts.xunit.xml" "--junit-prefix=savo_nav"
+11: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav
+11: Test timeout computed to be: 60
+11: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav':
+11:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/contracts/test_phase7_control_recovery_contracts.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_phase7_control_recovery_contracts/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase7_control_recovery_contracts.xunit.xml --junit-prefix=savo_nav
+11: ============================= test session starts ==============================
+11: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+11: cachedir: build/savo_nav/ament_cmake_pytest/test_phase7_control_recovery_contracts/.cache
+11: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+11: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+11: collected 7 items
+11: 
+11: ../../src/core/savo_nav/test/contracts/test_phase7_control_recovery_contracts.py . [ 14%]
+11: ......                                                                   [100%]
+11: 
+11: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase7_control_recovery_contracts.xunit.xml -
+11: ============================== 7 passed in 0.01s ===============================
+11: -- run_test.py: return code 0
+11: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase7_control_recovery_contracts.xunit.xml'
+11/39 Test #11: test_phase7_control_recovery_contracts ....................   Passed    0.33 sec
+test 12
+      Start 12: test_goal_admission_policy
+
+12: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_goal_admission_policy.gtest.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_gtest/test_goal_admission_policy.txt" "--command" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_goal_admission_policy" "--gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_goal_admission_policy.gtest.xml"
+12: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav
+12: Test timeout computed to be: 60
+12: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav':
+12:  - /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_goal_admission_policy --gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_goal_admission_policy.gtest.xml
+12: Running main() from /opt/ros/jazzy/src/gtest_vendor/src/gtest_main.cc
+12: [==========] Running 7 tests from 1 test suite.
+12: [----------] Global test environment set-up.
+12: [----------] 7 tests from GoalAdmissionPolicyTest
+12: [ RUN      ] GoalAdmissionPolicyTest.UnknownGuardRejectsNewGoal
+12: [       OK ] GoalAdmissionPolicyTest.UnknownGuardRejectsNewGoal (0 ms)
+12: [ RUN      ] GoalAdmissionPolicyTest.StaleGuardRejectsNewGoal
+12: [       OK ] GoalAdmissionPolicyTest.StaleGuardRejectsNewGoal (0 ms)
+12: [ RUN      ] GoalAdmissionPolicyTest.BlockedGuardRejectsNewGoal
+12: [       OK ] GoalAdmissionPolicyTest.BlockedGuardRejectsNewGoal (0 ms)
+12: [ RUN      ] GoalAdmissionPolicyTest.ReadyGuardAcceptsIdleGoal
+12: [       OK ] GoalAdmissionPolicyTest.ReadyGuardAcceptsIdleGoal (0 ms)
+12: [ RUN      ] GoalAdmissionPolicyTest.BusyGatewayRejectsReplacement
+12: [       OK ] GoalAdmissionPolicyTest.BusyGatewayRejectsReplacement (0 ms)
+12: [ RUN      ] GoalAdmissionPolicyTest.GuardLossCancelsActiveGoal
+12: [       OK ] GoalAdmissionPolicyTest.GuardLossCancelsActiveGoal (0 ms)
+12: [ RUN      ] GoalAdmissionPolicyTest.CancellationIsOneShot
+12: [       OK ] GoalAdmissionPolicyTest.CancellationIsOneShot (0 ms)
+12: [----------] 7 tests from GoalAdmissionPolicyTest (0 ms total)
+12: 
+12: [----------] Global test environment tear-down
+12: [==========] 7 tests from 1 test suite ran. (0 ms total)
+12: [  PASSED  ] 7 tests.
+12: -- run_test.py: return code 0
+12: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_goal_admission_policy.gtest.xml'
+12: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_goal_admission_policy.gtest.xml'
+12/39 Test #12: test_goal_admission_policy ................................   Passed    0.05 sec
+test 13
+      Start 13: test_phase7b_goal_admission_contracts
+
+13: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase7b_goal_admission_contracts.xunit.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_phase7b_goal_admission_contracts.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/contracts/test_phase7b_goal_admission_contracts.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_phase7b_goal_admission_contracts/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase7b_goal_admission_contracts.xunit.xml" "--junit-prefix=savo_nav"
+13: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav
+13: Test timeout computed to be: 60
+13: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav':
+13:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/contracts/test_phase7b_goal_admission_contracts.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_phase7b_goal_admission_contracts/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase7b_goal_admission_contracts.xunit.xml --junit-prefix=savo_nav
+13: ============================= test session starts ==============================
+13: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+13: cachedir: build/savo_nav/ament_cmake_pytest/test_phase7b_goal_admission_contracts/.cache
+13: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+13: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+13: collected 7 items
+13: 
+13: ../../src/core/savo_nav/test/contracts/test_phase7b_goal_admission_contracts.py . [ 14%]
+13: ......                                                                   [100%]
+13: 
+13: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase7b_goal_admission_contracts.xunit.xml -
+13: ============================== 7 passed in 0.02s ===============================
+13: -- run_test.py: return code 0
+13: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase7b_goal_admission_contracts.xunit.xml'
+13/39 Test #13: test_phase7b_goal_admission_contracts .....................   Passed    0.33 sec
+test 14
+      Start 14: test_phase4l_b3_coverage_contracts
+
+14: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase4l_b3_coverage_contracts.xunit.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_phase4l_b3_coverage_contracts.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/contracts/test_phase4l_b3_coverage_contracts.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_phase4l_b3_coverage_contracts/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase4l_b3_coverage_contracts.xunit.xml" "--junit-prefix=savo_nav"
+14: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav
+14: Test timeout computed to be: 60
+14: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav':
+14:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/contracts/test_phase4l_b3_coverage_contracts.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_phase4l_b3_coverage_contracts/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase4l_b3_coverage_contracts.xunit.xml --junit-prefix=savo_nav
+14: ============================= test session starts ==============================
+14: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+14: cachedir: build/savo_nav/ament_cmake_pytest/test_phase4l_b3_coverage_contracts/.cache
+14: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+14: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+14: collected 7 items
+14: 
+14: ../../src/core/savo_nav/test/contracts/test_phase4l_b3_coverage_contracts.py . [ 14%]
+14: ......                                                                   [100%]
+14: 
+14: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase4l_b3_coverage_contracts.xunit.xml -
+14: ============================== 7 passed in 0.02s ===============================
+14: -- run_test.py: return code 0
+14: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase4l_b3_coverage_contracts.xunit.xml'
+14/39 Test #14: test_phase4l_b3_coverage_contracts ........................   Passed    0.34 sec
+test 15
+      Start 15: test_phase4l_b3d_runtime_contracts
+
+15: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase4l_b3d_runtime_contracts.xunit.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_phase4l_b3d_runtime_contracts.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/contracts/test_phase4l_b3d_runtime_contracts.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_phase4l_b3d_runtime_contracts/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase4l_b3d_runtime_contracts.xunit.xml" "--junit-prefix=savo_nav"
+15: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav
+15: Test timeout computed to be: 60
+15: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav':
+15:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/contracts/test_phase4l_b3d_runtime_contracts.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_phase4l_b3d_runtime_contracts/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase4l_b3d_runtime_contracts.xunit.xml --junit-prefix=savo_nav
+15: ============================= test session starts ==============================
+15: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+15: cachedir: build/savo_nav/ament_cmake_pytest/test_phase4l_b3d_runtime_contracts/.cache
+15: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+15: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+15: collected 6 items
+15: 
+15: ../../src/core/savo_nav/test/contracts/test_phase4l_b3d_runtime_contracts.py . [ 16%]
+15: .....                                                                    [100%]
+15: 
+15: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase4l_b3d_runtime_contracts.xunit.xml -
+15: ============================== 6 passed in 0.01s ===============================
+15: -- run_test.py: return code 0
+15: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase4l_b3d_runtime_contracts.xunit.xml'
+15/39 Test #15: test_phase4l_b3d_runtime_contracts ........................   Passed    0.33 sec
+test 16
+      Start 16: test_phase4l_b3e_integration_contracts
+
+16: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase4l_b3e_integration_contracts.xunit.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_phase4l_b3e_integration_contracts.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/contracts/test_phase4l_b3e_integration_contracts.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_phase4l_b3e_integration_contracts/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase4l_b3e_integration_contracts.xunit.xml" "--junit-prefix=savo_nav"
+16: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav
+16: Test timeout computed to be: 60
+16: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav':
+16:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/contracts/test_phase4l_b3e_integration_contracts.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_phase4l_b3e_integration_contracts/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase4l_b3e_integration_contracts.xunit.xml --junit-prefix=savo_nav
+16: ============================= test session starts ==============================
+16: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+16: cachedir: build/savo_nav/ament_cmake_pytest/test_phase4l_b3e_integration_contracts/.cache
+16: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+16: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+16: collected 6 items
+16: 
+16: ../../src/core/savo_nav/test/contracts/test_phase4l_b3e_integration_contracts.py . [ 16%]
+16: .....                                                                    [100%]
+16: 
+16: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase4l_b3e_integration_contracts.xunit.xml -
+16: ============================== 6 passed in 0.01s ===============================
+16: -- run_test.py: return code 0
+16: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase4l_b3e_integration_contracts.xunit.xml'
+16/39 Test #16: test_phase4l_b3e_integration_contracts ....................   Passed    0.32 sec
+test 17
+      Start 17: test_launch_test_phase4l_b3e_coverage_runtime_launch.py
+
+17: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_launch_test_phase4l_b3e_coverage_runtime_launch.py.xunit.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/launch_test/test_launch_test_phase4l_b3e_coverage_runtime_launch.py.txt" "--command" "/usr/bin/python3" "-m" "launch_testing.launch_test" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/launch/test_phase4l_b3e_coverage_runtime_launch.py" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_launch_test_phase4l_b3e_coverage_runtime_launch.py.xunit.xml" "--package-name=savo_nav"
+17: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav
+17: Test timeout computed to be: 90
+17: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav':
+17:  - /usr/bin/python3 -m launch_testing.launch_test /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/launch/test_phase4l_b3e_coverage_runtime_launch.py --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_launch_test_phase4l_b3e_coverage_runtime_launch.py.xunit.xml --package-name=savo_nav
+17: [INFO] [launch]: All log files can be found below /home/ahnaf-tahmid/.ros/log/2026-08-09-05-24-19-490042-ahnaf-tahmid-B760M-PG-SONIC-WiFi-3085918
+17: [INFO] [launch]: Default logging verbosity is set to INFO
+17: [INFO] [fake_follow_path_server_node-1]: process started with pid [3085934]
+17: [INFO] [goal_gateway_node-2]: process started with pid [3085935]
+17: [INFO] [goal_admission_gate_node-3]: process started with pid [3085936]
+17: [fake_follow_path_server_node-1] [INFO] [1786242259.564714727] [fake_follow_path_server_node]: Fake FollowPath server ready: /test/follow_path
+17: [goal_gateway_node-2] [INFO] [1786242259.574025693] [goal_gateway_node]: Goal gateway started: navigation=/test/internal/navigation exploration=/test/internal/exploration internal_nav2=/test/navigate_to_pose
+17: [goal_admission_gate_node-3] [INFO] [1786242259.574526340] [goal_admission_gate_node]: Goal admission gate started | public=/test/navigation,/test/exploration internal=/test/internal/navigation,/test/internal/exploration
+17: test_complete_coverage_runtime_matrix (savo_nav.TestCoverageRuntime.test_complete_coverage_runtime_matrix)
+17: Exercise B3E1, B3E2 and B3E3. ... [fake_follow_path_server_node-1] [INFO] [1786242265.504788774] [fake_follow_path_server_node]: Rejecting cancel for late-success fixture
+17: ok
+17: 
+17: ----------------------------------------------------------------------
+17: Ran 1 test in 8.942s
+17: 
+17: OK
+17: [INFO] [goal_admission_gate_node-3]: sending signal 'SIGINT' to process[goal_admission_gate_node-3]
+17: [INFO] [goal_gateway_node-2]: sending signal 'SIGINT' to process[goal_gateway_node-2]
+17: [INFO] [fake_follow_path_server_node-1]: sending signal 'SIGINT' to process[fake_follow_path_server_node-1]
+17: [goal_admission_gate_node-3] [INFO] [1786242268.455949892] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+17: [goal_gateway_node-2] [INFO] [1786242268.456256473] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+17: [fake_follow_path_server_node-1] [INFO] [1786242268.456541498] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+17: [INFO] [fake_follow_path_server_node-1]: process has finished cleanly [pid 3085934]
+17: [INFO] [goal_admission_gate_node-3]: process has finished cleanly [pid 3085936]
+17: [INFO] [goal_gateway_node-2]: process has finished cleanly [pid 3085935]
+17: 
+17: ----------------------------------------------------------------------
+17: Ran 0 tests in 0.000s
+17: 
+17: NO TESTS RAN
+17: -- run_test.py: return code 0
+17: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_launch_test_phase4l_b3e_coverage_runtime_launch.py.xunit.xml'
+17/39 Test #17: test_launch_test_phase4l_b3e_coverage_runtime_launch.py ...   Passed    9.82 sec
+test 18
+      Start 18: test_location_navigation_runtime_contract
+
+18: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_location_navigation_runtime_contract.xunit.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_location_navigation_runtime_contract.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/contracts/test_location_navigation_runtime_contract.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_location_navigation_runtime_contract/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_location_navigation_runtime_contract.xunit.xml" "--junit-prefix=savo_nav"
+18: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav
+18: Test timeout computed to be: 60
+18: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav':
+18:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/contracts/test_location_navigation_runtime_contract.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_location_navigation_runtime_contract/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_location_navigation_runtime_contract.xunit.xml --junit-prefix=savo_nav
+18: ============================= test session starts ==============================
+18: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+18: cachedir: build/savo_nav/ament_cmake_pytest/test_location_navigation_runtime_contract/.cache
+18: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+18: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+18: collected 1 item
+18: 
+18: ../../src/core/savo_nav/test/contracts/test_location_navigation_runtime_contract.py . [100%]
+18: 
+18: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_location_navigation_runtime_contract.xunit.xml -
+18: ============================== 1 passed in 0.01s ===============================
+18: -- run_test.py: return code 0
+18: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_location_navigation_runtime_contract.xunit.xml'
+18/39 Test #18: test_location_navigation_runtime_contract .................   Passed    0.33 sec
+test 19
+      Start 19: test_source_headers
+
+19: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_source_headers.xunit.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_source_headers.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/contracts/test_source_headers.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_source_headers/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_source_headers.xunit.xml" "--junit-prefix=savo_nav"
+19: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav
+19: Test timeout computed to be: 60
+19: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav':
+19:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/contracts/test_source_headers.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_source_headers/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_source_headers.xunit.xml --junit-prefix=savo_nav
+19: ============================= test session starts ==============================
+19: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+19: cachedir: build/savo_nav/ament_cmake_pytest/test_source_headers/.cache
+19: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+19: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+19: collected 1 item
+19: 
+19: ../../src/core/savo_nav/test/contracts/test_source_headers.py .          [100%]
+19: 
+19: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_source_headers.xunit.xml -
+19: ============================== 1 passed in 0.01s ===============================
+19: -- run_test.py: return code 0
+19: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_source_headers.xunit.xml'
+19/39 Test #19: test_source_headers .......................................   Passed    0.33 sec
+test 20
+      Start 20: test_phase0_contracts
+
+20: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase0_contracts.xunit.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_phase0_contracts.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/contracts/test_phase0_contracts.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_phase0_contracts/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase0_contracts.xunit.xml" "--junit-prefix=savo_nav"
+20: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav
+20: Test timeout computed to be: 60
+20: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav':
+20:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/contracts/test_phase0_contracts.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_phase0_contracts/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase0_contracts.xunit.xml --junit-prefix=savo_nav
+20: ============================= test session starts ==============================
+20: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+20: cachedir: build/savo_nav/ament_cmake_pytest/test_phase0_contracts/.cache
+20: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+20: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+20: collected 11 items
+20: 
+20: ../../src/core/savo_nav/test/contracts/test_phase0_contracts.py ........ [ 72%]
+20: ...                                                                      [100%]
+20: 
+20: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase0_contracts.xunit.xml -
+20: ============================== 11 passed in 0.07s ==============================
+20: -- run_test.py: return code 0
+20: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase0_contracts.xunit.xml'
+20/39 Test #20: test_phase0_contracts .....................................   Passed    0.38 sec
+test 21
+      Start 21: test_phase3_readiness_contracts
+
+21: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase3_readiness_contracts.xunit.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_phase3_readiness_contracts.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/contracts/test_phase3_readiness_contracts.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_phase3_readiness_contracts/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase3_readiness_contracts.xunit.xml" "--junit-prefix=savo_nav"
+21: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav
+21: Test timeout computed to be: 60
+21: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav':
+21:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/contracts/test_phase3_readiness_contracts.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_phase3_readiness_contracts/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase3_readiness_contracts.xunit.xml --junit-prefix=savo_nav
+21: ============================= test session starts ==============================
+21: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+21: cachedir: build/savo_nav/ament_cmake_pytest/test_phase3_readiness_contracts/.cache
+21: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+21: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+21: collected 5 items
+21: 
+21: ../../src/core/savo_nav/test/contracts/test_phase3_readiness_contracts.py . [ 20%]
+21: ....                                                                     [100%]
+21: 
+21: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase3_readiness_contracts.xunit.xml -
+21: ============================== 5 passed in 0.01s ===============================
+21: -- run_test.py: return code 0
+21: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase3_readiness_contracts.xunit.xml'
+21/39 Test #21: test_phase3_readiness_contracts ...........................   Passed    0.32 sec
+test 22
+      Start 22: test_phase4_goal_contracts
+
+22: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase4_goal_contracts.xunit.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_phase4_goal_contracts.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/contracts/test_phase4_goal_contracts.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_phase4_goal_contracts/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase4_goal_contracts.xunit.xml" "--junit-prefix=savo_nav"
+22: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav
+22: Test timeout computed to be: 60
+22: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav':
+22:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/contracts/test_phase4_goal_contracts.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_phase4_goal_contracts/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase4_goal_contracts.xunit.xml --junit-prefix=savo_nav
+22: ============================= test session starts ==============================
+22: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+22: cachedir: build/savo_nav/ament_cmake_pytest/test_phase4_goal_contracts/.cache
+22: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+22: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+22: collected 8 items
+22: 
+22: ../../src/core/savo_nav/test/contracts/test_phase4_goal_contracts.py ... [ 37%]
+22: .....                                                                    [100%]
+22: 
+22: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase4_goal_contracts.xunit.xml -
+22: ============================== 8 passed in 0.01s ===============================
+22: -- run_test.py: return code 0
+22: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase4_goal_contracts.xunit.xml'
+22/39 Test #22: test_phase4_goal_contracts ................................   Passed    0.33 sec
+test 23
+      Start 23: test_phase5_nav2_contracts
+
+23: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase5_nav2_contracts.xunit.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_phase5_nav2_contracts.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/contracts/test_phase5_nav2_contracts.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_phase5_nav2_contracts/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase5_nav2_contracts.xunit.xml" "--junit-prefix=savo_nav"
+23: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav
+23: Test timeout computed to be: 60
+23: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav':
+23:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/contracts/test_phase5_nav2_contracts.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_phase5_nav2_contracts/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase5_nav2_contracts.xunit.xml --junit-prefix=savo_nav
+23: ============================= test session starts ==============================
+23: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+23: cachedir: build/savo_nav/ament_cmake_pytest/test_phase5_nav2_contracts/.cache
+23: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+23: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+23: collected 10 items
+23: 
+23: ../../src/core/savo_nav/test/contracts/test_phase5_nav2_contracts.py ... [ 30%]
+23: .......                                                                  [100%]
+23: 
+23: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase5_nav2_contracts.xunit.xml -
+23: ============================== 10 passed in 0.07s ==============================
+23: -- run_test.py: return code 0
+23: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase5_nav2_contracts.xunit.xml'
+23/39 Test #23: test_phase5_nav2_contracts ................................   Passed    0.40 sec
+test 24
+      Start 24: test_phase6_gateway_contracts
+
+24: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase6_gateway_contracts.xunit.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_phase6_gateway_contracts.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/contracts/test_phase6_gateway_contracts.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_phase6_gateway_contracts/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase6_gateway_contracts.xunit.xml" "--junit-prefix=savo_nav"
+24: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav
+24: Test timeout computed to be: 60
+24: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav':
+24:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/contracts/test_phase6_gateway_contracts.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_phase6_gateway_contracts/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase6_gateway_contracts.xunit.xml --junit-prefix=savo_nav
+24: ============================= test session starts ==============================
+24: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+24: cachedir: build/savo_nav/ament_cmake_pytest/test_phase6_gateway_contracts/.cache
+24: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+24: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+24: collected 10 items
+24: 
+24: ../../src/core/savo_nav/test/contracts/test_phase6_gateway_contracts.py . [ 10%]
+24: .........                                                                [100%]
+24: 
+24: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase6_gateway_contracts.xunit.xml -
+24: ============================== 10 passed in 0.01s ==============================
+24: -- run_test.py: return code 0
+24: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase6_gateway_contracts.xunit.xml'
+24/39 Test #24: test_phase6_gateway_contracts .............................   Passed    0.32 sec
+test 25
+      Start 25: test_saved_map_launch
+
+25: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_saved_map_launch.xunit.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_saved_map_launch.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/launch/test_saved_map_launch.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_saved_map_launch/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_saved_map_launch.xunit.xml" "--junit-prefix=savo_nav"
+25: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav
+25: Test timeout computed to be: 60
+25: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav':
+25:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/launch/test_saved_map_launch.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_saved_map_launch/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_saved_map_launch.xunit.xml --junit-prefix=savo_nav
+25: ============================= test session starts ==============================
+25: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+25: cachedir: build/savo_nav/ament_cmake_pytest/test_saved_map_launch/.cache
+25: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+25: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+25: collected 4 items
+25: 
+25: ../../src/core/savo_nav/test/launch/test_saved_map_launch.py ....        [100%]
+25: 
+25: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_saved_map_launch.xunit.xml -
+25: ============================== 4 passed in 0.13s ===============================
+25: -- run_test.py: return code 0
+25: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_saved_map_launch.xunit.xml'
+25/39 Test #25: test_saved_map_launch .....................................   Passed    0.45 sec
+test 26
+      Start 26: test_phase7c_fault_launch_contracts
+
+26: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase7c_fault_launch_contracts.xunit.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_phase7c_fault_launch_contracts.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/contracts/test_phase7c_fault_launch_contracts.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_phase7c_fault_launch_contracts/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase7c_fault_launch_contracts.xunit.xml" "--junit-prefix=savo_nav"
+26: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav
+26: Test timeout computed to be: 60
+26: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav':
+26:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/contracts/test_phase7c_fault_launch_contracts.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_phase7c_fault_launch_contracts/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase7c_fault_launch_contracts.xunit.xml --junit-prefix=savo_nav
+26: ============================= test session starts ==============================
+26: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+26: cachedir: build/savo_nav/ament_cmake_pytest/test_phase7c_fault_launch_contracts/.cache
+26: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+26: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+26: collected 6 items
+26: 
+26: ../../src/core/savo_nav/test/contracts/test_phase7c_fault_launch_contracts.py . [ 16%]
+26: .....                                                                    [100%]
+26: 
+26: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase7c_fault_launch_contracts.xunit.xml -
+26: ============================== 6 passed in 0.01s ===============================
+26: -- run_test.py: return code 0
+26: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase7c_fault_launch_contracts.xunit.xml'
+26/39 Test #26: test_phase7c_fault_launch_contracts .......................   Passed    0.32 sec
+test 27
+      Start 27: test_phase8_costmap_sensor_contracts
+
+27: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase8_costmap_sensor_contracts.xunit.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_phase8_costmap_sensor_contracts.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/contracts/test_phase8_costmap_sensor_contracts.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_phase8_costmap_sensor_contracts/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase8_costmap_sensor_contracts.xunit.xml" "--junit-prefix=savo_nav"
+27: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav
+27: Test timeout computed to be: 60
+27: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav':
+27:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/contracts/test_phase8_costmap_sensor_contracts.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_phase8_costmap_sensor_contracts/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase8_costmap_sensor_contracts.xunit.xml --junit-prefix=savo_nav
+27: ============================= test session starts ==============================
+27: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+27: cachedir: build/savo_nav/ament_cmake_pytest/test_phase8_costmap_sensor_contracts/.cache
+27: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+27: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+27: collected 8 items
+27: 
+27: ../../src/core/savo_nav/test/contracts/test_phase8_costmap_sensor_contracts.py . [ 12%]
+27: .......                                                                  [100%]
+27: 
+27: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase8_costmap_sensor_contracts.xunit.xml -
+27: ============================== 8 passed in 0.06s ===============================
+27: -- run_test.py: return code 0
+27: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_phase8_costmap_sensor_contracts.xunit.xml'
+27/39 Test #27: test_phase8_costmap_sensor_contracts ......................   Passed    0.36 sec
+test 28
+      Start 28: test_behavior_tree_contracts
+
+28: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_behavior_tree_contracts.xunit.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_behavior_tree_contracts.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/contracts/test_behavior_tree_contracts.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_behavior_tree_contracts/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_behavior_tree_contracts.xunit.xml" "--junit-prefix=savo_nav"
+28: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav
+28: Test timeout computed to be: 60
+28: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav':
+28:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/contracts/test_behavior_tree_contracts.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_behavior_tree_contracts/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_behavior_tree_contracts.xunit.xml --junit-prefix=savo_nav
+28: ============================= test session starts ==============================
+28: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+28: cachedir: build/savo_nav/ament_cmake_pytest/test_behavior_tree_contracts/.cache
+28: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+28: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+28: collected 6 items
+28: 
+28: ../../src/core/savo_nav/test/contracts/test_behavior_tree_contracts.py . [ 16%]
+28: .....                                                                    [100%]
+28: 
+28: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_behavior_tree_contracts.xunit.xml -
+28: ============================== 6 passed in 0.02s ===============================
+28: -- run_test.py: return code 0
+28: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_behavior_tree_contracts.xunit.xml'
+28/39 Test #28: test_behavior_tree_contracts ..............................   Passed    0.34 sec
+test 29
+      Start 29: test_production_navigation_contracts
+
+29: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_production_navigation_contracts.xunit.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_production_navigation_contracts.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/contracts/test_production_navigation_contracts.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_production_navigation_contracts/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_production_navigation_contracts.xunit.xml" "--junit-prefix=savo_nav"
+29: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav
+29: Test timeout computed to be: 60
+29: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav':
+29:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/contracts/test_production_navigation_contracts.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_production_navigation_contracts/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_production_navigation_contracts.xunit.xml --junit-prefix=savo_nav
+29: ============================= test session starts ==============================
+29: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+29: cachedir: build/savo_nav/ament_cmake_pytest/test_production_navigation_contracts/.cache
+29: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+29: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+29: collected 6 items
+29: 
+29: ../../src/core/savo_nav/test/contracts/test_production_navigation_contracts.py . [ 16%]
+29: .....                                                                    [100%]
+29: 
+29: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_production_navigation_contracts.xunit.xml -
+29: ============================== 6 passed in 0.04s ===============================
+29: -- run_test.py: return code 0
+29: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_production_navigation_contracts.xunit.xml'
+29/39 Test #29: test_production_navigation_contracts ......................   Passed    0.35 sec
+test 30
+      Start 30: test_live_mapping_navigation_contracts
+
+30: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_live_mapping_navigation_contracts.xunit.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_live_mapping_navigation_contracts.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/contracts/test_live_mapping_navigation_contracts.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_live_mapping_navigation_contracts/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_live_mapping_navigation_contracts.xunit.xml" "--junit-prefix=savo_nav"
+30: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav
+30: Test timeout computed to be: 60
+30: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav':
+30:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/contracts/test_live_mapping_navigation_contracts.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_live_mapping_navigation_contracts/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_live_mapping_navigation_contracts.xunit.xml --junit-prefix=savo_nav
+30: ============================= test session starts ==============================
+30: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+30: cachedir: build/savo_nav/ament_cmake_pytest/test_live_mapping_navigation_contracts/.cache
+30: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+30: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+30: collected 5 items
+30: 
+30: ../../src/core/savo_nav/test/contracts/test_live_mapping_navigation_contracts.py . [ 20%]
+30: ....                                                                     [100%]
+30: 
+30: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_live_mapping_navigation_contracts.xunit.xml -
+30: ============================== 5 passed in 0.01s ===============================
+30: -- run_test.py: return code 0
+30: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_live_mapping_navigation_contracts.xunit.xml'
+30/39 Test #30: test_live_mapping_navigation_contracts ....................   Passed    0.32 sec
+test 31
+      Start 31: test_real_robot_preflight_contracts
+
+31: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_real_robot_preflight_contracts.xunit.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_real_robot_preflight_contracts.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/contracts/test_real_robot_preflight_contracts.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_real_robot_preflight_contracts/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_real_robot_preflight_contracts.xunit.xml" "--junit-prefix=savo_nav"
+31: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav
+31: Test timeout computed to be: 60
+31: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav':
+31:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/contracts/test_real_robot_preflight_contracts.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_pytest/test_real_robot_preflight_contracts/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_real_robot_preflight_contracts.xunit.xml --junit-prefix=savo_nav
+31: ============================= test session starts ==============================
+31: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+31: cachedir: build/savo_nav/ament_cmake_pytest/test_real_robot_preflight_contracts/.cache
+31: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+31: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+31: collected 5 items
+31: 
+31: ../../src/core/savo_nav/test/contracts/test_real_robot_preflight_contracts.py . [ 20%]
+31: ....                                                                     [100%]
+31: 
+31: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_real_robot_preflight_contracts.xunit.xml -
+31: ============================== 5 passed in 0.01s ===============================
+31: -- run_test.py: return code 0
+31: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_real_robot_preflight_contracts.xunit.xml'
+31/39 Test #31: test_real_robot_preflight_contracts .......................   Passed    0.32 sec
+test 32
+      Start 32: test_location_navigation_contract
+
+32: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_location_navigation_contract.gtest.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cmake_gtest/test_location_navigation_contract.txt" "--command" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_location_navigation_contract" "--gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_location_navigation_contract.gtest.xml"
+32: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav
+32: Test timeout computed to be: 60
+32: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav':
+32:  - /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_location_navigation_contract --gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_location_navigation_contract.gtest.xml
+32: Running main() from /opt/ros/jazzy/src/gtest_vendor/src/gtest_main.cc
+32: [==========] Running 3 tests from 1 test suite.
+32: [----------] Global test environment set-up.
+32: [----------] 3 tests from LocationNavigationContract
+32: [ RUN      ] LocationNavigationContract.SelectsOnlyApprovedApproachPose
+32: [       OK ] LocationNavigationContract.SelectsOnlyApprovedApproachPose (0 ms)
+32: [ RUN      ] LocationNavigationContract.RejectsDirectTagPoseTarget
+32: [       OK ] LocationNavigationContract.RejectsDirectTagPoseTarget (0 ms)
+32: [ RUN      ] LocationNavigationContract.RejectsDisabledAndWrongMap
+32: [       OK ] LocationNavigationContract.RejectsDisabledAndWrongMap (0 ms)
+32: [----------] 3 tests from LocationNavigationContract (0 ms total)
+32: 
+32: [----------] Global test environment tear-down
+32: [==========] 3 tests from 1 test suite ran. (0 ms total)
+32: [  PASSED  ] 3 tests.
+32: -- run_test.py: return code 0
+32: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_location_navigation_contract.gtest.xml'
+32: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/test_location_navigation_contract.gtest.xml'
+32/39 Test #32: test_location_navigation_contract .........................   Passed    0.05 sec
+test 33
+      Start 33: cppcheck
+
+33: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/cppcheck.xunit.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cppcheck/cppcheck.txt" "--command" "/opt/ros/jazzy/bin/ament_cppcheck" "--xunit-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/cppcheck.xunit.xml" "--exclude" "test/unit/test_control_recovery.cpp" "test/unit/test_coverage_action_adapter.cpp" "test/unit/test_coverage_execution_model.cpp" "test/unit/test_coverage_path_validator.cpp" "test/unit/test_coverage_progress_tracker.cpp" "test/unit/test_dependency_monitors.cpp" "test/unit/test_goal_admission_policy.cpp" "test/unit/test_goal_arbiter.cpp" "test/unit/test_goal_context.cpp" "test/unit/test_goal_gateway.cpp" "test/unit/test_goal_validator.cpp" "test/unit/test_location_navigation_contract.cpp" "test/unit/test_map_context.cpp" "test/unit/test_navigation_readiness.cpp" "test/unit/test_navigation_readiness_evaluator.cpp" "test/unit/test_navigation_result.cpp" "test/unit/test_navigation_state.cpp" "test/unit/test_sensor_freshness_monitor.cpp" "test/unit/test_types.cpp"
+33: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav
+33: Test timeout computed to be: 300
+33: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav':
+33:  - /opt/ros/jazzy/bin/ament_cppcheck --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/cppcheck.xunit.xml --exclude test/unit/test_control_recovery.cpp test/unit/test_coverage_action_adapter.cpp test/unit/test_coverage_execution_model.cpp test/unit/test_coverage_path_validator.cpp test/unit/test_coverage_progress_tracker.cpp test/unit/test_dependency_monitors.cpp test/unit/test_goal_admission_policy.cpp test/unit/test_goal_arbiter.cpp test/unit/test_goal_context.cpp test/unit/test_goal_gateway.cpp test/unit/test_goal_validator.cpp test/unit/test_location_navigation_contract.cpp test/unit/test_map_context.cpp test/unit/test_navigation_readiness.cpp test/unit/test_navigation_readiness_evaluator.cpp test/unit/test_navigation_result.cpp test/unit/test_navigation_state.cpp test/unit/test_sensor_freshness_monitor.cpp test/unit/test_types.cpp
+33: cppcheck 2.13.0 has known performance issues and therefore will not be used, set the AMENT_CPPCHECK_ALLOW_SLOW_VERSIONS environment variable to override this.
+33: -- run_test.py: return code 0
+33: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/cppcheck.xunit.xml'
+33/39 Test #33: cppcheck ..................................................   Passed    0.12 sec
+test 34
+      Start 34: cpplint
+
+34: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/cpplint.xunit.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_cpplint/cpplint.txt" "--command" "/opt/ros/jazzy/bin/ament_cpplint" "--xunit-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/cpplint.xunit.xml"
+34: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav
+34: Test timeout computed to be: 120
+34: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav':
+34:  - /opt/ros/jazzy/bin/ament_cpplint --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/cpplint.xunit.xml
+34: Using '--root=/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/include' argument
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/include/savo_nav/action_names.hpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/include/savo_nav/constants.hpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/include/savo_nav/control_mode_client.hpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/include/savo_nav/control_recovery_guard.hpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/include/savo_nav/coverage_action_adapter.hpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/include/savo_nav/coverage_admission_proxy.hpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/include/savo_nav/coverage_execution_model.hpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/include/savo_nav/coverage_follow_path_gateway.hpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/include/savo_nav/coverage_path_validator.hpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/include/savo_nav/coverage_progress_tracker.hpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/include/savo_nav/frame_names.hpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/include/savo_nav/goal_admission_policy.hpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/include/savo_nav/goal_arbiter.hpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/include/savo_nav/goal_context.hpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/include/savo_nav/goal_gateway.hpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/include/savo_nav/goal_validator.hpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/include/savo_nav/localization_monitor.hpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/include/savo_nav/location_navigation_contract.hpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/include/savo_nav/map_context.hpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/include/savo_nav/nav2_health_monitor.hpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/include/savo_nav/navigation_readiness.hpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/include/savo_nav/navigation_result.hpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/include/savo_nav/navigation_state.hpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/include/savo_nav/recovery_bridge.hpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/include/savo_nav/safety_state_monitor.hpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/include/savo_nav/sensor_freshness_monitor.hpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/include/savo_nav/service_names.hpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/include/savo_nav/topic_names.hpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/include/savo_nav/types.hpp
+34: 
+34: Using '--root=/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/src' argument
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/src/core/control_mode_client.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/src/core/control_recovery_guard.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/src/core/coverage_execution_model.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/src/core/coverage_path_validator.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/src/core/coverage_progress_tracker.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/src/core/goal_admission_policy.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/src/core/goal_arbiter.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/src/core/goal_context.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/src/core/goal_gateway.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/src/core/goal_validator.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/src/core/localization_monitor.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/src/core/location_navigation_contract.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/src/core/map_context.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/src/core/nav2_health_monitor.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/src/core/navigation_readiness.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/src/core/navigation_result.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/src/core/navigation_state.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/src/core/recovery_bridge.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/src/core/safety_state_monitor.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/src/core/sensor_freshness_monitor.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/src/core/types.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/src/nodes/active_map_context_node.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/src/nodes/control_recovery_guard_node.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/src/nodes/goal_admission_gate_node.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/src/nodes/goal_gateway_node.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/src/nodes/navigate_to_location_node.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/src/nodes/navigation_readiness_node.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/src/ros/coverage_action_adapter.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/src/ros/coverage_admission_proxy.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/src/ros/coverage_follow_path_gateway.cpp
+34: 
+34: Using '--root=/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test' argument
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/fixtures/fake_follow_path_server_node.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/fixtures/fake_guarded_gateway_server_node.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/fixtures/fake_location_nav2_server_node.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/fixtures/fake_nav2_server_node.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/unit/test_control_recovery.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/unit/test_coverage_action_adapter.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/unit/test_coverage_execution_model.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/unit/test_coverage_path_validator.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/unit/test_coverage_progress_tracker.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/unit/test_dependency_monitors.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/unit/test_goal_admission_policy.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/unit/test_goal_arbiter.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/unit/test_goal_context.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/unit/test_goal_gateway.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/unit/test_goal_validator.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/unit/test_location_navigation_contract.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/unit/test_map_context.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/unit/test_navigation_readiness.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/unit/test_navigation_readiness_evaluator.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/unit/test_navigation_result.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/unit/test_navigation_state.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/unit/test_sensor_freshness_monitor.cpp
+34: 
+34: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav/test/unit/test_types.cpp
+34: 
+34: No problems found
+34: -- run_test.py: return code 0
+34: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/cpplint.xunit.xml'
+34/39 Test #34: cpplint ...................................................   Passed    1.61 sec
+test 35
+      Start 35: flake8
+
+35: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/flake8.xunit.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_flake8/flake8.txt" "--command" "/opt/ros/jazzy/bin/ament_flake8" "--xunit-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/flake8.xunit.xml"
+35: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav
+35: Test timeout computed to be: 60
+35: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav':
+35:  - /opt/ros/jazzy/bin/ament_flake8 --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/flake8.xunit.xml
+35: 
+35: 27 files checked
+35: No problems found
+35: 
+35: Checked files:
+35: 
+35: * ./test/contracts/test_live_mapping_navigation_contracts.py
+35: * ./test/contracts/test_location_navigation_runtime_contract.py
+35: * ./test/contracts/test_phase4l_b3d_runtime_contracts.py
+35: * ./test/contracts/test_phase0_contracts.py
+35: * ./test/contracts/test_phase7_control_recovery_contracts.py
+35: * ./test/contracts/test_production_navigation_contracts.py
+35: * ./test/contracts/test_phase5_nav2_contracts.py
+35: * ./test/contracts/test_phase6_gateway_contracts.py
+35: * ./test/contracts/test_phase3_readiness_contracts.py
+35: * ./test/contracts/test_phase4l_b3e_integration_contracts.py
+35: * ./test/contracts/test_behavior_tree_contracts.py
+35: * ./test/contracts/test_phase8_costmap_sensor_contracts.py
+35: * ./test/contracts/test_phase4l_b3_coverage_contracts.py
+35: * ./test/contracts/test_phase7b_goal_admission_contracts.py
+35: * ./test/contracts/test_real_robot_preflight_contracts.py
+35: * ./test/contracts/test_phase4_goal_contracts.py
+35: * ./test/contracts/test_phase7c_fault_launch_contracts.py
+35: * ./test/contracts/test_source_headers.py
+35: * ./test/fixtures/control_recovery_guard_fixture.py
+35: * ./test/fixtures/goal_admission_gate_fixture.py
+35: * ./test/fixtures/control_recovery_chain_fixture.py
+35: * ./test/fixtures/goal_gateway_client.py
+35: * ./test/launch/test_phase4l_b3e_coverage_runtime_launch.py
+35: * ./test/launch/test_saved_map_launch.py
+35: * ./launch/live_mapping_navigation.launch.py
+35: * ./launch/production_navigation.launch.py
+35: * ./launch/saved_map_navigation.launch.py
+35: -- run_test.py: return code 0
+35: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/flake8.xunit.xml'
+35/39 Test #35: flake8 ....................................................   Passed    0.36 sec
+test 36
+      Start 36: lint_cmake
+
+36: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/lint_cmake.xunit.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_lint_cmake/lint_cmake.txt" "--command" "/opt/ros/jazzy/bin/ament_lint_cmake" "--xunit-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/lint_cmake.xunit.xml"
+36: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav
+36: Test timeout computed to be: 60
+36: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav':
+36:  - /opt/ros/jazzy/bin/ament_lint_cmake --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/lint_cmake.xunit.xml
+36: 
+36: No problems found
+36: -- run_test.py: return code 0
+36: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/lint_cmake.xunit.xml'
+36/39 Test #36: lint_cmake ................................................   Passed    0.12 sec
+test 37
+      Start 37: pep257
+
+37: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/pep257.xunit.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_pep257/pep257.txt" "--command" "/opt/ros/jazzy/bin/ament_pep257" "--xunit-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/pep257.xunit.xml"
+37: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav
+37: Test timeout computed to be: 60
+37: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav':
+37:  - /opt/ros/jazzy/bin/ament_pep257 --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/pep257.xunit.xml
+37: checking ./launch/live_mapping_navigation.launch.py
+37: checking ./launch/production_navigation.launch.py
+37: checking ./launch/saved_map_navigation.launch.py
+37: checking ./test/contracts/test_behavior_tree_contracts.py
+37: checking ./test/contracts/test_live_mapping_navigation_contracts.py
+37: checking ./test/contracts/test_location_navigation_runtime_contract.py
+37: checking ./test/contracts/test_phase0_contracts.py
+37: checking ./test/contracts/test_phase3_readiness_contracts.py
+37: checking ./test/contracts/test_phase4_goal_contracts.py
+37: checking ./test/contracts/test_phase4l_b3_coverage_contracts.py
+37: checking ./test/contracts/test_phase4l_b3d_runtime_contracts.py
+37: checking ./test/contracts/test_phase4l_b3e_integration_contracts.py
+37: checking ./test/contracts/test_phase5_nav2_contracts.py
+37: checking ./test/contracts/test_phase6_gateway_contracts.py
+37: checking ./test/contracts/test_phase7_control_recovery_contracts.py
+37: checking ./test/contracts/test_phase7b_goal_admission_contracts.py
+37: checking ./test/contracts/test_phase7c_fault_launch_contracts.py
+37: checking ./test/contracts/test_phase8_costmap_sensor_contracts.py
+37: checking ./test/contracts/test_production_navigation_contracts.py
+37: checking ./test/contracts/test_real_robot_preflight_contracts.py
+37: checking ./test/contracts/test_source_headers.py
+37: checking ./test/fixtures/control_recovery_chain_fixture.py
+37: checking ./test/fixtures/control_recovery_guard_fixture.py
+37: checking ./test/fixtures/goal_admission_gate_fixture.py
+37: checking ./test/fixtures/goal_gateway_client.py
+37: checking ./test/launch/test_phase4l_b3e_coverage_runtime_launch.py
+37: checking ./test/launch/test_saved_map_launch.py
+37: No problems found
+37: -- run_test.py: return code 0
+37: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/pep257.xunit.xml'
+37/39 Test #37: pep257 ....................................................   Passed    0.28 sec
+test 38
+      Start 38: uncrustify
+
+38: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/uncrustify.xunit.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_uncrustify/uncrustify.txt" "--command" "/opt/ros/jazzy/bin/ament_uncrustify" "--xunit-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/uncrustify.xunit.xml"
+38: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav
+38: Test timeout computed to be: 60
+38: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav':
+38:  - /opt/ros/jazzy/bin/ament_uncrustify --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/uncrustify.xunit.xml
+38: No code style divergence in file 'include/savo_nav/action_names.hpp'
+38: 
+38: No code style divergence in file 'include/savo_nav/constants.hpp'
+38: 
+38: No code style divergence in file 'include/savo_nav/control_mode_client.hpp'
+38: 
+38: No code style divergence in file 'include/savo_nav/control_recovery_guard.hpp'
+38: 
+38: No code style divergence in file 'include/savo_nav/coverage_action_adapter.hpp'
+38: 
+38: No code style divergence in file 'include/savo_nav/coverage_admission_proxy.hpp'
+38: 
+38: No code style divergence in file 'include/savo_nav/coverage_execution_model.hpp'
+38: 
+38: No code style divergence in file 'include/savo_nav/coverage_follow_path_gateway.hpp'
+38: 
+38: No code style divergence in file 'include/savo_nav/coverage_path_validator.hpp'
+38: 
+38: No code style divergence in file 'include/savo_nav/coverage_progress_tracker.hpp'
+38: 
+38: No code style divergence in file 'include/savo_nav/frame_names.hpp'
+38: 
+38: No code style divergence in file 'include/savo_nav/goal_admission_policy.hpp'
+38: 
+38: No code style divergence in file 'include/savo_nav/goal_arbiter.hpp'
+38: 
+38: No code style divergence in file 'include/savo_nav/goal_context.hpp'
+38: 
+38: No code style divergence in file 'include/savo_nav/goal_gateway.hpp'
+38: 
+38: No code style divergence in file 'include/savo_nav/goal_validator.hpp'
+38: 
+38: No code style divergence in file 'include/savo_nav/localization_monitor.hpp'
+38: 
+38: No code style divergence in file 'include/savo_nav/location_navigation_contract.hpp'
+38: 
+38: No code style divergence in file 'include/savo_nav/map_context.hpp'
+38: 
+38: No code style divergence in file 'include/savo_nav/nav2_health_monitor.hpp'
+38: 
+38: No code style divergence in file 'include/savo_nav/navigation_readiness.hpp'
+38: 
+38: No code style divergence in file 'include/savo_nav/navigation_result.hpp'
+38: 
+38: No code style divergence in file 'include/savo_nav/navigation_state.hpp'
+38: 
+38: No code style divergence in file 'include/savo_nav/recovery_bridge.hpp'
+38: 
+38: No code style divergence in file 'include/savo_nav/safety_state_monitor.hpp'
+38: 
+38: No code style divergence in file 'include/savo_nav/sensor_freshness_monitor.hpp'
+38: 
+38: No code style divergence in file 'include/savo_nav/service_names.hpp'
+38: 
+38: No code style divergence in file 'include/savo_nav/topic_names.hpp'
+38: 
+38: No code style divergence in file 'include/savo_nav/types.hpp'
+38: 
+38: No code style divergence in file 'src/core/control_mode_client.cpp'
+38: 
+38: No code style divergence in file 'src/core/control_recovery_guard.cpp'
+38: 
+38: No code style divergence in file 'src/core/coverage_execution_model.cpp'
+38: 
+38: No code style divergence in file 'src/core/coverage_path_validator.cpp'
+38: 
+38: No code style divergence in file 'src/core/coverage_progress_tracker.cpp'
+38: 
+38: No code style divergence in file 'src/core/goal_admission_policy.cpp'
+38: 
+38: No code style divergence in file 'src/core/goal_arbiter.cpp'
+38: 
+38: No code style divergence in file 'src/core/goal_context.cpp'
+38: 
+38: No code style divergence in file 'src/core/goal_gateway.cpp'
+38: 
+38: No code style divergence in file 'src/core/goal_validator.cpp'
+38: 
+38: No code style divergence in file 'src/core/localization_monitor.cpp'
+38: 
+38: No code style divergence in file 'src/core/location_navigation_contract.cpp'
+38: 
+38: No code style divergence in file 'src/core/map_context.cpp'
+38: 
+38: No code style divergence in file 'src/core/nav2_health_monitor.cpp'
+38: 
+38: No code style divergence in file 'src/core/navigation_readiness.cpp'
+38: 
+38: No code style divergence in file 'src/core/navigation_result.cpp'
+38: 
+38: No code style divergence in file 'src/core/navigation_state.cpp'
+38: 
+38: No code style divergence in file 'src/core/recovery_bridge.cpp'
+38: 
+38: No code style divergence in file 'src/core/safety_state_monitor.cpp'
+38: 
+38: No code style divergence in file 'src/core/sensor_freshness_monitor.cpp'
+38: 
+38: No code style divergence in file 'src/core/types.cpp'
+38: 
+38: No code style divergence in file 'src/nodes/active_map_context_node.cpp'
+38: 
+38: No code style divergence in file 'src/nodes/control_recovery_guard_node.cpp'
+38: 
+38: No code style divergence in file 'src/nodes/goal_admission_gate_node.cpp'
+38: 
+38: No code style divergence in file 'src/nodes/goal_gateway_node.cpp'
+38: 
+38: No code style divergence in file 'src/nodes/navigate_to_location_node.cpp'
+38: 
+38: No code style divergence in file 'src/nodes/navigation_readiness_node.cpp'
+38: 
+38: No code style divergence in file 'src/ros/coverage_action_adapter.cpp'
+38: 
+38: No code style divergence in file 'src/ros/coverage_admission_proxy.cpp'
+38: 
+38: No code style divergence in file 'src/ros/coverage_follow_path_gateway.cpp'
+38: 
+38: No code style divergence in file 'test/fixtures/fake_follow_path_server_node.cpp'
+38: 
+38: No code style divergence in file 'test/fixtures/fake_guarded_gateway_server_node.cpp'
+38: 
+38: No code style divergence in file 'test/fixtures/fake_location_nav2_server_node.cpp'
+38: 
+38: No code style divergence in file 'test/fixtures/fake_nav2_server_node.cpp'
+38: 
+38: No code style divergence in file 'test/unit/test_control_recovery.cpp'
+38: 
+38: No code style divergence in file 'test/unit/test_coverage_action_adapter.cpp'
+38: 
+38: No code style divergence in file 'test/unit/test_coverage_execution_model.cpp'
+38: 
+38: No code style divergence in file 'test/unit/test_coverage_path_validator.cpp'
+38: 
+38: No code style divergence in file 'test/unit/test_coverage_progress_tracker.cpp'
+38: 
+38: No code style divergence in file 'test/unit/test_dependency_monitors.cpp'
+38: 
+38: No code style divergence in file 'test/unit/test_goal_admission_policy.cpp'
+38: 
+38: No code style divergence in file 'test/unit/test_goal_arbiter.cpp'
+38: 
+38: No code style divergence in file 'test/unit/test_goal_context.cpp'
+38: 
+38: No code style divergence in file 'test/unit/test_goal_gateway.cpp'
+38: 
+38: No code style divergence in file 'test/unit/test_goal_validator.cpp'
+38: 
+38: No code style divergence in file 'test/unit/test_location_navigation_contract.cpp'
+38: 
+38: No code style divergence in file 'test/unit/test_map_context.cpp'
+38: 
+38: No code style divergence in file 'test/unit/test_navigation_readiness.cpp'
+38: 
+38: No code style divergence in file 'test/unit/test_navigation_readiness_evaluator.cpp'
+38: 
+38: No code style divergence in file 'test/unit/test_navigation_result.cpp'
+38: 
+38: No code style divergence in file 'test/unit/test_navigation_state.cpp'
+38: 
+38: No code style divergence in file 'test/unit/test_sensor_freshness_monitor.cpp'
+38: 
+38: No code style divergence in file 'test/unit/test_types.cpp'
+38: 
+38: No problems found
+38: -- run_test.py: return code 0
+38: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/uncrustify.xunit.xml'
+38/39 Test #38: uncrustify ................................................   Passed    0.32 sec
+test 39
+      Start 39: xmllint
+
+39: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/xmllint.xunit.xml" "--package-name" "savo_nav" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/ament_xmllint/xmllint.txt" "--command" "/opt/ros/jazzy/bin/ament_xmllint" "--xunit-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/xmllint.xunit.xml"
+39: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav
+39: Test timeout computed to be: 60
+39: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/core/savo_nav':
+39:  - /opt/ros/jazzy/bin/ament_xmllint --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/xmllint.xunit.xml
+39: File 'package.xml' is valid
+39: 
+39: File 'behavior_trees/exploration_navigation.xml' is valid
+39: 
+39: File 'behavior_trees/navigate_to_pose.xml' is valid
+39: 
+39: No problems found
+39: -- run_test.py: return code 0
+39: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_nav/test_results/savo_nav/xmllint.xunit.xml'
+39/39 Test #39: xmllint ...................................................   Passed    0.51 sec
+
+100% tests passed, 0 tests failed out of 39
+
+Label Time Summary:
+cppcheck       =   0.12 sec*proc (1 test)
+cpplint        =   1.61 sec*proc (1 test)
+flake8         =   0.36 sec*proc (1 test)
+gtest          =   0.70 sec*proc (12 tests)
+launch_test    =   9.82 sec*proc (1 test)
+lint_cmake     =   0.12 sec*proc (1 test)
+linter         =   3.33 sec*proc (7 tests)
+pep257         =   0.28 sec*proc (1 test)
+pytest         =   6.53 sec*proc (19 tests)
+uncrustify     =   0.32 sec*proc (1 test)
+xmllint        =   0.51 sec*proc (1 test)
+
+Total Test time (real) =  20.39 sec
+Finished <<< savo_nav [20.4s]
+
+Summary: 1 package finished [20.6s]
+
+============================================================
+ COLCON TEST RESULT
+============================================================
+Summary: 625 tests, 0 errors, 0 failures, 82 skipped
+
+------------------------------------------------------------
+PACKAGE_RESULT: PASS
+COLCON_TEST_EXIT: 0
+TEST_RESULT_EXIT: 0
+------------------------------------------------------------

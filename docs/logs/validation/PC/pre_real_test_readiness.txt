@@ -1,0 +1,49 @@
+Robot Savo PC validation
+Run ID: 20260809T021142Z
+Step: Pre-real-test readiness
+Date: 2026-08-09T05:11:43+03:00
+Host: ahnaf-tahmid-B760M-PG-SONIC-WiFi
+Commit: eb71c26ac7dfbeaf9c2e44df3ba9f79117c7d4b6
+
+PASS
+PASS    required_files: all required files are nonempty
+PASS    git_diff_whitespace: ok
+PASS    zero_byte_runtime: none; intentional_markers=22; deferred_empty_docs=0
+PASS    launch_empty_executables: no removed/empty localization executables referenced by launch files
+PASS    yaml_parse: all nonempty yaml parsed
+PASS    xml_parse: all nonempty xml parsed
+PASS    python_parse: all nonempty python parsed
+PASS    bash_syntax: 40 shell scripts parsed
+PASS    netplan_core: Rendered configuration only; nothing was applied.
+PASS    netplan_edge: Rendered configuration only; nothing was applied.
+PASS    systemd_render: Rendered units only; nothing was installed or enabled.
+PASS    systemd_verify: ok
+PASS    backup_restore: PASS backup=/tmp/tmp.2MBOA26jZL/state.tar.gz
+/tmp/tmp.2MBOA26jZL/state.tar.gz: OK
+config/robot-savo.env: OK
+state/locations/locations.db: OK
+state/maps/active.yaml: OK
+PASS restored_state=/tmp/tmp.2MBOA26jZL/restored restored_config=/tmp/tmp.2MBOA26jZL/restored-config owner=ahnaf-tahmid:ahnaf-tahmid
+/tmp/tmp.2MBOA26jZL/state.tar.gz: OK
+config/robot-savo.env: OK
+state/locations/locations.db: OK
+state/maps/active.yaml: OK
+PASS backup_restore_test
+Refusing to overwrite nonempty state root without --overwrite
+PASS    rosdep_check: All system dependencies have been satisfied
+/usr/bin/rosdep:6: DeprecationWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html
+  from pkg_resources import load_entry_point
+PASS    observer_read_only: Robot SAVO observer source validation: PASS
+PASS    control_startup_stop: STOP is the deployment default
+PASS    geometry_provisional: BLOCKED_FOR_MOTION: geometry_not_locked
+PASS    voxel_default: D435 voxel validation defaults to false
+PASS    am8_required: quality=True; review_gateway=True; contract_v2=True
+PASS    diagnostic_motion_safety: moving diagnostics use approved ROS boundaries and explicit physical opt-ins
+PASS    ui_read_only_integration: typed mapping/location and live speech/system feeds are read-only
+PASS    bridge_command_boundary: typed STOP/teleop/navigation/mapping/query boundary present; approval remains operator-only
+PASS    savomind_speech_contract_v2: bounded authenticated v2 speech and physical-playback acknowledgement contract present
+
+------------------------------------------------------------
+RESULT: PASS
+EXIT_STATUS: 0
+------------------------------------------------------------

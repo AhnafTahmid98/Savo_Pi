@@ -100,6 +100,8 @@ class RuntimeHarness:
         self.handoff_cancel_count = 0
         self.map_save_count = 0
         self.save_success = True
+        self.executor_error = None
+        self.pending_goal_responses = set()
         self.temporary_root = tempfile.TemporaryDirectory(
             prefix='savo_am3_runtime_'
         )
@@ -185,7 +187,7 @@ class RuntimeHarness:
         )
 
         self.spin_thread = threading.Thread(
-            target=self.executor.spin,
+            target=self._spin_executor,
             daemon=True,
         )
         self.spin_thread.start()
@@ -245,6 +247,35 @@ class RuntimeHarness:
             )
         ), self.diagnostics()
         assert self.process.poll() is None, self.diagnostics()
+
+    def _spin_executor(self):
+        """Run the fixture executor while retaining unexpected exits."""
+        try:
+            self.executor.spin()
+        except BaseException as error:
+            self.executor_error = repr(error)
+            raise
+
+    def _assert_runtime_healthy(self, stage):
+        """Fail with the owner of a broken action handshake."""
+        if self.process.poll() is not None:
+            pytest.fail(
+                f'production_process_exited stage={stage} '
+                f'{self.diagnostics()}'
+            )
+        if not self.spin_thread.is_alive():
+            pytest.fail(
+                f'fixture_executor_stopped stage={stage} '
+                f'{self.diagnostics()}'
+            )
+
+    def _wait_for_action_server(self):
+        """Perform an explicit action readiness handshake before each goal."""
+        self._assert_runtime_healthy('before_action_server_handshake')
+        ready = self.action_client.wait_for_server(timeout_sec=3.0)
+        self._assert_runtime_healthy('after_action_server_handshake')
+        if not ready or not self.action_client.server_is_ready():
+            pytest.fail(f'action_server_unavailable {self.diagnostics()}')
 
     def handle_handoff_cancel(self, _request, response):
         """Accept guarded exploration-goal cancellation."""
@@ -393,11 +424,50 @@ class RuntimeHarness:
         goal.auto_save = auto_save
         goal.require_quality_approval = True
 
+        self._wait_for_action_server()
         future = self.action_client.send_goal_async(goal)
-        assert wait_until(future.done), self.diagnostics()
-        handle = future.result()
-        assert handle.accepted, self.diagnostics()
-        return handle
+        self.pending_goal_responses.add(future)
+        try:
+            completed = wait_until(
+                lambda: (
+                    future.done()
+                    or self.process.poll() is not None
+                    or not self.spin_thread.is_alive()
+                )
+            )
+            if self.process.poll() is not None:
+                future.cancel()
+                pytest.fail(
+                    'production_process_exited while_waiting_for_goal_response '
+                    f'{self.diagnostics()}'
+                )
+            if not self.spin_thread.is_alive():
+                future.cancel()
+                pytest.fail(
+                    'fixture_executor_stopped while_waiting_for_goal_response '
+                    f'{self.diagnostics()}'
+                )
+            if not completed or not future.done():
+                server_ready_now = self.action_client.server_is_ready()
+                future.cancel()
+                pytest.fail(
+                    'action_server_ready_but_no_goal_response '
+                    f'server_ready_at_submit=True '
+                    f'server_ready_now={server_ready_now} '
+                    f'{self.diagnostics()}'
+                )
+            error = future.exception()
+            if error is not None:
+                pytest.fail(
+                    f'action_goal_response_error={error!r} '
+                    f'{self.diagnostics()}'
+                )
+            handle = future.result()
+            if handle is None or not handle.accepted:
+                pytest.fail(f'action_goal_rejected {self.diagnostics()}')
+            return handle
+        finally:
+            self.pending_goal_responses.discard(future)
 
     def control(self, command, reason):
         """Call the typed mission control service."""
@@ -425,6 +495,10 @@ class RuntimeHarness:
             output = self.process.stdout.read()
         return (
             f'poll={self.process.poll()} modes={self.mode_commands} '
+            f'action_server_ready={self.action_client.server_is_ready()} '
+            f'executor_alive={self.spin_thread.is_alive()} '
+            f'executor_error={self.executor_error} '
+            f'pending_goal_responses={len(self.pending_goal_responses)} '
             f'starts={self.start_session_commands} '
             f'cancels={self.cancel_session_commands} '
             f'handoff_cancels={self.handoff_cancel_count} '
@@ -439,6 +513,10 @@ class RuntimeHarness:
 
     def close(self):
         """Stop the production process and fixture executor."""
+        for future in tuple(self.pending_goal_responses):
+            future.cancel()
+        self.pending_goal_responses.clear()
+
         if self.process.poll() is None:
             os.killpg(self.process.pid, signal.SIGINT)
             try:
@@ -448,9 +526,9 @@ class RuntimeHarness:
                 self.process.wait(timeout=5.0)
 
         self.executor.shutdown(timeout_sec=2.0)
+        self.spin_thread.join(timeout=2.0)
         self.action_client.destroy()
         self.node.destroy_node()
-        self.spin_thread.join(timeout=2.0)
         self.temporary_root.cleanup()
 
 

@@ -151,8 +151,10 @@ class Am7RuntimeHarness:
         self.return_cancel_requests = 0
         self.tf_behavior = tf_behavior
         self.return_goal_received_at = None
+        self.lifecycle_lock = threading.Lock()
         self.closed = False
         self.delayed_timers = []
+        self.executor_error = None
         self.map_saves = 0
         self.session_root = Path(tempfile.mkdtemp(prefix='savo_am7_runtime_'))
         self.session_directory = self._create_valid_session('campus_main')
@@ -298,7 +300,7 @@ class Am7RuntimeHarness:
         )
         self.tf_timer = self.node.create_timer(0.05, self.publish_transform)
         self.spin_thread = threading.Thread(
-            target=self.executor.spin,
+            target=self._spin_executor,
             daemon=True,
         )
         self.spin_thread.start()
@@ -308,6 +310,14 @@ class Am7RuntimeHarness:
             or self.action_client.server_is_ready()
         ), self.diagnostics()
         assert self.process.poll() is None, self.diagnostics()
+
+    def _spin_executor(self):
+        """Run the fixture executor while retaining unexpected exits."""
+        try:
+            self.executor.spin()
+        except BaseException as error:
+            self.executor_error = repr(error)
+            raise
 
     def _publisher(self, message_type, topic, qos):
         return self.node.create_publisher(message_type, topic, qos)
@@ -466,19 +476,23 @@ class Am7RuntimeHarness:
         return response
 
     def _delayed_publish(self, publisher, value, delay=0.08):
-        if self.closed:
-            return
-
         def publish_if_open():
-            if not self.closed:
+            with self.lifecycle_lock:
+                if self.closed:
+                    return
                 publisher.publish(self.string_message(value))
 
-        timer = threading.Timer(
-            delay, publish_if_open
-        )
+        timer = threading.Timer(delay, publish_if_open)
         timer.daemon = True
-        self.delayed_timers.append(timer)
-        timer.start()
+        with self.lifecycle_lock:
+            if self.closed:
+                return
+            self.delayed_timers.append(timer)
+            try:
+                timer.start()
+            except BaseException:
+                self.delayed_timers.remove(timer)
+                raise
 
     def _scan_start(self, _request, response):
         self.scan_starts += 1
@@ -955,6 +969,8 @@ class Am7RuntimeHarness:
                 output = self.process.stdout.read()
         return (
             f'process={getattr(self, "process", None)} '
+            f'executor_alive={self.spin_thread.is_alive()} '
+            f'executor_error={self.executor_error} '
             f'modes={self.mode_commands[-12:]} scans={self.scan_starts} '
             f'heads={self.head_starts} plans={self.coverage_requests} '
             f'approvals={self.coverage_approvals} returns={len(self.return_goals)} '
@@ -967,11 +983,18 @@ class Am7RuntimeHarness:
         )
 
     def close(self):
-        self.closed = True
-        for timer in self.delayed_timers:
+        with self.lifecycle_lock:
+            self.closed = True
+            timers = tuple(self.delayed_timers)
+            self.delayed_timers.clear()
+        for timer in timers:
             timer.cancel()
-        for timer in self.delayed_timers:
-            timer.join(timeout=0.5)
+        timer_join_deadline = time.monotonic() + 2.0
+        for timer in timers:
+            remaining = timer_join_deadline - time.monotonic()
+            if remaining <= 0.0:
+                break
+            timer.join(timeout=min(0.5, remaining))
         if self.process.poll() is None:
             os.killpg(self.process.pid, signal.SIGINT)
             try:
@@ -979,14 +1002,20 @@ class Am7RuntimeHarness:
             except subprocess.TimeoutExpired:
                 os.killpg(self.process.pid, signal.SIGKILL)
                 self.process.wait(timeout=5.0)
-        self.return_server.destroy()
         self.executor.shutdown(timeout_sec=2.0)
+        self.spin_thread.join(timeout=2.0)
+        self.return_server.destroy()
         self.action_client.destroy()
         self.node.destroy_node()
-        self.spin_thread.join(timeout=2.0)
         for path in self.session_root.rglob('*'):
             path.chmod(0o700 if path.is_dir() else 0o600)
         shutil.rmtree(self.session_root)
+
+        live_timers = [timer for timer in timers if timer.is_alive()]
+        if live_timers:
+            raise RuntimeError(
+                f'{len(live_timers)} delayed fixture timer(s) did not stop'
+            )
 
 
 @pytest.fixture(autouse=True, scope='module')

@@ -1,0 +1,1190 @@
+Robot Savo package PC validation
+Run ID: 20260809T021142Z
+Package: savo_speech
+Date: 2026-08-09T05:24:59+03:00
+Host: ahnaf-tahmid-B760M-PG-SONIC-WiFi
+Commit: eb71c26ac7dfbeaf9c2e44df3ba9f79117c7d4b6
+
+Starting >>> savo_speech
+UpdateCTestConfiguration  from :/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/CTestConfiguration.ini
+Parse Config file:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/CTestConfiguration.ini
+   Site: ahnaf-tahmid-B760M-PG-SONIC-WiFi
+   Build name: (empty)
+ Add coverage exclude regular expressions.
+Create new tag: 20260809-0225 - Experimental
+UpdateCTestConfiguration  from :/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/CTestConfiguration.ini
+Parse Config file:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/CTestConfiguration.ini
+Test project /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech
+Constructing a list of tests
+Done constructing a list of tests
+Updating test list for fixtures
+Added 0 tests to meet fixture requirements
+Checking test dependency graph...
+Checking test dependency graph end
+test 1
+    Start 1: test_audio_primitives
+
+1: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_results/savo_speech/test_audio_primitives.gtest.xml" "--package-name" "savo_speech" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/ament_cmake_gtest/test_audio_primitives.txt" "--command" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_audio_primitives" "--gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_results/savo_speech/test_audio_primitives.gtest.xml"
+1: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech
+1: Test timeout computed to be: 60
+1: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech':
+1:  - /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_audio_primitives --gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_results/savo_speech/test_audio_primitives.gtest.xml
+1: Running main() from /opt/ros/jazzy/src/gtest_vendor/src/gtest_main.cc
+1: [==========] Running 212 tests from 32 test suites.
+1: [----------] Global test environment set-up.
+1: [----------] 3 tests from AudioFormat
+1: [ RUN      ] AudioFormat.DefaultFormatIsInvalid
+1: [       OK ] AudioFormat.DefaultFormatIsInvalid (0 ms)
+1: [ RUN      ] AudioFormat.ValidMonoSpeechFormat
+1: [       OK ] AudioFormat.ValidMonoSpeechFormat (0 ms)
+1: [ RUN      ] AudioFormat.ValidSixChannelRespeakerFormat
+1: [       OK ] AudioFormat.ValidSixChannelRespeakerFormat (0 ms)
+1: [----------] 3 tests from AudioFormat (0 ms total)
+1: 
+1: [----------] 2 tests from AudioFrame
+1: [ RUN      ] AudioFrame.ReportsFrameCountAndConsistency
+1: [       OK ] AudioFrame.ReportsFrameCountAndConsistency (0 ms)
+1: [ RUN      ] AudioFrame.RejectsIncompleteInterleavedFrame
+1: [       OK ] AudioFrame.RejectsIncompleteInterleavedFrame (0 ms)
+1: [----------] 2 tests from AudioFrame (0 ms total)
+1: 
+1: [----------] 5 tests from AlsaCaptureConfig
+1: [ RUN      ] AlsaCaptureConfig.DefaultConfigurationNeedsDeviceName
+1: [       OK ] AlsaCaptureConfig.DefaultConfigurationNeedsDeviceName (0 ms)
+1: [ RUN      ] AlsaCaptureConfig.AcceptsValidConfiguration
+1: [       OK ] AlsaCaptureConfig.AcceptsValidConfiguration (0 ms)
+1: [ RUN      ] AlsaCaptureConfig.RejectsInvalidPeriod
+1: [       OK ] AlsaCaptureConfig.RejectsInvalidPeriod (0 ms)
+1: [ RUN      ] AlsaCaptureConfig.RejectsInvalidPeriodCount
+1: [       OK ] AlsaCaptureConfig.RejectsInvalidPeriodCount (0 ms)
+1: [ RUN      ] AlsaCaptureConfig.RejectsInvalidRecoveryLimit
+1: [       OK ] AlsaCaptureConfig.RejectsInvalidRecoveryLimit (0 ms)
+1: [----------] 5 tests from AlsaCaptureConfig (0 ms total)
+1: 
+1: [----------] 6 tests from AlsaPlaybackConfig
+1: [ RUN      ] AlsaPlaybackConfig.DefaultConfigurationNeedsDeviceName
+1: [       OK ] AlsaPlaybackConfig.DefaultConfigurationNeedsDeviceName (0 ms)
+1: [ RUN      ] AlsaPlaybackConfig.AcceptsValidConfiguration
+1: [       OK ] AlsaPlaybackConfig.AcceptsValidConfiguration (0 ms)
+1: [ RUN      ] AlsaPlaybackConfig.RejectsInvalidAudioFormat
+1: [       OK ] AlsaPlaybackConfig.RejectsInvalidAudioFormat (0 ms)
+1: [ RUN      ] AlsaPlaybackConfig.RejectsInvalidPeriod
+1: [       OK ] AlsaPlaybackConfig.RejectsInvalidPeriod (0 ms)
+1: [ RUN      ] AlsaPlaybackConfig.RejectsInvalidPeriodCount
+1: [       OK ] AlsaPlaybackConfig.RejectsInvalidPeriodCount (0 ms)
+1: [ RUN      ] AlsaPlaybackConfig.RejectsInvalidRecoveryLimit
+1: [       OK ] AlsaPlaybackConfig.RejectsInvalidRecoveryLimit (0 ms)
+1: [----------] 6 tests from AlsaPlaybackConfig (0 ms total)
+1: 
+1: [----------] 3 tests from AudioActivityMonitor
+1: [ RUN      ] AudioActivityMonitor.RecordsAudioLevels
+1: [       OK ] AudioActivityMonitor.RecordsAudioLevels (0 ms)
+1: [ RUN      ] AudioActivityMonitor.RejectsMultichannelFrame
+1: [       OK ] AudioActivityMonitor.RejectsMultichannelFrame (0 ms)
+1: [ RUN      ] AudioActivityMonitor.ResetClearsStatistics
+1: [       OK ] AudioActivityMonitor.ResetClearsStatistics (0 ms)
+1: [----------] 3 tests from AudioActivityMonitor (0 ms total)
+1: 
+1: [----------] 3 tests from AudioBuffer
+1: [ RUN      ] AudioBuffer.ReportsFramesAndDuration
+1: [       OK ] AudioBuffer.ReportsFramesAndDuration (0 ms)
+1: [ RUN      ] AudioBuffer.MultichannelDurationUsesFrameCount
+1: [       OK ] AudioBuffer.MultichannelDurationUsesFrameCount (0 ms)
+1: [ RUN      ] AudioBuffer.EmptyBufferIsNotConsistent
+1: [       OK ] AudioBuffer.EmptyBufferIsNotConsistent (0 ms)
+1: [----------] 3 tests from AudioBuffer (0 ms total)
+1: 
+1: [----------] 8 tests from AudioRuntime
+1: [ RUN      ] AudioRuntime.RejectsInvalidConfiguration
+1: [       OK ] AudioRuntime.RejectsInvalidConfiguration (0 ms)
+1: [ RUN      ] AudioRuntime.StartsAndStopsBothWorkers
+1: [       OK ] AudioRuntime.StartsAndStopsBothWorkers (1 ms)
+1: [ RUN      ] AudioRuntime.RollsBackPlaybackWhenCaptureStartupFails
+1: [       OK ] AudioRuntime.RollsBackPlaybackWhenCaptureStartupFails (0 ms)
+1: [ RUN      ] AudioRuntime.RoutesCapturedFramesThroughPipeline
+1: [       OK ] AudioRuntime.RoutesCapturedFramesThroughPipeline (2 ms)
+1: [ RUN      ] AudioRuntime.RoutesPlaybackRequestAndCompletion
+1: [       OK ] AudioRuntime.RoutesPlaybackRequestAndCompletion (1 ms)
+1: [ RUN      ] AudioRuntime.GatesCaptureDuringPlayback
+1: [       OK ] AudioRuntime.GatesCaptureDuringPlayback (3 ms)
+1: [ RUN      ] AudioRuntime.PropagatesPlaybackWorkerFault
+1: [       OK ] AudioRuntime.PropagatesPlaybackWorkerFault (1 ms)
+1: [ RUN      ] AudioRuntime.SupportsCleanRestart
+1: [       OK ] AudioRuntime.SupportsCleanRestart (2 ms)
+1: [----------] 8 tests from AudioRuntime (11 ms total)
+1: 
+1: [----------] 4 tests from AudioLevelMeter
+1: [ RUN      ] AudioLevelMeter.EmptyInputProducesZeroLevel
+1: [       OK ] AudioLevelMeter.EmptyInputProducesZeroLevel (0 ms)
+1: [ RUN      ] AudioLevelMeter.MeasuresNormalizedPeakAndRms
+1: [       OK ] AudioLevelMeter.MeasuresNormalizedPeakAndRms (0 ms)
+1: [ RUN      ] AudioLevelMeter.DetectsNegativeFullScaleClipping
+1: [       OK ] AudioLevelMeter.DetectsNegativeFullScaleClipping (0 ms)
+1: [ RUN      ] AudioLevelMeter.RejectsInvalidClippingThreshold
+1: [       OK ] AudioLevelMeter.RejectsInvalidClippingThreshold (0 ms)
+1: [----------] 4 tests from AudioLevelMeter (0 ms total)
+1: 
+1: [----------] 5 tests from MicrophoneGate
+1: [ RUN      ] MicrophoneGate.RejectsNegativeHoldDuration
+1: [       OK ] MicrophoneGate.RejectsNegativeHoldDuration (0 ms)
+1: [ RUN      ] MicrophoneGate.PlaybackImmediatelyGatesMicrophone
+1: [       OK ] MicrophoneGate.PlaybackImmediatelyGatesMicrophone (0 ms)
+1: [ RUN      ] MicrophoneGate.PostPlaybackHoldExpires
+1: [       OK ] MicrophoneGate.PostPlaybackHoldExpires (0 ms)
+1: [ RUN      ] MicrophoneGate.ManualGateOverridesPostPlaybackHold
+1: [       OK ] MicrophoneGate.ManualGateOverridesPostPlaybackHold (0 ms)
+1: [ RUN      ] MicrophoneGate.ShutdownGateHasHighestPriority
+1: [       OK ] MicrophoneGate.ShutdownGateHasHighestPriority (0 ms)
+1: [----------] 5 tests from MicrophoneGate (0 ms total)
+1: 
+1: [----------] 5 tests from PlaybackController
+1: [ RUN      ] PlaybackController.RejectsZeroChunkSize
+1: [       OK ] PlaybackController.RejectsZeroChunkSize (0 ms)
+1: [ RUN      ] PlaybackController.PlaysAudioInBoundedChunks
+1: [       OK ] PlaybackController.PlaysAudioInBoundedChunks (0 ms)
+1: [ RUN      ] PlaybackController.CancelsBetweenChunks
+1: [       OK ] PlaybackController.CancelsBetweenChunks (0 ms)
+1: [ RUN      ] PlaybackController.RejectsClosedSink
+1: [       OK ] PlaybackController.RejectsClosedSink (0 ms)
+1: [ RUN      ] PlaybackController.RejectsFormatMismatch
+1: [       OK ] PlaybackController.RejectsFormatMismatch (0 ms)
+1: [----------] 5 tests from PlaybackController (0 ms total)
+1: 
+1: [----------] 7 tests from PlaybackWorker
+1: [ RUN      ] PlaybackWorker.RejectsInvalidConfiguration
+1: [       OK ] PlaybackWorker.RejectsInvalidConfiguration (0 ms)
+1: [ RUN      ] PlaybackWorker.CompletesQueuedRequest
+1: [       OK ] PlaybackWorker.CompletesQueuedRequest (0 ms)
+1: [ RUN      ] PlaybackWorker.RejectsDuplicateRequestId
+1: [       OK ] PlaybackWorker.RejectsDuplicateRequestId (0 ms)
+1: [ RUN      ] PlaybackWorker.EnforcesBoundedRequestQueue
+1: [       OK ] PlaybackWorker.EnforcesBoundedRequestQueue (0 ms)
+1: [ RUN      ] PlaybackWorker.CancelsCurrentRequestBetweenChunks
+1: [       OK ] PlaybackWorker.CancelsCurrentRequestBetweenChunks (0 ms)
+1: [ RUN      ] PlaybackWorker.RuntimeFailureProducesFailedCompletion
+1: [       OK ] PlaybackWorker.RuntimeFailureProducesFailedCompletion (0 ms)
+1: [ RUN      ] PlaybackWorker.RejectsFormatMismatch
+1: [       OK ] PlaybackWorker.RejectsFormatMismatch (0 ms)
+1: [----------] 7 tests from PlaybackWorker (0 ms total)
+1: 
+1: [----------] 8 tests from AdaptiveEnergyVadBackend
+1: [ RUN      ] AdaptiveEnergyVadBackend.RejectsInvalidConfiguration
+1: [       OK ] AdaptiveEnergyVadBackend.RejectsInvalidConfiguration (0 ms)
+1: [ RUN      ] AdaptiveEnergyVadBackend.RejectsInvalidFrameFormat
+1: [       OK ] AdaptiveEnergyVadBackend.RejectsInvalidFrameFormat (0 ms)
+1: [ RUN      ] AdaptiveEnergyVadBackend.CalibrationSuppressesOutputAndLearnsNoiseFloor
+1: [       OK ] AdaptiveEnergyVadBackend.CalibrationSuppressesOutputAndLearnsNoiseFloor (0 ms)
+1: [ RUN      ] AdaptiveEnergyVadBackend.QuietFrameUpdatesNoiseFloor
+1: [       OK ] AdaptiveEnergyVadBackend.QuietFrameUpdatesNoiseFloor (0 ms)
+1: [ RUN      ] AdaptiveEnergyVadBackend.SpeechFrameProducesHighScoreAndFreezesNoiseFloor
+1: [       OK ] AdaptiveEnergyVadBackend.SpeechFrameProducesHighScoreAndFreezesNoiseFloor (0 ms)
+1: [ RUN      ] AdaptiveEnergyVadBackend.ProducesDeterministicIntermediateScore
+1: [       OK ] AdaptiveEnergyVadBackend.ProducesDeterministicIntermediateScore (0 ms)
+1: [ RUN      ] AdaptiveEnergyVadBackend.TracksClippingFrames
+1: [       OK ] AdaptiveEnergyVadBackend.TracksClippingFrames (0 ms)
+1: [ RUN      ] AdaptiveEnergyVadBackend.ResetRestoresInitialState
+1: [       OK ] AdaptiveEnergyVadBackend.ResetRestoresInitialState (0 ms)
+1: [----------] 8 tests from AdaptiveEnergyVadBackend (0 ms total)
+1: 
+1: [----------] 10 tests from VadProcessor
+1: [ RUN      ] VadProcessor.RejectsInvalidConfiguration
+1: [       OK ] VadProcessor.RejectsInvalidConfiguration (0 ms)
+1: [ RUN      ] VadProcessor.EmitsStartAfterConsecutiveSpeechFrames
+1: [       OK ] VadProcessor.EmitsStartAfterConsecutiveSpeechFrames (0 ms)
+1: [ RUN      ] VadProcessor.EmitsEndAfterConsecutiveSilenceFrames
+1: [       OK ] VadProcessor.EmitsEndAfterConsecutiveSilenceFrames (0 ms)
+1: [ RUN      ] VadProcessor.HysteresisPreservesSpeechState
+1: [       OK ] VadProcessor.HysteresisPreservesSpeechState (0 ms)
+1: [ RUN      ] VadProcessor.DoesNotEmitDuplicateTransitions
+1: [       OK ] VadProcessor.DoesNotEmitDuplicateTransitions (0 ms)
+1: [ RUN      ] VadProcessor.DropsOldestEventWhenQueueIsFull
+1: [       OK ] VadProcessor.DropsOldestEventWhenQueueIsFull (0 ms)
+1: [ RUN      ] VadProcessor.ResetReturnsProcessorToSilence
+1: [       OK ] VadProcessor.ResetReturnsProcessorToSilence (0 ms)
+1: [ RUN      ] VadProcessor.PropagatesTimestampSequenceAndSegment
+1: [       OK ] VadProcessor.PropagatesTimestampSequenceAndSegment (0 ms)
+1: [ RUN      ] VadProcessor.RejectsInvalidBackendScore
+1: [       OK ] VadProcessor.RejectsInvalidBackendScore (0 ms)
+1: [ RUN      ] VadProcessor.BackendFailureIsPropagated
+1: [       OK ] VadProcessor.BackendFailureIsPropagated (0 ms)
+1: [----------] 10 tests from VadProcessor (0 ms total)
+1: 
+1: [----------] 28 tests from UtteranceSessionCore
+1: [ RUN      ] UtteranceSessionCore.RejectsInvalidConfiguration
+1: [       OK ] UtteranceSessionCore.RejectsInvalidConfiguration (0 ms)
+1: [ RUN      ] UtteranceSessionCore.WakeWordArmsIdleSession
+1: [       OK ] UtteranceSessionCore.WakeWordArmsIdleSession (0 ms)
+1: [ RUN      ] UtteranceSessionCore.RejectsVadStartOnWakeFrame
+1: [       OK ] UtteranceSessionCore.RejectsVadStartOnWakeFrame (0 ms)
+1: [ RUN      ] UtteranceSessionCore.RejectsDuplicateWakeEvent
+1: [       OK ] UtteranceSessionCore.RejectsDuplicateWakeEvent (0 ms)
+1: [ RUN      ] UtteranceSessionCore.IgnoresNewWakeWhileArmed
+1: [       OK ] UtteranceSessionCore.IgnoresNewWakeWhileArmed (0 ms)
+1: [ RUN      ] UtteranceSessionCore.SpeechStartTimeoutCancelsSession
+1: [       OK ] UtteranceSessionCore.SpeechStartTimeoutCancelsSession (0 ms)
+1: [ RUN      ] UtteranceSessionCore.VadStartBeginsRecording
+1: [       OK ] UtteranceSessionCore.VadStartBeginsRecording (0 ms)
+1: [ RUN      ] UtteranceSessionCore.RetainsOnlyPostWakePreRoll
+1: [       OK ] UtteranceSessionCore.RetainsOnlyPostWakePreRoll (0 ms)
+1: [ RUN      ] UtteranceSessionCore.RecordingAppendsLaterFrames
+1: [       OK ] UtteranceSessionCore.RecordingAppendsLaterFrames (0 ms)
+1: [ RUN      ] UtteranceSessionCore.SpeechEndCompletesUtterance
+1: [       OK ] UtteranceSessionCore.SpeechEndCompletesUtterance (0 ms)
+1: [ RUN      ] UtteranceSessionCore.AwaitingResponseDoesNotConsumeListeningTimeout
+1: [       OK ] UtteranceSessionCore.AwaitingResponseDoesNotConsumeListeningTimeout (0 ms)
+1: [ RUN      ] UtteranceSessionCore.FollowUpTimeoutStartsAfterPlaybackCompletion
+1: [       OK ] UtteranceSessionCore.FollowUpTimeoutStartsAfterPlaybackCompletion (0 ms)
+1: [ RUN      ] UtteranceSessionCore.FollowUpPreservesWakeConversationAndClearsOldAudio
+1: [       OK ] UtteranceSessionCore.FollowUpPreservesWakeConversationAndClearsOldAudio (0 ms)
+1: [ RUN      ] UtteranceSessionCore.RejectsFollowUpOutsideAwaitingResponse
+1: [       OK ] UtteranceSessionCore.RejectsFollowUpOutsideAwaitingResponse (0 ms)
+1: [ RUN      ] UtteranceSessionCore.AssignsStableUtteranceIds
+1: [       OK ] UtteranceSessionCore.AssignsStableUtteranceIds (0 ms)
+1: [ RUN      ] UtteranceSessionCore.MaximumDurationCompletesRecording
+1: [       OK ] UtteranceSessionCore.MaximumDurationCompletesRecording (0 ms)
+1: [ RUN      ] UtteranceSessionCore.ExplicitCancellationReturnsToIdle
+1: [       OK ] UtteranceSessionCore.ExplicitCancellationReturnsToIdle (0 ms)
+1: [ RUN      ] UtteranceSessionCore.ResetClearsAllRuntimeState
+1: [       OK ] UtteranceSessionCore.ResetClearsAllRuntimeState (0 ms)
+1: [ RUN      ] UtteranceSessionCore.RejectsDuplicateAndOlderAudio
+1: [       OK ] UtteranceSessionCore.RejectsDuplicateAndOlderAudio (0 ms)
+1: [ RUN      ] UtteranceSessionCore.RecordsSequenceGapMetadata
+1: [       OK ] UtteranceSessionCore.RecordsSequenceGapMetadata (0 ms)
+1: [ RUN      ] UtteranceSessionCore.RejectsStaleVadEvent
+1: [       OK ] UtteranceSessionCore.RejectsStaleVadEvent (0 ms)
+1: [ RUN      ] UtteranceSessionCore.RejectsInvalidVadTransitions
+1: [       OK ] UtteranceSessionCore.RejectsInvalidVadTransitions (0 ms)
+1: [ RUN      ] UtteranceSessionCore.DropsOldestCompletedUtterance
+1: [       OK ] UtteranceSessionCore.DropsOldestCompletedUtterance (0 ms)
+1: [ RUN      ] UtteranceSessionCore.RejectsAudioFormatChange
+1: [       OK ] UtteranceSessionCore.RejectsAudioFormatChange (0 ms)
+1: [ RUN      ] UtteranceSessionCore.PendingEndWaitsForMatchingAudio
+1: [       OK ] UtteranceSessionCore.PendingEndWaitsForMatchingAudio (0 ms)
+1: [ RUN      ] UtteranceSessionCore.RejectsBackwardTimeAdvance
+1: [       OK ] UtteranceSessionCore.RejectsBackwardTimeAdvance (0 ms)
+1: [ RUN      ] UtteranceSessionCore.MaximumDurationWithoutAudioCancels
+1: [       OK ] UtteranceSessionCore.MaximumDurationWithoutAudioCancels (0 ms)
+1: [ RUN      ] UtteranceSessionCore.WaitCompletedTimesOutWhenEmpty
+1: [       OK ] UtteranceSessionCore.WaitCompletedTimesOutWhenEmpty (1 ms)
+1: [----------] 28 tests from UtteranceSessionCore (1 ms total)
+1: 
+1: [----------] 12 tests from UtteranceSessionProcessor
+1: [ RUN      ] UtteranceSessionProcessor.WakeFrameArmsSessionAndRejectsVadStart
+1: [       OK ] UtteranceSessionProcessor.WakeFrameArmsSessionAndRejectsVadStart (0 ms)
+1: [ RUN      ] UtteranceSessionProcessor.SpeechEndIncludesCurrentFrameAndCompletes
+1: [       OK ] UtteranceSessionProcessor.SpeechEndIncludesCurrentFrameAndCompletes (0 ms)
+1: [ RUN      ] UtteranceSessionProcessor.ForwardsFollowUpActivationWithoutNewWake
+1: [       OK ] UtteranceSessionProcessor.ForwardsFollowUpActivationWithoutNewWake (0 ms)
+1: [ RUN      ] UtteranceSessionProcessor.RejectsVadStartWithoutWake
+1: [       OK ] UtteranceSessionProcessor.RejectsVadStartWithoutWake (0 ms)
+1: [ RUN      ] UtteranceSessionProcessor.ProcessesEventBeforeTimeoutAtSameTimestamp
+1: [       OK ] UtteranceSessionProcessor.ProcessesEventBeforeTimeoutAtSameTimestamp (0 ms)
+1: [ RUN      ] UtteranceSessionProcessor.DrainsQueuedWakeSegmentEventsInDeterministicOrder
+1: [       OK ] UtteranceSessionProcessor.DrainsQueuedWakeSegmentEventsInDeterministicOrder (0 ms)
+1: [ RUN      ] UtteranceSessionProcessor.ForwardsCompletedUtteranceWait
+1: [       OK ] UtteranceSessionProcessor.ForwardsCompletedUtteranceWait (0 ms)
+1: [ RUN      ] UtteranceSessionProcessor.ResetDiscardsQueuedEventsAndSessionState
+1: [       OK ] UtteranceSessionProcessor.ResetDiscardsQueuedEventsAndSessionState (0 ms)
+1: [ RUN      ] UtteranceSessionProcessor.RecordsFrameFailureAndRethrows
+1: [       OK ] UtteranceSessionProcessor.RecordsFrameFailureAndRethrows (0 ms)
+1: [ RUN      ] UtteranceSessionProcessor.ForwardsExplicitCancellation
+1: [       OK ] UtteranceSessionProcessor.ForwardsExplicitCancellation (0 ms)
+1: [ RUN      ] UtteranceSessionProcessor.MaximumDurationCompletesAfterEventDrain
+1: [       OK ] UtteranceSessionProcessor.MaximumDurationCompletesAfterEventDrain (0 ms)
+1: [ RUN      ] UtteranceSessionProcessor.SnapshotReportsPendingUpstreamEvents
+1: [       OK ] UtteranceSessionProcessor.SnapshotReportsPendingUpstreamEvents (0 ms)
+1: [----------] 12 tests from UtteranceSessionProcessor (0 ms total)
+1: 
+1: [----------] 7 tests from CompletedUtteranceQueue
+1: [ RUN      ] CompletedUtteranceQueue.RejectsInvalidCapacity
+1: [       OK ] CompletedUtteranceQueue.RejectsInvalidCapacity (0 ms)
+1: [ RUN      ] CompletedUtteranceQueue.AcceptsAndPopsSerializedUtterance
+1: [       OK ] CompletedUtteranceQueue.AcceptsAndPopsSerializedUtterance (0 ms)
+1: [ RUN      ] CompletedUtteranceQueue.RejectsInvalidSerializedUtterance
+1: [       OK ] CompletedUtteranceQueue.RejectsInvalidSerializedUtterance (0 ms)
+1: [ RUN      ] CompletedUtteranceQueue.RejectsDuplicatePendingUtteranceId
+1: [       OK ] CompletedUtteranceQueue.RejectsDuplicatePendingUtteranceId (0 ms)
+1: [ RUN      ] CompletedUtteranceQueue.EnforcesConfiguredCapacity
+1: [       OK ] CompletedUtteranceQueue.EnforcesConfiguredCapacity (0 ms)
+1: [ RUN      ] CompletedUtteranceQueue.ClearRemovesQueuedUtterances
+1: [       OK ] CompletedUtteranceQueue.ClearRemovesQueuedUtterances (0 ms)
+1: [ RUN      ] CompletedUtteranceQueue.TimedWaitReturnsEmptyAndRejectsNegativeTimeout
+1: [       OK ] CompletedUtteranceQueue.TimedWaitReturnsEmptyAndRejectsNegativeTimeout (2 ms)
+1: [----------] 7 tests from CompletedUtteranceQueue (2 ms total)
+1: 
+1: [----------] 8 tests from CompletedUtteranceWorker
+1: [ RUN      ] CompletedUtteranceWorker.RejectsInvalidConfiguration
+1: [       OK ] CompletedUtteranceWorker.RejectsInvalidConfiguration (0 ms)
+1: [ RUN      ] CompletedUtteranceWorker.SerializesCompletedUtteranceAndPreservesMetadata
+1: [       OK ] CompletedUtteranceWorker.SerializesCompletedUtteranceAndPreservesMetadata (5 ms)
+1: [ RUN      ] CompletedUtteranceWorker.RejectsInvalidCompletedUtteranceWithoutFaulting
+1: [       OK ] CompletedUtteranceWorker.RejectsInvalidCompletedUtteranceWithoutFaulting (7 ms)
+1: [ RUN      ] CompletedUtteranceWorker.RejectsDuplicateAndOutOfOrderIds
+1: [       OK ] CompletedUtteranceWorker.RejectsDuplicateAndOutOfOrderIds (5 ms)
+1: [ RUN      ] CompletedUtteranceWorker.EnforcesMaximumWavByteLimit
+1: [       OK ] CompletedUtteranceWorker.EnforcesMaximumWavByteLimit (5 ms)
+1: [ RUN      ] CompletedUtteranceWorker.RejectsWhenOutputQueueIsFull
+1: [       OK ] CompletedUtteranceWorker.RejectsWhenOutputQueueIsFull (6 ms)
+1: [ RUN      ] CompletedUtteranceWorker.SourceFailureTransitionsWorkerToFaulted
+1: [       OK ] CompletedUtteranceWorker.SourceFailureTransitionsWorkerToFaulted (1 ms)
+1: [ RUN      ] CompletedUtteranceWorker.CanStopAndRestart
+1: [       OK ] CompletedUtteranceWorker.CanStopAndRestart (10 ms)
+1: [----------] 8 tests from CompletedUtteranceWorker (43 ms total)
+1: 
+1: [----------] 6 tests from PocketSphinxWakeWordBackendTest
+1: [ RUN      ] PocketSphinxWakeWordBackendTest.AcceptsStructurallyValidConfiguration
+1: [       OK ] PocketSphinxWakeWordBackendTest.AcceptsStructurallyValidConfiguration (0 ms)
+1: [ RUN      ] PocketSphinxWakeWordBackendTest.RejectsEmptySearchName
+1: [       OK ] PocketSphinxWakeWordBackendTest.RejectsEmptySearchName (0 ms)
+1: [ RUN      ] PocketSphinxWakeWordBackendTest.RejectsUnsupportedSampleRate
+1: [       OK ] PocketSphinxWakeWordBackendTest.RejectsUnsupportedSampleRate (0 ms)
+1: [ RUN      ] PocketSphinxWakeWordBackendTest.RejectsMissingAcousticModelDirectory
+1: [       OK ] PocketSphinxWakeWordBackendTest.RejectsMissingAcousticModelDirectory (0 ms)
+1: [ RUN      ] PocketSphinxWakeWordBackendTest.RejectsMissingDictionaryFile
+1: [       OK ] PocketSphinxWakeWordBackendTest.RejectsMissingDictionaryFile (0 ms)
+1: [ RUN      ] PocketSphinxWakeWordBackendTest.RejectsMissingKeywordFile
+1: [       OK ] PocketSphinxWakeWordBackendTest.RejectsMissingKeywordFile (0 ms)
+1: [----------] 6 tests from PocketSphinxWakeWordBackendTest (1 ms total)
+1: 
+1: [----------] 7 tests from WakeWordAssets
+1: [ RUN      ] WakeWordAssets.DictionaryContainsRequiredWords
+1: [       OK ] WakeWordAssets.DictionaryContainsRequiredWords (0 ms)
+1: [ RUN      ] WakeWordAssets.DefaultKeywordFileIsValid
+1: [       OK ] WakeWordAssets.DefaultKeywordFileIsValid (0 ms)
+1: [ RUN      ] WakeWordAssets.ExtendedKeywordFileIsValid
+1: [       OK ] WakeWordAssets.ExtendedKeywordFileIsValid (0 ms)
+1: [ RUN      ] WakeWordAssets.DefaultContainsLockedWakePhrases
+1: [       OK ] WakeWordAssets.DefaultContainsLockedWakePhrases (0 ms)
+1: [ RUN      ] WakeWordAssets.ExtendedContainsRequestedAliases
+1: [       OK ] WakeWordAssets.ExtendedContainsRequestedAliases (0 ms)
+1: [ RUN      ] WakeWordAssets.ShortAliasesUseStricterInitialThreshold
+1: [       OK ] WakeWordAssets.ShortAliasesUseStricterInitialThreshold (0 ms)
+1: [ RUN      ] WakeWordAssets.DecoderInitializesWithPackagedAssets
+1: [       OK ] WakeWordAssets.DecoderInitializesWithPackagedAssets (8 ms)
+1: [----------] 7 tests from WakeWordAssets (9 ms total)
+1: 
+1: [----------] 1 test from WakeWordAssetResolver
+1: [ RUN      ] WakeWordAssetResolver.RecognizesSupportedProfiles
+1: [       OK ] WakeWordAssetResolver.RecognizesSupportedProfiles (0 ms)
+1: [----------] 1 test from WakeWordAssetResolver (0 ms total)
+1: 
+1: [----------] 5 tests from WakeWordAssetResolverTest
+1: [ RUN      ] WakeWordAssetResolverTest.ResolvesDefaultPackagedAssets
+1: [       OK ] WakeWordAssetResolverTest.ResolvesDefaultPackagedAssets (0 ms)
+1: [ RUN      ] WakeWordAssetResolverTest.ResolvesExtendedPackagedAssets
+1: [       OK ] WakeWordAssetResolverTest.ResolvesExtendedPackagedAssets (0 ms)
+1: [ RUN      ] WakeWordAssetResolverTest.CustomProfileRequiresKeywordOverride
+1: [       OK ] WakeWordAssetResolverTest.CustomProfileRequiresKeywordOverride (0 ms)
+1: [ RUN      ] WakeWordAssetResolverTest.ExplicitOverridesDoNotRequirePackageAssets
+1: [       OK ] WakeWordAssetResolverTest.ExplicitOverridesDoNotRequirePackageAssets (0 ms)
+1: [ RUN      ] WakeWordAssetResolverTest.RejectsMissingResolvedAsset
+1: [       OK ] WakeWordAssetResolverTest.RejectsMissingResolvedAsset (0 ms)
+1: [----------] 5 tests from WakeWordAssetResolverTest (1 ms total)
+1: 
+1: [----------] 8 tests from WakeWordProcessor
+1: [ RUN      ] WakeWordProcessor.RejectsInvalidConfiguration
+1: [       OK ] WakeWordProcessor.RejectsInvalidConfiguration (0 ms)
+1: [ RUN      ] WakeWordProcessor.EmitsAcceptedDetection
+1: [       OK ] WakeWordProcessor.EmitsAcceptedDetection (0 ms)
+1: [ RUN      ] WakeWordProcessor.RejectsBelowThresholdDetection
+1: [       OK ] WakeWordProcessor.RejectsBelowThresholdDetection (0 ms)
+1: [ RUN      ] WakeWordProcessor.RequiresConsecutiveDetections
+1: [       OK ] WakeWordProcessor.RequiresConsecutiveDetections (0 ms)
+1: [ RUN      ] WakeWordProcessor.PhraseChangeResetsDebounce
+1: [       OK ] WakeWordProcessor.PhraseChangeResetsDebounce (0 ms)
+1: [ RUN      ] WakeWordProcessor.SuppressesDetectionDuringCooldown
+1: [       OK ] WakeWordProcessor.SuppressesDetectionDuringCooldown (0 ms)
+1: [ RUN      ] WakeWordProcessor.DropsOldestEventWhenQueueIsFull
+1: [       OK ] WakeWordProcessor.DropsOldestEventWhenQueueIsFull (0 ms)
+1: [ RUN      ] WakeWordProcessor.BackendFailureIsPropagated
+1: [       OK ] WakeWordProcessor.BackendFailureIsPropagated (0 ms)
+1: [----------] 8 tests from WakeWordProcessor (0 ms total)
+1: 
+1: [----------] 6 tests from AudioRingBuffer
+1: [ RUN      ] AudioRingBuffer.RejectsZeroCapacity
+1: [       OK ] AudioRingBuffer.RejectsZeroCapacity (0 ms)
+1: [ RUN      ] AudioRingBuffer.StoresPartialBufferChronologically
+1: [       OK ] AudioRingBuffer.StoresPartialBufferChronologically (0 ms)
+1: [ RUN      ] AudioRingBuffer.KeepsNewestSamplesAfterWrap
+1: [       OK ] AudioRingBuffer.KeepsNewestSamplesAfterWrap (0 ms)
+1: [ RUN      ] AudioRingBuffer.KeepsTailOfOversizedAppend
+1: [       OK ] AudioRingBuffer.KeepsTailOfOversizedAppend (0 ms)
+1: [ RUN      ] AudioRingBuffer.ClearRemovesSamples
+1: [       OK ] AudioRingBuffer.ClearRemovesSamples (0 ms)
+1: [ RUN      ] AudioRingBuffer.ReportsLifetimeStatistics
+1: [       OK ] AudioRingBuffer.ReportsLifetimeStatistics (0 ms)
+1: [----------] 6 tests from AudioRingBuffer (0 ms total)
+1: 
+1: [----------] 7 tests from BoundedAudioQueue
+1: [ RUN      ] BoundedAudioQueue.RejectsZeroCapacity
+1: [       OK ] BoundedAudioQueue.RejectsZeroCapacity (0 ms)
+1: [ RUN      ] BoundedAudioQueue.PreservesFifoOrdering
+1: [       OK ] BoundedAudioQueue.PreservesFifoOrdering (0 ms)
+1: [ RUN      ] BoundedAudioQueue.RejectNewestPolicyPreservesExistingFrames
+1: [       OK ] BoundedAudioQueue.RejectNewestPolicyPreservesExistingFrames (0 ms)
+1: [ RUN      ] BoundedAudioQueue.DropOldestPolicyKeepsNewestFrames
+1: [       OK ] BoundedAudioQueue.DropOldestPolicyKeepsNewestFrames (0 ms)
+1: [ RUN      ] BoundedAudioQueue.ClosedQueueRejectsNewFramesButDrainsExisting
+1: [       OK ] BoundedAudioQueue.ClosedQueueRejectsNewFramesButDrainsExisting (0 ms)
+1: [ RUN      ] BoundedAudioQueue.ClearRemovesQueuedFrames
+1: [       OK ] BoundedAudioQueue.ClearRemovesQueuedFrames (0 ms)
+1: [ RUN      ] BoundedAudioQueue.WaitPopTimesOutWhenNoFrameArrives
+1: [       OK ] BoundedAudioQueue.WaitPopTimesOutWhenNoFrameArrives (5 ms)
+1: [----------] 7 tests from BoundedAudioQueue (5 ms total)
+1: 
+1: [----------] 7 tests from CapturePipeline
+1: [ RUN      ] CapturePipeline.RejectsInvalidConfiguration
+1: [       OK ] CapturePipeline.RejectsInvalidConfiguration (0 ms)
+1: [ RUN      ] CapturePipeline.SelectsConfiguredChannelAndQueuesMono
+1: [       OK ] CapturePipeline.SelectsConfiguredChannelAndQueuesMono (0 ms)
+1: [ RUN      ] CapturePipeline.BuildsChronologicalMonoPreRoll
+1: [       OK ] CapturePipeline.BuildsChronologicalMonoPreRoll (0 ms)
+1: [ RUN      ] CapturePipeline.GatingFlushesQueueAndPreRollOnce
+1: [       OK ] CapturePipeline.GatingFlushesQueueAndPreRollOnce (0 ms)
+1: [ RUN      ] CapturePipeline.ResumesAfterPostPlaybackHold
+1: [       OK ] CapturePipeline.ResumesAfterPostPlaybackHold (0 ms)
+1: [ RUN      ] CapturePipeline.ReportsDropOldestQueueOverflow
+1: [       OK ] CapturePipeline.ReportsDropOldestQueueOverflow (0 ms)
+1: [ RUN      ] CapturePipeline.RejectsUnavailableChannel
+1: [       OK ] CapturePipeline.RejectsUnavailableChannel (0 ms)
+1: [----------] 7 tests from CapturePipeline (0 ms total)
+1: 
+1: [----------] 5 tests from CaptureProcessingDispatcher
+1: [ RUN      ] CaptureProcessingDispatcher.RejectsInvalidConfiguration
+1: [       OK ] CaptureProcessingDispatcher.RejectsInvalidConfiguration (0 ms)
+1: [ RUN      ] CaptureProcessingDispatcher.ProcessesFramesAndBecomesReady
+1: [       OK ] CaptureProcessingDispatcher.ProcessesFramesAndBecomesReady (5 ms)
+1: [ RUN      ] CaptureProcessingDispatcher.DetectsSequenceGap
+1: [       OK ] CaptureProcessingDispatcher.DetectsSequenceGap (5 ms)
+1: [ RUN      ] CaptureProcessingDispatcher.ProcessorFailureFaultsWorker
+1: [       OK ] CaptureProcessingDispatcher.ProcessorFailureFaultsWorker (1 ms)
+1: [ RUN      ] CaptureProcessingDispatcher.ReportsStaleProcessing
+1: [       OK ] CaptureProcessingDispatcher.ReportsStaleProcessing (35 ms)
+1: [----------] 5 tests from CaptureProcessingDispatcher (47 ms total)
+1: 
+1: [----------] 8 tests from CapturedAudioProcessorChain
+1: [ RUN      ] CapturedAudioProcessorChain.RejectsEmptyProcessorName
+1: [       OK ] CapturedAudioProcessorChain.RejectsEmptyProcessorName (0 ms)
+1: [ RUN      ] CapturedAudioProcessorChain.RejectsDuplicateProcessorName
+1: [       OK ] CapturedAudioProcessorChain.RejectsDuplicateProcessorName (0 ms)
+1: [ RUN      ] CapturedAudioProcessorChain.RejectsProcessingBeforeSeal
+1: [       OK ] CapturedAudioProcessorChain.RejectsProcessingBeforeSeal (0 ms)
+1: [ RUN      ] CapturedAudioProcessorChain.RejectsSealingEmptyChain
+1: [       OK ] CapturedAudioProcessorChain.RejectsSealingEmptyChain (0 ms)
+1: [ RUN      ] CapturedAudioProcessorChain.ProcessesInRegistrationOrder
+1: [       OK ] CapturedAudioProcessorChain.ProcessesInRegistrationOrder (0 ms)
+1: [ RUN      ] CapturedAudioProcessorChain.RequiredFailureStopsLaterProcessors
+1: [       OK ] CapturedAudioProcessorChain.RequiredFailureStopsLaterProcessors (0 ms)
+1: [ RUN      ] CapturedAudioProcessorChain.OptionalFailureContinuesProcessing
+1: [       OK ] CapturedAudioProcessorChain.OptionalFailureContinuesProcessing (0 ms)
+1: [ RUN      ] CapturedAudioProcessorChain.ResetClearsStatisticsButPreservesRegistration
+1: [       OK ] CapturedAudioProcessorChain.ResetClearsStatisticsButPreservesRegistration (0 ms)
+1: [----------] 8 tests from CapturedAudioProcessorChain (0 ms total)
+1: 
+1: [----------] 5 tests from CaptureWorker
+1: [ RUN      ] CaptureWorker.StartsRoutesFramesAndStops
+1: [       OK ] CaptureWorker.StartsRoutesFramesAndStops (4 ms)
+1: [ RUN      ] CaptureWorker.StartIsIdempotentWhileRunning
+1: [       OK ] CaptureWorker.StartIsIdempotentWhileRunning (0 ms)
+1: [ RUN      ] CaptureWorker.CountsFramesDroppedByMicrophoneGate
+1: [       OK ] CaptureWorker.CountsFramesDroppedByMicrophoneGate (4 ms)
+1: [ RUN      ] CaptureWorker.CaptureFailureTransitionsToFaulted
+1: [       OK ] CaptureWorker.CaptureFailureTransitionsToFaulted (4 ms)
+1: [ RUN      ] CaptureWorker.SupportsRestartAfterCleanStop
+1: [       OK ] CaptureWorker.SupportsRestartAfterCleanStop (3 ms)
+1: [----------] 5 tests from CaptureWorker (16 ms total)
+1: 
+1: [----------] 5 tests from ChannelSelector
+1: [ RUN      ] ChannelSelector.ExtractsFirstChannel
+1: [       OK ] ChannelSelector.ExtractsFirstChannel (0 ms)
+1: [ RUN      ] ChannelSelector.ExtractsSecondChannel
+1: [       OK ] ChannelSelector.ExtractsSecondChannel (0 ms)
+1: [ RUN      ] ChannelSelector.RejectsInvalidChannelCount
+1: [       OK ] ChannelSelector.RejectsInvalidChannelCount (0 ms)
+1: [ RUN      ] ChannelSelector.RejectsInvalidChannelIndex
+1: [       OK ] ChannelSelector.RejectsInvalidChannelIndex (0 ms)
+1: [ RUN      ] ChannelSelector.RejectsIncompleteInterleavedData
+1: [       OK ] ChannelSelector.RejectsIncompleteInterleavedData (0 ms)
+1: [----------] 5 tests from ChannelSelector (0 ms total)
+1: 
+1: [----------] 11 tests from WavCodec
+1: [ RUN      ] WavCodec.EncodedMonoHeaderHasExpectedSize
+1: [       OK ] WavCodec.EncodedMonoHeaderHasExpectedSize (0 ms)
+1: [ RUN      ] WavCodec.MonoRoundTripPreservesFormatAndSamples
+1: [       OK ] WavCodec.MonoRoundTripPreservesFormatAndSamples (0 ms)
+1: [ RUN      ] WavCodec.StereoRoundTripPreservesInterleaving
+1: [       OK ] WavCodec.StereoRoundTripPreservesInterleaving (0 ms)
+1: [ RUN      ] WavCodec.RejectsEmptyAudioDuringEncoding
+1: [       OK ] WavCodec.RejectsEmptyAudioDuringEncoding (0 ms)
+1: [ RUN      ] WavCodec.RejectsTruncatedHeader
+1: [       OK ] WavCodec.RejectsTruncatedHeader (0 ms)
+1: [ RUN      ] WavCodec.RejectsWrongRiffSignature
+1: [       OK ] WavCodec.RejectsWrongRiffSignature (0 ms)
+1: [ RUN      ] WavCodec.RejectsWrongWaveSignature
+1: [       OK ] WavCodec.RejectsWrongWaveSignature (0 ms)
+1: [ RUN      ] WavCodec.RejectsUnsupportedBitDepth
+1: [       OK ] WavCodec.RejectsUnsupportedBitDepth (0 ms)
+1: [ RUN      ] WavCodec.RejectsTruncatedRiffPayload
+1: [       OK ] WavCodec.RejectsTruncatedRiffPayload (0 ms)
+1: [ RUN      ] WavCodec.RejectsDataThatIsNotFrameAligned
+1: [       OK ] WavCodec.RejectsDataThatIsNotFrameAligned (0 ms)
+1: [ RUN      ] WavCodec.EnforcesConfiguredFileSizeLimit
+1: [       OK ] WavCodec.EnforcesConfiguredFileSizeLimit (0 ms)
+1: [----------] 11 tests from WavCodec (0 ms total)
+1: 
+1: [----------] 4 tests from SavoMindTransport
+1: [ RUN      ] SavoMindTransport.AcceptsCorrelatedBoundedPcmWav
+1: [       OK ] SavoMindTransport.AcceptsCorrelatedBoundedPcmWav (0 ms)
+1: [ RUN      ] SavoMindTransport.RejectsWrongCorrelationAndInvalidAudio
+1: [       OK ] SavoMindTransport.RejectsWrongCorrelationAndInvalidAudio (0 ms)
+1: [ RUN      ] SavoMindTransport.RejectsMissingTtsAndOversizedResponse
+1: [       OK ] SavoMindTransport.RejectsMissingTtsAndOversizedResponse (0 ms)
+1: [ RUN      ] SavoMindTransport.AcceptsPlaybackAcknowledgementContract
+1: [       OK ] SavoMindTransport.AcceptsPlaybackAcknowledgementContract (0 ms)
+1: [----------] 4 tests from SavoMindTransport (0 ms total)
+1: 
+1: [----------] 3 tests from UnixSocketSavoMindTransport
+1: [ RUN      ] UnixSocketSavoMindTransport.ExchangesAndAcknowledgesPhysicalPlayback
+1: [       OK ] UnixSocketSavoMindTransport.ExchangesAndAcknowledgesPhysicalPlayback (0 ms)
+1: [ RUN      ] UnixSocketSavoMindTransport.RejectsWrongCorrelation
+1: [       OK ] UnixSocketSavoMindTransport.RejectsWrongCorrelation (0 ms)
+1: [ RUN      ] UnixSocketSavoMindTransport.CancellationInterruptsActiveExchange
+1: [       OK ] UnixSocketSavoMindTransport.CancellationInterruptsActiveExchange (2000 ms)
+1: [----------] 3 tests from UnixSocketSavoMindTransport (2001 ms total)
+1: 
+1: [----------] Global test environment tear-down
+1: [==========] 212 tests from 32 test suites ran. (2143 ms total)
+1: [  PASSED  ] 212 tests.
+1: -- run_test.py: return code 0
+1: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_results/savo_speech/test_audio_primitives.gtest.xml'
+1: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_results/savo_speech/test_audio_primitives.gtest.xml'
+1/9 Test #1: test_audio_primitives ...............   Passed    2.22 sec
+test 2
+    Start 2: test_savomind_round_trip_contract
+
+2: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_results/savo_speech/test_savomind_round_trip_contract.xunit.xml" "--package-name" "savo_speech" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/ament_cmake_pytest/test_savomind_round_trip_contract.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/test/contracts/test_savomind_round_trip_contract.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/ament_cmake_pytest/test_savomind_round_trip_contract/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_results/savo_speech/test_savomind_round_trip_contract.xunit.xml" "--junit-prefix=savo_speech"
+2: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech
+2: Test timeout computed to be: 30
+2: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech':
+2:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/test/contracts/test_savomind_round_trip_contract.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/ament_cmake_pytest/test_savomind_round_trip_contract/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_results/savo_speech/test_savomind_round_trip_contract.xunit.xml --junit-prefix=savo_speech
+2: ============================= test session starts ==============================
+2: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+2: cachedir: build/savo_speech/ament_cmake_pytest/test_savomind_round_trip_contract/.cache
+2: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+2: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+2: collected 2 items
+2: 
+2: ../../src/edge/savo_speech/test/contracts/test_savomind_round_trip_contract.py . [ 50%]
+2: .                                                                        [100%]
+2: 
+2: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_results/savo_speech/test_savomind_round_trip_contract.xunit.xml -
+2: ============================== 2 passed in 0.05s ===============================
+2: -- run_test.py: return code 0
+2: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_results/savo_speech/test_savomind_round_trip_contract.xunit.xml'
+2/9 Test #2: test_savomind_round_trip_contract ...   Passed    0.37 sec
+test 3
+    Start 3: cpplint
+
+3: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_results/savo_speech/cpplint.xunit.xml" "--package-name" "savo_speech" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/ament_cpplint/cpplint.txt" "--command" "/opt/ros/jazzy/bin/ament_cpplint" "--xunit-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_results/savo_speech/cpplint.xunit.xml" "--filters=-readability/fn_size,-readability/braces,-build/include_order"
+3: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech
+3: Test timeout computed to be: 120
+3: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech':
+3:  - /opt/ros/jazzy/bin/ament_cpplint --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_results/savo_speech/cpplint.xunit.xml --filters=-readability/fn_size,-readability/braces,-build/include_order
+3: Using '--root=/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include' argument
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/audio/audio_activity_monitor.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/audio/audio_buffer.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/audio/audio_format.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/audio/audio_frame.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/audio/audio_level_meter.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/audio/audio_ring_buffer.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/audio/audio_runtime.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/audio/bounded_audio_queue.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/audio/capture_pipeline.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/audio/capture_processing_dispatcher.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/audio/capture_source.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/audio/capture_worker.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/audio/captured_audio_processor.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/audio/captured_audio_processor_chain.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/audio/captured_frame_source.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/audio/channel_selector.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/audio/microphone_gate.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/audio/playback_controller.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/audio/playback_sink.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/audio/playback_worker.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/audio/wav_reader.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/audio/wav_writer.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/constants.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/drivers/alsa_capture_stream.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/drivers/alsa_device_resolver.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/drivers/alsa_error.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/drivers/alsa_playback_stream.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/drivers/audio_device_descriptor.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/ros/topic_names.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/session/completed_utterance.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/session/completed_utterance_queue.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/session/completed_utterance_source.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/session/completed_utterance_worker.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/session/serialized_utterance.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/session/speech_error.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/session/speech_phase.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/session/utterance_session_core.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/session/utterance_session_event.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/session/utterance_session_processor.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/speech_node.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/transport/savomind_round_trip_worker.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/transport/savomind_transport.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/vad/adaptive_energy_vad_backend.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/vad/vad_backend.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/vad/vad_event.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/vad/vad_processor.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/version.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/wake_word/pocketsphinx_wake_word_backend.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/wake_word/wake_word_asset_resolver.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/wake_word/wake_word_backend.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/wake_word/wake_word_event.hpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include/savo_speech/wake_word/wake_word_processor.hpp
+3: 
+3: Using '--root=/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/src' argument
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/src/audio/audio_activity_monitor.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/src/audio/audio_level_meter.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/src/audio/audio_ring_buffer.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/src/audio/audio_runtime.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/src/audio/bounded_audio_queue.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/src/audio/capture_pipeline.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/src/audio/capture_processing_dispatcher.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/src/audio/capture_worker.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/src/audio/captured_audio_processor_chain.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/src/audio/channel_selector.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/src/audio/microphone_gate.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/src/audio/playback_controller.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/src/audio/playback_worker.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/src/audio/wav_reader.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/src/audio/wav_writer.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/src/drivers/alsa_capture_stream.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/src/drivers/alsa_device_resolver.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/src/drivers/alsa_playback_stream.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/src/main.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/src/session/completed_utterance_queue.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/src/session/completed_utterance_worker.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/src/session/utterance_session_core.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/src/session/utterance_session_processor.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/src/speech_node.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/src/tools/audio_device_probe.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/src/tools/audio_runtime_test_cli.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/src/tools/capture_test_cli.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/src/tools/playback_test_cli.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/src/tools/playback_worker_test_cli.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/src/transport/savomind_round_trip_worker.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/src/transport/savomind_transport.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/src/vad/adaptive_energy_vad_backend.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/src/vad/vad_processor.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/src/wake_word/pocketsphinx_wake_word_backend.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/src/wake_word/wake_word_asset_resolver.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/src/wake_word/wake_word_processor.cpp
+3: 
+3: Using '--root=/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/test' argument
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/test/unit/test_adaptive_energy_vad_backend.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/test/unit/test_alsa_capture_config.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/test/unit/test_alsa_playback_config.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/test/unit/test_audio_activity_monitor.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/test/unit/test_audio_buffer.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/test/unit/test_audio_format.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/test/unit/test_audio_level_meter.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/test/unit/test_audio_ring_buffer.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/test/unit/test_audio_runtime.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/test/unit/test_bounded_audio_queue.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/test/unit/test_capture_pipeline.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/test/unit/test_capture_processing_dispatcher.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/test/unit/test_capture_worker.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/test/unit/test_captured_audio_processor_chain.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/test/unit/test_channel_selector.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/test/unit/test_completed_utterance_queue.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/test/unit/test_completed_utterance_worker.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/test/unit/test_microphone_gate.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/test/unit/test_playback_controller.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/test/unit/test_playback_worker.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/test/unit/test_pocketsphinx_wake_word_backend.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/test/unit/test_savomind_transport.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/test/unit/test_unix_socket_savomind_transport.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/test/unit/test_utterance_session_core.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/test/unit/test_utterance_session_processor.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/test/unit/test_vad_processor.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/test/unit/test_wake_word_asset_resolver.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/test/unit/test_wake_word_assets.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/test/unit/test_wake_word_processor.cpp
+3: 
+3: Done processing /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/test/unit/test_wav_codec.cpp
+3: 
+3: No problems found
+3: -- run_test.py: return code 0
+3: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_results/savo_speech/cpplint.xunit.xml'
+3/9 Test #3: cpplint .............................   Passed    3.06 sec
+test 4
+    Start 4: cppcheck
+
+4: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_results/savo_speech/cppcheck.xunit.xml" "--package-name" "savo_speech" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/ament_cppcheck/cppcheck.txt" "--command" "/opt/ros/jazzy/bin/ament_cppcheck" "--xunit-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_results/savo_speech/cppcheck.xunit.xml" "--include_dirs" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include"
+4: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech
+4: Test timeout computed to be: 300
+4: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech':
+4:  - /opt/ros/jazzy/bin/ament_cppcheck --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_results/savo_speech/cppcheck.xunit.xml --include_dirs /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech/include
+4: cppcheck 2.13.0 has known performance issues and therefore will not be used, set the AMENT_CPPCHECK_ALLOW_SLOW_VERSIONS environment variable to override this.
+4: -- run_test.py: return code 0
+4: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_results/savo_speech/cppcheck.xunit.xml'
+4/9 Test #4: cppcheck ............................   Passed    0.13 sec
+test 5
+    Start 5: flake8
+
+5: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_results/savo_speech/flake8.xunit.xml" "--package-name" "savo_speech" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/ament_flake8/flake8.txt" "--command" "/opt/ros/jazzy/bin/ament_flake8" "--xunit-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_results/savo_speech/flake8.xunit.xml"
+5: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech
+5: Test timeout computed to be: 60
+5: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech':
+5:  - /opt/ros/jazzy/bin/ament_flake8 --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_results/savo_speech/flake8.xunit.xml
+5: 
+5: 2 files checked
+5: No problems found
+5: 
+5: Checked files:
+5: 
+5: * ./test/contracts/test_savomind_round_trip_contract.py
+5: * ./scripts/fake_savomind_speech_server.py
+5: -- run_test.py: return code 0
+5: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_results/savo_speech/flake8.xunit.xml'
+5/9 Test #5: flake8 ..............................   Passed    0.28 sec
+test 6
+    Start 6: lint_cmake
+
+6: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_results/savo_speech/lint_cmake.xunit.xml" "--package-name" "savo_speech" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/ament_lint_cmake/lint_cmake.txt" "--command" "/opt/ros/jazzy/bin/ament_lint_cmake" "--xunit-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_results/savo_speech/lint_cmake.xunit.xml"
+6: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech
+6: Test timeout computed to be: 60
+6: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech':
+6:  - /opt/ros/jazzy/bin/ament_lint_cmake --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_results/savo_speech/lint_cmake.xunit.xml
+6: 
+6: No problems found
+6: -- run_test.py: return code 0
+6: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_results/savo_speech/lint_cmake.xunit.xml'
+6/9 Test #6: lint_cmake ..........................   Passed    0.16 sec
+test 7
+    Start 7: pep257
+
+7: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_results/savo_speech/pep257.xunit.xml" "--package-name" "savo_speech" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/ament_pep257/pep257.txt" "--command" "/opt/ros/jazzy/bin/ament_pep257" "--xunit-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_results/savo_speech/pep257.xunit.xml"
+7: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech
+7: Test timeout computed to be: 60
+7: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech':
+7:  - /opt/ros/jazzy/bin/ament_pep257 --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_results/savo_speech/pep257.xunit.xml
+7: checking ./scripts/fake_savomind_speech_server.py
+7: checking ./test/contracts/test_savomind_round_trip_contract.py
+7: No problems found
+7: -- run_test.py: return code 0
+7: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_results/savo_speech/pep257.xunit.xml'
+7/9 Test #7: pep257 ..............................   Passed    0.16 sec
+test 8
+    Start 8: uncrustify
+
+8: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_results/savo_speech/uncrustify.xunit.xml" "--package-name" "savo_speech" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/ament_uncrustify/uncrustify.txt" "--command" "/opt/ros/jazzy/bin/ament_uncrustify" "--xunit-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_results/savo_speech/uncrustify.xunit.xml"
+8: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech
+8: Test timeout computed to be: 60
+8: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech':
+8:  - /opt/ros/jazzy/bin/ament_uncrustify --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_results/savo_speech/uncrustify.xunit.xml
+8: No code style divergence in file 'include/savo_speech/audio/audio_activity_monitor.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/audio/audio_buffer.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/audio/audio_format.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/audio/audio_frame.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/audio/audio_level_meter.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/audio/audio_ring_buffer.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/audio/audio_runtime.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/audio/bounded_audio_queue.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/audio/capture_pipeline.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/audio/capture_processing_dispatcher.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/audio/capture_source.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/audio/capture_worker.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/audio/captured_audio_processor.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/audio/captured_audio_processor_chain.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/audio/captured_frame_source.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/audio/channel_selector.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/audio/microphone_gate.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/audio/playback_controller.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/audio/playback_sink.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/audio/playback_worker.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/audio/wav_reader.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/audio/wav_writer.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/constants.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/drivers/alsa_capture_stream.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/drivers/alsa_device_resolver.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/drivers/alsa_error.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/drivers/alsa_playback_stream.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/drivers/audio_device_descriptor.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/ros/topic_names.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/session/completed_utterance.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/session/completed_utterance_queue.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/session/completed_utterance_source.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/session/completed_utterance_worker.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/session/serialized_utterance.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/session/speech_error.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/session/speech_phase.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/session/utterance_session_core.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/session/utterance_session_event.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/session/utterance_session_processor.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/speech_node.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/transport/savomind_round_trip_worker.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/transport/savomind_transport.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/vad/adaptive_energy_vad_backend.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/vad/vad_backend.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/vad/vad_event.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/vad/vad_processor.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/version.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/wake_word/pocketsphinx_wake_word_backend.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/wake_word/wake_word_asset_resolver.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/wake_word/wake_word_backend.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/wake_word/wake_word_event.hpp'
+8: 
+8: No code style divergence in file 'include/savo_speech/wake_word/wake_word_processor.hpp'
+8: 
+8: No code style divergence in file 'src/audio/audio_activity_monitor.cpp'
+8: 
+8: No code style divergence in file 'src/audio/audio_level_meter.cpp'
+8: 
+8: No code style divergence in file 'src/audio/audio_ring_buffer.cpp'
+8: 
+8: No code style divergence in file 'src/audio/audio_runtime.cpp'
+8: 
+8: No code style divergence in file 'src/audio/bounded_audio_queue.cpp'
+8: 
+8: No code style divergence in file 'src/audio/capture_pipeline.cpp'
+8: 
+8: No code style divergence in file 'src/audio/capture_processing_dispatcher.cpp'
+8: 
+8: No code style divergence in file 'src/audio/capture_worker.cpp'
+8: 
+8: No code style divergence in file 'src/audio/captured_audio_processor_chain.cpp'
+8: 
+8: No code style divergence in file 'src/audio/channel_selector.cpp'
+8: 
+8: No code style divergence in file 'src/audio/microphone_gate.cpp'
+8: 
+8: No code style divergence in file 'src/audio/playback_controller.cpp'
+8: 
+8: No code style divergence in file 'src/audio/playback_worker.cpp'
+8: 
+8: No code style divergence in file 'src/audio/wav_reader.cpp'
+8: 
+8: No code style divergence in file 'src/audio/wav_writer.cpp'
+8: 
+8: No code style divergence in file 'src/drivers/alsa_capture_stream.cpp'
+8: 
+8: No code style divergence in file 'src/drivers/alsa_device_resolver.cpp'
+8: 
+8: No code style divergence in file 'src/drivers/alsa_playback_stream.cpp'
+8: 
+8: No code style divergence in file 'src/main.cpp'
+8: 
+8: No code style divergence in file 'src/session/completed_utterance_queue.cpp'
+8: 
+8: No code style divergence in file 'src/session/completed_utterance_worker.cpp'
+8: 
+8: No code style divergence in file 'src/session/utterance_session_core.cpp'
+8: 
+8: No code style divergence in file 'src/session/utterance_session_processor.cpp'
+8: 
+8: No code style divergence in file 'src/speech_node.cpp'
+8: 
+8: No code style divergence in file 'src/tools/audio_device_probe.cpp'
+8: 
+8: No code style divergence in file 'src/tools/audio_runtime_test_cli.cpp'
+8: 
+8: No code style divergence in file 'src/tools/capture_test_cli.cpp'
+8: 
+8: No code style divergence in file 'src/tools/playback_test_cli.cpp'
+8: 
+8: No code style divergence in file 'src/tools/playback_worker_test_cli.cpp'
+8: 
+8: No code style divergence in file 'src/transport/savomind_round_trip_worker.cpp'
+8: 
+8: No code style divergence in file 'src/transport/savomind_transport.cpp'
+8: 
+8: No code style divergence in file 'src/vad/adaptive_energy_vad_backend.cpp'
+8: 
+8: No code style divergence in file 'src/vad/vad_processor.cpp'
+8: 
+8: No code style divergence in file 'src/wake_word/pocketsphinx_wake_word_backend.cpp'
+8: 
+8: No code style divergence in file 'src/wake_word/wake_word_asset_resolver.cpp'
+8: 
+8: No code style divergence in file 'src/wake_word/wake_word_processor.cpp'
+8: 
+8: No code style divergence in file 'test/unit/test_adaptive_energy_vad_backend.cpp'
+8: 
+8: No code style divergence in file 'test/unit/test_alsa_capture_config.cpp'
+8: 
+8: No code style divergence in file 'test/unit/test_alsa_playback_config.cpp'
+8: 
+8: No code style divergence in file 'test/unit/test_audio_activity_monitor.cpp'
+8: 
+8: No code style divergence in file 'test/unit/test_audio_buffer.cpp'
+8: 
+8: No code style divergence in file 'test/unit/test_audio_format.cpp'
+8: 
+8: No code style divergence in file 'test/unit/test_audio_level_meter.cpp'
+8: 
+8: No code style divergence in file 'test/unit/test_audio_ring_buffer.cpp'
+8: 
+8: No code style divergence in file 'test/unit/test_audio_runtime.cpp'
+8: 
+8: No code style divergence in file 'test/unit/test_bounded_audio_queue.cpp'
+8: 
+8: No code style divergence in file 'test/unit/test_capture_pipeline.cpp'
+8: 
+8: No code style divergence in file 'test/unit/test_capture_processing_dispatcher.cpp'
+8: 
+8: No code style divergence in file 'test/unit/test_capture_worker.cpp'
+8: 
+8: No code style divergence in file 'test/unit/test_captured_audio_processor_chain.cpp'
+8: 
+8: No code style divergence in file 'test/unit/test_channel_selector.cpp'
+8: 
+8: No code style divergence in file 'test/unit/test_completed_utterance_queue.cpp'
+8: 
+8: No code style divergence in file 'test/unit/test_completed_utterance_worker.cpp'
+8: 
+8: No code style divergence in file 'test/unit/test_microphone_gate.cpp'
+8: 
+8: No code style divergence in file 'test/unit/test_playback_controller.cpp'
+8: 
+8: No code style divergence in file 'test/unit/test_playback_worker.cpp'
+8: 
+8: No code style divergence in file 'test/unit/test_pocketsphinx_wake_word_backend.cpp'
+8: 
+8: No code style divergence in file 'test/unit/test_savomind_transport.cpp'
+8: 
+8: No code style divergence in file 'test/unit/test_unix_socket_savomind_transport.cpp'
+8: 
+8: No code style divergence in file 'test/unit/test_utterance_session_core.cpp'
+8: 
+8: No code style divergence in file 'test/unit/test_utterance_session_processor.cpp'
+8: 
+8: No code style divergence in file 'test/unit/test_vad_processor.cpp'
+8: 
+8: No code style divergence in file 'test/unit/test_wake_word_asset_resolver.cpp'
+8: 
+8: No code style divergence in file 'test/unit/test_wake_word_assets.cpp'
+8: 
+8: No code style divergence in file 'test/unit/test_wake_word_processor.cpp'
+8: 
+8: No code style divergence in file 'test/unit/test_wav_codec.cpp'
+8: 
+8: No problems found
+8: -- run_test.py: return code 0
+8: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_results/savo_speech/uncrustify.xunit.xml'
+8/9 Test #8: uncrustify ..........................   Passed    0.63 sec
+test 9
+    Start 9: xmllint
+
+9: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_results/savo_speech/xmllint.xunit.xml" "--package-name" "savo_speech" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/ament_xmllint/xmllint.txt" "--command" "/opt/ros/jazzy/bin/ament_xmllint" "--xunit-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_results/savo_speech/xmllint.xunit.xml"
+9: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech
+9: Test timeout computed to be: 60
+9: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/edge/savo_speech':
+9:  - /opt/ros/jazzy/bin/ament_xmllint --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_results/savo_speech/xmllint.xunit.xml
+9: File 'package.xml' is valid
+9: 
+9: File 'launch/speech_bringup.launch.xml' is valid
+9: 
+9: No problems found
+9: -- run_test.py: return code 0
+9: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_speech/test_results/savo_speech/xmllint.xunit.xml'
+9/9 Test #9: xmllint .............................   Passed    0.52 sec
+
+100% tests passed, 0 tests failed out of 9
+
+Label Time Summary:
+cppcheck      =   0.13 sec*proc (1 test)
+cpplint       =   3.06 sec*proc (1 test)
+flake8        =   0.28 sec*proc (1 test)
+gtest         =   2.22 sec*proc (1 test)
+lint_cmake    =   0.16 sec*proc (1 test)
+linter        =   4.94 sec*proc (7 tests)
+pep257        =   0.16 sec*proc (1 test)
+pytest        =   0.37 sec*proc (1 test)
+uncrustify    =   0.63 sec*proc (1 test)
+xmllint       =   0.52 sec*proc (1 test)
+
+Total Test time (real) =   7.53 sec
+Finished <<< savo_speech [7.55s]
+
+Summary: 1 package finished [7.69s]
+
+============================================================
+ COLCON TEST RESULT
+============================================================
+Summary: 583 tests, 0 errors, 0 failures, 118 skipped
+
+------------------------------------------------------------
+PACKAGE_RESULT: PASS
+COLCON_TEST_EXIT: 0
+TEST_RESULT_EXIT: 0
+------------------------------------------------------------

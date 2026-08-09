@@ -1,0 +1,221 @@
+Robot Savo package PC validation
+Run ID: 20260809T021142Z
+Package: savo_description
+Date: 2026-08-09T05:21:43+03:00
+Host: ahnaf-tahmid-B760M-PG-SONIC-WiFi
+Commit: eb71c26ac7dfbeaf9c2e44df3ba9f79117c7d4b6
+
+Starting >>> savo_description
+UpdateCTestConfiguration  from :/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/CTestConfiguration.ini
+Parse Config file:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/CTestConfiguration.ini
+   Site: ahnaf-tahmid-B760M-PG-SONIC-WiFi
+   Build name: (empty)
+ Add coverage exclude regular expressions.
+Create new tag: 20260809-0221 - Experimental
+UpdateCTestConfiguration  from :/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/CTestConfiguration.ini
+Parse Config file:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/CTestConfiguration.ini
+Test project /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description
+Constructing a list of tests
+Done constructing a list of tests
+Updating test list for fixtures
+Added 0 tests to meet fixture requirements
+Checking test dependency graph...
+Checking test dependency graph end
+test 1
+    Start 1: test_urdf_exists
+
+1: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_urdf_exists.xunit.xml" "--package-name" "savo_description" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/ament_cmake_pytest/test_urdf_exists.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_description/test/test_urdf_exists.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/ament_cmake_pytest/test_urdf_exists/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_urdf_exists.xunit.xml" "--junit-prefix=savo_description"
+1: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description
+1: Test timeout computed to be: 60
+1: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description':
+1:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_description/test/test_urdf_exists.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/ament_cmake_pytest/test_urdf_exists/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_urdf_exists.xunit.xml --junit-prefix=savo_description
+1: ============================= test session starts ==============================
+1: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+1: cachedir: build/savo_description/ament_cmake_pytest/test_urdf_exists/.cache
+1: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+1: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+1: collected 2 items
+1: 
+1: ../../src/shared/savo_description/test/test_urdf_exists.py ..            [100%]
+1: 
+1: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_urdf_exists.xunit.xml -
+1: ============================== 2 passed in 0.01s ===============================
+1: -- run_test.py: return code 0
+1: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_urdf_exists.xunit.xml'
+1/8 Test #1: test_urdf_exists .................   Passed    0.33 sec
+test 2
+    Start 2: test_xacro_builds
+
+2: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_xacro_builds.xunit.xml" "--package-name" "savo_description" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/ament_cmake_pytest/test_xacro_builds.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_description/test/test_xacro_builds.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/ament_cmake_pytest/test_xacro_builds/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_xacro_builds.xunit.xml" "--junit-prefix=savo_description"
+2: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description
+2: Test timeout computed to be: 60
+2: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description':
+2:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_description/test/test_xacro_builds.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/ament_cmake_pytest/test_xacro_builds/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_xacro_builds.xunit.xml --junit-prefix=savo_description
+2: ============================= test session starts ==============================
+2: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+2: cachedir: build/savo_description/ament_cmake_pytest/test_xacro_builds/.cache
+2: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+2: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+2: collected 1 item
+2: 
+2: ../../src/shared/savo_description/test/test_xacro_builds.py .            [100%]
+2: 
+2: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_xacro_builds.xunit.xml -
+2: ============================== 1 passed in 0.13s ===============================
+2: -- run_test.py: return code 0
+2: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_xacro_builds.xunit.xml'
+2/8 Test #2: test_xacro_builds ................   Passed    0.47 sec
+test 3
+    Start 3: test_required_frames
+
+3: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_required_frames.xunit.xml" "--package-name" "savo_description" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/ament_cmake_pytest/test_required_frames.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_description/test/test_required_frames.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/ament_cmake_pytest/test_required_frames/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_required_frames.xunit.xml" "--junit-prefix=savo_description"
+3: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description
+3: Test timeout computed to be: 60
+3: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description':
+3:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_description/test/test_required_frames.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/ament_cmake_pytest/test_required_frames/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_required_frames.xunit.xml --junit-prefix=savo_description
+3: ============================= test session starts ==============================
+3: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+3: cachedir: build/savo_description/ament_cmake_pytest/test_required_frames/.cache
+3: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+3: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+3: collected 1 item
+3: 
+3: ../../src/shared/savo_description/test/test_required_frames.py .         [100%]
+3: 
+3: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_required_frames.xunit.xml -
+3: ============================== 1 passed in 0.12s ===============================
+3: -- run_test.py: return code 0
+3: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_required_frames.xunit.xml'
+3/8 Test #3: test_required_frames .............   Passed    0.46 sec
+test 4
+    Start 4: test_config_files
+
+4: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_config_files.xunit.xml" "--package-name" "savo_description" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/ament_cmake_pytest/test_config_files.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_description/test/test_config_files.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/ament_cmake_pytest/test_config_files/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_config_files.xunit.xml" "--junit-prefix=savo_description"
+4: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description
+4: Test timeout computed to be: 60
+4: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description':
+4:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_description/test/test_config_files.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/ament_cmake_pytest/test_config_files/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_config_files.xunit.xml --junit-prefix=savo_description
+4: ============================= test session starts ==============================
+4: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+4: cachedir: build/savo_description/ament_cmake_pytest/test_config_files/.cache
+4: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+4: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+4: collected 1 item
+4: 
+4: ../../src/shared/savo_description/test/test_config_files.py .            [100%]
+4: 
+4: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_config_files.xunit.xml -
+4: ============================== 1 passed in 0.02s ===============================
+4: -- run_test.py: return code 0
+4: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_config_files.xunit.xml'
+4/8 Test #4: test_config_files ................   Passed    0.38 sec
+test 5
+    Start 5: test_no_duplicate_frames
+
+5: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_no_duplicate_frames.xunit.xml" "--package-name" "savo_description" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/ament_cmake_pytest/test_no_duplicate_frames.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_description/test/test_no_duplicate_frames.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/ament_cmake_pytest/test_no_duplicate_frames/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_no_duplicate_frames.xunit.xml" "--junit-prefix=savo_description"
+5: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description
+5: Test timeout computed to be: 60
+5: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description':
+5:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_description/test/test_no_duplicate_frames.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/ament_cmake_pytest/test_no_duplicate_frames/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_no_duplicate_frames.xunit.xml --junit-prefix=savo_description
+5: ============================= test session starts ==============================
+5: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+5: cachedir: build/savo_description/ament_cmake_pytest/test_no_duplicate_frames/.cache
+5: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+5: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+5: collected 2 items
+5: 
+5: ../../src/shared/savo_description/test/test_no_duplicate_frames.py ..    [100%]
+5: 
+5: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_no_duplicate_frames.xunit.xml -
+5: ============================== 2 passed in 0.23s ===============================
+5: -- run_test.py: return code 0
+5: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_no_duplicate_frames.xunit.xml'
+5/8 Test #5: test_no_duplicate_frames .........   Passed    0.55 sec
+test 6
+    Start 6: test_install_contract
+
+6: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_install_contract.xunit.xml" "--package-name" "savo_description" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/ament_cmake_pytest/test_install_contract.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_description/test/test_install_contract.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/ament_cmake_pytest/test_install_contract/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_install_contract.xunit.xml" "--junit-prefix=savo_description"
+6: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description
+6: Test timeout computed to be: 60
+6: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description':
+6:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_description/test/test_install_contract.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/ament_cmake_pytest/test_install_contract/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_install_contract.xunit.xml --junit-prefix=savo_description
+6: ============================= test session starts ==============================
+6: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+6: cachedir: build/savo_description/ament_cmake_pytest/test_install_contract/.cache
+6: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+6: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+6: collected 2 items
+6: 
+6: ../../src/shared/savo_description/test/test_install_contract.py ..       [100%]
+6: 
+6: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_install_contract.xunit.xml -
+6: ============================== 2 passed in 0.01s ===============================
+6: -- run_test.py: return code 0
+6: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_install_contract.xunit.xml'
+6/8 Test #6: test_install_contract ............   Passed    0.33 sec
+test 7
+    Start 7: test_geometry_contract
+
+7: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_geometry_contract.xunit.xml" "--package-name" "savo_description" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/ament_cmake_pytest/test_geometry_contract.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_description/test/test_geometry_contract.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/ament_cmake_pytest/test_geometry_contract/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_geometry_contract.xunit.xml" "--junit-prefix=savo_description"
+7: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description
+7: Test timeout computed to be: 60
+7: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description':
+7:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_description/test/test_geometry_contract.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/ament_cmake_pytest/test_geometry_contract/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_geometry_contract.xunit.xml --junit-prefix=savo_description
+7: ============================= test session starts ==============================
+7: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+7: cachedir: build/savo_description/ament_cmake_pytest/test_geometry_contract/.cache
+7: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+7: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+7: collected 5 items
+7: 
+7: ../../src/shared/savo_description/test/test_geometry_contract.py .....   [100%]
+7: 
+7: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_geometry_contract.xunit.xml -
+7: ============================== 5 passed in 0.04s ===============================
+7: -- run_test.py: return code 0
+7: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_geometry_contract.xunit.xml'
+7/8 Test #7: test_geometry_contract ...........   Passed    0.37 sec
+test 8
+    Start 8: test_am0b_geometry_profile
+
+8: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_am0b_geometry_profile.xunit.xml" "--package-name" "savo_description" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/ament_cmake_pytest/test_am0b_geometry_profile.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_description/test/test_am0b_geometry_profile.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/ament_cmake_pytest/test_am0b_geometry_profile/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_am0b_geometry_profile.xunit.xml" "--junit-prefix=savo_description"
+8: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description
+8: Test timeout computed to be: 60
+8: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description':
+8:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_description/test/test_am0b_geometry_profile.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/ament_cmake_pytest/test_am0b_geometry_profile/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_am0b_geometry_profile.xunit.xml --junit-prefix=savo_description
+8: ============================= test session starts ==============================
+8: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+8: cachedir: build/savo_description/ament_cmake_pytest/test_am0b_geometry_profile/.cache
+8: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws
+8: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+8: collected 5 items
+8: 
+8: ../../src/shared/savo_description/test/test_am0b_geometry_profile.py ... [ 60%]
+8: ..                                                                       [100%]
+8: 
+8: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_am0b_geometry_profile.xunit.xml -
+8: ============================== 5 passed in 0.04s ===============================
+8: -- run_test.py: return code 0
+8: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_description/test_results/savo_description/test_am0b_geometry_profile.xunit.xml'
+8/8 Test #8: test_am0b_geometry_profile .......   Passed    0.36 sec
+
+100% tests passed, 0 tests failed out of 8
+
+Label Time Summary:
+pytest    =   3.24 sec*proc (8 tests)
+
+Total Test time (real) =   3.25 sec
+Finished <<< savo_description [3.27s]
+
+Summary: 1 package finished [3.42s]
+
+============================================================
+ COLCON TEST RESULT
+============================================================
+Summary: 27 tests, 0 errors, 0 failures, 0 skipped
+
+------------------------------------------------------------
+PACKAGE_RESULT: PASS
+COLCON_TEST_EXIT: 0
+TEST_RESULT_EXIT: 0
+------------------------------------------------------------

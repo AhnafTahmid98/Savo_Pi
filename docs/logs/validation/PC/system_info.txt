@@ -1,0 +1,42 @@
+Robot Savo PC validation — System information
+Run ID: 20260809T021142Z
+Date: 2026-08-09T05:11:42+03:00
+
+Hostname:
+ahnaf-tahmid-B760M-PG-SONIC-WiFi
+
+hostnamectl:
+ Static hostname: ahnaf-tahmid-B760M-PG-SONIC-WiFi
+       Icon name: computer-desktop
+         Chassis: desktop 🖥️
+      Machine ID: 2b8b5ae685af427e92e2f75074727f0b
+         Boot ID: 04dff7c069fd4ca18eb5b547bdea1f4e
+Operating System: Ubuntu 24.04.4 LTS
+          Kernel: Linux 7.0.0-28-generic
+    Architecture: x86-64
+ Hardware Vendor: ASRock
+  Hardware Model: B760M PG SONIC WiFi
+Firmware Version: 10.01
+   Firmware Date: Thu 2024-08-08
+    Firmware Age: 2y
+
+Kernel:
+Linux ahnaf-tahmid-B760M-PG-SONIC-WiFi 7.0.0-28-generic #28~24.04.1-Ubuntu SMP PREEMPT_DYNAMIC Wed Jul  1 15:50:57 UTC 2 x86_64 x86_64 x86_64 GNU/Linux
+
+OS:
+Distributor ID:	Ubuntu
+Description:	Ubuntu 24.04.4 LTS
+Release:	24.04
+Codename:	noble
+
+Architecture:
+x86_64
+
+Python:
+Python 3.12.3
+
+colcon:
+/usr/bin/colcon
+
+rosdep:
+/usr/bin/rosdep

@@ -1,0 +1,42 @@
+ROS 2 Jazzy environment                    PASS
+git diff --check                           PASS (exit 0)
+Full bringup source validation             PASS (exit 0)
+Observer source validation                 PASS (exit 0)
+Pre-real-test readiness                    PASS (exit 0)
+rosdep dependency check                    PASS (exit 0)
+PC full colcon build                       PASS (exit 0)
+PC full colcon test                        FAIL (exit 1)
+PC full colcon test-result                 FAIL (exit 1)
+Hardware-free pre-real-test regression     FAIL (exit 1)
+savo_base                                  PASS
+savo_bringup                               PASS
+savo_bridge                                PASS
+savo_control                               PASS
+savo_description                           PASS
+savo_head                                  PASS
+savo_lidar                                 PASS
+savo_localization                          PASS
+savo_locations                             PASS
+savo_mapping                               PASS
+savo_msgs                                  PASS
+savo_nav                                   PASS
+savo_observer                              PASS
+savo_perception                            PASS
+savo_power                                 PASS
+savo_realsense                             PASS
+savo_speech                                PASS
+savo_supervisor                            PASS
+savo_ui                                    PASS
+savo_vo                                    PASS
+
+============================================================
+ FINAL REPOSITORY STATUS
+============================================================
+
+?? docs/logs/
+
+Evidence directory:
+/home/ahnaf-tahmid/Savo_Pi/docs/logs/validation/PC
+
+Run ID:
+20260809T021142Z

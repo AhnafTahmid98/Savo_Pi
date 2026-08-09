@@ -1,0 +1,255 @@
+Robot Savo package PC validation
+Run ID: 20260809T021142Z
+Package: savo_perception
+Date: 2026-08-09T05:24:40+03:00
+Host: ahnaf-tahmid-B760M-PG-SONIC-WiFi
+Commit: eb71c26ac7dfbeaf9c2e44df3ba9f79117c7d4b6
+
+Starting >>> savo_perception
+UpdateCTestConfiguration  from :/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/CTestConfiguration.ini
+Parse Config file:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/CTestConfiguration.ini
+   Site: ahnaf-tahmid-B760M-PG-SONIC-WiFi
+   Build name: (empty)
+ Add coverage exclude regular expressions.
+Create new tag: 20260809-0224 - Experimental
+UpdateCTestConfiguration  from :/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/CTestConfiguration.ini
+Parse Config file:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/CTestConfiguration.ini
+Test project /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception
+Constructing a list of tests
+Done constructing a list of tests
+Updating test list for fixtures
+Added 0 tests to meet fixture requirements
+Checking test dependency graph...
+Checking test dependency graph end
+test 1
+    Start 1: test_obstacle_cloud_filter
+
+1: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/test_results/savo_perception/test_obstacle_cloud_filter.gtest.xml" "--package-name" "savo_perception" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/ament_cmake_gtest/test_obstacle_cloud_filter.txt" "--command" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/test_obstacle_cloud_filter" "--gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/test_results/savo_perception/test_obstacle_cloud_filter.gtest.xml"
+1: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception
+1: Test timeout computed to be: 60
+1: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception':
+1:  - /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/test_obstacle_cloud_filter --gtest_output=xml:/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/test_results/savo_perception/test_obstacle_cloud_filter.gtest.xml
+1: Running main() from /opt/ros/jazzy/src/gtest_vendor/src/gtest_main.cc
+1: [==========] Running 24 tests from 2 test suites.
+1: [----------] Global test environment set-up.
+1: [----------] 8 tests from ObstacleCloudFilterConfigTest
+1: [ RUN      ] ObstacleCloudFilterConfigTest.ValidConfigPasses
+1: [       OK ] ObstacleCloudFilterConfigTest.ValidConfigPasses (0 ms)
+1: [ RUN      ] ObstacleCloudFilterConfigTest.NonFiniteConfigIsRejected
+1: [       OK ] ObstacleCloudFilterConfigTest.NonFiniteConfigIsRejected (0 ms)
+1: [ RUN      ] ObstacleCloudFilterConfigTest.NegativeMinimumRangeIsRejected
+1: [       OK ] ObstacleCloudFilterConfigTest.NegativeMinimumRangeIsRejected (0 ms)
+1: [ RUN      ] ObstacleCloudFilterConfigTest.ReversedRangeLimitsAreRejected
+1: [       OK ] ObstacleCloudFilterConfigTest.ReversedRangeLimitsAreRejected (0 ms)
+1: [ RUN      ] ObstacleCloudFilterConfigTest.ReversedHeightLimitsAreRejected
+1: [       OK ] ObstacleCloudFilterConfigTest.ReversedHeightLimitsAreRejected (0 ms)
+1: [ RUN      ] ObstacleCloudFilterConfigTest.InvalidVoxelSizeIsRejected
+1: [       OK ] ObstacleCloudFilterConfigTest.InvalidVoxelSizeIsRejected (0 ms)
+1: [ RUN      ] ObstacleCloudFilterConfigTest.InvalidSelfFilterBoundsAreRejected
+1: [       OK ] ObstacleCloudFilterConfigTest.InvalidSelfFilterBoundsAreRejected (0 ms)
+1: [ RUN      ] ObstacleCloudFilterConfigTest.ZeroMaximumOutputIsRejected
+1: [       OK ] ObstacleCloudFilterConfigTest.ZeroMaximumOutputIsRejected (0 ms)
+1: [----------] 8 tests from ObstacleCloudFilterConfigTest (0 ms total)
+1: 
+1: [----------] 16 tests from ObstacleCloudFilterPointTest
+1: [ RUN      ] ObstacleCloudFilterPointTest.NanPointIsRejected
+1: [       OK ] ObstacleCloudFilterPointTest.NanPointIsRejected (0 ms)
+1: [ RUN      ] ObstacleCloudFilterPointTest.PositiveInfinityPointIsRejected
+1: [       OK ] ObstacleCloudFilterPointTest.PositiveInfinityPointIsRejected (0 ms)
+1: [ RUN      ] ObstacleCloudFilterPointTest.NegativeInfinityPointIsRejected
+1: [       OK ] ObstacleCloudFilterPointTest.NegativeInfinityPointIsRejected (0 ms)
+1: [ RUN      ] ObstacleCloudFilterPointTest.PointBelowMinimumRangeIsRejected
+1: [       OK ] ObstacleCloudFilterPointTest.PointBelowMinimumRangeIsRejected (0 ms)
+1: [ RUN      ] ObstacleCloudFilterPointTest.PointAboveMaximumRangeIsRejected
+1: [       OK ] ObstacleCloudFilterPointTest.PointAboveMaximumRangeIsRejected (0 ms)
+1: [ RUN      ] ObstacleCloudFilterPointTest.FloorPointIsRejected
+1: [       OK ] ObstacleCloudFilterPointTest.FloorPointIsRejected (0 ms)
+1: [ RUN      ] ObstacleCloudFilterPointTest.OverHeightPointIsRejected
+1: [       OK ] ObstacleCloudFilterPointTest.OverHeightPointIsRejected (0 ms)
+1: [ RUN      ] ObstacleCloudFilterPointTest.RobotSelfVolumePointIsRejected
+1: [       OK ] ObstacleCloudFilterPointTest.RobotSelfVolumePointIsRejected (0 ms)
+1: [ RUN      ] ObstacleCloudFilterPointTest.ValidObstacleIsRetained
+1: [       OK ] ObstacleCloudFilterPointTest.ValidObstacleIsRetained (0 ms)
+1: [ RUN      ] ObstacleCloudFilterPointTest.SameVoxelDuplicateIsRejected
+1: [       OK ] ObstacleCloudFilterPointTest.SameVoxelDuplicateIsRejected (0 ms)
+1: [ RUN      ] ObstacleCloudFilterPointTest.SeparateVoxelPointsAreRetained
+1: [       OK ] ObstacleCloudFilterPointTest.SeparateVoxelPointsAreRetained (0 ms)
+1: [ RUN      ] ObstacleCloudFilterPointTest.FirstPointInVoxelIsRetained
+1: [       OK ] ObstacleCloudFilterPointTest.FirstPointInVoxelIsRetained (0 ms)
+1: [ RUN      ] ObstacleCloudFilterPointTest.MaximumOutputLimitIsEnforced
+1: [       OK ] ObstacleCloudFilterPointTest.MaximumOutputLimitIsEnforced (0 ms)
+1: [ RUN      ] ObstacleCloudFilterPointTest.StatisticsCountsAreCorrect
+1: [       OK ] ObstacleCloudFilterPointTest.StatisticsCountsAreCorrect (0 ms)
+1: [ RUN      ] ObstacleCloudFilterPointTest.EmptyInputProducesEmptyOutput
+1: [       OK ] ObstacleCloudFilterPointTest.EmptyInputProducesEmptyOutput (0 ms)
+1: [ RUN      ] ObstacleCloudFilterPointTest.DisabledSelfFilterRetainsPoint
+1: [       OK ] ObstacleCloudFilterPointTest.DisabledSelfFilterRetainsPoint (0 ms)
+1: [----------] 16 tests from ObstacleCloudFilterPointTest (0 ms total)
+1: 
+1: [----------] Global test environment tear-down
+1: [==========] 24 tests from 2 test suites ran. (0 ms total)
+1: [  PASSED  ] 24 tests.
+1: -- run_test.py: return code 0
+1: -- run_test.py: inject classname prefix into gtest result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/test_results/savo_perception/test_obstacle_cloud_filter.gtest.xml'
+1: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/test_results/savo_perception/test_obstacle_cloud_filter.gtest.xml'
+1/6 Test #1: test_obstacle_cloud_filter ..............   Passed    0.05 sec
+test 2
+    Start 2: test_phase8a_obstacle_cloud_contracts
+
+2: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/test_results/savo_perception/test_phase8a_obstacle_cloud_contracts.xunit.xml" "--package-name" "savo_perception" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/ament_cmake_pytest/test_phase8a_obstacle_cloud_contracts.txt" "--command" "/usr/bin/python3" "-u" "-m" "pytest" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_perception/test/contracts/test_phase8a_obstacle_cloud_contracts.py" "-o" "cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/ament_cmake_pytest/test_phase8a_obstacle_cloud_contracts/.cache" "--junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/test_results/savo_perception/test_phase8a_obstacle_cloud_contracts.xunit.xml" "--junit-prefix=savo_perception"
+2: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception
+2: Test timeout computed to be: 60
+2: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception':
+2:  - /usr/bin/python3 -u -m pytest /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_perception/test/contracts/test_phase8a_obstacle_cloud_contracts.py -o cache_dir=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/ament_cmake_pytest/test_phase8a_obstacle_cloud_contracts/.cache --junit-xml=/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/test_results/savo_perception/test_phase8a_obstacle_cloud_contracts.xunit.xml --junit-prefix=savo_perception
+2: ============================= test session starts ==============================
+2: platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+2: cachedir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/ament_cmake_pytest/test_phase8a_obstacle_cloud_contracts/.cache
+2: rootdir: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_perception
+2: plugins: ament-pep257-0.17.5, ament-flake8-0.17.5, launch-testing-ros-0.26.12, ament-lint-0.17.5, ament-xmllint-0.17.5, launch-testing-3.4.11, ament-copyright-0.17.5, typeguard-4.1.5, cov-4.1.0, colcon-core-0.21.0
+2: collected 8 items
+2: 
+2: ../../src/shared/savo_perception/test/contracts/test_phase8a_obstacle_cloud_contracts.py . [ 12%]
+2: .......                                                                  [100%]
+2: 
+2: - generated xml file: /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/test_results/savo_perception/test_phase8a_obstacle_cloud_contracts.xunit.xml -
+2: ============================== 8 passed in 0.02s ===============================
+2: -- run_test.py: return code 0
+2: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/test_results/savo_perception/test_phase8a_obstacle_cloud_contracts.xunit.xml'
+2/6 Test #2: test_phase8a_obstacle_cloud_contracts ...   Passed    0.33 sec
+test 3
+    Start 3: flake8
+
+3: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/test_results/savo_perception/flake8.xunit.xml" "--package-name" "savo_perception" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/ament_flake8/flake8.txt" "--command" "/opt/ros/jazzy/bin/ament_flake8" "--xunit-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/test_results/savo_perception/flake8.xunit.xml" "--config" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_perception/setup.cfg"
+3: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_perception
+3: Test timeout computed to be: 60
+3: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_perception':
+3:  - /opt/ros/jazzy/bin/ament_flake8 --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/test_results/savo_perception/flake8.xunit.xml --config /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_perception/setup.cfg
+3: 
+3: 54 files checked
+3: No problems found
+3: 
+3: Checked files:
+3: 
+3: * ./setup.py
+3: * ./test/contracts/test_phase8a_obstacle_cloud_contracts.py
+3: * ./test/fixtures/obstacle_cloud_filter_hardware_fixture.py
+3: * ./test/fixtures/obstacle_cloud_filter_fixture.py
+3: * ./scripts/ultrasonic_sample_cli.py
+3: * ./scripts/tof_mux_scan_cli.py
+3: * ./scripts/perception_smoke_test_cli.py
+3: * ./scripts/dump_effective_params.py
+3: * ./scripts/range_echo_cli.py
+3: * ./scripts/safety_inject_cli.py
+3: * ./tools/dev/import_vl53l1x_uld.py
+3: * ./savo_perception/constants.py
+3: * ./savo_perception/__init__.py
+3: * ./savo_perception/version.py
+3: * ./savo_perception/nodes/ultrasonic_node_py.py
+3: * ./savo_perception/nodes/vl53_mux_node_py.py
+3: * ./savo_perception/nodes/safety_stop_node_py.py
+3: * ./savo_perception/nodes/sensor_dashboard_node.py
+3: * ./savo_perception/nodes/__init__.py
+3: * ./savo_perception/nodes/range_health_node_py.py
+3: * ./savo_perception/diagnostics/report_formatter.py
+3: * ./savo_perception/diagnostics/ultrasonic_check.py
+3: * ./savo_perception/diagnostics/safety_fusion_check.py
+3: * ./savo_perception/diagnostics/tof_mux_check.py
+3: * ./savo_perception/diagnostics/__init__.py
+3: * ./savo_perception/diagnostics/range_health_check.py
+3: * ./savo_perception/safety/range_fusion.py
+3: * ./savo_perception/safety/safety_state.py
+3: * ./savo_perception/safety/safety_policy.py
+3: * ./savo_perception/safety/__init__.py
+3: * ./savo_perception/models/sensor_health.py
+3: * ./savo_perception/models/range_sample.py
+3: * ./savo_perception/models/safety_state.py
+3: * ./savo_perception/models/__init__.py
+3: * ./savo_perception/ros/adapters.py
+3: * ./savo_perception/ros/qos_profiles.py
+3: * ./savo_perception/ros/topic_contract.py
+3: * ./savo_perception/ros/params.py
+3: * ./savo_perception/ros/__init__.py
+3: * ./savo_perception/utils/topic_names.py
+3: * ./savo_perception/utils/param_loader.py
+3: * ./savo_perception/utils/ratekeeper.py
+3: * ./savo_perception/utils/__init__.py
+3: * ./savo_perception/utils/timing.py
+3: * ./savo_perception/utils/diagnostics.py
+3: * ./savo_perception/utils/qos.py
+3: * ./savo_perception/utils/clamp.py
+3: * ./savo_perception/drivers/vl53_mux_driver.py
+3: * ./savo_perception/drivers/ultrasonic_driver.py
+3: * ./savo_perception/drivers/__init__.py
+3: * ./launch/obstacle_cloud_filter.launch.py
+3: * ./launch/range_sensors.launch.py
+3: * ./launch/safety_bringup.launch.py
+3: * ./launch/perception_bringup.launch.py
+3: -- run_test.py: return code 0
+3: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/test_results/savo_perception/flake8.xunit.xml'
+3/6 Test #3: flake8 ..................................   Passed    0.68 sec
+test 4
+    Start 4: cppcheck
+
+4: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/test_results/savo_perception/cppcheck.xunit.xml" "--package-name" "savo_perception" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/ament_cppcheck/cppcheck.txt" "--command" "/opt/ros/jazzy/bin/ament_cppcheck" "--xunit-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/test_results/savo_perception/cppcheck.xunit.xml" "--include_dirs" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_perception/include" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_perception/include" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_perception/third_party/vl53l1x_uld/include" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_perception/third_party/vl53l1x_uld/platform"
+4: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_perception
+4: Test timeout computed to be: 300
+4: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_perception':
+4:  - /opt/ros/jazzy/bin/ament_cppcheck --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/test_results/savo_perception/cppcheck.xunit.xml --include_dirs /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_perception/include /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_perception/include /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_perception/third_party/vl53l1x_uld/include /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_perception/third_party/vl53l1x_uld/platform
+4: cppcheck 2.13.0 has known performance issues and therefore will not be used, set the AMENT_CPPCHECK_ALLOW_SLOW_VERSIONS environment variable to override this.
+4: -- run_test.py: return code 0
+4: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/test_results/savo_perception/cppcheck.xunit.xml'
+4/6 Test #4: cppcheck ................................   Passed    0.12 sec
+test 5
+    Start 5: lint_cmake
+
+5: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/test_results/savo_perception/lint_cmake.xunit.xml" "--package-name" "savo_perception" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/ament_lint_cmake/lint_cmake.txt" "--command" "/opt/ros/jazzy/bin/ament_lint_cmake" "--xunit-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/test_results/savo_perception/lint_cmake.xunit.xml"
+5: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_perception
+5: Test timeout computed to be: 60
+5: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_perception':
+5:  - /opt/ros/jazzy/bin/ament_lint_cmake --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/test_results/savo_perception/lint_cmake.xunit.xml
+5: 
+5: No problems found
+5: -- run_test.py: return code 0
+5: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/test_results/savo_perception/lint_cmake.xunit.xml'
+5/6 Test #5: lint_cmake ..............................   Passed    0.11 sec
+test 6
+    Start 6: xmllint
+
+6: Test command: /usr/bin/python3 "-u" "/opt/ros/jazzy/share/ament_cmake_test/cmake/run_test.py" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/test_results/savo_perception/xmllint.xunit.xml" "--package-name" "savo_perception" "--output-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/ament_xmllint/xmllint.txt" "--command" "/opt/ros/jazzy/bin/ament_xmllint" "--xunit-file" "/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/test_results/savo_perception/xmllint.xunit.xml"
+6: Working Directory: /home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_perception
+6: Test timeout computed to be: 60
+6: -- run_test.py: invoking following command in '/home/ahnaf-tahmid/Savo_Pi/savo_ws/src/shared/savo_perception':
+6:  - /opt/ros/jazzy/bin/ament_xmllint --xunit-file /home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/test_results/savo_perception/xmllint.xunit.xml
+6: File 'package.xml' is valid
+6: 
+6: No problems found
+6: -- run_test.py: return code 0
+6: -- run_test.py: verify result file '/home/ahnaf-tahmid/Savo_Pi/savo_ws/build/savo_perception/test_results/savo_perception/xmllint.xunit.xml'
+6/6 Test #6: xmllint .................................   Passed    0.12 sec
+
+100% tests passed, 0 tests failed out of 6
+
+Label Time Summary:
+cppcheck      =   0.12 sec*proc (1 test)
+flake8        =   0.68 sec*proc (1 test)
+gtest         =   0.05 sec*proc (1 test)
+lint_cmake    =   0.11 sec*proc (1 test)
+linter        =   1.03 sec*proc (4 tests)
+pytest        =   0.33 sec*proc (1 test)
+xmllint       =   0.12 sec*proc (1 test)
+
+Total Test time (real) =   1.41 sec
+Finished <<< savo_perception [1.44s]
+
+Summary: 1 package finished [1.57s]
+
+============================================================
+ COLCON TEST RESULT
+============================================================
+Summary: 87 tests, 0 errors, 0 failures, 46 skipped
+
+------------------------------------------------------------
+PACKAGE_RESULT: PASS
+COLCON_TEST_EXIT: 0
+TEST_RESULT_EXIT: 0
+------------------------------------------------------------
