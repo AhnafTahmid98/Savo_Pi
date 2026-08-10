@@ -44,8 +44,13 @@ bool UtteranceSessionConfig::is_valid() const noexcept
       speech_start_timeout,
       std::chrono::milliseconds{60000}) &&
     valid_duration(
+      minimum_speech_duration,
+      std::chrono::milliseconds{300000}) &&
+    valid_duration(
       maximum_utterance_duration,
       std::chrono::milliseconds{300000}) &&
+    minimum_speech_duration <=
+    maximum_utterance_duration &&
     completed_queue_capacity >= 1U &&
     completed_queue_capacity <= 1024U;
 }
@@ -752,6 +757,25 @@ bool UtteranceSessionCore::finalize_locked(
     reason ==
     UtteranceCompletionReason::SpeechEnded)
   {
+    if (
+      active_speech_start_.has_value() &&
+      active_wake_event_.has_value())
+    {
+      const auto speech_duration =
+        completed_at -
+        active_speech_start_->occurred_at;
+
+      if (
+        speech_duration <
+        config_.minimum_speech_duration)
+      {
+        reject_short_utterance_locked(
+          speech_end_frame_sequence);
+
+        return false;
+      }
+    }
+
     trim_active_after_sequence_locked(
       speech_end_frame_sequence);
   }
@@ -871,6 +895,43 @@ bool UtteranceSessionCore::finalize_locked(
     UtteranceSessionState::AwaitingResponse;
 
   return true;
+}
+
+void UtteranceSessionCore::reject_short_utterance_locked(
+  const std::uint64_t speech_end_frame_sequence)
+{
+  ++statistics_.short_speech_rejections;
+
+  // The rejected segment is noise, not a user turn. Remove all
+  // audio associated with it so it cannot contaminate a later
+  // genuine command within the same listening window.
+  if (pre_roll_buffer_) {
+    pre_roll_buffer_->clear();
+  }
+
+  pre_roll_spans_.clear();
+
+  clear_active_utterance_locked();
+
+  // Keep active_wake_event_ and listening_started_at_ unchanged.
+  // In particular, do not grant another full listening timeout
+  // after a rejected noise segment.
+  const std::uint64_t boundary_sequence =
+    std::max(
+    speech_end_frame_sequence,
+    last_audio_sequence_.value_or(
+      speech_end_frame_sequence));
+
+  listening_boundary_sequence_ =
+    boundary_sequence;
+
+  state_ =
+    UtteranceSessionState::Armed;
+
+  last_cancellation_reason_ =
+    UtteranceCancellationReason::None;
+
+  last_error_.clear();
 }
 
 bool UtteranceSessionCore::check_timeouts_locked(

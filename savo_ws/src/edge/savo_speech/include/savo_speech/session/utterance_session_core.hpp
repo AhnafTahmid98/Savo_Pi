@@ -30,6 +30,7 @@ struct UtteranceSessionConfig
 {
   std::chrono::milliseconds pre_roll_duration{1000};
   std::chrono::milliseconds speech_start_timeout{3000};
+  std::chrono::milliseconds minimum_speech_duration{300};
   std::chrono::milliseconds maximum_utterance_duration{15000};
 
   std::size_t completed_queue_capacity{4U};
@@ -66,6 +67,7 @@ struct UtteranceSessionStatistics
   std::uint64_t utterances_completed{0U};
   std::uint64_t speech_ended_completions{0U};
   std::uint64_t maximum_duration_completions{0U};
+  std::uint64_t short_speech_rejections{0U};
 
   std::uint64_t sessions_canceled{0U};
   std::uint64_t speech_start_timeouts{0U};
@@ -194,6 +196,9 @@ private:
   [[nodiscard]] bool finalize_locked(
     UtteranceCompletionReason reason,
     Clock::time_point completed_at,
+    std::uint64_t speech_end_frame_sequence);
+
+  void reject_short_utterance_locked(
     std::uint64_t speech_end_frame_sequence);
 
   [[nodiscard]] bool check_timeouts_locked(

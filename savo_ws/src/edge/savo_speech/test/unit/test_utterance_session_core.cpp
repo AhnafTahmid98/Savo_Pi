@@ -114,6 +114,7 @@ make_config()
 
   config.pre_roll_duration = 1ms;
   config.speech_start_timeout = 100ms;
+  config.minimum_speech_duration = 1ms;
   config.maximum_utterance_duration = 100ms;
 
   config.completed_queue_capacity = 2U;
@@ -165,7 +166,7 @@ void complete_initial_utterance(
         vad_end_id,
         segment_id,
         wake_sequence + 1U,
-        base_time + 20,
+        base_time + 21,
         savo_speech::vad::VadEventType::
         SpeechEnded)));
 
@@ -216,7 +217,7 @@ void complete_follow_up_utterance(
         vad_end_id,
         segment_id,
         frame_sequence,
-        follow_up_started_at + 20,
+        follow_up_started_at + 21,
         savo_speech::vad::VadEventType::
         SpeechEnded)));
 
@@ -238,6 +239,27 @@ TEST(UtteranceSessionCore, RejectsInvalidConfiguration)
 
   config = make_config();
   config.speech_start_timeout = 0ms;
+
+  EXPECT_THROW(
+    static_cast<void>(Core{config}),
+    std::invalid_argument);
+
+  config = make_config();
+  config.minimum_speech_duration = 0ms;
+
+  EXPECT_THROW(
+    static_cast<void>(Core{config}),
+    std::invalid_argument);
+
+  config = make_config();
+  config.minimum_speech_duration = -1ms;
+
+  EXPECT_THROW(
+    static_cast<void>(Core{config}),
+    std::invalid_argument);
+
+  config = make_config();
+  config.minimum_speech_duration = 101ms;
 
   EXPECT_THROW(
     static_cast<void>(Core{config}),
@@ -702,7 +724,7 @@ TEST(
         4U,
         2U,
         4U,
-        1020,
+        1021,
         savo_speech::vad::VadEventType::
         SpeechEnded)));
 
@@ -759,6 +781,426 @@ TEST(
   EXPECT_EQ(
     core.snapshot().state,
     State::Armed);
+}
+
+TEST(
+  UtteranceSessionCore,
+  RejectsShortSpeechAfterInitialWake)
+{
+  auto config = make_config();
+  config.minimum_speech_duration = 30ms;
+
+  Core core{config};
+
+  core.process_audio_frame(
+    make_frame(1U, 100, 0));
+
+  ASSERT_TRUE(
+    core.handle_wake_word_event(
+      make_wake(1U, 1U, 0)));
+
+  core.process_audio_frame(
+    make_frame(2U, 200, 20));
+
+  ASSERT_TRUE(
+    core.handle_vad_event(
+      make_vad(
+        1U,
+        1U,
+        2U,
+        20,
+        savo_speech::vad::VadEventType::
+        SpeechStarted)));
+
+  core.process_audio_frame(
+    make_frame(3U, 300, 40));
+
+  ASSERT_TRUE(
+    core.handle_vad_event(
+      make_vad(
+        2U,
+        1U,
+        3U,
+        40,
+        savo_speech::vad::VadEventType::
+        SpeechEnded)));
+
+  const auto snapshot = core.snapshot();
+
+  EXPECT_EQ(snapshot.state, State::Armed);
+
+  EXPECT_EQ(
+    snapshot.statistics.short_speech_rejections,
+    1U);
+
+  EXPECT_EQ(
+    snapshot.active_wake_phrase,
+    "hey savo");
+
+  EXPECT_EQ(snapshot.active_audio_samples, 0U);
+  EXPECT_EQ(snapshot.pre_roll_samples, 0U);
+
+  EXPECT_FALSE(
+    core.try_pop_completed().has_value());
+}
+
+TEST(
+  UtteranceSessionCore,
+  ShortSpeechDoesNotResetInitialListeningDeadline)
+{
+  auto config = make_config();
+  config.minimum_speech_duration = 30ms;
+
+  Core core{config};
+
+  core.process_audio_frame(
+    make_frame(1U, 100, 0));
+
+  ASSERT_TRUE(
+    core.handle_wake_word_event(
+      make_wake(1U, 1U, 0)));
+
+  core.process_audio_frame(
+    make_frame(2U, 200, 20));
+
+  ASSERT_TRUE(
+    core.handle_vad_event(
+      make_vad(
+        1U,
+        1U,
+        2U,
+        20,
+        savo_speech::vad::VadEventType::
+        SpeechStarted)));
+
+  core.process_audio_frame(
+    make_frame(3U, 300, 40));
+
+  ASSERT_TRUE(
+    core.handle_vad_event(
+      make_vad(
+        2U,
+        1U,
+        3U,
+        40,
+        savo_speech::vad::VadEventType::
+        SpeechEnded)));
+
+  ASSERT_EQ(
+    core.snapshot().state,
+    State::Armed);
+
+  core.advance_time(time_at(99));
+
+  EXPECT_EQ(
+    core.snapshot().state,
+    State::Armed);
+
+  core.advance_time(time_at(100));
+
+  const auto snapshot = core.snapshot();
+
+  EXPECT_EQ(snapshot.state, State::Idle);
+
+  EXPECT_EQ(
+    snapshot.last_cancellation_reason,
+    CancellationReason::SpeechStartTimeout);
+
+  EXPECT_EQ(
+    snapshot.statistics.short_speech_rejections,
+    1U);
+}
+
+TEST(
+  UtteranceSessionCore,
+  ShortSpeechDoesNotResetFollowUpDeadline)
+{
+  auto config = make_config();
+  config.minimum_speech_duration = 30ms;
+
+  Core core{config};
+
+  // Valid initial user turn: 40 ms >= 30 ms.
+  core.process_audio_frame(
+    make_frame(1U, 100, 0));
+
+  ASSERT_TRUE(
+    core.handle_wake_word_event(
+      make_wake(1U, 1U, 0)));
+
+  core.process_audio_frame(
+    make_frame(2U, 200, 20));
+
+  ASSERT_TRUE(
+    core.handle_vad_event(
+      make_vad(
+        1U,
+        1U,
+        2U,
+        20,
+        savo_speech::vad::VadEventType::
+        SpeechStarted)));
+
+  core.process_audio_frame(
+    make_frame(3U, 300, 60));
+
+  ASSERT_TRUE(
+    core.handle_vad_event(
+      make_vad(
+        2U,
+        1U,
+        3U,
+        60,
+        savo_speech::vad::VadEventType::
+        SpeechEnded)));
+
+  ASSERT_TRUE(
+    core.try_pop_completed().has_value());
+
+  ASSERT_TRUE(
+    core.begin_follow_up(
+      time_at(1000)));
+
+  // False follow-up burst: only 10 ms.
+  core.process_audio_frame(
+    make_frame(4U, 400, 1010));
+
+  ASSERT_TRUE(
+    core.handle_vad_event(
+      make_vad(
+        3U,
+        2U,
+        4U,
+        1010,
+        savo_speech::vad::VadEventType::
+        SpeechStarted)));
+
+  core.process_audio_frame(
+    make_frame(5U, 500, 1020));
+
+  ASSERT_TRUE(
+    core.handle_vad_event(
+      make_vad(
+        4U,
+        2U,
+        5U,
+        1020,
+        savo_speech::vad::VadEventType::
+        SpeechEnded)));
+
+  ASSERT_EQ(
+    core.snapshot().state,
+    State::Armed);
+
+  EXPECT_FALSE(
+    core.try_pop_completed().has_value());
+
+  core.advance_time(time_at(1099));
+
+  EXPECT_EQ(
+    core.snapshot().state,
+    State::Armed);
+
+  core.advance_time(time_at(1100));
+
+  const auto snapshot = core.snapshot();
+
+  EXPECT_EQ(snapshot.state, State::Idle);
+
+  EXPECT_EQ(
+    snapshot.statistics.short_speech_rejections,
+    1U);
+
+  EXPECT_EQ(
+    snapshot.last_cancellation_reason,
+    CancellationReason::SpeechStartTimeout);
+}
+
+TEST(
+  UtteranceSessionCore,
+  ValidSpeechAfterRejectedFollowUpNoiseStillCompletes)
+{
+  auto config = make_config();
+  config.minimum_speech_duration = 30ms;
+
+  Core core{config};
+
+  // Valid initial turn.
+  core.process_audio_frame(
+    make_frame(1U, 100, 0));
+
+  ASSERT_TRUE(
+    core.handle_wake_word_event(
+      make_wake(1U, 1U, 0)));
+
+  core.process_audio_frame(
+    make_frame(2U, 200, 20));
+
+  ASSERT_TRUE(
+    core.handle_vad_event(
+      make_vad(
+        1U,
+        1U,
+        2U,
+        20,
+        savo_speech::vad::VadEventType::
+        SpeechStarted)));
+
+  core.process_audio_frame(
+    make_frame(3U, 300, 60));
+
+  ASSERT_TRUE(
+    core.handle_vad_event(
+      make_vad(
+        2U,
+        1U,
+        3U,
+        60,
+        savo_speech::vad::VadEventType::
+        SpeechEnded)));
+
+  const auto initial =
+    core.try_pop_completed();
+
+  ASSERT_TRUE(initial.has_value());
+
+  ASSERT_TRUE(
+    core.begin_follow_up(
+      time_at(1000)));
+
+  // Rejected 10 ms noise segment.
+  core.process_audio_frame(
+    make_frame(4U, 400, 1010));
+
+  ASSERT_TRUE(
+    core.handle_vad_event(
+      make_vad(
+        3U,
+        2U,
+        4U,
+        1010,
+        savo_speech::vad::VadEventType::
+        SpeechStarted)));
+
+  core.process_audio_frame(
+    make_frame(5U, 500, 1020));
+
+  ASSERT_TRUE(
+    core.handle_vad_event(
+      make_vad(
+        4U,
+        2U,
+        5U,
+        1020,
+        savo_speech::vad::VadEventType::
+        SpeechEnded)));
+
+  ASSERT_EQ(
+    core.snapshot().state,
+    State::Armed);
+
+  // Genuine follow-up within the original 100 ms window.
+  core.process_audio_frame(
+    make_frame(6U, 600, 1040));
+
+  ASSERT_TRUE(
+    core.handle_vad_event(
+      make_vad(
+        5U,
+        3U,
+        6U,
+        1040,
+        savo_speech::vad::VadEventType::
+        SpeechStarted)));
+
+  core.process_audio_frame(
+    make_frame(7U, 700, 1080));
+
+  ASSERT_TRUE(
+    core.handle_vad_event(
+      make_vad(
+        6U,
+        3U,
+        7U,
+        1080,
+        savo_speech::vad::VadEventType::
+        SpeechEnded)));
+
+  const auto follow_up =
+    core.try_pop_completed();
+
+  ASSERT_TRUE(follow_up.has_value());
+
+  EXPECT_FALSE(
+    core.try_pop_completed().has_value());
+
+  EXPECT_EQ(
+    follow_up->wake_event_id,
+    initial->wake_event_id);
+
+  EXPECT_EQ(
+    core.snapshot().statistics.short_speech_rejections,
+    1U);
+
+  EXPECT_EQ(
+    core.snapshot().state,
+    State::AwaitingResponse);
+}
+
+TEST(
+  UtteranceSessionCore,
+  SpeechAtMinimumDurationIsAccepted)
+{
+  auto config = make_config();
+  config.minimum_speech_duration = 30ms;
+
+  Core core{config};
+
+  core.process_audio_frame(
+    make_frame(1U, 100, 0));
+
+  ASSERT_TRUE(
+    core.handle_wake_word_event(
+      make_wake(1U, 1U, 0)));
+
+  core.process_audio_frame(
+    make_frame(2U, 200, 20));
+
+  ASSERT_TRUE(
+    core.handle_vad_event(
+      make_vad(
+        1U,
+        1U,
+        2U,
+        20,
+        savo_speech::vad::VadEventType::
+        SpeechStarted)));
+
+  core.process_audio_frame(
+    make_frame(3U, 300, 50));
+
+  ASSERT_TRUE(
+    core.handle_vad_event(
+      make_vad(
+        2U,
+        1U,
+        3U,
+        50,
+        savo_speech::vad::VadEventType::
+        SpeechEnded)));
+
+  EXPECT_TRUE(
+    core.try_pop_completed().has_value());
+
+  const auto snapshot = core.snapshot();
+
+  EXPECT_EQ(
+    snapshot.statistics.short_speech_rejections,
+    0U);
+
+  EXPECT_EQ(
+    snapshot.state,
+    State::AwaitingResponse);
 }
 
 TEST(UtteranceSessionCore, AssignsStableUtteranceIds)

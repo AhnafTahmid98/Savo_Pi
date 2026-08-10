@@ -109,6 +109,7 @@ savo_speech_node:
       # on Raspberry Pi 5 using the ReSpeaker microphone array.
       pre_roll_ms: 1000
       speech_start_timeout_ms: 10000
+      minimum_speech_duration_ms: 300
       maximum_duration_ms: 15000
 
       completed_queue_capacity: 4

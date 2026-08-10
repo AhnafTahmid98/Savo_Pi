@@ -136,6 +136,9 @@ private:
       utterance_session_speech_start_timeout_ms{3000};
 
     std::int64_t
+      utterance_session_minimum_speech_duration_ms{300};
+
+    std::int64_t
       utterance_session_maximum_duration_ms{15000};
 
     std::int64_t

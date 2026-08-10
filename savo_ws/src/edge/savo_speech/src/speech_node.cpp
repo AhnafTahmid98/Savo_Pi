@@ -526,6 +526,10 @@ void SpeechNode::declare_parameters()
     3000);
 
   declare_parameter<std::int64_t>(
+    "utterance_session.minimum_speech_duration_ms",
+    300);
+
+  declare_parameter<std::int64_t>(
     "utterance_session.maximum_duration_ms",
     15000);
 
@@ -781,6 +785,10 @@ void SpeechNode::load_parameters()
   config_.utterance_session_speech_start_timeout_ms =
     get_parameter(
     "utterance_session.speech_start_timeout_ms").as_int();
+
+  config_.utterance_session_minimum_speech_duration_ms =
+    get_parameter(
+    "utterance_session.minimum_speech_duration_ms").as_int();
 
   config_.utterance_session_maximum_duration_ms =
     get_parameter(
@@ -1169,10 +1177,25 @@ void SpeechNode::validate_parameters() const
       "utterance_session.speech_start_timeout_ms");
 
     validate_integer_range(
+      config_.utterance_session_minimum_speech_duration_ms,
+      1,
+      300000,
+      "utterance_session.minimum_speech_duration_ms");
+
+    validate_integer_range(
       config_.utterance_session_maximum_duration_ms,
       1,
       300000,
       "utterance_session.maximum_duration_ms");
+
+    if (
+      config_.utterance_session_minimum_speech_duration_ms >
+      config_.utterance_session_maximum_duration_ms)
+    {
+      throw std::invalid_argument{
+              "utterance_session.minimum_speech_duration_ms "
+              "must not exceed maximum_duration_ms"};
+    }
 
     validate_integer_range(
       config_.utterance_session_completed_queue_capacity,
@@ -1189,6 +1212,10 @@ void SpeechNode::validate_parameters() const
     session_config.speech_start_timeout =
       std::chrono::milliseconds{
       config_.utterance_session_speech_start_timeout_ms};
+
+    session_config.minimum_speech_duration =
+      std::chrono::milliseconds{
+      config_.utterance_session_minimum_speech_duration_ms};
 
     session_config.maximum_utterance_duration =
       std::chrono::milliseconds{
@@ -1695,6 +1722,11 @@ void SpeechNode::initialize_audio_runtime()
           std::chrono::milliseconds{
           config_.
           utterance_session_speech_start_timeout_ms};
+
+        session_config.minimum_speech_duration =
+          std::chrono::milliseconds{
+          config_.
+          utterance_session_minimum_speech_duration_ms};
 
         session_config.maximum_utterance_duration =
           std::chrono::milliseconds{
