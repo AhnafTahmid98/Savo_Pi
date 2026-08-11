@@ -1,18 +1,46 @@
-# Robot SAVO geometry measurement worksheet
+# Robot Savo geometry measurement record
 
-The checked-in `robot_savo_core_v1` values are provisional. Keep the robot on a level surface in its normal operating configuration and record raw measurements before editing the profile. A human reviewer must fill `measured_by`, `measurement_date`, and the notes before changing `measurement_state` to `locked`.
+Profile revision 2 integrates owner-supplied physical measurements dated
+2026-08-11. Coordinates use +X forward, +Y left, +Z up.
 
-Use metres and radians with the ROS convention: +X forward, +Y left, +Z up. Record the instrument and estimated uncertainty for every value.
+## Measured
 
-1. Measure maximum chassis X, Y, and Z extents, including rigid collision-relevant parts. Do not include configurable software padding.
-2. Under normal robot load, measure each wheel diameter at the loaded rolling radius and the wheel tread width. Measure every wheel centre relative to `base_link`; record front/rear X, left/right Y, and Z.
-3. Establish `base_footprint` on the floor projection and measure its vertical distance to `base_link`.
-4. Measure the LiDAR scan origin, BNO055 sensing origin, and BNO055 axis orientation relative to `base_link`.
-5. Measure the RealSense D435 body origin and orientation. Verify the ROS optical convention separately; do not use the housing face as the optical origin without checking the device model.
-6. Measure left/right ToF emitter origins and orientations, then check their Y symmetry. Measure the front ultrasonic acoustic centre.
-7. Measure the pan-axis origin relative to `pantilt_mount_link`, the tilt-axis origin relative to `pantilt_pan_link`, and their positive axes.
-8. Measure the Pi-camera optical centre relative to the tilt axis and verify the camera-to-optical rotation.
-9. Measure the display and ReSpeaker mounting origins because they affect the fixed model and collision-envelope review.
-10. Run `validate_geometry_profile.py PROFILE --require-locked`, generate the URDF, inspect the TF tree, and have a second person review the worksheet before controlled motion testing.
+- Three plates: `0.2796 x 0.2100 x 0.0040 m`.
+- Reported plate ground Z: base `0.014`, first `0.080`, second `0.200 m`.
+- Wheel centers: front X `+0.080`, rear X `-0.080`, left Y `+0.108`, right Y `-0.108 m`.
+- Wheel diameter `0.065 m`; wheelbase `0.160 m`; track `0.216 m`.
+- IMU ground XYZ `[0,-0.0465,0.015] m`; BNO055 +Z points up.
+- LiDAR ground XYZ `[0,0,0.330] m`.
+- D435 ground XYZ `[0.130,0,0.225] m`, mount RPY `[0,0,0]`.
+- Left/right ToF ground XYZ `[0,+/-0.106,0.025] m`, facing +Y/-Y.
+- Front ultrasonic ground XYZ `[0.137,0,0.056] m`, facing +X.
+- Pan axis `[0.115,0,0.244]`, tilt axis `[0.115,0,0.290]`, and Pi-camera lens `[0.140,0,0.280] m` from ground at neutral.
 
-Never lock the profile from inferred CAD or software defaults alone.
+## Derived frame convention
+
+`base_footprint` is the robot center projected onto the ground. `base_link` is
+the axle plane at `+0.0325 m`, derived from wheel radius. It is not a direct
+height measurement. All fixed-mount `base_link` Z values subtract `0.0325 m`
+from their ground Z.
+
+## Provisional modeling decisions
+
+The supplied plate Z datum is not proven to be a surface or center plane.
+Because URDF box origins are center planes, the model provisionally treats the
+reported Z values as centers and records a `0.002 m` ambiguity. D435 internal
+color/depth frame translations remain zero placeholders, not calibrated stream
+extrinsics. Legacy display/ReSpeaker positions, wheel width, masses, and
+inertials also remain provisional.
+
+## Required runtime verification before lock
+
+1. Establish BNO055 +X/+Y orientation relative to the robot.
+2. Verify LiDAR scan-zero yaw in RViz with an obstacle directly ahead.
+3. Obtain authoritative D435 internal stream extrinsics or safely redesign TF ownership.
+4. Validate head `pan_sign` and `tilt_sign`, neutral image direction, and dynamic TF.
+5. Resolve each plate Z datum as surface or center plane.
+6. Measure wheel width and physical mass/inertial values.
+7. Survey the full collision envelope and remaining display/ReSpeaker geometry.
+
+Do not change `measurement_state` to `locked` until these blockers have dated,
+reviewed evidence.

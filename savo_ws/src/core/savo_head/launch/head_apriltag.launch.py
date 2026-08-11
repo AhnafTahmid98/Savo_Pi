@@ -106,8 +106,8 @@ def _make_nodes(context):
             )
         )
 
-    # Disabled by default until the measured physical head transforms replace
-    # the zero translation placeholders in head_frames.yaml.
+    # Disabled by default until pan/tilt direction and runtime TF behavior are
+    # physically validated. Measured translations alone do not open the gate.
     if enable_tf:
         executable_suffix = "_py" if use_python_fallback else ""
         nodes.append(
@@ -197,8 +197,8 @@ def generate_launch_description():
                 "enable_tf",
                 default_value="false",
                 description=(
-                    "Start head TF publishing only after physical "
-                    "pan-tilt-camera translations are measured."
+                    "Start the calibration-gated head TF node. The config "
+                    "still refuses publication until runtime calibration is approved."
                 ),
             ),
             DeclareLaunchArgument(

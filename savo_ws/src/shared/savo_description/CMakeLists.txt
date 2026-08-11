@@ -35,6 +35,10 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_install_contract test/test_install_contract.py)
   ament_add_pytest_test(test_geometry_contract test/test_geometry_contract.py)
   ament_add_pytest_test(test_am0b_geometry_profile test/test_am0b_geometry_profile.py)
+  ament_add_pytest_test(
+    test_robot_savo_geometry_integration
+    test/test_robot_savo_geometry_integration.py
+  )
 endif()
 
 ament_package()

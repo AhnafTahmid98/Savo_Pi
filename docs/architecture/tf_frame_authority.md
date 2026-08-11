@@ -1,19 +1,26 @@
 # TF Frame Authority
 
-Every transform has exactly one runtime owner. Frame names are configured centrally by `savo_description`; changing a name or mount is an interface and safety change.
+Every transform has one runtime owner.
 
 | Transform subtree | Authority | State |
 | --- | --- | --- |
-| `map -> odom` | SLAM during mapping, AMCL during saved-map navigation | Dynamic, mutually exclusive |
+| `map -> odom` | SLAM during mapping or AMCL during saved-map navigation | Dynamic, mutually exclusive |
 | `odom -> base_footprint` | `robot_localization` EKF | Dynamic |
-| `base_footprint -> base_link` | Core robot state publisher | Fixed, provisional geometry |
-| `base_link -> chassis/decks/wheels/sensors/Pi mounts` | Core robot state publisher from URDF | Fixed, provisional geometry |
-| `camera_link -> camera_color/depth_*` | Robot state publisher | Fixed; RealSense `publish_tf=false` |
-| `base_link -> depth_obstacle_frame` | Robot state publisher | Fixed, provisional |
-| `pantilt_mount_link -> pan -> tilt -> pi_camera` | `savo_head` head TF node | Dynamic, currently `publish_tf=false`, calibration false |
+| `base_footprint -> base_link` | `robot_state_publisher` | Fixed +0.0325 m axle-plane convention |
+| `base_link -> chassis/plates/wheels/fixed sensors` | `robot_state_publisher` | Fixed, profile revision 2 |
+| `base_link -> camera_link -> camera_color/depth_*` | `robot_state_publisher` | Fixed; RealSense driver TF disabled |
+| `base_link -> pantilt_mount_link` | `robot_state_publisher` | Fixed measured translation |
+| `pantilt_mount_link -> pantilt_pan_link -> pantilt_tilt_link -> pi_camera_link -> pi_camera_optical_frame` | `savo_head/head_tf_node` | Dynamic, `publish_tf=false`, calibration false |
 
-The wheel odometry node publishes odometry messages with `publish_tf=false`; it must not compete with the EKF. Edge VO publishes odometry data, not the authoritative Core TF. RealSense driver TF is disabled to avoid duplication. Mapping and saved-map navigation launch must prevent SLAM/AMCL coexistence as `map -> odom` owner.
+The RealSense driver uses `publish_tf=false` in every production profile.
+Description-owned color/depth frame translations are still provisional zeros;
+they must not be described as calibrated internal D435 extrinsics. Do not enable
+driver TF without redesigning and regression-testing the entire subtree.
 
-Configured fixed sensor translations include LiDAR `[0,0,0.205]`, IMU `[0,0,0.075]`, D435 `[0.135,0,0.155]`, ToF left/right `[0.125,+/-0.090,0.070]`, and ultrasonic `[0.150,0,0.070]` metres from `base_link`, with zero RPY. These are source-configured provisional values, not measurements.
+Head translations are measured, but unknown `pan_sign`/`tilt_sign` keep the
+dynamic publisher fail-closed. `savo_head` must never publish
+`base_link -> pantilt_mount_link`.
 
-TF failure is fail-closed for localization, mapping, navigation, obstacle projection, and semantic confirmation. Validate generated URDF, duplicate frames, timestamp freshness, `map -> base_footprint` continuity, optical conventions, physical sensor axes, and mode transitions. Lock the geometry profile and calibrate the head chain before enabling production motion or dynamic head TF.
+Wheel odometry publishes messages with `publish_tf=false` and cannot compete
+with the EKF. Mapping and saved-map navigation must prevent simultaneous SLAM
+and AMCL ownership of `map -> odom`.

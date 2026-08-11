@@ -10,7 +10,7 @@
       optional:
         realsense_link: "camera_link"
         realsense_depth_optical: "camera_depth_optical_frame"
-        head_camera: "head_camera_link"
+        head_camera: "pi_camera_link"
 
     frame_policy:
       require_map_to_odom: true

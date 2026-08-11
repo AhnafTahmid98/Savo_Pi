@@ -4,6 +4,20 @@ All notable changes to the Robot Savo repository should be recorded in this file
 
 The project does not yet use tagged semantic releases consistently. Entries are therefore grouped by date. This initial changelog was reconstructed from dated repository documents and the current source snapshot because the inspected exported ZIP does not contain Git history.
 
+## 2026-08-11 — measured geometry integration
+
+* Integrated owner-supplied plate, wheel-center, IMU, LiDAR, D435, ToF,
+  ultrasonic, and neutral pan/tilt/Pi-camera translations into geometry profile
+  revision 2 while retaining `measurement_state: provisional`.
+* Synchronized measured `0.160 m` wheelbase, `0.216 m` track, and derived
+  `0.188 m` mecanum k across base, localization, diagnostic defaults, and tests.
+* Retained the axle-plane `base_link` convention at wheel radius, the
+  conservative production Nav2 envelope, single description-owned RealSense
+  TF authority, and fail-closed head calibration gate.
+* Added cross-package geometry contracts and documented remaining orientation,
+  internal-extrinsic, plate-datum, servo-sign, wheel-width/mass, and collision
+  envelope validation work.
+
 ## 2026-08-09 — Phase 7 verification, traceability, regression, evidence and final audit
 
 ### Added — complete verification system

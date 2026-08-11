@@ -1,55 +1,70 @@
-# Robot Savo current fixed-sensor mount baseline.
-# Values mirror robot_savo_sensors.xacro and robot_savo_costmap_frames.xacro.
-# Confirm the physical offsets before the final autonomous-mapping tune.
+# Fixed-frame values relative to the axle-plane base_link convention.
+# Translations are derived from owner-supplied ground measurements. Orientation
+# placeholders and remaining runtime checks are called out per sensor.
 metadata:
   profile: robot_savo_core_v1
-  source: current_xacro_baseline
-  final_physical_measurement_required: true
+  geometry_revision: 2
+  source: owner_supplied_physical_measurements_2026-08-11
+  measurement_state: provisional
   units: metres_and_radians
 
 mounts:
   lidar:
     frame: laser_frame
     parent: base_link
-    xyz_m: [0.0, 0.0, 0.205]
+    xyz_m: [0.0, 0.0, 0.2975]
     rpy_rad: [0.0, 0.0, 0.0]
+    orientation_state: level_provisional_yaw_requires_scan_validation
   imu:
     frame: imu_link
     parent: base_link
-    xyz_m: [0.0, 0.0, 0.075]
+    xyz_m: [0.0, -0.0465, -0.0175]
     rpy_rad: [0.0, 0.0, 0.0]
+    orientation_state: placeholder_bno055_z_up_only_x_y_unresolved
   camera:
     frame: camera_link
     parent: base_link
-    xyz_m: [0.135, 0.0, 0.155]
+    xyz_m: [0.130, 0.0, 0.1925]
     rpy_rad: [0.0, 0.0, 0.0]
+    mount_orientation_state: measured_forward_horizontal_level
+    internal_stream_extrinsics_state: provisional_zero_translation
   tof_left:
     frame: tof_left_link
     parent: base_link
-    xyz_m: [0.125, 0.090, 0.070]
-    rpy_rad: [0.0, 0.0, 0.0]
+    xyz_m: [0.0, 0.106, -0.0075]
+    rpy_rad: [0.0, 0.0, 1.57079632679]
+    sensing_direction: positive_y
   tof_right:
     frame: tof_right_link
     parent: base_link
-    xyz_m: [0.125, -0.090, 0.070]
-    rpy_rad: [0.0, 0.0, 0.0]
+    xyz_m: [0.0, -0.106, -0.0075]
+    rpy_rad: [0.0, 0.0, -1.57079632679]
+    sensing_direction: negative_y
   ultrasonic_front:
     frame: ultrasonic_front_link
     parent: base_link
-    xyz_m: [0.150, 0.0, 0.070]
+    xyz_m: [0.137, 0.0, 0.0235]
     rpy_rad: [0.0, 0.0, 0.0]
+    sensing_direction: positive_x
   display:
     frame: display_link
     parent: base_link
     xyz_m: [0.115, 0.0, 0.145]
     rpy_rad: [0.0, 0.0, 0.0]
+    measurement_state: provisional_legacy_value
   respeaker:
     frame: respeaker_link
     parent: base_link
     xyz_m: [0.0, 0.0, 0.180]
     rpy_rad: [0.0, 0.0, 0.0]
+    measurement_state: provisional_legacy_value
+  pantilt_mount:
+    frame: pantilt_mount_link
+    parent: base_link
+    xyz_m: [0.115, 0.0, 0.2115]
+    rpy_rad: [0.0, 0.0, 0.0]
   depth_obstacle:
     frame: depth_obstacle_frame
     parent: base_link
-    xyz_m: [0.135, 0.0, 0.155]
+    xyz_m: [0.130, 0.0, 0.1925]
     rpy_rad: [0.0, 0.0, 0.0]

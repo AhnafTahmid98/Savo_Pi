@@ -7,10 +7,6 @@
       <material>Gazebo/DarkGrey</material>
     </gazebo>
 
-    <gazebo reference="lower_deck_link">
-      <material>Gazebo/Black</material>
-    </gazebo>
-
     <gazebo reference="middle_deck_link">
       <material>Gazebo/Grey</material>
     </gazebo>

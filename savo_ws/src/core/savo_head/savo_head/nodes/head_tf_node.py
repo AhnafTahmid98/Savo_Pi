@@ -163,7 +163,7 @@ class HeadTfNode(Node):
         self.declare_parameter("status_topic", STATUS)
         self.declare_parameter("dashboard_text_topic", DASHBOARD_TEXT)
 
-        self.declare_parameter("publish_tf", True)
+        self.declare_parameter("publish_tf", False)
         self.declare_parameter("transforms_calibrated", False)
         self.declare_parameter("tf_rate_hz", 30.0)
         self.declare_parameter("status_hz", 2.0)

@@ -52,7 +52,7 @@ Production C++ nodes/drivers; `_py` scripts are fallbacks/diagnostics. Configura
 
 ## TF ownership
 
-Dynamic `pantilt_mount_link -> pan_link -> tilt_link -> head_camera_link -> head_camera_optical_frame` (names configurable). `savo_description` must not duplicate these joints. Publishing requires calibrated transforms and fresh state.
+Dynamic `pantilt_mount_link -> pantilt_pan_link -> pantilt_tilt_link -> pi_camera_link -> pi_camera_optical_frame`. The measured neutral translations are `[0,0,0]`, `[0,0,0.046]`, `[0.025,0,-0.010]`, and `[0,0,0] m`. `savo_description` owns only `base_link -> pantilt_mount_link`. Publishing remains disabled until servo signs and runtime behavior are calibrated.
 
 ## Parameters and configuration
 
@@ -118,7 +118,7 @@ Implemented with earlier hardware evidence; current servo, camera, TF, scan, and
 
 ## Known limitations and remaining validation
 
-Mount transforms/tag size and physical centers/limits must be measured and locked.
+Head translations are measured, but `pan_sign`/`tilt_sign`, physical center/limits, cable clearance, tag size, and runtime optical behavior must be validated before enabling calibrated dynamic TF.
 
 ## Change-control considerations
 

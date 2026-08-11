@@ -22,6 +22,7 @@ def test_profile_schema_and_provisional_lock_gate():
     with pytest.raises(MODULE.GeometryProfileError, match="requires locked geometry"):
         MODULE.validate_profile(profile, require_locked=True)
     MODULE.validate_profile(profile, require_locked=True, allow_provisional=True)
+    assert "full_fixed_collision_envelope" in profile["calibration_remaining"]
 
 
 def test_profile_has_required_tf_chain_without_duplicates_or_cycles():
@@ -30,7 +31,7 @@ def test_profile_has_required_tf_chain_without_duplicates_or_cycles():
     assert profile["mounts"]["pantilt_mount"] == {
         "parent": "base_link",
         "frame": "pantilt_mount_link",
-        "xyz_m": [0.0, 0.0, 0.0],
+        "xyz_m": [0.115, 0.0, 0.2115],
         "rpy_rad": [0.0, 0.0, 0.0],
     }
     assert [
@@ -54,11 +55,14 @@ def test_nav2_footprint_is_derived_from_chassis_and_padding_is_separate():
         (ROOT / "config/generated/nav2_footprint.yaml").read_text()
     )
     assert MODULE.footprint(profile) == [
-        [0.165, 0.12],
-        [0.165, -0.12],
-        [-0.165, -0.12],
-        [-0.165, 0.12],
+        [0.1398, 0.105],
+        [0.1398, -0.105],
+        [-0.1398, -0.105],
+        [-0.1398, 0.105],
     ]
+    assert generated["metadata"]["envelope_semantics"] == (
+        "measured_plate_only_not_complete_robot_collision_envelope"
+    )
     assert generated["footprint_padding"] == profile["navigation"]["footprint_padding_m"]
     assert generated["metadata"]["geometry_sha256"] == MODULE.canonical_digest(profile)
 

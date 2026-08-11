@@ -7,14 +7,14 @@
     wheel_diameter_m: 0.065
     wheel_radius_m: 0.0325
 
-    track_width_m: 0.165
+    track_width_m: 0.216
 
-    # measure on real robot and update if needed
-    wheelbase_m: 0.165
+    # Owner-measured wheel-center spacing on Robot Savo.
+    wheelbase_m: 0.160
 
     # k = (wheelbase + track) / 2 — used in mecanum mixing formulas
     compute_k_from_geometry: true
-    kinematic_k_m: 0.165   # used only if compute_k_from_geometry = false
+    kinematic_k_m: 0.188   # synchronized fallback
 
     # -------------------------------------------------------------------------
     # Command conventions

@@ -7,8 +7,9 @@ migrations:
   - original: savo_description/rviz/tf_check.rviz
     destination: savo_observer/rviz/tf.rviz
     original_sha256: 5c9caca68d80c0ca9f7d3bd1b7f89d96580ece6503c5107de6cbc1731f1ca81e
-    current_sha256: 5c9caca68d80c0ca9f7d3bd1b7f89d96580ece6503c5107de6cbc1731f1ca81e
-    status: moved_unchanged
+    current_sha256: 3f3aaf3f75eb339d29287d6acb647b9ab433b287c37731b6c7d9dc67599b6d1b
+    status: moved_and_corrected
+    correction: Added the production pan/tilt and Pi-camera TF chain to the observer view.
   - original: savo_description/rviz/sensors_view.rviz
     destination: savo_observer/rviz/sensors.rviz
     original_sha256: a36cc8c97ebf1a76122208455ac883401d054d698384e1ebaf790755504d5504

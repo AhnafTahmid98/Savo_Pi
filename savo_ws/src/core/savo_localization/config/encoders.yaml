@@ -11,8 +11,8 @@ wheel_odom_node:
     publish_tf: false
 
     wheel_diameter_m: 0.065
-    wheelbase_m: 0.165
-    track_m: 0.165
+    wheelbase_m: 0.160
+    track_m: 0.216
 
     cpr: 20
     decoding: 4

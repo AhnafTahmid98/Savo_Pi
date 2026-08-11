@@ -3,40 +3,43 @@
 
   <xacro:arg name="use_transmissions" default="false"/>
   <xacro:arg name="use_gazebo" default="false"/>
-  <xacro:arg name="base_length" default="0.330"/>
-  <xacro:arg name="base_width" default="0.240"/>
-  <xacro:arg name="base_height" default="0.060"/>
-  <xacro:arg name="base_link_z" default="0.065"/>
+  <xacro:arg name="base_length" default="0.2796"/>
+  <xacro:arg name="base_width" default="0.2100"/>
+  <xacro:arg name="base_height" default="0.0040"/>
+  <xacro:arg name="base_link_z" default="0.0325"/>
   <xacro:arg name="deck_thickness" default="0.004"/>
-  <xacro:arg name="deck_spacing" default="0.070"/>
+  <xacro:arg name="base_plate_z" default="-0.0185"/>
+  <xacro:arg name="first_plate_z" default="0.0475"/>
+  <xacro:arg name="second_plate_z" default="0.1675"/>
   <xacro:arg name="base_mass" default="1.20"/>
   <xacro:arg name="deck_mass" default="0.20"/>
   <xacro:arg name="wheel_radius" default="0.0325"/>
   <xacro:arg name="wheel_width" default="0.030"/>
-  <xacro:arg name="wheel_front_x" default="0.115"/>
-  <xacro:arg name="wheel_rear_x" default="-0.115"/>
-  <xacro:arg name="wheel_left_y" default="0.100"/>
-  <xacro:arg name="wheel_right_y" default="-0.100"/>
-  <xacro:arg name="wheel_z" default="-0.030"/>
+  <xacro:arg name="wheel_front_x" default="0.080"/>
+  <xacro:arg name="wheel_rear_x" default="-0.080"/>
+  <xacro:arg name="wheel_left_y" default="0.108"/>
+  <xacro:arg name="wheel_right_y" default="-0.108"/>
+  <xacro:arg name="wheel_z" default="0.0"/>
   <xacro:arg name="wheel_mass" default="0.12"/>
-  <xacro:arg name="lidar_xyz" default="0 0 0.205"/>
+  <xacro:arg name="lidar_xyz" default="0 0 0.2975"/>
   <xacro:arg name="lidar_rpy" default="0 0 0"/>
-  <xacro:arg name="imu_xyz" default="0 0 0.075"/>
+  <xacro:arg name="imu_xyz" default="0 -0.0465 -0.0175"/>
   <xacro:arg name="imu_rpy" default="0 0 0"/>
-  <xacro:arg name="camera_xyz" default="0.135 0 0.155"/>
+  <xacro:arg name="camera_xyz" default="0.130 0 0.1925"/>
   <xacro:arg name="camera_rpy" default="0 0 0"/>
-  <xacro:arg name="tof_left_xyz" default="0.125 0.090 0.070"/>
-  <xacro:arg name="tof_left_rpy" default="0 0 0"/>
-  <xacro:arg name="tof_right_xyz" default="0.125 -0.090 0.070"/>
-  <xacro:arg name="tof_right_rpy" default="0 0 0"/>
-  <xacro:arg name="ultrasonic_xyz" default="0.150 0 0.070"/>
+  <xacro:arg name="tof_left_xyz" default="0 0.106 -0.0075"/>
+  <xacro:arg name="tof_left_rpy" default="0 0 1.57079632679"/>
+  <xacro:arg name="tof_right_xyz" default="0 -0.106 -0.0075"/>
+  <xacro:arg name="tof_right_rpy" default="0 0 -1.57079632679"/>
+  <xacro:arg name="ultrasonic_xyz" default="0.137 0 0.0235"/>
   <xacro:arg name="ultrasonic_rpy" default="0 0 0"/>
   <xacro:arg name="display_xyz" default="0.115 0 0.145"/>
   <xacro:arg name="display_rpy" default="0 0 0"/>
   <xacro:arg name="respeaker_xyz" default="0 0 0.180"/>
   <xacro:arg name="respeaker_rpy" default="0 0 0"/>
-  <xacro:arg name="pantilt_mount_xyz" default="0 0 0"/>
+  <xacro:arg name="pantilt_mount_xyz" default="0.115 0 0.2115"/>
   <xacro:arg name="pantilt_mount_rpy" default="0 0 0"/>
+  <xacro:arg name="depth_obstacle_xyz" default="0.130 0 0.1925"/>
 
   <xacro:include filename="$(find savo_description)/urdf/materials.xacro"/>
 
@@ -59,7 +62,10 @@
   <xacro:robot_savo_core
     base_length="$(arg base_length)" base_width="$(arg base_width)"
     base_height="$(arg base_height)" base_link_z="$(arg base_link_z)"
-    deck_thickness="$(arg deck_thickness)" deck_spacing="$(arg deck_spacing)"
+    deck_thickness="$(arg deck_thickness)"
+    base_plate_z="$(arg base_plate_z)"
+    first_plate_z="$(arg first_plate_z)"
+    second_plate_z="$(arg second_plate_z)"
     base_mass="$(arg base_mass)" deck_mass="$(arg deck_mass)"/>
 
   <xacro:robot_savo_wheels
@@ -82,7 +88,7 @@
 
   <xacro:robot_savo_two_pi/>
 
-  <xacro:robot_savo_costmap_frames/>
+  <xacro:robot_savo_costmap_frames depth_obstacle_xyz="$(arg depth_obstacle_xyz)"/>
 
   <xacro:if value="$(arg use_transmissions)">
     <xacro:robot_savo_transmissions/>

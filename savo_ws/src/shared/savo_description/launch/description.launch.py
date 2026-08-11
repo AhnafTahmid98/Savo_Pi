@@ -60,7 +60,18 @@ def _launch_description(context):
         "base_height": chassis["height_m"],
         "base_link_z": chassis["base_footprint_to_base_link_z_m"],
         "deck_thickness": chassis["deck_thickness_m"],
-        "deck_spacing": chassis["deck_spacing_m"],
+        "base_plate_z": (
+            chassis["modeled_plate_center_ground_z_m"]["base"]
+            - chassis["base_footprint_to_base_link_z_m"]
+        ),
+        "first_plate_z": (
+            chassis["modeled_plate_center_ground_z_m"]["first"]
+            - chassis["base_footprint_to_base_link_z_m"]
+        ),
+        "second_plate_z": (
+            chassis["modeled_plate_center_ground_z_m"]["second"]
+            - chassis["base_footprint_to_base_link_z_m"]
+        ),
         "base_mass": chassis["mass_kg"],
         "deck_mass": chassis["deck_mass_each_kg"],
         "wheel_radius": wheels["radius_m"],
@@ -91,6 +102,7 @@ def _launch_description(context):
         "respeaker_rpy": mounts["respeaker"]["rpy_rad"],
         "pantilt_mount_xyz": mounts["pantilt_mount"]["xyz_m"],
         "pantilt_mount_rpy": mounts["pantilt_mount"]["rpy_rad"],
+        "depth_obstacle_xyz": mounts["realsense_d435"]["xyz_m"],
     }
 
     xacro_path = package_share / "urdf" / "robot_savo.urdf.xacro"

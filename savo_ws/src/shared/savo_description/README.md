@@ -36,21 +36,30 @@ It does not publish:
 
 Those are owned by SLAM, AMCL, EKF, or navigation.
 
-## AM-0 description contract
+## Geometry profile contract
 
 The package is installed as a normal `ament_cmake` runtime package. Its launch,
 URDF/Xacro, configuration, RViz, mesh, and helper-script assets are available
 from `share/savo_description` after a workspace build.
 
-The files below document the values already encoded in the current Xacro model:
+The revision-2 canonical profile contains measured plate, wheel-center, fixed
+sensor, and neutral head translations:
+
+- `config/profiles/robot_savo_core_v1.yaml`
+
+The files below are human-readable mirrors guarded by contract tests:
 
 - `config/robot_dimensions.yaml`
 - `config/wheel_geometry.yaml`
 - `config/sensor_mounts.yaml`
 
-They are marked `final_physical_measurement_required: true`. They preserve the
-current source baseline and prevent silent Xacro/config drift; they do not claim
-that the final Nav2 footprint or sensor offsets have been physically locked.
+The profile remains provisional. IMU/LiDAR orientation, D435 internal
+extrinsics, head servo signs, plate Z datum, wheel width/mass/inertials, and
+remaining component geometry still block physical lock.
+
+`base_link` uses the reviewed wheel axle-plane convention at `+0.0325 m` from
+`base_footprint`. The generated `nav2_footprint.yaml` is the measured plate
+envelope only; production Nav2 retains a larger conservative footprint.
 
 The LiDAR frame contract is:
 

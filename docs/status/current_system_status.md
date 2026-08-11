@@ -1,6 +1,6 @@
 # Robot Savo current system status
 
-**Status date:** 2026-08-09
+**Status date:** 2026-08-11
 
 **Inspected artifact:** live Git checkout at `~/Savo_Pi`
 
@@ -79,7 +79,7 @@ approved command source
 | Area | Current source state | Remaining gate |
 | --- | --- | --- |
 | Bringup | Distributed role/mode/profile graph source-validated | Clean target builds and two-Pi safe-idle |
-| Geometry/TF | Xacro/profile/digest validators present | Measure, review, lock, regenerate, physically verify |
+| Geometry/TF | Owner measurements integrated as profile revision 2; wheel/sensor/head translations synchronized | Resolve orientation/datum/extrinsic blockers, review, lock, physically verify |
 | Base/control/safety | C++ command and fail-closed execution paths present | Wheels-raised STOP/watchdog/polarity/sensor-gate regression |
 | LiDAR/localization | Drivers, odometry, EKF, health present | Live rates/signs/TF/covariance/drift/stale validation |
 | Mapping/locations | Autonomous workflow, persistence, quality/review/release present | Manual then guarded autonomous physical lifecycle and rollback |
@@ -95,7 +95,7 @@ approved command source
 Production motion remains blocked until applicable gates close:
 
 1. Record exact revision and clean target dependency resolution/build/tests.
-2. Lock measured geometry and verify generated footprint/fixed TF.
+2. Resolve remaining geometry calibration items, lock the profile, and physically verify fixed/dynamic TF.
 3. Pass Core and Edge safe-idle with control in `STOP`.
 4. Validate motors, encoders, IMU, LiDAR, near-field safety, power, network, and time sync.
 5. Validate supervisor arming, fault latch, authorization revocation, and shutdown.
@@ -103,10 +103,9 @@ Production motion remains blocked until applicable gates close:
 7. Complete manual mapping and verified production release before autonomous mapping or saved-map navigation.
 8. Keep D435 voxel disabled until its separate real-hardware validation passes.
 
-Two additional Phase 4 findings require closure during geometry and hardware integration:
+The former wheel-geometry conflict is closed in source: description, base, and localization now use measured `0.160 m` wheelbase and `0.216 m` track (`k=0.188 m`). The profile remains provisional for IMU/LiDAR orientation, D435 internal extrinsics, head servo signs, plate Z datum, wheel width/mass/inertials, and remaining component geometry.
 
-- base/localization kinematics use `0.165 m` wheelbase and track while provisional URDF wheel centres imply `0.230 m` and `0.200 m`;
-- base and head drivers separately initialize the same PCA9685 at Core bus 1 address `0x40`; channels do not overlap, but chip-wide initialization and concurrent access require validation.
+One Phase 4 hardware finding still requires closure: base and head drivers separately initialize the same PCA9685 at Core bus 1 address `0x40`; channels do not overlap, but chip-wide initialization and concurrent access require validation.
 
 The current Edge role service also orders itself after `savo-ui-runtime.service` while setting distributed `SAVO_START_UI=false`; the renderer emits the companion unit but fresh-install guidance does not install it automatically. UI service ownership must be reconciled and tested rather than enabling another owner to silence the dependency.
 

@@ -50,6 +50,12 @@ Visualization Manager:
               {}
             laser_frame:
               {}
+            pantilt_mount_link:
+              pantilt_pan_link:
+                pantilt_tilt_link:
+                  pi_camera_link:
+                    pi_camera_optical_frame:
+                      {}
             respeaker_link:
               {}
             savo_core_board_link:

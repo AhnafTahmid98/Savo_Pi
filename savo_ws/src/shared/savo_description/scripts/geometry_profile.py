@@ -122,7 +122,6 @@ def validate_profile(
         "base_footprint_to_base_link_z_m",
         "mass_kg",
         "deck_thickness_m",
-        "deck_spacing_m",
         "deck_mass_each_kg",
     ):
         _finite(chassis.get(key), f"chassis.{key}", positive=True)
@@ -139,8 +138,46 @@ def validate_profile(
         raise GeometryProfileError("front/rear wheel X offsets must be symmetric")
     if not left_y > 0.0 or not right_y < 0.0 or not math.isclose(left_y, -right_y):
         raise GeometryProfileError("left/right wheel Y offsets must be symmetric")
-    if abs(front_x) > chassis["length_m"] / 2.0 or abs(left_y) > chassis["width_m"] / 2.0:
-        raise GeometryProfileError("wheel centers must remain inside the chassis extents")
+    # Wheel centers may legitimately sit outboard of a plate edge. Validate
+    # ordering and symmetry above; collision envelopes are handled separately.
+
+    if chassis.get("base_link_convention") != "wheel_axle_plane_from_configured_wheel_radius":
+        raise GeometryProfileError("base_link must use the reviewed wheel axle-plane convention")
+    if not math.isclose(
+        float(chassis["base_footprint_to_base_link_z_m"]),
+        float(wheels["radius_m"]),
+        abs_tol=1e-12,
+    ):
+        raise GeometryProfileError("base_link axle-plane Z must equal configured wheel radius")
+    if not math.isclose(float(wheels["z_m"]), 0.0, abs_tol=1e-12):
+        raise GeometryProfileError("wheel centers must lie on the axle-plane base_link")
+
+    plate_ground = _mapping(chassis.get("plate_ground_z_m"), "chassis.plate_ground_z_m")
+    modeled_plate_ground = _mapping(
+        chassis.get("modeled_plate_center_ground_z_m"),
+        "chassis.modeled_plate_center_ground_z_m",
+    )
+    for layer in ("base", "first", "second"):
+        reported_z = _finite(
+            plate_ground.get(layer), f"chassis.plate_ground_z_m.{layer}"
+        )
+        modeled_z = _finite(
+            modeled_plate_ground.get(layer),
+            f"chassis.modeled_plate_center_ground_z_m.{layer}",
+        )
+        if abs(modeled_z - reported_z) > float(chassis["deck_thickness_m"]) / 2.0:
+            raise GeometryProfileError(
+                f"modeled plate center for {layer} exceeds the datum ambiguity"
+            )
+    ambiguity = _finite(
+        chassis.get("plate_z_ambiguity_m"),
+        "chassis.plate_z_ambiguity_m",
+        positive=True,
+    )
+    if not math.isclose(ambiguity, float(chassis["deck_thickness_m"]) / 2.0):
+        raise GeometryProfileError("plate Z ambiguity must equal half the plate thickness")
+    if chassis.get("plate_z_datum") != "unresolved_surface_or_center_plane":
+        raise GeometryProfileError("plate Z datum must remain explicitly unresolved")
 
     frames = _mapping(profile.get("frames"), "frames")
     missing_frames = [key for key in REQUIRED_FRAMES if not str(frames.get(key, "")).strip()]
@@ -164,6 +201,14 @@ def validate_profile(
 
     if not math.isclose(mounts["tof_left"]["xyz_m"][1], -mounts["tof_right"]["xyz_m"][1]):
         raise GeometryProfileError("ToF left/right Y origins must be symmetric")
+    if not math.isclose(
+        float(mounts["tof_left"]["rpy_rad"][2]), math.pi / 2.0, abs_tol=1e-10
+    ):
+        raise GeometryProfileError("left ToF local +X must face robot +Y")
+    if not math.isclose(
+        float(mounts["tof_right"]["rpy_rad"][2]), -math.pi / 2.0, abs_tol=1e-10
+    ):
+        raise GeometryProfileError("right ToF local +X must face robot -Y")
 
     head = _mapping(profile.get("head"), "head")
     for key in ("pan", "tilt", "pi_camera", "pi_camera_optical"):
@@ -171,6 +216,8 @@ def validate_profile(
         _vector(item.get("xyz_m"), f"head.{key}.xyz_m")
         _vector(item.get("rpy_rad"), f"head.{key}.rpy_rad")
         edges.append((str(item["parent"]), str(item["frame"])))
+    if head["pan"].get("axis") != "z" or head["tilt"].get("axis") != "y":
+        raise GeometryProfileError("head pan/tilt axes must be robot Z/Y")
     optical = head["pi_camera_optical"]["rpy_rad"]
     expected_optical = [-1.57079632679, 0.0, -1.57079632679]
     if any(not math.isclose(float(a), b, abs_tol=1e-9) for a, b in zip(optical, expected_optical)):
@@ -194,6 +241,24 @@ def validate_profile(
     if navigation.get("robot_base_frame") != frames["base_footprint"]:
         raise GeometryProfileError("Nav2 robot base frame must be base_footprint")
     _finite(navigation.get("footprint_padding_m"), "navigation.footprint_padding_m")
+    if navigation.get("footprint_model") != "measured_plate_envelope_only":
+        raise GeometryProfileError("generated footprint must be labeled as plate-only")
+
+    realsense = _mapping(
+        profile.get("realsense_internal_frames"), "realsense_internal_frames"
+    )
+    if realsense.get("authority") != "robot_state_publisher":
+        raise GeometryProfileError("robot_state_publisher must own RealSense fixed TF")
+    if realsense.get("driver_publish_tf") is not False:
+        raise GeometryProfileError("RealSense driver TF must remain disabled")
+
+    remaining = profile.get("calibration_remaining")
+    if not isinstance(remaining, list):
+        raise GeometryProfileError("calibration_remaining must be a list")
+    if metadata["measurement_state"] == "provisional" and not remaining:
+        raise GeometryProfileError("provisional profile must list calibration blockers")
+    if metadata["measurement_state"] == "locked" and remaining:
+        raise GeometryProfileError("locked profile cannot retain calibration blockers")
 
 
 def canonical_digest(profile: dict[str, Any]) -> str:

@@ -60,7 +60,7 @@ EKF owns dynamic `odom -> base_footprint`; wheel odom keeps `publish_tf: false`.
 | IMU/wheel/EKF rates | `25/30/30 Hz` | Timing |
 | encoder GPIO FL/FR/RL/RR | `20-21/13-25/23-24/12-26` | Quadrature inputs |
 | CPR/decoding | `20/4` | Tick conversion |
-| diameter/base/track | `0.065/0.165/0.165 m` | Kinematics |
+| diameter/base/track | `0.065/0.160/0.216 m` | Measured wheel geometry |
 | EKF sensor timeout | `0.2 s` | Freshness |
 | `use_vo` | `false` | Integration gate |
 
@@ -116,7 +116,7 @@ Implemented with PC evidence/earlier baseline; GPIO signs, IMU orientation, EKF/
 
 ## Known limitations and remaining validation
 
-Geometry remains provisional; VO fusion is gated; CPR/polarity/slip/covariance need measurement.
+Geometry remains provisional despite synchronized wheel centers: CPR/polarity, loaded radius/slip, covariance, and BNO055 +X/+Y orientation need hardware validation. VO fusion remains gated.
 
 ## Change-control considerations
 

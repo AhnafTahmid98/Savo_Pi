@@ -53,6 +53,11 @@ contracts.
 `map_release_id` records released-map provenance and is not a substitute
 for `map_revision`.
 
+A robot-geometry revision does not by itself alter stored map-frame location
+coordinates. If that revision leads to a new production map, every named
+location and approach pose must be validated against the new map before the
+new joint map/location release is approved.
+
 ## Pose separation
 
 The AprilTag pose is not automatically a safe navigation goal.

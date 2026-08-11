@@ -4,8 +4,7 @@
   <xacro:macro name="robot_savo_costmap_frames"
     params="
       parent:=base_link
-      depth_obstacle_x:=0.135
-      depth_obstacle_z:=0.155
+      depth_obstacle_xyz:='0.130 0 0.1925'
       local_costmap_z:=0.000
       footprint_z:=0.000
     ">
@@ -15,7 +14,7 @@
     <joint name="depth_obstacle_frame_joint" type="fixed">
       <parent link="${parent}"/>
       <child link="depth_obstacle_frame"/>
-      <origin xyz="${depth_obstacle_x} 0 ${depth_obstacle_z}" rpy="0 0 0"/>
+      <origin xyz="${depth_obstacle_xyz}" rpy="0 0 0"/>
     </joint>
 
     <link name="local_costmap_frame"/>

@@ -148,6 +148,12 @@ def test_profile_records_pending_real_d435_validation():
     assert validation['filtered_realsense_producer_verified'] is True
     assert validation['filtered_realsense_hardware_validated'] is False
     assert validation['raw_realsense_cloud_for_nav2'] is False
+    assert profile['footprint_source'] == (
+        'savo_nav_conservative_collision_envelope'
+    )
+    assert profile['footprint_status'] == (
+        'provisional_pending_full_collision_survey'
+    )
     assert profile['lidar_required_for_navigation'] is True
     assert profile['realsense_required_for_navigation'] is False
     assert ownership['savo_nav_sensor_production_authority'] is False

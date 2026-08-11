@@ -96,7 +96,7 @@ Production compositions: `manual_mapping.launch.xml`, `autonomous_mapping.launch
 
 ## Persistent state and runtime files
 
-Session directories contain map YAML/image and manifests/verification/quality evidence. Production releases and `active_map.yaml` live under `/var/lib/robot_savo/maps/production`; joint release journals support rollback. Location snapshots remain owned by `savo_locations`.
+Session directories contain map YAML/image and manifests/verification/quality evidence. Production releases and `active_map.yaml` live under `/var/lib/robot_savo/maps/production`; joint release journals support rollback. Each release carries an immutable geometry-profile artifact and digest. Geometry revision 2 remains provisional and therefore cannot produce a production release under the default lock policy. Existing releases keep their original digest; after geometry is locked, create and revalidate a new map/location release rather than rewriting an older release. Location snapshots remain owned by `savo_locations`.
 
 ## Hardware ownership
 

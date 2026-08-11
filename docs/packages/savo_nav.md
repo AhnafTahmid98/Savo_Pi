@@ -76,7 +76,7 @@ Saved-map AMCL owns `map -> odom`; live mapping SLAM Toolbox owns it. Localizati
 
 ## Parameters and configuration
 
-LiDAR readiness defaults: pointcloud not required; odom/scan/safety timeout 1 s, control 2 s, costmaps 3 s, accepted mode `NAV`. Gateway disallows degraded readiness and behavior-tree override, allows coordinates within ±1000 m, execution 300 s and feedback stale 10 s, one active goal. Nav2 DWB caps x/y `0.24 m/s`, yaw `0.55 rad/s`, controller 15 Hz, footprint from description, inflation 0.45 m. Voxel overlay requires explicit D435 validation and fresh filtered cloud.
+LiDAR readiness defaults: pointcloud not required; odom/scan/safety timeout 1 s, control 2 s, costmaps 3 s, accepted mode `NAV`. Gateway disallows degraded readiness and behavior-tree override, allows coordinates within ±1000 m, execution 300 s and feedback stale 10 s, one active goal. Nav2 DWB caps x/y `0.24 m/s`, yaw `0.55 rad/s`, controller 15 Hz, and uses the Nav-owned conservative `0.330 x 0.240 m` collision envelope plus `0.02 m` padding. The generated description footprint is plate-only; the production envelope remains provisional pending a full fixed-component collision survey. Inflation remains 0.45 m. Voxel overlay requires explicit D435 validation and fresh filtered cloud.
 
 ## Launch files
 

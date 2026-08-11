@@ -88,7 +88,8 @@ None. Base geometry is static in `savo_description`; `odom -> base_footprint` is
 | `quench_ms` | `18` | Direction reversal protection |
 | `invert_fl/rl/fr/rr` | `true` | Current wiring polarity; change only after direction test |
 | `wheel_diameter_m` | `0.065` | Kinematic configuration |
-| `wheelbase_m`, `track_width_m` | `0.165`, `0.165` | Current geometry; physical lock required |
+| `wheelbase_m`, `track_width_m` | `0.160`, `0.216` | Owner-measured wheel-center geometry |
+| `kinematic_k_m` | `0.188` | Synchronized fallback for `(wheelbase + track) / 2` |
 | `board_backend` | `auto` | Production hardware selection; tests may use `dryrun` |
 
 Encoder values in `mecanum_kinematics.yaml` describe the relationship but acquisition/odometry are owned by `savo_localization`.
@@ -151,7 +152,7 @@ Implemented with retained PC-test and earlier physical-baseline evidence. Curren
 
 ## Known limitations and remaining validation
 
-Command space is normalized; configured physical limits are not the active driver limit model. Geometry and encoder-related values require consistency checks against the locked physical profile.
+Command space is normalized; configured physical limits are not the active driver limit model. Measured wheel-center geometry is synchronized, while loaded radius, polarity, encoder counts, and real-floor kinematics still require regression.
 
 A retained Python fallback model docstring still mentions `savo_intent`; the production C++ driver does not depend on that retired package or topic.
 

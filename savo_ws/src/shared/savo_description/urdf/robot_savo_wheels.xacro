@@ -6,11 +6,11 @@
       parent:=base_link
       wheel_radius:=0.0325
       wheel_width:=0.030
-      wheel_front_x:=0.115
-      wheel_rear_x:=-0.115
-      wheel_left_y:=0.100
-      wheel_right_y:=-0.100
-      wheel_z:=-0.030
+      wheel_front_x:=0.080
+      wheel_rear_x:=-0.080
+      wheel_left_y:=0.108
+      wheel_right_y:=-0.108
+      wheel_z:=0.0
       wheel_mass:=0.12
     ">
 

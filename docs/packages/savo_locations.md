@@ -132,7 +132,7 @@ Implemented/source-tested; current physical candidate capture, operator review, 
 
 ## Known limitations and remaining validation
 
-Unicode case folding is deliberately disabled; ASCII normalization rules apply. Release correctness depends on locked map/geometry and operator process.
+Unicode case folding is deliberately disabled; ASCII normalization rules apply. Release correctness depends on locked map/geometry and operator process. Geometry changes do not rewrite stored coordinates; if a new production map is generated, named locations and approach poses must be validated against that map before approving its joint map/location release.
 
 ## Change-control considerations
 

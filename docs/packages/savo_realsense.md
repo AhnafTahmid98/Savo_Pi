@@ -50,7 +50,7 @@ No action.
 
 ## TF ownership
 
-RealSense `publish_tf=false`; `savo_description` exclusively owns fixed camera frames.
+RealSense `publish_tf=false`; `savo_description` exclusively owns fixed camera frames. The physical mount is measured at ground `[0.130,0,0.225] m` with zero RPY. Description-owned zero color/depth translations remain provisional and are not device-calibrated internal extrinsics.
 
 ## Parameters and configuration
 
@@ -116,7 +116,7 @@ Implemented with retained PC evidence; live USB3, serial, profiles/rates, alignm
 
 ## Known limitations and remaining validation
 
-Serial must match hardware; firmware is not asserted as source truth. Pointcloud/voxel path remains physically gated.
+Serial must match hardware; firmware is not asserted as source truth. Internal D435 stream extrinsics and their TF representation require device evidence. Pointcloud/voxel use remains physically gated.
 
 ## Change-control considerations
 

@@ -1,20 +1,26 @@
-# Robot Savo current description baseline.
-# Values mirror robot_savo_core.xacro and are not a substitute for the final
-# physical measurement pass before Nav2 footprint tuning.
+# Human-readable mirror of the canonical geometry profile.
 metadata:
   profile: robot_savo_core_v1
-  source: current_xacro_baseline
-  final_physical_measurement_required: true
+  geometry_revision: 2
+  source: owner_supplied_physical_measurements_2026-08-11
+  measurement_state: provisional
   units: metres_and_kilograms
 
 base:
-  length_m: 0.330
-  width_m: 0.240
-  height_m: 0.060
-  base_link_z_m: 0.065
+  length_m: 0.2796
+  width_m: 0.2100
+  height_m: 0.0040
+  base_link_z_m: 0.0325
+  base_link_z_basis: wheel_axle_plane_convention_from_wheel_radius
   mass_kg: 1.20
 
-decks:
-  thickness_m: 0.004
-  spacing_m: 0.070
+plates:
+  count: 3
+  length_m: 0.2796
+  width_m: 0.2100
+  thickness_m: 0.0040
+  reported_ground_z_m: {base: 0.014, first: 0.080, second: 0.200}
+  modeled_center_ground_z_m: {base: 0.014, first: 0.080, second: 0.200}
+  z_datum: unresolved_surface_or_center_plane
+  z_ambiguity_m: 0.002
   mass_each_kg: 0.20

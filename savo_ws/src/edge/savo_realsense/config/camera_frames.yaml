@@ -5,5 +5,7 @@ frames:
   depth_optical_frame: camera_depth_optical_frame
 
 tf:
-  publish_driver_tf: true
+  # robot_state_publisher is the sole fixed-camera TF authority.
+  publish_driver_tf: false
   tf_publish_rate: 0.0
+  internal_extrinsics_state: provisional_zero_translation_not_device_calibrated

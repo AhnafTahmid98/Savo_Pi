@@ -196,11 +196,11 @@ def wheel_speed_mps(delta_count, dt, counts_per_wheel_rev, wheel_dia_m):
 
 def estimate_mecanum_body_velocity(fl_v, fr_v, rl_v, rr_v, wheelbase_m, track_m):
     """Rough mecanum estimate; signs depend on final ROS calibration."""
-    radius_sum = max(1e-9, wheelbase_m + track_m)
+    kinematic_k_m = max(1e-9, (wheelbase_m + track_m) / 2.0)
 
     vx = (fl_v + fr_v + rl_v + rr_v) / 4.0
     vy = (-fl_v + fr_v + rl_v - rr_v) / 4.0
-    omega = (-fl_v + fr_v - rl_v + rr_v) / (4.0 * radius_sum)
+    omega = (-fl_v + fr_v - rl_v + rr_v) / (4.0 * kinematic_k_m)
 
     return vx, vy, omega
 
@@ -574,8 +574,8 @@ def parse_args():
     parser.add_argument("--decoding", type=int, default=4, choices=[1, 2, 4], help="Quadrature decoding factor")
     parser.add_argument("--gear", type=float, default=1.0, help="Motor-to-wheel gear multiplier")
 
-    parser.add_argument("--wheelbase", type=float, default=0.165, help="Front-rear wheel spacing in meters")
-    parser.add_argument("--track", type=float, default=0.165, help="Left-right wheel spacing in meters")
+    parser.add_argument("--wheelbase", type=float, default=0.160, help="Front-rear wheel spacing in meters")
+    parser.add_argument("--track", type=float, default=0.216, help="Left-right wheel spacing in meters")
 
     parser.add_argument("--chip", type=int, default=None, help="gpiochip index; auto if omitted")
     parser.add_argument("--internal-pullup", action="store_true", help="Request Pi internal pull-ups")

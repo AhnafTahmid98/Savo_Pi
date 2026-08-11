@@ -1,24 +1,27 @@
 # Calibration Register
 
-Status values: `CONFIGURED` means present in source but not measured here; `PENDING` means no authoritative value; `VALIDATED` requires dated retained evidence.
+`MEASURED` records an owner-supplied physical value. `DERIVED` is calculated
+from measured/configured geometry. `PENDING` requires physical runtime evidence.
 
-| Calibration item | Current configured baseline | Status | Required evidence |
+| Calibration item | Current value/state | Status | Remaining evidence |
 | --- | --- | --- | --- |
-| Wheel diameter | `0.065 m` | CONFIGURED | Loaded rolling-distance trials |
-| Kinematic wheelbase / track | `0.165 / 0.165 m` | CONFIGURED, conflict | Measure contact centres; reconcile URDF `0.230 / 0.200 m` implication |
-| Encoder CPR/decoding/gear | `20 / x4 / 1.0` | CONFIGURED | Shaft/wheel revolution counts and gearbox identification |
-| Encoder polarity | all false | CONFIGURED | Each wheel forward/lateral/yaw sign test |
-| Motor polarity | all inverted | CONFIGURED | Wheels-raised direction test |
-| IMU mode/rate | NDOF, `25 Hz` | CONFIGURED | Axis, calibration, bias/noise, magnetic survey |
-| EKF covariances | YAML values | CONFIGURED | Static/dynamic logs and residual analysis |
-| Fixed sensor extrinsics | `sensor_mounts.yaml` | CONFIGURED, provisional | Datum survey plus live frame check |
-| Head zero | pan `72 deg`, tilt `55 deg` | CONFIGURED | Mechanical centre, optical axis, stop clearance |
-| Head limits | pan `0..170`, tilt `45..130 deg` | CONFIGURED | Servo/bracket sweep under load |
-| Servo pulse range | `500..2500 us` | CONFIGURED | Model-safe pulse and mechanical stop test |
-| Base ADC scale/offset | package YAML | CONFIGURED | Calibrated meter at multiple voltages/loads |
-| UPS voltage/SOC | HAT telemetry | PENDING | Meter comparison and discharge curve |
-| Range thresholds | front `.25/.80`, side `.08/.25 m` | CONFIGURED | Target/material/FOV and stopping-distance trials |
-| D435 depth/VO | profile configuration | PENDING | USB mode, depth scale, alignment, extrinsic, trajectory comparison |
-| LiDAR mount/rate | z `.205 m`, `5.5 Hz` expected | CONFIGURED | Level/alignment, live rate/range scan |
+| Wheel diameter/radius | `0.065 / 0.0325 m` | MEASURED/configured | Loaded rolling-distance trials |
+| Wheelbase / track / mecanum k | `0.160 / 0.216 / 0.188 m` | MEASURED/DERIVED | Odometry scale and yaw trials |
+| Wheel centers | X `+/-0.080`, Y `+/-0.108 m` | MEASURED | Review after bracket/wheel changes |
+| Encoder CPR/decoding/gear | `20 / x4 / 1.0` | CONFIGURED | Shaft/wheel revolution counts |
+| Encoder and motor polarity | source values | PENDING | Wheels-raised sign test |
+| Base frame height | `0.0325 m` axle plane | CONVENTION/DERIVED | Preserve frame contract |
+| Plate XYZ | `0.2796 x 0.2100 x 0.0040 m`; Z `.014/.080/.200` | MEASURED, provisional datum | Resolve surface versus center-plane datum (`2 mm` ambiguity) |
+| BNO055 position | ground `[0,-.0465,.015]` | MEASURED | Establish board +X/+Y, bias/noise and magnetic survey |
+| LiDAR position | ground `[0,0,.330]` | MEASURED | Verify scan-zero yaw with front obstacle |
+| D435 mount | ground `[.130,0,.225]`, RPY zero | MEASURED | Validate internal stream extrinsics/depth/VO |
+| Side ToF mounts | ground `[0,+/-.106,.025]` | MEASURED | Live left/right beam check |
+| Front ultrasonic | ground `[.137,0,.056]` | MEASURED | Live beam/FOV check |
+| Head translations | pan/tilt/lens ground positions measured | MEASURED | Validate pan_sign/tilt_sign and runtime TF |
+| Head neutral | pan `72 deg`, tilt `55 deg` | CONFIGURED | Mechanical center/clearance |
+| Wheel width/mass/inertials | source provisional values | PENDING | Physical survey/weighing |
+| Display/ReSpeaker/mass geometry | legacy profile values | PENDING | Physical survey |
 
-For every `VALIDATED` entry add robot hardware revision, source commit, date/operator, tool ID/calibration date, environment/load, raw artifact, calculation, accepted value/tolerance, reviewer, and configuration change reference. Calibration expiry or hardware replacement returns the item to pending.
+The geometry profile remains `provisional`. A dated `VALIDATED` entry must retain
+robot revision, commit, operator, instrument, environment/load, raw artifact,
+calculation, tolerance, reviewer, and configuration change reference.

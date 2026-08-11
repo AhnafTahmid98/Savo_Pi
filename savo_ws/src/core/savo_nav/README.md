@@ -186,7 +186,9 @@ This profile requires the map, complete TF chain, fused odometry, LiDAR, Nav2
 action server, global and local costmaps, `NAV` control mode, and fresh safety
 state. It is the controlled first-test profile.
 
-Both costmaps use the generated polygon footprint from `savo_description`.
+Both costmaps retain the Nav-owned conservative `0.330 x 0.240 m` collision
+envelope with `0.02 m` padding. The generated `savo_description` footprint is
+the measured plate envelope only and is not the production collision footprint.
 LiDAR marks and clears obstacles in the global and local costmaps.
 
 ### Filtered D435 VoxelLayer companion

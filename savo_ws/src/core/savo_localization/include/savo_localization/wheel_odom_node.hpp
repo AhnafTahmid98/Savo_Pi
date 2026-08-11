@@ -94,8 +94,8 @@ private:
   bool publish_tf_{false};
 
   double wheel_diameter_m_{0.065};
-  double wheelbase_m_{0.165};
-  double track_m_{0.165};
+  double wheelbase_m_{0.160};
+  double track_m_{0.216};
 
   int cpr_{20};
   int decoding_{4};

@@ -12,8 +12,8 @@ constexpr double PI = 3.14159265358979323846;
 
 struct MecanumGeometry
 {
-  double wheelbase_m{0.165};
-  double track_m{0.165};
+  double wheelbase_m{0.160};
+  double track_m{0.216};
   double wheel_diameter_m{0.065};
   int counts_per_wheel_rev{80};
 

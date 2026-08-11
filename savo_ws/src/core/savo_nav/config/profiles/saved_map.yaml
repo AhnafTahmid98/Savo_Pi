@@ -39,7 +39,8 @@ saved_map_profile:
   filtered_pointcloud_enabled: false
   voxel_layer_enabled: false
   geometry_profile: robot_savo_core_v1
-  footprint_source: savo_description/config/profiles/robot_savo_core_v1.yaml
+  footprint_source: savo_nav_conservative_collision_envelope
+  footprint_status: provisional_pending_full_collision_survey
   footprint_padding_m: 0.02
   hardware_test_enabled: false
   hardware_activation_enabled: false
@@ -67,4 +68,5 @@ saved_map_profile:
     - Production launch consumes and verifies the active AM-8 joint release.
     - The baseline costmaps are LiDAR-only for first controlled navigation tests.
     - RealSense VoxelLayer support is provided by the companion guarded profile.
-    - Actual footprint and motion tuning remain physical real-robot gates.
+    - The 0.330 x 0.240 m footprint remains a conservative production envelope;
+      measured plate-only geometry must not shrink it before a collision survey.

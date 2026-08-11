@@ -56,3 +56,14 @@ def test_topics_and_qos_are_explicit_and_high_bandwidth_is_disabled():
                 assert topic.get('Reliability Policy') == 'Best Effort', path
             if class_name.endswith(('/PointCloud2', '/Image')):
                 assert display.get('Enabled') is False, (path, display.get('Name'))
+
+
+def test_tf_view_includes_fixed_sensors_and_dynamic_head_chain():
+    source = (RVIZ / 'tf.rviz').read_text(encoding='utf-8')
+    for frame in (
+        'base_footprint', 'base_link', 'laser_frame', 'imu_link',
+        'camera_link', 'tof_left_link', 'tof_right_link',
+        'ultrasonic_front_link', 'pantilt_mount_link', 'pantilt_pan_link',
+        'pantilt_tilt_link', 'pi_camera_link', 'pi_camera_optical_frame',
+    ):
+        assert f'{frame}:' in source

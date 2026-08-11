@@ -217,7 +217,7 @@ private:
     declare_parameter<std::string>("status_topic", kTopicStatus);
     declare_parameter<std::string>("dashboard_text_topic", kTopicDashboardText);
 
-    declare_parameter<bool>("publish_tf", true);
+    declare_parameter<bool>("publish_tf", false);
     declare_parameter<bool>("transforms_calibrated", false);
     declare_parameter<double>("tf_rate_hz", kTfHz);
     declare_parameter<double>("status_hz", kStatusHz);
