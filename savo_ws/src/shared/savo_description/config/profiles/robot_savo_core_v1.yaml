@@ -103,7 +103,6 @@ calibration_remaining:
   - imu_board_x_y_orientation
   - lidar_scan_zero_yaw
   - realsense_internal_color_depth_extrinsics
-  - head_pan_and_tilt_signs
   - plate_z_surface_or_center_datum
   - wheel_width_mass_and_inertials
   - full_fixed_collision_envelope
