@@ -18,9 +18,11 @@ head_tf_node:
     pan_axis: "z"
     tilt_axis: "y"
 
-    # Placeholders only: verify physical direction before calibration approval.
+    # Hardware-validated on Robot Savo:
+    # increasing pan angle moves physically LEFT;
+    # increasing tilt angle moves physically UP.
     pan_sign: 1.0
-    tilt_sign: 1.0
+    tilt_sign: -1.0
 
     pan_zero_deg: 72.0
     tilt_zero_deg: 55.0
