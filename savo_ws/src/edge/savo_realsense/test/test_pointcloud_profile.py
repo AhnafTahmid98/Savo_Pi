@@ -38,10 +38,12 @@ def test_main_d435_profile_has_permanent_pointcloud_enabled() -> None:
     assert params["pointcloud__neon_.pointcloud_qos"] == "SENSOR_DATA"
 
 
-def test_pointcloud_camera_profile_enables_neon_pointcloud() -> None:
+def test_pointcloud_camera_profile_uses_direct_node_runtime_parameters() -> None:
     config = load_yaml("realsense_pointcloud_camera.yaml")
     params = config["/camera/camera"]["ros__parameters"]
 
+    # Unlike rs_launch.py's flat config, direct RealSense ROS 4.58.1 node
+    # parameters use the runtime NEON plugin names.
     assert params["pointcloud__neon_.enable"] is True
     assert params["pointcloud__neon_.stream_filter"] == 2
     assert params["pointcloud__neon_.stream_index_filter"] == 0

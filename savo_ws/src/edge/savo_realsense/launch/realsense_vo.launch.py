@@ -8,7 +8,8 @@ from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description() -> LaunchDescription:
-    config_file = LaunchConfiguration("config_file")
+    driver_config_file = LaunchConfiguration("driver_config_file")
+    monitor_config_file = LaunchConfiguration("monitor_config_file")
 
     realsense_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -19,7 +20,7 @@ def generate_launch_description() -> LaunchDescription:
             ])
         ),
         launch_arguments={
-            "config_file": config_file,
+            "config_file": driver_config_file,
         }.items(),
     )
 
@@ -28,7 +29,7 @@ def generate_launch_description() -> LaunchDescription:
         executable="camera_topic_monitor_node",
         name="camera_topic_monitor_node",
         output="screen",
-        parameters=[config_file],
+        parameters=[monitor_config_file],
     )
 
     health_node = Node(
@@ -36,12 +37,20 @@ def generate_launch_description() -> LaunchDescription:
         executable="camera_health_node",
         name="camera_health_node",
         output="screen",
-        parameters=[config_file],
+        parameters=[monitor_config_file],
     )
 
     return LaunchDescription([
         DeclareLaunchArgument(
-            "config_file",
+            "driver_config_file",
+            default_value=PathJoinSubstitution([
+                FindPackageShare("savo_realsense"),
+                "config",
+                "realsense_vo_driver.yaml",
+            ]),
+        ),
+        DeclareLaunchArgument(
+            "monitor_config_file",
             default_value=PathJoinSubstitution([
                 FindPackageShare("savo_realsense"),
                 "config",
