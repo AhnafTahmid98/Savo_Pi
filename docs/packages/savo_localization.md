@@ -58,7 +58,7 @@ EKF owns dynamic `odom -> base_footprint`; wheel odom keeps `publish_tf: false`.
 | --- | ---: | --- |
 | BNO bus/address/mode | `1/0x28/ndof` | IMU |
 | IMU/wheel/EKF rates | `25/30/30 Hz` | Timing |
-| encoder GPIO FL/FR/RL/RR | `20-21/13-25/23-24/12-26` | Quadrature inputs |
+| encoder GPIO FL/FR/RL/RR | `20-21/13-25/23-24/26-12` | Quadrature inputs |
 | CPR/decoding | `20/4` | Tick conversion |
 | diameter/base/track | `0.065/0.160/0.216 m` | Measured wheel geometry |
 | EKF sensor timeout | `0.2 s` | Freshness |

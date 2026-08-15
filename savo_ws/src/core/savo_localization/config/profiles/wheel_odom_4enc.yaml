@@ -44,8 +44,8 @@ wheel_odom_node:
     rl_a_gpio: 23
     rl_b_gpio: 24
 
-    rr_a_gpio: 12
-    rr_b_gpio: 26
+    rr_a_gpio: 26
+    rr_b_gpio: 12
 
     invert_fl: false
     invert_fr: false

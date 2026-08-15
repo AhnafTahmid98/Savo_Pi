@@ -16,7 +16,7 @@ No verified pin-to-pin harness record exists in the inspected source. This regis
 | ENC-FL | Core GPIO 20/21 | FL encoder | A/B | Voltage/pinout/connector pending |
 | ENC-FR | Core GPIO 13/25 | FR encoder | A/B | Voltage/pinout/connector pending |
 | ENC-RL | Core GPIO 23/24 | RL encoder | A/B | Voltage/pinout/connector pending |
-| ENC-RR | Core GPIO 12/26 | RR encoder | A/B | Voltage/pinout/connector pending |
+| ENC-RR | Core GPIO 26/12 | RR encoder | A/B | Voltage/pinout/connector pending |
 | MOT-01..04 | Freenove board | Four motors | PCA channel pairs per GPIO/I2C map | Polarity/connectors/wire gauge pending |
 | SRV-P/T | PCA ch 15/14 | Pan/tilt servos | 50 Hz configured | Connector polarity/current pending |
 | PWR-* | Battery/UPS/converters | Loads | Three monitored domains | Full power-tree trace pending |

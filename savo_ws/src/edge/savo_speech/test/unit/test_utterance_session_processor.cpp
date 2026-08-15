@@ -161,6 +161,11 @@ make_session_config()
 
   config.pre_roll_duration = 1ms;
   config.speech_start_timeout = 100ms;
+
+  // Processor tests use very short synthetic speech segments.
+  // Keep their existing intent while production uses 300 ms.
+  config.minimum_speech_duration = 1ms;
+
   config.maximum_utterance_duration = 1000ms;
   config.completed_queue_capacity = 4U;
 

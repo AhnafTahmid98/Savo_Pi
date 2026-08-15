@@ -9,7 +9,7 @@ Numbers below are BCM GPIO numbers and source-configured addresses. They are not
 | Front-left encoder A / B | 20 / 21 | Input | `savo_localization` |
 | Front-right encoder A / B | 13 / 25 | Input | `savo_localization` |
 | Rear-left encoder A / B | 23 / 24 | Input | `savo_localization` |
-| Rear-right encoder A / B | 12 / 26 | Input | `savo_localization` |
+| Rear-right encoder A / B | 26 / 12 | Input | `savo_localization` |
 | Front ultrasonic trigger | 27 | Output | `savo_perception` |
 | Front ultrasonic echo | 22 | Input | `savo_perception` |
 

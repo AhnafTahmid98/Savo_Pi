@@ -465,7 +465,7 @@ def run(args):
     print("  FL: A=GPIO20, B=GPIO21")
     print("  FR: A=GPIO13, B=GPIO25")
     print("  RL: A=GPIO23, B=GPIO24")
-    print("  RR: A=GPIO12, B=GPIO26")
+    print("  RR: A=GPIO26, B=GPIO12")
     print()
     print("Expected:")
     print("  Forward wheel rotation should count positive.")
@@ -490,7 +490,7 @@ def parse_args():
     # FL physical wheel -> GPIO20/GPIO21
     # FR physical wheel -> GPIO13/GPIO25
     # RL physical wheel -> GPIO23/GPIO24
-    # RR physical wheel -> GPIO12/GPIO26
+    # RR physical wheel -> GPIO26/GPIO12
     parser.add_argument("--fl-a", type=int, default=20, help="Front-left encoder A BCM GPIO")
     parser.add_argument("--fl-b", type=int, default=21, help="Front-left encoder B BCM GPIO")
 
@@ -500,8 +500,8 @@ def parse_args():
     parser.add_argument("--rl-a", type=int, default=23, help="Rear-left encoder A BCM GPIO")
     parser.add_argument("--rl-b", type=int, default=24, help="Rear-left encoder B BCM GPIO")
 
-    parser.add_argument("--rr-a", type=int, default=12, help="Rear-right encoder A BCM GPIO")
-    parser.add_argument("--rr-b", type=int, default=26, help="Rear-right encoder B BCM GPIO")
+    parser.add_argument("--rr-a", type=int, default=26, help="Rear-right encoder A BCM GPIO")
+    parser.add_argument("--rr-b", type=int, default=12, help="Rear-right encoder B BCM GPIO")
 
     # Keep old working flag style:
     # default = no inversion.

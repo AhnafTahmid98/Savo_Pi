@@ -103,8 +103,8 @@ DEFAULT_FR_B_GPIO = 25
 DEFAULT_RL_A_GPIO = 23
 DEFAULT_RL_B_GPIO = 24
 
-DEFAULT_RR_A_GPIO = 12
-DEFAULT_RR_B_GPIO = 26
+DEFAULT_RR_A_GPIO = 26
+DEFAULT_RR_B_GPIO = 12
 
 class _GpioPair(tuple):
     def __new__(cls, a_gpio: int, b_gpio: int):
