@@ -49,7 +49,10 @@ def test_constants_importable():
 
     assert constants.PACKAGE_NAME == "savo_vo"
     assert constants.DEFAULT_COLOR_IMAGE_TOPIC == "/camera/camera/color/image_raw"
-    assert constants.DEFAULT_DEPTH_IMAGE_TOPIC == "/camera/camera/depth/image_rect_raw"
+    assert constants.DEFAULT_DEPTH_IMAGE_TOPIC == (
+        "/camera/camera/aligned_depth_to_color/image_raw"
+    )
+    assert constants.DEFAULT_BASE_FRAME == "base_footprint"
     assert constants.DEFAULT_VO_ODOM_TOPIC == "/vo/odom"
 
 

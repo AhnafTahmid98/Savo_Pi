@@ -3,14 +3,6 @@
 namespace savo_vo
 {
 
-bool CameraIntrinsics::is_valid() const
-{
-  return fx > 0.0 &&
-         fy > 0.0 &&
-         width > 0 &&
-         height > 0;
-}
-
 bool TrackingQuality::is_good(
   double minimum_score,
   int minimum_features) const

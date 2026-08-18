@@ -209,7 +209,7 @@ def test_frame_consumers_match_description_contract() -> None:
 
     vo = _yaml(SRC_ROOT / "edge/savo_vo/config/frames.yaml")["frames"]
     assert vo["odom_frame"] == frames["odom"]
-    assert vo["base_frame"] == frames["base_link"]
+    assert vo["base_frame"] == frames["base_footprint"]
     assert vo["camera_link_frame"] == frames["camera"]
     assert vo["camera_color_frame"] == frames["camera_color_optical"]
     assert vo["camera_depth_frame"] == frames["camera_depth_optical"]

@@ -3,19 +3,19 @@ rgbd_odometry_node:
     color_image_topic: "/camera/camera/color/image_raw"
     color_camera_info_topic: "/camera/camera/color/camera_info"
 
-    depth_image_topic: "/camera/camera/depth/image_rect_raw"
-    depth_camera_info_topic: "/camera/camera/depth/camera_info"
+    depth_image_topic: "/camera/camera/aligned_depth_to_color/image_raw"
 
     odom_topic: "/vo/odom/raw"
     status_topic: "/vo/status"
     tracking_quality_topic: "/vo/tracking_quality"
 
     odom_frame: "odom"
-    base_frame: "base_link"
+    base_frame: "base_footprint"
     camera_frame: "camera_color_optical_frame"
 
-    max_image_delay_s: 0.15
-    max_depth_delay_s: 0.15
+    sync_queue_size: 10
+    max_sync_delta_s: 0.02
+    max_frame_interval_s: 0.20
     stale_timeout_s: 0.30
 
     min_features: 80
@@ -23,8 +23,33 @@ rgbd_odometry_node:
     max_features: 800
 
     min_tracking_quality: 0.35
-    max_translation_jump_m: 0.30
-    max_rotation_jump_rad: 0.35
+    min_depth_correspondences: 30
+    min_pnp_inliers: 20
+    min_pnp_inlier_ratio: 0.50
+    pnp_iterations: 100
+    pnp_reprojection_error_px: 2.5
+    pnp_confidence: 0.99
+
+    depth_scale_16u: 0.001
+    min_depth_m: 0.20
+    max_depth_m: 6.0
+
+    max_translation_jump_m: 0.15
+    max_rotation_jump_rad: 0.20
+    translation_deadband_m: 0.001
+    rotation_deadband_rad: 0.001
+
+    base_to_camera_x_m: 0.130
+    base_to_camera_y_m: 0.0
+    base_to_camera_z_m: 0.225
+    base_to_camera_roll_rad: -1.5707963267948966
+    base_to_camera_pitch_rad: 0.0
+    base_to_camera_yaw_rad: -1.5707963267948966
+
+    position_variance: 0.05
+    yaw_variance: 0.10
+    linear_velocity_variance: 0.10
+    angular_velocity_variance: 0.20
 
     publish_tf: false
     publish_diagnostics: true

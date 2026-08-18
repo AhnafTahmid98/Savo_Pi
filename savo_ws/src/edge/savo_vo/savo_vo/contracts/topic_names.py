@@ -3,7 +3,7 @@
 COLOR_IMAGE_TOPIC = "/camera/camera/color/image_raw"
 COLOR_CAMERA_INFO_TOPIC = "/camera/camera/color/camera_info"
 
-DEPTH_IMAGE_TOPIC = "/camera/camera/depth/image_rect_raw"
+DEPTH_IMAGE_TOPIC = "/camera/camera/aligned_depth_to_color/image_raw"
 DEPTH_CAMERA_INFO_TOPIC = "/camera/camera/depth/camera_info"
 
 VO_ODOM_TOPIC = "/vo/odom"

@@ -25,22 +25,13 @@ enum class VOTrackingState : std::uint8_t
   kError = 4,
 };
 
-struct CameraIntrinsics
-{
-  double fx{0.0};
-  double fy{0.0};
-  double cx{0.0};
-  double cy{0.0};
-  int width{0};
-  int height{0};
-
-  bool is_valid() const;
-};
-
 struct TrackingQuality
 {
   int feature_count{0};
   int tracked_count{0};
+  int valid_depth_count{0};
+  int pnp_inlier_count{0};
+  double pnp_inlier_ratio{0.0};
   double score{0.0};
   VOTrackingState state{VOTrackingState::kWaitingForReference};
   std::string message{"waiting for visual odometry reference frame"};

@@ -9,7 +9,8 @@ constexpr const char * kPackageName = "savo_vo";
 
 constexpr const char * kColorImageTopic = "/camera/camera/color/image_raw";
 constexpr const char * kColorCameraInfoTopic = "/camera/camera/color/camera_info";
-constexpr const char * kDepthImageTopic = "/camera/camera/depth/image_rect_raw";
+constexpr const char * kDepthImageTopic =
+  "/camera/camera/aligned_depth_to_color/image_raw";
 constexpr const char * kDepthCameraInfoTopic = "/camera/camera/depth/camera_info";
 
 constexpr const char * kVoOdomTopic = "/vo/odom";
@@ -20,7 +21,7 @@ constexpr const char * kVoTrackingQualityTopic = "/vo/tracking_quality";
 constexpr const char * kDiagnosticsTopic = "/diagnostics";
 
 constexpr const char * kOdomFrame = "odom";
-constexpr const char * kBaseFrame = "base_link";
+constexpr const char * kBaseFrame = "base_footprint";
 constexpr const char * kCameraFrame = "camera_color_optical_frame";
 
 constexpr const char * kColorImageTopicParam = "color_image_topic";

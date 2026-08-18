@@ -17,7 +17,9 @@ public:
 
   TrackingQuality evaluate(
     int detected_features,
-    int tracked_features) const;
+    int tracked_features,
+    int valid_depth_correspondences,
+    int pnp_inliers) const;
 
 private:
   int min_features_{80};
@@ -28,6 +30,8 @@ private:
 double compute_tracking_score(
   int detected_features,
   int tracked_features,
+  int valid_depth_correspondences,
+  int pnp_inliers,
   int good_features_target);
 
 bool is_tracking_usable(
@@ -39,6 +43,9 @@ std::string build_tracking_message(
   VOTrackingState state,
   int detected_features,
   int tracked_features,
+  int valid_depth_correspondences,
+  int pnp_inliers,
+  double pnp_inlier_ratio,
   double score);
 
 }  // namespace savo_vo

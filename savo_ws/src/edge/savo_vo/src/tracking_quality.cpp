@@ -18,19 +18,32 @@ TrackingQualityEstimator::TrackingQualityEstimator(
 
 TrackingQuality TrackingQualityEstimator::evaluate(
   const int detected_features,
-  const int tracked_features) const
+  const int tracked_features,
+  const int valid_depth_correspondences,
+  const int pnp_inliers) const
 {
   TrackingQuality quality;
   quality.feature_count = std::max(0, detected_features);
   quality.tracked_count = std::max(0, tracked_features);
+  quality.valid_depth_count = std::max(0, valid_depth_correspondences);
+  quality.pnp_inlier_count = std::max(0, pnp_inliers);
+  quality.pnp_inlier_ratio = quality.valid_depth_count > 0 ?
+    static_cast<double>(quality.pnp_inlier_count) /
+    static_cast<double>(quality.valid_depth_count) : 0.0;
   quality.score = compute_tracking_score(
     quality.feature_count,
     quality.tracked_count,
+    quality.valid_depth_count,
+    quality.pnp_inlier_count,
     good_features_target_);
 
   if (quality.feature_count <= 0) {
     quality.state = VOTrackingState::kWaitingForReference;
-  } else if (quality.tracked_count < min_features_) {
+  } else if (
+    quality.tracked_count < min_features_ ||
+    quality.valid_depth_count <= 0 ||
+    quality.pnp_inlier_count <= 0)
+  {
     quality.state = VOTrackingState::kRejected;
   } else if (quality.score < min_score_) {
     quality.state = VOTrackingState::kLost;
@@ -42,6 +55,9 @@ TrackingQuality TrackingQualityEstimator::evaluate(
     quality.state,
     quality.feature_count,
     quality.tracked_count,
+    quality.valid_depth_count,
+    quality.pnp_inlier_count,
+    quality.pnp_inlier_ratio,
     quality.score);
 
   return quality;
@@ -50,13 +66,19 @@ TrackingQuality TrackingQualityEstimator::evaluate(
 double compute_tracking_score(
   const int detected_features,
   const int tracked_features,
+  const int valid_depth_correspondences,
+  const int pnp_inliers,
   const int good_features_target)
 {
   const int safe_detected = std::max(0, detected_features);
   const int safe_tracked = std::max(0, tracked_features);
+  const int safe_depth = std::max(0, valid_depth_correspondences);
+  const int safe_inliers = std::max(0, pnp_inliers);
   const int safe_target = std::max(1, good_features_target);
 
-  if (safe_detected == 0 || safe_tracked == 0) {
+  if (safe_detected == 0 || safe_tracked == 0 ||
+    safe_depth == 0 || safe_inliers == 0)
+  {
     return 0.0;
   }
 
@@ -66,7 +88,17 @@ double compute_tracking_score(
   const double target_score =
     static_cast<double>(safe_tracked) / static_cast<double>(safe_target);
 
-  const double combined_score = 0.60 * retention_score + 0.40 * target_score;
+  const double depth_support_score =
+    static_cast<double>(safe_depth) / static_cast<double>(safe_tracked);
+
+  const double geometric_inlier_score =
+    static_cast<double>(safe_inliers) / static_cast<double>(safe_depth);
+
+  const double combined_score =
+    0.20 * retention_score +
+    0.15 * target_score +
+    0.25 * depth_support_score +
+    0.40 * geometric_inlier_score;
 
   return std::clamp(combined_score, 0.0, 1.0);
 }
@@ -85,12 +117,18 @@ std::string build_tracking_message(
   const VOTrackingState state,
   const int detected_features,
   const int tracked_features,
+  const int valid_depth_correspondences,
+  const int pnp_inliers,
+  const double pnp_inlier_ratio,
   const double score)
 {
   std::ostringstream stream;
   stream << tracking_state_to_string(state)
          << ": detected=" << std::max(0, detected_features)
          << ", tracked=" << std::max(0, tracked_features)
+         << ", valid_depth=" << std::max(0, valid_depth_correspondences)
+         << ", pnp_inliers=" << std::max(0, pnp_inliers)
+         << ", pnp_inlier_ratio=" << std::clamp(pnp_inlier_ratio, 0.0, 1.0)
          << ", score=" << score;
 
   return stream.str();

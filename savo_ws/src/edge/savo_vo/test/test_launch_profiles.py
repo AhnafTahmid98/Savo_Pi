@@ -106,9 +106,19 @@ def test_profiles_wire_raw_and_clean_vo_topics():
         assert rgbd["status_topic"] == "/vo/status"
         assert rgbd["tracking_quality_topic"] == "/vo/tracking_quality"
         assert "health_topic" not in rgbd
+        assert rgbd["depth_image_topic"] == (
+            "/camera/camera/aligned_depth_to_color/image_raw"
+        )
+        assert rgbd["base_frame"] == "base_footprint"
+        assert rgbd["camera_frame"] == "camera_color_optical_frame"
+        assert rgbd["min_depth_correspondences"] >= 4
+        assert rgbd["min_pnp_inliers"] >= 4
+        assert 0.0 < rgbd["min_pnp_inlier_ratio"] <= 1.0
+        assert rgbd["publish_tf"] is False
 
         assert republisher["odom_raw_topic"] == "/vo/odom/raw"
         assert republisher["odom_topic"] == "/vo/odom"
+        assert republisher["base_frame"] == "base_footprint"
 
         assert health["odom_topic"] == "/vo/odom"
         assert health["health_topic"] == "/vo/health"

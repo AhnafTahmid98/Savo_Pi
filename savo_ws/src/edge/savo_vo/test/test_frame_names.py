@@ -1,6 +1,7 @@
 """Tests for savo_vo frame name contracts."""
 
 from savo_vo.contracts.frame_names import (
+    BASE_FOOTPRINT_FRAME,
     BASE_LINK_FRAME,
     CAMERA_COLOR_FRAME,
     CAMERA_DEPTH_FRAME,
@@ -14,6 +15,7 @@ from savo_vo.contracts.frame_names import (
 def test_core_robot_frames_match_expected_defaults() -> None:
     assert ODOM_FRAME == "odom"
     assert BASE_LINK_FRAME == "base_link"
+    assert BASE_FOOTPRINT_FRAME == "base_footprint"
 
 
 def test_vo_internal_frames_match_expected_defaults() -> None:
@@ -30,6 +32,7 @@ def test_camera_frames_match_expected_defaults() -> None:
 def test_frame_names_are_not_empty() -> None:
     frames = [
         ODOM_FRAME,
+        BASE_FOOTPRINT_FRAME,
         BASE_LINK_FRAME,
         VO_ODOM_FRAME,
         VO_CAMERA_FRAME,

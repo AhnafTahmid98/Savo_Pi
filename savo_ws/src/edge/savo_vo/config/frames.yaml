@@ -1,6 +1,6 @@
 frames:
   odom_frame: "odom"
-  base_frame: "base_link"
+  base_frame: "base_footprint"
 
   vo_odom_frame: "vo_odom"
   vo_camera_frame: "vo_camera_link"

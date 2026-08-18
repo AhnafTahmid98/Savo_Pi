@@ -7,7 +7,7 @@ PACKAGE_NAME = "savo_vo"
 DEFAULT_COLOR_IMAGE_TOPIC = "/camera/camera/color/image_raw"
 DEFAULT_COLOR_CAMERA_INFO_TOPIC = "/camera/camera/color/camera_info"
 
-DEFAULT_DEPTH_IMAGE_TOPIC = "/camera/camera/depth/image_rect_raw"
+DEFAULT_DEPTH_IMAGE_TOPIC = "/camera/camera/aligned_depth_to_color/image_raw"
 DEFAULT_DEPTH_CAMERA_INFO_TOPIC = "/camera/camera/depth/camera_info"
 
 DEFAULT_VO_ODOM_TOPIC = "/vo/odom"
@@ -20,7 +20,7 @@ DEFAULT_VO_RESET_TOPIC = "/vo/reset"
 DEFAULT_DIAGNOSTICS_TOPIC = "/diagnostics"
 
 DEFAULT_ODOM_FRAME = "odom"
-DEFAULT_BASE_FRAME = "base_link"
+DEFAULT_BASE_FRAME = "base_footprint"
 DEFAULT_CAMERA_FRAME = "camera_color_optical_frame"
 
 DEFAULT_STALE_TIMEOUT_S = 0.50

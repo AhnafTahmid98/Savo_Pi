@@ -18,7 +18,7 @@ from savo_vo.contracts.topic_names import (
 def test_realsense_input_topics_match_expected_defaults() -> None:
     assert COLOR_IMAGE_TOPIC == "/camera/camera/color/image_raw"
     assert COLOR_CAMERA_INFO_TOPIC == "/camera/camera/color/camera_info"
-    assert DEPTH_IMAGE_TOPIC == "/camera/camera/depth/image_rect_raw"
+    assert DEPTH_IMAGE_TOPIC == "/camera/camera/aligned_depth_to_color/image_raw"
     assert DEPTH_CAMERA_INFO_TOPIC == "/camera/camera/depth/camera_info"
 
 

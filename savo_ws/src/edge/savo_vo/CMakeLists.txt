@@ -21,6 +21,7 @@ find_package(nav_msgs REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
 find_package(builtin_interfaces REQUIRED)
 find_package(cv_bridge REQUIRED)
+find_package(message_filters REQUIRED)
 find_package(OpenCV REQUIRED COMPONENTS core imgproc video calib3d)
 
 ament_python_install_package(${PROJECT_NAME})
@@ -31,6 +32,7 @@ add_library(savo_vo_core
   src/timestamp_sync.cpp
   src/covariance_builder.cpp
   src/geometry_utils.cpp
+  src/rgbd_geometry.cpp
   src/rgbd_odometry_node.cpp
   src/vo_health_node.cpp
   src/vo_diagnostics_node.cpp
@@ -41,6 +43,7 @@ target_include_directories(savo_vo_core
   PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
+    ${OpenCV_INCLUDE_DIRS}
 )
 
 target_compile_features(savo_vo_core
@@ -57,6 +60,7 @@ ament_target_dependencies(savo_vo_core
   diagnostic_msgs
   builtin_interfaces
   cv_bridge
+  message_filters
 )
 
 target_link_libraries(savo_vo_core
@@ -162,7 +166,19 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
 endif()
 
 if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
   find_package(ament_cmake_pytest REQUIRED)
+
+  ament_add_gtest(test_rgbd_geometry
+    test/test_rgbd_geometry.cpp
+  )
+
+  if(TARGET test_rgbd_geometry)
+    target_link_libraries(test_rgbd_geometry
+      savo_vo_core
+      ${OpenCV_LIBS}
+    )
+  endif()
 
   file(GLOB PYTEST_FILES
     RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}"

@@ -4,4 +4,4 @@ vo_republisher_node:
     odom_topic: "/vo/odom"
 
     odom_frame: "odom"
-    base_frame: "base_link"
+    base_frame: "base_footprint"

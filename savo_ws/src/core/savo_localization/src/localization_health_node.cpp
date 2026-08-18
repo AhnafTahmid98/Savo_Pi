@@ -592,16 +592,9 @@ private:
 
   void on_vo_odom(const nav_msgs::msg::Odometry & message)
   {
-    // VO is an EKF input. Its child frame may be base_link or base_footprint
-    // depending on the edge odometry implementation, so health validates data,
-    // timestamp progression, and non-empty frames without imposing TF ownership.
-    const bool frame_valid =
-      !message.header.frame_id.empty() && !message.child_frame_id.empty();
-    const bool data_valid = valid_odom_message(message) && odom_speed_valid(message);
-    vo_tracker_.record(
-      now(), message.header.stamp, data_valid, frame_valid,
-      frame_valid ? std::string{} : "vo_frames_empty",
-      timestamp_fault_hold_s_, rate_window_size_);
+    // /vo/odom is a pose measurement of the same planar base_footprint used by
+    // robot_localization. VO does not own or publish the odom TF.
+    record_odom(vo_tracker_, message, odom_frame_id_, base_frame_id_);
   }
 
   void on_imu_state(const std::string & payload)

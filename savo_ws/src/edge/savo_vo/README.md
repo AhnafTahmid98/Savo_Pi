@@ -263,7 +263,7 @@ Default input topics:
 ```text
 /camera/camera/color/image_raw
 /camera/camera/color/camera_info
-/camera/camera/depth/image_rect_raw
+/camera/camera/aligned_depth_to_color/image_raw
 /camera/camera/depth/camera_info
 ```
 
@@ -282,7 +282,7 @@ Keep this default:
 publish_tf: false
 ```
 
-The EKF in `savo_localization` should own the final `odom -> base_link` transform.
+The EKF in `savo_localization` owns the final `odom -> base_footprint` transform.
 
 ### Step 10 — Launch Files
 

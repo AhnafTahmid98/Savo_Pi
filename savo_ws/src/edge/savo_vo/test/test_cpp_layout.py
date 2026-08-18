@@ -15,6 +15,7 @@ CPP_HEADERS = [
     "timestamp_sync.hpp",
     "covariance_builder.hpp",
     "geometry_utils.hpp",
+    "rgbd_geometry.hpp",
 ]
 
 
@@ -32,6 +33,7 @@ CPP_SOURCES = [
     "timestamp_sync.cpp",
     "covariance_builder.cpp",
     "geometry_utils.cpp",
+    "rgbd_geometry.cpp",
 ]
 
 
@@ -101,3 +103,17 @@ def test_no_direct_camera_package_dependency_in_cpp_files():
     for path in checked_paths:
         text = path.read_text(encoding="utf-8")
         assert "savo_realsense" not in text, f"Direct dependency found in {path}"
+
+
+def test_cpp_vo_uses_synchronized_rgbd_pnp_not_affine_pixel_motion():
+    node = (PACKAGE_ROOT / "src/rgbd_odometry_node.cpp").read_text(encoding="utf-8")
+    geometry = (PACKAGE_ROOT / "src/rgbd_geometry.cpp").read_text(encoding="utf-8")
+    cmake = (PACKAGE_ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
+
+    assert "message_filters::Synchronizer" in node
+    assert "previous_aligned_depth_image_" in node
+    assert "solvePnPRansac" in geometry
+    assert "previous_camera_T_current_camera" in geometry
+    assert "estimateAffinePartial2D" not in node
+    assert "std::clamp(delta_x" not in node
+    assert "find_package(message_filters REQUIRED)" in cmake

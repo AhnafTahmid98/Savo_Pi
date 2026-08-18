@@ -38,3 +38,41 @@ def test_cmake_installs_localization_config_directory() -> None:
     cmake = (PACKAGE_ROOT / "CMakeLists.txt").read_text()
     assert "config/" in cmake
     assert "DESTINATION share/${PROJECT_NAME}/config" in cmake
+
+
+def test_vo_fusion_contract_matches_planar_ekf_base() -> None:
+    """VO must measure odom -> base_footprint without taking TF ownership."""
+    overlay = yaml.safe_load((PACKAGE_ROOT / VO_OVERLAY).read_text(encoding="utf-8"))
+    params = overlay["ekf_filter_node"]["ros__parameters"]
+
+    assert params["odom1"] == "/vo/odom"
+    assert params["odom1_config"] == [
+        True,
+        True,
+        False,
+        False,
+        False,
+        True,
+        False,
+        False,
+        False,
+        False,
+        False,
+        False,
+        False,
+        False,
+        False,
+    ]
+    assert params["odom1_differential"] is False
+    assert params["odom1_relative"] is True
+
+    frames = yaml.safe_load(
+        (PACKAGE_ROOT / "config/frames.yaml").read_text(encoding="utf-8")
+    )
+    ekf_frames = frames["ekf_filter_node"]["ros__parameters"]
+    assert ekf_frames["base_link_frame"] == "base_footprint"
+
+    health_source = (
+        PACKAGE_ROOT / "src/localization_health_node.cpp"
+    ).read_text(encoding="utf-8")
+    assert "record_odom(vo_tracker_, message, odom_frame_id_, base_frame_id_)" in health_source
