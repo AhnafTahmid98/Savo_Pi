@@ -26,38 +26,46 @@ def test_vo_launch_separates_driver_and_monitor_configs() -> None:
 
     assert 'LaunchConfiguration("driver_config_file")' in launch_text
     assert 'LaunchConfiguration("monitor_config_file")' in launch_text
-    assert '"config_file": driver_config_file' in launch_text
+    assert launch_text.count("Node(") == 3
+    assert 'package="realsense2_camera"' in launch_text
+    assert 'executable="realsense2_camera_node"' in launch_text
+    assert 'namespace="camera"' in launch_text
+    assert 'name="camera"' in launch_text
+    assert "parameters=[driver_config_file]" in launch_text
     assert launch_text.count("parameters=[monitor_config_file]") == 2
-    assert "parameters=[driver_config_file]" not in launch_text
+    assert "rs_launch.py" not in launch_text
+    assert "IncludeLaunchDescription" not in launch_text
     assert '"realsense_vo_driver.yaml"' in launch_text
     assert '"realsense_vo_profile.yaml"' in launch_text
 
 
-def test_vo_driver_config_is_flat_and_enables_required_streams() -> None:
-    params = load_yaml("config/realsense_vo_driver.yaml")
-
-    assert "realsense2_camera" not in params
-    assert "/camera/camera" not in params
-    assert "ros__parameters" not in params
-    assert all(not isinstance(value, dict) for value in params.values())
+def test_vo_driver_config_is_direct_node_yaml_and_enables_streams() -> None:
+    config = load_yaml("config/realsense_vo_driver.yaml")
+    params = config["/camera/camera"]["ros__parameters"]
 
     assert params["camera_name"] == "camera"
     assert params["camera_namespace"] == "camera"
+    assert params["serial_no"] == "801212070967"
     assert params["enable_color"] is True
     assert params["enable_depth"] is True
     assert params["depth_module.depth_profile"] == "640x480x30"
     assert params["rgb_camera.color_profile"] == "640x480x30"
     assert params["align_depth.enable"] is True
     assert params["enable_sync"] is True
-    assert params["pointcloud.enable"] is True
-    assert params["pointcloud.stream_filter"] == 2
-    assert params["pointcloud.stream_index_filter"] == 0
-    assert params["pointcloud.allow_no_texture_points"] is True
-    assert params["pointcloud.ordered_pc"] is False
+    assert params["pointcloud__neon_.enable"] is True
+    assert params["pointcloud__neon_.stream_filter"] == 2
+    assert params["pointcloud__neon_.stream_index_filter"] == 0
+    assert params["pointcloud__neon_.allow_no_texture_points"] is True
+    assert params["pointcloud__neon_.ordered_pc"] is False
+    assert params["pointcloud__neon_.pointcloud_qos"] == "SENSOR_DATA"
+    assert "pointcloud.enable" not in params
+    assert "pointcloud.stream_filter" not in params
+    assert "pointcloud.stream_index_filter" not in params
 
 
 def test_vo_driver_disables_tf_infrared_and_motion_streams() -> None:
-    params = load_yaml("config/realsense_vo_driver.yaml")
+    config = load_yaml("config/realsense_vo_driver.yaml")
+    params = config["/camera/camera"]["ros__parameters"]
 
     assert params["publish_tf"] is False
     assert params["tf_publish_rate"] == 0.0
@@ -66,7 +74,6 @@ def test_vo_driver_disables_tf_infrared_and_motion_streams() -> None:
     assert params["enable_infra2"] is False
     assert params["enable_gyro"] is False
     assert params["enable_accel"] is False
-    assert not any(key.startswith("pointcloud__neon_") for key in params)
 
 
 def test_vo_monitor_profile_requires_pointcloud() -> None:

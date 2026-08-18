@@ -1,7 +1,6 @@
 # Copyright 2026 Ahnaf Tahmid
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
-from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
@@ -11,17 +10,13 @@ def generate_launch_description() -> LaunchDescription:
     driver_config_file = LaunchConfiguration("driver_config_file")
     monitor_config_file = LaunchConfiguration("monitor_config_file")
 
-    realsense_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            PathJoinSubstitution([
-                FindPackageShare("realsense2_camera"),
-                "launch",
-                "rs_launch.py",
-            ])
-        ),
-        launch_arguments={
-            "config_file": driver_config_file,
-        }.items(),
+    realsense_node = Node(
+        package="realsense2_camera",
+        executable="realsense2_camera_node",
+        namespace="camera",
+        name="camera",
+        output="screen",
+        parameters=[driver_config_file],
     )
 
     topic_monitor = Node(
@@ -57,7 +52,7 @@ def generate_launch_description() -> LaunchDescription:
                 "realsense_vo_profile.yaml",
             ]),
         ),
-        realsense_launch,
+        realsense_node,
         topic_monitor,
         health_node,
     ])
