@@ -19,8 +19,8 @@ ENCODER_CONFIGS = (
     "config/profiles/wheel_odom_4enc.yaml",
 )
 EXPECTED_ENCODER_GPIOS = {
-    "fl_a_gpio": 20,
-    "fl_b_gpio": 21,
+    "fl_a_gpio": 21,
+    "fl_b_gpio": 20,
     "fr_a_gpio": 13,
     "fr_b_gpio": 25,
     "rl_a_gpio": 24,
@@ -29,7 +29,7 @@ EXPECTED_ENCODER_GPIOS = {
     "rr_b_gpio": 26,
 }
 EXPECTED_ENCODER_WHEELS = {
-    "FL": (20, 21),
+    "FL": (21, 20),
     "FR": (13, 25),
     "RL": (24, 23),
     "RR": (12, 26),

@@ -13,7 +13,7 @@ No verified pin-to-pin harness record exists in the inspected source. This regis
 | I2C-E | Edge SDA/SCL | Edge UPS | Bus 1, `0x36` | Connector/pull-ups pending |
 | TOF-L/R | TCA9548A ch 2/3 | VL53L1X left/right | Each `0x29` | Connector/pinout/routing pending |
 | US-01 | Core GPIO 27/22 | Front ultrasonic | Trigger/echo | Supply and echo level conversion pending |
-| ENC-FL | Core GPIO 20/21 | FL encoder | A/B | Voltage/pinout/connector pending |
+| ENC-FL | Core GPIO 21/20 | FL encoder | A/B | Voltage/pinout/connector pending |
 | ENC-FR | Core GPIO 13/25 | FR encoder | A/B | Voltage/pinout/connector pending |
 | ENC-RL | Core GPIO 24/23 | RL encoder | A/B | Voltage/pinout/connector pending |
 | ENC-RR | Core GPIO 12/26 | RR encoder | A/B | Voltage/pinout/connector pending |
