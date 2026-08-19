@@ -35,8 +35,8 @@ wheel_odom_node:
     wheel_speed_deadband_mps: 0.02
     min_active_wheels_for_twist: 2
 
-    fl_a_gpio: 21
-    fl_b_gpio: 20
+    fl_a_gpio: 20
+    fl_b_gpio: 21
 
     fr_a_gpio: 13
     fr_b_gpio: 25
