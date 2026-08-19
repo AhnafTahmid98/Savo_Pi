@@ -4,10 +4,36 @@ from pathlib import Path
 
 import yaml
 
+from savo_localization.constants import (
+    DEFAULT_ENCODER_GPIO_MAP,
+    DEFAULT_ENCODER_INVERT_MAP,
+)
+
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 VO_OVERLAY = "config/ekf_vo_input_optional.yaml"
 STALE_OVERLAY = "vo_fusion_optional.yaml"
+ENCODER_CONFIGS = (
+    "config/encoders.yaml",
+    "config/profiles/bench_encoders_4wheel.yaml",
+    "config/profiles/wheel_odom_4enc.yaml",
+)
+EXPECTED_ENCODER_GPIOS = {
+    "fl_a_gpio": 20,
+    "fl_b_gpio": 21,
+    "fr_a_gpio": 13,
+    "fr_b_gpio": 25,
+    "rl_a_gpio": 24,
+    "rl_b_gpio": 23,
+    "rr_a_gpio": 12,
+    "rr_b_gpio": 26,
+}
+EXPECTED_ENCODER_WHEELS = {
+    "FL": (20, 21),
+    "FR": (13, 25),
+    "RL": (24, 23),
+    "RR": (12, 26),
+}
 
 
 def test_optional_vo_overlay_exists_and_is_valid_yaml() -> None:
@@ -38,6 +64,36 @@ def test_cmake_installs_localization_config_directory() -> None:
     cmake = (PACKAGE_ROOT / "CMakeLists.txt").read_text()
     assert "config/" in cmake
     assert "DESTINATION share/${PROJECT_NAME}/config" in cmake
+
+
+def test_real_robot_encoder_gpio_mapping_and_direction_flags() -> None:
+    """Keep all real-hardware encoder configs aligned with Robot Savo wiring."""
+    for relative_path in ENCODER_CONFIGS:
+        config = yaml.safe_load(
+            (PACKAGE_ROOT / relative_path).read_text(encoding="utf-8")
+        )
+        params = config["wheel_odom_node"]["ros__parameters"]
+
+        assert {
+            name: params[name] for name in EXPECTED_ENCODER_GPIOS
+        } == EXPECTED_ENCODER_GPIOS
+        assert {
+            name: params[name]
+            for name in ("invert_fl", "invert_fr", "invert_rl", "invert_rr")
+        } == {
+            "invert_fl": False,
+            "invert_fr": False,
+            "invert_rl": False,
+            "invert_rr": False,
+        }
+
+
+def test_python_encoder_defaults_match_real_robot_wiring() -> None:
+    """Keep Python model fallbacks aligned with the production configuration."""
+    assert DEFAULT_ENCODER_GPIO_MAP == EXPECTED_ENCODER_WHEELS
+    assert DEFAULT_ENCODER_INVERT_MAP == {
+        wheel: False for wheel in EXPECTED_ENCODER_WHEELS
+    }
 
 
 def test_vo_fusion_contract_matches_planar_ekf_base() -> None:

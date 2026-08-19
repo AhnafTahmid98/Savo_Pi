@@ -48,7 +48,7 @@ class WheelEncoderConfig:
     name: str
     a_gpio: int
     b_gpio: int
-    inverted: bool = True
+    inverted: bool = False
 
     def validate(self) -> None:
         if self.name not in WHEEL_ORDER:

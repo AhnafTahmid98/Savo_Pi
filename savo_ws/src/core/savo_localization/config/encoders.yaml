@@ -36,11 +36,11 @@ wheel_odom_node:
     fr_a_gpio: 13
     fr_b_gpio: 25
 
-    rl_a_gpio: 23
-    rl_b_gpio: 24
+    rl_a_gpio: 24
+    rl_b_gpio: 23
 
-    rr_a_gpio: 26
-    rr_b_gpio: 12
+    rr_a_gpio: 12
+    rr_b_gpio: 26
 
     invert_fl: false
     invert_fr: false

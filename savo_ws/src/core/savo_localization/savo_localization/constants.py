@@ -100,11 +100,11 @@ DEFAULT_FL_B_GPIO = 21
 DEFAULT_FR_A_GPIO = 13
 DEFAULT_FR_B_GPIO = 25
 
-DEFAULT_RL_A_GPIO = 23
-DEFAULT_RL_B_GPIO = 24
+DEFAULT_RL_A_GPIO = 24
+DEFAULT_RL_B_GPIO = 23
 
-DEFAULT_RR_A_GPIO = 26
-DEFAULT_RR_B_GPIO = 12
+DEFAULT_RR_A_GPIO = 12
+DEFAULT_RR_B_GPIO = 26
 
 class _GpioPair(tuple):
     def __new__(cls, a_gpio: int, b_gpio: int):
@@ -142,10 +142,10 @@ DEFAULT_ENCODER_GPIO_MAP = {
 }
 
 DEFAULT_ENCODER_INVERT_MAP = {
-    WHEEL_FL: True,
-    WHEEL_FR: True,
-    WHEEL_RL: True,
-    WHEEL_RR: True,
+    WHEEL_FL: False,
+    WHEEL_FR: False,
+    WHEEL_RL: False,
+    WHEEL_RR: False,
 }
 
 # Encoder timing / diagnostics

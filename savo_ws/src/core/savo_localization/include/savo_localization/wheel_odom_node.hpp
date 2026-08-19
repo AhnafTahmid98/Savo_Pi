@@ -111,10 +111,10 @@ private:
   int fl_b_gpio_{21};
   int fr_a_gpio_{13};
   int fr_b_gpio_{25};
-  int rl_a_gpio_{23};
-  int rl_b_gpio_{24};
-  int rr_a_gpio_{26};
-  int rr_b_gpio_{12};
+  int rl_a_gpio_{24};
+  int rl_b_gpio_{23};
+  int rr_a_gpio_{12};
+  int rr_b_gpio_{26};
 
   bool invert_fl_{false};
   bool invert_fr_{false};
