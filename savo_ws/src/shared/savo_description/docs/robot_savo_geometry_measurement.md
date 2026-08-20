@@ -5,7 +5,10 @@ Profile revision 2 integrates owner-supplied physical measurements dated
 
 ## Measured
 
-- Three plates: `0.2796 x 0.2100 x 0.0040 m`.
+- Four plates, all `0.0040 m` thick. The base, first, and second plates are
+  `0.2796 x 0.2100 m`; the third LiDAR-only plate is `0.1420 x 0.1440 m`.
+- `Base_Layer.STL` includes the DC-motor mounts, producing a `0.0280 m` total
+  mesh envelope. The physical base plate itself remains `0.0040 m` thick.
 - Reported plate ground Z: base `0.014`, first `0.080`, second `0.200 m`.
 - Wheel centers: front X `+0.080`, rear X `-0.080`, left Y `+0.108`, right Y `-0.108 m`.
 - Wheel diameter `0.065 m`; wheelbase `0.160 m`; track `0.216 m`.
@@ -30,7 +33,16 @@ Because URDF box origins are center planes, the model provisionally treats the
 reported Z values as centers and records a `0.002 m` ambiguity. D435 internal
 color/depth frame translations remain zero placeholders, not calibrated stream
 extrinsics. Legacy display/ReSpeaker positions, wheel width, masses, and
-inertials also remain provisional.
+inertials also remain provisional. The third-layer ground Z has not yet been
+measured.
+
+## Layer equipment layout
+
+- Base: DC motors, mecanum wheels, ToFs, front ultrasonic, IMU, and multiplexer.
+- First: display, speakers, Core Pi, and breadboard.
+- Second: RealSense D435, ReSpeaker microphone array, Edge Pi, and pan-tilt
+  camera; the pan-tilt assembly is above the RealSense.
+- Third: RPLIDAR A1 only.
 
 ## Required runtime verification before lock
 
@@ -38,7 +50,8 @@ inertials also remain provisional.
 2. Verify LiDAR scan-zero yaw in RViz with an obstacle directly ahead.
 3. Obtain authoritative D435 internal stream extrinsics or safely redesign TF ownership.
 4. Validate head `pan_sign` and `tilt_sign`, neutral image direction, and dynamic TF.
-5. Resolve each plate Z datum as surface or center plane.
+5. Measure the third-layer ground Z and resolve each plate Z datum as surface
+   or center plane.
 6. Measure wheel width and physical mass/inertial values.
 7. Survey the full collision envelope and remaining display/ReSpeaker geometry.
 

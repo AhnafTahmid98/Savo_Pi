@@ -69,9 +69,8 @@ constexpr double kNanosecondsPerSecond = 1.0e9;
   return std::atan2(std::sin(lhs - rhs), std::cos(lhs - rhs));
 }
 
-struct AcceptedSample
+struct SpatialSample
 {
-  Observation observation{};
   geometry_msgs::msg::PoseStamped pose{};
 };
 
@@ -83,7 +82,7 @@ struct StabilitySummary
 };
 
 [[nodiscard]] StabilitySummary summarize(
-  const std::vector<AcceptedSample> & samples,
+  const std::vector<SpatialSample> & samples,
   const std::string & frame_id,
   const rclcpp::Time & stamp)
 {
@@ -461,7 +460,7 @@ private:
     const bool confirmed,
     const std::uint8_t code,
     const std::string & reason,
-    const std::vector<AcceptedSample> & accepted,
+    const std::vector<Observation> & accepted,
     const std::uint32_t rejected,
     const std::optional<StabilitySummary> & stability,
     const bool canceled)
@@ -475,7 +474,7 @@ private:
     result->rejected_observations = rejected;
 
     if (!accepted.empty()) {
-      result->final_observation = accepted.back().observation;
+      result->final_observation = accepted.back();
     }
 
     if (stability.has_value()) {
@@ -505,9 +504,13 @@ private:
       requested_timeout : default_timeout_s_;
     const auto start = now();
     const auto deadline = start + rclcpp::Duration::from_seconds(timeout_s);
+    const bool spatial_evidence_required =
+      apriltag_contract::RequiresSpatialEvidence(
+        goal->mode, goal->require_map_pose);
     std::uint64_t consumed_sequence = latest_sequence();
     std::optional<std::int32_t> locked_tag_id;
-    std::vector<AcceptedSample> accepted;
+    std::vector<Observation> accepted;
+    std::vector<SpatialSample> spatial_samples;
     std::uint32_t rejected = 0U;
     bool saw_wrong_tag = false;
     bool saw_matching_unstable = false;
@@ -554,27 +557,16 @@ private:
           consumed_sequence,
           observation.observation_sequence);
 
-        if (observation.family != goal->expected_family) {
-          saw_wrong_tag = true;
-          ++rejected;
-          continue;
-        }
-
+        const bool family_matches = observation.family == goal->expected_family;
         const std::int32_t expected_id =
           goal->expected_tag_id == ConfirmAprilTag::Goal::ANY_TAG_ID ?
           (locked_tag_id.has_value() ? locked_tag_id.value() : observation.tag_id) :
           goal->expected_tag_id;
 
-        if (!locked_tag_id.has_value() &&
+        if (family_matches && !locked_tag_id.has_value() &&
           goal->expected_tag_id == ConfirmAprilTag::Goal::ANY_TAG_ID)
         {
           locked_tag_id = observation.tag_id;
-        }
-
-        if (observation.tag_id != expected_id) {
-          saw_wrong_tag = true;
-          ++rejected;
-          continue;
         }
 
         const rclcpp::Time observation_stamp(observation.header.stamp);
@@ -582,35 +574,57 @@ private:
           std::numeric_limits<double>::infinity() :
           (now() - observation_stamp).seconds();
 
-        if (age_s < 0.0 || age_s > maximum_observation_age_s_ ||
-          observation.detection_quality < minimum_detection_quality_ ||
-          observation.hamming_distance > maximum_hamming_distance_ ||
-          !observation.pose_valid)
+        const auto identity_disposition =
+          apriltag_contract::ClassifyIdentityEvidence(
+            family_matches,
+            observation.tag_id == expected_id,
+            age_s >= 0.0 && age_s <= maximum_observation_age_s_,
+            observation.detection_quality >= minimum_detection_quality_,
+            observation.hamming_distance <= maximum_hamming_distance_);
+
+        if (identity_disposition ==
+          apriltag_contract::IdentityEvidenceDisposition::kWrongTag)
+        {
+          saw_wrong_tag = true;
+          ++rejected;
+          continue;
+        }
+        if (identity_disposition ==
+          apriltag_contract::IdentityEvidenceDisposition::kUnstable)
         {
           saw_matching_unstable = true;
           ++rejected;
           continue;
         }
 
-        const auto transformed = map_pose(observation, goal->require_map_pose);
-        if (!transformed.has_value() && goal->require_map_pose) {
-          saw_matching_unstable = true;
-          ++rejected;
-          continue;
+        if (spatial_evidence_required) {
+          if (!observation.pose_valid) {
+            saw_matching_unstable = true;
+            ++rejected;
+            continue;
+          }
+
+          const auto transformed = map_pose(observation, true);
+          if (!transformed.has_value()) {
+            saw_matching_unstable = true;
+            ++rejected;
+            continue;
+          }
+
+          SpatialSample sample;
+          sample.pose = transformed.value();
+          spatial_samples.push_back(std::move(sample));
         }
 
-        AcceptedSample sample;
-        sample.observation = observation;
-        if (transformed.has_value()) {
-          sample.pose = transformed.value();
-        } else {
-          sample.pose.header = observation.header;
-          sample.pose.pose = observation.pose.pose;
-        }
-        accepted.push_back(std::move(sample));
+        accepted.push_back(observation);
 
         if (accepted.size() > static_cast<std::size_t>(minimum_observations_ * 3)) {
           accepted.erase(accepted.begin());
+        }
+        if (spatial_samples.size() >
+          static_cast<std::size_t>(minimum_observations_ * 3))
+        {
+          spatial_samples.erase(spatial_samples.begin());
         }
 
         publish_feedback(
@@ -621,10 +635,34 @@ private:
           rejected,
           observation);
 
-        if (accepted.size() >= static_cast<std::size_t>(minimum_observations_)) {
+        if (apriltag_contract::HasMinimumEvidence(
+            accepted.size(), static_cast<std::size_t>(minimum_observations_)))
+        {
+          if (apriltag_contract::IsIdentityOnlyArrival(
+              goal->mode, goal->require_map_pose))
+          {
+            publish_feedback(
+              goal_handle,
+              ConfirmAprilTag::Feedback::STATE_CONFIRMING,
+              "apriltag_identity_confirmed",
+              static_cast<std::uint32_t>(accepted.size()),
+              rejected,
+              observation);
+            finish(
+              goal_handle,
+              true,
+              ConfirmAprilTag::Result::RESULT_CONFIRMED,
+              "apriltag_identity_confirmation_succeeded",
+              accepted,
+              rejected,
+              std::nullopt,
+              false);
+            return;
+          }
+
           const auto stability = summarize(
-            accepted,
-            accepted.back().pose.header.frame_id,
+            spatial_samples,
+            spatial_samples.back().pose.header.frame_id,
             now());
 
           if (stability.position_stddev_m <= maximum_position_stddev_m_ &&

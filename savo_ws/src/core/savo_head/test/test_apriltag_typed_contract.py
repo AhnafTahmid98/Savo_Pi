@@ -17,6 +17,10 @@ def test_typed_apriltag_contract_names_and_duties() -> None:
         "kRegisterLocation = 1U",
         "kConfirmArrival = 2U",
         "IsValidDuty",
+        "RequiresSpatialEvidence",
+        "IsIdentityOnlyArrival",
+        "ClassifyIdentityEvidence",
+        "HasMinimumEvidence",
     ):
         assert token in text
 

@@ -18,10 +18,19 @@ coordinate_convention:
   z: up
 
 chassis:
-  # All three plates share these measured dimensions.
+  # All four physical plates are 4 mm thick. Base, first, and second are the
+  # full-size plates below; the third plate is the smaller LiDAR-only plate.
+  plate_count: 4
   length_m: 0.2796
   width_m: 0.2100
   height_m: 0.0040
+  third_plate_length_m: 0.1420
+  third_plate_width_m: 0.1440
+  third_plate_height_m: 0.0040
+  # Base_Layer.STL includes the motor mounts. Its 28 mm mesh envelope is not
+  # the plate thickness and must not replace the 4 mm physical plate value.
+  base_mesh_envelope_height_m: 0.0280
+  base_mesh_includes_motor_mounts: true
   base_footprint_to_base_link_z_m: 0.0325
   base_link_convention: wheel_axle_plane_from_configured_wheel_radius
   mass_kg: 1.20
@@ -34,6 +43,12 @@ chassis:
   plate_z_ambiguity_m: 0.002
   plate_ground_z_m: {base: 0.014, first: 0.080, second: 0.200}
   modeled_plate_center_ground_z_m: {base: 0.014, first: 0.080, second: 0.200}
+  unmeasured_plate_ground_layers: [third]
+  layer_contents:
+    base: [dc_motors, mecanum_wheels, tof_sensors, ultrasonic, imu, multiplexer]
+    first: [display, speakers, core_pi, breadboard]
+    second: [realsense_d435, respeaker_mic_array, edge_pi, pan_tilt_camera]
+    third: [rplidar_a1]
 
 wheels:
   type: mecanum
@@ -100,6 +115,7 @@ realsense_internal_frames:
   extrinsics_state: provisional_zero_translation_not_device_calibrated
 
 calibration_remaining:
+  - third_plate_ground_z
   - imu_board_x_y_orientation
   - lidar_scan_zero_yaw
   - realsense_internal_color_depth_extrinsics

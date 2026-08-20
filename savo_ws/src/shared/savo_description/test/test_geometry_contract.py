@@ -45,6 +45,22 @@ def test_plate_dimensions_and_axle_frame_match_core_xacro() -> None:
     assert chassis["length_m"] == mirror["base"]["length_m"] == pytest.approx(0.2796)
     assert chassis["width_m"] == mirror["base"]["width_m"] == pytest.approx(0.2100)
     assert chassis["height_m"] == mirror["base"]["height_m"] == pytest.approx(0.0040)
+    assert chassis["plate_count"] == mirror["plates"]["count"] == 4
+    assert chassis["third_plate_height_m"] == mirror["plates"][
+        "third_thickness_m"
+    ] == pytest.approx(0.0040)
+    assert chassis["third_plate_length_m"] == mirror["plates"][
+        "third_length_m"
+    ] == pytest.approx(0.1420)
+    assert chassis["third_plate_width_m"] == mirror["plates"][
+        "third_width_m"
+    ] == pytest.approx(0.1440)
+    assert chassis["base_mesh_envelope_height_m"] == mirror["plates"][
+        "base_mesh_envelope_height_m"
+    ] == pytest.approx(0.0280)
+    assert chassis["base_mesh_includes_motor_mounts"] is True
+    assert mirror["plates"]["base_mesh_includes_motor_mounts"] is True
+    assert chassis["layer_contents"] == mirror["layer_contents"]
     assert chassis["base_footprint_to_base_link_z_m"] == pytest.approx(0.0325)
     assert _macro_default(core, "base_length") == pytest.approx(0.2796)
     assert _macro_default(core, "base_width") == pytest.approx(0.2100)

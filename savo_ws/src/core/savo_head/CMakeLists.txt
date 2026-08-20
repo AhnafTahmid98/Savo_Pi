@@ -233,6 +233,11 @@ if(BUILD_TESTING)
   )
 
   ament_add_pytest_test(
+    test_apriltag_confirmation_policy
+    test/test_apriltag_confirmation_policy.py
+  )
+
+  ament_add_pytest_test(
     test_apriltag_production_launch_contract
     test/test_apriltag_production_launch_contract.py
   )
