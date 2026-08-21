@@ -58,6 +58,9 @@ def _launch_description(context):
         "base_length": chassis["length_m"],
         "base_width": chassis["width_m"],
         "base_height": chassis["height_m"],
+        "third_plate_length": chassis["third_plate_length_m"],
+        "third_plate_width": chassis["third_plate_width_m"],
+        "third_plate_height": chassis["third_plate_height_m"],
         "base_link_z": chassis["base_footprint_to_base_link_z_m"],
         "deck_thickness": chassis["deck_thickness_m"],
         "base_plate_z": (
@@ -70,6 +73,10 @@ def _launch_description(context):
         ),
         "second_plate_z": (
             chassis["modeled_plate_center_ground_z_m"]["second"]
+            - chassis["base_footprint_to_base_link_z_m"]
+        ),
+        "third_plate_z": (
+            chassis["modeled_plate_center_ground_z_m"]["third"]
             - chassis["base_footprint_to_base_link_z_m"]
         ),
         "base_mass": chassis["mass_kg"],

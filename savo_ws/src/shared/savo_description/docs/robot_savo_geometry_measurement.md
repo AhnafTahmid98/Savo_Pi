@@ -1,7 +1,7 @@
 # Robot Savo geometry measurement record
 
-Profile revision 2 integrates owner-supplied physical measurements dated
-2026-08-11. Coordinates use +X forward, +Y left, +Z up.
+Profile revision 3 integrates owner-supplied physical measurements dated
+2026-08-20. Coordinates use +X forward, +Y left, +Z up.
 
 ## Measured
 
@@ -9,7 +9,10 @@ Profile revision 2 integrates owner-supplied physical measurements dated
   `0.2796 x 0.2100 m`; the third LiDAR-only plate is `0.1420 x 0.1440 m`.
 - `Base_Layer.STL` includes the DC-motor mounts, producing a `0.0280 m` total
   mesh envelope. The physical base plate itself remains `0.0040 m` thick.
-- Reported plate ground Z: base `0.014`, first `0.080`, second `0.200 m`.
+- Authoritative reported plate ground Z: base `0.015`, first `0.080`, second
+  `0.196`, and third `0.280 m`.
+- Center-plane separations derived from those absolute heights are `0.065 m`
+  base-to-first, `0.116 m` first-to-second, and `0.084 m` second-to-third.
 - Wheel centers: front X `+0.080`, rear X `-0.080`, left Y `+0.108`, right Y `-0.108 m`.
 - Wheel diameter `0.065 m`; wheelbase `0.160 m`; track `0.216 m`.
 - IMU ground XYZ `[0,-0.0465,0.015] m`; BNO055 +Z points up.
@@ -33,8 +36,7 @@ Because URDF box origins are center planes, the model provisionally treats the
 reported Z values as centers and records a `0.002 m` ambiguity. D435 internal
 color/depth frame translations remain zero placeholders, not calibrated stream
 extrinsics. Legacy display/ReSpeaker positions, wheel width, masses, and
-inertials also remain provisional. The third-layer ground Z has not yet been
-measured.
+inertials also remain provisional.
 
 ## Layer equipment layout
 
@@ -50,8 +52,7 @@ measured.
 2. Verify LiDAR scan-zero yaw in RViz with an obstacle directly ahead.
 3. Obtain authoritative D435 internal stream extrinsics or safely redesign TF ownership.
 4. Validate head `pan_sign` and `tilt_sign`, neutral image direction, and dynamic TF.
-5. Measure the third-layer ground Z and resolve each plate Z datum as surface
-   or center plane.
+5. Resolve each reported plate Z datum as surface or center plane.
 6. Measure wheel width and physical mass/inertial values.
 7. Survey the full collision envelope and remaining display/ReSpeaker geometry.
 

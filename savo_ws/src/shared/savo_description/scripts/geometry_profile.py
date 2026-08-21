@@ -119,6 +119,9 @@ def validate_profile(
         "length_m",
         "width_m",
         "height_m",
+        "third_plate_length_m",
+        "third_plate_width_m",
+        "third_plate_height_m",
         "base_footprint_to_base_link_z_m",
         "mass_kg",
         "deck_thickness_m",
@@ -157,7 +160,7 @@ def validate_profile(
         chassis.get("modeled_plate_center_ground_z_m"),
         "chassis.modeled_plate_center_ground_z_m",
     )
-    for layer in ("base", "first", "second"):
+    for layer in ("base", "first", "second", "third"):
         reported_z = _finite(
             plate_ground.get(layer), f"chassis.plate_ground_z_m.{layer}"
         )

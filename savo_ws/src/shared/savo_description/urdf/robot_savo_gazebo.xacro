@@ -15,6 +15,10 @@
       <material>Gazebo/White</material>
     </gazebo>
 
+    <gazebo reference="lidar_deck_link">
+      <material>Gazebo/White</material>
+    </gazebo>
+
     <gazebo reference="wheel_fl_link">
       <material>Gazebo/Black</material>
       <mu1>1.0</mu1>

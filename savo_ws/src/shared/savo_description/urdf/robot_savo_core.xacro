@@ -6,11 +6,15 @@
       base_length:=0.2796
       base_width:=0.2100
       base_height:=0.0040
+      third_plate_length:=0.1420
+      third_plate_width:=0.1440
+      third_plate_height:=0.0040
       base_link_z:=0.0325
       deck_thickness:=0.004
-      base_plate_z:=-0.0185
+      base_plate_z:=-0.0175
       first_plate_z:=0.0475
-      second_plate_z:=0.1675
+      second_plate_z:=0.1635
+      third_plate_z:=0.2475
       base_mass:=1.20
       deck_mass:=0.20
     ">
@@ -62,6 +66,16 @@
       xyz="0 0 ${second_plate_z}"
       rpy="0 0 0"
       size_xyz="${base_length} ${base_width} ${deck_thickness}"
+      mass="${deck_mass}"
+      material="savo_light_gray"
+    />
+
+    <xacro:fixed_box
+      name="lidar_deck_link"
+      parent="base_link"
+      xyz="0 0 ${third_plate_z}"
+      rpy="0 0 0"
+      size_xyz="${third_plate_length} ${third_plate_width} ${third_plate_height}"
       mass="${deck_mass}"
       material="savo_light_gray"
     />

@@ -6,11 +6,15 @@
   <xacro:arg name="base_length" default="0.2796"/>
   <xacro:arg name="base_width" default="0.2100"/>
   <xacro:arg name="base_height" default="0.0040"/>
+  <xacro:arg name="third_plate_length" default="0.1420"/>
+  <xacro:arg name="third_plate_width" default="0.1440"/>
+  <xacro:arg name="third_plate_height" default="0.0040"/>
   <xacro:arg name="base_link_z" default="0.0325"/>
   <xacro:arg name="deck_thickness" default="0.004"/>
-  <xacro:arg name="base_plate_z" default="-0.0185"/>
+  <xacro:arg name="base_plate_z" default="-0.0175"/>
   <xacro:arg name="first_plate_z" default="0.0475"/>
-  <xacro:arg name="second_plate_z" default="0.1675"/>
+  <xacro:arg name="second_plate_z" default="0.1635"/>
+  <xacro:arg name="third_plate_z" default="0.2475"/>
   <xacro:arg name="base_mass" default="1.20"/>
   <xacro:arg name="deck_mass" default="0.20"/>
   <xacro:arg name="wheel_radius" default="0.0325"/>
@@ -62,10 +66,14 @@
   <xacro:robot_savo_core
     base_length="$(arg base_length)" base_width="$(arg base_width)"
     base_height="$(arg base_height)" base_link_z="$(arg base_link_z)"
+    third_plate_length="$(arg third_plate_length)"
+    third_plate_width="$(arg third_plate_width)"
+    third_plate_height="$(arg third_plate_height)"
     deck_thickness="$(arg deck_thickness)"
     base_plate_z="$(arg base_plate_z)"
     first_plate_z="$(arg first_plate_z)"
     second_plate_z="$(arg second_plate_z)"
+    third_plate_z="$(arg third_plate_z)"
     base_mass="$(arg base_mass)" deck_mass="$(arg deck_mass)"/>
 
   <xacro:robot_savo_wheels

@@ -1,8 +1,8 @@
 # Human-readable mirror of the canonical geometry profile.
 metadata:
   profile: robot_savo_core_v1
-  geometry_revision: 2
-  source: owner_supplied_physical_measurements_2026-08-11
+  geometry_revision: 3
+  source: owner_supplied_physical_measurements_2026-08-20
   measurement_state: provisional
   units: metres_and_kilograms
 
@@ -25,9 +25,10 @@ plates:
   third_thickness_m: 0.0040
   base_mesh_envelope_height_m: 0.0280
   base_mesh_includes_motor_mounts: true
-  reported_ground_z_m: {base: 0.014, first: 0.080, second: 0.200}
-  modeled_center_ground_z_m: {base: 0.014, first: 0.080, second: 0.200}
-  unmeasured_ground_z_layers: [third]
+  reported_ground_z_m: {base: 0.015, first: 0.080, second: 0.196, third: 0.280}
+  modeled_center_ground_z_m: {base: 0.015, first: 0.080, second: 0.196, third: 0.280}
+  derived_center_spacing_m: {base_to_first: 0.065, first_to_second: 0.116, second_to_third: 0.084}
+  unmeasured_ground_z_layers: []
   z_datum: unresolved_surface_or_center_plane
   z_ambiguity_m: 0.002
   mass_each_kg: 0.20
