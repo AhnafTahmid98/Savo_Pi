@@ -83,7 +83,7 @@ def test_realsense_driver_does_not_duplicate_description_tf():
         "realsense_nav_profile.yaml",
         "realsense_minimal.yaml",
         "realsense_d435_camera.yaml",
-        "realsense_vo_profile.yaml",
+        "realsense_vo_driver.yaml",
         "realsense_pointcloud_camera.yaml",
     )
     config_root = ROOT.parents[1] / "edge/savo_realsense/config"
