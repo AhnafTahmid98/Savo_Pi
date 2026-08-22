@@ -62,3 +62,22 @@ def test_cpp_defaults_use_laser_frame() -> None:
         text = (PACKAGE_ROOT / relative_path).read_text()
         assert '"laser_frame"' in text
         assert '"laser"' not in text
+
+
+def test_cpp_real_driver_bins_hardware_angles_and_applies_configured_transform() -> None:
+    """Keep the production C++ acquisition path wired to measured-angle bins."""
+    driver = (PACKAGE_ROOT / "src/drivers/rplidar_driver.cpp").read_text()
+    compensator = (
+        PACKAGE_ROOT / "src/drivers/scan_angle_compensator.cpp"
+    ).read_text()
+    cmake = (PACKAGE_ROOT / "CMakeLists.txt").read_text()
+
+    assert "sample.angle_rad = measurement.angle_rad" in driver
+    assert "bin_scan_samples_by_angle(" in driver
+    assert "config_.inverted" in driver
+    assert "config_.angle_offset_rad" in driver
+    assert "scan.ranges_m.assign" in compensator
+    assert "std::numeric_limits<float>::infinity()" in compensator
+    assert "scan.intensities.assign" in compensator
+    assert "scan_angle_compensator.cpp" in cmake
+    assert "test_scan_angle_compensator.cpp" in cmake

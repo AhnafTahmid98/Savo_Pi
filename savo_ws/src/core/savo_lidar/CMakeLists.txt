@@ -49,6 +49,7 @@ install(
 add_library(${PROJECT_NAME}_cpp SHARED
   src/drivers/serial_port.cpp
   src/drivers/rplidar_protocol.cpp
+  src/drivers/scan_angle_compensator.cpp
   src/drivers/rplidar_driver.cpp
   src/ros/scan_publisher.cpp
   src/ros/diagnostics.cpp
@@ -144,6 +145,19 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 
   find_package(ament_cmake_pytest REQUIRED)
+  find_package(ament_cmake_gtest REQUIRED)
+
+  ament_add_gtest(
+    test_scan_angle_compensator
+    test/test_scan_angle_compensator.cpp
+  )
+
+  if(TARGET test_scan_angle_compensator)
+    target_link_libraries(
+      test_scan_angle_compensator
+      ${PROJECT_NAME}_cpp
+    )
+  endif()
 
   ament_add_pytest_test(test_angle_filter test/test_angle_filter.py)
   ament_add_pytest_test(test_range_filter test/test_range_filter.py)

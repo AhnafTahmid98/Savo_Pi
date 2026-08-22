@@ -1,9 +1,9 @@
 #include "savo_lidar/rplidar_driver.hpp"
 
+#include "savo_lidar/scan_angle_compensator.hpp"
+
 #include <algorithm>
 #include <chrono>
-#include <cmath>
-#include <limits>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -194,10 +194,9 @@ LidarScan RplidarDriver::read_scan(double timeout_s)
   scan.frame_id = config_.frame_id;
   scan.range_min_m = config_.min_range_m;
   scan.range_max_m = config_.max_range_m;
-  scan.angle_min_rad = 0.0;
-  scan.angle_max_rad = 2.0 * 3.14159265358979323846;
-  scan.angle_increment_rad = 0.0;
   scan.sequence = scan_count_ + 1U;
+
+  std::vector<LidarSample> samples;
 
   const auto start = std::chrono::steady_clock::now();
 
@@ -212,7 +211,7 @@ LidarScan RplidarDriver::read_scan(double timeout_s)
       }
 
       if (measurement.start_flag) {
-        if (have_started_rotation && !scan.empty()) {
+        if (have_started_rotation && !samples.empty()) {
           break;
         }
 
@@ -224,18 +223,22 @@ LidarScan RplidarDriver::read_scan(double timeout_s)
         continue;
       }
 
-      append_measurement_to_scan(scan, measurement);
+      append_measurement(samples, measurement);
     }
 
-    if (scan.empty()) {
+    if (samples.empty()) {
       throw std::runtime_error("RPLIDAR scan timeout; no valid samples collected");
     }
+
+    scan = bin_scan_samples_by_angle(
+      samples,
+      std::move(scan),
+      config_.inverted,
+      config_.angle_offset_rad);
 
     scan.scan_time_s = elapsed_s(scan_start_time_);
 
     if (scan.size() > 1U) {
-      scan.angle_increment_rad =
-        (scan.angle_max_rad - scan.angle_min_rad) / static_cast<double>(scan.size());
       scan.time_increment_s = scan.scan_time_s / static_cast<double>(scan.size());
     }
 
@@ -330,21 +333,16 @@ void RplidarDriver::mark_error(const std::string & message)
   state_ = DriverState::error;
 }
 
-void RplidarDriver::append_measurement_to_scan(
-  LidarScan & scan,
+void RplidarDriver::append_measurement(
+  std::vector<LidarSample> & samples,
   const RplidarMeasurement & measurement)
 {
-  if (
-    measurement.valid &&
-    is_valid_range(measurement.distance_m, scan.range_min_m, scan.range_max_m))
-  {
-    scan.ranges_m.push_back(measurement.distance_m);
-    scan.intensities.push_back(static_cast<float>(measurement.quality));
-    return;
-  }
-
-  scan.ranges_m.push_back(std::numeric_limits<float>::infinity());
-  scan.intensities.push_back(0.0F);
+  LidarSample sample;
+  sample.angle_rad = measurement.angle_rad;
+  sample.range_m = measurement.distance_m;
+  sample.intensity = static_cast<float>(measurement.quality);
+  sample.valid = measurement.valid;
+  samples.push_back(sample);
 }
 
 const char * to_string(DriverState state)

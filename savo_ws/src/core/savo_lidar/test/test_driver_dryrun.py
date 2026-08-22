@@ -44,7 +44,9 @@ def test_dryrun_driver_returns_scan_after_start():
     assert scan.range_min_m == 0.15
     assert scan.range_max_m == 12.0
     assert scan.angle_min_rad == pytest.approx(-math.pi)
-    assert scan.angle_max_rad == pytest.approx(math.pi)
+    assert scan.angle_max_rad == pytest.approx(
+        scan.angle_min_rad + (len(scan.ranges) - 1) * scan.angle_increment_rad
+    )
     assert scan.angle_increment_rad > 0.0
 
     driver.stop()

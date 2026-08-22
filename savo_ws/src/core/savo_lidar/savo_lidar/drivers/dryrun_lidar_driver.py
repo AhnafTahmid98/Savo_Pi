@@ -62,10 +62,12 @@ class DryrunLidarDriver:
         self._running = False
         self._scan_count = 0
         self._angle_min_rad = -math.pi
-        self._angle_max_rad = math.pi
         self._angle_increment_rad = (
-            self._angle_max_rad - self._angle_min_rad
+            2.0 * math.pi
         ) / float(self.point_count)
+        self._angle_max_rad = self._angle_min_rad + (
+            self.point_count - 1
+        ) * self._angle_increment_rad
 
     @property
     def running(self) -> bool:

@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "savo_lidar/rplidar_protocol.hpp"
 #include "savo_lidar/scan_types.hpp"
@@ -62,8 +63,8 @@ private:
   void begin_scan();
   void mark_error(const std::string & message);
 
-  static void append_measurement_to_scan(
-    LidarScan & scan,
+  static void append_measurement(
+    std::vector<LidarSample> & samples,
     const RplidarMeasurement & measurement);
 
   RplidarConfig config_;
