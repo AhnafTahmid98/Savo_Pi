@@ -116,7 +116,6 @@ realsense_internal_frames:
   extrinsics_state: provisional_zero_translation_not_device_calibrated
 
 calibration_remaining:
-  - imu_board_x_y_orientation
   - lidar_scan_zero_yaw
   - realsense_internal_color_depth_extrinsics
   - plate_z_surface_or_center_datum
