@@ -53,9 +53,9 @@ The files below are human-readable mirrors guarded by contract tests:
 - `config/wheel_geometry.yaml`
 - `config/sensor_mounts.yaml`
 
-The profile remains provisional. IMU/LiDAR orientation, D435 internal
-extrinsics, head servo signs, plate Z datum, wheel width/mass/inertials, and
-remaining component geometry still block physical lock.
+The profile remains provisional. LiDAR orientation, D435 internal
+extrinsics, plate Z datum, wheel width/mass/inertials, and remaining component
+geometry still block physical lock.
 
 `base_link` uses the reviewed wheel axle-plane convention at `+0.0325 m` from
 `base_footprint`. The generated `nav2_footprint.yaml` is the measured plate
