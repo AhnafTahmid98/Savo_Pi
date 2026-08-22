@@ -51,7 +51,8 @@ inertials also remain provisional.
 1. Establish BNO055 +X/+Y orientation relative to the robot.
 2. Verify LiDAR scan-zero yaw in RViz with an obstacle directly ahead.
 3. Obtain authoritative D435 internal stream extrinsics or safely redesign TF ownership.
-4. Validate head `pan_sign` and `tilt_sign`, neutral image direction, and dynamic TF.
+4. Complete the Pi runtime TF validation for the measured head chain before
+   closing its calibration blocker.
 5. Resolve each reported plate Z datum as surface or center plane.
 6. Measure wheel width and physical mass/inertial values.
 7. Survey the full collision envelope and remaining display/ReSpeaker geometry.

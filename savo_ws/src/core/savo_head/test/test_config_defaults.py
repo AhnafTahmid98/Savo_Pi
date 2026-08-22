@@ -136,8 +136,12 @@ def test_frame_defaults():
 
     assert int(params["pan_zero_deg"]) == 72
     assert int(params["tilt_zero_deg"]) == 55
-    assert params["publish_tf"] is False
-    assert params["transforms_calibrated"] is False
+    assert params["pan_sign"] == 1.0
+    assert params["tilt_sign"] == -1.0
+    assert params["publish_tf"] is True
+    assert params["transforms_calibrated"] is True
+    assert params["require_valid_pan_tilt_state"] is True
+    assert params["stale_state_timeout_s"] == 0.50
 
 
 def test_camera_stream_defaults():

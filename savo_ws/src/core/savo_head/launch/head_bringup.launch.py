@@ -206,8 +206,8 @@ def generate_launch_description():
                     [package_share, "config", "head_frames.yaml"]
                 ),
                 description=(
-                    "Head TF parameters. Publishing remains calibration-gated "
-                    "until measured transforms are approved."
+                    "Production-calibrated dynamic head TF parameters. "
+                    "Publication still requires a fresh pan/tilt state."
                 ),
             ),
             DeclareLaunchArgument(

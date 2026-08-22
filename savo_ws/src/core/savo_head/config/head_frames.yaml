@@ -1,8 +1,9 @@
 head_tf_node:
   ros__parameters:
     # Dynamic head TF begins at the description-owned fixed mount frame.
-    publish_tf: false
-    transforms_calibrated: false
+    # Publication remains fail-closed until a fresh pan/tilt JointState exists.
+    publish_tf: true
+    transforms_calibrated: true
     publish_joint_state: true
     tf_rate_hz: 30.0
 

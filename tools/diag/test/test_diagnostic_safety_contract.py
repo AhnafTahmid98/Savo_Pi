@@ -1,4 +1,8 @@
+import importlib.util
+import math
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).resolve().parents[3]
 DIAG = ROOT / "tools" / "diag"
@@ -49,6 +53,22 @@ def test_head_motion_uses_only_head_controller_boundary() -> None:
     assert "/savo_head/pan_tilt_cmd" in source
     assert "/savo_head/pan_tilt_state" in source
     assert "PCA9685" not in source
+
+
+def test_head_motion_converts_joint_state_radians_to_cli_degrees() -> None:
+    path = DIAG / "ui/head_pan_tilt_test.py"
+    spec = importlib.util.spec_from_file_location("head_pan_tilt_test", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    message = type(
+        "JointStateSample",
+        (),
+        {"position": [math.radians(72.0), math.radians(55.0)]},
+    )()
+    assert module._position(message) == pytest.approx((72.0, 55.0))
+    assert module._position(type("ShortState", (), {"position": [0.0]})()) is None
 
 
 def test_run_all_never_starts_moving_diagnostics() -> None:

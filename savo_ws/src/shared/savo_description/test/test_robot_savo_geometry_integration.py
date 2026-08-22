@@ -130,7 +130,7 @@ def test_side_tof_axes_and_front_ultrasonic_axis() -> None:
     assert "tof_right" in side_section
 
 
-def test_head_profile_and_runtime_yaml_agree_and_remain_fail_closed() -> None:
+def test_head_profile_and_production_runtime_yaml_agree() -> None:
     profile = _yaml(PROFILE_PATH)
     params = _params(SRC_ROOT / "core/savo_head/config/head_frames.yaml", "head_tf_node")
     head = profile["head"]
@@ -150,8 +150,14 @@ def test_head_profile_and_runtime_yaml_agree_and_remain_fail_closed() -> None:
     )
     assert params["pan_axis"] == head["pan"]["axis"] == "z"
     assert params["tilt_axis"] == head["tilt"]["axis"] == "y"
-    assert params["publish_tf"] is False
-    assert params["transforms_calibrated"] is False
+    assert params["pan_sign"] == pytest.approx(1.0)
+    assert params["tilt_sign"] == pytest.approx(-1.0)
+    assert params["pan_zero_deg"] == pytest.approx(72.0)
+    assert params["tilt_zero_deg"] == pytest.approx(55.0)
+    assert params["publish_tf"] is True
+    assert params["transforms_calibrated"] is True
+    assert params["require_valid_pan_tilt_state"] is True
+    assert params["stale_state_timeout_s"] == pytest.approx(0.50)
 
 
 def test_neutral_head_chain_reconstructs_measured_ground_positions() -> None:
@@ -166,6 +172,24 @@ def test_neutral_head_chain_reconstructs_measured_ground_positions() -> None:
     assert pan_ground == pytest.approx([0.115, 0.0, 0.244])
     assert tilt_ground == pytest.approx([0.115, 0.0, 0.290])
     assert camera_ground == pytest.approx([0.140, 0.0, 0.280])
+
+
+def test_description_exclusively_owns_base_to_pantilt_mount() -> None:
+    profile = _yaml(PROFILE_PATH)
+    mount = profile["mounts"]["pantilt_mount"]
+    sensors = (
+        DESCRIPTION_ROOT / "urdf/robot_savo_sensors.xacro"
+    ).read_text(encoding="utf-8")
+    head_config = (
+        SRC_ROOT / "core/savo_head/config/head_frames.yaml"
+    ).read_text(encoding="utf-8")
+
+    assert mount["parent"] == "base_link"
+    assert mount["frame"] == "pantilt_mount_link"
+    assert mount["xyz_m"] == pytest.approx([0.115, 0.0, 0.2115])
+    assert "parent:=base_link" in sensors
+    assert 'name="pantilt_mount_link"' in sensors
+    assert 'base_frame: "pantilt_mount_link"' in head_config
 
 
 def test_realsense_has_one_tf_authority_and_provisional_internal_extrinsics() -> None:

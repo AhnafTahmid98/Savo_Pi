@@ -149,7 +149,7 @@ def test_head_frames_config_locks_tf_contract():
     assert_any_value_contains(
         "head_frames.yaml",
         [
-            "base_link",
+            "pantilt_mount_link",
             "pantilt_pan_link",
             "pantilt_tilt_link",
             "pi_camera_link",

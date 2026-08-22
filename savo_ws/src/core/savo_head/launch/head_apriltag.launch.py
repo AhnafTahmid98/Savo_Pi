@@ -106,8 +106,9 @@ def _make_nodes(context):
             )
         )
 
-    # Disabled by default until pan/tilt direction and runtime TF behavior are
-    # physically validated. Measured translations alone do not open the gate.
+    # Keep this disabled by default because the production head bringup owns
+    # the single head_tf_node instance. Standalone AprilTag launch users may
+    # opt in when head_bringup is not running.
     if enable_tf:
         executable_suffix = "_py" if use_python_fallback else ""
         nodes.append(
@@ -197,8 +198,8 @@ def generate_launch_description():
                 "enable_tf",
                 default_value="false",
                 description=(
-                    "Start the calibration-gated head TF node. The config "
-                    "still refuses publication until runtime calibration is approved."
+                    "Start head_tf_node for standalone AprilTag operation. "
+                    "Leave disabled when production head bringup owns TF."
                 ),
             ),
             DeclareLaunchArgument(
@@ -220,8 +221,8 @@ def generate_launch_description():
                     [package_share, "config", "head_frames.yaml"]
                 ),
                 description=(
-                    "Head TF parameters. Publishing remains calibration-gated "
-                    "until measured transforms are approved."
+                    "Production-calibrated dynamic head TF parameters. "
+                    "Publication still requires a fresh pan/tilt state."
                 ),
             ),
             DeclareLaunchArgument(

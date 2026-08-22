@@ -57,8 +57,11 @@ def _read_only(args, started: float, started_utc: str) -> int:
 def _position(message) -> tuple[float, float] | None:
     if len(message.position) < 2:
         return None
-    # The production state uses degrees even though JointState usually carries radians.
-    return float(message.position[0]), float(message.position[1])
+    # The production JointState uses radians; diagnostic CLI targets use degrees.
+    return (
+        math.degrees(float(message.position[0])),
+        math.degrees(float(message.position[1])),
+    )
 
 
 def _motion(args, started: float, started_utc: str) -> int:
