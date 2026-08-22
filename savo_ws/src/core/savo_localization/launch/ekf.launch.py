@@ -8,7 +8,7 @@ from __future__ import annotations
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.conditions import IfCondition, UnlessCondition
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
@@ -22,6 +22,7 @@ def generate_launch_description() -> LaunchDescription:
     frames_config = LaunchConfiguration("frames_config")
     diagnostics_config = LaunchConfiguration("diagnostics_config")
     profile_config = LaunchConfiguration("profile_config")
+    vo_profile_config = LaunchConfiguration("vo_profile_config")
 
     use_vo = LaunchConfiguration("use_vo")
     use_health = LaunchConfiguration("use_health")
@@ -73,7 +74,19 @@ def generate_launch_description() -> LaunchDescription:
                         "robot_savo_4enc_imu_ekf.yaml",
                     ]
                 ),
-                description="EKF launch profile overlay.",
+                description="Baseline EKF and health profile overlay.",
+            ),
+            DeclareLaunchArgument(
+                "vo_profile_config",
+                default_value=PathJoinSubstitution(
+                    [
+                        package_share,
+                        "config",
+                        "profiles",
+                        "robot_savo_4enc_imu_vo_ekf.yaml",
+                    ]
+                ),
+                description="VO-enabled EKF and health profile overlay.",
             ),
             DeclareLaunchArgument(
                 "use_vo",
@@ -112,7 +125,7 @@ def generate_launch_description() -> LaunchDescription:
                     frames_config,
                     ekf_config,
                     vo_config,
-                    profile_config,
+                    vo_profile_config,
                 ],
                 remappings=[
                     ("odometry/filtered", "/odometry/filtered"),
@@ -123,12 +136,33 @@ def generate_launch_description() -> LaunchDescription:
                 executable="localization_health_node",
                 name="localization_health_node",
                 output="screen",
-                condition=IfCondition(use_health),
+                condition=IfCondition(
+                    PythonExpression(
+                        ["'", use_health, "' == 'true' and '", use_vo, "' == 'false'"]
+                    )
+                ),
                 parameters=[
                     topics_config,
                     frames_config,
                     diagnostics_config,
                     profile_config,
+                ],
+            ),
+            Node(
+                package="savo_localization",
+                executable="localization_health_node",
+                name="localization_health_node",
+                output="screen",
+                condition=IfCondition(
+                    PythonExpression(
+                        ["'", use_health, "' == 'true' and '", use_vo, "' == 'true'"]
+                    )
+                ),
+                parameters=[
+                    topics_config,
+                    frames_config,
+                    diagnostics_config,
+                    vo_profile_config,
                 ],
             ),
         ]

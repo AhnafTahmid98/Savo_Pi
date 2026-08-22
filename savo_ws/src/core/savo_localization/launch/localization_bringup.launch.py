@@ -218,12 +218,34 @@ def generate_launch_description() -> LaunchDescription:
                 executable="localization_health_node",
                 name="localization_health_node",
                 output="screen",
-                condition=IfCondition(use_health),
+                condition=IfCondition(
+                    PythonExpression(
+                        ["'", use_health, "' == 'true' and '", use_vo, "' == 'false'"]
+                    )
+                ),
                 parameters=[
                     topics_config,
                     frames_config,
                     diagnostics_config,
                     baseline_profile_config,
+                ],
+            ),
+
+            Node(
+                package="savo_localization",
+                executable="localization_health_node",
+                name="localization_health_node",
+                output="screen",
+                condition=IfCondition(
+                    PythonExpression(
+                        ["'", use_health, "' == 'true' and '", use_vo, "' == 'true'"]
+                    )
+                ),
+                parameters=[
+                    topics_config,
+                    frames_config,
+                    diagnostics_config,
+                    vo_profile_config,
                 ],
             ),
 
