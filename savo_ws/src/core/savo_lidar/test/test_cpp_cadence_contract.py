@@ -1,3 +1,4 @@
+import ast
 from pathlib import Path
 
 import yaml
@@ -76,3 +77,30 @@ def test_worker_is_joined_before_node_resources_are_destroyed() -> None:
     assert "io_cancellation_requested()" in serial
     assert "config_.motor_stop_timeout_s" in driver
     assert "RPLIDAR startup cancelled" in driver
+
+
+def test_all_direct_cpp_hardware_launches_allow_cp210x_close_grace() -> None:
+    direct_driver_launches = set()
+
+    for launch_path in (ROOT / "launch").glob("*.launch.py"):
+        tree = ast.parse(launch_path.read_text())
+        for call in (node for node in ast.walk(tree) if isinstance(node, ast.Call)):
+            if not isinstance(call.func, ast.Name) or call.func.id != "Node":
+                continue
+
+            keywords = {keyword.arg: keyword.value for keyword in call.keywords}
+            executable = keywords.get("executable")
+            if not isinstance(executable, ast.Constant):
+                continue
+            if executable.value != "lidar_driver_node":
+                continue
+
+            direct_driver_launches.add(launch_path.name)
+            assert ast.literal_eval(keywords["sigterm_timeout"]) == "7.0"
+            assert "sigkill_timeout" not in keywords
+
+    assert direct_driver_launches == {
+        "lidar_bringup.launch.py",
+        "lidar_hw_only.launch.py",
+        "lidar_mapping_ready.launch.py",
+    }

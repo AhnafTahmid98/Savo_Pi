@@ -68,6 +68,9 @@ def generate_launch_description() -> LaunchDescription:
         name="lidar_driver_node",
         output="screen",
         parameters=[profile_path],
+        # CP2102/cp210x close may spend ~5 s in CP210X_PURGE on Robot Savo;
+        # this grace only prevents premature launch escalation.
+        sigterm_timeout="7.0",
         condition=IfCondition(
             PythonExpression(["'", driver, "' == 'real'"])
         ),
