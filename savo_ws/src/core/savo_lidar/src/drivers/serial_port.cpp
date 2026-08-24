@@ -22,6 +22,8 @@ namespace savo_lidar
 namespace
 {
 
+constexpr auto CANCELLATION_POLL_INTERVAL = std::chrono::milliseconds(20);
+
 std::string errno_message(const std::string & prefix)
 {
   return prefix + ": " + std::string(strerror(errno));
@@ -83,9 +85,11 @@ SerialPort::~SerialPort()
 
 SerialPort::SerialPort(SerialPort && other) noexcept
 : fd_(other.fd_),
-  config_(std::move(other.config_))
+  config_(std::move(other.config_)),
+  io_cancellation_requested_(other.io_cancellation_requested_.load())
 {
   other.fd_ = -1;
+  other.io_cancellation_requested_.store(false);
 }
 
 SerialPort & SerialPort::operator=(SerialPort && other) noexcept
@@ -95,7 +99,9 @@ SerialPort & SerialPort::operator=(SerialPort && other) noexcept
 
     fd_ = other.fd_;
     config_ = std::move(other.config_);
+    io_cancellation_requested_.store(other.io_cancellation_requested_.load());
     other.fd_ = -1;
+    other.io_cancellation_requested_.store(false);
   }
 
   return *this;
@@ -131,9 +137,24 @@ void SerialPort::close() noexcept
   }
 }
 
+void SerialPort::cancel_pending_io() noexcept
+{
+  io_cancellation_requested_.store(true);
+}
+
+void SerialPort::reset_io_cancellation() noexcept
+{
+  io_cancellation_requested_.store(false);
+}
+
 bool SerialPort::is_open() const noexcept
 {
   return fd_ >= 0;
+}
+
+bool SerialPort::io_cancellation_requested() const noexcept
+{
+  return io_cancellation_requested_.load();
 }
 
 int SerialPort::fd() const noexcept
@@ -232,6 +253,10 @@ std::size_t SerialPort::write_bytes(const std::uint8_t * data, std::size_t size)
   std::size_t total_written = 0;
 
   while (total_written < size) {
+    if (io_cancellation_requested()) {
+      throw std::runtime_error("serial operation cancelled");
+    }
+
     const auto remaining = size - total_written;
     const auto result = ::write(fd_, data + total_written, remaining);
 
@@ -258,6 +283,49 @@ std::size_t SerialPort::write_bytes(const std::vector<std::uint8_t> & data)
   }
 
   return write_bytes(data.data(), data.size());
+}
+
+std::size_t SerialPort::write_bytes(
+  const std::vector<std::uint8_t> & data,
+  double timeout_s)
+{
+  ensure_open();
+
+  if (data.empty()) {
+    return 0;
+  }
+
+  const auto deadline =
+    std::chrono::steady_clock::now() + std::chrono::duration<double>(timeout_s);
+  std::size_t total_written = 0;
+
+  while (total_written < data.size()) {
+    if (io_cancellation_requested()) {
+      throw std::runtime_error("serial operation cancelled");
+    }
+
+    const auto result = ::write(
+      fd_,
+      data.data() + total_written,
+      data.size() - total_written);
+
+    if (result > 0) {
+      total_written += static_cast<std::size_t>(result);
+      continue;
+    }
+
+    if (result < 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)) {
+      if (std::chrono::steady_clock::now() >= deadline) {
+        throw std::runtime_error("timeout while writing serial bytes");
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      continue;
+    }
+
+    throw std::runtime_error(errno_message("failed to write serial bytes"));
+  }
+
+  return total_written;
 }
 
 std::size_t SerialPort::read_some(std::uint8_t * data, std::size_t max_size)
@@ -301,6 +369,10 @@ std::vector<std::uint8_t> SerialPort::read_exact(std::size_t size, double timeou
 {
   ensure_open();
 
+  if (io_cancellation_requested()) {
+    throw std::runtime_error("serial operation cancelled");
+  }
+
   std::vector<std::uint8_t> output;
   output.resize(size);
 
@@ -314,6 +386,10 @@ std::vector<std::uint8_t> SerialPort::read_exact(std::size_t size, double timeou
   std::size_t offset = 0;
 
   while (offset < size) {
+    if (io_cancellation_requested()) {
+      throw std::runtime_error("serial operation cancelled");
+    }
+
     const auto now = std::chrono::steady_clock::now();
     const auto elapsed = now - start;
 
@@ -338,26 +414,43 @@ bool SerialPort::wait_readable(double timeout_s) const
 {
   ensure_open();
 
-  pollfd pfd;
-  pfd.fd = fd_;
-  pfd.events = POLLIN;
-  pfd.revents = 0;
+  const auto deadline =
+    std::chrono::steady_clock::now() + std::chrono::duration<double>(timeout_s);
 
-  const auto result = ::poll(&pfd, 1, timeout_to_ms(timeout_s));
+  while (std::chrono::steady_clock::now() < deadline) {
+    if (io_cancellation_requested()) {
+      throw std::runtime_error("serial operation cancelled");
+    }
 
-  if (result > 0) {
-    return (pfd.revents & POLLIN) != 0;
+    const auto remaining = std::chrono::duration<double>(
+      deadline - std::chrono::steady_clock::now());
+    const auto poll_interval = std::min(
+      remaining,
+      std::chrono::duration<double>(CANCELLATION_POLL_INTERVAL));
+
+    pollfd pfd;
+    pfd.fd = fd_;
+    pfd.events = POLLIN;
+    pfd.revents = 0;
+
+    const auto result = ::poll(
+      &pfd,
+      1,
+      timeout_to_ms(poll_interval.count()));
+
+    if (result > 0) {
+      if (io_cancellation_requested()) {
+        throw std::runtime_error("serial operation cancelled");
+      }
+      return (pfd.revents & POLLIN) != 0;
+    }
+
+    if (result < 0 && errno != EINTR) {
+      throw std::runtime_error(errno_message("failed while polling serial port"));
+    }
   }
 
-  if (result == 0) {
-    return false;
-  }
-
-  if (errno == EINTR) {
-    return false;
-  }
-
-  throw std::runtime_error(errno_message("failed while polling serial port"));
+  return false;
 }
 
 bool SerialPort::path_exists(const std::string & port)

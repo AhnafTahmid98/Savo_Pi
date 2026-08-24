@@ -11,10 +11,12 @@ ScanAcquisitionWorker::ScanAcquisitionWorker(
   AcquireCallback acquire,
   PublishCallback publish,
   ErrorCallback on_error,
-  std::chrono::duration<double> retry_delay)
+  std::chrono::duration<double> retry_delay,
+  CancelCallback cancel_acquire)
 : acquire_(std::move(acquire)),
   publish_(std::move(publish)),
   on_error_(std::move(on_error)),
+  cancel_acquire_(std::move(cancel_acquire)),
   retry_delay_(retry_delay)
 {
   if (!acquire_ || !publish_ || !on_error_) {
@@ -48,7 +50,15 @@ void ScanAcquisitionWorker::start()
 
 void ScanAcquisitionWorker::request_stop() noexcept
 {
-  stop_requested_.store(true);
+  const bool already_requested = stop_requested_.exchange(true);
+
+  if (!already_requested && cancel_acquire_) {
+    try {
+      cancel_acquire_();
+    } catch (...) {
+    }
+  }
+
   wait_condition_.notify_all();
 }
 

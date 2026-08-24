@@ -64,6 +64,15 @@ def test_cpp_publisher_uses_preserved_first_ray_ros_timestamp() -> None:
 
 def test_worker_is_joined_before_node_resources_are_destroyed() -> None:
     node = (ROOT / "src/nodes/lidar_driver_node.cpp").read_text()
+    worker = (ROOT / "src/drivers/scan_acquisition_worker.cpp").read_text()
+    serial = (ROOT / "src/drivers/serial_port.cpp").read_text()
+    driver = (ROOT / "src/drivers/rplidar_driver.cpp").read_text()
     destructor = node[node.index("~LidarDriverNode()") : node.index("private:")]
     assert destructor.index("request_stop()") < destructor.index("join()")
     assert destructor.index("join()") < destructor.index("driver_->stop()")
+    assert "driver_->cancel_pending_operation()" in node
+    assert "cancel_acquire_();" in worker
+    assert "CANCELLATION_POLL_INTERVAL" in serial
+    assert "io_cancellation_requested()" in serial
+    assert "config_.motor_stop_timeout_s" in driver
+    assert "RPLIDAR startup cancelled" in driver

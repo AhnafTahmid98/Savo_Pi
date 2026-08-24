@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -26,8 +27,11 @@ public:
 
   void open(const SerialConfig & config);
   void close() noexcept;
+  void cancel_pending_io() noexcept;
+  void reset_io_cancellation() noexcept;
 
   bool is_open() const noexcept;
+  bool io_cancellation_requested() const noexcept;
   int fd() const noexcept;
 
   const SerialConfig & config() const noexcept;
@@ -40,6 +44,9 @@ public:
 
   std::size_t write_bytes(const std::uint8_t * data, std::size_t size);
   std::size_t write_bytes(const std::vector<std::uint8_t> & data);
+  std::size_t write_bytes(
+    const std::vector<std::uint8_t> & data,
+    double timeout_s);
 
   std::size_t read_some(std::uint8_t * data, std::size_t max_size);
   std::vector<std::uint8_t> read_available(std::size_t max_size);
@@ -56,6 +63,7 @@ private:
 
   int fd_{-1};
   SerialConfig config_;
+  std::atomic<bool> io_cancellation_requested_{false};
 };
 
 }  // namespace savo_lidar

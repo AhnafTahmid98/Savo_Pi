@@ -15,20 +15,22 @@ namespace savo_lidar
 {
 
 // Runs one bounded blocking acquisition callback at a time and forwards every
-// successful result exactly once. request_stop() interrupts retry backoff; an
-// in-flight callback finishes within the driver's configured operation timeouts.
+// successful result exactly once. request_stop() interrupts retry backoff and
+// invokes the cancellation callback to unblock an in-flight acquisition.
 class SAVO_LIDAR_PUBLIC ScanAcquisitionWorker
 {
 public:
   using AcquireCallback = std::function<LidarScan()>;
   using PublishCallback = std::function<void(const LidarScan &)>;
   using ErrorCallback = std::function<bool(const std::string &)>;
+  using CancelCallback = std::function<void()>;
 
   ScanAcquisitionWorker(
     AcquireCallback acquire,
     PublishCallback publish,
     ErrorCallback on_error,
-    std::chrono::duration<double> retry_delay);
+    std::chrono::duration<double> retry_delay,
+    CancelCallback cancel_acquire = {});
   ~ScanAcquisitionWorker();
 
   ScanAcquisitionWorker(const ScanAcquisitionWorker &) = delete;
@@ -49,6 +51,7 @@ private:
   AcquireCallback acquire_;
   PublishCallback publish_;
   ErrorCallback on_error_;
+  CancelCallback cancel_acquire_;
   std::chrono::duration<double> retry_delay_;
 
   std::atomic<bool> stop_requested_{false};

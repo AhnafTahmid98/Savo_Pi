@@ -14,6 +14,8 @@ namespace savo_lidar
 namespace
 {
 
+constexpr auto START_CANCELLATION_POLL_INTERVAL = std::chrono::milliseconds(20);
+
 double elapsed_s(const std::chrono::steady_clock::time_point & start)
 {
   const auto now = std::chrono::steady_clock::now();
@@ -75,8 +77,19 @@ void RplidarDriver::start()
 
     if (config_.motor_start_settle_s > 0.0) {
       const auto settle = std::chrono::duration<double>(config_.motor_start_settle_s);
-      std::this_thread::sleep_for(
-        std::chrono::duration_cast<std::chrono::milliseconds>(settle));
+      const auto settle_deadline = std::chrono::steady_clock::now() + settle;
+
+      while (std::chrono::steady_clock::now() < settle_deadline) {
+        if (serial_.io_cancellation_requested()) {
+          throw std::runtime_error("RPLIDAR startup cancelled");
+        }
+
+        const auto remaining = std::chrono::duration<double>(
+          settle_deadline - std::chrono::steady_clock::now());
+        std::this_thread::sleep_for(std::min(
+          remaining,
+          std::chrono::duration<double>(START_CANCELLATION_POLL_INTERVAL)));
+      }
     }
 
     scan_assembler_.reset();
@@ -91,9 +104,15 @@ void RplidarDriver::start()
 
 void RplidarDriver::stop() noexcept
 {
+  // The acquisition worker is joined before stop() is called, so it is safe to
+  // re-enable I/O briefly for the best-effort motor stop command.
+  serial_.reset_io_cancellation();
+
   try {
     if (serial_.is_open()) {
-      send_command(RPLIDAR_CMD_STOP);
+      serial_.write_bytes(
+        make_command(RPLIDAR_CMD_STOP),
+        config_.motor_stop_timeout_s);
     }
   } catch (...) {
   }
@@ -101,6 +120,11 @@ void RplidarDriver::stop() noexcept
   serial_.close();
   scan_assembler_.reset();
   state_ = DriverState::stopped;
+}
+
+void RplidarDriver::cancel_pending_operation() noexcept
+{
+  serial_.cancel_pending_io();
 }
 
 void RplidarDriver::reset()

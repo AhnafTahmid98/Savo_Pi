@@ -191,6 +191,73 @@ TEST(ScanAcquisitionWorker, DoesNotPublishAReadCompletedAfterStopRequest)
   EXPECT_EQ(publishes.load(), 0);
 }
 
+TEST(ScanAcquisitionWorker, StopCancelsBlockedAcquisitionAndJoinsPromptly)
+{
+  std::mutex mutex;
+  std::condition_variable condition;
+  bool acquire_entered = false;
+  bool cancelled = false;
+  std::atomic<int> publishes{0};
+  std::atomic<int> cancellations{0};
+
+  savo_lidar::ScanAcquisitionWorker worker(
+    [&]() -> savo_lidar::LidarScan {
+      std::unique_lock<std::mutex> lock(mutex);
+      acquire_entered = true;
+      condition.notify_all();
+      condition.wait(lock, [&]() {return cancelled;});
+      throw std::runtime_error("fake acquisition cancelled");
+    },
+    [&publishes](const savo_lidar::LidarScan &) {publishes.fetch_add(1);},
+    [](const std::string &) {return true;},
+    5s,
+    [&]() {
+      cancellations.fetch_add(1);
+      std::lock_guard<std::mutex> lock(mutex);
+      cancelled = true;
+      condition.notify_all();
+    });
+
+  worker.start();
+  {
+    std::unique_lock<std::mutex> lock(mutex);
+    ASSERT_TRUE(condition.wait_for(lock, 1s, [&]() {return acquire_entered;}));
+  }
+
+  const auto stop_started = std::chrono::steady_clock::now();
+  worker.request_stop();
+  worker.request_stop();
+  worker.join();
+  const auto stop_elapsed = std::chrono::steady_clock::now() - stop_started;
+
+  EXPECT_LT(stop_elapsed, 500ms);
+  EXPECT_EQ(publishes.load(), 0);
+  EXPECT_EQ(cancellations.load(), 1);
+  EXPECT_FALSE(worker.running());
+}
+
+TEST(ScanAcquisitionWorker, SupportsRepeatedCompletedStartAndStopCycles)
+{
+  std::atomic<int> acquisitions{0};
+
+  savo_lidar::ScanAcquisitionWorker worker(
+    [&]() -> savo_lidar::LidarScan {
+      acquisitions.fetch_add(1);
+      throw std::runtime_error("fake completed cycle");
+    },
+    [](const savo_lidar::LidarScan &) {},
+    [](const std::string &) {return false;},
+    10ms);
+
+  worker.start();
+  worker.join();
+  worker.start();
+  worker.join();
+
+  EXPECT_EQ(acquisitions.load(), 2);
+  EXPECT_FALSE(worker.running());
+}
+
 TEST(ScanAcquisitionWorker, StopInterruptsReconnectBackoff)
 {
   std::mutex mutex;

@@ -67,7 +67,12 @@ public:
         [this]() {return acquire_scan();},
         [this](const LidarScan & scan) {publish_scan(scan);},
         [this](const std::string & message) {return handle_acquisition_error(message);},
-        std::chrono::duration<double>(config_.serial.reconnect_delay_s));
+        std::chrono::duration<double>(config_.serial.reconnect_delay_s),
+        [this]() {
+          if (driver_) {
+            driver_->cancel_pending_operation();
+          }
+        });
       acquisition_worker_->start();
     }
 

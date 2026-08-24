@@ -43,6 +43,7 @@ public:
   void start();
   void stop() noexcept;
   void reset();
+  void cancel_pending_operation() noexcept;
 
   bool running() const noexcept;
   DriverState state() const noexcept;
