@@ -64,7 +64,7 @@ wheels:
 
 mounts:
   # LiDAR scan-zero yaw is hardware-calibrated; level roll/pitch are preserved.
-  lidar: {parent: base_link, frame: laser_frame, xyz_m: [0.0, 0.0, 0.2975], rpy_rad: [0.0, 0.0, -3.005253]}
+  lidar: {parent: base_link, frame: laser_frame, xyz_m: [0.0, 0.0, 0.2975], rpy_rad: [0.0, 0.0, -3.089891]}
   # IMU RPY is a placeholder: only BNO055 +Z up is known; board +X/+Y are unresolved.
   imu: {parent: base_link, frame: imu_link, xyz_m: [0.0, -0.0465, -0.0175], rpy_rad: [0.0, 0.0, 0.0]}
   realsense_d435: {parent: base_link, frame: camera_link, xyz_m: [0.130, 0.0, 0.1925], rpy_rad: [0.0, 0.0, 0.0]}

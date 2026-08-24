@@ -1,7 +1,7 @@
 metadata:
   geometry_profile: robot_savo_core_v1
   geometry_revision: 3
-  geometry_sha256: a42eb4736add7f86a053bfcb4cc8df2dcb3769ab4353647b8cd2c79c7e5f6656
+  geometry_sha256: d4f8855e200d3fe10095530eb5ec72f6c5e8e1d709f41149914d67cc4cf1ebe0
   generated_from: config/profiles/robot_savo_core_v1.yaml
   envelope_semantics: measured_plate_only_not_complete_robot_collision_envelope
 robot_base_frame: base_footprint

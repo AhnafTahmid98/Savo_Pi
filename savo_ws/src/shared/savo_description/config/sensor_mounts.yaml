@@ -13,7 +13,7 @@ mounts:
     frame: laser_frame
     parent: base_link
     xyz_m: [0.0, 0.0, 0.2975]
-    rpy_rad: [0.0, 0.0, -3.005253]
+    rpy_rad: [0.0, 0.0, -3.089891]
     orientation_state: scan_zero_yaw_hardware_validated
   imu:
     frame: imu_link

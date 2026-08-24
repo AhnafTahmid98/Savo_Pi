@@ -55,7 +55,7 @@ def test_lidar_scan_zero_yaw_is_calibrated_once_in_description_chain():
         "parent": "base_link",
         "frame": "laser_frame",
         "xyz_m": [0.0, 0.0, 0.2975],
-        "rpy_rad": [0.0, 0.0, -3.005253],
+        "rpy_rad": [0.0, 0.0, -3.089891],
     }
     assert profile["calibration_remaining"] == [
         "realsense_internal_color_depth_extrinsics",
@@ -66,13 +66,13 @@ def test_lidar_scan_zero_yaw_is_calibrated_once_in_description_chain():
     ]
 
     mirror = yaml.safe_load((ROOT / "config/sensor_mounts.yaml").read_text())
-    assert mirror["mounts"]["lidar"]["rpy_rad"] == [0.0, 0.0, -3.005253]
+    assert mirror["mounts"]["lidar"]["rpy_rad"] == [0.0, 0.0, -3.089891]
 
     robot = (ROOT / "urdf/robot_savo.urdf.xacro").read_text()
     sensors = (ROOT / "urdf/robot_savo_sensors.xacro").read_text()
     launch = (ROOT / "launch/description.launch.py").read_text()
-    assert '<xacro:arg name="lidar_rpy" default="0 0 -3.005253"/>' in robot
-    assert "lidar_rpy:='0 0 -3.005253'" in sensors
+    assert '<xacro:arg name="lidar_rpy" default="0 0 -3.089891"/>' in robot
+    assert "lidar_rpy:='0 0 -3.089891'" in sensors
     assert '"lidar_rpy": mounts["lidar"]["rpy_rad"]' in launch
 
 

@@ -16,8 +16,11 @@ Profile revision 3 integrates owner-supplied physical measurements dated
 - Wheel centers: front X `+0.080`, rear X `-0.080`, left Y `+0.108`, right Y `-0.108 m`.
 - Wheel diameter `0.065 m`; wheelbase `0.160 m`; track `0.216 m`.
 - IMU ground XYZ `[0,-0.0465,0.015] m`; BNO055 +Z points up.
-- LiDAR ground XYZ `[0,0,0.330] m`; the hardware-calibrated
-  `base_link -> laser_frame` scan-zero yaw is `-3.005253 rad` (`-172.188 deg`).
+- LiDAR ground XYZ `[0,0,0.330] m`; the final flat-door plane-fit calibration
+  sets the `base_link -> laser_frame` scan-zero yaw to `-3.089891 rad`
+  (`-177.038 deg`). This supersedes the earlier `-172.188 deg` cluster-center
+  estimate; three independent 20-scan batches had a `0.267 deg` repeatability
+  spread and `0.0095 m` maximum plane-fit RMS.
 - D435 ground XYZ `[0.130,0,0.225] m`, mount RPY `[0,0,0]`.
 - Left/right ToF ground XYZ `[0,+/-0.106,0.025] m`, facing +Y/-Y.
 - Front ultrasonic ground XYZ `[0.137,0,0.056] m`, facing +X.
