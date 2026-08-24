@@ -16,7 +16,8 @@ Profile revision 3 integrates owner-supplied physical measurements dated
 - Wheel centers: front X `+0.080`, rear X `-0.080`, left Y `+0.108`, right Y `-0.108 m`.
 - Wheel diameter `0.065 m`; wheelbase `0.160 m`; track `0.216 m`.
 - IMU ground XYZ `[0,-0.0465,0.015] m`; BNO055 +Z points up.
-- LiDAR ground XYZ `[0,0,0.330] m`.
+- LiDAR ground XYZ `[0,0,0.330] m`; the hardware-calibrated
+  `base_link -> laser_frame` scan-zero yaw is `-3.005253 rad` (`-172.188 deg`).
 - D435 ground XYZ `[0.130,0,0.225] m`, mount RPY `[0,0,0]`.
 - Left/right ToF ground XYZ `[0,+/-0.106,0.025] m`, facing +Y/-Y.
 - Front ultrasonic ground XYZ `[0.137,0,0.056] m`, facing +X.
@@ -49,13 +50,12 @@ inertials also remain provisional.
 ## Required runtime verification before lock
 
 1. Establish BNO055 +X/+Y orientation relative to the robot.
-2. Verify LiDAR scan-zero yaw in RViz with an obstacle directly ahead.
-3. Obtain authoritative D435 internal stream extrinsics or safely redesign TF ownership.
-4. Complete the Pi runtime TF validation for the measured head chain before
+2. Obtain authoritative D435 internal stream extrinsics or safely redesign TF ownership.
+3. Complete the Pi runtime TF validation for the measured head chain before
    closing its calibration blocker.
-5. Resolve each reported plate Z datum as surface or center plane.
-6. Measure wheel width and physical mass/inertial values.
-7. Survey the full collision envelope and remaining display/ReSpeaker geometry.
+4. Resolve each reported plate Z datum as surface or center plane.
+5. Measure wheel width and physical mass/inertial values.
+6. Survey the full collision envelope and remaining display/ReSpeaker geometry.
 
 Do not change `measurement_state` to `locked` until these blockers have dated,
 reviewed evidence.

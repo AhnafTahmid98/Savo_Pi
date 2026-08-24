@@ -49,6 +49,33 @@ def test_profile_has_required_tf_chain_without_duplicates_or_cycles():
     ]
 
 
+def test_lidar_scan_zero_yaw_is_calibrated_once_in_description_chain():
+    profile = MODULE.load_profile(PROFILE)
+    assert profile["mounts"]["lidar"] == {
+        "parent": "base_link",
+        "frame": "laser_frame",
+        "xyz_m": [0.0, 0.0, 0.2975],
+        "rpy_rad": [0.0, 0.0, -3.005253],
+    }
+    assert profile["calibration_remaining"] == [
+        "realsense_internal_color_depth_extrinsics",
+        "plate_z_surface_or_center_datum",
+        "wheel_width_mass_and_inertials",
+        "full_fixed_collision_envelope",
+        "display_respeaker_and_remaining_mass_geometry",
+    ]
+
+    mirror = yaml.safe_load((ROOT / "config/sensor_mounts.yaml").read_text())
+    assert mirror["mounts"]["lidar"]["rpy_rad"] == [0.0, 0.0, -3.005253]
+
+    robot = (ROOT / "urdf/robot_savo.urdf.xacro").read_text()
+    sensors = (ROOT / "urdf/robot_savo_sensors.xacro").read_text()
+    launch = (ROOT / "launch/description.launch.py").read_text()
+    assert '<xacro:arg name="lidar_rpy" default="0 0 -3.005253"/>' in robot
+    assert "lidar_rpy:='0 0 -3.005253'" in sensors
+    assert '"lidar_rpy": mounts["lidar"]["rpy_rad"]' in launch
+
+
 def test_nav2_footprint_is_derived_from_chassis_and_padding_is_separate():
     profile = MODULE.load_profile(PROFILE)
     generated = yaml.safe_load(

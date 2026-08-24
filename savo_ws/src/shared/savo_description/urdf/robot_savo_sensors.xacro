@@ -4,7 +4,7 @@
   <xacro:macro name="robot_savo_sensors"
     params="
       parent:=base_link
-      lidar_xyz:='0 0 0.2975' lidar_rpy:='0 0 0'
+      lidar_xyz:='0 0 0.2975' lidar_rpy:='0 0 -3.005253'
       imu_xyz:='0 -0.0465 -0.0175' imu_rpy:='0 0 0'
       camera_xyz:='0.130 0 0.1925' camera_rpy:='0 0 0'
       tof_left_xyz:='0 0.106 -0.0075' tof_left_rpy:='0 0 1.57079632679'

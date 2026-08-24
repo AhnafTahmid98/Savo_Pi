@@ -26,7 +26,7 @@
   <xacro:arg name="wheel_z" default="0.0"/>
   <xacro:arg name="wheel_mass" default="0.12"/>
   <xacro:arg name="lidar_xyz" default="0 0 0.2975"/>
-  <xacro:arg name="lidar_rpy" default="0 0 0"/>
+  <xacro:arg name="lidar_rpy" default="0 0 -3.005253"/>
   <xacro:arg name="imu_xyz" default="0 -0.0465 -0.0175"/>
   <xacro:arg name="imu_rpy" default="0 0 0"/>
   <xacro:arg name="camera_xyz" default="0.130 0 0.1925"/>
