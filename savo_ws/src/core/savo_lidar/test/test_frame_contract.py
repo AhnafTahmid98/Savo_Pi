@@ -67,12 +67,15 @@ def test_cpp_defaults_use_laser_frame() -> None:
 def test_cpp_real_driver_bins_hardware_angles_and_applies_configured_transform() -> None:
     """Keep the production C++ acquisition path wired to measured-angle bins."""
     driver = (PACKAGE_ROOT / "src/drivers/rplidar_driver.cpp").read_text()
+    assembler = (
+        PACKAGE_ROOT / "src/drivers/scan_frame_assembler.cpp"
+    ).read_text()
     compensator = (
         PACKAGE_ROOT / "src/drivers/scan_angle_compensator.cpp"
     ).read_text()
     cmake = (PACKAGE_ROOT / "CMakeLists.txt").read_text()
 
-    assert "sample.angle_rad = measurement.angle_rad" in driver
+    assert "sample.angle_rad = measurement.angle_rad" in assembler
     assert "bin_scan_samples_by_angle(" in driver
     assert "config_.inverted" in driver
     assert "config_.angle_offset_rad" in driver

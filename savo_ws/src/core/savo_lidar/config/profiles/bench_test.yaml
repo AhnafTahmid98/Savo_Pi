@@ -21,7 +21,6 @@ lidar_driver_node:
     heartbeat_topic: "/savo_lidar/heartbeat"
 
     expected_scan_rate_hz: 7.0
-    publish_rate_hz: 7.0
     read_timeout_s: 5.0
 
     motor_start_settle_s: 2.0

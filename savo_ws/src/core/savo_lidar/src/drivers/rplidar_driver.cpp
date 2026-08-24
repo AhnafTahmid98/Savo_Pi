@@ -8,7 +8,6 @@
 #include <string>
 #include <thread>
 #include <utility>
-#include <vector>
 
 namespace savo_lidar
 {
@@ -80,9 +79,8 @@ void RplidarDriver::start()
         std::chrono::duration_cast<std::chrono::milliseconds>(settle));
     }
 
+    scan_assembler_.reset();
     begin_scan();
-
-    scan_start_time_ = std::chrono::steady_clock::now();
     state_ = DriverState::running;
   } catch (const std::exception & exc) {
     mark_error(exc.what());
@@ -101,6 +99,7 @@ void RplidarDriver::stop() noexcept
   }
 
   serial_.close();
+  scan_assembler_.reset();
   state_ = DriverState::stopped;
 }
 
@@ -112,6 +111,7 @@ void RplidarDriver::reset()
     }
 
     send_command(RPLIDAR_CMD_RESET);
+    scan_assembler_.reset();
     state_ = DriverState::stopped;
   } catch (const std::exception & exc) {
     mark_error(exc.what());
@@ -180,7 +180,9 @@ RplidarHealth RplidarDriver::get_health()
   }
 }
 
-LidarScan RplidarDriver::read_scan(double timeout_s)
+LidarScan RplidarDriver::read_scan(
+  double timeout_s,
+  const RosTimestampCallback & ros_timestamp_now)
 {
   if (!running()) {
     throw std::runtime_error("RPLIDAR driver is not running");
@@ -190,62 +192,46 @@ LidarScan RplidarDriver::read_scan(double timeout_s)
     throw std::invalid_argument("read_scan timeout_s must be > 0");
   }
 
+  if (!ros_timestamp_now) {
+    throw std::invalid_argument("read_scan ROS timestamp callback must be set");
+  }
+
   LidarScan scan;
   scan.frame_id = config_.frame_id;
   scan.range_min_m = config_.min_range_m;
   scan.range_max_m = config_.max_range_m;
   scan.sequence = scan_count_ + 1U;
 
-  std::vector<LidarSample> samples;
-
   const auto start = std::chrono::steady_clock::now();
-
-  bool have_started_rotation = false;
 
   try {
     while (!timeout_reached(start, timeout_s)) {
       const auto measurement = read_measurement(remaining_timeout_s(start, timeout_s));
+      const auto received_at = std::chrono::steady_clock::now();
+      const auto ros_received_time_ns =
+        measurement.start_flag ? ros_timestamp_now() : 0;
+      auto completed = scan_assembler_.add_measurement(
+        measurement,
+        received_at,
+        ros_received_time_ns);
 
-      if (!measurement.valid) {
-        continue;
+      if (completed) {
+        scan = bin_scan_samples_by_angle(
+          completed->samples,
+          std::move(scan),
+          config_.inverted,
+          config_.angle_offset_rad);
+
+        apply_scan_timing(scan, completed->scan_time_s);
+        scan.ros_start_time_ns = completed->ros_start_time_ns;
+
+        ++scan_count_;
+        scan.sequence = scan_count_;
+        return scan;
       }
-
-      if (measurement.start_flag) {
-        if (have_started_rotation && !samples.empty()) {
-          break;
-        }
-
-        have_started_rotation = true;
-        scan_start_time_ = std::chrono::steady_clock::now();
-      }
-
-      if (!have_started_rotation) {
-        continue;
-      }
-
-      append_measurement(samples, measurement);
     }
 
-    if (samples.empty()) {
-      throw std::runtime_error("RPLIDAR scan timeout; no valid samples collected");
-    }
-
-    scan = bin_scan_samples_by_angle(
-      samples,
-      std::move(scan),
-      config_.inverted,
-      config_.angle_offset_rad);
-
-    scan.scan_time_s = elapsed_s(scan_start_time_);
-
-    if (scan.size() > 1U) {
-      scan.time_increment_s = scan.scan_time_s / static_cast<double>(scan.size());
-    }
-
-    ++scan_count_;
-    scan.sequence = scan_count_;
-
-    return scan;
+    throw std::runtime_error("RPLIDAR scan timeout; no complete revolution collected");
   } catch (const std::exception & exc) {
     mark_error(exc.what());
     throw;
@@ -331,18 +317,6 @@ void RplidarDriver::mark_error(const std::string & message)
 {
   last_error_ = message;
   state_ = DriverState::error;
-}
-
-void RplidarDriver::append_measurement(
-  std::vector<LidarSample> & samples,
-  const RplidarMeasurement & measurement)
-{
-  LidarSample sample;
-  sample.angle_rad = measurement.angle_rad;
-  sample.range_m = measurement.distance_m;
-  sample.intensity = static_cast<float>(measurement.quality);
-  sample.valid = measurement.valid;
-  samples.push_back(sample);
 }
 
 const char * to_string(DriverState state)

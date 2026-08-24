@@ -197,6 +197,12 @@ For full LiDAR bringup:
 ros2 launch savo_lidar lidar_bringup.launch.py profile:=real_rplidar_a1.yaml
 ```
 
+The production C++ driver publishes each completed hardware revolution as soon
+as it is assembled. It has no configured publication timer; `publish_rate_hz`
+is retained only by the separate Python dry-run/fallback path. Each scan's ROS
+header stamp is captured at its first-ray revolution boundary, while
+`scan_time` uses the steady-clock interval to the next boundary.
+
 ## Mapping-ready LiDAR bringup
 
 Before starting `savo_mapping`, run:

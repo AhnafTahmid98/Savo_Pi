@@ -15,6 +15,7 @@ find_package(ament_cmake_python REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(Threads REQUIRED)
 
 # ---------------------------------------------------------------------------
 # Python package
@@ -50,6 +51,8 @@ add_library(${PROJECT_NAME}_cpp SHARED
   src/drivers/serial_port.cpp
   src/drivers/rplidar_protocol.cpp
   src/drivers/scan_angle_compensator.cpp
+  src/drivers/scan_acquisition_worker.cpp
+  src/drivers/scan_frame_assembler.cpp
   src/drivers/rplidar_driver.cpp
   src/ros/scan_publisher.cpp
   src/ros/diagnostics.cpp
@@ -62,6 +65,10 @@ target_include_directories(${PROJECT_NAME}_cpp
 )
 
 target_compile_features(${PROJECT_NAME}_cpp PUBLIC cxx_std_17)
+
+target_link_libraries(${PROJECT_NAME}_cpp
+  Threads::Threads
+)
 
 target_compile_definitions(${PROJECT_NAME}_cpp
   PRIVATE SAVO_LIDAR_BUILDING_LIBRARY
@@ -159,6 +166,18 @@ if(BUILD_TESTING)
     )
   endif()
 
+  ament_add_gtest(
+    test_scan_acquisition
+    test/test_scan_acquisition.cpp
+  )
+
+  if(TARGET test_scan_acquisition)
+    target_link_libraries(
+      test_scan_acquisition
+      ${PROJECT_NAME}_cpp
+    )
+  endif()
+
   ament_add_pytest_test(test_angle_filter test/test_angle_filter.py)
   ament_add_pytest_test(test_range_filter test/test_range_filter.py)
   ament_add_pytest_test(test_scan_rate_filter test/test_scan_rate_filter.py)
@@ -168,6 +187,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_topic_names test/test_topic_names.py)
   ament_add_pytest_test(test_param_loader test/test_param_loader.py)
   ament_add_pytest_test(test_driver_dryrun test/test_driver_dryrun.py)
+  ament_add_pytest_test(test_cpp_cadence_contract test/test_cpp_cadence_contract.py)
   ament_add_pytest_test(test_lidar_models test/test_lidar_models.py)
   ament_add_pytest_test(test_frame_contract test/test_frame_contract.py)
 endif()

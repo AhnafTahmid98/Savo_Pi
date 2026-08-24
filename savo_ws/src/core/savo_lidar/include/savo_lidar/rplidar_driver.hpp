@@ -1,12 +1,12 @@
 #pragma once
 
-#include <chrono>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
-#include <vector>
 
 #include "savo_lidar/rplidar_protocol.hpp"
+#include "savo_lidar/scan_frame_assembler.hpp"
 #include "savo_lidar/scan_types.hpp"
 #include "savo_lidar/serial_config.hpp"
 #include "savo_lidar/serial_port.hpp"
@@ -26,6 +26,8 @@ enum class DriverState : std::uint8_t
 class SAVO_LIDAR_PUBLIC RplidarDriver
 {
 public:
+  using RosTimestampCallback = std::function<std::int64_t()>;
+
   RplidarDriver();
   explicit RplidarDriver(const RplidarConfig & config);
   ~RplidarDriver();
@@ -50,7 +52,9 @@ public:
   RplidarDeviceInfo get_info();
   RplidarHealth get_health();
 
-  LidarScan read_scan(double timeout_s);
+  LidarScan read_scan(
+    double timeout_s,
+    const RosTimestampCallback & ros_timestamp_now);
 
   std::uint64_t scan_count() const noexcept;
   std::string last_error() const;
@@ -63,18 +67,13 @@ private:
   void begin_scan();
   void mark_error(const std::string & message);
 
-  static void append_measurement(
-    std::vector<LidarSample> & samples,
-    const RplidarMeasurement & measurement);
-
   RplidarConfig config_;
   SerialPort serial_;
+  ScanFrameAssembler scan_assembler_;
 
   DriverState state_{DriverState::stopped};
   std::uint64_t scan_count_{0};
   std::string last_error_;
-
-  std::chrono::steady_clock::time_point scan_start_time_;
 };
 
 SAVO_LIDAR_PUBLIC const char * to_string(DriverState state);

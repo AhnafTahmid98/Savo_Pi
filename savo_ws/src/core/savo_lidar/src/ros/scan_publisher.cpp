@@ -51,7 +51,14 @@ std::uint64_t ScanPublisher::publish_count() const noexcept
 
 sensor_msgs::msg::LaserScan ScanPublisher::to_message(const LidarScan & scan) const
 {
-  return to_laser_scan_msg(scan, node_->now());
+  if (!scan.ros_start_time_ns) {
+    throw std::runtime_error("LaserScan has no first-ray ROS timestamp");
+  }
+
+  const rclcpp::Time first_ray_stamp(
+    *scan.ros_start_time_ns,
+    node_->get_clock()->get_clock_type());
+  return to_laser_scan_msg(scan, first_ray_stamp);
 }
 
 sensor_msgs::msg::LaserScan to_laser_scan_msg(

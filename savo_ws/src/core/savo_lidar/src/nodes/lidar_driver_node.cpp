@@ -1,11 +1,16 @@
 #include "savo_lidar/diagnostics.hpp"
 #include "savo_lidar/rplidar_driver.hpp"
+#include "savo_lidar/scan_acquisition_worker.hpp"
 #include "savo_lidar/scan_publisher.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
+#include <cstdint>
 #include <exception>
 #include <memory>
+#include <mutex>
+#include <stdexcept>
 #include <string>
 
 #include "rclcpp/rclcpp.hpp"
@@ -51,12 +56,6 @@ public:
       heartbeat_topic_,
       rclcpp::QoS(1).reliable().transient_local());
 
-    scan_timer_ = create_wall_timer(
-      period_from_hz(publish_rate_hz_),
-      [this]() {
-        on_scan_timer();
-      });
-
     heartbeat_timer_ = create_wall_timer(
       period_from_hz(heartbeat_hz_),
       [this]() {
@@ -64,7 +63,12 @@ public:
       });
 
     if (auto_start_) {
-      start_driver();
+      acquisition_worker_ = std::make_unique<ScanAcquisitionWorker>(
+        [this]() {return acquire_scan();},
+        [this](const LidarScan & scan) {publish_scan(scan);},
+        [this](const std::string & message) {return handle_acquisition_error(message);},
+        std::chrono::duration<double>(config_.serial.reconnect_delay_s));
+      acquisition_worker_->start();
     }
 
     RCLCPP_INFO(
@@ -76,9 +80,16 @@ public:
 
   ~LidarDriverNode() override
   {
+    if (acquisition_worker_) {
+      acquisition_worker_->request_stop();
+      acquisition_worker_->join();
+    }
+
     if (driver_) {
       driver_->stop();
     }
+
+    driver_running_.store(false);
   }
 
 private:
@@ -112,16 +123,11 @@ private:
     heartbeat_topic_ =
       declare_parameter<std::string>("heartbeat_topic", "/savo_lidar/heartbeat");
 
-    publish_rate_hz_ = declare_parameter<double>("publish_rate_hz", 5.5);
     heartbeat_hz_ = declare_parameter<double>("heartbeat_hz", 1.0);
     read_timeout_s_ = declare_parameter<double>("read_timeout_s", 2.0);
     auto_start_ = declare_parameter<bool>("auto_start", true);
 
     config_.validate();
-
-    if (publish_rate_hz_ <= 0.0) {
-      throw std::invalid_argument("publish_rate_hz must be > 0");
-    }
 
     if (heartbeat_hz_ <= 0.0) {
       throw std::invalid_argument("heartbeat_hz must be > 0");
@@ -134,94 +140,78 @@ private:
 
   void start_driver()
   {
-    last_start_attempt_ = now();
+    driver_->start();
+    driver_running_.store(true);
+    set_last_error("");
 
-    try {
-      driver_->start();
-
-      RCLCPP_INFO(
-        get_logger(),
-        "RPLIDAR driver started | port=%s | baudrate=%d",
-        config_.serial.port.c_str(),
-        config_.serial.baudrate);
-    } catch (const std::exception & exc) {
-      publish_error_state(exc.what());
-
-      RCLCPP_WARN(
-        get_logger(),
-        "RPLIDAR driver start failed: %s",
-        exc.what());
-    }
+    RCLCPP_INFO(
+      get_logger(),
+      "RPLIDAR driver started | port=%s | baudrate=%d",
+      config_.serial.port.c_str(),
+      config_.serial.baudrate);
   }
 
-  void on_scan_timer()
+  LidarScan acquire_scan()
   {
     if (!driver_) {
-      publish_error_state("driver object is not initialized");
-      return;
+      throw std::runtime_error("driver object is not initialized");
     }
 
     if (!driver_->running()) {
-      maybe_reconnect();
-      return;
+      start_driver();
     }
 
-    try {
-      auto scan = driver_->read_scan(read_timeout_s_);
-
-      scan_publisher_->publish(scan);
-
-      const auto now_time = now();
-      double scan_rate_hz = 0.0;
-
-      if (last_scan_time_.nanoseconds() > 0) {
-        const auto dt_s = (now_time - last_scan_time_).seconds();
-        if (dt_s > 0.0) {
-          scan_rate_hz = 1.0 / dt_s;
-        }
-      }
-
-      last_scan_time_ = now_time;
-      last_scan_rate_hz_ = scan_rate_hz > 0.0 ? scan_rate_hz : config_.expected_scan_rate_hz;
-
-      const auto diagnostics = make_ok_driver_diagnostics(
-        scan,
-        driver_->scan_count(),
-        last_scan_rate_hz_,
-        config_.frame_id,
-        config_.scan_topic,
-        config_.serial.port);
-
-      publish_driver_state(diagnostics);
-    } catch (const std::exception & exc) {
-      publish_error_state(exc.what());
-
-      RCLCPP_WARN(
-        get_logger(),
-        "RPLIDAR scan read failed: %s",
-        exc.what());
-
-      driver_->stop();
-    }
+    return driver_->read_scan(
+      read_timeout_s_,
+      [this]() {return now().nanoseconds();});
   }
 
-  void maybe_reconnect()
+  void publish_scan(const LidarScan & scan)
   {
-    if (!config_.serial.reconnect_on_error) {
-      publish_error_state("driver is not running");
-      return;
-    }
+    scan_publisher_->publish(scan);
 
-    const auto now_time = now();
+    const auto published_at = std::chrono::steady_clock::now();
+    double scan_rate_hz =
+      scan.scan_time_s > 0.0 ? 1.0 / scan.scan_time_s : 0.0;
 
-    if (last_start_attempt_.nanoseconds() > 0) {
-      const auto age_s = (now_time - last_start_attempt_).seconds();
-      if (age_s < config_.serial.reconnect_delay_s) {
-        return;
+    if (last_publish_time_ != std::chrono::steady_clock::time_point{}) {
+      const auto publish_period_s =
+        std::chrono::duration<double>(published_at - last_publish_time_).count();
+      if (publish_period_s > 0.0) {
+        scan_rate_hz = 1.0 / publish_period_s;
       }
     }
 
-    start_driver();
+    last_publish_time_ = published_at;
+    last_scan_rate_hz_ = scan_rate_hz;
+    scan_count_.store(driver_->scan_count());
+
+    const auto diagnostics = make_ok_driver_diagnostics(
+      scan,
+      scan_count_.load(),
+      last_scan_rate_hz_,
+      config_.frame_id,
+      config_.scan_topic,
+      config_.serial.port);
+
+    publish_driver_state(diagnostics);
+  }
+
+  bool handle_acquisition_error(const std::string & message)
+  {
+    driver_->stop();
+    driver_running_.store(false);
+    last_publish_time_ = std::chrono::steady_clock::time_point{};
+    last_scan_rate_hz_ = 0.0;
+    set_last_error(message);
+    publish_error_state(message);
+
+    RCLCPP_WARN(
+      get_logger(),
+      "RPLIDAR acquisition failed: %s",
+      message.c_str());
+
+    return config_.serial.reconnect_on_error;
   }
 
   void publish_driver_state(const DriverDiagnostics & diagnostics)
@@ -236,8 +226,8 @@ private:
     const auto diagnostics = make_error_driver_diagnostics(
       message,
       false,
-      driver_ && driver_->running(),
-      driver_ ? driver_->scan_count() : 0U,
+      driver_running_.load(),
+      scan_count_.load(),
       config_.frame_id,
       config_.scan_topic,
       config_.serial.port);
@@ -251,12 +241,12 @@ private:
       return;
     }
 
-    const bool running = driver_ && driver_->running();
+    const bool running = driver_running_.load();
 
     const auto status = running ? std::string(STATUS_OK) : std::string(STATUS_OFFLINE);
     const auto message = running ? "driver running" : "driver not running";
-    const auto scan_count = driver_ ? driver_->scan_count() : 0U;
-    const auto last_error = driver_ ? driver_->last_error() : std::string();
+    const auto scan_count = scan_count_.load();
+    const auto last_error = get_last_error();
 
     std_msgs::msg::String msg;
     msg.data = make_driver_heartbeat_json(
@@ -270,27 +260,42 @@ private:
     heartbeat_publisher_->publish(msg);
   }
 
+  void set_last_error(const std::string & message)
+  {
+    std::lock_guard<std::mutex> lock(error_mutex_);
+    last_error_ = message;
+  }
+
+  std::string get_last_error() const
+  {
+    std::lock_guard<std::mutex> lock(error_mutex_);
+    return last_error_;
+  }
+
   RplidarConfig config_;
 
   std::string state_topic_{"/savo_lidar/state"};
   std::string heartbeat_topic_{"/savo_lidar/heartbeat"};
 
-  double publish_rate_hz_{5.5};
   double heartbeat_hz_{1.0};
   double read_timeout_s_{2.0};
   bool auto_start_{true};
 
-  rclcpp::Time last_scan_time_;
-  rclcpp::Time last_start_attempt_;
+  std::chrono::steady_clock::time_point last_publish_time_{};
   double last_scan_rate_hz_{0.0};
 
+  std::atomic<bool> driver_running_{false};
+  std::atomic<std::uint64_t> scan_count_{0U};
+  mutable std::mutex error_mutex_;
+  std::string last_error_;
+
   std::unique_ptr<RplidarDriver> driver_;
+  std::unique_ptr<ScanAcquisitionWorker> acquisition_worker_;
   std::unique_ptr<ScanPublisher> scan_publisher_;
 
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr state_publisher_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr heartbeat_publisher_;
 
-  rclcpp::TimerBase::SharedPtr scan_timer_;
   rclcpp::TimerBase::SharedPtr heartbeat_timer_;
 };
 

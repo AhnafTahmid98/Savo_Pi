@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -29,6 +30,7 @@ struct SAVO_LIDAR_PUBLIC LidarScan
 
   double scan_time_s{0.0};
   double time_increment_s{0.0};
+  std::optional<std::int64_t> ros_start_time_ns;
 
   float range_min_m{0.15F};
   float range_max_m{12.0F};
