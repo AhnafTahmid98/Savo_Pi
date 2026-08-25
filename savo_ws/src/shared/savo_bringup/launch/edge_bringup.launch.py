@@ -44,12 +44,16 @@ def _setup(context):
 
     start_realsense = as_bool(_value(context, "start_realsense"))
     start_vo = as_bool(_value(context, "start_vo"))
-    start_obstacle_cloud = should_start_obstacle_cloud(
+    explicit_obstacle_cloud = as_bool(
+        _value(context, "start_obstacle_cloud")
+    )
+    obstacle_cloud_requested = should_start_obstacle_cloud(
         mode,
         profile,
         d435_voxel_validated=voxel_validated,
-        explicit_start=as_bool(_value(context, "start_obstacle_cloud")),
+        explicit_start=explicit_obstacle_cloud,
     )
+    start_obstacle_cloud = start_realsense and obstacle_cloud_requested
     start_speech = as_bool(_value(context, "start_speech"))
     start_ui = as_bool(_value(context, "start_ui"))
     start_bridge = as_bool(_value(context, "start_bridge"))
@@ -65,7 +69,7 @@ def _setup(context):
     )
     if start_vo and not start_realsense:
         raise RuntimeError("start_vo requires start_realsense")
-    if start_obstacle_cloud and not start_realsense:
+    if explicit_obstacle_cloud and not start_realsense:
         raise RuntimeError("start_obstacle_cloud requires start_realsense")
     requirements = resolve_requirements(
         "edge",
@@ -92,7 +96,7 @@ def _setup(context):
                 "config",
                 (
                     "realsense_pointcloud_camera.yaml"
-                    if requirements.voxel_layer_enabled
+                    if start_obstacle_cloud
                     else "realsense_d435_camera.yaml"
                 ),
             ]
@@ -103,7 +107,7 @@ def _setup(context):
                 "config",
                 (
                     "realsense_pointcloud_nodes.yaml"
-                    if requirements.voxel_layer_enabled
+                    if start_obstacle_cloud
                     else "realsense_d435_nodes.yaml"
                 ),
             ]
@@ -217,7 +221,10 @@ def _setup(context):
                     "require_vo": requirements.require_vo,
                     "require_speech": requirements.require_speech,
                     "require_ui": start_ui,
-                    "require_obstacle_cloud": start_obstacle_cloud,
+                    # The D435 obstacle cloud is an optional navigation helper.
+                    # Its own health/status topics expose degradation without
+                    # making Edge or Core navigation readiness depend on it.
+                    "require_obstacle_cloud": False,
                 },
             ],
             arguments=[

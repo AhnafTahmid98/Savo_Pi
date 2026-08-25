@@ -110,7 +110,7 @@ def test_edge_bringup_uses_cpp_production_implementations() -> None:
 
 
 def test_edge_realsense_and_obstacle_cloud_profile_selection() -> None:
-    """Select the cloud filter only for validated navigation or override."""
+    """Run the optional cloud helper in navigation or by override."""
     launch = read("launch/edge_bringup.launch.py")
     common = {
         "host_role": "edge",
@@ -151,18 +151,14 @@ def test_edge_realsense_and_obstacle_cloud_profile_selection() -> None:
             explicit_start=False,
         ) is False
     for mode in ("autonomous_mapping", "saved_map_navigation"):
-        assert should_start_obstacle_cloud(
-            mode,
-            "lidar_d435_voxel",
-            d435_voxel_validated=True,
-            explicit_start=False,
-        ) is True
-        assert should_start_obstacle_cloud(
-            mode,
-            "lidar_d435_voxel",
-            d435_voxel_validated=False,
-            explicit_start=False,
-        ) is False
+        for selected_profile in ("lidar_only", "lidar_d435_voxel"):
+            for validated in (False, True):
+                assert should_start_obstacle_cloud(
+                    mode,
+                    selected_profile,
+                    d435_voxel_validated=validated,
+                    explicit_start=False,
+                ) is True
 
     assert should_start_obstacle_cloud(
         "safe_idle",
@@ -173,9 +169,23 @@ def test_edge_realsense_and_obstacle_cloud_profile_selection() -> None:
     assert should_start_obstacle_cloud(
         "autonomous_mapping",
         "lidar_only",
-        d435_voxel_validated=True,
+        d435_voxel_validated=False,
         explicit_start=False,
-    ) is False
+    ) is True
+    assert '"require_obstacle_cloud": False' in launch
+    assert (
+        'start_obstacle_cloud = start_realsense and '
+        'obstacle_cloud_requested'
+    ) in launch
+    assert 'if explicit_obstacle_cloud and not start_realsense' in launch
+    assert (
+        '"realsense_pointcloud_camera.yaml"\n'
+        '                    if start_obstacle_cloud'
+    ) in launch
+    assert (
+        '"realsense_pointcloud_nodes.yaml"\n'
+        '                    if start_obstacle_cloud'
+    ) in launch
 
 
 def test_supervisor_and_bridge_receive_the_existing_robot_mode() -> None:
@@ -429,7 +439,7 @@ def test_profiles_are_versioned_and_keep_voxel_disabled_by_default() -> None:
 
     assert profiles["lidar_only"]["d435_voxel_validated"] is False
     assert profiles["lidar_only"]["navigation_profile"] == "lidar_only"
-    assert profiles["lidar_d435_voxel"]["d435_voxel_validated"] is True
+    assert profiles["lidar_d435_voxel"]["d435_voxel_validated"] is False
     assert profiles["production"]["allow_provisional_geometry"] is False
 
 

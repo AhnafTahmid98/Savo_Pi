@@ -128,7 +128,7 @@ public:
     policy_.require_pointcloud =
       declare_parameter<bool>(
       "require_pointcloud",
-      true);
+      false);
 
     policy_.require_control_mode =
       declare_parameter<bool>(

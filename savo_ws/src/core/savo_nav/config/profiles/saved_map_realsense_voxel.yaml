@@ -9,7 +9,7 @@ saved_map_realsense_voxel_profile:
   readiness_parameters: config/readiness_realsense_voxel.yaml
   local_costmap_mode: lidar_clearing_plus_filtered_d435_voxel_marking
   lidar_required_for_navigation: true
-  realsense_required_for_navigation: true
+  realsense_required_for_navigation: false
   filtered_pointcloud_enabled: true
   filtered_pointcloud_topic: /savo_perception/obstacles/points
   raw_pointcloud_allowed: false
@@ -23,5 +23,6 @@ saved_map_realsense_voxel_profile:
   software_completion: complete
   notes:
     - LiDAR remains the authoritative clearing source in both costmaps.
-    - The filtered D435 cloud may mark local obstacles but cannot clear space.
+    - The filtered D435 cloud is an optional local marking helper.
+    - Nonpersistent marks expire without unsafe obstacle-cloud ray clearing.
     - Activate only after the complete guarded D435 hardware validation passes.

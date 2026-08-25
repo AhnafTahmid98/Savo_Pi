@@ -222,10 +222,13 @@ TEST(NavigationReadinessEvaluatorTest, WaitsForPointCloud)
   auto snapshot = MakeReadySnapshot();
   snapshot.pointcloud_fresh = false;
 
+  savo_nav::NavigationReadinessPolicy policy;
+  policy.require_pointcloud = true;
+
   const auto result =
     savo_nav::NavigationReadiness::Evaluate(
     snapshot,
-    {});
+    policy);
 
   EXPECT_EQ(
     result.state,
@@ -247,6 +250,13 @@ TEST(NavigationReadinessEvaluatorTest, AllowsOptionalPointCloud)
 
   EXPECT_EQ(result.state, State::kReady);
   EXPECT_TRUE(result.goal_acceptance_allowed);
+}
+
+TEST(NavigationReadinessEvaluatorTest, PointCloudIsOptionalByDefault)
+{
+  const savo_nav::NavigationReadinessPolicy policy;
+
+  EXPECT_FALSE(policy.require_pointcloud);
 }
 
 TEST(NavigationReadinessEvaluatorTest, WaitsForNav2)

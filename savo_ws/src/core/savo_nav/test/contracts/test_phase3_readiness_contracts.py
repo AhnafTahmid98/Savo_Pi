@@ -105,6 +105,19 @@ def test_phase3_readiness_configuration():
     )
 
 
+def test_filtered_pointcloud_is_optional_in_code_defaults():
+    """Direct node launches must retain LiDAR-only readiness semantics."""
+    header = (
+        ROOT / 'include/savo_nav/navigation_readiness.hpp'
+    ).read_text(encoding='utf-8')
+    source = (
+        ROOT / 'src/nodes/navigation_readiness_node.cpp'
+    ).read_text(encoding='utf-8')
+
+    assert 'bool require_pointcloud{false};' in header
+    assert '"require_pointcloud",\n      false' in source
+
+
 def test_target_tf_chain_is_preserved():
     source = (
         ROOT

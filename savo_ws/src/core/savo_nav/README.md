@@ -191,7 +191,7 @@ envelope with `0.02 m` padding. The generated `savo_description` footprint is
 the measured plate envelope only and is not the production collision footprint.
 LiDAR marks and clears obstacles in the global and local costmaps.
 
-### Filtered D435 VoxelLayer companion
+### Optional filtered-D435 voxel companion
 
 Use only after real D435 validation:
 
@@ -214,9 +214,11 @@ The companion profile consumes only:
 /savo_perception/obstacles/points
 ```
 
-The raw RealSense cloud is forbidden. The filtered obstacle-only cloud marks
-local obstacles without clearing. LiDAR remains the authoritative clearing
-source, and no D435 layer is added to the global costmap.
+Nav2 must not consume the raw RealSense cloud. The filtered obstacle-only cloud
+marks local obstacles through the nonpersistent voxel layer without ray
+clearing. Its observations expire after one second, so helper loss removes its
+marks while LiDAR navigation continues. LiDAR remains the required marking and
+clearing source, and no D435 layer is added to the global costmap.
 
 ## Build and test
 

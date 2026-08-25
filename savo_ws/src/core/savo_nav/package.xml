@@ -56,6 +56,7 @@
   <exec_depend>nav2_navfn_planner</exec_depend>
   <exec_depend>nav2_planner</exec_depend>
   <exec_depend>nav2_waypoint_follower</exec_depend>
+  <exec_depend>nonpersistent_voxel_layer</exec_depend>
 
   <test_depend>ament_cmake_gtest</test_depend>
   <test_depend>ament_cmake_pytest</test_depend>

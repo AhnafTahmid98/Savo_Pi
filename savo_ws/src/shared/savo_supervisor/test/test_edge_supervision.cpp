@@ -111,6 +111,22 @@ TEST(EdgeSupervision, OptionalVoLossDoesNotBlockCoreStartup)
   EXPECT_TRUE(result.degraded);
 }
 
+TEST(EdgeSupervision, OptionalCameraLossDegradesWithoutBlockingStartup)
+{
+  auto camera = healthy_camera();
+  camera.healthy = false;
+  camera.pointcloud_ready = false;
+  camera.reason = "camera_unavailable";
+
+  const auto result = savo_supervisor::EdgeSupervision{}.Evaluate(
+    healthy_bridge(), camera, healthy_speech(), healthy_vo(), healthy_ui());
+
+  EXPECT_TRUE(result.capabilities.edge_startup_ready);
+  EXPECT_FALSE(result.capabilities.realsense_ready);
+  EXPECT_TRUE(result.degraded);
+  EXPECT_EQ(result.reason, "edge_optional_capability_degraded");
+}
+
 TEST(EdgeSupervision, RequiredBridgeLossBlocksStartup)
 {
   auto bridge = healthy_bridge();

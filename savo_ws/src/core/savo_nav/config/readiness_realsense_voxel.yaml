@@ -1,14 +1,14 @@
 # Copyright 2026 Ahnaf Tahmid
 # SPDX-License-Identifier: LicenseRef-Proprietary
 
-# Overlay for the later D435 voxel-layer hardware-validation stage.
-# Load this instead of readiness.yaml only when the filtered obstacle cloud is
-# running and has passed the real-robot freshness/frame/self-filter checks.
+# Overlay for the later D435 voxel-helper hardware-validation stage.
+# LiDAR remains the required obstacle sensor. The filtered D435 cloud is
+# monitored by its producer health/status but never gates navigation readiness.
 navigation_readiness_node:
   ros__parameters:
     publish_period_ms: 200
 
-    require_pointcloud: true
+    require_pointcloud: false
     require_control_mode: true
     require_safety_state: true
     require_global_costmap: true

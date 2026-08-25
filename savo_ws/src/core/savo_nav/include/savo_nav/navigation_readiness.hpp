@@ -14,7 +14,7 @@ namespace savo_nav
 
 struct NavigationReadinessPolicy
 {
-  bool require_pointcloud{true};
+  bool require_pointcloud{false};
   bool require_control_mode{true};
   bool require_safety_state{true};
   bool require_global_costmap{true};

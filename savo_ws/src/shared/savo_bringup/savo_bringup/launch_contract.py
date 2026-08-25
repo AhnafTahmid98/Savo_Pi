@@ -56,12 +56,11 @@ def should_start_obstacle_cloud(
     d435_voxel_validated: bool,
     explicit_start: bool,
 ) -> bool:
-    """Select the filtered D435 path without broadening automatic startup."""
-    return explicit_start or (
-        robot_mode in {"autonomous_mapping", "saved_map_navigation"}
-        and bringup_profile == "lidar_d435_voxel"
-        and d435_voxel_validated
-    )
+    """Run the optional D435 helper in Nav modes or by explicit override."""
+    return explicit_start or robot_mode in {
+        "autonomous_mapping",
+        "saved_map_navigation",
+    }
 
 
 def resolve_host_role(

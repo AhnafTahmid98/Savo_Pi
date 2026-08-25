@@ -182,13 +182,18 @@ def test_live_and_saved_voxel_profiles_preserve_sensor_roles():
         assert local['obstacle_layer']['scan']['clearing'] is True
 
         voxel = local['voxel_layer']
-        assert voxel['plugin'] == 'nav2_costmap_2d::VoxelLayer'
+        assert (
+            voxel['plugin']
+            == 'nav2_costmap_2d/NonPersistentVoxelLayer'
+        )
         assert voxel['publish_voxel_map'] is False
         source = voxel['filtered_obstacles']
         assert source['topic'] == '/savo_perception/obstacles/points'
         assert source['data_type'] == 'PointCloud2'
         assert source['marking'] is True
         assert source['clearing'] is False
+        assert source['observation_persistence'] == 1.0
+        assert source['expected_update_rate'] == 0.0
         assert RAW_TOPIC not in yaml.safe_dump(nav2)
         assert 'voxel_layer' not in global_costmap['plugins']
 
@@ -209,12 +214,12 @@ def test_voxel_grid_covers_the_accepted_obstacle_height():
         assert coverage >= source['max_obstacle_height']
 
 
-def test_voxel_readiness_requires_a_fresh_filtered_cloud():
-    """Missing or stale filtered D435 data must block voxel readiness."""
+def test_voxel_readiness_keeps_filtered_cloud_optional():
+    """Missing or stale filtered D435 data must not block navigation."""
     params = load_yaml(VOXEL_READINESS)[
         'navigation_readiness_node'
     ]['ros__parameters']
-    assert params['require_pointcloud'] is True
+    assert params['require_pointcloud'] is False
     assert (
         params['pointcloud_topic']
         == '/savo_perception/obstacles/points'
@@ -222,12 +227,19 @@ def test_voxel_readiness_requires_a_fresh_filtered_cloud():
     assert params['pointcloud_timeout_seconds'] > 0.0
 
 
+def test_optional_voxel_runtime_dependency_is_declared():
+    """Install the released Jazzy plugin used for stale-safe helper marks."""
+    package_xml = (ROOT / 'package.xml').read_text(encoding='utf-8')
+    dependency = '<exec_depend>nonpersistent_voxel_layer</exec_depend>'
+    assert dependency in package_xml
+
+
 def test_guarded_voxel_companion_profile_is_source_complete():
     """Keep the saved-map voxel activation contract hardware-gated."""
-
     profile = load_yaml(VOXEL_PROFILE)[
         'saved_map_realsense_voxel_profile'
     ]
     assert profile['software_completion'] == 'complete'
     assert profile['activation_enabled'] is False
-    assert profile['realsense_required_for_navigation'] is True
+    assert profile['realsense_required_for_navigation'] is False
+    assert profile['lidar_required_for_navigation'] is True
