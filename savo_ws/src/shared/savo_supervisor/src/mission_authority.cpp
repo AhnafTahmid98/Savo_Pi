@@ -97,7 +97,8 @@ MissionCapabilities MissionAuthority::EvaluateCapabilities(
     dependencies.map_context, policy_.require_approved_release_for_navigation);
 
   capabilities.can_start_manual_mapping = policy_.allow_manual_mapping &&
-    core_running && core.can_start_geometric_mapping && capabilities.mapping_available;
+    core_running && core.can_start_geometric_mapping && capabilities.mapping_available &&
+    dependencies.mapping.ready;
   capabilities.can_start_autonomous_mapping = policy_.allow_autonomous_mapping &&
     capabilities.can_start_manual_mapping && capabilities.navigation_ready &&
     dependencies.endpoints.autonomous_mapping_action &&
@@ -110,7 +111,8 @@ MissionCapabilities MissionAuthority::EvaluateCapabilities(
     dependencies.mapping.ready && capabilities.navigation_ready &&
     dependencies.endpoints.coverage_action && live_map;
   capabilities.can_navigate = policy_.allow_navigation && core_running && no_stop &&
-    core.core_motion_ready && capabilities.navigation_ready && saved_map;
+    core.core_motion_ready && core.can_start_geometric_mapping &&
+    capabilities.navigation_ready && saved_map;
   capabilities.can_register_location = policy_.allow_location_registration &&
     capabilities.semantic_mapping_ready && capabilities.mapping_available && live_map;
   capabilities.can_review_location = policy_.allow_location_review &&

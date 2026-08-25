@@ -108,6 +108,7 @@ def test_edge_bringup_uses_cpp_production_implementations() -> None:
 
 
 def test_supervisor_and_bridge_receive_the_existing_robot_mode() -> None:
+    """Existing robot_mode must select one matching Supervisor/Bridge policy."""
     core = read("launch/core_bringup.launch.py")
     edge = read("launch/edge_bringup.launch.py")
     autonomous = read("launch/autonomous_mapping.launch.py")

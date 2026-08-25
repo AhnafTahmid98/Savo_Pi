@@ -159,6 +159,12 @@ TEST(MissionAuthority, MappingAndNavigationCapabilitiesFailClosed)
   auto capabilities = authority.EvaluateCapabilities(missing_lidar);
   EXPECT_FALSE(capabilities.can_start_manual_mapping);
   EXPECT_FALSE(capabilities.can_start_autonomous_mapping);
+  missing_lidar.map_context.type =
+    savo_supervisor::MapContextType::kSavedRelease;
+  missing_lidar.map_context.map_release_id = "release-1";
+  missing_lidar.map_context.approved = true;
+  capabilities = authority.EvaluateCapabilities(missing_lidar);
+  EXPECT_FALSE(capabilities.can_navigate);
 
   auto missing_mapping = healthy_dependencies();
   missing_mapping.mapping.ready = false;
