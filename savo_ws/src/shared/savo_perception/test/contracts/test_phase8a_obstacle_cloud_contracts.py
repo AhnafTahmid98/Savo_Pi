@@ -152,6 +152,30 @@ def test_production_source_has_no_forbidden_authority():
     )
 
 
+def test_pointcloud_layout_contract_matches_real_d435_storage():
+    """Accept only safe single-row padding and retain field validation."""
+    header = read('include/savo_perception/obstacle_cloud_filter.hpp')
+    library = read('src/filtering/obstacle_cloud_filter.cpp')
+    node = read('src/nodes/obstacle_cloud_filter_node.cpp')
+    fixture = read('test/fixtures/obstacle_cloud_filter_fixture.py')
+    hardware = read(
+        'test/fixtures/obstacle_cloud_filter_hardware_fixture.py'
+    )
+
+    assert 'PointCloudStorageLayout' in header
+    assert 'layout.height != 1U' in library
+    assert 'layout.row_step < minimum_row_step' in library
+    assert 'layout.data_size != declared_data_size' in library
+    assert 'checked_multiply' in library
+    assert 'big_endian_cloud_not_supported' in node
+    assert 'unsupported_xyz_field_type' in node
+    assert 'xyz_field_outside_point_step' in node
+    assert 'point_step - field_offset' in node
+    assert 'padded_realsense_cloud' in fixture
+    assert 'height != 1 and row_step != minimum_row_step' in hardware
+    assert 'filtered output row must be compact' in hardware
+
+
 def test_readme_documents_filtered_architecture():
     """Require obstacle-only ownership and hardware-pending documentation."""
     readme = read('README.md')

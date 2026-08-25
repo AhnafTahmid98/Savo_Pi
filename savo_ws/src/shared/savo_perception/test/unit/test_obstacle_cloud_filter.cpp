@@ -14,6 +14,7 @@ namespace
 {
 
 using savo_perception::ObstacleCloudFilterConfig;
+using savo_perception::PointCloudStorageLayout;
 using savo_perception::PointXYZ;
 
 savo_perception::ObstacleCloudFilterResult filter(
@@ -28,6 +29,159 @@ savo_perception::ObstacleCloudFilterResult filter(
 }
 
 }  // namespace
+
+TEST(PointCloudStorageLayoutTest, AcceptsObservedD435SingleRowPadding)
+{
+  const PointCloudStorageLayout layout{
+    234483U,
+    1U,
+    20U,
+    6144000U,
+    6144000U};
+
+  EXPECT_TRUE(
+    savo_perception::
+    validate_point_cloud_storage_layout(layout).empty());
+}
+
+TEST(PointCloudStorageLayoutTest, AcceptsSmallEquivalentSingleRowPadding)
+{
+  const PointCloudStorageLayout layout{
+    3U,
+    1U,
+    20U,
+    80U,
+    80U};
+
+  EXPECT_TRUE(
+    savo_perception::
+    validate_point_cloud_storage_layout(layout).empty());
+}
+
+TEST(PointCloudStorageLayoutTest, RejectsShortRow)
+{
+  const PointCloudStorageLayout layout{
+    3U,
+    1U,
+    20U,
+    59U,
+    59U};
+
+  EXPECT_EQ(
+    savo_perception::
+    validate_point_cloud_storage_layout(layout),
+    "malformed_pointcloud_layout");
+}
+
+TEST(PointCloudStorageLayoutTest, RejectsZeroPointStep)
+{
+  const PointCloudStorageLayout layout{
+    3U,
+    1U,
+    0U,
+    0U,
+    0U};
+
+  EXPECT_EQ(
+    savo_perception::
+    validate_point_cloud_storage_layout(layout),
+    "malformed_pointcloud_layout");
+}
+
+TEST(PointCloudStorageLayoutTest, RejectsUndersizedDeclaredStorage)
+{
+  const PointCloudStorageLayout layout{
+    3U,
+    1U,
+    20U,
+    80U,
+    79U};
+
+  EXPECT_EQ(
+    savo_perception::
+    validate_point_cloud_storage_layout(layout),
+    "malformed_pointcloud_layout");
+}
+
+TEST(PointCloudStorageLayoutTest, RejectsOversizedDeclaredStorage)
+{
+  const PointCloudStorageLayout layout{
+    3U,
+    1U,
+    20U,
+    80U,
+    81U};
+
+  EXPECT_EQ(
+    savo_perception::
+    validate_point_cloud_storage_layout(layout),
+    "malformed_pointcloud_layout");
+}
+
+TEST(PointCloudStorageLayoutTest, RejectsPaddedOrganizedRows)
+{
+  const PointCloudStorageLayout layout{
+    3U,
+    2U,
+    20U,
+    80U,
+    160U};
+
+  EXPECT_EQ(
+    savo_perception::
+    validate_point_cloud_storage_layout(layout),
+    "malformed_pointcloud_layout");
+}
+
+TEST(PointCloudStorageLayoutTest, RejectsWidthPointStepOverflow)
+{
+  const auto maximum =
+    std::numeric_limits<std::size_t>::max();
+
+  const PointCloudStorageLayout layout{
+    maximum,
+    1U,
+    2U,
+    maximum,
+    maximum};
+
+  EXPECT_EQ(
+    savo_perception::
+    validate_point_cloud_storage_layout(layout),
+    "malformed_pointcloud_layout");
+}
+
+TEST(PointCloudStorageLayoutTest, RejectsRowHeightOverflow)
+{
+  const auto maximum =
+    std::numeric_limits<std::size_t>::max();
+
+  const PointCloudStorageLayout layout{
+    maximum,
+    2U,
+    1U,
+    maximum,
+    maximum};
+
+  EXPECT_EQ(
+    savo_perception::
+    validate_point_cloud_storage_layout(layout),
+    "malformed_pointcloud_layout");
+}
+
+TEST(PointCloudStorageLayoutTest, AcceptsCompactFilteredOutputLayout)
+{
+  const PointCloudStorageLayout layout{
+    3U,
+    1U,
+    12U,
+    36U,
+    36U};
+
+  EXPECT_TRUE(
+    savo_perception::
+    validate_point_cloud_storage_layout(layout).empty());
+}
 
 TEST(ObstacleCloudFilterConfigTest, ValidConfigPasses)
 {

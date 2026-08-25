@@ -122,6 +122,62 @@ class ObstacleCloudFixture(Node):
         message.is_dense = False
         return message
 
+    def padded_realsense_cloud(self, frame_id, points, stamp=None):
+        """Build a small equivalent of the hardware-padded D435 cloud."""
+        message = PointCloud2()
+        message.header.frame_id = frame_id
+        message.header.stamp = stamp or self.get_clock().now().to_msg()
+        message.height = 1
+        message.width = len(points)
+        message.fields = [
+            PointField(
+                name='x',
+                offset=0,
+                datatype=PointField.FLOAT32,
+                count=1,
+            ),
+            PointField(
+                name='y',
+                offset=4,
+                datatype=PointField.FLOAT32,
+                count=1,
+            ),
+            PointField(
+                name='z',
+                offset=8,
+                datatype=PointField.FLOAT32,
+                count=1,
+            ),
+            PointField(
+                name='rgb',
+                offset=16,
+                datatype=PointField.FLOAT32,
+                count=1,
+            ),
+        ]
+        message.is_bigendian = False
+        message.point_step = 20
+        message.row_step = message.point_step * (message.width + 1)
+        storage = bytearray(message.row_step)
+
+        for index, point in enumerate(points):
+            offset = index * message.point_step
+            struct.pack_into('<fff', storage, offset, *point)
+            struct.pack_into('<f', storage, offset + 16, 0.0)
+
+        # A valid-looking obstacle in trailing storage must not become a point.
+        struct.pack_into(
+            '<fff',
+            storage,
+            message.width * message.point_step,
+            1.50,
+            0.00,
+            0.30,
+        )
+        message.data = bytes(storage)
+        message.is_dense = True
+        return message
+
     def spin_until(self, predicate, timeout_sec=5.0):
         """Spin until a predicate succeeds or the deadline expires."""
         deadline = time.monotonic() + timeout_sec
@@ -253,6 +309,44 @@ def run_filter(fixture):
     print('Finite-point filtering: PASSED')
     print('Voxel downsampling: PASSED')
     print('Obstacle-only output contract: PASSED')
+
+    # Real D435 v4.58.1 hardware reports height=1, point_step=20, and
+    # row_step=6144000 for width=234483. This smaller fixture preserves the
+    # same single-row trailing-storage geometry without a multi-megabyte cloud.
+    padded = fixture.padded_realsense_cloud(
+        VALID_FRAME,
+        [
+            (0.60, -0.20, 0.30),
+            (0.80, 0.00, 0.30),
+            (1.00, 0.20, 0.30),
+        ],
+    )
+    padded_stamp = padded.header.stamp
+    output_count = len(fixture.output_messages)
+
+    assert fixture.publish_until(
+        padded,
+        lambda: (
+            len(fixture.output_messages) > output_count
+            and fixture.output_messages[-1].header.stamp == padded_stamp
+        ),
+    )
+
+    padded_output = fixture.output_messages[-1]
+    padded_points = decode_points(padded_output)
+    assert padded_output.header.stamp == padded_stamp
+    assert padded_output.height == 1
+    assert padded_output.row_step == (
+        padded_output.point_step * padded_output.width
+    )
+    assert len(padded_points) == 3
+    assert has_point(padded_points, (1.00, -0.20, 0.30))
+    assert has_point(padded_points, (1.20, 0.00, 0.30))
+    assert has_point(padded_points, (1.40, 0.20, 0.30))
+    assert not has_point(padded_points, (1.90, 0.00, 0.30))
+    print('Padded single-row D435 input layout: PASSED')
+    print('Trailing row storage ignored: PASSED')
+    print('Filtered output compact row layout: PASSED')
 
 
 def run_bad_frame(fixture):

@@ -17,6 +17,15 @@ struct PointXYZ
   double z{0.0};
 };
 
+struct PointCloudStorageLayout
+{
+  std::size_t width{0U};
+  std::size_t height{0U};
+  std::size_t point_step{0U};
+  std::size_t row_step{0U};
+  std::size_t data_size{0U};
+};
+
 struct ObstacleCloudFilterConfig
 {
   double min_range_m{0.20};
@@ -56,6 +65,9 @@ struct ObstacleCloudFilterResult
 
 std::string validate_obstacle_cloud_filter_config(
   const ObstacleCloudFilterConfig & config);
+
+std::string validate_point_cloud_storage_layout(
+  const PointCloudStorageLayout & layout);
 
 ObstacleCloudFilterResult filter_obstacle_cloud(
   const std::vector<PointXYZ> & points,

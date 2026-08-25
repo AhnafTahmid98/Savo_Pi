@@ -359,6 +359,20 @@ bool ObstacleCloudFilterNode::validate_cloud_layout(
     return false;
   }
 
+  const auto storage_error =
+    validate_point_cloud_storage_layout(
+    PointCloudStorageLayout{
+      static_cast<std::size_t>(message.width),
+      static_cast<std::size_t>(message.height),
+      static_cast<std::size_t>(message.point_step),
+      static_cast<std::size_t>(message.row_step),
+      message.data.size()});
+
+  if (!storage_error.empty()) {
+    reason = storage_error;
+    return false;
+  }
+
   const auto * x_field = find_field(message, "x");
   const auto * y_field = find_field(message, "y");
   const auto * z_field = find_field(message, "z");
@@ -384,31 +398,19 @@ bool ObstacleCloudFilterNode::validate_cloud_layout(
       return false;
     }
 
+    const auto field_offset =
+      static_cast<std::size_t>(field->offset);
+
+    const auto point_step =
+      static_cast<std::size_t>(message.point_step);
+
     if (
-      field->offset + sizeof(float) >
-      message.point_step)
+      field_offset > point_step ||
+      sizeof(float) > point_step - field_offset)
     {
       reason = "xyz_field_outside_point_step";
       return false;
     }
-  }
-
-  const std::size_t expected_row_step =
-    static_cast<std::size_t>(
-    message.point_step) *
-    static_cast<std::size_t>(message.width);
-
-  const std::size_t expected_data_size =
-    expected_row_step *
-    static_cast<std::size_t>(message.height);
-
-  if (
-    message.point_step == 0U ||
-    message.row_step != expected_row_step ||
-    message.data.size() != expected_data_size)
-  {
-    reason = "malformed_pointcloud_layout";
-    return false;
   }
 
   return true;

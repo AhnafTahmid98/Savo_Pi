@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstdint>
 #include <functional>
+#include <limits>
 #include <stdexcept>
 #include <unordered_set>
 
@@ -19,6 +20,22 @@ namespace
 bool finite(const double value)
 {
   return std::isfinite(value);
+}
+
+bool checked_multiply(
+  const std::size_t left,
+  const std::size_t right,
+  std::size_t & result)
+{
+  if (
+    right != 0U &&
+    left > std::numeric_limits<std::size_t>::max() / right)
+  {
+    return false;
+  }
+
+  result = left * right;
+  return true;
 }
 
 bool point_is_finite(const PointXYZ & point)
@@ -83,6 +100,49 @@ VoxelKey make_voxel_key(
 }
 
 }  // namespace
+
+std::string validate_point_cloud_storage_layout(
+  const PointCloudStorageLayout & layout)
+{
+  if (layout.point_step == 0U) {
+    return "malformed_pointcloud_layout";
+  }
+
+  std::size_t minimum_row_step = 0U;
+
+  if (!checked_multiply(
+      layout.point_step,
+      layout.width,
+      minimum_row_step))
+  {
+    return "malformed_pointcloud_layout";
+  }
+
+  // The node iterates points linearly, so only one row may have trailing
+  // storage that is not part of the declared width.
+  if (
+    layout.row_step < minimum_row_step ||
+    (layout.height != 1U && layout.row_step != minimum_row_step))
+  {
+    return "malformed_pointcloud_layout";
+  }
+
+  std::size_t declared_data_size = 0U;
+
+  if (!checked_multiply(
+      layout.row_step,
+      layout.height,
+      declared_data_size))
+  {
+    return "malformed_pointcloud_layout";
+  }
+
+  if (layout.data_size != declared_data_size) {
+    return "malformed_pointcloud_layout";
+  }
+
+  return {};
+}
 
 std::string validate_obstacle_cloud_filter_config(
   const ObstacleCloudFilterConfig & config)
