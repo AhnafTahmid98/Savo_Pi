@@ -120,6 +120,36 @@ TEST(CoreReadinessPolicy, MissingRequiredLidarFaultsSupervisor)
   EXPECT_FALSE(state.ready);
 }
 
+TEST(CoreReadinessPolicy, MissingOptionalLidarAllowsSafeLocalMotionOnly)
+{
+  savo_supervisor::SupervisorPolicy policy;
+  auto core = healthy_core();
+  core[3].required = false;
+  core[3].ready = false;
+  core[3].state = savo_supervisor::ComponentState::STALE;
+  core[3].reason_code = "lidar_heartbeat_stale";
+  const auto state = policy.EvaluateSupervisor(
+    core, clear_safety(), test_time(), 10.0);
+  EXPECT_EQ(state.lifecycle, savo_supervisor::Lifecycle::RUNNING);
+  EXPECT_TRUE(state.ready);
+  EXPECT_TRUE(state.capabilities.can_manual_drive);
+  EXPECT_FALSE(state.capabilities.can_start_geometric_mapping);
+}
+
+TEST(CoreReadinessPolicy, MissingRequiredLocalizationBlocksMappingAndStartup)
+{
+  savo_supervisor::SupervisorPolicy policy;
+  auto core = healthy_core();
+  core[4].ready = false;
+  core[4].state = savo_supervisor::ComponentState::STALE;
+  core[4].reason_code = "localization_heartbeat_stale";
+  const auto state = policy.EvaluateSupervisor(
+    core, clear_safety(), test_time(), 10.0);
+  EXPECT_EQ(state.lifecycle, savo_supervisor::Lifecycle::FAULTED);
+  EXPECT_FALSE(state.ready);
+  EXPECT_FALSE(state.capabilities.can_start_geometric_mapping);
+}
+
 TEST(CoreReadinessPolicy, ZeroSlowdownBlocksMotionLikeAStop)
 {
   savo_supervisor::SupervisorPolicy policy;

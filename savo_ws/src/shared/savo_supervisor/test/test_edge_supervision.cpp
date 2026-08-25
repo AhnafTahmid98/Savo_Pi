@@ -100,6 +100,17 @@ TEST(EdgeSupervision, OptionalSpeechLossDegradesWithoutBlockingStartup)
   EXPECT_TRUE(result.degraded);
 }
 
+TEST(EdgeSupervision, OptionalVoLossDoesNotBlockCoreStartup)
+{
+  auto vo = healthy_vo();
+  vo.ready = false;
+  vo.reason = "vo_not_ready";
+  const auto result = savo_supervisor::EdgeSupervision{}.Evaluate(
+    healthy_bridge(), healthy_camera(), healthy_speech(), vo, healthy_ui());
+  EXPECT_TRUE(result.capabilities.edge_startup_ready);
+  EXPECT_TRUE(result.degraded);
+}
+
 TEST(EdgeSupervision, RequiredBridgeLossBlocksStartup)
 {
   auto bridge = healthy_bridge();

@@ -1349,6 +1349,15 @@ void BridgeNode::publish_status()
     (
       !ros_command_dispatcher_config_->active_map_id.empty() &&
       ros_command_dispatcher_config_->active_map_revision > 0U
+    ) ||
+    (
+      dispatcher_snapshot.map_context_synchronized &&
+      observation_is_fresh(
+        dispatcher_snapshot.map_context_observed,
+        dispatcher_snapshot.map_context_age_ms,
+        ros_command_dispatcher_config_->observed_state_timeout_ms) &&
+      !dispatcher_snapshot.active_map_id.empty() &&
+      dispatcher_snapshot.active_map_revision > 0U
     )
     );
 

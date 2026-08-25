@@ -150,6 +150,35 @@ TEST(MissionAuthority, RuntimeFaultRevokesAndRequiresExplicitResume)
   EXPECT_EQ(authority.state().state, savo_supervisor::OperationState::kActive);
 }
 
+TEST(MissionAuthority, MappingAndNavigationCapabilitiesFailClosed)
+{
+  savo_supervisor::MissionAuthority authority;
+
+  auto missing_lidar = healthy_dependencies();
+  missing_lidar.core.capabilities.can_start_geometric_mapping = false;
+  auto capabilities = authority.EvaluateCapabilities(missing_lidar);
+  EXPECT_FALSE(capabilities.can_start_manual_mapping);
+  EXPECT_FALSE(capabilities.can_start_autonomous_mapping);
+
+  auto missing_mapping = healthy_dependencies();
+  missing_mapping.mapping.ready = false;
+  capabilities = authority.EvaluateCapabilities(missing_mapping);
+  EXPECT_FALSE(capabilities.can_start_manual_mapping);
+  EXPECT_FALSE(capabilities.can_start_autonomous_mapping);
+
+  auto missing_navigation = healthy_dependencies();
+  missing_navigation.navigation.ready = false;
+  capabilities = authority.EvaluateCapabilities(missing_navigation);
+  EXPECT_FALSE(capabilities.can_start_autonomous_mapping);
+
+  missing_navigation.map_context.type =
+    savo_supervisor::MapContextType::kSavedRelease;
+  missing_navigation.map_context.map_release_id = "release-1";
+  missing_navigation.map_context.approved = true;
+  capabilities = authority.EvaluateCapabilities(missing_navigation);
+  EXPECT_FALSE(capabilities.can_navigate);
+}
+
 TEST(MissionAuthority, SafetyStopBlocksMotionWithoutBlockingReview)
 {
   auto dependencies = healthy_dependencies();

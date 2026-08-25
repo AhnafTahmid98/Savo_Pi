@@ -242,6 +242,7 @@ def _setup(context):
                 IncludeLaunchDescription(
                     _python_launch("savo_supervisor", "supervisor.launch.py"),
                     launch_arguments={
+                        "robot_mode": mode,
                         "system_state_path": LaunchConfiguration(
                             "supervisor_state_path"
                         ),

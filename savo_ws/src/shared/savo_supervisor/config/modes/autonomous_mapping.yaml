@@ -1,0 +1,4 @@
+savo_supervisor_node:
+  ros__parameters:
+    lidar:
+      required: true

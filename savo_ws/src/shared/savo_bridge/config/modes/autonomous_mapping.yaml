@@ -1,0 +1,27 @@
+/savo_bridge/savo_bridge_node:
+  ros__parameters:
+    observation_topics:
+      - /savo_control/mode_state
+      - /savo_control/external_stop
+      - /safety/stop
+      - /cmd_vel_safe
+      - /savo_mapping/status
+      - /savo_mapping/autonomous/status
+      - /savo_nav/readiness
+    observation_requirements:
+      - required
+      - required
+      - required
+      - required
+      - required
+      - required
+      - required
+    observation_stale_after_ms:
+      - 2000
+      - 1000
+      - 1000
+      - 1000
+      - 2000
+      - 2000
+      - 1000
+    command_dispatcher.require_active_map_context: false

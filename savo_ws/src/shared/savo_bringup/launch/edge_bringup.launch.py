@@ -163,6 +163,7 @@ def _setup(context):
             IncludeLaunchDescription(
                 _python_launch("savo_bridge", "edge_bridge.launch.py"),
                 launch_arguments={
+                    "robot_mode": mode,
                     "active_map_id": LaunchConfiguration("active_map_id"),
                     "active_map_revision": LaunchConfiguration(
                         "active_map_revision"

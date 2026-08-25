@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 import subprocess
 
+import yaml
+
 
 PACKAGE = Path(__file__).resolve().parents[2]
 
@@ -24,7 +26,7 @@ def test_edge_configuration_uses_guarded_authority() -> None:
         'command_dispatcher.location_resolve_service: /savo_locations/resolve',
         'command_dispatcher.active_map_id: ""',
         'command_dispatcher.active_map_revision: 0',
-        'command_dispatcher.require_active_map_context: true',
+        'command_dispatcher.require_active_map_context: false',
         'snapshot_path: /run/savo_bridge/snapshot.json',
     )
     for marker in required:
@@ -79,6 +81,8 @@ def test_launch_requires_observed_map_context() -> None:
     assert 'DeclareLaunchArgument("active_map_revision", default_value="0")' in normalized_launch
     assert 'default_value="saved_map"' not in normalized_launch
     assert 'executable="savo_bridge_node"' in normalized_launch
+    assert 'OpaqueFunction(function=_launch_bridge)' in launch
+    assert 'unsupported Bridge robot_mode policy' in launch
 
 
 def test_systemd_and_runner_do_not_invent_active_map() -> None:
@@ -89,3 +93,75 @@ def test_systemd_and_runner_do_not_invent_active_map() -> None:
     assert 'saved_map' not in runner
     assert 'active_map_id:=' not in runner
     assert 'active_map_revision:=' not in runner
+
+
+def mode_parameters(mode: str) -> dict:
+    document = yaml.safe_load(read(f'config/modes/{mode}.yaml'))
+    return document['/savo_bridge/savo_bridge_node']['ros__parameters']
+
+
+def test_mode_observation_contracts_are_fail_closed_and_minimal() -> None:
+    common = yaml.safe_load(read('config/savo_bridge.edge.yaml'))[
+        '/savo_bridge/savo_bridge_node'
+    ]['ros__parameters']
+    common_topics = {
+        '/savo_control/mode_state',
+        '/savo_control/external_stop',
+        '/safety/stop',
+        '/cmd_vel_safe',
+    }
+    assert set(common['observation_topics']) == common_topics
+    assert set(common['edge_evidence_nodes']) == {
+        '/edge_bringup_readiness_node',
+        '/edge_ups_node',
+    }
+    assert common['edge_evidence_topics'] == []
+
+    safe = mode_parameters('safe_idle')
+    assert set(safe['observation_topics']) == common_topics
+    assert safe['command_dispatcher.require_active_map_context'] is False
+
+    manual = mode_parameters('manual_mapping')
+    assert set(manual['observation_topics']) == common_topics | {
+        '/savo_mapping/status'
+    }
+    assert '/savo_nav/readiness' not in manual['observation_topics']
+    assert '/savo_nav/map_context/status' not in manual['observation_topics']
+
+    autonomous = mode_parameters('autonomous_mapping')
+    assert set(autonomous['observation_topics']) == common_topics | {
+        '/savo_mapping/status',
+        '/savo_mapping/autonomous/status',
+        '/savo_nav/readiness',
+    }
+    assert '/savo_nav/map_context/status' not in autonomous[
+        'observation_topics'
+    ]
+    assert autonomous['command_dispatcher.require_active_map_context'] is False
+
+    saved = mode_parameters('saved_map_navigation')
+    assert set(saved['observation_topics']) == common_topics | {
+        '/savo_nav/readiness',
+        '/savo_nav/map_context/status',
+    }
+    assert saved['command_dispatcher.require_active_map_context'] is True
+
+    for parameters in (common, safe, manual, autonomous, saved):
+        topics = parameters['observation_topics']
+        assert len(topics) == len(parameters['observation_requirements'])
+        assert len(topics) == len(parameters['observation_stale_after_ms'])
+        assert set(parameters['observation_requirements']) == {'required'}
+        assert '/savo_speech/readiness' not in topics
+        assert all('/savo_ui' not in topic for topic in topics)
+
+
+def test_saved_map_readiness_uses_fresh_synchronized_runtime_context() -> None:
+    source = read('src/bridge_node.cpp')
+    for marker in (
+        'dispatcher_snapshot.map_context_synchronized',
+        'dispatcher_snapshot.map_context_observed',
+        'dispatcher_snapshot.map_context_age_ms',
+        'dispatcher_snapshot.active_map_id.empty()',
+        'dispatcher_snapshot.active_map_revision > 0U',
+    ):
+        assert marker in source

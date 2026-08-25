@@ -166,6 +166,9 @@ def generate_launch_description() -> LaunchDescription:
     supervisor_launch = IncludeLaunchDescription(
         _python_launch("savo_supervisor", "supervisor.launch.py"),
         condition=IfCondition(LaunchConfiguration("start_supervisor")),
+        launch_arguments={
+            "robot_mode": "autonomous_mapping",
+        }.items(),
     )
 
     head_launch = IncludeLaunchDescription(

@@ -104,6 +104,42 @@ def test_edge_bringup_uses_cpp_production_implementations() -> None:
     assert "edge_bridge.launch.py" in launch
     assert "power_edge.launch.py" in launch
     assert 'or profile == "lidar_d435_voxel"' in launch
+    assert '"robot_mode": mode' in launch
+
+
+def test_supervisor_and_bridge_receive_the_existing_robot_mode() -> None:
+    core = read("launch/core_bringup.launch.py")
+    edge = read("launch/edge_bringup.launch.py")
+    autonomous = read("launch/autonomous_mapping.launch.py")
+    assert '"robot_mode": mode' in core
+    assert '"robot_mode": mode' in edge
+    assert '"robot_mode": "autonomous_mapping"' in autonomous
+
+    project_root = ROOT.parents[3]
+    supported = {
+        "safe_idle",
+        "manual_mapping",
+        "autonomous_mapping",
+        "saved_map_navigation",
+    }
+    for relative in (
+        "savo_ws/src/shared/savo_supervisor/launch/supervisor.launch.py",
+        "savo_ws/src/shared/savo_bridge/launch/edge_bridge.launch.py",
+    ):
+        tree = ast.parse((project_root / relative).read_text())
+        assignments = [
+            node for node in tree.body
+            if isinstance(node, ast.Assign)
+            and any(
+                isinstance(target, ast.Name)
+                and target.id == "_MODE_POLICY_FILES"
+                for target in node.targets
+            )
+        ]
+        assert len(assignments) == 1
+        policies = ast.literal_eval(assignments[0].value)
+        assert set(policies) == supported
+        assert len(set(policies.values())) == len(supported)
 
 
 def test_full_entry_point_keeps_core_and_edge_roles_explicit() -> None:

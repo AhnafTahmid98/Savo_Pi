@@ -3,8 +3,15 @@
 
 from pathlib import Path
 
+import yaml
+
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def load_parameters(relative):
+    document = yaml.safe_load((ROOT / relative).read_text())
+    return document['savo_supervisor_node']['ros__parameters']
 
 
 def test_phase3_runtime_fixture_and_probe_are_present():
@@ -52,3 +59,30 @@ def test_systemd_assets_are_installed_by_package():
     assert 'systemctl enable --now savo-supervisor.service' in installer
     assert 'PHASE_3_REAL_ROBOT_PREFLIGHT_COMPLETE' in preflight
     assert 'Phase 3 real-robot validation' in validation
+
+
+def test_mode_policies_only_change_lidar_startup_requirement():
+    expected = {
+        'safe_idle': False,
+        'manual_mapping': True,
+        'autonomous_mapping': True,
+        'saved_map_navigation': True,
+    }
+    for mode, lidar_required in expected.items():
+        parameters = load_parameters(f'config/modes/{mode}.yaml')
+        assert parameters == {'lidar': {'required': lidar_required}}
+
+
+def test_supervisor_launch_selects_one_fail_closed_mode_policy():
+    launch = (ROOT / 'launch' / 'supervisor.launch.py').read_text()
+    for mode in (
+        'safe_idle',
+        'manual_mapping',
+        'autonomous_mapping',
+        'saved_map_navigation',
+    ):
+        assert f"'{mode}': '{mode}.yaml'" in launch
+    assert 'OpaqueFunction(function=_launch_supervisor)' in launch
+    assert 'unsupported Supervisor robot_mode policy' in launch
+    assert "default_value='safe_idle'" in launch
+    assert "default_value='false'" in launch
