@@ -7,10 +7,10 @@ import pwd
 import subprocess
 from pathlib import Path
 
-import yaml
-
 from savo_bringup.launch_contract import resolve_host_role
 from savo_bringup.launch_contract import validate_selection
+
+import yaml
 
 
 ROOT = Path(__file__).resolve().parents[1]
