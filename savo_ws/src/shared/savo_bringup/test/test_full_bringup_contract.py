@@ -8,6 +8,8 @@ import subprocess
 from pathlib import Path
 
 from savo_bringup.launch_contract import resolve_host_role
+from savo_bringup.launch_contract import resolve_requirements
+from savo_bringup.launch_contract import should_start_obstacle_cloud
 from savo_bringup.launch_contract import validate_selection
 
 import yaml
@@ -103,8 +105,77 @@ def test_edge_bringup_uses_cpp_production_implementations() -> None:
     assert "ui_bringup.launch.py" in launch
     assert "edge_bridge.launch.py" in launch
     assert "power_edge.launch.py" in launch
-    assert 'or profile == "lidar_d435_voxel"' in launch
+    assert "should_start_obstacle_cloud(" in launch
     assert '"robot_mode": mode' in launch
+
+
+def test_edge_realsense_and_obstacle_cloud_profile_selection() -> None:
+    """Select the cloud filter only for validated navigation or override."""
+    launch = read("launch/edge_bringup.launch.py")
+    common = {
+        "host_role": "edge",
+        "start_bridge": True,
+        "start_realsense": True,
+        "start_vo": True,
+        "start_speech": False,
+    }
+    for mode in (
+        "safe_idle",
+        "manual_mapping",
+        "autonomous_mapping",
+        "saved_map_navigation",
+    ):
+        baseline = resolve_requirements(
+            robot_mode=mode,
+            bringup_profile="lidar_only",
+            **common,
+        )
+        assert baseline.voxel_layer_enabled is False
+
+    voxel = resolve_requirements(
+        robot_mode="safe_idle",
+        bringup_profile="lidar_d435_voxel",
+        **common,
+    )
+    assert voxel.voxel_layer_enabled is True
+    assert '"realsense_pointcloud_camera.yaml"' in launch
+    assert 'else "realsense_d435_camera.yaml"' in launch
+    assert '"realsense_pointcloud_nodes.yaml"' in launch
+    assert 'else "realsense_d435_nodes.yaml"' in launch
+
+    for mode in ("safe_idle", "manual_mapping"):
+        assert should_start_obstacle_cloud(
+            mode,
+            "lidar_d435_voxel",
+            d435_voxel_validated=True,
+            explicit_start=False,
+        ) is False
+    for mode in ("autonomous_mapping", "saved_map_navigation"):
+        assert should_start_obstacle_cloud(
+            mode,
+            "lidar_d435_voxel",
+            d435_voxel_validated=True,
+            explicit_start=False,
+        ) is True
+        assert should_start_obstacle_cloud(
+            mode,
+            "lidar_d435_voxel",
+            d435_voxel_validated=False,
+            explicit_start=False,
+        ) is False
+
+    assert should_start_obstacle_cloud(
+        "safe_idle",
+        "lidar_only",
+        d435_voxel_validated=False,
+        explicit_start=True,
+    ) is True
+    assert should_start_obstacle_cloud(
+        "autonomous_mapping",
+        "lidar_only",
+        d435_voxel_validated=True,
+        explicit_start=False,
+    ) is False
 
 
 def test_supervisor_and_bridge_receive_the_existing_robot_mode() -> None:
@@ -241,6 +312,10 @@ def test_validated_normal_runtime_defaults_are_synchronized() -> None:
     assert top["active_map_revision"] == "0"
 
     edge = launch_string_defaults("launch/edge_bringup.launch.py")
+    assert edge["start_vo"] == "true"
+    assert edge["start_obstacle_cloud"] == "false"
+    assert edge["d435_voxel_validated"] == "false"
+    assert edge["vo_profile"] == "real_robot_v1"
     assert edge["active_map_id"] == ""
     assert edge["active_map_revision"] == "0"
 
@@ -262,6 +337,56 @@ def test_motion_modes_fail_closed_on_geometry_and_voxel_validation() -> None:
     assert "production profile cannot allow provisional geometry" in contract
     assert "production profile requires locked geometry" in contract
     assert "host_role:=all is reserved for bench use" in contract
+
+    for mode in ("autonomous_mapping", "saved_map_navigation"):
+        try:
+            validate_selection(
+                "core",
+                mode,
+                "lidar_d435_voxel",
+                d435_voxel_validated=False,
+                require_locked_geometry=True,
+                allow_provisional_geometry=False,
+            )
+        except RuntimeError as error:
+            assert "d435_voxel_validated:=true" in str(error)
+        else:
+            raise AssertionError("unvalidated D435 voxel mode was accepted")
+
+
+def test_navigation_mode_and_profile_selection_matrix() -> None:
+    """Select Nav2 only for autonomous modes and their sensor profile."""
+    common = {
+        "host_role": "core",
+        "start_bridge": False,
+        "start_realsense": False,
+        "start_vo": False,
+        "start_speech": False,
+    }
+    assert resolve_requirements(
+        robot_mode="safe_idle",
+        bringup_profile="lidar_only",
+        **common,
+    ).require_navigation is False
+    assert resolve_requirements(
+        robot_mode="manual_mapping",
+        bringup_profile="lidar_only",
+        **common,
+    ).require_navigation is False
+    for mode in ("autonomous_mapping", "saved_map_navigation"):
+        assert resolve_requirements(
+            robot_mode=mode,
+            bringup_profile="lidar_only",
+            **common,
+        ).require_navigation is True
+
+    core = read("launch/core_bringup.launch.py")
+    assert '"nav2_live_mapping_voxel.yaml"' in core
+    assert 'else "nav2_live_mapping.yaml"' in core
+    assert '"nav2_saved_map_voxel.yaml"' in core
+    assert 'else "nav2_saved_map.yaml"' in core
+    assert '"nav_params_file": nav_params' in core
+    assert '"nav_readiness_params": readiness_params' in core
 
 
 def test_readiness_authority_is_cpp_and_publishes_operator_contract() -> None:

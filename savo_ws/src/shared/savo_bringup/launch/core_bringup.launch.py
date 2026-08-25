@@ -93,6 +93,28 @@ def _setup(context):
     ]
 
     if mode == "autonomous_mapping":
+        nav_params = PathJoinSubstitution(
+            [
+                FindPackageShare("savo_nav"),
+                "config",
+                (
+                    "nav2_live_mapping_voxel.yaml"
+                    if requirements.voxel_layer_enabled
+                    else "nav2_live_mapping.yaml"
+                ),
+            ]
+        )
+        readiness_params = PathJoinSubstitution(
+            [
+                FindPackageShare("savo_nav"),
+                "config",
+                (
+                    "readiness_realsense_voxel.yaml"
+                    if requirements.voxel_layer_enabled
+                    else "readiness.yaml"
+                ),
+            ]
+        )
         actions.append(
             IncludeLaunchDescription(
                 _python_launch("savo_bringup", "autonomous_mapping.launch.py"),
@@ -123,6 +145,8 @@ def _setup(context):
                     "head_camera_mode": LaunchConfiguration(
                         "head_camera_mode"
                     ),
+                    "nav_params_file": nav_params,
+                    "nav_readiness_params": readiness_params,
                     "locations_database_path": LaunchConfiguration(
                         "locations_database_path"
                     ),

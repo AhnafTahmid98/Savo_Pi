@@ -84,6 +84,7 @@ def test_requested_production_layout_is_canonical():
         ROOT / 'behavior_trees/exploration_navigation.xml',
         ROOT / 'config/nav2_saved_map.yaml',
         ROOT / 'config/nav2_live_mapping.yaml',
+        ROOT / 'config/nav2_live_mapping_voxel.yaml',
         ROOT / 'config/nav2_saved_map_voxel.yaml',
     }
     for path in required:

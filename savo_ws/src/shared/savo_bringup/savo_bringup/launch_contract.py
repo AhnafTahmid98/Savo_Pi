@@ -49,6 +49,21 @@ def as_bool(value: str) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def should_start_obstacle_cloud(
+    robot_mode: str,
+    bringup_profile: str,
+    *,
+    d435_voxel_validated: bool,
+    explicit_start: bool,
+) -> bool:
+    """Select the filtered D435 path without broadening automatic startup."""
+    return explicit_start or (
+        robot_mode in {"autonomous_mapping", "saved_map_navigation"}
+        and bringup_profile == "lidar_d435_voxel"
+        and d435_voxel_validated
+    )
+
+
 def resolve_host_role(
     requested_role: str,
     hostname: str,

@@ -24,10 +24,14 @@ def test_pointcloud_camera_profile_matches_robot_savo_d435_config() -> None:
     assert params["enable_sync"] is True
 
 
-def test_main_d435_profile_has_permanent_pointcloud_enabled() -> None:
+def test_main_d435_profile_keeps_vo_streams_and_pointcloud() -> None:
     config = load_yaml("realsense_d435_camera.yaml")
     params = config["/camera/camera"]["ros__parameters"]
 
+    assert params["enable_color"] is True
+    assert params["enable_depth"] is True
+    assert params["depth_module.depth_profile"] == "848x480x30"
+    assert params["rgb_camera.color_profile"] == "640x480x30"
     assert params["align_depth.enable"] is True
     assert params["enable_sync"] is True
     assert params["pointcloud__neon_.enable"] is True
@@ -74,3 +78,16 @@ def test_pointcloud_nodes_require_pointcloud() -> None:
     assert health_params["require_pointcloud"] is True
     assert monitor_params["expected_pointcloud_hz"] > 0.0
     assert health_params["expected_pointcloud_hz"] > 0.0
+
+
+def test_all_runtime_driver_profiles_leave_fixed_tf_to_description() -> None:
+    for name in (
+        "realsense_minimal.yaml",
+        "realsense_d435_camera.yaml",
+        "realsense_vo_driver.yaml",
+        "realsense_pointcloud_camera.yaml",
+        "realsense_nav_profile.yaml",
+    ):
+        config = load_yaml(name)
+        driver_params = next(iter(config.values()))["ros__parameters"]
+        assert driver_params["publish_tf"] is False, name

@@ -15,6 +15,7 @@ from launch_ros.substitutions import FindPackageShare
 
 from savo_bringup.launch_contract import as_bool
 from savo_bringup.launch_contract import resolve_requirements
+from savo_bringup.launch_contract import should_start_obstacle_cloud
 from savo_bringup.launch_contract import validate_selection
 
 
@@ -43,9 +44,11 @@ def _setup(context):
 
     start_realsense = as_bool(_value(context, "start_realsense"))
     start_vo = as_bool(_value(context, "start_vo"))
-    start_obstacle_cloud = (
-        as_bool(_value(context, "start_obstacle_cloud"))
-        or profile == "lidar_d435_voxel"
+    start_obstacle_cloud = should_start_obstacle_cloud(
+        mode,
+        profile,
+        d435_voxel_validated=voxel_validated,
+        explicit_start=as_bool(_value(context, "start_obstacle_cloud")),
     )
     start_speech = as_bool(_value(context, "start_speech"))
     start_ui = as_bool(_value(context, "start_ui"))

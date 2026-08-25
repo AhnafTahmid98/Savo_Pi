@@ -12,6 +12,8 @@ ROOT = Path(__file__).resolve().parents[2]
 SENSOR_CONTRACT = ROOT / 'config/costmap_sensors.yaml'
 NAV2_CONFIG = ROOT / 'config/nav2_saved_map.yaml'
 VOXEL_CONFIG = ROOT / 'config/nav2_saved_map_voxel.yaml'
+LIVE_VOXEL_CONFIG = ROOT / 'config/nav2_live_mapping_voxel.yaml'
+VOXEL_READINESS = ROOT / 'config/readiness_realsense_voxel.yaml'
 PROFILE = ROOT / 'config/profiles/saved_map.yaml'
 VOXEL_PROFILE = ROOT / 'config/profiles/saved_map_realsense_voxel.yaml'
 RAW_TOPIC = '/camera/camera/depth/color/points'
@@ -160,27 +162,68 @@ def test_profile_records_pending_real_d435_validation():
     assert ownership['savo_nav_velocity_authority'] is False
 
 
-def test_guarded_voxel_companion_profile_is_source_complete():
-    """Provide a filtered-D435 local voxel profile without activating it."""
-    nav2 = load_yaml(VOXEL_CONFIG)
-    local = costmap_parameters(nav2, 'local_costmap')
-    global_costmap = costmap_parameters(nav2, 'global_costmap')
+def test_live_and_saved_voxel_profiles_preserve_sensor_roles():
+    """Keep LiDAR clearing and filtered-D435 local-only marking."""
+    for config_path in (LIVE_VOXEL_CONFIG, VOXEL_CONFIG):
+        nav2 = load_yaml(config_path)
+        local = costmap_parameters(nav2, 'local_costmap')
+        global_costmap = costmap_parameters(nav2, 'global_costmap')
 
-    assert local['plugins'] == [
-        'obstacle_layer',
-        'voxel_layer',
-        'inflation_layer',
-    ]
-    voxel = local['voxel_layer']
-    assert voxel['plugin'] == 'nav2_costmap_2d::VoxelLayer'
-    assert voxel['publish_voxel_map'] is False
-    source = voxel['filtered_obstacles']
-    assert source['topic'] == '/savo_perception/obstacles/points'
-    assert source['data_type'] == 'PointCloud2'
-    assert source['marking'] is True
-    assert source['clearing'] is False
-    assert RAW_TOPIC not in yaml.safe_dump(nav2)
-    assert 'voxel_layer' not in global_costmap['plugins']
+        assert local['plugins'] == [
+            'obstacle_layer',
+            'voxel_layer',
+            'inflation_layer',
+        ]
+        assert global_costmap['obstacle_layer']['scan']['topic'] == '/scan'
+        assert global_costmap['obstacle_layer']['scan']['marking'] is True
+        assert global_costmap['obstacle_layer']['scan']['clearing'] is True
+        assert local['obstacle_layer']['scan']['topic'] == '/scan'
+        assert local['obstacle_layer']['scan']['marking'] is True
+        assert local['obstacle_layer']['scan']['clearing'] is True
+
+        voxel = local['voxel_layer']
+        assert voxel['plugin'] == 'nav2_costmap_2d::VoxelLayer'
+        assert voxel['publish_voxel_map'] is False
+        source = voxel['filtered_obstacles']
+        assert source['topic'] == '/savo_perception/obstacles/points'
+        assert source['data_type'] == 'PointCloud2'
+        assert source['marking'] is True
+        assert source['clearing'] is False
+        assert RAW_TOPIC not in yaml.safe_dump(nav2)
+        assert 'voxel_layer' not in global_costmap['plugins']
+
+
+def test_voxel_grid_covers_the_accepted_obstacle_height():
+    """Fit the full D435 height contract within Nav2's 16-bit grid."""
+    for config_path in (LIVE_VOXEL_CONFIG, VOXEL_CONFIG):
+        local = costmap_parameters(
+            load_yaml(config_path), 'local_costmap'
+        )
+        voxel = local['voxel_layer']
+        source = voxel['filtered_obstacles']
+        assert voxel['z_voxels'] <= 16
+        coverage = (
+            voxel['origin_z']
+            + voxel['z_resolution'] * voxel['z_voxels']
+        )
+        assert coverage >= source['max_obstacle_height']
+
+
+def test_voxel_readiness_requires_a_fresh_filtered_cloud():
+    """Missing or stale filtered D435 data must block voxel readiness."""
+    params = load_yaml(VOXEL_READINESS)[
+        'navigation_readiness_node'
+    ]['ros__parameters']
+    assert params['require_pointcloud'] is True
+    assert (
+        params['pointcloud_topic']
+        == '/savo_perception/obstacles/points'
+    )
+    assert params['pointcloud_timeout_seconds'] > 0.0
+
+
+def test_guarded_voxel_companion_profile_is_source_complete():
+    """Keep the saved-map voxel activation contract hardware-gated."""
 
     profile = load_yaml(VOXEL_PROFILE)[
         'saved_map_realsense_voxel_profile'

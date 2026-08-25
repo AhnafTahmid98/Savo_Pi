@@ -110,6 +110,8 @@ def test_one_launch_wires_complete_am8_release_chain() -> None:
 
     assert '"start_review_gateway": "true"' in launch
     assert '"nav2_live_mapping.yaml"' in launch
+    assert '"nav_params_file"' in launch
+    assert '"nav_readiness_params"' in launch
     assert '"location_integration.launch.py"' in launch
     assert '"autonomous_mapping.launch.xml"' in launch
     assert "autonomous_mapping_orchestrator.launch.xml" in mapping_launch
