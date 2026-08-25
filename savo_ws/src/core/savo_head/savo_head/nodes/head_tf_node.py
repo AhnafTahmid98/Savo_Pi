@@ -29,7 +29,7 @@ from savo_head.contracts.frame_names import (
 from savo_head.contracts.topic_names import (
     DASHBOARD_TEXT,
     PAN_TILT_STATE,
-    STATUS,
+    TF_STATUS,
 )
 
 
@@ -160,7 +160,7 @@ class HeadTfNode(Node):
 
     def _declare_parameters(self) -> None:
         self.declare_parameter("pan_tilt_state_topic", PAN_TILT_STATE)
-        self.declare_parameter("status_topic", STATUS)
+        self.declare_parameter("status_topic", TF_STATUS)
         self.declare_parameter("dashboard_text_topic", DASHBOARD_TEXT)
 
         self.declare_parameter("publish_tf", False)

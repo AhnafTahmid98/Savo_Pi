@@ -19,6 +19,10 @@ SCAN_STATE: Final[str] = "/savo_head/scan_state"
 STATUS: Final[str] = "/savo_head/status"
 DASHBOARD_TEXT: Final[str] = "/savo_head/dashboard_text"
 
+SCAN_STATUS: Final[str] = "/savo_head/scan/status"
+TF_STATUS: Final[str] = "/savo_head/tf/status"
+APRILTAG_STATUS: Final[str] = "/savo_head/apriltag/status"
+
 CONTROLLER_STATUS: Final[str] = (
     "/savo_head/controller/status"
 )
@@ -67,6 +71,10 @@ class HeadTopicNames:
     status: str = STATUS
     dashboard_text: str = DASHBOARD_TEXT
 
+    scan_status: str = SCAN_STATUS
+    tf_status: str = TF_STATUS
+    apriltag_status: str = APRILTAG_STATUS
+
     controller_status: str = CONTROLLER_STATUS
     controller_dashboard_text: str = (
         CONTROLLER_DASHBOARD_TEXT
@@ -102,6 +110,9 @@ class HeadTopicNames:
             self.scan_state,
             self.status,
             self.dashboard_text,
+            self.scan_status,
+            self.tf_status,
+            self.apriltag_status,
             self.controller_status,
             self.controller_dashboard_text,
             self.camera_stream_cmd,
@@ -146,6 +157,9 @@ __all__ = [
     "SCAN_STATE",
     "STATUS",
     "DASHBOARD_TEXT",
+    "SCAN_STATUS",
+    "TF_STATUS",
+    "APRILTAG_STATUS",
     "CONTROLLER_STATUS",
     "CONTROLLER_DASHBOARD_TEXT",
     "DIAGNOSTICS",

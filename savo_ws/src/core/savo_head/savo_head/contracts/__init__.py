@@ -28,6 +28,7 @@ from savo_head.contracts.parameter_names import (
 )
 from savo_head.contracts.topic_names import (
     APRILTAG_DETECTIONS,
+    APRILTAG_STATUS,
     CAMERA_INFO,
     CAMERA_STATUS,
     CAMERA_STREAM_CMD,
@@ -46,8 +47,10 @@ from savo_head.contracts.topic_names import (
     PAN_TILT_STATE,
     SCAN_CMD,
     SCAN_STATE,
+    SCAN_STATUS,
     SEMANTIC_CONFIRMATIONS,
     STATUS,
+    TF_STATUS,
     TOPICS,
     HeadTopicNames,
     get_topic_names,
@@ -70,6 +73,9 @@ __all__ = [
     "SCAN_STATE",
     "STATUS",
     "DASHBOARD_TEXT",
+    "SCAN_STATUS",
+    "TF_STATUS",
+    "APRILTAG_STATUS",
     "DIAGNOSTICS",
     "CAMERA_STREAM_CMD",
     "CAMERA_STREAM_STATE",

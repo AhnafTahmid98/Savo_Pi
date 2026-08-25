@@ -214,7 +214,7 @@ private:
   void declare_parameters()
   {
     declare_parameter<std::string>("pan_tilt_state_topic", kTopicPanTiltState);
-    declare_parameter<std::string>("status_topic", kTopicStatus);
+    declare_parameter<std::string>("status_topic", kTopicTfStatus);
     declare_parameter<std::string>("dashboard_text_topic", kTopicDashboardText);
 
     declare_parameter<bool>("publish_tf", false);

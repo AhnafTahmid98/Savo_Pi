@@ -7,6 +7,9 @@ savo_head:
     scan_state_topic: /savo_head/scan_state
     status_topic: /savo_head/status
     dashboard_text_topic: /savo_head/dashboard_text
+    scan_status_topic: /savo_head/scan/status
+    tf_status_topic: /savo_head/tf/status
+    apriltag_status_topic: /savo_head/apriltag/status
     controller_status_topic: /savo_head/controller/status
     controller_dashboard_text_topic: /savo_head/controller/dashboard_text
     diagnostics_topic: /diagnostics

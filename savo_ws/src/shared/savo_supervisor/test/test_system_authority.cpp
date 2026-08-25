@@ -41,6 +41,25 @@ TEST(SystemAuthority, ArmFailsClosedUntilStartupDependenciesAreReady)
   EXPECT_EQ(decision.code, savo_supervisor::SystemAuthorityCode::kNotReady);
 }
 
+TEST(SystemAuthority, ExplicitLocalArmDoesNotRequireRemoteCommandPath)
+{
+  savo_supervisor::SystemAuthority authority;
+  auto dependencies = healthy_dependencies();
+  dependencies.remote_commands_ready = false;
+  dependencies.degraded = true;
+
+  const auto decision = authority.Handle(
+    request(savo_supervisor::SystemCommand::kArm), dependencies);
+  ASSERT_TRUE(decision.accepted);
+  const auto snapshot = authority.snapshot(dependencies);
+  EXPECT_TRUE(snapshot.startup_ready);
+  EXPECT_TRUE(snapshot.armed);
+  EXPECT_FALSE(snapshot.remote_commands_ready);
+  EXPECT_EQ(
+    snapshot.state,
+    savo_supervisor::SystemAuthorityState::kArmedDegraded);
+}
+
 TEST(SystemAuthority, ExplicitArmAndDisarmAreGenerationProtected)
 {
   savo_supervisor::SystemAuthority authority;

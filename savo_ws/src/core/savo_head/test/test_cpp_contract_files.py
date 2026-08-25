@@ -350,6 +350,9 @@ int main()
   const auto topics = default_head_topic_contract();
   assert(topics.valid());
   assert(topics.pan_tilt_cmd == "/savo_head/pan_tilt_cmd");
+  assert(topics.scan_status == "/savo_head/scan/status");
+  assert(topics.tf_status == "/savo_head/tf/status");
+  assert(topics.apriltag_status == "/savo_head/apriltag/status");
   assert(topics.semantic_confirmations == "/savo_head/semantic_confirmations");
 
   const auto qos = default_head_qos_contract();

@@ -66,7 +66,7 @@ def test_autonomous_mapping_launch_is_fail_closed_by_default() -> None:
     assert '"lidar_profile"' in launch
     assert 'default_value="mapping_rplidar_a1.yaml"' in launch
     assert '"localization_use_vo"' in launch
-    assert 'default_value="false"' in launch
+    assert '"localization_use_vo",\n                default_value="true"' in launch
     assert "_MAP_ID_PATTERN" in launch
     assert "OpaqueFunction(function=_validate_arguments)" in launch
 
@@ -80,9 +80,9 @@ def test_autonomous_mapping_launch_is_fail_closed_by_default() -> None:
     assert '"allow_provisional_geometry", default_value="false"' in launch
     assert '"start_head"' in launch
     assert '"head_enable_tf"' in launch
-    assert 'default_value="false"' in launch
+    assert '"head_enable_tf",\n                default_value="true"' in launch
     assert '"head_camera_mode"' in launch
-    assert 'default_value="disabled"' in launch
+    assert '"head_camera_mode",\n                default_value="ros"' in launch
     assert '"start_location_lifecycle"' in launch
     assert '"start_semantic_interruption"' in launch
     assert '"locations_database_path"' in launch

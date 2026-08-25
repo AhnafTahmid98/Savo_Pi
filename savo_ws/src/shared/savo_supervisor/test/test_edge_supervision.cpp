@@ -112,6 +112,31 @@ TEST(EdgeSupervision, RequiredBridgeLossBlocksStartup)
   EXPECT_EQ(result.reason, "edge_startup_dependency_unavailable");
 }
 
+TEST(EdgeSupervision, OptionalBridgeLossAllowsLocalStartupButDisablesRemotePath)
+{
+  savo_supervisor::EdgeSupervisionPolicy policy;
+  policy.bridge_required_for_startup = false;
+  auto bridge = healthy_bridge();
+  bridge.received = false;
+  bridge.fresh = false;
+  bridge.valid = false;
+  bridge.process_alive = false;
+  bridge.bridge_ready = false;
+  bridge.readiness_asserted = false;
+  bridge.heartbeat_fresh = false;
+  bridge.commands_enabled = false;
+  bridge.stop_ready = false;
+  bridge.reason = "bridge_not_observed";
+
+  const auto result = savo_supervisor::EdgeSupervision{policy}.Evaluate(
+    bridge, healthy_camera(), healthy_speech(), healthy_vo(), healthy_ui());
+  EXPECT_TRUE(result.capabilities.edge_startup_ready);
+  EXPECT_FALSE(result.capabilities.remote_command_path_ready);
+  EXPECT_FALSE(result.capabilities.edge_health_ready);
+  EXPECT_TRUE(result.degraded);
+  EXPECT_EQ(result.reason, "edge_optional_capability_degraded");
+}
+
 TEST(EdgeSupervision, CameraCanBeConfiguredAsStartupRequirement)
 {
   savo_supervisor::EdgeSupervisionPolicy policy;
@@ -125,11 +150,13 @@ TEST(EdgeSupervision, CameraCanBeConfiguredAsStartupRequirement)
 
 TEST(EdgeSupervision, StopTransportIsRequiredForRemoteCommandPath)
 {
+  savo_supervisor::EdgeSupervisionPolicy policy;
+  policy.bridge_required_for_startup = false;
   auto bridge = healthy_bridge();
   bridge.stop_ready = false;
   bridge.reason = "stop_transport_not_ready";
-  const auto result = savo_supervisor::EdgeSupervision{}.Evaluate(
+  const auto result = savo_supervisor::EdgeSupervision{policy}.Evaluate(
     bridge, healthy_camera(), healthy_speech(), healthy_vo(), healthy_ui());
-  EXPECT_FALSE(result.capabilities.edge_startup_ready);
+  EXPECT_TRUE(result.capabilities.edge_startup_ready);
   EXPECT_FALSE(result.capabilities.remote_command_path_ready);
 }

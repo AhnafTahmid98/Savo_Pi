@@ -260,8 +260,8 @@ def generate_launch_description() -> LaunchDescription:
                     ]
                 ),
             ),
-            DeclareLaunchArgument("active_map_id", default_value="saved_map"),
-            DeclareLaunchArgument("active_map_revision", default_value="1"),
+            DeclareLaunchArgument("active_map_id", default_value=""),
+            DeclareLaunchArgument("active_map_revision", default_value="0"),
             OpaqueFunction(function=_setup),
         ]
     )

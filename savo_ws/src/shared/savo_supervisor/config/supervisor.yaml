@@ -131,7 +131,7 @@ savo_supervisor_node:
       - operator_app
 
     edge.bridge.enabled: true
-    edge.bridge.required_for_startup: true
+    edge.bridge.required_for_startup: false
     edge.bridge.state_topic: /savo_bridge/state
     edge.bridge.readiness_topic: /savo_bridge/readiness
     edge.bridge.heartbeat_topic: /savo_bridge/heartbeat

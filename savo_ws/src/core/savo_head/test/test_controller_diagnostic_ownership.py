@@ -149,6 +149,68 @@ def test_bringup_locks_topic_ownership():
     )
 
 
+def test_component_diagnostics_do_not_default_to_aggregate():
+    head_types = read(
+        'include/savo_head/core/head_types.hpp'
+    )
+    topic_names = read(
+        'savo_head/contracts/topic_names.py'
+    )
+
+    component_contracts = {
+        'scan': (
+            'kTopicScanStatus',
+            'SCAN_STATUS',
+            '/savo_head/scan/status',
+        ),
+        'tf': (
+            'kTopicTfStatus',
+            'TF_STATUS',
+            '/savo_head/tf/status',
+        ),
+        'apriltag': (
+            'kTopicAprilTagStatus',
+            'APRILTAG_STATUS',
+            '/savo_head/apriltag/status',
+        ),
+    }
+
+    for _, (cpp_name, py_name, topic) in component_contracts.items():
+        assert cpp_name in head_types
+        assert py_name in topic_names
+        assert topic in head_types
+        assert topic in topic_names
+
+    cpp_nodes = {
+        'src/nodes/head_scan_node.cpp': 'kTopicScanStatus',
+        'src/nodes/head_tf_node.cpp': 'kTopicTfStatus',
+        'src/nodes/apriltag_confirm_node.cpp': 'kTopicAprilTagStatus',
+    }
+    for path, component_default in cpp_nodes.items():
+        source = read(path)
+        assert (
+            f'"status_topic", {component_default}'
+            in source
+        )
+        assert '"status_topic", kTopicStatus' not in source
+
+    python_nodes = {
+        'savo_head/nodes/head_scan_node.py': 'SCAN_STATUS',
+        'savo_head/nodes/head_tf_node.py': 'TF_STATUS',
+        'savo_head/nodes/apriltag_confirm_node.py': 'APRILTAG_STATUS',
+    }
+    for path, component_default in python_nodes.items():
+        source = read(path)
+        assert (
+            f'self.declare_parameter("status_topic", {component_default})'
+            in source
+        )
+        assert (
+            'self.declare_parameter("status_topic", STATUS)'
+            not in source
+        )
+
+
 def test_configuration_documents_ownership():
     head_topics = yaml.safe_load(
         read('config/head_topics.yaml')
@@ -172,6 +234,21 @@ def test_configuration_documents_ownership():
         assert (
             params['controller_status_topic']
             == '/savo_head/controller/status'
+        )
+
+        assert (
+            params['scan_status_topic']
+            == '/savo_head/scan/status'
+        )
+
+        assert (
+            params['tf_status_topic']
+            == '/savo_head/tf/status'
+        )
+
+        assert (
+            params['apriltag_status_topic']
+            == '/savo_head/apriltag/status'
         )
 
         assert (

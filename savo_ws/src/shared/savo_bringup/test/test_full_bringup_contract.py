@@ -9,6 +9,9 @@ from pathlib import Path
 
 import yaml
 
+from savo_bringup.launch_contract import resolve_host_role
+from savo_bringup.launch_contract import validate_selection
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -16,6 +19,27 @@ ROOT = Path(__file__).resolve().parents[1]
 def read(relative: str) -> str:
     """Read one package-relative bringup artifact."""
     return (ROOT / relative).read_text(encoding="utf-8")
+
+
+def launch_string_defaults(relative: str) -> dict[str, str]:
+    """Return literal string defaults from one Python launch file."""
+    tree = ast.parse(read(relative), filename=relative)
+    defaults = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        if getattr(node.func, "id", "") != "DeclareLaunchArgument":
+            continue
+        if not node.args or not isinstance(node.args[0], ast.Constant):
+            continue
+        for keyword in node.keywords:
+            if keyword.arg != "default_value":
+                continue
+            if isinstance(keyword.value, ast.Constant) and isinstance(
+                keyword.value.value, str
+            ):
+                defaults[node.args[0].value] = keyword.value.value
+    return defaults
 
 
 def test_required_launch_files_are_nonempty_and_parseable() -> None:
@@ -90,6 +114,107 @@ def test_full_entry_point_keeps_core_and_edge_roles_explicit() -> None:
     assert "host_role:=all is reserved" in launch
     assert "core_bringup.launch.py" in launch
     assert "edge_bringup.launch.py" in launch
+
+
+def test_auto_host_role_resolves_only_known_robot_hosts() -> None:
+    """Automatic role selection must use the established hostname contract."""
+    for hostname in ("core", "savo-core", "core.robot.local"):
+        assert resolve_host_role("auto", hostname) == "core"
+    for hostname in ("edge", "savo-edge", "edge.robot.local"):
+        assert resolve_host_role("auto", hostname) == "edge"
+
+
+def test_explicit_host_roles_remain_supported() -> None:
+    """Explicit role selection remains available for deployment and tests."""
+    assert resolve_host_role("core", "developer-mac") == "core"
+    assert resolve_host_role("edge", "developer-mac") == "edge"
+    assert resolve_host_role("all", "developer-mac") == "all"
+
+
+def test_auto_host_role_rejects_unknown_or_conflicting_identity() -> None:
+    """Unknown hosts and hostname/environment conflicts must fail closed."""
+    try:
+        resolve_host_role("auto", "developer-mac")
+    except RuntimeError as error:
+        assert "cannot identify this host" in str(error)
+    else:
+        raise AssertionError("unknown automatic host role was accepted")
+
+    try:
+        resolve_host_role("auto", "savo-core", "edge")
+    except RuntimeError as error:
+        assert "SAVO_ROLE does not match" in str(error)
+    else:
+        raise AssertionError("hostname/SAVO_ROLE mismatch was accepted")
+
+
+def test_all_host_role_remains_bench_only() -> None:
+    """Automatic-role support must not broaden the single-host bench role."""
+    validate_selection(
+        resolve_host_role("all", "developer-mac"),
+        "safe_idle",
+        "bench",
+        d435_voxel_validated=False,
+        require_locked_geometry=False,
+        allow_provisional_geometry=False,
+    )
+    try:
+        validate_selection(
+            "all",
+            "safe_idle",
+            "lidar_only",
+            d435_voxel_validated=False,
+            require_locked_geometry=True,
+            allow_provisional_geometry=False,
+        )
+    except RuntimeError as error:
+        assert "reserved for bench use" in str(error)
+    else:
+        raise AssertionError("host_role:=all escaped its bench-only gate")
+
+
+def test_validated_normal_runtime_defaults_are_synchronized() -> None:
+    """Canonical and nested production launches must use validated defaults."""
+    expected = {
+        "localization_use_vo": "true",
+        "head_enable_tf": "true",
+        "head_camera_mode": "ros",
+        "control_startup_mode": "STOP",
+        "control_use_backup_escape": "false",
+        "control_use_stuck_detector": "false",
+    }
+    for launch in (
+        "launch/robot_bringup.launch.py",
+        "launch/core_bringup.launch.py",
+        "launch/autonomous_mapping.launch.py",
+    ):
+        defaults = launch_string_defaults(launch)
+        for name, value in expected.items():
+            assert defaults[name] == value, f"{launch}: {name}"
+
+    top = launch_string_defaults("launch/robot_bringup.launch.py")
+    assert top["host_role"] == "auto"
+    assert top["supervisor_auto_arm"] == "false"
+    assert top["start_obstacle_cloud"] == "false"
+    assert top["start_speech"] == "false"
+    assert top["start_ui"] == "false"
+    assert top["d435_voxel_validated"] == "false"
+    assert top["speech_params_file"] == "edge_real_robot_v1.yaml"
+    assert top["active_map_id"] == ""
+    assert top["active_map_revision"] == "0"
+
+    edge = launch_string_defaults("launch/edge_bringup.launch.py")
+    assert edge["active_map_id"] == ""
+    assert edge["active_map_revision"] == "0"
+
+    for launch in (
+        "launch/manual_mapping.launch.py",
+        "launch/mapping.launch.py",
+    ):
+        assert (
+            launch_string_defaults(launch)["localization_use_vo"]
+            == "true"
+        )
 
 
 def test_motion_modes_fail_closed_on_geometry_and_voxel_validation() -> None:

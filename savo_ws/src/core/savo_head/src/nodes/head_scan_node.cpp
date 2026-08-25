@@ -190,7 +190,7 @@ private:
     declare_parameter<std::string>("pan_tilt_cmd_topic", kTopicPanTiltCmd);
     declare_parameter<std::string>("scan_cmd_topic", kTopicScanCmd);
     declare_parameter<std::string>("scan_state_topic", kTopicScanState);
-    declare_parameter<std::string>("status_topic", kTopicStatus);
+    declare_parameter<std::string>("status_topic", kTopicScanStatus);
     declare_parameter<std::string>("dashboard_text_topic", kTopicDashboardText);
 
     declare_parameter<std::string>("start_scan_service", "/savo_head/start_scan");

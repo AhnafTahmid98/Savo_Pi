@@ -4,6 +4,13 @@ from dataclasses import dataclass
 
 
 HOST_ROLES = {"core", "edge", "all"}
+AUTO_HOST_ROLE = "auto"
+HOSTNAME_ROLES = {
+    "core": "core",
+    "savo-core": "core",
+    "edge": "edge",
+    "savo-edge": "edge",
+}
 ROBOT_MODES = {
     "safe_idle",
     "manual",
@@ -40,6 +47,42 @@ class LaunchRequirements:
 def as_bool(value: str) -> bool:
     """Interpret the common ROS launch boolean spellings."""
     return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def resolve_host_role(
+    requested_role: str,
+    hostname: str,
+    environment_role: str | None = None,
+) -> str:
+    """Resolve the canonical host role without guessing on unknown hosts."""
+    requested = requested_role.strip().lower()
+    if requested not in HOST_ROLES | {AUTO_HOST_ROLE}:
+        raise RuntimeError(f"unsupported host_role: {requested_role}")
+
+    short_hostname = hostname.strip().lower().split(".", maxsplit=1)[0]
+    detected_role = HOSTNAME_ROLES.get(short_hostname)
+
+    configured_role = (environment_role or "").strip().lower()
+    if configured_role:
+        if configured_role not in {"core", "edge"}:
+            raise RuntimeError(
+                "SAVO_ROLE must be exactly 'core' or 'edge' when set"
+            )
+        if detected_role is not None and configured_role != detected_role:
+            raise RuntimeError(
+                "SAVO_ROLE does not match Robot Savo hostname: "
+                f"hostname={short_hostname}, SAVO_ROLE={configured_role}"
+            )
+
+    if requested != AUTO_HOST_ROLE:
+        return requested
+    if detected_role is None:
+        raise RuntimeError(
+            "host_role:=auto cannot identify this host: "
+            f"hostname={short_hostname or '<empty>'}; expected "
+            "core, savo-core, edge, or savo-edge"
+        )
+    return detected_role
 
 
 def validate_selection(

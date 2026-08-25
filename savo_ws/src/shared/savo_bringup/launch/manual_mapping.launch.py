@@ -30,7 +30,7 @@ def generate_launch_description() -> LaunchDescription:
                 "allow_provisional_geometry", default_value="false"
             ),
             DeclareLaunchArgument("control_startup_mode", default_value="STOP"),
-            DeclareLaunchArgument("localization_use_vo", default_value="false"),
+            DeclareLaunchArgument("localization_use_vo", default_value="true"),
             IncludeLaunchDescription(
                 core_launch,
                 launch_arguments={

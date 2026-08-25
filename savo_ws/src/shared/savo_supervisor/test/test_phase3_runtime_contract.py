@@ -52,7 +52,7 @@ def test_invalid_phase3_configuration_fails_closed():
 
 def test_production_config_distinguishes_required_and_optional_edge_capabilities():
     config = (ROOT / 'config' / 'supervisor.yaml').read_text()
-    assert 'edge.bridge.required_for_startup: true' in config
+    assert 'edge.bridge.required_for_startup: false' in config
     assert 'edge.realsense.required_for_startup: false' in config
     assert 'edge.speech.required_for_startup: false' in config
     assert 'edge.vo.required_for_startup: false' in config

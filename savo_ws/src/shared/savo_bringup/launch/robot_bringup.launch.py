@@ -1,5 +1,8 @@
 """Role-selecting full Robot Savo launch entry point."""
 
+import os
+import socket
+
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.actions import IncludeLaunchDescription
@@ -12,6 +15,7 @@ from launch.substitutions import PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
 
 from savo_bringup.launch_contract import as_bool
+from savo_bringup.launch_contract import resolve_host_role
 from savo_bringup.launch_contract import validate_selection
 
 
@@ -41,7 +45,12 @@ def _common_arguments():
 
 
 def _setup(context):
-    role = _value(context, "host_role")
+    requested_role = _value(context, "host_role")
+    role = resolve_host_role(
+        requested_role,
+        socket.gethostname(),
+        os.environ.get("SAVO_ROLE"),
+    )
     mode = _value(context, "robot_mode")
     profile = _value(context, "bringup_profile")
     validate_selection(
@@ -68,7 +77,8 @@ def _setup(context):
         LogInfo(
             msg=(
                 "Robot Savo distributed bringup selected: "
-                f"host_role={role}, mode={mode}, profile={profile}"
+                f"host_role={role}, requested_role={requested_role}, "
+                f"mode={mode}, profile={profile}"
             )
         )
     ]
@@ -125,7 +135,18 @@ def _setup(context):
             edge_arguments[key] = LaunchConfiguration(name)
         speech_params = _value(context, "speech_params_file")
         if speech_params:
-            edge_arguments["speech_params_file"] = speech_params
+            edge_arguments["speech_params_file"] = (
+                PathJoinSubstitution(
+                    [
+                        FindPackageShare("savo_speech"),
+                        "config",
+                        "profiles",
+                        speech_params,
+                    ]
+                )
+                if speech_params == "edge_real_robot_v1.yaml"
+                else speech_params
+            )
         actions.append(
             IncludeLaunchDescription(
                 _launch("edge_bringup.launch.py"),
@@ -143,7 +164,7 @@ def generate_launch_description() -> LaunchDescription:
 
     return LaunchDescription(
         [
-            DeclareLaunchArgument("host_role", default_value="core"),
+            DeclareLaunchArgument("host_role", default_value="auto"),
             DeclareLaunchArgument("robot_mode", default_value="safe_idle"),
             DeclareLaunchArgument("bringup_profile", default_value="lidar_only"),
             DeclareLaunchArgument("d435_voxel_validated", default_value="false"),
@@ -204,9 +225,9 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument("control_startup_mode", default_value="STOP"),
             DeclareLaunchArgument("control_use_backup_escape", default_value="false"),
             DeclareLaunchArgument("control_use_stuck_detector", default_value="false"),
-            DeclareLaunchArgument("localization_use_vo", default_value="false"),
-            DeclareLaunchArgument("head_enable_tf", default_value="false"),
-            DeclareLaunchArgument("head_camera_mode", default_value="disabled"),
+            DeclareLaunchArgument("localization_use_vo", default_value="true"),
+            DeclareLaunchArgument("head_enable_tf", default_value="true"),
+            DeclareLaunchArgument("head_camera_mode", default_value="ros"),
             DeclareLaunchArgument("start_realsense", default_value="true"),
             DeclareLaunchArgument("start_vo", default_value="true"),
             DeclareLaunchArgument("start_obstacle_cloud", default_value="false"),
@@ -218,10 +239,10 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument("ui_profile", default_value="pi"),
             DeclareLaunchArgument(
                 "speech_params_file",
-                default_value="",
+                default_value="edge_real_robot_v1.yaml",
             ),
-            DeclareLaunchArgument("active_map_id", default_value="saved_map"),
-            DeclareLaunchArgument("active_map_revision", default_value="1"),
+            DeclareLaunchArgument("active_map_id", default_value=""),
+            DeclareLaunchArgument("active_map_revision", default_value="0"),
             OpaqueFunction(function=_setup),
         ]
     )

@@ -26,9 +26,9 @@ from savo_head.constants import (
 from savo_head.contracts.frame_names import BASE_LINK, MAP, PI_CAMERA_OPTICAL_FRAME
 from savo_head.contracts.topic_names import (
     APRILTAG_DETECTIONS,
+    APRILTAG_STATUS,
     DASHBOARD_TEXT,
     SEMANTIC_CONFIRMATIONS,
-    STATUS,
 )
 from savo_head.models.semantic_confirmation import (
     AprilTagObservation,
@@ -98,7 +98,7 @@ class AprilTagConfirmNode(Node):
         self.declare_parameter("semantic_confirmations_topic", SEMANTIC_CONFIRMATIONS)
         self.declare_parameter("robot_pose_snapshot_topic", "/savo_head/robot_pose_snapshot")
 
-        self.declare_parameter("status_topic", STATUS)
+        self.declare_parameter("status_topic", APRILTAG_STATUS)
         self.declare_parameter("dashboard_text_topic", DASHBOARD_TEXT)
         self.declare_parameter("status_hz", 2.0)
 

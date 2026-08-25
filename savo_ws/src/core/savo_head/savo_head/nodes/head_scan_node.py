@@ -24,8 +24,8 @@ from savo_head.contracts.topic_names import (
     DASHBOARD_TEXT,
     PAN_TILT_CMD,
     SCAN_CMD,
+    SCAN_STATUS,
     SCAN_STATE,
-    STATUS,
 )
 from savo_head.core.scan_pattern import ScanRuntime, make_scan_runtime, profile_from_params
 from savo_head.models.scan_status import (
@@ -125,7 +125,7 @@ class HeadScanNode(Node):
         self.declare_parameter("pan_tilt_cmd_topic", PAN_TILT_CMD)
         self.declare_parameter("scan_cmd_topic", SCAN_CMD)
         self.declare_parameter("scan_state_topic", SCAN_STATE)
-        self.declare_parameter("status_topic", STATUS)
+        self.declare_parameter("status_topic", SCAN_STATUS)
         self.declare_parameter("dashboard_text_topic", DASHBOARD_TEXT)
 
         self.declare_parameter("start_scan_service", "/savo_head/start_scan")

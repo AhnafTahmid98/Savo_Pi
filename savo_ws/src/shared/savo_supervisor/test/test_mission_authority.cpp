@@ -261,3 +261,47 @@ TEST(MissionAuthority, BridgeLossRevokesOnlyRemoteOriginLease)
   EXPECT_FALSE(local_authority.Revalidate(dependencies));
   EXPECT_EQ(local_authority.state().state, savo_supervisor::OperationState::kActive);
 }
+
+TEST(MissionAuthority, MissingBridgeRejectsRemoteButAllowsSafeLocalOrigin)
+{
+  auto dependencies = healthy_dependencies();
+  dependencies.system.remote_commands_ready = false;
+  savo_supervisor::MissionAuthority authority;
+
+  auto remote = request(
+    savo_supervisor::AuthorityCommand::kAcquire,
+    savo_supervisor::MissionOperation::kManualControl);
+  remote.remote_origin = true;
+  const auto denied = authority.Handle(remote, dependencies);
+  EXPECT_FALSE(denied.authorized);
+  EXPECT_EQ(denied.reason, "remote_command_path_not_ready");
+
+  auto local = remote;
+  local.request_id = "local-request-1";
+  local.actor_id = "local-operator";
+  local.remote_origin = false;
+  const auto allowed = authority.Handle(local, dependencies);
+  EXPECT_TRUE(allowed.authorized);
+  EXPECT_EQ(authority.state().state, savo_supervisor::OperationState::kActive);
+}
+
+TEST(MissionAuthority, MissingOrStaleHeadBlocksHeadRequiredOperations)
+{
+  auto dependencies = healthy_dependencies();
+  savo_supervisor::MissionAuthority authority;
+
+  dependencies.head.received = false;
+  dependencies.head.valid = false;
+  auto capabilities = authority.EvaluateCapabilities(dependencies);
+  EXPECT_FALSE(capabilities.head_ready);
+  EXPECT_FALSE(capabilities.semantic_mapping_ready);
+  EXPECT_FALSE(capabilities.can_start_autonomous_mapping);
+
+  dependencies.head.received = true;
+  dependencies.head.valid = true;
+  dependencies.head.fresh = false;
+  capabilities = authority.EvaluateCapabilities(dependencies);
+  EXPECT_FALSE(capabilities.head_ready);
+  EXPECT_FALSE(capabilities.semantic_mapping_ready);
+  EXPECT_FALSE(capabilities.can_start_autonomous_mapping);
+}

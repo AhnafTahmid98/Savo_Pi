@@ -81,6 +81,49 @@ TEST(MissionPayloadParser, ParsesHeadSemanticReadiness)
   EXPECT_TRUE(result.camera_pose_ready);
 }
 
+TEST(MissionPayloadParser, ComponentDiagnosticCannotReplaceHeadAggregate)
+{
+  diagnostic_msgs::msg::DiagnosticStatus component;
+  component.name = "savo_head.head_tf";
+  component.level = diagnostic_msgs::msg::DiagnosticStatus::OK;
+  component.message = "tf operational";
+
+  diagnostic_msgs::msg::DiagnosticStatus aggregate;
+  aggregate.name = "savo_head.head_status";
+  aggregate.level = diagnostic_msgs::msg::DiagnosticStatus::OK;
+  aggregate.message = "head operational";
+  aggregate.values = {
+    kv("pan_tilt_state", "OK"),
+    kv("camera_stream_healthy", "true"),
+    kv("camera_pose_ready", "true")};
+
+  diagnostic_msgs::msg::DiagnosticArray message;
+  message.status = {component, aggregate};
+
+  savo_supervisor::MissionPayloadParser parser;
+  const auto result = parser.ParseHeadStatus(message);
+  EXPECT_TRUE(result.valid);
+  EXPECT_TRUE(result.operational);
+  EXPECT_TRUE(result.pan_tilt_ready);
+}
+
+TEST(MissionPayloadParser, MissingHeadAggregateFailsClosed)
+{
+  diagnostic_msgs::msg::DiagnosticStatus component;
+  component.name = "savo_head.head_tf";
+  component.level = diagnostic_msgs::msg::DiagnosticStatus::OK;
+  component.message = "tf operational";
+  diagnostic_msgs::msg::DiagnosticArray message;
+  message.status = {component};
+
+  savo_supervisor::MissionPayloadParser parser;
+  const auto result = parser.ParseHeadStatus(message);
+  EXPECT_TRUE(result.received);
+  EXPECT_FALSE(result.valid);
+  EXPECT_FALSE(result.operational);
+  EXPECT_EQ(result.reason, "head_aggregate_status_missing");
+}
+
 TEST(MissionPayloadParser, StaleHeadDiagnosticIsNotOperational)
 {
   diagnostic_msgs::msg::DiagnosticStatus status;

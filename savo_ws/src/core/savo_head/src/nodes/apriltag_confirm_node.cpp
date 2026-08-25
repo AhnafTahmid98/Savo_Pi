@@ -473,7 +473,7 @@ private:
     declare_parameter<double>("tag_size_m", 0.0);
     declare_parameter<std::string>("robot_pose_snapshot_topic", "/savo_head/robot_pose_snapshot");
 
-    declare_parameter<std::string>("status_topic", kTopicStatus);
+    declare_parameter<std::string>("status_topic", kTopicAprilTagStatus);
     declare_parameter<std::string>("dashboard_text_topic", kTopicDashboardText);
     declare_parameter<double>("status_hz", kStatusHz);
 

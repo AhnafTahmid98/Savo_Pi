@@ -453,9 +453,10 @@ def generate_launch_description() -> LaunchDescription:
             ),
             DeclareLaunchArgument(
                 "localization_use_vo",
-                default_value="false",
+                default_value="true",
                 description=(
-                    "Use edge VO input only after the edge stream is live."
+                    "Fuse the validated Edge VO stream during production "
+                    "localization."
                 ),
             ),
             DeclareLaunchArgument(
@@ -472,10 +473,10 @@ def generate_launch_description() -> LaunchDescription:
             ),
             DeclareLaunchArgument(
                 "head_enable_tf",
-                default_value="false",
+                default_value="true",
                 description=(
-                    "Keep head TF disabled until AM-0B locks the physical "
-                    "head and camera transforms."
+                    "Publish the calibrated head TF; fresh pan/tilt state "
+                    "remains required."
                 ),
             ),
             DeclareLaunchArgument(
@@ -484,10 +485,9 @@ def generate_launch_description() -> LaunchDescription:
             ),
             DeclareLaunchArgument(
                 "head_camera_mode",
-                default_value="disabled",
+                default_value="ros",
                 description=(
-                    "Camera transport stays disabled until the real camera "
-                    "path is selected for hardware testing."
+                    "Use the validated ROS IMX219 camera transport."
                 ),
             ),
             DeclareLaunchArgument(

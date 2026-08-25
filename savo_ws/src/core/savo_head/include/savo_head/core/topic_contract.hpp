@@ -21,6 +21,9 @@ struct HeadTopicContract
   std::string scan_state{kTopicScanState};
 
   std::string status{kTopicStatus};
+  std::string scan_status{kTopicScanStatus};
+  std::string tf_status{kTopicTfStatus};
+  std::string apriltag_status{kTopicAprilTagStatus};
   std::string controller_status{kTopicControllerStatus};
 
   std::string diagnostics{"/diagnostics"};
@@ -58,6 +61,9 @@ struct HeadTopicContract
       scan_cmd,
       scan_state,
       status,
+      scan_status,
+      tf_status,
+      apriltag_status,
       controller_status,
       diagnostics,
       dashboard_text,

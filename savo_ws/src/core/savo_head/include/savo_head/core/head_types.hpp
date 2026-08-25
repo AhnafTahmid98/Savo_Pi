@@ -42,6 +42,15 @@ inline constexpr const char * kTopicScanState = "/savo_head/scan_state";
 inline constexpr const char * kTopicStatus = "/savo_head/status";
 inline constexpr const char * kTopicDashboardText = "/savo_head/dashboard_text";
 
+inline constexpr const char * kTopicScanStatus =
+  "/savo_head/scan/status";
+
+inline constexpr const char * kTopicTfStatus =
+  "/savo_head/tf/status";
+
+inline constexpr const char * kTopicAprilTagStatus =
+  "/savo_head/apriltag/status";
+
 inline constexpr const char * kTopicControllerStatus =
   "/savo_head/controller/status";
 
