@@ -195,11 +195,11 @@ def test_baseline_costmaps_are_lidar_only():
 
     assert global_costmap[
         'obstacle_layer'
-    ]['observation_sources'] == ['scan']
+    ]['observation_sources'] == 'scan'
 
     assert local_costmap[
         'obstacle_layer'
-    ]['observation_sources'] == ['scan']
+    ]['observation_sources'] == 'scan'
 
     serialized = NAV2_CONFIG.read_text(
         encoding='utf-8'

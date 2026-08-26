@@ -11,6 +11,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 SENSOR_CONTRACT = ROOT / 'config/costmap_sensors.yaml'
 NAV2_CONFIG = ROOT / 'config/nav2_saved_map.yaml'
+LIVE_CONFIG = ROOT / 'config/nav2_live_mapping.yaml'
 VOXEL_CONFIG = ROOT / 'config/nav2_saved_map_voxel.yaml'
 LIVE_VOXEL_CONFIG = ROOT / 'config/nav2_live_mapping_voxel.yaml'
 VOXEL_READINESS = ROOT / 'config/readiness_realsense_voxel.yaml'
@@ -122,6 +123,38 @@ def test_existing_costmaps_retain_safe_baseline():
     assert local_parameters['footprint_padding'] == 0.02
 
 
+def test_observation_sources_use_ros_string_parameter_type():
+    """Require scalar source IDs in every production costmap profile."""
+    profiles = (
+        (LIVE_CONFIG, False),
+        (NAV2_CONFIG, False),
+        (LIVE_VOXEL_CONFIG, True),
+        (VOXEL_CONFIG, True),
+    )
+
+    for config_path, has_voxel_layer in profiles:
+        nav2 = load_yaml(config_path)
+
+        for costmap_name in ('global_costmap', 'local_costmap'):
+            costmap = costmap_parameters(nav2, costmap_name)
+            obstacle = costmap['obstacle_layer']
+            sources = obstacle['observation_sources']
+            assert type(sources) is str
+            assert not isinstance(sources, list)
+            assert sources == 'scan'
+            assert isinstance(obstacle['scan'], dict)
+
+        if has_voxel_layer:
+            voxel = costmap_parameters(nav2, 'local_costmap')[
+                'voxel_layer'
+            ]
+            sources = voxel['observation_sources']
+            assert type(sources) is str
+            assert not isinstance(sources, list)
+            assert sources == 'filtered_obstacles'
+            assert isinstance(voxel['filtered_obstacles'], dict)
+
+
 def test_ownership_boundaries_are_explicit():
     """Require all non-navigation authorities to remain false."""
     ownership = load_yaml(SENSOR_CONTRACT)[
@@ -187,6 +220,8 @@ def test_live_and_saved_voxel_profiles_preserve_sensor_roles():
             == 'nav2_costmap_2d/NonPersistentVoxelLayer'
         )
         assert voxel['publish_voxel_map'] is False
+        assert voxel['observation_sources'] == 'filtered_obstacles'
+        assert type(voxel['observation_sources']) is str
         source = voxel['filtered_obstacles']
         assert source['topic'] == '/savo_perception/obstacles/points'
         assert source['data_type'] == 'PointCloud2'

@@ -115,8 +115,7 @@ global_costmap:
         plugin: "nav2_costmap_2d::ObstacleLayer"
         enabled: true
 
-        observation_sources:
-        - "scan"
+        observation_sources: "scan"
 
         scan:
           topic: "/scan"
@@ -272,8 +271,7 @@ local_costmap:
         plugin: "nav2_costmap_2d::ObstacleLayer"
         enabled: true
 
-        observation_sources:
-        - "scan"
+        observation_sources: "scan"
 
         scan:
           topic: "/scan"
