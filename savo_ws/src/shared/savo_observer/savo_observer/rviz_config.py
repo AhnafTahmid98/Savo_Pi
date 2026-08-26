@@ -1,7 +1,7 @@
 """Create bounded runtime RViz configurations for observer-only options."""
 
-import tempfile
 from pathlib import Path
+import tempfile
 
 import yaml
 

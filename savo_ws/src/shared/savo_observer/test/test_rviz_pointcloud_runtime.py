@@ -4,13 +4,12 @@ from copy import deepcopy
 from pathlib import Path
 
 import pytest
-import yaml
-
 from savo_observer.rviz_config import (
     create_pointcloud_runtime_config,
     parse_launch_boolean,
     remove_runtime_config,
 )
+import yaml
 
 
 ROOT = Path(__file__).resolve().parents[1]
