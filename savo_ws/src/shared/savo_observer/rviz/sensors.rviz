@@ -123,6 +123,39 @@ Visualization Manager:
       Use Fixed Frame: true
       Value: false
 
+    - Class: rviz_default_plugins/PointCloud2
+      Enabled: false
+      Name: FilteredObstacleCloud
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Best Effort
+        Value: /savo_perception/obstacles/points
+      Value: false
+
+    - Class: rviz_default_plugins/Image
+      Enabled: false
+      Name: D435ColorImage
+      Topic:
+        Depth: 2
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Best Effort
+        Value: /camera/camera/color/image_raw
+      Value: false
+
+    - Class: rviz_default_plugins/Image
+      Enabled: false
+      Name: HeadCameraImage
+      Topic:
+        Depth: 2
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Best Effort
+        Value: /savo_head/camera/image_raw
+      Value: false
+
   Enabled: true
   Global Options:
     Background Color: 38; 38; 38

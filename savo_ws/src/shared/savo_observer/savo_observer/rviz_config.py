@@ -26,8 +26,13 @@ def parse_launch_boolean(value, name):
     )
 
 
-def enable_pointcloud_displays(document):
-    """Enable only top-level PointCloud2 displays in an RViz document."""
+def enable_optional_displays(
+    document,
+    *,
+    enable_camera_preview=False,
+    enable_pointclouds=False,
+):
+    """Enable only requested top-level high-bandwidth RViz displays."""
     if not isinstance(document, dict):
         raise ValueError('RViz configuration root must be a mapping')
 
@@ -39,25 +44,33 @@ def enable_pointcloud_displays(document):
     if not isinstance(displays, list):
         raise ValueError('RViz configuration lacks a Displays list')
 
-    enabled_count = 0
+    enabled_counts = {'images': 0, 'pointclouds': 0}
     for display in displays:
         if not isinstance(display, dict):
             raise ValueError('RViz Displays entries must be mappings')
 
         class_name = str(display.get('Class', ''))
-        if not class_name.endswith('/PointCloud2'):
+        if class_name.endswith('/Image') and enable_camera_preview:
+            enabled_counts['images'] += 1
+        elif class_name.endswith('/PointCloud2') and enable_pointclouds:
+            enabled_counts['pointclouds'] += 1
+        else:
             continue
 
         display['Enabled'] = True
         if 'Value' in display:
             display['Value'] = True
-        enabled_count += 1
 
-    return enabled_count
+    return enabled_counts
 
 
-def create_pointcloud_runtime_config(source_path):
-    """Write a temporary PointCloud2-enabled copy of one RViz file."""
+def create_runtime_config(
+    source_path,
+    *,
+    enable_camera_preview=False,
+    enable_pointclouds=False,
+):
+    """Write one temporary copy with requested optional displays enabled."""
     source = Path(source_path)
     try:
         document = yaml.safe_load(source.read_text(encoding='utf-8'))
@@ -66,18 +79,22 @@ def create_pointcloud_runtime_config(source_path):
             f'could not read RViz configuration {source}: {error}'
         ) from error
 
-    enabled_count = enable_pointcloud_displays(document)
+    enabled_counts = enable_optional_displays(
+        document,
+        enable_camera_preview=enable_camera_preview,
+        enable_pointclouds=enable_pointclouds,
+    )
     with tempfile.NamedTemporaryFile(
         mode='w',
         encoding='utf-8',
-        prefix='savo_observer_pointclouds_',
+        prefix='savo_observer_rviz_',
         suffix='.rviz',
         delete=False,
     ) as stream:
         yaml.safe_dump(document, stream, sort_keys=False)
         runtime_path = Path(stream.name)
 
-    return runtime_path, enabled_count
+    return runtime_path, enabled_counts
 
 
 def remove_runtime_config(path):

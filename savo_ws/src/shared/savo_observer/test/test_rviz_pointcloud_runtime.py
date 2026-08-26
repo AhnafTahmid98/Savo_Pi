@@ -1,11 +1,11 @@
-"""Validate temporary PointCloud2 enablement without ROS or an RViz GUI."""
+"""Validate temporary high-bandwidth RViz enablement without ROS or a GUI."""
 
 from copy import deepcopy
 from pathlib import Path
 
 import pytest
 from savo_observer.rviz_config import (
-    create_pointcloud_runtime_config,
+    create_runtime_config,
     parse_launch_boolean,
     remove_runtime_config,
 )
@@ -20,32 +20,50 @@ def _displays(document):
     return document['Visualization Manager']['Displays']
 
 
-def _is_pointcloud(display):
-    return str(display.get('Class', '')).endswith('/PointCloud2')
+def _display_kind(display):
+    class_name = str(display.get('Class', ''))
+    if class_name.endswith('/Image'):
+        return 'images'
+    if class_name.endswith('/PointCloud2'):
+        return 'pointclouds'
+    return None
 
 
 def test_launch_boolean_parser_is_explicit_and_fail_closed():
     """Accept normal boolean forms and reject every ambiguous value."""
-    for value in (True, 'true', 'TRUE', 'yes', 'on', '1'):
-        assert parse_launch_boolean(value, 'enable_pointclouds') is True
-    for value in (False, 'false', 'FALSE', 'no', 'off', '0'):
-        assert parse_launch_boolean(value, 'enable_pointclouds') is False
-    for value in ('', 'enabled', 'truthy', '2', None):
-        with pytest.raises(ValueError, match='enable_pointclouds must be'):
-            parse_launch_boolean(value, 'enable_pointclouds')
+    for name in ('enable_camera_preview', 'enable_pointclouds'):
+        for value in (True, 'true', 'TRUE', 'yes', 'on', '1'):
+            assert parse_launch_boolean(value, name) is True
+        for value in (False, 'false', 'FALSE', 'no', 'off', '0'):
+            assert parse_launch_boolean(value, name) is False
+        for value in ('', 'enabled', 'truthy', '2', None):
+            with pytest.raises(ValueError, match=f'{name} must be'):
+                parse_launch_boolean(value, name)
 
 
-def test_runtime_copies_enable_only_existing_pointcloud_displays():
-    """Preserve source files, topics, QoS, images, and unrelated displays."""
-    pointcloud_count = 0
-    views_without_pointclouds = 0
-    pointcloud_topics = set()
+@pytest.mark.parametrize(
+    ('enable_camera_preview', 'enable_pointclouds'),
+    [(False, False), (True, False), (False, True), (True, True)],
+)
+def test_runtime_copy_enables_only_requested_display_classes(
+    enable_camera_preview,
+    enable_pointclouds,
+):
+    """Cover default-disabled, camera-only, cloud-only, and combined modes."""
+    requested = {
+        'images': enable_camera_preview,
+        'pointclouds': enable_pointclouds,
+    }
+    totals = {'images': 0, 'pointclouds': 0}
+    topics = {'images': set(), 'pointclouds': set()}
 
     for source_path in sorted(RVIZ.glob('*.rviz')):
         source_bytes = source_path.read_bytes()
         source_document = yaml.safe_load(source_bytes)
-        runtime_path, enabled_count = create_pointcloud_runtime_config(
-            source_path
+        runtime_path, enabled_counts = create_runtime_config(
+            source_path,
+            enable_camera_preview=enable_camera_preview,
+            enable_pointclouds=enable_pointclouds,
         )
 
         try:
@@ -58,37 +76,41 @@ def test_runtime_copies_enable_only_existing_pointcloud_displays():
             runtime_displays = _displays(runtime_document)
             assert len(runtime_displays) == len(source_displays)
 
-            expected_enabled = 0
+            expected_counts = {'images': 0, 'pointclouds': 0}
             for source, runtime in zip(source_displays, runtime_displays):
                 expected = deepcopy(source)
-                if _is_pointcloud(source):
-                    expected_enabled += 1
-                    pointcloud_count += 1
-                    pointcloud_topics.add(source['Topic']['Value'])
-                    expected['Enabled'] = True
-                    if 'Value' in expected:
-                        expected['Value'] = True
+                kind = _display_kind(source)
+                if kind is not None:
+                    totals[kind] += 1
+                    topics[kind].add(source['Topic']['Value'])
+                    if requested[kind]:
+                        expected_counts[kind] += 1
+                        expected['Enabled'] = True
+                        if 'Value' in expected:
+                            expected['Value'] = True
                 assert runtime == expected
 
-            assert enabled_count == expected_enabled
-            if expected_enabled == 0:
-                views_without_pointclouds += 1
+            assert enabled_counts == expected_counts
         finally:
             remove_runtime_config(runtime_path)
 
         assert not runtime_path.exists()
         assert source_path.read_bytes() == source_bytes
 
-    assert pointcloud_count > 0
-    assert views_without_pointclouds > 0
-    assert pointcloud_topics == {
+    assert totals['images'] > 0
+    assert totals['pointclouds'] > 0
+    assert topics['images'] == {
+        '/camera/camera/color/image_raw',
+        '/savo_head/camera/image_raw',
+    }
+    assert topics['pointclouds'] == {
         '/camera/camera/depth/color/points',
         '/savo_perception/obstacles/points',
     }
 
 
-def test_user_config_enables_pointcloud_without_enabling_image(tmp_path):
-    """Apply the same selective behavior to a user-supplied RViz file."""
+def test_user_config_combines_options_without_changing_topics_or_qos(tmp_path):
+    """Apply both independent flags to a user-supplied RViz file."""
     source_path = tmp_path / 'user.rviz'
     document = {
         'Visualization Manager': {
@@ -121,18 +143,24 @@ def test_user_config_enables_pointcloud_without_enabling_image(tmp_path):
         encoding='utf-8',
     )
     source_bytes = source_path.read_bytes()
-    runtime_path, enabled_count = create_pointcloud_runtime_config(source_path)
+    runtime_path, enabled_counts = create_runtime_config(
+        source_path,
+        enable_camera_preview=True,
+        enable_pointclouds=True,
+    )
 
     try:
         runtime = yaml.safe_load(runtime_path.read_text(encoding='utf-8'))
         cloud, image = _displays(runtime)
-        assert enabled_count == 1
+        assert enabled_counts == {'images': 1, 'pointclouds': 1}
         assert cloud['Enabled'] is True
         assert cloud['Value'] is True
-        assert cloud['Topic'] == document['Visualization Manager']['Displays'][
-            0
-        ]['Topic']
-        assert image == document['Visualization Manager']['Displays'][1]
+        assert image['Enabled'] is True
+        assert image['Value'] is True
+        for index, display in enumerate((cloud, image)):
+            assert display['Topic'] == document['Visualization Manager'][
+                'Displays'
+            ][index]['Topic']
     finally:
         remove_runtime_config(runtime_path)
 

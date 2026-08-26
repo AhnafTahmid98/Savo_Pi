@@ -19,8 +19,21 @@ Visualization Manager:
       Topic: {Depth: 1, Durability Policy: Transient Local, History Policy: Keep Last, Reliability Policy: Reliable, Value: /map}
     - Class: rviz_default_plugins/LaserScan
       Enabled: true
-      Name: LiDAR
+      Name: LaserScan
       Topic: {Depth: 5, Durability Policy: Volatile, History Policy: Keep Last, Reliability Policy: Best Effort, Value: /scan}
+    - Class: rviz_default_plugins/Odometry
+      Enabled: true
+      Name: FilteredOdometry
+      Topic: {Depth: 5, Durability Policy: Volatile, History Policy: Keep Last, Reliability Policy: Reliable, Value: /odometry/filtered}
+    - Class: rviz_default_plugins/Odometry
+      Enabled: true
+      Name: WheelOdometry
+      Topic: {Depth: 5, Durability Policy: Volatile, History Policy: Keep Last, Reliability Policy: Reliable, Value: /wheel/odom}
+    - Class: rviz_default_plugins/Odometry
+      Enabled: false
+      Name: VisualOdometry
+      Topic: {Depth: 5, Durability Policy: Volatile, History Policy: Keep Last, Reliability Policy: Best Effort, Value: /vo/odom}
+      Value: false
     - Class: rviz_default_plugins/PointCloud2
       Enabled: false
       Name: RawDepthCloud
@@ -30,6 +43,16 @@ Visualization Manager:
       Enabled: false
       Name: FilteredObstacleCloud
       Topic: {Depth: 2, Durability Policy: Volatile, History Policy: Keep Last, Reliability Policy: Best Effort, Value: /savo_perception/obstacles/points}
+      Value: false
+    - Class: rviz_default_plugins/Image
+      Enabled: false
+      Name: D435ColorImage
+      Topic: {Depth: 2, Durability Policy: Volatile, History Policy: Keep Last, Reliability Policy: Best Effort, Value: /camera/camera/color/image_raw}
+      Value: false
+    - Class: rviz_default_plugins/Image
+      Enabled: false
+      Name: HeadCameraImage
+      Topic: {Depth: 2, Durability Policy: Volatile, History Policy: Keep Last, Reliability Policy: Best Effort, Value: /savo_head/camera/image_raw}
       Value: false
     - Class: rviz_default_plugins/Map
       Enabled: false
@@ -41,6 +64,22 @@ Visualization Manager:
       Name: LocalCostmap
       Topic: {Depth: 1, Durability Policy: Transient Local, History Policy: Keep Last, Reliability Policy: Reliable, Value: /local_costmap/costmap}
       Value: false
+    - Class: rviz_default_plugins/Path
+      Enabled: true
+      Name: GlobalPlan
+      Topic: {Depth: 5, Durability Policy: Volatile, History Policy: Keep Last, Reliability Policy: Reliable, Value: /plan}
+    - Class: rviz_default_plugins/Polygon
+      Enabled: true
+      Name: Footprint
+      Topic: {Depth: 5, Durability Policy: Volatile, History Policy: Keep Last, Reliability Policy: Reliable, Value: /local_costmap/published_footprint}
+    - Class: rviz_default_plugins/Path
+      Enabled: true
+      Name: CoveragePath
+      Topic: {Depth: 5, Durability Policy: Transient Local, History Policy: Keep Last, Reliability Policy: Reliable, Value: /savo_mapping/coverage/path}
+    - Class: rviz_default_plugins/Pose
+      Enabled: true
+      Name: ExplorationSelectedGoal
+      Topic: {Depth: 5, Durability Policy: Volatile, History Policy: Keep Last, Reliability Policy: Reliable, Value: /savo_mapping/exploration/selected_goal}
   Enabled: true
   Global Options: {Background Color: "22; 26; 32", Fixed Frame: map, Frame Rate: 20}
   Name: root

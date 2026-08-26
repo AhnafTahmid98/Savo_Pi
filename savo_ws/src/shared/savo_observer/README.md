@@ -27,12 +27,18 @@ Available views are `overview`, `robot_model`, `tf`, `sensors`, `safety`,
 `localization`, `mapping`, `manual_mapping`, `autonomous_mapping`, `coverage`,
 `scan360`, `map_quality`, `navigation`, `costmaps`, `locations`, and
 `full_debug`. The fixed frame is normally `map`; model/sensor-centric views use
-`base_footprint`. High-bandwidth point clouds are disabled in every default.
+`base_footprint`. High-bandwidth point clouds and camera images are disabled in
+every checked-in view by default. The `full_debug` view brings together the
+robot model, TF, map, scan, three odometry sources, both point clouds, both
+camera feeds, costmaps, plan, footprint, coverage path, and selected
+exploration goal without adding command tools.
 
-Six nonempty legacy RViz configurations were moved with their original hashes.
-The costmap view was then intentionally corrected to remove `SetGoal` and
-`SetInitialPose`. Four empty mapping placeholders were implemented. The full
-inventory and hashes are in `config/migration_manifest.yaml`.
+Six nonempty legacy RViz configurations were imported with their original
+hashes recorded. The TF, costmap, and sensor views were then intentionally
+corrected for current read-only coverage; the costmap correction removed
+`SetGoal` and `SetInitialPose`. Four empty mapping placeholders were
+implemented. The full inventory and hashes are in
+`config/migration_manifest.yaml`.
 
 ## Profiles and bandwidth
 
@@ -41,12 +47,15 @@ inventory and hashes are in `config/migration_manifest.yaml`.
 - `full_debug`: 2 Hz telemetry; point clouds and costmaps remain manually enabled.
 - `mobile`: 0.5 Hz telemetry, bounded 60-sample history, no images or clouds.
 
-No sensor data is republished. Camera preview and PointCloud2 displays default
-to false. Explicitly passing `enable_pointclouds:=true` creates a temporary
-runtime copy of the selected RViz configuration with only its existing
-PointCloud2 displays enabled for that RViz session. Source-owned `.rviz` files,
-PointCloud2 topics and QoS, and Image displays are unchanged. The temporary copy
-is removed when RViz exits, and the observer remains read-only.
+No sensor data is republished. `enable_camera_preview` and
+`enable_pointclouds` both default to false. Passing either flag as true creates
+one temporary runtime copy of the selected RViz configuration and enables only
+its existing Image or PointCloud2 displays, respectively. Passing both enables
+both display classes in the same copy. Source-owned `.rviz` files, display
+topics, and QoS remain unchanged. The temporary copy is removed when RViz
+exits, and the observer remains read-only. These opt-in displays consume the
+approved head-camera, D435 color, raw D435 cloud, and filtered-obstacle topics;
+the observer does not publish or proxy them.
 
 ## Network setup
 
@@ -70,7 +79,7 @@ ros2 launch savo_observer observer.launch.py mode:=full view:=overview profile:=
 ros2 launch savo_observer observer.launch.py mode:=full view:=navigation profile:=standard
 ros2 launch savo_observer observer.launch.py mode:=rviz view:=tf profile:=standard
 ros2 launch savo_observer observer.launch.py mode:=rviz view:=sensors \
-  profile:=standard enable_pointclouds:=true
+  profile:=standard enable_camera_preview:=true enable_pointclouds:=true
 ros2 launch savo_observer observer.launch.py mode:=dashboard profile:=mobile \
   dashboard_bind_address:=0.0.0.0 dashboard_port:=8765
 ```

@@ -26,9 +26,14 @@ spatial_topics:
   scan: /scan
   odometry_filtered: /odometry/filtered
   wheel_odometry: /wheel/odom
+  visual_odometry: /vo/odom
   global_costmap: /global_costmap/costmap
   local_costmap: /local_costmap/costmap
   global_plan: /plan
   footprint: /local_costmap/published_footprint
   realsense_points: /camera/camera/depth/color/points
   filtered_obstacles: /savo_perception/obstacles/points
+  coverage_path: /savo_mapping/coverage/path
+  exploration_selected_goal: /savo_mapping/exploration/selected_goal
+  d435_color_image: /camera/camera/color/image_raw
+  head_camera_image: /savo_head/camera/image_raw

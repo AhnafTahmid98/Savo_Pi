@@ -49,3 +49,15 @@ def test_ros_publishers_are_confined_to_observer_telemetry():
     for forbidden in ('/cmd_vel', '/goal_pose', '/initialpose', '/mode_cmd'):
         assert forbidden not in telemetry
         assert forbidden not in dashboard
+
+
+def test_runtime_does_not_use_stale_realsense_status_topic():
+    for directory in RUNTIME:
+        for path in directory.rglob('*'):
+            if not path.is_file() or '__pycache__' in path.parts:
+                continue
+            try:
+                source = path.read_text(encoding='utf-8')
+            except UnicodeDecodeError:
+                continue
+            assert '/savo_realsense/status' not in source, path

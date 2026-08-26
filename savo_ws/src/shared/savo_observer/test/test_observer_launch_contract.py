@@ -31,25 +31,32 @@ def test_canonical_defaults_and_modes_are_stable():
     assert "'full': 'full_observer.launch.py'" in source
 
 
-def test_enable_pointclouds_is_forwarded_and_consumed():
-    """Require the opt-in argument to reach and alter only RViz setup."""
+def test_high_bandwidth_flags_are_forwarded_and_consumed():
+    """Require both opt-in arguments to reach and alter only RViz setup."""
     observer = (LAUNCH / 'observer.launch.py').read_text(encoding='utf-8')
     full = (LAUNCH / 'full_observer.launch.py').read_text(encoding='utf-8')
     rviz = (LAUNCH / 'rviz_observer.launch.py').read_text(encoding='utf-8')
 
-    for source in (observer, full, rviz):
-        assert "DeclareLaunchArgument('enable_pointclouds'" in source
-        assert "default_value='false'" in source
+    for argument in ('enable_camera_preview', 'enable_pointclouds'):
+        for source in (observer, full, rviz):
+            assert f"'{argument}', default_value='false'" in source
 
+    assert "'enable_camera_preview'," in observer
     assert "'enable_pointclouds'," in observer
+    assert (
+        "'enable_camera_preview': LaunchConfiguration("
+        "\n                        'enable_camera_preview'"
+        in full
+    )
     assert (
         "'enable_pointclouds': LaunchConfiguration('enable_pointclouds')"
         in full
     )
+    assert "_value(context, 'enable_camera_preview')" in rviz
     assert "_value(context, 'enable_pointclouds')" in rviz
     assert 'parse_launch_boolean' in rviz
-    assert 'if enable_pointclouds:' in rviz
-    assert 'create_pointcloud_runtime_config' in rviz
+    assert 'if enable_camera_preview or enable_pointclouds:' in rviz
+    assert 'create_runtime_config' in rviz
     assert 'OnProcessExit' in rviz
 
 

@@ -12,9 +12,8 @@ from launch.actions import (
 from launch.event_handlers import OnProcessExit
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-
 from savo_observer.rviz_config import (
-    create_pointcloud_runtime_config,
+    create_runtime_config,
     parse_launch_boolean,
     remove_runtime_config,
 )
@@ -67,13 +66,19 @@ def _setup(context):
         raise RuntimeError(f'RViz configuration does not exist: {config}')
 
     runtime_config = None
+    enable_camera_preview = parse_launch_boolean(
+        _value(context, 'enable_camera_preview'),
+        'enable_camera_preview',
+    )
     enable_pointclouds = parse_launch_boolean(
         _value(context, 'enable_pointclouds'),
         'enable_pointclouds',
     )
-    if enable_pointclouds:
-        runtime_config, _enabled_count = create_pointcloud_runtime_config(
-            config
+    if enable_camera_preview or enable_pointclouds:
+        runtime_config, _enabled_counts = create_runtime_config(
+            config,
+            enable_camera_preview=enable_camera_preview,
+            enable_pointclouds=enable_pointclouds,
         )
         config = str(runtime_config)
 
