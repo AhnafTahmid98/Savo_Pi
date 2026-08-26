@@ -165,6 +165,8 @@ def test_pointcloud_layout_contract_matches_real_d435_storage():
     assert 'PointCloudStorageLayout' in header
     assert 'layout.height != 1U' in library
     assert 'layout.row_step < minimum_row_step' in library
+    assert 'layout.data_size < minimum_row_step' in library
+    assert 'layout.data_size > declared_data_size' in library
     assert 'layout.data_size != declared_data_size' in library
     assert 'checked_multiply' in library
     assert 'big_endian_cloud_not_supported' in node
@@ -172,8 +174,11 @@ def test_pointcloud_layout_contract_matches_real_d435_storage():
     assert 'xyz_field_outside_point_step' in node
     assert 'point_step - field_offset' in node
     assert 'padded_realsense_cloud' in fixture
+    assert 'len(padded.data) == padded.width * padded.point_step' in fixture
     assert 'height != 1 and row_step != minimum_row_step' in hardware
+    assert 'minimum_row_step <= data_size <= row_step' in hardware
     assert 'filtered output row must be compact' in hardware
+    assert 'filtered output data size=' in hardware
 
 
 def test_readme_documents_filtered_architecture():

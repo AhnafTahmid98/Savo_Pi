@@ -137,7 +137,18 @@ std::string validate_point_cloud_storage_layout(
     return "malformed_pointcloud_layout";
   }
 
-  if (layout.data_size != declared_data_size) {
+  if (
+    layout.height == 1U &&
+    (layout.data_size < minimum_row_step ||
+    layout.data_size > declared_data_size))
+  {
+    return "malformed_pointcloud_layout";
+  }
+
+  if (
+    layout.height != 1U &&
+    layout.data_size != declared_data_size)
+  {
     return "malformed_pointcloud_layout";
   }
 

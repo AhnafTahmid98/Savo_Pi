@@ -30,7 +30,21 @@ savo_perception::ObstacleCloudFilterResult filter(
 
 }  // namespace
 
-TEST(PointCloudStorageLayoutTest, AcceptsObservedD435SingleRowPadding)
+TEST(PointCloudStorageLayoutTest, AcceptsLatestD435CompactSingleRowStorage)
+{
+  const PointCloudStorageLayout layout{
+    235429U,
+    1U,
+    20U,
+    6144000U,
+    4708580U};
+
+  EXPECT_TRUE(
+    savo_perception::
+    validate_point_cloud_storage_layout(layout).empty());
+}
+
+TEST(PointCloudStorageLayoutTest, AcceptsPreviousD435FullSingleRowStorage)
 {
   const PointCloudStorageLayout layout{
     234483U,
@@ -44,14 +58,28 @@ TEST(PointCloudStorageLayoutTest, AcceptsObservedD435SingleRowPadding)
     validate_point_cloud_storage_layout(layout).empty());
 }
 
-TEST(PointCloudStorageLayoutTest, AcceptsSmallEquivalentSingleRowPadding)
+TEST(PointCloudStorageLayoutTest, AcceptsSmallCompactSingleRowStorage)
 {
   const PointCloudStorageLayout layout{
     3U,
     1U,
     20U,
-    80U,
-    80U};
+    100U,
+    60U};
+
+  EXPECT_TRUE(
+    savo_perception::
+    validate_point_cloud_storage_layout(layout).empty());
+}
+
+TEST(PointCloudStorageLayoutTest, AcceptsSmallFullSingleRowStorage)
+{
+  const PointCloudStorageLayout layout{
+    3U,
+    1U,
+    20U,
+    100U,
+    100U};
 
   EXPECT_TRUE(
     savo_perception::
@@ -65,7 +93,7 @@ TEST(PointCloudStorageLayoutTest, RejectsShortRow)
     1U,
     20U,
     59U,
-    59U};
+    60U};
 
   EXPECT_EQ(
     savo_perception::
@@ -94,8 +122,8 @@ TEST(PointCloudStorageLayoutTest, RejectsUndersizedDeclaredStorage)
     3U,
     1U,
     20U,
-    80U,
-    79U};
+    100U,
+    59U};
 
   EXPECT_EQ(
     savo_perception::
@@ -109,8 +137,8 @@ TEST(PointCloudStorageLayoutTest, RejectsOversizedDeclaredStorage)
     3U,
     1U,
     20U,
-    80U,
-    81U};
+    100U,
+    101U};
 
   EXPECT_EQ(
     savo_perception::
@@ -126,6 +154,21 @@ TEST(PointCloudStorageLayoutTest, RejectsPaddedOrganizedRows)
     20U,
     80U,
     160U};
+
+  EXPECT_EQ(
+    savo_perception::
+    validate_point_cloud_storage_layout(layout),
+    "malformed_pointcloud_layout");
+}
+
+TEST(PointCloudStorageLayoutTest, RejectsOrganizedDataSizeMismatch)
+{
+  const PointCloudStorageLayout layout{
+    3U,
+    2U,
+    20U,
+    60U,
+    119U};
 
   EXPECT_EQ(
     savo_perception::

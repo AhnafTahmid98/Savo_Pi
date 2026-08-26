@@ -394,6 +394,7 @@ def cloud_layout(message, label, allow_empty, xyz_only):
         raise ValidationFailure(f'{label}: big-endian data is unsupported')
 
     minimum_row_step = point_step * width
+    data_size = len(message.data)
     expected_data_size = row_step * height
 
     if row_step < minimum_row_step:
@@ -405,9 +406,14 @@ def cloud_layout(message, label, allow_empty, xyz_only):
             f'{label}: organized row_step={row_step}, '
             f'expected compact {minimum_row_step}'
         )
-    if len(message.data) != expected_data_size:
+    if height == 1 and not minimum_row_step <= data_size <= row_step:
         raise ValidationFailure(
-            f'{label}: data size={len(message.data)}, '
+            f'{label}: single-row data size={data_size}, expected range '
+            f'[{minimum_row_step}, {row_step}]'
+        )
+    if height != 1 and data_size != expected_data_size:
+        raise ValidationFailure(
+            f'{label}: data size={data_size}, '
             f'expected {expected_data_size}'
         )
 
@@ -445,6 +451,11 @@ def cloud_layout(message, label, allow_empty, xyz_only):
             raise ValidationFailure(
                 f'{label}: filtered output row must be compact; '
                 f'row_step={row_step}, expected {minimum_row_step}'
+            )
+        if data_size != expected_data_size:
+            raise ValidationFailure(
+                f'{label}: filtered output data size={data_size}, '
+                f'expected compact {expected_data_size}'
             )
         expected_offsets = {'x': 0, 'y': 4, 'z': 8}
         actual_offsets = {

@@ -122,7 +122,13 @@ class ObstacleCloudFixture(Node):
         message.is_dense = False
         return message
 
-    def padded_realsense_cloud(self, frame_id, points, stamp=None):
+    def padded_realsense_cloud(
+        self,
+        frame_id,
+        points,
+        stamp=None,
+        include_trailing_storage=False,
+    ):
         """Build a small equivalent of the hardware-padded D435 cloud."""
         message = PointCloud2()
         message.header.frame_id = frame_id
@@ -157,23 +163,30 @@ class ObstacleCloudFixture(Node):
         ]
         message.is_bigendian = False
         message.point_step = 20
-        message.row_step = message.point_step * (message.width + 1)
-        storage = bytearray(message.row_step)
+        message.row_step = message.point_step * (message.width + 2)
+        valid_data_size = message.point_step * message.width
+        storage_size = (
+            message.row_step
+            if include_trailing_storage
+            else valid_data_size
+        )
+        storage = bytearray(storage_size)
 
         for index, point in enumerate(points):
             offset = index * message.point_step
             struct.pack_into('<fff', storage, offset, *point)
             struct.pack_into('<f', storage, offset + 16, 0.0)
 
-        # A valid-looking obstacle in trailing storage must not become a point.
-        struct.pack_into(
-            '<fff',
-            storage,
-            message.width * message.point_step,
-            1.50,
-            0.00,
-            0.30,
-        )
+        if include_trailing_storage:
+            # A valid-looking trailing obstacle must not become a point.
+            struct.pack_into(
+                '<fff',
+                storage,
+                valid_data_size,
+                1.50,
+                0.00,
+                0.30,
+            )
         message.data = bytes(storage)
         message.is_dense = True
         return message
@@ -310,9 +323,8 @@ def run_filter(fixture):
     print('Voxel downsampling: PASSED')
     print('Obstacle-only output contract: PASSED')
 
-    # Real D435 v4.58.1 hardware reports height=1, point_step=20, and
-    # row_step=6144000 for width=234483. This smaller fixture preserves the
-    # same single-row trailing-storage geometry without a multi-megabyte cloud.
+    # Real D435 hardware reports height=1, point_step=20, a padded row_step,
+    # and compact data containing exactly width * point_step bytes.
     padded = fixture.padded_realsense_cloud(
         VALID_FRAME,
         [
@@ -321,6 +333,8 @@ def run_filter(fixture):
             (1.00, 0.20, 0.30),
         ],
     )
+    assert padded.row_step == 100
+    assert len(padded.data) == padded.width * padded.point_step
     padded_stamp = padded.header.stamp
     output_count = len(fixture.output_messages)
 
@@ -335,16 +349,54 @@ def run_filter(fixture):
     padded_output = fixture.output_messages[-1]
     padded_points = decode_points(padded_output)
     assert padded_output.header.stamp == padded_stamp
+    assert padded_output.header.frame_id == 'base_link'
     assert padded_output.height == 1
     assert padded_output.row_step == (
         padded_output.point_step * padded_output.width
+    )
+    assert len(padded_output.data) == (
+        padded_output.row_step * padded_output.height
     )
     assert len(padded_points) == 3
     assert has_point(padded_points, (1.00, -0.20, 0.30))
     assert has_point(padded_points, (1.20, 0.00, 0.30))
     assert has_point(padded_points, (1.40, 0.20, 0.30))
     assert not has_point(padded_points, (1.90, 0.00, 0.30))
-    print('Padded single-row D435 input layout: PASSED')
+    print('Compact-data padded-row D435 input layout: PASSED')
+
+    full_row = fixture.padded_realsense_cloud(
+        VALID_FRAME,
+        [
+            (0.60, -0.20, 0.30),
+            (0.80, 0.00, 0.30),
+            (1.00, 0.20, 0.30),
+        ],
+        include_trailing_storage=True,
+    )
+    assert len(full_row.data) == full_row.row_step
+    full_row_stamp = full_row.header.stamp
+    output_count = len(fixture.output_messages)
+
+    assert fixture.publish_until(
+        full_row,
+        lambda: (
+            len(fixture.output_messages) > output_count
+            and fixture.output_messages[-1].header.stamp == full_row_stamp
+        ),
+    )
+
+    full_row_output = fixture.output_messages[-1]
+    full_row_points = decode_points(full_row_output)
+    assert full_row_output.header.stamp == full_row_stamp
+    assert full_row_output.header.frame_id == 'base_link'
+    assert full_row_output.row_step == (
+        full_row_output.point_step * full_row_output.width
+    )
+    assert len(full_row_output.data) == (
+        full_row_output.row_step * full_row_output.height
+    )
+    assert len(full_row_points) == 3
+    assert not has_point(full_row_points, (1.90, 0.00, 0.30))
     print('Trailing row storage ignored: PASSED')
     print('Filtered output compact row layout: PASSED')
 
