@@ -41,7 +41,12 @@ inventory and hashes are in `config/migration_manifest.yaml`.
 - `full_debug`: 2 Hz telemetry; point clouds and costmaps remain manually enabled.
 - `mobile`: 0.5 Hz telemetry, bounded 60-sample history, no images or clouds.
 
-No sensor data is republished. Camera preview and point clouds default to false.
+No sensor data is republished. Camera preview and PointCloud2 displays default
+to false. Explicitly passing `enable_pointclouds:=true` creates a temporary
+runtime copy of the selected RViz configuration with only its existing
+PointCloud2 displays enabled for that RViz session. Source-owned `.rviz` files,
+PointCloud2 topics and QoS, and Image displays are unchanged. The temporary copy
+is removed when RViz exits, and the observer remains read-only.
 
 ## Network setup
 
@@ -64,6 +69,8 @@ topic visibility and provides domain/firewall guidance when discovery is empty.
 ros2 launch savo_observer observer.launch.py mode:=full view:=overview profile:=standard
 ros2 launch savo_observer observer.launch.py mode:=full view:=navigation profile:=standard
 ros2 launch savo_observer observer.launch.py mode:=rviz view:=tf profile:=standard
+ros2 launch savo_observer observer.launch.py mode:=rviz view:=sensors \
+  profile:=standard enable_pointclouds:=true
 ros2 launch savo_observer observer.launch.py mode:=dashboard profile:=mobile \
   dashboard_bind_address:=0.0.0.0 dashboard_port:=8765
 ```
@@ -71,6 +78,9 @@ ros2 launch savo_observer observer.launch.py mode:=dashboard profile:=mobile \
 For the mobile command, open `http://ROBOT_OBSERVER_PC_IP:8765` from a phone on
 the same trusted LAN. The server runs on the external observer computer, not on
 the robot Raspberry Pis.
+
+Official RViz validation for Robot Savo will run in the bridged Ubuntu 24.04
+Noble VM on the Mac. VM/runtime acceptance is not yet claimed here.
 
 ## Troubleshooting
 

@@ -4,7 +4,13 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-RUNTIME = [ROOT / 'src', ROOT / 'launch', ROOT / 'rviz', ROOT / 'dashboard']
+RUNTIME = [
+    ROOT / 'src',
+    ROOT / 'launch',
+    ROOT / 'rviz',
+    ROOT / 'dashboard',
+    ROOT / 'savo_observer',
+]
 PROHIBITED = {
     'create_client<', 'create_service<', 'rclcpp_action', 'async_send_goal',
     'SetGoal', 'SetInitialPose', 'PublishPoint', 'Teleop',

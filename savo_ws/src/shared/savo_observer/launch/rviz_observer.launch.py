@@ -4,9 +4,20 @@ from pathlib import Path
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, OpaqueFunction
+from launch.actions import (
+    DeclareLaunchArgument,
+    OpaqueFunction,
+    RegisterEventHandler,
+)
+from launch.event_handlers import OnProcessExit
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+
+from savo_observer.rviz_config import (
+    create_pointcloud_runtime_config,
+    parse_launch_boolean,
+    remove_runtime_config,
+)
 
 
 VIEWS = {
@@ -34,6 +45,11 @@ def _value(context, name):
     return LaunchConfiguration(name).perform(context)
 
 
+def _cleanup_runtime_config(_context, path):
+    remove_runtime_config(path)
+    return []
+
+
 def _setup(context):
     view = _value(context, 'view')
     profile = _value(context, 'profile')
@@ -43,25 +59,52 @@ def _setup(context):
         raise RuntimeError(f'unknown observer profile: {profile}')
     configured = _value(context, 'rviz_config')
     config = configured or str(
-        Path(get_package_share_directory('savo_observer')) / 'rviz' / VIEWS[view]
+        Path(get_package_share_directory('savo_observer'))
+        / 'rviz'
+        / VIEWS[view]
     )
     if not Path(config).is_file():
         raise RuntimeError(f'RViz configuration does not exist: {config}')
+
+    runtime_config = None
+    enable_pointclouds = parse_launch_boolean(
+        _value(context, 'enable_pointclouds'),
+        'enable_pointclouds',
+    )
+    if enable_pointclouds:
+        runtime_config, _enabled_count = create_pointcloud_runtime_config(
+            config
+        )
+        config = str(runtime_config)
+
     arguments = ['-d', config]
     fixed_frame = _value(context, 'fixed_frame')
     if fixed_frame:
         arguments.extend(['--fixed-frame', fixed_frame])
-    arguments.extend(['--ros-args', '--log-level', _value(context, 'log_level')])
-    return [
-        Node(
-            package='rviz2',
-            executable='rviz2',
-            name='savo_observer_rviz',
-            output='screen',
-            arguments=arguments,
-            parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time')}],
+    arguments.extend(
+        ['--ros-args', '--log-level', _value(context, 'log_level')]
+    )
+    rviz = Node(
+        package='rviz2',
+        executable='rviz2',
+        name='savo_observer_rviz',
+        output='screen',
+        arguments=arguments,
+        parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time')}],
+    )
+    actions = [rviz]
+    if runtime_config is not None:
+        cleanup = OpaqueFunction(
+            function=_cleanup_runtime_config,
+            args=[str(runtime_config)],
         )
-    ]
+        actions.insert(
+            0,
+            RegisterEventHandler(
+                OnProcessExit(target_action=rviz, on_exit=[cleanup])
+            ),
+        )
+    return actions
 
 
 def generate_launch_description():
@@ -74,7 +117,9 @@ def generate_launch_description():
             DeclareLaunchArgument('rviz_config', default_value=''),
             DeclareLaunchArgument('fixed_frame', default_value=''),
             DeclareLaunchArgument('log_level', default_value='info'),
-            DeclareLaunchArgument('enable_camera_preview', default_value='false'),
+            DeclareLaunchArgument(
+                'enable_camera_preview', default_value='false'
+            ),
             DeclareLaunchArgument('enable_pointclouds', default_value='false'),
             OpaqueFunction(function=_setup),
         ]
