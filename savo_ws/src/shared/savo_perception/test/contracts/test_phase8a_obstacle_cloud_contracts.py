@@ -182,11 +182,25 @@ def test_pointcloud_layout_contract_matches_real_d435_storage():
 
 
 def test_readme_documents_filtered_architecture():
-    """Require obstacle-only ownership and hardware-pending documentation."""
+    """Require obstacle-only ownership and scoped hardware acceptance."""
     readme = read('README.md')
     assert '## Phase 8A obstacle-cloud filtering' in readme
     assert FILTERED_TOPIC in readme
     assert 'obstacle-only' in readme
     assert 'clearing remains false' in readme
-    assert 'real D435 hardware validation remains pending' in readme
+    assert 'real-D435 sensor-side acceptance completed on 2026-08-26' in readme
+    assert 'production and floor-level D435 validation remains gated' in readme
+    assert 'open hardware-stability warning' in readme
+    assert 'LiDAR remains responsible for reliable clearing' in readme
     assert 'raw RealSense cloud directly into Nav2' not in readme
+
+    hardware_script = read(
+        'tools/hardware/phase8a5_d435_validation.sh'
+    )
+    assert 'producer stationary acceptance is complete' in hardware_script
+    assert 'Phase 8B Nav2 validation is tracked separately' in hardware_script
+    assert 'Full production D435 validation remains gated' in hardware_script
+    assert (
+        'Phase 8B Nav2 local VoxelLayer integration remains pending'
+        not in hardware_script
+    )

@@ -2402,9 +2402,9 @@ finalize_success()
   SUCCESS=1
   report ""
   report "Phase 8A5 real D435 hardware validation completed successfully"
-  report "Phase 8A obstacle-cloud producer is complete"
-  report "Phase 8B Nav2 local VoxelLayer integration remains pending"
-  report "Development is paused before Phase 8B"
+  report "Phase 8A obstacle-cloud producer stationary acceptance is complete"
+  report "Phase 8B Nav2 validation is tracked separately in savo_nav"
+  report "Full production D435 validation remains gated"
 }
 
 main()

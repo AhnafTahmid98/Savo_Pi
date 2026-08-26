@@ -193,7 +193,7 @@ LiDAR marks and clears obstacles in the global and local costmaps.
 
 ### Optional filtered-D435 voxel companion
 
-Use only after real D435 validation:
+Use only after complete guarded D435 production validation and gate enablement:
 
 ```text
 config/nav2_saved_map_voxel.yaml
@@ -219,6 +219,39 @@ marks local obstacles through the nonpersistent voxel layer without ray
 clearing. Its observations expire after one second, so helper loss removes its
 marks while LiDAR navigation continues. LiDAR remains the required marking and
 clearing source, and no D435 layer is added to the global costmap.
+
+### 2026-08-26 stationary D435 voxel hardware acceptance
+
+Robot Savo passed a scoped stationary D435 and local-costmap acceptance test on
+real ROS 2 Jazzy hardware. The robot remained stationary on a table; no
+controller, planner, BT navigator, autonomous goal, or robot motion was used.
+The isolated test used a temporary identity `odom -> base_footprint` transform,
+and disabled the LiDAR obstacle layer only to attribute local marks to the D435.
+
+The test first exposed and corrected the Nav2 Jazzy parameter contract:
+`observation_sources` must be a scalar string (`"scan"` or
+`"filtered_obstacles"`), not a YAML sequence/string array. After correction,
+Core validation reported 632 `savo_nav` tests, 0 errors, 0 failures, and 82
+skipped; the isolated local costmap configured to `inactive` and activated to
+`active`. Runtime parameters confirmed D435 marking enabled, clearing disabled,
+`observation_persistence=1.0`, and `expected_update_rate=0.0`.
+
+With filtered input in `base_link`, the baseline grid contained 51 positive and
+51 lethal cells. After D435 loss, the filter reported `state=stale` and the
+first zero-cost grid appeared 1.068 seconds after the last filtered cloud; a
+second zero-grid confirmation followed at 1.668 seconds. After restart, the
+filter returned to `state=ready` and the grid again contained 44 positive and
+44 lethal cells. Stationary D435 marking, nonpersistent stale mark expiration,
+and recovery therefore passed. This is not D435 ray clearing: D435 clearing
+remains false, while LiDAR remains the required authoritative clearing source.
+
+This acceptance does not complete floor-level, final self-filter, obstacle
+scene, moving-robot, stop-distance, autonomous-navigation, prolonged-load, or
+production activation validation. `d435_voxel_validated=false` and
+`activation_enabled=false` remain required. An open RealSense startup/USB
+stability warning also remains: some starts report a depth-stream hardware
+error, one test observed temporary USB disappearance/re-enumeration, and some
+monitor/health processes require SIGTERM after SIGINT.
 
 ## Build and test
 

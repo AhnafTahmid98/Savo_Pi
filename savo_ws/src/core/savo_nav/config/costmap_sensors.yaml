@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: LicenseRef-Proprietary
 
 costmap_sensors:
-  integration_status: ready_for_guarded_real_d435_validation
+  integration_status: stationary_d435_voxel_acceptance_complete_production_gated
 
   lidar:
     topic: /scan
@@ -31,16 +31,20 @@ costmap_sensors:
     clearing: false
     producer_implemented: true
     producer_contract_verified: true
+    producer_stationary_hardware_accepted: true
+    stationary_voxel_hardware_accepted: true
+    stationary_hardware_acceptance_date: '2026-08-26'
     producer_hardware_validated: false
     producer_source: savo_perception/src/nodes/obstacle_cloud_filter_node.cpp
     raw_topic_allowed_in_nav2: false
-    activation_gate: real_d435_frame_freshness_and_self_filter_validation
+    activation_gate: complete_floor_scene_motion_and_stability_validation
     evidence: >-
-      savo_perception now provides the production C++ filtered PointCloud2
-      producer. Real D435 frame, freshness, self-filter and floor testing is
-      still required before enabling the Nav2 voxel layer. Clearing remains
-      false because the filtered cloud has obstacle-only semantics; LiDAR owns
-      reliable free-space clearing.
+      Stationary Real D435 parser, frame, timestamp, freshness, stale-expiry,
+      recovery, Edge-to-Core DDS, and isolated local-voxel marking acceptance
+      passed on 2026-08-26. Full floor, self-filter, obstacle-scene,
+      moving-navigation, and stability validation is still required before
+      activation. Clearing remains false because the filtered cloud has
+      obstacle-only semantics; LiDAR owns reliable free-space clearing.
 
   ownership:
     sensor_production: false

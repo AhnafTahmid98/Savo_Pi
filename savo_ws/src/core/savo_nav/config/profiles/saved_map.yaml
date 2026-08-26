@@ -56,14 +56,16 @@ saved_map_profile:
     guard_process_loss_tested: true
     downstream_gateway_absence_tested: true
     filtered_realsense_producer_verified: true
+    filtered_realsense_stationary_hardware_accepted: true
     filtered_realsense_hardware_validated: false
     raw_realsense_cloud_for_nav2: false
     filtered_realsense_cloud_topic: /savo_perception/obstacles/points
     realsense_global_costmap_enabled: false
     voxel_debug_publication_enabled: false
     voxel_profile_source_complete: true
+    voxel_profile_stationary_hardware_accepted: true
     voxel_profile_activation_enabled: false
-    voxel_profile_activation_gate: real_d435_hardware_validation_pending
+    voxel_profile_activation_gate: complete_floor_scene_motion_and_stability_validation_pending
   notes:
     - Production launch consumes and verifies the active AM-8 joint release.
     - The baseline costmaps are LiDAR-only for first controlled navigation tests.

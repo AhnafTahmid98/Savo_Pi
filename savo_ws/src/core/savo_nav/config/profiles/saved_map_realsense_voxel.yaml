@@ -18,6 +18,9 @@ saved_map_realsense_voxel_profile:
   voxel_marking: true
   voxel_clearing: false
   voxel_debug_publication_enabled: false
+  stationary_hardware_acceptance_completed: true
+  stationary_hardware_acceptance_date: '2026-08-26'
+  production_validation_complete: false
   activation_enabled: false
   activation_gate: real_d435_frame_freshness_self_filter_floor_and_obstacle_validation
   software_completion: complete
@@ -25,4 +28,5 @@ saved_map_realsense_voxel_profile:
     - LiDAR remains the authoritative clearing source in both costmaps.
     - The filtered D435 cloud is an optional local marking helper.
     - Nonpersistent marks expire without unsafe obstacle-cloud ray clearing.
+    - Stationary marking, stale-expiry, and recovery acceptance passed on 2026-08-26.
     - Activate only after the complete guarded D435 hardware validation passes.

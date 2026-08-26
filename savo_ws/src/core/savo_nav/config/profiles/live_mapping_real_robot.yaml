@@ -35,5 +35,6 @@ live_mapping_real_robot_profile:
   notes:
     - SLAM Toolbox must already own map to odom.
     - AMCL and map_server must not run in this mode.
-    - The filtered-D435 voxel profile remains disabled until hardware validation.
+    - The filtered-D435 voxel profile remains disabled until complete floor,
+      scene, motion, and stability validation.
     - The conservative footprint and DWB values require controlled real-floor tuning.

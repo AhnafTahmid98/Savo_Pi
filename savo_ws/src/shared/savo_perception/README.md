@@ -205,12 +205,23 @@ The lightweight pure C++ filter has no PCL dependency and publishes XYZ-only
 PointCloud2 data with obstacle-only semantics. RealSense Nav2 clearing remains
 false; LiDAR remains responsible for reliable clearing.
 
-PC synthetic validation covers filtering, transforms, missing-transform
-containment, staleness, and recovery. Real D435 hardware validation remains
-pending. The provisional self-filter bounds require real-robot measurement and
-tuning before production activation.
+Phase 8A1-A4 PC-side synthetic validation covers filtering, transforms,
+missing-transform containment, staleness, and recovery. Phase 8A5 stationary
+real-D435 sensor-side acceptance completed on 2026-08-26 with D435 serial
+`801212070967`, firmware `5.16.0.1`, and USB 3.2/SuperSpeed. It verified the
+compact single-row PointCloud2 layout, exact source-timestamp preservation,
+TF into `base_link`, stale detection and recovery, and Edge-to-Core DDS delivery.
+
+This stationary acceptance is not complete production D435 validation. The
+provisional self-filter, floor rejection, obstacle height/range scenes,
+collision envelope, prolonged USB/CPU/thermal/DDS stability, and moving-robot
+navigation behavior still require guarded real-floor validation. RealSense
+startup also retains an open hardware-stability warning: some starts report a
+depth-stream hardware error, and one test observed USB disappearance and
+re-enumeration before later successful SuperSpeed streaming.
 
 This producer adds no control, recovery, velocity, safety-stop, or hardware
 authority. The raw RealSense cloud is not consumed directly by Nav2.
 
-Phase 8A1-A4 uses PC-side synthetic validation; real D435 hardware validation remains pending.
+Phase 8A5 stationary real-D435 sensor-side acceptance is complete; full
+production and floor-level D435 validation remains gated.

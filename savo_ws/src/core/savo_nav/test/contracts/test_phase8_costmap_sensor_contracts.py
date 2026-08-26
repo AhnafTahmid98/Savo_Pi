@@ -38,13 +38,13 @@ def costmap_parameters(document, costmap_name):
 
 
 def test_sensor_contract_records_guarded_hardware_stage():
-    """Require the implemented producer and pending hardware gate."""
+    """Record stationary acceptance without opening production gates."""
     assert SENSOR_CONTRACT.is_file()
     assert SENSOR_CONTRACT.stat().st_size > 0
     contract = load_yaml(SENSOR_CONTRACT)['costmap_sensors']
     assert (
         contract['integration_status']
-        == 'ready_for_guarded_real_d435_validation'
+        == 'stationary_d435_voxel_acceptance_complete_production_gated'
     )
 
 
@@ -79,6 +79,8 @@ def test_realsense_contract_is_implemented_but_fail_closed():
     )
     assert realsense['producer_implemented'] is True
     assert realsense['producer_contract_verified'] is True
+    assert realsense['producer_stationary_hardware_accepted'] is True
+    assert realsense['stationary_voxel_hardware_accepted'] is True
     assert realsense['producer_hardware_validated'] is False
     assert realsense['clearing'] is False
     assert realsense['raw_topic_allowed_in_nav2'] is False
@@ -169,18 +171,22 @@ def test_ownership_boundaries_are_explicit():
     }
 
 
-def test_profile_records_pending_real_d435_validation():
-    """Keep the optional voxel layer disabled until hardware validation."""
+def test_profile_records_scoped_real_d435_validation():
+    """Record stationary acceptance while keeping full validation gated."""
     profile = load_yaml(PROFILE)['saved_map_profile']
     validation = profile['validation']
     ownership = profile['ownership']
     assert validation['voxel_profile_source_complete'] is True
+    assert validation['voxel_profile_stationary_hardware_accepted'] is True
     assert validation['voxel_profile_activation_enabled'] is False
     assert (
         validation['voxel_profile_activation_gate']
-        == 'real_d435_hardware_validation_pending'
+        == 'complete_floor_scene_motion_and_stability_validation_pending'
     )
     assert validation['filtered_realsense_producer_verified'] is True
+    assert validation[
+        'filtered_realsense_stationary_hardware_accepted'
+    ] is True
     assert validation['filtered_realsense_hardware_validated'] is False
     assert validation['raw_realsense_cloud_for_nav2'] is False
     assert profile['footprint_source'] == (
@@ -275,6 +281,22 @@ def test_guarded_voxel_companion_profile_is_source_complete():
         'saved_map_realsense_voxel_profile'
     ]
     assert profile['software_completion'] == 'complete'
+    assert profile['stationary_hardware_acceptance_completed'] is True
+    assert profile['production_validation_complete'] is False
     assert profile['activation_enabled'] is False
     assert profile['realsense_required_for_navigation'] is False
     assert profile['lidar_required_for_navigation'] is True
+
+
+def test_readme_records_stationary_voxel_acceptance_and_open_gates():
+    """Document scoped hardware evidence without claiming production lock."""
+    readme = (ROOT / 'README.md').read_text(encoding='utf-8')
+    assert '2026-08-26 stationary D435 voxel hardware acceptance' in readme
+    assert 'stationary on a table' in readme
+    assert 'nonpersistent stale mark expiration' in readme
+    assert 'This is not D435 ray clearing' in readme
+    assert 'LiDAR remains the required authoritative clearing source' in readme
+    assert '`d435_voxel_validated=false`' in readme
+    assert '`activation_enabled=false`' in readme
+    assert 'does not complete floor-level' in readme
+    assert 'open RealSense startup/USB' in readme
