@@ -15,6 +15,7 @@ from savo_localization.constants import (
     DEFAULT_FILTERED_ODOM_TOPIC,
     DEFAULT_IMU_STATE_TOPIC,
     DEFAULT_IMU_TOPIC,
+    DEFAULT_JOINT_STATES_TOPIC,
     DEFAULT_STATE_SUMMARY_TOPIC,
     DEFAULT_WHEEL_ODOM_STATE_TOPIC,
     DEFAULT_WHEEL_ODOM_TOPIC,
@@ -130,6 +131,7 @@ class LocalizationTopics:
     imu_state: str = DEFAULT_IMU_STATE_TOPIC
     wheel_odom: str = DEFAULT_WHEEL_ODOM_TOPIC
     wheel_odom_state: str = DEFAULT_WHEEL_ODOM_STATE_TOPIC
+    joint_states: str = DEFAULT_JOINT_STATES_TOPIC
     filtered_odom: str = DEFAULT_FILTERED_ODOM_TOPIC
     ekf_state: str = DEFAULT_EKF_STATE_TOPIC
     ekf_health: str = DEFAULT_EKF_HEALTH_TOPIC
@@ -142,6 +144,7 @@ class LocalizationTopics:
             "imu_state": self.imu_state,
             "wheel_odom": self.wheel_odom,
             "wheel_odom_state": self.wheel_odom_state,
+            "joint_states": self.joint_states,
             "filtered_odom": self.filtered_odom,
             "ekf_state": self.ekf_state,
             "ekf_health": self.ekf_health,
@@ -156,6 +159,7 @@ def make_localization_topics(
     imu_state: str = DEFAULT_IMU_STATE_TOPIC,
     wheel_odom: str = DEFAULT_WHEEL_ODOM_TOPIC,
     wheel_odom_state: str = DEFAULT_WHEEL_ODOM_STATE_TOPIC,
+    joint_states: str = DEFAULT_JOINT_STATES_TOPIC,
     filtered_odom: str = DEFAULT_FILTERED_ODOM_TOPIC,
     ekf_state: str = DEFAULT_EKF_STATE_TOPIC,
     ekf_health: str = DEFAULT_EKF_HEALTH_TOPIC,
@@ -167,6 +171,7 @@ def make_localization_topics(
         imu_state=normalize_topic_name(imu_state),
         wheel_odom=normalize_topic_name(wheel_odom),
         wheel_odom_state=normalize_topic_name(wheel_odom_state),
+        joint_states=normalize_topic_name(joint_states),
         filtered_odom=normalize_topic_name(filtered_odom),
         ekf_state=normalize_topic_name(ekf_state),
         ekf_health=normalize_topic_name(ekf_health),
@@ -220,6 +225,13 @@ def get_default_topic_contract() -> TopicContract:
                 topic=topics.wheel_odom_state,
                 message_type="std_msgs/msg/String",
                 owner="wheel_odom_node",
+            ),
+            "joint_states": TopicSpec(
+                name="joint_states",
+                topic=topics.joint_states,
+                message_type="sensor_msgs/msg/JointState",
+                owner="wheel_odom_node",
+                required=False,
             ),
             "filtered_odom": TopicSpec(
                 name="filtered_odom",

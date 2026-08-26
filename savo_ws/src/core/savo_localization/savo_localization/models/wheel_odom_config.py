@@ -9,6 +9,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from savo_localization.constants import (
+    DEFAULT_JOINT_STATES_TOPIC,
     DEFAULT_ODOM_COVARIANCE_SCALE,
     DEFAULT_TRACK_M,
     DEFAULT_WHEEL_ODOM_RATE_HZ,
@@ -177,10 +178,12 @@ class WheelOdomConfig:
 
     wheel_odom_topic: str = DEFAULT_WHEEL_ODOM_TOPIC
     wheel_odom_state_topic: str = DEFAULT_WHEEL_ODOM_STATE_TOPIC
+    joint_states_topic: str = DEFAULT_JOINT_STATES_TOPIC
 
     publish_rate_hz: float = DEFAULT_WHEEL_ODOM_RATE_HZ
     timeout_s: float = DEFAULT_WHEEL_ODOM_TIMEOUT_S
     publish_tf: bool = False
+    publish_joint_states: bool = True
 
     geometry: WheelOdomGeometryConfig = WheelOdomGeometryConfig()
     covariance: WheelOdomCovarianceConfig = WheelOdomCovarianceConfig()
@@ -198,6 +201,8 @@ class WheelOdomConfig:
         normalize_frame_id(self.base_frame_id)
         normalize_topic(self.wheel_odom_topic)
         normalize_topic(self.wheel_odom_state_topic)
+        if self.publish_joint_states:
+            normalize_topic(self.joint_states_topic)
 
         if self.publish_rate_hz <= 0.0:
             raise ValueError(f"publish_rate_hz must be > 0.0, got {self.publish_rate_hz}")
@@ -224,6 +229,12 @@ class WheelOdomConfig:
     def normalized_wheel_odom_state_topic(self) -> str:
         return normalize_topic(self.wheel_odom_state_topic)
 
+    @property
+    def normalized_joint_states_topic(self) -> str:
+        if not self.joint_states_topic.strip():
+            return ""
+        return normalize_topic(self.joint_states_topic)
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "model": self.model,
@@ -231,9 +242,11 @@ class WheelOdomConfig:
             "base_frame_id": self.normalized_base_frame_id,
             "wheel_odom_topic": self.normalized_wheel_odom_topic,
             "wheel_odom_state_topic": self.normalized_wheel_odom_state_topic,
+            "joint_states_topic": self.normalized_joint_states_topic,
             "publish_rate_hz": float(self.publish_rate_hz),
             "timeout_s": float(self.timeout_s),
             "publish_tf": bool(self.publish_tf),
+            "publish_joint_states": bool(self.publish_joint_states),
             "reset_pose_on_start": bool(self.reset_pose_on_start),
             "start_x_m": float(self.start_x_m),
             "start_y_m": float(self.start_y_m),
@@ -287,11 +300,15 @@ def wheel_odom_config_from_ros_params(params: dict[str, Any]) -> WheelOdomConfig
         wheel_odom_state_topic=str(
             params.get("wheel_odom_state_topic", DEFAULT_WHEEL_ODOM_STATE_TOPIC)
         ),
+        joint_states_topic=str(
+            params.get("joint_states_topic", DEFAULT_JOINT_STATES_TOPIC)
+        ),
         publish_rate_hz=float(
             params.get("publish_rate_hz", DEFAULT_WHEEL_ODOM_RATE_HZ)
         ),
         timeout_s=float(params.get("timeout_s", DEFAULT_WHEEL_ODOM_TIMEOUT_S)),
         publish_tf=_parse_bool(params.get("publish_tf", False)),
+        publish_joint_states=_parse_bool(params.get("publish_joint_states", True)),
         geometry=geometry,
         covariance=covariance,
         reset_pose_on_start=_parse_bool(params.get("reset_pose_on_start", True)),

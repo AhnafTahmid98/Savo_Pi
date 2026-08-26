@@ -8,6 +8,7 @@ wheel_odom_node:
   ros__parameters:
     wheel_odom_topic: /wheel/odom
     wheel_odom_state_topic: /savo_localization/wheel_odom_state
+    joint_states_topic: /joint_states
 
 ekf_filter_node:
   ros__parameters:

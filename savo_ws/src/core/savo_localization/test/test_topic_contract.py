@@ -14,6 +14,7 @@ from savo_localization.constants import (
     DEFAULT_FILTERED_ODOM_TOPIC,
     DEFAULT_IMU_STATE_TOPIC,
     DEFAULT_IMU_TOPIC,
+    DEFAULT_JOINT_STATES_TOPIC,
     DEFAULT_STATE_SUMMARY_TOPIC,
     DEFAULT_WHEEL_ODOM_STATE_TOPIC,
     DEFAULT_WHEEL_ODOM_TOPIC,
@@ -111,6 +112,7 @@ def test_default_topic_contract_contains_core_topics() -> None:
     assert "imu_state" in names
     assert "wheel_odom" in names
     assert "wheel_odom_state" in names
+    assert "joint_states" in names
     assert "filtered_odom" in names
     assert "ekf_state" in names
     assert "ekf_health" in names
@@ -125,6 +127,7 @@ def test_default_topic_contract_matches_constants() -> None:
     assert contract.topic("imu_state") == DEFAULT_IMU_STATE_TOPIC
     assert contract.topic("wheel_odom") == DEFAULT_WHEEL_ODOM_TOPIC
     assert contract.topic("wheel_odom_state") == DEFAULT_WHEEL_ODOM_STATE_TOPIC
+    assert contract.topic("joint_states") == DEFAULT_JOINT_STATES_TOPIC
     assert contract.topic("filtered_odom") == DEFAULT_FILTERED_ODOM_TOPIC
     assert contract.topic("ekf_state") == DEFAULT_EKF_STATE_TOPIC
     assert contract.topic("ekf_health") == DEFAULT_EKF_HEALTH_TOPIC
@@ -230,6 +233,8 @@ def test_robot_savo_topic_ownership() -> None:
     assert contract.spec("imu_state").owner == "imu_node"
     assert contract.spec("wheel_odom").owner == "wheel_odom_node"
     assert contract.spec("wheel_odom_state").owner == "wheel_odom_node"
+    assert contract.spec("joint_states").owner == "wheel_odom_node"
+    assert contract.spec("joint_states").required is False
     assert contract.spec("filtered_odom").owner == "ekf_filter_node"
     assert contract.spec("ekf_state").owner == "ekf_state_publisher_node"
     assert contract.spec("ekf_health").owner == "localization_health_node"
@@ -244,5 +249,6 @@ def test_robot_savo_message_types() -> None:
     assert contract.spec("filtered_odom").message_type == "nav_msgs/msg/Odometry"
     assert contract.spec("imu_state").message_type == "std_msgs/msg/String"
     assert contract.spec("wheel_odom_state").message_type == "std_msgs/msg/String"
+    assert contract.spec("joint_states").message_type == "sensor_msgs/msg/JointState"
     assert contract.spec("ekf_state").message_type == "std_msgs/msg/String"
     assert contract.spec("state_summary").message_type == "std_msgs/msg/String"

@@ -10,6 +10,13 @@ were removed. There is deliberately no wheel odometry fallback executable: a
 missing hardware encoder node must block production startup rather than silently
 changing localization authority.
 
+The C++ wheel odometry node also publishes `/joint_states` for the four
+continuous wheel joints. Position and velocity are measured from the same
+signed encoder sample used by wheel odometry and are expressed in radians and
+radians per second. This passive state output lets `robot_state_publisher` and
+RViz update the wheel links; it does not command the motors and does not publish
+wheel-link TF itself.
+
 Safe inspection:
 
 ```bash

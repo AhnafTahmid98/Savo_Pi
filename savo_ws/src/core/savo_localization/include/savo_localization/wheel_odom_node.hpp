@@ -8,12 +8,14 @@
 #include "geometry_msgs/msg/transform_stamped.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "sensor_msgs/msg/joint_state.hpp"
 #include "std_msgs/msg/string.hpp"
 #include "tf2_ros/transform_broadcaster.h"
 
 #include "savo_localization/encoder_reader.hpp"
 #include "savo_localization/encoder_state.hpp"
 #include "savo_localization/mecanum_odom.hpp"
+#include "savo_localization/wheel_joint_state.hpp"
 
 namespace savo_localization
 {
@@ -42,6 +44,10 @@ private:
   void publish_state(
     const WheelOdomSample & odom_sample,
     const EncoderSample & encoder_sample);
+
+  void publish_joint_state(
+    const EncoderSample & encoder_sample,
+    const rclcpp::Time & measurement_time);
 
   void publish_transform(const WheelOdomSample & odom_sample);
 
@@ -88,10 +94,12 @@ private:
 
   std::string wheel_odom_topic_{"/wheel/odom"};
   std::string wheel_odom_state_topic_{"/savo_localization/wheel_odom_state"};
+  std::string joint_states_topic_{"/joint_states"};
 
   double publish_rate_hz_{30.0};
   double timeout_s_{0.5};
   bool publish_tf_{false};
+  bool publish_joint_states_{true};
 
   double wheel_diameter_m_{0.065};
   double wheelbase_m_{0.160};
@@ -155,6 +163,7 @@ private:
 
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr state_pub_;
+  rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_state_pub_;
 
   std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
   rclcpp::TimerBase::SharedPtr timer_;

@@ -17,6 +17,7 @@ from savo_localization.constants import (
     DEFAULT_ENCODER_POLL_S,
     DEFAULT_ENCODER_REPORT_INTERVAL_S,
     DEFAULT_GEAR_RATIO,
+    DEFAULT_JOINT_STATES_TOPIC,
     DEFAULT_TRACK_M,
     DEFAULT_USE_HW_DEBOUNCE,
     DEFAULT_USE_INTERNAL_PULLUP,
@@ -232,10 +233,12 @@ class WheelOdomConfig:
 
     wheel_odom_topic: str = DEFAULT_WHEEL_ODOM_TOPIC
     wheel_odom_state_topic: str = DEFAULT_WHEEL_ODOM_STATE_TOPIC
+    joint_states_topic: str = DEFAULT_JOINT_STATES_TOPIC
 
     publish_rate_hz: float = DEFAULT_WHEEL_ODOM_RATE_HZ
     timeout_s: float = DEFAULT_WHEEL_ODOM_TIMEOUT_S
     publish_tf: bool = False
+    publish_joint_states: bool = True
 
     pose_covariance: tuple[float, float, float, float, float, float] = (
         0.05,
@@ -269,6 +272,9 @@ class WheelOdomConfig:
 
         if not self.wheel_odom_state_topic.strip():
             raise ValueError("wheel_odom_state_topic cannot be empty")
+
+        if self.publish_joint_states and not self.joint_states_topic.strip():
+            raise ValueError("joint_states_topic cannot be empty")
 
         if self.publish_rate_hz <= 0.0:
             raise ValueError(f"publish_rate_hz must be > 0.0, got {self.publish_rate_hz}")
@@ -350,11 +356,15 @@ def encoder_config_from_ros_params(params: dict[str, Any]) -> EncoderConfig:
         wheel_odom_state_topic=str(
             params.get("wheel_odom_state_topic", DEFAULT_WHEEL_ODOM_STATE_TOPIC)
         ),
+        joint_states_topic=str(
+            params.get("joint_states_topic", DEFAULT_JOINT_STATES_TOPIC)
+        ),
         publish_rate_hz=float(
             params.get("publish_rate_hz", DEFAULT_WHEEL_ODOM_RATE_HZ)
         ),
         timeout_s=float(params.get("timeout_s", DEFAULT_WHEEL_ODOM_TIMEOUT_S)),
         publish_tf=_parse_bool(params.get("publish_tf", False)),
+        publish_joint_states=_parse_bool(params.get("publish_joint_states", True)),
         pose_covariance=_covariance6_tuple(
             params.get(
                 "pose_covariance",

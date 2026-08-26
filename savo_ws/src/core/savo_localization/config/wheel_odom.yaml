@@ -11,6 +11,7 @@ wheel_odom_node:
 
     # EKF owns odom -> base_link TF in the normal localization stack.
     publish_tf: false
+    publish_joint_states: true
 
     wheel_diameter_m: 0.065
     wheelbase_m: 0.160

@@ -69,6 +69,12 @@ WheelOdomNode::WheelOdomNode(const rclcpp::NodeOptions & options)
     wheel_odom_state_topic_,
     rclcpp::QoS(10).reliable());
 
+  if (publish_joint_states_) {
+    joint_state_pub_ = create_publisher<sensor_msgs::msg::JointState>(
+      joint_states_topic_,
+      rclcpp::QoS(10).reliable());
+  }
+
   if (publish_tf_) {
     tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
   }
@@ -80,9 +86,11 @@ WheelOdomNode::WheelOdomNode(const rclcpp::NodeOptions & options)
 
   RCLCPP_INFO(
     get_logger(),
-    "wheel_odom_node started | odom_topic=%s | state_topic=%s | rate=%.2f Hz | poll=%.4fs",
+    "wheel_odom_node started | odom_topic=%s | state_topic=%s | joint_states_topic=%s | "
+    "rate=%.2f Hz | poll=%.4fs",
     wheel_odom_topic_.c_str(),
     wheel_odom_state_topic_.c_str(),
+    publish_joint_states_ ? joint_states_topic_.c_str() : "disabled",
     publish_rate_hz_,
     poll_s_);
 }
@@ -101,10 +109,12 @@ void WheelOdomNode::declare_parameters()
 
   declare_parameter<std::string>("wheel_odom_topic", wheel_odom_topic_);
   declare_parameter<std::string>("wheel_odom_state_topic", wheel_odom_state_topic_);
+  declare_parameter<std::string>("joint_states_topic", joint_states_topic_);
 
   declare_parameter<double>("publish_rate_hz", publish_rate_hz_);
   declare_parameter<double>("timeout_s", timeout_s_);
   declare_parameter<bool>("publish_tf", publish_tf_);
+  declare_parameter<bool>("publish_joint_states", publish_joint_states_);
 
   declare_parameter<double>("wheel_diameter_m", wheel_diameter_m_);
   declare_parameter<double>("wheelbase_m", wheelbase_m_);
@@ -168,10 +178,12 @@ void WheelOdomNode::load_parameters()
 
   wheel_odom_topic_ = get_parameter("wheel_odom_topic").as_string();
   wheel_odom_state_topic_ = get_parameter("wheel_odom_state_topic").as_string();
+  joint_states_topic_ = get_parameter("joint_states_topic").as_string();
 
   publish_rate_hz_ = get_parameter("publish_rate_hz").as_double();
   timeout_s_ = get_parameter("timeout_s").as_double();
   publish_tf_ = get_parameter("publish_tf").as_bool();
+  publish_joint_states_ = get_parameter("publish_joint_states").as_bool();
 
   wheel_diameter_m_ = get_parameter("wheel_diameter_m").as_double();
   wheelbase_m_ = get_parameter("wheelbase_m").as_double();
@@ -238,6 +250,11 @@ void WheelOdomNode::load_parameters()
 
   if (wheel_odom_topic_.empty() || wheel_odom_state_topic_.empty()) {
     throw std::runtime_error("wheel odom topics cannot be empty");
+  }
+
+  if (publish_joint_states_ && joint_states_topic_.empty()) {
+    throw std::runtime_error(
+      "joint_states_topic cannot be empty when publish_joint_states is true");
   }
 
   if (publish_rate_hz_ <= 0.0) {
@@ -358,6 +375,8 @@ void WheelOdomNode::timer_callback()
     last_update_time_ = now_time;
     ++loop_count_;
     ++publish_count_;
+
+    publish_joint_state(encoder_sample, now_time);
   } catch (const std::exception & exc) {
     ++error_count_;
 
@@ -385,6 +404,37 @@ void WheelOdomNode::publish_state(
   std_msgs::msg::String msg;
   msg.data = make_state_json(odom_sample, encoder_sample);
   state_pub_->publish(msg);
+}
+
+void WheelOdomNode::publish_joint_state(
+  const EncoderSample & encoder_sample,
+  const rclcpp::Time & measurement_time)
+{
+  if (!publish_joint_states_ || !joint_state_pub_) {
+    return;
+  }
+
+  try {
+    const WheelJointState state = wheel_joint_state_from_encoder_sample(
+      encoder_sample,
+      counts_per_wheel_rev(cpr_, decoding_, gear_ratio_));
+
+    sensor_msgs::msg::JointState msg;
+    msg.header.stamp = measurement_time;
+    for (const char * joint_name : WHEEL_JOINT_NAMES) {
+      msg.name.emplace_back(joint_name);
+    }
+    msg.position.assign(state.position_rad.begin(), state.position_rad.end());
+    msg.velocity.assign(state.velocity_rad_s.begin(), state.velocity_rad_s.end());
+    joint_state_pub_->publish(msg);
+  } catch (const std::exception & exc) {
+    RCLCPP_WARN_THROTTLE(
+      get_logger(),
+      *get_clock(),
+      2000,
+      "wheel JointState publication failed without affecting odometry: %s",
+      exc.what());
+  }
 }
 
 void WheelOdomNode::publish_transform(const WheelOdomSample & odom_sample)

@@ -34,6 +34,7 @@ DEFAULT_IMU_STATE_TOPIC = "/savo_localization/imu_state"
 
 DEFAULT_WHEEL_ODOM_TOPIC = "/wheel/odom"
 DEFAULT_WHEEL_ODOM_STATE_TOPIC = "/savo_localization/wheel_odom_state"
+DEFAULT_JOINT_STATES_TOPIC = "/joint_states"
 DEFAULT_ENCODER_STATE_TOPIC = "/savo_localization/encoder_state"
 
 DEFAULT_FILTERED_ODOM_TOPIC = "/odometry/filtered"
@@ -242,6 +243,7 @@ __all__ = [
     "DEFAULT_IMU_STATE_TOPIC",
     "DEFAULT_WHEEL_ODOM_TOPIC",
     "DEFAULT_WHEEL_ODOM_STATE_TOPIC",
+    "DEFAULT_JOINT_STATES_TOPIC",
     "DEFAULT_ENCODER_STATE_TOPIC",
     "DEFAULT_FILTERED_ODOM_TOPIC",
     "DEFAULT_EKF_STATE_TOPIC",

@@ -68,6 +68,7 @@ set(WHEEL_ODOM_SOURCES
   src/encoder_state.cpp
   src/encoder_reader.cpp
   src/mecanum_odom.cpp
+  src/wheel_joint_state.cpp
   src/gpio_encoder_backend.cpp
   src/wheel_odom_node.cpp
 )
@@ -90,6 +91,7 @@ if(WHEEL_ODOM_READY)
     std_msgs
     geometry_msgs
     nav_msgs
+    sensor_msgs
     diagnostic_msgs
     tf2
     tf2_ros
@@ -224,6 +226,16 @@ if(BUILD_TESTING)
     test/test_localization_health_core.cpp
   )
 
+  ament_add_gtest(
+    test_wheel_joint_state
+    test/test_wheel_joint_state.cpp
+    src/wheel_joint_state.cpp
+  )
+
+  if(TARGET test_wheel_joint_state)
+    target_include_directories(test_wheel_joint_state PRIVATE include)
+  endif()
+
   if(TARGET test_localization_health_core)
     target_link_libraries(
       test_localization_health_core
@@ -248,6 +260,10 @@ if(BUILD_TESTING)
   add_pytest_if_exists(test_encoder_models test/test_encoder_models.py)
   add_pytest_if_exists(test_encoder_health_check test/test_encoder_health_check.py)
   add_pytest_if_exists(test_wheel_odom_models test/test_wheel_odom_models.py)
+  add_pytest_if_exists(
+    test_wheel_joint_state_contract
+    test/test_wheel_joint_state_contract.py
+  )
   add_pytest_if_exists(test_odom_sanity_check test/test_odom_sanity_check.py)
   add_pytest_if_exists(test_imu_models test/test_imu_models.py)
   add_pytest_if_exists(test_imu_health_check test/test_imu_health_check.py)
