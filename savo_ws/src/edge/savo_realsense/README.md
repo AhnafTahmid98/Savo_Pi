@@ -1,3 +1,43 @@
+# Robot Savo RealSense
+
+## Optional observer color relay
+
+The production D435 color stream remains full-rate `640x480x30` at
+`/camera/camera/color/image_raw` on Edge. For the external observer only,
+`realsense_vo.launch.py` accepts
+`enable_observer_color_relay:=true` to start one standard `image_transport`
+republisher on Edge:
+
+```text
+/camera/camera/color/image_raw
+  -> JPEG compression on Edge
+  -> /savo_observer/d435/color/image_raw/compressed
+  -> Ubuntu RViz compressed transport
+```
+
+Production depth at `/camera/camera/depth/image_rect_raw` and the raw cloud at
+`/camera/camera/depth/color/points` also remain unchanged and available.
+
+The relay defaults to disabled because large raw DDS image samples are only a
+problem on the Edge Wi-Fi to bridged Ubuntu VM observer path. It does not
+change camera FPS or resolution, the raw color topic, raw pointcloud,
+navigation or perception semantics, VO, or fixed D435 TF ownership. The
+separate RealSense startup firmware notification is not suppressed or
+reinterpreted by this relay.
+
+Normal production remains:
+
+```bash
+ros2 launch savo_realsense realsense_vo.launch.py
+```
+
+Enable the observer JPEG relay explicitly on Edge with:
+
+```bash
+ros2 launch savo_realsense realsense_vo.launch.py \
+  enable_observer_color_relay:=true
+```
+
 Recommended writing order
 Step 1 — package metadata
 

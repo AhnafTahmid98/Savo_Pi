@@ -35,5 +35,7 @@ spatial_topics:
   filtered_obstacles: /savo_perception/obstacles/points
   coverage_path: /savo_mapping/coverage/path
   exploration_selected_goal: /savo_mapping/exploration/selected_goal
-  d435_color_image: /camera/camera/color/image_raw
+  d435_color_image_raw: /camera/camera/color/image_raw
+  d435_color_image_base: /savo_observer/d435/color/image_raw
+  d435_color_image_compressed: /savo_observer/d435/color/image_raw/compressed
   head_camera_image: /savo_head/camera/image_raw

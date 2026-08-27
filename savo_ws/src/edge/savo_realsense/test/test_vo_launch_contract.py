@@ -2,12 +2,13 @@
 
 """Contracts for the RealSense VO driver and monitor configuration split."""
 
-import re
+import ast
 from pathlib import Path
-
-import yaml
+import re
+import xml.etree.ElementTree as ET
 
 from savo_realsense.constants import DEFAULT_POINTCLOUD_TOPIC
+import yaml
 
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
@@ -21,12 +22,49 @@ def load_yaml(path: str) -> dict:
     return yaml.safe_load(read_file(path))
 
 
+def launch_argument_defaults(path: str) -> dict[str, str]:
+    tree = ast.parse(read_file(path), filename=path)
+    defaults = {}
+    for call in (
+        node for node in ast.walk(tree) if isinstance(node, ast.Call)
+    ):
+        if getattr(call.func, "id", "") != "DeclareLaunchArgument":
+            continue
+        if not call.args or not isinstance(call.args[0], ast.Constant):
+            continue
+        default = next(
+            (
+                keyword.value.value
+                for keyword in call.keywords
+                if keyword.arg == "default_value"
+                and isinstance(keyword.value, ast.Constant)
+            ),
+            None,
+        )
+        defaults[call.args[0].value] = default
+    return defaults
+
+
+def node_calls(path: str) -> list[ast.Call]:
+    tree = ast.parse(read_file(path), filename=path)
+    return [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and getattr(node.func, "id", "") == "Node"
+    ]
+
+
+def keyword_value(call: ast.Call, name: str) -> ast.expr:
+    return next(keyword.value for keyword in call.keywords if keyword.arg == name)
+
+
 def test_vo_launch_separates_driver_and_monitor_configs() -> None:
     launch_text = read_file("launch/realsense_vo.launch.py")
 
     assert 'LaunchConfiguration("driver_config_file")' in launch_text
     assert 'LaunchConfiguration("monitor_config_file")' in launch_text
-    assert launch_text.count("Node(") == 3
+    assert launch_text.count("Node(") == 4
     assert 'package="realsense2_camera"' in launch_text
     assert 'executable="realsense2_camera_node"' in launch_text
     assert 'namespace="camera"' in launch_text
@@ -37,6 +75,50 @@ def test_vo_launch_separates_driver_and_monitor_configs() -> None:
     assert "IncludeLaunchDescription" not in launch_text
     assert '"realsense_vo_driver.yaml"' in launch_text
     assert '"realsense_vo_profile.yaml"' in launch_text
+
+
+def test_observer_color_relay_is_opt_in_and_hardware_equivalent() -> None:
+    assert launch_argument_defaults("launch/realsense_vo.launch.py")[
+        "enable_observer_color_relay"
+    ] == "false"
+
+    relays = [
+        call
+        for call in node_calls("launch/realsense_vo.launch.py")
+        if ast.literal_eval(keyword_value(call, "package")) == "image_transport"
+        and ast.literal_eval(keyword_value(call, "executable")) == "republish"
+    ]
+    assert len(relays) == 1
+    relay = relays[0]
+
+    assert ast.literal_eval(keyword_value(relay, "name")) == (
+        "d435_observer_color_republisher"
+    )
+    assert ast.unparse(keyword_value(relay, "condition")) == (
+        "IfCondition(enable_observer_color_relay)"
+    )
+    assert ast.literal_eval(keyword_value(relay, "parameters")) == [{
+        "in_transport": "raw",
+        "out_transport": "compressed",
+    }]
+    assert ast.literal_eval(keyword_value(relay, "remappings")) == [
+        ("in", "/camera/camera/color/image_raw"),
+        (
+            "out/compressed",
+            "/savo_observer/d435/color/image_raw/compressed",
+        ),
+    ]
+
+
+def test_observer_color_relay_runtime_dependencies_are_declared() -> None:
+    package = ET.parse(PACKAGE_ROOT / "package.xml").getroot()
+    runtime_dependencies = {
+        element.text for element in package.findall("exec_depend")
+    }
+    assert {
+        "compressed_image_transport",
+        "image_transport",
+    }.issubset(runtime_dependencies)
 
 
 def test_vo_driver_config_is_direct_node_yaml_and_enables_streams() -> None:

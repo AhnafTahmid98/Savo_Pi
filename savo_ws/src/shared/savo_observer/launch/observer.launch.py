@@ -35,6 +35,8 @@ def _setup(context):
             'dashboard_port',
             'enable_camera_preview',
             'enable_pointclouds',
+            'enable_raw_d435_pointcloud',
+            'd435_image_transport',
             'log_level',
         ]
     }
@@ -60,6 +62,12 @@ def generate_launch_description():
             DeclareLaunchArgument('dashboard_port', default_value='8765'),
             DeclareLaunchArgument('enable_camera_preview', default_value='false'),
             DeclareLaunchArgument('enable_pointclouds', default_value='false'),
+            DeclareLaunchArgument(
+                'enable_raw_d435_pointcloud', default_value='false'
+            ),
+            DeclareLaunchArgument(
+                'd435_image_transport', default_value='compressed'
+            ),
             DeclareLaunchArgument('log_level', default_value='info'),
             OpaqueFunction(function=_setup),
         ]

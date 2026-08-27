@@ -1,6 +1,7 @@
 """Validate the complete read-only RViz view set."""
 
 from pathlib import Path
+import xml.etree.ElementTree as ET
 
 import yaml
 
@@ -82,7 +83,9 @@ def test_full_debug_has_complete_approved_spatial_context():
         'VisualOdometry': '/vo/odom',
         'RawDepthCloud': '/camera/camera/depth/color/points',
         'FilteredObstacleCloud': '/savo_perception/obstacles/points',
-        'D435ColorImage': '/camera/camera/color/image_raw',
+        'D435ColorImage': (
+            '/savo_observer/d435/color/image_raw/compressed'
+        ),
         'HeadCameraImage': '/savo_head/camera/image_raw',
         'GlobalCostmap': '/global_costmap/costmap',
         'LocalCostmap': '/local_costmap/costmap',
@@ -111,6 +114,10 @@ def test_navigation_and_sensor_views_have_read_only_context():
         (RVIZ / 'sensors.rviz').read_text(encoding='utf-8')
     )
     sensor_topics = _display_topics(sensors)
+    sensor_displays = {
+        display.get('Name'): display
+        for display in sensors['Visualization Manager']['Displays']
+    }
     assert sensor_topics['DepthPointCloud'] == (
         '/camera/camera/depth/color/points'
     )
@@ -118,9 +125,13 @@ def test_navigation_and_sensor_views_have_read_only_context():
         '/savo_perception/obstacles/points'
     )
     assert sensor_topics['D435ColorImage'] == (
-        '/camera/camera/color/image_raw'
+        '/savo_observer/d435/color/image_raw/compressed'
     )
     assert sensor_topics['HeadCameraImage'] == '/savo_head/camera/image_raw'
+    for name in ('DepthPointCloud', 'FilteredObstacleCloud'):
+        assert sensor_displays[name]['Class'].endswith('/PointCloud2')
+        assert sensor_displays[name]['Enabled'] is False
+        assert sensor_displays[name]['Value'] is False
 
 
 def test_selected_exploration_goal_is_present_in_mapping_views():
@@ -169,9 +180,46 @@ def test_observer_uses_only_approved_spatial_topics():
         'exploration_selected_goal': (
             '/savo_mapping/exploration/selected_goal'
         ),
-        'd435_color_image': '/camera/camera/color/image_raw',
+        'd435_color_image_raw': '/camera/camera/color/image_raw',
+        'd435_color_image_base': (
+            '/savo_observer/d435/color/image_raw'
+        ),
+        'd435_color_image_compressed': (
+            '/savo_observer/d435/color/image_raw/compressed'
+        ),
         'head_camera_image': '/savo_head/camera/image_raw',
     }
+
+
+def test_d435_preview_uses_jazzy_compressed_transport_contract():
+    for name in ('sensors.rviz', 'full_debug.rviz'):
+        document = yaml.safe_load((RVIZ / name).read_text(encoding='utf-8'))
+        displays = document['Visualization Manager']['Displays']
+        d435 = next(
+            display
+            for display in displays
+            if display.get('Name') == 'D435ColorImage'
+        )
+        head = next(
+            display
+            for display in displays
+            if display.get('Name') == 'HeadCameraImage'
+        )
+
+        assert d435['Topic']['Value'] == (
+            '/savo_observer/d435/color/image_raw/compressed'
+        )
+        assert d435['Enabled'] is False
+        assert d435['Value'] is False
+        assert head['Topic']['Value'] == '/savo_head/camera/image_raw'
+
+
+def test_compressed_rviz_transport_dependency_is_declared():
+    package = ET.parse(ROOT / 'package.xml').getroot()
+    runtime_dependencies = {
+        element.text for element in package.findall('exec_depend')
+    }
+    assert 'compressed_image_transport' in runtime_dependencies
 
 
 def test_tf_view_includes_fixed_sensors_and_dynamic_head_chain():

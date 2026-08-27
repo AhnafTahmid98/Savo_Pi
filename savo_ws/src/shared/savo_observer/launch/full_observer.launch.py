@@ -27,6 +27,12 @@ def generate_launch_description():
             DeclareLaunchArgument('dashboard_port', default_value='8765'),
             DeclareLaunchArgument('enable_camera_preview', default_value='false'),
             DeclareLaunchArgument('enable_pointclouds', default_value='false'),
+            DeclareLaunchArgument(
+                'enable_raw_d435_pointcloud', default_value='false'
+            ),
+            DeclareLaunchArgument(
+                'd435_image_transport', default_value='compressed'
+            ),
             DeclareLaunchArgument('log_level', default_value='info'),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(str(launch_dir / 'rviz_observer.launch.py')),
@@ -40,6 +46,12 @@ def generate_launch_description():
                         'enable_camera_preview'
                     ),
                     'enable_pointclouds': LaunchConfiguration('enable_pointclouds'),
+                    'enable_raw_d435_pointcloud': LaunchConfiguration(
+                        'enable_raw_d435_pointcloud'
+                    ),
+                    'd435_image_transport': LaunchConfiguration(
+                        'd435_image_transport'
+                    ),
                 }.items(),
             ),
             IncludeLaunchDescription(

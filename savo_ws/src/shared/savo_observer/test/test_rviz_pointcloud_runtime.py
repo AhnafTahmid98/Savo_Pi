@@ -6,7 +6,13 @@ from pathlib import Path
 import pytest
 from savo_observer.rviz_config import (
     create_runtime_config,
+    D435_COMPRESSED_IMAGE_TOPIC,
+    D435_IMAGE_TOPICS,
+    D435_OBSERVER_IMAGE_BASE_TOPIC,
+    D435_RAW_IMAGE_TOPIC,
+    parse_d435_image_transport,
     parse_launch_boolean,
+    RAW_D435_POINTCLOUD_TOPIC,
     remove_runtime_config,
 )
 import yaml
@@ -25,13 +31,19 @@ def _display_kind(display):
     if class_name.endswith('/Image'):
         return 'images'
     if class_name.endswith('/PointCloud2'):
+        if display['Topic']['Value'] == RAW_D435_POINTCLOUD_TOPIC:
+            return 'raw_d435_pointclouds'
         return 'pointclouds'
     return None
 
 
 def test_launch_boolean_parser_is_explicit_and_fail_closed():
     """Accept normal boolean forms and reject every ambiguous value."""
-    for name in ('enable_camera_preview', 'enable_pointclouds'):
+    for name in (
+        'enable_camera_preview',
+        'enable_pointclouds',
+        'enable_raw_d435_pointcloud',
+    ):
         for value in (True, 'true', 'TRUE', 'yes', 'on', '1'):
             assert parse_launch_boolean(value, name) is True
         for value in (False, 'false', 'FALSE', 'no', 'off', '0'):
@@ -41,21 +53,64 @@ def test_launch_boolean_parser_is_explicit_and_fail_closed():
                 parse_launch_boolean(value, name)
 
 
+def test_d435_image_transport_parser_is_explicit_and_fail_closed():
+    """Accept raw/compressed and reject unsupported transport modes."""
+    assert D435_OBSERVER_IMAGE_BASE_TOPIC == (
+        '/savo_observer/d435/color/image_raw'
+    )
+    assert D435_COMPRESSED_IMAGE_TOPIC == (
+        '/savo_observer/d435/color/image_raw/compressed'
+    )
+    assert D435_RAW_IMAGE_TOPIC == '/camera/camera/color/image_raw'
+    assert D435_IMAGE_TOPICS == {
+        'compressed': D435_COMPRESSED_IMAGE_TOPIC,
+        'raw': D435_RAW_IMAGE_TOPIC,
+    }
+    assert parse_d435_image_transport('raw') == 'raw'
+    assert parse_d435_image_transport('RAW') == 'raw'
+    assert parse_d435_image_transport('compressed') == 'compressed'
+    assert parse_d435_image_transport('COMPRESSED') == 'compressed'
+    for value in ('', 'theora', 'auto', 'jpeg', None):
+        with pytest.raises(ValueError, match='must be raw or compressed'):
+            parse_d435_image_transport(value)
+
+
 @pytest.mark.parametrize(
-    ('enable_camera_preview', 'enable_pointclouds'),
-    [(False, False), (True, False), (False, True), (True, True)],
+    (
+        'enable_camera_preview',
+        'enable_pointclouds',
+        'enable_raw_d435_pointcloud',
+    ),
+    [
+        (False, False, False),
+        (True, False, False),
+        (False, True, False),
+        (False, False, True),
+        (True, True, False),
+        (True, False, True),
+        (False, True, True),
+        (True, True, True),
+    ],
 )
+@pytest.mark.parametrize('d435_image_transport', ['raw', 'compressed'])
 def test_runtime_copy_enables_only_requested_display_classes(
     enable_camera_preview,
     enable_pointclouds,
+    enable_raw_d435_pointcloud,
+    d435_image_transport,
 ):
-    """Cover default-disabled, camera-only, cloud-only, and combined modes."""
+    """Cover independent camera, filtered-cloud, and raw-cloud options."""
     requested = {
         'images': enable_camera_preview,
         'pointclouds': enable_pointclouds,
+        'raw_d435_pointclouds': enable_raw_d435_pointcloud,
     }
-    totals = {'images': 0, 'pointclouds': 0}
-    topics = {'images': set(), 'pointclouds': set()}
+    totals = {
+        'images': 0,
+        'pointclouds': 0,
+        'raw_d435_pointclouds': 0,
+    }
+    topics = {kind: set() for kind in totals}
 
     for source_path in sorted(RVIZ.glob('*.rviz')):
         source_bytes = source_path.read_bytes()
@@ -64,6 +119,8 @@ def test_runtime_copy_enables_only_requested_display_classes(
             source_path,
             enable_camera_preview=enable_camera_preview,
             enable_pointclouds=enable_pointclouds,
+            enable_raw_d435_pointcloud=enable_raw_d435_pointcloud,
+            d435_image_transport=d435_image_transport,
         )
 
         try:
@@ -76,13 +133,17 @@ def test_runtime_copy_enables_only_requested_display_classes(
             runtime_displays = _displays(runtime_document)
             assert len(runtime_displays) == len(source_displays)
 
-            expected_counts = {'images': 0, 'pointclouds': 0}
+            expected_counts = {kind: 0 for kind in totals}
             for source, runtime in zip(source_displays, runtime_displays):
                 expected = deepcopy(source)
                 kind = _display_kind(source)
                 if kind is not None:
                     totals[kind] += 1
                     topics[kind].add(source['Topic']['Value'])
+                    if source.get('Name') == 'D435ColorImage':
+                        expected['Topic']['Value'] = D435_IMAGE_TOPICS[
+                            d435_image_transport
+                        ]
                     if requested[kind]:
                         expected_counts[kind] += 1
                         expected['Enabled'] = True
@@ -99,18 +160,21 @@ def test_runtime_copy_enables_only_requested_display_classes(
 
     assert totals['images'] > 0
     assert totals['pointclouds'] > 0
+    assert totals['raw_d435_pointclouds'] > 0
     assert topics['images'] == {
-        '/camera/camera/color/image_raw',
+        '/savo_observer/d435/color/image_raw/compressed',
         '/savo_head/camera/image_raw',
     }
     assert topics['pointclouds'] == {
-        '/camera/camera/depth/color/points',
         '/savo_perception/obstacles/points',
+    }
+    assert topics['raw_d435_pointclouds'] == {
+        '/camera/camera/depth/color/points',
     }
 
 
-def test_user_config_combines_options_without_changing_topics_or_qos(tmp_path):
-    """Apply both independent flags to a user-supplied RViz file."""
+def test_user_config_combines_options_without_changing_qos(tmp_path):
+    """Apply all independent flags to a user-supplied RViz file."""
     source_path = tmp_path / 'user.rviz'
     document = {
         'Visualization Manager': {
@@ -126,9 +190,19 @@ def test_user_config_combines_options_without_changing_topics_or_qos(tmp_path):
                     'Value': False,
                 },
                 {
+                    'Class': 'rviz_default_plugins/PointCloud2',
+                    'Enabled': False,
+                    'Name': 'RawDepthCloud',
+                    'Topic': {
+                        'Reliability Policy': 'Best Effort',
+                        'Value': RAW_D435_POINTCLOUD_TOPIC,
+                    },
+                    'Value': False,
+                },
+                {
                     'Class': 'rviz_default_plugins/Image',
                     'Enabled': False,
-                    'Name': 'Image',
+                    'Name': 'D435ColorImage',
                     'Topic': {
                         'Reliability Policy': 'Best Effort',
                         'Value': '/custom/image',
@@ -147,20 +221,28 @@ def test_user_config_combines_options_without_changing_topics_or_qos(tmp_path):
         source_path,
         enable_camera_preview=True,
         enable_pointclouds=True,
+        enable_raw_d435_pointcloud=True,
+        d435_image_transport='raw',
     )
 
     try:
         runtime = yaml.safe_load(runtime_path.read_text(encoding='utf-8'))
-        cloud, image = _displays(runtime)
-        assert enabled_counts == {'images': 1, 'pointclouds': 1}
-        assert cloud['Enabled'] is True
-        assert cloud['Value'] is True
+        cloud, raw_cloud, image = _displays(runtime)
+        assert enabled_counts == {
+            'images': 1,
+            'pointclouds': 1,
+            'raw_d435_pointclouds': 1,
+        }
+        for display in (cloud, raw_cloud, image):
+            assert display['Enabled'] is True
+            assert display['Value'] is True
         assert image['Enabled'] is True
         assert image['Value'] is True
-        for index, display in enumerate((cloud, image)):
-            assert display['Topic'] == document['Visualization Manager'][
-                'Displays'
-            ][index]['Topic']
+        assert image['Topic']['Value'] == '/camera/camera/color/image_raw'
+        for index, display in enumerate((cloud, raw_cloud)):
+            assert display['Topic'] == document[
+                'Visualization Manager'
+            ]['Displays'][index]['Topic']
     finally:
         remove_runtime_config(runtime_path)
 

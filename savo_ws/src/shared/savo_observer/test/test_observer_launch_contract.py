@@ -32,30 +32,39 @@ def test_canonical_defaults_and_modes_are_stable():
 
 
 def test_high_bandwidth_flags_are_forwarded_and_consumed():
-    """Require both opt-in arguments to reach and alter only RViz setup."""
+    """Require independent image/cloud options to reach only RViz setup."""
     observer = (LAUNCH / 'observer.launch.py').read_text(encoding='utf-8')
     full = (LAUNCH / 'full_observer.launch.py').read_text(encoding='utf-8')
     rviz = (LAUNCH / 'rviz_observer.launch.py').read_text(encoding='utf-8')
 
-    for argument in ('enable_camera_preview', 'enable_pointclouds'):
+    for argument in (
+        'enable_camera_preview',
+        'enable_pointclouds',
+        'enable_raw_d435_pointcloud',
+    ):
         for source in (observer, full, rviz):
             assert f"'{argument}', default_value='false'" in source
 
-    assert "'enable_camera_preview'," in observer
-    assert "'enable_pointclouds'," in observer
-    assert (
-        "'enable_camera_preview': LaunchConfiguration("
-        "\n                        'enable_camera_preview'"
-        in full
-    )
-    assert (
-        "'enable_pointclouds': LaunchConfiguration('enable_pointclouds')"
-        in full
-    )
-    assert "_value(context, 'enable_camera_preview')" in rviz
-    assert "_value(context, 'enable_pointclouds')" in rviz
+    for source in (observer, full, rviz):
+        assert (
+            "'d435_image_transport', default_value='compressed'"
+            in source
+        )
+
+    for argument in (
+        'enable_camera_preview',
+        'enable_pointclouds',
+        'enable_raw_d435_pointcloud',
+        'd435_image_transport',
+    ):
+        assert f"'{argument}'," in observer
+        assert f"'{argument}': LaunchConfiguration(" in full
+        assert f"_value(context, '{argument}')" in rviz
+
     assert 'parse_launch_boolean' in rviz
-    assert 'if enable_camera_preview or enable_pointclouds:' in rviz
+    assert 'parse_d435_image_transport' in rviz
+    assert 'or enable_raw_d435_pointcloud' in rviz
+    assert "or d435_image_transport != 'compressed'" in rviz
     assert 'create_runtime_config' in rviz
     assert 'OnProcessExit' in rviz
 

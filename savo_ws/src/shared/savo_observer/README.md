@@ -47,15 +47,40 @@ implemented. The full inventory and hashes are in
 - `full_debug`: 2 Hz telemetry; point clouds and costmaps remain manually enabled.
 - `mobile`: 0.5 Hz telemetry, bounded 60-sample history, no images or clouds.
 
-No sensor data is republished. `enable_camera_preview` and
-`enable_pointclouds` both default to false. Passing either flag as true creates
-one temporary runtime copy of the selected RViz configuration and enables only
-its existing Image or PointCloud2 displays, respectively. Passing both enables
-both display classes in the same copy. Source-owned `.rviz` files, display
-topics, and QoS remain unchanged. The temporary copy is removed when RViz
-exits, and the observer remains read-only. These opt-in displays consume the
-approved head-camera, D435 color, raw D435 cloud, and filtered-obstacle topics;
-the observer does not publish or proxy them.
+No sensor data is republished by `savo_observer`. `enable_camera_preview`,
+`enable_pointclouds`, and `enable_raw_d435_pointcloud` default to false.
+Passing a flag as true creates one temporary runtime copy of the selected RViz
+configuration and enables only the corresponding displays. Source-owned
+`.rviz` files and QoS remain unchanged, the temporary copy is removed when
+RViz exits, and the observer remains read-only.
+
+The head-camera display always consumes `/savo_head/camera/image_raw` using raw
+transport. `d435_image_transport` defaults to `compressed` and accepts only
+`raw` or `compressed`. Compressed mode uses the standard Jazzy RViz
+`image_transport` contract at
+`/savo_observer/d435/color/image_raw/compressed`; the `/compressed` suffix
+selects compressed transport for the base topic
+`/savo_observer/d435/color/image_raw`. Raw mode directly consumes the unchanged
+production `/camera/camera/color/image_raw` topic. The optional relay that
+creates the compressed copy runs on Edge under `savo_realsense`, not in this
+package.
+
+`enable_pointclouds:=true` enables observer-friendly clouds, with
+`/savo_perception/obstacles/points` as the primary filtered D435 obstacle
+cloud. It does not enable the large raw D435 cloud.
+`enable_raw_d435_pointcloud:=true` is the separate diagnostic opt-in for
+`/camera/camera/depth/color/points` in views that contain it. The filtered
+cloud remains obstacle-only and marking-oriented; observer configuration does
+not alter perception filtering or navigation clearing semantics. Compressed
+image transport does not solve the separate sustained raw-pointcloud transport
+limitation across Edge Wi-Fi to the bridged VM.
+
+The Edge relay is disabled by default and exists because full-size raw D435
+RGB DDS samples were unreliable across Edge Wi-Fi to the bridged Ubuntu VM.
+It compresses only an observer copy and does not reduce the production
+`640x480x30` D435 stream, alter the raw pointcloud, change TF ownership, or
+affect navigation, perception, or VO. It does not address or hide the separate
+RealSense startup firmware notification.
 
 ## Network setup
 
@@ -79,7 +104,19 @@ ros2 launch savo_observer observer.launch.py mode:=full view:=overview profile:=
 ros2 launch savo_observer observer.launch.py mode:=full view:=navigation profile:=standard
 ros2 launch savo_observer observer.launch.py mode:=rviz view:=tf profile:=standard
 ros2 launch savo_observer observer.launch.py mode:=rviz view:=sensors \
-  profile:=standard enable_camera_preview:=true enable_pointclouds:=true
+  profile:=standard enable_camera_preview:=true enable_pointclouds:=true \
+  d435_image_transport:=compressed
+ros2 launch savo_observer rviz_observer.launch.py view:=sensors \
+  profile:=standard fixed_frame:=base_link enable_camera_preview:=true \
+  enable_pointclouds:=true d435_image_transport:=compressed \
+  use_sim_time:=false
+ros2 launch savo_observer rviz_observer.launch.py view:=sensors \
+  profile:=standard fixed_frame:=base_link enable_camera_preview:=true \
+  enable_pointclouds:=true d435_image_transport:=raw use_sim_time:=false
+ros2 launch savo_observer rviz_observer.launch.py view:=full_debug \
+  profile:=standard fixed_frame:=base_link enable_camera_preview:=true \
+  enable_pointclouds:=true enable_raw_d435_pointcloud:=true \
+  d435_image_transport:=compressed use_sim_time:=false
 ros2 launch savo_observer observer.launch.py mode:=dashboard profile:=mobile \
   dashboard_bind_address:=0.0.0.0 dashboard_port:=8765
 ```

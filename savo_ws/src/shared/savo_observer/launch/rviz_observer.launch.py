@@ -14,6 +14,7 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from savo_observer.rviz_config import (
     create_runtime_config,
+    parse_d435_image_transport,
     parse_launch_boolean,
     remove_runtime_config,
 )
@@ -74,11 +75,25 @@ def _setup(context):
         _value(context, 'enable_pointclouds'),
         'enable_pointclouds',
     )
-    if enable_camera_preview or enable_pointclouds:
+    enable_raw_d435_pointcloud = parse_launch_boolean(
+        _value(context, 'enable_raw_d435_pointcloud'),
+        'enable_raw_d435_pointcloud',
+    )
+    d435_image_transport = parse_d435_image_transport(
+        _value(context, 'd435_image_transport')
+    )
+    if (
+        enable_camera_preview
+        or enable_pointclouds
+        or enable_raw_d435_pointcloud
+        or d435_image_transport != 'compressed'
+    ):
         runtime_config, _enabled_counts = create_runtime_config(
             config,
             enable_camera_preview=enable_camera_preview,
             enable_pointclouds=enable_pointclouds,
+            enable_raw_d435_pointcloud=enable_raw_d435_pointcloud,
+            d435_image_transport=d435_image_transport,
         )
         config = str(runtime_config)
 
@@ -126,6 +141,12 @@ def generate_launch_description():
                 'enable_camera_preview', default_value='false'
             ),
             DeclareLaunchArgument('enable_pointclouds', default_value='false'),
+            DeclareLaunchArgument(
+                'enable_raw_d435_pointcloud', default_value='false'
+            ),
+            DeclareLaunchArgument(
+                'd435_image_transport', default_value='compressed'
+            ),
             OpaqueFunction(function=_setup),
         ]
     )
