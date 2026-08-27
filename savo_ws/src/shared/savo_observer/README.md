@@ -54,9 +54,12 @@ configuration and enables only the corresponding displays. Source-owned
 `.rviz` files and QoS remain unchanged, the temporary copy is removed when
 RViz exits, and the observer remains read-only.
 
-The head-camera display always consumes `/savo_head/camera/image_raw` using raw
-transport. `d435_image_transport` defaults to `compressed` and accepts only
-`raw` or `compressed`. Compressed mode uses the standard Jazzy RViz
+The head-camera display consumes the existing image-transport endpoint at
+`/savo_head/camera/image_raw/compressed` with Best Effort reliability; the
+observer does not add a republisher. `enable_camera_preview:=true` enables both
+`HeadCameraCompressed` and `D435ColorImage` when they are present in the
+selected view. `d435_image_transport` defaults to `compressed` and accepts
+only `raw` or `compressed`. D435 compressed mode uses the standard Jazzy RViz
 `image_transport` contract at
 `/savo_observer/d435/color/image_raw/compressed`; the `/compressed` suffix
 selects compressed transport for the base topic

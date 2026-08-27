@@ -163,7 +163,7 @@ def test_runtime_copy_enables_only_requested_display_classes(
     assert totals['raw_d435_pointclouds'] > 0
     assert topics['images'] == {
         '/savo_observer/d435/color/image_raw/compressed',
-        '/savo_head/camera/image_raw',
+        '/savo_head/camera/image_raw/compressed',
     }
     assert topics['pointclouds'] == {
         '/savo_perception/obstacles/points',
@@ -247,3 +247,33 @@ def test_user_config_combines_options_without_changing_qos(tmp_path):
         remove_runtime_config(runtime_path)
 
     assert source_path.read_bytes() == source_bytes
+
+
+@pytest.mark.parametrize('name', ['sensors.rviz', 'full_debug.rviz'])
+def test_camera_preview_enables_both_approved_displays(name):
+    """Enable both D435 and compressed head previews in runtime copies."""
+    runtime_path, enabled_counts = create_runtime_config(
+        RVIZ / name,
+        enable_camera_preview=True,
+    )
+
+    try:
+        runtime = yaml.safe_load(runtime_path.read_text(encoding='utf-8'))
+        displays = {
+            display['Name']: display for display in _displays(runtime)
+        }
+        assert enabled_counts['images'] == 2
+        for display_name in ('D435ColorImage', 'HeadCameraCompressed'):
+            assert displays[display_name]['Enabled'] is True
+            assert displays[display_name]['Value'] is True
+        assert displays['D435ColorImage']['Topic']['Value'] == (
+            '/savo_observer/d435/color/image_raw/compressed'
+        )
+        assert displays['HeadCameraCompressed']['Topic']['Value'] == (
+            '/savo_head/camera/image_raw/compressed'
+        )
+        assert displays['HeadCameraCompressed']['Topic'][
+            'Reliability Policy'
+        ] == 'Best Effort'
+    finally:
+        remove_runtime_config(runtime_path)

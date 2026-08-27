@@ -13,9 +13,9 @@ migrations:
   - original: savo_description/rviz/sensors_view.rviz
     destination: savo_observer/rviz/sensors.rviz
     original_sha256: a36cc8c97ebf1a76122208455ac883401d054d698384e1ebaf790755504d5504
-    current_sha256: 1e7256d4947de7ae57b89a1e43f6dd6edd2b4bb708fce7a60b60b37c9e3ddd6f
+    current_sha256: 4b5cb2cf1ea7da3f439689217f55ce6667721c09655c2dda21464118f3759a16
     status: moved_and_corrected
-    correction: Added disabled camera images and the filtered obstacle cloud; D435 preview uses the observer compressed transport.
+    correction: Added disabled camera images and the filtered obstacle cloud; D435 and head-camera previews use their validated compressed transports.
   - original: savo_description/rviz/costmap_debug.rviz
     destination: savo_observer/rviz/costmaps.rviz
     original_sha256: 286dba2db57acc1cbfedabf476e148a204fc81ad1ac6d38f90c683af38e467a5

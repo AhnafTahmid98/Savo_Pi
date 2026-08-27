@@ -86,7 +86,7 @@ def test_full_debug_has_complete_approved_spatial_context():
         'D435ColorImage': (
             '/savo_observer/d435/color/image_raw/compressed'
         ),
-        'HeadCameraImage': '/savo_head/camera/image_raw',
+        'HeadCameraCompressed': '/savo_head/camera/image_raw/compressed',
         'GlobalCostmap': '/global_costmap/costmap',
         'LocalCostmap': '/local_costmap/costmap',
         'GlobalPlan': '/plan',
@@ -127,7 +127,9 @@ def test_navigation_and_sensor_views_have_read_only_context():
     assert sensor_topics['D435ColorImage'] == (
         '/savo_observer/d435/color/image_raw/compressed'
     )
-    assert sensor_topics['HeadCameraImage'] == '/savo_head/camera/image_raw'
+    assert sensor_topics['HeadCameraCompressed'] == (
+        '/savo_head/camera/image_raw/compressed'
+    )
     for name in ('DepthPointCloud', 'FilteredObstacleCloud'):
         assert sensor_displays[name]['Class'].endswith('/PointCloud2')
         assert sensor_displays[name]['Enabled'] is False
@@ -187,11 +189,14 @@ def test_observer_uses_only_approved_spatial_topics():
         'd435_color_image_compressed': (
             '/savo_observer/d435/color/image_raw/compressed'
         ),
-        'head_camera_image': '/savo_head/camera/image_raw',
+        'head_camera_image_raw': '/savo_head/camera/image_raw',
+        'head_camera_image_compressed': (
+            '/savo_head/camera/image_raw/compressed'
+        ),
     }
 
 
-def test_d435_preview_uses_jazzy_compressed_transport_contract():
+def test_camera_previews_use_validated_compressed_transport_contracts():
     for name in ('sensors.rviz', 'full_debug.rviz'):
         document = yaml.safe_load((RVIZ / name).read_text(encoding='utf-8'))
         displays = document['Visualization Manager']['Displays']
@@ -203,7 +208,7 @@ def test_d435_preview_uses_jazzy_compressed_transport_contract():
         head = next(
             display
             for display in displays
-            if display.get('Name') == 'HeadCameraImage'
+            if display.get('Name') == 'HeadCameraCompressed'
         )
 
         assert d435['Topic']['Value'] == (
@@ -211,7 +216,26 @@ def test_d435_preview_uses_jazzy_compressed_transport_contract():
         )
         assert d435['Enabled'] is False
         assert d435['Value'] is False
-        assert head['Topic']['Value'] == '/savo_head/camera/image_raw'
+        assert head['Class'] == 'rviz_default_plugins/Image'
+        assert head['Topic'] == {
+            'Depth': 2,
+            'Durability Policy': 'Volatile',
+            'History Policy': 'Keep Last',
+            'Reliability Policy': 'Best Effort',
+            'Value': '/savo_head/camera/image_raw/compressed',
+        }
+        assert head['Enabled'] is False
+        assert head['Value'] is False
+
+
+def test_no_rviz_display_uses_raw_head_camera_topic():
+    for path, document in _documents():
+        for display in document['Visualization Manager']['Displays']:
+            topic = display.get('Topic', {}).get('Value')
+            assert topic != '/savo_head/camera/image_raw', (
+                path,
+                display.get('Name'),
+            )
 
 
 def test_compressed_rviz_transport_dependency_is_declared():

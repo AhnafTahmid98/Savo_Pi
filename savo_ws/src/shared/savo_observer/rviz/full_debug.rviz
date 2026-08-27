@@ -51,8 +51,8 @@ Visualization Manager:
       Value: false
     - Class: rviz_default_plugins/Image
       Enabled: false
-      Name: HeadCameraImage
-      Topic: {Depth: 2, Durability Policy: Volatile, History Policy: Keep Last, Reliability Policy: Best Effort, Value: /savo_head/camera/image_raw}
+      Name: HeadCameraCompressed
+      Topic: {Depth: 2, Durability Policy: Volatile, History Policy: Keep Last, Reliability Policy: Best Effort, Value: /savo_head/camera/image_raw/compressed}
       Value: false
     - Class: rviz_default_plugins/Map
       Enabled: false
