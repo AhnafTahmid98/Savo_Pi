@@ -131,9 +131,23 @@ install(FILES
 # -----------------------------------------------------------------------------
 if(BUILD_TESTING)
   find_package(ament_cmake_flake8 REQUIRED)
+  find_package(ament_cmake_gtest REQUIRED)
   find_package(ament_cmake_pytest REQUIRED)
 
   ament_flake8(CONFIG_FILE ${CMAKE_CURRENT_SOURCE_DIR}/setup.cfg)
+
+  ament_add_gtest(test_freenove_motor_board
+    test/test_freenove_motor_board.cpp
+    src/drivers/freenove_motor_board.cpp
+  )
+  target_include_directories(test_freenove_motor_board
+    PRIVATE
+      include
+  )
+  target_compile_features(test_freenove_motor_board
+    PRIVATE
+      cxx_std_17
+  )
 
   function(add_pytest_if_exists test_name test_path)
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${test_path}")

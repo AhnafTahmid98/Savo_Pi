@@ -6,7 +6,6 @@
 
 #include <algorithm>
 #include <chrono>
-#include <cmath>
 #include <cstdint>
 #include <fcntl.h>
 #include <stdexcept>
@@ -15,24 +14,6 @@
 
 namespace savo_base
 {
-namespace
-{
-
-constexpr int kPcaMode1 = 0x00;
-constexpr int kPcaMode2 = 0x01;
-constexpr int kPcaPrescale = 0xFE;
-constexpr int kLed0OnL = 0x06;
-
-constexpr int kMode1Restart = 0x80;
-constexpr int kMode1Sleep = 0x10;
-constexpr int kMode1AllCall = 0x01;
-constexpr int kMode1AutoIncrement = 0x20;
-constexpr int kMode2OutDrv = 0x04;
-
-constexpr double kOscillatorHz = 25000000.0;
-constexpr int kPwmSteps = 4096;
-
-}  // namespace
 
 FreenoveMotorBoard::FreenoveMotorBoard(
   const BoardConfig & board_config,
@@ -47,17 +28,24 @@ FreenoveMotorBoard::FreenoveMotorBoard(
   }
 
   open_bus();
-  configure_pwm();
-  stop();
+  try {
+    configure_pwm();
+  } catch (...) {
+    close();
+    throw;
+  }
 }
 
 FreenoveMotorBoard::~FreenoveMotorBoard()
 {
-  try {
-    stop();
-    close();
-  } catch (...) {
-  }
+  freenove_detail::shutdown_fail_safe(
+    [this]() {stop();},
+    [this]() {
+      if (fd_ >= 0) {
+        write_register(freenove_detail::kPcaAllLedOffH, freenove_detail::kPcaFullOff);
+      }
+    },
+    [this]() {close();});
 }
 
 bool FreenoveMotorBoard::connected() const
@@ -76,7 +64,7 @@ bool FreenoveMotorBoard::ping() const
   }
 
   try {
-    static_cast<void>(read_register(kPcaMode1));
+    static_cast<void>(read_register(freenove_detail::kPcaMode1));
     return true;
   } catch (...) {
     return false;
@@ -164,27 +152,30 @@ void FreenoveMotorBoard::open_bus()
 
 void FreenoveMotorBoard::configure_pwm()
 {
-  write_register(kPcaMode2, kMode2OutDrv);
-  write_register(kPcaMode1, kMode1AllCall | kMode1AutoIncrement);
-  std::this_thread::sleep_for(std::chrono::milliseconds(5));
-
-  set_pwm_frequency(board_config_.pwm_freq_hz);
+  freenove_detail::initialize_pca9685_fail_safe(
+    board_config_.pwm_freq_hz,
+    [this](const int reg, const int value) {write_register(reg, value);},
+    [this](const int reg) {return read_register(reg);},
+    [this]() {write_startup_brake_frame();},
+    [](const int milliseconds) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(milliseconds));
+    });
 }
 
-void FreenoveMotorBoard::set_pwm_frequency(const double frequency_hz)
+void FreenoveMotorBoard::write_startup_brake_frame()
 {
-  const double safe_frequency = std::clamp(frequency_hz, 24.0, 1526.0);
-  const double prescale_value = (kOscillatorHz / (kPwmSteps * safe_frequency)) - 1.0;
-  const int prescale = static_cast<int>(std::lround(prescale_value));
+  const auto registers = freenove_detail::startup_brake_registers(channels_);
+  std::array<std::uint8_t, 65> buffer{};
+  buffer[0] = freenove_detail::kLed0OnL;
+  std::copy(registers.begin(), registers.end(), buffer.begin() + 1);
 
-  const int old_mode = read_register(kPcaMode1) | kMode1AutoIncrement | kMode1AllCall;
-  const int sleep_mode = (old_mode & 0x7F) | kMode1Sleep;
+  if (::write(fd_, buffer.data(), buffer.size()) !=
+    static_cast<ssize_t>(buffer.size()))
+  {
+    throw std::runtime_error("Failed to write PCA9685 startup brake frame");
+  }
 
-  write_register(kPcaMode1, sleep_mode);
-  write_register(kPcaPrescale, prescale);
-  write_register(kPcaMode1, old_mode);
-  std::this_thread::sleep_for(std::chrono::milliseconds(5));
-  write_register(kPcaMode1, old_mode | kMode1Restart);
+  last_output_ = {0, 0, 0, 0};
 }
 
 void FreenoveMotorBoard::set_wheel(
@@ -214,22 +205,9 @@ void FreenoveMotorBoard::set_motor_pair(
   const int channel_b,
   const int value)
 {
-  const int duty = clamp_duty(value);
-
-  if (duty > 0) {
-    set_pwm_channel(channel_a, 0);
-    set_pwm_channel(channel_b, duty);
-    return;
-  }
-
-  if (duty < 0) {
-    set_pwm_channel(channel_a, -duty);
-    set_pwm_channel(channel_b, 0);
-    return;
-  }
-
-  set_pwm_channel(channel_a, 4095);
-  set_pwm_channel(channel_b, 4095);
+  const auto pwm = freenove_detail::motor_pair_pwm(value);
+  set_pwm_channel(channel_a, pwm.channel_a);
+  set_pwm_channel(channel_b, pwm.channel_b);
 }
 
 void FreenoveMotorBoard::set_pwm_channel(const int channel, const int duty)
@@ -238,23 +216,15 @@ void FreenoveMotorBoard::set_pwm_channel(const int channel, const int duty)
     throw std::runtime_error("PCA9685 channel out of range");
   }
 
-  const int value = std::clamp(duty, 0, 4095);
-  const int reg = kLed0OnL + 4 * channel;
+  const int reg = freenove_detail::kLed0OnL + 4 * channel;
+  const auto registers = freenove_detail::pwm_channel_registers(duty);
 
   uint8_t buffer[5]{};
   buffer[0] = static_cast<uint8_t>(reg);
-
-  if (value >= 4095) {
-    buffer[1] = 0x00;
-    buffer[2] = 0x10;
-    buffer[3] = 0x00;
-    buffer[4] = 0x00;
-  } else {
-    buffer[1] = 0x00;
-    buffer[2] = 0x00;
-    buffer[3] = static_cast<uint8_t>(value & 0xFF);
-    buffer[4] = static_cast<uint8_t>((value >> 8) & 0x0F);
-  }
+  buffer[1] = registers.on_l;
+  buffer[2] = registers.on_h;
+  buffer[3] = registers.off_l;
+  buffer[4] = registers.off_h;
 
   if (::write(fd_, buffer, sizeof(buffer)) != static_cast<ssize_t>(sizeof(buffer))) {
     throw std::runtime_error("Failed to write PCA9685 PWM channel");
