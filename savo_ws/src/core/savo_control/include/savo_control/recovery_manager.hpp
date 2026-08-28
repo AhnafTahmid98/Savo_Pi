@@ -583,11 +583,19 @@ private:
 
   double elapsed(const double now_s) const
   {
+    if (state_.state == RecoveryState::IDLE) {
+      return 0.0;
+    }
+
     return std::max(0.0, ControlMath::finite_or_zero(now_s) - state_.start_s);
   }
 
   double phase_elapsed(const double now_s) const
   {
+    if (state_.state == RecoveryState::IDLE) {
+      return 0.0;
+    }
+
     return std::max(0.0, ControlMath::finite_or_zero(now_s) - state_.phase_start_s);
   }
 

@@ -164,11 +164,19 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/scripts")
 endif()
 
 if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
   find_package(ament_cmake_pytest REQUIRED)
   find_package(ament_cmake_cppcheck REQUIRED)
   find_package(ament_cmake_lint_cmake REQUIRED)
   find_package(ament_cmake_uncrustify REQUIRED)
   find_package(ament_cmake_xmllint REQUIRED)
+
+  ament_add_gtest(test_recovery_manager
+    test/test_recovery_manager.cpp
+  )
+  target_link_libraries(test_recovery_manager
+    ${PROJECT_NAME}_core
+  )
 
   function(add_pytest_if_exists test_name test_file)
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${test_file}")
