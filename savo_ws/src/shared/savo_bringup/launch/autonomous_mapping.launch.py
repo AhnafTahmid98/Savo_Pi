@@ -160,6 +160,9 @@ def generate_launch_description() -> LaunchDescription:
             "use_python_fallback": LaunchConfiguration(
                 "power_use_python_fallback"
             ),
+            "edge_ups_expected": LaunchConfiguration(
+                "edge_ups_expected"
+            ),
         }.items(),
     )
 
@@ -464,6 +467,10 @@ def generate_launch_description() -> LaunchDescription:
             ),
             DeclareLaunchArgument(
                 "power_use_python_fallback",
+                default_value="false",
+            ),
+            DeclareLaunchArgument(
+                "edge_ups_expected",
                 default_value="false",
             ),
             DeclareLaunchArgument(

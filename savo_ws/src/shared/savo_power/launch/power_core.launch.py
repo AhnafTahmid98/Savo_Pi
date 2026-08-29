@@ -3,6 +3,7 @@ from launch.actions import DeclareLaunchArgument
 from launch.conditions import IfCondition, UnlessCondition
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
 
@@ -16,6 +17,13 @@ def _cfg(*parts):
 
 def generate_launch_description():
     use_python_fallback = LaunchConfiguration("use_python_fallback")
+    edge_ups_expected = LaunchConfiguration("edge_ups_expected")
+    edge_ups_expected_override = {
+        "edge_ups_expected": ParameterValue(
+            edge_ups_expected,
+            value_type=bool,
+        ),
+    }
 
     common_params = _cfg("power_common.yaml")
     topics_params = _cfg("topics.yaml")
@@ -32,6 +40,13 @@ def generate_launch_description():
             "use_python_fallback",
             default_value="false",
             description="Run Python fallback nodes instead of C++ production nodes.",
+        ),
+        DeclareLaunchArgument(
+            "edge_ups_expected",
+            default_value="false",
+            description=(
+                "Require Edge UPS telemetry in the Core power aggregate."
+            ),
         ),
 
         Node(
@@ -70,6 +85,7 @@ def generate_launch_description():
                 topics_params,
                 profile_params,
                 aggregator_params,
+                edge_ups_expected_override,
             ],
             condition=UnlessCondition(use_python_fallback),
         ),
@@ -136,6 +152,7 @@ def generate_launch_description():
                 topics_params,
                 profile_params,
                 aggregator_params,
+                edge_ups_expected_override,
             ],
             condition=IfCondition(use_python_fallback),
         ),

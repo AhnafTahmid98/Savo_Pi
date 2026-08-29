@@ -353,7 +353,7 @@ def expected_sources_from_params(
     if getattr(params, "core_ups_expected", True):
         expected.append(BatterySource.CORE_UPS)
 
-    if getattr(params, "edge_ups_expected", True):
+    if getattr(params, "edge_ups_expected", False):
         expected.append(BatterySource.EDGE_UPS)
 
     if getattr(params, "base_battery_expected", True):
@@ -478,14 +478,11 @@ def reading_dict_to_source_status(
 
     normalized = normalize_battery_source(source)
 
-    if not expected:
-        return make_not_expected_power_source_status(normalized)
-
     if age_value_s > max(0.0, float(stale_timeout_s)):
         return make_power_source_status(
             normalized,
             state=PowerState.STALE,
-            expected=True,
+            expected=expected,
             seen=True,
             age_value_s=age_value_s,
             detail=(
@@ -499,7 +496,7 @@ def reading_dict_to_source_status(
     return make_power_source_status(
         normalized,
         state=state,
-        expected=True,
+        expected=expected,
         seen=True,
         age_value_s=age_value_s,
         detail=str(reading.get("detail", "")),
@@ -522,14 +519,14 @@ def build_source_statuses(
     for source in POWER_SOURCE_ORDER:
         expected = source in expected_set
 
-        if not expected:
-            statuses.append(make_not_expected_power_source_status(source))
-            continue
-
         reading = memory.reading_for_source(source)
 
         if reading is None:
-            statuses.append(make_missing_power_source_status(source))
+            statuses.append(
+                make_missing_power_source_status(source)
+                if expected
+                else make_not_expected_power_source_status(source)
+            )
             continue
 
         age_value = memory.source_age_s(source, now_s=now)
@@ -538,7 +535,7 @@ def build_source_statuses(
             reading_dict_to_source_status(
                 source,
                 reading,
-                expected=True,
+                expected=expected,
                 age_value_s=age_value,
                 stale_timeout_s=stale_timeout_s,
             )

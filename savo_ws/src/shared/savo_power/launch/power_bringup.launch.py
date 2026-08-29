@@ -23,6 +23,7 @@ def _role_condition(role, target):
 def generate_launch_description():
     role = LaunchConfiguration("role")
     use_python_fallback = LaunchConfiguration("use_python_fallback")
+    edge_ups_expected = LaunchConfiguration("edge_ups_expected")
     enable_edge_power_health = LaunchConfiguration("enable_edge_power_health")
     enable_edge_power_dashboard = LaunchConfiguration("enable_edge_power_dashboard")
 
@@ -36,6 +37,13 @@ def generate_launch_description():
             "use_python_fallback",
             default_value="false",
             description="Run Python fallback nodes instead of C++ production nodes.",
+        ),
+        DeclareLaunchArgument(
+            "edge_ups_expected",
+            default_value="false",
+            description=(
+                "Require Edge UPS telemetry in the Core power aggregate."
+            ),
         ),
         DeclareLaunchArgument(
             "enable_edge_power_health",
@@ -52,6 +60,7 @@ def generate_launch_description():
             PythonLaunchDescriptionSource(_launch_file("power_core.launch.py")),
             launch_arguments={
                 "use_python_fallback": use_python_fallback,
+                "edge_ups_expected": edge_ups_expected,
             }.items(),
             condition=_role_condition(role, "core"),
         ),

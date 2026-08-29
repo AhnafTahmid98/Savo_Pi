@@ -141,6 +141,9 @@ def _setup(context):
                     "localization_use_vo": LaunchConfiguration(
                         "localization_use_vo"
                     ),
+                    "edge_ups_expected": LaunchConfiguration(
+                        "edge_ups_expected"
+                    ),
                     "head_enable_tf": LaunchConfiguration("head_enable_tf"),
                     "head_camera_mode": LaunchConfiguration(
                         "head_camera_mode"
@@ -258,7 +261,12 @@ def _setup(context):
             actions.append(
                 IncludeLaunchDescription(
                     _python_launch("savo_power", "power_core.launch.py"),
-                    launch_arguments={"use_python_fallback": "false"}.items(),
+                    launch_arguments={
+                        "use_python_fallback": "false",
+                        "edge_ups_expected": LaunchConfiguration(
+                            "edge_ups_expected"
+                        ),
+                    }.items(),
                 )
             )
         if start_supervisor:
@@ -518,6 +526,7 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument("start_localization", default_value="true"),
             DeclareLaunchArgument("start_control", default_value="true"),
             DeclareLaunchArgument("start_power", default_value="true"),
+            DeclareLaunchArgument("edge_ups_expected", default_value="false"),
             DeclareLaunchArgument("start_supervisor", default_value="true"),
             DeclareLaunchArgument("start_head", default_value="true"),
             DeclareLaunchArgument(

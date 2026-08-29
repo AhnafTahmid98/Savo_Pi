@@ -105,6 +105,7 @@ def _setup(context):
             "control_use_backup_escape",
             "control_use_stuck_detector",
             "localization_use_vo",
+            "edge_ups_expected",
             "head_enable_tf",
             "head_camera_mode",
         ]:
@@ -226,6 +227,7 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument("control_use_backup_escape", default_value="false"),
             DeclareLaunchArgument("control_use_stuck_detector", default_value="false"),
             DeclareLaunchArgument("localization_use_vo", default_value="true"),
+            DeclareLaunchArgument("edge_ups_expected", default_value="false"),
             DeclareLaunchArgument("head_enable_tf", default_value="true"),
             DeclareLaunchArgument("head_camera_mode", default_value="ros"),
             DeclareLaunchArgument("start_realsense", default_value="true"),

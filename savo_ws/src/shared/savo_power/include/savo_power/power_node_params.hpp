@@ -153,7 +153,7 @@ struct BaseBatteryNodeParams
 struct PowerAggregatorNodeParams
 {
   bool core_ups_expected{true};
-  bool edge_ups_expected{true};
+  bool edge_ups_expected{false};
   bool base_battery_expected{true};
 
   double publish_rate_hz{constants::kHealthPublishHzDefault};

@@ -67,6 +67,26 @@ def test_core_launch_uses_core_configs():
     assert '"core", "dashboard.yaml"' in text
 
 
+def test_core_launch_has_typed_edge_ups_policy_override_last():
+    text = read("launch/power_core.launch.py")
+
+    assert '"edge_ups_expected"' in text
+    assert 'default_value="false"' in text
+    assert (
+        "from launch_ros.parameter_descriptions import ParameterValue"
+        in text
+    )
+    assert (
+        "ParameterValue(\n"
+        "            edge_ups_expected,\n"
+        "            value_type=bool,"
+        in text
+    )
+    assert text.count(
+        "aggregator_params,\n                edge_ups_expected_override,"
+    ) == 2
+
+
 def test_edge_launch_runs_edge_ups_by_default():
     text = read("launch/power_edge.launch.py")
 
@@ -107,8 +127,20 @@ def test_bringup_launch_includes_core_and_edge_launches():
     assert "role:=core" not in text
 
     assert '"use_python_fallback": use_python_fallback' in text
+    assert '"edge_ups_expected": edge_ups_expected' in text
     assert '"enable_power_health": enable_edge_power_health' in text
     assert '"enable_power_dashboard": enable_edge_power_dashboard' in text
+
+
+def test_bringup_launch_defaults_edge_ups_to_optional():
+    text = read("launch/power_bringup.launch.py")
+
+    declaration = (
+        'DeclareLaunchArgument(\n'
+        '            "edge_ups_expected",\n'
+        '            default_value="false",'
+    )
+    assert declaration in text
 
 
 def test_bringup_role_condition_supports_core_edge_both():

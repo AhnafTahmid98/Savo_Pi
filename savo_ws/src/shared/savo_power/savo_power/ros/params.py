@@ -51,7 +51,7 @@ class PowerAggregatorNodeParams:
     stale_timeout_s: float = c.DEFAULT_STALE_TIMEOUT_S
 
     core_ups_expected: bool = True
-    edge_ups_expected: bool = True
+    edge_ups_expected: bool = False
     base_battery_expected: bool = True
 
     publish_rate_hz: float = c.DEFAULT_PUBLISH_RATE_HZ
@@ -433,7 +433,7 @@ def read_power_aggregator_node_params(node: object) -> PowerAggregatorNodeParams
         edge_ups_expected=get_bool_param(
             node,
             c.PARAM_EDGE_UPS_EXPECTED,
-            True,
+            False,
         ),
         base_battery_expected=get_bool_param(
             node,

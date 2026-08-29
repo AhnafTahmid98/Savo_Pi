@@ -132,20 +132,21 @@ def test_kit_battery_config_targets_base_battery_topic():
         assert params["topic"] == c.BASE_BATTERY_TOPIC
 
 
-def test_core_aggregator_expects_all_sources():
-    params = node_params(
-        "config/core/power_aggregator.yaml",
-        "/power_aggregator_node",
-    )
+def test_core_aggregator_requires_core_and_base_but_not_edge_by_default():
+    for node_name in ("/power_aggregator_node", "/power_aggregator_node_py"):
+        params = node_params(
+            "config/core/power_aggregator.yaml",
+            node_name,
+        )
 
-    assert params["core_ups_expected"] is True
-    assert params["edge_ups_expected"] is True
-    assert params["base_battery_expected"] is True
+        assert params["core_ups_expected"] is True
+        assert params["edge_ups_expected"] is False
+        assert params["base_battery_expected"] is True
 
-    assert params["core_ups_topic"] == c.CORE_UPS_TOPIC
-    assert params["edge_ups_topic"] == c.EDGE_UPS_TOPIC
-    assert params["base_battery_topic"] == c.BASE_BATTERY_TOPIC
-    assert params["status_topic"] == c.STATUS_TOPIC
+        assert params["core_ups_topic"] == c.CORE_UPS_TOPIC
+        assert params["edge_ups_topic"] == c.EDGE_UPS_TOPIC
+        assert params["base_battery_topic"] == c.BASE_BATTERY_TOPIC
+        assert params["status_topic"] == c.STATUS_TOPIC
 
 
 def test_health_configs_keep_shutdown_disabled():
@@ -196,6 +197,9 @@ def test_core_profile_uses_cpp_default():
     assert params["enable_power_aggregator"] is True
     assert params["enable_power_health"] is True
     assert params["enable_power_dashboard"] is True
+    assert params["core_ups_expected"] is True
+    assert params["edge_ups_expected"] is False
+    assert params["base_battery_expected"] is True
 
 
 def test_edge_profile_only_runs_edge_ups_by_default():

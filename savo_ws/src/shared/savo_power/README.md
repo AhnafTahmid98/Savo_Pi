@@ -23,6 +23,38 @@ Do not assume percentage values are valid unless the corresponding source and
 calibration state report them as valid. Power faults must remain visible to
 bringup, supervisor, UI, and observer components.
 
+## Core aggregate source policy
+
+Core UPS and base-battery telemetry are always required by the Core power
+aggregate. Edge UPS telemetry remains subscribed and visible, but is optional
+for aggregate readiness by default. This supports installations where the Edge
+UPS powers the Edge Pi correctly while its I2C telemetry path is unavailable or
+unreliable; it does not fabricate or suppress Edge readings.
+
+Start with the default policy:
+
+```bash
+ros2 launch savo_power power_core.launch.py
+```
+
+Explicitly require Edge UPS telemetry for strict operation:
+
+```bash
+ros2 launch savo_power power_core.launch.py edge_ups_expected:=true
+```
+
+The generic role-selecting bringup exposes the same option:
+
+```bash
+ros2 launch savo_power power_bringup.launch.py \
+  role:=core \
+  edge_ups_expected:=false
+
+ros2 launch savo_power power_bringup.launch.py \
+  role:=core \
+  edge_ups_expected:=true
+```
+
 ## Build and test
 
 ```bash

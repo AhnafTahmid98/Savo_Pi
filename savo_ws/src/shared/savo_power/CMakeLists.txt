@@ -130,7 +130,15 @@ ament_export_dependencies(
 )
 
 if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
   find_package(ament_cmake_pytest REQUIRED)
+
+  ament_add_gtest(test_power_aggregator_cpp
+    test/test_power_aggregator.cpp
+  )
+  target_link_libraries(test_power_aggregator_cpp
+    ${PROJECT_NAME}
+  )
 
   file(GLOB SAVO_POWER_PYTEST_FILES test/test_*.py)
 

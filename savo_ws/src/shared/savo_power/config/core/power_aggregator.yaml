@@ -4,7 +4,7 @@
     stale_timeout_s: 5.0
 
     core_ups_expected: true
-    edge_ups_expected: true
+    edge_ups_expected: false
     base_battery_expected: true
 
     core_ups_topic: "/savo_power/core/ups"
@@ -19,7 +19,7 @@
     stale_timeout_s: 5.0
 
     core_ups_expected: true
-    edge_ups_expected: true
+    edge_ups_expected: false
     base_battery_expected: true
 
     core_ups_topic: "/savo_power/core/ups"

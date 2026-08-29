@@ -14,7 +14,7 @@ namespace savo_power
 struct PowerAggregatorConfig
 {
   bool core_ups_expected{true};
-  bool edge_ups_expected{true};
+  bool edge_ups_expected{false};
   bool base_battery_expected{true};
 
   double stale_timeout_s{5.0};

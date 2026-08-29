@@ -2,6 +2,8 @@ import json
 from pathlib import Path
 from dataclasses import is_dataclass
 
+import pytest
+
 from savo_power.models.power_status import BatterySource, PowerState
 from savo_power.nodes import power_aggregator_node_py as aggregator
 
@@ -36,6 +38,22 @@ def make_full_ok_memory(now_s=10.0):
         now_s=now_s,
     )
 
+    return memory
+
+
+def make_required_ok_memory(now_s=10.0):
+    memory = aggregator.PowerAggregatorMemory()
+    memory.update("core_ups", make_ok_reading("core_ups"), now_s=now_s)
+    memory.update(
+        "base_battery",
+        {
+            "source": "base_battery",
+            "state": "ok",
+            "voltage_v": 8.10,
+            "soc_pct": 80.0,
+        },
+        now_s=now_s,
+    )
     return memory
 
 
@@ -204,6 +222,137 @@ def test_missing_expected_source_is_visible_in_statuses():
     assert by_source[BatterySource.CORE_UPS].seen is True
     assert by_source[BatterySource.EDGE_UPS].seen is False
     assert by_source[BatterySource.BASE_BATTERY].seen is False
+
+
+def test_default_params_require_core_and_base_but_not_edge():
+    params = aggregator.PowerAggregatorNodeParams()
+
+    assert aggregator.expected_sources_from_params(params) == (
+        BatterySource.CORE_UPS,
+        BatterySource.BASE_BATTERY,
+    )
+
+
+def test_optional_missing_edge_does_not_block_healthy_required_sources():
+    summary = aggregator.aggregate_memory(
+        make_required_ok_memory(),
+        expected_sources=(
+            BatterySource.CORE_UPS,
+            BatterySource.BASE_BATTERY,
+        ),
+        stale_timeout_s=5.0,
+        now_s=12.0,
+    )
+
+    assert summary.overall_state == PowerState.OK
+    assert summary.ok is True
+    edge = next(
+        status
+        for status in aggregator.summary_source_statuses(summary)
+        if status.source == BatterySource.EDGE_UPS
+    )
+    assert edge.expected is False
+    assert edge.seen is False
+
+
+def test_optional_edge_error_does_not_change_aggregate_severity():
+    memory = make_required_ok_memory()
+    memory.update(
+        "edge_ups",
+        {"source": "edge_ups", "state": "error"},
+        now_s=10.0,
+    )
+
+    summary = aggregator.aggregate_memory(
+        memory,
+        expected_sources=(
+            BatterySource.CORE_UPS,
+            BatterySource.BASE_BATTERY,
+        ),
+        stale_timeout_s=5.0,
+        now_s=12.0,
+    )
+
+    assert summary.overall_state == PowerState.OK
+    assert summary.ok is True
+    edge = next(
+        status
+        for status in aggregator.summary_source_statuses(summary)
+        if status.source == BatterySource.EDGE_UPS
+    )
+    assert edge.expected is False
+    assert edge.seen is True
+    assert edge.state == PowerState.ERROR
+
+
+def test_required_missing_edge_preserves_failure_behavior():
+    summary = aggregator.aggregate_memory(
+        make_required_ok_memory(),
+        expected_sources=(
+            BatterySource.CORE_UPS,
+            BatterySource.EDGE_UPS,
+            BatterySource.BASE_BATTERY,
+        ),
+        stale_timeout_s=5.0,
+        now_s=12.0,
+    )
+
+    assert summary.overall_state != PowerState.OK
+    assert summary.ok is False
+
+
+def test_required_edge_error_preserves_failure_behavior():
+    memory = make_required_ok_memory()
+    memory.update(
+        "edge_ups",
+        {"source": "edge_ups", "state": "error"},
+        now_s=10.0,
+    )
+
+    summary = aggregator.aggregate_memory(
+        memory,
+        expected_sources=(
+            BatterySource.CORE_UPS,
+            BatterySource.EDGE_UPS,
+            BatterySource.BASE_BATTERY,
+        ),
+        stale_timeout_s=5.0,
+        now_s=12.0,
+    )
+
+    assert summary.overall_state == PowerState.ERROR
+    assert summary.ok is False
+
+
+@pytest.mark.parametrize("required_source", ["core_ups", "base_battery"])
+@pytest.mark.parametrize("failure", ["missing", "error"])
+def test_core_and_base_failures_still_block_with_optional_edge(
+    required_source,
+    failure,
+):
+    memory = make_required_ok_memory()
+    if failure == "missing":
+        memory.readings_by_source.pop(BatterySource(required_source))
+        memory.updated_time_by_source.pop(BatterySource(required_source))
+    else:
+        memory.update(
+            required_source,
+            {"source": required_source, "state": "error"},
+            now_s=10.0,
+        )
+
+    summary = aggregator.aggregate_memory(
+        memory,
+        expected_sources=(
+            BatterySource.CORE_UPS,
+            BatterySource.BASE_BATTERY,
+        ),
+        stale_timeout_s=5.0,
+        now_s=12.0,
+    )
+
+    assert summary.overall_state != PowerState.OK
+    assert summary.ok is False
 
 
 def test_aggregator_node_names_and_topics_are_locked():

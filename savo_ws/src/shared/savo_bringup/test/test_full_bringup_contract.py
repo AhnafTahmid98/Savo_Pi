@@ -224,6 +224,20 @@ def test_supervisor_and_bridge_receive_the_existing_robot_mode() -> None:
         assert len(set(policies.values())) == len(supported)
 
 
+def test_edge_ups_expectation_reaches_every_core_power_launch() -> None:
+    """Canonical bringup keeps Edge optional but allows strict override."""
+    robot = read("launch/robot_bringup.launch.py")
+    core = read("launch/core_bringup.launch.py")
+    autonomous = read("launch/autonomous_mapping.launch.py")
+
+    for launch in (robot, core, autonomous):
+        assert '"edge_ups_expected"' in launch
+        assert 'default_value="false"' in launch
+
+    assert '"edge_ups_expected": LaunchConfiguration(' in core
+    assert '"edge_ups_expected": LaunchConfiguration(' in autonomous
+
+
 def test_full_entry_point_keeps_core_and_edge_roles_explicit() -> None:
     """The full launch must keep distributed roles explicit."""
     launch = read("launch/robot_bringup.launch.py")

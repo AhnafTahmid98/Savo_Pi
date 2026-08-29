@@ -41,9 +41,22 @@ PowerStatusSummary PowerAggregator::aggregate(
     BatterySource::BASE_BATTERY,
     config_.base_battery_expected);
 
-  summary.overall_state = more_severe(
-    more_severe(summary.core_ups.state, summary.edge_ups.state),
-    summary.base_battery.state);
+  summary.overall_state = PowerState::OK;
+  if (summary.core_ups.expected) {
+    summary.overall_state = more_severe(
+      summary.overall_state,
+      summary.core_ups.state);
+  }
+  if (summary.edge_ups.expected) {
+    summary.overall_state = more_severe(
+      summary.overall_state,
+      summary.edge_ups.state);
+  }
+  if (summary.base_battery.expected) {
+    summary.overall_state = more_severe(
+      summary.overall_state,
+      summary.base_battery.state);
+  }
 
   summary.health_level =
     health_level_from_power_state(summary.overall_state);
@@ -65,17 +78,15 @@ PowerSourceStatus PowerAggregator::make_source_status(
   BatterySource expected_source,
   bool expected) const
 {
-  if (!expected) {
-    return make_not_expected_source_status(expected_source);
-  }
-
   if (!input.seen) {
-    return make_missing_source_status(expected_source);
+    return expected ?
+      make_missing_source_status(expected_source) :
+      make_not_expected_source_status(expected_source);
   }
 
   PowerSourceStatus status;
   status.source = expected_source;
-  status.expected = true;
+  status.expected = expected;
   status.seen = true;
   status.age_s = input.age_s;
   status.stale = input.age_s > config_.stale_timeout_s;
