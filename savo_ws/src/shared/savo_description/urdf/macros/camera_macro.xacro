@@ -13,7 +13,7 @@
     />
   </xacro:macro>
 
-  <xacro:macro name="camera_frames" params="name parent xyz rpy">
+  <xacro:macro name="camera_frames" params="name parent xyz rpy color_xyz color_rpy">
     <link name="${name}_link"/>
 
     <joint name="${name}_joint" type="fixed">
@@ -26,7 +26,7 @@
     <joint name="${name}_color_joint" type="fixed">
       <parent link="${name}_link"/>
       <child link="${name}_color_frame"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <origin xyz="${color_xyz}" rpy="${color_rpy}"/>
     </joint>
 
     <link name="${name}_color_optical_frame"/>
@@ -51,7 +51,7 @@
     </joint>
   </xacro:macro>
 
-  <xacro:macro name="depth_camera" params="name parent xyz rpy size_xyz mass material">
+  <xacro:macro name="depth_camera" params="name parent xyz rpy color_xyz color_rpy size_xyz mass material">
     <xacro:camera_body
       name="${name}_body"
       parent="${parent}"
@@ -67,6 +67,8 @@
       parent="${name}_body"
       xyz="0 0 0"
       rpy="0 0 0"
+      color_xyz="${color_xyz}"
+      color_rpy="${color_rpy}"
     />
   </xacro:macro>
 

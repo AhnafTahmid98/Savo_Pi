@@ -3,14 +3,14 @@ metadata:
   schema_version: 1
   robot_name: robot_savo
   units: {length: m, angle: rad, mass: kg}
-  measurement_state: provisional
+  measurement_state: locked
   measured_by: Robot Savo owner
-  measurement_date: "2026-08-20"
-  source: owner_supplied_physical_measurements_2026-08-20
-  geometry_revision: 3
+  measurement_date: "2026-08-29"
+  source: owner_physical_measurements_and_d435_factory_calibration_2026-08-29
+  geometry_revision: 5
   notes: >-
-    Measured plate, wheel-center, and sensor/head translations integrated. The
-    profile remains provisional pending the calibration items listed below.
+    Production geometry is locked from owner measurements, D435 factory
+    calibration, and the complete assembled fixed-body XY envelope survey.
 
 coordinate_convention:
   x: forward
@@ -36,13 +36,10 @@ chassis:
   mass_kg: 1.20
   deck_thickness_m: 0.0040
   deck_mass_each_kg: 0.20
-  # Owner-supplied ground heights. The datum (surface or center plane) is not
-  # yet proven. URDF boxes provisionally use these as their center-plane Z;
-  # each modeled plate center therefore carries a +/-0.002 m ambiguity.
-  plate_z_datum: unresolved_surface_or_center_plane
-  plate_z_ambiguity_m: 0.002
-  plate_ground_z_m: {base: 0.015, first: 0.080, second: 0.196, third: 0.280}
-  modeled_plate_center_ground_z_m: {base: 0.015, first: 0.080, second: 0.196, third: 0.280}
+  # Owner-confirmed ground heights are to each plate's bottom surface.
+  plate_z_datum: measured_bottom_surface
+  plate_bottom_surface_ground_z_m: {base: 0.015, first: 0.080, second: 0.196, third: 0.280}
+  plate_center_ground_z_m: {base: 0.017, first: 0.082, second: 0.198, third: 0.282}
   derived_plate_center_spacing_m: {base_to_first: 0.065, first_to_second: 0.116, second_to_third: 0.084}
   unmeasured_plate_ground_layers: []
   layer_contents:
@@ -65,7 +62,7 @@ wheels:
 mounts:
   # LiDAR scan-zero yaw is hardware-calibrated; level roll/pitch are preserved.
   lidar: {parent: base_link, frame: laser_frame, xyz_m: [0.0, 0.0, 0.2975], rpy_rad: [0.0, 0.0, -3.089891]}
-  # IMU RPY is a placeholder: only BNO055 +Z up is known; board +X/+Y are unresolved.
+  # Later hardware calibration closed the BNO055 orientation at zero mount RPY.
   imu: {parent: base_link, frame: imu_link, xyz_m: [0.0, -0.0465, -0.0175], rpy_rad: [0.0, 0.0, 0.0]}
   realsense_d435: {parent: base_link, frame: camera_link, xyz_m: [0.130, 0.0, 0.1925], rpy_rad: [0.0, 0.0, 0.0]}
   tof_left: {parent: base_link, frame: tof_left_link, xyz_m: [0.0, 0.106, -0.0075], rpy_rad: [0.0, 0.0, 1.57079632679]}
@@ -113,17 +110,90 @@ frames:
 realsense_internal_frames:
   authority: robot_state_publisher
   driver_publish_tf: false
-  extrinsics_state: provisional_zero_translation_not_device_calibrated
+  extrinsics_state: factory_calibrated_from_physical_device
+  device_serial: "801212070967"
+  firmware_version: "5.16.0.1"
+  calibration_source: librealsense_factory_depth_to_color_extrinsics
+  optical_frame_convention: {x: right, y: down, z: forward}
+  ros_body_frame_convention: {x: forward, y: left, z: up}
+  body_to_optical_rpy_rad: [-1.57079632679, 0.0, -1.57079632679]
+  # p_color = R * p_depth + t, expressed in optical coordinates.
+  depth_to_color_optical:
+    rotation:
+      - [0.999915, -0.00716836, 0.01092]
+      - [0.00717283, 0.999974, -0.000370232]
+      - [-0.0109171, 0.000448528, 0.99994]
+    translation_m: [0.0148680368438363, 0.000240577792283148, 0.000124865109683014]
+  # URDF parent depth optical -> child color optical uses this inverse pose.
+  color_to_depth_optical:
+    rotation:
+      - [0.999915, 0.00717283, -0.0109171]
+      - [-0.00716836, 0.999974, 0.000448528]
+      - [0.01092, -0.000370232, 0.99994]
+    translation_m: [-0.0148671297356486, -0.000134048212203197, -0.000287127564661205]
+  urdf_reference:
+    camera_link_reference: existing_depth_body_reference
+    camera_depth_frame_pose: coincident_with_camera_link
+    camera_color_frame_xyz_m: [-0.000287127564661, 0.014867129735649, 0.000134048212203]
+    camera_color_frame_rpy_rad: [-0.007168423593435, 0.000448528015039, 0.010917321307075]
 
-calibration_remaining:
-  - realsense_internal_color_depth_extrinsics
-  - plate_z_surface_or_center_datum
-  - wheel_width_mass_and_inertials
-  - full_fixed_collision_envelope
-  - display_respeaker_and_remaining_mass_geometry
+calibration_remaining: []
+
+# These estimates affect detailed visualization/simulation fidelity, not
+# production TF, kinematics, obstacle sensing, or the Nav2 geometry lock.
+model_fidelity_todos:
+  - component_masses_and_inertias
+  - full_robot_mass_and_center_of_gravity
+  - detailed_component_mesh_alignment_and_wheel_width
+  - legacy_display_respeaker_and_head_bracket_primitive_fidelity
+
+geometry_evidence:
+  authoritative_physical:
+    - plate_dimensions_bottom_surface_heights_and_thickness
+    - wheel_radius_and_center_positions
+    - lidar_imu_d435_tof_ultrasonic_and_head_mount_poses
+    - d435_factory_depth_color_extrinsics
+    - complete_assembled_fixed_body_xy_envelope
+  legacy_provisional_model:
+    - display_and_respeaker_primitives
+    - wheel_width_and_component_collision_sizes
+    - pi_assemblies_and_fixed_head_brackets
+  safe_conservative_planning:
+    - production_nav2_0.290_by_0.290_polygon_with_0.020_padding
+
+closed_calibrations:
+  lidar_scan_zero_yaw: hardware_validated
+  imu_orientation: hardware_validated
+  head_signs_and_runtime_tf: hardware_validated
+  plate_z_datum: owner_resolved_bottom_surface
+  d435_internal_extrinsics: factory_calibrated_serial_801212070967
+  fixed_body_xy_envelope: complete_assembled_robot_survey
 
 navigation:
   robot_base_frame: base_footprint
-  footprint_model: measured_plate_envelope_only
+  footprint_model: complete_physical_survey_with_conservative_raw_margin
   footprint_padding_m: 0.02
-  production_footprint_policy: retain_conservative_0.330_by_0.240_envelope_pending_full_collision_survey
+  production_footprint_policy: symmetric_0.290_by_0.290_raw_plus_single_0.020_nav2_padding
+  physical_fixed_body_xy_envelope_m:
+    survey_scope: fully_assembled_including_wheels_and_permanently_mounted_fixed_hardware
+    length: 0.280
+    width: 0.280
+  production_raw_xy_envelope_m:
+    length: 0.290
+    width: 0.290
+    min_x: -0.145
+    max_x: 0.145
+    min_y: -0.145
+    max_y: 0.145
+  production_padded_xy_envelope_m:
+    min_x: -0.165
+    max_x: 0.165
+    min_y: -0.165
+    max_y: 0.165
+  legacy_modeled_collision_xy_envelope_m:
+    source: current_urdf_primitives_including_legacy_provisional_display
+    min_x: -0.1398
+    max_x: 0.1975
+    min_y: -0.123
+    max_y: 0.123
+  collision_consistency: physical_survey_authoritative_legacy_display_primitive_is_nonproduction_model_fidelity

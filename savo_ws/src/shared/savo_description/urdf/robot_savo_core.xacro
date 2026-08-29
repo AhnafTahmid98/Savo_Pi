@@ -11,10 +11,10 @@
       third_plate_height:=0.0040
       base_link_z:=0.0325
       deck_thickness:=0.004
-      base_plate_z:=-0.0175
-      first_plate_z:=0.0475
-      second_plate_z:=0.1635
-      third_plate_z:=0.2475
+      base_plate_z:=-0.0155
+      first_plate_z:=0.0495
+      second_plate_z:=0.1655
+      third_plate_z:=0.2495
       base_mass:=1.20
       deck_mass:=0.20
     ">

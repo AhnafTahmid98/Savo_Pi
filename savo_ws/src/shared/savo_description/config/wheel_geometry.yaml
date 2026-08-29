@@ -2,9 +2,9 @@
 # wheel width/mass values in the canonical profile.
 metadata:
   profile: robot_savo_core_v1
-  geometry_revision: 2
+  geometry_revision: 5
   source: owner_supplied_physical_measurements_2026-08-11
-  measurement_state: provisional
+  measurement_state: locked
   units: metres_and_kilograms
 
 wheels:

@@ -26,14 +26,20 @@ def _macro_default(path: Path, name: str) -> float:
     return float(match.group(1))
 
 
-def test_measurement_metadata_stays_provisional() -> None:
+def test_measurement_metadata_is_locked() -> None:
     profile = _load_yaml("profiles/robot_savo_core_v1.yaml")
-    assert profile["metadata"]["geometry_revision"] == 3
-    assert profile["metadata"]["measurement_state"] == "provisional"
-    assert profile["chassis"]["plate_z_datum"] == (
-        "unresolved_surface_or_center_plane"
-    )
-    assert profile["chassis"]["plate_z_ambiguity_m"] == pytest.approx(0.002)
+    assert profile["metadata"]["geometry_revision"] == 5
+    assert profile["metadata"]["measurement_state"] == "locked"
+    assert profile["chassis"]["plate_z_datum"] == "measured_bottom_surface"
+    assert profile["calibration_remaining"] == []
+    assert profile["model_fidelity_todos"]
+
+    dimensions = _load_yaml("robot_dimensions.yaml")
+    mounts = _load_yaml("sensor_mounts.yaml")
+    wheels = _load_yaml("wheel_geometry.yaml")
+    assert dimensions["metadata"]["measurement_state"] == "locked"
+    assert mounts["metadata"]["measurement_state"] == "locked"
+    assert wheels["metadata"]["measurement_state"] == "locked"
 
 
 def test_plate_dimensions_and_axle_frame_match_core_xacro() -> None:
@@ -68,33 +74,46 @@ def test_plate_dimensions_and_axle_frame_match_core_xacro() -> None:
     assert _macro_default(core, "third_plate_length") == pytest.approx(0.1420)
     assert _macro_default(core, "third_plate_width") == pytest.approx(0.1440)
     assert _macro_default(core, "third_plate_height") == pytest.approx(0.0040)
-    assert _macro_default(core, "base_plate_z") == pytest.approx(-0.0175)
-    assert _macro_default(core, "first_plate_z") == pytest.approx(0.0475)
-    assert _macro_default(core, "second_plate_z") == pytest.approx(0.1635)
-    assert _macro_default(core, "third_plate_z") == pytest.approx(0.2475)
+    assert _macro_default(core, "base_plate_z") == pytest.approx(-0.0155)
+    assert _macro_default(core, "first_plate_z") == pytest.approx(0.0495)
+    assert _macro_default(core, "second_plate_z") == pytest.approx(0.1655)
+    assert _macro_default(core, "third_plate_z") == pytest.approx(0.2495)
 
 
 def test_all_authoritative_plate_ground_heights_are_modeled() -> None:
     profile = _load_yaml("profiles/robot_savo_core_v1.yaml")["chassis"]
     mirror = _load_yaml("robot_dimensions.yaml")["plates"]
 
-    expected_ground_z = {
+    expected_bottom_z = {
         "base": 0.015,
         "first": 0.080,
         "second": 0.196,
         "third": 0.280,
+    }
+    expected_center_z = {
+        "base": 0.017,
+        "first": 0.082,
+        "second": 0.198,
+        "third": 0.282,
+    }
+    expected_base_link_z = {
+        "base": -0.0155,
+        "first": 0.0495,
+        "second": 0.1655,
+        "third": 0.2495,
     }
     expected_spacing = {
         "base_to_first": 0.065,
         "first_to_second": 0.116,
         "second_to_third": 0.084,
     }
-    assert profile["plate_ground_z_m"] == pytest.approx(expected_ground_z)
-    assert profile["modeled_plate_center_ground_z_m"] == pytest.approx(
-        expected_ground_z
+    assert profile["plate_bottom_surface_ground_z_m"] == pytest.approx(
+        expected_bottom_z
     )
-    assert mirror["reported_ground_z_m"] == pytest.approx(expected_ground_z)
-    assert mirror["modeled_center_ground_z_m"] == pytest.approx(expected_ground_z)
+    assert profile["plate_center_ground_z_m"] == pytest.approx(expected_center_z)
+    assert mirror["bottom_surface_ground_z_m"] == pytest.approx(expected_bottom_z)
+    assert mirror["center_ground_z_m"] == pytest.approx(expected_center_z)
+    assert mirror["center_base_link_z_m"] == pytest.approx(expected_base_link_z)
     assert profile["derived_plate_center_spacing_m"] == pytest.approx(
         expected_spacing
     )

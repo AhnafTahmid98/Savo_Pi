@@ -8,4 +8,4 @@ tf:
   # robot_state_publisher is the sole fixed-camera TF authority.
   publish_driver_tf: false
   tf_publish_rate: 0.0
-  internal_extrinsics_state: provisional_zero_translation_not_device_calibrated
+  internal_extrinsics_state: factory_calibrated_serial_801212070967_firmware_5.16.0.1

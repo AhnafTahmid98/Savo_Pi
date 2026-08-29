@@ -7,6 +7,8 @@
       lidar_xyz:='0 0 0.2975' lidar_rpy:='0 0 -3.089891'
       imu_xyz:='0 -0.0465 -0.0175' imu_rpy:='0 0 0'
       camera_xyz:='0.130 0 0.1925' camera_rpy:='0 0 0'
+      camera_color_xyz:='-0.000287127564661 0.014867129735649 0.000134048212203'
+      camera_color_rpy:='-0.007168423593435 0.000448528015039 0.010917321307075'
       tof_left_xyz:='0 0.106 -0.0075' tof_left_rpy:='0 0 1.57079632679'
       tof_right_xyz:='0 -0.106 -0.0075' tof_right_rpy:='0 0 -1.57079632679'
       ultrasonic_xyz:='0.137 0 0.0235' ultrasonic_rpy:='0 0 0'
@@ -42,6 +44,8 @@
       parent="${parent}"
       xyz="${camera_xyz}"
       rpy="${camera_rpy}"
+      color_xyz="${camera_color_xyz}"
+      color_rpy="${camera_color_rpy}"
       size_xyz="0.090 0.025 0.025"
       mass="0.075"
       material="savo_camera"

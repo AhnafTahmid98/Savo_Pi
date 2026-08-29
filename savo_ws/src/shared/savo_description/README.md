@@ -42,7 +42,7 @@ The package is installed as a normal `ament_cmake` runtime package. Its launch,
 URDF/Xacro, configuration, RViz, mesh, and helper-script assets are available
 from `share/savo_description` after a workspace build.
 
-The revision-2 canonical profile contains measured plate, wheel-center, fixed
+The revision-5 canonical profile contains measured plate, wheel-center, fixed
 sensor, and neutral head translations:
 
 - `config/profiles/robot_savo_core_v1.yaml`
@@ -53,13 +53,16 @@ The files below are human-readable mirrors guarded by contract tests:
 - `config/wheel_geometry.yaml`
 - `config/sensor_mounts.yaml`
 
-The profile remains provisional. LiDAR orientation, D435 internal
-extrinsics, plate Z datum, wheel width/mass/inertials, and remaining component
-geometry still block physical lock.
+The production geometry profile is locked. The fully assembled robot, including
+wheels and permanently mounted fixed hardware, measured `0.280 x 0.280 m` in
+XY. The production raw planning envelope is a centered, conservative
+`0.290 x 0.290 m`, with Nav2 applying `0.020 m` padding once.
 
 `base_link` uses the reviewed wheel axle-plane convention at `+0.0325 m` from
-`base_footprint`. The generated `nav2_footprint.yaml` is the measured plate
-envelope only; production Nav2 retains a larger conservative footprint.
+`base_footprint`. The generated `nav2_footprint.yaml` is the authoritative raw
+production footprint. Legacy display/ReSpeaker and other detailed primitives
+remain non-blocking model-fidelity estimates and do not override the complete
+physical envelope survey.
 
 The LiDAR frame contract is:
 

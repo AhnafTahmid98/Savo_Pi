@@ -11,10 +11,10 @@
   <xacro:arg name="third_plate_height" default="0.0040"/>
   <xacro:arg name="base_link_z" default="0.0325"/>
   <xacro:arg name="deck_thickness" default="0.004"/>
-  <xacro:arg name="base_plate_z" default="-0.0175"/>
-  <xacro:arg name="first_plate_z" default="0.0475"/>
-  <xacro:arg name="second_plate_z" default="0.1635"/>
-  <xacro:arg name="third_plate_z" default="0.2475"/>
+  <xacro:arg name="base_plate_z" default="-0.0155"/>
+  <xacro:arg name="first_plate_z" default="0.0495"/>
+  <xacro:arg name="second_plate_z" default="0.1655"/>
+  <xacro:arg name="third_plate_z" default="0.2495"/>
   <xacro:arg name="base_mass" default="1.20"/>
   <xacro:arg name="deck_mass" default="0.20"/>
   <xacro:arg name="wheel_radius" default="0.0325"/>
@@ -31,6 +31,8 @@
   <xacro:arg name="imu_rpy" default="0 0 0"/>
   <xacro:arg name="camera_xyz" default="0.130 0 0.1925"/>
   <xacro:arg name="camera_rpy" default="0 0 0"/>
+  <xacro:arg name="camera_color_xyz" default="-0.000287127564661 0.014867129735649 0.000134048212203"/>
+  <xacro:arg name="camera_color_rpy" default="-0.007168423593435 0.000448528015039 0.010917321307075"/>
   <xacro:arg name="tof_left_xyz" default="0 0.106 -0.0075"/>
   <xacro:arg name="tof_left_rpy" default="0 0 1.57079632679"/>
   <xacro:arg name="tof_right_xyz" default="0 -0.106 -0.0075"/>
@@ -86,6 +88,8 @@
     lidar_xyz="$(arg lidar_xyz)" lidar_rpy="$(arg lidar_rpy)"
     imu_xyz="$(arg imu_xyz)" imu_rpy="$(arg imu_rpy)"
     camera_xyz="$(arg camera_xyz)" camera_rpy="$(arg camera_rpy)"
+    camera_color_xyz="$(arg camera_color_xyz)"
+    camera_color_rpy="$(arg camera_color_rpy)"
     tof_left_xyz="$(arg tof_left_xyz)" tof_left_rpy="$(arg tof_left_rpy)"
     tof_right_xyz="$(arg tof_right_xyz)" tof_right_rpy="$(arg tof_right_rpy)"
     ultrasonic_xyz="$(arg ultrasonic_xyz)" ultrasonic_rpy="$(arg ultrasonic_rpy)"

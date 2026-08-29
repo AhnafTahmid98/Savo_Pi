@@ -119,7 +119,7 @@ def test_existing_costmaps_retain_safe_baseline():
     ] == '/scan'
     assert 'robot_radius' not in global_parameters
     assert 'robot_radius' not in local_parameters
-    assert global_parameters['footprint'].startswith('[[0.165, 0.120]')
+    assert global_parameters['footprint'].startswith('[[0.145, 0.145]')
     assert local_parameters['footprint'] == global_parameters['footprint']
     assert global_parameters['footprint_padding'] == 0.02
     assert local_parameters['footprint_padding'] == 0.02
