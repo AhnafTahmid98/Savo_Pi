@@ -573,6 +573,14 @@ void SpeechNode::declare_parameters()
   declare_parameter<bool>("savomind.require_server_uid", false);
   declare_parameter<std::int64_t>("savomind.server_uid", 10001);
 
+  declare_parameter<bool>("robot_playback.enabled", false);
+  declare_parameter<std::string>(
+    "robot_playback.socket_path", "/run/savo_speech/playback.sock");
+  declare_parameter<std::int64_t>(
+    "robot_playback.maximum_wav_bytes", 16 * 1024 * 1024);
+  declare_parameter<bool>("robot_playback.require_peer_uid", false);
+  declare_parameter<std::int64_t>("robot_playback.peer_uid", 10001);
+
   declare_parameter<double>(
     "diagnostics.status_publish_rate_hz",
     constants::kDefaultStatusPublishRateHz);
@@ -843,6 +851,17 @@ void SpeechNode::load_parameters()
   config_.savomind_require_server_uid =
     get_parameter("savomind.require_server_uid").as_bool();
   config_.savomind_server_uid = get_parameter("savomind.server_uid").as_int();
+
+  config_.robot_playback_enabled =
+    get_parameter("robot_playback.enabled").as_bool();
+  config_.robot_playback_socket_path =
+    get_parameter("robot_playback.socket_path").as_string();
+  config_.robot_playback_maximum_wav_bytes =
+    get_parameter("robot_playback.maximum_wav_bytes").as_int();
+  config_.robot_playback_require_peer_uid =
+    get_parameter("robot_playback.require_peer_uid").as_bool();
+  config_.robot_playback_peer_uid =
+    get_parameter("robot_playback.peer_uid").as_int();
 
   config_.status_publish_rate_hz =
     get_parameter(
@@ -1336,6 +1355,28 @@ void SpeechNode::validate_parameters() const
       config_.savomind_server_uid, 0, 2147483647, "savomind.server_uid");
   }
 
+  if (config_.robot_playback_enabled) {
+    if (!config_.audio_required) {
+      throw std::invalid_argument{
+              "robot_playback.enabled requires audio.required=true"};
+    }
+    validate_non_empty(
+      config_.robot_playback_socket_path,
+      "robot_playback.socket_path");
+    if (config_.robot_playback_socket_path.front() != '/') {
+      throw std::invalid_argument{
+              "robot_playback.socket_path must be absolute"};
+    }
+    validate_integer_range(
+      config_.robot_playback_maximum_wav_bytes,
+      44, 64 * 1024 * 1024,
+      "robot_playback.maximum_wav_bytes");
+    validate_integer_range(
+      config_.robot_playback_peer_uid,
+      0, 2147483647,
+      "robot_playback.peer_uid");
+  }
+
   validate_rate(
     config_.status_publish_rate_hz,
     "diagnostics.status_publish_rate_hz");
@@ -1476,6 +1517,24 @@ void SpeechNode::initialize_audio_runtime()
     if (!started || !audio_runtime_->ready()) {
       throw std::runtime_error{
               "audio runtime did not enter the running state"};
+    }
+
+    if (config_.robot_playback_enabled) {
+      transport::RobotPlaybackServerConfig server_config;
+      server_config.socket_path = config_.robot_playback_socket_path;
+      server_config.maximum_wav_bytes = static_cast<std::size_t>(
+        config_.robot_playback_maximum_wav_bytes);
+      server_config.require_peer_uid =
+        config_.robot_playback_require_peer_uid;
+      server_config.peer_uid = static_cast<std::uint32_t>(
+        config_.robot_playback_peer_uid);
+      robot_playback_server_ =
+        std::make_unique<transport::RobotPlaybackServer>(
+        *audio_runtime_, server_config);
+      if (!robot_playback_server_->start()) {
+        throw std::runtime_error{
+                "robot playback server was already active"};
+      }
     }
 
     audio_activity_monitor_ =
@@ -2178,6 +2237,10 @@ void SpeechNode::process_savomind_events()
 void SpeechNode::shutdown_audio_runtime() noexcept
 {
   shutdown_savomind_runtime();
+  if (robot_playback_server_) {
+    robot_playback_server_->stop();
+  }
+  robot_playback_server_.reset();
   if (capture_processing_dispatcher_) {
     capture_processing_dispatcher_->stop();
   }
