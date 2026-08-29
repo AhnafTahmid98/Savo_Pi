@@ -192,7 +192,7 @@ def test_description_exclusively_owns_base_to_pantilt_mount() -> None:
     assert 'base_frame: "pantilt_mount_link"' in head_config
 
 
-def test_realsense_has_one_tf_authority_and_provisional_internal_extrinsics() -> None:
+def test_realsense_has_one_tf_authority_and_factory_internal_extrinsics() -> None:
     config_root = SRC_ROOT / "edge/savo_realsense/config"
     for path in config_root.glob("realsense*.yaml"):
         data = _yaml(path)
@@ -203,8 +203,11 @@ def test_realsense_has_one_tf_authority_and_provisional_internal_extrinsics() ->
     frames = _yaml(config_root / "camera_frames.yaml")
     assert frames["tf"]["publish_driver_tf"] is False
     assert frames["tf"]["internal_extrinsics_state"] == (
-        "provisional_zero_translation_not_device_calibrated"
+        "factory_calibrated_serial_801212070967_firmware_5.16.0.1"
     )
+    calibration = _yaml(PROFILE_PATH)["realsense_internal_frames"]
+    assert calibration["device_serial"] == "801212070967"
+    assert calibration["driver_publish_tf"] is False
 
 
 def test_frame_consumers_match_description_contract() -> None:
@@ -263,15 +266,17 @@ def test_production_geometry_gates_remain_fail_closed() -> None:
 
 
 def test_navigation_keeps_conservative_production_envelope() -> None:
-    measured_half_width = 0.2100 / 2.0
-    provisional_wheel_envelope = 0.108 + 0.030 / 2.0
-    assert provisional_wheel_envelope > measured_half_width
+    profile = _yaml(PROFILE_PATH)
+    assert profile["navigation"]["physical_fixed_body_xy_envelope_m"][
+        "width"
+    ] == pytest.approx(0.280)
     expected = (
-        "[[0.165, 0.120], [0.165, -0.120], "
-        "[-0.165, -0.120], [-0.165, 0.120]]"
+        "[[0.145, 0.145], [0.145, -0.145], "
+        "[-0.145, -0.145], [-0.145, 0.145]]"
     )
     for name in (
         "nav2_live_mapping.yaml",
+        "nav2_live_mapping_voxel.yaml",
         "nav2_saved_map.yaml",
         "nav2_saved_map_voxel.yaml",
     ):

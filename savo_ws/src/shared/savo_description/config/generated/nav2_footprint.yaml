@@ -1,9 +1,9 @@
 metadata:
   geometry_profile: robot_savo_core_v1
-  geometry_revision: 3
-  geometry_sha256: d4f8855e200d3fe10095530eb5ec72f6c5e8e1d709f41149914d67cc4cf1ebe0
+  geometry_revision: 5
+  geometry_sha256: 0b0ea6ce38f7f90002c4f7784e9ac7cd9465f133dda4173852671e057cb0ad8c
   generated_from: config/profiles/robot_savo_core_v1.yaml
-  envelope_semantics: measured_plate_only_not_complete_robot_collision_envelope
+  envelope_semantics: conservative_raw_production_envelope_from_complete_physical_survey
 robot_base_frame: base_footprint
-footprint: "[[0.1398, 0.105], [0.1398, -0.105], [-0.1398, -0.105], [-0.1398, 0.105]]"
+footprint: "[[0.145, 0.145], [0.145, -0.145], [-0.145, -0.145], [-0.145, 0.145]]"
 footprint_padding: 0.02

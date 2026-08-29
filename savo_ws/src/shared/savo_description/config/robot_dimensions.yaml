@@ -1,9 +1,9 @@
 # Human-readable mirror of the canonical geometry profile.
 metadata:
   profile: robot_savo_core_v1
-  geometry_revision: 3
-  source: owner_supplied_physical_measurements_2026-08-20
-  measurement_state: provisional
+  geometry_revision: 5
+  source: owner_physical_measurements_2026-08-29
+  measurement_state: locked
   units: metres_and_kilograms
 
 base:
@@ -25,12 +25,12 @@ plates:
   third_thickness_m: 0.0040
   base_mesh_envelope_height_m: 0.0280
   base_mesh_includes_motor_mounts: true
-  reported_ground_z_m: {base: 0.015, first: 0.080, second: 0.196, third: 0.280}
-  modeled_center_ground_z_m: {base: 0.015, first: 0.080, second: 0.196, third: 0.280}
+  bottom_surface_ground_z_m: {base: 0.015, first: 0.080, second: 0.196, third: 0.280}
+  center_ground_z_m: {base: 0.017, first: 0.082, second: 0.198, third: 0.282}
+  center_base_link_z_m: {base: -0.0155, first: 0.0495, second: 0.1655, third: 0.2495}
   derived_center_spacing_m: {base_to_first: 0.065, first_to_second: 0.116, second_to_third: 0.084}
   unmeasured_ground_z_layers: []
-  z_datum: unresolved_surface_or_center_plane
-  z_ambiguity_m: 0.002
+  z_datum: measured_bottom_surface
   mass_each_kg: 0.20
 
 layer_contents:
@@ -38,3 +38,13 @@ layer_contents:
   first: [display, speakers, core_pi, breadboard]
   second: [realsense_d435, respeaker_mic_array, edge_pi, pan_tilt_camera]
   third: [rplidar_a1]
+
+fixed_body_xy_envelope:
+  survey_scope: fully_assembled_including_wheels_and_permanently_mounted_fixed_hardware
+  physical_length_m: 0.280
+  physical_width_m: 0.280
+  production_raw_length_m: 0.290
+  production_raw_width_m: 0.290
+  production_raw_extents_m: {front: 0.145, rear: -0.145, left: 0.145, right: -0.145}
+  nav2_padding_m: 0.020
+  approximate_padded_extents_m: {front: 0.165, rear: -0.165, left: 0.165, right: -0.165}

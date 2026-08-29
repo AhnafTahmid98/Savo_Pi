@@ -30,7 +30,7 @@ def main() -> int:
         "base_link convention: axle plane at "
         f"{chassis['base_footprint_to_base_link_z_m']:.4f} m"
     )
-    print(f"Measured plate-only footprint: {footprint(profile)}")
+    print(f"Production raw footprint: {footprint(profile)}")
     print(f"Production footprint policy: {profile['navigation']['production_footprint_policy']}")
     if metadata["measurement_state"] == "provisional":
         print("Physical measurement lock: NOT COMPLETE")

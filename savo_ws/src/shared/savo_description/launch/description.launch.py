@@ -54,6 +54,7 @@ def _launch_description(context):
     chassis = profile["chassis"]
     wheels = profile["wheels"]
     mounts = profile["mounts"]
+    realsense = profile["realsense_internal_frames"]["urdf_reference"]
     scalar_arguments = {
         "base_length": chassis["length_m"],
         "base_width": chassis["width_m"],
@@ -64,19 +65,19 @@ def _launch_description(context):
         "base_link_z": chassis["base_footprint_to_base_link_z_m"],
         "deck_thickness": chassis["deck_thickness_m"],
         "base_plate_z": (
-            chassis["modeled_plate_center_ground_z_m"]["base"]
+            chassis["plate_center_ground_z_m"]["base"]
             - chassis["base_footprint_to_base_link_z_m"]
         ),
         "first_plate_z": (
-            chassis["modeled_plate_center_ground_z_m"]["first"]
+            chassis["plate_center_ground_z_m"]["first"]
             - chassis["base_footprint_to_base_link_z_m"]
         ),
         "second_plate_z": (
-            chassis["modeled_plate_center_ground_z_m"]["second"]
+            chassis["plate_center_ground_z_m"]["second"]
             - chassis["base_footprint_to_base_link_z_m"]
         ),
         "third_plate_z": (
-            chassis["modeled_plate_center_ground_z_m"]["third"]
+            chassis["plate_center_ground_z_m"]["third"]
             - chassis["base_footprint_to_base_link_z_m"]
         ),
         "base_mass": chassis["mass_kg"],
@@ -97,6 +98,8 @@ def _launch_description(context):
         "imu_rpy": mounts["imu"]["rpy_rad"],
         "camera_xyz": mounts["realsense_d435"]["xyz_m"],
         "camera_rpy": mounts["realsense_d435"]["rpy_rad"],
+        "camera_color_xyz": realsense["camera_color_frame_xyz_m"],
+        "camera_color_rpy": realsense["camera_color_frame_rpy_rad"],
         "tof_left_xyz": mounts["tof_left"]["xyz_m"],
         "tof_left_rpy": mounts["tof_left"]["rpy_rad"],
         "tof_right_xyz": mounts["tof_right"]["xyz_m"],
