@@ -220,7 +220,9 @@ void RobotPlaybackServer::run() noexcept
       handle_client(client);
       if (active_client_fd_.exchange(-1) == client) {::close(client);}
     }
-  } catch (const std::exception & exception) {set_error(exception.what());}
+  } catch (const std::exception & exception) {
+    set_error(exception.what());
+  }
   const int fd = listener_fd_.exchange(-1);
   if (fd >= 0) {::close(fd);}
   static_cast<void>(::unlink(config_.socket_path.c_str()));
@@ -259,8 +261,12 @@ void RobotPlaybackServer::handle_client(const int client_fd) noexcept
     limits.minimum_sample_rate_hz = 16000U;
     limits.maximum_sample_rate_hz = 16000U;
     audio::AudioBuffer decoded;
-    try {decoded = audio::WavReader::decode(wav, limits);}
-    catch (const std::exception &) {send_ack(client_fd, AckStatus::InvalidWav, request_id); return;}
+    try {
+      decoded = audio::WavReader::decode(wav, limits);
+    } catch (const std::exception &) {
+      send_ack(client_fd, AckStatus::InvalidWav, request_id);
+      return;
+    }
     if (decoded.format.sample_rate_hz != 16000U || decoded.format.channels != 1U ||
       decoded.format.sample_format != audio::PcmSampleFormat::Signed16LittleEndian)
     {send_ack(client_fd, AckStatus::InvalidFormat, request_id); return;}
