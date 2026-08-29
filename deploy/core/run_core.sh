@@ -34,6 +34,7 @@ main() {
     "${STATE_ROOT}/maps/release_transactions" \
     "${LOCATION_STATE_ROOT}" \
     "${LOCATION_STATE_ROOT}/releases" \
+    "${STATE_ROOT}/localization" \
     "${SUPERVISOR_STATE_ROOT}" \
     "${ROS_HOME}" \
     "${ROS_LOG_DIR}"; do
@@ -59,7 +60,7 @@ main() {
     allow_provisional_geometry:="${SAVO_ALLOW_PROVISIONAL_GEOMETRY:-false}" \
     d435_voxel_validated:="${SAVO_D435_VOXEL_VALIDATED:-false}" \
     control_startup_mode:="${SAVO_CONTROL_STARTUP_MODE:-STOP}" \
-    localization_use_vo:="${SAVO_LOCALIZATION_USE_VO:-false}" \
+    localization_use_vo:="${SAVO_LOCALIZATION_USE_VO:-true}" \
     start_speech:=false \
     start_ui:=false
 }

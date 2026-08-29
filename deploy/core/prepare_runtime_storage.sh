@@ -62,6 +62,7 @@ directories=(
   "${STATE_ROOT}/locations"
   "${STATE_ROOT}/locations/backups"
   "${STATE_ROOT}/locations/releases"
+  "${STATE_ROOT}/localization"
   "${STATE_ROOT}/supervisor"
   "${STATE_ROOT}/ros"
   "${LOG_ROOT}"

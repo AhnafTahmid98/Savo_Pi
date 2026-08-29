@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <memory>
 #include <string>
 
 #include "savo_localization/i2c_bus.hpp"
@@ -16,6 +17,35 @@ constexpr double BNO055_ACCEL_SCALE_MPS2 = 1.0 / 100.0;
 constexpr double BNO055_GYRO_SCALE_DPS = 1.0 / 16.0;
 constexpr double BNO055_EULER_SCALE_DEG = 1.0 / 16.0;
 constexpr double BNO055_MAG_SCALE_UT = 1.0 / 16.0;
+
+namespace bno055_registers
+{
+
+constexpr uint8_t ACC_OFFSET_X_LSB = 0x55;
+constexpr uint8_t ACC_OFFSET_X_MSB = 0x56;
+constexpr uint8_t ACC_OFFSET_Y_LSB = 0x57;
+constexpr uint8_t ACC_OFFSET_Y_MSB = 0x58;
+constexpr uint8_t ACC_OFFSET_Z_LSB = 0x59;
+constexpr uint8_t ACC_OFFSET_Z_MSB = 0x5A;
+constexpr uint8_t MAG_OFFSET_X_LSB = 0x5B;
+constexpr uint8_t MAG_OFFSET_X_MSB = 0x5C;
+constexpr uint8_t MAG_OFFSET_Y_LSB = 0x5D;
+constexpr uint8_t MAG_OFFSET_Y_MSB = 0x5E;
+constexpr uint8_t MAG_OFFSET_Z_LSB = 0x5F;
+constexpr uint8_t MAG_OFFSET_Z_MSB = 0x60;
+constexpr uint8_t GYR_OFFSET_X_LSB = 0x61;
+constexpr uint8_t GYR_OFFSET_X_MSB = 0x62;
+constexpr uint8_t GYR_OFFSET_Y_LSB = 0x63;
+constexpr uint8_t GYR_OFFSET_Y_MSB = 0x64;
+constexpr uint8_t GYR_OFFSET_Z_LSB = 0x65;
+constexpr uint8_t GYR_OFFSET_Z_MSB = 0x66;
+constexpr uint8_t ACC_RADIUS_LSB = 0x67;
+constexpr uint8_t ACC_RADIUS_MSB = 0x68;
+constexpr uint8_t MAG_RADIUS_LSB = 0x69;
+constexpr uint8_t MAG_RADIUS_MSB = 0x6A;
+constexpr std::size_t CALIBRATION_BLOCK_LENGTH = 22U;
+
+}  // namespace bno055_registers
 
 enum class BNO055Mode : uint8_t
 {
@@ -57,6 +87,38 @@ struct ImuCalibration
   bool fully_calibrated() const;
 };
 
+struct BNO055CalibrationProfile
+{
+  int16_t accel_offset_x{0};
+  int16_t accel_offset_y{0};
+  int16_t accel_offset_z{0};
+  int16_t mag_offset_x{0};
+  int16_t mag_offset_y{0};
+  int16_t mag_offset_z{0};
+  int16_t gyro_offset_x{0};
+  int16_t gyro_offset_y{0};
+  int16_t gyro_offset_z{0};
+  uint16_t accel_radius{0};
+  uint16_t mag_radius{0};
+};
+
+bool operator==(
+  const BNO055CalibrationProfile & lhs,
+  const BNO055CalibrationProfile & rhs);
+bool operator!=(
+  const BNO055CalibrationProfile & lhs,
+  const BNO055CalibrationProfile & rhs);
+
+bool validate_bno055_calibration_profile(
+  const BNO055CalibrationProfile & profile,
+  std::string * error = nullptr);
+
+std::array<uint8_t, bno055_registers::CALIBRATION_BLOCK_LENGTH>
+encode_bno055_calibration_profile(const BNO055CalibrationProfile & profile);
+
+BNO055CalibrationProfile decode_bno055_calibration_profile(
+  const std::array<uint8_t, bno055_registers::CALIBRATION_BLOCK_LENGTH> & bytes);
+
 struct BNO055Status
 {
   uint8_t chip_id{0};
@@ -85,6 +147,9 @@ public:
   explicit BNO055Driver(
     int i2c_bus = 1,
     uint8_t address = BNO055_DEFAULT_ADDRESS);
+  BNO055Driver(
+    std::unique_ptr<I2CBusInterface> bus,
+    uint8_t address = BNO055_DEFAULT_ADDRESS);
 
   ~BNO055Driver() = default;
 
@@ -101,6 +166,7 @@ public:
   bool initialize(
     BNO055Mode mode = BNO055Mode::NDOF,
     bool reset_on_start = true);
+  bool initialize_config_mode(bool reset_on_start = true);
 
   bool chip_ok();
   uint8_t read_chip_id();
@@ -124,6 +190,8 @@ public:
   uint8_t read_system_status();
   uint8_t read_system_error();
   BNO055Status read_status();
+  BNO055CalibrationProfile read_calibration_profile();
+  void write_calibration_profile(const BNO055CalibrationProfile & profile);
 
   BNO055Sample read_sample(
     bool read_magnetic = true,
@@ -134,7 +202,7 @@ public:
   static std::string mode_name(BNO055Mode mode);
 
 private:
-  I2CBus bus_;
+  std::unique_ptr<I2CBusInterface> bus_;
   uint8_t address_{BNO055_DEFAULT_ADDRESS};
   BNO055Mode mode_{BNO055Mode::CONFIG};
 

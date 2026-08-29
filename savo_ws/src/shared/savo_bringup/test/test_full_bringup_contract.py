@@ -4,6 +4,7 @@ import ast
 import grp
 import os
 import pwd
+import re
 import subprocess
 from pathlib import Path
 
@@ -353,6 +354,62 @@ def test_validated_normal_runtime_defaults_are_synchronized() -> None:
         )
 
 
+def test_all_production_vo_entrypoints_and_wrapper_are_synchronized() -> None:
+    """Default every normal entrypoint to VO while preserving explicit false."""
+    project_root = ROOT.parents[3]
+    localization_launch = (
+        project_root
+        / "savo_ws/src/core/savo_localization/launch/localization_bringup.launch.py"
+    )
+    localization_tree = ast.parse(localization_launch.read_text(encoding="utf-8"))
+    standalone_defaults = {}
+    for node in ast.walk(localization_tree):
+        if not isinstance(node, ast.Call):
+            continue
+        if getattr(node.func, "id", "") != "DeclareLaunchArgument":
+            continue
+        if not node.args or not isinstance(node.args[0], ast.Constant):
+            continue
+        for keyword in node.keywords:
+            if keyword.arg == "default_value" and isinstance(
+                keyword.value, ast.Constant
+            ):
+                standalone_defaults[node.args[0].value] = keyword.value.value
+
+    assert standalone_defaults["use_vo"] == "true"
+    assert launch_string_defaults("launch/core_bringup.launch.py")[
+        "localization_use_vo"
+    ] == "true"
+    edge_defaults = launch_string_defaults("launch/edge_bringup.launch.py")
+    assert edge_defaults["start_vo"] == "true"
+    assert edge_defaults["start_realsense"] == "true"
+
+    core_run = (project_root / "deploy/core/run_core.sh").read_text(
+        encoding="utf-8"
+    )
+    match = re.search(
+        r'localization_use_vo:=("\$\{SAVO_LOCALIZATION_USE_VO:-[^}]+\}")',
+        core_run,
+    )
+    assert match is not None
+    expansion = match.group(1)
+    override_cases = ((None, "true"), ("false", "false"), ("true", "true"))
+    for override, expected in override_cases:
+        environment = os.environ.copy()
+        if override is None:
+            environment.pop("SAVO_LOCALIZATION_USE_VO", None)
+        else:
+            environment["SAVO_LOCALIZATION_USE_VO"] = override
+        resolved = subprocess.run(
+            ["bash", "-c", f'printf "%s" {expansion}'],
+            check=True,
+            capture_output=True,
+            text=True,
+            env=environment,
+        )
+        assert resolved.stdout == expected
+
+
 def test_motion_modes_fail_closed_on_geometry_and_voxel_validation() -> None:
     """Unsafe geometry and voxel selections must be rejected."""
     contract = read("savo_bringup/launch_contract.py")
@@ -512,6 +569,8 @@ def test_deployment_entry_points_use_real_packages_and_launches() -> None:
     assert "host_role:=edge" in edge_run
     assert '"${STATE_ROOT}/maps/production"' in storage
     assert '"${STATE_ROOT}/locations/releases"' in storage
+    assert '"${STATE_ROOT}/localization"' in storage
+    assert '"${STATE_ROOT}/localization"' in core_run
     assert "map_output_root" in core_run
     assert "locations_database_path" in core_run
     assert "supervisor_state_path" in core_run
@@ -545,6 +604,7 @@ def test_runtime_storage_is_idempotent_without_root(tmp_path: Path) -> None:
         state_root / "maps/production",
         state_root / "maps/release_transactions",
         state_root / "locations/releases",
+        state_root / "localization",
         state_root / "supervisor",
         log_root,
     }:

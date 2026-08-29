@@ -78,6 +78,7 @@ ImuNode::ImuNode(const rclcpp::NodeOptions & options)
   declare_parameters();
   load_parameters();
   configure_driver();
+  create_calibration_save_service();
 
   imu_pub_ = create_publisher<sensor_msgs::msg::Imu>(
     imu_topic_,
@@ -129,6 +130,18 @@ void ImuNode::declare_parameters()
 
   declare_parameter<double>("publish_rate_hz", publish_rate_hz_);
   declare_parameter<bool>("reset_on_start", reset_on_start_);
+  declare_parameter<bool>(
+    "calibration_restore_enabled",
+    calibration_restore_enabled_);
+  declare_parameter<std::string>(
+    "calibration_profile_path",
+    calibration_profile_path_);
+  declare_parameter<bool>(
+    "calibration_require_verified_restore",
+    calibration_require_verified_restore_);
+  declare_parameter<std::string>(
+    "calibration_save_service",
+    calibration_save_service_name_);
 
   declare_parameter<bool>("publish_orientation", publish_orientation_);
   declare_parameter<bool>("publish_magnetic_field", publish_magnetic_field_);
@@ -179,6 +192,13 @@ void ImuNode::load_parameters()
 
   publish_rate_hz_ = get_parameter("publish_rate_hz").as_double();
   reset_on_start_ = get_parameter("reset_on_start").as_bool();
+  calibration_restore_enabled_ =
+    get_parameter("calibration_restore_enabled").as_bool();
+  calibration_profile_path_ = get_parameter("calibration_profile_path").as_string();
+  calibration_require_verified_restore_ =
+    get_parameter("calibration_require_verified_restore").as_bool();
+  calibration_save_service_name_ =
+    get_parameter("calibration_save_service").as_string();
 
   publish_orientation_ = get_parameter("publish_orientation").as_bool();
   publish_magnetic_field_ = get_parameter("publish_magnetic_field").as_bool();
@@ -229,6 +249,14 @@ void ImuNode::load_parameters()
   if (i2c_address_ < 0x00 || i2c_address_ > 0x7F) {
     throw std::runtime_error("i2c_address must be a valid 7-bit I2C address");
   }
+
+  if (calibration_profile_path_.empty()) {
+    throw std::runtime_error("calibration_profile_path cannot be empty");
+  }
+
+  if (calibration_save_service_name_.empty()) {
+    throw std::runtime_error("calibration_save_service cannot be empty");
+  }
 }
 
 void ImuNode::configure_driver()
@@ -237,12 +265,46 @@ void ImuNode::configure_driver()
     i2c_bus_,
     static_cast<uint8_t>(i2c_address_));
 
-  const bool initialized = driver_->initialize(
-    configured_mode(),
-    reset_on_start_);
+  const bool initialized = driver_->initialize_config_mode(reset_on_start_);
 
   if (!initialized) {
     throw std::runtime_error("failed to initialize BNO055 IMU");
+  }
+
+  calibration_runtime_ = std::make_unique<BNO055CalibrationRuntime>(
+    calibration_profile_path_);
+  calibration_runtime_->restore(
+    *driver_,
+    calibration_restore_enabled_,
+    calibration_require_verified_restore_,
+    calibration_metadata(false));
+
+  driver_->set_mode(configured_mode());
+  calibration_runtime_->verify_operational_status(*driver_);
+
+  const auto & calibration_state = calibration_runtime_->state();
+  if (calibration_state.restore_failed) {
+    if (calibration_state.verification_required) {
+      RCLCPP_ERROR(
+        get_logger(),
+        "BNO055 calibration restore failed: %s",
+        calibration_state.error.c_str());
+    } else {
+      RCLCPP_WARN(
+        get_logger(),
+        "BNO055 calibration restore failed in non-required mode: %s",
+        calibration_state.error.c_str());
+    }
+  } else if (calibration_state.status == "profile_missing") {
+    RCLCPP_WARN(
+      get_logger(),
+      "No saved BNO055 calibration profile at %s; continuing with live calibration",
+      calibration_profile_path_.c_str());
+  } else if (calibration_state.status == "restored") {
+    RCLCPP_INFO(
+      get_logger(),
+      "BNO055 calibration profile restored and verified from %s",
+      calibration_profile_path_.c_str());
   }
 
   RCLCPP_INFO(
@@ -250,6 +312,61 @@ void ImuNode::configure_driver()
     "BNO055 ready | chip_id=0x%02X | mode=%s",
     driver_->read_chip_id(),
     BNO055Driver::mode_name(configured_mode()).c_str());
+}
+
+void ImuNode::create_calibration_save_service()
+{
+  calibration_save_service_ = create_service<std_srvs::srv::Trigger>(
+    calibration_save_service_name_,
+    std::bind(
+      &ImuNode::save_calibration_callback,
+      this,
+      std::placeholders::_1,
+      std::placeholders::_2));
+}
+
+void ImuNode::save_calibration_callback(
+  const std::shared_ptr<std_srvs::srv::Trigger::Request>,
+  std::shared_ptr<std_srvs::srv::Trigger::Response> response)
+{
+  if (!driver_ || !calibration_runtime_) {
+    response->success = false;
+    response->message = "BNO055 calibration runtime is unavailable";
+    return;
+  }
+  if (!have_live_calibration_status_) {
+    response->success = false;
+    response->message = "calibration save rejected: no live BNO055 status received";
+    return;
+  }
+
+  try {
+    BNO055CalibrationMetadata metadata = calibration_metadata(true);
+    const BNO055CalibrationCaptureResult result = calibration_runtime_->capture(
+      *driver_, metadata);
+    response->success = result.success;
+
+    std::ostringstream message;
+    message << result.message;
+    if (result.success) {
+      message << " | path=" << calibration_profile_path_
+              << " | accel_offset=(" << result.profile.accel_offset_x << ','
+              << result.profile.accel_offset_y << ','
+              << result.profile.accel_offset_z << ')'
+              << " | mag_offset=(" << result.profile.mag_offset_x << ','
+              << result.profile.mag_offset_y << ','
+              << result.profile.mag_offset_z << ')'
+              << " | gyro_offset=(" << result.profile.gyro_offset_x << ','
+              << result.profile.gyro_offset_y << ','
+              << result.profile.gyro_offset_z << ')'
+              << " | accel_radius=" << result.profile.accel_radius
+              << " | mag_radius=" << result.profile.mag_radius;
+    }
+    response->message = message.str();
+  } catch (const std::exception & exception) {
+    response->success = false;
+    response->message = "calibration save failed: " + std::string(exception.what());
+  }
 }
 
 void ImuNode::timer_callback()
@@ -271,6 +388,7 @@ void ImuNode::timer_callback()
     ++publish_count_;
     last_sample_time_ = now();
     have_last_sample_ = true;
+    have_live_calibration_status_ = true;
   } catch (const std::exception & exc) {
     ++error_count_;
 
@@ -363,6 +481,25 @@ diagnostic_msgs::msg::DiagnosticArray ImuNode::make_diagnostic_msg(
   status.values.push_back(key_value("calib_gyro", std::to_string(sample.status.calibration.gyro)));
   status.values.push_back(key_value("calib_accel", std::to_string(sample.status.calibration.accel)));
   status.values.push_back(key_value("calib_mag", std::to_string(sample.status.calibration.mag)));
+  const auto & calibration_state = calibration_runtime_->state();
+  status.values.push_back(key_value(
+    "calibration_restore_enabled", bool_text(calibration_state.restore_enabled)));
+  status.values.push_back(key_value("calibration_profile_path", calibration_profile_path_));
+  status.values.push_back(key_value(
+    "calibration_profile_present", bool_text(calibration_state.profile_present)));
+  status.values.push_back(key_value(
+    "calibration_profile_loaded", bool_text(calibration_state.profile_loaded)));
+  status.values.push_back(key_value(
+    "calibration_restore_attempted", bool_text(calibration_state.restore_attempted)));
+  status.values.push_back(key_value(
+    "calibration_profile_verified", bool_text(calibration_state.profile_verified)));
+  status.values.push_back(key_value(
+    "calibration_operational_status_verified",
+    bool_text(calibration_state.operational_status_verified)));
+  status.values.push_back(key_value(
+    "calibration_restore_failed", bool_text(calibration_state.restore_failed)));
+  status.values.push_back(key_value("calibration_restore_status", calibration_state.status));
+  status.values.push_back(key_value("calibration_restore_error", calibration_state.error));
   status.values.push_back(key_value("sample_count", std::to_string(sample_count_)));
   status.values.push_back(key_value("publish_count", std::to_string(publish_count_)));
   status.values.push_back(key_value("error_count", std::to_string(error_count_)));
@@ -388,6 +525,24 @@ std::string ImuNode::make_state_json(const BNO055Sample & sample) const
   oss << "\"chip_ok\":" << bool_text(sample.status.chip_id == BNO055_CHIP_ID) << ",";
   oss << "\"system_status\":" << static_cast<int>(sample.status.system_status) << ",";
   oss << "\"system_error\":" << static_cast<int>(sample.status.system_error) << ",";
+
+  const auto & calibration_state = calibration_runtime_->state();
+  oss << "\"calibration_profile\":{";
+  oss << "\"restore_enabled\":" << bool_text(calibration_state.restore_enabled) << ",";
+  oss << "\"verification_required\":" <<
+    bool_text(calibration_state.verification_required) << ",";
+  oss << "\"path\":\"" << escape_json(calibration_profile_path_) << "\",";
+  oss << "\"present\":" << bool_text(calibration_state.profile_present) << ",";
+  oss << "\"loaded\":" << bool_text(calibration_state.profile_loaded) << ",";
+  oss << "\"restore_attempted\":" <<
+    bool_text(calibration_state.restore_attempted) << ",";
+  oss << "\"verified\":" << bool_text(calibration_state.profile_verified) << ",";
+  oss << "\"operational_status_verified\":" <<
+    bool_text(calibration_state.operational_status_verified) << ",";
+  oss << "\"restore_failed\":" << bool_text(calibration_state.restore_failed) << ",";
+  oss << "\"status\":\"" << escape_json(calibration_state.status) << "\",";
+  oss << "\"error\":\"" << escape_json(calibration_state.error) << "\"";
+  oss << "},";
 
   oss << "\"calibration\":{";
   oss << "\"system\":" << sample.status.calibration.system << ",";
@@ -450,6 +605,19 @@ BNO055Mode ImuNode::configured_mode() const
   throw std::runtime_error("unsupported BNO055 mode: " + mode_);
 }
 
+BNO055CalibrationMetadata ImuNode::calibration_metadata(
+  const bool include_timestamp) const
+{
+  BNO055CalibrationMetadata metadata;
+  metadata.i2c_bus = i2c_bus_;
+  metadata.i2c_address = static_cast<uint8_t>(i2c_address_);
+  metadata.operational_mode = configured_mode();
+  if (include_timestamp) {
+    metadata.captured_at = bno055_calibration_timestamp_utc();
+  }
+  return metadata;
+}
+
 std::array<double, 9> ImuNode::orientation_covariance() const
 {
   return covariance3_from_diagonal(
@@ -501,10 +669,17 @@ double ImuNode::yaw_to_quaternion_w(double yaw_rad)
   return std::cos(yaw_rad * 0.5);
 }
 
-int ImuNode::diagnostic_level_from_sample(const BNO055Sample & sample)
+int ImuNode::diagnostic_level_from_sample(const BNO055Sample & sample) const
 {
   if (sample.status.chip_id != BNO055_CHIP_ID || sample.status.system_error != 0) {
     return diagnostic_msgs::msg::DiagnosticStatus::ERROR;
+  }
+
+  const auto & calibration_state = calibration_runtime_->state();
+  if (calibration_state.restore_failed) {
+    return calibration_state.verification_required ?
+      diagnostic_msgs::msg::DiagnosticStatus::ERROR :
+      diagnostic_msgs::msg::DiagnosticStatus::WARN;
   }
 
   if (!sample.status.calibration.motion_ready()) {
@@ -514,7 +689,8 @@ int ImuNode::diagnostic_level_from_sample(const BNO055Sample & sample)
   return diagnostic_msgs::msg::DiagnosticStatus::OK;
 }
 
-std::string ImuNode::diagnostic_message_from_sample(const BNO055Sample & sample)
+std::string ImuNode::diagnostic_message_from_sample(
+  const BNO055Sample & sample) const
 {
   if (sample.status.chip_id != BNO055_CHIP_ID) {
     return "unexpected BNO055 chip id";
@@ -522,6 +698,13 @@ std::string ImuNode::diagnostic_message_from_sample(const BNO055Sample & sample)
 
   if (sample.status.system_error != 0) {
     return "BNO055 system error";
+  }
+
+  const auto & calibration_state = calibration_runtime_->state();
+  if (calibration_state.restore_failed) {
+    return calibration_state.verification_required ?
+      "BNO055 calibration restore failed" :
+      "IMU usable, calibration restore failed";
   }
 
   if (!sample.status.calibration.motion_ready()) {

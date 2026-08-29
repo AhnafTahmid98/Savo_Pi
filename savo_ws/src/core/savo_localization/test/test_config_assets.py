@@ -66,6 +66,107 @@ def test_cmake_installs_localization_config_directory() -> None:
     assert "DESTINATION share/${PROJECT_NAME}/config" in cmake
 
 
+def test_bno055_calibration_persistence_production_contract() -> None:
+    """Lock production restore defaults, persistent storage, and explicit capture."""
+    config = yaml.safe_load(
+        (PACKAGE_ROOT / "config/imu.yaml").read_text(encoding="utf-8")
+    )["imu_node"]["ros__parameters"]
+    assert config["reset_on_start"] is True
+    assert config["calibration_restore_enabled"] is True
+    assert config["calibration_require_verified_restore"] is True
+    assert config["calibration_profile_path"] == (
+        "/var/lib/robot_savo/localization/bno055_calibration.yaml"
+    )
+    assert config["calibration_save_service"] == (
+        "/savo_localization/save_imu_calibration"
+    )
+
+    for launch_name in (
+        "imu.launch.py",
+        "localization_bench_imu.launch.py",
+        "localization_bringup.launch.py",
+    ):
+        launch = (PACKAGE_ROOT / "launch" / launch_name).read_text(encoding="utf-8")
+        assert '"calibration_restore_enabled"' in launch
+        assert 'default_value="true"' in launch
+        assert (
+            '"calibration_restore_enabled": calibration_restore_enabled' in launch
+        )
+
+
+def test_bno055_production_uses_real_i2c_and_fake_is_test_only() -> None:
+    """Keep the fake backend out of every installed production target."""
+    config = yaml.safe_load(
+        (PACKAGE_ROOT / "config/imu.yaml").read_text(encoding="utf-8")
+    )["imu_node"]["ros__parameters"]
+    assert config["i2c_bus"] == 1
+    assert config["i2c_address"] == 0x28
+
+    driver = (PACKAGE_ROOT / "src/bno055_driver.cpp").read_text(encoding="utf-8")
+    real_bus = (PACKAGE_ROOT / "src/i2c_bus.cpp").read_text(encoding="utf-8")
+    cmake = (PACKAGE_ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
+    assert "std::make_unique<I2CBus>(i2c_bus)" in driver
+    assert 'return "/dev/i2c-" + std::to_string(bus_number_)' in real_bus
+    assert "src/i2c_bus.cpp" in cmake
+    production_sources = cmake.split("set(BNO055_DRIVER_SOURCES", 1)[1].split(
+        ")", 1
+    )[0]
+    assert "fake_i2c_bus" not in production_sources
+
+    fake = PACKAGE_ROOT / "test/fake_i2c_bus.hpp"
+    assert fake.is_file()
+    assert not (PACKAGE_ROOT / "include/fake_i2c_bus.hpp").exists()
+    for relative in (
+        "test/test_bno055_driver.cpp",
+        "test/test_bno055_calibration.cpp",
+    ):
+        assert '#include "fake_i2c_bus.hpp"' in (
+            PACKAGE_ROOT / relative
+        ).read_text(encoding="utf-8")
+
+    production_corpus = "\n".join(
+        path.read_text(encoding="utf-8", errors="replace")
+        for directory in ("include", "src", "launch", "config")
+        for path in (PACKAGE_ROOT / directory).rglob("*")
+        if path.is_file()
+    )
+    assert "FakeI2CBus" not in production_corpus
+    assert "fake_i2c_bus" not in production_corpus
+
+
+def test_bno055_ros_dependencies_match_production_contract() -> None:
+    """Require only the service and YAML dependencies used by persistence."""
+    package_xml = (PACKAGE_ROOT / "package.xml").read_text(encoding="utf-8")
+    cmake = (PACKAGE_ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
+    for dependency in ("std_srvs", "yaml_cpp_vendor"):
+        assert f"<depend>{dependency}</depend>" in package_xml
+        assert f"find_package({dependency} REQUIRED)" in cmake
+    assert "std_srvs" in cmake
+    assert "target_link_libraries(savo_bno055_driver yaml-cpp)" in cmake
+
+
+def test_bno055_restore_diagnostics_and_manual_save_are_explicit() -> None:
+    """Require auditable restore state and operator-triggered persistence."""
+    imu_source = (PACKAGE_ROOT / "src/imu_node.cpp").read_text(encoding="utf-8")
+    health_source = (PACKAGE_ROOT / "src/localization_health_node.cpp").read_text(
+        encoding="utf-8"
+    )
+
+    for key in (
+        "calibration_profile_present",
+        "calibration_profile_loaded",
+        "calibration_restore_attempted",
+        "calibration_profile_verified",
+        "calibration_restore_failed",
+    ):
+        assert key in imu_source
+    assert "save_calibration_callback" in imu_source
+    assert "live status must be exactly 3/3/3/3" in (
+        PACKAGE_ROOT / "src/bno055_calibration.cpp"
+    ).read_text(encoding="utf-8")
+    assert "BNO055 calibration restore failed" in health_source
+
+
 def test_real_robot_encoder_gpio_mapping_and_direction_flags() -> None:
     """Keep all real-hardware encoder configs aligned with Robot Savo wiring."""
     for relative_path in ENCODER_CONFIGS:

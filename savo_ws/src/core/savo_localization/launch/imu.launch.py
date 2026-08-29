@@ -23,6 +23,9 @@ def generate_launch_description() -> LaunchDescription:
     profile_config = LaunchConfiguration("profile_config")
 
     use_health = LaunchConfiguration("use_health")
+    calibration_restore_enabled = LaunchConfiguration(
+        "calibration_restore_enabled"
+    )
 
     return LaunchDescription(
         [
@@ -66,6 +69,11 @@ def generate_launch_description() -> LaunchDescription:
                 default_value="false",
                 description="Start localization_health_node with IMU-only checks.",
             ),
+            DeclareLaunchArgument(
+                "calibration_restore_enabled",
+                default_value="true",
+                description="Restore the verified BNO055 calibration profile at startup.",
+            ),
             Node(
                 package="savo_localization",
                 executable="imu_node",
@@ -76,6 +84,9 @@ def generate_launch_description() -> LaunchDescription:
                     topics_config,
                     frames_config,
                     profile_config,
+                    {
+                        "calibration_restore_enabled": calibration_restore_enabled,
+                    },
                 ],
             ),
             Node(

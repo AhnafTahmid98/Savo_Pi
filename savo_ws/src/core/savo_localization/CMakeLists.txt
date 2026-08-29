@@ -19,9 +19,11 @@ find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
+find_package(yaml_cpp_vendor REQUIRED)
 
 ament_python_install_package(${PROJECT_NAME})
 
@@ -35,27 +37,52 @@ if(NOT LGPIO_LIBRARY)
     "Install liblgpio-dev on savo-core to enable the hardware encoder node.")
 endif()
 
-set(IMU_NODE_SOURCES
+set(BNO055_DRIVER_SOURCES
   src/i2c_bus.cpp
   src/bno055_driver.cpp
+  src/bno055_calibration.cpp
+)
+# Production targets always use the concrete Linux I2CBus above. The fake bus
+# remains under test/ and is included only by the BNO055 gtest sources below.
+
+set(IMU_NODE_SOURCES
   src/imu_node.cpp
 )
 
 set(IMU_NODE_READY TRUE)
-foreach(src_file ${IMU_NODE_SOURCES})
+foreach(src_file ${BNO055_DRIVER_SOURCES} ${IMU_NODE_SOURCES})
   if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${src_file}")
     set(IMU_NODE_READY FALSE)
   endif()
 endforeach()
 
 if(IMU_NODE_READY)
+  add_library(savo_bno055_driver SHARED ${BNO055_DRIVER_SOURCES})
+  target_include_directories(
+    savo_bno055_driver
+    PUBLIC
+      "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+      "$<INSTALL_INTERFACE:include>"
+  )
+  target_link_libraries(savo_bno055_driver yaml-cpp)
+
   add_executable(imu_node ${IMU_NODE_SOURCES})
+  target_link_libraries(imu_node savo_bno055_driver)
 
   ament_target_dependencies(imu_node
     rclcpp
     std_msgs
     sensor_msgs
     diagnostic_msgs
+    std_srvs
+  )
+
+  install(TARGETS
+    savo_bno055_driver
+    EXPORT export_savo_localization_health_core
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin
   )
 
   install(TARGETS
@@ -232,6 +259,18 @@ if(BUILD_TESTING)
     src/wheel_joint_state.cpp
   )
 
+  if(IMU_NODE_READY)
+    # These are the only targets that include test/fake_i2c_bus.hpp.
+    ament_add_gtest(
+      test_bno055_driver
+      test/test_bno055_driver.cpp
+    )
+    ament_add_gtest(
+      test_bno055_calibration
+      test/test_bno055_calibration.cpp
+    )
+  endif()
+
   if(TARGET test_wheel_joint_state)
     target_include_directories(test_wheel_joint_state PRIVATE include)
   endif()
@@ -241,6 +280,14 @@ if(BUILD_TESTING)
       test_localization_health_core
       savo_localization_health_core
     )
+  endif()
+
+  if(TARGET test_bno055_driver)
+    target_link_libraries(test_bno055_driver savo_bno055_driver)
+  endif()
+
+  if(TARGET test_bno055_calibration)
+    target_link_libraries(test_bno055_calibration savo_bno055_driver yaml-cpp)
   endif()
 
   function(add_pytest_if_exists test_name test_path)
@@ -285,5 +332,6 @@ ament_export_targets(
   HAS_LIBRARY_TARGET
 )
 ament_export_include_directories(include)
+ament_export_dependencies(yaml_cpp_vendor)
 
 ament_package()

@@ -10,7 +10,9 @@
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/imu.hpp"
 #include "std_msgs/msg/string.hpp"
+#include "std_srvs/srv/trigger.hpp"
 
+#include "savo_localization/bno055_calibration.hpp"
 #include "savo_localization/bno055_driver.hpp"
 
 namespace savo_localization
@@ -29,6 +31,10 @@ private:
   void declare_parameters();
   void load_parameters();
   void configure_driver();
+  void create_calibration_save_service();
+  void save_calibration_callback(
+    const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+    std::shared_ptr<std_srvs::srv::Trigger::Response> response);
 
   void timer_callback();
 
@@ -44,6 +50,7 @@ private:
   std::string make_state_json(const BNO055Sample & sample) const;
 
   BNO055Mode configured_mode() const;
+  BNO055CalibrationMetadata calibration_metadata(bool include_timestamp) const;
 
   std::array<double, 9> orientation_covariance() const;
   std::array<double, 9> angular_velocity_covariance() const;
@@ -58,8 +65,8 @@ private:
   static double yaw_to_quaternion_z(double yaw_rad);
   static double yaw_to_quaternion_w(double yaw_rad);
 
-  static int diagnostic_level_from_sample(const BNO055Sample & sample);
-  static std::string diagnostic_message_from_sample(const BNO055Sample & sample);
+  int diagnostic_level_from_sample(const BNO055Sample & sample) const;
+  std::string diagnostic_message_from_sample(const BNO055Sample & sample) const;
 
   std::string frame_id_{"imu_link"};
   std::string imu_topic_{"/imu/data"};
@@ -72,6 +79,12 @@ private:
 
   double publish_rate_hz_{25.0};
   bool reset_on_start_{true};
+  bool calibration_restore_enabled_{true};
+  bool calibration_require_verified_restore_{true};
+  std::string calibration_profile_path_{
+    "/var/lib/robot_savo/localization/bno055_calibration.yaml"};
+  std::string calibration_save_service_name_{
+    "/savo_localization/save_imu_calibration"};
 
   bool publish_orientation_{true};
   bool publish_magnetic_field_{true};
@@ -91,16 +104,19 @@ private:
   double linear_acceleration_covariance_z_{0.10};
 
   std::unique_ptr<BNO055Driver> driver_;
+  std::unique_ptr<BNO055CalibrationRuntime> calibration_runtime_;
 
   rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_pub_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr state_pub_;
   rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr diagnostics_pub_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr calibration_save_service_;
 
   rclcpp::TimerBase::SharedPtr timer_;
 
   std::uint64_t sample_count_{0};
   std::uint64_t publish_count_{0};
   std::uint64_t error_count_{0};
+  bool have_live_calibration_status_{false};
 
   rclcpp::Time last_sample_time_;
   bool have_last_sample_{false};

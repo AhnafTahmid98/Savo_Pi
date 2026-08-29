@@ -13,6 +13,11 @@ imu_node:
     publish_rate_hz: 25.0
     reset_on_start: true
 
+    calibration_restore_enabled: true
+    calibration_profile_path: /var/lib/robot_savo/localization/bno055_calibration.yaml
+    calibration_require_verified_restore: true
+    calibration_save_service: /savo_localization/save_imu_calibration
+
     publish_orientation: true
     publish_magnetic_field: true
     publish_temperature: true

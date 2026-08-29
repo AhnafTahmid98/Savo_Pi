@@ -78,7 +78,7 @@ def test_profiles_select_baseline_and_vo_health_modes() -> None:
     assert "vo_required" not in vo_health
 
 
-def test_localization_bringup_keeps_ekf_and_health_profiles_consistent() -> None:
+def test_localization_bringup_supports_both_vo_modes_with_consistent_profiles() -> None:
     ekf_nodes = _launch_nodes("localization_bringup.launch.py", "ekf_node")
     health_nodes = _launch_nodes(
         "localization_bringup.launch.py", "localization_health_node"
@@ -165,6 +165,7 @@ def test_launch_defaults_reference_the_intended_profiles() -> None:
     bringup = _launch_argument_defaults("localization_bringup.launch.py")
     ekf = _launch_argument_defaults("ekf.launch.py")
 
+    assert bringup["use_vo"] == "'true'"
     assert BASELINE_PROFILE in bringup["baseline_profile_config"]
     assert VO_PROFILE in bringup["vo_profile_config"]
     assert BASELINE_PROFILE in ekf["profile_config"]

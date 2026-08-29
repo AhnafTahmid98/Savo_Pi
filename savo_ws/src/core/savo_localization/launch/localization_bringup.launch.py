@@ -33,6 +33,9 @@ def generate_launch_description() -> LaunchDescription:
     use_ekf = LaunchConfiguration("use_ekf")
     use_vo = LaunchConfiguration("use_vo")
     use_health = LaunchConfiguration("use_health")
+    calibration_restore_enabled = LaunchConfiguration(
+        "calibration_restore_enabled"
+    )
 
     return LaunchDescription(
         [
@@ -133,13 +136,18 @@ def generate_launch_description() -> LaunchDescription:
             ),
             DeclareLaunchArgument(
                 "use_vo",
-                default_value="false",
+                default_value="true",
                 description="Fuse /vo/odom from savo-edge.",
             ),
             DeclareLaunchArgument(
                 "use_health",
                 default_value="true",
                 description="Start localization_health_node.",
+            ),
+            DeclareLaunchArgument(
+                "calibration_restore_enabled",
+                default_value="true",
+                description="Restore the verified BNO055 calibration profile at startup.",
             ),
             Node(
                 package="savo_localization",
@@ -152,6 +160,9 @@ def generate_launch_description() -> LaunchDescription:
                     frames_config,
                     imu_config,
                     baseline_profile_config,
+                    {
+                        "calibration_restore_enabled": calibration_restore_enabled,
+                    },
                 ],
             ),
 

@@ -600,10 +600,15 @@ private:
   void on_imu_state(const std::string & payload)
   {
     if (contains_case_sensitive(payload, "unexpected BNO055 chip id") ||
-      contains_case_sensitive(payload, "BNO055 system error"))
+      contains_case_sensitive(payload, "BNO055 system error") ||
+      contains_case_sensitive(payload, "BNO055 calibration restore failed"))
     {
       imu_tracker_.diagnostic_error = true;
       imu_tracker_.detail = "imu_state_reports_error";
+    } else if (contains_case_sensitive(payload, "IMU usable, calibration restore failed")) {
+      imu_tracker_.diagnostic_error = false;
+      imu_tracker_.diagnostic_warning = true;
+      imu_tracker_.detail = "imu_calibration_restore_failed_optional";
     } else if (contains_case_sensitive(payload, "calibration not fully ready")) {
       imu_tracker_.diagnostic_error = false;
       imu_tracker_.diagnostic_warning = true;
