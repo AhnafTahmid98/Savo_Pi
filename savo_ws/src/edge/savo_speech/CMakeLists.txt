@@ -117,6 +117,7 @@ add_library(savo_speech_audio_core STATIC
 )
 
 add_library(savo_speech_transport_core STATIC
+  src/transport/robot_playback_server.cpp
   src/transport/savomind_transport.cpp
   src/transport/savomind_round_trip_worker.cpp
 )
@@ -372,6 +373,7 @@ if(BUILD_TESTING)
     test/unit/test_wav_codec.cpp
     test/unit/test_savomind_transport.cpp
     test/unit/test_unix_socket_savomind_transport.cpp
+    test/unit/test_robot_playback_server.cpp
   )
 
   target_include_directories(test_audio_primitives

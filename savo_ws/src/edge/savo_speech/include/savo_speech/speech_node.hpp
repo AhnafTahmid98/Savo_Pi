@@ -24,6 +24,7 @@
 #include "savo_speech/session/utterance_session_processor.hpp"
 #include "savo_speech/transport/savomind_round_trip_worker.hpp"
 #include "savo_speech/transport/savomind_transport.hpp"
+#include "savo_speech/transport/robot_playback_server.hpp"
 #include "savo_speech/vad/adaptive_energy_vad_backend.hpp"
 #include "savo_speech/vad/vad_processor.hpp"
 #include "savo_speech/wake_word/pocketsphinx_wake_word_backend.hpp"
@@ -170,6 +171,13 @@ private:
     bool savomind_require_server_uid{false};
     std::int64_t savomind_server_uid{10001};
 
+    bool robot_playback_enabled{false};
+    std::string robot_playback_socket_path{
+      "/run/savo_speech/playback.sock"};
+    std::int64_t robot_playback_maximum_wav_bytes{16 * 1024 * 1024};
+    bool robot_playback_require_peer_uid{false};
+    std::int64_t robot_playback_peer_uid{10001};
+
     double status_publish_rate_hz{2.0};
     double heartbeat_rate_hz{1.0};
   };
@@ -227,6 +235,9 @@ private:
 
   std::unique_ptr<audio::AudioRuntime>
   audio_runtime_;
+
+  std::unique_ptr<transport::RobotPlaybackServer>
+  robot_playback_server_;
 
   std::unique_ptr<audio::AudioActivityMonitor>
   audio_activity_monitor_;

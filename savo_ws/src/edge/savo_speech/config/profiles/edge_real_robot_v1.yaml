@@ -140,6 +140,14 @@ savo_speech_node:
       require_server_uid: true
       server_uid: 10001
 
+    robot_playback:
+      enabled: true
+      socket_path: "/run/savo_speech/playback.sock"
+      maximum_wav_bytes: 16777216
+      # SavoMind's production container UID; validated with SO_PEERCRED.
+      require_peer_uid: true
+      peer_uid: 10001
+
     diagnostics:
       status_publish_rate_hz: 2.0
       heartbeat_rate_hz: 1.0
