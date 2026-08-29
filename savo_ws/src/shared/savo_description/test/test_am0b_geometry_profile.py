@@ -225,6 +225,16 @@ def test_xacro_and_tf_authority_boundaries_are_explicit():
     assert "publish_tf: false" in authority
 
 
+def test_rsp_entry_point_requires_locked_physical_geometry_by_default():
+    rsp_launch = (ROOT / "launch/rsp.launch.py").read_text()
+    assert '"require_locked_geometry"' in rsp_launch
+    assert 'default_value="true"' in rsp_launch
+    assert '"allow_provisional_geometry"' in rsp_launch
+    assert 'default_value="false"' in rsp_launch
+    assert '"require_locked_geometry": LaunchConfiguration(' in rsp_launch
+    assert '"allow_provisional_geometry": LaunchConfiguration(' in rsp_launch
+
+
 def test_realsense_driver_does_not_duplicate_description_tf():
     profiles = (
         "realsense_nav_profile.yaml",
