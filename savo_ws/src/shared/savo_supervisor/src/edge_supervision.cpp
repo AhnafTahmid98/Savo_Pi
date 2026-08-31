@@ -95,7 +95,7 @@ EdgeSupervisionState EdgeSupervision::Evaluate(
     realsense.color_ready && realsense.depth_ready && realsense.pointcloud_ready;
   const bool speech_ready = speech.valid && speech.fresh && speech.heartbeat_fresh && speech.ready;
   const bool vo_ready = vo.valid && vo.fresh && vo.ready;
-  const bool ui_ready = !ui.enabled || ui.graph_visible;
+  const bool ui_ready = !policy_.ui_enabled || (ui.enabled && ui.graph_visible);
 
   result.components.push_back(summarize(
     "bridge", policy_.bridge_enabled, policy_.bridge_required_for_startup,
