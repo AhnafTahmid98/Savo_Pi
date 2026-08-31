@@ -73,7 +73,8 @@ def test_vo_launch_separates_driver_and_monitor_configs() -> None:
     assert launch_text.count("parameters=[monitor_config_file]") == 2
     assert "rs_launch.py" not in launch_text
     assert "IncludeLaunchDescription" not in launch_text
-    assert '"realsense_vo_driver.yaml"' in launch_text
+    assert '"realsense_d435_camera.yaml"' in launch_text
+    assert '"realsense_vo_driver.yaml"' not in launch_text
     assert '"realsense_vo_profile.yaml"' in launch_text
 
 
@@ -121,8 +122,8 @@ def test_observer_color_relay_runtime_dependencies_are_declared() -> None:
     }.issubset(runtime_dependencies)
 
 
-def test_vo_driver_config_is_direct_node_yaml_and_enables_streams() -> None:
-    config = load_yaml("config/realsense_vo_driver.yaml")
+def test_vo_launch_driver_config_is_validated_production_profile() -> None:
+    config = load_yaml("config/realsense_d435_camera.yaml")
     params = config["/camera/camera"]["ros__parameters"]
 
     assert params["camera_name"] == "camera"
@@ -130,7 +131,7 @@ def test_vo_driver_config_is_direct_node_yaml_and_enables_streams() -> None:
     assert params["serial_no"] == "801212070967"
     assert params["enable_color"] is True
     assert params["enable_depth"] is True
-    assert params["depth_module.depth_profile"] == "640x480x30"
+    assert params["depth_module.depth_profile"] == "848x480x30"
     assert params["rgb_camera.color_profile"] == "640x480x30"
     assert params["align_depth.enable"] is True
     assert params["enable_sync"] is True
@@ -145,8 +146,8 @@ def test_vo_driver_config_is_direct_node_yaml_and_enables_streams() -> None:
     assert "pointcloud.stream_index_filter" not in params
 
 
-def test_vo_driver_disables_tf_infrared_and_motion_streams() -> None:
-    config = load_yaml("config/realsense_vo_driver.yaml")
+def test_vo_launch_driver_disables_tf_infrared_and_motion_streams() -> None:
+    config = load_yaml("config/realsense_d435_camera.yaml")
     params = config["/camera/camera"]["ros__parameters"]
 
     assert params["publish_tf"] is False
@@ -156,6 +157,13 @@ def test_vo_driver_disables_tf_infrared_and_motion_streams() -> None:
     assert params["enable_infra2"] is False
     assert params["enable_gyro"] is False
     assert params["enable_accel"] is False
+
+
+def test_legacy_vo_driver_matches_validated_production_driver() -> None:
+    legacy = load_yaml("config/realsense_vo_driver.yaml")
+    production = load_yaml("config/realsense_d435_camera.yaml")
+
+    assert legacy == production
 
 
 def test_vo_monitor_profile_requires_pointcloud() -> None:
