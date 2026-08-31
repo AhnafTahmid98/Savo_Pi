@@ -12,6 +12,9 @@ def generate_launch_description() -> LaunchDescription:
     camera_config_file = LaunchConfiguration("camera_config_file")
     nodes_config_file = LaunchConfiguration("nodes_config_file")
     use_depth_front_min = LaunchConfiguration("use_depth_front_min")
+    enable_observer_color_relay = LaunchConfiguration(
+        "enable_observer_color_relay"
+    )
 
     realsense_node = Node(
         package="realsense2_camera",
@@ -47,6 +50,25 @@ def generate_launch_description() -> LaunchDescription:
         condition=IfCondition(use_depth_front_min),
     )
 
+    observer_color_relay = Node(
+        package="image_transport",
+        executable="republish",
+        name="d435_observer_color_republisher",
+        output="screen",
+        condition=IfCondition(enable_observer_color_relay),
+        parameters=[{
+            "in_transport": "raw",
+            "out_transport": "compressed",
+        }],
+        remappings=[
+            ("in", "/camera/camera/color/image_raw"),
+            (
+                "out/compressed",
+                "/savo_observer/d435/color/image_raw/compressed",
+            ),
+        ],
+    )
+
     return LaunchDescription([
         DeclareLaunchArgument(
             "camera_config_file",
@@ -68,8 +90,14 @@ def generate_launch_description() -> LaunchDescription:
             "use_depth_front_min",
             default_value="true",
         ),
+        DeclareLaunchArgument(
+            "enable_observer_color_relay",
+            default_value="true",
+            description="Publish the production observer compressed D435 color",
+        ),
         realsense_node,
         topic_monitor,
         health_node,
         depth_front_min_node,
+        observer_color_relay,
     ])

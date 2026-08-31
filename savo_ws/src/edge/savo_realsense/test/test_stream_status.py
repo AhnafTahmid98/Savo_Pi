@@ -91,3 +91,17 @@ def test_stream_status_ignores_rate_check_when_expected_rate_is_zero() -> None:
     )
 
     assert not status.below_expected_rate
+
+
+def test_validated_native_pointcloud_rate_remains_healthy_when_fresh() -> None:
+    status = StreamStatus(
+        topic="/camera/camera/depth/color/points",
+        seen=True,
+        stale=False,
+        rate_hz=2.73,
+        expected_hz=8.0,
+        last_age_s=0.37,
+    )
+
+    assert status.ok
+    assert status.below_expected_rate

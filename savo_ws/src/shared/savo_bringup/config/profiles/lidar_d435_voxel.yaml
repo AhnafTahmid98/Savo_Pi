@@ -4,5 +4,5 @@ robot_savo_bringup_profile:
   require_locked_geometry: true
   allow_provisional_geometry: false
   navigation_profile: lidar_d435_voxel
-  d435_voxel_validated: false
-  motion_scope: controlled_real_robot_after_d435_validation
+  d435_voxel_validated: true
+  motion_scope: controlled_real_robot

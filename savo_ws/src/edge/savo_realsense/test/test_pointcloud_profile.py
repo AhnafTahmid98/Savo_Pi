@@ -80,6 +80,27 @@ def test_pointcloud_nodes_require_pointcloud() -> None:
     assert health_params["expected_pointcloud_hz"] > 0.0
 
 
+def test_compatibility_pointcloud_profiles_match_canonical_production() -> None:
+    assert load_yaml("realsense_pointcloud_camera.yaml") == load_yaml(
+        "realsense_d435_camera.yaml"
+    )
+    assert load_yaml("realsense_pointcloud_nodes.yaml") == load_yaml(
+        "realsense_d435_nodes.yaml"
+    )
+
+
+def test_native_health_uses_fresh_nonzero_pointcloud_not_expected_rate() -> None:
+    implementation = (
+        PACKAGE_ROOT / "src" / "camera_monitor_common.cpp"
+    ).read_text(encoding="utf-8")
+    ok_body = implementation.split(
+        "bool StreamStatus::ok() const", maxsplit=1
+    )[1].split("}", maxsplit=1)[0]
+
+    assert "return seen && !stale && rate_hz > 0.0;" in ok_body
+    assert "expected_hz" not in ok_body
+
+
 def test_all_runtime_driver_profiles_leave_fixed_tf_to_description() -> None:
     for name in (
         "realsense_minimal.yaml",

@@ -166,11 +166,14 @@ Supported robot modes are:
 
 Supported profiles are `bench`, `lidar_only`, `lidar_d435_voxel`, and
 `production`. Motion-capable non-bench profiles require a locked geometry
-profile. `lidar_d435_voxel` additionally requires
-`d435_voxel_validated:=true`; otherwise launch fails before runtime nodes
-start. In navigation modes, Edge starts the filtered D435 obstacle helper even
-with `lidar_only` so hardware validation data is available, but helper loss
-does not gate the required LiDAR navigation path.
+profile. The D435 obstacle pipeline is hardware validated, so canonical
+real-robot Edge bringup defaults `d435_voxel_validated:=true` and
+`start_obstacle_cloud:=true`. It starts the single validated D435 camera,
+monitor and health nodes, front-depth producer, VO, local raw pointcloud,
+filtered obstacle cloud, and compressed observer color relay. Explicitly
+disabling the obstacle or observer relay remains available for controlled
+testing. Helper loss does not gate the required LiDAR navigation path, and
+LiDAR remains the reliable clearing source.
 
 The first controlled real-robot test should use:
 

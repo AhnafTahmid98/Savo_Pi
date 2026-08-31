@@ -148,6 +148,43 @@ def test_observer_color_relay_runtime_dependencies_are_declared() -> None:
     }.issubset(runtime_dependencies)
 
 
+def test_canonical_bringup_starts_one_camera_and_production_color_relay() -> None:
+    launch_path = "launch/realsense_bringup.launch.py"
+    launch_text = read_file(launch_path)
+
+    assert launch_argument_defaults(launch_path)[
+        "enable_observer_color_relay"
+    ] == "true"
+    assert launch_text.count('executable="realsense2_camera_node"') == 1
+    assert launch_text.count("Node(") == 5
+    assert '"realsense_d435_camera.yaml"' in launch_text
+    assert '"realsense_d435_nodes.yaml"' in launch_text
+    assert 'executable="depth_front_min_node"' in launch_text
+
+    relays = [
+        call
+        for call in node_calls(launch_path)
+        if ast.literal_eval(keyword_value(call, "package")) == "image_transport"
+        and ast.literal_eval(keyword_value(call, "executable")) == "republish"
+    ]
+    assert len(relays) == 1
+    relay = relays[0]
+    assert ast.unparse(keyword_value(relay, "condition")) == (
+        "IfCondition(enable_observer_color_relay)"
+    )
+    assert ast.literal_eval(keyword_value(relay, "parameters")) == [{
+        "in_transport": "raw",
+        "out_transport": "compressed",
+    }]
+    assert ast.literal_eval(keyword_value(relay, "remappings")) == [
+        ("in", "/camera/camera/color/image_raw"),
+        (
+            "out/compressed",
+            "/savo_observer/d435/color/image_raw/compressed",
+        ),
+    ]
+
+
 def test_vo_launch_driver_config_is_validated_production_profile() -> None:
     config = load_yaml("config/realsense_d435_camera.yaml")
     params = config["/camera/camera"]["ros__parameters"]

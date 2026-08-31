@@ -123,6 +123,7 @@ def _setup(context):
             "start_realsense",
             "start_vo",
             "start_obstacle_cloud",
+            "enable_observer_color_relay",
             "start_speech",
             "start_ui",
             "start_bridge",
@@ -168,7 +169,7 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument("host_role", default_value="auto"),
             DeclareLaunchArgument("robot_mode", default_value="safe_idle"),
             DeclareLaunchArgument("bringup_profile", default_value="lidar_only"),
-            DeclareLaunchArgument("d435_voxel_validated", default_value="false"),
+            DeclareLaunchArgument("d435_voxel_validated", default_value="true"),
             DeclareLaunchArgument("require_locked_geometry", default_value="true"),
             DeclareLaunchArgument(
                 "allow_provisional_geometry", default_value="false"
@@ -232,7 +233,10 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument("head_camera_mode", default_value="ros"),
             DeclareLaunchArgument("start_realsense", default_value="true"),
             DeclareLaunchArgument("start_vo", default_value="true"),
-            DeclareLaunchArgument("start_obstacle_cloud", default_value="false"),
+            DeclareLaunchArgument("start_obstacle_cloud", default_value="true"),
+            DeclareLaunchArgument(
+                "enable_observer_color_relay", default_value="true"
+            ),
             DeclareLaunchArgument("start_speech", default_value="false"),
             DeclareLaunchArgument("start_ui", default_value="false"),
             DeclareLaunchArgument("start_bridge", default_value="true"),

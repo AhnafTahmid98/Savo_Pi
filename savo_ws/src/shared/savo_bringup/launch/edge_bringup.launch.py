@@ -44,6 +44,9 @@ def _setup(context):
 
     start_realsense = as_bool(_value(context, "start_realsense"))
     start_vo = as_bool(_value(context, "start_vo"))
+    enable_observer_color_relay = as_bool(
+        _value(context, "enable_observer_color_relay")
+    )
     explicit_obstacle_cloud = as_bool(
         _value(context, "start_obstacle_cloud")
     )
@@ -71,6 +74,10 @@ def _setup(context):
         raise RuntimeError("start_vo requires start_realsense")
     if explicit_obstacle_cloud and not start_realsense:
         raise RuntimeError("start_obstacle_cloud requires start_realsense")
+    if explicit_obstacle_cloud and not voxel_validated:
+        raise RuntimeError(
+            "start_obstacle_cloud requires d435_voxel_validated:=true"
+        )
     requirements = resolve_requirements(
         "edge",
         mode,
@@ -94,22 +101,14 @@ def _setup(context):
             [
                 FindPackageShare("savo_realsense"),
                 "config",
-                (
-                    "realsense_pointcloud_camera.yaml"
-                    if start_obstacle_cloud
-                    else "realsense_d435_camera.yaml"
-                ),
+                "realsense_d435_camera.yaml",
             ]
         )
         nodes_config = PathJoinSubstitution(
             [
                 FindPackageShare("savo_realsense"),
                 "config",
-                (
-                    "realsense_pointcloud_nodes.yaml"
-                    if start_obstacle_cloud
-                    else "realsense_d435_nodes.yaml"
-                ),
+                "realsense_d435_nodes.yaml",
             ]
         )
         actions.append(
@@ -119,6 +118,9 @@ def _setup(context):
                     "camera_config_file": camera_config,
                     "nodes_config_file": nodes_config,
                     "use_depth_front_min": "true",
+                    "enable_observer_color_relay": (
+                        "true" if enable_observer_color_relay else "false"
+                    ),
                 }.items(),
             )
         )
@@ -244,7 +246,7 @@ def generate_launch_description() -> LaunchDescription:
         [
             DeclareLaunchArgument("robot_mode", default_value="safe_idle"),
             DeclareLaunchArgument("bringup_profile", default_value="lidar_only"),
-            DeclareLaunchArgument("d435_voxel_validated", default_value="false"),
+            DeclareLaunchArgument("d435_voxel_validated", default_value="true"),
             DeclareLaunchArgument("require_locked_geometry", default_value="true"),
             DeclareLaunchArgument(
                 "allow_provisional_geometry", default_value="false"
@@ -253,7 +255,10 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument("log_level", default_value="info"),
             DeclareLaunchArgument("start_realsense", default_value="true"),
             DeclareLaunchArgument("start_vo", default_value="true"),
-            DeclareLaunchArgument("start_obstacle_cloud", default_value="false"),
+            DeclareLaunchArgument("start_obstacle_cloud", default_value="true"),
+            DeclareLaunchArgument(
+                "enable_observer_color_relay", default_value="true"
+            ),
             DeclareLaunchArgument("start_speech", default_value="false"),
             DeclareLaunchArgument("start_ui", default_value="false"),
             DeclareLaunchArgument("start_bridge", default_value="true"),

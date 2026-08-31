@@ -1,12 +1,11 @@
 # Robot Savo RealSense
 
-## Optional observer color relay
+## Production observer color relay
 
 The production D435 color stream remains full-rate `640x480x30` at
 `/camera/camera/color/image_raw` on Edge. For the external observer only,
-`realsense_vo.launch.py` accepts
-`enable_observer_color_relay:=true` to start one standard `image_transport`
-republisher on Edge:
+The canonical `realsense_bringup.launch.py` starts one standard
+`image_transport` republisher on Edge by default:
 
 ```text
 /camera/camera/color/image_raw
@@ -18,25 +17,44 @@ republisher on Edge:
 Production depth at `/camera/camera/depth/image_rect_raw` and the raw cloud at
 `/camera/camera/depth/color/points` also remain unchanged and available.
 
-The relay defaults to disabled because large raw DDS image samples are only a
-problem on the Edge Wi-Fi to bridged Ubuntu VM observer path. It does not
-change camera FPS or resolution, the raw color topic, raw pointcloud,
-navigation or perception semantics, VO, or fixed D435 TF ownership. The
-separate RealSense startup firmware notification is not suppressed or
-reinterpreted by this relay.
+The relay exists only for the observer path. It does not change camera FPS or
+resolution, the raw color topic, raw pointcloud, navigation or perception
+semantics, VO, or fixed D435 TF ownership. It can be disabled for controlled
+testing with `enable_observer_color_relay:=false`.
 
-Normal production remains:
+Normal production is:
 
 ```bash
-ros2 launch savo_realsense realsense_vo.launch.py
+ros2 launch savo_realsense realsense_bringup.launch.py
 ```
 
-Enable the observer JPEG relay explicitly on Edge with:
+The standalone VO-oriented launch retains its explicit relay switch:
 
 ```bash
 ros2 launch savo_realsense realsense_vo.launch.py \
   enable_observer_color_relay:=true
 ```
+
+The canonical driver configuration is `realsense_d435_camera.yaml`; it already
+enables the local raw pointcloud required by the obstacle filter. The legacy
+`realsense_pointcloud_camera.yaml` and `realsense_pointcloud_nodes.yaml` files
+remain installed for their standalone launch interface and are contract-tested
+to match the canonical production configuration.
+
+The native monitor records `expected_pointcloud_hz` as diagnostic metadata.
+Health is fail-closed on an unseen, stale, or zero-rate required cloud, but does
+not compare the measured rate with that metadata. The hardware-measured
+approximately 2.73 Hz pointcloud is therefore healthy while fresh under the
+0.75-second stale timeout; the existing expected-rate metadata was not lowered.
+
+RealSense may log `No stream match for pointcloud chosen texture Process -
+Color` while the validated XYZ cloud continues publishing. The wrapper's
+supported parameter describes `stream_filter` as the pointcloud texture stream;
+it does not document a separate untextured-XYZ selection. Robot Savo therefore
+preserves the hardware-validated Color selection and treats this warning as
+non-fatal only while raw/filtered cloud health, publication counts, and TF/error
+counters remain healthy. Any missing, stale, malformed, or transform-failing
+cloud remains a real failure.
 
 Recommended writing order
 Step 1 — package metadata
