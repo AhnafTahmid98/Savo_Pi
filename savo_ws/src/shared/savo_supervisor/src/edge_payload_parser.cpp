@@ -24,6 +24,16 @@ std::string lower(std::string value)
   return value;
 }
 
+std::string trim(std::string value)
+{
+  const auto first = value.find_first_not_of(" \t\r\n");
+  if (first == std::string::npos) {
+    return {};
+  }
+  const auto last = value.find_last_not_of(" \t\r\n");
+  return value.substr(first, last - first + 1U);
+}
+
 bool required_boolean(const Json & json, const char * key, bool & value)
 {
   if (!json.contains(key) || !json.at(key).is_boolean()) {
@@ -135,14 +145,19 @@ VisualOdometryObservation EdgePayloadParser::ParseVoHealth(
 {
   VisualOdometryObservation result;
   result.received = true;
-  const auto normalized = lower(payload);
+  const auto normalized = lower(trim(payload));
   const auto separator = normalized.find(':');
-  result.state = separator == std::string::npos ? normalized : normalized.substr(0U, separator);
-  result.reason = separator == std::string::npos ? normalized : normalized.substr(separator + 1U);
+  result.state = trim(
+    separator == std::string::npos ? normalized : normalized.substr(0U, separator));
+  result.reason = trim(
+    separator == std::string::npos ? normalized : normalized.substr(separator + 1U));
   if (result.state == "ok") {
     result.valid = true;
     result.ready = true;
   } else if (result.state == "degraded") {
+    result.valid = true;
+    result.degraded = true;
+  } else if (result.state == "stale") {
     result.valid = true;
     result.degraded = true;
   } else if (result.state == "waiting" || result.state == "error") {

@@ -90,14 +90,47 @@ TEST(EdgeSupervision, HealthyEdgeEnablesStartupAndRemotePath)
 
 TEST(EdgeSupervision, OptionalSpeechLossDegradesWithoutBlockingStartup)
 {
+  savo_supervisor::EdgeSupervisionPolicy policy;
+  policy.speech_enabled = true;
   auto speech = healthy_speech();
   speech.ready = false;
   speech.reason = "speech_error";
-  const auto result = savo_supervisor::EdgeSupervision{}.Evaluate(
+  const auto result = savo_supervisor::EdgeSupervision{policy}.Evaluate(
     healthy_bridge(), healthy_camera(), speech, healthy_vo(), healthy_ui());
   EXPECT_FALSE(result.capabilities.edge_health_ready);
   EXPECT_TRUE(result.capabilities.edge_startup_ready);
   EXPECT_TRUE(result.degraded);
+}
+
+TEST(EdgeSupervision, ProductionDefaultsIgnoreIntentionallyDisabledSpeechAndUi)
+{
+  const auto result = savo_supervisor::EdgeSupervision{}.Evaluate(
+    healthy_bridge(), healthy_camera(), savo_supervisor::VoiceObservation{},
+    healthy_vo(), savo_supervisor::UiObservation{});
+
+  EXPECT_TRUE(result.capabilities.edge_health_ready);
+  EXPECT_TRUE(result.capabilities.edge_startup_ready);
+  EXPECT_TRUE(result.capabilities.speech_ready);
+  EXPECT_TRUE(result.capabilities.ui_ready);
+  EXPECT_FALSE(result.degraded);
+}
+
+TEST(EdgeSupervision, ExplicitlyEnabledSpeechAndUiExposeAbsence)
+{
+  savo_supervisor::EdgeSupervisionPolicy policy;
+  policy.speech_enabled = true;
+  policy.ui_enabled = true;
+
+  const auto result = savo_supervisor::EdgeSupervision{policy}.Evaluate(
+    healthy_bridge(), healthy_camera(), savo_supervisor::VoiceObservation{},
+    healthy_vo(), savo_supervisor::UiObservation{});
+
+  EXPECT_FALSE(result.capabilities.edge_health_ready);
+  EXPECT_TRUE(result.capabilities.edge_startup_ready);
+  EXPECT_FALSE(result.capabilities.speech_ready);
+  EXPECT_FALSE(result.capabilities.ui_ready);
+  EXPECT_TRUE(result.degraded);
+  EXPECT_EQ(result.reason, "edge_optional_capability_degraded");
 }
 
 TEST(EdgeSupervision, OptionalVoLossDoesNotBlockCoreStartup)

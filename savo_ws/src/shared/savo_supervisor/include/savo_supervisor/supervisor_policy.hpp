@@ -45,7 +45,7 @@ struct SupervisorPolicy
   static ComponentConfig DefaultPowerConfig();
 
   ComponentSummary EvaluateComponent(
-    const ComponentStatus & status,
+    ComponentStatus & status,
     const rclcpp::Time & now,
     double startup_age_s) const;
 

@@ -579,7 +579,7 @@ private:
     declare_parameter<std::string>("edge.realsense.status_topic", "/realsense/status");
     declare_parameter<double>("edge.realsense.status_timeout_s", 2.0);
 
-    declare_parameter<bool>("edge.speech.enabled", true);
+    declare_parameter<bool>("edge.speech.enabled", false);
     declare_parameter<bool>("edge.speech.required_for_startup", false);
     declare_parameter<std::string>("edge.speech.readiness_topic", "/savo_speech/readiness");
     declare_parameter<std::string>("edge.speech.heartbeat_topic", "/savo_speech/heartbeat");
@@ -591,7 +591,7 @@ private:
     declare_parameter<std::string>("edge.vo.health_topic", "/vo/health");
     declare_parameter<double>("edge.vo.health_timeout_s", 2.0);
 
-    declare_parameter<bool>("edge.ui.enabled", true);
+    declare_parameter<bool>("edge.ui.enabled", false);
     declare_parameter<bool>("edge.ui.required_for_startup", false);
     declare_parameter<std::vector<std::string>>(
       "edge.ui.expected_nodes", std::vector<std::string>{"/savo_ui_node"});
@@ -613,6 +613,9 @@ private:
     declare_parameter<double>(prefix + ".summary_timeout_s", defaults.summary_timeout_s);
     declare_parameter<double>(prefix + ".heartbeat_timeout_s", defaults.heartbeat_timeout_s);
     declare_parameter<int>(prefix + ".expected_schema_version", defaults.expected_schema_version);
+    declare_parameter<double>(
+      prefix + ".consistency_transition_grace_s",
+      defaults.consistency_transition_grace_s);
   }
 
   svo::ComponentConfig load_component(
@@ -629,6 +632,8 @@ private:
     config.heartbeat_timeout_s = get_parameter(prefix + ".heartbeat_timeout_s").as_double();
     config.expected_schema_version = static_cast<int>(
       get_parameter(prefix + ".expected_schema_version").as_int());
+    config.consistency_transition_grace_s =
+      get_parameter(prefix + ".consistency_transition_grace_s").as_double();
     return config;
   }
 
@@ -1089,7 +1094,7 @@ private:
     }
     if (edge_policy_.realsense_enabled) {
       subscriptions_.push_back(create_subscription<std_msgs::msg::String>(
-        realsense_status_topic_, rclcpp::QoS(1).transient_local().reliable(),
+        realsense_status_topic_, rclcpp::QoS(10).reliable().durability_volatile(),
           [this](std_msgs::msg::String::SharedPtr msg) {
             realsense_observation_ = edge_parser_.ParseRealSenseStatus(msg->data);
             realsense_status_tracker_.observe_message(
@@ -1113,7 +1118,7 @@ private:
     }
     if (edge_policy_.vo_enabled) {
       subscriptions_.push_back(create_subscription<std_msgs::msg::String>(
-        vo_health_topic_, rclcpp::QoS(1).transient_local().reliable(),
+        vo_health_topic_, rclcpp::QoS(10).reliable().durability_volatile(),
           [this](std_msgs::msg::String::SharedPtr msg) {
             vo_observation_ = edge_parser_.ParseVoHealth(msg->data);
             vo_health_tracker_.observe_message(

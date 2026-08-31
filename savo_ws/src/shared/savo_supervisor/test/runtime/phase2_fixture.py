@@ -79,13 +79,13 @@ class MissionFixture(Node):
         self._bridge_heartbeat = self.create_publisher(
             UInt64, '/savo_bridge/heartbeat', status_qos)
         self._realsense_status = self.create_publisher(
-            String, '/realsense/status', retained_qos)
+            String, '/realsense/status', status_qos)
         self._speech_readiness = self.create_publisher(
             String, '/savo_speech/readiness', retained_qos)
         self._speech_heartbeat = self.create_publisher(
             UInt64, '/savo_speech/heartbeat', status_qos)
         self._vo_health = self.create_publisher(
-            String, '/vo/health', retained_qos)
+            String, '/vo/health', status_qos)
 
         self._control = self.create_subscription(
             String, _CONTROL_TOPIC, self._on_control, status_qos)

@@ -58,3 +58,29 @@ def test_production_config_distinguishes_required_and_optional_edge_capabilities
     assert 'edge.vo.required_for_startup: false' in config
     assert 'edge.ui.required_for_startup: false' in config
     assert 'system_authority.auto_arm: false' in config
+
+
+def test_periodic_realsense_and_vo_health_use_production_volatile_qos():
+    node = (ROOT / 'src' / 'supervisor_node.cpp').read_text()
+    fixture = (ROOT / 'test' / 'runtime' / 'phase2_fixture.py').read_text()
+    realsense = (
+        ROOT.parents[1] / 'edge' / 'savo_realsense' / 'src' /
+        'camera_health_main.cpp'
+    ).read_text()
+    vo = (
+        ROOT.parents[1] / 'edge' / 'savo_vo' / 'src' / 'vo_health_node.cpp'
+    ).read_text()
+
+    expected_qos = 'rclcpp::QoS(10).reliable().durability_volatile()'
+    assert node.count(expected_qos) >= 2
+    assert 'realsense_status_topic_, ' + expected_qos in node
+    assert 'vo_health_topic_, ' + expected_qos in node
+    realsense_qos = (
+        'auto reliable_qos = '
+        'rclcpp::QoS(rclcpp::KeepLast(10)).reliable()'
+    )
+    assert realsense_qos in realsense
+    assert 'qos.durability_volatile()' in vo
+    assert 'return "stale: visual odometry timeout";' in vo
+    assert "String, '/realsense/status', status_qos" in fixture
+    assert "String, '/vo/health', status_qos" in fixture

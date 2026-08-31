@@ -206,21 +206,21 @@ def run(output: Path | None) -> int:
             'explicit arm enables remote command authority',
         )
 
-        node.publish_control('drop_speech')
+        node.publish_control('drop_vo')
         snapshots['optional_edge_degraded'] = node.wait_state(
             lambda state: (
                 _system_state('ARMED_DEGRADED')(state)
                 and state.get('edge_capabilities', {}).get(
-                    'speech_ready') is False
+                    'vo_ready') is False
                 and state.get('system_authority', {}).get(
                     'remote_commands_ready') is True
             ),
-            'optional speech loss degrades without disabling bridge commands',
+            'optional VO loss degrades without disabling bridge commands',
         )
-        node.publish_control('restore_speech')
+        node.publish_control('restore_vo')
         node.wait_state(
             _system_armed,
-            'optional speech recovery restores nominal armed state',
+            'optional VO recovery restores nominal armed state',
         )
 
         acquired = node.call_manual_authority(

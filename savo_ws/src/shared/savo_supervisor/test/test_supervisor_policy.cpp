@@ -137,6 +137,7 @@ TEST(SupervisorPolicy, DefaultLocalizationConfig)
   EXPECT_DOUBLE_EQ(config.health_timeout_s, 1.5);
   EXPECT_DOUBLE_EQ(config.summary_timeout_s, 1.5);
   EXPECT_DOUBLE_EQ(config.heartbeat_timeout_s, 2.5);
+  EXPECT_DOUBLE_EQ(config.consistency_transition_grace_s, 1.5);
   EXPECT_EQ(config.expected_schema_version, 1);
 }
 
@@ -286,6 +287,128 @@ TEST(SupervisorPolicy, DegradedLocalizationCanRemainReady)
   EXPECT_TRUE(result.degraded);
 }
 
+TEST(SupervisorPolicy, DegradedToOkArrivalSkewRemainsReady)
+{
+  SupervisorPolicy policy;
+  auto status = make_status();
+
+  observe_all(status, 10.0);
+  set_consistent_state(status, "DEGRADED", true, true);
+
+  status.health_tracker.observe_message(
+    test_time(10.5), message_stamp(11), false, "");
+  status.health_state = "OK";
+  status.health_degraded = false;
+  status.health_reason_code = savo_supervisor::reason::kLocalizationOperational;
+
+  auto result = policy.EvaluateComponent(status, test_time(10.6), 10.6);
+  EXPECT_EQ(result.state, ComponentState::DEGRADED);
+  EXPECT_TRUE(result.ready);
+
+  status.summary_tracker.observe_message(
+    test_time(10.7), message_stamp(11), false, "");
+  status.summary_state = "OK";
+  status.summary_degraded = false;
+  status.summary_reason_code = savo_supervisor::reason::kLocalizationOperational;
+
+  result = policy.EvaluateComponent(status, test_time(10.8), 10.8);
+  EXPECT_EQ(result.state, ComponentState::DEGRADED);
+  EXPECT_TRUE(result.ready);
+
+  status.heartbeat_tracker.observe_message(
+    test_time(10.9), message_stamp(11), false, "");
+  status.heartbeat_state = "OK";
+
+  result = policy.EvaluateComponent(status, test_time(11.0), 11.0);
+  EXPECT_EQ(result.state, ComponentState::OK);
+  EXPECT_TRUE(result.ready);
+  EXPECT_FALSE(result.degraded);
+}
+
+TEST(SupervisorPolicy, OkToDegradedArrivalSkewRemainsReady)
+{
+  SupervisorPolicy policy;
+  auto status = make_status();
+
+  observe_all(status, 20.0);
+  set_consistent_state(status, "OK", true, false);
+
+  status.health_tracker.observe_message(
+    test_time(20.2), message_stamp(21), false, "");
+  status.health_state = "DEGRADED";
+  status.health_degraded = true;
+  status.health_reason_code = savo_supervisor::reason::kLocalizationDegraded;
+
+  auto result = policy.EvaluateComponent(status, test_time(20.3), 20.3);
+  EXPECT_EQ(result.state, ComponentState::DEGRADED);
+  EXPECT_TRUE(result.ready);
+
+  status.summary_tracker.observe_message(
+    test_time(20.4), message_stamp(21), false, "");
+  status.summary_state = "DEGRADED";
+  status.summary_degraded = true;
+  status.summary_reason_code = savo_supervisor::reason::kLocalizationDegraded;
+
+  status.heartbeat_tracker.observe_message(
+    test_time(20.6), message_stamp(21), false, "");
+  status.heartbeat_state = "DEGRADED";
+
+  result = policy.EvaluateComponent(status, test_time(20.7), 20.7);
+  EXPECT_EQ(result.state, ComponentState::DEGRADED);
+  EXPECT_TRUE(result.ready);
+  EXPECT_TRUE(result.degraded);
+}
+
+TEST(SupervisorPolicy, PersistentCompatibleStateMismatchFailsClosed)
+{
+  SupervisorPolicy policy;
+  auto status = make_status();
+
+  observe_all(status, 30.0);
+  set_consistent_state(status, "OK", true, false);
+
+  status.health_tracker.observe_message(
+    test_time(30.1), message_stamp(31), false, "");
+  status.health_state = "DEGRADED";
+  status.health_degraded = true;
+  status.health_reason_code = savo_supervisor::reason::kLocalizationDegraded;
+
+  auto result = policy.EvaluateComponent(status, test_time(30.2), 30.2);
+  ASSERT_EQ(result.state, ComponentState::DEGRADED);
+  ASSERT_TRUE(result.ready);
+
+  status.health_tracker.observe_message(
+    test_time(31.6), message_stamp(32), false, "");
+  status.summary_tracker.observe_message(
+    test_time(31.6), message_stamp(32), false, "");
+  status.heartbeat_tracker.observe_message(
+    test_time(31.6), message_stamp(32), false, "");
+
+  result = policy.EvaluateComponent(status, test_time(31.8), 31.8);
+  EXPECT_EQ(result.state, ComponentState::INVALID);
+  EXPECT_FALSE(result.ready);
+  EXPECT_EQ(
+    result.reason_code,
+    savo_supervisor::reason::kLocalizationStateInconsistent);
+}
+
+TEST(SupervisorPolicy, ReadinessDisagreementIsNotTransitionCompatible)
+{
+  SupervisorPolicy policy;
+  auto status = make_status();
+
+  observe_all(status, 40.0);
+  set_consistent_state(status, "OK", true, false);
+  status.health_ready = false;
+
+  const auto result = policy.EvaluateComponent(status, test_time(40.1), 40.1);
+  EXPECT_EQ(result.state, ComponentState::INVALID);
+  EXPECT_FALSE(result.ready);
+  EXPECT_EQ(
+    result.reason_code,
+    savo_supervisor::reason::kLocalizationStateInconsistent);
+}
+
 TEST(SupervisorPolicy, StaleHealthHasDistinctReason)
 {
   SupervisorPolicy policy;
@@ -416,8 +539,8 @@ TEST(SupervisorPolicy, InconsistentStateIsInvalid)
   observe_all(status, 10.0);
   set_consistent_state(status, "OK", true, false);
 
-  status.summary_state = "ERROR";
-  status.summary_ready = false;
+  status.health_state = "ERROR";
+  status.health_ready = false;
 
   const auto result =
     policy.EvaluateComponent(

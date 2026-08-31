@@ -86,3 +86,25 @@ def test_supervisor_launch_selects_one_fail_closed_mode_policy():
     assert 'unsupported Supervisor robot_mode policy' in launch
     assert "default_value='safe_idle'" in launch
     assert "default_value='false'" in launch
+
+
+def test_default_optional_edge_monitoring_matches_production_bringup():
+    parameters = load_parameters('config/supervisor.yaml')
+    edge_launch = (
+        ROOT.parent / 'savo_bringup' / 'launch' /
+        'edge_bringup.launch.py'
+    ).read_text()
+    node = (ROOT / 'src' / 'supervisor_node.cpp').read_text()
+
+    assert parameters['edge.speech.enabled'] is False
+    assert parameters['edge.ui.enabled'] is False
+    assert (
+        'DeclareLaunchArgument("start_speech", default_value="false")'
+        in edge_launch
+    )
+    assert (
+        'DeclareLaunchArgument("start_ui", default_value="false")'
+        in edge_launch
+    )
+    assert 'declare_parameter<bool>("edge.speech.enabled", false)' in node
+    assert 'declare_parameter<bool>("edge.ui.enabled", false)' in node

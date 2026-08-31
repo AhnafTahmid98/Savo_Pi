@@ -188,7 +188,7 @@ Phase 3 observes the edge command and perception path without turning an optiona
 - visual-odometry health
 - configured UI node visibility in the ROS graph
 
-The default startup policy requires truthful core readiness, known safety and a healthy core-edge bridge. RealSense, speech, VO and UI are observed as optional capabilities by default; their loss degrades the published edge model but does not independently fault local core safety.
+The default startup policy requires truthful core readiness, known safety and a healthy core-edge bridge. RealSense and VO are observed as optional capabilities by default. Speech and UI monitoring default off to match production Edge bringup; when explicitly enabled, their loss degrades the published edge model without independently faulting local core safety.
 
 ### `/savo_supervisor/manage_system_state`
 

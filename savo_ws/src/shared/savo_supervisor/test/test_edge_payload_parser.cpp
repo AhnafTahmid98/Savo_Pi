@@ -76,4 +76,18 @@ TEST(EdgePayloadParser, ParsesVoHealthLevels)
   EXPECT_TRUE(degraded.valid);
   EXPECT_TRUE(degraded.degraded);
   EXPECT_FALSE(degraded.ready);
+
+  const auto stale =
+    savo_supervisor::EdgePayloadParser{}.ParseVoHealth(
+    "stale: visual odometry timeout");
+  EXPECT_TRUE(stale.valid);
+  EXPECT_EQ(stale.state, "stale");
+  EXPECT_FALSE(stale.ready);
+  EXPECT_TRUE(stale.degraded);
+  EXPECT_EQ(stale.reason, "visual odometry timeout");
+
+  const auto unsupported =
+    savo_supervisor::EdgePayloadParser{}.ParseVoHealth("paused: operator request");
+  EXPECT_FALSE(unsupported.valid);
+  EXPECT_EQ(unsupported.reason, "vo_health_invalid");
 }

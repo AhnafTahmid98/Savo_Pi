@@ -71,6 +71,7 @@ savo_supervisor_node:
       summary_timeout_s: 1.5
       heartbeat_timeout_s: 2.5
       expected_schema_version: 1
+      consistency_transition_grace_s: 1.5
 
     power:
       enabled: true
@@ -145,7 +146,7 @@ savo_supervisor_node:
     edge.realsense.status_topic: /realsense/status
     edge.realsense.status_timeout_s: 2.0
 
-    edge.speech.enabled: true
+    edge.speech.enabled: false
     edge.speech.required_for_startup: false
     edge.speech.readiness_topic: /savo_speech/readiness
     edge.speech.heartbeat_topic: /savo_speech/heartbeat
@@ -157,7 +158,7 @@ savo_supervisor_node:
     edge.vo.health_topic: /vo/health
     edge.vo.health_timeout_s: 2.0
 
-    edge.ui.enabled: true
+    edge.ui.enabled: false
     edge.ui.required_for_startup: false
     edge.ui.expected_nodes:
       - /savo_ui_node

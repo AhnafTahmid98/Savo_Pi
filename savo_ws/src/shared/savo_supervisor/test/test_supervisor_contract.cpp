@@ -90,6 +90,18 @@ TEST(SupervisorContract, RejectsInvalidTimeout)
     "localization health_timeout_s must be finite and positive");
 }
 
+TEST(SupervisorContract, RejectsInvalidConsistencyTransitionGrace)
+{
+  SupervisorPolicy policy;
+  policy.localization.consistency_transition_grace_s = -1.0;
+
+  EXPECT_FALSE(policy.Validate());
+
+  EXPECT_EQ(
+    policy.ValidationError(),
+    "localization consistency_transition_grace_s must be finite and non-negative");
+}
+
 TEST(SupervisorContract, RejectsUnsupportedSchema)
 {
   SupervisorPolicy policy;

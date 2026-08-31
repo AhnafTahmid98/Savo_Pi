@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <optional>
 #include <string>
 
 #include "savo_supervisor/freshness_tracker.hpp"
@@ -25,6 +26,7 @@ struct ComponentConfig
   bool summary_required{false};
   bool heartbeat_required{false};
   bool enforce_consistency{false};
+  double consistency_transition_grace_s{0.0};
 
   double health_timeout_s{1.0};
   double summary_timeout_s{1.0};
@@ -58,6 +60,8 @@ struct ComponentStatus
   bool heartbeat_ready{false};
   bool heartbeat_degraded{false};
   std::string heartbeat_reason_code;
+
+  std::optional<rclcpp::Time> consistency_mismatch_since;
 };
 
 }  // namespace savo_supervisor

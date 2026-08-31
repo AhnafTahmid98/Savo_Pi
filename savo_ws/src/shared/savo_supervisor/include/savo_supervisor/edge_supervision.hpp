@@ -112,11 +112,11 @@ struct EdgeSupervisionPolicy
   bool bridge_required_for_startup{true};
   bool realsense_enabled{true};
   bool realsense_required_for_startup{false};
-  bool speech_enabled{true};
+  bool speech_enabled{false};
   bool speech_required_for_startup{false};
   bool vo_enabled{true};
   bool vo_required_for_startup{false};
-  bool ui_enabled{true};
+  bool ui_enabled{false};
   bool ui_required_for_startup{false};
 };
 
