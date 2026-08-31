@@ -10,9 +10,15 @@ from launch_ros.substitutions import FindPackageShare
 def generate_launch_description() -> LaunchDescription:
     driver_config_file = LaunchConfiguration("driver_config_file")
     monitor_config_file = LaunchConfiguration("monitor_config_file")
+    use_depth_front_min = LaunchConfiguration("use_depth_front_min")
     enable_observer_color_relay = LaunchConfiguration(
         "enable_observer_color_relay"
     )
+    depth_front_min_config_file = PathJoinSubstitution([
+        FindPackageShare("savo_realsense"),
+        "config",
+        "realsense_d435_nodes.yaml",
+    ])
 
     realsense_node = Node(
         package="realsense2_camera",
@@ -37,6 +43,15 @@ def generate_launch_description() -> LaunchDescription:
         name="camera_health_node",
         output="screen",
         parameters=[monitor_config_file],
+    )
+
+    depth_front_min_node = Node(
+        package="savo_realsense",
+        executable="depth_front_min_node",
+        name="depth_front_min_node",
+        output="screen",
+        parameters=[depth_front_min_config_file],
+        condition=IfCondition(use_depth_front_min),
     )
 
     observer_color_relay = Node(
@@ -76,6 +91,10 @@ def generate_launch_description() -> LaunchDescription:
             ]),
         ),
         DeclareLaunchArgument(
+            "use_depth_front_min",
+            default_value="true",
+        ),
+        DeclareLaunchArgument(
             "enable_observer_color_relay",
             default_value="false",
             description=(
@@ -85,5 +104,6 @@ def generate_launch_description() -> LaunchDescription:
         realsense_node,
         topic_monitor,
         health_node,
+        depth_front_min_node,
         observer_color_relay,
     ])

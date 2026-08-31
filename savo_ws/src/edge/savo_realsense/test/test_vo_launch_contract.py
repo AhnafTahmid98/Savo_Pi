@@ -64,7 +64,7 @@ def test_vo_launch_separates_driver_and_monitor_configs() -> None:
 
     assert 'LaunchConfiguration("driver_config_file")' in launch_text
     assert 'LaunchConfiguration("monitor_config_file")' in launch_text
-    assert launch_text.count("Node(") == 4
+    assert launch_text.count("Node(") == 5
     assert 'package="realsense2_camera"' in launch_text
     assert 'executable="realsense2_camera_node"' in launch_text
     assert 'namespace="camera"' in launch_text
@@ -76,6 +76,32 @@ def test_vo_launch_separates_driver_and_monitor_configs() -> None:
     assert '"realsense_d435_camera.yaml"' in launch_text
     assert '"realsense_vo_driver.yaml"' not in launch_text
     assert '"realsense_vo_profile.yaml"' in launch_text
+
+
+def test_vo_launch_starts_depth_front_min_from_production_nodes_config() -> None:
+    launch_path = "launch/realsense_vo.launch.py"
+    launch_text = read_file(launch_path)
+
+    assert launch_argument_defaults(launch_path)["use_depth_front_min"] == "true"
+    assert '"realsense_d435_nodes.yaml"' in launch_text
+    assert "parameters=[depth_front_min_config_file]" in launch_text
+
+    depth_nodes = [
+        call
+        for call in node_calls(launch_path)
+        if ast.literal_eval(keyword_value(call, "package")) == "savo_realsense"
+        and ast.literal_eval(keyword_value(call, "executable"))
+        == "depth_front_min_node"
+    ]
+    assert len(depth_nodes) == 1
+    depth_node = depth_nodes[0]
+    assert ast.literal_eval(keyword_value(depth_node, "name")) == (
+        "depth_front_min_node"
+    )
+    assert ast.literal_eval(keyword_value(depth_node, "output")) == "screen"
+    assert ast.unparse(keyword_value(depth_node, "condition")) == (
+        "IfCondition(use_depth_front_min)"
+    )
 
 
 def test_observer_color_relay_is_opt_in_and_hardware_equivalent() -> None:
