@@ -112,8 +112,6 @@ def test_mode_observation_contracts_are_fail_closed_and_minimal() -> None:
         '/cmd_vel_safe',
     }
     assert set(common['observation_topics']) == common_topics
-    assert common['edge_evidence_nodes'] == []
-    assert common['edge_evidence_topics'] == []
     assert '/edge_ups_node' not in config
     assert '/edge_bringup_readiness_node' not in config
 
@@ -160,6 +158,35 @@ def test_mode_observation_contracts_are_fail_closed_and_minimal() -> None:
         assert set(parameters['observation_requirements']) == {'required'}
         assert '/savo_speech/readiness' not in topics
         assert all('/savo_ui' not in topic for topic in topics)
+
+
+def test_optional_graph_evidence_arrays_use_typed_cpp_defaults() -> None:
+    config = read('config/savo_bridge.edge.yaml')
+    common = yaml.safe_load(config)[
+        '/savo_bridge/savo_bridge_node'
+    ]['ros__parameters']
+    bridge_source = read('src/bridge_node.cpp')
+
+    optional_arrays = (
+        'core_evidence_nodes',
+        'edge_evidence_nodes',
+        'edge_evidence_topics',
+    )
+    for parameter_name in optional_arrays:
+        # ROS 2 Jazzy parses an untyped YAML [] as PARAMETER_NOT_SET. Omitting
+        # optional arrays lets the typed C++ declaration supply an empty vector.
+        assert parameter_name not in common
+        assert common.get(parameter_name, []) == []
+        assert (
+            f'"{parameter_name}",\n'
+            '    std::vector<std::string>{}'
+        ) in bridge_source
+
+    assert common['core_evidence_topics'] == [
+        '/savo_control/mode_state'
+    ]
+    assert '/edge_ups_node' not in config
+    assert '/edge_bringup_readiness_node' not in config
 
 
 def test_saved_map_readiness_uses_fresh_synchronized_runtime_context() -> None:

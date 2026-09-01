@@ -3,15 +3,12 @@
     snapshot_enabled: true
     snapshot_path: /run/savo_bridge/snapshot.json
 
-    core_evidence_nodes: []
     core_evidence_topics:
       - /savo_control/mode_state
 
     # Local node discovery plus all four bridge-owned topics already prove
     # that the Edge-side bridge DDS participant is active. Do not select Edge
     # readiness here: Edge readiness itself requires Bridge readiness.
-    edge_evidence_nodes: []
-    edge_evidence_topics: []
 
     observation_topics:
       - /savo_control/mode_state

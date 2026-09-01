@@ -206,8 +206,15 @@ def test_bridge_edge_evidence_does_not_require_edge_ups() -> None:
         "/savo_bridge/savo_bridge_node"
     ]["ros__parameters"]
 
-    assert parameters["edge_evidence_nodes"] == []
-    assert parameters["edge_evidence_topics"] == []
+    assert "core_evidence_nodes" not in parameters
+    assert parameters.get("core_evidence_nodes", []) == []
+    assert parameters["core_evidence_topics"] == [
+        "/savo_control/mode_state"
+    ]
+    assert "edge_evidence_nodes" not in parameters
+    assert parameters.get("edge_evidence_nodes", []) == []
+    assert "edge_evidence_topics" not in parameters
+    assert parameters.get("edge_evidence_topics", []) == []
     config = read(BRIDGE_CONFIG)
     assert "/edge_ups_node" not in config
     assert "/edge_bringup_readiness_node" not in config
