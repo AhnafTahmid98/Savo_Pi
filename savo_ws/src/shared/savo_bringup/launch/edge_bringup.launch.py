@@ -5,6 +5,7 @@ from launch.actions import DeclareLaunchArgument
 from launch.actions import IncludeLaunchDescription
 from launch.actions import LogInfo
 from launch.actions import OpaqueFunction
+from launch.actions import TimerAction
 from launch.launch_description_sources import FrontendLaunchDescriptionSource
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
@@ -56,7 +57,11 @@ def _setup(context):
         d435_voxel_validated=voxel_validated,
         explicit_start=explicit_obstacle_cloud,
     )
-    start_obstacle_cloud = start_realsense and obstacle_cloud_requested
+    start_obstacle_cloud = (
+        start_realsense
+        and explicit_obstacle_cloud
+        and obstacle_cloud_requested
+    )
     start_speech = as_bool(_value(context, "start_speech"))
     start_ui = as_bool(_value(context, "start_ui"))
     start_bridge = as_bool(_value(context, "start_bridge"))
@@ -121,31 +126,53 @@ def _setup(context):
                     "enable_observer_color_relay": (
                         "true" if enable_observer_color_relay else "false"
                     ),
+                    "realsense_start_delay_s": LaunchConfiguration(
+                        "realsense_start_delay_s"
+                    ),
+                    "camera_support_start_delay_s": LaunchConfiguration(
+                        "camera_support_start_delay_s"
+                    ),
+                    "observer_relay_start_delay_s": LaunchConfiguration(
+                        "observer_relay_start_delay_s"
+                    ),
                 }.items(),
             )
         )
 
     if start_vo:
         actions.append(
-            IncludeLaunchDescription(
-                _python_launch("savo_vo", "vo_bringup.launch.py"),
-                launch_arguments={
-                    "implementation": "cpp",
-                    "profile": LaunchConfiguration("vo_profile"),
-                    "log_level": LaunchConfiguration("log_level"),
-                }.items(),
+            TimerAction(
+                period=LaunchConfiguration("vo_start_delay_s"),
+                actions=[
+                    IncludeLaunchDescription(
+                        _python_launch("savo_vo", "vo_bringup.launch.py"),
+                        launch_arguments={
+                            "implementation": "cpp",
+                            "profile": LaunchConfiguration("vo_profile"),
+                            "log_level": LaunchConfiguration("log_level"),
+                        }.items(),
+                    )
+                ],
+                cancel_on_shutdown=True,
             )
         )
 
     if start_obstacle_cloud:
         actions.append(
-            IncludeLaunchDescription(
-                _python_launch(
-                    "savo_perception", "obstacle_cloud_filter.launch.py"
-                ),
-                launch_arguments={
-                    "use_sim_time": LaunchConfiguration("use_sim_time")
-                }.items(),
+            TimerAction(
+                period=LaunchConfiguration("obstacle_cloud_start_delay_s"),
+                actions=[
+                    IncludeLaunchDescription(
+                        _python_launch(
+                            "savo_perception",
+                            "obstacle_cloud_filter.launch.py",
+                        ),
+                        launch_arguments={
+                            "use_sim_time": LaunchConfiguration("use_sim_time")
+                        }.items(),
+                    )
+                ],
+                cancel_on_shutdown=True,
             )
         )
 
@@ -169,15 +196,21 @@ def _setup(context):
 
     if start_bridge:
         actions.append(
-            IncludeLaunchDescription(
-                _python_launch("savo_bridge", "edge_bridge.launch.py"),
-                launch_arguments={
-                    "robot_mode": mode,
-                    "active_map_id": LaunchConfiguration("active_map_id"),
-                    "active_map_revision": LaunchConfiguration(
-                        "active_map_revision"
-                    ),
-                }.items(),
+            TimerAction(
+                period=LaunchConfiguration("bridge_start_delay_s"),
+                actions=[
+                    IncludeLaunchDescription(
+                        _python_launch("savo_bridge", "edge_bridge.launch.py"),
+                        launch_arguments={
+                            "robot_mode": mode,
+                            "active_map_id": LaunchConfiguration("active_map_id"),
+                            "active_map_revision": LaunchConfiguration(
+                                "active_map_revision"
+                            ),
+                        }.items(),
+                    )
+                ],
+                cancel_on_shutdown=True,
             )
         )
 
@@ -194,46 +227,52 @@ def _setup(context):
         )
 
     actions.append(
-        Node(
-            package="savo_bringup",
-            executable="bringup_readiness_node",
-            name="edge_bringup_readiness_node",
-            output="screen",
-            parameters=[
-                PathJoinSubstitution(
-                    [
-                        FindPackageShare("savo_bringup"),
-                        "config",
-                        "edge_real_robot.yaml",
-                    ]
-                ),
-                {
-                    "host_role": "edge",
-                    "robot_mode": mode,
-                    "bringup_profile": profile,
-                    "d435_voxel_validated": voxel_validated,
-                    "require_locked_geometry": require_locked,
-                    "allow_provisional_geometry": allow_provisional,
-                    "require_geometry": False,
-                    "require_power": start_power,
-                    "require_supervisor": False,
-                    "require_navigation": False,
-                    "require_bridge": requirements.require_bridge,
-                    "require_realsense": requirements.require_realsense,
-                    "require_vo": requirements.require_vo,
-                    "require_speech": requirements.require_speech,
-                    "require_ui": start_ui,
-                    # The D435 obstacle cloud is an optional navigation helper.
-                    # Its own health/status topics expose degradation without
-                    # making Edge or Core navigation readiness depend on it.
-                    "require_obstacle_cloud": False,
-                },
+        TimerAction(
+            period=LaunchConfiguration("readiness_start_delay_s"),
+            actions=[
+                Node(
+                    package="savo_bringup",
+                    executable="bringup_readiness_node",
+                    name="edge_bringup_readiness_node",
+                    output="screen",
+                    parameters=[
+                        PathJoinSubstitution(
+                            [
+                                FindPackageShare("savo_bringup"),
+                                "config",
+                                "edge_real_robot.yaml",
+                            ]
+                        ),
+                        {
+                            "host_role": "edge",
+                            "robot_mode": mode,
+                            "bringup_profile": profile,
+                            "d435_voxel_validated": voxel_validated,
+                            "require_locked_geometry": require_locked,
+                            "allow_provisional_geometry": allow_provisional,
+                            "require_geometry": False,
+                            "require_power": start_power,
+                            "require_supervisor": False,
+                            "require_navigation": False,
+                            "require_bridge": requirements.require_bridge,
+                            "require_realsense": requirements.require_realsense,
+                            "require_vo": requirements.require_vo,
+                            "require_speech": requirements.require_speech,
+                            "require_ui": start_ui,
+                            # The D435 obstacle cloud is an optional navigation helper.
+                            # Its own health/status topics expose degradation without
+                            # making Edge or Core navigation readiness depend on it.
+                            "require_obstacle_cloud": False,
+                        },
+                    ],
+                    arguments=[
+                        "--ros-args",
+                        "--log-level",
+                        LaunchConfiguration("log_level"),
+                    ],
+                )
             ],
-            arguments=[
-                "--ros-args",
-                "--log-level",
-                LaunchConfiguration("log_level"),
-            ],
+            cancel_on_shutdown=True,
         )
     )
     return actions
@@ -263,6 +302,25 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument("start_ui", default_value="false"),
             DeclareLaunchArgument("start_bridge", default_value="true"),
             DeclareLaunchArgument("start_power", default_value="true"),
+            DeclareLaunchArgument(
+                "realsense_start_delay_s", default_value="0.0"
+            ),
+            DeclareLaunchArgument(
+                "camera_support_start_delay_s", default_value="7.0"
+            ),
+            DeclareLaunchArgument("vo_start_delay_s", default_value="14.0"),
+            DeclareLaunchArgument(
+                "obstacle_cloud_start_delay_s", default_value="22.0"
+            ),
+            DeclareLaunchArgument(
+                "observer_relay_start_delay_s", default_value="28.0"
+            ),
+            DeclareLaunchArgument(
+                "bridge_start_delay_s", default_value="34.0"
+            ),
+            DeclareLaunchArgument(
+                "readiness_start_delay_s", default_value="40.0"
+            ),
             DeclareLaunchArgument("vo_profile", default_value="real_robot_v1"),
             DeclareLaunchArgument("ui_profile", default_value="pi"),
             DeclareLaunchArgument(

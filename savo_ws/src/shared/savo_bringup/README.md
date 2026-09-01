@@ -142,6 +142,21 @@ ros2 launch savo_bringup robot_bringup.launch.py \
   bringup_profile:=lidar_only
 ```
 
+The default Core `safe_idle` contract starts robot description/fixed TF, base,
+LiDAR, perception, control in `STOP`, localization with VO fusion, Core power,
+Supervisor without auto-arm, and the head with ROS camera transport. It does
+not start mapping, Nav2, a navigation goal, or location lifecycle services.
+The location lifecycle is owned by `manual_mapping`, `autonomous_mapping`, and
+`saved_map_navigation`, or may be requested explicitly in another mode.
+
+Core readiness requires the local geometry, base, control/safety, LiDAR,
+perception, localization, power, and Supervisor contracts. Edge-owned bridge,
+RealSense, VO, obstacle-cloud, speech, and UI resources are not local Core
+readiness dependencies. The head starts in normal safe idle for camera and
+status availability, with `center_on_start=false`, but is not a basic driving
+readiness dependency; semantic mapping modes own the location/head integration
+they require.
+
 Run the matching edge stack on `savo-edge`:
 
 ```bash
@@ -174,6 +189,80 @@ filtered obstacle cloud, and compressed observer color relay. Explicitly
 disabling the obstacle or observer relay remains available for controlled
 testing. Helper loss does not gate the required LiDAR navigation path, and
 LiDAR remains the reliable clearing source.
+
+### Staged Edge startup
+
+Canonical Edge startup is staged to keep D435 USB initialization, DDS graph
+discovery, RGB-D VO, PointCloud2 filtering, and JPEG compression from creating
+one Raspberry Pi CPU/current/network spike. Delays affect process startup only;
+they do not change any steady-state stream, monitor, VO, filter, or relay rate.
+
+| Launch time | Stage | Processes and data flow |
+|---:|---|---|
+| `0.0` s | RealSense | One D435 driver produces color/depth/CameraInfo, aligned depth, and the validated raw PointCloud2 |
+| `7.0` s | Camera support | Topic monitor, camera health, and `depth_front_min` |
+| `14.0` s | Visual odometry | C++ RGB-D odometry, republisher, health, and diagnostics |
+| `22.0` s | Obstacle cloud | TF transform, crop/self-filter, and 0.05 m voxel reduction |
+| `28.0` s | Observer relay | Raw D435 color to compressed observer color |
+| `34.0` s | Bridge | `savo_bridge_node` with the selected safe command policy |
+| `40.0` s | Readiness | Edge bringup readiness begins steady-state validation |
+
+The expected total startup and health-settling window is approximately 40–60
+seconds. Raw PointCloud2 remains part of the single validated RealSense driver:
+`/camera/camera/depth/color/points` is transformed and filtered into
+`/savo_perception/obstacles/points`. This Robot Savo perception voxel reduction
+is not the Nav2 voxel costmap layer and Edge bringup does not start Nav2.
+
+The delay arguments are:
+
+- `realsense_start_delay_s` (default `0.0`)
+- `camera_support_start_delay_s` (default `7.0`)
+- `vo_start_delay_s` (default `14.0`)
+- `obstacle_cloud_start_delay_s` (default `22.0`)
+- `observer_relay_start_delay_s` (default `28.0`)
+- `bridge_start_delay_s` (default `34.0`)
+- `readiness_start_delay_s` (default `40.0`)
+
+All are exposed by `robot_bringup.launch.py`; `0.0` requests immediate startup.
+For example, extend only the VO stabilization window with:
+
+```bash
+ros2 launch savo_bringup robot_bringup.launch.py \
+  host_role:=edge \
+  vo_start_delay_s:=18.0
+```
+
+The normal hardware-validation command is:
+
+```bash
+ros2 launch savo_bringup robot_bringup.launch.py \
+  host_role:=edge \
+  robot_mode:=safe_idle \
+  bringup_profile:=lidar_d435_voxel \
+  d435_voxel_validated:=true \
+  start_realsense:=true \
+  start_vo:=true \
+  start_obstacle_cloud:=true \
+  enable_observer_color_relay:=true \
+  start_bridge:=true \
+  start_edge_power:=false \
+  start_speech:=false \
+  start_ui:=false
+```
+
+`start_edge_power:=false` omits the known-bad Edge UPS node and removes power
+from Edge readiness requirements. Bridge graph evidence also excludes both the
+UPS and Edge readiness node. The bridge proves its local Edge DDS presence from
+its own node and four owned topics, while independently requiring Core graph
+visibility, fresh observation topics, live command transport, and snapshot
+publication. Edge readiness may therefore require Bridge readiness without a
+`Bridge -> Edge readiness -> Bridge` cycle.
+
+Every delayed stage uses a shutdown-canceling ROS launch timer. During normal
+Ctrl+C shutdown, pending stages are canceled and already-started child nodes are
+terminated by the launch service; no shell sleeps or detached launch wrappers
+are used. Speech and UI retain their existing optional behavior and are not
+redesigned by this staging change.
 
 The first controlled real-robot test should use:
 

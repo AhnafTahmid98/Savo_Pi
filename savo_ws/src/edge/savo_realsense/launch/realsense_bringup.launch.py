@@ -2,6 +2,7 @@
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
+from launch.actions import TimerAction
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
@@ -14,6 +15,15 @@ def generate_launch_description() -> LaunchDescription:
     use_depth_front_min = LaunchConfiguration("use_depth_front_min")
     enable_observer_color_relay = LaunchConfiguration(
         "enable_observer_color_relay"
+    )
+    realsense_start_delay_s = LaunchConfiguration(
+        "realsense_start_delay_s"
+    )
+    camera_support_start_delay_s = LaunchConfiguration(
+        "camera_support_start_delay_s"
+    )
+    observer_relay_start_delay_s = LaunchConfiguration(
+        "observer_relay_start_delay_s"
     )
 
     realsense_node = Node(
@@ -95,9 +105,39 @@ def generate_launch_description() -> LaunchDescription:
             default_value="true",
             description="Publish the production observer compressed D435 color",
         ),
-        realsense_node,
-        topic_monitor,
-        health_node,
-        depth_front_min_node,
-        observer_color_relay,
+        DeclareLaunchArgument(
+            "realsense_start_delay_s",
+            default_value="0.0",
+            description="Seconds from launch start before the D435 driver starts",
+        ),
+        DeclareLaunchArgument(
+            "camera_support_start_delay_s",
+            default_value="0.0",
+            description=(
+                "Seconds from launch start before camera monitors and "
+                "depth_front_min start"
+            ),
+        ),
+        DeclareLaunchArgument(
+            "observer_relay_start_delay_s",
+            default_value="0.0",
+            description=(
+                "Seconds from launch start before the compressed color relay starts"
+            ),
+        ),
+        TimerAction(
+            period=realsense_start_delay_s,
+            actions=[realsense_node],
+            cancel_on_shutdown=True,
+        ),
+        TimerAction(
+            period=camera_support_start_delay_s,
+            actions=[topic_monitor, health_node, depth_front_min_node],
+            cancel_on_shutdown=True,
+        ),
+        TimerAction(
+            period=observer_relay_start_delay_s,
+            actions=[observer_color_relay],
+            cancel_on_shutdown=True,
+        ),
     ])

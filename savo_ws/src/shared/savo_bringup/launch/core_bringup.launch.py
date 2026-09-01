@@ -15,6 +15,7 @@ from launch_ros.substitutions import FindPackageShare
 
 from savo_bringup.launch_contract import as_bool
 from savo_bringup.launch_contract import resolve_requirements
+from savo_bringup.launch_contract import should_start_location_lifecycle
 from savo_bringup.launch_contract import validate_selection
 
 
@@ -62,6 +63,12 @@ def _setup(context):
     use_sim_time = LaunchConfiguration("use_sim_time")
     log_level = LaunchConfiguration("log_level")
     diagnostics_mode = mode == "diagnostics"
+    start_locations = should_start_location_lifecycle(
+        mode,
+        explicit_start=as_bool(
+            _value(context, "start_location_lifecycle")
+        ),
+    ) and not diagnostics_mode
     if mode == "autonomous_mapping":
         start_description = True
         start_base = True
@@ -148,6 +155,9 @@ def _setup(context):
                     "head_camera_mode": LaunchConfiguration(
                         "head_camera_mode"
                     ),
+                    "start_location_lifecycle": (
+                        "true" if start_locations else "false"
+                    ),
                     "nav_params_file": nav_params,
                     "nav_readiness_params": readiness_params,
                     "locations_database_path": LaunchConfiguration(
@@ -164,10 +174,6 @@ def _setup(context):
         )
     else:
         start_head = as_bool(_value(context, "start_head"))
-        start_locations = (
-            as_bool(_value(context, "start_location_lifecycle"))
-            and not diagnostics_mode
-        )
 
         if start_description:
             actions.append(
@@ -458,7 +464,7 @@ def generate_launch_description() -> LaunchDescription:
         [
             DeclareLaunchArgument("robot_mode", default_value="safe_idle"),
             DeclareLaunchArgument("bringup_profile", default_value="lidar_only"),
-            DeclareLaunchArgument("d435_voxel_validated", default_value="false"),
+            DeclareLaunchArgument("d435_voxel_validated", default_value="true"),
             DeclareLaunchArgument("use_sim_time", default_value="false"),
             DeclareLaunchArgument("log_level", default_value="info"),
             DeclareLaunchArgument("map_id", default_value="robot_savo_map"),
@@ -530,7 +536,7 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument("start_supervisor", default_value="true"),
             DeclareLaunchArgument("start_head", default_value="true"),
             DeclareLaunchArgument(
-                "start_location_lifecycle", default_value="true"
+                "start_location_lifecycle", default_value="false"
             ),
             OpaqueFunction(function=_setup),
         ]

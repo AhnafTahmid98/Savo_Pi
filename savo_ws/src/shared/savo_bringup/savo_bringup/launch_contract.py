@@ -25,6 +25,11 @@ BRINGUP_PROFILES = {
     "lidar_d435_voxel",
     "production",
 }
+LOCATION_LIFECYCLE_MODES = {
+    "manual_mapping",
+    "autonomous_mapping",
+    "saved_map_navigation",
+}
 
 
 @dataclass(frozen=True)
@@ -62,6 +67,15 @@ def should_start_obstacle_cloud(
         or bringup_profile in {"lidar_d435_voxel", "production"}
         or robot_mode in {"autonomous_mapping", "saved_map_navigation"}
     )
+
+
+def should_start_location_lifecycle(
+    robot_mode: str,
+    *,
+    explicit_start: bool,
+) -> bool:
+    """Start location services explicitly or when owned by the robot mode."""
+    return explicit_start or robot_mode in LOCATION_LIFECYCLE_MODES
 
 
 def resolve_host_role(

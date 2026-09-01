@@ -10,6 +10,7 @@ from pathlib import Path
 
 from savo_bringup.launch_contract import resolve_host_role
 from savo_bringup.launch_contract import resolve_requirements
+from savo_bringup.launch_contract import should_start_location_lifecycle
 from savo_bringup.launch_contract import should_start_obstacle_cloud
 from savo_bringup.launch_contract import validate_selection
 
@@ -208,10 +209,8 @@ def test_edge_realsense_and_obstacle_cloud_profile_selection() -> None:
         explicit_start=True,
     ) is False
     assert '"require_obstacle_cloud": False' in launch
-    assert (
-        'start_obstacle_cloud = start_realsense and '
-        'obstacle_cloud_requested'
-    ) in launch
+    assert 'and explicit_obstacle_cloud' in launch
+    assert 'and obstacle_cloud_requested' in launch
     assert 'if explicit_obstacle_cloud and not start_realsense' in launch
     assert 'if explicit_obstacle_cloud and not voxel_validated' in launch
     assert '"enable_observer_color_relay": (' in launch
@@ -275,6 +274,56 @@ def test_full_entry_point_keeps_core_and_edge_roles_explicit() -> None:
     assert "host_role:=all is reserved" in launch
     assert "core_bringup.launch.py" in launch
     assert "edge_bringup.launch.py" in launch
+
+
+def test_canonical_core_start_flags_are_explicit_and_forwarded() -> None:
+    """Top-level Core ownership must not depend on hidden nested defaults."""
+    launch = read("launch/robot_bringup.launch.py")
+    defaults = launch_string_defaults("launch/robot_bringup.launch.py")
+    required_core_flags = {
+        "start_description",
+        "start_base",
+        "start_lidar",
+        "start_perception",
+        "start_localization",
+        "start_control",
+        "start_power",
+        "start_supervisor",
+        "start_head",
+    }
+    for name in required_core_flags:
+        assert defaults[name] == "true", name
+        assert launch.count(f'"{name}"') >= 2, name
+    assert defaults["start_location_lifecycle"] == "false"
+    assert launch.count('"start_location_lifecycle"') >= 2
+    assert "core_arguments[name] = LaunchConfiguration(name)" in launch
+
+
+def test_location_lifecycle_is_mode_owned_not_safe_idle_default() -> None:
+    """Location services stay out of safe idle and follow semantic modes."""
+    for mode in ("safe_idle", "manual", "diagnostics"):
+        assert should_start_location_lifecycle(
+            mode, explicit_start=False
+        ) is False
+    for mode in (
+        "manual_mapping",
+        "autonomous_mapping",
+        "saved_map_navigation",
+    ):
+        assert should_start_location_lifecycle(
+            mode, explicit_start=False
+        ) is True
+    assert should_start_location_lifecycle(
+        "safe_idle", explicit_start=True
+    ) is True
+
+    core = read("launch/core_bringup.launch.py")
+    assert "should_start_location_lifecycle(" in core
+    assert 'if mode == "manual_mapping"' in core
+    assert 'elif mode == "saved_map_navigation"' in core
+    assert 'if mode == "autonomous_mapping"' in core
+    assert 'if start_locations:' in core
+    assert '"start_location_lifecycle": (' in core
 
 
 def test_auto_host_role_resolves_only_known_robot_hosts() -> None:
@@ -366,6 +415,23 @@ def test_validated_normal_runtime_defaults_are_synchronized() -> None:
     assert top["speech_params_file"] == "edge_real_robot_v1.yaml"
     assert top["active_map_id"] == ""
     assert top["active_map_revision"] == "0"
+
+    core = launch_string_defaults("launch/core_bringup.launch.py")
+    for name in (
+        "start_description",
+        "start_base",
+        "start_lidar",
+        "start_perception",
+        "start_localization",
+        "start_control",
+        "start_power",
+        "start_supervisor",
+        "start_head",
+    ):
+        assert core[name] == "true", name
+    assert core["start_location_lifecycle"] == "false"
+    assert core["d435_voxel_validated"] == "true"
+    assert core["edge_ups_expected"] == "false"
 
     edge = launch_string_defaults("launch/edge_bringup.launch.py")
     assert edge["start_realsense"] == "true"
@@ -550,6 +616,123 @@ def test_profiles_are_versioned_and_record_d435_validation() -> None:
     assert edge["bringup_readiness_node"]["ros__parameters"][
         "d435_voxel_validated"
     ] is True
+    core = yaml.safe_load(read("config/core_real_robot.yaml"))
+    core_params = core["bringup_readiness_node"]["ros__parameters"]
+    assert core_params["d435_voxel_validated"] is True
+    for edge_resource in (
+        "require_bridge",
+        "require_realsense",
+        "require_vo",
+        "require_speech",
+        "require_ui",
+        "require_obstacle_cloud",
+    ):
+        assert core_params[edge_resource] is False
+
+
+def test_safe_idle_preserves_core_safety_head_and_tf_contracts() -> None:
+    """Canonical safe idle starts hardware without motion or duplicate TF."""
+    project_root = ROOT.parents[3]
+    core = read("launch/core_bringup.launch.py")
+    readiness = read("src/nodes/bringup_readiness_node.cpp")
+    head = (
+        project_root
+        / "savo_ws/src/core/savo_head/launch/head_bringup.launch.py"
+    ).read_text(encoding="utf-8")
+    base = (
+        project_root
+        / "savo_ws/src/core/savo_base/launch/base_bringup.launch.py"
+    ).read_text(encoding="utf-8")
+    description = (
+        project_root
+        / "savo_ws/src/shared/savo_description/launch/description.launch.py"
+    ).read_text(encoding="utf-8")
+    geometry = yaml.safe_load(
+        (
+            project_root
+            / (
+                "savo_ws/src/shared/savo_description/config/profiles/"
+                "robot_savo_core_v1.yaml"
+            )
+        ).read_text(encoding="utf-8")
+    )
+
+    assert launch_string_defaults("launch/robot_bringup.launch.py")[
+        "robot_mode"
+    ] == "safe_idle"
+    assert '"center_on_start": "false"' in core
+    assert '"camera_mode": LaunchConfiguration("head_camera_mode")' in core
+    assert launch_string_defaults("launch/core_bringup.launch.py")[
+        "control_startup_mode"
+    ] == "STOP"
+    assert launch_string_defaults("launch/core_bringup.launch.py")[
+        "supervisor_auto_arm"
+    ] == "false"
+    assert launch_string_defaults("launch/core_bringup.launch.py")[
+        "localization_use_vo"
+    ] == "true"
+    assert launch_string_defaults("launch/core_bringup.launch.py")[
+        "head_camera_mode"
+    ] == "ros"
+    assert launch_string_defaults("launch/core_bringup.launch.py")[
+        "edge_ups_expected"
+    ] == "false"
+    assert launch_string_defaults("launch/core_bringup.launch.py")[
+        "base_profile"
+    ] == "real_robot_v1.yaml"
+    assert '"auto_arm": LaunchConfiguration("supervisor_auto_arm")' in core
+    assert '"center_on_start",\n                default_value="false"' in head
+    assert '"cmd_topic": "/cmd_vel_safe"' in base
+    assert '"use_watchdog",\n            default_value="true"' in base
+
+    safe_requirements = resolve_requirements(
+        "core",
+        "safe_idle",
+        "lidar_only",
+        start_bridge=False,
+        start_realsense=False,
+        start_vo=False,
+        start_speech=False,
+    )
+    assert safe_requirements.require_mapping is False
+    assert safe_requirements.require_navigation is False
+    assert 'mode == "manual_mapping"' in core
+    assert 'mode == "saved_map_navigation"' in core
+    assert 'mode == "autonomous_mapping"' in core
+
+    assert description.count('package="robot_state_publisher"') == 1
+    assert geometry["realsense_internal_frames"]["authority"] == (
+        "robot_state_publisher"
+    )
+    assert geometry["realsense_internal_frames"]["driver_publish_tf"] is False
+    for config_name in (
+        "realsense_d435_camera.yaml",
+        "realsense_minimal.yaml",
+        "realsense_nav_profile.yaml",
+        "realsense_pointcloud_camera.yaml",
+        "realsense_vo_driver.yaml",
+    ):
+        config = yaml.safe_load(
+            (
+                project_root
+                / "savo_ws/src/edge/savo_realsense/config"
+                / config_name
+            ).read_text(encoding="utf-8")
+        )
+        driver_parameters = [
+            node["ros__parameters"]
+            for node in config.values()
+            if isinstance(node, dict)
+            and "publish_tf" in node.get("ros__parameters", {})
+        ]
+        assert driver_parameters
+        assert all(
+            parameters["publish_tf"] is False
+            for parameters in driver_parameters
+        )
+
+    assert "require_head" not in readiness
+    assert "require_head" not in read("config/core_real_robot.yaml")
 
 
 def test_saved_navigation_preserves_am8_release_gate() -> None:

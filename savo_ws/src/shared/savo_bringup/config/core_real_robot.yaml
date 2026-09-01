@@ -7,7 +7,7 @@ bringup_readiness_node:
     publish_rate_hz: 2.0
     startup_timeout_s: 45.0
     freshness_timeout_s: 3.0
-    d435_voxel_validated: false
+    d435_voxel_validated: true
     require_locked_geometry: true
     allow_provisional_geometry: false
     require_geometry: true

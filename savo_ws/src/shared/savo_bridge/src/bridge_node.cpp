@@ -1462,9 +1462,15 @@ void BridgeNode::publish_status()
         ros_command_dispatcher_config_->navigation_ready_state);
   }
 
+  // The bridge's local node plus all bridge-owned topics are already required
+  // by dds_active. An additional Edge selector is optional; requiring Edge
+  // bringup readiness here would create Bridge -> Readiness -> Bridge.
   const bool selectors_configured =
-    evidence.core_evidence_configured &&
-    evidence.edge_evidence_configured;
+    evidence.core_evidence_configured;
+
+  const bool edge_presence_ready =
+    !evidence.edge_evidence_configured ||
+    evidence.edge_visible;
 
   const bool production_dependencies_ready =
     graph_error.empty() &&
@@ -1472,7 +1478,7 @@ void BridgeNode::publish_status()
     evidence.dds_active &&
     selectors_configured &&
     evidence.core_visible &&
-    evidence.edge_visible &&
+    edge_presence_ready &&
     subscriptions_complete &&
     health.required_topics_ready &&
     snapshot_enabled_ &&
@@ -1510,7 +1516,7 @@ void BridgeNode::publish_status()
   } else if (!selectors_configured) {
     bridge_runtime.readiness_reason =
       "graph_evidence_selectors_unconfigured";
-  } else if (!evidence.core_visible || !evidence.edge_visible) {
+  } else if (!evidence.core_visible || !edge_presence_ready) {
     bridge_runtime.readiness_reason =
       "graph_evidence_incomplete";
   } else if (!subscriptions_complete) {
@@ -1579,7 +1585,7 @@ void BridgeNode::publish_status()
 
   const bool evidence_complete =
     evidence.core_visible &&
-    evidence.edge_visible;
+    edge_presence_ready;
 
   const bool snapshot_failed =
     snapshot_enabled_ &&

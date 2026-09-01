@@ -101,7 +101,8 @@ def mode_parameters(mode: str) -> dict:
 
 
 def test_mode_observation_contracts_are_fail_closed_and_minimal() -> None:
-    common = yaml.safe_load(read('config/savo_bridge.edge.yaml'))[
+    config = read('config/savo_bridge.edge.yaml')
+    common = yaml.safe_load(config)[
         '/savo_bridge/savo_bridge_node'
     ]['ros__parameters']
     common_topics = {
@@ -111,11 +112,17 @@ def test_mode_observation_contracts_are_fail_closed_and_minimal() -> None:
         '/cmd_vel_safe',
     }
     assert set(common['observation_topics']) == common_topics
-    assert set(common['edge_evidence_nodes']) == {
-        '/edge_bringup_readiness_node',
-        '/edge_ups_node',
-    }
+    assert common['edge_evidence_nodes'] == []
     assert common['edge_evidence_topics'] == []
+    assert '/edge_ups_node' not in config
+    assert '/edge_bringup_readiness_node' not in config
+
+    bridge_source = read('src/bridge_node.cpp')
+    assert 'evidence.core_evidence_configured;' in bridge_source
+    assert '!evidence.edge_evidence_configured ||' in bridge_source
+    assert 'evidence.edge_visible;' in bridge_source
+    assert 'evidence.dds_active &&' in bridge_source
+    assert 'health.required_topics_ready &&' in bridge_source
 
     safe = mode_parameters('safe_idle')
     assert set(safe['observation_topics']) == common_topics

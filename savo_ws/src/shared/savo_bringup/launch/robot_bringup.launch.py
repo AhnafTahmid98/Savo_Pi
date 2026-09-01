@@ -108,6 +108,16 @@ def _setup(context):
             "edge_ups_expected",
             "head_enable_tf",
             "head_camera_mode",
+            "start_description",
+            "start_base",
+            "start_lidar",
+            "start_perception",
+            "start_localization",
+            "start_control",
+            "start_power",
+            "start_supervisor",
+            "start_head",
+            "start_location_lifecycle",
         ]:
             core_arguments[name] = LaunchConfiguration(name)
         actions.append(
@@ -128,6 +138,13 @@ def _setup(context):
             "start_ui",
             "start_bridge",
             "start_edge_power",
+            "realsense_start_delay_s",
+            "camera_support_start_delay_s",
+            "vo_start_delay_s",
+            "obstacle_cloud_start_delay_s",
+            "observer_relay_start_delay_s",
+            "bridge_start_delay_s",
+            "readiness_start_delay_s",
             "vo_profile",
             "ui_profile",
             "active_map_id",
@@ -231,6 +248,18 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument("edge_ups_expected", default_value="false"),
             DeclareLaunchArgument("head_enable_tf", default_value="true"),
             DeclareLaunchArgument("head_camera_mode", default_value="ros"),
+            DeclareLaunchArgument("start_description", default_value="true"),
+            DeclareLaunchArgument("start_base", default_value="true"),
+            DeclareLaunchArgument("start_lidar", default_value="true"),
+            DeclareLaunchArgument("start_perception", default_value="true"),
+            DeclareLaunchArgument("start_localization", default_value="true"),
+            DeclareLaunchArgument("start_control", default_value="true"),
+            DeclareLaunchArgument("start_power", default_value="true"),
+            DeclareLaunchArgument("start_supervisor", default_value="true"),
+            DeclareLaunchArgument("start_head", default_value="true"),
+            DeclareLaunchArgument(
+                "start_location_lifecycle", default_value="false"
+            ),
             DeclareLaunchArgument("start_realsense", default_value="true"),
             DeclareLaunchArgument("start_vo", default_value="true"),
             DeclareLaunchArgument("start_obstacle_cloud", default_value="true"),
@@ -241,6 +270,25 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument("start_ui", default_value="false"),
             DeclareLaunchArgument("start_bridge", default_value="true"),
             DeclareLaunchArgument("start_edge_power", default_value="true"),
+            DeclareLaunchArgument(
+                "realsense_start_delay_s", default_value="0.0"
+            ),
+            DeclareLaunchArgument(
+                "camera_support_start_delay_s", default_value="7.0"
+            ),
+            DeclareLaunchArgument("vo_start_delay_s", default_value="14.0"),
+            DeclareLaunchArgument(
+                "obstacle_cloud_start_delay_s", default_value="22.0"
+            ),
+            DeclareLaunchArgument(
+                "observer_relay_start_delay_s", default_value="28.0"
+            ),
+            DeclareLaunchArgument(
+                "bridge_start_delay_s", default_value="34.0"
+            ),
+            DeclareLaunchArgument(
+                "readiness_start_delay_s", default_value="40.0"
+            ),
             DeclareLaunchArgument("vo_profile", default_value="real_robot_v1"),
             DeclareLaunchArgument("ui_profile", default_value="pi"),
             DeclareLaunchArgument(
