@@ -19,6 +19,8 @@ constexpr const char * COLOR_IMAGE_TOPIC = "/camera/camera/color/image_raw";
 constexpr const char * COLOR_INFO_TOPIC = "/camera/camera/color/camera_info";
 constexpr const char * DEPTH_IMAGE_TOPIC = "/camera/camera/depth/image_rect_raw";
 constexpr const char * DEPTH_INFO_TOPIC = "/camera/camera/depth/camera_info";
+constexpr const char * ALIGNED_DEPTH_IMAGE_TOPIC =
+  "/camera/camera/aligned_depth_to_color/image_raw";
 constexpr const char * POINTCLOUD_TOPIC = "/camera/camera/depth/color/points";
 constexpr const char * STATUS_TOPIC = "/realsense/status";
 constexpr const char * DIAGNOSTICS_TOPIC = "/diagnostics";
@@ -33,9 +35,12 @@ public:
     params_.stale_timeout_s = declare_parameter<double>("stale_timeout_s", 0.75);
     params_.expected_color_hz = declare_parameter<double>("expected_color_hz", 20.0);
     params_.expected_depth_hz = declare_parameter<double>("expected_depth_hz", 20.0);
+    params_.expected_aligned_depth_hz =
+      declare_parameter<double>("expected_aligned_depth_hz", 20.0);
     params_.expected_camera_info_hz = declare_parameter<double>("expected_camera_info_hz", 20.0);
     params_.expected_pointcloud_hz = declare_parameter<double>("expected_pointcloud_hz", 8.0);
     require_pointcloud_ = declare_parameter<bool>("require_pointcloud", false);
+    require_aligned_depth_ = declare_parameter<bool>("require_aligned_depth", false);
 
     if (status_hz_ <= 0.0) {
       status_hz_ = 2.0;
@@ -59,6 +64,10 @@ public:
     depth_info_sub_ = create_subscription<sensor_msgs::msg::CameraInfo>(
       DEPTH_INFO_TOPIC, reliable_qos,
       [this](sensor_msgs::msg::CameraInfo::ConstSharedPtr) { depth_info_tracker_.tick(now()); });
+
+    aligned_depth_sub_ = create_subscription<sensor_msgs::msg::Image>(
+      ALIGNED_DEPTH_IMAGE_TOPIC, sensor_qos,
+      [this](sensor_msgs::msg::Image::ConstSharedPtr) { aligned_depth_tracker_.tick(now()); });
 
     pointcloud_sub_ = create_subscription<sensor_msgs::msg::PointCloud2>(
       POINTCLOUD_TOPIC, sensor_qos,
@@ -90,15 +99,21 @@ private:
     const auto depth_info = savo_realsense::build_stream_status(
       DEPTH_INFO_TOPIC, depth_info_tracker_, now_time,
       params_.expected_camera_info_hz, params_.stale_timeout_s);
+    const auto aligned_depth = savo_realsense::build_stream_status(
+      ALIGNED_DEPTH_IMAGE_TOPIC, aligned_depth_tracker_, now_time,
+      params_.expected_aligned_depth_hz, params_.stale_timeout_s);
     const auto pointcloud = savo_realsense::build_stream_status(
       POINTCLOUD_TOPIC, pointcloud_tracker_, now_time,
       params_.expected_pointcloud_hz, params_.stale_timeout_s);
 
     const bool pointcloud_ok = require_pointcloud_ ? pointcloud.ok() : true;
-    const bool ok = color.ok() && color_info.ok() && depth.ok() && depth_info.ok() && pointcloud_ok;
+    const bool aligned_depth_ok = require_aligned_depth_ ? aligned_depth.ok() : true;
+    const bool ok = color.ok() && color_info.ok() && depth.ok() && depth_info.ok() &&
+      aligned_depth_ok && pointcloud_ok;
 
     std_msgs::msg::String message;
-    message.data = make_status_json(ok, color, color_info, depth, depth_info, pointcloud);
+    message.data = make_status_json(
+      ok, color, color_info, depth, depth_info, aligned_depth, pointcloud);
     status_pub_->publish(message);
 
     std::vector<diagnostic_msgs::msg::DiagnosticStatus> diagnostics;
@@ -108,6 +123,11 @@ private:
     diagnostics.push_back(savo_realsense::make_stream_diagnostic("RealSense depth image", depth));
     diagnostics.push_back(
       savo_realsense::make_stream_diagnostic("RealSense depth camera info", depth_info));
+
+    if (require_aligned_depth_ || aligned_depth.seen) {
+      diagnostics.push_back(
+        savo_realsense::make_stream_diagnostic("RealSense aligned depth image", aligned_depth));
+    }
 
     if (require_pointcloud_ || pointcloud.seen) {
       diagnostics.push_back(
@@ -123,18 +143,23 @@ private:
     const savo_realsense::StreamStatus & color_info,
     const savo_realsense::StreamStatus & depth,
     const savo_realsense::StreamStatus & depth_info,
+    const savo_realsense::StreamStatus & aligned_depth,
     const savo_realsense::StreamStatus & pointcloud) const
   {
     std::ostringstream stream;
     stream
       << "{"
       << "\"ok\":" << json_bool(ok)
-      << ",\"message\":\"" << status_message(ok, color, color_info, depth, depth_info, pointcloud)
+      << ",\"message\":\"" << status_message(
+        ok, color, color_info, depth, depth_info, aligned_depth, pointcloud)
       << "\""
       << ",\"color_ok\":" << json_bool(color.ok())
       << ",\"color_info_ok\":" << json_bool(color_info.ok())
       << ",\"depth_ok\":" << json_bool(depth.ok())
       << ",\"depth_info_ok\":" << json_bool(depth_info.ok())
+      << ",\"aligned_depth_ok\":"
+      << json_bool(require_aligned_depth_ ? aligned_depth.ok() : true)
+      << ",\"require_aligned_depth\":" << json_bool(require_aligned_depth_)
       << ",\"pointcloud_ok\":" << json_bool(require_pointcloud_ ? pointcloud.ok() : true)
       << ",\"require_pointcloud\":" << json_bool(require_pointcloud_)
       << "}";
@@ -148,6 +173,7 @@ private:
     const savo_realsense::StreamStatus & color_info,
     const savo_realsense::StreamStatus & depth,
     const savo_realsense::StreamStatus & depth_info,
+    const savo_realsense::StreamStatus & aligned_depth,
     const savo_realsense::StreamStatus & pointcloud) const
   {
     if (ok) {
@@ -166,6 +192,9 @@ private:
     }
     if (!depth_info.ok()) {
       bad.push_back("depth_info");
+    }
+    if (require_aligned_depth_ && !aligned_depth.ok()) {
+      bad.push_back("aligned_depth");
     }
     if (require_pointcloud_ && !pointcloud.ok()) {
       bad.push_back("pointcloud");
@@ -193,18 +222,21 @@ private:
 
   double status_hz_{2.0};
   bool require_pointcloud_{false};
+  bool require_aligned_depth_{false};
   savo_realsense::StreamMonitorParams params_;
 
   savo_realsense::RateTracker color_tracker_;
   savo_realsense::RateTracker color_info_tracker_;
   savo_realsense::RateTracker depth_tracker_;
   savo_realsense::RateTracker depth_info_tracker_;
+  savo_realsense::RateTracker aligned_depth_tracker_;
   savo_realsense::RateTracker pointcloud_tracker_;
 
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr color_sub_;
   rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr color_info_sub_;
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr depth_sub_;
   rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr depth_info_sub_;
+  rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr aligned_depth_sub_;
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_sub_;
 
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr status_pub_;

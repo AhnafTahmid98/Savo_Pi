@@ -16,6 +16,8 @@ constexpr const char * COLOR_IMAGE_TOPIC = "/camera/camera/color/image_raw";
 constexpr const char * COLOR_INFO_TOPIC = "/camera/camera/color/camera_info";
 constexpr const char * DEPTH_IMAGE_TOPIC = "/camera/camera/depth/image_rect_raw";
 constexpr const char * DEPTH_INFO_TOPIC = "/camera/camera/depth/camera_info";
+constexpr const char * ALIGNED_DEPTH_IMAGE_TOPIC =
+  "/camera/camera/aligned_depth_to_color/image_raw";
 constexpr const char * POINTCLOUD_TOPIC = "/camera/camera/depth/color/points";
 constexpr const char * DIAGNOSTICS_TOPIC = "/diagnostics";
 
@@ -29,9 +31,12 @@ public:
     params_.stale_timeout_s = declare_parameter<double>("stale_timeout_s", 0.75);
     params_.expected_color_hz = declare_parameter<double>("expected_color_hz", 20.0);
     params_.expected_depth_hz = declare_parameter<double>("expected_depth_hz", 20.0);
+    params_.expected_aligned_depth_hz =
+      declare_parameter<double>("expected_aligned_depth_hz", 20.0);
     params_.expected_camera_info_hz = declare_parameter<double>("expected_camera_info_hz", 20.0);
     params_.expected_pointcloud_hz = declare_parameter<double>("expected_pointcloud_hz", 8.0);
     require_pointcloud_ = declare_parameter<bool>("require_pointcloud", false);
+    require_aligned_depth_ = declare_parameter<bool>("require_aligned_depth", false);
 
     if (publish_hz_ <= 0.0) {
       publish_hz_ = 2.0;
@@ -55,6 +60,10 @@ public:
     depth_info_sub_ = create_subscription<sensor_msgs::msg::CameraInfo>(
       DEPTH_INFO_TOPIC, reliable_qos,
       [this](sensor_msgs::msg::CameraInfo::ConstSharedPtr) { depth_info_tracker_.tick(now()); });
+
+    aligned_depth_sub_ = create_subscription<sensor_msgs::msg::Image>(
+      ALIGNED_DEPTH_IMAGE_TOPIC, sensor_qos,
+      [this](sensor_msgs::msg::Image::ConstSharedPtr) { aligned_depth_tracker_.tick(now()); });
 
     pointcloud_sub_ = create_subscription<sensor_msgs::msg::PointCloud2>(
       POINTCLOUD_TOPIC, sensor_qos,
@@ -85,6 +94,9 @@ private:
     const auto depth_info = savo_realsense::build_stream_status(
       DEPTH_INFO_TOPIC, depth_info_tracker_, now_time,
       params_.expected_camera_info_hz, params_.stale_timeout_s);
+    const auto aligned_depth = savo_realsense::build_stream_status(
+      ALIGNED_DEPTH_IMAGE_TOPIC, aligned_depth_tracker_, now_time,
+      params_.expected_aligned_depth_hz, params_.stale_timeout_s);
     const auto pointcloud = savo_realsense::build_stream_status(
       POINTCLOUD_TOPIC, pointcloud_tracker_, now_time,
       params_.expected_pointcloud_hz, params_.stale_timeout_s);
@@ -97,6 +109,11 @@ private:
     diagnostics.push_back(
       savo_realsense::make_stream_diagnostic("RealSense depth camera info", depth_info));
 
+    if (require_aligned_depth_ || aligned_depth.seen) {
+      diagnostics.push_back(
+        savo_realsense::make_stream_diagnostic("RealSense aligned depth image", aligned_depth));
+    }
+
     if (require_pointcloud_ || pointcloud.seen) {
       diagnostics.push_back(
         savo_realsense::make_stream_diagnostic("RealSense pointcloud", pointcloud));
@@ -107,18 +124,21 @@ private:
 
   double publish_hz_{2.0};
   bool require_pointcloud_{false};
+  bool require_aligned_depth_{false};
   savo_realsense::StreamMonitorParams params_;
 
   savo_realsense::RateTracker color_tracker_;
   savo_realsense::RateTracker color_info_tracker_;
   savo_realsense::RateTracker depth_tracker_;
   savo_realsense::RateTracker depth_info_tracker_;
+  savo_realsense::RateTracker aligned_depth_tracker_;
   savo_realsense::RateTracker pointcloud_tracker_;
 
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr color_sub_;
   rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr color_info_sub_;
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr depth_sub_;
   rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr depth_info_sub_;
+  rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr aligned_depth_sub_;
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_sub_;
 
   rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr diagnostics_pub_;

@@ -35,14 +35,6 @@ def generate_launch_description() -> LaunchDescription:
         parameters=[camera_config_file],
     )
 
-    topic_monitor = Node(
-        package="savo_realsense",
-        executable="camera_topic_monitor_node",
-        name="camera_topic_monitor_node",
-        output="screen",
-        parameters=[nodes_config_file],
-    )
-
     health_node = Node(
         package="savo_realsense",
         executable="camera_health_node",
@@ -114,7 +106,7 @@ def generate_launch_description() -> LaunchDescription:
             "camera_support_start_delay_s",
             default_value="0.0",
             description=(
-                "Seconds from launch start before camera monitors and "
+                "Seconds from launch start before camera health and "
                 "depth_front_min start"
             ),
         ),
@@ -132,7 +124,7 @@ def generate_launch_description() -> LaunchDescription:
         ),
         TimerAction(
             period=camera_support_start_delay_s,
-            actions=[topic_monitor, health_node, depth_front_min_node],
+            actions=[health_node, depth_front_min_node],
             cancel_on_shutdown=True,
         ),
         TimerAction(

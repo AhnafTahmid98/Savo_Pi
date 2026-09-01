@@ -17,6 +17,7 @@ struct StreamMonitorParams
   double stale_timeout_s{0.75};
   double expected_color_hz{20.0};
   double expected_depth_hz{20.0};
+  double expected_aligned_depth_hz{20.0};
   double expected_camera_info_hz{20.0};
   double expected_pointcloud_hz{8.0};
 };

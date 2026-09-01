@@ -20,6 +20,8 @@ def test_pointcloud_camera_profile_matches_robot_savo_d435_config() -> None:
     assert params["enable_depth"] is True
     assert params["depth_module.depth_profile"] == "848x480x30"
     assert params["rgb_camera.color_profile"] == "640x480x30"
+    assert params["color_qos"] == "SENSOR_DATA"
+    assert params["depth_qos"] == "SENSOR_DATA"
     assert params["align_depth.enable"] is True
     assert params["enable_sync"] is True
 
@@ -35,7 +37,7 @@ def test_main_d435_profile_keeps_vo_streams_and_pointcloud() -> None:
     assert params["align_depth.enable"] is True
     assert params["enable_sync"] is True
     assert params["pointcloud__neon_.enable"] is True
-    assert params["pointcloud__neon_.stream_filter"] == 2
+    assert params["pointcloud__neon_.stream_filter"] == 0
     assert params["pointcloud__neon_.stream_index_filter"] == 0
     assert params["pointcloud__neon_.allow_no_texture_points"] is True
     assert params["pointcloud__neon_.ordered_pc"] is False
@@ -49,7 +51,7 @@ def test_pointcloud_camera_profile_uses_direct_node_runtime_parameters() -> None
     # Unlike rs_launch.py's flat config, direct RealSense ROS 4.58.1 node
     # parameters use the runtime NEON plugin names.
     assert params["pointcloud__neon_.enable"] is True
-    assert params["pointcloud__neon_.stream_filter"] == 2
+    assert params["pointcloud__neon_.stream_filter"] == 0
     assert params["pointcloud__neon_.stream_index_filter"] == 0
     assert params["pointcloud__neon_.allow_no_texture_points"] is True
     assert params["pointcloud__neon_.ordered_pc"] is False
@@ -66,6 +68,10 @@ def test_d435_nodes_require_pointcloud() -> None:
     assert health_params["require_pointcloud"] is True
     assert monitor_params["expected_pointcloud_hz"] > 0.0
     assert health_params["expected_pointcloud_hz"] > 0.0
+    assert monitor_params["require_aligned_depth"] is True
+    assert health_params["require_aligned_depth"] is True
+    assert monitor_params["expected_aligned_depth_hz"] > 0.0
+    assert health_params["expected_aligned_depth_hz"] > 0.0
 
 
 def test_pointcloud_nodes_require_pointcloud() -> None:
@@ -99,6 +105,40 @@ def test_native_health_uses_fresh_nonzero_pointcloud_not_expected_rate() -> None
 
     assert "return seen && !stale && rate_hz > 0.0;" in ok_body
     assert "expected_hz" not in ok_body
+
+
+def test_native_health_reports_and_gates_required_aligned_depth() -> None:
+    health_implementation = (
+        PACKAGE_ROOT / "src" / "camera_health_main.cpp"
+    ).read_text(encoding="utf-8")
+    monitor_implementation = (
+        PACKAGE_ROOT / "src" / "camera_topic_monitor_main.cpp"
+    ).read_text(encoding="utf-8")
+
+    for implementation in (health_implementation, monitor_implementation):
+        assert (
+            "/camera/camera/aligned_depth_to_color/image_raw" in implementation
+        )
+        assert (
+            'declare_parameter<double>("expected_aligned_depth_hz", 20.0)'
+            in implementation
+        )
+        assert (
+            'declare_parameter<bool>("require_aligned_depth", false)'
+            in implementation
+        )
+
+    assert '\\"aligned_depth_ok\\"' in health_implementation
+    assert '\\"require_aligned_depth\\"' in health_implementation
+    assert "aligned_depth_ok && pointcloud_ok" in health_implementation
+
+
+def test_minimal_profile_does_not_require_aligned_depth() -> None:
+    config = load_yaml("realsense_minimal.yaml")
+
+    for node_name in ("camera_topic_monitor_node", "camera_health_node"):
+        params = config[node_name]["ros__parameters"]
+        assert params["require_aligned_depth"] is False
 
 
 def test_all_runtime_driver_profiles_leave_fixed_tf_to_description() -> None:

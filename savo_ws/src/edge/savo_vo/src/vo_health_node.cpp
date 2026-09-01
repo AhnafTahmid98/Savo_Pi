@@ -117,8 +117,8 @@ void VOHealthNode::on_odom(const Odometry::SharedPtr msg)
     return;
   }
 
-  has_odom_ = true;
-  last_odom_time_s_ = now().seconds();
+  state_.has_odom = true;
+  state_.last_odom_time_s = now().seconds();
 }
 
 void VOHealthNode::on_status(const String::SharedPtr msg)
@@ -127,7 +127,9 @@ void VOHealthNode::on_status(const String::SharedPtr msg)
     return;
   }
 
-  last_status_ = msg->data.empty() ? "status empty" : msg->data;
+  state_.has_status = true;
+  state_.last_status_time_s = now().seconds();
+  state_.status_text = msg->data.empty() ? "status empty" : msg->data;
 }
 
 void VOHealthNode::publish_health()
@@ -139,31 +141,7 @@ void VOHealthNode::publish_health()
 
 std::string VOHealthNode::build_health_message(const double now_s) const
 {
-  if (!has_odom_) {
-    return "waiting: no visual odometry received";
-  }
-
-  const double odom_age_s = std::max(0.0, now_s - last_odom_time_s_);
-
-  if (odom_age_s > stale_timeout_s_) {
-    return "stale: visual odometry timeout";
-  }
-
-  if (last_status_.find("error") != std::string::npos) {
-    return "error: " + last_status_;
-  }
-
-  if (last_status_.find("waiting") != std::string::npos) {
-    return "waiting: " + last_status_;
-  }
-
-  if (last_status_.find("lost") != std::string::npos ||
-      last_status_.find("rejected") != std::string::npos ||
-      last_status_.find("degraded") != std::string::npos) {
-    return "degraded: " + last_status_;
-  }
-
-  return "ok: " + last_status_;
+  return evaluate_vo_health(state_, now_s, stale_timeout_s_);
 }
 
 }  // namespace savo_vo

@@ -157,10 +157,8 @@ def test_camera_stage_is_one_driver_then_support_then_observer_relay() -> None:
 
     assert launch.count('executable="realsense2_camera_node"') == 1
     assert "actions=[realsense_node]" in launch
-    assert (
-        "actions=[topic_monitor, health_node, depth_front_min_node]"
-        in launch
-    )
+    assert "actions=[health_node, depth_front_min_node]" in launch
+    assert 'executable="camera_topic_monitor_node"' not in launch
     assert "actions=[observer_color_relay]" in launch
     assert 'condition=IfCondition(use_depth_front_min)' in launch
     assert 'condition=IfCondition(enable_observer_color_relay)' in launch

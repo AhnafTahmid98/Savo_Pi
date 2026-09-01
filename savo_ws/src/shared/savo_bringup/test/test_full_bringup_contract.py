@@ -123,7 +123,7 @@ def test_edge_bringup_uses_cpp_production_implementations() -> None:
     assert launch.count("realsense_bringup.launch.py") == 1
     assert "realsense_pointcloud.launch.py" not in launch
     assert realsense.count('executable="realsense2_camera_node"') == 1
-    assert 'executable="camera_topic_monitor_node"' in realsense
+    assert 'executable="camera_topic_monitor_node"' not in realsense
     assert 'executable="camera_health_node"' in realsense
     assert 'executable="depth_front_min_node"' in realsense
     assert 'package="image_transport"' in realsense

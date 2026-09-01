@@ -44,10 +44,12 @@ camera_topic_monitor_node:
 
     expected_color_hz: 30.0
     expected_depth_hz: 30.0
+    expected_aligned_depth_hz: 30.0
     expected_camera_info_hz: 30.0
     expected_pointcloud_hz: 10.0
 
     require_pointcloud: false
+    require_aligned_depth: false
 
 camera_health_node:
   ros__parameters:
@@ -56,7 +58,9 @@ camera_health_node:
 
     expected_color_hz: 30.0
     expected_depth_hz: 30.0
+    expected_aligned_depth_hz: 30.0
     expected_camera_info_hz: 30.0
     expected_pointcloud_hz: 10.0
 
     require_pointcloud: false
+    require_aligned_depth: false

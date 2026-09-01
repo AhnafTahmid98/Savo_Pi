@@ -34,6 +34,7 @@ add_library(savo_vo_core
   src/geometry_utils.cpp
   src/rgbd_geometry.cpp
   src/rgbd_odometry_node.cpp
+  src/vo_health_state.cpp
   src/vo_health_node.cpp
   src/vo_diagnostics_node.cpp
   src/vo_republisher_node.cpp
@@ -177,6 +178,16 @@ if(BUILD_TESTING)
     target_link_libraries(test_rgbd_geometry
       savo_vo_core
       ${OpenCV_LIBS}
+    )
+  endif()
+
+  ament_add_gtest(test_vo_health_state
+    test/test_vo_health_state.cpp
+  )
+
+  if(TARGET test_vo_health_state)
+    target_link_libraries(test_vo_health_state
+      savo_vo_core
     )
   endif()
 

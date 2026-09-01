@@ -28,6 +28,15 @@ Normal production is:
 ros2 launch savo_realsense realsense_bringup.launch.py
 ```
 
+Production starts `camera_health_node` as the sole raw-stream health authority.
+The separate topic monitor remains available for explicit diagnostics without
+adding a second production subscriber to every high-bandwidth camera stream:
+
+```bash
+ros2 run savo_realsense camera_topic_monitor_node --ros-args \
+  --params-file install/savo_realsense/share/savo_realsense/config/realsense_d435_nodes.yaml
+```
+
 The standalone VO-oriented launch retains its explicit relay switch:
 
 ```bash
@@ -46,15 +55,15 @@ Health is fail-closed on an unseen, stale, or zero-rate required cloud, but does
 not compare the measured rate with that metadata. The hardware-measured
 approximately 2.73 Hz pointcloud is therefore healthy while fresh under the
 0.75-second stale timeout; the existing expected-rate metadata was not lowered.
+Production health also requires the aligned depth image consumed by RGB-D VO;
+minimal profiles leave that gate optional.
 
-RealSense may log `No stream match for pointcloud chosen texture Process -
-Color` while the validated XYZ cloud continues publishing. The wrapper's
-supported parameter describes `stream_filter` as the pointcloud texture stream;
-it does not document a separate untextured-XYZ selection. Robot Savo therefore
-preserves the hardware-validated Color selection and treats this warning as
-non-fatal only while raw/filtered cloud health, publication counts, and TF/error
-counters remain healthy. Any missing, stale, malformed, or transform-failing
-cloud remains a real failure.
+RealSense ROS 4.58.1 explicitly handles `RS2_STREAM_ANY` (`stream_filter: 0`)
+as an untextured XYZ cloud: it bypasses texture-frame lookup, keeps valid depth
+vertices, and publishes the same `/camera/camera/depth/color/points` topic.
+Production uses that mode because the obstacle pipeline needs geometry, not RGB
+coloring. Any missing, stale, malformed, or transform-failing cloud remains a
+real failure.
 
 Recommended writing order
 Step 1 — package metadata

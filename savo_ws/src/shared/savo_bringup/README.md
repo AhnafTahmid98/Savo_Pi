@@ -254,7 +254,7 @@ Supported profiles are `bench`, `lidar_only`, `lidar_d435_voxel`, and
 profile. The D435 obstacle pipeline is hardware validated, so canonical
 real-robot Edge bringup defaults `d435_voxel_validated:=true` and
 `start_obstacle_cloud:=true`. It starts the single validated D435 camera,
-monitor and health nodes, front-depth producer, VO, local raw pointcloud,
+camera health authority, front-depth producer, VO, local raw pointcloud,
 filtered obstacle cloud, and compressed observer color relay. Explicitly
 disabling the obstacle or observer relay remains available for controlled
 testing. Helper loss does not gate the required LiDAR navigation path, and
@@ -270,7 +270,7 @@ they do not change any steady-state stream, monitor, VO, filter, or relay rate.
 | Launch time | Stage | Processes and data flow |
 |---:|---|---|
 | `0.0` s | RealSense | One D435 driver produces color/depth/CameraInfo, aligned depth, and the validated raw PointCloud2 |
-| `7.0` s | Camera support | Topic monitor, camera health, and `depth_front_min` |
+| `7.0` s | Camera support | Camera health and `depth_front_min` |
 | `14.0` s | Visual odometry | C++ RGB-D odometry, republisher, health, and diagnostics |
 | `22.0` s | Obstacle cloud | TF transform, crop/self-filter, and 0.05 m voxel reduction |
 | `28.0` s | Observer relay | Raw D435 color to compressed observer color |

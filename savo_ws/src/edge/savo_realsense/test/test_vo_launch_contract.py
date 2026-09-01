@@ -156,10 +156,12 @@ def test_canonical_bringup_starts_one_camera_and_production_color_relay() -> Non
         "enable_observer_color_relay"
     ] == "true"
     assert launch_text.count('executable="realsense2_camera_node"') == 1
-    assert launch_text.count("Node(") == 5
+    assert launch_text.count("Node(") == 4
     assert '"realsense_d435_camera.yaml"' in launch_text
     assert '"realsense_d435_nodes.yaml"' in launch_text
     assert 'executable="depth_front_min_node"' in launch_text
+    assert 'executable="camera_health_node"' in launch_text
+    assert 'executable="camera_topic_monitor_node"' not in launch_text
 
     relays = [
         call
@@ -196,10 +198,12 @@ def test_vo_launch_driver_config_is_validated_production_profile() -> None:
     assert params["enable_depth"] is True
     assert params["depth_module.depth_profile"] == "848x480x30"
     assert params["rgb_camera.color_profile"] == "640x480x30"
+    assert params["color_qos"] == "SENSOR_DATA"
+    assert params["depth_qos"] == "SENSOR_DATA"
     assert params["align_depth.enable"] is True
     assert params["enable_sync"] is True
     assert params["pointcloud__neon_.enable"] is True
-    assert params["pointcloud__neon_.stream_filter"] == 2
+    assert params["pointcloud__neon_.stream_filter"] == 0
     assert params["pointcloud__neon_.stream_index_filter"] == 0
     assert params["pointcloud__neon_.allow_no_texture_points"] is True
     assert params["pointcloud__neon_.ordered_pc"] is False
@@ -240,6 +244,8 @@ def test_vo_monitor_profile_requires_pointcloud() -> None:
         params = config[node_name]["ros__parameters"]
         assert params["expected_pointcloud_hz"] == 30.0
         assert params["require_pointcloud"] is True
+        assert params["expected_aligned_depth_hz"] == 30.0
+        assert params["require_aligned_depth"] is True
 
 
 def test_vo_pointcloud_topic_contract_remains_raw_filter_input() -> None:

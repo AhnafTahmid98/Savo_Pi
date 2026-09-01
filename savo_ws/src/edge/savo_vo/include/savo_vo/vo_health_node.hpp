@@ -6,6 +6,8 @@
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/string.hpp"
 
+#include "savo_vo/vo_health_state.hpp"
+
 namespace savo_vo
 {
 
@@ -39,10 +41,7 @@ private:
   std::string health_topic_;
 
   double stale_timeout_s_{0.50};
-  double last_odom_time_s_{0.0};
-
-  bool has_odom_{false};
-  std::string last_status_{"waiting for visual odometry"};
+  VOHealthState state_;
 
   rclcpp::Publisher<String>::SharedPtr health_pub_;
   rclcpp::Subscription<Odometry>::SharedPtr odom_sub_;

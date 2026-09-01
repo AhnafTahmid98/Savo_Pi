@@ -7,6 +7,7 @@ PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 CPP_HEADERS = [
     "rgbd_odometry_node.hpp",
     "vo_health_node.hpp",
+    "vo_health_state.hpp",
     "vo_diagnostics_node.hpp",
     "vo_republisher_node.hpp",
     "vo_constants.hpp",
@@ -23,6 +24,7 @@ CPP_SOURCES = [
     "rgbd_odometry_node.cpp",
     "rgbd_odometry_main.cpp",
     "vo_health_node.cpp",
+    "vo_health_state.cpp",
     "vo_health_main.cpp",
     "vo_diagnostics_node.cpp",
     "vo_diagnostics_main.cpp",
