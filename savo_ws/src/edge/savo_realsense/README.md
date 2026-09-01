@@ -58,12 +58,12 @@ approximately 2.73 Hz pointcloud is therefore healthy while fresh under the
 Production health also requires the aligned depth image consumed by RGB-D VO;
 minimal profiles leave that gate optional.
 
-RealSense ROS 4.58.1 explicitly handles `RS2_STREAM_ANY` (`stream_filter: 0`)
-as an untextured XYZ cloud: it bypasses texture-frame lookup, keeps valid depth
-vertices, and publishes the same `/camera/camera/depth/color/points` topic.
-Production uses that mode because the obstacle pipeline needs geometry, not RGB
-coloring. Any missing, stale, malformed, or transform-failing cloud remains a
-real failure.
+Edge hardware validation with the D435 and RealSense ROS 4.58.1 established
+`pointcloud__neon_.stream_filter: 1` as the reliable depth-stream selector for
+publishing `/camera/camera/depth/color/points`. Selector `0` failed on this
+runtime with `No matching stream for texture 'Process - Any'`. Production uses
+the hardware-validated selector `1`; any missing, stale, malformed, or
+transform-failing cloud remains a real failure.
 
 Recommended writing order
 Step 1 — package metadata

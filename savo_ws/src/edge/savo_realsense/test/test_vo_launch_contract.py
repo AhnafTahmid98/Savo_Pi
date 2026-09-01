@@ -203,7 +203,7 @@ def test_vo_launch_driver_config_is_validated_production_profile() -> None:
     assert params["align_depth.enable"] is True
     assert params["enable_sync"] is True
     assert params["pointcloud__neon_.enable"] is True
-    assert params["pointcloud__neon_.stream_filter"] == 0
+    assert params["pointcloud__neon_.stream_filter"] == 1
     assert params["pointcloud__neon_.stream_index_filter"] == 0
     assert params["pointcloud__neon_.allow_no_texture_points"] is True
     assert params["pointcloud__neon_.ordered_pc"] is False

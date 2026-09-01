@@ -24,8 +24,9 @@
     enable_sync: true
 
     pointcloud__neon_.enable: true
-    # RS2_STREAM_ANY: publish XYZ without requiring a color texture frame.
-    pointcloud__neon_.stream_filter: 0
+    # Hardware-validated on D435 with RealSense ROS 4.58.1: the depth stream
+    # selector provides reliable pointcloud publication.
+    pointcloud__neon_.stream_filter: 1
     pointcloud__neon_.stream_index_filter: 0
     pointcloud__neon_.allow_no_texture_points: true
     pointcloud__neon_.ordered_pc: false

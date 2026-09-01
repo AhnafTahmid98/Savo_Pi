@@ -37,7 +37,7 @@ def test_main_d435_profile_keeps_vo_streams_and_pointcloud() -> None:
     assert params["align_depth.enable"] is True
     assert params["enable_sync"] is True
     assert params["pointcloud__neon_.enable"] is True
-    assert params["pointcloud__neon_.stream_filter"] == 0
+    assert params["pointcloud__neon_.stream_filter"] == 1
     assert params["pointcloud__neon_.stream_index_filter"] == 0
     assert params["pointcloud__neon_.allow_no_texture_points"] is True
     assert params["pointcloud__neon_.ordered_pc"] is False
@@ -51,7 +51,7 @@ def test_pointcloud_camera_profile_uses_direct_node_runtime_parameters() -> None
     # Unlike rs_launch.py's flat config, direct RealSense ROS 4.58.1 node
     # parameters use the runtime NEON plugin names.
     assert params["pointcloud__neon_.enable"] is True
-    assert params["pointcloud__neon_.stream_filter"] == 0
+    assert params["pointcloud__neon_.stream_filter"] == 1
     assert params["pointcloud__neon_.stream_index_filter"] == 0
     assert params["pointcloud__neon_.allow_no_texture_points"] is True
     assert params["pointcloud__neon_.ordered_pc"] is False
