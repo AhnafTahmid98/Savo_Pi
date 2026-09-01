@@ -157,6 +157,76 @@ status availability, with `center_on_start=false`, but is not a basic driving
 readiness dependency; semantic mapping modes own the location/head integration
 they require.
 
+### Staged Core startup
+
+Canonical non-autonomous Core startup is staged to spread Raspberry Pi 5
+serial, GPIO/I2C, camera, localization, and DDS discovery work over time. The
+delays affect process startup only. They do not change motor, watchdog, LiDAR,
+range-safety, IMU, encoder, EKF, power, head, camera, geometry, or readiness
+rates and thresholds.
+
+| Launch time | Stage | Existing launch composition |
+|---:|---|---|
+| `0.0` s | Description | Locked geometry, robot state publisher, and fixed robot TF |
+| `3.0` s | Base | C++ Freenove driver, watchdog, state, and heartbeat |
+| `6.0` s | LiDAR | RPLIDAR A1 driver, filter, watchdog, health, and state |
+| `9.0` s | Perception | ToF, ultrasonic, range health/safety, and `/cmd_vel_safe` gate |
+| `12.0` s | Control | Mode manager, mux, shaper, recovery, and status in `STOP` |
+| `17.0` s | Localization | BNO055, encoders/wheel odometry, EKF, and health |
+| `22.0` s | Core power | Core UPS, base battery, aggregate, health, and status |
+| `27.0` s | Head | PCA9685 head nodes and the selected head-camera transport |
+| `33.0` s | Supervisor | Current mode policy with `auto_arm=false` by default |
+| `37.0` s | Locations | Only when mode-owned or explicitly enabled |
+| `40.0` s | Mode system | Manual SLAM or verified saved-map navigation, by mode only |
+| `45.0` s | Core readiness | Existing steady-state requirements begin validation |
+
+The nested `core_bringup.launch.py` arguments are:
+
+- `description_start_delay_s` (default `0.0`)
+- `base_start_delay_s` (default `3.0`)
+- `lidar_start_delay_s` (default `6.0`)
+- `perception_start_delay_s` (default `9.0`)
+- `control_start_delay_s` (default `12.0`)
+- `localization_start_delay_s` (default `17.0`)
+- `power_start_delay_s` (default `22.0`)
+- `head_start_delay_s` (default `27.0`)
+- `supervisor_start_delay_s` (default `33.0`)
+- `location_lifecycle_start_delay_s` (default `37.0`)
+- `manual_mapping_start_delay_s` (default `40.0`)
+- `navigation_start_delay_s` (default `40.0`)
+- `readiness_start_delay_s` (default `45.0`)
+
+`robot_bringup.launch.py` exposes the same Core controls except that Core
+readiness is named `core_readiness_start_delay_s`. This keeps it independent
+from Edge's existing `readiness_start_delay_s:=40.0`. For example:
+
+```bash
+ros2 launch savo_bringup robot_bringup.launch.py \
+  host_role:=core \
+  robot_mode:=safe_idle \
+  bringup_profile:=lidar_only \
+  localization_start_delay_s:=20.0 \
+  core_readiness_start_delay_s:=48.0
+```
+
+Existing `start_*` flags are evaluated before their non-autonomous timers, so
+disabled components remain disabled and `0.0` requests immediate startup.
+Safe idle remains stopped and unarmed, starts no SLAM or Nav2, does not center
+the head, and does not auto-start its scan. Manual SLAM and saved-map
+navigation start only in their matching modes at 40 seconds. Location services
+remain off in normal safe idle and do not imply navigation.
+
+The dedicated `autonomous_mapping.launch.py` composition is intentionally not
+restructured by Core staging: its safety and mission-authority launch remains
+the owner of its foundation, live-navigation, and mapping nodes, with control
+in `STOP` until the typed autonomous-mapping action is admitted. The parent
+Core readiness still starts at its configured delay.
+
+Every Core stage timer uses ROS launch with `cancel_on_shutdown=true`. Normal
+Ctrl+C cancels pending stages and asks already-started child nodes to terminate;
+no shell sleeps or detached launch wrappers are involved. Core staging is
+independent from the separately configured Edge timeline.
+
 Run the matching edge stack on `savo-edge`:
 
 ```bash

@@ -244,12 +244,17 @@ def test_core_launch_does_not_receive_edge_stage_controls() -> None:
     core = read(PACKAGE_ROOT / "launch" / "core_bringup.launch.py")
     robot = read(ROBOT_LAUNCH)
 
-    for name in STAGE_DEFAULTS:
+    for name in STAGE_DEFAULTS.keys() - {"readiness_start_delay_s"}:
         assert name not in core
+    assert launch_defaults(PACKAGE_ROOT / "launch" / "core_bringup.launch.py")[
+        "readiness_start_delay_s"
+    ] == "45.0"
     core_branch = robot.split('if role in {"core", "all"}:', maxsplit=1)[1]
     core_branch = core_branch.split('if role in {"edge", "all"}:', maxsplit=1)[0]
-    for name in STAGE_DEFAULTS:
+    for name in STAGE_DEFAULTS.keys() - {"readiness_start_delay_s"}:
         assert name not in core_branch
+    assert '"core_readiness_start_delay_s"' in core_branch
+    assert 'core_arguments["readiness_start_delay_s"]' in core_branch
 
 
 def test_edge_bringup_does_not_introduce_nav2_or_motion() -> None:

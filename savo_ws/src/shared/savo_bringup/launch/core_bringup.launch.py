@@ -5,6 +5,7 @@ from launch.actions import DeclareLaunchArgument
 from launch.actions import IncludeLaunchDescription
 from launch.actions import LogInfo
 from launch.actions import OpaqueFunction
+from launch.actions import TimerAction
 from launch.launch_description_sources import FrontendLaunchDescriptionSource
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
@@ -33,6 +34,15 @@ def _frontend_launch(package: str, filename: str):
 
 def _value(context, name: str) -> str:
     return LaunchConfiguration(name).perform(context).strip()
+
+
+def _stage(delay_argument: str, action):
+    """Delay one Core stage without blocking launch or surviving shutdown."""
+    return TimerAction(
+        period=LaunchConfiguration(delay_argument),
+        actions=[action],
+        cancel_on_shutdown=True,
+    )
 
 
 def _setup(context):
@@ -177,178 +187,211 @@ def _setup(context):
 
         if start_description:
             actions.append(
-                IncludeLaunchDescription(
-                    _python_launch("savo_description", "description.launch.py"),
-                    launch_arguments={
-                        "geometry_profile": LaunchConfiguration(
-                            "geometry_profile"
-                        ),
-                        "require_locked_geometry": LaunchConfiguration(
-                            "require_locked_geometry"
-                        ),
-                        "allow_provisional_geometry": LaunchConfiguration(
-                            "allow_provisional_geometry"
-                        ),
-                        "use_sim_time": use_sim_time,
-                        "use_transmissions": "false",
-                        "use_gazebo": "false",
-                    }.items(),
+                _stage(
+                    "description_start_delay_s",
+                    IncludeLaunchDescription(
+                        _python_launch("savo_description", "description.launch.py"),
+                        launch_arguments={
+                            "geometry_profile": LaunchConfiguration(
+                                "geometry_profile"
+                            ),
+                            "require_locked_geometry": LaunchConfiguration(
+                                "require_locked_geometry"
+                            ),
+                            "allow_provisional_geometry": LaunchConfiguration(
+                                "allow_provisional_geometry"
+                            ),
+                            "use_sim_time": use_sim_time,
+                            "use_transmissions": "false",
+                            "use_gazebo": "false",
+                        }.items(),
+                    ),
                 )
             )
         if start_base:
             actions.append(
-                IncludeLaunchDescription(
-                    _python_launch("savo_base", "base_bringup.launch.py"),
-                    launch_arguments={
-                        "profile": LaunchConfiguration("base_profile"),
-                        "driver_impl": "cpp",
-                        "use_diag_runner": "false",
-                        "output": "screen",
-                        "log_level": log_level,
-                    }.items(),
+                _stage(
+                    "base_start_delay_s",
+                    IncludeLaunchDescription(
+                        _python_launch("savo_base", "base_bringup.launch.py"),
+                        launch_arguments={
+                            "profile": LaunchConfiguration("base_profile"),
+                            "driver_impl": "cpp",
+                            "use_diag_runner": "false",
+                            "output": "screen",
+                            "log_level": log_level,
+                        }.items(),
+                    ),
                 )
             )
         if start_lidar:
             actions.append(
-                IncludeLaunchDescription(
-                    _python_launch("savo_lidar", "lidar_bringup.launch.py"),
-                    launch_arguments={
-                        "profile": LaunchConfiguration("lidar_profile")
-                    }.items(),
+                _stage(
+                    "lidar_start_delay_s",
+                    IncludeLaunchDescription(
+                        _python_launch("savo_lidar", "lidar_bringup.launch.py"),
+                        launch_arguments={
+                            "profile": LaunchConfiguration("lidar_profile")
+                        }.items(),
+                    ),
                 )
             )
         if start_perception:
             actions.append(
-                IncludeLaunchDescription(
-                    _python_launch(
-                        "savo_perception", "perception_bringup.launch.py"
-                    ),
-                    launch_arguments={
-                        "driver_impl": "cpp",
-                        "config_file": LaunchConfiguration(
-                            "perception_config_file"
+                _stage(
+                    "perception_start_delay_s",
+                    IncludeLaunchDescription(
+                        _python_launch(
+                            "savo_perception", "perception_bringup.launch.py"
                         ),
-                        "use_dashboard": "false",
-                    }.items(),
+                        launch_arguments={
+                            "driver_impl": "cpp",
+                            "config_file": LaunchConfiguration(
+                                "perception_config_file"
+                            ),
+                            "use_dashboard": "false",
+                        }.items(),
+                    ),
                 )
             )
         if start_control:
             actions.append(
-                IncludeLaunchDescription(
-                    _python_launch("savo_control", "control_bringup.launch.py"),
-                    launch_arguments={
-                        "startup_mode": LaunchConfiguration(
-                            "control_startup_mode"
-                        ),
-                        "use_backup_escape": LaunchConfiguration(
-                            "control_use_backup_escape"
-                        ),
-                        "use_stuck_detector": LaunchConfiguration(
-                            "control_use_stuck_detector"
-                        ),
-                        "use_dashboard": "false",
-                    }.items(),
+                _stage(
+                    "control_start_delay_s",
+                    IncludeLaunchDescription(
+                        _python_launch("savo_control", "control_bringup.launch.py"),
+                        launch_arguments={
+                            "startup_mode": LaunchConfiguration(
+                                "control_startup_mode"
+                            ),
+                            "use_backup_escape": LaunchConfiguration(
+                                "control_use_backup_escape"
+                            ),
+                            "use_stuck_detector": LaunchConfiguration(
+                                "control_use_stuck_detector"
+                            ),
+                            "use_dashboard": "false",
+                        }.items(),
+                    ),
                 )
             )
         if start_localization:
             actions.append(
-                IncludeLaunchDescription(
-                    _python_launch(
-                        "savo_localization", "localization_bringup.launch.py"
+                _stage(
+                    "localization_start_delay_s",
+                    IncludeLaunchDescription(
+                        _python_launch(
+                            "savo_localization", "localization_bringup.launch.py"
+                        ),
+                        launch_arguments={
+                            "use_vo": LaunchConfiguration("localization_use_vo"),
+                            "use_dashboard": "false",
+                            "use_state_publisher": "false",
+                        }.items(),
                     ),
-                    launch_arguments={
-                        "use_vo": LaunchConfiguration("localization_use_vo"),
-                        "use_dashboard": "false",
-                        "use_state_publisher": "false",
-                    }.items(),
                 )
             )
         if start_power:
             actions.append(
-                IncludeLaunchDescription(
-                    _python_launch("savo_power", "power_core.launch.py"),
-                    launch_arguments={
-                        "use_python_fallback": "false",
-                        "edge_ups_expected": LaunchConfiguration(
-                            "edge_ups_expected"
-                        ),
-                    }.items(),
-                )
-            )
-        if start_supervisor:
-            actions.append(
-                IncludeLaunchDescription(
-                    _python_launch("savo_supervisor", "supervisor.launch.py"),
-                    launch_arguments={
-                        "robot_mode": mode,
-                        "system_state_path": LaunchConfiguration(
-                            "supervisor_state_path"
-                        ),
-                        "auto_arm": LaunchConfiguration("supervisor_auto_arm"),
-                    }.items(),
+                _stage(
+                    "power_start_delay_s",
+                    IncludeLaunchDescription(
+                        _python_launch("savo_power", "power_core.launch.py"),
+                        launch_arguments={
+                            "use_python_fallback": "false",
+                            "edge_ups_expected": LaunchConfiguration(
+                                "edge_ups_expected"
+                            ),
+                        }.items(),
+                    ),
                 )
             )
         if start_head:
             actions.append(
-                IncludeLaunchDescription(
-                    _python_launch("savo_head", "head_bringup.launch.py"),
-                    launch_arguments={
-                        "backend": "pca9685",
-                        "use_python_fallback": "false",
-                        "enable_scan": "true",
-                        "enable_tf": LaunchConfiguration("head_enable_tf"),
-                        "enable_status": "true",
-                        "enable_apriltag_confirm": "true",
-                        "center_on_start": "false",
-                        "center_on_shutdown": "true",
-                        "camera_mode": LaunchConfiguration("head_camera_mode"),
-                    }.items(),
+                _stage(
+                    "head_start_delay_s",
+                    IncludeLaunchDescription(
+                        _python_launch("savo_head", "head_bringup.launch.py"),
+                        launch_arguments={
+                            "backend": "pca9685",
+                            "use_python_fallback": "false",
+                            "enable_scan": "true",
+                            "enable_tf": LaunchConfiguration("head_enable_tf"),
+                            "enable_status": "true",
+                            "enable_apriltag_confirm": "true",
+                            "center_on_start": "false",
+                            "center_on_shutdown": "true",
+                            "camera_mode": LaunchConfiguration("head_camera_mode"),
+                        }.items(),
+                    ),
+                )
+            )
+        if start_supervisor:
+            actions.append(
+                _stage(
+                    "supervisor_start_delay_s",
+                    IncludeLaunchDescription(
+                        _python_launch("savo_supervisor", "supervisor.launch.py"),
+                        launch_arguments={
+                            "robot_mode": mode,
+                            "system_state_path": LaunchConfiguration(
+                                "supervisor_state_path"
+                            ),
+                            "auto_arm": LaunchConfiguration("supervisor_auto_arm"),
+                        }.items(),
+                    ),
                 )
             )
         if start_locations:
             actions.append(
-                IncludeLaunchDescription(
-                    _python_launch(
-                        "savo_bringup", "location_integration.launch.py"
+                _stage(
+                    "location_lifecycle_start_delay_s",
+                    IncludeLaunchDescription(
+                        _python_launch(
+                            "savo_bringup", "location_integration.launch.py"
+                        ),
+                        launch_arguments={
+                            "log_level": log_level,
+                            "start_locations": "true",
+                            "start_supervisor": "false",
+                            "start_head_observer": "false",
+                            "start_head_action": "true",
+                            "start_registration": "true",
+                            "start_review_gateway": "true",
+                            "start_navigation": "false",
+                            "locations_database_path": LaunchConfiguration(
+                                "locations_database_path"
+                            ),
+                            "locations_releases_root": LaunchConfiguration(
+                                "locations_releases_root"
+                            ),
+                            "locations_create_parent_directories": LaunchConfiguration(
+                                "locations_create_parent_directories"
+                            ),
+                        }.items(),
                     ),
-                    launch_arguments={
-                        "log_level": log_level,
-                        "start_locations": "true",
-                        "start_supervisor": "false",
-                        "start_head_observer": "false",
-                        "start_head_action": "true",
-                        "start_registration": "true",
-                        "start_review_gateway": "true",
-                        "start_navigation": "false",
-                        "locations_database_path": LaunchConfiguration(
-                            "locations_database_path"
-                        ),
-                        "locations_releases_root": LaunchConfiguration(
-                            "locations_releases_root"
-                        ),
-                        "locations_create_parent_directories": LaunchConfiguration(
-                            "locations_create_parent_directories"
-                        ),
-                    }.items(),
                 )
             )
 
         if mode == "manual_mapping":
             actions.append(
-                IncludeLaunchDescription(
-                    _frontend_launch("savo_mapping", "manual_mapping.launch.xml"),
-                    launch_arguments={
-                        "map_id": LaunchConfiguration("map_id"),
-                        "map_output_root": LaunchConfiguration(
-                            "map_output_root"
-                        ),
-                        "allow_map_overwrite": LaunchConfiguration(
-                            "allow_map_overwrite"
-                        ),
-                        "use_sim_time": use_sim_time,
-                        "autostart": "true",
-                        "semantic_mapping_enabled": "true",
-                    }.items(),
+                _stage(
+                    "manual_mapping_start_delay_s",
+                    IncludeLaunchDescription(
+                        _frontend_launch("savo_mapping", "manual_mapping.launch.xml"),
+                        launch_arguments={
+                            "map_id": LaunchConfiguration("map_id"),
+                            "map_output_root": LaunchConfiguration(
+                                "map_output_root"
+                            ),
+                            "allow_map_overwrite": LaunchConfiguration(
+                                "allow_map_overwrite"
+                            ),
+                            "use_sim_time": use_sim_time,
+                            "autostart": "true",
+                            "semantic_mapping_enabled": "true",
+                        }.items(),
+                    ),
                 )
             )
         elif mode == "saved_map_navigation":
@@ -375,82 +418,88 @@ def _setup(context):
                 ]
             )
             actions.append(
-                IncludeLaunchDescription(
-                    _python_launch(
-                        "savo_nav", "production_navigation.launch.py"
+                _stage(
+                    "navigation_start_delay_s",
+                    IncludeLaunchDescription(
+                        _python_launch(
+                            "savo_nav", "production_navigation.launch.py"
+                        ),
+                        launch_arguments={
+                            "production_map_root": LaunchConfiguration(
+                                "production_map_root"
+                            ),
+                            "active_map_contract": LaunchConfiguration(
+                                "active_map_contract"
+                            ),
+                            "geometry_profile": LaunchConfiguration(
+                                "geometry_profile"
+                            ),
+                            "params_file": nav_params,
+                            "readiness_params": readiness_params,
+                            "use_sim_time": use_sim_time,
+                            "autostart": "true",
+                            "start_readiness": "true",
+                            "start_goal_gateway": "true",
+                            "start_map_context_sync": "true",
+                            "log_level": log_level,
+                        }.items(),
                     ),
-                    launch_arguments={
-                        "production_map_root": LaunchConfiguration(
-                            "production_map_root"
-                        ),
-                        "active_map_contract": LaunchConfiguration(
-                            "active_map_contract"
-                        ),
-                        "geometry_profile": LaunchConfiguration(
-                            "geometry_profile"
-                        ),
-                        "params_file": nav_params,
-                        "readiness_params": readiness_params,
-                        "use_sim_time": use_sim_time,
-                        "autostart": "true",
-                        "start_readiness": "true",
-                        "start_goal_gateway": "true",
-                        "start_map_context_sync": "true",
-                        "log_level": log_level,
-                    }.items(),
                 )
             )
 
     actions.append(
-        Node(
-            package="savo_bringup",
-            executable="bringup_readiness_node",
-            name="bringup_readiness_node",
-            output="screen",
-            parameters=[
-                PathJoinSubstitution(
-                    [
-                        FindPackageShare("savo_bringup"),
-                        "config",
-                        "core_real_robot.yaml",
-                    ]
-                ),
-                {
-                    "host_role": "core",
-                    "robot_mode": mode,
-                    "bringup_profile": profile,
-                    "d435_voxel_validated": voxel_validated,
-                    "require_locked_geometry": require_locked,
-                    "allow_provisional_geometry": allow_provisional,
-                    "require_geometry": start_description,
-                    "geometry_policy_validated": True,
-                    "require_base": start_base,
-                    "require_control": start_control,
-                    "require_safety": start_perception,
-                    "require_lidar": start_lidar,
-                    "require_perception": start_perception,
-                    "require_localization": start_localization,
-                    "require_power": start_power,
-                    "require_supervisor": (
-                        requirements.require_supervisor and start_supervisor
+        _stage(
+            "readiness_start_delay_s",
+            Node(
+                package="savo_bringup",
+                executable="bringup_readiness_node",
+                name="bringup_readiness_node",
+                output="screen",
+                parameters=[
+                    PathJoinSubstitution(
+                        [
+                            FindPackageShare("savo_bringup"),
+                            "config",
+                            "core_real_robot.yaml",
+                        ]
                     ),
-                    "require_supervisor_authority": mode not in {
-                        "safe_idle",
-                        "diagnostics",
-                    } and start_supervisor,
-                    "require_mapping": requirements.require_mapping,
-                    "require_navigation": requirements.require_navigation,
-                    "require_active_release": mode == "saved_map_navigation",
-                    "active_release_verified": mode == "saved_map_navigation",
-                    "require_map_context": mode == "saved_map_navigation",
-                    "require_goal_admission": requirements.require_navigation,
-                    "require_bridge": False,
-                    "require_realsense": False,
-                    "require_vo": False,
-                    "require_speech": False,
-                },
-            ],
-            arguments=["--ros-args", "--log-level", log_level],
+                    {
+                        "host_role": "core",
+                        "robot_mode": mode,
+                        "bringup_profile": profile,
+                        "d435_voxel_validated": voxel_validated,
+                        "require_locked_geometry": require_locked,
+                        "allow_provisional_geometry": allow_provisional,
+                        "require_geometry": start_description,
+                        "geometry_policy_validated": True,
+                        "require_base": start_base,
+                        "require_control": start_control,
+                        "require_safety": start_perception,
+                        "require_lidar": start_lidar,
+                        "require_perception": start_perception,
+                        "require_localization": start_localization,
+                        "require_power": start_power,
+                        "require_supervisor": (
+                            requirements.require_supervisor and start_supervisor
+                        ),
+                        "require_supervisor_authority": mode not in {
+                            "safe_idle",
+                            "diagnostics",
+                        } and start_supervisor,
+                        "require_mapping": requirements.require_mapping,
+                        "require_navigation": requirements.require_navigation,
+                        "require_active_release": mode == "saved_map_navigation",
+                        "active_release_verified": mode == "saved_map_navigation",
+                        "require_map_context": mode == "saved_map_navigation",
+                        "require_goal_admission": requirements.require_navigation,
+                        "require_bridge": False,
+                        "require_realsense": False,
+                        "require_vo": False,
+                        "require_speech": False,
+                    },
+                ],
+                arguments=["--ros-args", "--log-level", log_level],
+            ),
         )
     )
     return actions
@@ -537,6 +586,37 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument("start_head", default_value="true"),
             DeclareLaunchArgument(
                 "start_location_lifecycle", default_value="false"
+            ),
+            DeclareLaunchArgument(
+                "description_start_delay_s", default_value="0.0"
+            ),
+            DeclareLaunchArgument("base_start_delay_s", default_value="3.0"),
+            DeclareLaunchArgument("lidar_start_delay_s", default_value="6.0"),
+            DeclareLaunchArgument(
+                "perception_start_delay_s", default_value="9.0"
+            ),
+            DeclareLaunchArgument(
+                "control_start_delay_s", default_value="12.0"
+            ),
+            DeclareLaunchArgument(
+                "localization_start_delay_s", default_value="17.0"
+            ),
+            DeclareLaunchArgument("power_start_delay_s", default_value="22.0"),
+            DeclareLaunchArgument("head_start_delay_s", default_value="27.0"),
+            DeclareLaunchArgument(
+                "supervisor_start_delay_s", default_value="33.0"
+            ),
+            DeclareLaunchArgument(
+                "location_lifecycle_start_delay_s", default_value="37.0"
+            ),
+            DeclareLaunchArgument(
+                "manual_mapping_start_delay_s", default_value="40.0"
+            ),
+            DeclareLaunchArgument(
+                "navigation_start_delay_s", default_value="40.0"
+            ),
+            DeclareLaunchArgument(
+                "readiness_start_delay_s", default_value="45.0"
             ),
             OpaqueFunction(function=_setup),
         ]

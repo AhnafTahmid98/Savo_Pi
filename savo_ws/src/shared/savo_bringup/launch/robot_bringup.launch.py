@@ -118,8 +118,23 @@ def _setup(context):
             "start_supervisor",
             "start_head",
             "start_location_lifecycle",
+            "description_start_delay_s",
+            "base_start_delay_s",
+            "lidar_start_delay_s",
+            "perception_start_delay_s",
+            "control_start_delay_s",
+            "localization_start_delay_s",
+            "power_start_delay_s",
+            "head_start_delay_s",
+            "supervisor_start_delay_s",
+            "location_lifecycle_start_delay_s",
+            "manual_mapping_start_delay_s",
+            "navigation_start_delay_s",
         ]:
             core_arguments[name] = LaunchConfiguration(name)
+        core_arguments["readiness_start_delay_s"] = LaunchConfiguration(
+            "core_readiness_start_delay_s"
+        )
         actions.append(
             IncludeLaunchDescription(
                 _launch("core_bringup.launch.py"),
@@ -259,6 +274,37 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument("start_head", default_value="true"),
             DeclareLaunchArgument(
                 "start_location_lifecycle", default_value="false"
+            ),
+            DeclareLaunchArgument(
+                "description_start_delay_s", default_value="0.0"
+            ),
+            DeclareLaunchArgument("base_start_delay_s", default_value="3.0"),
+            DeclareLaunchArgument("lidar_start_delay_s", default_value="6.0"),
+            DeclareLaunchArgument(
+                "perception_start_delay_s", default_value="9.0"
+            ),
+            DeclareLaunchArgument(
+                "control_start_delay_s", default_value="12.0"
+            ),
+            DeclareLaunchArgument(
+                "localization_start_delay_s", default_value="17.0"
+            ),
+            DeclareLaunchArgument("power_start_delay_s", default_value="22.0"),
+            DeclareLaunchArgument("head_start_delay_s", default_value="27.0"),
+            DeclareLaunchArgument(
+                "supervisor_start_delay_s", default_value="33.0"
+            ),
+            DeclareLaunchArgument(
+                "location_lifecycle_start_delay_s", default_value="37.0"
+            ),
+            DeclareLaunchArgument(
+                "manual_mapping_start_delay_s", default_value="40.0"
+            ),
+            DeclareLaunchArgument(
+                "navigation_start_delay_s", default_value="40.0"
+            ),
+            DeclareLaunchArgument(
+                "core_readiness_start_delay_s", default_value="45.0"
             ),
             DeclareLaunchArgument("start_realsense", default_value="true"),
             DeclareLaunchArgument("start_vo", default_value="true"),
