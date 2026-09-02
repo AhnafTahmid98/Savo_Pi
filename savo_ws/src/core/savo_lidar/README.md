@@ -47,7 +47,7 @@ Published by this package:
 | `/scan/filtered` | `sensor_msgs/msg/LaserScan` | Optional filtered scan output |
 | `/savo_lidar/state` | `std_msgs/msg/String` | Driver state as compact JSON |
 | `/savo_lidar/scan_quality` | `std_msgs/msg/String` | Scan quality summary as compact JSON |
-| `/savo_lidar/watchdog_state` | `std_msgs/msg/String` | Scan freshness state as compact JSON |
+| `/savo_lidar/watchdog_state` | `std_msgs/msg/String` | Scan freshness derived from lightweight driver-state evidence |
 | `/savo_lidar/health` | `std_msgs/msg/String` | Combined LiDAR health status |
 | `/savo_lidar/state_summary` | `std_msgs/msg/String` | Dashboard-friendly summary |
 
@@ -202,6 +202,10 @@ as it is assembled. It has no configured publication timer; `publish_rate_hz`
 is retained only by the separate Python dry-run/fallback path. Each scan's ROS
 header stamp is captured at its first-ray revolution boundary, while
 `scan_time` uses the steady-clock interval to the next boundary.
+
+The watchdog does not subscribe to the full `/scan` payload. It treats a new
+`scan_count` in a successful `/savo_lidar/state` update as scan-progress
+evidence and keeps the same fail-closed stale timeout policy.
 
 ## Mapping-ready LiDAR bringup
 

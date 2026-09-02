@@ -47,7 +47,7 @@ lidar_filter_node:
 
 lidar_watchdog_node:
   ros__parameters:
-    scan_topic: "/scan"
+    driver_state_topic: "/savo_lidar/state"
     watchdog_state_topic: "/savo_lidar/watchdog_state"
 
     stale_timeout_s: 0.75

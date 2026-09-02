@@ -23,8 +23,7 @@ struct CameraHealthConfig
   std::string expected_encoding{"rgb8"};
 
   double startup_grace_s{3.0};
-  double image_stale_timeout_s{2.0};
-  double camera_info_stale_timeout_s{2.0};
+  double metadata_stale_timeout_s{2.0};
   double min_frame_rate_hz{10.0};
 
   std::uint64_t min_frame_samples{5U};
@@ -32,7 +31,6 @@ struct CameraHealthConfig
   bool require_calibration_for_pose{true};
   bool strict_frame_id{true};
   bool strict_resolution{true};
-  bool strict_encoding{true};
 
   [[nodiscard]] std::vector<std::string> validation_errors() const;
   [[nodiscard]] bool valid() const;
@@ -43,25 +41,14 @@ struct CameraHealthSnapshot
   double start_time_s{0.0};
   double now_s{0.0};
 
-  bool image_seen{false};
-  bool camera_info_seen{false};
+  bool image_publisher_present{false};
+  bool stream_metadata_seen{false};
+  double metadata_receipt_time_s{0.0};
+  bool metadata_timestamp_monotonic{true};
 
-  double image_receipt_time_s{0.0};
-  double camera_info_receipt_time_s{0.0};
-
-  bool image_timestamp_monotonic{true};
-  bool camera_info_timestamp_monotonic{true};
-  bool image_data_valid{false};
-
-  std::uint32_t image_width{0U};
-  std::uint32_t image_height{0U};
-
-  std::uint32_t camera_info_width{0U};
-  std::uint32_t camera_info_height{0U};
-
-  std::string image_frame_id{};
-  std::string camera_info_frame_id{};
-  std::string image_encoding{};
+  std::uint32_t metadata_width{0U};
+  std::uint32_t metadata_height{0U};
+  std::string metadata_frame_id{};
 
   bool camera_calibrated{false};
 
@@ -87,6 +74,7 @@ struct CameraHealthResult
   const CameraHealthSnapshot & snapshot);
 
 [[nodiscard]] std::string camera_health_status_text(
+  const CameraHealthConfig & config,
   const CameraHealthResult & result,
   const CameraHealthSnapshot & snapshot);
 

@@ -1,19 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""LiDAR watchdog node - publishes scan freshness state."""
+"""LiDAR watchdog node - publishes scan freshness from driver state."""
 
 from __future__ import annotations
 
-from savo_lidar.nodes._ros_compat import LaserScan, Node, String, rclpy
+from savo_lidar.nodes._ros_compat import Node, String, rclpy
 
 from savo_lidar.constants import (
-    DEFAULT_SCAN_TOPIC,
+    DEFAULT_STATE_TOPIC,
     DEFAULT_STALE_TIMEOUT_S,
     DEFAULT_WATCHDOG_STATE_TOPIC,
 )
 from savo_lidar.ros import get_float_param, get_string_param
-from savo_lidar.safety import ScanWatchdog, StaleScanPolicy
-from savo_lidar.utils import node_start_message, node_stop_message, scan_qos, status_qos
+from savo_lidar.safety import (
+    DriverStateScanEvidence,
+    ScanWatchdog,
+    StaleScanPolicy,
+)
+from savo_lidar.utils import node_start_message, node_stop_message, status_qos
 from savo_lidar.utils.diagnostics import make_status_payload, payload_to_json
 
 
@@ -21,7 +25,11 @@ class LidarWatchdogNode(Node):
     def __init__(self) -> None:
         super().__init__("lidar_watchdog_node")
 
-        self._scan_topic = get_string_param(self, "scan_topic", DEFAULT_SCAN_TOPIC)
+        self._driver_state_topic = get_string_param(
+            self,
+            "driver_state_topic",
+            DEFAULT_STATE_TOPIC,
+        )
         self._watchdog_topic = get_string_param(
             self,
             "watchdog_state_topic",
@@ -38,6 +46,7 @@ class LidarWatchdogNode(Node):
         self._validate_config()
 
         self._watchdog = ScanWatchdog(timeout_s=self._timeout_s)
+        self._evidence = DriverStateScanEvidence()
         self._policy = StaleScanPolicy(
             warn_before_stale_ratio=self._warn_before_stale_ratio,
         )
@@ -47,11 +56,11 @@ class LidarWatchdogNode(Node):
             self._watchdog_topic,
             status_qos(),
         )
-        self._scan_sub = self.create_subscription(
-            LaserScan,
-            self._scan_topic,
-            self._on_scan,
-            scan_qos(),
+        self._driver_state_sub = self.create_subscription(
+            String,
+            self._driver_state_topic,
+            self._on_driver_state,
+            status_qos(),
         )
 
         self._timer = self.create_timer(
@@ -62,7 +71,7 @@ class LidarWatchdogNode(Node):
         self.get_logger().info(
             node_start_message(
                 "lidar_watchdog_node",
-                scan_topic=self._scan_topic,
+                driver_state_topic=self._driver_state_topic,
                 watchdog_topic=self._watchdog_topic,
                 stale_timeout_s=self._timeout_s,
                 publish_hz=self._publish_hz,
@@ -86,8 +95,9 @@ class LidarWatchdogNode(Node):
                 f"got {self._warn_before_stale_ratio}"
             )
 
-    def _on_scan(self, _scan: LaserScan) -> None:
-        self._watchdog.mark_scan()
+    def _on_driver_state(self, msg: String) -> None:
+        if self._evidence.observe(msg.data):
+            self._watchdog.mark_scan()
 
     def _on_timer(self) -> None:
         age_s = self._watchdog.age_s()
@@ -102,11 +112,12 @@ class LidarWatchdogNode(Node):
                 component="lidar_watchdog_node",
                 status=decision.status,
                 message=decision.message,
-                scan_topic=self._scan_topic,
+                driver_state_topic=self._driver_state_topic,
                 watchdog_state_topic=self._watchdog_topic,
                 stale=decision.stale,
                 scan_ok=decision.scan_ok,
                 scan_count=self._watchdog.scan_count,
+                driver_scan_count=self._evidence.last_scan_count,
                 last_scan_age_s=age_s,
                 timeout_s=self._timeout_s,
                 warn_before_stale_ratio=self._warn_before_stale_ratio,

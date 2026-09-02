@@ -2,7 +2,11 @@
 
 import pytest
 
-from savo_lidar.safety import ScanWatchdog, StaleScanPolicy
+from savo_lidar.safety import (
+    DriverStateScanEvidence,
+    ScanWatchdog,
+    StaleScanPolicy,
+)
 from savo_lidar.constants import STATUS_OK, STATUS_STALE, STATUS_WARN
 
 
@@ -76,6 +80,74 @@ def test_scan_watchdog_rejects_invalid_timeout():
 
     with pytest.raises(ValueError):
         ScanWatchdog(timeout_s=-1.0)
+
+
+def healthy_driver_state(scan_count: int) -> str:
+    return (
+        '{"status":"OK","hardware_ok":true,'
+        '"driver_running":true,"scan_ok":true,'
+        f'"scan_count":{scan_count}'
+        '}'
+    )
+
+
+def test_driver_state_evidence_accepts_only_distinct_healthy_scans():
+    evidence = DriverStateScanEvidence()
+
+    assert evidence.observe(healthy_driver_state(41))
+    assert not evidence.observe(healthy_driver_state(41))
+    assert evidence.observe(healthy_driver_state(42))
+    assert evidence.last_scan_count == 42
+
+
+def test_driver_state_evidence_accepts_counter_reset_after_restart():
+    evidence = DriverStateScanEvidence(last_scan_count=42)
+
+    assert evidence.observe(healthy_driver_state(0))
+    assert evidence.last_scan_count == 0
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        "not-json",
+        "[]",
+        "{}",
+        '{"status":"ERROR","hardware_ok":true,'
+        '"driver_running":true,"scan_ok":true,"scan_count":1}',
+        '{"status":"OK","hardware_ok":false,'
+        '"driver_running":true,"scan_ok":true,"scan_count":1}',
+        '{"status":"OK","hardware_ok":true,'
+        '"driver_running":false,"scan_ok":true,"scan_count":1}',
+        '{"status":"OK","hardware_ok":true,'
+        '"driver_running":true,"scan_ok":false,"scan_count":1}',
+        '{"status":"OK","hardware_ok":true,'
+        '"driver_running":true,"scan_ok":true,"scan_count":true}',
+        '{"status":"OK","hardware_ok":true,'
+        '"driver_running":true,"scan_ok":true,"scan_count":-1}',
+    ],
+)
+def test_driver_state_evidence_rejects_invalid_or_unhealthy_payload(payload):
+    evidence = DriverStateScanEvidence()
+
+    assert not evidence.observe(payload)
+    assert evidence.last_scan_count is None
+
+
+def test_watchdog_marks_only_accepted_driver_state_evidence():
+    evidence = DriverStateScanEvidence()
+    watchdog = ScanWatchdog(timeout_s=1.0)
+
+    for stamp_s, payload in (
+        (10.0, healthy_driver_state(7)),
+        (10.2, healthy_driver_state(7)),
+        (10.4, healthy_driver_state(8)),
+    ):
+        if evidence.observe(payload):
+            watchdog.mark_scan(stamp_s=stamp_s)
+
+    assert watchdog.scan_count == 2
+    assert watchdog.last_scan_s == 10.4
 
 
 def test_stale_scan_policy_reports_missing_scan_as_stale():

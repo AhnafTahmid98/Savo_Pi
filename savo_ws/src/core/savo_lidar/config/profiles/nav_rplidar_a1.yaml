@@ -46,7 +46,7 @@ lidar_filter_node:
 
 lidar_watchdog_node:
   ros__parameters:
-    scan_topic: "/scan"
+    driver_state_topic: "/savo_lidar/state"
     watchdog_state_topic: "/savo_lidar/watchdog_state"
 
     # 0.50s catches scan loss quickly without tripping on one missed A1 scan.

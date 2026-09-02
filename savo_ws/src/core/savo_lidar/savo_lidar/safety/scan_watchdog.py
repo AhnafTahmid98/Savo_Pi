@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Any
 
@@ -63,6 +64,44 @@ class ScanWatchdog:
         }
 
 
+@dataclass
+class DriverStateScanEvidence:
+    """Extract distinct successful-scan evidence from driver-state JSON."""
+
+    last_scan_count: int | None = None
+
+    def observe(self, payload_text: str) -> bool:
+        """Return true only for a new, explicitly healthy scan count."""
+        try:
+            payload = json.loads(payload_text)
+        except (TypeError, json.JSONDecodeError):
+            return False
+
+        if not isinstance(payload, dict):
+            return False
+
+        scan_count = payload.get("scan_count")
+        if (
+            payload.get("status") != "OK"
+            or payload.get("hardware_ok") is not True
+            or payload.get("driver_running") is not True
+            or payload.get("scan_ok") is not True
+            or isinstance(scan_count, bool)
+            or not isinstance(scan_count, int)
+            or scan_count < 0
+        ):
+            return False
+
+        if scan_count == self.last_scan_count:
+            return False
+
+        # Any changed healthy count is progress. A lower value is valid after
+        # a driver restart, so resets must not permanently stale the watchdog.
+        self.last_scan_count = scan_count
+        return True
+
+
 __all__ = [
+    "DriverStateScanEvidence",
     "ScanWatchdog",
 ]

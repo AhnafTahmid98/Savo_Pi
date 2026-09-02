@@ -65,6 +65,11 @@ def test_ros_mode_owns_camera_health_node():
         in source[ros_branch:udp_branch]
     )
 
+    disabled_branch = source[
+        source.index("if mode == 'disabled':"):ros_branch
+    ]
+    assert "head_camera_status_node" not in disabled_branch
+
 
 def test_bringup_uses_only_camera_stack():
     source = read(

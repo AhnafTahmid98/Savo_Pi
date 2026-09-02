@@ -14,8 +14,9 @@
 
     startup_grace_s: 3.0
 
-    image_stale_timeout_s: 2.0
-    camera_info_stale_timeout_s: 2.0
+    # ROS 2 gscam publishes CameraInfo once per successfully pulled frame.
+    # This monitor uses that frame-coupled metadata instead of Image payloads.
+    metadata_stale_timeout_s: 2.0
 
     min_frame_rate_hz: 10.0
     min_frame_samples: 5
@@ -25,6 +26,4 @@
 
     strict_frame_id: true
     strict_resolution: true
-    strict_encoding: true
-
     status_publish_hz: 2.0

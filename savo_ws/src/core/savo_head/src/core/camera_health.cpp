@@ -88,19 +88,11 @@ std::vector<std::string> CameraHealthConfig::validation_errors() const
   }
 
   if (
-    !std::isfinite(image_stale_timeout_s) ||
-    image_stale_timeout_s <= 0.0)
+    !std::isfinite(metadata_stale_timeout_s) ||
+    metadata_stale_timeout_s <= 0.0)
   {
     errors.emplace_back(
-      "image_stale_timeout_s must be finite and positive");
-  }
-
-  if (
-    !std::isfinite(camera_info_stale_timeout_s) ||
-    camera_info_stale_timeout_s <= 0.0)
-  {
-    errors.emplace_back(
-      "camera_info_stale_timeout_s must be finite and positive");
+      "metadata_stale_timeout_s must be finite and positive");
   }
 
   if (
@@ -128,10 +120,8 @@ const char * to_string(CameraHealthLevel level)
   switch (level) {
     case CameraHealthLevel::kOk:
       return "OK";
-
     case CameraHealthLevel::kWarn:
       return "WARN";
-
     case CameraHealthLevel::kError:
       return "ERROR";
   }
@@ -157,147 +147,81 @@ CameraHealthResult evaluate_camera_health(
   const auto startup_age_s =
     std::max(0.0, snapshot.now_s - snapshot.start_time_s);
 
-  /*
-   * During startup, missing streams are warnings. After the startup
-   * grace period, missing streams become errors.
-   */
-  if (!snapshot.image_seen) {
+  if (!snapshot.image_publisher_present) {
     if (startup_age_s <= config.startup_grace_s) {
-      return warning_result("waiting_for_image", false);
+      return warning_result("waiting_for_image_publisher", false);
     }
-
-    return error_result("image_not_received");
+    return error_result("image_publisher_not_present");
   }
 
-  if (!snapshot.camera_info_seen) {
+  /* CameraInfo is frame-coupled to each successfully published gscam Image. */
+  if (!snapshot.stream_metadata_seen) {
     if (startup_age_s <= config.startup_grace_s) {
-      return warning_result("waiting_for_camera_info", false);
+      return warning_result("waiting_for_stream_metadata", false);
     }
-
-    return error_result("camera_info_not_received");
-  }
-
-  /*
-   * A camera stream that previously existed but stopped updating is
-   * considered unhealthy.
-   */
-  if (
-    non_negative_age(
-      snapshot.now_s,
-      snapshot.image_receipt_time_s) >
-    config.image_stale_timeout_s)
-  {
-    return error_result("image_stale");
+    return error_result("stream_metadata_not_received");
   }
 
   if (
-    non_negative_age(
-      snapshot.now_s,
-      snapshot.camera_info_receipt_time_s) >
-    config.camera_info_stale_timeout_s)
+    non_negative_age(snapshot.now_s, snapshot.metadata_receipt_time_s) >
+    config.metadata_stale_timeout_s)
   {
-    return error_result("camera_info_stale");
+    return error_result("stream_metadata_stale");
   }
 
-  if (!snapshot.image_timestamp_monotonic) {
-    return error_result("image_timestamp_not_monotonic");
+  if (!snapshot.metadata_timestamp_monotonic) {
+    return error_result("stream_metadata_timestamp_not_monotonic");
   }
 
-  if (!snapshot.camera_info_timestamp_monotonic) {
-    return error_result("camera_info_timestamp_not_monotonic");
+  const bool metadata_dimensions_missing =
+    snapshot.metadata_width == 0U &&
+    snapshot.metadata_height == 0U;
+
+  if ((snapshot.metadata_width == 0U) != (snapshot.metadata_height == 0U)) {
+    return error_result("stream_metadata_dimensions_invalid");
   }
 
-  if (!snapshot.image_data_valid) {
-    return error_result("image_data_invalid");
+  if (metadata_dimensions_missing && snapshot.camera_calibrated) {
+    return error_result("stream_metadata_dimensions_invalid");
   }
 
-  /*
-   * Validate Image and CameraInfo dimensions against both the configured
-   * camera profile and each other.
-   */
-  if (config.strict_resolution) {
-    if (
-      snapshot.image_width != config.expected_width ||
-      snapshot.image_height != config.expected_height)
-    {
-      return error_result("image_resolution_mismatch");
-    }
-
-    if (
-      snapshot.camera_info_width != config.expected_width ||
-      snapshot.camera_info_height != config.expected_height)
-    {
-      return error_result("camera_info_resolution_mismatch");
-    }
-  }
-
+  /* Uncalibrated CameraInfo may report 0x0; config is the documented fallback. */
   if (
-    snapshot.image_width != snapshot.camera_info_width ||
-    snapshot.image_height != snapshot.camera_info_height)
+    config.strict_resolution &&
+    !metadata_dimensions_missing &&
+    (snapshot.metadata_width != config.expected_width ||
+    snapshot.metadata_height != config.expected_height))
   {
-    return error_result("image_camera_info_resolution_disagree");
-  }
-
-  /*
-   * The Image and CameraInfo messages must refer to the same optical
-   * frame.
-   */
-  if (snapshot.image_frame_id != snapshot.camera_info_frame_id) {
-    return error_result("image_camera_info_frame_disagree");
+    return error_result("stream_metadata_resolution_mismatch");
   }
 
   if (
     config.strict_frame_id &&
-    snapshot.image_frame_id != config.expected_frame_id)
+    snapshot.metadata_frame_id != config.expected_frame_id)
   {
     return error_result("camera_frame_mismatch");
   }
 
-  if (
-    config.strict_encoding &&
-    snapshot.image_encoding != config.expected_encoding)
-  {
-    return error_result("image_encoding_mismatch");
-  }
-
-  /*
-   * Do not judge the measured frame rate until enough samples exist.
-   */
   if (snapshot.frames_received < config.min_frame_samples) {
-    return warning_result(
-      "collecting_frame_rate",
-      true,
-      false);
+    return warning_result("collecting_frame_rate", true, false);
   }
 
   if (
     config.min_frame_rate_hz > 0.0 &&
     snapshot.frame_rate_hz < config.min_frame_rate_hz)
   {
-    return warning_result(
-      "low_frame_rate",
-      true,
-      false);
+    return warning_result("low_frame_rate", true, false);
   }
 
-  /*
-   * A live uncalibrated camera is stream-healthy but cannot yet produce
-   * trustworthy metric AprilTag poses.
-   */
-  if (
-    config.require_calibration_for_pose &&
-    !snapshot.camera_calibrated)
-  {
-    return warning_result(
-      "camera_uncalibrated",
-      true,
-      false);
+  if (config.require_calibration_for_pose && !snapshot.camera_calibrated) {
+    return warning_result("camera_uncalibrated", true, false);
   }
 
   return ok_result();
 }
 
 std::string camera_health_status_text(
+  const CameraHealthConfig & config,
   const CameraHealthResult & result,
   const CameraHealthSnapshot & snapshot)
 {
@@ -306,28 +230,25 @@ std::string camera_health_status_text(
   stream
     << "status=" << result.status
     << " reason=" << result.reason
-    << " stream_healthy="
-    << (result.stream_healthy ? "true" : "false")
+    << " stream_healthy=" << (result.stream_healthy ? "true" : "false")
     << " ready_for_pose_estimation="
     << (result.ready_for_pose_estimation ? "true" : "false")
-    << " image_seen="
-    << (snapshot.image_seen ? "true" : "false")
+    << " image_publisher_present="
+    << (snapshot.image_publisher_present ? "true" : "false")
+    << " stream_metadata_seen="
+    << (snapshot.stream_metadata_seen ? "true" : "false")
     << " camera_info_seen="
-    << (snapshot.camera_info_seen ? "true" : "false")
-    << " calibrated="
-    << (snapshot.camera_calibrated ? "true" : "false")
-    << " frame_rate_hz="
-    << snapshot.frame_rate_hz
-    << " frames_received="
-    << snapshot.frames_received
-    << " frame_id="
-    << snapshot.image_frame_id
-    << " resolution="
-    << snapshot.image_width
-    << "x"
-    << snapshot.image_height
-    << " encoding="
-    << snapshot.image_encoding;
+    << (snapshot.stream_metadata_seen ? "true" : "false")
+    << " calibrated=" << (snapshot.camera_calibrated ? "true" : "false")
+    << " frame_rate_hz=" << snapshot.frame_rate_hz
+    << " frames_received=" << snapshot.frames_received
+    << " frame_id=" << snapshot.metadata_frame_id
+    << " metadata_resolution=" << snapshot.metadata_width
+    << "x" << snapshot.metadata_height
+    << " configured_resolution=" << config.expected_width
+    << "x" << config.expected_height
+    << " configured_encoding=" << config.expected_encoding
+    << " encoding_verification=static_config";
 
   return stream.str();
 }
