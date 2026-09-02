@@ -255,7 +255,10 @@ profile. The D435 obstacle pipeline is hardware validated, so canonical
 real-robot Edge bringup defaults `d435_voxel_validated:=true` and
 `start_obstacle_cloud:=true`. It starts the single validated D435 camera,
 camera health authority, front-depth producer, VO, local raw pointcloud,
-filtered obstacle cloud, and compressed observer color relay. Explicitly
+filtered obstacle cloud, and compressed observer color relay. Camera health
+uses the lightweight front-depth, VO-health, and obstacle-cloud-health signals;
+it does not add Image or PointCloud2 subscriptions to the production graph.
+Explicitly
 disabling the obstacle or observer relay remains available for controlled
 testing. Helper loss does not gate the required LiDAR navigation path, and
 LiDAR remains the reliable clearing source.

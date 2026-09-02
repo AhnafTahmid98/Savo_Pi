@@ -4,6 +4,7 @@ from launch.actions import DeclareLaunchArgument
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
 
@@ -42,7 +43,16 @@ def generate_launch_description() -> LaunchDescription:
         executable="camera_health_node",
         name="camera_health_node",
         output="screen",
-        parameters=[monitor_config_file],
+        parameters=[
+            monitor_config_file,
+            {
+                "require_depth_signal": ParameterValue(
+                    use_depth_front_min, value_type=bool
+                ),
+                "require_vo_health": False,
+                "require_obstacle_cloud_health": False,
+            },
+        ],
     )
 
     depth_front_min_node = Node(

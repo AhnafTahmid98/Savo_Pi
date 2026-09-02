@@ -70,7 +70,9 @@ def test_vo_launch_separates_driver_and_monitor_configs() -> None:
     assert 'namespace="camera"' in launch_text
     assert 'name="camera"' in launch_text
     assert "parameters=[driver_config_file]" in launch_text
-    assert launch_text.count("parameters=[monitor_config_file]") == 2
+    assert launch_text.count("parameters=[monitor_config_file]") == 1
+    assert '"require_vo_health": False' in launch_text
+    assert '"require_obstacle_cloud_health": False' in launch_text
     assert "rs_launch.py" not in launch_text
     assert "IncludeLaunchDescription" not in launch_text
     assert '"realsense_d435_camera.yaml"' in launch_text
@@ -233,19 +235,25 @@ def test_legacy_vo_driver_matches_validated_production_driver() -> None:
     assert legacy == production
 
 
-def test_vo_monitor_profile_requires_pointcloud() -> None:
+def test_vo_monitor_profile_keeps_diagnostics_and_lightweight_health_split() -> None:
     config = load_yaml("config/realsense_vo_profile.yaml")
 
     assert set(config) == {
         "camera_topic_monitor_node",
         "camera_health_node",
     }
-    for node_name in config:
-        params = config[node_name]["ros__parameters"]
-        assert params["expected_pointcloud_hz"] == 30.0
-        assert params["require_pointcloud"] is True
-        assert params["expected_aligned_depth_hz"] == 30.0
-        assert params["require_aligned_depth"] is True
+    monitor = config["camera_topic_monitor_node"]["ros__parameters"]
+    health = config["camera_health_node"]["ros__parameters"]
+
+    assert monitor["expected_pointcloud_hz"] == 30.0
+    assert monitor["require_pointcloud"] is True
+    assert monitor["expected_aligned_depth_hz"] == 30.0
+    assert monitor["require_aligned_depth"] is True
+    assert health["depth_signal_topic"] == "/depth/min_front_m"
+    assert health["vo_health_topic"] == "/vo/health"
+    assert health["require_depth_signal"] is True
+    assert health["require_vo_health"] is False
+    assert health["require_obstacle_cloud_health"] is False
 
 
 def test_vo_pointcloud_topic_contract_remains_raw_filter_input() -> None:

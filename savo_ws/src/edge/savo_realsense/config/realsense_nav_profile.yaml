@@ -58,15 +58,12 @@ camera_health_node:
   ros__parameters:
     status_hz: 2.0
     stale_timeout_s: 0.50
-
-    expected_color_hz: 30.0
-    expected_depth_hz: 30.0
-    expected_aligned_depth_hz: 30.0
-    expected_camera_info_hz: 30.0
-    expected_pointcloud_hz: 10.0
-
-    require_pointcloud: true
-    require_aligned_depth: false
+    depth_signal_topic: /depth/min_front_m
+    vo_health_topic: /vo/health
+    obstacle_cloud_health_topic: /savo_perception/obstacle_cloud/health
+    require_depth_signal: true
+    require_vo_health: false
+    require_obstacle_cloud_health: false
 
 depth_front_min_node:
   ros__parameters:

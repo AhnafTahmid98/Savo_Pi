@@ -1,27 +1,28 @@
+#include <algorithm>
+#include <chrono>
+#include <cmath>
 #include <memory>
 #include <sstream>
 #include <string>
 #include <vector>
 
 #include "diagnostic_msgs/msg/diagnostic_array.hpp"
+#include "diagnostic_msgs/msg/diagnostic_status.hpp"
+#include "diagnostic_msgs/msg/key_value.hpp"
 #include "rclcpp/rclcpp.hpp"
-#include "sensor_msgs/msg/camera_info.hpp"
-#include "sensor_msgs/msg/image.hpp"
-#include "sensor_msgs/msg/point_cloud2.hpp"
+#include "std_msgs/msg/bool.hpp"
+#include "std_msgs/msg/float32.hpp"
 #include "std_msgs/msg/string.hpp"
 
-#include "savo_realsense/camera_monitor_common.hpp"
+#include "savo_realsense/camera_health_state.hpp"
 
 namespace
 {
 
-constexpr const char * COLOR_IMAGE_TOPIC = "/camera/camera/color/image_raw";
-constexpr const char * COLOR_INFO_TOPIC = "/camera/camera/color/camera_info";
-constexpr const char * DEPTH_IMAGE_TOPIC = "/camera/camera/depth/image_rect_raw";
-constexpr const char * DEPTH_INFO_TOPIC = "/camera/camera/depth/camera_info";
-constexpr const char * ALIGNED_DEPTH_IMAGE_TOPIC =
-  "/camera/camera/aligned_depth_to_color/image_raw";
-constexpr const char * POINTCLOUD_TOPIC = "/camera/camera/depth/color/points";
+constexpr const char * DEFAULT_DEPTH_SIGNAL_TOPIC = "/depth/min_front_m";
+constexpr const char * DEFAULT_VO_HEALTH_TOPIC = "/vo/health";
+constexpr const char * DEFAULT_OBSTACLE_CLOUD_HEALTH_TOPIC =
+  "/savo_perception/obstacle_cloud/health";
 constexpr const char * STATUS_TOPIC = "/realsense/status";
 constexpr const char * DIAGNOSTICS_TOPIC = "/diagnostics";
 
@@ -31,218 +32,192 @@ public:
   CameraHealthNode()
   : Node("camera_health_node")
   {
-    status_hz_ = declare_parameter<double>("status_hz", 2.0);
-    params_.stale_timeout_s = declare_parameter<double>("stale_timeout_s", 0.75);
-    params_.expected_color_hz = declare_parameter<double>("expected_color_hz", 20.0);
-    params_.expected_depth_hz = declare_parameter<double>("expected_depth_hz", 20.0);
-    params_.expected_aligned_depth_hz =
-      declare_parameter<double>("expected_aligned_depth_hz", 20.0);
-    params_.expected_camera_info_hz = declare_parameter<double>("expected_camera_info_hz", 20.0);
-    params_.expected_pointcloud_hz = declare_parameter<double>("expected_pointcloud_hz", 8.0);
-    require_pointcloud_ = declare_parameter<bool>("require_pointcloud", false);
-    require_aligned_depth_ = declare_parameter<bool>("require_aligned_depth", false);
+    status_hz_ = std::max(0.1, declare_parameter<double>("status_hz", 2.0));
+    stale_timeout_s_ = std::max(
+      0.1, declare_parameter<double>("stale_timeout_s", 0.75));
 
-    if (status_hz_ <= 0.0) {
-      status_hz_ = 2.0;
+    depth_signal_topic_ = declare_parameter<std::string>(
+      "depth_signal_topic", DEFAULT_DEPTH_SIGNAL_TOPIC);
+    vo_health_topic_ = declare_parameter<std::string>(
+      "vo_health_topic", DEFAULT_VO_HEALTH_TOPIC);
+    obstacle_cloud_health_topic_ = declare_parameter<std::string>(
+      "obstacle_cloud_health_topic", DEFAULT_OBSTACLE_CLOUD_HEALTH_TOPIC);
+
+    depth_signal_.required = declare_parameter<bool>("require_depth_signal", true);
+    const bool legacy_require_aligned_depth =
+      declare_parameter<bool>("require_aligned_depth", false);
+    vo_health_.required = declare_parameter<bool>(
+      "require_vo_health", legacy_require_aligned_depth);
+    const bool legacy_require_pointcloud =
+      declare_parameter<bool>("require_pointcloud", false);
+    obstacle_cloud_.required = declare_parameter<bool>(
+      "require_obstacle_cloud_health", legacy_require_pointcloud);
+
+    const auto reliable_qos = rclcpp::QoS(rclcpp::KeepLast(10)).reliable();
+    if (depth_signal_.required) {
+      depth_signal_sub_ = create_subscription<std_msgs::msg::Float32>(
+        depth_signal_topic_, reliable_qos,
+        [this](const std_msgs::msg::Float32::ConstSharedPtr message) {
+          depth_signal_.seen = true;
+          depth_signal_.healthy =
+            message && std::isfinite(message->data) && message->data > 0.0F;
+          depth_signal_.last_update_s = now().seconds();
+        });
     }
-
-    auto sensor_qos = rclcpp::SensorDataQoS();
-    auto reliable_qos = rclcpp::QoS(rclcpp::KeepLast(10)).reliable();
-
-    color_sub_ = create_subscription<sensor_msgs::msg::Image>(
-      COLOR_IMAGE_TOPIC, sensor_qos,
-      [this](sensor_msgs::msg::Image::ConstSharedPtr) { color_tracker_.tick(now()); });
-
-    color_info_sub_ = create_subscription<sensor_msgs::msg::CameraInfo>(
-      COLOR_INFO_TOPIC, reliable_qos,
-      [this](sensor_msgs::msg::CameraInfo::ConstSharedPtr) { color_info_tracker_.tick(now()); });
-
-    depth_sub_ = create_subscription<sensor_msgs::msg::Image>(
-      DEPTH_IMAGE_TOPIC, sensor_qos,
-      [this](sensor_msgs::msg::Image::ConstSharedPtr) { depth_tracker_.tick(now()); });
-
-    depth_info_sub_ = create_subscription<sensor_msgs::msg::CameraInfo>(
-      DEPTH_INFO_TOPIC, reliable_qos,
-      [this](sensor_msgs::msg::CameraInfo::ConstSharedPtr) { depth_info_tracker_.tick(now()); });
-
-    aligned_depth_sub_ = create_subscription<sensor_msgs::msg::Image>(
-      ALIGNED_DEPTH_IMAGE_TOPIC, sensor_qos,
-      [this](sensor_msgs::msg::Image::ConstSharedPtr) { aligned_depth_tracker_.tick(now()); });
-
-    pointcloud_sub_ = create_subscription<sensor_msgs::msg::PointCloud2>(
-      POINTCLOUD_TOPIC, sensor_qos,
-      [this](sensor_msgs::msg::PointCloud2::ConstSharedPtr) { pointcloud_tracker_.tick(now()); });
+    if (vo_health_.required) {
+      vo_health_sub_ = create_subscription<std_msgs::msg::String>(
+        vo_health_topic_, reliable_qos,
+        [this](const std_msgs::msg::String::ConstSharedPtr message) {
+          vo_health_.seen = true;
+          vo_health_.healthy =
+            message && savo_realsense::health_text_is_ok(message->data);
+          vo_health_.last_update_s = now().seconds();
+        });
+    }
+    if (obstacle_cloud_.required) {
+      obstacle_cloud_health_sub_ = create_subscription<std_msgs::msg::Bool>(
+        obstacle_cloud_health_topic_, reliable_qos,
+        [this](const std_msgs::msg::Bool::ConstSharedPtr message) {
+          obstacle_cloud_.seen = true;
+          obstacle_cloud_.healthy = message && message->data;
+          obstacle_cloud_.last_update_s = now().seconds();
+        });
+    }
 
     status_pub_ = create_publisher<std_msgs::msg::String>(STATUS_TOPIC, reliable_qos);
     diagnostics_pub_ =
       create_publisher<diagnostic_msgs::msg::DiagnosticArray>(DIAGNOSTICS_TOPIC, reliable_qos);
-
     timer_ = create_wall_timer(
       std::chrono::duration<double>(1.0 / status_hz_),
-      [this]() { publish_status(); });
+      [this]() {publish_status();});
   }
 
 private:
-  void publish_status()
-  {
-    const auto now_time = now();
+  diagnostic_msgs::msg::DiagnosticStatus make_signal_diagnostic(
+    const std::string & name,
+    const std::string & topic,
+    const savo_realsense::HealthSignal & signal,
+    double now_s) const;
 
-    const auto color = savo_realsense::build_stream_status(
-      COLOR_IMAGE_TOPIC, color_tracker_, now_time,
-      params_.expected_color_hz, params_.stale_timeout_s);
-    const auto color_info = savo_realsense::build_stream_status(
-      COLOR_INFO_TOPIC, color_info_tracker_, now_time,
-      params_.expected_camera_info_hz, params_.stale_timeout_s);
-    const auto depth = savo_realsense::build_stream_status(
-      DEPTH_IMAGE_TOPIC, depth_tracker_, now_time,
-      params_.expected_depth_hz, params_.stale_timeout_s);
-    const auto depth_info = savo_realsense::build_stream_status(
-      DEPTH_INFO_TOPIC, depth_info_tracker_, now_time,
-      params_.expected_camera_info_hz, params_.stale_timeout_s);
-    const auto aligned_depth = savo_realsense::build_stream_status(
-      ALIGNED_DEPTH_IMAGE_TOPIC, aligned_depth_tracker_, now_time,
-      params_.expected_aligned_depth_hz, params_.stale_timeout_s);
-    const auto pointcloud = savo_realsense::build_stream_status(
-      POINTCLOUD_TOPIC, pointcloud_tracker_, now_time,
-      params_.expected_pointcloud_hz, params_.stale_timeout_s);
-
-    const bool pointcloud_ok = require_pointcloud_ ? pointcloud.ok() : true;
-    const bool aligned_depth_ok = require_aligned_depth_ ? aligned_depth.ok() : true;
-    const bool ok = color.ok() && color_info.ok() && depth.ok() && depth_info.ok() &&
-      aligned_depth_ok && pointcloud_ok;
-
-    std_msgs::msg::String message;
-    message.data = make_status_json(
-      ok, color, color_info, depth, depth_info, aligned_depth, pointcloud);
-    status_pub_->publish(message);
-
-    std::vector<diagnostic_msgs::msg::DiagnosticStatus> diagnostics;
-    diagnostics.push_back(savo_realsense::make_stream_diagnostic("RealSense color image", color));
-    diagnostics.push_back(
-      savo_realsense::make_stream_diagnostic("RealSense color camera info", color_info));
-    diagnostics.push_back(savo_realsense::make_stream_diagnostic("RealSense depth image", depth));
-    diagnostics.push_back(
-      savo_realsense::make_stream_diagnostic("RealSense depth camera info", depth_info));
-
-    if (require_aligned_depth_ || aligned_depth.seen) {
-      diagnostics.push_back(
-        savo_realsense::make_stream_diagnostic("RealSense aligned depth image", aligned_depth));
-    }
-
-    if (require_pointcloud_ || pointcloud.seen) {
-      diagnostics.push_back(
-        savo_realsense::make_stream_diagnostic("RealSense pointcloud", pointcloud));
-    }
-
-    diagnostics_pub_->publish(savo_realsense::make_diagnostic_array(diagnostics, now_time));
-  }
-
+  void publish_status();
   std::string make_status_json(
-    bool ok,
-    const savo_realsense::StreamStatus & color,
-    const savo_realsense::StreamStatus & color_info,
-    const savo_realsense::StreamStatus & depth,
-    const savo_realsense::StreamStatus & depth_info,
-    const savo_realsense::StreamStatus & aligned_depth,
-    const savo_realsense::StreamStatus & pointcloud) const
-  {
-    std::ostringstream stream;
-    stream
-      << "{"
-      << "\"ok\":" << json_bool(ok)
-      << ",\"message\":\"" << status_message(
-        ok, color, color_info, depth, depth_info, aligned_depth, pointcloud)
-      << "\""
-      << ",\"color_ok\":" << json_bool(color.ok())
-      << ",\"color_info_ok\":" << json_bool(color_info.ok())
-      << ",\"depth_ok\":" << json_bool(depth.ok())
-      << ",\"depth_info_ok\":" << json_bool(depth_info.ok())
-      << ",\"aligned_depth_ok\":"
-      << json_bool(require_aligned_depth_ ? aligned_depth.ok() : true)
-      << ",\"require_aligned_depth\":" << json_bool(require_aligned_depth_)
-      << ",\"pointcloud_ok\":" << json_bool(require_pointcloud_ ? pointcloud.ok() : true)
-      << ",\"require_pointcloud\":" << json_bool(require_pointcloud_)
-      << "}";
+    const savo_realsense::CameraHealthEvaluation & evaluation) const;
 
-    return stream.str();
-  }
-
-  std::string status_message(
-    bool ok,
-    const savo_realsense::StreamStatus & color,
-    const savo_realsense::StreamStatus & color_info,
-    const savo_realsense::StreamStatus & depth,
-    const savo_realsense::StreamStatus & depth_info,
-    const savo_realsense::StreamStatus & aligned_depth,
-    const savo_realsense::StreamStatus & pointcloud) const
-  {
-    if (ok) {
-      return "RealSense streams OK";
-    }
-
-    std::vector<std::string> bad;
-    if (!color.ok()) {
-      bad.push_back("color");
-    }
-    if (!color_info.ok()) {
-      bad.push_back("color_info");
-    }
-    if (!depth.ok()) {
-      bad.push_back("depth");
-    }
-    if (!depth_info.ok()) {
-      bad.push_back("depth_info");
-    }
-    if (require_aligned_depth_ && !aligned_depth.ok()) {
-      bad.push_back("aligned_depth");
-    }
-    if (require_pointcloud_ && !pointcloud.ok()) {
-      bad.push_back("pointcloud");
-    }
-
-    if (bad.empty()) {
-      return "No RealSense streams detected";
-    }
-
-    std::ostringstream stream;
-    stream << "Unhealthy streams: ";
-    for (std::size_t i = 0; i < bad.size(); ++i) {
-      if (i > 0) {
-        stream << ", ";
-      }
-      stream << bad[i];
-    }
-    return stream.str();
-  }
-
-  static const char * json_bool(bool value)
+  static const char * json_bool(const bool value)
   {
     return value ? "true" : "false";
   }
 
   double status_hz_{2.0};
-  bool require_pointcloud_{false};
-  bool require_aligned_depth_{false};
-  savo_realsense::StreamMonitorParams params_;
-
-  savo_realsense::RateTracker color_tracker_;
-  savo_realsense::RateTracker color_info_tracker_;
-  savo_realsense::RateTracker depth_tracker_;
-  savo_realsense::RateTracker depth_info_tracker_;
-  savo_realsense::RateTracker aligned_depth_tracker_;
-  savo_realsense::RateTracker pointcloud_tracker_;
-
-  rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr color_sub_;
-  rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr color_info_sub_;
-  rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr depth_sub_;
-  rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr depth_info_sub_;
-  rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr aligned_depth_sub_;
-  rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_sub_;
-
+  double stale_timeout_s_{0.75};
+  std::string depth_signal_topic_;
+  std::string vo_health_topic_;
+  std::string obstacle_cloud_health_topic_;
+  savo_realsense::HealthSignal depth_signal_;
+  savo_realsense::HealthSignal vo_health_;
+  savo_realsense::HealthSignal obstacle_cloud_;
+  rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr depth_signal_sub_;
+  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr vo_health_sub_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr obstacle_cloud_health_sub_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr status_pub_;
   rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr diagnostics_pub_;
   rclcpp::TimerBase::SharedPtr timer_;
 };
+
+diagnostic_msgs::msg::DiagnosticStatus CameraHealthNode::make_signal_diagnostic(
+  const std::string & name,
+  const std::string & topic,
+  const savo_realsense::HealthSignal & signal,
+  const double now_s) const
+{
+  diagnostic_msgs::msg::DiagnosticStatus status;
+  status.name = name;
+  status.hardware_id = "realsense_d435";
+
+  const bool fresh = savo_realsense::signal_is_fresh(
+    signal, now_s, stale_timeout_s_);
+  if (!signal.required) {
+    status.level = diagnostic_msgs::msg::DiagnosticStatus::OK;
+    status.message = "optional";
+  } else if (!signal.seen) {
+    status.level = diagnostic_msgs::msg::DiagnosticStatus::ERROR;
+    status.message = "not seen";
+  } else if (!fresh) {
+    status.level = diagnostic_msgs::msg::DiagnosticStatus::WARN;
+    status.message = "stale";
+  } else if (!signal.healthy) {
+    status.level = diagnostic_msgs::msg::DiagnosticStatus::ERROR;
+    status.message = "unhealthy";
+  } else {
+    status.level = diagnostic_msgs::msg::DiagnosticStatus::OK;
+    status.message = "healthy";
+  }
+
+  auto append_value = [&status](const std::string & key, const std::string & value) {
+    diagnostic_msgs::msg::KeyValue entry;
+    entry.key = key;
+    entry.value = value;
+    status.values.push_back(entry);
+  };
+  append_value("topic", topic);
+  append_value("required", json_bool(signal.required));
+  append_value("seen", json_bool(signal.seen));
+  append_value("fresh", json_bool(fresh));
+  append_value("healthy", json_bool(signal.healthy));
+  append_value(
+    "last_age_s",
+    signal.seen ? std::to_string(std::max(0.0, now_s - signal.last_update_s)) : "n/a");
+  return status;
+}
+
+void CameraHealthNode::publish_status()
+{
+  const auto now_time = now();
+  const double now_s = now_time.seconds();
+  const auto evaluation = savo_realsense::evaluate_camera_health(
+    depth_signal_, vo_health_, obstacle_cloud_, now_s, stale_timeout_s_);
+
+  std_msgs::msg::String status_message;
+  status_message.data = make_status_json(evaluation);
+  status_pub_->publish(status_message);
+
+  diagnostic_msgs::msg::DiagnosticArray diagnostics;
+  diagnostics.header.stamp = now_time;
+  diagnostics.status = {
+    make_signal_diagnostic(
+      "RealSense depth-front signal", depth_signal_topic_, depth_signal_, now_s),
+    make_signal_diagnostic("RealSense VO health", vo_health_topic_, vo_health_, now_s),
+    make_signal_diagnostic(
+      "RealSense obstacle-cloud health", obstacle_cloud_health_topic_, obstacle_cloud_, now_s),
+  };
+  diagnostics_pub_->publish(diagnostics);
+}
+
+std::string CameraHealthNode::make_status_json(
+  const savo_realsense::CameraHealthEvaluation & evaluation) const
+{
+  std::ostringstream stream;
+  stream
+    << "{"
+    << "\"ok\":" << json_bool(evaluation.ok)
+    << ",\"message\":\"" << savo_realsense::camera_health_message(evaluation) << "\""
+    << ",\"color_ok\":" << json_bool(evaluation.color_ok)
+    << ",\"color_info_ok\":" << json_bool(evaluation.color_info_ok)
+    << ",\"depth_ok\":" << json_bool(evaluation.depth_ok)
+    << ",\"depth_info_ok\":" << json_bool(evaluation.depth_info_ok)
+    << ",\"aligned_depth_ok\":" << json_bool(evaluation.aligned_depth_ok)
+    << ",\"require_aligned_depth\":" << json_bool(vo_health_.required)
+    << ",\"pointcloud_ok\":" << json_bool(evaluation.pointcloud_ok)
+    << ",\"require_pointcloud\":" << json_bool(obstacle_cloud_.required)
+    << ",\"depth_signal_ok\":" << json_bool(evaluation.depth_signal_ok)
+    << ",\"require_depth_signal\":" << json_bool(depth_signal_.required)
+    << ",\"vo_health_ok\":" << json_bool(evaluation.vo_health_ok)
+    << ",\"require_vo_health\":" << json_bool(vo_health_.required)
+    << ",\"obstacle_cloud_ok\":" << json_bool(evaluation.obstacle_cloud_ok)
+    << ",\"require_obstacle_cloud_health\":" << json_bool(obstacle_cloud_.required)
+    << "}";
+  return stream.str();
+}
 
 }  // namespace
 

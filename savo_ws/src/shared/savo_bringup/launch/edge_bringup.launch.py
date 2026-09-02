@@ -123,6 +123,12 @@ def _setup(context):
                     "camera_config_file": camera_config,
                     "nodes_config_file": nodes_config,
                     "use_depth_front_min": "true",
+                    "require_vo_health": (
+                        "true" if start_vo else "false"
+                    ),
+                    "require_obstacle_cloud_health": (
+                        "true" if start_obstacle_cloud else "false"
+                    ),
                     "enable_observer_color_relay": (
                         "true" if enable_observer_color_relay else "false"
                     ),

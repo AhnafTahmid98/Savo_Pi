@@ -28,9 +28,16 @@ Normal production is:
 ros2 launch savo_realsense realsense_bringup.launch.py
 ```
 
-Production starts `camera_health_node` as the sole raw-stream health authority.
-The separate topic monitor remains available for explicit diagnostics without
-adding a second production subscriber to every high-bandwidth camera stream:
+Production starts `camera_health_node` as the aggregate pipeline health
+authority. It does not subscribe to raw Image, CameraInfo, or PointCloud2
+payloads. Instead, it fail-closes on fresh `/depth/min_front_m`, `/vo/health`,
+and `/savo_perception/obstacle_cloud/health` signals when their producers are
+enabled. VO and obstacle-cloud requirements follow the canonical Edge feature
+flags, so disabled optional consumers do not cause false failures.
+
+The separate raw topic monitor remains available for explicit diagnostics, but
+is deliberately excluded from canonical production bringup because it consumes
+the high-bandwidth camera streams:
 
 ```bash
 ros2 run savo_realsense camera_topic_monitor_node --ros-args \
@@ -50,13 +57,12 @@ enables the local raw pointcloud required by the obstacle filter. The legacy
 remain installed for their standalone launch interface and are contract-tested
 to match the canonical production configuration.
 
-The native monitor records `expected_pointcloud_hz` as diagnostic metadata.
-Health is fail-closed on an unseen, stale, or zero-rate required cloud, but does
-not compare the measured rate with that metadata. The hardware-measured
-approximately 2.73 Hz pointcloud is therefore healthy while fresh under the
-0.75-second stale timeout; the existing expected-rate metadata was not lowered.
-Production health also requires the aligned depth image consumed by RGB-D VO;
-minimal profiles leave that gate optional.
+The diagnostic topic monitor records `expected_pointcloud_hz` as metadata. The
+production health node keeps the established `/realsense/status` fields, but
+projects them from lightweight downstream proof: depth fields come from the
+front-depth signal, color/aligned-depth fields come from VO health, and the
+pointcloud field comes from obstacle-cloud health. Any required signal that is
+missing, stale, or unhealthy fails closed under the existing stale timeout.
 
 Edge hardware validation with the D435 and RealSense ROS 4.58.1 established
 `pointcloud__neon_.stream_filter: 1` as the reliable depth-stream selector for
@@ -189,7 +195,9 @@ stale timeout
 Second node
 camera_health_node.py
 
-It combines stream status into one camera health status.
+The production C++ node combines lightweight depth, VO, and obstacle-cloud
+signals into one camera health status without copying camera payloads. The
+Python node remains a fallback/diagnostic implementation.
 
 Third node
 depth_front_min_node.py

@@ -52,6 +52,16 @@ ament_target_dependencies(savo_realsense_camera_monitor_common
   diagnostic_msgs
 )
 
+add_library(savo_realsense_camera_health_state
+  src/camera_health_state.cpp
+)
+
+target_include_directories(savo_realsense_camera_health_state
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+
 add_executable(depth_front_min_node
   src/depth_front_min_main.cpp
 )
@@ -79,12 +89,11 @@ target_include_directories(camera_health_node
 )
 
 target_link_libraries(camera_health_node
-  savo_realsense_camera_monitor_common
+  savo_realsense_camera_health_state
 )
 
 ament_target_dependencies(camera_health_node
   rclcpp
-  sensor_msgs
   std_msgs
   diagnostic_msgs
 )
@@ -111,6 +120,7 @@ ament_target_dependencies(camera_topic_monitor_node
 install(TARGETS
   savo_realsense_depth_front_min
   savo_realsense_camera_monitor_common
+  savo_realsense_camera_health_state
   EXPORT export_${PROJECT_NAME}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
@@ -162,7 +172,15 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
 endif()
 
 if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
   find_package(ament_cmake_pytest REQUIRED)
+
+  ament_add_gtest(test_camera_health_state
+    test/test_camera_health_state.cpp
+  )
+  target_link_libraries(test_camera_health_state
+    savo_realsense_camera_health_state
+  )
 
   file(GLOB PYTEST_FILES RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "test/test_*.py")
 
@@ -176,6 +194,7 @@ ament_export_include_directories(include)
 ament_export_libraries(
   savo_realsense_depth_front_min
   savo_realsense_camera_monitor_common
+  savo_realsense_camera_health_state
 )
 ament_export_targets(export_${PROJECT_NAME})
 

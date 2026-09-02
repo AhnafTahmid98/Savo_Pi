@@ -164,6 +164,21 @@ def test_camera_stage_is_one_driver_then_support_then_observer_relay() -> None:
     assert 'condition=IfCondition(enable_observer_color_relay)' in launch
 
 
+def test_camera_health_requirements_follow_enabled_edge_consumers() -> None:
+    """Optional VO/cloud producers only gate health when they are started."""
+    edge = read(EDGE_LAUNCH)
+    realsense = read(REALSENSE_LAUNCH)
+
+    assert '"require_vo_health": (' in edge
+    assert '"true" if start_vo else "false"' in edge
+    assert '"require_obstacle_cloud_health": (' in edge
+    assert '"true" if start_obstacle_cloud else "false"' in edge
+    assert '"require_depth_signal": ParameterValue(' in realsense
+    assert '"require_vo_health": ParameterValue(' in realsense
+    assert '"require_obstacle_cloud_health": ParameterValue(' in realsense
+    assert 'default_value="false"' in realsense
+
+
 def test_feature_flags_still_gate_all_delayed_edge_components() -> None:
     """A timer is only created after its existing feature gate passes."""
     launch = read(EDGE_LAUNCH)

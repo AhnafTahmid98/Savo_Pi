@@ -22,7 +22,14 @@ def generate_launch_description() -> LaunchDescription:
         executable="camera_health_node",
         name="camera_health_node",
         output="screen",
-        parameters=[config_file],
+        parameters=[
+            config_file,
+            {
+                "require_depth_signal": True,
+                "require_vo_health": False,
+                "require_obstacle_cloud_health": False,
+            },
+        ],
     )
 
     return LaunchDescription([

@@ -6,6 +6,7 @@ from launch.actions import TimerAction
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
 
@@ -13,6 +14,10 @@ def generate_launch_description() -> LaunchDescription:
     camera_config_file = LaunchConfiguration("camera_config_file")
     nodes_config_file = LaunchConfiguration("nodes_config_file")
     use_depth_front_min = LaunchConfiguration("use_depth_front_min")
+    require_vo_health = LaunchConfiguration("require_vo_health")
+    require_obstacle_cloud_health = LaunchConfiguration(
+        "require_obstacle_cloud_health"
+    )
     enable_observer_color_relay = LaunchConfiguration(
         "enable_observer_color_relay"
     )
@@ -40,7 +45,20 @@ def generate_launch_description() -> LaunchDescription:
         executable="camera_health_node",
         name="camera_health_node",
         output="screen",
-        parameters=[nodes_config_file],
+        parameters=[
+            nodes_config_file,
+            {
+                "require_depth_signal": ParameterValue(
+                    use_depth_front_min, value_type=bool
+                ),
+                "require_vo_health": ParameterValue(
+                    require_vo_health, value_type=bool
+                ),
+                "require_obstacle_cloud_health": ParameterValue(
+                    require_obstacle_cloud_health, value_type=bool
+                ),
+            },
+        ],
     )
 
     depth_front_min_node = Node(
@@ -91,6 +109,18 @@ def generate_launch_description() -> LaunchDescription:
         DeclareLaunchArgument(
             "use_depth_front_min",
             default_value="true",
+        ),
+        DeclareLaunchArgument(
+            "require_vo_health",
+            default_value="false",
+            description="Require fresh /vo/health in RealSense health",
+        ),
+        DeclareLaunchArgument(
+            "require_obstacle_cloud_health",
+            default_value="false",
+            description=(
+                "Require fresh obstacle-cloud health in RealSense health"
+            ),
         ),
         DeclareLaunchArgument(
             "enable_observer_color_relay",
