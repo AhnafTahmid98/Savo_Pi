@@ -51,6 +51,7 @@ private:
   std::string heartbeat_topic_;
 
   double transform_timeout_s_{0.10};
+  double max_processing_hz_{10.0};
   double stale_timeout_s_{0.75};
   double status_publish_hz_{2.0};
   double heartbeat_hz_{1.0};
@@ -69,6 +70,7 @@ private:
   std::size_t malformed_clouds_{0U};
   std::size_t clouds_received_{0U};
   std::size_t clouds_published_{0U};
+  std::size_t clouds_rate_limited_{0U};
   std::size_t heartbeat_counter_{0U};
 
   rclcpp::Time last_valid_input_time_{0, 0, RCL_ROS_TIME};
@@ -76,6 +78,12 @@ private:
   std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener>
   tf_listener_;
+
+  std::unique_ptr<ObstacleCloudProcessingGate>
+  processing_gate_;
+
+  std::unique_ptr<ObstacleCloudFilterAccumulator>
+  filter_accumulator_;
 
   rclcpp::Subscription<
     sensor_msgs::msg::PointCloud2>::SharedPtr

@@ -961,6 +961,7 @@ expected_filter = {
     'self_filter_enabled': True,
     'max_output_points': 100000,
     'transform_timeout_s': 0.10,
+    'max_processing_hz': 10.0,
     'stale_timeout_s': 0.75,
 }
 

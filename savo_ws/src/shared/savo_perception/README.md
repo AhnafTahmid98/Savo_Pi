@@ -205,6 +205,19 @@ The lightweight pure C++ filter has no PCL dependency and publishes XYZ-only
 PointCloud2 data with obstacle-only semantics. RealSense Nav2 clearing remains
 false; LiDAR remains responsible for reliable clearing.
 
+The raw sensor subscription is best-effort, volatile, and `KeepLast(1)`, so an
+expensive callback cannot accumulate old camera clouds. Production processing
+is intentionally bounded by `max_processing_hz: 10.0`; rate-limited arrivals
+are counted but are dropped before TF lookup or point iteration and do not
+indicate camera failure. Health freshness continues to use the most recent
+successfully processed cloud. The node transforms and filters each finite point
+through one shared incremental filter, retaining only accepted obstacle points
+instead of allocating a second full transformed cloud.
+
+This cloud remains an optional local marking helper. LiDAR is still the
+authoritative marking/clearing and reflex-safety sensor; D435 clearing remains
+disabled.
+
 Phase 8A1-A4 PC-side synthetic validation covers filtering, transforms,
 missing-transform containment, staleness, and recovery. Phase 8A5 stationary
 real-D435 sensor-side acceptance completed on 2026-08-26 with D435 serial

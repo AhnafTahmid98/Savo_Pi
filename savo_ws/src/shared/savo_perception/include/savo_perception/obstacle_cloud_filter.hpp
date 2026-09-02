@@ -4,6 +4,7 @@
 #pragma once
 
 #include <cstddef>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -61,6 +62,43 @@ struct ObstacleCloudFilterResult
 {
   std::vector<PointXYZ> points;
   ObstacleCloudFilterStats stats;
+};
+
+class ObstacleCloudFilterAccumulator
+{
+public:
+  explicit ObstacleCloudFilterAccumulator(
+    const ObstacleCloudFilterConfig & config);
+  ~ObstacleCloudFilterAccumulator();
+
+  ObstacleCloudFilterAccumulator(
+    const ObstacleCloudFilterAccumulator &) = delete;
+  ObstacleCloudFilterAccumulator & operator=(
+    const ObstacleCloudFilterAccumulator &) = delete;
+
+  void reset();
+  void reject_non_finite_input();
+  void consume(const PointXYZ & point);
+
+  [[nodiscard]] const ObstacleCloudFilterResult & result() const;
+
+private:
+  struct Impl;
+  std::unique_ptr<Impl> impl_;
+};
+
+class ObstacleCloudProcessingGate
+{
+public:
+  explicit ObstacleCloudProcessingGate(double max_processing_hz);
+
+  [[nodiscard]] bool should_process(double monotonic_time_s);
+  void reset();
+
+private:
+  double minimum_interval_s_{0.0};
+  double last_selected_time_s_{0.0};
+  bool have_selected_time_{false};
 };
 
 std::string validate_obstacle_cloud_filter_config(

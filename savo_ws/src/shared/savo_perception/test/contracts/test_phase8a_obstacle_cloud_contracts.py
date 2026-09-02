@@ -23,6 +23,7 @@ PHASE_FILES = (
     'config/edge/obstacle_cloud_filter.yaml',
     'launch/obstacle_cloud_filter.launch.py',
     'test/unit/test_obstacle_cloud_filter.cpp',
+    'test/contracts/test_obstacle_cloud_filter_core.py',
     'test/contracts/test_phase8a_obstacle_cloud_contracts.py',
     'test/fixtures/obstacle_cloud_filter_fixture.py',
 )
@@ -112,6 +113,73 @@ def test_edge_configuration_is_safe_and_ordered():
     assert config['self_max_y_m'] > config['self_min_y_m']
     assert config['self_max_z_m'] > config['self_min_z_m']
     assert config['max_output_points'] > 0
+    assert config['max_processing_hz'] == 10.0
+
+
+def test_input_qos_rate_gate_and_one_pass_filter_are_bounded():
+    """Lock the no-backlog and one-pass production performance contract."""
+    node = read('src/nodes/obstacle_cloud_filter_node.cpp')
+    library = read('src/filtering/obstacle_cloud_filter.cpp')
+    callback = node[node.index('void ObstacleCloudFilterNode::handle_cloud'):]
+
+    assert 'auto input_qos = rclcpp::SensorDataQoS()' in node
+    assert 'keep_last(1).best_effort().durability_volatile()' in node
+    assert 'max_processing_hz' in node
+    assert 'clouds_rate_limited' in node
+    assert 'ObstacleCloudFilterAccumulator' in node
+    assert 'transformed_points' not in node
+    assert 'std::hypot' not in library
+    assert 'occupied_voxels.reserve(points.size())' not in library
+    assert 'kInitialCandidateReserve' in library
+
+    for status_field in (
+        'state',
+        'reason',
+        'input_topic',
+        'output_topic',
+        'input_frame',
+        'output_frame',
+        'input_points',
+        'output_points',
+        'finite_points',
+        'range_rejected',
+        'height_rejected',
+        'self_rejected',
+        'voxel_rejected',
+        'output_limited',
+        'transform_failures',
+        'malformed_clouds',
+        'clouds_received',
+        'clouds_published',
+        'age_seconds',
+        'clearing_supported',
+        'semantics',
+    ):
+        assert f'\\"{status_field}\\"' in node
+
+    gate = callback.index('should_process(monotonic_time_s)')
+    layout = callback.index('validate_cloud_layout')
+    transform = callback.index('lookupTransform')
+    iterator = callback.index('PointCloud2ConstIterator<float>')
+    assert gate < layout < transform < iterator
+
+    rate_limited_branch = callback[
+        callback.index('if (!processing_gate_->should_process'):
+        callback.index('if (!message)')
+    ]
+    assert '++clouds_rate_limited_' in rate_limited_branch
+    assert 'return;' in rate_limited_branch
+    assert 'healthy_' not in rate_limited_branch
+    assert 'last_valid_input_time_' not in rate_limited_branch
+
+    assert callback.index('reject_cloud(\n      "malformed_cloud"') > gate
+    assert callback.index('reject_cloud(\n      "transform_unavailable"') > gate
+    assert callback.index('last_valid_input_time_ = now()') > transform
+
+    finite_rejection = callback.index('!std::isfinite(x)')
+    transform_math = callback.index('r00 * x')
+    accumulator = callback.index('filter_accumulator_->consume')
+    assert finite_rejection < accumulator < transform_math
 
 
 def test_launch_starts_only_the_filter_node():

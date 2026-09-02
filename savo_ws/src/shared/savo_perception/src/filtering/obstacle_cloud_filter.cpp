@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <functional>
 #include <limits>
+#include <memory>
 #include <stdexcept>
 #include <unordered_set>
 
@@ -88,16 +89,18 @@ struct VoxelKeyHash
 
 VoxelKey make_voxel_key(
   const PointXYZ & point,
-  const double voxel_size_m)
+  const double inverse_voxel_size)
 {
   return {
     static_cast<std::int64_t>(
-      std::floor(point.x / voxel_size_m)),
+      std::floor(point.x * inverse_voxel_size)),
     static_cast<std::int64_t>(
-      std::floor(point.y / voxel_size_m)),
+      std::floor(point.y * inverse_voxel_size)),
     static_cast<std::int64_t>(
-      std::floor(point.z / voxel_size_m))};
+      std::floor(point.z * inverse_voxel_size))};
 }
+
+constexpr std::size_t kInitialCandidateReserve = 16384U;
 
 }  // namespace
 
@@ -205,87 +208,171 @@ std::string validate_obstacle_cloud_filter_config(
   return {};
 }
 
+struct ObstacleCloudFilterAccumulator::Impl
+{
+  explicit Impl(
+    const ObstacleCloudFilterConfig & filter_config)
+  : config(filter_config),
+    minimum_range_squared(
+      filter_config.min_range_m * filter_config.min_range_m),
+    maximum_range_squared(
+      filter_config.max_range_m * filter_config.max_range_m),
+    inverse_voxel_size(1.0 / filter_config.voxel_size_m)
+  {
+    const auto validation =
+      validate_obstacle_cloud_filter_config(config);
+
+    if (!validation.empty()) {
+      throw std::invalid_argument(validation);
+    }
+
+    const auto initial_reserve =
+      std::min(config.max_output_points, kInitialCandidateReserve);
+
+    filter_result.points.reserve(initial_reserve);
+    occupied_voxels.reserve(initial_reserve);
+  }
+
+  ObstacleCloudFilterConfig config;
+  double minimum_range_squared;
+  double maximum_range_squared;
+  double inverse_voxel_size;
+  ObstacleCloudFilterResult filter_result;
+  std::unordered_set<VoxelKey, VoxelKeyHash> occupied_voxels;
+};
+
+ObstacleCloudFilterAccumulator::ObstacleCloudFilterAccumulator(
+  const ObstacleCloudFilterConfig & config)
+: impl_(std::make_unique<Impl>(config))
+{
+}
+
+ObstacleCloudFilterAccumulator::~ObstacleCloudFilterAccumulator() = default;
+
+void ObstacleCloudFilterAccumulator::reset()
+{
+  impl_->filter_result.points.clear();
+  impl_->filter_result.stats = {};
+  impl_->occupied_voxels.clear();
+}
+
+void ObstacleCloudFilterAccumulator::reject_non_finite_input()
+{
+  ++impl_->filter_result.stats.input_points;
+}
+
+void ObstacleCloudFilterAccumulator::consume(
+  const PointXYZ & point)
+{
+  auto & result = impl_->filter_result;
+  const auto & config = impl_->config;
+
+  ++result.stats.input_points;
+
+  if (!point_is_finite(point)) {
+    return;
+  }
+
+  ++result.stats.finite_points;
+
+  const double horizontal_range_squared =
+    point.x * point.x + point.y * point.y;
+
+  if (
+    horizontal_range_squared < impl_->minimum_range_squared ||
+    horizontal_range_squared > impl_->maximum_range_squared)
+  {
+    ++result.stats.range_rejected;
+    return;
+  }
+
+  if (
+    point.z < config.min_height_m ||
+    point.z > config.max_height_m)
+  {
+    ++result.stats.height_rejected;
+    return;
+  }
+
+  if (
+    config.self_filter_enabled &&
+    point_is_in_self_box(point, config))
+  {
+    ++result.stats.self_rejected;
+    return;
+  }
+
+  const auto voxel =
+    make_voxel_key(point, impl_->inverse_voxel_size);
+
+  if (impl_->occupied_voxels.find(voxel) != impl_->occupied_voxels.end()) {
+    ++result.stats.voxel_rejected;
+    return;
+  }
+
+  if (result.points.size() >= config.max_output_points) {
+    result.stats.output_limited = true;
+    return;
+  }
+
+  impl_->occupied_voxels.insert(voxel);
+  result.points.push_back(point);
+  result.stats.output_points = result.points.size();
+}
+
+const ObstacleCloudFilterResult &
+ObstacleCloudFilterAccumulator::result() const
+{
+  return impl_->filter_result;
+}
+
+ObstacleCloudProcessingGate::ObstacleCloudProcessingGate(
+  const double max_processing_hz)
+{
+  if (!finite(max_processing_hz) || max_processing_hz <= 0.0) {
+    throw std::invalid_argument("invalid_max_processing_rate");
+  }
+
+  minimum_interval_s_ = 1.0 / max_processing_hz;
+}
+
+bool ObstacleCloudProcessingGate::should_process(
+  const double monotonic_time_s)
+{
+  if (!finite(monotonic_time_s)) {
+    throw std::invalid_argument("non_finite_processing_time");
+  }
+
+  if (
+    !have_selected_time_ ||
+    monotonic_time_s < last_selected_time_s_ ||
+    monotonic_time_s - last_selected_time_s_ >= minimum_interval_s_)
+  {
+    last_selected_time_s_ = monotonic_time_s;
+    have_selected_time_ = true;
+    return true;
+  }
+
+  return false;
+}
+
+void ObstacleCloudProcessingGate::reset()
+{
+  last_selected_time_s_ = 0.0;
+  have_selected_time_ = false;
+}
+
 ObstacleCloudFilterResult filter_obstacle_cloud(
   const std::vector<PointXYZ> & points,
   const ObstacleCloudFilterConfig & config)
 {
-  const auto validation =
-    validate_obstacle_cloud_filter_config(config);
-
-  if (!validation.empty()) {
-    throw std::invalid_argument(validation);
-  }
-
-  ObstacleCloudFilterResult result;
-  result.stats.input_points = points.size();
-
-  result.points.reserve(
-    std::min(
-      points.size(),
-      config.max_output_points));
-
-  std::unordered_set<VoxelKey, VoxelKeyHash>
-  occupied_voxels;
-
-  occupied_voxels.reserve(points.size());
+  ObstacleCloudFilterAccumulator accumulator(config);
 
   for (const auto & point : points) {
-    if (!point_is_finite(point)) {
-      continue;
-    }
-
-    ++result.stats.finite_points;
-
-    const double horizontal_range =
-      std::hypot(point.x, point.y);
-
-    if (
-      horizontal_range < config.min_range_m ||
-      horizontal_range > config.max_range_m)
-    {
-      ++result.stats.range_rejected;
-      continue;
-    }
-
-    if (
-      point.z < config.min_height_m ||
-      point.z > config.max_height_m)
-    {
-      ++result.stats.height_rejected;
-      continue;
-    }
-
-    if (
-      config.self_filter_enabled &&
-      point_is_in_self_box(point, config))
-    {
-      ++result.stats.self_rejected;
-      continue;
-    }
-
-    const auto voxel =
-      make_voxel_key(point, config.voxel_size_m);
-
-    if (!occupied_voxels.insert(voxel).second) {
-      ++result.stats.voxel_rejected;
-      continue;
-    }
-
-    if (
-      result.points.size() >=
-      config.max_output_points)
-    {
-      result.stats.output_limited = true;
-      continue;
-    }
-
-    result.points.push_back(point);
+    accumulator.consume(point);
   }
 
-  result.stats.output_points =
-    result.points.size();
-
-  return result;
+  return accumulator.result();
 }
 
 }  // namespace savo_perception

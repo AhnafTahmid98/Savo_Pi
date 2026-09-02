@@ -284,6 +284,7 @@ def load_filter_configuration(path):
         'self_max_z_m',
         'max_output_points',
         'transform_timeout_s',
+        'max_processing_hz',
         'stale_timeout_s',
         'status_publish_hz',
         'heartbeat_hz',
@@ -309,6 +310,7 @@ def load_filter_configuration(path):
         'self_min_z_m',
         'self_max_z_m',
         'transform_timeout_s',
+        'max_processing_hz',
         'stale_timeout_s',
         'status_publish_hz',
         'heartbeat_hz',
@@ -346,6 +348,8 @@ def load_filter_configuration(path):
         raise ValidationFailure('voxel_size_m must be positive')
     if int(parameters['max_output_points']) <= 0:
         raise ValidationFailure('max_output_points must be positive')
+    if float(parameters['max_processing_hz']) <= 0.0:
+        raise ValidationFailure('max_processing_hz must be positive')
 
     for axis in ('x', 'y', 'z'):
         if (
@@ -1326,6 +1330,7 @@ class HardwareObserver(Node):
             'malformed_clouds',
             'clouds_received',
             'clouds_published',
+            'clouds_rate_limited',
         ):
             value = document.get(name)
             if not isinstance(value, int) or value < 0:
@@ -1333,6 +1338,21 @@ class HardwareObserver(Node):
                     'status_counter',
                     f'status counter {name} is invalid: {value!r}',
                 )
+
+        status_max_processing_hz = document.get('max_processing_hz')
+        if (
+            not isinstance(status_max_processing_hz, (int, float))
+            or isinstance(status_max_processing_hz, bool)
+            or not math.isclose(
+                float(status_max_processing_hz),
+                float(self.config['max_processing_hz']),
+            )
+        ):
+            self.record_failure(
+                'status_rate_limit',
+                'status max_processing_hz does not match production config: '
+                f'{status_max_processing_hz!r}',
+            )
 
         output_points = document.get('output_points')
         if (
@@ -2889,7 +2909,7 @@ def parse_arguments():
     parser.add_argument(
         '--minimum-output-rate-hz',
         type=float,
-        default=20.0,
+        default=7.5,
     )
     parser.add_argument(
         '--minimum-status-rate-hz',

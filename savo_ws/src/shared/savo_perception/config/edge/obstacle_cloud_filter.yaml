@@ -35,6 +35,11 @@ obstacle_cloud_filter_node:
 
     max_output_points: 100000
     transform_timeout_s: 0.10
+
+    # This optional marking helper intentionally processes only fresh samples.
+    # The input subscription also keeps only the newest raw cloud.
+    max_processing_hz: 10.0
+
     stale_timeout_s: 0.75
     status_publish_hz: 2.0
     heartbeat_hz: 1.0

@@ -14,6 +14,8 @@ namespace
 {
 
 using savo_perception::ObstacleCloudFilterConfig;
+using savo_perception::ObstacleCloudFilterAccumulator;
+using savo_perception::ObstacleCloudProcessingGate;
 using savo_perception::PointCloudStorageLayout;
 using savo_perception::PointXYZ;
 
@@ -458,4 +460,100 @@ TEST(ObstacleCloudFilterPointTest, DisabledSelfFilterRetainsPoint)
 
   EXPECT_EQ(result.points.size(), 1U);
   EXPECT_EQ(result.stats.self_rejected, 0U);
+}
+
+TEST(ObstacleCloudFilterPointTest, VectorAndIncrementalApisAreEquivalent)
+{
+  ObstacleCloudFilterConfig config;
+  const std::vector<PointXYZ> points{
+    {std::numeric_limits<double>::quiet_NaN(), 0.0, 0.2},
+    {0.1, 0.0, 0.2},
+    {0.25, 0.0, 0.2},
+    {1.0, 0.0, 0.3},
+    {1.01, 0.0, 0.3},
+    {1.2, 0.0, 1.7}};
+
+  const auto vector_result =
+    savo_perception::filter_obstacle_cloud(points, config);
+
+  ObstacleCloudFilterAccumulator accumulator(config);
+  for (const auto & point : points) {
+    accumulator.consume(point);
+  }
+
+  const auto & incremental_result = accumulator.result();
+  ASSERT_EQ(vector_result.points.size(), incremental_result.points.size());
+
+  for (std::size_t index = 0U; index < vector_result.points.size(); ++index) {
+    EXPECT_DOUBLE_EQ(vector_result.points[index].x, incremental_result.points[index].x);
+    EXPECT_DOUBLE_EQ(vector_result.points[index].y, incremental_result.points[index].y);
+    EXPECT_DOUBLE_EQ(vector_result.points[index].z, incremental_result.points[index].z);
+  }
+
+  EXPECT_EQ(vector_result.stats.input_points, incremental_result.stats.input_points);
+  EXPECT_EQ(vector_result.stats.finite_points, incremental_result.stats.finite_points);
+  EXPECT_EQ(vector_result.stats.range_rejected, incremental_result.stats.range_rejected);
+  EXPECT_EQ(vector_result.stats.height_rejected, incremental_result.stats.height_rejected);
+  EXPECT_EQ(vector_result.stats.self_rejected, incremental_result.stats.self_rejected);
+  EXPECT_EQ(vector_result.stats.voxel_rejected, incremental_result.stats.voxel_rejected);
+  EXPECT_EQ(vector_result.stats.output_points, incremental_result.stats.output_points);
+  EXPECT_EQ(vector_result.stats.output_limited, incremental_result.stats.output_limited);
+}
+
+TEST(ObstacleCloudFilterPointTest, IncrementalAccumulatorReusesCleanState)
+{
+  ObstacleCloudFilterConfig config;
+  config.self_filter_enabled = false;
+  ObstacleCloudFilterAccumulator accumulator(config);
+
+  accumulator.consume({1.0, 0.0, 0.3});
+  ASSERT_EQ(accumulator.result().points.size(), 1U);
+
+  accumulator.reset();
+  accumulator.reject_non_finite_input();
+  accumulator.consume({1.2, 0.0, 0.3});
+
+  ASSERT_EQ(accumulator.result().points.size(), 1U);
+  EXPECT_DOUBLE_EQ(accumulator.result().points.front().x, 1.2);
+  EXPECT_EQ(accumulator.result().stats.input_points, 2U);
+  EXPECT_EQ(accumulator.result().stats.finite_points, 1U);
+}
+
+TEST(ObstacleCloudProcessingGateTest, SelectsFirstAndNextEligibleCloud)
+{
+  ObstacleCloudProcessingGate gate(10.0);
+
+  EXPECT_TRUE(gate.should_process(100.0));
+  EXPECT_FALSE(gate.should_process(100.05));
+  EXPECT_TRUE(gate.should_process(100.101));
+}
+
+TEST(ObstacleCloudProcessingGateTest, ClockRollbackDoesNotBlockRecovery)
+{
+  ObstacleCloudProcessingGate gate(10.0);
+
+  EXPECT_TRUE(gate.should_process(100.0));
+  EXPECT_TRUE(gate.should_process(1.0));
+  EXPECT_FALSE(gate.should_process(1.05));
+  EXPECT_TRUE(gate.should_process(1.101));
+}
+
+TEST(ObstacleCloudProcessingGateTest, ResetMakesNextCloudEligible)
+{
+  ObstacleCloudProcessingGate gate(10.0);
+
+  EXPECT_TRUE(gate.should_process(100.0));
+  EXPECT_FALSE(gate.should_process(100.01));
+  gate.reset();
+  EXPECT_TRUE(gate.should_process(100.01));
+}
+
+TEST(ObstacleCloudProcessingGateTest, InvalidRateIsRejected)
+{
+  EXPECT_THROW(ObstacleCloudProcessingGate(0.0), std::invalid_argument);
+  EXPECT_THROW(ObstacleCloudProcessingGate(-1.0), std::invalid_argument);
+  EXPECT_THROW(
+    ObstacleCloudProcessingGate(
+      std::numeric_limits<double>::infinity()),
+    std::invalid_argument);
 }

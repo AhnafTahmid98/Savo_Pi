@@ -295,6 +295,12 @@ if(BUILD_TESTING)
     TIMEOUT 60
   )
 
+  ament_add_pytest_test(
+    test_obstacle_cloud_filter_core
+    test/contracts/test_obstacle_cloud_filter_core.py
+    TIMEOUT 60
+  )
+
   find_package(ament_lint_auto REQUIRED)
 
   # Skip noisy style-only linters for this hybrid production package.

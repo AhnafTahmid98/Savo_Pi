@@ -8,9 +8,8 @@
 
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <sensor_msgs/point_cloud2_iterator.hpp>
+#include <tf2/LinearMath/Matrix3x3.h>
 #include <tf2/LinearMath/Quaternion.h>
-#include <tf2/LinearMath/Transform.h>
-#include <tf2/LinearMath/Vector3.h>
 #include <tf2/exceptions.h>
 
 #include <algorithm>
@@ -25,7 +24,6 @@
 #include <stdexcept>
 #include <string>
 #include <utility>
-#include <vector>
 
 namespace savo_perception
 {
@@ -135,6 +133,16 @@ ObstacleCloudFilterNode::ObstacleCloudFilterNode()
     }
   }
 
+  if (configuration_valid_) {
+    processing_gate_ =
+      std::make_unique<ObstacleCloudProcessingGate>(
+      max_processing_hz_);
+
+    filter_accumulator_ =
+      std::make_unique<ObstacleCloudFilterAccumulator>(
+      filter_config_);
+  }
+
   tf_buffer_ =
     std::make_unique<tf2_ros::Buffer>(get_clock());
 
@@ -143,10 +151,13 @@ ObstacleCloudFilterNode::ObstacleCloudFilterNode()
     *tf_buffer_);
 
   if (configuration_valid_) {
+    auto input_qos = rclcpp::SensorDataQoS();
+    input_qos.keep_last(1).best_effort().durability_volatile();
+
     cloud_subscription_ =
       create_subscription<sensor_msgs::msg::PointCloud2>(
       input_topic_,
-      rclcpp::SensorDataQoS(),
+      input_qos,
       std::bind(
         &ObstacleCloudFilterNode::handle_cloud,
         this,
@@ -284,6 +295,11 @@ void ObstacleCloudFilterNode::declare_and_read_parameters()
     "transform_timeout_s",
     0.10);
 
+  max_processing_hz_ =
+    declare_parameter<double>(
+    "max_processing_hz",
+    10.0);
+
   stale_timeout_s_ =
     declare_parameter<double>(
     "stale_timeout_s",
@@ -328,6 +344,10 @@ std::string ObstacleCloudFilterNode::validate_parameters() const
 
   if (!finite_positive(transform_timeout_s_)) {
     return "invalid_transform_timeout";
+  }
+
+  if (!finite_positive(max_processing_hz_)) {
+    return "invalid_max_processing_rate";
   }
 
   if (!finite_positive(stale_timeout_s_)) {
@@ -421,6 +441,15 @@ void ObstacleCloudFilterNode::handle_cloud(
 {
   ++clouds_received_;
 
+  const auto monotonic_time_s =
+    std::chrono::duration<double>(
+    std::chrono::steady_clock::now().time_since_epoch()).count();
+
+  if (!processing_gate_->should_process(monotonic_time_s)) {
+    ++clouds_rate_limited_;
+    return;
+  }
+
   if (!message) {
     reject_cloud(
       "malformed_cloud",
@@ -479,20 +508,26 @@ void ObstacleCloudFilterNode::handle_cloud(
     rotation.z,
     rotation.w);
 
-  const tf2::Transform transform(
-    quaternion,
-    tf2::Vector3(
-      translation.x,
-      translation.y,
-      translation.z));
+  const tf2::Matrix3x3 rotation_matrix(quaternion);
 
-  std::vector<PointXYZ> transformed_points;
+  const double r00 = rotation_matrix[0][0];
+  const double r01 = rotation_matrix[0][1];
+  const double r02 = rotation_matrix[0][2];
+  const double r10 = rotation_matrix[1][0];
+  const double r11 = rotation_matrix[1][1];
+  const double r12 = rotation_matrix[1][2];
+  const double r20 = rotation_matrix[2][0];
+  const double r21 = rotation_matrix[2][1];
+  const double r22 = rotation_matrix[2][2];
+  const double tx = translation.x;
+  const double ty = translation.y;
+  const double tz = translation.z;
 
   const std::size_t point_count =
     static_cast<std::size_t>(message->width) *
     static_cast<std::size_t>(message->height);
 
-  transformed_points.reserve(point_count);
+  filter_accumulator_->reset();
 
   try {
     sensor_msgs::PointCloud2ConstIterator<float>
@@ -508,19 +543,24 @@ void ObstacleCloudFilterNode::handle_cloud(
       index < point_count;
       ++index, ++x_iterator, ++y_iterator, ++z_iterator)
     {
-      const tf2::Vector3 input_point(
-        static_cast<double>(*x_iterator),
-        static_cast<double>(*y_iterator),
-        static_cast<double>(*z_iterator));
+      const double x = static_cast<double>(*x_iterator);
+      const double y = static_cast<double>(*y_iterator);
+      const double z = static_cast<double>(*z_iterator);
 
-      const auto output_point =
-        transform * input_point;
+      if (
+        !std::isfinite(x) ||
+        !std::isfinite(y) ||
+        !std::isfinite(z))
+      {
+        filter_accumulator_->reject_non_finite_input();
+        continue;
+      }
 
-      transformed_points.push_back(
+      filter_accumulator_->consume(
         PointXYZ{
-          output_point.x(),
-          output_point.y(),
-          output_point.z()});
+          r00 * x + r01 * y + r02 * z + tx,
+          r10 * x + r11 * y + r12 * z + ty,
+          r20 * x + r21 * y + r22 * z + tz});
     }
   } catch (const std::exception & error) {
     reject_cloud(
@@ -530,21 +570,7 @@ void ObstacleCloudFilterNode::handle_cloud(
     return;
   }
 
-  ObstacleCloudFilterResult result;
-
-  try {
-    result =
-      filter_obstacle_cloud(
-      transformed_points,
-      filter_config_);
-  } catch (const std::exception & error) {
-    configuration_valid_ = false;
-    state_ = "invalid_configuration";
-    reason_ = error.what();
-    healthy_ = false;
-    publish_health_and_status();
-    return;
-  }
+  const auto & result = filter_accumulator_->result();
 
   sensor_msgs::msg::PointCloud2 output;
   output.header.stamp = message->header.stamp;
@@ -709,6 +735,8 @@ std::string ObstacleCloudFilterNode::make_status_json() const
   output << ",\"malformed_clouds\":" << malformed_clouds_;
   output << ",\"clouds_received\":" << clouds_received_;
   output << ",\"clouds_published\":" << clouds_published_;
+  output << ",\"clouds_rate_limited\":" << clouds_rate_limited_;
+  output << ",\"max_processing_hz\":" << max_processing_hz_;
   output << ",\"age_seconds\":" << age_seconds;
   output << ",\"clearing_supported\":false";
   output << ",\"semantics\":\"obstacle_only\"}";
