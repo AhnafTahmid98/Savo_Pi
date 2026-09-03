@@ -1,3 +1,5 @@
+import os
+
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.actions import OpaqueFunction
@@ -16,6 +18,20 @@ _MODE_POLICY_FILES = {
 }
 
 
+def _runtime_directory(context) -> str:
+    explicit = (
+        LaunchConfiguration('runtime_directory').perform(context).strip()
+    )
+    if explicit:
+        return explicit
+
+    service_runtime = os.environ.get('SAVO_BRIDGE_RUNTIME_DIR', '').strip()
+    if service_runtime:
+        return service_runtime
+
+    return f'/tmp/savo_bridge-runtime-{os.geteuid()}'
+
+
 def _launch_bridge(context):
     robot_mode = LaunchConfiguration('robot_mode').perform(context).strip()
     try:
@@ -28,6 +44,7 @@ def _launch_bridge(context):
     mode_policy = PathJoinSubstitution([
         FindPackageShare('savo_bridge'), 'config', 'modes', policy_file,
     ])
+    runtime_directory = _runtime_directory(context)
 
     return [
         Node(
@@ -49,6 +66,12 @@ def _launch_bridge(context):
                         LaunchConfiguration('active_map_revision'),
                         value_type=int,
                     ),
+                    'command_server.socket_path': os.path.join(
+                        runtime_directory, 'command.sock'
+                    ),
+                    'snapshot_path': os.path.join(
+                        runtime_directory, 'snapshot.json'
+                    ),
                 },
             ],
         ),
@@ -66,6 +89,7 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument('config_file', default_value=default_config),
             DeclareLaunchArgument('active_map_id', default_value=''),
             DeclareLaunchArgument('active_map_revision', default_value='0'),
+            DeclareLaunchArgument('runtime_directory', default_value=''),
             OpaqueFunction(function=_launch_bridge),
         ]
     )

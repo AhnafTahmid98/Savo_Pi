@@ -70,6 +70,7 @@ def test_systemd_runtime_contract_is_shared_and_fail_closed() -> None:
     assert 'RuntimeDirectoryMode=0770' in service
     assert 'UMask=0007' in service
     assert 'ReadWritePaths=/run/savo_bridge' in service
+    assert 'Environment=SAVO_BRIDGE_RUNTIME_DIR=/run/savo_bridge' in service
     assert 'ExecStart=' in service
     assert 'ExecStartPre=' not in service
 
@@ -83,6 +84,32 @@ def test_launch_requires_observed_map_context() -> None:
     assert 'executable="savo_bridge_node"' in normalized_launch
     assert 'OpaqueFunction(function=_launch_bridge)' in launch
     assert 'unsupported Bridge robot_mode policy' in launch
+
+
+def test_edge_launch_resolves_a_private_command_runtime() -> None:
+    launch = read('launch/edge_bridge.launch.py')
+    assert (
+        "DeclareLaunchArgument('runtime_directory', default_value='')"
+        in launch
+    )
+    assert "os.environ.get('SAVO_BRIDGE_RUNTIME_DIR', '')" in launch
+    assert "return f'/tmp/savo_bridge-runtime-{os.geteuid()}'" in launch
+    assert "runtime_directory, 'command.sock'" in launch
+    assert "runtime_directory, 'snapshot.json'" in launch
+
+
+def test_command_server_parent_validation_remains_fail_closed() -> None:
+    source = read('src/command_server.cpp')
+    required = (
+        'metadata.st_uid != ::geteuid()',
+        '(permissions & S_IWOTH) != 0',
+        'S_ISLNK(metadata.st_mode)',
+        '::mkdir(current.c_str(), S_IRWXU)',
+        '::chmod(current.c_str(), S_IRWXU | S_IRWXG)',
+        'command_server_parent_directory_unsafe',
+    )
+    for marker in required:
+        assert marker in source
 
 
 def test_systemd_and_runner_do_not_invent_active_map() -> None:

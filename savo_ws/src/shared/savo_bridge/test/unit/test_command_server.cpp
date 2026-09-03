@@ -363,6 +363,84 @@ TEST(SavoBridgeCommandServer, SymlinkParentIsRejected)
   EXPECT_EQ(server.start().status, CommandServerStatus::UnsafePath);
 }
 
+TEST(SavoBridgeCommandServer, MissingPrivateParentIsCreatedIdempotently)
+{
+  TemporaryDirectory temporary;
+  const auto parent = temporary.path() / "runtime";
+  const auto path = parent / "command.sock";
+
+  CommandServer first{config_for(path)};
+  ASSERT_EQ(first.start().status, CommandServerStatus::Started);
+  ASSERT_EQ(first.stop().status, CommandServerStatus::Stopped);
+
+  struct stat metadata {};
+  ASSERT_EQ(::lstat(parent.c_str(), &metadata), 0);
+  EXPECT_TRUE(S_ISDIR(metadata.st_mode));
+  EXPECT_EQ(metadata.st_uid, ::geteuid());
+  EXPECT_EQ(metadata.st_mode & 0777U, 0700U);
+
+  CommandServer second{config_for(path)};
+  ASSERT_EQ(second.start().status, CommandServerStatus::Started);
+  EXPECT_EQ(second.stop().status, CommandServerStatus::Stopped);
+}
+
+TEST(SavoBridgeCommandServer, MissingSharedParentUsesConfiguredGroup)
+{
+  TemporaryDirectory temporary;
+  const auto parent = temporary.path() / "shared-runtime";
+  const auto path = parent / "command.sock";
+  auto config = config_for(path);
+  config.socket_gid = static_cast<std::uint32_t>(::getegid());
+
+  CommandServer server{config};
+  ASSERT_EQ(server.start().status, CommandServerStatus::Started);
+
+  struct stat metadata {};
+  ASSERT_EQ(::lstat(parent.c_str(), &metadata), 0);
+  EXPECT_EQ(metadata.st_uid, ::geteuid());
+  EXPECT_EQ(metadata.st_gid, ::getegid());
+  EXPECT_EQ(metadata.st_mode & 0777U, 0770U);
+  EXPECT_EQ(server.stop().status, CommandServerStatus::Stopped);
+}
+
+TEST(SavoBridgeCommandServer, WorldWritableParentIsRejected)
+{
+  TemporaryDirectory temporary;
+  const auto parent = temporary.path() / "world-writable";
+  ASSERT_TRUE(std::filesystem::create_directory(parent));
+  ASSERT_EQ(::chmod(parent.c_str(), 0777), 0);
+
+  CommandServer server{config_for(parent / "command.sock")};
+  EXPECT_EQ(server.start().status, CommandServerStatus::UnsafePath);
+  EXPECT_FALSE(std::filesystem::exists(parent / "command.sock"));
+}
+
+TEST(SavoBridgeCommandServer, ConfiguredSharedParentMustBeGroupTraversable)
+{
+  TemporaryDirectory temporary;
+  const auto parent = temporary.path() / "private-parent";
+  ASSERT_TRUE(std::filesystem::create_directory(parent));
+  ASSERT_EQ(::chmod(parent.c_str(), 0700), 0);
+  auto config = config_for(parent / "command.sock");
+  config.socket_gid = static_cast<std::uint32_t>(::getegid());
+
+  CommandServer server{config};
+  EXPECT_EQ(server.start().status, CommandServerStatus::UnsafePath);
+  EXPECT_FALSE(std::filesystem::exists(parent / "command.sock"));
+}
+
+TEST(SavoBridgeCommandServer, NonWritableParentIsRejected)
+{
+  TemporaryDirectory temporary;
+  const auto parent = temporary.path() / "read-only";
+  ASSERT_TRUE(std::filesystem::create_directory(parent));
+  ASSERT_EQ(::chmod(parent.c_str(), 0500), 0);
+
+  CommandServer server{config_for(parent / "command.sock")};
+  EXPECT_EQ(server.start().status, CommandServerStatus::UnsafePath);
+  EXPECT_FALSE(std::filesystem::exists(parent / "command.sock"));
+}
+
 TEST(SavoBridgeCommandServer, UnsafeSocketModesAreRejected)
 {
   TemporaryDirectory temporary;

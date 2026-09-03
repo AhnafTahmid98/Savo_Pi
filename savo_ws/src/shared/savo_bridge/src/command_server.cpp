@@ -361,8 +361,99 @@ struct FrameReadResult
   return std::find(allowed.begin(), allowed.end(), uid) != allowed.end();
 }
 
-[[nodiscard]] bool safe_parent_directory(
-  const std::filesystem::path & socket_path) noexcept
+[[nodiscard]] bool process_belongs_to_group(const gid_t group) noexcept
+{
+  if (group == ::getegid()) {
+    return true;
+  }
+
+  const int group_count = ::getgroups(0, nullptr);
+  if (group_count <= 0) {
+    return false;
+  }
+
+  try {
+    std::vector<gid_t> groups(static_cast<std::size_t>(group_count));
+    if (::getgroups(group_count, groups.data()) != group_count) {
+      return false;
+    }
+    return std::find(groups.begin(), groups.end(), group) != groups.end();
+  } catch (...) {
+    return false;
+  }
+}
+
+[[nodiscard]] bool safe_directory_metadata(
+  const struct stat & metadata,
+  const bool is_socket_parent,
+  const std::optional<std::uint32_t> expected_group = std::nullopt) noexcept
+{
+  if (!S_ISDIR(metadata.st_mode) || metadata.st_uid != ::geteuid()) {
+    return false;
+  }
+  if (
+    is_socket_parent && expected_group.has_value() &&
+    metadata.st_gid != static_cast<gid_t>(expected_group.value()))
+  {
+    return false;
+  }
+
+  const mode_t permissions = metadata.st_mode & 07777;
+  if (
+    is_socket_parent && expected_group.has_value() &&
+    (permissions & (S_IRGRP | S_IWGRP | S_IXGRP)) !=
+    (S_IRGRP | S_IWGRP | S_IXGRP))
+  {
+    return false;
+  }
+  if ((permissions & S_IWOTH) != 0) {
+    return false;
+  }
+  if (
+    (permissions & S_IWGRP) != 0 &&
+    !process_belongs_to_group(metadata.st_gid))
+  {
+    return false;
+  }
+  if (
+    is_socket_parent &&
+    (permissions & (S_IWUSR | S_IXUSR)) != (S_IWUSR | S_IXUSR))
+  {
+    return false;
+  }
+  return true;
+}
+
+[[nodiscard]] bool safe_ancestor_metadata(
+  const struct stat & metadata) noexcept
+{
+  if (!S_ISDIR(metadata.st_mode)) {
+    return false;
+  }
+
+  if (metadata.st_uid == ::geteuid()) {
+    return safe_directory_metadata(metadata, false, std::nullopt);
+  }
+  if (metadata.st_uid != 0) {
+    return false;
+  }
+
+  const mode_t permissions = metadata.st_mode & 07777;
+  if ((permissions & S_IWOTH) != 0) {
+    return (permissions & S_ISVTX) != 0;
+  }
+  if (
+    (permissions & S_IWGRP) != 0 &&
+    !process_belongs_to_group(metadata.st_gid))
+  {
+    return false;
+  }
+  return true;
+}
+
+[[nodiscard]] bool ensure_safe_parent_directory(
+  const std::filesystem::path & socket_path,
+  const std::optional<std::uint32_t> socket_group) noexcept
 {
   try {
     const auto parent = socket_path.parent_path();
@@ -378,9 +469,42 @@ struct FrameReadResult
       current /= component;
 
       struct stat metadata {};
-      if (::lstat(current.c_str(), &metadata) != 0 ||
-        S_ISLNK(metadata.st_mode) ||
-        !S_ISDIR(metadata.st_mode))
+      if (::lstat(current.c_str(), &metadata) != 0) {
+        if (errno != ENOENT || current != parent) {
+          return false;
+        }
+        {
+          const UmaskGuard owner_only_umask{0077};
+          if (::mkdir(current.c_str(), S_IRWXU) != 0) {
+            return false;
+          }
+        }
+        if (
+          socket_group.has_value() &&
+          (
+            ::chown(
+              current.c_str(),
+              static_cast<uid_t>(-1),
+              static_cast<gid_t>(socket_group.value())) != 0 ||
+            ::chmod(current.c_str(), S_IRWXU | S_IRWXG) != 0
+          ))
+        {
+          return false;
+        }
+        if (::lstat(current.c_str(), &metadata) != 0) {
+          return false;
+        }
+      }
+
+      if (S_ISLNK(metadata.st_mode)) {
+        return false;
+      }
+
+      const bool is_socket_parent = current == parent;
+      if (
+        is_socket_parent ?
+        !safe_directory_metadata(metadata, true, socket_group) :
+        !safe_ancestor_metadata(metadata))
       {
         return false;
       }
@@ -839,7 +963,7 @@ public:
     }
 
     const std::filesystem::path path{config_.socket_path};
-    if (!safe_parent_directory(path)) {
+    if (!ensure_safe_parent_directory(path, config_.socket_gid)) {
       return make_result(
         CommandServerStatus::UnsafePath,
         "command_server_parent_directory_unsafe");
