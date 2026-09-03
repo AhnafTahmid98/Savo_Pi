@@ -8,10 +8,9 @@ from geometry_msgs.msg import Point
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
+from savo_observer.range_state import range_sample_state
 from std_msgs.msg import Float32
 from visualization_msgs.msg import Marker, MarkerArray
-
-from savo_observer.range_state import range_sample_state
 
 
 RANGE_MARKERS_TOPIC = '/savo_observer/range_markers'

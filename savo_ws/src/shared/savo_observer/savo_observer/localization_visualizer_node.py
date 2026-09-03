@@ -7,14 +7,13 @@ from nav_msgs.msg import Odometry
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
-from visualization_msgs.msg import Marker, MarkerArray
-
 from savo_observer.localization_math import (
     covariance_ellipse,
     ellipse_points,
     yaw_arc_points,
     yaw_uncertainty_half_span,
 )
+from visualization_msgs.msg import Marker, MarkerArray
 
 
 FILTERED_ODOM_TOPIC = '/odometry/filtered'

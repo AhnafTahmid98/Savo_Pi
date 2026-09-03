@@ -20,7 +20,8 @@ def covariance_ellipse(
     confidence_sigma: float = 2.0,
     max_radius_m: float = 1.5,
 ) -> EllipseGeometry | None:
-    """Return the eigendecomposition of the planar pose covariance.
+    """
+    Return the eigendecomposition of the planar pose covariance.
 
     ROS pose covariance is a row-major 6x6 matrix.  The XY block uses indices
     0, 1, 6, and 7.  Slight publisher asymmetry is handled by averaging the two

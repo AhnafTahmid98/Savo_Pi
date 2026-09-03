@@ -45,9 +45,9 @@ def test_exact_three_range_topics_and_frames_are_used():
 
 
 def test_marker_geometry_and_ids_are_bounded_and_planar():
-    assert "markers = [" in LOCALIZATION
-    assert "Exactly five markers" in LOCALIZATION
-    assert "Exactly twelve deterministic marker IDs" in RANGE
+    assert 'markers = [' in LOCALIZATION
+    assert 'Exactly five markers' in LOCALIZATION
+    assert 'Exactly twelve deterministic marker IDs' in RANGE
     assert 'Marker.CUBE' not in LOCALIZATION
     assert 'Marker.CYLINDER' not in LOCALIZATION
     assert 'Marker.CUBE' not in RANGE
