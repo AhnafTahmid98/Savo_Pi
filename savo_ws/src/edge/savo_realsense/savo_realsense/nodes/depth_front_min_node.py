@@ -1,5 +1,6 @@
 # Copyright 2026 Ahnaf Tahmid
 import math
+import time
 
 import cv2
 import rclpy
@@ -56,6 +57,10 @@ class DepthFrontMinNode(Node):
             DEFAULT_FRONT_DEPTH_PERCENTILE,
             min_value=0.0,
         )
+        self._max_processing_hz = get_float_param(
+            self, "max_processing_hz", 15.0, min_value=1.0
+        )
+        self._last_processed_monotonic: float | None = None
 
         self._x_min_ratio = get_float_param(self, "x_min_ratio", 0.35, min_value=0.0)
         self._x_max_ratio = get_float_param(self, "x_max_ratio", 0.65, min_value=0.0)
@@ -72,7 +77,7 @@ class DepthFrontMinNode(Node):
             Image,
             self._input_topic,
             self._on_depth_image,
-            sensor_data_qos(),
+            sensor_data_qos(depth=1),
         )
 
         self.get_logger().info(
@@ -80,6 +85,15 @@ class DepthFrontMinNode(Node):
         )
 
     def _on_depth_image(self, msg: Image) -> None:
+        monotonic_now = time.monotonic()
+        if (
+            self._last_processed_monotonic is not None
+            and monotonic_now - self._last_processed_monotonic
+            < 1.0 / self._max_processing_hz
+        ):
+            return
+        self._last_processed_monotonic = monotonic_now
+
         try:
             image = self._bridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")
         except (CvBridgeError, cv2.error) as exc:

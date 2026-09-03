@@ -124,6 +124,7 @@ def test_input_qos_rate_gate_and_one_pass_filter_are_bounded():
 
     assert 'auto input_qos = rclcpp::SensorDataQoS()' in node
     assert 'keep_last(1).best_effort().durability_volatile()' in node
+    assert 'rclcpp::SensorDataQoS().keep_last(1)' in node
     assert 'max_processing_hz' in node
     assert 'clouds_rate_limited' in node
     assert 'ObstacleCloudFilterAccumulator' in node

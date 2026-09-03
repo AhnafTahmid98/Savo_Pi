@@ -258,10 +258,10 @@ camera health authority, front-depth producer, VO, local raw pointcloud,
 filtered obstacle cloud, and compressed observer color relay. Camera health
 uses the lightweight front-depth, VO-health, and obstacle-cloud-health signals;
 it does not add Image or PointCloud2 subscriptions to the production graph.
-Explicitly
-disabling the obstacle or observer relay remains available for controlled
-testing. Helper loss does not gate the required LiDAR navigation path, and
-LiDAR remains the reliable clearing source.
+Explicitly disabling the obstacle or observer relay remains available for
+controlled testing. When the validated obstacle cloud is started, its health
+and heartbeat are required by Edge readiness; it remains independent of the
+Core LiDAR navigation path, where LiDAR is the reliable clearing source.
 
 ### Staged Edge startup
 
@@ -336,6 +336,19 @@ Ctrl+C shutdown, pending stages are canceled and already-started child nodes are
 terminated by the launch service; no shell sleeps or detached launch wrappers
 are used. Speech and UI retain their existing optional behavior and are not
 redesigned by this staging change.
+
+For hardware discovery checks, avoid leaving the ROS 2 CLI daemon competing
+with the sensor pipeline. Stop it first and request direct discovery:
+
+```bash
+ros2 daemon stop
+ros2 node list --no-daemon
+ros2 topic list --no-daemon
+```
+
+Run high-bandwidth `ros2 topic hz` probes one at a time because each probe adds
+a live subscriber. Robot launch and readiness use native ROS subscriptions and
+never invoke the ROS 2 CLI or depend on its discovery cache.
 
 The first controlled real-robot test should use:
 

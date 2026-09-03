@@ -46,6 +46,12 @@ it and `max_frame_interval_s`, require Raspberry Pi calibration before they can
 be added safely. Throughput below the camera's nominal frame rate alone does
 not make fresh, accepted VO unhealthy.
 
+The production image subscriptions use best-effort KEEP_LAST depth 1 and the
+RGB-D synchronizer holds at most two candidates. Its callback only replaces a
+single pending pair; a 15 Hz processing timer takes the newest pair for
+OpenCV/PnP work. This bounds memory and latency while retaining the existing
+timestamp-delta and `max_frame_interval_s` rejection rules.
+
 ## Package Boundary
 
 ```text

@@ -3,6 +3,7 @@
 #include "savo_realsense/depth_front_min_node.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstring>
 #include <functional>
@@ -56,6 +57,7 @@ DepthFrontMinNode::DepthFrontMinNode(const rclcpp::NodeOptions & options)
   min_valid_m_ = declare_parameter<double>("min_valid_m", 0.02);
   max_valid_m_ = declare_parameter<double>("max_valid_m", 3.0);
   percentile_ = declare_parameter<double>("percentile", 10.0);
+  max_processing_hz_ = declare_parameter<double>("max_processing_hz", 15.0);
 
   x_min_ratio_ = declare_parameter<double>("x_min_ratio", 0.35);
   x_max_ratio_ = declare_parameter<double>("x_max_ratio", 0.65);
@@ -63,20 +65,22 @@ DepthFrontMinNode::DepthFrontMinNode(const rclcpp::NodeOptions & options)
   y_max_ratio_ = declare_parameter<double>("y_max_ratio", 0.75);
 
   sanitize_parameters();
+  processing_gate_ = DepthProcessingGate(max_processing_hz_);
 
   publisher_ = create_publisher<std_msgs::msg::Float32>(
     output_topic_, rclcpp::QoS(10).reliable().durability_volatile());
 
   subscription_ = create_subscription<sensor_msgs::msg::Image>(
     input_topic_,
-    rclcpp::SensorDataQoS(),
+    rclcpp::SensorDataQoS().keep_last(1),
     std::bind(&DepthFrontMinNode::on_depth_image, this, std::placeholders::_1));
 
   RCLCPP_INFO(
     get_logger(),
-    "Depth front-min C++ node subscribed to %s, publishing %s",
+    "Depth front-min C++ node subscribed to %s, publishing %s at up to %.1f Hz",
     input_topic_.c_str(),
-    output_topic_.c_str());
+    output_topic_.c_str(),
+    max_processing_hz_);
 }
 
 void DepthFrontMinNode::sanitize_parameters()
@@ -85,6 +89,7 @@ void DepthFrontMinNode::sanitize_parameters()
   min_valid_m_ = std::max(min_valid_m_, 0.001);
   max_valid_m_ = std::max(max_valid_m_, min_valid_m_);
   percentile_ = std::clamp(percentile_, 0.0, 100.0);
+  max_processing_hz_ = std::max(max_processing_hz_, 1.0);
 
   x_min_ratio_ = clamp_ratio(x_min_ratio_);
   x_max_ratio_ = clamp_ratio(x_max_ratio_);
@@ -104,6 +109,13 @@ void DepthFrontMinNode::sanitize_parameters()
 
 void DepthFrontMinNode::on_depth_image(const sensor_msgs::msg::Image::SharedPtr msg)
 {
+  const double monotonic_time_s =
+    std::chrono::duration<double>(
+    std::chrono::steady_clock::now().time_since_epoch()).count();
+  if (!processing_gate_.should_process(monotonic_time_s)) {
+    return;
+  }
+
   if (msg->width == 0U || msg->height == 0U || msg->data.empty()) {
     publish_depth(std::numeric_limits<float>::quiet_NaN());
     return;
@@ -127,13 +139,13 @@ void DepthFrontMinNode::on_depth_image(const sensor_msgs::msg::Image::SharedPtr 
     return;
   }
 
-  std::vector<float> valid_depths;
-  valid_depths.reserve(static_cast<size_t>((x1 - x0) * (y1 - y0)));
+  valid_depths_.clear();
+  valid_depths_.reserve(static_cast<size_t>((x1 - x0) * (y1 - y0)));
 
   if (msg->encoding == "16UC1") {
-    collect_16uc1(*msg, x0, x1, y0, y1, valid_depths);
+    collect_16uc1(*msg, x0, x1, y0, y1, valid_depths_);
   } else if (msg->encoding == "32FC1") {
-    collect_32fc1(*msg, x0, x1, y0, y1, valid_depths);
+    collect_32fc1(*msg, x0, x1, y0, y1, valid_depths_);
   } else {
     RCLCPP_WARN_THROTTLE(
       get_logger(), *get_clock(), 2000,
@@ -143,12 +155,12 @@ void DepthFrontMinNode::on_depth_image(const sensor_msgs::msg::Image::SharedPtr 
     return;
   }
 
-  if (valid_depths.empty()) {
+  if (valid_depths_.empty()) {
     publish_depth(std::numeric_limits<float>::quiet_NaN());
     return;
   }
 
-  publish_depth(percentile_value(valid_depths));
+  publish_depth(percentile_value(valid_depths_));
 }
 
 void DepthFrontMinNode::collect_16uc1(

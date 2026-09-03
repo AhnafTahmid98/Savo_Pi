@@ -265,10 +265,9 @@ def _setup(context):
                             "require_vo": requirements.require_vo,
                             "require_speech": requirements.require_speech,
                             "require_ui": start_ui,
-                            # The D435 obstacle cloud is an optional navigation helper.
-                            # Its own health/status topics expose degradation without
-                            # making Edge or Core navigation readiness depend on it.
-                            "require_obstacle_cloud": False,
+                            # If the validated cloud helper was selected, Edge
+                            # readiness observes its health and heartbeat.
+                            "require_obstacle_cloud": start_obstacle_cloud,
                         },
                     ],
                     arguments=[

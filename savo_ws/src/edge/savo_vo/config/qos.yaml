@@ -1,7 +1,7 @@
 qos:
   camera:
     history: "keep_last"
-    depth: 5
+    depth: 1
     reliability: "best_effort"
     durability: "volatile"
 

@@ -17,6 +17,7 @@ CPP_HEADERS = [
     "covariance_builder.hpp",
     "geometry_utils.hpp",
     "rgbd_geometry.hpp",
+    "latest_frame_selector.hpp",
 ]
 
 
@@ -36,6 +37,7 @@ CPP_SOURCES = [
     "covariance_builder.cpp",
     "geometry_utils.cpp",
     "rgbd_geometry.cpp",
+    "latest_frame_selector.cpp",
 ]
 
 
@@ -113,6 +115,9 @@ def test_cpp_vo_uses_synchronized_rgbd_pnp_not_affine_pixel_motion():
     cmake = (PACKAGE_ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
 
     assert "message_filters::Synchronizer" in node
+    assert "image_qos.depth = 1U" in node
+    assert "latest_frame_selector_" in node
+    assert "process_latest_images" in node
     assert "previous_aligned_depth_image_" in node
     assert "solvePnPRansac" in geometry
     assert "previous_camera_T_current_camera" in geometry

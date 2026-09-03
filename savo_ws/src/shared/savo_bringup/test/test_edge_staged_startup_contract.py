@@ -177,6 +177,7 @@ def test_camera_health_requirements_follow_enabled_edge_consumers() -> None:
     assert '"require_vo_health": ParameterValue(' in realsense
     assert '"require_obstacle_cloud_health": ParameterValue(' in realsense
     assert 'default_value="false"' in realsense
+    assert '"require_obstacle_cloud": start_obstacle_cloud' in edge
 
 
 def test_feature_flags_still_gate_all_delayed_edge_components() -> None:

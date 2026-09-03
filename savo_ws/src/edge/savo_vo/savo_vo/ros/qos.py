@@ -8,7 +8,7 @@ from rclpy.qos import (
 )
 
 
-def camera_qos(depth: int = 5) -> QoSProfile:
+def camera_qos(depth: int = 1) -> QoSProfile:
     return QoSProfile(
         history=HistoryPolicy.KEEP_LAST,
         depth=depth,

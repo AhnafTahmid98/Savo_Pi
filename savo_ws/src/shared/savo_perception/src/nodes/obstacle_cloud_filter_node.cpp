@@ -101,7 +101,7 @@ ObstacleCloudFilterNode::ObstacleCloudFilterNode()
   cloud_publisher_ =
     create_publisher<sensor_msgs::msg::PointCloud2>(
     output_topic_,
-    rclcpp::SensorDataQoS());
+    rclcpp::SensorDataQoS().keep_last(1));
 
   health_publisher_ =
     create_publisher<std_msgs::msg::Bool>(

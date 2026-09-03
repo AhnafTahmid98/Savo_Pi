@@ -32,6 +32,7 @@ add_library(savo_vo_core
   src/timestamp_sync.cpp
   src/covariance_builder.cpp
   src/geometry_utils.cpp
+  src/latest_frame_selector.cpp
   src/rgbd_geometry.cpp
   src/rgbd_odometry_node.cpp
   src/vo_health_state.cpp
@@ -187,6 +188,16 @@ if(BUILD_TESTING)
 
   if(TARGET test_vo_health_state)
     target_link_libraries(test_vo_health_state
+      savo_vo_core
+    )
+  endif()
+
+  ament_add_gtest(test_latest_frame_selector
+    test/test_latest_frame_selector.cpp
+  )
+
+  if(TARGET test_latest_frame_selector)
+    target_link_libraries(test_latest_frame_selector
       savo_vo_core
     )
   endif()

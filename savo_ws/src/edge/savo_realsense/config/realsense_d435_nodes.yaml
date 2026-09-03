@@ -29,6 +29,9 @@ depth_front_min_node:
     min_valid_m: 0.02
     max_valid_m: 3.00
     percentile: 10.0
+    # This safety projection selects fresh frames; source starvation still
+    # fails camera health through the unchanged 0.75 s signal timeout.
+    max_processing_hz: 15.0
     x_min_ratio: 0.35
     x_max_ratio: 0.65
     y_min_ratio: 0.35

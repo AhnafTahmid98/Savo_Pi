@@ -98,7 +98,7 @@ class RGBDOdometryNode(Node):
 
         self._sync = message_filters.ApproximateTimeSynchronizer(
             [color_sub, depth_sub, info_sub],
-            queue_size=10,
+            queue_size=2,
             slop=max(self._max_image_delay_s, self._max_depth_delay_s),
         )
         self._sync.registerCallback(self._on_rgbd_frame)

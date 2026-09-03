@@ -6,6 +6,7 @@
 #include <functional>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "cv_bridge/cv_bridge.hpp"
@@ -64,7 +65,7 @@ RGBDOdometryNode::RGBDOdometryNode(
 
 rclcpp::QoS RGBDOdometryNode::camera_qos()
 {
-  return rclcpp::SensorDataQoS();
+  return rclcpp::SensorDataQoS().keep_last(1);
 }
 
 rclcpp::QoS RGBDOdometryNode::odometry_qos()
@@ -105,7 +106,8 @@ void RGBDOdometryNode::declare_parameters()
   declare_parameter<std::string>(constants::kBaseFrameParam, constants::kBaseFrame);
   declare_parameter<std::string>(constants::kCameraFrameParam, constants::kCameraFrame);
 
-  declare_parameter<int>("sync_queue_size", 10);
+  declare_parameter<int>("sync_queue_size", 2);
+  declare_parameter<double>("processing_rate_hz", 15.0);
   declare_parameter<double>("max_sync_delta_s", 0.02);
   declare_parameter<double>("max_frame_interval_s", 0.20);
 
@@ -166,6 +168,9 @@ void RGBDOdometryNode::load_parameters()
   camera_frame_ = get_parameter(constants::kCameraFrameParam).as_string();
 
   sync_queue_size_ = std::max(2, static_cast<int>(get_parameter("sync_queue_size").as_int()));
+  processing_rate_hz_ = std::max(
+    1.0,
+    get_parameter("processing_rate_hz").as_double());
   max_sync_delta_s_ = std::max(0.001, get_parameter("max_sync_delta_s").as_double());
   max_frame_interval_s_ = std::max(
     0.01,
@@ -257,8 +262,10 @@ void RGBDOdometryNode::create_publishers()
 
 void RGBDOdometryNode::create_subscribers()
 {
-  color_sub_.subscribe(this, color_image_topic_, rmw_qos_profile_sensor_data);
-  depth_sub_.subscribe(this, depth_image_topic_, rmw_qos_profile_sensor_data);
+  auto image_qos = rmw_qos_profile_sensor_data;
+  image_qos.depth = 1U;
+  color_sub_.subscribe(this, color_image_topic_, image_qos);
+  depth_sub_.subscribe(this, depth_image_topic_, image_qos);
 
   image_sync_ = std::make_shared<message_filters::Synchronizer<ImageSyncPolicy>>(
     ImageSyncPolicy(sync_queue_size_),
@@ -280,6 +287,9 @@ void RGBDOdometryNode::create_subscribers()
 
 void RGBDOdometryNode::create_timers()
 {
+  processing_timer_ = create_wall_timer(
+    std::chrono::duration<double>(1.0 / processing_rate_hz_),
+    std::bind(&RGBDOdometryNode::process_latest_images, this));
   status_timer_ = create_wall_timer(
     std::chrono::milliseconds(500),
     std::bind(&RGBDOdometryNode::publish_waiting_status, this));
@@ -300,6 +310,29 @@ void RGBDOdometryNode::on_synchronized_images(
     aligned_depth_msg->header.stamp);
   if (!std::isfinite(pair_delta_s) || pair_delta_s > max_sync_delta_s_) {
     publish_status("rejected: synchronized RGB-D timestamp delta exceeded limit");
+    publish_tracking_quality(0.0);
+    return;
+  }
+
+  const double stamp_s = stamp_to_seconds(color_msg->header.stamp);
+  if (!latest_frame_selector_.offer(stamp_s)) {
+    return;
+  }
+
+  pending_color_image_ = color_msg;
+  pending_aligned_depth_image_ = aligned_depth_msg;
+}
+
+void RGBDOdometryNode::process_latest_images()
+{
+  if (!latest_frame_selector_.take().has_value()) {
+    return;
+  }
+
+  auto color_msg = std::move(pending_color_image_);
+  auto aligned_depth_msg = std::move(pending_aligned_depth_image_);
+  if (!color_msg || !aligned_depth_msg || !latest_camera_info_) {
+    publish_status("waiting for synchronized aligned RGB-D input and color CameraInfo");
     publish_tracking_quality(0.0);
     return;
   }
@@ -465,7 +498,9 @@ TrackingQuality RGBDOdometryNode::estimate_visual_motion(
   }
 
   const double dt_s = current_stamp_s - previous_stamp_s_;
-  if (!std::isfinite(dt_s) || dt_s <= 0.001 || dt_s > max_frame_interval_s_) {
+  if (!valid_frame_interval(
+      previous_stamp_s_, current_stamp_s, max_frame_interval_s_))
+  {
     reset_reference(gray_image, aligned_depth_image, current_stamp_s);
 
     TrackingQuality quality;

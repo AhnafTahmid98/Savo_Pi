@@ -11,6 +11,8 @@
 #include "sensor_msgs/msg/image.hpp"
 #include "std_msgs/msg/float32.hpp"
 
+#include "savo_realsense/depth_processing_gate.hpp"
+
 namespace savo_realsense
 {
 
@@ -53,11 +55,15 @@ private:
   double min_valid_m_{0.02};
   double max_valid_m_{3.0};
   double percentile_{10.0};
+  double max_processing_hz_{15.0};
 
   double x_min_ratio_{0.35};
   double x_max_ratio_{0.65};
   double y_min_ratio_{0.35};
   double y_max_ratio_{0.75};
+
+  DepthProcessingGate processing_gate_{15.0};
+  std::vector<float> valid_depths_;
 
   rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr publisher_;
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr subscription_;

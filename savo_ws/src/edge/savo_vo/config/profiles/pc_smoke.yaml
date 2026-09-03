@@ -9,7 +9,8 @@ rgbd_odometry_node:
     odom_frame: odom
     base_frame: base_footprint
     camera_frame: camera_color_optical_frame
-    sync_queue_size: 10
+    sync_queue_size: 2
+    processing_rate_hz: 15.0
     max_sync_delta_s: 0.03
     max_frame_interval_s: 0.30
     min_features: 40

@@ -208,7 +208,7 @@ def test_edge_realsense_and_obstacle_cloud_profile_selection() -> None:
         d435_voxel_validated=False,
         explicit_start=True,
     ) is False
-    assert '"require_obstacle_cloud": False' in launch
+    assert '"require_obstacle_cloud": start_obstacle_cloud' in launch
     assert 'and explicit_obstacle_cloud' in launch
     assert 'and obstacle_cloud_requested' in launch
     assert 'if explicit_obstacle_cloud and not start_realsense' in launch
@@ -451,6 +451,64 @@ def test_validated_normal_runtime_defaults_are_synchronized() -> None:
             launch_string_defaults(launch)["localization_use_vo"]
             == "true"
         )
+
+
+def test_full_edge_pipeline_uses_bounded_latest_sample_contracts() -> None:
+    """Lock the hardware-tested full Edge streams and bounded consumers."""
+    project_root = ROOT.parents[3]
+    realsense_root = project_root / "savo_ws/src/edge/savo_realsense"
+    vo_root = project_root / "savo_ws/src/edge/savo_vo"
+    perception_root = project_root / "savo_ws/src/shared/savo_perception"
+
+    camera = yaml.safe_load(
+        (realsense_root / "config/realsense_d435_camera.yaml").read_text(
+            encoding="utf-8"
+        )
+    )["/camera/camera"]["ros__parameters"]
+    assert camera["depth_module.depth_profile"] == "848x480x30"
+    assert camera["rgb_camera.color_profile"] == "640x480x30"
+    assert camera["align_depth.enable"] is True
+    assert camera["pointcloud__neon_.enable"] is True
+    assert camera["pointcloud__neon_.stream_filter"] == 1
+
+    depth_source = (realsense_root / "src/depth_front_min_node.cpp").read_text(
+        encoding="utf-8"
+    )
+    assert "SensorDataQoS().keep_last(1)" in depth_source
+    assert "processing_gate_.should_process" in depth_source
+
+    vo_config = yaml.safe_load(
+        (vo_root / "config/profiles/real_robot_v1.yaml").read_text(
+            encoding="utf-8"
+        )
+    )["rgbd_odometry_node"]["ros__parameters"]
+    assert vo_config["sync_queue_size"] == 2
+    assert vo_config["processing_rate_hz"] == 15.0
+    assert vo_config["max_frame_interval_s"] == 0.20
+    vo_source = (vo_root / "src/rgbd_odometry_node.cpp").read_text(
+        encoding="utf-8"
+    )
+    assert "image_qos.depth = 1U" in vo_source
+    assert "latest_frame_selector_.offer" in vo_source
+    assert "valid_frame_interval(" in vo_source
+
+    obstacle_source = (
+        perception_root / "src/nodes/obstacle_cloud_filter_node.cpp"
+    ).read_text(encoding="utf-8")
+    obstacle_config = yaml.safe_load(
+        (
+            perception_root / "config/edge/obstacle_cloud_filter.yaml"
+        ).read_text(encoding="utf-8")
+    )["obstacle_cloud_filter_node"]["ros__parameters"]
+    assert (
+        "keep_last(1).best_effort().durability_volatile()"
+        in obstacle_source
+    )
+    assert obstacle_config["max_processing_hz"] == 10.0
+    assert obstacle_config["stale_timeout_s"] == 0.75
+
+    edge_launch = read("launch/edge_bringup.launch.py")
+    assert '"require_obstacle_cloud": start_obstacle_cloud' in edge_launch
 
 
 def test_all_production_vo_entrypoints_and_wrapper_are_synchronized() -> None:

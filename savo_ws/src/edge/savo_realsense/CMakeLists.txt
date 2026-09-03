@@ -23,6 +23,7 @@ ament_python_install_package(${PROJECT_NAME})
 
 add_library(savo_realsense_depth_front_min
   src/depth_front_min_node.cpp
+  src/depth_processing_gate.cpp
 )
 
 target_include_directories(savo_realsense_depth_front_min
@@ -180,6 +181,13 @@ if(BUILD_TESTING)
   )
   target_link_libraries(test_camera_health_state
     savo_realsense_camera_health_state
+  )
+
+  ament_add_gtest(test_depth_processing_gate
+    test/test_depth_processing_gate.cpp
+  )
+  target_link_libraries(test_depth_processing_gate
+    savo_realsense_depth_front_min
   )
 
   file(GLOB PYTEST_FILES RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "test/test_*.py")

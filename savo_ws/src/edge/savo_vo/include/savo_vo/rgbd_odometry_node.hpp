@@ -16,6 +16,7 @@
 #include "std_msgs/msg/string.hpp"
 
 #include "savo_vo/covariance_builder.hpp"
+#include "savo_vo/latest_frame_selector.hpp"
 #include "savo_vo/rgbd_geometry.hpp"
 #include "savo_vo/tracking_quality.hpp"
 #include "savo_vo/vo_types.hpp"
@@ -50,6 +51,7 @@ private:
   void on_synchronized_images(
     const Image::ConstSharedPtr & color_msg,
     const Image::ConstSharedPtr & aligned_depth_msg);
+  void process_latest_images();
   void on_camera_info(const CameraInfo::SharedPtr msg);
   void publish_waiting_status();
 
@@ -99,7 +101,8 @@ private:
   std::string base_frame_;
   std::string camera_frame_;
 
-  int sync_queue_size_{10};
+  int sync_queue_size_{2};
+  double processing_rate_hz_{15.0};
   double max_sync_delta_s_{0.02};
   double max_frame_interval_s_{0.20};
 
@@ -139,6 +142,9 @@ private:
   VOCovarianceConfig covariance_config_;
 
   CameraInfo::SharedPtr latest_camera_info_;
+  LatestFrameSelector latest_frame_selector_;
+  Image::ConstSharedPtr pending_color_image_;
+  Image::ConstSharedPtr pending_aligned_depth_image_;
 
   rclcpp::Publisher<Odometry>::SharedPtr odom_pub_;
   rclcpp::Publisher<String>::SharedPtr status_pub_;
@@ -150,6 +156,7 @@ private:
   rclcpp::Subscription<CameraInfo>::SharedPtr camera_info_sub_;
 
   rclcpp::TimerBase::SharedPtr status_timer_;
+  rclcpp::TimerBase::SharedPtr processing_timer_;
 };
 
 }  // namespace savo_vo

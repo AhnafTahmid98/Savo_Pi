@@ -12,7 +12,8 @@ rgbd_odometry_node:
     # Public VO represents the same planar robot origin used by the EKF.
     base_frame: base_footprint
     camera_frame: camera_color_optical_frame
-    sync_queue_size: 10
+    sync_queue_size: 2
+    processing_rate_hz: 15.0
     # Less than one 30 Hz frame period, so adjacent frames cannot be paired.
     max_sync_delta_s: 0.02
     max_frame_interval_s: 0.20

@@ -20,6 +20,16 @@ def test_cmake_builds_camera_monitor_nodes_as_cpp_defaults() -> None:
     assert "src/depth_front_min_main.cpp" in cmake
 
 
+def test_depth_front_min_uses_latest_bounded_sensor_processing() -> None:
+    source = read_file("src/depth_front_min_node.cpp")
+    config = read_file("config/realsense_d435_nodes.yaml")
+
+    assert "rclcpp::SensorDataQoS().keep_last(1)" in source
+    assert "processing_gate_.should_process" in source
+    assert "max_processing_hz: 15.0" in config
+    assert "stale_timeout_s: 0.75" in config
+
+
 def test_python_monitor_nodes_are_fallback_only() -> None:
     cmake = read_file("CMakeLists.txt")
     setup = read_file("setup.py")
