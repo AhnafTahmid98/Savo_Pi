@@ -79,6 +79,22 @@ def generate_launch_description() -> LaunchDescription:
         parameters=[{
             "in_transport": "raw",
             "out_transport": "compressed",
+            (
+                "qos_overrides./camera/camera/color/image_raw."
+                "subscription.reliability"
+            ): "best_effort",
+            (
+                "qos_overrides./camera/camera/color/image_raw."
+                "subscription.durability"
+            ): "volatile",
+            (
+                "qos_overrides./camera/camera/color/image_raw."
+                "subscription.history"
+            ): "keep_last",
+            (
+                "qos_overrides./camera/camera/color/image_raw."
+                "subscription.depth"
+            ): 1,
         }],
         remappings=[
             ("in", "/camera/camera/color/image_raw"),

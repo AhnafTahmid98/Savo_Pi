@@ -129,6 +129,22 @@ def test_observer_color_relay_is_opt_in_and_hardware_equivalent() -> None:
     assert ast.literal_eval(keyword_value(relay, "parameters")) == [{
         "in_transport": "raw",
         "out_transport": "compressed",
+        (
+            "qos_overrides./camera/camera/color/image_raw."
+            "subscription.reliability"
+        ): "best_effort",
+        (
+            "qos_overrides./camera/camera/color/image_raw."
+            "subscription.durability"
+        ): "volatile",
+        (
+            "qos_overrides./camera/camera/color/image_raw."
+            "subscription.history"
+        ): "keep_last",
+        (
+            "qos_overrides./camera/camera/color/image_raw."
+            "subscription.depth"
+        ): 1,
     }]
     assert ast.literal_eval(keyword_value(relay, "remappings")) == [
         ("in", "/camera/camera/color/image_raw"),
@@ -179,6 +195,22 @@ def test_canonical_bringup_starts_one_camera_and_production_color_relay() -> Non
     assert ast.literal_eval(keyword_value(relay, "parameters")) == [{
         "in_transport": "raw",
         "out_transport": "compressed",
+        (
+            "qos_overrides./camera/camera/color/image_raw."
+            "subscription.reliability"
+        ): "best_effort",
+        (
+            "qos_overrides./camera/camera/color/image_raw."
+            "subscription.durability"
+        ): "volatile",
+        (
+            "qos_overrides./camera/camera/color/image_raw."
+            "subscription.history"
+        ): "keep_last",
+        (
+            "qos_overrides./camera/camera/color/image_raw."
+            "subscription.depth"
+        ): 1,
     }]
     assert ast.literal_eval(keyword_value(relay, "remappings")) == [
         ("in", "/camera/camera/color/image_raw"),
