@@ -32,6 +32,17 @@ Visualization Manager:
       Update Interval: 0
       Value: true
 
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: RangeMarkers
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /savo_observer/range_markers
+      Value: true
+
     - Alpha: 0.75
       Class: rviz_default_plugins/RobotModel
       Collision Enabled: false

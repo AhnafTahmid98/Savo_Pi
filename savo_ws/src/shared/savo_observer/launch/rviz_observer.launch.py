@@ -79,6 +79,14 @@ def _setup(context):
         _value(context, 'enable_raw_d435_pointcloud'),
         'enable_raw_d435_pointcloud',
     )
+    enable_localization_markers = parse_launch_boolean(
+        _value(context, 'enable_localization_markers'),
+        'enable_localization_markers',
+    )
+    enable_range_markers = parse_launch_boolean(
+        _value(context, 'enable_range_markers'),
+        'enable_range_markers',
+    )
     d435_image_transport = parse_d435_image_transport(
         _value(context, 'd435_image_transport')
     )
@@ -112,7 +120,37 @@ def _setup(context):
         arguments=arguments,
         parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time')}],
     )
-    actions = [rviz]
+    actions = []
+    observer_parameters = [
+        {'use_sim_time': LaunchConfiguration('use_sim_time')}
+    ]
+    if enable_localization_markers:
+        actions.append(
+            Node(
+                package='savo_observer',
+                executable='localization_visualizer_node',
+                name='localization_visualizer_node',
+                output='screen',
+                parameters=observer_parameters,
+                ros_arguments=[
+                    '--log-level', _value(context, 'log_level')
+                ],
+            )
+        )
+    if enable_range_markers:
+        actions.append(
+            Node(
+                package='savo_observer',
+                executable='range_visualizer_node',
+                name='range_visualizer_node',
+                output='screen',
+                parameters=observer_parameters,
+                ros_arguments=[
+                    '--log-level', _value(context, 'log_level')
+                ],
+            )
+        )
+    actions.append(rviz)
     if runtime_config is not None:
         cleanup = OpaqueFunction(
             function=_cleanup_runtime_config,
@@ -143,6 +181,12 @@ def generate_launch_description():
             DeclareLaunchArgument('enable_pointclouds', default_value='false'),
             DeclareLaunchArgument(
                 'enable_raw_d435_pointcloud', default_value='false'
+            ),
+            DeclareLaunchArgument(
+                'enable_localization_markers', default_value='true'
+            ),
+            DeclareLaunchArgument(
+                'enable_range_markers', default_value='true'
             ),
             DeclareLaunchArgument(
                 'd435_image_transport', default_value='compressed'

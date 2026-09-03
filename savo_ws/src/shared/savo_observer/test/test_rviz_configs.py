@@ -81,6 +81,8 @@ def test_full_debug_has_complete_approved_spatial_context():
         'FilteredOdometry': '/odometry/filtered',
         'WheelOdometry': '/wheel/odom',
         'VisualOdometry': '/vo/odom',
+        'LocalizationMarkers': '/savo_observer/localization_markers',
+        'RangeMarkers': '/savo_observer/range_markers',
         'RawDepthCloud': '/camera/camera/depth/color/points',
         'FilteredObstacleCloud': '/savo_perception/obstacles/points',
         'D435ColorImage': (
@@ -96,6 +98,49 @@ def test_full_debug_has_complete_approved_spatial_context():
             '/savo_mapping/exploration/selected_goal'
         ),
     }
+
+
+def test_full_debug_tf_and_3d_odometry_covariance_are_uncluttered():
+    document = yaml.safe_load(
+        (RVIZ / 'full_debug.rviz').read_text(encoding='utf-8')
+    )
+    displays = {
+        display['Name']: display
+        for display in document['Visualization Manager']['Displays']
+    }
+    tf = displays['TF']
+    assert tf['Enabled'] is True
+    assert tf['Show Names'] is False
+    assert tf['Show Axes'] is False
+    assert tf['Show Arrows'] is False
+    assert tf['Marker Scale'] <= 0.10
+    for name in ('FilteredOdometry', 'WheelOdometry', 'VisualOdometry'):
+        odometry = displays[name]
+        assert odometry['Covariance']['Value'] is False
+        assert odometry['Covariance']['Position']['Value'] is False
+        assert odometry['Covariance']['Orientation']['Value'] is False
+        assert odometry['Keep'] == 1
+
+
+def test_marker_arrays_are_present_only_in_intended_views():
+    expected = {
+        'full_debug.rviz': {'LocalizationMarkers', 'RangeMarkers'},
+        'localization.rviz': {'LocalizationMarkers'},
+        'manual_mapping.rviz': {'LocalizationMarkers', 'RangeMarkers'},
+        'sensors.rviz': {'RangeMarkers'},
+        'safety.rviz': {'RangeMarkers'},
+    }
+    for filename, marker_names in expected.items():
+        document = yaml.safe_load((RVIZ / filename).read_text(encoding='utf-8'))
+        displays = {
+            display['Name']: display
+            for display in document['Visualization Manager']['Displays']
+        }
+        for marker_name in marker_names:
+            marker = displays[marker_name]
+            assert marker['Class'].endswith('/MarkerArray')
+            assert marker['Enabled'] is True
+            assert marker['Topic']['Reliability Policy'] == 'Reliable'
 
 
 def test_navigation_and_sensor_views_have_read_only_context():
@@ -172,6 +217,11 @@ def test_observer_uses_only_approved_spatial_topics():
         'odometry_filtered': '/odometry/filtered',
         'wheel_odometry': '/wheel/odom',
         'visual_odometry': '/vo/odom',
+        'range_left': '/savo_perception/range/left_m',
+        'range_right': '/savo_perception/range/right_m',
+        'range_front': '/savo_perception/range/front_ultrasonic_m',
+        'localization_markers': '/savo_observer/localization_markers',
+        'range_markers': '/savo_observer/range_markers',
         'global_costmap': '/global_costmap/costmap',
         'local_costmap': '/local_costmap/costmap',
         'global_plan': '/plan',

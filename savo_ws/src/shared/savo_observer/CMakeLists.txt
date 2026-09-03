@@ -13,8 +13,12 @@ find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 find_package(ament_index_cpp REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rclpy REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
 
 ament_python_install_package(${PROJECT_NAME})
 
@@ -53,6 +57,8 @@ install(FILES LICENSE package.xml README.md DESTINATION share/${PROJECT_NAME})
 install(PROGRAMS
   scripts/check_observer_connection
   scripts/list_observer_views
+  scripts/localization_visualizer_node
+  scripts/range_visualizer_node
   scripts/validate_observer_install
   DESTINATION lib/${PROJECT_NAME}
 )

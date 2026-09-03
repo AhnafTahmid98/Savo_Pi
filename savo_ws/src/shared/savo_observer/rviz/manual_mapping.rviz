@@ -18,9 +18,30 @@ Visualization Manager:
       Name: LiDAR
       Topic: {Depth: 5, Durability Policy: Volatile, History Policy: Keep Last, Reliability Policy: Best Effort, Value: /scan}
     - Class: rviz_default_plugins/Odometry
+      Covariance:
+        Orientation: {Value: false}
+        Position: {Value: false}
+        Value: false
       Enabled: true
+      Keep: 1
       Name: FilteredOdometry
+      Shape: {Alpha: 0.9, Axes Length: 0.20, Axes Radius: 0.015, Color: "30; 230; 70", Value: Arrow}
       Topic: {Depth: 5, Durability Policy: Volatile, History Policy: Keep Last, Reliability Policy: Reliable, Value: /odometry/filtered}
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: LocalizationMarkers
+      Topic: {Depth: 5, Durability Policy: Volatile, History Policy: Keep Last, Reliability Policy: Reliable, Value: /savo_observer/localization_markers}
+      Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: RangeMarkers
+      Topic: {Depth: 5, Durability Policy: Volatile, History Policy: Keep Last, Reliability Policy: Reliable, Value: /savo_observer/range_markers}
+      Value: true
+    - Class: rviz_default_plugins/PointCloud2
+      Enabled: false
+      Name: FilteredObstacleCloud
+      Topic: {Depth: 2, Durability Policy: Volatile, History Policy: Keep Last, Reliability Policy: Best Effort, Value: /savo_perception/obstacles/points}
+      Value: false
   Enabled: true
   Global Options: {Background Color: "35; 35; 35", Fixed Frame: map, Frame Rate: 20}
   Name: root

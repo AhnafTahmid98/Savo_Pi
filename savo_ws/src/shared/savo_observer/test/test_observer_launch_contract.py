@@ -69,6 +69,22 @@ def test_high_bandwidth_flags_are_forwarded_and_consumed():
     assert 'OnProcessExit' in rviz
 
 
+def test_lightweight_marker_nodes_default_on_and_can_be_disabled():
+    observer = (LAUNCH / 'observer.launch.py').read_text(encoding='utf-8')
+    full = (LAUNCH / 'full_observer.launch.py').read_text(encoding='utf-8')
+    rviz = (LAUNCH / 'rviz_observer.launch.py').read_text(encoding='utf-8')
+    for argument in ('enable_localization_markers', 'enable_range_markers'):
+        for source in (observer, full, rviz):
+            assert f"'{argument}', default_value='true'" in source
+        assert f"'{argument}'," in observer
+        assert f"'{argument}': LaunchConfiguration(" in full
+        assert f"_value(context, '{argument}')" in rviz
+    assert "executable='localization_visualizer_node'" in rviz
+    assert "executable='range_visualizer_node'" in rviz
+    assert 'if enable_localization_markers:' in rviz
+    assert 'if enable_range_markers:' in rviz
+
+
 def test_launches_contain_only_observer_and_rviz_processes():
     launch_files = (
         path
@@ -87,3 +103,5 @@ def test_launches_contain_only_observer_and_rviz_processes():
     assert "package='rviz2'" in source
     assert "executable='observer_telemetry_node'" in source
     assert "executable='observer_dashboard_node'" in source
+    assert "executable='localization_visualizer_node'" in source
+    assert "executable='range_visualizer_node'" in source

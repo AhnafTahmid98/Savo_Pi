@@ -36,6 +36,8 @@ def _setup(context):
             'enable_camera_preview',
             'enable_pointclouds',
             'enable_raw_d435_pointcloud',
+            'enable_localization_markers',
+            'enable_range_markers',
             'd435_image_transport',
             'log_level',
         ]
@@ -64,6 +66,12 @@ def generate_launch_description():
             DeclareLaunchArgument('enable_pointclouds', default_value='false'),
             DeclareLaunchArgument(
                 'enable_raw_d435_pointcloud', default_value='false'
+            ),
+            DeclareLaunchArgument(
+                'enable_localization_markers', default_value='true'
+            ),
+            DeclareLaunchArgument(
+                'enable_range_markers', default_value='true'
             ),
             DeclareLaunchArgument(
                 'd435_image_transport', default_value='compressed'

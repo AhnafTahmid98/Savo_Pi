@@ -12,8 +12,12 @@
 
   <depend>ament_index_cpp</depend>
   <depend>diagnostic_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
   <depend>rclcpp</depend>
+  <depend>rclpy</depend>
   <depend>std_msgs</depend>
+  <depend>visualization_msgs</depend>
 
   <exec_depend>ament_index_python</exec_depend>
   <exec_depend>compressed_image_transport</exec_depend>

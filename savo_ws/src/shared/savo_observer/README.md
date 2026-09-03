@@ -29,9 +29,11 @@ Available views are `overview`, `robot_model`, `tf`, `sensors`, `safety`,
 `full_debug`. The fixed frame is normally `map`; model/sensor-centric views use
 `base_footprint`. High-bandwidth point clouds and camera images are disabled in
 every checked-in view by default. The `full_debug` view brings together the
-robot model, TF, map, scan, three odometry sources, both point clouds, both
-camera feeds, costmaps, plan, footprint, coverage path, and selected
-exploration goal without adding command tools.
+robot model, uncluttered TF, map, scan, three odometry sources, planar
+localization markers, physical range markers, both point clouds, both camera
+feeds, costmaps, plan, footprint, coverage path, and selected exploration goal
+without adding command tools. Its fixed frame remains `map`, with the normal
+camera target on `base_footprint`.
 
 Six nonempty legacy RViz configurations were imported with their original
 hashes recorded. The TF, costmap, and sensor views were then intentionally
@@ -40,6 +42,65 @@ corrected for current read-only coverage; the costmap correction removed
 implemented. The full inventory and hashes are in
 `config/migration_manifest.yaml`.
 
+## Planar localization visualization
+
+RViz's built-in Odometry covariance display is disabled for filtered, wheel,
+and visual odometry in `full_debug` and the focused localization/mapping views.
+That display renders the full 3D covariance and produced the enormous
+yellow/pink vertical volumes seen in VM testing. The odometry messages and
+their covariance values are untouched; only that unsuitable rendering is
+disabled.
+
+`localization_visualizer_node` subscribes read-only to
+`/odometry/filtered`, `/wheel/odom`, and `/vo/odom` using SensorData QoS. It
+publishes at 5 Hz on `/savo_observer/localization_markers` and reuses five
+marker IDs:
+
+- The green filtered-pose arrow, blue wheel-pose arrow, and magenta VO-pose
+  arrow show each source at its real X/Y position. Tiny Z offsets exist only
+  to prevent z-fighting.
+- The cyan filtered-pose ellipse is a 2-sigma confidence ellipse by default.
+  The node symmetrizes the XY covariance block, computes its eigenvalues and
+  eigenvectors, uses `2 * sqrt(eigenvalue)` as each principal radius, and
+  rotates the ellipse by the major eigenvector. Invalid or
+  non-positive-semidefinite covariance is not drawn. Extreme radii are clamped
+  for RViz only.
+- The amber arc uses `pose.covariance[35]`: its default half-span is
+  `2 * sqrt(yaw_variance)`. A tighter arc means lower reported yaw uncertainty;
+  a wider arc means higher uncertainty. Its visual span is bounded, and no Z,
+  roll, or pitch covariance volume is created.
+
+Use `view:=localization` to compare all three pose sources. VO remains opt-in
+as an RViz Odometry display, while its lightweight marker appears whenever
+`/vo/odom` exists. `view:=manual_mapping` keeps the map, model, LiDAR,
+filtered pose, compact uncertainty, and physical range markers enabled; its
+filtered D435 obstacle cloud remains an independent opt-in.
+
+## Physical range and D435 obstacle layers
+
+`range_visualizer_node` subscribes read-only to the three physical obstacle
+sensors with their source SensorData/best-effort QoS:
+
+- LEFT: `/savo_perception/range/left_m` in `tof_left_link`
+- RIGHT: `/savo_perception/range/right_m` in `tof_right_link`
+- FRONT: `/savo_perception/range/front_ultrasonic_m` in
+  `ultrasonic_front_link`
+
+It publishes exactly twelve reusable markers at 5 Hz on
+`/savo_observer/range_markers`. Each fresh positive measurement is a thin ray
+along the sensor frame's local +X axis, a small endpoint at the measured
+distance, and a compact label. The existing TF tree supplies all mounting
+position and direction geometry. Missing, stale, and invalid samples have
+distinct neutral/orange status markers and no fabricated ray or obstacle
+endpoint. These states describe observer data freshness only; the node does
+not reproduce the perception safety algorithm or decide stop/slow behavior.
+
+The three range markers are separate from the filtered D435 obstacle cloud on
+`/savo_perception/obstacles/points`. The preferred sensor-debug combination is
+the range marker layer plus that filtered cloud. The raw D435 cloud on
+`/camera/camera/depth/color/points` is much heavier and remains a separate,
+explicit opt-in.
+
 ## Profiles and bandwidth
 
 - `low_bandwidth`: 0.5 Hz dashboard telemetry; edge and speech observations disabled.
@@ -47,12 +108,19 @@ implemented. The full inventory and hashes are in
 - `full_debug`: 2 Hz telemetry; point clouds and costmaps remain manually enabled.
 - `mobile`: 0.5 Hz telemetry, bounded 60-sample history, no images or clouds.
 
-No sensor data is republished by `savo_observer`. `enable_camera_preview`,
-`enable_pointclouds`, and `enable_raw_d435_pointcloud` default to false.
+No sensor data or odometry is republished by `savo_observer`.
+`enable_camera_preview`, `enable_pointclouds`, and
+`enable_raw_d435_pointcloud` default to false.
 Passing a flag as true creates one temporary runtime copy of the selected RViz
 configuration and enables only the corresponding displays. Source-owned
 `.rviz` files and QoS remain unchanged, the temporary copy is removed when
 RViz exits, and the observer remains read-only.
+
+The low-bandwidth marker nodes default on for RViz/full modes. They can be
+disabled independently with `enable_localization_markers:=false` or
+`enable_range_markers:=false`. Both use latest-sample semantics, bounded
+marker counts, deterministic IDs, and low-rate timers; they do no image or
+point-cloud processing and perform no TF polling.
 
 The head-camera display consumes the existing image-transport endpoint at
 `/savo_head/camera/image_raw/compressed` with Best Effort reliability; the
@@ -117,7 +185,7 @@ ros2 launch savo_observer rviz_observer.launch.py view:=sensors \
   profile:=standard fixed_frame:=base_link enable_camera_preview:=true \
   enable_pointclouds:=true d435_image_transport:=raw use_sim_time:=false
 ros2 launch savo_observer rviz_observer.launch.py view:=full_debug \
-  profile:=standard fixed_frame:=base_link enable_camera_preview:=true \
+  profile:=standard fixed_frame:=map enable_camera_preview:=true \
   enable_pointclouds:=true enable_raw_d435_pointcloud:=true \
   d435_image_transport:=compressed use_sim_time:=false
 ros2 launch savo_observer observer.launch.py mode:=dashboard profile:=mobile \
@@ -136,6 +204,11 @@ Noble VM on the Mac. VM/runtime acceptance is not yet claimed here.
 - No topics: check `ROS_DOMAIN_ID`, `ROS_LOCALHOST_ONLY=0`, DDS implementation,
   multicast, VM bridge mode, and firewall.
 - TF errors: use `view:=tf`; the observer never publishes transforms.
+- Giant covariance volumes: use the checked-in views, which disable RViz's
+  built-in 3D covariance and use the planar marker layer instead.
+- Missing gray range marker: check the corresponding Float32 topic and sensor
+  frame. Gray `STALE` means no fresh sample arrived within the observer
+  timeout; orange `INVALID` reflects a non-finite or non-positive sample.
 - Stale red panels: confirm the package owning that topic is enabled and online.
 - Slow Wi-Fi: use `profile:=low_bandwidth`; leave clouds/images disabled.
 - Dashboard unavailable: verify the bind address, TCP port, and local firewall.

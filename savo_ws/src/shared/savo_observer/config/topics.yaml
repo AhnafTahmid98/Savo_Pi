@@ -27,6 +27,11 @@ spatial_topics:
   odometry_filtered: /odometry/filtered
   wheel_odometry: /wheel/odom
   visual_odometry: /vo/odom
+  range_left: /savo_perception/range/left_m
+  range_right: /savo_perception/range/right_m
+  range_front: /savo_perception/range/front_ultrasonic_m
+  localization_markers: /savo_observer/localization_markers
+  range_markers: /savo_observer/range_markers
   global_costmap: /global_costmap/costmap
   local_costmap: /local_costmap/costmap
   global_plan: /plan

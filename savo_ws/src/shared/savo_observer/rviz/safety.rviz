@@ -17,6 +17,11 @@ Visualization Manager:
       Enabled: true
       Name: Footprint
       Topic: {Depth: 5, Durability Policy: Volatile, History Policy: Keep Last, Reliability Policy: Reliable, Value: /local_costmap/published_footprint}
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: RangeMarkers
+      Topic: {Depth: 5, Durability Policy: Volatile, History Policy: Keep Last, Reliability Policy: Reliable, Value: /savo_observer/range_markers}
+      Value: true
     - Class: rviz_default_plugins/PointCloud2
       Enabled: false
       Name: FilteredObstacleCloud

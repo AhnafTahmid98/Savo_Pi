@@ -13,7 +13,8 @@ RUNTIME = [
 ]
 PROHIBITED = {
     'create_client<', 'create_service<', 'rclcpp_action', 'async_send_goal',
-    'SetGoal', 'SetInitialPose', 'PublishPoint', 'Teleop',
+    'create_client(', 'create_service(', 'ActionClient', 'SetGoal',
+    'SetInitialPose', 'PublishPoint', 'Teleop',
 }
 
 
@@ -36,7 +37,7 @@ def test_runtime_has_no_service_action_or_unsafe_rviz_api():
                 assert token not in source, (path, token)
 
 
-def test_ros_publishers_are_confined_to_observer_telemetry():
+def test_ros_publishers_are_confined_to_observer_outputs():
     telemetry = (ROOT / 'src/nodes/observer_telemetry_node.cpp').read_text(
         encoding='utf-8'
     )
@@ -46,9 +47,20 @@ def test_ros_publishers_are_confined_to_observer_telemetry():
     assert 'create_publisher<' in telemetry
     assert 'output_namespace + ' in telemetry
     assert 'create_publisher<' not in dashboard
-    for forbidden in ('/cmd_vel', '/goal_pose', '/initialpose', '/mode_cmd'):
-        assert forbidden not in telemetry
-        assert forbidden not in dashboard
+    localization = (
+        ROOT / 'savo_observer' / 'localization_visualizer_node.py'
+    ).read_text(encoding='utf-8')
+    ranges = (
+        ROOT / 'savo_observer' / 'range_visualizer_node.py'
+    ).read_text(encoding='utf-8')
+    assert '/savo_observer/localization_markers' in localization
+    assert '/savo_observer/range_markers' in ranges
+    for forbidden in (
+        '/cmd_vel', '/goal_pose', '/initialpose', '/mode_cmd',
+        '/safety/stop', '/safety/slowdown_factor',
+    ):
+        for source in (telemetry, dashboard, localization, ranges):
+            assert forbidden not in source
 
 
 def test_runtime_does_not_use_stale_realsense_status_topic():
