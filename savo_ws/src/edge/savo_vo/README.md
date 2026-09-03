@@ -21,6 +21,31 @@ It runs on `savo-edge`, consumes RealSense RGB-D camera topics, estimates visual
 
 Later, `savo_localization` can fuse `/vo/odom` with wheel odometry and IMU.
 
+## Runtime health contract
+
+The production C++ odometry node publishes a semantic `/vo/status` for every
+processed synchronized RGB-D pair. For an accepted pair, it publishes status
+immediately before `/vo/odom/raw`; the republisher then forwards that odometry
+to `/vo/odom`. Status and odometry use matching reliable, volatile, depth-10
+QoS, but remain independent ROS topics and may be observed independently.
+
+`vo_health_node` therefore treats a fresh semantic status as authoritative:
+errors remain errors, initialization remains waiting, and rejected/lost
+tracking remains degraded. A healthy status also requires fresh odometry.
+When the auxiliary status channel is missing or stale but accepted odometry is
+fresh, health remains operational with an `ok:` prefix and explicitly reports
+the status-channel fault. Missing or stale odometry still fails closed as
+`stale:`.
+
+The configured `stale_timeout_s` is a liveness limit, not a preferred-rate
+target. `max_frame_interval_s` rejects unsuitable frame pairs inside the
+estimator; it is not a measured throughput health threshold. No minimum
+operational VO rate is currently enforced because the repository has no
+hardware-validated minimum. That threshold, and the scheduling margin between
+it and `max_frame_interval_s`, require Raspberry Pi calibration before they can
+be added safely. Throughput below the camera's nominal frame rate alone does
+not make fresh, accepted VO unhealthy.
+
 ## Package Boundary
 
 ```text

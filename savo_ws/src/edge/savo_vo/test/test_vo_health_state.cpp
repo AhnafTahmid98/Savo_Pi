@@ -17,19 +17,47 @@ savo_vo::VOHealthState fresh_state(const std::string & status)
   return state;
 }
 
-TEST(VOHealthState, MissingOrStaleStatusFailsClosed)
+void add_fresh_odom(savo_vo::VOHealthState & state)
+{
+  state.has_odom = true;
+  state.last_odom_time_s = 9.8;
+}
+
+TEST(VOHealthState, MissingStatusAndMissingOdometryIsStale)
 {
   EXPECT_EQ(
     savo_vo::evaluate_vo_health({}, kNow, kTimeout),
-    "stale: visual odometry status not received");
+    "stale: visual odometry status and odometry not received");
+}
 
+TEST(VOHealthState, StaleStatusAndStaleOdometryIsStale)
+{
   auto state = fresh_state("tracking normal");
   state.last_status_time_s = 9.0;
   state.has_odom = true;
-  state.last_odom_time_s = 9.9;
+  state.last_odom_time_s = 9.0;
   EXPECT_EQ(
     savo_vo::evaluate_vo_health(state, kNow, kTimeout),
-    "stale: visual odometry status timeout");
+    "stale: visual odometry timeout; status channel stale");
+}
+
+TEST(VOHealthState, MissingStatusAndFreshOdometryIsOperationalWithTelemetryWarning)
+{
+  savo_vo::VOHealthState state;
+  add_fresh_odom(state);
+  EXPECT_EQ(
+    savo_vo::evaluate_vo_health(state, kNow, kTimeout),
+    "ok: odometry fresh; status channel not received; telemetry degraded");
+}
+
+TEST(VOHealthState, StaleStatusAndFreshOdometryIsOperationalWithTelemetryWarning)
+{
+  auto state = fresh_state("tracking normal");
+  state.last_status_time_s = 9.0;
+  add_fresh_odom(state);
+  EXPECT_EQ(
+    savo_vo::evaluate_vo_health(state, kNow, kTimeout),
+    "ok: odometry fresh; status channel stale");
 }
 
 TEST(VOHealthState, FreshWaitingStatusDoesNotBecomeFakeOdomTimeout)
@@ -47,7 +75,8 @@ TEST(VOHealthState, FreshRejectedLostAndDegradedStatusesAreDegraded)
       "tracking lost",
       "tracking degraded"})
   {
-    const auto state = fresh_state(status);
+    auto state = fresh_state(status);
+    add_fresh_odom(state);
     EXPECT_EQ(
       savo_vo::evaluate_vo_health(state, kNow, kTimeout),
       "degraded: " + status);
@@ -56,13 +85,23 @@ TEST(VOHealthState, FreshRejectedLostAndDegradedStatusesAreDegraded)
 
 TEST(VOHealthState, FreshErrorStatusIsError)
 {
-  const auto state = fresh_state("error: failed to convert synchronized RGB-D images");
+  auto state = fresh_state("error: failed to convert synchronized RGB-D images");
+  add_fresh_odom(state);
   EXPECT_EQ(
     savo_vo::evaluate_vo_health(state, kNow, kTimeout),
     "error: error: failed to convert synchronized RGB-D images");
 }
 
-TEST(VOHealthState, HealthyTrackingRequiresFreshOdometry)
+TEST(VOHealthState, FreshHealthyStatusAndFreshOdometryIsOk)
+{
+  auto state = fresh_state("tracking normal");
+  add_fresh_odom(state);
+  EXPECT_EQ(
+    savo_vo::evaluate_vo_health(state, kNow, kTimeout),
+    "ok: tracking normal");
+}
+
+TEST(VOHealthState, FreshHealthyStatusRequiresFreshOdometry)
 {
   auto state = fresh_state("tracking normal");
   EXPECT_EQ(
@@ -74,11 +113,16 @@ TEST(VOHealthState, HealthyTrackingRequiresFreshOdometry)
   EXPECT_EQ(
     savo_vo::evaluate_vo_health(state, kNow, kTimeout),
     "stale: visual odometry timeout");
+}
 
-  state.last_odom_time_s = 9.8;
+TEST(VOHealthState, FreshStatusAtTimeoutBoundaryRemainsAuthoritative)
+{
+  auto state = fresh_state("error: tracking failed");
+  state.last_status_time_s = kNow - kTimeout;
+  add_fresh_odom(state);
   EXPECT_EQ(
     savo_vo::evaluate_vo_health(state, kNow, kTimeout),
-    "ok: tracking normal");
+    "error: error: tracking failed");
 }
 
 }  // namespace
