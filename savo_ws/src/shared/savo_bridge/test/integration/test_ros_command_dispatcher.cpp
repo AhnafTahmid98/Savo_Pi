@@ -442,22 +442,29 @@ protected:
       {
         supervisor_authorization_request_count_.fetch_add(1U);
         last_supervisor_authority_command_.store(request->command);
+        if (request->command == AuthorizeOperation::Request::COMMAND_ACQUIRE) {
+          std::this_thread::sleep_for(
+            std::chrono::milliseconds(
+              supervisor_authorization_delay_ms_.load()));
+        }
         response->authorized = supervisor_authorization_allowed_.load();
-        response->result_code = response->authorized ?
-          AuthorizeOperation::Response::RESULT_AUTHORIZED :
-          AuthorizeOperation::Response::RESULT_NOT_READY;
-        response->reason = response->authorized ?
-          "test_supervisor_authorized" : "test_supervisor_rejected";
+        response->result_code =
+        response->authorized ?
+        AuthorizeOperation::Response::RESULT_AUTHORIZED :
+        AuthorizeOperation::Response::RESULT_NOT_READY;
+        response->reason =
+        response->authorized ?
+        "test_supervisor_authorized" : "test_supervisor_rejected";
         response->operation_state =
-          request->command == AuthorizeOperation::Request::COMMAND_RELEASE ?
-          "IDLE" : "ACTIVE";
+        request->command == AuthorizeOperation::Request::COMMAND_RELEASE ?
+        "IDLE" : "ACTIVE";
         response->active_operation =
-          request->command == AuthorizeOperation::Request::COMMAND_RELEASE ?
-          AuthorizeOperation::Request::OP_NONE :
-          AuthorizeOperation::Request::OP_START_AUTONOMOUS_MAPPING;
+        request->command == AuthorizeOperation::Request::COMMAND_RELEASE ?
+        AuthorizeOperation::Request::OP_NONE :
+        AuthorizeOperation::Request::OP_START_AUTONOMOUS_MAPPING;
         response->active_request_id =
-          request->command == AuthorizeOperation::Request::COMMAND_RELEASE ?
-          "" : request->request_id;
+        request->command == AuthorizeOperation::Request::COMMAND_RELEASE ?
+        "" : request->request_id;
         response->authority_generation = 1U;
       });
 
@@ -1075,6 +1082,7 @@ protected:
   std::atomic<std::size_t> supervisor_authorization_request_count_{0U};
   std::atomic<std::uint8_t> last_supervisor_authority_command_{0U};
   std::atomic<bool> supervisor_authorization_allowed_{true};
+  std::atomic<std::int64_t> supervisor_authorization_delay_ms_{0};
 
   std::atomic<std::int64_t>
   navigation_action_delay_ms_{100};
@@ -1529,13 +1537,37 @@ TEST_F(
   RosCommandDispatcherTest,
   MissingSupervisorPreventsAutonomousMappingActionSubmission)
 {
+  auto supervisor_probe = fixture_node_->create_client<AuthorizeOperation>(
+    config_.supervisor_authorization_service);
+  ASSERT_TRUE(supervisor_probe->wait_for_service(1500ms));
   supervisor_authorization_service_.reset();
+  ASSERT_TRUE(wait_for(
+      [&supervisor_probe]()
+      {
+        return !supervisor_probe->service_is_ready();
+      },
+      1500ms)) << "Supervisor service removal was not discovered";
   const auto result = dispatcher_->dispatch(
     make_start_mapping_command("mapping-supervisor-missing-1"));
 
   EXPECT_FALSE(result.accepted);
   EXPECT_EQ(result.reason, "bridge_supervisor_authorization_unavailable");
   EXPECT_EQ(mapping_goal_request_count_.load(), 0U);
+}
+
+TEST_F(
+  RosCommandDispatcherTest,
+  AvailableSupervisorWithoutTimelyResponseReturnsTimeout)
+{
+  supervisor_authorization_delay_ms_.store(
+    config_.supervisor_authorization_timeout_ms + 400);
+  const auto result = dispatcher_->dispatch(
+    make_start_mapping_command("mapping-supervisor-timeout-1"));
+
+  EXPECT_FALSE(result.accepted);
+  EXPECT_EQ(result.reason, "bridge_supervisor_authorization_timeout");
+  EXPECT_EQ(mapping_goal_request_count_.load(), 0U);
+  EXPECT_GE(supervisor_authorization_request_count_.load(), 1U);
 }
 
 TEST_F(

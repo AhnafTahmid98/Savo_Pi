@@ -892,7 +892,10 @@ using ValidationResult = std::optional<ValidationFailure>;
     }
   }
   for (const std::string field : {
-      "auto_save", "require_quality_approval", "require_semantic"})
+        "auto_save",
+        "require_quality_approval",
+        "require_semantic",
+      })
   {
     if (payload.contains(field) && !payload.at(field).is_boolean()) {
       return ValidationFailure{ErrorCode::InvalidFieldType, field + " must be boolean"};
