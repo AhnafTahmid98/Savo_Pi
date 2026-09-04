@@ -48,7 +48,7 @@ Production controllers/nodes are C++ under `src/`/`include/`. Python executables
 
 ### Subscribed topics
 
-`/savo_control/mode_cmd`, `/external_stop`, `/manual_override`; the four command lanes; `/safety/stop`, `/safety/slowdown_factor`; `/cmd_vel_safe`, `/odometry/filtered`; left/right ranges and `/depth/min_front_m`.
+`/savo_control/mode_cmd`, `/savo_control/external_stop`, `/savo_control/manual_override`; the four command lanes; `/safety/stop`, `/safety/slowdown_factor`; `/cmd_vel_safe`, `/odometry/filtered`; left/right ranges and `/depth/min_front_m`. The mode manager republishes authoritative external-stop state at 20 Hz on `/savo_control/external_stop_state` for fresh cross-host observation.
 
 ### Services
 

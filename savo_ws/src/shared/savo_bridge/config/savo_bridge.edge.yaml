@@ -12,7 +12,7 @@
 
     observation_topics:
       - /savo_control/mode_state
-      - /savo_control/external_stop
+      - /savo_control/external_stop_state
       - /safety/stop
       - /cmd_vel_safe
 
@@ -46,6 +46,7 @@
     command_dispatcher.mode_command_topic: /savo_control/mode_cmd
     command_dispatcher.mode_state_topic: /savo_control/mode_state
     command_dispatcher.external_stop_topic: /savo_control/external_stop
+    command_dispatcher.external_stop_state_topic: /savo_control/external_stop_state
     command_dispatcher.safety_stop_topic: /safety/stop
     command_dispatcher.manual_velocity_topic: /cmd_vel_manual
     command_dispatcher.safe_velocity_topic: /cmd_vel_safe
@@ -57,6 +58,7 @@
     command_dispatcher.mapping_control_service: /savo_mapping/autonomous/control
     command_dispatcher.mapping_status_topic: /savo_mapping/autonomous/status
     command_dispatcher.supervisor_state_topic: /savo_supervisor/state_summary
+    command_dispatcher.supervisor_authorization_service: /savo_supervisor/authorize_operation
     command_dispatcher.active_map_id: ""
     command_dispatcher.active_map_revision: 0
     command_dispatcher.require_active_map_context: false
@@ -71,3 +73,4 @@
     command_dispatcher.navigation_cancel_timeout_ms: 2000
     command_dispatcher.mapping_server_timeout_ms: 2000
     command_dispatcher.mapping_control_timeout_ms: 2000
+    command_dispatcher.supervisor_authorization_timeout_ms: 2000

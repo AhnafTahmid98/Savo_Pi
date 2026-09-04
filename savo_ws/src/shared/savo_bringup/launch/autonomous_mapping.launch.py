@@ -171,6 +171,13 @@ def generate_launch_description() -> LaunchDescription:
         condition=IfCondition(LaunchConfiguration("start_supervisor")),
         launch_arguments={
             "robot_mode": "autonomous_mapping",
+            "system_state_path": LaunchConfiguration(
+                "supervisor_state_path"
+            ),
+            "auto_arm": LaunchConfiguration("supervisor_auto_arm"),
+            "require_semantic_autonomous_mapping": LaunchConfiguration(
+                "start_semantic_interruption"
+            ),
         }.items(),
     )
 
@@ -369,6 +376,15 @@ def generate_launch_description() -> LaunchDescription:
             ),
             DeclareLaunchArgument("use_sim_time", default_value="false"),
             DeclareLaunchArgument("log_level", default_value="info"),
+            DeclareLaunchArgument(
+                "supervisor_state_path",
+                default_value=(
+                    "/var/lib/robot_savo/supervisor/system_state.json"
+                ),
+            ),
+            DeclareLaunchArgument(
+                "supervisor_auto_arm", default_value="false"
+            ),
             DeclareLaunchArgument("map_frame", default_value="map"),
             DeclareLaunchArgument("base_frame", default_value="base_link"),
             DeclareLaunchArgument("start_description", default_value="true"),

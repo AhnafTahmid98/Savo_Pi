@@ -46,6 +46,15 @@ def _launch_supervisor(context):
                         'system_state_path'),
                     'system_authority.auto_arm': ParameterValue(
                         LaunchConfiguration('auto_arm'), value_type=bool),
+                    (
+                        'mission_authorization.'
+                        'require_semantic_autonomous_mapping'
+                    ): ParameterValue(
+                        LaunchConfiguration(
+                            'require_semantic_autonomous_mapping'
+                        ),
+                        value_type=bool,
+                    ),
                 },
             ],
         ),
@@ -86,6 +95,15 @@ def generate_launch_description():
             'auto_arm',
             default_value='false',
             description='Automatically arm when startup dependencies are ready.',
+        ),
+        DeclareLaunchArgument(
+            'require_semantic_autonomous_mapping',
+            default_value='true',
+            description=(
+                'Require semantic readiness for every autonomous mapping '
+                'authorization. Per-request require_semantic remains '
+                'enforced when this policy gate is disabled.'
+            ),
         ),
         OpaqueFunction(function=_launch_supervisor),
     ])

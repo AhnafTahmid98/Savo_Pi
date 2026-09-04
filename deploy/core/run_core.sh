@@ -61,6 +61,7 @@ main() {
     d435_voxel_validated:="${SAVO_D435_VOXEL_VALIDATED:-false}" \
     control_startup_mode:="${SAVO_CONTROL_STARTUP_MODE:-STOP}" \
     localization_use_vo:="${SAVO_LOCALIZATION_USE_VO:-true}" \
+    start_semantic_interruption:="${SAVO_START_SEMANTIC_INTERRUPTION:-true}" \
     start_speech:=false \
     start_ui:=false
 }

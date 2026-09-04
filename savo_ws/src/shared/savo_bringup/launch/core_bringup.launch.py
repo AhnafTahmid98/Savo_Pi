@@ -143,6 +143,12 @@ def _setup(context):
                     ),
                     "use_sim_time": use_sim_time,
                     "log_level": log_level,
+                    "supervisor_state_path": LaunchConfiguration(
+                        "supervisor_state_path"
+                    ),
+                    "supervisor_auto_arm": LaunchConfiguration(
+                        "supervisor_auto_arm"
+                    ),
                     "geometry_profile": LaunchConfiguration(
                         "geometry_profile"
                     ),
@@ -167,6 +173,9 @@ def _setup(context):
                     ),
                     "start_location_lifecycle": (
                         "true" if start_locations else "false"
+                    ),
+                    "start_semantic_interruption": LaunchConfiguration(
+                        "start_semantic_interruption"
                     ),
                     "nav_params_file": nav_params,
                     "nav_readiness_params": readiness_params,
@@ -586,6 +595,9 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument("start_head", default_value="true"),
             DeclareLaunchArgument(
                 "start_location_lifecycle", default_value="false"
+            ),
+            DeclareLaunchArgument(
+                "start_semantic_interruption", default_value="true"
             ),
             DeclareLaunchArgument(
                 "description_start_delay_s", default_value="0.0"

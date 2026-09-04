@@ -23,8 +23,13 @@ find "${PACKAGE}/launch" "${PACKAGE}/test" -type f -name '*.py' -print0 2>/dev/n
 find "${PACKAGE}/config" "${PACKAGE}/dashboard/layouts" "${PACKAGE}/rviz" \
   -type f \( -name '*.yaml' -o -name '*.rviz' \) -print0 | \
   xargs -0 python3 -c 'import sys,yaml; [yaml.safe_load(open(p, encoding="utf-8")) for p in sys.argv[1:]]'
-find "${REPO_ROOT}/deploy/observer" "${PACKAGE}/scripts" -type f -print0 | \
-  xargs -0 -n1 bash -n
+while IFS= read -r -d '' path; do
+  case "$(head -n 1 "${path}")" in
+    '#!/usr/bin/env bash') bash -n "${path}" ;;
+    '#!/usr/bin/env python3') python3 -m py_compile "${path}" ;;
+    *) echo "Unsupported observer script shebang: ${path}" >&2; exit 1 ;;
+  esac
+done < <(find "${REPO_ROOT}/deploy/observer" "${PACKAGE}/scripts" -type f -print0)
 
 if rg -n 'SetGoal|SetInitialPose|PublishPoint|Teleop' "${PACKAGE}/rviz"; then
   echo 'Unsafe RViz tool found.' >&2

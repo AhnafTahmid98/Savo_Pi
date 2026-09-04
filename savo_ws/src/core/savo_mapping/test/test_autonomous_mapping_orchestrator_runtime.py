@@ -23,6 +23,7 @@ from savo_msgs.action import RunAutonomousMapping
 from savo_msgs.msg import AutonomousMappingStatus
 from savo_msgs.msg import FrontierExplorationStatus
 from savo_msgs.srv import ControlAutonomousMapping
+from savo_msgs.srv import AuthorizeOperation
 from std_msgs.msg import Bool
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
@@ -87,6 +88,11 @@ class RuntimeHarness:
         self.cancel_session_topic = f'{prefix}/cancel_session_cmd'
         self.handoff_cancel_service = f'{prefix}/handoff_cancel'
         self.map_save_service = f'{prefix}/map_save'
+        self.authority_service = f'{prefix}/authorize_operation'
+        self.authority_generation = 1
+        self.authority_state = 'ACTIVE'
+        self.authority_allowed = True
+        self.authority_commands = []
 
         self.node = rclpy.create_node(f'am3_fixture_{suffix}')
         self.group = ReentrantCallbackGroup()
@@ -173,6 +179,12 @@ class RuntimeHarness:
             self.handle_map_save,
             callback_group=self.group,
         )
+        self.authority_server = self.node.create_service(
+            AuthorizeOperation,
+            self.authority_service,
+            self.handle_authority,
+            callback_group=self.group,
+        )
 
         self.action_client = ActionClient(
             self.node,
@@ -197,6 +209,8 @@ class RuntimeHarness:
             '--ros-args',
             '-p', f'action_name:={self.action_name}',
             '-p', f'control_service:={self.control_service}',
+            '-p',
+            f'supervisor_authorization_service:={self.authority_service}',
             '-p', f'status_topic:={self.status_topic}',
             '-p', f'mode_topic:={self.mode_topic}',
             '-p', f'exploration_mode_topic:={self.exploration_mode_topic}',
@@ -282,6 +296,61 @@ class RuntimeHarness:
         self.handoff_cancel_count += 1
         response.success = True
         response.message = 'handoff_cancel_accepted'
+        return response
+
+    def handle_authority(self, request, response):
+        """Emulate one exact Supervisor mapping lease."""
+        self.authority_commands.append(request.command)
+        exact = (
+            request.operation
+            == AuthorizeOperation.Request.OP_START_AUTONOMOUS_MAPPING
+            and request.request_id == 'authority-am3-runtime'
+            and request.actor_id == 'runtime-operator'
+            and request.map_id == 'campus_main'
+            and request.map_revision == 1
+            and request.require_semantic
+            and request.expected_generation == self.authority_generation
+        )
+        if request.command == AuthorizeOperation.Request.COMMAND_RELEASE:
+            if exact:
+                self.authority_generation += 1
+                self.authority_state = 'IDLE'
+        elif request.command == AuthorizeOperation.Request.COMMAND_PAUSE:
+            if exact:
+                self.authority_generation += 1
+                self.authority_state = 'PAUSED'
+        elif request.command == AuthorizeOperation.Request.COMMAND_RESUME:
+            if exact:
+                self.authority_generation += 1
+                self.authority_state = 'ACTIVE'
+        response.authorized = (
+            self.authority_allowed
+            and exact
+            and (
+                request.command != AuthorizeOperation.Request.COMMAND_CHECK
+                or self.authority_state == 'ACTIVE'
+            )
+        )
+        response.result_code = (
+            AuthorizeOperation.Response.RESULT_AUTHORIZED
+            if response.authorized
+            else AuthorizeOperation.Response.RESULT_OWNERSHIP_MISMATCH
+        )
+        response.reason = (
+            'fixture_authorized'
+            if response.authorized
+            else 'fixture_authority_rejected'
+        )
+        response.operation_state = self.authority_state
+        response.active_operation = (
+            AuthorizeOperation.Request.OP_NONE
+            if self.authority_state == 'IDLE'
+            else AuthorizeOperation.Request.OP_START_AUTONOMOUS_MAPPING
+        )
+        response.active_request_id = (
+            '' if self.authority_state == 'IDLE' else request.request_id
+        )
+        response.authority_generation = self.authority_generation
         return response
 
     def create_valid_session(self, map_id):
@@ -412,7 +481,7 @@ class RuntimeHarness:
         self.workflow_phase_pub.publish(self.string_message('idle'))
         self.runtime_authority_pub.publish(self.bool_message(False))
 
-    def send_goal(self, auto_save=True):
+    def send_goal(self, auto_save=True, authority_generation=1):
         """Start one typed frontier mission."""
         goal = RunAutonomousMapping.Goal()
         goal.contract_version = RunAutonomousMapping.Goal.CONTRACT_VERSION
@@ -421,6 +490,9 @@ class RuntimeHarness:
         goal.map_id = 'campus_main'
         goal.map_revision = 1
         goal.strategy = RunAutonomousMapping.Goal.STRATEGY_FRONTIER
+        goal.authority_request_id = 'authority-am3-runtime'
+        goal.authority_generation = authority_generation
+        goal.require_semantic = True
         goal.auto_save = auto_save
         goal.require_quality_approval = True
 
@@ -642,6 +714,9 @@ def test_start_pause_resume_and_cancel_lifecycle():
         assert wrapped_result.result.final_status.state == (
             AutonomousMappingStatus.STATE_CANCELED
         )
+        assert AuthorizeOperation.Request.COMMAND_RELEASE in (
+            harness.authority_commands
+        )
     finally:
         harness.close()
 
@@ -703,6 +778,102 @@ def test_stable_frontier_exhaustion_completes_manual_save_mission():
             AutonomousMappingStatus.STATE_COMPLETED
         )
         assert not wrapped_result.result.map_saved
+        assert AuthorizeOperation.Request.COMMAND_RELEASE in (
+            harness.authority_commands
+        )
+    finally:
+        harness.close()
+
+
+def test_direct_action_with_stale_authority_never_starts_workflow():
+    """A raw action client cannot forge a stale Supervisor generation."""
+    harness = RuntimeHarness()
+    try:
+        harness.publish_initial_state()
+        goal_handle = harness.send_goal(authority_generation=99)
+        result_future = goal_handle.get_result_async()
+        assert wait_until(result_future.done), harness.diagnostics()
+        result = result_future.result().result
+        assert not result.success
+        assert result.result_code == (
+            RunAutonomousMapping.Result.RESULT_READINESS_LOST
+        )
+        assert not harness.start_session_commands
+    finally:
+        harness.close()
+
+
+def test_supervisor_revocation_pauses_without_automatic_resume():
+    """Revoked motion stays quiesced after dependency recovery."""
+    harness = RuntimeHarness()
+    try:
+        harness.publish_initial_state()
+        goal_handle = harness.send_goal(auto_save=False)
+        result_future = goal_handle.get_result_async()
+        assert wait_until(
+            lambda: 'mission-am3-runtime' in harness.start_session_commands
+        ), harness.diagnostics()
+        harness.publish_exploring_state()
+        assert wait_until(
+            lambda: harness.latest_state()
+            == AutonomousMappingStatus.STATE_EXPLORING
+        ), harness.diagnostics()
+
+        harness.authority_generation += 1
+        harness.authority_state = 'REVOKED'
+        harness.authority_allowed = False
+        assert wait_until(
+            lambda: harness.latest_state()
+            in {
+                AutonomousMappingStatus.STATE_PAUSING,
+                AutonomousMappingStatus.STATE_PAUSED,
+            }
+        ), harness.diagnostics()
+        harness.publish_monitor_state()
+        assert wait_until(
+            lambda: harness.latest_state()
+            == AutonomousMappingStatus.STATE_PAUSED
+        ), harness.diagnostics()
+
+        frontier_count = harness.mode_commands.count('autonomous:frontier')
+        harness.authority_allowed = True
+        time.sleep(2.0)
+        assert harness.latest_state() == AutonomousMappingStatus.STATE_PAUSED
+        assert (
+            harness.mode_commands.count('autonomous:frontier')
+            == frontier_count
+        )
+
+        response = harness.control(
+            ControlAutonomousMapping.Request.COMMAND_RESUME,
+            'explicit_resume_after_revalidation',
+        )
+        assert response.accepted
+        assert wait_until(
+            lambda: harness.mode_commands.count('autonomous:frontier')
+            > frontier_count
+        ), harness.diagnostics()
+
+        harness.publish_exploring_state()
+        response = harness.control(
+            ControlAutonomousMapping.Request.COMMAND_CANCEL,
+            'test_cleanup',
+        )
+        assert response.accepted
+        prior_monitor_count = harness.mode_commands.count('monitor_only')
+        assert wait_until(
+            lambda: harness.mode_commands.count('monitor_only')
+            > prior_monitor_count
+        ), harness.diagnostics()
+        harness.publish_monitor_state()
+        assert wait_until(
+            lambda: 'mission-am3-runtime'
+            in harness.cancel_session_commands
+        ), harness.diagnostics()
+        harness.session_state_pub.publish(
+            harness.string_message('cancelled')
+        )
+        assert wait_until(result_future.done), harness.diagnostics()
     finally:
         harness.close()
 
@@ -759,6 +930,9 @@ def test_auto_save_rejects_a_map_that_fails_the_requested_quality_gate():
             status.state == AutonomousMappingStatus.STATE_VERIFYING
             for status in harness.statuses
         )
+        assert AuthorizeOperation.Request.COMMAND_RELEASE in (
+            harness.authority_commands
+        )
     finally:
         harness.close()
 
@@ -796,6 +970,9 @@ def test_auto_save_failure_returns_typed_save_failed_result():
         assert not wrapped_result.map_saved
         assert wrapped_result.final_status.state == (
             AutonomousMappingStatus.STATE_FAILED
+        )
+        assert AuthorizeOperation.Request.COMMAND_RELEASE in (
+            harness.authority_commands
         )
     finally:
         harness.close()

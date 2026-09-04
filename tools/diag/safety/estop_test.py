@@ -16,7 +16,7 @@ from tools.diag.infra.ros_probe import collect, compact
 args = parser(__doc__).parse_args()
 started = time.monotonic(); started_utc = datetime.now(UTC).isoformat()
 try:
-    probe = collect('/savo_control/external_stop', 'std_msgs/msg/Bool', duration_s=args.timeout,
+    probe = collect('/savo_control/external_stop_state', 'std_msgs/msg/Bool', duration_s=args.timeout,
                     minimum_samples=1, reliable=True)
     details = compact(probe)
     if probe.publisher_count == 0:

@@ -87,6 +87,9 @@ struct MissionRequest
   std::string actor_id;
   std::string map_id;
   std::uint32_t map_revision{0};
+  std::string authority_request_id;
+  std::uint64_t authority_generation{0U};
+  bool require_semantic{true};
   MissionStrategy strategy{MissionStrategy::None};
   bool auto_save{true};
   bool require_quality_approval{true};
@@ -107,6 +110,9 @@ struct MissionInputs
 
   bool runtime_authority_received{false};
   bool runtime_authorized{false};
+
+  bool supervisor_authority_received{false};
+  bool supervisor_authorized{false};
 
   bool handoff_state_received{false};
   bool handoff_active{false};

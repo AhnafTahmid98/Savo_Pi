@@ -26,6 +26,9 @@ MissionRequest valid_request()
   request.actor_id = "operator";
   request.map_id = "campus-floor-1";
   request.map_revision = 1U;
+  request.authority_request_id = "authority-auto-map-1";
+  request.authority_generation = 1U;
+  request.require_semantic = true;
   request.strategy = MissionStrategy::Frontier;
   request.auto_save = true;
   request.require_quality_approval = true;
@@ -45,6 +48,8 @@ MissionInputs starting_inputs()
   inputs.safety_stop_active = false;
   inputs.runtime_authority_received = true;
   inputs.runtime_authorized = false;
+  inputs.supervisor_authority_received = true;
+  inputs.supervisor_authorized = true;
   inputs.handoff_state_received = true;
   inputs.handoff_active = false;
   inputs.handoff_state = "idle";
@@ -108,6 +113,33 @@ void enter_coverage_active(
 }
 
 }  // namespace
+
+TEST(AutonomousMappingMissionTest, SupervisorRevocationPausesAndNeedsExplicitResume)
+{
+  AutonomousMappingMission mission;
+  auto inputs = exploring_inputs();
+  ASSERT_TRUE(mission.start(valid_request(), inputs).accepted);
+  ASSERT_EQ(mission.snapshot().state, MissionState::Exploring);
+
+  inputs.supervisor_authorized = false;
+  auto decision = mission.observe(inputs);
+  EXPECT_EQ(decision.snapshot.state, MissionState::Pausing);
+
+  inputs.mode = MappingMode::MonitorOnly;
+  inputs.exploration_mode = ExplorationMode::Idle;
+  inputs.workflow_phase = WorkflowPhase::Idle;
+  inputs.runtime_authorized = false;
+  decision = mission.observe(inputs);
+  EXPECT_EQ(decision.snapshot.state, MissionState::Paused);
+
+  inputs.supervisor_authorized = true;
+  decision = mission.observe(inputs);
+  EXPECT_EQ(decision.snapshot.state, MissionState::Paused);
+
+  decision = mission.control(MissionCommand::Resume, "operator_resume", inputs);
+  EXPECT_TRUE(decision.accepted);
+  EXPECT_NE(decision.snapshot.state, MissionState::Paused);
+}
 
 
 TEST(AutonomousMappingMissionTest, SequencesStartPoseInitialScansThenFrontier)

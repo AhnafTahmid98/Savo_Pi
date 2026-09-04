@@ -167,6 +167,8 @@ bool is_valid_request(const MissionRequest & request)
     !request.actor_id.empty() &&
     !request.map_id.empty() &&
     request.map_revision > 0U &&
+    !request.authority_request_id.empty() &&
+    request.authority_generation > 0U &&
     request.strategy == MissionStrategy::Frontier;
 }
 
@@ -1746,6 +1748,7 @@ bool AutonomousMappingMission::authority_inputs_complete(
     inputs.readiness_received &&
     inputs.safety_stop_received &&
     inputs.runtime_authority_received &&
+    inputs.supervisor_authority_received &&
     inputs.handoff_state_received;
 }
 
@@ -1754,7 +1757,9 @@ bool AutonomousMappingMission::safe_mapping_state(
 {
   return
     inputs.mapping_ready &&
-    !inputs.safety_stop_active;
+    !inputs.safety_stop_active &&
+    inputs.supervisor_authority_received &&
+    inputs.supervisor_authorized;
 }
 
 bool AutonomousMappingMission::workflow_is_frontier(

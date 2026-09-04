@@ -136,13 +136,16 @@ def test_action_starts_one_mission_and_returns_typed_status() -> None:
     text = read("action/RunAutonomousMapping.action")
 
     for token in (
-        "uint32 CONTRACT_VERSION=2",
+        "uint32 CONTRACT_VERSION=3",
         "uint32 contract_version",
         "uint8 result_code",
         "string mission_id",
         "string actor_id",
         "string map_id",
         "uint8 strategy",
+        "string authority_request_id",
+        "uint64 authority_generation",
+        "bool require_semantic",
         "bool auto_save",
         "bool require_quality_approval",
         "builtin_interfaces/Duration mission_timeout",

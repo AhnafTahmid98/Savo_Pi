@@ -24,6 +24,7 @@ def test_edge_configuration_uses_guarded_authority() -> None:
         '- 10001',
         'command_dispatcher.navigation_action_name: /savo_nav/navigation/navigate_to_pose',
         'command_dispatcher.location_resolve_service: /savo_locations/resolve',
+        'command_dispatcher.external_stop_state_topic: /savo_control/external_stop_state',
         'command_dispatcher.active_map_id: ""',
         'command_dispatcher.active_map_revision: 0',
         'command_dispatcher.require_active_map_context: false',
@@ -134,7 +135,7 @@ def test_mode_observation_contracts_are_fail_closed_and_minimal() -> None:
     ]['ros__parameters']
     common_topics = {
         '/savo_control/mode_state',
-        '/savo_control/external_stop',
+        '/savo_control/external_stop_state',
         '/safety/stop',
         '/cmd_vel_safe',
     }

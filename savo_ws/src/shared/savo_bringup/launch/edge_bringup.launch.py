@@ -306,7 +306,7 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument("start_speech", default_value="false"),
             DeclareLaunchArgument("start_ui", default_value="false"),
             DeclareLaunchArgument("start_bridge", default_value="true"),
-            DeclareLaunchArgument("start_power", default_value="true"),
+            DeclareLaunchArgument("start_power", default_value="false"),
             DeclareLaunchArgument(
                 "realsense_start_delay_s", default_value="0.0"
             ),

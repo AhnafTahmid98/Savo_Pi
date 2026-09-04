@@ -6,7 +6,7 @@ Owns Core BNO055/encoder acquisition, mecanum odometry, EKF fusion, dynamic `odo
 
 ## Deployment
 
-Core only. Normal bringup starts IMU, wheel odometry, `robot_localization` EKF, and health; VO fusion is opt-in and defaults off.
+Core only. Canonical bringup starts IMU, wheel odometry, `robot_localization` EKF, and health with the VO overlay enabled by default. VO remains optional to localization health (`vo_required=false`): loss is explicit DEGRADED operation, not a false healthy state.
 
 ## Responsibilities
 
@@ -62,7 +62,7 @@ EKF owns dynamic `odom -> base_footprint`; wheel odom keeps `publish_tf: false`.
 | CPR/decoding | `20/4` | Tick conversion |
 | diameter/base/track | `0.065/0.160/0.216 m` | Measured wheel geometry |
 | EKF sensor timeout | `0.2 s` | Freshness |
-| `use_vo` | `false` | Integration gate |
+| `use_vo` | `true` | Canonical integration gate; hardware validation remains required before motion acceptance |
 
 ## Launch files
 
@@ -104,7 +104,7 @@ IMU may reset; wheel odom initializes at zero; shutdown releases hardware and st
 
 ## Run
 
-`ros2 launch savo_localization localization_bringup.launch.py use_vo:=false`
+`ros2 launch savo_localization localization_bringup.launch.py use_vo:=true`
 
 ## Validation and testing
 
@@ -116,7 +116,7 @@ Implemented with PC evidence/earlier baseline; GPIO signs, IMU orientation, EKF/
 
 ## Known limitations and remaining validation
 
-Geometry remains provisional despite synchronized wheel centers: CPR/polarity, loaded radius/slip, covariance, and BNO055 +X/+Y orientation need hardware validation. VO fusion remains gated.
+Geometry remains provisional despite synchronized wheel centers: CPR/polarity, loaded radius/slip, covariance, and BNO055 +X/+Y orientation need hardware validation. VO scale, timestamps, dropout/reseed, and EKF interaction also require guarded hardware validation; the launch default is not acceptance evidence.
 
 ## Change-control considerations
 

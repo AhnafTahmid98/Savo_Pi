@@ -74,6 +74,8 @@ def test_autonomous_mapping_launch_is_fail_closed_by_default() -> None:
     assert "ros2 action send_goal" not in launch
     assert "ActionClient" not in launch
     assert "create_client" not in launch
+    assert '"supervisor_auto_arm", default_value="false"' in launch
+    assert '"auto_arm": LaunchConfiguration("supervisor_auto_arm")' in launch
     assert '_python_launch("savo_description"' in launch
     assert '"start_description", default_value="true"' in launch
     assert '"require_locked_geometry", default_value="true"' in launch
@@ -85,6 +87,10 @@ def test_autonomous_mapping_launch_is_fail_closed_by_default() -> None:
     assert '"head_camera_mode",\n                default_value="ros"' in launch
     assert '"start_location_lifecycle"' in launch
     assert '"start_semantic_interruption"' in launch
+    assert (
+        '"start_semantic_interruption", default_value="true"'
+        in launch
+    )
     assert '"locations_database_path"' in launch
     assert '"coverage_enabled"' in launch
     assert '"coverage_execution_handoff_params_file"' in launch
@@ -94,6 +100,157 @@ def test_autonomous_mapping_launch_is_fail_closed_by_default() -> None:
     assert '"start_head_action": "true"' in launch
     assert '"start_registration": "true"' in launch
     assert '"start_locations": "true"' in launch
+
+
+def test_canonical_entry_forwards_only_semantic_interruption_control() -> None:
+    """Canonical false disables only continuous semantic interruption."""
+    robot = read("launch/robot_bringup.launch.py")
+    core = read("launch/core_bringup.launch.py")
+    autonomous = read("launch/autonomous_mapping.launch.py")
+    mapping = (
+        ROOT.parents[1]
+        / "core"
+        / "savo_mapping"
+        / "launch"
+        / "autonomous_mapping.launch.xml"
+    ).read_text(encoding="utf-8")
+
+    for launch in (robot, core, autonomous):
+        assert (
+            '"start_semantic_interruption", default_value="true"'
+            in launch
+        )
+
+    core_branch = robot.split(
+        'if role in {"core", "all"}:', maxsplit=1
+    )[1].split('if role in {"edge", "all"}:', maxsplit=1)[0]
+    assert '"start_semantic_interruption",' in core_branch
+    assert "core_arguments[name] = LaunchConfiguration(name)" in core_branch
+    assert (
+        '"start_semantic_interruption": LaunchConfiguration(\n'
+        '                        "start_semantic_interruption"\n'
+        "                    )"
+        in core
+    )
+    assert (
+        '"supervisor_auto_arm": LaunchConfiguration(\n'
+        '                        "supervisor_auto_arm"\n'
+        "                    )"
+        in core
+    )
+    assert (
+        '"supervisor_state_path": LaunchConfiguration(\n'
+        '                        "supervisor_state_path"\n'
+        "                    )"
+        in core
+    )
+    assert (
+        '"semantic_interruption_enabled": LaunchConfiguration(\n'
+        '                "start_semantic_interruption"\n'
+        "            )"
+        in autonomous
+    )
+    assert (
+        '"require_semantic_autonomous_mapping": LaunchConfiguration(\n'
+        '                "start_semantic_interruption"\n'
+        "            )"
+        in autonomous
+    )
+    assert 'if="$(var semantic_interruption_enabled)"' in mapping
+    assert 'exec="semantic_interruption_coordinator_node"' in mapping
+
+    assert '"start_head", default_value="true"' in autonomous
+    assert '"start_location_lifecycle", default_value="true"' in autonomous
+    assert '"start_supervisor", default_value="true"' in autonomous
+    assert 'start_supervisor = True' in core
+    assert '"true" if start_locations else "false"' in core
+
+
+def test_supervisor_preserves_per_request_semantic_strictness() -> None:
+    """Map-only policy does not weaken an explicitly semantic request."""
+    supervisor_launch = (
+        ROOT.parents[1]
+        / "shared"
+        / "savo_supervisor"
+        / "launch"
+        / "supervisor.launch.py"
+    ).read_text(encoding="utf-8")
+    authority = (
+        ROOT.parents[1]
+        / "shared"
+        / "savo_supervisor"
+        / "src"
+        / "mission_authority.cpp"
+    ).read_text(encoding="utf-8")
+
+    assert (
+        "'require_semantic_autonomous_mapping',\n"
+        "            default_value='true'"
+        in supervisor_launch
+    )
+    assert (
+        "'mission_authorization.'\n"
+        "                        'require_semantic_autonomous_mapping'"
+        in supervisor_launch
+    )
+    assert (
+        "(!policy_.require_semantic_autonomous_mapping || "
+        "capabilities.semantic_mapping_ready)"
+        in authority
+    )
+    assert (
+        "(!request.require_semantic || capabilities.semantic_mapping_ready)"
+        in authority
+    )
+
+
+def test_map_only_release_accepts_zero_semantic_locations() -> None:
+    """Map-only release stays valid without weakening semantic sessions."""
+    mapping_root = ROOT.parents[1] / "core" / "savo_mapping"
+    locations_root = ROOT.parents[1] / "core" / "savo_locations"
+    orchestrator_config = (
+        mapping_root / "config" / "autonomous_mapping_orchestrator.yaml"
+    ).read_text(encoding="utf-8")
+    quality_config = (
+        mapping_root / "config" / "map_quality.yaml"
+    ).read_text(encoding="utf-8")
+    orchestrator = (
+        mapping_root
+        / "src"
+        / "nodes"
+        / "autonomous_mapping_orchestrator_node.cpp"
+    ).read_text(encoding="utf-8")
+    release_repository = (
+        locations_root / "src" / "location_release_repository.cpp"
+    ).read_text(encoding="utf-8")
+
+    assert "require_approved_location: false" in orchestrator_config
+    assert "require_semantic_landmarks: false" in quality_config
+    assert (
+        "if (require_approved_location_ && approved_count == 0U)"
+        in orchestrator
+    )
+    assert (
+        "request->require_approved_location = require_approved_location_"
+        in orchestrator
+    )
+    assert (
+        "if (request.require_approved_location && locations.empty())"
+        in release_repository
+    )
+
+
+def test_core_runner_forwards_semantic_interruption_default_true() -> None:
+    """Production runner exposes map-only mode without changing its default."""
+    runner = (
+        ROOT.parents[3] / "deploy" / "core" / "run_core.sh"
+    ).read_text(encoding="utf-8")
+
+    assert (
+        'start_semantic_interruption:="'
+        '${SAVO_START_SEMANTIC_INTERRUPTION:-true}"'
+        in runner
+    )
 
 
 def test_one_launch_wires_complete_am8_release_chain() -> None:
@@ -116,7 +273,8 @@ def test_one_launch_wires_complete_am8_release_chain() -> None:
     assert '"autonomous_mapping.launch.xml"' in launch
     assert "autonomous_mapping_orchestrator.launch.xml" in mapping_launch
     assert "map_session_manager.launch.xml" in mapping_launch
-    assert "contract_version: 2" in readme
+    assert "contract_version: 3" in readme
+    assert "authority_generation" in readme
     assert "require_quality_approval: true" in readme
 
 

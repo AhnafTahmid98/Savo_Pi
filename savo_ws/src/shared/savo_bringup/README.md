@@ -68,13 +68,20 @@ ros2 topic pub --once \
   std_msgs/msg/String \
   "{data: NAV}"
 
+ros2 service call \
+  /savo_supervisor/authorize_operation \
+  savo_msgs/srv/AuthorizeOperation \
+  "{command: 1, operation: 3, request_id: mapping_request_001, actor_id: operator_1, map_id: campus_main, map_revision: 1, require_semantic: true, motion_required: true, expected_generation: 0}"
+
+# Use authority_generation returned by the authorized ACQUIRE response.
 ros2 action send_goal \
   /savo_mapping/autonomous/run \
   savo_msgs/action/RunAutonomousMapping \
-  "{contract_version: 2, mission_id: mission_campus_main_001, actor_id: operator_1, map_id: campus_main, map_revision: 1, strategy: 1, auto_save: true, require_quality_approval: true, mission_timeout: {sec: 0, nanosec: 0}}"
+  "{contract_version: 3, mission_id: mission_campus_main_001, actor_id: operator_1, map_id: campus_main, map_revision: 1, strategy: 1, authority_request_id: mapping_request_001, authority_generation: 1, require_semantic: true, auto_save: true, require_quality_approval: true, mission_timeout: {sec: 0, nanosec: 0}}"
 ```
 
-The action goal is the only mission start boundary. AM-5 records the initial
+The action goal is the only mission start boundary, but it proceeds only after
+an exact Supervisor lease CHECK. AM-5 records the initial
 map-frame pose, runs an initial Scan360, switches to monitor-only for the initial
 head scan, then enters frontier exploration. A typed control request can insert
 a guarded conditional Scan360 and automatically resume frontier exploration.
@@ -109,7 +116,8 @@ its `start_*` argument. The production defaults start all core-side groups.
 
 `autonomous_mapping.launch.py` starts the location review gateway and the
 mapping orchestrator in the same guarded stack. A production mission goal must
-use `contract_version: 2` and `require_quality_approval: true`.
+use `contract_version: 3`, an exact live Supervisor authority generation, and
+`require_quality_approval: true`.
 
 The required terminal path is:
 

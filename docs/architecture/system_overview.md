@@ -36,7 +36,7 @@ The system fails closed on stale command input, safety-stop input, invalid bring
 
 ## State and data flow
 
-LiDAR, encoders, IMU, near-field range sensors, and power telemetry originate on Core. Edge contributes RealSense streams, optional `/vo/odom`, Edge UPS state, bridge state, and optional speech/UI health. Core fuses wheel odometry and IMU into `/odometry/filtered`; VO fusion is configured off by default. SLAM or AMCL owns `map -> odom`, while the EKF owns `odom -> base_footprint`.
+LiDAR, encoders, IMU, near-field range sensors, and power telemetry originate on Core. Edge contributes RealSense streams, optional `/vo/odom`, opt-in Edge UPS state, bridge state, and optional speech/UI health. Core fuses wheel odometry and IMU into `/odometry/filtered`; canonical bringup enables the optional VO overlay by default. SLAM or AMCL owns `map -> odom`, while the EKF owns `odom -> base_footprint`.
 
 Mapping creates immutable session artifacts, quality reports, review state, and transactional production releases. Navigation accepts only a verified active-map contract. Semantic locations use a Core SQLite registry and operator-controlled release lifecycle.
 

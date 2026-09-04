@@ -161,6 +161,7 @@ def test_control_mode_manager_contract():
         "control_status_topic",
         "safety_stop_topic",
         "external_stop_topic",
+        "external_stop_state_topic",
         "recovery_active_topic",
         "manual_override_topic",
     ]

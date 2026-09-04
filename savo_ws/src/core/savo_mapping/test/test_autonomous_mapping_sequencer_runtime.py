@@ -22,6 +22,7 @@ from rclpy.qos import ReliabilityPolicy
 from savo_msgs.action import RunAutonomousMapping
 from savo_msgs.msg import AutonomousMappingStatus
 from savo_msgs.srv import ControlAutonomousMapping
+from savo_msgs.srv import AuthorizeOperation
 from std_msgs.msg import Bool
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
@@ -89,6 +90,9 @@ class SequencerHarness:
         self.cancel_session_topic = f'{prefix}/cancel_session_cmd'
         self.handoff_cancel_service = f'{prefix}/handoff_cancel'
         self.map_save_service = f'{prefix}/map_save'
+        self.authority_service = f'{prefix}/authorize_operation'
+        self.authority_generation = 1
+        self.authority_state = 'ACTIVE'
         self.scan_state_topic = f'{prefix}/scan360/state'
         self.scan_start_service = f'{prefix}/scan360/start'
         self.scan_cancel_service = f'{prefix}/scan360/cancel'
@@ -211,6 +215,12 @@ class SequencerHarness:
             self.handle_head_resume,
             callback_group=self.group,
         )
+        self.authority_server = self.node.create_service(
+            AuthorizeOperation,
+            self.authority_service,
+            self.handle_authority,
+            callback_group=self.group,
+        )
 
         self.action_client = ActionClient(
             self.node,
@@ -235,6 +245,8 @@ class SequencerHarness:
             '--ros-args',
             '-p', f'action_name:={self.action_name}',
             '-p', f'control_service:={self.control_service}',
+            '-p',
+            f'supervisor_authorization_service:={self.authority_service}',
             '-p', f'status_topic:={self.status_topic}',
             '-p', f'mode_topic:={self.mode_topic}',
             '-p', f'exploration_mode_topic:={self.exploration_mode_topic}',
@@ -310,6 +322,32 @@ class SequencerHarness:
         """Accept a generic fixture trigger."""
         response.success = True
         response.message = 'accepted'
+        return response
+
+    def handle_authority(self, request, response):
+        """Emulate one exact Supervisor mapping lease."""
+        if request.command == AuthorizeOperation.Request.COMMAND_RELEASE:
+            self.authority_generation += 1
+            self.authority_state = 'IDLE'
+        elif request.command == AuthorizeOperation.Request.COMMAND_PAUSE:
+            self.authority_generation += 1
+            self.authority_state = 'PAUSED'
+        elif request.command == AuthorizeOperation.Request.COMMAND_RESUME:
+            self.authority_generation += 1
+            self.authority_state = 'ACTIVE'
+        response.authorized = True
+        response.result_code = AuthorizeOperation.Response.RESULT_AUTHORIZED
+        response.reason = 'fixture_authorized'
+        response.operation_state = self.authority_state
+        response.active_operation = (
+            AuthorizeOperation.Request.OP_NONE
+            if self.authority_state == 'IDLE'
+            else AuthorizeOperation.Request.OP_START_AUTONOMOUS_MAPPING
+        )
+        response.active_request_id = (
+            '' if self.authority_state == 'IDLE' else request.request_id
+        )
+        response.authority_generation = self.authority_generation
         return response
 
     def delayed_publish(self, publisher, value, delay=0.10):
@@ -430,6 +468,9 @@ class SequencerHarness:
         goal.map_id = 'campus_main'
         goal.map_revision = 1
         goal.strategy = RunAutonomousMapping.Goal.STRATEGY_FRONTIER
+        goal.authority_request_id = 'authority-am5-runtime'
+        goal.authority_generation = 1
+        goal.require_semantic = True
         goal.auto_save = False
         goal.require_quality_approval = False
         goal.mission_timeout.sec = 0

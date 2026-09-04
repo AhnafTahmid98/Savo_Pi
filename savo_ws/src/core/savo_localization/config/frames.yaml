@@ -16,7 +16,6 @@ ekf_filter_node:
 
 localization_health_node:
   ros__parameters:
-    map_frame_id: map
     odom_frame_id: odom
     base_frame_id: base_footprint
     imu_frame_id: imu_link

@@ -655,6 +655,28 @@ TEST(SavoBridgeCommandProtocol, ParsesAuthorizedWholePlanMappingCommands)
   ASSERT_NE(start_payload, nullptr);
   EXPECT_TRUE(start_payload->auto_save);
   EXPECT_TRUE(start_payload->require_quality_approval);
+  EXPECT_TRUE(start_payload->require_semantic);
+
+  const auto map_only = savo_bridge::parse_command_request(
+    R"json({
+      "command_id":"mapping-start-map-only-1",
+      "command_type":"start_autonomous_mapping",
+      "expires_at_unix_ms":1800000001000,
+      "issued_at_unix_ms":1800000000000,
+      "origin_agent":"mapping_agent",
+      "request_id":"mapping-request-map-only-1",
+      "payload":{"mission_id":"mission-map-only-1","map_id":"map-1",
+        "map_revision":1,"auto_save":true,
+        "require_quality_approval":true,"require_semantic":false},
+      "source":"savomind"
+    })json",
+    NOW_UNIX_MS);
+  ASSERT_TRUE(map_only.succeeded());
+  const auto * map_only_payload =
+    std::get_if<savo_bridge::StartAutonomousMappingCommandPayload>(
+    &map_only.command->payload);
+  ASSERT_NE(map_only_payload, nullptr);
+  EXPECT_FALSE(map_only_payload->require_semantic);
 
   const auto control = savo_bridge::parse_command_request(
     R"json({

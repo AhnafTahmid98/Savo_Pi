@@ -13,6 +13,20 @@ def test_mapping_commands_are_typed_and_quality_gated() -> None:
     assert '"request_scan360"' in protocol
     assert 'auto_save and operator quality approval' in protocol
     assert 'require_quality_approval' in protocol
+    assert 'require_semantic' in protocol
+
+
+def test_mapping_action_requires_exact_supervisor_lease_first() -> None:
+    dispatcher = read('src/ros_command_dispatcher.cpp')
+    for token in (
+        'COMMAND_ACQUIRE',
+        'OP_START_AUTONOMOUS_MAPPING',
+        'bridge_supervisor_authorization_rejected',
+        'goal.authority_request_id',
+        'goal.authority_generation',
+        'goal.require_semantic',
+    ):
+        assert token in dispatcher
 
 
 def test_status_queries_cover_navigation_mapping_and_supervisor() -> None:

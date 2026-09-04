@@ -231,6 +231,10 @@ MissionAuthorizationDecision MissionAuthority::Handle(
         return deny(MissionAuthorizationCode::kOperationConflict, "major_operation_already_active");
       }
       if (state_.actor_id != request.actor_id ||
+        state_.map_id != request.map_id ||
+        state_.map_revision != request.map_revision ||
+        state_.map_release_id != request.map_release_id ||
+        state_.semantic_required != request.require_semantic ||
         (request.expected_generation > 0U && request.expected_generation != state_.generation))
       {
         return deny(MissionAuthorizationCode::kOwnershipMismatch, "operation_ownership_mismatch");
@@ -254,7 +258,12 @@ MissionAuthorizationDecision MissionAuthority::Handle(
     }
     if (state_.state != OperationState::kIdle) {
       if (state_.request_id == request.request_id && state_.operation == request.operation &&
-        state_.actor_id == request.actor_id)
+        state_.actor_id == request.actor_id && state_.map_id == request.map_id &&
+        state_.map_revision == request.map_revision &&
+        state_.map_release_id == request.map_release_id &&
+        state_.semantic_required == request.require_semantic &&
+        (request.expected_generation == 0U ||
+        request.expected_generation == state_.generation))
       {
         return allow("operation_already_owned");
       }
@@ -276,6 +285,10 @@ MissionAuthorizationDecision MissionAuthority::Handle(
 
   if (state_.state == OperationState::kIdle || request.request_id != state_.request_id ||
     request.actor_id != state_.actor_id || request.operation != state_.operation ||
+    request.map_id != state_.map_id ||
+    request.map_revision != state_.map_revision ||
+    request.map_release_id != state_.map_release_id ||
+    request.require_semantic != state_.semantic_required ||
     (request.expected_generation > 0U && request.expected_generation != state_.generation))
   {
     return deny(MissionAuthorizationCode::kOwnershipMismatch, "operation_ownership_mismatch");

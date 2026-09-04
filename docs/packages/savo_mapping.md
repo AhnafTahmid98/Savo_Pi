@@ -14,7 +14,10 @@ Core only. Manual and autonomous compositions are selected by `savo_bringup`; pr
 - Manage mapping mode/readiness/workflow/session state.
 - Run manual mapping and frontier exploration.
 - Plan coverage and stage it until explicit supervisor-authorized execution.
-- Execute contract-v2 `RunAutonomousMapping`: start pose, initial/final Scan360/head scans, frontier exhaustion, coverage, return near start, save, verification, location checks, operator review, and release.
+- Execute contract-v3 `RunAutonomousMapping` behind an exact, continuously
+  checked Supervisor lease: start pose, initial/final Scan360/head scans,
+  frontier exhaustion, coverage, return near start, save, verification,
+  location checks, operator review, and release.
 - Register semantic candidates via head evidence and locations persistence.
 - Save artifacts, verify them, score quality, catalog/release production maps, and maintain active-map contract.
 

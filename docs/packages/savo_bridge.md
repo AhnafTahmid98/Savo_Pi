@@ -34,7 +34,7 @@ Production C++ node. Discovers configured evidence, subscribes observations, wri
 
 ### Published topics
 
-Only explicit command adapters: `/savo_control/mode_cmd`, `/savo_control/external_stop`, and bounded `/cmd_vel_manual`; never `/cmd_vel_safe`. Other operations use typed services/actions.
+Only explicit command adapters: `/savo_control/mode_cmd`, `/savo_control/external_stop`, and bounded `/cmd_vel_manual`; never `/cmd_vel_safe`. The bridge confirms STOP using the Core-owned `/savo_control/external_stop_state` heartbeat rather than treating its own command event as current state. Other operations use typed services/actions.
 
 ### Subscribed topics
 
@@ -42,11 +42,11 @@ Configured observations include control mode, safety stop, `/cmd_vel_safe`, nav 
 
 ### Services
 
-Clients include `/savo_locations/resolve`, `/savo_mapping/autonomous/control`, and configured query dependencies.
+Clients include `/savo_locations/resolve`, `/savo_mapping/autonomous/control`, `/savo_supervisor/authorize_operation`, and configured query dependencies.
 
 ### Actions
 
-Clients use guarded navigation `/savo_nav/navigation/navigate_to_pose` and mapping `/savo_mapping/autonomous/run`; cancellation remains typed/bounded.
+Clients use guarded navigation `/savo_nav/navigation/navigate_to_pose` and mapping `/savo_mapping/autonomous/run`; mapping submission occurs only after an exact Supervisor `ACQUIRE`, with the returned request/generation evidence carried by the action goal. Cancellation remains typed/bounded.
 
 ## TF ownership
 
@@ -80,7 +80,7 @@ Unix-domain sockets/peer credentials, JSON/protocol support, ROS client/action A
 
 ## Safety behavior
 
-Malformed/oversized/duplicate/stale/unauthorized requests, wrong peer UID, absent services/actions, missing readiness/map context, or timeout fail closed. STOP has explicit confirmation behavior.
+Malformed/oversized/duplicate/stale/unauthorized requests, wrong peer UID, absent services/actions, missing readiness/map context, missing/rejected Supervisor authority, or timeout fail closed. STOP has explicit confirmation behavior.
 
 ## Failure and degraded behavior
 

@@ -851,7 +851,7 @@ using ValidationResult = std::optional<ValidationFailure>;
 {
   const std::set<std::string> allowed{
     "auto_save", "map_id", "map_revision", "mission_id",
-    "mission_timeout_ms", "require_quality_approval"};
+    "mission_timeout_ms", "require_quality_approval", "require_semantic"};
   if (const auto error = reject_unknown_fields(
       payload, allowed, ErrorCode::UnknownPayloadField,
       "unknown start_autonomous_mapping payload field"))
@@ -891,7 +891,9 @@ using ValidationResult = std::optional<ValidationFailure>;
         "mission_timeout_ms must be 0 through 86400000"};
     }
   }
-  for (const std::string field : {"auto_save", "require_quality_approval"}) {
+  for (const std::string field : {
+      "auto_save", "require_quality_approval", "require_semantic"})
+  {
     if (payload.contains(field) && !payload.at(field).is_boolean()) {
       return ValidationFailure{ErrorCode::InvalidFieldType, field + " must be boolean"};
     }
@@ -901,6 +903,9 @@ using ValidationResult = std::optional<ValidationFailure>;
   }
   if (payload.contains("require_quality_approval")) {
     result.require_quality_approval = payload.at("require_quality_approval").get<bool>();
+  }
+  if (payload.contains("require_semantic")) {
+    result.require_semantic = payload.at("require_semantic").get<bool>();
   }
   if (!result.auto_save || !result.require_quality_approval) {
     return ValidationFailure{

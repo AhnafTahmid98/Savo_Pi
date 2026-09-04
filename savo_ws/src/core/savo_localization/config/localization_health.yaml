@@ -1,7 +1,6 @@
 localization_health_node:
   ros__parameters:
     publish_rate_hz: 2.0
-    stale_timeout_s: 0.5
 
     imu_topic: /imu/data
     imu_state_topic: /savo_localization/imu_state
@@ -15,13 +14,11 @@ localization_health_node:
     health_topic: /savo_localization/health
     state_summary_topic: /savo_localization/state_summary
 
-    map_frame_id: map
     odom_frame_id: odom
     base_frame_id: base_footprint
     imu_frame_id: imu_link
 
     use_imu: true
-    use_encoders: true
     use_wheel_odom: true
     use_ekf: true
     use_vo: false
@@ -43,6 +40,4 @@ localization_health_node:
     max_odom_linear_speed_mps: 1.5
     max_odom_angular_speed_rad_s: 4.0
 
-    publish_full_state: true
-    publish_compact_summary: true
     log_warnings: true

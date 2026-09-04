@@ -2,7 +2,7 @@
   ros__parameters:
     observation_topics:
       - /savo_control/mode_state
-      - /savo_control/external_stop
+      - /savo_control/external_stop_state
       - /safety/stop
       - /cmd_vel_safe
       - /savo_nav/readiness

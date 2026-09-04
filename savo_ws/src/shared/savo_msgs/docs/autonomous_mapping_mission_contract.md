@@ -7,13 +7,14 @@
 - `savo_nav` owns validation and execution of each admitted exploration goal.
 - `savo_control` and `savo_perception` remain final movement and safety
   authorities.
-- `savo_supervisor` authorizes the operating mode; it does not choose frontiers
-  or save maps.
+- `savo_supervisor` owns the exclusive mission lease and operating-mode
+  authorization; it does not choose frontiers or save maps.
 
 ## Public interfaces
 
 - `/savo_mapping/autonomous/run` uses `RunAutonomousMapping.action` and starts
-  exactly one mission.
+  exactly one mission. Contract v3 carries the request ID, generation, map
+  context, and semantic requirement of an already-acquired Supervisor lease.
 - `/savo_mapping/autonomous/control` uses `ControlAutonomousMapping.srv` and
   supports pause, resume and cancel.
 - `/savo_mapping/autonomous/status` publishes
@@ -25,6 +26,15 @@
 The public mission contract never carries a Nav2 pose or path. Exploration goal
 selection remains internal to `savo_mapping`, and all movement is forwarded
 through the existing guarded `savo_nav` exploration handoff.
+
+The bridge calls `/savo_supervisor/authorize_operation` with
+`COMMAND_ACQUIRE` before submitting the action. The mapping action server then
+independently CHECKs the same actor, request, operation, generation, map ID,
+map revision, and semantic requirement before starting a session or scan. It
+revalidates the lease while the mission is active, pauses and quiesces on loss,
+requires explicit RESUME, and releases the lease before reporting a terminal
+action result. A raw action client therefore cannot bypass Supervisor merely by
+supplying an actor string.
 
 AM-7 adds movement internally without adding poses or paths to the public
 mission request: Coverage uses the supervisor-gated public Coverage operation

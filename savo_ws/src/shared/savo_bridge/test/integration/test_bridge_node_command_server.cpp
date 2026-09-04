@@ -301,6 +301,9 @@ private:
         "command_dispatcher.external_stop_topic",
         prefix + "/external_stop"),
       rclcpp::Parameter(
+        "command_dispatcher.external_stop_state_topic",
+        prefix + "/external_stop_state"),
+      rclcpp::Parameter(
         "command_dispatcher.safety_stop_topic",
         prefix + "/safety_stop"),
       rclcpp::Parameter(
@@ -605,11 +608,11 @@ TEST(BridgeNodeCommandServer, LiveModeDispatchesStopAndReplaysDuplicate)
     prefix + "/mode_state",
     latched_qos);
 
-  auto external_stop_publisher =
+  auto external_stop_state_publisher =
     fixture->create_publisher<
     std_msgs::msg::Bool>(
-    prefix + "/external_stop",
-    reliable_qos);
+    prefix + "/external_stop_state",
+    latched_qos);
 
   auto safety_stop_publisher =
     fixture->create_publisher<
@@ -647,9 +650,11 @@ TEST(BridgeNodeCommandServer, LiveModeDispatchesStopAndReplaysDuplicate)
     std_msgs::msg::Bool>(
     prefix + "/external_stop",
     reliable_qos,
-    [&external_stop_true_count](
+    [&external_stop_state_publisher,
+    &external_stop_true_count](
       const std_msgs::msg::Bool::SharedPtr message)
     {
+      external_stop_state_publisher->publish(*message);
       if (message->data) {
         external_stop_true_count.fetch_add(1U);
       }
@@ -699,7 +704,7 @@ TEST(BridgeNodeCommandServer, LiveModeDispatchesStopAndReplaysDuplicate)
 
   for (std::size_t index = 0U; index < 20U; ++index) {
     mode_state_publisher->publish(stop_mode);
-    external_stop_publisher->publish(external_clear);
+    external_stop_state_publisher->publish(external_clear);
     std::this_thread::sleep_for(
       std::chrono::milliseconds(20));
   }

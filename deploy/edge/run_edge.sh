@@ -35,7 +35,8 @@ main() {
     start_obstacle_cloud:="${SAVO_START_OBSTACLE_CLOUD:-false}" \
     start_speech:="${SAVO_START_SPEECH:-false}" \
     start_ui:="${SAVO_START_UI:-false}" \
-    start_bridge:="${SAVO_START_BRIDGE:-true}"
+    start_bridge:="${SAVO_START_BRIDGE:-true}" \
+    start_edge_power:="${SAVO_START_EDGE_POWER:-false}"
 }
 
 main "$@"

@@ -6,7 +6,7 @@ Role-specific UPS/base-battery acquisition, aggregate power state, health, prese
 
 ## Deployment
 
-Built on both Pis. Core runs Core UPS + base ADS7830 + aggregator/health/dashboard; Edge runs Edge UPS + health/dashboard.
+Built on both Pis. Core runs Core UPS + base ADS7830 + aggregator/health/dashboard. The Edge UPS + health/dashboard path is retained but its known-bad hardware integration is disabled by default pending revalidation.
 
 ## Responsibilities
 
@@ -28,7 +28,7 @@ Production C++ drivers/nodes and equivalent Python fallback executables, role la
 
 ### Edge
 
-`edge_ups_node`, `power_health_node`, `power_dashboard_node`. `_py` variants are retained fallbacks; C++ is production default.
+`edge_ups_node`, `power_health_node`, `power_dashboard_node`. `_py` variants are retained fallbacks; C++ is production default. Canonical Edge bringup requires an explicit `start_edge_power:=true` opt-in.
 
 ## Runtime data flow
 

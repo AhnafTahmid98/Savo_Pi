@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This procedure deploys the Edge role to the Raspberry Pi that owns RealSense acquisition, visual odometry, speech hardware, touchscreen presentation, the constrained SavoMind bridge, and Edge-side power monitoring.
+This procedure deploys the Edge role to the Raspberry Pi that owns RealSense acquisition, visual odometry, speech hardware, touchscreen presentation, and the constrained SavoMind bridge. The present Edge UPS path is known-bad and remains opt-in until hardware revalidation.
 
 The Edge computer can request robot behavior only through typed and bounded interfaces. It must not acquire direct drivetrain, supervisor, map-release, or operator-approval authority.
 
@@ -21,6 +21,7 @@ The Edge computer can request robot behavior only through typed and bounded inte
 | D435 obstacle cloud | Disabled until hardware-validated |
 | Speech and UI | Disabled by default; enable only after component validation |
 | SavoMind bridge | Enabled by default in distributed Edge bringup |
+| Edge UPS monitor | Disabled by default; opt in only for guarded revalidation |
 
 ## Safety and authority prerequisites
 

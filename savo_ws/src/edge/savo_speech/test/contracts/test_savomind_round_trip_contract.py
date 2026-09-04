@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 import socket
 import struct
 import subprocess
 import sys
+import tempfile
 import time
 
 PACKAGE = Path(__file__).resolve().parents[2]
@@ -50,8 +52,14 @@ def receive_exact(client: socket.socket, size: int) -> bytes:
     return b''.join(chunks)
 
 
-def test_fake_server_implements_protocol_v2_and_playback_ack(tmp_path: Path) -> None:
-    socket_path = tmp_path / 'speech.sock'
+def test_fake_server_implements_protocol_v2_and_playback_ack() -> None:
+    # Darwin's sockaddr_un path limit is shorter than pytest's nested tmp_path.
+    socket_root = Path('/private/tmp') if sys.platform == 'darwin' else Path(
+        tempfile.gettempdir()
+    )
+    socket_path = socket_root / (
+        f'savo-speech-{os.getpid()}-{time.monotonic_ns()}.sock'
+    )
     process = subprocess.Popen(
         [sys.executable, str(SERVER), '--socket', str(socket_path), '--once'],
         stdout=subprocess.PIPE,
@@ -118,3 +126,4 @@ def test_fake_server_implements_protocol_v2_and_playback_ack(tmp_path: Path) -> 
         if process.poll() is None:
             process.terminate()
             process.wait(timeout=3)
+        socket_path.unlink(missing_ok=True)

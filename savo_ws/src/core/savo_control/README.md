@@ -11,7 +11,8 @@ components. Existing Python status and test helpers remain where used.
 - Manual, navigation, recovery, and approved test commands enter through their
   dedicated inputs and are selected by the control-mode/mux contract.
 - Output toward the safety/base path is `/cmd_vel_safe`.
-- External STOP is `/savo_control/external_stop`.
+- External STOP commands use `/savo_control/external_stop`; the mode manager
+  publishes its authoritative current value on `/savo_control/external_stop_state`.
 - Diagnostics must never bypass the control package or publish directly to
   motor hardware.
 

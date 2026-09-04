@@ -67,7 +67,7 @@ Interfaces are compiled into type support used by other packages.
 | `NavigateToLocation` | Nav semantic destination workflow |
 | `RegisterMappedLocation` | Mapping candidate construction/persistence workflow |
 | `RotateToHeading` | Control bounded yaw maneuver |
-| `RunAutonomousMapping` | Mapping contract-v2 autonomous mission |
+| `RunAutonomousMapping` | Mapping contract-v3 Supervisor-bound autonomous mission |
 
 ### Published topics
 
@@ -148,4 +148,3 @@ Interface field/constants are compatibility changes requiring all role consumers
 - [Implementation README](../../savo_ws/src/shared/savo_msgs/README.md)
 - [ROS topic contracts](../architecture/ros2_topic_contracts.md)
 - [Ownership matrix](package_ownership_matrix.md)
-

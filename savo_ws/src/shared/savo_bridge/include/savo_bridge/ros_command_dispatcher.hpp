@@ -43,6 +43,11 @@ struct RosCommandDispatcherConfig
   std::string external_stop_topic{
     "/savo_control/external_stop"};
 
+  // Authoritative state heartbeat from savo_control. Commands must never be
+  // inferred from, or published on, this topic.
+  std::string external_stop_state_topic{
+    "/savo_control/external_stop_state"};
+
   std::string safety_stop_topic{
     "/safety/stop"};
 
@@ -77,6 +82,8 @@ struct RosCommandDispatcherConfig
     "/savo_mapping/autonomous/status"};
   std::string supervisor_state_topic{
     "/savo_supervisor/state_summary"};
+  std::string supervisor_authorization_service{
+    "/savo_supervisor/authorize_operation"};
 
   // Canonical state values.
   std::string stop_mode{"STOP"};
@@ -103,6 +110,7 @@ struct RosCommandDispatcherConfig
   std::int64_t navigation_cancel_timeout_ms{2000};
   std::int64_t mapping_server_timeout_ms{2000};
   std::int64_t mapping_control_timeout_ms{2000};
+  std::int64_t supervisor_authorization_timeout_ms{2000};
 
   // Teleoperation execution bounds. Protocol parsing already applies
   // the same or stricter limits; the dispatcher validates again.

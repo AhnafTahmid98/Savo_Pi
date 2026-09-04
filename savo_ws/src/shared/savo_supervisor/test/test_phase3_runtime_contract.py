@@ -70,6 +70,9 @@ def test_periodic_realsense_and_vo_health_use_production_volatile_qos():
     vo = (
         ROOT.parents[1] / 'edge' / 'savo_vo' / 'src' / 'vo_health_node.cpp'
     ).read_text()
+    vo_state = (
+        ROOT.parents[1] / 'edge' / 'savo_vo' / 'src' / 'vo_health_state.cpp'
+    ).read_text()
 
     expected_qos = 'rclcpp::QoS(10).reliable().durability_volatile()'
     assert node.count(expected_qos) >= 2
@@ -81,6 +84,6 @@ def test_periodic_realsense_and_vo_health_use_production_volatile_qos():
     )
     assert realsense_qos in realsense
     assert 'qos.durability_volatile()' in vo
-    assert 'return "stale: visual odometry timeout";' in vo
+    assert 'return "stale: visual odometry timeout";' in vo_state
     assert "String, '/realsense/status', status_qos" in fixture
     assert "String, '/vo/health', status_qos" in fixture

@@ -24,6 +24,7 @@
 #include "savo_msgs/action/run_autonomous_mapping.hpp"
 #include "savo_msgs/msg/autonomous_mapping_status.hpp"
 #include "savo_msgs/msg/location_record.hpp"
+#include "savo_msgs/srv/authorize_operation.hpp"
 #include "savo_msgs/srv/control_autonomous_mapping.hpp"
 #include "savo_msgs/srv/resolve_location.hpp"
 #include "std_msgs/msg/bool.hpp"
@@ -56,6 +57,9 @@ using MappingServerGoalHandle =
 
 using ControlAutonomousMapping =
   savo_msgs::srv::ControlAutonomousMapping;
+
+using AuthorizeOperation =
+  savo_msgs::srv::AuthorizeOperation;
 
 [[nodiscard]] bool twist_is_zero(
   const geometry_msgs::msg::Twist & message)
@@ -118,6 +122,9 @@ protected:
     config_.external_stop_topic =
       prefix + "/external_stop";
 
+    config_.external_stop_state_topic =
+      prefix + "/external_stop_state";
+
     config_.safety_stop_topic =
       prefix + "/safety_stop";
 
@@ -150,6 +157,8 @@ protected:
 
     config_.supervisor_state_topic =
       prefix + "/supervisor_state";
+    config_.supervisor_authorization_service =
+      prefix + "/authorize_operation";
 
     config_.active_map_id = "test-map";
     config_.active_map_revision = 7U;
@@ -166,6 +175,7 @@ protected:
     config_.navigation_cancel_timeout_ms = 800;
     config_.mapping_server_timeout_ms = 800;
     config_.mapping_control_timeout_ms = 800;
+    config_.supervisor_authorization_timeout_ms = 800;
 
     config_.maximum_teleop_duration_ms = 1000;
     config_.teleop_publish_period_ms = 20;
@@ -188,11 +198,11 @@ protected:
       config_.mode_state_topic,
       latched_qos);
 
-    external_stop_publisher_ =
+    external_stop_state_publisher_ =
       fixture_node_->create_publisher<
       std_msgs::msg::Bool>(
-      config_.external_stop_topic,
-      reliable_qos);
+      config_.external_stop_state_topic,
+      latched_qos);
 
     safety_stop_publisher_ =
       fixture_node_->create_publisher<
@@ -423,6 +433,34 @@ protected:
         response->status = mapping_status_message_;
       });
 
+    supervisor_authorization_service_ =
+      fixture_node_->create_service<AuthorizeOperation>(
+      config_.supervisor_authorization_service,
+      [this](
+        const std::shared_ptr<AuthorizeOperation::Request> request,
+        std::shared_ptr<AuthorizeOperation::Response> response)
+      {
+        supervisor_authorization_request_count_.fetch_add(1U);
+        last_supervisor_authority_command_.store(request->command);
+        response->authorized = supervisor_authorization_allowed_.load();
+        response->result_code = response->authorized ?
+          AuthorizeOperation::Response::RESULT_AUTHORIZED :
+          AuthorizeOperation::Response::RESULT_NOT_READY;
+        response->reason = response->authorized ?
+          "test_supervisor_authorized" : "test_supervisor_rejected";
+        response->operation_state =
+          request->command == AuthorizeOperation::Request::COMMAND_RELEASE ?
+          "IDLE" : "ACTIVE";
+        response->active_operation =
+          request->command == AuthorizeOperation::Request::COMMAND_RELEASE ?
+          AuthorizeOperation::Request::OP_NONE :
+          AuthorizeOperation::Request::OP_START_AUTONOMOUS_MAPPING;
+        response->active_request_id =
+          request->command == AuthorizeOperation::Request::COMMAND_RELEASE ?
+          "" : request->request_id;
+        response->authority_generation = 1U;
+      });
+
     mapping_action_server_ =
       rclcpp_action::create_server<RunAutonomousMapping>(
       fixture_node_,
@@ -435,6 +473,11 @@ protected:
         last_mapping_goal_auto_save_.store(goal->auto_save);
         last_mapping_goal_requires_approval_.store(
           goal->require_quality_approval);
+        last_mapping_goal_has_exact_authority_.store(
+          goal->actor_id == "savo_bridge:mapping_agent" &&
+          goal->authority_request_id == "mapping-start-request" &&
+          goal->authority_generation == 1U &&
+          goal->require_semantic);
         return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
       },
       [](const std::shared_ptr<MappingServerGoalHandle>)
@@ -496,6 +539,7 @@ protected:
         const std_msgs::msg::Bool::SharedPtr message)
       {
         last_external_stop_.store(message->data);
+        external_stop_state_publisher_->publish(*message);
 
         if (message->data) {
           external_stop_true_count_.fetch_add(1U);
@@ -586,6 +630,7 @@ protected:
     navigation_action_server_.reset();
     mapping_action_server_.reset();
     mapping_control_service_.reset();
+    supervisor_authorization_service_.reset();
     resolve_location_service_.reset();
 
     mode_command_subscription_.reset();
@@ -593,7 +638,7 @@ protected:
     external_stop_subscription_.reset();
 
     mode_state_publisher_.reset();
-    external_stop_publisher_.reset();
+    external_stop_state_publisher_.reset();
     safety_stop_publisher_.reset();
     safe_velocity_publisher_.reset();
     navigation_readiness_publisher_.reset();
@@ -631,6 +676,10 @@ protected:
 
   void publish_continuous_observations()
   {
+    std_msgs::msg::Bool external_stop_message;
+    external_stop_message.data = last_external_stop_.load();
+    external_stop_state_publisher_->publish(external_stop_message);
+
     std_msgs::msg::Bool safety_message;
 
     safety_message.data =
@@ -679,7 +728,7 @@ protected:
       mode_state_publisher_->publish(
         mode_message);
 
-      external_stop_publisher_->publish(
+      external_stop_state_publisher_->publish(
         external_stop_message);
 
       safe_velocity_publisher_->publish(
@@ -937,7 +986,7 @@ protected:
 
   rclcpp::Publisher<
     std_msgs::msg::Bool>::SharedPtr
-    external_stop_publisher_;
+    external_stop_state_publisher_;
 
   rclcpp::Publisher<
     std_msgs::msg::Bool>::SharedPtr
@@ -971,6 +1020,9 @@ protected:
 
   rclcpp::Service<ControlAutonomousMapping>::SharedPtr
     mapping_control_service_;
+
+  rclcpp::Service<AuthorizeOperation>::SharedPtr
+    supervisor_authorization_service_;
 
   rclcpp_action::Server<RunAutonomousMapping>::SharedPtr
     mapping_action_server_;
@@ -1019,6 +1071,10 @@ protected:
   std::atomic<std::size_t> mapping_goal_accept_count_{0U};
   std::atomic<bool> last_mapping_goal_auto_save_{false};
   std::atomic<bool> last_mapping_goal_requires_approval_{false};
+  std::atomic<bool> last_mapping_goal_has_exact_authority_{false};
+  std::atomic<std::size_t> supervisor_authorization_request_count_{0U};
+  std::atomic<std::uint8_t> last_supervisor_authority_command_{0U};
+  std::atomic<bool> supervisor_authorization_allowed_{true};
 
   std::atomic<std::int64_t>
   navigation_action_delay_ms_{100};
@@ -1446,6 +1502,40 @@ TEST_F(
   EXPECT_EQ(mapping_goal_request_count_.load(), 1U);
   EXPECT_TRUE(last_mapping_goal_auto_save_.load());
   EXPECT_TRUE(last_mapping_goal_requires_approval_.load());
+  EXPECT_TRUE(last_mapping_goal_has_exact_authority_.load());
+  EXPECT_EQ(supervisor_authorization_request_count_.load(), 1U);
+  EXPECT_EQ(
+    last_supervisor_authority_command_.load(),
+    AuthorizeOperation::Request::COMMAND_ACQUIRE);
+}
+
+TEST_F(
+  RosCommandDispatcherTest,
+  SupervisorRejectionPreventsAutonomousMappingActionSubmission)
+{
+  supervisor_authorization_allowed_.store(false);
+  const auto result = dispatcher_->dispatch(
+    make_start_mapping_command("mapping-supervisor-rejected-1"));
+
+  EXPECT_FALSE(result.accepted);
+  EXPECT_NE(
+    result.reason.find("bridge_supervisor_authorization_rejected"),
+    std::string::npos);
+  EXPECT_EQ(mapping_goal_request_count_.load(), 0U);
+  EXPECT_GE(supervisor_authorization_request_count_.load(), 1U);
+}
+
+TEST_F(
+  RosCommandDispatcherTest,
+  MissingSupervisorPreventsAutonomousMappingActionSubmission)
+{
+  supervisor_authorization_service_.reset();
+  const auto result = dispatcher_->dispatch(
+    make_start_mapping_command("mapping-supervisor-missing-1"));
+
+  EXPECT_FALSE(result.accepted);
+  EXPECT_EQ(result.reason, "bridge_supervisor_authorization_unavailable");
+  EXPECT_EQ(mapping_goal_request_count_.load(), 0U);
 }
 
 TEST_F(

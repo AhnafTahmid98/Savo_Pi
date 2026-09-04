@@ -118,6 +118,7 @@ def _setup(context):
             "start_supervisor",
             "start_head",
             "start_location_lifecycle",
+            "start_semantic_interruption",
             "description_start_delay_s",
             "base_start_delay_s",
             "lidar_start_delay_s",
@@ -276,6 +277,9 @@ def generate_launch_description() -> LaunchDescription:
                 "start_location_lifecycle", default_value="false"
             ),
             DeclareLaunchArgument(
+                "start_semantic_interruption", default_value="true"
+            ),
+            DeclareLaunchArgument(
                 "description_start_delay_s", default_value="0.0"
             ),
             DeclareLaunchArgument("base_start_delay_s", default_value="3.0"),
@@ -315,7 +319,7 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument("start_speech", default_value="false"),
             DeclareLaunchArgument("start_ui", default_value="false"),
             DeclareLaunchArgument("start_bridge", default_value="true"),
-            DeclareLaunchArgument("start_edge_power", default_value="true"),
+            DeclareLaunchArgument("start_edge_power", default_value="false"),
             DeclareLaunchArgument(
                 "realsense_start_delay_s", default_value="0.0"
             ),

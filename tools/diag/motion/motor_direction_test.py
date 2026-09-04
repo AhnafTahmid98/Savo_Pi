@@ -51,7 +51,7 @@ def main() -> int:
     state={'mode': None, 'safety': None, 'external_stop': None}
     node.create_subscription(String, '/savo_control/mode_state', lambda m: state.__setitem__('mode', m.data), 10)
     node.create_subscription(Bool, '/safety/stop', lambda m: state.__setitem__('safety', m.data), 10)
-    node.create_subscription(Bool, '/savo_control/external_stop', lambda m: state.__setitem__('external_stop', m.data), 10)
+    node.create_subscription(Bool, '/savo_control/external_stop_state', lambda m: state.__setitem__('external_stop', m.data), 10)
     publisher=node.create_publisher(Twist, '/cmd_vel_manual', 10)
     preflight_deadline=time.monotonic()+3.0
     while time.monotonic()<preflight_deadline and None in state.values(): rclpy.spin_once(node, timeout_sec=0.1)

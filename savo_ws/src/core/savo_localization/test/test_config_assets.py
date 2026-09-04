@@ -1,6 +1,7 @@
 """Validate installed localization configuration references."""
 
 from pathlib import Path
+import re
 
 import yaml
 
@@ -34,6 +35,29 @@ EXPECTED_ENCODER_WHEELS = {
     "RL": (24, 23),
     "RR": (12, 26),
 }
+
+
+def test_health_overlays_only_use_declared_runtime_parameters() -> None:
+    """Prevent safety-looking YAML knobs from being silently ignored."""
+    source = (PACKAGE_ROOT / "src/localization_health_node.cpp").read_text(
+        encoding="utf-8"
+    )
+    declared = set(
+        re.findall(r'declare_parameter<[^>]+>\(\s*"([^"]+)"', source)
+    )
+    assert declared
+
+    unknown_by_file = {}
+    for path in sorted((PACKAGE_ROOT / "config").rglob("*.yaml")):
+        document = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        parameters = document.get("localization_health_node", {}).get(
+            "ros__parameters", {}
+        )
+        unknown = sorted(set(parameters) - declared)
+        if unknown:
+            unknown_by_file[str(path.relative_to(PACKAGE_ROOT))] = unknown
+
+    assert unknown_by_file == {}
 
 
 def test_optional_vo_overlay_exists_and_is_valid_yaml() -> None:

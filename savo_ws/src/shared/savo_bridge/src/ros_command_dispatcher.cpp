@@ -33,6 +33,7 @@
 #include "savo_msgs/action/run_autonomous_mapping.hpp"
 #include "savo_msgs/msg/autonomous_mapping_status.hpp"
 #include "savo_msgs/msg/location_record.hpp"
+#include "savo_msgs/srv/authorize_operation.hpp"
 #include "savo_msgs/srv/control_autonomous_mapping.hpp"
 #include "savo_msgs/srv/resolve_location.hpp"
 #include "std_msgs/msg/bool.hpp"
@@ -332,6 +333,9 @@ private:
   using ControlAutonomousMapping =
     savo_msgs::srv::ControlAutonomousMapping;
 
+  using AuthorizeOperation =
+    savo_msgs::srv::AuthorizeOperation;
+
 public:
   Impl(
     rclcpp::Node & node,
@@ -389,8 +393,8 @@ public:
 
     external_stop_subscription_ =
       node_.create_subscription<std_msgs::msg::Bool>(
-      config_.external_stop_topic,
-      reliable_qos,
+      config_.external_stop_state_topic,
+      latched_state_qos,
       [this](
         const std_msgs::msg::Bool::SharedPtr message)
       {
@@ -579,6 +583,10 @@ public:
     mapping_control_client_ =
       node_.create_client<ControlAutonomousMapping>(
       config_.mapping_control_service);
+
+    supervisor_authorization_client_ =
+      node_.create_client<AuthorizeOperation>(
+      config_.supervisor_authorization_service);
 
     mapping_action_client_ =
       rclcpp_action::create_client<RunAutonomousMapping>(
@@ -1064,9 +1072,86 @@ private:
       last_reason_ = "bridge_mapping_payload_invalid";
       return rejection(last_reason_, false, 0U);
     }
+
+    if (!supervisor_authorization_client_->wait_for_service(
+        std::chrono::milliseconds(
+          config_.supervisor_authorization_timeout_ms)))
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      ++rejected_command_count_;
+      last_reason_ = "bridge_supervisor_authorization_unavailable";
+      return rejection(last_reason_, true, 0U);
+    }
+
+    const std::string actor_id =
+      "savo_bridge:" + command.origin_agent.value();
+    const std::string authority_request_id =
+      command.request_id.value_or(command.command_id);
+    auto authorization = std::make_shared<AuthorizeOperation::Request>();
+    authorization->command = AuthorizeOperation::Request::COMMAND_ACQUIRE;
+    authorization->operation =
+      AuthorizeOperation::Request::OP_START_AUTONOMOUS_MAPPING;
+    authorization->request_id = authority_request_id;
+    authorization->actor_id = actor_id;
+    authorization->map_id = payload->map_id;
+    authorization->map_revision = payload->map_revision;
+    authorization->require_semantic = payload->require_semantic;
+    authorization->motion_required = true;
+    authorization->expected_generation = 0U;
+
+    auto authorization_future =
+      supervisor_authorization_client_->async_send_request(authorization);
+    if (authorization_future.wait_for(
+        std::chrono::milliseconds(
+          config_.supervisor_authorization_timeout_ms)) !=
+      std::future_status::ready)
+    {
+      release_mapping_authority(
+        authority_request_id, actor_id, payload->map_id,
+        payload->map_revision, payload->require_semantic, 0U);
+      std::lock_guard<std::mutex> lock(mutex_);
+      ++rejected_command_count_;
+      last_reason_ = "bridge_supervisor_authorization_timeout";
+      return rejection(last_reason_, true, 0U);
+    }
+
+    const auto authorization_response = authorization_future.get();
+    const bool exact_authority = authorization_response &&
+      authorization_response->authorized &&
+      authorization_response->result_code ==
+      AuthorizeOperation::Response::RESULT_AUTHORIZED &&
+      authorization_response->operation_state == "ACTIVE" &&
+      authorization_response->active_operation ==
+      AuthorizeOperation::Request::OP_START_AUTONOMOUS_MAPPING &&
+      authorization_response->active_request_id == authority_request_id &&
+      authorization_response->authority_generation > 0U;
+    if (!exact_authority) {
+      if (authorization_response &&
+        authorization_response->active_operation ==
+        AuthorizeOperation::Request::OP_START_AUTONOMOUS_MAPPING &&
+        authorization_response->active_request_id == authority_request_id)
+      {
+        release_mapping_authority(
+          authority_request_id, actor_id, payload->map_id,
+          payload->map_revision, payload->require_semantic,
+          authorization_response->authority_generation);
+      }
+      std::lock_guard<std::mutex> lock(mutex_);
+      ++rejected_command_count_;
+      last_reason_ = authorization_response ?
+        "bridge_supervisor_authorization_rejected:" +
+        authorization_response->reason :
+        "bridge_supervisor_authorization_rejected";
+      return rejection(last_reason_, true, 0U);
+    }
+
     if (!mapping_action_client_->wait_for_action_server(
         std::chrono::milliseconds(config_.mapping_server_timeout_ms)))
     {
+      release_mapping_authority(
+        authority_request_id, actor_id, payload->map_id,
+        payload->map_revision, payload->require_semantic,
+        authorization_response->authority_generation);
       std::lock_guard<std::mutex> lock(mutex_);
       ++rejected_command_count_;
       last_reason_ = "bridge_mapping_action_unavailable";
@@ -1076,10 +1161,14 @@ private:
     RunAutonomousMapping::Goal goal;
     goal.contract_version = RunAutonomousMapping::Goal::CONTRACT_VERSION;
     goal.mission_id = payload->mission_id;
-    goal.actor_id = "savo_bridge:" + command.origin_agent.value();
+    goal.actor_id = actor_id;
     goal.map_id = payload->map_id;
     goal.map_revision = payload->map_revision;
     goal.strategy = RunAutonomousMapping::Goal::STRATEGY_FRONTIER;
+    goal.authority_request_id = authority_request_id;
+    goal.authority_generation =
+      authorization_response->authority_generation;
+    goal.require_semantic = payload->require_semantic;
     goal.auto_save = true;
     goal.require_quality_approval = true;
     goal.mission_timeout.sec = static_cast<std::int32_t>(
@@ -1092,6 +1181,10 @@ private:
         std::chrono::milliseconds(config_.mapping_server_timeout_ms)) !=
       std::future_status::ready || !future.get())
     {
+      release_mapping_authority(
+        authority_request_id, actor_id, payload->map_id,
+        payload->map_revision, payload->require_semantic,
+        authorization_response->authority_generation);
       std::lock_guard<std::mutex> lock(mutex_);
       ++rejected_command_count_;
       last_reason_ = "bridge_mapping_goal_rejected_or_timed_out";
@@ -1102,6 +1195,38 @@ private:
     last_terminal_command_id_ = command.command_id;
     last_reason_ = "bridge_mapping_goal_accepted";
     return acceptance(last_reason_, 0U);
+  }
+
+  void release_mapping_authority(
+    const std::string & request_id,
+    const std::string & actor_id,
+    const std::string & map_id,
+    const std::uint32_t map_revision,
+    const bool require_semantic,
+    const std::uint64_t generation)
+  {
+    if (!supervisor_authorization_client_->service_is_ready()) {
+      return;
+    }
+    auto request = std::make_shared<AuthorizeOperation::Request>();
+    request->command = AuthorizeOperation::Request::COMMAND_RELEASE;
+    request->operation =
+      AuthorizeOperation::Request::OP_START_AUTONOMOUS_MAPPING;
+    request->request_id = request_id;
+    request->actor_id = actor_id;
+    request->map_id = map_id;
+    request->map_revision = map_revision;
+    request->require_semantic = require_semantic;
+    request->motion_required = true;
+    request->expected_generation = generation;
+    try {
+      (void)supervisor_authorization_client_->async_send_request(request);
+    } catch (const std::exception & error) {
+      RCLCPP_ERROR(
+        node_.get_logger(),
+        "failed to release rejected mapping authority: %s",
+        error.what());
+    }
   }
 
   [[nodiscard]] CommandDispatchResult dispatch_mapping_control(
@@ -1175,6 +1300,7 @@ private:
       config_.mode_command_topic,
       config_.mode_state_topic,
       config_.external_stop_topic,
+      config_.external_stop_state_topic,
       config_.safety_stop_topic,
       config_.manual_velocity_topic,
       config_.safe_velocity_topic,
@@ -1182,6 +1308,7 @@ private:
       config_.map_context_status_topic,
       config_.mapping_status_topic,
       config_.supervisor_state_topic,
+      config_.supervisor_authorization_service,
     };
 
     for (const std::string & topic : topics) {
@@ -1191,13 +1318,19 @@ private:
       }
     }
 
+    if (config_.external_stop_topic == config_.external_stop_state_topic) {
+      throw std::invalid_argument(
+              "ros_command_dispatcher_external_stop_command_state_collision");
+    }
+
     if (!valid_topic(config_.navigation_action_name)) {
       throw std::invalid_argument(
               "ros_command_dispatcher_navigation_action_invalid");
     }
 
     if (!valid_topic(config_.mapping_action_name) ||
-      !valid_topic(config_.mapping_control_service))
+      !valid_topic(config_.mapping_control_service) ||
+      !valid_topic(config_.supervisor_authorization_service))
     {
       throw std::invalid_argument(
               "ros_command_dispatcher_mapping_interface_invalid");
@@ -1248,7 +1381,8 @@ private:
       !valid_timeout(config_.navigation_execution_timeout_ms) ||
       !valid_timeout(config_.navigation_cancel_timeout_ms) ||
       !valid_timeout(config_.mapping_server_timeout_ms) ||
-      !valid_timeout(config_.mapping_control_timeout_ms))
+      !valid_timeout(config_.mapping_control_timeout_ms) ||
+      !valid_timeout(config_.supervisor_authorization_timeout_ms))
     {
       throw std::invalid_argument(
               "ros_command_dispatcher_timeout_invalid");
@@ -3541,6 +3675,9 @@ private:
 
   rclcpp::Client<ControlAutonomousMapping>::SharedPtr
     mapping_control_client_;
+
+  rclcpp::Client<AuthorizeOperation>::SharedPtr
+    supervisor_authorization_client_;
 
   rclcpp_action::Client<RunAutonomousMapping>::SharedPtr
     mapping_action_client_;

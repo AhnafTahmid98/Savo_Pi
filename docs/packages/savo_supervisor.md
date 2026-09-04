@@ -24,7 +24,10 @@ C++ policy/parsers/state store/node, YAML, systemd/scripts, and extensive contra
 
 ### `supervisor_node`
 
-Only production executable. Aggregates component evidence, serves authority/state services, persists state, publishes capability/system summaries, and owns mission-action cancellation clients used when authority is revoked.
+Only production executable. Aggregates component evidence, serves
+authority/state services, persists state, and publishes capability/system
+summaries. Mission executors continuously CHECK their bound lease and quiesce
+when Supervisor revokes it.
 
 ## Runtime data flow
 
@@ -51,7 +54,9 @@ Core/Edge bringup/readiness/heartbeats; control, safety, localization, mapping/n
 
 ### Actions
 
-No action server. Cancellation clients target `RunAutonomousMapping`, `RotateToHeading`, `ExecuteCoveragePath`, and `ConfirmAprilTag` on revocation/shutdown.
+No action server. Supervisor revocation changes the authoritative lease state;
+the bound autonomous-mapping executor detects that through its periodic CHECK,
+cancels or pauses active downstream work, and requires explicit RESUME.
 
 ## TF ownership
 

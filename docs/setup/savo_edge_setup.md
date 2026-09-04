@@ -2,7 +2,7 @@
 
 ## Purpose and target
 
-This procedure prepares the Raspberry Pi 5 that owns RealSense acquisition, visual odometry, speech hardware, touchscreen presentation, the constrained SavoMind bridge, and Edge power monitoring. The supported target is Ubuntu 24.04 LTS ARM64 with ROS 2 Jazzy and hostname `edge` or `savo-edge`.
+This procedure prepares the Raspberry Pi 5 that owns RealSense acquisition, visual odometry, speech hardware, touchscreen presentation, and the constrained SavoMind bridge. The known-bad Edge UPS monitor is disabled by default and must be enabled only during guarded hardware revalidation. The supported target is Ubuntu 24.04 LTS ARM64 with ROS 2 Jazzy and hostname `edge` or `savo-edge`.
 
 ## Prerequisites
 

@@ -77,10 +77,8 @@ wheel_odom_node:
 localization_health_node:
   ros__parameters:
     publish_rate_hz: 2.0
-    stale_timeout_s: 0.5
 
     use_imu: false
-    use_encoders: true
     use_wheel_odom: true
     use_ekf: false
     use_vo: false
@@ -99,11 +97,7 @@ localization_health_node:
     max_pose_jump_m: 0.50
     max_yaw_jump_rad: 1.00
 
-    min_valid_encoder_wheels: 4
     max_encoder_illegal_transitions: 20
-
-    publish_full_state: true
-    publish_compact_summary: true
     log_warnings: true
     log_errors: true
 

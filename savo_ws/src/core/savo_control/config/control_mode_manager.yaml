@@ -26,5 +26,6 @@ control_mode_manager_node:
 
     safety_stop_topic: "/safety/stop"
     external_stop_topic: "/savo_control/external_stop"
+    external_stop_state_topic: "/savo_control/external_stop_state"
     recovery_active_topic: "/savo_control/recovery_active"
     manual_override_topic: "/savo_control/manual_override"

@@ -30,13 +30,14 @@ for file in "${required_files[@]}"; do
 done
 
 python3 -m compileall -q "${BRINGUP}"
-python3 - <<PY
+python3 - "${BRINGUP}" <<'PY'
 from pathlib import Path
 import ast
+import sys
 import xml.etree.ElementTree as ET
 import yaml
 
-root = Path(${BRINGUP@Q})
+root = Path(sys.argv[1])
 for path in root.rglob("*.py"):
     ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
 for path in root.rglob("*.yaml"):

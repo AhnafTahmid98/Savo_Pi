@@ -790,6 +790,12 @@ void BridgeNode::configure_command_server()
     "command_dispatcher.external_stop_topic",
     dispatcher_config.external_stop_topic);
 
+  dispatcher_config.external_stop_state_topic =
+    declare_read_only_parameter<std::string>(
+    *this,
+    "command_dispatcher.external_stop_state_topic",
+    dispatcher_config.external_stop_state_topic);
+
   dispatcher_config.safety_stop_topic =
     declare_read_only_parameter<std::string>(
     *this,
@@ -848,6 +854,10 @@ void BridgeNode::configure_command_server()
     declare_read_only_parameter<std::string>(
     *this, "command_dispatcher.supervisor_state_topic",
     dispatcher_config.supervisor_state_topic);
+  dispatcher_config.supervisor_authorization_service =
+    declare_read_only_parameter<std::string>(
+    *this, "command_dispatcher.supervisor_authorization_service",
+    dispatcher_config.supervisor_authorization_service);
 
   dispatcher_config.active_map_id =
     declare_read_only_parameter<std::string>(
@@ -929,6 +939,10 @@ void BridgeNode::configure_command_server()
     declare_read_only_parameter<std::int64_t>(
     *this, "command_dispatcher.mapping_control_timeout_ms",
     dispatcher_config.mapping_control_timeout_ms);
+  dispatcher_config.supervisor_authorization_timeout_ms =
+    declare_read_only_parameter<std::int64_t>(
+    *this, "command_dispatcher.supervisor_authorization_timeout_ms",
+    dispatcher_config.supervisor_authorization_timeout_ms);
 
   if (
     active_map_revision < 0 ||

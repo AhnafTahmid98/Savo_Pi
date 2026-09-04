@@ -19,6 +19,7 @@ inline constexpr const char * CONTROL_MODE_CMD = "/savo_control/mode_cmd";
 inline constexpr const char * CONTROL_MODE_STATE = "/savo_control/mode_state";
 inline constexpr const char * CONTROL_MODE_REASON = "/savo_control/mode_reason";
 inline constexpr const char * CONTROL_STATUS = "/savo_control/control_status";
+inline constexpr const char * EXTERNAL_STOP_STATE = "/savo_control/external_stop_state";
 
 // Safety
 inline constexpr const char * SAFETY_STOP = "/safety/stop";
@@ -107,6 +108,7 @@ inline bool is_status_topic(const std::string & topic)
   return topic == CONTROL_STATUS ||
          topic == CONTROL_MODE_STATE ||
          topic == CONTROL_MODE_REASON ||
+         topic == EXTERNAL_STOP_STATE ||
          topic == RECOVERY_STATUS ||
          topic == RECOVERY_MONITOR_STATUS ||
          topic == CONTROL_DASHBOARD ||

@@ -124,6 +124,7 @@ struct StartAutonomousMappingCommandPayload
   std::int64_t mission_timeout_ms{0};
   bool auto_save{true};
   bool require_quality_approval{true};
+  bool require_semantic{true};
 };
 
 struct ControlMappingCommandPayload

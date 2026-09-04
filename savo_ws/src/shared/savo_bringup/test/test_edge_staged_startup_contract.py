@@ -211,7 +211,16 @@ def test_edge_power_remains_optional_for_readiness() -> None:
     assert 'start_power = as_bool(_value(context, "start_power"))' in launch
     assert "if start_power:" in launch
     assert '"require_power": start_power' in launch
-    assert 'DeclareLaunchArgument("start_power", default_value="true")' in launch
+    assert 'DeclareLaunchArgument("start_power", default_value="false")' in launch
+
+
+def test_known_bad_edge_power_is_opt_in_through_canonical_entrypoint() -> None:
+    """The unsupported UPS path never starts unless the operator opts in."""
+    robot = read(ROBOT_LAUNCH)
+    runner = read(PROJECT_ROOT / "deploy" / "edge" / "run_edge.sh")
+
+    assert 'DeclareLaunchArgument("start_edge_power", default_value="false")' in robot
+    assert 'start_edge_power:="${SAVO_START_EDGE_POWER:-false}"' in runner
 
 
 def test_bridge_edge_evidence_does_not_require_edge_ups() -> None:

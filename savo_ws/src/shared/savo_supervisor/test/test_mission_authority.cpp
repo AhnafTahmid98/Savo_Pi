@@ -92,6 +92,44 @@ TEST(MissionAuthority, HealthySemanticMappingCapabilitiesAreReady)
   EXPECT_TRUE(capabilities.can_register_location);
 }
 
+TEST(MissionAuthority, MapOnlyPolicyStillHonorsPerRequestSemanticRequirement)
+{
+  auto dependencies = healthy_dependencies();
+  dependencies.head.received = false;
+  dependencies.head.fresh = false;
+  dependencies.head.valid = false;
+  dependencies.head.operational = false;
+  dependencies.head.pan_tilt_ready = false;
+  dependencies.head.camera_ready = false;
+  dependencies.head.camera_pose_ready = false;
+  dependencies.locations.received = false;
+  dependencies.locations.fresh = false;
+  dependencies.locations.valid = false;
+  dependencies.locations.read_ready = false;
+  dependencies.locations.write_ready = false;
+  dependencies.locations.storage_healthy = false;
+
+  savo_supervisor::MissionAuthorityPolicy policy;
+  policy.require_semantic_autonomous_mapping = false;
+  savo_supervisor::MissionAuthority authority{policy};
+
+  const auto capabilities = authority.EvaluateCapabilities(dependencies);
+  EXPECT_FALSE(capabilities.semantic_mapping_ready);
+  EXPECT_TRUE(capabilities.can_start_autonomous_mapping);
+
+  auto map_only = request(
+    savo_supervisor::AuthorityCommand::kCheck,
+    savo_supervisor::MissionOperation::kAutonomousMapping);
+  map_only.require_semantic = false;
+  EXPECT_TRUE(authority.Handle(map_only, dependencies).authorized);
+
+  auto semantic = map_only;
+  semantic.require_semantic = true;
+  const auto denied = authority.Handle(semantic, dependencies);
+  EXPECT_FALSE(denied.authorized);
+  EXPECT_EQ(denied.reason, "autonomous_semantic_mapping_not_ready");
+}
+
 TEST(MissionAuthority, NavigationRequiresApprovedSavedRelease)
 {
   auto dependencies = healthy_dependencies();
@@ -145,6 +183,7 @@ TEST(MissionAuthority, RuntimeFaultRevokesAndRequiresExplicitResume)
   auto resume = request(
     savo_supervisor::AuthorityCommand::kResume,
     savo_supervisor::MissionOperation::kAutonomousMapping);
+  resume.require_semantic = true;
   resume.expected_generation = authority.state().generation;
   EXPECT_TRUE(authority.Handle(resume, dependencies).authorized);
   EXPECT_EQ(authority.state().state, savo_supervisor::OperationState::kActive);
@@ -218,6 +257,15 @@ TEST(MissionAuthority, ActiveLeaseRejectsWrongActorAndStaleGeneration)
     savo_supervisor::AuthorityCommand::kCheck,
     savo_supervisor::MissionOperation::kAutonomousMapping);
   check.require_semantic = true;
+  check.request_id = "different-request";
+  check.expected_generation = authority.state().generation;
+  const auto wrong_request = authority.Handle(check, dependencies);
+  EXPECT_FALSE(wrong_request.authorized);
+  EXPECT_EQ(
+    wrong_request.code,
+    savo_supervisor::MissionAuthorizationCode::kOperationConflict);
+
+  check.request_id = "request-1";
   check.actor_id = "different-operator";
   check.expected_generation = authority.state().generation;
   const auto wrong_actor = authority.Handle(check, dependencies);
@@ -232,6 +280,31 @@ TEST(MissionAuthority, ActiveLeaseRejectsWrongActorAndStaleGeneration)
   EXPECT_FALSE(stale_generation.authorized);
   EXPECT_EQ(
     stale_generation.code,
+    savo_supervisor::MissionAuthorizationCode::kOwnershipMismatch);
+}
+
+TEST(MissionAuthority, ActiveLeaseRejectsDifferentMappingContext)
+{
+  auto dependencies = healthy_dependencies();
+  savo_supervisor::MissionAuthority authority;
+  auto acquire = request(
+    savo_supervisor::AuthorityCommand::kAcquire,
+    savo_supervisor::MissionOperation::kAutonomousMapping);
+  acquire.require_semantic = true;
+  ASSERT_TRUE(authority.Handle(acquire, dependencies).authorized);
+
+  auto check = acquire;
+  check.command = savo_supervisor::AuthorityCommand::kCheck;
+  check.expected_generation = authority.state().generation;
+  check.map_revision = 2U;
+  EXPECT_EQ(
+    authority.Handle(check, dependencies).code,
+    savo_supervisor::MissionAuthorizationCode::kOwnershipMismatch);
+
+  check.map_revision = 1U;
+  check.require_semantic = false;
+  EXPECT_EQ(
+    authority.Handle(check, dependencies).code,
     savo_supervisor::MissionAuthorizationCode::kOwnershipMismatch);
 }
 

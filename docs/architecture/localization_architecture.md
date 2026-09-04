@@ -17,7 +17,7 @@ robot_state_publisher              -> base_footprint -> fixed robot frames
 
 Wheel odometry is configured for `30 Hz`, `0.065 m` wheel diameter, measured `0.160 m` wheelbase, measured `0.216 m` track, derived mecanum `k=0.188 m`, and `0.5 s` encoder timeout. Encoder GPIO pairs are FL `20/21`, FR `13/25`, RL `23/24`, and RR `26/12`; configured CPR is 20 with x4 decoding. The BNO055 uses Core I2C bus 1 at `0x28`, NDOF mode, `25 Hz`.
 
-The EKF runs at `30 Hz`, uses a `0.2 s` sensor timeout, operates in 2D, publishes `/odometry/filtered`, and is the sole `odom -> base_footprint` TF authority. Wheel odometry has `publish_tf=false`. VO fusion is `false` by default; when enabled, `/vo/odom` must use the configured `odom` and `base_footprint` frames and validated covariance/timestamps.
+The EKF runs at `30 Hz`, uses a `0.2 s` sensor timeout, operates in 2D, publishes `/odometry/filtered`, and is the sole `odom -> base_footprint` TF authority. Wheel odometry has `publish_tf=false`. Canonical bringup enables the VO overlay by default; `/vo/odom` must use the configured `odom` and `base_footprint` frames and validated covariance/timestamps. VO is optional to health (`vo_required=false`), so its loss is reported as DEGRADED while healthy wheel/IMU/EKF data can remain mission-eligible.
 
 ## Mode ownership
 

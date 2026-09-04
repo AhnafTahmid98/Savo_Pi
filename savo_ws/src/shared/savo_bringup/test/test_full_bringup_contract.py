@@ -810,7 +810,7 @@ def test_autonomous_mapping_still_uses_review_and_quality_contract_v2() -> None:
     launch = read("launch/autonomous_mapping.launch.py")
     readme = read("README.md")
     assert '"start_review_gateway": "true"' in launch
-    assert "contract_version: 2" in readme
+    assert "contract_version: 3" in readme
     assert "require_quality_approval: true" in readme
 
 

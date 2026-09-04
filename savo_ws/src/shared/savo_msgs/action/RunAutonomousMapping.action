@@ -5,7 +5,7 @@
 # cancel request. The production mission remains FRONTIER strategy with an
 # AM-7 post-frontier Coverage pass; standalone COVERAGE is not admitted.
 
-uint32 CONTRACT_VERSION=2
+uint32 CONTRACT_VERSION=3
 
 uint8 STRATEGY_FRONTIER=1
 uint8 STRATEGY_COVERAGE=2
@@ -16,6 +16,13 @@ string actor_id
 string map_id
 uint32 map_revision
 uint8 strategy
+
+# Evidence for the live, exclusive Supervisor lease acquired before this goal
+# is submitted. The action server independently CHECKs this exact lease; these
+# fields are identifiers, not a client-asserted authorization decision.
+string authority_request_id
+uint64 authority_generation
+bool require_semantic
 
 bool auto_save
 bool require_quality_approval

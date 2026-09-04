@@ -39,12 +39,16 @@ def test_orchestrator_uses_typed_public_boundary() -> None:
         'savo_msgs/msg/autonomous_mapping_status.hpp',
         'savo_msgs/msg/frontier_exploration_status.hpp',
         'savo_msgs/srv/control_autonomous_mapping.hpp',
+        'savo_msgs/srv/authorize_operation.hpp',
         'rclcpp_action::create_server<RunMission>',
         'create_service<ControlMission>',
         'MissionCommand::Pause',
         'MissionCommand::Resume',
         'MissionCommand::Cancel',
         'MissionCommand::RequestScan360',
+        'COMMAND_CHECK',
+        'COMMAND_RELEASE',
+        'authority_generation',
     ):
         assert token in source
 
@@ -154,6 +158,7 @@ def test_launch_and_config_are_nonempty_and_consistent() -> None:
         '/savo_mapping/autonomous/run',
         '/savo_mapping/autonomous/control',
         '/savo_mapping/autonomous/status',
+        '/savo_supervisor/authorize_operation',
         '/savo_mapping/exploration/runtime_enabled',
         '/savo_mapping/exploration_goal/state',
         '/savo_mapping/frontier_explorer/typed_status',

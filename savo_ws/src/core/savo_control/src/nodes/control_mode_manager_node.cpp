@@ -84,6 +84,9 @@ public:
       rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local());
     mode_reason_pub_ = create_publisher<std_msgs::msg::String>(mode_reason_topic_, 10);
     control_status_pub_ = create_publisher<std_msgs::msg::String>(control_status_topic_, 10);
+    external_stop_state_pub_ = create_publisher<std_msgs::msg::Bool>(
+      external_stop_state_topic_,
+      rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local());
 
     timer_ = create_wall_timer(
       std::chrono::duration<double>(1.0 / publish_hz_),
@@ -130,6 +133,7 @@ private:
 
     declare_parameter<std::string>("safety_stop_topic", topics::SAFETY_STOP);
     declare_parameter<std::string>("external_stop_topic", "/savo_control/external_stop");
+    declare_parameter<std::string>("external_stop_state_topic", topics::EXTERNAL_STOP_STATE);
     declare_parameter<std::string>("recovery_active_topic", topics::RECOVERY_ACTIVE);
     declare_parameter<std::string>("manual_override_topic", "/savo_control/manual_override");
   }
@@ -173,6 +177,7 @@ private:
 
     safety_stop_topic_ = get_parameter("safety_stop_topic").as_string();
     external_stop_topic_ = get_parameter("external_stop_topic").as_string();
+    external_stop_state_topic_ = get_parameter("external_stop_state_topic").as_string();
     recovery_active_topic_ = get_parameter("recovery_active_topic").as_string();
     manual_override_topic_ = get_parameter("manual_override_topic").as_string();
   }
@@ -212,6 +217,9 @@ private:
     mode_state_pub_->publish(string_msg(to_string(state.mode)));
     mode_reason_pub_->publish(string_msg(to_string(state.reason)));
     control_status_pub_->publish(string_msg(manager_.status_string()));
+    std_msgs::msg::Bool external_stop_state;
+    external_stop_state.data = state.external_stop_active;
+    external_stop_state_pub_->publish(external_stop_state);
   }
 
   ControlModeManager manager_{};
@@ -225,6 +233,7 @@ private:
 
   std::string safety_stop_topic_{topics::SAFETY_STOP};
   std::string external_stop_topic_{"/savo_control/external_stop"};
+  std::string external_stop_state_topic_{topics::EXTERNAL_STOP_STATE};
   std::string recovery_active_topic_{topics::RECOVERY_ACTIVE};
   std::string manual_override_topic_{"/savo_control/manual_override"};
 
@@ -237,6 +246,7 @@ private:
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr mode_state_pub_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr mode_reason_pub_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr control_status_pub_;
+  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr external_stop_state_pub_;
 
   rclcpp::TimerBase::SharedPtr timer_;
 };
