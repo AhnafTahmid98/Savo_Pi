@@ -255,6 +255,7 @@ private:
     context.received = true;
     context.active = latest_mission_->active;
     context.mission_id = latest_mission_->mission_id;
+    context.actor_id = latest_mission_->actor_id;
     context.map_id = latest_mission_->map_id;
     context.map_revision = latest_mission_->map_revision;
     context.state = latest_mission_->state;
@@ -435,7 +436,7 @@ private:
       std::lock_guard<std::mutex> lock(mutex_);
       request->contract_version = ControlMission::Request::CONTRACT_VERSION;
       request->mission_id = core_.snapshot().mission_id;
-      request->actor_id = actor_id_;
+      request->actor_id = core_.snapshot().mission_actor_id;
       request->command = command;
       request->reason = reason;
     }

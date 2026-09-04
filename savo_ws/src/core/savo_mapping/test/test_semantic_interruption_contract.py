@@ -49,6 +49,13 @@ def test_coordinator_does_not_bypass_owners() -> None:
         assert token not in source
 
 
+def test_control_uses_actor_bound_to_observed_mission() -> None:
+    source = read('src/nodes/semantic_interruption_coordinator_node.cpp')
+
+    assert 'context.actor_id = latest_mission_->actor_id;' in source
+    assert 'request->actor_id = core_.snapshot().mission_actor_id;' in source
+
+
 def test_configuration_uses_current_repository_endpoints() -> None:
     config = read('config/semantic_interruption.yaml')
 

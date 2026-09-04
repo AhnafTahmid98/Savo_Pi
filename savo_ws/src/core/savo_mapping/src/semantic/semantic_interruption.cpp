@@ -115,7 +115,7 @@ SemanticObservationResult SemanticInterruptionCore::Observe(
   }
 
   if (!mission.received || !mission.active || mission.mission_id.empty() ||
-    mission.map_id.empty() || mission.map_revision == 0U)
+    mission.actor_id.empty() || mission.map_id.empty() || mission.map_revision == 0U)
   {
     return reject(
       SemanticObservationDisposition::MissionUnavailable,
@@ -170,6 +170,7 @@ SemanticObservationResult SemanticInterruptionCore::Observe(
   snapshot_.reason = "eligible_apriltag_detected";
   snapshot_.active = true;
   snapshot_.mission_id = mission.mission_id;
+  snapshot_.mission_actor_id = mission.actor_id;
   snapshot_.map_id = mission.map_id;
   snapshot_.map_revision = mission.map_revision;
   snapshot_.interrupted_mission_state = mission.state;

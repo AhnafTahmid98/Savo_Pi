@@ -30,8 +30,8 @@ from rclpy.qos import ReliabilityPolicy
 from savo_msgs.action import RunAutonomousMapping
 from savo_msgs.msg import AutonomousMappingStatus
 from savo_msgs.msg import FrontierExplorationStatus
-from savo_msgs.srv import CommitLocationRelease
 from savo_msgs.srv import AuthorizeOperation
+from savo_msgs.srv import CommitLocationRelease
 from savo_msgs.srv import ListLocationCandidates
 from savo_msgs.srv import ListLocations
 from savo_msgs.srv import PrepareLocationRelease

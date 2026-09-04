@@ -26,6 +26,7 @@ SemanticMissionContext mission(
   value.received = true;
   value.active = true;
   value.mission_id = "mission_alpha";
+  value.actor_id = "operator_am7";
   value.map_id = "first_floor";
   value.map_revision = 1U;
   value.state = state;
@@ -81,6 +82,12 @@ void pause_for_semantics(SemanticInterruptionCore & core)
 TEST(SemanticInterruption, FiltersInvalidStaleIneligibleAndKnownObservations)
 {
   SemanticInterruptionCore core;
+  auto actorless_mission = mission();
+  actorless_mission.actor_id.clear();
+  EXPECT_EQ(
+    core.Observe(observation(), actorless_mission, false, 20 * kSecond).disposition,
+    SemanticObservationDisposition::MissionUnavailable);
+
   auto weak = observation();
   weak.detection_quality = 0.2F;
   EXPECT_EQ(
@@ -122,6 +129,7 @@ TEST(SemanticInterruption, PausesAndWaitsForConfirmedPausedState)
   SemanticInterruptionCore core;
   ASSERT_TRUE(core.Observe(observation(), mission(), false, 20 * kSecond).accepted);
   EXPECT_EQ(core.snapshot().state, SemanticInterruptionState::TagDetected);
+  EXPECT_EQ(core.snapshot().mission_actor_id, "operator_am7");
 
   core.BeginPause(20 * kSecond);
   EXPECT_EQ(core.snapshot().state, SemanticInterruptionState::Pausing);

@@ -65,6 +65,7 @@ struct SemanticMissionContext
   bool received{false};
   bool active{false};
   std::string mission_id{};
+  std::string actor_id{};
   std::string map_id{};
   std::uint32_t map_revision{0U};
   std::uint8_t state{0U};
@@ -120,6 +121,7 @@ struct SemanticInterruptionSnapshot
   std::string reason{"idle"};
   bool active{false};
   std::string mission_id{};
+  std::string mission_actor_id{};
   std::string map_id{};
   std::uint32_t map_revision{0U};
   std::uint8_t interrupted_mission_state{0U};

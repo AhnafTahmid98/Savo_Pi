@@ -22,8 +22,8 @@ from rclpy.qos import ReliabilityPolicy
 from savo_msgs.action import RunAutonomousMapping
 from savo_msgs.msg import AutonomousMappingStatus
 from savo_msgs.msg import FrontierExplorationStatus
-from savo_msgs.srv import ControlAutonomousMapping
 from savo_msgs.srv import AuthorizeOperation
+from savo_msgs.srv import ControlAutonomousMapping
 from std_msgs.msg import Bool
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
