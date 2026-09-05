@@ -24,10 +24,25 @@ find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(yaml_cpp_vendor REQUIRED)
+find_package(nlohmann_json REQUIRED)
 
 ament_python_install_package(${PROJECT_NAME})
 
 include_directories(include)
+
+add_library(
+  savo_localization_producer_health
+  SHARED
+  src/producer_health.cpp
+)
+target_include_directories(
+  savo_localization_producer_health
+  PUBLIC
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+    "$<INSTALL_INTERFACE:include>"
+)
+target_compile_features(savo_localization_producer_health PUBLIC cxx_std_17)
+target_link_libraries(savo_localization_producer_health nlohmann_json::nlohmann_json)
 
 find_library(LGPIO_LIBRARY lgpio)
 
@@ -67,7 +82,11 @@ if(IMU_NODE_READY)
   target_link_libraries(savo_bno055_driver yaml-cpp)
 
   add_executable(imu_node ${IMU_NODE_SOURCES})
-  target_link_libraries(imu_node savo_bno055_driver)
+  target_link_libraries(
+    imu_node
+    savo_bno055_driver
+    savo_localization_producer_health
+  )
 
   ament_target_dependencies(imu_node
     rclcpp
@@ -124,7 +143,11 @@ if(WHEEL_ODOM_READY)
     tf2_ros
   )
 
-  target_link_libraries(wheel_odom_node ${LGPIO_LIBRARY})
+  target_link_libraries(
+    wheel_odom_node
+    ${LGPIO_LIBRARY}
+    savo_localization_producer_health
+  )
   target_compile_definitions(wheel_odom_node PRIVATE SAVO_LOCALIZATION_LINKED_LGPIO=1)
 
   install(TARGETS
@@ -151,6 +174,10 @@ target_compile_features(
   PUBLIC
     cxx_std_17
 )
+target_link_libraries(
+  savo_localization_health_core
+  savo_localization_producer_health
+)
 
 add_executable(
   localization_health_node
@@ -176,7 +203,9 @@ ament_target_dependencies(
 )
 
 install(
-  TARGETS savo_localization_health_core
+  TARGETS
+    savo_localization_producer_health
+    savo_localization_health_core
   EXPORT export_savo_localization_health_core
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
@@ -254,6 +283,11 @@ if(BUILD_TESTING)
   )
 
   ament_add_gtest(
+    test_producer_health
+    test/test_producer_health.cpp
+  )
+
+  ament_add_gtest(
     test_wheel_joint_state
     test/test_wheel_joint_state.cpp
     src/wheel_joint_state.cpp
@@ -279,6 +313,13 @@ if(BUILD_TESTING)
     target_link_libraries(
       test_localization_health_core
       savo_localization_health_core
+    )
+  endif()
+
+  if(TARGET test_producer_health)
+    target_link_libraries(
+      test_producer_health
+      savo_localization_producer_health
     )
   endif()
 
@@ -332,6 +373,6 @@ ament_export_targets(
   HAS_LIBRARY_TARGET
 )
 ament_export_include_directories(include)
-ament_export_dependencies(yaml_cpp_vendor)
+ament_export_dependencies(yaml_cpp_vendor nlohmann_json)
 
 ament_package()

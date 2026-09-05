@@ -382,3 +382,55 @@ TEST(LocalizationPayloadParser, AdditionalFieldsAreAllowed)
 
   EXPECT_TRUE(result.valid);
 }
+
+TEST(LocalizationPayloadParser, AcceptsExtendedRateQualityMetadata)
+{
+  LocalizationPayloadParser parser(1);
+
+  const auto result = parser.ParseHealth(
+    R"({
+      "schema_version": 1,
+      "node": "localization_health_node",
+      "state": "OK",
+      "ready": true,
+      "degraded": false,
+      "reason_code": "localization_operational",
+      "stamp_s": 103.0,
+      "components": {
+        "imu": {
+          "rate_hz": 25.0,
+          "source_rate_hz": 25.0,
+          "receive_rate_hz": 11.7,
+          "source_rate_available": true,
+          "rate_basis": "producer_successful_publication",
+          "rate_quality": "EXCELLENT"
+        }
+      }
+    })");
+
+  ASSERT_TRUE(result.valid);
+  EXPECT_EQ(result.state, "OK");
+  EXPECT_TRUE(result.ready);
+}
+
+TEST(LocalizationPayloadParser, RateQualityLabelsAreNotTopLevelStates)
+{
+  LocalizationPayloadParser parser(1);
+
+  for (const char * state : {"GOOD", "EXCELLENT"}) {
+    const auto result = parser.ParseHealth(
+      std::string(R"({
+        "schema_version": 1,
+        "state": ")") + state +
+      R"(",
+        "ready": true,
+        "degraded": false,
+        "reason_code": "localization_operational",
+        "stamp_s": 104.0
+      })");
+    EXPECT_FALSE(result.valid);
+    EXPECT_EQ(
+      result.detail,
+      std::string("unsupported localization state: ") + state);
+  }
+}

@@ -30,36 +30,6 @@ std::string hex_u8(uint8_t value)
   return oss.str();
 }
 
-std::string escape_json(const std::string & text)
-{
-  std::ostringstream oss;
-
-  for (const char c : text) {
-    switch (c) {
-      case '"':
-        oss << "\\\"";
-        break;
-      case '\\':
-        oss << "\\\\";
-        break;
-      case '\n':
-        oss << "\\n";
-        break;
-      case '\r':
-        oss << "\\r";
-        break;
-      case '\t':
-        oss << "\\t";
-        break;
-      default:
-        oss << c;
-        break;
-    }
-  }
-
-  return oss.str();
-}
-
 diagnostic_msgs::msg::KeyValue key_value(
   const std::string & key,
   const std::string & value)
@@ -86,12 +56,12 @@ ImuNode::ImuNode(const rclcpp::NodeOptions & options)
 
   state_pub_ = create_publisher<std_msgs::msg::String>(
     imu_state_topic_,
-    rclcpp::QoS(10).reliable());
+    rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local());
 
   if (publish_diagnostics_) {
     diagnostics_pub_ = create_publisher<diagnostic_msgs::msg::DiagnosticArray>(
       diagnostics_topic_,
-      rclcpp::QoS(10).reliable());
+      rclcpp::QoS(rclcpp::KeepLast(1)).reliable());
   }
 
   const auto period = std::chrono::duration<double>(1.0 / publish_rate_hz_);
@@ -129,6 +99,12 @@ void ImuNode::declare_parameters()
   declare_parameter<std::string>("mode", mode_);
 
   declare_parameter<double>("publish_rate_hz", publish_rate_hz_);
+  declare_parameter<double>("health_publish_rate_hz", health_publish_rate_hz_);
+  declare_parameter<double>(
+    "diagnostics_publish_rate_hz", diagnostics_publish_rate_hz_);
+  declare_parameter<double>("timestamp_fault_hold_s", timestamp_fault_hold_s_);
+  declare_parameter<int>(
+    "producer_rate_window_size", static_cast<int>(producer_rate_window_size_));
   declare_parameter<bool>("reset_on_start", reset_on_start_);
   declare_parameter<bool>(
     "calibration_restore_enabled",
@@ -191,6 +167,12 @@ void ImuNode::load_parameters()
   mode_ = get_parameter("mode").as_string();
 
   publish_rate_hz_ = get_parameter("publish_rate_hz").as_double();
+  health_publish_rate_hz_ = get_parameter("health_publish_rate_hz").as_double();
+  diagnostics_publish_rate_hz_ =
+    get_parameter("diagnostics_publish_rate_hz").as_double();
+  timestamp_fault_hold_s_ = get_parameter("timestamp_fault_hold_s").as_double();
+  producer_rate_window_size_ = static_cast<std::size_t>(
+    get_parameter("producer_rate_window_size").as_int());
   reset_on_start_ = get_parameter("reset_on_start").as_bool();
   calibration_restore_enabled_ =
     get_parameter("calibration_restore_enabled").as_bool();
@@ -240,6 +222,15 @@ void ImuNode::load_parameters()
 
   if (publish_rate_hz_ <= 0.0) {
     throw std::runtime_error("publish_rate_hz must be > 0.0");
+  }
+  if (health_publish_rate_hz_ <= 0.0 || diagnostics_publish_rate_hz_ <= 0.0) {
+    throw std::runtime_error("health and diagnostics publish rates must be > 0.0");
+  }
+  if (timestamp_fault_hold_s_ <= 0.0) {
+    throw std::runtime_error("timestamp_fault_hold_s must be > 0.0");
+  }
+  if (producer_rate_window_size_ < 3U) {
+    throw std::runtime_error("producer_rate_window_size must be >= 3");
   }
 
   if (i2c_bus_ < 0) {
@@ -377,20 +368,33 @@ void ImuNode::timer_callback()
       publish_orientation_,
       publish_temperature_);
 
-    publish_imu(sample);
-    publish_state(sample);
-
-    if (publish_diagnostics_) {
-      publish_diagnostics(sample);
-    }
-
+    const auto imu_message = make_imu_msg(sample);
+    imu_pub_->publish(imu_message);
+    const std::int64_t publish_time_ns =
+      std::chrono::duration_cast<std::chrono::nanoseconds>(
+      std::chrono::steady_clock::now().time_since_epoch()).count();
     ++sample_count_;
     ++publish_count_;
-    last_sample_time_ = now();
-    have_last_sample_ = true;
     have_live_calibration_status_ = true;
+    last_sample_ = sample;
+    last_sample_data_valid_ = sample_data_valid(sample);
+    read_error_active_ = false;
+
+    if (producer_rate_tracker_.RecordSuccess(
+        publish_time_ns, rclcpp::Time(imu_message.header.stamp).nanoseconds(),
+        producer_rate_window_size_))
+    {
+      timestamp_fault_until_ns_ = publish_time_ns + static_cast<std::int64_t>(
+        std::llround(timestamp_fault_hold_s_ * 1.0e9));
+    }
+    publish_health_outputs(publish_time_ns, false);
   } catch (const std::exception & exc) {
     ++error_count_;
+    read_error_active_ = true;
+    const std::int64_t failure_time_ns =
+      std::chrono::duration_cast<std::chrono::nanoseconds>(
+      std::chrono::steady_clock::now().time_since_epoch()).count();
+    publish_health_outputs(failure_time_ns, false);
 
     RCLCPP_WARN_THROTTLE(
       get_logger(),
@@ -401,20 +405,41 @@ void ImuNode::timer_callback()
   }
 }
 
-void ImuNode::publish_imu(const BNO055Sample & sample)
+void ImuNode::publish_health_outputs(
+  const std::int64_t monotonic_time_ns,
+  const bool force)
 {
-  imu_pub_->publish(make_imu_msg(sample));
+  const auto snapshot = make_health_snapshot(monotonic_time_ns);
+  const bool transition = snapshot.health_state != last_health_state_ ||
+    snapshot.reason != last_health_reason_;
+
+  if (force || transition || output_due(
+      monotonic_time_ns, last_health_publish_ns_, health_publish_rate_hz_))
+  {
+    publish_state(snapshot);
+    last_health_publish_ns_ = monotonic_time_ns;
+  }
+  if (publish_diagnostics_ &&
+    (force || transition || output_due(
+      monotonic_time_ns, last_diagnostics_publish_ns_, diagnostics_publish_rate_hz_)))
+  {
+    publish_diagnostics(snapshot);
+    last_diagnostics_publish_ns_ = monotonic_time_ns;
+  }
+
+  last_health_state_ = snapshot.health_state;
+  last_health_reason_ = snapshot.reason;
 }
 
-void ImuNode::publish_state(const BNO055Sample & sample)
+void ImuNode::publish_state(const ProducerHealthSnapshot & snapshot)
 {
-  state_pub_->publish(make_state_msg(sample));
+  state_pub_->publish(make_state_msg(snapshot));
 }
 
-void ImuNode::publish_diagnostics(const BNO055Sample & sample)
+void ImuNode::publish_diagnostics(const ProducerHealthSnapshot & snapshot)
 {
   if (diagnostics_pub_) {
-    diagnostics_pub_->publish(make_diagnostic_msg(sample));
+    diagnostics_pub_->publish(make_diagnostic_msg(snapshot));
   }
 }
 
@@ -450,15 +475,16 @@ sensor_msgs::msg::Imu ImuNode::make_imu_msg(const BNO055Sample & sample) const
   return msg;
 }
 
-std_msgs::msg::String ImuNode::make_state_msg(const BNO055Sample & sample) const
+std_msgs::msg::String ImuNode::make_state_msg(
+  const ProducerHealthSnapshot & snapshot) const
 {
   std_msgs::msg::String msg;
-  msg.data = make_state_json(sample);
+  msg.data = SerializeProducerHealth(snapshot);
   return msg;
 }
 
 diagnostic_msgs::msg::DiagnosticArray ImuNode::make_diagnostic_msg(
-  const BNO055Sample & sample) const
+  const ProducerHealthSnapshot & snapshot) const
 {
   diagnostic_msgs::msg::DiagnosticArray array_msg;
   array_msg.header.stamp = now();
@@ -466,21 +492,25 @@ diagnostic_msgs::msg::DiagnosticArray ImuNode::make_diagnostic_msg(
   diagnostic_msgs::msg::DiagnosticStatus status;
   status.name = "savo_localization/imu_node";
   status.hardware_id = "bno055";
-  status.level = diagnostic_level_from_sample(sample);
-  status.message = diagnostic_message_from_sample(sample);
+  status.level = snapshot.health_state == "ERROR" ?
+    diagnostic_msgs::msg::DiagnosticStatus::ERROR :
+    snapshot.health_state == "DEGRADED" ?
+    diagnostic_msgs::msg::DiagnosticStatus::WARN :
+    diagnostic_msgs::msg::DiagnosticStatus::OK;
+  status.message = snapshot.reason;
 
   status.values.push_back(key_value("frame_id", frame_id_));
   status.values.push_back(key_value("imu_topic", imu_topic_));
   status.values.push_back(key_value("i2c_bus", std::to_string(i2c_bus_)));
   status.values.push_back(key_value("i2c_address", hex_u8(static_cast<uint8_t>(i2c_address_))));
   status.values.push_back(key_value("mode", mode_));
-  status.values.push_back(key_value("chip_id", hex_u8(sample.status.chip_id)));
-  status.values.push_back(key_value("system_status", std::to_string(sample.status.system_status)));
-  status.values.push_back(key_value("system_error", std::to_string(sample.status.system_error)));
-  status.values.push_back(key_value("calib_system", std::to_string(sample.status.calibration.system)));
-  status.values.push_back(key_value("calib_gyro", std::to_string(sample.status.calibration.gyro)));
-  status.values.push_back(key_value("calib_accel", std::to_string(sample.status.calibration.accel)));
-  status.values.push_back(key_value("calib_mag", std::to_string(sample.status.calibration.mag)));
+  status.values.push_back(key_value("chip_id", hex_u8(snapshot.chip_id)));
+  status.values.push_back(key_value("system_status", std::to_string(snapshot.system_status)));
+  status.values.push_back(key_value("system_error", std::to_string(snapshot.system_error)));
+  status.values.push_back(key_value("calib_system", std::to_string(snapshot.calibration_system)));
+  status.values.push_back(key_value("calib_gyro", std::to_string(snapshot.calibration_gyro)));
+  status.values.push_back(key_value("calib_accel", std::to_string(snapshot.calibration_accel)));
+  status.values.push_back(key_value("calib_mag", std::to_string(snapshot.calibration_mag)));
   const auto & calibration_state = calibration_runtime_->state();
   status.values.push_back(key_value(
     "calibration_restore_enabled", bool_text(calibration_state.restore_enabled)));
@@ -503,93 +533,104 @@ diagnostic_msgs::msg::DiagnosticArray ImuNode::make_diagnostic_msg(
   status.values.push_back(key_value("sample_count", std::to_string(sample_count_)));
   status.values.push_back(key_value("publish_count", std::to_string(publish_count_)));
   status.values.push_back(key_value("error_count", std::to_string(error_count_)));
+  status.values.push_back(key_value(
+    "producer_rate_hz", std::to_string(snapshot.producer_rate_hz)));
+  status.values.push_back(key_value(
+    "producer_rate_quality", snapshot.rate_quality));
+  status.values.push_back(key_value(
+    "last_success_age_s", std::to_string(snapshot.last_success_age_s)));
 
   array_msg.status.push_back(status);
   return array_msg;
 }
 
-std::string ImuNode::make_state_json(const BNO055Sample & sample) const
+ProducerHealthSnapshot ImuNode::make_health_snapshot(
+  const std::int64_t monotonic_time_ns) const
 {
-  std::ostringstream oss;
-  oss << std::fixed << std::setprecision(6);
+  ProducerHealthSnapshot snapshot;
+  snapshot.node = "imu_node";
+  snapshot.frame_id = frame_id_;
+  snapshot.frame_valid = !frame_id_.empty();
+  snapshot.timestamp_valid = monotonic_time_ns >= timestamp_fault_until_ns_;
+  snapshot.sample_count = sample_count_;
+  snapshot.publish_count = publish_count_;
+  snapshot.error_count = error_count_;
 
-  oss << "{";
-  oss << "\"node\":\"imu_node\",";
-  oss << "\"status\":\"" << escape_json(diagnostic_message_from_sample(sample)) << "\",";
-  oss << "\"frame_id\":\"" << escape_json(frame_id_) << "\",";
-  oss << "\"imu_topic\":\"" << escape_json(imu_topic_) << "\",";
-  oss << "\"i2c_bus\":" << i2c_bus_ << ",";
-  oss << "\"i2c_address\":\"" << hex_u8(static_cast<uint8_t>(i2c_address_)) << "\",";
-  oss << "\"mode\":\"" << escape_json(mode_) << "\",";
-  oss << "\"chip_id\":\"" << hex_u8(sample.status.chip_id) << "\",";
-  oss << "\"chip_ok\":" << bool_text(sample.status.chip_id == BNO055_CHIP_ID) << ",";
-  oss << "\"system_status\":" << static_cast<int>(sample.status.system_status) << ",";
-  oss << "\"system_error\":" << static_cast<int>(sample.status.system_error) << ",";
+  const auto rate = producer_rate_tracker_.Observe(monotonic_time_ns, publish_rate_hz_);
+  snapshot.producer_rate_available = rate.available;
+  snapshot.producer_rate_hz = rate.rate_hz;
+  snapshot.last_success_age_s = rate.last_success_age_s;
+  snapshot.rate_quality = std::string(ProducerRateTracker::QualityString(rate.quality));
 
+  if (!last_sample_) {
+    snapshot.health_state = read_error_active_ ? "ERROR" : "INITIALIZING";
+    snapshot.reason = read_error_active_ ? "imu_read_failed" : "waiting_for_first_success";
+    return snapshot;
+  }
+
+  const auto & sample = *last_sample_;
   const auto & calibration_state = calibration_runtime_->state();
-  oss << "\"calibration_profile\":{";
-  oss << "\"restore_enabled\":" << bool_text(calibration_state.restore_enabled) << ",";
-  oss << "\"verification_required\":" <<
-    bool_text(calibration_state.verification_required) << ",";
-  oss << "\"path\":\"" << escape_json(calibration_profile_path_) << "\",";
-  oss << "\"present\":" << bool_text(calibration_state.profile_present) << ",";
-  oss << "\"loaded\":" << bool_text(calibration_state.profile_loaded) << ",";
-  oss << "\"restore_attempted\":" <<
-    bool_text(calibration_state.restore_attempted) << ",";
-  oss << "\"verified\":" << bool_text(calibration_state.profile_verified) << ",";
-  oss << "\"operational_status_verified\":" <<
-    bool_text(calibration_state.operational_status_verified) << ",";
-  oss << "\"restore_failed\":" << bool_text(calibration_state.restore_failed) << ",";
-  oss << "\"status\":\"" << escape_json(calibration_state.status) << "\",";
-  oss << "\"error\":\"" << escape_json(calibration_state.error) << "\"";
-  oss << "},";
+  snapshot.data_valid = last_sample_data_valid_;
+  snapshot.chip_id = sample.status.chip_id;
+  snapshot.system_status = sample.status.system_status;
+  snapshot.system_error = sample.status.system_error;
+  snapshot.calibration_system = sample.status.calibration.system;
+  snapshot.calibration_gyro = sample.status.calibration.gyro;
+  snapshot.calibration_accel = sample.status.calibration.accel;
+  snapshot.calibration_mag = sample.status.calibration.mag;
+  snapshot.motion_ready = sample.status.calibration.motion_ready();
+  snapshot.hardware_ok = sample.status.chip_id == BNO055_CHIP_ID &&
+    sample.status.system_error == 0 &&
+    !(calibration_state.restore_failed && calibration_state.verification_required);
 
-  oss << "\"calibration\":{";
-  oss << "\"system\":" << sample.status.calibration.system << ",";
-  oss << "\"gyro\":" << sample.status.calibration.gyro << ",";
-  oss << "\"accel\":" << sample.status.calibration.accel << ",";
-  oss << "\"mag\":" << sample.status.calibration.mag << ",";
-  oss << "\"motion_ready\":" << bool_text(sample.status.calibration.motion_ready()) << ",";
-  oss << "\"fully_calibrated\":" << bool_text(sample.status.calibration.fully_calibrated());
-  oss << "},";
+  if (read_error_active_) {
+    snapshot.health_state = "ERROR";
+    snapshot.reason = "imu_read_failed";
+  } else if (!snapshot.timestamp_valid) {
+    snapshot.health_state = "ERROR";
+    snapshot.reason = "imu_timestamp_regression";
+  } else if (!snapshot.data_valid) {
+    snapshot.health_state = "ERROR";
+    snapshot.reason = "imu_data_invalid";
+  } else if (!snapshot.hardware_ok) {
+    snapshot.health_state = "ERROR";
+    snapshot.reason = diagnostic_message_from_sample(sample);
+  } else if (diagnostic_level_from_sample(sample) ==
+    diagnostic_msgs::msg::DiagnosticStatus::WARN)
+  {
+    snapshot.health_state = "DEGRADED";
+    snapshot.reason = diagnostic_message_from_sample(sample);
+  } else {
+    snapshot.health_state = "OK";
+    snapshot.reason = "IMU healthy";
+  }
+  return snapshot;
+}
 
-  oss << "\"accel_mps2\":{";
-  oss << "\"x\":" << sample.accel_mps2.x << ",";
-  oss << "\"y\":" << sample.accel_mps2.y << ",";
-  oss << "\"z\":" << sample.accel_mps2.z;
-  oss << "},";
+bool ImuNode::sample_data_valid(const BNO055Sample & sample) const
+{
+  return std::isfinite(sample.accel_mps2.x) &&
+         std::isfinite(sample.accel_mps2.y) &&
+         std::isfinite(sample.accel_mps2.z) &&
+         std::isfinite(sample.gyro_dps.x) &&
+         std::isfinite(sample.gyro_dps.y) &&
+         std::isfinite(sample.gyro_dps.z) &&
+         (!sample.euler_deg.available ||
+         (std::isfinite(sample.euler_deg.yaw_deg) &&
+         std::isfinite(sample.euler_deg.roll_deg) &&
+         std::isfinite(sample.euler_deg.pitch_deg)));
+}
 
-  oss << "\"gyro_dps\":{";
-  oss << "\"x\":" << sample.gyro_dps.x << ",";
-  oss << "\"y\":" << sample.gyro_dps.y << ",";
-  oss << "\"z\":" << sample.gyro_dps.z;
-  oss << "},";
-
-  oss << "\"euler_deg\":{";
-  oss << "\"available\":" << bool_text(sample.euler_deg.available) << ",";
-  oss << "\"yaw\":" << sample.euler_deg.yaw_deg << ",";
-  oss << "\"roll\":" << sample.euler_deg.roll_deg << ",";
-  oss << "\"pitch\":" << sample.euler_deg.pitch_deg;
-  oss << "},";
-
-  oss << "\"mag_ut\":{";
-  oss << "\"available\":" << bool_text(sample.magnetic_available) << ",";
-  oss << "\"x\":" << sample.mag_ut.x << ",";
-  oss << "\"y\":" << sample.mag_ut.y << ",";
-  oss << "\"z\":" << sample.mag_ut.z;
-  oss << "},";
-
-  oss << "\"temperature\":{";
-  oss << "\"available\":" << bool_text(sample.temperature_available) << ",";
-  oss << "\"c\":" << sample.temperature_c;
-  oss << "},";
-
-  oss << "\"sample_count\":" << sample_count_ << ",";
-  oss << "\"publish_count\":" << publish_count_ << ",";
-  oss << "\"error_count\":" << error_count_;
-  oss << "}";
-
-  return oss.str();
+bool ImuNode::output_due(
+  const std::int64_t monotonic_time_ns,
+  const std::int64_t last_publish_time_ns,
+  const double rate_hz) const
+{
+  if (last_publish_time_ns < 0) {
+    return true;
+  }
+  const auto period_ns = static_cast<std::int64_t>(std::llround(1.0e9 / rate_hz));
+  return monotonic_time_ns - last_publish_time_ns >= period_ns;
 }
 
 BNO055Mode ImuNode::configured_mode() const
@@ -678,8 +719,8 @@ int ImuNode::diagnostic_level_from_sample(const BNO055Sample & sample) const
   const auto & calibration_state = calibration_runtime_->state();
   if (calibration_state.restore_failed) {
     return calibration_state.verification_required ?
-      diagnostic_msgs::msg::DiagnosticStatus::ERROR :
-      diagnostic_msgs::msg::DiagnosticStatus::WARN;
+           diagnostic_msgs::msg::DiagnosticStatus::ERROR :
+           diagnostic_msgs::msg::DiagnosticStatus::WARN;
   }
 
   if (!sample.status.calibration.motion_ready()) {
@@ -703,8 +744,8 @@ std::string ImuNode::diagnostic_message_from_sample(
   const auto & calibration_state = calibration_runtime_->state();
   if (calibration_state.restore_failed) {
     return calibration_state.verification_required ?
-      "BNO055 calibration restore failed" :
-      "IMU usable, calibration restore failed";
+           "BNO055 calibration restore failed" :
+           "IMU usable, calibration restore failed";
   }
 
   if (!sample.status.calibration.motion_ready()) {

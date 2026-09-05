@@ -2,10 +2,8 @@ localization_health_node:
   ros__parameters:
     publish_rate_hz: 2.0
 
-    imu_topic: /imu/data
     imu_state_topic: /savo_localization/imu_state
 
-    wheel_odom_topic: /wheel/odom
     wheel_odom_state_topic: /savo_localization/wheel_odom_state
 
     filtered_odom_topic: /odometry/filtered
@@ -31,6 +29,7 @@ localization_health_node:
     expected_ekf_rate_hz: 30.0
 
     rate_tolerance_ratio: 0.50
+    rate_transition_debounce_s: 1.0
 
     max_imu_age_s: 0.5
     max_wheel_odom_age_s: 0.5

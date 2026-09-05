@@ -71,7 +71,7 @@ class EncoderDirectionNode(Node):
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Check four-wheel encoder direction signs from /savo_localization/wheel_odom_state."
+        description="Check four-wheel encoder direction signs from the wheel odometry debug topic."
     )
     parser.add_argument(
         "command",
@@ -80,7 +80,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--state-topic",
-        default="/savo_localization/wheel_odom_state",
+        default="/savo_localization/wheel_odom_debug",
     )
     parser.add_argument("--duration", type=float, default=3.0)
     parser.add_argument("--timeout", type=float, default=8.0)

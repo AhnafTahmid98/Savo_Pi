@@ -8,6 +8,9 @@ wheel_odom_node:
 
     wheel_odom_topic: /wheel/odom
     wheel_odom_state_topic: /savo_localization/wheel_odom_state
+    wheel_odom_debug_topic: /savo_localization/wheel_odom_debug
+    publish_debug_state: true
+    debug_publish_rate_hz: 5.0
 
     publish_rate_hz: 30.0
     timeout_s: 0.5

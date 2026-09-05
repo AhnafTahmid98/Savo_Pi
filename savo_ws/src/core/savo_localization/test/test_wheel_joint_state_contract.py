@@ -78,7 +78,7 @@ def test_empty_joint_state_topic_is_conditional_and_does_not_gate_odometry() -> 
         "joint_states_topic cannot be empty when publish_joint_states is true"
         in source
     )
-    assert source.index("publish_odometry(odom_sample, encoder_sample);") < (
+    assert source.index("odom_pub_->publish(odom_message);") < (
         source.index("publish_joint_state(encoder_sample, now_time);")
     )
 
@@ -134,7 +134,7 @@ def test_node_uses_existing_sample_and_measurement_timestamp_passively() -> None
     assert "msg.position.assign(" in source
     assert "msg.velocity.assign(" in source
     assert "msg.effort" not in source
-    assert source.index("publish_odometry(odom_sample, encoder_sample);") < (
+    assert source.index("odom_pub_->publish(odom_message);") < (
         source.index("publish_joint_state(encoder_sample, now_time);")
     )
 

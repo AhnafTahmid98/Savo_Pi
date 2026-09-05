@@ -111,7 +111,7 @@ def main() -> int:
     parser.add_argument("--odom-topic", default="/wheel/odom")
     parser.add_argument(
         "--state-topic",
-        default="/savo_localization/wheel_odom_state",
+        default="/savo_localization/wheel_odom_debug",
     )
     parser.add_argument("--samples", type=int, default=30)
     parser.add_argument("--timeout", type=float, default=8.0)

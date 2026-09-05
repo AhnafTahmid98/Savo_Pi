@@ -3,6 +3,7 @@
 #include <array>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "geometry_msgs/msg/transform_stamped.hpp"
@@ -15,6 +16,7 @@
 #include "savo_localization/encoder_reader.hpp"
 #include "savo_localization/encoder_state.hpp"
 #include "savo_localization/mecanum_odom.hpp"
+#include "savo_localization/producer_health.hpp"
 #include "savo_localization/wheel_joint_state.hpp"
 
 namespace savo_localization
@@ -37,11 +39,9 @@ private:
 
   void timer_callback();
 
-  void publish_odometry(
-    const WheelOdomSample & odom_sample,
-    const EncoderSample & encoder_sample);
-
-  void publish_state(
+  void publish_health_outputs(std::int64_t monotonic_time_ns, bool force);
+  void publish_state(const ProducerHealthSnapshot & snapshot);
+  void publish_debug_state(
     const WheelOdomSample & odom_sample,
     const EncoderSample & encoder_sample);
 
@@ -60,6 +60,15 @@ private:
   std::string make_state_json(
     const WheelOdomSample & odom_sample,
     const EncoderSample & encoder_sample) const;
+  [[nodiscard]] ProducerHealthSnapshot make_health_snapshot(
+    std::int64_t monotonic_time_ns) const;
+  [[nodiscard]] bool sample_data_valid(
+    const WheelOdomSample & odom_sample,
+    const EncoderSample & encoder_sample) const;
+  [[nodiscard]] bool output_due(
+    std::int64_t monotonic_time_ns,
+    std::int64_t last_publish_time_ns,
+    double rate_hz) const;
 
   EncoderHardwareConfig make_encoder_config_from_params() const;
   MecanumGeometry make_mecanum_geometry_from_params() const;
@@ -94,12 +103,19 @@ private:
 
   std::string wheel_odom_topic_{"/wheel/odom"};
   std::string wheel_odom_state_topic_{"/savo_localization/wheel_odom_state"};
+  std::string wheel_odom_debug_topic_{"/savo_localization/wheel_odom_debug"};
   std::string joint_states_topic_{"/joint_states"};
 
   double publish_rate_hz_{30.0};
+  double health_publish_rate_hz_{5.0};
+  double debug_publish_rate_hz_{2.0};
+  double timestamp_fault_hold_s_{2.0};
+  std::size_t producer_rate_window_size_{30U};
   double timeout_s_{0.5};
   bool publish_tf_{false};
   bool publish_joint_states_{true};
+  bool publish_debug_state_{false};
+  int max_encoder_illegal_transitions_{20};
 
   double wheel_diameter_m_{0.065};
   double wheelbase_m_{0.160};
@@ -163,6 +179,7 @@ private:
 
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr state_pub_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr debug_state_pub_;
   rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_state_pub_;
 
   std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
@@ -174,6 +191,16 @@ private:
   std::uint64_t loop_count_{0};
   std::uint64_t publish_count_{0};
   std::uint64_t error_count_{0};
+  bool update_error_active_{false};
+  bool last_sample_data_valid_{false};
+  std::optional<WheelOdomSample> last_odom_sample_{};
+  std::optional<EncoderSample> last_encoder_sample_{};
+  ProducerRateTracker producer_rate_tracker_{};
+  std::int64_t timestamp_fault_until_ns_{0};
+  std::int64_t last_health_publish_ns_{-1};
+  std::int64_t last_debug_publish_ns_{-1};
+  std::string last_health_state_{};
+  std::string last_health_reason_{};
 };
 
 }  // namespace savo_localization

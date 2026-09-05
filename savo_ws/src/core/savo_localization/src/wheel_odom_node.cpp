@@ -67,7 +67,13 @@ WheelOdomNode::WheelOdomNode(const rclcpp::NodeOptions & options)
 
   state_pub_ = create_publisher<std_msgs::msg::String>(
     wheel_odom_state_topic_,
-    rclcpp::QoS(10).reliable());
+    rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local());
+
+  if (publish_debug_state_) {
+    debug_state_pub_ = create_publisher<std_msgs::msg::String>(
+      wheel_odom_debug_topic_,
+      rclcpp::QoS(rclcpp::KeepLast(1)).reliable());
+  }
 
   if (publish_joint_states_) {
     joint_state_pub_ = create_publisher<sensor_msgs::msg::JointState>(
@@ -109,12 +115,21 @@ void WheelOdomNode::declare_parameters()
 
   declare_parameter<std::string>("wheel_odom_topic", wheel_odom_topic_);
   declare_parameter<std::string>("wheel_odom_state_topic", wheel_odom_state_topic_);
+  declare_parameter<std::string>("wheel_odom_debug_topic", wheel_odom_debug_topic_);
   declare_parameter<std::string>("joint_states_topic", joint_states_topic_);
 
   declare_parameter<double>("publish_rate_hz", publish_rate_hz_);
+  declare_parameter<double>("health_publish_rate_hz", health_publish_rate_hz_);
+  declare_parameter<double>("debug_publish_rate_hz", debug_publish_rate_hz_);
+  declare_parameter<double>("timestamp_fault_hold_s", timestamp_fault_hold_s_);
+  declare_parameter<int>(
+    "producer_rate_window_size", static_cast<int>(producer_rate_window_size_));
   declare_parameter<double>("timeout_s", timeout_s_);
   declare_parameter<bool>("publish_tf", publish_tf_);
   declare_parameter<bool>("publish_joint_states", publish_joint_states_);
+  declare_parameter<bool>("publish_debug_state", publish_debug_state_);
+  declare_parameter<int>(
+    "max_encoder_illegal_transitions", max_encoder_illegal_transitions_);
 
   declare_parameter<double>("wheel_diameter_m", wheel_diameter_m_);
   declare_parameter<double>("wheelbase_m", wheelbase_m_);
@@ -178,12 +193,21 @@ void WheelOdomNode::load_parameters()
 
   wheel_odom_topic_ = get_parameter("wheel_odom_topic").as_string();
   wheel_odom_state_topic_ = get_parameter("wheel_odom_state_topic").as_string();
+  wheel_odom_debug_topic_ = get_parameter("wheel_odom_debug_topic").as_string();
   joint_states_topic_ = get_parameter("joint_states_topic").as_string();
 
   publish_rate_hz_ = get_parameter("publish_rate_hz").as_double();
+  health_publish_rate_hz_ = get_parameter("health_publish_rate_hz").as_double();
+  debug_publish_rate_hz_ = get_parameter("debug_publish_rate_hz").as_double();
+  timestamp_fault_hold_s_ = get_parameter("timestamp_fault_hold_s").as_double();
+  producer_rate_window_size_ = static_cast<std::size_t>(
+    get_parameter("producer_rate_window_size").as_int());
   timeout_s_ = get_parameter("timeout_s").as_double();
   publish_tf_ = get_parameter("publish_tf").as_bool();
   publish_joint_states_ = get_parameter("publish_joint_states").as_bool();
+  publish_debug_state_ = get_parameter("publish_debug_state").as_bool();
+  max_encoder_illegal_transitions_ = static_cast<int>(
+    get_parameter("max_encoder_illegal_transitions").as_int());
 
   wheel_diameter_m_ = get_parameter("wheel_diameter_m").as_double();
   wheelbase_m_ = get_parameter("wheelbase_m").as_double();
@@ -260,6 +284,22 @@ void WheelOdomNode::load_parameters()
   if (publish_rate_hz_ <= 0.0) {
     throw std::runtime_error("publish_rate_hz must be > 0.0");
   }
+  if (health_publish_rate_hz_ <= 0.0 || debug_publish_rate_hz_ <= 0.0) {
+    throw std::runtime_error("health and debug publish rates must be > 0.0");
+  }
+  if (timestamp_fault_hold_s_ <= 0.0) {
+    throw std::runtime_error("timestamp_fault_hold_s must be > 0.0");
+  }
+  if (producer_rate_window_size_ < 3U) {
+    throw std::runtime_error("producer_rate_window_size must be >= 3");
+  }
+  if (publish_debug_state_ && wheel_odom_debug_topic_.empty()) {
+    throw std::runtime_error(
+            "wheel_odom_debug_topic cannot be empty when publish_debug_state is true");
+  }
+  if (max_encoder_illegal_transitions_ < 0) {
+    throw std::runtime_error("max_encoder_illegal_transitions must be >= 0");
+  }
 
   if (timeout_s_ <= 0.0) {
     throw std::runtime_error("timeout_s must be > 0.0");
@@ -318,6 +358,8 @@ void WheelOdomNode::configure_odometry()
 
 void WheelOdomNode::timer_callback()
 {
+  const std::int64_t monotonic_time_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+    std::chrono::steady_clock::now().time_since_epoch()).count();
   try {
     encoder_reader_->poll();
 
@@ -326,6 +368,13 @@ void WheelOdomNode::timer_callback()
     if (!have_last_update_) {
       last_update_time_ = now_time;
       have_last_update_ = true;
+      return;
+    }
+
+    if (now_time.nanoseconds() < last_update_time_.nanoseconds()) {
+      timestamp_fault_until_ns_ = monotonic_time_ns + static_cast<std::int64_t>(
+        std::llround(timestamp_fault_hold_s_ * 1.0e9));
+      publish_health_outputs(monotonic_time_ns, false);
       return;
     }
 
@@ -365,8 +414,11 @@ void WheelOdomNode::timer_callback()
       active_wheel_count,
       encoder_sample.total_illegal_transitions());
 
-    publish_odometry(odom_sample, encoder_sample);
-    publish_state(odom_sample, encoder_sample);
+    const auto odom_message = make_odometry_msg(odom_sample);
+    odom_pub_->publish(odom_message);
+    const std::int64_t publish_time_ns =
+      std::chrono::duration_cast<std::chrono::nanoseconds>(
+      std::chrono::steady_clock::now().time_since_epoch()).count();
 
     if (publish_tf_) {
       publish_transform(odom_sample);
@@ -375,10 +427,28 @@ void WheelOdomNode::timer_callback()
     last_update_time_ = now_time;
     ++loop_count_;
     ++publish_count_;
+    update_error_active_ = false;
+    last_odom_sample_ = odom_sample;
+    last_encoder_sample_ = encoder_sample;
+    last_sample_data_valid_ = sample_data_valid(odom_sample, encoder_sample);
+
+    if (producer_rate_tracker_.RecordSuccess(
+        publish_time_ns, rclcpp::Time(odom_message.header.stamp).nanoseconds(),
+        producer_rate_window_size_))
+    {
+      timestamp_fault_until_ns_ = publish_time_ns + static_cast<std::int64_t>(
+        std::llround(timestamp_fault_hold_s_ * 1.0e9));
+    }
 
     publish_joint_state(encoder_sample, now_time);
+    publish_health_outputs(publish_time_ns, false);
   } catch (const std::exception & exc) {
     ++error_count_;
+    update_error_active_ = true;
+    const std::int64_t failure_time_ns =
+      std::chrono::duration_cast<std::chrono::nanoseconds>(
+      std::chrono::steady_clock::now().time_since_epoch()).count();
+    publish_health_outputs(failure_time_ns, false);
 
     RCLCPP_WARN_THROTTLE(
       get_logger(),
@@ -389,21 +459,45 @@ void WheelOdomNode::timer_callback()
   }
 }
 
-void WheelOdomNode::publish_odometry(
-  const WheelOdomSample & odom_sample,
-  const EncoderSample & encoder_sample)
+void WheelOdomNode::publish_health_outputs(
+  const std::int64_t monotonic_time_ns,
+  const bool force)
 {
-  (void)encoder_sample;
-  odom_pub_->publish(make_odometry_msg(odom_sample));
+  const auto snapshot = make_health_snapshot(monotonic_time_ns);
+  const bool transition = snapshot.health_state != last_health_state_ ||
+    snapshot.reason != last_health_reason_;
+
+  if (force || transition || output_due(
+      monotonic_time_ns, last_health_publish_ns_, health_publish_rate_hz_))
+  {
+    publish_state(snapshot);
+    last_health_publish_ns_ = monotonic_time_ns;
+  }
+  if (publish_debug_state_ && last_odom_sample_ && last_encoder_sample_ &&
+    output_due(monotonic_time_ns, last_debug_publish_ns_, debug_publish_rate_hz_))
+  {
+    publish_debug_state(*last_odom_sample_, *last_encoder_sample_);
+    last_debug_publish_ns_ = monotonic_time_ns;
+  }
+
+  last_health_state_ = snapshot.health_state;
+  last_health_reason_ = snapshot.reason;
 }
 
-void WheelOdomNode::publish_state(
+void WheelOdomNode::publish_state(const ProducerHealthSnapshot & snapshot)
+{
+  std_msgs::msg::String msg;
+  msg.data = SerializeProducerHealth(snapshot);
+  state_pub_->publish(msg);
+}
+
+void WheelOdomNode::publish_debug_state(
   const WheelOdomSample & odom_sample,
   const EncoderSample & encoder_sample)
 {
   std_msgs::msg::String msg;
   msg.data = make_state_json(odom_sample, encoder_sample);
-  state_pub_->publish(msg);
+  debug_state_pub_->publish(msg);
 }
 
 void WheelOdomNode::publish_joint_state(
@@ -509,7 +603,7 @@ std::string WheelOdomNode::make_state_json(
   oss << "\"node\":\"wheel_odom_node\",";
   oss << "\"status\":\"OK\",";
   oss << "\"odom_topic\":\"" << escape_json(wheel_odom_topic_) << "\",";
-  oss << "\"state_topic\":\"" << escape_json(wheel_odom_state_topic_) << "\",";
+  oss << "\"debug_topic\":\"" << escape_json(wheel_odom_debug_topic_) << "\",";
   oss << "\"odom_frame_id\":\"" << escape_json(odom_frame_id_) << "\",";
   oss << "\"base_frame_id\":\"" << escape_json(base_frame_id_) << "\",";
   oss << "\"publish_tf\":" << bool_text(publish_tf_) << ",";
@@ -588,6 +682,92 @@ std::string WheelOdomNode::make_state_json(
   return oss.str();
 }
 
+ProducerHealthSnapshot WheelOdomNode::make_health_snapshot(
+  const std::int64_t monotonic_time_ns) const
+{
+  ProducerHealthSnapshot snapshot;
+  snapshot.node = "wheel_odom_node";
+  snapshot.frame_id = odom_frame_id_;
+  snapshot.parent_frame_id = odom_frame_id_;
+  snapshot.child_frame_id = base_frame_id_;
+  snapshot.frame_valid = !odom_frame_id_.empty() && !base_frame_id_.empty() &&
+    odom_frame_id_ != base_frame_id_;
+  snapshot.timestamp_valid = monotonic_time_ns >= timestamp_fault_until_ns_;
+  snapshot.hardware_ok = !update_error_active_;
+  snapshot.motion_ready = last_odom_sample_.has_value();
+  snapshot.data_valid = last_sample_data_valid_;
+  snapshot.sample_count = odom_ ? odom_->sample_count() : 0U;
+  snapshot.publish_count = publish_count_;
+  snapshot.error_count = error_count_;
+  if (last_encoder_sample_) {
+    snapshot.illegal_transition_count =
+      last_encoder_sample_->total_illegal_transitions();
+  }
+
+  const auto rate = producer_rate_tracker_.Observe(monotonic_time_ns, publish_rate_hz_);
+  snapshot.producer_rate_available = rate.available;
+  snapshot.producer_rate_hz = rate.rate_hz;
+  snapshot.last_success_age_s = rate.last_success_age_s;
+  snapshot.rate_quality = std::string(ProducerRateTracker::QualityString(rate.quality));
+
+  if (!last_odom_sample_) {
+    snapshot.health_state = update_error_active_ ? "ERROR" : "INITIALIZING";
+    snapshot.reason = update_error_active_ ?
+      "wheel_odometry_update_failed" : "waiting_for_first_success";
+  } else if (update_error_active_) {
+    snapshot.health_state = "ERROR";
+    snapshot.reason = "wheel_odometry_update_failed";
+  } else if (!snapshot.timestamp_valid) {
+    snapshot.health_state = "ERROR";
+    snapshot.reason = "wheel_odom_timestamp_regression";
+  } else if (!snapshot.data_valid || !snapshot.frame_valid) {
+    snapshot.health_state = "ERROR";
+    snapshot.reason = !snapshot.data_valid ?
+      "wheel_odom_data_invalid" : "wheel_odom_frame_invalid";
+  } else if (snapshot.illegal_transition_count >
+    static_cast<std::uint64_t>(max_encoder_illegal_transitions_))
+  {
+    snapshot.health_state = "DEGRADED";
+    snapshot.reason = "encoder_illegal_transition_limit_exceeded";
+  } else {
+    snapshot.health_state = "OK";
+    snapshot.reason = "wheel odometry healthy";
+  }
+  return snapshot;
+}
+
+bool WheelOdomNode::sample_data_valid(
+  const WheelOdomSample & odom_sample,
+  const EncoderSample & encoder_sample) const
+{
+  const auto finite_wheel = [](const WheelEncoderState & sample) {
+      return std::isfinite(sample.counts_per_second) &&
+             std::isfinite(sample.speed_mps);
+    };
+  return std::isfinite(odom_sample.stamp_s) &&
+         std::isfinite(odom_sample.dt_s) && odom_sample.dt_s > 0.0 &&
+         std::isfinite(odom_sample.pose.x_m) &&
+         std::isfinite(odom_sample.pose.y_m) &&
+         std::isfinite(odom_sample.pose.yaw_rad) &&
+         std::isfinite(odom_sample.twist.vx_mps) &&
+         std::isfinite(odom_sample.twist.vy_mps) &&
+         std::isfinite(odom_sample.twist.omega_rad_s) &&
+         finite_wheel(encoder_sample.fl) && finite_wheel(encoder_sample.fr) &&
+         finite_wheel(encoder_sample.rl) && finite_wheel(encoder_sample.rr);
+}
+
+bool WheelOdomNode::output_due(
+  const std::int64_t monotonic_time_ns,
+  const std::int64_t last_publish_time_ns,
+  const double rate_hz) const
+{
+  if (last_publish_time_ns < 0) {
+    return true;
+  }
+  const auto period_ns = static_cast<std::int64_t>(std::llround(1.0e9 / rate_hz));
+  return monotonic_time_ns - last_publish_time_ns >= period_ns;
+}
+
 WheelSpeeds WheelOdomNode::filter_wheel_speeds(
   const WheelSpeeds & raw_wheel_speeds)
 {
@@ -610,8 +790,8 @@ WheelSpeeds WheelOdomNode::filter_wheel_speeds(
 
   const double alpha = std::clamp(velocity_ema_alpha_, 0.0, 1.0);
   const auto ema = [alpha](double previous, double current) {
-    return previous + alpha * (current - previous);
-  };
+      return previous + alpha * (current - previous);
+    };
 
   filtered_wheel_speeds_.fl_mps = apply_deadband(
     ema(filtered_wheel_speeds_.fl_mps, deadbanded.fl_mps), wheel_speed_deadband_mps_);

@@ -3,7 +3,10 @@
 
 #include "savo_localization/localization_health_core.hpp"
 
+#include <algorithm>
 #include <array>
+#include <cmath>
+#include <stdexcept>
 #include <utility>
 
 namespace savo_localization
@@ -40,6 +43,99 @@ LocalizationHealthResult make_result(
 }
 
 }  // namespace
+
+bool RateAccountingTracker::Record(
+  const std::int64_t receive_time_ns,
+  const std::int64_t header_stamp_ns,
+  const std::size_t window_size)
+{
+  if (window_size < 3U) {
+    throw std::invalid_argument("rate accounting window must contain at least three samples");
+  }
+
+  if (receive_time_ns > last_receive_time_ns_) {
+    receive_timestamps_ns_.push_back(receive_time_ns);
+    last_receive_time_ns_ = receive_time_ns;
+  }
+  while (receive_timestamps_ns_.size() > window_size) {
+    receive_timestamps_ns_.pop_front();
+  }
+
+  const bool regressed =
+    last_header_stamp_ns_ > 0 && header_stamp_ns < last_header_stamp_ns_;
+  if (regressed) {
+    source_timestamps_ns_.clear();
+  }
+  if (header_stamp_ns <= 0) {
+    last_header_stamp_ns_ = header_stamp_ns;
+    return regressed;
+  }
+  if (header_stamp_ns != last_header_stamp_ns_) {
+    source_timestamps_ns_.push_back(header_stamp_ns);
+  }
+  last_header_stamp_ns_ = header_stamp_ns;
+  while (source_timestamps_ns_.size() > window_size) {
+    source_timestamps_ns_.pop_front();
+  }
+  return regressed;
+}
+
+RateAccountingObservation RateAccountingTracker::Observe(
+  const std::int64_t current_receive_time_ns,
+  const double expected_rate_hz,
+  const double minimum_rate_ratio,
+  const std::int64_t transition_debounce_ns)
+{
+  if (!std::isfinite(expected_rate_hz) || expected_rate_hz <= 0.0 ||
+    !std::isfinite(minimum_rate_ratio) || minimum_rate_ratio <= 0.0 ||
+    minimum_rate_ratio > 1.0 || transition_debounce_ns < 0)
+  {
+    throw std::invalid_argument("invalid rate accounting threshold");
+  }
+
+  RateAccountingObservation observation;
+  observation.source_rate_available = source_timestamps_ns_.size() >= 3U;
+  observation.receive_rate_available = receive_timestamps_ns_.size() >= 3U;
+  observation.source_rate_hz = WindowRateHz(source_timestamps_ns_);
+  observation.receive_rate_hz = WindowRateHz(receive_timestamps_ns_);
+  observation.validation_rate_hz = observation.source_rate_available ?
+    observation.source_rate_hz : observation.receive_rate_hz;
+  observation.quality = ProducerRateTracker::ClassifyQuality(
+    observation.validation_rate_hz, expected_rate_hz);
+
+  const bool evidence_available =
+    observation.source_rate_available || observation.receive_rate_available;
+  const bool instant_valid =
+    observation.validation_rate_hz >= expected_rate_hz * minimum_rate_ratio;
+  observation.rate_valid = rate_debouncer_.Observe(
+    current_receive_time_ns, evidence_available, instant_valid,
+    transition_debounce_ns);
+  return observation;
+}
+
+double RateAccountingTracker::AgeSeconds(
+  const std::int64_t current_receive_time_ns) const
+{
+  if (last_receive_time_ns_ < 0) {
+    return -1.0;
+  }
+  return std::max(0.0, static_cast<double>(
+             current_receive_time_ns - last_receive_time_ns_) / 1.0e9);
+}
+
+double RateAccountingTracker::WindowRateHz(
+  const std::deque<std::int64_t> & timestamps_ns) noexcept
+{
+  if (timestamps_ns.size() < 3U) {
+    return 0.0;
+  }
+  const std::int64_t duration_ns = timestamps_ns.back() - timestamps_ns.front();
+  if (duration_ns <= 0) {
+    return 0.0;
+  }
+  return static_cast<double>(timestamps_ns.size() - 1U) * 1.0e9 /
+         static_cast<double>(duration_ns);
+}
 
 LocalizationHealthResult LocalizationHealthCore::Evaluate(
   const LocalizationHealthInputs & inputs) const
@@ -206,7 +302,8 @@ void LocalizationHealthCore::AppendSourceDegradedReasons(
 {
   if (!source.received) {
     if (!source.required) {
-      degraded_reasons.push_back(reason_with_detail(source.name, "missing_optional", source.detail));
+      degraded_reasons.push_back(reason_with_detail(source.name, "missing_optional",
+          source.detail));
     }
     return;
   }
@@ -218,7 +315,8 @@ void LocalizationHealthCore::AppendSourceDegradedReasons(
     degraded_reasons.push_back(reason_with_detail(source.name, "rate_low", source.detail));
   }
   if (source.diagnostic_warning) {
-    degraded_reasons.push_back(reason_with_detail(source.name, "diagnostic_warning", source.detail));
+    degraded_reasons.push_back(reason_with_detail(source.name, "diagnostic_warning",
+        source.detail));
   }
 }
 

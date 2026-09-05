@@ -175,6 +175,9 @@ def test_bno055_restore_diagnostics_and_manual_save_are_explicit() -> None:
     health_source = (PACKAGE_ROOT / "src/localization_health_node.cpp").read_text(
         encoding="utf-8"
     )
+    producer_source = (PACKAGE_ROOT / "src/producer_health.cpp").read_text(
+        encoding="utf-8"
+    )
 
     for key in (
         "calibration_profile_present",
@@ -188,7 +191,8 @@ def test_bno055_restore_diagnostics_and_manual_save_are_explicit() -> None:
     assert "live status must be exactly 3/3/3/3" in (
         PACKAGE_ROOT / "src/bno055_calibration.cpp"
     ).read_text(encoding="utf-8")
-    assert "BNO055 calibration restore failed" in health_source
+    assert "ProducerHealthConsumer" in health_source
+    assert 'object.at("health_state")' in producer_source
 
 
 def test_real_robot_encoder_gpio_mapping_and_direction_flags() -> None:

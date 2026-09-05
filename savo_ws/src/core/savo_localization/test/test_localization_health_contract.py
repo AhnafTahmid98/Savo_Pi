@@ -161,6 +161,117 @@ def test_vo_health_remains_optional_with_existing_rate_contract() -> None:
     assert 'declare_parameter<bool>("vo_required", false)' in source
 
 
+def test_producer_health_rate_accounting_preserves_existing_floor_and_freshness() -> None:
+    diagnostics = yaml.safe_load(
+        (PACKAGE_ROOT / "config" / "diagnostics.yaml").read_text(encoding="utf-8")
+    )["localization_health_node"]["ros__parameters"]
+    standalone = yaml.safe_load(
+        (PACKAGE_ROOT / "config" / "localization_health.yaml").read_text(
+            encoding="utf-8"
+        )
+    )["localization_health_node"]["ros__parameters"]
+    source = (PACKAGE_ROOT / "src" / "localization_health_node.cpp").read_text(
+        encoding="utf-8"
+    )
+    imu = yaml.safe_load(
+        (PACKAGE_ROOT / "config" / "imu.yaml").read_text(encoding="utf-8")
+    )["imu_node"]["ros__parameters"]
+    wheel = yaml.safe_load(
+        (PACKAGE_ROOT / "config" / "wheel_odom.yaml").read_text(encoding="utf-8")
+    )["wheel_odom_node"]["ros__parameters"]
+
+    assert diagnostics["expected_imu_rate_hz"] == 25.0
+    assert diagnostics["rate_tolerance_ratio"] == 0.50
+    assert (
+        diagnostics["expected_imu_rate_hz"] * diagnostics["rate_tolerance_ratio"]
+        == 12.5
+    )
+    assert diagnostics["rate_transition_debounce_s"] == 1.0
+    assert standalone["expected_imu_rate_hz"] == 25.0
+    assert standalone["rate_tolerance_ratio"] == 0.50
+    assert standalone["rate_transition_debounce_s"] == 1.0
+    assert diagnostics["max_imu_age_s"] == 0.5
+    assert diagnostics["max_wheel_odom_age_s"] == 0.5
+    assert diagnostics["max_filtered_odom_age_s"] == 0.5
+    assert diagnostics["max_tf_age_s"] == 0.5
+    assert imu["publish_rate_hz"] == 25.0
+    assert imu["health_publish_rate_hz"] == 5.0
+    assert imu["diagnostics_publish_rate_hz"] == 2.0
+    assert wheel["publish_rate_hz"] == 30.0
+    assert wheel["health_publish_rate_hz"] == 5.0
+    assert wheel["publish_debug_state"] is False
+    for token in (
+        "source_rate_hz",
+        "receive_rate_hz",
+        "source_rate_available",
+        "rate_basis",
+        "rate_quality",
+        "producer_successful_publication",
+        "ProducerHealthConsumer",
+    ):
+        assert token in source
+
+
+def test_health_aggregator_does_not_observe_required_raw_topics_or_global_diagnostics() -> None:
+    source = (PACKAGE_ROOT / "src" / "localization_health_node.cpp").read_text(
+        encoding="utf-8"
+    )
+
+    assert "sensor_msgs/msg/imu.hpp" not in source
+    assert "imu_subscription_" not in source
+    assert "wheel_odom_subscription_" not in source
+    assert "diagnostics_subscription_" not in source
+    assert "on_diagnostics" not in source
+    assert "std::regex" not in source
+    assert "rclcpp::KeepLast(1)).reliable().transient_local()" in source
+    assert "rclcpp::SensorDataQoS().keep_last(1)" in source
+
+
+def test_large_wheel_debug_state_is_disabled_in_production() -> None:
+    config = yaml.safe_load(
+        (PACKAGE_ROOT / "config" / "wheel_odom.yaml").read_text(encoding="utf-8")
+    )["wheel_odom_node"]["ros__parameters"]
+    source = (PACKAGE_ROOT / "src" / "wheel_odom_node.cpp").read_text(
+        encoding="utf-8"
+    )
+
+    assert config["publish_debug_state"] is False
+    assert config["debug_publish_rate_hz"] == 5.0
+    assert "debug_state_pub_->publish(msg);" in source
+    assert "state_pub_->publish(msg);" in source
+    assert "SerializeProducerHealth(snapshot)" in source
+
+
+def test_imu_state_is_compact_and_diagnostics_are_decimated() -> None:
+    source = (PACKAGE_ROOT / "src" / "imu_node.cpp").read_text(encoding="utf-8")
+
+    assert "SerializeProducerHealth(snapshot)" in source
+    assert "make_state_json" not in source
+    assert 'declare_parameter<double>("health_publish_rate_hz"' in source
+    assert '"diagnostics_publish_rate_hz", diagnostics_publish_rate_hz_' in source
+
+
+def test_rate_quality_does_not_expand_top_level_state_vocabulary() -> None:
+    core = (PACKAGE_ROOT / "src" / "localization_health_core.cpp").read_text(
+        encoding="utf-8"
+    )
+    node = (PACKAGE_ROOT / "src" / "localization_health_node.cpp").read_text(
+        encoding="utf-8"
+    )
+    producer = (PACKAGE_ROOT / "src" / "producer_health.cpp").read_text(
+        encoding="utf-8"
+    )
+
+    for state in ("INITIALIZING", "OK", "DEGRADED", "STALE", "ERROR"):
+        assert f'return "{state}";' in core
+    assert '\\"state\\":\\"' in node
+    assert "LocalizationHealthCore::ToString(result.state)" in node
+    assert 'return "GOOD";' in producer
+    assert 'return "EXCELLENT";' in producer
+    assert 'LocalizationHealthState::kGood' not in core
+    assert 'LocalizationHealthState::kExcellent' not in core
+
+
 def test_launch_defaults_reference_the_intended_profiles() -> None:
     bringup = _launch_argument_defaults("localization_bringup.launch.py")
     ekf = _launch_argument_defaults("ekf.launch.py")

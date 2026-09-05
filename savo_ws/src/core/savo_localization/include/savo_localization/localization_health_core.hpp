@@ -3,7 +3,11 @@
 
 #pragma once
 
+#include "savo_localization/producer_health.hpp"
+
+#include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -21,6 +25,44 @@ enum class LocalizationHealthState : std::uint8_t
   kError
 };
 
+struct RateAccountingObservation
+{
+  bool source_rate_available{false};
+  bool receive_rate_available{false};
+  bool rate_valid{true};
+  double source_rate_hz{0.0};
+  double receive_rate_hz{0.0};
+  double validation_rate_hz{0.0};
+  RateQuality quality{RateQuality::kBelowMinimum};
+};
+
+class RateAccountingTracker
+{
+public:
+  bool Record(
+    std::int64_t receive_time_ns,
+    std::int64_t header_stamp_ns,
+    std::size_t window_size);
+
+  [[nodiscard]] RateAccountingObservation Observe(
+    std::int64_t current_receive_time_ns,
+    double expected_rate_hz,
+    double minimum_rate_ratio,
+    std::int64_t transition_debounce_ns);
+
+  [[nodiscard]] double AgeSeconds(std::int64_t current_receive_time_ns) const;
+
+private:
+  [[nodiscard]] static double WindowRateHz(
+    const std::deque<std::int64_t> & timestamps_ns) noexcept;
+
+  std::deque<std::int64_t> source_timestamps_ns_{};
+  std::deque<std::int64_t> receive_timestamps_ns_{};
+  std::int64_t last_header_stamp_ns_{-1};
+  std::int64_t last_receive_time_ns_{-1};
+  RateValidityDebouncer rate_debouncer_{};
+};
+
 struct SourceHealthObservation
 {
   std::string name{};
@@ -36,6 +78,11 @@ struct SourceHealthObservation
   bool diagnostic_error{false};
   double age_s{-1.0};
   double rate_hz{0.0};
+  double source_rate_hz{0.0};
+  double receive_rate_hz{0.0};
+  bool source_rate_available{false};
+  std::string rate_basis{"unavailable"};
+  std::string rate_quality{"BELOW_MINIMUM"};
   std::string detail{};
 };
 

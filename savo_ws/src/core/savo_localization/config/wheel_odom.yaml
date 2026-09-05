@@ -5,8 +5,15 @@ wheel_odom_node:
 
     wheel_odom_topic: /wheel/odom
     wheel_odom_state_topic: /savo_localization/wheel_odom_state
+    wheel_odom_debug_topic: /savo_localization/wheel_odom_debug
 
     publish_rate_hz: 30.0
+    health_publish_rate_hz: 5.0
+    producer_rate_window_size: 30
+    timestamp_fault_hold_s: 2.0
+    publish_debug_state: false
+    debug_publish_rate_hz: 5.0
+    max_encoder_illegal_transitions: 20
     timeout_s: 0.5
 
     # EKF owns odom -> base_link TF in the normal localization stack.

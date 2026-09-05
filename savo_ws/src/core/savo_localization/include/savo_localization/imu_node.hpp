@@ -3,6 +3,7 @@
 #include <array>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "diagnostic_msgs/msg/diagnostic_array.hpp"
@@ -14,6 +15,7 @@
 
 #include "savo_localization/bno055_calibration.hpp"
 #include "savo_localization/bno055_driver.hpp"
+#include "savo_localization/producer_health.hpp"
 
 namespace savo_localization
 {
@@ -38,16 +40,22 @@ private:
 
   void timer_callback();
 
-  void publish_imu(const BNO055Sample & sample);
-  void publish_state(const BNO055Sample & sample);
-  void publish_diagnostics(const BNO055Sample & sample);
+  void publish_health_outputs(std::int64_t monotonic_time_ns, bool force);
+  void publish_state(const ProducerHealthSnapshot & snapshot);
+  void publish_diagnostics(const ProducerHealthSnapshot & snapshot);
 
   sensor_msgs::msg::Imu make_imu_msg(const BNO055Sample & sample) const;
-  std_msgs::msg::String make_state_msg(const BNO055Sample & sample) const;
+  std_msgs::msg::String make_state_msg(const ProducerHealthSnapshot & snapshot) const;
   diagnostic_msgs::msg::DiagnosticArray make_diagnostic_msg(
-    const BNO055Sample & sample) const;
+    const ProducerHealthSnapshot & snapshot) const;
 
-  std::string make_state_json(const BNO055Sample & sample) const;
+  [[nodiscard]] ProducerHealthSnapshot make_health_snapshot(
+    std::int64_t monotonic_time_ns) const;
+  [[nodiscard]] bool sample_data_valid(const BNO055Sample & sample) const;
+  [[nodiscard]] bool output_due(
+    std::int64_t monotonic_time_ns,
+    std::int64_t last_publish_time_ns,
+    double rate_hz) const;
 
   BNO055Mode configured_mode() const;
   BNO055CalibrationMetadata calibration_metadata(bool include_timestamp) const;
@@ -78,6 +86,10 @@ private:
   std::string mode_{"ndof"};
 
   double publish_rate_hz_{25.0};
+  double health_publish_rate_hz_{5.0};
+  double diagnostics_publish_rate_hz_{2.0};
+  double timestamp_fault_hold_s_{2.0};
+  std::size_t producer_rate_window_size_{30U};
   bool reset_on_start_{true};
   bool calibration_restore_enabled_{true};
   bool calibration_require_verified_restore_{true};
@@ -117,9 +129,15 @@ private:
   std::uint64_t publish_count_{0};
   std::uint64_t error_count_{0};
   bool have_live_calibration_status_{false};
-
-  rclcpp::Time last_sample_time_;
-  bool have_last_sample_{false};
+  bool last_sample_data_valid_{false};
+  bool read_error_active_{false};
+  std::optional<BNO055Sample> last_sample_{};
+  ProducerRateTracker producer_rate_tracker_{};
+  std::int64_t timestamp_fault_until_ns_{0};
+  std::int64_t last_health_publish_ns_{-1};
+  std::int64_t last_diagnostics_publish_ns_{-1};
+  std::string last_health_state_{};
+  std::string last_health_reason_{};
 };
 
 }  // namespace savo_localization

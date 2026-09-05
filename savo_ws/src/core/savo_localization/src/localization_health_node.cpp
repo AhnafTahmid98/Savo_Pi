@@ -8,11 +8,9 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
-#include <deque>
 #include <iomanip>
 #include <limits>
 #include <memory>
-#include <regex>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -26,7 +24,7 @@
 #include "geometry_msgs/msg/quaternion.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "rclcpp/rclcpp.hpp"
-#include "sensor_msgs/msg/imu.hpp"
+#include "savo_localization/producer_health.hpp"
 #include "std_msgs/msg/string.hpp"
 #include "tf2/exceptions.hpp"
 #include "tf2/time.hpp"
@@ -38,7 +36,6 @@ namespace savo_localization
 namespace
 {
 
-constexpr std::size_t kRateWindowMinimum{3U};
 constexpr std::size_t kMaxReasonCount{16U};
 constexpr double kPi{3.14159265358979323846};
 
@@ -68,20 +65,6 @@ bool all_finite(const ContainerT & values)
   return std::all_of(
     values.begin(), values.end(),
     [](const auto value) {return finite(static_cast<double>(value));});
-}
-
-bool valid_imu_message(const sensor_msgs::msg::Imu & message)
-{
-  return finite_quaternion(message.orientation) &&
-         finite(message.angular_velocity.x) &&
-         finite(message.angular_velocity.y) &&
-         finite(message.angular_velocity.z) &&
-         finite(message.linear_acceleration.x) &&
-         finite(message.linear_acceleration.y) &&
-         finite(message.linear_acceleration.z) &&
-         all_finite(message.orientation_covariance) &&
-         all_finite(message.angular_velocity_covariance) &&
-         all_finite(message.linear_acceleration_covariance);
 }
 
 bool valid_odom_message(const nav_msgs::msg::Odometry & message)
@@ -208,30 +191,10 @@ std::string join_reasons(const std::vector<std::string> & reasons)
   return output.str();
 }
 
-bool contains_case_sensitive(
-  const std::string & value,
-  const std::string & token)
+std::int64_t steady_now_ns()
 {
-  return value.find(token) != std::string::npos;
-}
-
-int extract_json_integer(
-  const std::string & payload,
-  const std::string & key,
-  const int fallback)
-{
-  const std::regex expression(
-    "\\\"" + key + "\\\"\\s*:\\s*(-?[0-9]+)");
-  std::smatch match;
-  if (!std::regex_search(payload, match, expression) || match.size() < 2U) {
-    return fallback;
-  }
-
-  try {
-    return std::stoi(match[1].str());
-  } catch (const std::exception &) {
-    return fallback;
-  }
+  return std::chrono::duration_cast<std::chrono::nanoseconds>(
+    std::chrono::steady_clock::now().time_since_epoch()).count();
 }
 
 struct RuntimeTracker
@@ -243,13 +206,11 @@ struct RuntimeTracker
   bool diagnostic_error{false};
   std::string detail{};
 
-  rclcpp::Time last_receive{};
-  std::int64_t last_header_stamp_ns{-1};
-  double timestamp_fault_until_s{0.0};
-  std::deque<double> arrival_times_s{};
+  RateAccountingTracker rate_accounting{};
+  std::int64_t timestamp_fault_until_ns{0};
 
   void record(
-    const rclcpp::Time & receive_time,
+    const std::int64_t receive_time_ns,
     const builtin_interfaces::msg::Time & header_stamp,
     const bool valid_data,
     const bool valid_frame,
@@ -261,47 +222,23 @@ struct RuntimeTracker
     data_valid = valid_data;
     frame_valid = valid_frame;
     detail = std::move(observation_detail);
-    last_receive = receive_time;
-
     const std::int64_t header_ns = rclcpp::Time(header_stamp).nanoseconds();
-    if (header_ns > 0) {
-      if (last_header_stamp_ns > 0 && header_ns < last_header_stamp_ns) {
-        timestamp_fault_until_s = receive_time.seconds() + timestamp_fault_hold_s;
-      }
-      last_header_stamp_ns = header_ns;
-    }
-
-    arrival_times_s.push_back(receive_time.seconds());
-    while (arrival_times_s.size() > rate_window_size) {
-      arrival_times_s.pop_front();
+    if (rate_accounting.Record(receive_time_ns, header_ns, rate_window_size)) {
+      const auto fault_hold_ns = static_cast<std::int64_t>(
+        std::llround(timestamp_fault_hold_s * 1.0e9));
+      timestamp_fault_until_ns = std::max(
+        timestamp_fault_until_ns, receive_time_ns + fault_hold_ns);
     }
   }
 
-  [[nodiscard]] double age_s(const rclcpp::Time & current_time) const
+  [[nodiscard]] double age_s(const std::int64_t current_receive_time_ns) const
   {
-    if (!received) {
-      return -1.0;
-    }
-    return std::max(0.0, (current_time - last_receive).seconds());
+    return received ? rate_accounting.AgeSeconds(current_receive_time_ns) : -1.0;
   }
 
-  [[nodiscard]] double rate_hz() const
+  [[nodiscard]] bool timestamp_valid(const std::int64_t current_receive_time_ns) const
   {
-    if (arrival_times_s.size() < kRateWindowMinimum) {
-      return 0.0;
-    }
-
-    const double duration_s = arrival_times_s.back() - arrival_times_s.front();
-    if (!finite(duration_s) || duration_s <= 0.0) {
-      return 0.0;
-    }
-
-    return static_cast<double>(arrival_times_s.size() - 1U) / duration_s;
-  }
-
-  [[nodiscard]] bool timestamp_valid(const rclcpp::Time & current_time) const
-  {
-    return current_time.seconds() >= timestamp_fault_until_s;
+    return current_receive_time_ns >= timestamp_fault_until_ns;
   }
 };
 
@@ -355,10 +292,8 @@ private:
     startup_grace_s_ = declare_parameter<double>("startup_grace_s", 3.0);
     timestamp_fault_hold_s_ = declare_parameter<double>("timestamp_fault_hold_s", 2.0);
 
-    imu_topic_ = declare_parameter<std::string>("imu_topic", "/imu/data");
     imu_state_topic_ = declare_parameter<std::string>(
       "imu_state_topic", "/savo_localization/imu_state");
-    wheel_odom_topic_ = declare_parameter<std::string>("wheel_odom_topic", "/wheel/odom");
     wheel_odom_state_topic_ = declare_parameter<std::string>(
       "wheel_odom_state_topic", "/savo_localization/wheel_odom_state");
     filtered_odom_topic_ = declare_parameter<std::string>(
@@ -392,6 +327,8 @@ private:
     expected_ekf_rate_hz_ = declare_parameter<double>("expected_ekf_rate_hz", 30.0);
     expected_vo_rate_hz_ = declare_parameter<double>("expected_vo_rate_hz", 15.0);
     rate_tolerance_ratio_ = declare_parameter<double>("rate_tolerance_ratio", 0.50);
+    rate_transition_debounce_s_ = declare_parameter<double>(
+      "rate_transition_debounce_s", 1.0);
     const int rate_window_size = declare_parameter<int>("rate_window_size", 30);
     rate_window_size_ = static_cast<std::size_t>(std::max(3, rate_window_size));
 
@@ -418,18 +355,20 @@ private:
 
   void validate_parameters() const
   {
-    const std::array<double, 17> positive_values{
+    const std::array<double, 18> positive_values{
       publish_rate_hz_, heartbeat_rate_hz_, startup_grace_s_,
       timestamp_fault_hold_s_, expected_imu_rate_hz_,
       expected_wheel_odom_rate_hz_, expected_ekf_rate_hz_,
-      expected_vo_rate_hz_, rate_tolerance_ratio_, max_imu_age_s_,
+      expected_vo_rate_hz_, rate_tolerance_ratio_, rate_transition_debounce_s_,
+      max_imu_age_s_,
       max_wheel_odom_age_s_, max_filtered_odom_age_s_, max_vo_odom_age_s_,
       max_tf_age_s_, max_odom_linear_speed_mps_,
       max_odom_angular_speed_rad_s_, max_pose_jump_m_};
 
     for (const double value : positive_values) {
       if (!finite(value) || value <= 0.0) {
-        throw std::invalid_argument("localization health numeric parameters must be finite and > 0");
+        throw std::invalid_argument(
+            "localization health numeric parameters must be finite and > 0");
       }
     }
 
@@ -443,11 +382,10 @@ private:
       throw std::invalid_argument("max_encoder_illegal_transitions must be >= 0");
     }
 
-    const std::array<std::string, 13> names{
-      imu_topic_, imu_state_topic_, wheel_odom_topic_, wheel_odom_state_topic_,
-      filtered_odom_topic_, vo_odom_topic_, diagnostics_topic_, health_topic_,
-      state_summary_topic_, heartbeat_topic_, odom_frame_id_, base_frame_id_,
-      imu_frame_id_};
+    const std::array<std::string, 11> names{
+      imu_state_topic_, wheel_odom_state_topic_, filtered_odom_topic_, vo_odom_topic_,
+      diagnostics_topic_, health_topic_, state_summary_topic_, heartbeat_topic_,
+      odom_frame_id_, base_frame_id_, imu_frame_id_};
     for (const auto & name : names) {
       if (name.empty()) {
         throw std::invalid_argument("localization health topic and frame names cannot be empty");
@@ -472,50 +410,23 @@ private:
 
   void create_subscriptions()
   {
-    imu_subscription_ = create_subscription<sensor_msgs::msg::Imu>(
-      imu_topic_, rclcpp::SensorDataQoS(),
-      [this](sensor_msgs::msg::Imu::ConstSharedPtr message) {on_imu(*message);});
-
-    wheel_odom_subscription_ = create_subscription<nav_msgs::msg::Odometry>(
-      wheel_odom_topic_, rclcpp::SensorDataQoS(),
-      [this](nav_msgs::msg::Odometry::ConstSharedPtr message) {on_wheel_odom(*message);});
-
     filtered_odom_subscription_ = create_subscription<nav_msgs::msg::Odometry>(
-      filtered_odom_topic_, rclcpp::SensorDataQoS(),
+      filtered_odom_topic_, rclcpp::SensorDataQoS().keep_last(1),
       [this](nav_msgs::msg::Odometry::ConstSharedPtr message) {on_filtered_odom(*message);});
 
     vo_odom_subscription_ = create_subscription<nav_msgs::msg::Odometry>(
-      vo_odom_topic_, rclcpp::SensorDataQoS(),
+      vo_odom_topic_, rclcpp::SensorDataQoS().keep_last(1),
       [this](nav_msgs::msg::Odometry::ConstSharedPtr message) {on_vo_odom(*message);});
 
+    const auto snapshot_qos = rclcpp::QoS(
+      rclcpp::KeepLast(1)).reliable().transient_local();
     imu_state_subscription_ = create_subscription<std_msgs::msg::String>(
-      imu_state_topic_, rclcpp::QoS(10).reliable(),
+      imu_state_topic_, snapshot_qos,
       [this](std_msgs::msg::String::ConstSharedPtr message) {on_imu_state(message->data);});
 
     wheel_state_subscription_ = create_subscription<std_msgs::msg::String>(
-      wheel_odom_state_topic_, rclcpp::QoS(10).reliable(),
+      wheel_odom_state_topic_, snapshot_qos,
       [this](std_msgs::msg::String::ConstSharedPtr message) {on_wheel_state(message->data);});
-
-    diagnostics_subscription_ = create_subscription<diagnostic_msgs::msg::DiagnosticArray>(
-      diagnostics_topic_, rclcpp::QoS(10).reliable(),
-      [this](diagnostic_msgs::msg::DiagnosticArray::ConstSharedPtr message) {
-        on_diagnostics(*message);
-      });
-  }
-
-  void on_imu(const sensor_msgs::msg::Imu & message)
-  {
-    const auto receive_time = now();
-    const bool frame_valid = message.header.frame_id == imu_frame_id_;
-    imu_tracker_.record(
-      receive_time,
-      message.header.stamp,
-      valid_imu_message(message),
-      frame_valid,
-      frame_valid ? std::string{} :
-      "expected=" + imu_frame_id_ + ",actual=" + message.header.frame_id,
-      timestamp_fault_hold_s_,
-      rate_window_size_);
   }
 
   bool odom_speed_valid(const nav_msgs::msg::Odometry & message) const
@@ -547,13 +458,8 @@ private:
     }
 
     tracker.record(
-      now(), message.header.stamp, data_valid, frame_valid, detail,
+      steady_now_ns(), message.header.stamp, data_valid, frame_valid, detail,
       timestamp_fault_hold_s_, rate_window_size_);
-  }
-
-  void on_wheel_odom(const nav_msgs::msg::Odometry & message)
-  {
-    record_odom(wheel_tracker_, message, odom_frame_id_, base_frame_id_);
   }
 
   void on_filtered_odom(const nav_msgs::msg::Odometry & message)
@@ -599,85 +505,119 @@ private:
 
   void on_imu_state(const std::string & payload)
   {
-    if (contains_case_sensitive(payload, "unexpected BNO055 chip id") ||
-      contains_case_sensitive(payload, "BNO055 system error") ||
-      contains_case_sensitive(payload, "BNO055 calibration restore failed"))
-    {
-      imu_tracker_.diagnostic_error = true;
-      imu_tracker_.detail = "imu_state_reports_error";
-    } else if (contains_case_sensitive(payload, "IMU usable, calibration restore failed")) {
-      imu_tracker_.diagnostic_error = false;
-      imu_tracker_.diagnostic_warning = true;
-      imu_tracker_.detail = "imu_calibration_restore_failed_optional";
-    } else if (contains_case_sensitive(payload, "calibration not fully ready")) {
-      imu_tracker_.diagnostic_error = false;
-      imu_tracker_.diagnostic_warning = true;
-      imu_tracker_.detail = "imu_calibration_not_motion_ready";
-    } else if (contains_case_sensitive(payload, "IMU healthy")) {
-      imu_tracker_.diagnostic_error = false;
-      imu_tracker_.diagnostic_warning = false;
-    }
+    imu_tracker_.Record(steady_now_ns(), payload, rate_window_size_);
   }
 
   void on_wheel_state(const std::string & payload)
   {
-    if (!contains_case_sensitive(payload, "\"status\":\"OK\"")) {
-      wheel_tracker_.diagnostic_error = true;
-      wheel_tracker_.detail = "wheel_state_not_ok";
-      return;
-    }
-
-    wheel_tracker_.diagnostic_error = false;
-    const int illegal_transitions = extract_json_integer(
-      payload, "total_illegal_transitions", -1);
-    if (illegal_transitions > max_encoder_illegal_transitions_) {
-      wheel_tracker_.diagnostic_warning = true;
-      wheel_tracker_.detail = "encoder_illegal_transition_limit_exceeded";
-    } else {
-      wheel_tracker_.diagnostic_warning = false;
-    }
+    wheel_tracker_.Record(steady_now_ns(), payload, rate_window_size_);
   }
 
-  void on_diagnostics(const diagnostic_msgs::msg::DiagnosticArray & message)
-  {
-    for (const auto & status : message.status) {
-      if (status.name != "savo_localization/imu_node") {
-        continue;
-      }
-
-      imu_tracker_.diagnostic_error =
-        status.level >= diagnostic_msgs::msg::DiagnosticStatus::ERROR;
-      imu_tracker_.diagnostic_warning =
-        status.level == diagnostic_msgs::msg::DiagnosticStatus::WARN;
-      if (imu_tracker_.diagnostic_error || imu_tracker_.diagnostic_warning) {
-        imu_tracker_.detail = status.message;
-      }
-    }
-  }
-
-  [[nodiscard]] SourceHealthObservation make_source_observation(
+  [[nodiscard]] SourceHealthObservation make_producer_observation(
     const std::string & name,
-    const RuntimeTracker & tracker,
+    ProducerHealthConsumer & tracker,
     const bool enabled,
     const bool required,
     const double max_age_s,
     const double expected_rate_hz,
-    const rclcpp::Time & current_time) const
+    const std::string & expected_node,
+    const std::string & expected_frame,
+    const std::string & expected_child_frame,
+    const std::int64_t current_receive_time_ns)
+  {
+    SourceHealthObservation observation;
+    observation.name = name;
+    observation.enabled = enabled;
+    observation.required = required;
+    const auto consumed = tracker.Observe(current_receive_time_ns, max_age_s);
+    observation.received = consumed.received;
+    observation.detail = consumed.detail;
+    if (!consumed.received) {
+      return observation;
+    }
+
+    const bool identity_valid = consumed.payload_valid &&
+      consumed.snapshot.node == expected_node;
+    const bool expected_frames_valid = expected_child_frame.empty() ?
+      consumed.snapshot.frame_id == expected_frame :
+      consumed.snapshot.parent_frame_id == expected_frame &&
+      consumed.snapshot.child_frame_id == expected_child_frame;
+    const bool frame_valid = consumed.payload_valid &&
+      consumed.snapshot.frame_valid && expected_frames_valid;
+
+    observation.age_s = consumed.producer_age_s >= 0.0 ?
+      std::max(consumed.receive_age_s, consumed.producer_age_s) :
+      consumed.receive_age_s;
+    observation.fresh = consumed.fresh;
+    observation.data_valid = consumed.payload_valid && identity_valid &&
+      consumed.snapshot.data_valid;
+    observation.frame_valid = frame_valid;
+    observation.timestamp_valid = consumed.payload_valid &&
+      consumed.snapshot.timestamp_valid;
+
+    observation.source_rate_available = consumed.payload_valid &&
+      consumed.snapshot.producer_rate_available;
+    observation.source_rate_hz = consumed.payload_valid ?
+      consumed.snapshot.producer_rate_hz : 0.0;
+    observation.receive_rate_hz = consumed.receive_rate_hz;
+    observation.rate_hz = observation.source_rate_hz;
+    observation.rate_valid = tracker.ObserveRateValid(
+      current_receive_time_ns,
+      expected_rate_hz,
+      rate_tolerance_ratio_,
+      static_cast<std::int64_t>(std::llround(rate_transition_debounce_s_ * 1.0e9)));
+    observation.rate_basis = "producer_successful_publication";
+    observation.rate_quality = std::string(ProducerRateTracker::QualityString(
+        ProducerRateTracker::ClassifyQuality(
+          observation.source_rate_hz, expected_rate_hz)));
+
+    observation.diagnostic_error = !consumed.payload_valid || !identity_valid ||
+      consumed.snapshot.health_state == "ERROR" || !consumed.snapshot.hardware_ok;
+    observation.diagnostic_warning = consumed.payload_valid &&
+      (consumed.snapshot.health_state == "DEGRADED" ||
+      !consumed.snapshot.motion_ready ||
+      (name == "wheel_odom" && consumed.snapshot.illegal_transition_count >
+      static_cast<std::uint64_t>(max_encoder_illegal_transitions_)));
+    if (!identity_valid && consumed.payload_valid) {
+      observation.detail = "expected_node=" + expected_node +
+        ",actual_node=" + consumed.snapshot.node;
+    } else if (!frame_valid && consumed.payload_valid) {
+      observation.detail = "producer_frame_mismatch";
+    }
+    return observation;
+  }
+
+  [[nodiscard]] SourceHealthObservation make_source_observation(
+    const std::string & name,
+    RuntimeTracker & tracker,
+    const bool enabled,
+    const bool required,
+    const double max_age_s,
+    const double expected_rate_hz,
+    const std::int64_t current_receive_time_ns)
   {
     SourceHealthObservation observation;
     observation.name = name;
     observation.enabled = enabled;
     observation.required = required;
     observation.received = tracker.received;
-    observation.age_s = tracker.age_s(current_time);
+    observation.age_s = tracker.age_s(current_receive_time_ns);
     observation.fresh = tracker.received && observation.age_s <= max_age_s;
     observation.data_valid = tracker.data_valid;
     observation.frame_valid = tracker.frame_valid;
-    observation.timestamp_valid = tracker.timestamp_valid(current_time);
-    observation.rate_hz = tracker.rate_hz();
-    observation.rate_valid =
-      tracker.arrival_times_s.size() < kRateWindowMinimum ||
-      observation.rate_hz >= expected_rate_hz * rate_tolerance_ratio_;
+    observation.timestamp_valid = tracker.timestamp_valid(current_receive_time_ns);
+    const auto rates = tracker.rate_accounting.Observe(
+      current_receive_time_ns, expected_rate_hz, rate_tolerance_ratio_,
+      static_cast<std::int64_t>(std::llround(rate_transition_debounce_s_ * 1.0e9)));
+    observation.source_rate_hz = rates.source_rate_hz;
+    observation.receive_rate_hz = rates.receive_rate_hz;
+    observation.source_rate_available = rates.source_rate_available;
+    observation.rate_hz = rates.validation_rate_hz;
+    observation.rate_valid = rates.rate_valid;
+    observation.rate_basis = rates.source_rate_available ?
+      "source_header" : "callback_receive";
+    observation.rate_quality = std::string(
+      ProducerRateTracker::QualityString(rates.quality));
     observation.diagnostic_warning = tracker.diagnostic_warning;
     observation.diagnostic_error = tracker.diagnostic_error;
     observation.detail = tracker.detail;
@@ -713,24 +653,28 @@ private:
     return result;
   }
 
-  [[nodiscard]] LocalizationHealthInputs build_inputs(const rclcpp::Time & current_time)
+  [[nodiscard]] LocalizationHealthInputs build_inputs(
+    const rclcpp::Time & current_time,
+    const std::int64_t current_receive_time_ns)
   {
     LocalizationHealthInputs inputs;
     inputs.startup_age_s = std::max(0.0, (current_time - start_time_).seconds());
     inputs.startup_grace_s = startup_grace_s_;
 
-    inputs.imu = make_source_observation(
+    inputs.imu = make_producer_observation(
       "imu", imu_tracker_, use_imu_, use_imu_, max_imu_age_s_,
-      expected_imu_rate_hz_, current_time);
-    inputs.wheel_odom = make_source_observation(
+      expected_imu_rate_hz_, "imu_node", imu_frame_id_, "",
+      current_receive_time_ns);
+    inputs.wheel_odom = make_producer_observation(
       "wheel_odom", wheel_tracker_, use_wheel_odom_, use_wheel_odom_,
-      max_wheel_odom_age_s_, expected_wheel_odom_rate_hz_, current_time);
+      max_wheel_odom_age_s_, expected_wheel_odom_rate_hz_, "wheel_odom_node",
+      odom_frame_id_, base_frame_id_, current_receive_time_ns);
     inputs.filtered_odom = make_source_observation(
       "filtered_odom", filtered_tracker_, use_ekf_, use_ekf_,
-      max_filtered_odom_age_s_, expected_ekf_rate_hz_, current_time);
+      max_filtered_odom_age_s_, expected_ekf_rate_hz_, current_receive_time_ns);
     inputs.vo_odom = make_source_observation(
       "vo_odom", vo_tracker_, use_vo_, vo_required_, max_vo_odom_age_s_,
-      expected_vo_rate_hz_, current_time);
+      expected_vo_rate_hz_, current_receive_time_ns);
 
     const auto odom_to_base = observe_transform(
       odom_frame_id_, base_frame_id_, true, current_time);
@@ -775,6 +719,11 @@ private:
            << "\"diagnostic_error\":" << bool_text(source.diagnostic_error) << ','
            << "\"age_s\":" << source.age_s << ','
            << "\"rate_hz\":" << source.rate_hz << ','
+           << "\"source_rate_hz\":" << source.source_rate_hz << ','
+           << "\"receive_rate_hz\":" << source.receive_rate_hz << ','
+           << "\"source_rate_available\":" << bool_text(source.source_rate_available) << ','
+           << "\"rate_basis\":\"" << source.rate_basis << "\","
+           << "\"rate_quality\":\"" << source.rate_quality << "\","
            << "\"detail\":\"" << escape_json(source.detail) << "\""
            << '}';
   }
@@ -886,7 +835,7 @@ private:
   void evaluate_and_publish()
   {
     const auto current_time = now();
-    const auto inputs = build_inputs(current_time);
+    const auto inputs = build_inputs(current_time, steady_now_ns());
     const auto result = core_.Evaluate(inputs);
 
     std_msgs::msg::String health_message;
@@ -947,9 +896,7 @@ private:
   double startup_grace_s_{3.0};
   double timestamp_fault_hold_s_{2.0};
 
-  std::string imu_topic_{"/imu/data"};
   std::string imu_state_topic_{"/savo_localization/imu_state"};
-  std::string wheel_odom_topic_{"/wheel/odom"};
   std::string wheel_odom_state_topic_{"/savo_localization/wheel_odom_state"};
   std::string filtered_odom_topic_{"/odometry/filtered"};
   std::string vo_odom_topic_{"/vo/odom"};
@@ -975,6 +922,7 @@ private:
   double expected_ekf_rate_hz_{30.0};
   double expected_vo_rate_hz_{15.0};
   double rate_tolerance_ratio_{0.50};
+  double rate_transition_debounce_s_{1.0};
   std::size_t rate_window_size_{30U};
 
   double max_imu_age_s_{0.5};
@@ -990,8 +938,8 @@ private:
   bool log_warnings_{true};
   bool log_errors_{true};
 
-  RuntimeTracker imu_tracker_{};
-  RuntimeTracker wheel_tracker_{};
+  ProducerHealthConsumer imu_tracker_{};
+  ProducerHealthConsumer wheel_tracker_{};
   RuntimeTracker filtered_tracker_{};
   RuntimeTracker vo_tracker_{};
 
@@ -1016,15 +964,10 @@ private:
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr heartbeat_publisher_;
   rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr diagnostics_publisher_;
 
-  rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_subscription_;
-  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr wheel_odom_subscription_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr filtered_odom_subscription_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr vo_odom_subscription_;
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr imu_state_subscription_;
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr wheel_state_subscription_;
-  rclcpp::Subscription<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr
-    diagnostics_subscription_;
-
   rclcpp::TimerBase::SharedPtr health_timer_;
   rclcpp::TimerBase::SharedPtr heartbeat_timer_;
 };

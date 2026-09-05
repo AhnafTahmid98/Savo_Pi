@@ -15,6 +15,9 @@ namespace
 using savo_localization::LocalizationHealthCore;
 using savo_localization::LocalizationHealthInputs;
 using savo_localization::LocalizationHealthState;
+using savo_localization::ProducerRateTracker;
+using savo_localization::RateAccountingTracker;
+using savo_localization::RateQuality;
 using savo_localization::SourceHealthObservation;
 using savo_localization::TransformHealthObservation;
 
@@ -34,6 +37,11 @@ SourceHealthObservation healthy_source(
   source.rate_valid = true;
   source.age_s = 0.01;
   source.rate_hz = 30.0;
+  source.source_rate_hz = 30.0;
+  source.receive_rate_hz = 30.0;
+  source.source_rate_available = true;
+  source.rate_basis = "source_header";
+  source.rate_quality = "EXCELLENT";
   return source;
 }
 
@@ -76,6 +84,129 @@ TEST(LocalizationHealthCoreTest, ConvertsAllStatesToStableStrings)
   for (const auto & item : expected) {
     EXPECT_EQ(LocalizationHealthCore::ToString(item.first), item.second);
   }
+}
+
+TEST(LocalizationHealthCoreTest, ObservedEkfSeparatesHeaderAndReceiveRates)
+{
+  RateAccountingTracker tracker;
+  constexpr std::int64_t kHeaderPeriodNs = 40000000LL;
+  constexpr std::int64_t kReceivePeriodNs = 85000000LL;
+  constexpr std::int64_t kBaseNs = 1000000000LL;
+  for (std::int64_t index = 0; index < 30; ++index) {
+    EXPECT_FALSE(tracker.Record(
+        kBaseNs + index * kReceivePeriodNs,
+        kBaseNs + index * kHeaderPeriodNs,
+        30U));
+  }
+
+  const auto rates = tracker.Observe(
+    kBaseNs + 29 * kReceivePeriodNs, 25.0, 0.50, 1000000000LL);
+  EXPECT_TRUE(rates.source_rate_available);
+  EXPECT_TRUE(rates.receive_rate_available);
+  EXPECT_NEAR(rates.source_rate_hz, 25.0, 0.01);
+  EXPECT_NEAR(rates.receive_rate_hz, 11.7647, 0.01);
+  EXPECT_NEAR(rates.validation_rate_hz, 25.0, 0.01);
+  EXPECT_TRUE(rates.rate_valid);
+  EXPECT_EQ(rates.quality, RateQuality::kExcellent);
+}
+
+TEST(LocalizationHealthCoreTest, GenuineLowSourceRateFailsClosed)
+{
+  RateAccountingTracker tracker;
+  constexpr std::int64_t kPeriodNs = 100000000LL;
+  constexpr std::int64_t kBaseNs = 1000000000LL;
+  for (std::int64_t index = 0; index < 5; ++index) {
+    EXPECT_FALSE(tracker.Record(
+        kBaseNs + index * kPeriodNs,
+        kBaseNs + index * kPeriodNs,
+        30U));
+  }
+
+  const auto rates = tracker.Observe(
+    kBaseNs + 4 * kPeriodNs, 25.0, 0.50, 1000000000LL);
+  EXPECT_NEAR(rates.source_rate_hz, 10.0, 0.01);
+  EXPECT_FALSE(rates.rate_valid);
+  EXPECT_EQ(rates.quality, RateQuality::kBelowMinimum);
+}
+
+TEST(LocalizationHealthCoreTest, MissingSourceTimingFallsBackFailClosedToReceiveRate)
+{
+  RateAccountingTracker tracker;
+  constexpr std::int64_t kPeriodNs = 100000000LL;
+  constexpr std::int64_t kBaseNs = 1000000000LL;
+  for (std::int64_t index = 0; index < 5; ++index) {
+    EXPECT_FALSE(tracker.Record(
+        kBaseNs + index * kPeriodNs,
+        0,
+        30U));
+  }
+
+  const auto rates = tracker.Observe(
+    kBaseNs + 4 * kPeriodNs, 25.0, 0.50, 1000000000LL);
+  EXPECT_FALSE(rates.source_rate_available);
+  EXPECT_TRUE(rates.receive_rate_available);
+  EXPECT_NEAR(rates.validation_rate_hz, 10.0, 0.01);
+  EXPECT_FALSE(rates.rate_valid);
+}
+
+TEST(LocalizationHealthCoreTest, RateQualityBoundariesAreStableMetadata)
+{
+  EXPECT_EQ(
+    ProducerRateTracker::ClassifyQuality(12.49, 25.0),
+    RateQuality::kBelowMinimum);
+  EXPECT_EQ(
+    ProducerRateTracker::ClassifyQuality(12.50, 25.0),
+    RateQuality::kMinimum);
+  EXPECT_EQ(
+    ProducerRateTracker::ClassifyQuality(18.75, 25.0),
+    RateQuality::kGood);
+  EXPECT_EQ(
+    ProducerRateTracker::ClassifyQuality(22.50, 25.0),
+    RateQuality::kExcellent);
+  EXPECT_EQ(
+    ProducerRateTracker::QualityString(RateQuality::kMinimum),
+    "MINIMUM");
+  EXPECT_EQ(
+    ProducerRateTracker::QualityString(RateQuality::kGood),
+    "GOOD");
+  EXPECT_EQ(
+    ProducerRateTracker::QualityString(RateQuality::kExcellent),
+    "EXCELLENT");
+}
+
+TEST(LocalizationHealthCoreTest, EstablishedRateUsesTransitionDebounce)
+{
+  RateAccountingTracker tracker;
+  constexpr std::int64_t kBaseNs = 1000000000LL;
+  for (std::int64_t index = 0; index < 3; ++index) {
+    EXPECT_FALSE(tracker.Record(
+        kBaseNs + index * 40000000LL,
+        kBaseNs + index * 40000000LL,
+        3U));
+  }
+  EXPECT_TRUE(tracker.Observe(
+      kBaseNs + 80000000LL, 25.0, 0.50, 1000000000LL).rate_valid);
+
+  for (std::int64_t index = 1; index <= 3; ++index) {
+    EXPECT_FALSE(tracker.Record(
+        kBaseNs + 80000000LL + index * 200000000LL,
+        kBaseNs + 80000000LL + index * 200000000LL,
+        3U));
+  }
+  const auto pending = tracker.Observe(
+    kBaseNs + 680000000LL, 25.0, 0.50, 1000000000LL);
+  EXPECT_LT(pending.source_rate_hz, 12.5);
+  EXPECT_TRUE(pending.rate_valid);
+  EXPECT_FALSE(tracker.Observe(
+      kBaseNs + 1680000000LL, 25.0, 0.50, 1000000000LL).rate_valid);
+}
+
+TEST(LocalizationHealthCoreTest, HeaderTimestampRegressionIsReported)
+{
+  RateAccountingTracker tracker;
+  EXPECT_FALSE(tracker.Record(1000000000LL, 1000000000LL, 30U));
+  EXPECT_FALSE(tracker.Record(1100000000LL, 1100000000LL, 30U));
+  EXPECT_TRUE(tracker.Record(1200000000LL, 1050000000LL, 30U));
 }
 
 TEST(LocalizationHealthCoreTest, ReportsOkWhenAllRequiredEvidenceIsHealthy)
@@ -127,6 +258,8 @@ TEST(LocalizationHealthCoreTest, StaleRequiredInputBlocksReadiness)
   auto inputs = healthy_inputs();
   inputs.wheel_odom.fresh = false;
   inputs.wheel_odom.age_s = 1.0;
+  inputs.wheel_odom.source_rate_hz = 30.0;
+  inputs.wheel_odom.rate_quality = "EXCELLENT";
 
   const auto result = core.Evaluate(inputs);
 
@@ -151,6 +284,25 @@ TEST(LocalizationHealthCoreTest, OptionalVoLossIsDegradedButReady)
   EXPECT_TRUE(result.ready);
   EXPECT_TRUE(result.degraded);
   EXPECT_EQ(result.reason_code, "localization_operational_degraded");
+}
+
+TEST(LocalizationHealthCoreTest, OptionalStaleVoIsDegradedButReady)
+{
+  const LocalizationHealthCore core;
+  auto inputs = healthy_inputs();
+  inputs.vo_odom = healthy_source("vo_odom", false);
+  inputs.vo_odom.fresh = false;
+  inputs.vo_odom.age_s = 1.0;
+  inputs.vo_odom.source_rate_hz = 15.0;
+  inputs.vo_odom.rate_quality = "EXCELLENT";
+
+  const auto result = core.Evaluate(inputs);
+
+  EXPECT_EQ(result.state, LocalizationHealthState::kDegraded);
+  EXPECT_TRUE(result.ready);
+  EXPECT_TRUE(result.degraded);
+  ASSERT_EQ(result.reasons.size(), 1U);
+  EXPECT_NE(result.reasons.front().find("vo_odom_stale_optional"), std::string::npos);
 }
 
 TEST(LocalizationHealthCoreTest, RequiredVoLossBlocksReadiness)

@@ -82,7 +82,7 @@ def main() -> int:
     parser.add_argument("--odom-topic", default="/wheel/odom")
     parser.add_argument(
         "--state-topic",
-        default="/savo_localization/wheel_odom_state",
+        default="/savo_localization/wheel_odom_debug",
     )
     parser.add_argument("--rate", type=float, default=2.0)
     parser.add_argument("--duration", type=float, default=0.0)
