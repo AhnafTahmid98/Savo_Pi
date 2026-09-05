@@ -107,3 +107,23 @@ def test_requested_production_layout_is_canonical():
         assert path.stat().st_size > 0, path
 
     assert not (ROOT / 'config/nav2').exists()
+
+
+def test_bt_navigator_enables_only_guarded_navigate_to_pose():
+    """Prevent Jazzy from loading stock motion-recovery through-poses BT."""
+    configs = (
+        ROOT / 'config/nav2_live_mapping.yaml',
+        ROOT / 'config/nav2_live_mapping_voxel.yaml',
+        ROOT / 'config/nav2_saved_map.yaml',
+        ROOT / 'config/nav2_saved_map_voxel.yaml',
+    )
+
+    for config in configs:
+        document = yaml.safe_load(config.read_text(encoding='utf-8'))
+        parameters = document['bt_navigator']['ros__parameters']
+
+        assert parameters['navigators'] == ['navigate_to_pose']
+        assert parameters['navigate_to_pose']['plugin'] == (
+            'nav2_bt_navigator::NavigateToPoseNavigator'
+        )
+        assert 'navigate_through_poses' not in parameters
