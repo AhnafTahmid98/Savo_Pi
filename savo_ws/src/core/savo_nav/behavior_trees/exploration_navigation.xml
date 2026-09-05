@@ -40,7 +40,7 @@
               <ClearEntireCostmap name="ClearExplorationLocalCostmapFinal" service_name="local_costmap/clear_entirely_local_costmap"/>
               <ClearEntireCostmap name="ClearExplorationGlobalCostmapFinal" service_name="global_costmap/clear_entirely_global_costmap"/>
             </Sequence>
-            <Wait wait_duration="0.5" error_code_id="{wait_error_code}"/>
+            <Wait wait_duration="0.5"/>
           </RoundRobin>
         </ReactiveFallback>
       </Sequence>

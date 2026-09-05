@@ -43,6 +43,21 @@ def test_trees_replan_and_use_only_non_motion_recovery():
         assert forbidden.isdisjoint(tags)
 
 
+def test_wait_nodes_use_jazzy_supported_ports_only():
+    """Keep package-owned Wait nodes compatible with Nav2 Jazzy."""
+    allowed_attributes = {'name', 'wait_duration'}
+
+    for path in (GUARDED_TREE, EXPLORATION_TREE):
+        root = ET.parse(path).getroot()
+        wait_nodes = list(root.iter('Wait'))
+
+        assert wait_nodes, path
+
+        for element in wait_nodes:
+            assert set(element.attrib) <= allowed_attributes, (path, element.attrib)
+            assert 'wait_duration' in element.attrib
+
+
 def test_nav2_behavior_server_exposes_wait_only():
     """Prevent built-in Nav2 motion behaviors from becoming executable."""
     document = yaml.safe_load(NAV2_CONFIG.read_text(encoding='utf-8'))
