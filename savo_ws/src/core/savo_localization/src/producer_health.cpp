@@ -147,9 +147,23 @@ bool RateValidityDebouncer::Observe(
 
   if (instant_valid) {
     low_rate_since_ns_ = -1;
-    debounced_rate_valid_ = true;
-    established_valid_rate_ = true;
+    if (!established_valid_rate_) {
+      valid_rate_since_ns_ = -1;
+      debounced_rate_valid_ = true;
+      established_valid_rate_ = true;
+    } else if (!debounced_rate_valid_) {
+      if (valid_rate_since_ns_ < 0) {
+        valid_rate_since_ns_ = monotonic_time_ns;
+      }
+      if (monotonic_time_ns - valid_rate_since_ns_ >= transition_debounce_ns) {
+        valid_rate_since_ns_ = -1;
+        debounced_rate_valid_ = true;
+      }
+    } else {
+      valid_rate_since_ns_ = -1;
+    }
   } else {
+    valid_rate_since_ns_ = -1;
     if (!established_valid_rate_) {
       debounced_rate_valid_ = false;
     } else if (debounced_rate_valid_) {

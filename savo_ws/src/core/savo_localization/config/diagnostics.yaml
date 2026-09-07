@@ -18,6 +18,9 @@ localization_health_node:
     rate_window_size: 30
     rate_tolerance_ratio: 0.50
     rate_transition_debounce_s: 1.0
+    # The 30-sample EKF window spans roughly 1-2 s near its 15 Hz minimum.
+    # Require sustained low/recovered EKF evidence before changing readiness.
+    ekf_rate_transition_debounce_s: 3.0
 
     max_imu_age_s: 0.5
     max_wheel_odom_age_s: 0.5

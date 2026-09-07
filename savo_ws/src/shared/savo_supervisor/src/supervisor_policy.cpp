@@ -186,6 +186,9 @@ bool states_consistent(const ComponentStatus & status)
   bool initialized = false;
   for (const auto channel : channels) {
     if (!channel_required(status.config, channel)) {continue;}
+    if (channel == Channel::kHeartbeat && status.config.heartbeat_liveness_only) {
+      continue;
+    }
     if (!initialized) {
       state = channel_state(status, channel);
       ready = channel_ready(status, channel);
@@ -194,7 +197,9 @@ bool states_consistent(const ComponentStatus & status)
       continue;
     }
     const auto observed_state = channel_state(status, channel);
-    if (channel == Channel::kHeartbeat && (observed_state.empty() || observed_state == "UNKNOWN")) {
+    if (channel == Channel::kHeartbeat &&
+      (observed_state.empty() || observed_state == "UNKNOWN"))
+    {
       if (channel_ready(status, channel) != ready) {return false;}
       continue;
     }
@@ -202,26 +207,6 @@ bool states_consistent(const ComponentStatus & status)
       return false;
     }
     if (channel != Channel::kHeartbeat && channel_degraded(status, channel) != degraded) {
-      return false;
-    }
-  }
-  return true;
-}
-
-bool semantically_compatible_operational_transition(
-  const ComponentStatus & status)
-{
-  const std::array<Channel, 3> channels{
-    Channel::kHealth, Channel::kSummary, Channel::kHeartbeat};
-  for (const auto channel : channels) {
-    if (!channel_required(status.config, channel)) {continue;}
-    const auto & state = channel_state(status, channel);
-    if ((state != "OK" && state != "DEGRADED") || !channel_ready(status, channel)) {
-      return false;
-    }
-    if (channel != Channel::kHeartbeat &&
-      channel_degraded(status, channel) != (state == "DEGRADED"))
-    {
       return false;
     }
   }
@@ -408,6 +393,7 @@ ComponentConfig SupervisorPolicy::DefaultLocalizationConfig()
     "localization", "/savo_localization/health", "/savo_localization/state_summary",
     "/savo_localization/heartbeat", true, true, true, 1.5, 1.5, 2.5, true);
   config.expected_schema_version = 1;
+  config.heartbeat_liveness_only = true;
   config.consistency_transition_grace_s = 1.5;
   return config;
 }
@@ -519,7 +505,7 @@ ComponentSummary SupervisorPolicy::EvaluateComponent(
   if (status.config.enforce_consistency) {
     if (states_consistent(status)) {
       status.consistency_mismatch_since.reset();
-    } else if (semantically_compatible_operational_transition(status)) {
+    } else {
       if (!status.consistency_mismatch_since.has_value()) {
         status.consistency_mismatch_since = now;
       }
@@ -528,19 +514,17 @@ ComponentSummary SupervisorPolicy::EvaluateComponent(
       if (mismatch_age_s > status.config.consistency_transition_grace_s) {
         set_component_result(result, ComponentState::INVALID, false, false,
           reason::kLocalizationStateInconsistent,
-          "compatible localization transition exceeded coherency grace");
+          "localization state transition exceeded coherency grace");
         return result;
       }
-    } else {
-      status.consistency_mismatch_since.reset();
-      set_component_result(result, ComponentState::INVALID, false, false,
-        reason::kLocalizationStateInconsistent, "required component channels disagree");
-      return result;
     }
   }
 
   for (const auto channel : channels) {
     if (!channel_required(status.config, channel)) {continue;}
+    if (channel == Channel::kHeartbeat && status.config.heartbeat_liveness_only) {
+      continue;
+    }
     const auto & observed_state = channel_state(status, channel);
     if (observed_state == "ERROR") {
       set_component_result(result, ComponentState::ERROR, false, false,

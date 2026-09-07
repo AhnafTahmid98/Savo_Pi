@@ -26,6 +26,7 @@ struct ComponentConfig
   bool summary_required{false};
   bool heartbeat_required{false};
   bool enforce_consistency{false};
+  bool heartbeat_liveness_only{false};
   double consistency_transition_grace_s{0.0};
 
   double health_timeout_s{1.0};

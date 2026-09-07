@@ -129,6 +129,25 @@ TEST(LocalizationHealthCoreTest, GenuineLowSourceRateFailsClosed)
   EXPECT_EQ(rates.quality, RateQuality::kBelowMinimum);
 }
 
+TEST(LocalizationHealthCoreTest, EkfTargetRateIsNotTheOperationalMinimum)
+{
+  RateAccountingTracker tracker;
+  constexpr std::int64_t kPeriodNs = 50000000LL;
+  constexpr std::int64_t kBaseNs = 1000000000LL;
+  for (std::int64_t index = 0; index < 30; ++index) {
+    EXPECT_FALSE(tracker.Record(
+        kBaseNs + index * kPeriodNs,
+        kBaseNs + index * kPeriodNs,
+        30U));
+  }
+
+  const auto rates = tracker.Observe(
+    kBaseNs + 29 * kPeriodNs, 30.0, 0.50, 3000000000LL);
+  EXPECT_NEAR(rates.source_rate_hz, 20.0, 0.01);
+  EXPECT_TRUE(rates.rate_valid);
+  EXPECT_EQ(rates.quality, RateQuality::kMinimum);
+}
+
 TEST(LocalizationHealthCoreTest, MissingSourceTimingFallsBackFailClosedToReceiveRate)
 {
   RateAccountingTracker tracker;
@@ -201,6 +220,37 @@ TEST(LocalizationHealthCoreTest, EstablishedRateUsesTransitionDebounce)
       kBaseNs + 1680000000LL, 25.0, 0.50, 1000000000LL).rate_valid);
 }
 
+TEST(LocalizationHealthCoreTest, TransientEkfLowRateDoesNotImmediatelyFail)
+{
+  RateAccountingTracker tracker;
+  constexpr std::int64_t kBaseNs = 1000000000LL;
+  constexpr std::int64_t kDebounceNs = 3000000000LL;
+  for (std::int64_t index = 0; index < 3; ++index) {
+    EXPECT_FALSE(tracker.Record(
+        kBaseNs + index * 33333333LL,
+        kBaseNs + index * 33333333LL,
+        3U));
+  }
+  EXPECT_TRUE(tracker.Observe(
+      kBaseNs + 66666666LL, 30.0, 0.50, kDebounceNs).rate_valid);
+
+  for (std::int64_t index = 1; index <= 3; ++index) {
+    EXPECT_FALSE(tracker.Record(
+        kBaseNs + 66666666LL + index * 100000000LL,
+        kBaseNs + 66666666LL + index * 100000000LL,
+        3U));
+  }
+  const auto transient = tracker.Observe(
+    kBaseNs + 366666666LL, 30.0, 0.50, kDebounceNs);
+  EXPECT_LT(transient.source_rate_hz, 15.0);
+  EXPECT_TRUE(transient.rate_valid);
+
+  EXPECT_TRUE(tracker.Observe(
+      kBaseNs + 3366666665LL, 30.0, 0.50, kDebounceNs).rate_valid);
+  EXPECT_FALSE(tracker.Observe(
+      kBaseNs + 3366666666LL, 30.0, 0.50, kDebounceNs).rate_valid);
+}
+
 TEST(LocalizationHealthCoreTest, HeaderTimestampRegressionIsReported)
 {
   RateAccountingTracker tracker;
@@ -269,6 +319,22 @@ TEST(LocalizationHealthCoreTest, StaleRequiredInputBlocksReadiness)
   EXPECT_NE(result.reasons.front().find("wheel_odom_stale"), std::string::npos);
 }
 
+TEST(LocalizationHealthCoreTest, StaleFilteredOdomBypassesRateDebounce)
+{
+  const LocalizationHealthCore core;
+  auto inputs = healthy_inputs();
+  inputs.filtered_odom.fresh = false;
+  inputs.filtered_odom.age_s = 0.51;
+  inputs.filtered_odom.rate_valid = true;
+
+  const auto result = core.Evaluate(inputs);
+
+  EXPECT_EQ(result.state, LocalizationHealthState::kStale);
+  EXPECT_FALSE(result.ready);
+  ASSERT_EQ(result.reasons.size(), 1U);
+  EXPECT_NE(result.reasons.front().find("filtered_odom_stale"), std::string::npos);
+}
+
 TEST(LocalizationHealthCoreTest, OptionalVoLossIsDegradedButReady)
 {
   const LocalizationHealthCore core;
@@ -335,6 +401,37 @@ TEST(LocalizationHealthCoreTest, RequiredLowRateBlocksReadiness)
   EXPECT_NE(
     result.reasons.front().find("imu_rate_below_minimum"),
     std::string::npos);
+}
+
+TEST(LocalizationHealthCoreTest, ProlongedFilteredOdomLowRateBlocksReadiness)
+{
+  const LocalizationHealthCore core;
+  auto inputs = healthy_inputs();
+  inputs.filtered_odom.rate_valid = false;
+  inputs.filtered_odom.rate_hz = 14.0;
+
+  const auto result = core.Evaluate(inputs);
+
+  EXPECT_EQ(result.state, LocalizationHealthState::kStale);
+  EXPECT_FALSE(result.ready);
+  ASSERT_EQ(result.reasons.size(), 1U);
+  EXPECT_NE(
+    result.reasons.front().find("filtered_odom_rate_below_minimum"),
+    std::string::npos);
+}
+
+TEST(LocalizationHealthCoreTest, FreshFilteredOdomSurvivesDebouncedRateDip)
+{
+  const LocalizationHealthCore core;
+  auto inputs = healthy_inputs();
+  inputs.filtered_odom.rate_valid = true;
+  inputs.filtered_odom.rate_hz = 14.0;
+  inputs.filtered_odom.rate_quality = "BELOW_MINIMUM";
+
+  const auto result = core.Evaluate(inputs);
+
+  EXPECT_EQ(result.state, LocalizationHealthState::kOk);
+  EXPECT_TRUE(result.ready);
 }
 
 TEST(LocalizationHealthCoreTest, OptionalLowRateIsDegradedButReady)

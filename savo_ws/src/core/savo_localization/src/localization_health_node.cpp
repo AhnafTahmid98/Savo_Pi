@@ -329,6 +329,8 @@ private:
     rate_tolerance_ratio_ = declare_parameter<double>("rate_tolerance_ratio", 0.50);
     rate_transition_debounce_s_ = declare_parameter<double>(
       "rate_transition_debounce_s", 1.0);
+    ekf_rate_transition_debounce_s_ = declare_parameter<double>(
+      "ekf_rate_transition_debounce_s", 3.0);
     const int rate_window_size = declare_parameter<int>("rate_window_size", 30);
     rate_window_size_ = static_cast<std::size_t>(std::max(3, rate_window_size));
 
@@ -355,11 +357,12 @@ private:
 
   void validate_parameters() const
   {
-    const std::array<double, 18> positive_values{
+    const std::array<double, 19> positive_values{
       publish_rate_hz_, heartbeat_rate_hz_, startup_grace_s_,
       timestamp_fault_hold_s_, expected_imu_rate_hz_,
       expected_wheel_odom_rate_hz_, expected_ekf_rate_hz_,
       expected_vo_rate_hz_, rate_tolerance_ratio_, rate_transition_debounce_s_,
+      ekf_rate_transition_debounce_s_,
       max_imu_age_s_,
       max_wheel_odom_age_s_, max_filtered_odom_age_s_, max_vo_odom_age_s_,
       max_tf_age_s_, max_odom_linear_speed_mps_,
@@ -594,6 +597,7 @@ private:
     const bool required,
     const double max_age_s,
     const double expected_rate_hz,
+    const double rate_transition_debounce_s,
     const std::int64_t current_receive_time_ns)
   {
     SourceHealthObservation observation;
@@ -608,7 +612,7 @@ private:
     observation.timestamp_valid = tracker.timestamp_valid(current_receive_time_ns);
     const auto rates = tracker.rate_accounting.Observe(
       current_receive_time_ns, expected_rate_hz, rate_tolerance_ratio_,
-      static_cast<std::int64_t>(std::llround(rate_transition_debounce_s_ * 1.0e9)));
+      static_cast<std::int64_t>(std::llround(rate_transition_debounce_s * 1.0e9)));
     observation.source_rate_hz = rates.source_rate_hz;
     observation.receive_rate_hz = rates.receive_rate_hz;
     observation.source_rate_available = rates.source_rate_available;
@@ -671,10 +675,11 @@ private:
       odom_frame_id_, base_frame_id_, current_receive_time_ns);
     inputs.filtered_odom = make_source_observation(
       "filtered_odom", filtered_tracker_, use_ekf_, use_ekf_,
-      max_filtered_odom_age_s_, expected_ekf_rate_hz_, current_receive_time_ns);
+      max_filtered_odom_age_s_, expected_ekf_rate_hz_,
+      ekf_rate_transition_debounce_s_, current_receive_time_ns);
     inputs.vo_odom = make_source_observation(
       "vo_odom", vo_tracker_, use_vo_, vo_required_, max_vo_odom_age_s_,
-      expected_vo_rate_hz_, current_receive_time_ns);
+      expected_vo_rate_hz_, rate_transition_debounce_s_, current_receive_time_ns);
 
     const auto odom_to_base = observe_transform(
       odom_frame_id_, base_frame_id_, true, current_time);
@@ -880,6 +885,7 @@ private:
            << '{'
            << "\"schema_version\":1,"
            << "\"node\":\"localization_health_node\","
+           << "\"role\":\"liveness\","
            << "\"alive\":true,"
            << "\"state\":\"" << LocalizationHealthCore::ToString(last_result_.state) << "\","
            << "\"ready\":" << bool_text(last_result_.ready) << ','
@@ -923,6 +929,7 @@ private:
   double expected_vo_rate_hz_{15.0};
   double rate_tolerance_ratio_{0.50};
   double rate_transition_debounce_s_{1.0};
+  double ekf_rate_transition_debounce_s_{3.0};
   std::size_t rate_window_size_{30U};
 
   double max_imu_age_s_{0.5};

@@ -64,6 +64,7 @@ public:
 
 private:
   std::int64_t low_rate_since_ns_{-1};
+  std::int64_t valid_rate_since_ns_{-1};
   bool established_valid_rate_{false};
   bool debounced_rate_valid_{false};
 };

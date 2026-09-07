@@ -129,7 +129,24 @@ TEST(ProducerHealthTest, OnlyEstablishedLiveLowRateReceivesFailureDebounce)
   EXPECT_TRUE(debounce.Observe(999999999LL, true, false, 1000000000LL));
   EXPECT_FALSE(debounce.Observe(1000000003LL, true, false, 1000000000LL));
 
-  EXPECT_TRUE(debounce.Observe(1000000004LL, true, true, 1000000000LL));
+  EXPECT_FALSE(debounce.Observe(1000000004LL, true, true, 1000000000LL));
+  EXPECT_FALSE(debounce.Observe(2000000003LL, true, true, 1000000000LL));
+  EXPECT_TRUE(debounce.Observe(2000000004LL, true, true, 1000000000LL));
+}
+
+TEST(ProducerHealthTest, ShortRecoverySpikeDoesNotClearEstablishedLowRate)
+{
+  RateValidityDebouncer debounce;
+  constexpr std::int64_t kDebounceNs = 3000000000LL;
+
+  EXPECT_TRUE(debounce.Observe(0, true, true, kDebounceNs));
+  EXPECT_TRUE(debounce.Observe(1, true, false, kDebounceNs));
+  EXPECT_FALSE(debounce.Observe(kDebounceNs + 1, true, false, kDebounceNs));
+
+  EXPECT_FALSE(debounce.Observe(kDebounceNs + 2, true, true, kDebounceNs));
+  EXPECT_FALSE(debounce.Observe(kDebounceNs + 3, true, false, kDebounceNs));
+  EXPECT_FALSE(debounce.Observe(kDebounceNs + 4, true, true, kDebounceNs));
+  EXPECT_TRUE(debounce.Observe(2 * kDebounceNs + 4, true, true, kDebounceNs));
 }
 
 TEST(ProducerHealthTest, StaleHealthCannotBeOverriddenByExcellentOldRate)

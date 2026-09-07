@@ -186,10 +186,18 @@ def test_producer_health_rate_accounting_preserves_existing_floor_and_freshness(
         diagnostics["expected_imu_rate_hz"] * diagnostics["rate_tolerance_ratio"]
         == 12.5
     )
+    assert diagnostics["expected_ekf_rate_hz"] == 30.0
+    assert (
+        diagnostics["expected_ekf_rate_hz"] * diagnostics["rate_tolerance_ratio"]
+        == 15.0
+    )
+    assert diagnostics["rate_window_size"] == 30
     assert diagnostics["rate_transition_debounce_s"] == 1.0
+    assert diagnostics["ekf_rate_transition_debounce_s"] == 3.0
     assert standalone["expected_imu_rate_hz"] == 25.0
     assert standalone["rate_tolerance_ratio"] == 0.50
     assert standalone["rate_transition_debounce_s"] == 1.0
+    assert standalone["ekf_rate_transition_debounce_s"] == 3.0
     assert diagnostics["max_imu_age_s"] == 0.5
     assert diagnostics["max_wheel_odom_age_s"] == 0.5
     assert diagnostics["max_filtered_odom_age_s"] == 0.5
@@ -208,6 +216,7 @@ def test_producer_health_rate_accounting_preserves_existing_floor_and_freshness(
         "rate_quality",
         "producer_successful_publication",
         "ProducerHealthConsumer",
+        r'<< "\"role\":\"liveness\","',
     ):
         assert token in source
 
@@ -225,6 +234,22 @@ def test_health_aggregator_does_not_observe_required_raw_topics_or_global_diagno
     assert "std::regex" not in source
     assert "rclcpp::KeepLast(1)).reliable().transient_local()" in source
     assert "rclcpp::SensorDataQoS().keep_last(1)" in source
+
+
+def test_extended_rate_debounce_applies_only_to_required_ekf_output() -> None:
+    source = (PACKAGE_ROOT / "src" / "localization_health_node.cpp").read_text(
+        encoding="utf-8"
+    )
+
+    filtered_call = source.split(
+        'inputs.filtered_odom = make_source_observation(', maxsplit=1
+    )[1].split('inputs.vo_odom = make_source_observation(', maxsplit=1)[0]
+    vo_call = source.split('inputs.vo_odom = make_source_observation(', maxsplit=1)[1]
+    vo_call = vo_call.split('const auto odom_to_base', maxsplit=1)[0]
+
+    assert "ekf_rate_transition_debounce_s_" in filtered_call
+    assert "rate_transition_debounce_s_" in vo_call
+    assert "ekf_rate_transition_debounce_s_" not in vo_call
 
 
 def test_large_wheel_debug_state_is_disabled_in_production() -> None:

@@ -137,6 +137,7 @@ TEST(SupervisorPolicy, DefaultLocalizationConfig)
   EXPECT_DOUBLE_EQ(config.health_timeout_s, 1.5);
   EXPECT_DOUBLE_EQ(config.summary_timeout_s, 1.5);
   EXPECT_DOUBLE_EQ(config.heartbeat_timeout_s, 2.5);
+  EXPECT_TRUE(config.heartbeat_liveness_only);
   EXPECT_DOUBLE_EQ(config.consistency_transition_grace_s, 1.5);
   EXPECT_EQ(config.expected_schema_version, 1);
 }
@@ -312,12 +313,8 @@ TEST(SupervisorPolicy, DegradedToOkArrivalSkewRemainsReady)
   status.summary_reason_code = savo_supervisor::reason::kLocalizationOperational;
 
   result = policy.EvaluateComponent(status, test_time(10.8), 10.8);
-  EXPECT_EQ(result.state, ComponentState::DEGRADED);
+  EXPECT_EQ(result.state, ComponentState::OK);
   EXPECT_TRUE(result.ready);
-
-  status.heartbeat_tracker.observe_message(
-    test_time(10.9), message_stamp(11), false, "");
-  status.heartbeat_state = "OK";
 
   result = policy.EvaluateComponent(status, test_time(11.0), 11.0);
   EXPECT_EQ(result.state, ComponentState::OK);
@@ -392,7 +389,7 @@ TEST(SupervisorPolicy, PersistentCompatibleStateMismatchFailsClosed)
     savo_supervisor::reason::kLocalizationStateInconsistent);
 }
 
-TEST(SupervisorPolicy, ReadinessDisagreementIsNotTransitionCompatible)
+TEST(SupervisorPolicy, BriefAuthoritativeReadinessDisagreementIsFailClosedNotInvalid)
 {
   SupervisorPolicy policy;
   auto status = make_status();
@@ -400,8 +397,73 @@ TEST(SupervisorPolicy, ReadinessDisagreementIsNotTransitionCompatible)
   observe_all(status, 40.0);
   set_consistent_state(status, "OK", true, false);
   status.health_ready = false;
+  status.health_reason_code = savo_supervisor::reason::kLocalizationNotReady;
 
-  const auto result = policy.EvaluateComponent(status, test_time(40.1), 40.1);
+  auto result = policy.EvaluateComponent(status, test_time(40.1), 40.1);
+  EXPECT_EQ(result.state, ComponentState::ERROR);
+  EXPECT_FALSE(result.ready);
+
+  status.health_ready = true;
+  status.health_reason_code = savo_supervisor::reason::kLocalizationOperational;
+  result = policy.EvaluateComponent(status, test_time(40.2), 40.2);
+  EXPECT_EQ(result.state, ComponentState::OK);
+  EXPECT_TRUE(result.ready);
+}
+
+TEST(SupervisorPolicy, FreshHeartbeatPreviousStateIsLivenessOnly)
+{
+  SupervisorPolicy policy;
+  auto status = make_status();
+
+  observe_all(status, 50.0);
+  set_consistent_state(status, "OK", true, false);
+  status.heartbeat_state = "STALE";
+  status.heartbeat_ready = false;
+
+  const auto result = policy.EvaluateComponent(status, test_time(50.1), 50.1);
+  EXPECT_EQ(result.state, ComponentState::OK);
+  EXPECT_TRUE(result.ready);
+  EXPECT_FALSE(result.degraded);
+}
+
+TEST(SupervisorPolicy, StaleToOkAuthoritativeSkewRecoversWithinGrace)
+{
+  SupervisorPolicy policy;
+  auto status = make_status();
+
+  observe_all(status, 55.0);
+  set_consistent_state(status, "STALE", false, false);
+  status.health_state = "OK";
+  status.health_ready = true;
+  status.health_reason_code = savo_supervisor::reason::kLocalizationOperational;
+
+  auto result = policy.EvaluateComponent(status, test_time(55.1), 55.1);
+  EXPECT_EQ(result.state, ComponentState::STALE);
+  EXPECT_FALSE(result.ready);
+
+  status.summary_state = "OK";
+  status.summary_ready = true;
+  status.summary_reason_code = savo_supervisor::reason::kLocalizationOperational;
+  result = policy.EvaluateComponent(status, test_time(55.2), 55.2);
+  EXPECT_EQ(result.state, ComponentState::OK);
+  EXPECT_TRUE(result.ready);
+}
+
+TEST(SupervisorPolicy, PersistentAuthoritativeReadinessDisagreementIsInvalid)
+{
+  SupervisorPolicy policy;
+  auto status = make_status();
+
+  observe_all(status, 60.0);
+  set_consistent_state(status, "OK", true, false);
+  status.health_ready = false;
+  status.health_reason_code = savo_supervisor::reason::kLocalizationNotReady;
+
+  auto result = policy.EvaluateComponent(status, test_time(60.1), 60.1);
+  ASSERT_EQ(result.state, ComponentState::ERROR);
+
+  observe_all(status, 61.7);
+  result = policy.EvaluateComponent(status, test_time(61.7), 61.7);
   EXPECT_EQ(result.state, ComponentState::INVALID);
   EXPECT_FALSE(result.ready);
   EXPECT_EQ(
@@ -531,7 +593,7 @@ TEST(SupervisorPolicy, DeadHeartbeatIsError)
     savo_supervisor::reason::kLocalizationHeartbeatNotAlive);
 }
 
-TEST(SupervisorPolicy, InconsistentStateIsInvalid)
+TEST(SupervisorPolicy, BriefErrorTransitionRemainsFailClosed)
 {
   SupervisorPolicy policy;
   auto status = make_status();
@@ -541,14 +603,73 @@ TEST(SupervisorPolicy, InconsistentStateIsInvalid)
 
   status.health_state = "ERROR";
   status.health_ready = false;
+  status.health_reason_code = savo_supervisor::reason::kLocalizationError;
 
-  const auto result =
+  auto result =
     policy.EvaluateComponent(
       status,
       test_time(10.1),
       10.1);
 
+  EXPECT_EQ(result.state, ComponentState::ERROR);
+  EXPECT_FALSE(result.ready);
+
+  status.summary_state = "ERROR";
+  status.summary_ready = false;
+  status.summary_reason_code = savo_supervisor::reason::kLocalizationError;
+  result = policy.EvaluateComponent(status, test_time(10.2), 10.2);
+  EXPECT_EQ(result.state, ComponentState::ERROR);
+  EXPECT_FALSE(result.ready);
+}
+
+TEST(SupervisorPolicy, ActualStaleHealthAndSummaryBlockDespiteOldHeartbeat)
+{
+  SupervisorPolicy policy;
+  auto status = make_status();
+
+  observe_all(status, 70.0);
+  set_consistent_state(status, "STALE", false, false);
+  status.heartbeat_state = "OK";
+  status.heartbeat_ready = true;
+
+  const auto result = policy.EvaluateComponent(status, test_time(70.1), 70.1);
+  EXPECT_EQ(result.state, ComponentState::STALE);
+  EXPECT_FALSE(result.ready);
+}
+
+TEST(SupervisorPolicy, ActualErrorHealthAndSummaryBlockDespiteOldHeartbeat)
+{
+  SupervisorPolicy policy;
+  auto status = make_status();
+
+  observe_all(status, 80.0);
+  set_consistent_state(status, "ERROR", false, false);
+  status.heartbeat_state = "OK";
+  status.heartbeat_ready = true;
+
+  const auto result = policy.EvaluateComponent(status, test_time(80.1), 80.1);
+  EXPECT_EQ(result.state, ComponentState::ERROR);
+  EXPECT_FALSE(result.ready);
+}
+
+TEST(SupervisorPolicy, PersistentAuthoritativeStateDisagreementIsInvalid)
+{
+  SupervisorPolicy policy;
+  auto status = make_status();
+
+  observe_all(status, 90.0);
+  set_consistent_state(status, "OK", true, false);
+  status.health_state = "ERROR";
+  status.health_ready = false;
+  status.health_reason_code = savo_supervisor::reason::kLocalizationError;
+
+  auto result = policy.EvaluateComponent(status, test_time(90.1), 90.1);
+  ASSERT_EQ(result.state, ComponentState::ERROR);
+
+  observe_all(status, 91.7);
+  result = policy.EvaluateComponent(status, test_time(91.7), 91.7);
   EXPECT_EQ(result.state, ComponentState::INVALID);
+  EXPECT_FALSE(result.ready);
 
   EXPECT_EQ(
     result.reason_code,
