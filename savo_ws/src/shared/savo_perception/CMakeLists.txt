@@ -283,6 +283,11 @@ if(BUILD_TESTING)
     test/unit/test_obstacle_cloud_filter.cpp
   )
 
+  ament_add_gtest(test_range_fusion
+    test/unit/test_range_fusion.cpp
+    src/fusion/range_fusion.cpp
+  )
+
   if(TARGET test_obstacle_cloud_filter)
     target_link_libraries(test_obstacle_cloud_filter
       savo_perception_obstacle_cloud_filter
@@ -298,6 +303,12 @@ if(BUILD_TESTING)
   ament_add_pytest_test(
     test_obstacle_cloud_filter_core
     test/contracts/test_obstacle_cloud_filter_core.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
+    test_range_safety_contracts
+    test/contracts/test_range_safety_contracts.py
     TIMEOUT 60
   )
 

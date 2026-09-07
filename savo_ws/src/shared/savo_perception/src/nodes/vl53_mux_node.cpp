@@ -75,6 +75,36 @@ std::string reading_text(const Vl53l1xReading & reading)
   return stream.str();
 }
 
+std::string json_escape(const std::string & value)
+{
+  std::ostringstream out;
+
+  for (const auto ch : value) {
+    switch (ch) {
+      case '"':
+        out << "\\\"";
+        break;
+      case '\\':
+        out << "\\\\";
+        break;
+      case '\n':
+        out << "\\n";
+        break;
+      case '\r':
+        out << "\\r";
+        break;
+      case '\t':
+        out << "\\t";
+        break;
+      default:
+        out << ch;
+        break;
+    }
+  }
+
+  return out.str();
+}
+
 }  // namespace
 
 Vl53MuxNode::Vl53MuxNode(const rclcpp::NodeOptions & options)
@@ -116,6 +146,8 @@ void Vl53MuxNode::declare_parameters()
 
   declare_parameter<std::string>("left_topic", topics::kTofLeftM);
   declare_parameter<std::string>("right_topic", topics::kTofRightM);
+  declare_parameter<std::string>("status_topic", topics::kTofStatus);
+  declare_parameter<double>("status_publish_hz", 2.0);
 
   declare_parameter<bool>("publish_nan_on_error", constants::kPublishNanOnErrorDefault);
   declare_parameter<bool>("startup_fail_is_fatal", constants::kStartupFailIsFatalDefault);
@@ -152,6 +184,10 @@ void Vl53MuxNode::load_parameters()
 
   config_.left_topic = get_parameter("left_topic").as_string();
   config_.right_topic = get_parameter("right_topic").as_string();
+  config_.status_topic = get_parameter("status_topic").as_string();
+  config_.status_publish_hz = safe_positive_double(
+    get_parameter("status_publish_hz").as_double(),
+    2.0);
 
   config_.publish_nan_on_error = get_parameter("publish_nan_on_error").as_bool();
   config_.startup_fail_is_fatal = get_parameter("startup_fail_is_fatal").as_bool();
@@ -190,6 +226,10 @@ void Vl53MuxNode::setup_interfaces()
   right_pub_ = create_publisher<std_msgs::msg::Float32>(
     config_.right_topic,
     rclcpp::SensorDataQoS());
+
+  status_pub_ = create_publisher<std_msgs::msg::String>(
+    config_.status_topic,
+    rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local());
 
   const auto period = std::chrono::duration<double>(1.0 / config_.rate_hz);
 
@@ -345,6 +385,9 @@ void Vl53MuxNode::on_timer()
 void Vl53MuxNode::publish_latest()
 {
   if (!worker_state_) {
+    Vl53LatestState latest;
+    latest.driver_error = "worker_unavailable";
+    publish_status(latest, false);
     publish_distance(left_pub_, std::nullopt);
     publish_distance(right_pub_, std::nullopt);
     return;
@@ -357,6 +400,7 @@ void Vl53MuxNode::publish_latest()
   }
 
   if (!latest.has_update) {
+    publish_status(latest, true);
     publish_distance(left_pub_, std::nullopt);
     publish_distance(right_pub_, std::nullopt);
 
@@ -369,6 +413,7 @@ void Vl53MuxNode::publish_latest()
   }
 
   if (latest_is_stale(latest)) {
+    publish_status(latest, true);
     publish_distance(left_pub_, std::nullopt);
     publish_distance(right_pub_, std::nullopt);
 
@@ -383,6 +428,7 @@ void Vl53MuxNode::publish_latest()
 
   publish_reading(left_pub_, latest.left);
   publish_reading(right_pub_, latest.right);
+  publish_status(latest, true);
 
   const bool left_valid = latest.left.valid;
   const bool right_valid = latest.right.valid;
@@ -439,6 +485,65 @@ void Vl53MuxNode::publish_distance(
   std_msgs::msg::Float32 msg;
   msg.data = distance_to_msg_value(distance_m, config_.publish_nan_on_error);
   publisher->publish(msg);
+}
+
+void Vl53MuxNode::publish_status(
+  const Vl53LatestState & latest,
+  const bool worker_available)
+{
+  if (!status_pub_) {
+    return;
+  }
+
+  const auto now = std::chrono::steady_clock::now();
+  const bool stale = worker_available && latest_is_stale(latest);
+  const bool healthy = worker_available && latest.has_update && !stale &&
+    latest.driver_error.empty() && latest.left.valid && latest.right.valid;
+  const std::string state = healthy ? "OK" :
+    (worker_available && !latest.has_update && !stale ? "INITIALIZING" : "ERROR");
+
+  std::ostringstream signature;
+  signature << state << ":" << (stale ? "stale" : "fresh") << ":"
+            << latest.driver_error << ":" << latest.left.valid << ":"
+            << latest.left.error << ":" << latest.right.valid << ":"
+            << latest.right.error;
+
+  const bool state_changed = signature.str() != last_status_signature_;
+  const bool periodic_due = now - last_status_publish_ >=
+    std::chrono::duration<double>(1.0 / config_.status_publish_hz);
+  if (!state_changed && !periodic_due) {
+    return;
+  }
+
+  const auto age_s = std::max(
+    0.0,
+    std::chrono::duration<double>(now - latest.stamp).count());
+
+  std::ostringstream out;
+  out << "{";
+  out << "\"node\":\"" << constants::kVl53MuxNodeName << "\",";
+  out << "\"state\":\"" << state << "\",";
+  out << "\"worker_stale\":" << (stale ? "true" : "false") << ",";
+  out << "\"age_s\":" << age_s << ",";
+  out << "\"driver_error\":\"" << json_escape(latest.driver_error) << "\",";
+  out << "\"bus\":" << config_.bus << ",";
+  out << "\"tca_addr\":" << static_cast<int>(config_.tca_addr) << ",";
+  out << "\"vl53_addr\":" << static_cast<int>(config_.vl53_addr) << ",";
+  out << "\"left\":{";
+  out << "\"channel\":" << config_.left_channel << ",";
+  out << "\"valid\":" << (latest.left.valid ? "true" : "false") << ",";
+  out << "\"error\":\"" << json_escape(latest.left.error) << "\"},";
+  out << "\"right\":{";
+  out << "\"channel\":" << config_.right_channel << ",";
+  out << "\"valid\":" << (latest.right.valid ? "true" : "false") << ",";
+  out << "\"error\":\"" << json_escape(latest.right.error) << "\"}";
+  out << "}";
+
+  std_msgs::msg::String msg;
+  msg.data = out.str();
+  status_pub_->publish(msg);
+  last_status_signature_ = signature.str();
+  last_status_publish_ = now;
 }
 
 bool Vl53MuxNode::latest_is_stale(const Vl53LatestState & latest) const

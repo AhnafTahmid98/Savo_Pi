@@ -11,6 +11,7 @@
 
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/float32.hpp"
+#include "std_msgs/msg/string.hpp"
 
 #include "savo_perception/constants.hpp"
 #include "savo_perception/topic_names.hpp"
@@ -41,6 +42,8 @@ struct SAVO_PERCEPTION_PUBLIC Vl53MuxNodeConfig
 
   std::string left_topic{topics::kTofLeftM};
   std::string right_topic{topics::kTofRightM};
+  std::string status_topic{topics::kTofStatus};
+  double status_publish_hz{2.0};
 
   bool publish_nan_on_error{constants::kPublishNanOnErrorDefault};
   bool startup_fail_is_fatal{constants::kStartupFailIsFatalDefault};
@@ -100,6 +103,7 @@ private:
   void publish_distance(
     const rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr & publisher,
     const std::optional<double> & distance_m);
+  void publish_status(const Vl53LatestState & latest, bool worker_available);
 
   [[nodiscard]] bool latest_is_stale(const Vl53LatestState & latest) const;
 
@@ -107,6 +111,10 @@ private:
 
   rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr left_pub_;
   rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr right_pub_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr status_pub_;
+
+  std::string last_status_signature_;
+  std::chrono::steady_clock::time_point last_status_publish_{};
 
   rclcpp::TimerBase::SharedPtr timer_;
 

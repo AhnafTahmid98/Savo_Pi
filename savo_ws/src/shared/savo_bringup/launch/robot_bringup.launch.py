@@ -101,9 +101,12 @@ def _setup(context):
             "base_profile",
             "lidar_profile",
             "perception_config_file",
+            "perception_use_ultrasonic",
             "control_startup_mode",
             "control_use_backup_escape",
             "control_use_stuck_detector",
+            "control_use_control_status",
+            "control_use_recovery_status",
             "localization_use_vo",
             "edge_ups_expected",
             "head_enable_tf",
@@ -119,6 +122,10 @@ def _setup(context):
             "start_head",
             "start_location_lifecycle",
             "start_semantic_interruption",
+            "initial_scan360_required",
+            "initial_head_scan_required",
+            "final_scan360_required",
+            "final_head_scan_required",
             "description_start_delay_s",
             "base_start_delay_s",
             "lidar_start_delay_s",
@@ -258,8 +265,11 @@ def generate_launch_description() -> LaunchDescription:
                 ),
             ),
             DeclareLaunchArgument("control_startup_mode", default_value="STOP"),
+            DeclareLaunchArgument("perception_use_ultrasonic", default_value="true"),
             DeclareLaunchArgument("control_use_backup_escape", default_value="false"),
             DeclareLaunchArgument("control_use_stuck_detector", default_value="false"),
+            DeclareLaunchArgument("control_use_control_status", default_value="false"),
+            DeclareLaunchArgument("control_use_recovery_status", default_value="false"),
             DeclareLaunchArgument("localization_use_vo", default_value="true"),
             DeclareLaunchArgument("edge_ups_expected", default_value="false"),
             DeclareLaunchArgument("head_enable_tf", default_value="true"),
@@ -278,6 +288,18 @@ def generate_launch_description() -> LaunchDescription:
             ),
             DeclareLaunchArgument(
                 "start_semantic_interruption", default_value="true"
+            ),
+            DeclareLaunchArgument(
+                "initial_scan360_required", default_value="true"
+            ),
+            DeclareLaunchArgument(
+                "initial_head_scan_required", default_value="true"
+            ),
+            DeclareLaunchArgument(
+                "final_scan360_required", default_value="true"
+            ),
+            DeclareLaunchArgument(
+                "final_head_scan_required", default_value="true"
             ),
             DeclareLaunchArgument(
                 "description_start_delay_s", default_value="0.0"

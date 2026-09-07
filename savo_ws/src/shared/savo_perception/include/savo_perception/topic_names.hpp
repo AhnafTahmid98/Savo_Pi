@@ -24,6 +24,7 @@ inline constexpr const char * kDepthFrontM = "/depth/min_front_m";
 
 inline constexpr const char * kTofLeftM = "/savo_perception/range/left_m";
 inline constexpr const char * kTofRightM = "/savo_perception/range/right_m";
+inline constexpr const char * kTofStatus = "/savo_perception/tof_status";
 inline constexpr const char * kUltrasonicFrontM = "/savo_perception/range/front_ultrasonic_m";
 
 inline constexpr const char * kSafetyStop = "/safety/stop";

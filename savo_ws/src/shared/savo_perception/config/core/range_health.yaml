@@ -25,6 +25,9 @@ range_health_node:
 
     optional_sensors:
       - depth_front
+      - ultrasonic_front
+
+    use_ultrasonic: true
 
     publish_json: true
     publish_compact_status: true
@@ -54,6 +57,9 @@ range_health_node_py:
 
     optional_sensors:
       - depth_front
+      - ultrasonic_front
+
+    use_ultrasonic: true
 
     publish_json: true
     publish_compact_status: true

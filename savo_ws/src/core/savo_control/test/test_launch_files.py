@@ -104,3 +104,43 @@ def test_dashboard_is_not_forced_on_by_default():
         text = read_launch(name)
         assert "use_dashboard" in text
         assert 'default_value="false"' in text
+
+
+def test_python_status_monitors_are_available_but_default_off():
+    text = read_launch("control_bringup.launch.py")
+
+    for argument, executable in [
+        ("use_control_status", "control_status_node.py"),
+        ("use_recovery_status", "recovery_status_node.py"),
+    ]:
+        declaration = text.index(
+            f'DeclareLaunchArgument(\n                "{argument}"'
+        )
+        assert 'default_value="false"' in text[declaration:declaration + 180]
+        assert executable in text
+
+    recovery_manager = text.index(
+        'DeclareLaunchArgument(\n                "use_recovery_manager"'
+    )
+    assert 'default_value="true"' in text[recovery_manager:recovery_manager + 180]
+
+
+def test_rotate_action_server_is_available_but_default_off():
+    text = read_launch("control_bringup.launch.py")
+
+    declaration = text.index(
+        'DeclareLaunchArgument(\n                "use_rotate_to_heading"'
+    )
+    assert 'default_value="false"' in text[declaration:declaration + 220]
+    assert 'executable="rotate_to_heading_node"' in text
+    assert "condition=IfCondition(use_rotate_to_heading)" in text
+    assert '"rotate_to_heading.yaml"' in text
+
+    # Production launch exposes an idle action server; it sends no target,
+    # enable, mode-change, or action-goal command of its own.
+    assert "auto_publish_target" not in text
+    assert "request_mode_on_start" not in text
+    assert "target_heading_rad" not in text
+    assert "ActionClient" not in text
+    assert "ExecuteProcess" not in text
+    assert 'default_value="STOP"' in text

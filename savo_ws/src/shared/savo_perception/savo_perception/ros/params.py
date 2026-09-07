@@ -115,6 +115,7 @@ class SafetyStopParams:
     slowdown_ema_alpha: float = SLOWDOWN_EMA_ALPHA_DEFAULT
 
     fail_safe_on_stale: bool = FAIL_SAFE_ON_STALE_DEFAULT
+    use_ultrasonic: bool = True
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -142,6 +143,7 @@ class RangeHealthParams:
     range_health_topic: str = SAVO_PERCEPTION_RANGE_HEALTH
     publish_hz: float = RANGE_HEALTH_HZ_DEFAULT
     stale_timeout_s: float = SENSOR_STALE_TIMEOUT_S_DEFAULT
+    use_ultrasonic: bool = True
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -300,6 +302,7 @@ def load_safety_stop_params(values: Mapping[str, Any]) -> SafetyStopParams:
             min_value=0.0,
         ),
         fail_safe_on_stale=to_bool(get_param(values, "fail_safe_on_stale", FAIL_SAFE_ON_STALE_DEFAULT)),
+        use_ultrasonic=to_bool(get_param(values, "use_ultrasonic", True)),
     )
 
 
@@ -329,6 +332,7 @@ def load_range_health_params(values: Mapping[str, Any]) -> RangeHealthParams:
             get_param(values, "stale_timeout_s", SENSOR_STALE_TIMEOUT_S_DEFAULT),
             min_value=0.01,
         ),
+        use_ultrasonic=to_bool(get_param(values, "use_ultrasonic", True)),
     )
 
 

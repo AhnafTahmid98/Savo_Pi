@@ -24,6 +24,7 @@ topics:
     state: /savo_perception/safety_state
 
   health:
+    tof_status: /savo_perception/tof_status
     range_health: /savo_perception/range_health
     sensor_status: /savo_perception/sensor_status
     heartbeat: /savo_perception/heartbeat
@@ -76,6 +77,13 @@ ownership:
       - /savo_perception/range/left_m
       - /savo_perception/range/right_m
       - /savo_perception/range/front_ultrasonic_m
+
+  tof_status:
+    producer: savo_perception
+    host: savo-core
+    message_type: std_msgs/msg/String
+    topic: /savo_perception/tof_status
+    qos: reliable_transient_local_keep_last_1
 
   safety_outputs:
     producer: savo_perception

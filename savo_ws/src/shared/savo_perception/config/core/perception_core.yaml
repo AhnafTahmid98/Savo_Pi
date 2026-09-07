@@ -25,6 +25,8 @@ vl53_mux_node:
 
     left_topic: /savo_perception/range/left_m
     right_topic: /savo_perception/range/right_m
+    status_topic: /savo_perception/tof_status
+    status_publish_hz: 2.0
 
     publish_nan_on_error: true
     startup_fail_is_fatal: false
@@ -136,9 +138,11 @@ safety_stop_node:
 
     optional_sensors:
       - depth_front
+      - ultrasonic_front
 
     use_depth_front: true
     depth_front_required: false
+    use_ultrasonic: true
 
     publish_state_json: true
     startup_fail_is_fatal: false
@@ -180,9 +184,11 @@ safety_stop_node_py:
 
     optional_sensors:
       - depth_front
+      - ultrasonic_front
 
     use_depth_front: true
     depth_front_required: false
+    use_ultrasonic: true
 
     publish_state_json: true
     startup_fail_is_fatal: false
@@ -283,6 +289,9 @@ range_health_node:
 
     optional_sensors:
       - depth_front
+      - ultrasonic_front
+
+    use_ultrasonic: true
 
     publish_json: true
     publish_compact_status: true
@@ -312,6 +321,9 @@ range_health_node_py:
 
     optional_sensors:
       - depth_front
+      - ultrasonic_front
+
+    use_ultrasonic: true
 
     publish_json: true
     publish_compact_status: true

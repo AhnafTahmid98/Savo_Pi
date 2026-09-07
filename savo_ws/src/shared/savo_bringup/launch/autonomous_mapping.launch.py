@@ -12,6 +12,7 @@ from launch.launch_description_sources import FrontendLaunchDescriptionSource
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch.substitutions import PathJoinSubstitution
+from launch.substitutions import PythonExpression
 
 from launch_ros.substitutions import FindPackageShare
 
@@ -77,6 +78,15 @@ def generate_launch_description() -> LaunchDescription:
     """Compose the guarded core-side autonomous frontier mapping stack."""
     use_sim_time = LaunchConfiguration("use_sim_time")
     log_level = LaunchConfiguration("log_level")
+    scan360_required = PythonExpression(
+        [
+            "'",
+            LaunchConfiguration("initial_scan360_required"),
+            "'.lower() in ('true', '1', 'yes', 'on') or '",
+            LaunchConfiguration("final_scan360_required"),
+            "'.lower() in ('true', '1', 'yes', 'on')",
+        ]
+    )
 
     description_launch = IncludeLaunchDescription(
         _python_launch("savo_description", "description.launch.py"),
@@ -121,6 +131,9 @@ def generate_launch_description() -> LaunchDescription:
         launch_arguments={
             "driver_impl": LaunchConfiguration("perception_driver_impl"),
             "config_file": LaunchConfiguration("perception_config_file"),
+            "use_ultrasonic": LaunchConfiguration(
+                "perception_use_ultrasonic"
+            ),
             "use_dashboard": "false",
         }.items(),
     )
@@ -136,6 +149,13 @@ def generate_launch_description() -> LaunchDescription:
             "use_stuck_detector": LaunchConfiguration(
                 "control_use_stuck_detector"
             ),
+            "use_control_status": LaunchConfiguration(
+                "control_use_control_status"
+            ),
+            "use_recovery_status": LaunchConfiguration(
+                "control_use_recovery_status"
+            ),
+            "use_rotate_to_heading": scan360_required,
             "use_dashboard": "false",
         }.items(),
     )
@@ -285,6 +305,12 @@ def generate_launch_description() -> LaunchDescription:
             ),
             "coverage_operation_params_file": LaunchConfiguration(
                 "coverage_operation_params_file"
+            ),
+            "initial_scan360_required": LaunchConfiguration(
+                "initial_scan360_required"
+            ),
+            "initial_head_scan_required": LaunchConfiguration(
+                "initial_head_scan_required"
             ),
             "final_scan360_required": LaunchConfiguration(
                 "final_scan360_required"
@@ -458,6 +484,10 @@ def generate_launch_description() -> LaunchDescription:
                 default_value=default_perception_config,
             ),
             DeclareLaunchArgument(
+                "perception_use_ultrasonic",
+                default_value="true",
+            ),
+            DeclareLaunchArgument(
                 "control_startup_mode",
                 default_value="STOP",
                 description=(
@@ -471,6 +501,14 @@ def generate_launch_description() -> LaunchDescription:
             ),
             DeclareLaunchArgument(
                 "control_use_stuck_detector",
+                default_value="false",
+            ),
+            DeclareLaunchArgument(
+                "control_use_control_status",
+                default_value="false",
+            ),
+            DeclareLaunchArgument(
+                "control_use_recovery_status",
                 default_value="false",
             ),
             DeclareLaunchArgument(
@@ -547,6 +585,12 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument(
                 "coverage_operation_params_file",
                 default_value=default_coverage_operation,
+            ),
+            DeclareLaunchArgument(
+                "initial_scan360_required", default_value="true"
+            ),
+            DeclareLaunchArgument(
+                "initial_head_scan_required", default_value="true"
             ),
             DeclareLaunchArgument(
                 "final_scan360_required", default_value="true"

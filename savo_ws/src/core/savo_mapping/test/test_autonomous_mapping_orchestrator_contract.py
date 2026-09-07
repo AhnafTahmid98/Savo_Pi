@@ -153,6 +153,12 @@ def test_launch_and_config_are_nonempty_and_consistent() -> None:
 
     assert 'autonomous_mapping_orchestrator_node' in launch
     assert 'autonomous_mapping_orchestrator.yaml' in launch
+    assert 'name="initial_scan360_required" default="true"' in launch
+    assert 'name="initial_head_scan_required" default="true"' in launch
+    assert 'name="sequence.require_initial_scan360"' in launch
+    assert 'value="$(var initial_scan360_required)"' in launch
+    assert 'name="sequence.require_initial_head_scan"' in launch
+    assert 'value="$(var initial_head_scan_required)"' in launch
 
     for endpoint in (
         '/savo_mapping/autonomous/run',

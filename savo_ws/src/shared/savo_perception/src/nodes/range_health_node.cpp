@@ -89,6 +89,7 @@ void RangeHealthNode::declare_parameters()
 
   declare_parameter<bool>("include_depth_in_overall_ok", false);
   declare_parameter<bool>("depth_front_required", false);
+  declare_parameter<bool>("use_ultrasonic", true);
 
   declare_parameter<std::vector<std::string>>(
     "required_sensors",
@@ -96,7 +97,7 @@ void RangeHealthNode::declare_parameters()
 
   declare_parameter<std::vector<std::string>>(
     "optional_sensors",
-    std::vector<std::string>{"depth_front"});
+    std::vector<std::string>{"depth_front", "ultrasonic_front"});
 
   declare_parameter<bool>("publish_json", true);
   declare_parameter<bool>("publish_compact_status", true);
@@ -128,9 +129,16 @@ void RangeHealthNode::load_parameters()
 
   include_depth_in_overall_ok_ = get_parameter("include_depth_in_overall_ok").as_bool();
   depth_front_required_ = get_parameter("depth_front_required").as_bool();
+  use_ultrasonic_ = get_parameter("use_ultrasonic").as_bool();
 
   required_sensors_ = get_parameter("required_sensors").as_string_array();
   optional_sensors_ = get_parameter("optional_sensors").as_string_array();
+
+  if (!use_ultrasonic_) {
+    required_sensors_.erase(
+      std::remove(required_sensors_.begin(), required_sensors_.end(), "ultrasonic_front"),
+      required_sensors_.end());
+  }
 
   if (depth_front_required_ && !is_required_sensor("depth_front")) {
     required_sensors_.push_back("depth_front");
@@ -168,12 +176,14 @@ void RangeHealthNode::setup_interfaces()
       on_tof_right(msg);
     });
 
-  ultrasonic_front_sub_ = create_subscription<std_msgs::msg::Float32>(
-    ultrasonic_front_topic_,
-    rclcpp::SensorDataQoS(),
-    [this](const std_msgs::msg::Float32::SharedPtr msg) {
-      on_ultrasonic_front(msg);
-    });
+  if (use_ultrasonic_) {
+    ultrasonic_front_sub_ = create_subscription<std_msgs::msg::Float32>(
+      ultrasonic_front_topic_,
+      rclcpp::SensorDataQoS(),
+      [this](const std_msgs::msg::Float32::SharedPtr msg) {
+        on_ultrasonic_front(msg);
+      });
+  }
 
   const auto status_qos = rclcpp::QoS(10).reliable();
 
@@ -253,7 +263,7 @@ RangeSample RangeHealthNode::sample_from_value(
 {
   const auto distance_m = static_cast<double>(value);
 
-  if (std::isnan(distance_m) || distance_m <= 0.0) {
+  if (!std::isfinite(distance_m) || distance_m <= 0.0) {
     return make_invalid_range_sample(sensor_name, "invalid_distance", source);
   }
 
@@ -278,12 +288,17 @@ std::vector<SensorHealth> RangeHealthNode::current_health() const
 {
   const auto now = std::chrono::steady_clock::now();
 
-  return {
+  std::vector<SensorHealth> health{
     make_sensor_health(depth_front_, stale_timeout_s_, now),
     make_sensor_health(tof_left_, stale_timeout_s_, now),
     make_sensor_health(tof_right_, stale_timeout_s_, now),
-    make_sensor_health(ultrasonic_front_, stale_timeout_s_, now),
   };
+
+  if (use_ultrasonic_) {
+    health.push_back(make_sensor_health(ultrasonic_front_, stale_timeout_s_, now));
+  }
+
+  return health;
 }
 
 bool RangeHealthNode::overall_ok(const std::vector<SensorHealth> & health) const
@@ -405,6 +420,10 @@ void RangeHealthNode::publish_sensor_status(const std::vector<SensorHealth> & he
       out << " " << item.sensor_name << "=" << to_string(item.status);
     }
 
+    if (!use_ultrasonic_) {
+      out << " ultrasonic_front=DISABLED";
+    }
+
     msg.data = out.str();
   } else {
     msg.data = health_to_json(health);
@@ -436,6 +455,11 @@ void RangeHealthNode::publish_heartbeat()
 
 std::string RangeHealthNode::health_to_json(const std::vector<SensorHealth> & health) const
 {
+  std::vector<std::string> disabled_sensors;
+  if (!use_ultrasonic_) {
+    disabled_sensors.push_back("ultrasonic_front");
+  }
+
   std::ostringstream out;
 
   out << "{";
@@ -445,6 +469,7 @@ std::string RangeHealthNode::health_to_json(const std::vector<SensorHealth> & he
   out << "\"error_required_sensors\":" << string_list_to_json(error_required_sensors(health)) << ",";
   out << "\"required_sensors\":" << string_list_to_json(required_sensors_) << ",";
   out << "\"optional_sensors\":" << string_list_to_json(optional_sensors_) << ",";
+  out << "\"disabled_sensors\":" << string_list_to_json(disabled_sensors) << ",";
   out << "\"sensors\":[";
 
   for (std::size_t i = 0; i < health.size(); ++i) {

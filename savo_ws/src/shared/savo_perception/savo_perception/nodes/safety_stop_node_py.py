@@ -72,9 +72,14 @@ class SafetyStopNodePy(Node):
         self.declare_parameter("slowdown_ema_alpha", 0.35)
 
         self.declare_parameter("fail_safe_on_stale", True)
+        self.declare_parameter("use_ultrasonic", True)
         self.declare_parameter(
             "required_sensors",
             ["tof_left", "tof_right"],
+        )
+        self.declare_parameter(
+            "optional_sensors",
+            ["depth_front", "ultrasonic_front"],
         )
 
         values = {
@@ -99,6 +104,7 @@ class SafetyStopNodePy(Node):
             "slowdown_max": self.get_parameter("slowdown_max").value,
             "slowdown_ema_alpha": self.get_parameter("slowdown_ema_alpha").value,
             "fail_safe_on_stale": self.get_parameter("fail_safe_on_stale").value,
+            "use_ultrasonic": self.get_parameter("use_ultrasonic").value,
         }
 
         self.params = load_safety_stop_params(values)
@@ -111,6 +117,7 @@ class SafetyStopNodePy(Node):
             side_slow_m=self.params.side_slow_m,
             stale_timeout_s=self.params.stale_timeout_s,
             fail_safe_on_stale=self.params.fail_safe_on_stale,
+            use_ultrasonic=self.params.use_ultrasonic,
             required_sensors=required,
         )
 
@@ -148,12 +155,13 @@ class SafetyStopNodePy(Node):
             lambda msg: self._on_range_msg("tof_right", msg, required=True),
             qos_range_sensor(),
         )
-        self.create_subscription(
-            Float32,
-            self.params.ultrasonic_front_topic,
-            lambda msg: self._on_range_msg("ultrasonic_front", msg, required=False),
-            qos_range_sensor(),
-        )
+        if self.params.use_ultrasonic:
+            self.create_subscription(
+                Float32,
+                self.params.ultrasonic_front_topic,
+                lambda msg: self._on_range_msg("ultrasonic_front", msg, required=False),
+                qos_range_sensor(),
+            )
 
         self.stop_pub = self.create_publisher(
             Bool,
@@ -224,8 +232,8 @@ class SafetyStopNodePy(Node):
         except Exception:
             distance_m = math.nan
 
-        if math.isnan(distance_m):
-            return self._missing_sample(sensor_name, required=required, reason="nan_or_invalid")
+        if not math.isfinite(distance_m):
+            return self._missing_sample(sensor_name, required=required, reason="non_finite")
 
         if distance_m <= 0.0:
             return self._missing_sample(sensor_name, required=required, reason="non_positive")

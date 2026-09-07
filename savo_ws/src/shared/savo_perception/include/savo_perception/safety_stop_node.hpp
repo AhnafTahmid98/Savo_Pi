@@ -70,6 +70,7 @@ private:
 
   double loop_hz_{constants::kSafetyLoopHzDefault};
   bool publish_state_json_{true};
+  bool use_ultrasonic_{true};
 
   RangeSample depth_front_;
   RangeSample tof_left_;

@@ -82,7 +82,7 @@ def _build_nodes(context, *args, **kwargs):
                 executable=safety_executable,
                 name=safety_node_name,
                 output="screen",
-                parameters=[config_file],
+                parameters=[config_file, {"use_ultrasonic": use_ultrasonic}],
             )
         )
 
@@ -104,7 +104,7 @@ def _build_nodes(context, *args, **kwargs):
                 executable=range_health_executable,
                 name=range_health_node_name,
                 output="screen",
-                parameters=[config_file],
+                parameters=[config_file, {"use_ultrasonic": use_ultrasonic}],
             )
         )
 

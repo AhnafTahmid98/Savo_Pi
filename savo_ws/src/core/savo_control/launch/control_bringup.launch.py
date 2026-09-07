@@ -28,6 +28,9 @@ def generate_launch_description() -> LaunchDescription:
     recovery_yaml = os.path.join(pkg_share, "config", "recovery.yaml")
     stuck_detector_yaml = os.path.join(pkg_share, "config", "stuck_detector.yaml")
     distance_approach_yaml = os.path.join(pkg_share, "config", "distance_approach.yaml")
+    rotate_to_heading_yaml = os.path.join(
+        pkg_share, "config", "rotate_to_heading.yaml"
+    )
 
     startup_mode = LaunchConfiguration("startup_mode")
 
@@ -38,6 +41,7 @@ def generate_launch_description() -> LaunchDescription:
     use_backup_escape = LaunchConfiguration("use_backup_escape")
     use_stuck_detector = LaunchConfiguration("use_stuck_detector")
     use_distance_approach = LaunchConfiguration("use_distance_approach")
+    use_rotate_to_heading = LaunchConfiguration("use_rotate_to_heading")
     use_control_status = LaunchConfiguration("use_control_status")
     use_recovery_status = LaunchConfiguration("use_recovery_status")
     use_dashboard = LaunchConfiguration("use_dashboard")
@@ -100,6 +104,11 @@ def generate_launch_description() -> LaunchDescription:
                 description="Start distance approach controller.",
             ),
             DeclareLaunchArgument(
+                "use_rotate_to_heading",
+                default_value="false",
+                description="Start the idle RotateToHeading action server.",
+            ),
+            DeclareLaunchArgument(
                 "approach_impl",
                 default_value="cpp",
                 description="Distance approach implementation: cpp or py.",
@@ -116,12 +125,12 @@ def generate_launch_description() -> LaunchDescription:
             ),
             DeclareLaunchArgument(
                 "use_control_status",
-                default_value="true",
+                default_value="false",
                 description="Start Python control_status_node.",
             ),
             DeclareLaunchArgument(
                 "use_recovery_status",
-                default_value="true",
+                default_value="false",
                 description="Start Python recovery_status_node.",
             ),
             DeclareLaunchArgument(
@@ -251,6 +260,17 @@ def generate_launch_description() -> LaunchDescription:
                             value_type=float,
                         ),
                     },
+                ],
+            ),
+            Node(
+                condition=IfCondition(use_rotate_to_heading),
+                package="savo_control",
+                executable="rotate_to_heading_node",
+                name="rotate_to_heading_node",
+                output="screen",
+                parameters=[
+                    control_common_yaml,
+                    rotate_to_heading_yaml,
                 ],
             ),
             Node(

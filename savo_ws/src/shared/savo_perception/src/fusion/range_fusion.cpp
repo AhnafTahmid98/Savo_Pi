@@ -32,6 +32,12 @@ std::vector<std::string> effective_required_sensors(const RangeFusionConfig & co
 {
   auto required = config.required_sensors;
 
+  if (!config.use_ultrasonic) {
+    required.erase(
+      std::remove(required.begin(), required.end(), "ultrasonic_front"),
+      required.end());
+  }
+
   if (config.depth_front_required && !contains_sensor_name(required, "depth_front")) {
     required.push_back("depth_front");
   }
@@ -164,7 +170,10 @@ std::optional<double> ultrasonic_front_distance(
   const RangeSnapshot & snapshot,
   const RangeFusionConfig & config)
 {
-  if (snapshot.ultrasonic_front.usable(config.stale_timeout_s)) {
+  if (
+    config.use_ultrasonic &&
+    snapshot.ultrasonic_front.usable(config.stale_timeout_s))
+  {
     return snapshot.ultrasonic_front.distance_m;
   }
 
@@ -191,7 +200,10 @@ RangeFusionResult fuse_range_snapshot(
 
   // Depth/RealSense may slow the robot, but front hard-stop authority stays with ultrasonic.
   std::optional<double> front_hard_stop_distance_m;
-  if (snapshot.ultrasonic_front.usable(config.stale_timeout_s)) {
+  if (
+    config.use_ultrasonic &&
+    snapshot.ultrasonic_front.usable(config.stale_timeout_s))
+  {
     front_hard_stop_distance_m = snapshot.ultrasonic_front.distance_m;
   }
 
@@ -200,6 +212,21 @@ RangeFusionResult fuse_range_snapshot(
 
   result.stale_sensors = collect_stale_sensors(snapshot, config.stale_timeout_s);
   result.invalid_sensors = collect_invalid_sensors(snapshot);
+
+  if (!config.use_ultrasonic) {
+    result.stale_sensors.erase(
+      std::remove(
+        result.stale_sensors.begin(),
+        result.stale_sensors.end(),
+        "ultrasonic_front"),
+      result.stale_sensors.end());
+    result.invalid_sensors.erase(
+      std::remove(
+        result.invalid_sensors.begin(),
+        result.invalid_sensors.end(),
+        "ultrasonic_front"),
+      result.invalid_sensors.end());
+  }
 
   const auto required = effective_required_sensors(config);
   const auto required_stale = required_stale_sensors(result.stale_sensors, required);

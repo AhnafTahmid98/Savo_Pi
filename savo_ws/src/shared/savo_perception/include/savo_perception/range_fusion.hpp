@@ -28,6 +28,7 @@ struct SAVO_PERCEPTION_PUBLIC RangeFusionConfig
 
   bool use_depth_front{true};
   bool depth_front_required{false};
+  bool use_ultrasonic{true};
 
   double slowdown_min{0.20};
   double slowdown_max{1.0};

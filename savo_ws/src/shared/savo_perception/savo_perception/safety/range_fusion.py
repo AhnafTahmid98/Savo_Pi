@@ -32,6 +32,7 @@ class RangeFusionConfig:
     ultrasonic_stop_m: float = 0.10
     stale_timeout_s: float = SENSOR_STALE_TIMEOUT_S_DEFAULT
     fail_safe_on_stale: bool = FAIL_SAFE_ON_STALE_DEFAULT
+    use_ultrasonic: bool = True
     required_sensors: tuple[str, ...] = field(
         default_factory=lambda: ("tof_left", "tof_right")
     )
@@ -99,6 +100,14 @@ def required_stale_sensors(
     return [name for name in required_sensors if name in stale]
 
 
+def required_invalid_sensors(
+    invalid_sensors: Sequence[str],
+    required_sensors: Sequence[str],
+) -> list[str]:
+    invalid = set(invalid_sensors)
+    return [name for name in required_sensors if name in invalid]
+
+
 def fuse_range_snapshot(
     snapshot: RangeSnapshot,
     config: RangeFusionConfig | None = None,
@@ -112,13 +121,23 @@ def fuse_range_snapshot(
     side_distance_m = snapshot.min_side_m(cfg.stale_timeout_s)
     ultrasonic_front_distance_m = (
         float(snapshot.ultrasonic_front.distance_m)
-        if snapshot.ultrasonic_front.usable(cfg.stale_timeout_s)
+        if cfg.use_ultrasonic
+        and snapshot.ultrasonic_front.usable(cfg.stale_timeout_s)
         else None
     )
 
     stale = snapshot.stale_sensors(cfg.stale_timeout_s)
     invalid = snapshot.invalid_sensors()
-    required_stale = required_stale_sensors(stale, cfg.required_sensors)
+    required = tuple(
+        name
+        for name in cfg.required_sensors
+        if cfg.use_ultrasonic or name != "ultrasonic_front"
+    )
+    if not cfg.use_ultrasonic:
+        stale = [name for name in stale if name != "ultrasonic_front"]
+        invalid = [name for name in invalid if name != "ultrasonic_front"]
+    required_stale = required_stale_sensors(stale, required)
+    required_invalid = required_invalid_sensors(invalid, required)
 
     if cfg.fail_safe_on_stale and required_stale:
         decision = SafetyDecision.stop(
@@ -127,6 +146,24 @@ def fuse_range_snapshot(
             side_distance_m=side_distance_m,
             stale_sensors=required_stale,
             invalid_sensors=invalid,
+        )
+        return RangeFusionResult(
+            decision=decision,
+            front_distance_m=front_distance_m,
+            side_distance_m=side_distance_m,
+            front_sources=front_sources,
+            side_sources=side_sources,
+            stale_sensors=stale,
+            invalid_sensors=invalid,
+        )
+
+    if required_invalid:
+        decision = SafetyDecision.stop(
+            reason="required_sensor_invalid",
+            front_distance_m=front_distance_m,
+            side_distance_m=side_distance_m,
+            stale_sensors=stale,
+            invalid_sensors=required_invalid,
         )
         return RangeFusionResult(
             decision=decision,
@@ -201,5 +238,6 @@ __all__ = [
     "slowdown_from_distance",
     "min_optional",
     "required_stale_sensors",
+    "required_invalid_sensors",
     "fuse_range_snapshot",
 ]

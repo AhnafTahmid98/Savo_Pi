@@ -54,8 +54,9 @@ inline SensorHealth make_sensor_health(
 {
   SensorHealth health;
   health.sensor_name = sample.sensor_name;
-  health.valid = sample.valid;
-  health.last_distance_m = sample.distance_m;
+  health.valid = sample.valid && sample.distance_m.has_value() &&
+    std::isfinite(*sample.distance_m) && *sample.distance_m > 0.0;
+  health.last_distance_m = health.valid ? sample.distance_m : std::nullopt;
   health.age_s = sample.age_s(now);
   health.stale = sample.stale(stale_timeout_s, now);
   health.error = sample.error;
@@ -64,7 +65,7 @@ inline SensorHealth make_sensor_health(
   if (health.stale) {
     health.status = SensorStatus::kStale;
     health.ok = false;
-  } else if (!sample.valid || !sample.distance_m.has_value()) {
+  } else if (!health.valid) {
     health.status = SensorStatus::kError;
     health.ok = false;
   } else {

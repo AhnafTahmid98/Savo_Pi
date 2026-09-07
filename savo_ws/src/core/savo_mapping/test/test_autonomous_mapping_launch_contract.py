@@ -34,6 +34,8 @@ def test_autonomous_mapping_launch_is_valid_and_complete() -> None:
         'coverage_profile_file',
         'coverage_execution_handoff_params_file',
         'coverage_operation_params_file',
+        'initial_scan360_required',
+        'initial_head_scan_required',
         'final_scan360_required',
         'final_head_scan_required',
         'scan360_params_file',
@@ -102,6 +104,36 @@ def test_autonomous_launch_starts_safe_and_preserves_ownership() -> None:
     assert '/navigate_to_pose' not in text
     assert 'name="auto_start"' in text
     assert 'value="false"' in text
+
+
+def test_initial_scan_requirements_are_explicit_and_default_compatible(
+) -> None:
+    """The full profile keeps both scans while allowing a headless mission."""
+    tree = ET.parse(LAUNCH)
+    root = tree.getroot()
+    arguments = {
+        element.attrib['name']: element.attrib.get('default')
+        for element in root.findall('arg')
+    }
+
+    assert arguments['initial_scan360_required'] == 'true'
+    assert arguments['initial_head_scan_required'] == 'true'
+
+    orchestrator = next(
+        element for element in root.findall('include')
+        if 'autonomous_mapping_orchestrator.launch.xml'
+        in element.attrib['file']
+    )
+    forwarded = {
+        element.attrib['name']: element.attrib['value']
+        for element in orchestrator.findall('arg')
+    }
+    assert forwarded['initial_scan360_required'] == (
+        '$(var initial_scan360_required)'
+    )
+    assert forwarded['initial_head_scan_required'] == (
+        '$(var initial_head_scan_required)'
+    )
 
 
 def test_all_launch_variables_are_declared() -> None:

@@ -22,6 +22,8 @@ vl53_mux_node:
 
     left_topic: /savo_perception/range/left_m
     right_topic: /savo_perception/range/right_m
+    status_topic: /savo_perception/tof_status
+    status_publish_hz: 2.0
 
     publish_nan_on_error: true
     startup_fail_is_fatal: false

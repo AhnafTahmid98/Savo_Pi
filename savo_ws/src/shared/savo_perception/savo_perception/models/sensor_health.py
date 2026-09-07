@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import math
 import time
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional
@@ -41,11 +42,17 @@ class SensorHealth:
     ) -> "SensorHealth":
         age = sample.age_s(now_mono_s)
         stale = age > float(stale_timeout_s)
+        valid = (
+            sample.valid
+            and sample.distance_m is not None
+            and math.isfinite(float(sample.distance_m))
+            and float(sample.distance_m) > 0.0
+        )
 
         if stale:
             status = STATUS_STALE
             ok = False
-        elif not sample.valid:
+        elif not valid:
             status = STATUS_ERROR
             ok = False
         else:
@@ -56,10 +63,10 @@ class SensorHealth:
             sensor_name=sample.sensor_name,
             ok=ok,
             status=status,
-            last_distance_m=sample.distance_m,
+            last_distance_m=sample.distance_m if valid else None,
             age_s=age,
             stale=stale,
-            valid=sample.valid,
+            valid=valid,
             error=sample.error,
             source=sample.source,
         )

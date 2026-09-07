@@ -16,6 +16,7 @@ def _build_nodes(context, *args, **kwargs):
 
     driver_impl = LaunchConfiguration("driver_impl").perform(context).strip().lower()
     use_safety_stop = _as_bool(LaunchConfiguration("use_safety_stop").perform(context))
+    use_ultrasonic = _as_bool(LaunchConfiguration("use_ultrasonic").perform(context))
     use_cmd_vel_gate = _as_bool(LaunchConfiguration("use_cmd_vel_gate").perform(context))
     use_range_health = _as_bool(LaunchConfiguration("use_range_health").perform(context))
     use_dashboard = _as_bool(LaunchConfiguration("use_dashboard").perform(context))
@@ -46,7 +47,7 @@ def _build_nodes(context, *args, **kwargs):
                 executable=safety_executable,
                 name=safety_node_name,
                 output="screen",
-                parameters=[config_file],
+                parameters=[config_file, {"use_ultrasonic": use_ultrasonic}],
             )
         )
 
@@ -68,7 +69,7 @@ def _build_nodes(context, *args, **kwargs):
                 executable=range_health_executable,
                 name=range_health_node_name,
                 output="screen",
-                parameters=[config_file],
+                parameters=[config_file, {"use_ultrasonic": use_ultrasonic}],
             )
         )
 
@@ -107,6 +108,11 @@ def generate_launch_description():
                 "config_file",
                 default_value=default_config,
                 description="YAML parameter file for safety nodes.",
+            ),
+            DeclareLaunchArgument(
+                "use_ultrasonic",
+                default_value="true",
+                description="Include the optional ultrasonic source in safety and health.",
             ),
             DeclareLaunchArgument(
                 "use_safety_stop",

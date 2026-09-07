@@ -47,6 +47,7 @@ struct SAVO_PERCEPTION_PUBLIC RangeSample
     return valid &&
       distance_m.has_value() &&
       std::isfinite(*distance_m) &&
+      *distance_m > 0.0 &&
       !stale(stale_timeout_s, now);
   }
 };
@@ -138,7 +139,10 @@ struct SAVO_PERCEPTION_PUBLIC RangeSnapshot
     std::vector<std::string> out;
 
     for (const auto & sample : all_samples()) {
-      if (!sample.valid || !sample.distance_m.has_value()) {
+      if (
+        !sample.valid || !sample.distance_m.has_value() ||
+        !std::isfinite(*sample.distance_m) || *sample.distance_m <= 0.0)
+      {
         out.push_back(sample.sensor_name);
       }
     }
@@ -168,7 +172,8 @@ inline bool is_valid_distance(
   const double min_m,
   const double max_m)
 {
-  return std::isfinite(distance_m) && distance_m >= min_m && distance_m <= max_m;
+  return std::isfinite(distance_m) && distance_m > 0.0 &&
+    distance_m >= min_m && distance_m <= max_m;
 }
 
 inline RangeSample make_range_sample(

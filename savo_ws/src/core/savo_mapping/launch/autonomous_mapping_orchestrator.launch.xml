@@ -11,6 +11,8 @@
     default="$(find-pkg-share savo_mapping)/config/autonomous_mapping_orchestrator.yaml"/>
 
   <arg name="coverage_enabled" default="true"/>
+  <arg name="initial_scan360_required" default="true"/>
+  <arg name="initial_head_scan_required" default="true"/>
   <arg name="final_scan360_required" default="true"/>
   <arg name="final_head_scan_required" default="true"/>
   <arg
@@ -40,6 +42,12 @@
       name="release.allow_provisional_geometry"
       value="$(var allow_provisional_geometry)"/>
     <param name="return_to_start.enabled" value="$(var coverage_enabled)"/>
+    <param
+      name="sequence.require_initial_scan360"
+      value="$(var initial_scan360_required)"/>
+    <param
+      name="sequence.require_initial_head_scan"
+      value="$(var initial_head_scan_required)"/>
     <param
       name="final_sequence.require_final_scan360"
       value="$(var final_scan360_required)"/>

@@ -32,6 +32,7 @@ TOPIC_DEPTH_FRONT_M: Final[str] = "/depth/min_front_m"
 
 TOPIC_TOF_LEFT_M: Final[str] = "/savo_perception/range/left_m"
 TOPIC_TOF_RIGHT_M: Final[str] = "/savo_perception/range/right_m"
+TOPIC_TOF_STATUS: Final[str] = "/savo_perception/tof_status"
 TOPIC_ULTRASONIC_FRONT_M: Final[str] = "/savo_perception/range/front_ultrasonic_m"
 
 TOPIC_SAFETY_STOP: Final[str] = "/safety/stop"
@@ -158,6 +159,7 @@ class PerceptionDefaults:
     depth_front_topic: str = TOPIC_DEPTH_FRONT_M
     tof_left_topic: str = TOPIC_TOF_LEFT_M
     tof_right_topic: str = TOPIC_TOF_RIGHT_M
+    tof_status_topic: str = TOPIC_TOF_STATUS
     ultrasonic_front_topic: str = TOPIC_ULTRASONIC_FRONT_M
     safety_stop_topic: str = TOPIC_SAFETY_STOP
     slowdown_topic: str = TOPIC_SAFETY_SLOWDOWN_FACTOR
@@ -294,6 +296,7 @@ __all__ = [
     "TOPIC_DEPTH_FRONT_M",
     "TOPIC_TOF_LEFT_M",
     "TOPIC_TOF_RIGHT_M",
+    "TOPIC_TOF_STATUS",
     "TOPIC_ULTRASONIC_FRONT_M",
     "TOPIC_SAFETY_STOP",
     "TOPIC_SAFETY_SLOWDOWN_FACTOR",

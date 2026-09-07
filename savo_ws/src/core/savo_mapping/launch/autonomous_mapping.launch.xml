@@ -66,6 +66,8 @@
   <arg
     name="coverage_operation_params_file"
     default="$(find-pkg-share savo_mapping)/config/coverage_operation_orchestrator.yaml"/>
+  <arg name="initial_scan360_required" default="true"/>
+  <arg name="initial_head_scan_required" default="true"/>
   <arg name="final_scan360_required" default="true"/>
   <arg name="final_head_scan_required" default="true"/>
   <arg
@@ -290,6 +292,12 @@
     <arg
       name="allow_provisional_geometry"
       value="$(var allow_provisional_geometry)"/>
+    <arg
+      name="initial_scan360_required"
+      value="$(var initial_scan360_required)"/>
+    <arg
+      name="initial_head_scan_required"
+      value="$(var initial_head_scan_required)"/>
     <arg
       name="final_scan360_required"
       value="$(var final_scan360_required)"/>

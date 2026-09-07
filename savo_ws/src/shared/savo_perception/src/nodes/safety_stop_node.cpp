@@ -114,10 +114,11 @@ void SafetyStopNode::declare_parameters()
 
   declare_parameter<std::vector<std::string>>(
     "optional_sensors",
-    std::vector<std::string>{"depth_front"});
+    std::vector<std::string>{"depth_front", "ultrasonic_front"});
 
   declare_parameter<bool>("use_depth_front", true);
   declare_parameter<bool>("depth_front_required", false);
+  declare_parameter<bool>("use_ultrasonic", true);
 
   declare_parameter<bool>("publish_state_json", true);
   declare_parameter<bool>("startup_fail_is_fatal", constants::kStartupFailIsFatalDefault);
@@ -190,6 +191,8 @@ void SafetyStopNode::load_parameters()
 
   policy_config_.fusion.use_depth_front = get_parameter("use_depth_front").as_bool();
   policy_config_.fusion.depth_front_required = get_parameter("depth_front_required").as_bool();
+  use_ultrasonic_ = get_parameter("use_ultrasonic").as_bool();
+  policy_config_.fusion.use_ultrasonic = use_ultrasonic_;
 
   publish_state_json_ = get_parameter("publish_state_json").as_bool();
 
@@ -225,12 +228,14 @@ void SafetyStopNode::setup_interfaces()
       on_tof_right(msg);
     });
 
-  ultrasonic_front_sub_ = create_subscription<std_msgs::msg::Float32>(
-    ultrasonic_front_topic_,
-    rclcpp::SensorDataQoS(),
-    [this](const std_msgs::msg::Float32::SharedPtr msg) {
-      on_ultrasonic_front(msg);
-    });
+  if (use_ultrasonic_) {
+    ultrasonic_front_sub_ = create_subscription<std_msgs::msg::Float32>(
+      ultrasonic_front_topic_,
+      rclcpp::SensorDataQoS(),
+      [this](const std_msgs::msg::Float32::SharedPtr msg) {
+        on_ultrasonic_front(msg);
+      });
+  }
 
   const auto safety_qos = rclcpp::QoS(10).reliable();
 
@@ -296,7 +301,7 @@ RangeSample SafetyStopNode::sample_from_value(
 {
   const auto distance_m = static_cast<double>(value);
 
-  if (std::isnan(distance_m) || distance_m <= 0.0) {
+  if (!std::isfinite(distance_m) || distance_m <= 0.0) {
     return make_invalid_range_sample(sensor_name, "invalid_distance", source);
   }
 

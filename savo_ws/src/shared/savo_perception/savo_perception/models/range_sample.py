@@ -158,7 +158,7 @@ class RangeSnapshot:
         return [
             sample.sensor_name
             for sample in self.all_samples()
-            if not sample.valid
+            if not sample.valid or not is_valid_distance(sample.distance_m)
         ]
 
     def to_dict(self) -> Dict[str, Any]:
@@ -186,13 +186,10 @@ def is_valid_distance(
     except Exception:
         return False
 
-    if math.isnan(value):
+    if not math.isfinite(value):
         return False
 
-    if math.isinf(value):
-        return value > 0.0
-
-    return float(min_m) <= value <= float(max_m)
+    return value > 0.0 and float(min_m) <= value <= float(max_m)
 
 
 def sanitize_distance(

@@ -149,6 +149,9 @@ def _setup(context):
                     "supervisor_auto_arm": LaunchConfiguration(
                         "supervisor_auto_arm"
                     ),
+                    "perception_use_ultrasonic": LaunchConfiguration(
+                        "perception_use_ultrasonic"
+                    ),
                     "geometry_profile": LaunchConfiguration(
                         "geometry_profile"
                     ),
@@ -161,6 +164,12 @@ def _setup(context):
                     "control_startup_mode": LaunchConfiguration(
                         "control_startup_mode"
                     ),
+                    "control_use_control_status": LaunchConfiguration(
+                        "control_use_control_status"
+                    ),
+                    "control_use_recovery_status": LaunchConfiguration(
+                        "control_use_recovery_status"
+                    ),
                     "localization_use_vo": LaunchConfiguration(
                         "localization_use_vo"
                     ),
@@ -171,11 +180,24 @@ def _setup(context):
                     "head_camera_mode": LaunchConfiguration(
                         "head_camera_mode"
                     ),
+                    "start_head": LaunchConfiguration("start_head"),
                     "start_location_lifecycle": (
                         "true" if start_locations else "false"
                     ),
                     "start_semantic_interruption": LaunchConfiguration(
                         "start_semantic_interruption"
+                    ),
+                    "initial_scan360_required": LaunchConfiguration(
+                        "initial_scan360_required"
+                    ),
+                    "initial_head_scan_required": LaunchConfiguration(
+                        "initial_head_scan_required"
+                    ),
+                    "final_scan360_required": LaunchConfiguration(
+                        "final_scan360_required"
+                    ),
+                    "final_head_scan_required": LaunchConfiguration(
+                        "final_head_scan_required"
                     ),
                     "nav_params_file": nav_params,
                     "nav_readiness_params": readiness_params,
@@ -258,6 +280,9 @@ def _setup(context):
                             "config_file": LaunchConfiguration(
                                 "perception_config_file"
                             ),
+                            "use_ultrasonic": LaunchConfiguration(
+                                "perception_use_ultrasonic"
+                            ),
                             "use_dashboard": "false",
                         }.items(),
                     ),
@@ -278,6 +303,12 @@ def _setup(context):
                             ),
                             "use_stuck_detector": LaunchConfiguration(
                                 "control_use_stuck_detector"
+                            ),
+                            "use_control_status": LaunchConfiguration(
+                                "control_use_control_status"
+                            ),
+                            "use_recovery_status": LaunchConfiguration(
+                                "control_use_recovery_status"
                             ),
                             "use_dashboard": "false",
                         }.items(),
@@ -578,8 +609,11 @@ def generate_launch_description() -> LaunchDescription:
                 ),
             ),
             DeclareLaunchArgument("control_startup_mode", default_value="STOP"),
+            DeclareLaunchArgument("perception_use_ultrasonic", default_value="true"),
             DeclareLaunchArgument("control_use_backup_escape", default_value="false"),
             DeclareLaunchArgument("control_use_stuck_detector", default_value="false"),
+            DeclareLaunchArgument("control_use_control_status", default_value="false"),
+            DeclareLaunchArgument("control_use_recovery_status", default_value="false"),
             DeclareLaunchArgument("localization_use_vo", default_value="true"),
             DeclareLaunchArgument("head_enable_tf", default_value="true"),
             DeclareLaunchArgument("head_camera_mode", default_value="ros"),
@@ -598,6 +632,18 @@ def generate_launch_description() -> LaunchDescription:
             ),
             DeclareLaunchArgument(
                 "start_semantic_interruption", default_value="true"
+            ),
+            DeclareLaunchArgument(
+                "initial_scan360_required", default_value="true"
+            ),
+            DeclareLaunchArgument(
+                "initial_head_scan_required", default_value="true"
+            ),
+            DeclareLaunchArgument(
+                "final_scan360_required", default_value="true"
+            ),
+            DeclareLaunchArgument(
+                "final_head_scan_required", default_value="true"
             ),
             DeclareLaunchArgument(
                 "description_start_delay_s", default_value="0.0"

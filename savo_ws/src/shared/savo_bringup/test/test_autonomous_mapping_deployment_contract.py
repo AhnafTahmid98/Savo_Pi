@@ -102,6 +102,74 @@ def test_autonomous_mapping_launch_is_fail_closed_by_default() -> None:
     assert '"start_locations": "true"' in launch
 
 
+def test_optional_ultrasonic_and_control_monitors_propagate_without_changing_defaults() -> None:
+    autonomous = read("launch/autonomous_mapping.launch.py")
+    core = read("launch/core_bringup.launch.py")
+    robot = read("launch/robot_bringup.launch.py")
+
+    for source in (autonomous, core, robot):
+        assert '"perception_use_ultrasonic"' in source
+        assert '"control_use_control_status"' in source
+        assert '"control_use_recovery_status"' in source
+        assert '"supervisor_auto_arm", default_value="false"' in source
+
+    assert '"use_ultrasonic": LaunchConfiguration(' in autonomous
+    assert '"perception_use_ultrasonic"' in autonomous
+    assert '"control_startup_mode",\n                default_value="STOP"' in autonomous
+
+
+def test_headless_mapping_flags_propagate_without_weakening_defaults() -> None:
+    autonomous = read("launch/autonomous_mapping.launch.py")
+    core = read("launch/core_bringup.launch.py")
+    robot = read("launch/robot_bringup.launch.py")
+    mapping = (
+        ROOT.parents[1]
+        / "core"
+        / "savo_mapping"
+        / "launch"
+        / "autonomous_mapping.launch.xml"
+    ).read_text(encoding="utf-8")
+
+    scan_arguments = (
+        "initial_scan360_required",
+        "initial_head_scan_required",
+        "final_scan360_required",
+        "final_head_scan_required",
+    )
+    for argument in scan_arguments:
+        assert f'"{argument}"' in autonomous
+        assert f'"{argument}"' in core
+        assert f'"{argument}"' in robot
+        assert f'name="{argument}" default="true"' in mapping
+
+    assert '"start_head": LaunchConfiguration("start_head")' in core
+    assert (
+        'condition=IfCondition(LaunchConfiguration("start_head"))'
+        in autonomous
+    )
+    assert (
+        'condition=IfCondition(\n'
+        '            LaunchConfiguration("start_location_lifecycle")'
+        in autonomous
+    )
+    assert 'if="$(var semantic_interruption_enabled)"' in mapping
+
+    # Scan360 needs the rotate server if either mission scan is required.
+    assert 'scan360_required = PythonExpression(' in autonomous
+    assert 'LaunchConfiguration("initial_scan360_required")' in autonomous
+    assert 'LaunchConfiguration("final_scan360_required")' in autonomous
+    assert '"use_rotate_to_heading": scan360_required' in autonomous
+
+    # Launch remains inert and authority remains closed in headless mode too.
+    assert (
+        '"control_startup_mode",\n                default_value="STOP"'
+        in autonomous
+    )
+    assert '"supervisor_auto_arm", default_value="false"' in autonomous
+    assert "ActionClient" not in autonomous
+    assert "ros2 action send_goal" not in autonomous
+
+
 def test_canonical_entry_forwards_only_semantic_interruption_control() -> None:
     """Canonical false disables only continuous semantic interruption."""
     robot = read("launch/robot_bringup.launch.py")

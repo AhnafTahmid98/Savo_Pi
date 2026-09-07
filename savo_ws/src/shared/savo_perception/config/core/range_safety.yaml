@@ -38,9 +38,11 @@ safety_stop_node:
 
     optional_sensors:
       - depth_front
+      - ultrasonic_front
 
     use_depth_front: true
     depth_front_required: false
+    use_ultrasonic: true
 
     publish_state_json: true
     startup_fail_is_fatal: false
@@ -82,9 +84,11 @@ safety_stop_node_py:
 
     optional_sensors:
       - depth_front
+      - ultrasonic_front
 
     use_depth_front: true
     depth_front_required: false
+    use_ultrasonic: true
 
     publish_state_json: true
     startup_fail_is_fatal: false

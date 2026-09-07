@@ -85,8 +85,10 @@ def fusion_config_for_state(
         front_slow_m=fusion.front_slow_m,
         side_stop_m=fusion.side_stop_m + config.side_clear_hysteresis_m,
         side_slow_m=fusion.side_slow_m,
+        ultrasonic_stop_m=fusion.ultrasonic_stop_m,
         stale_timeout_s=fusion.stale_timeout_s,
         fail_safe_on_stale=fusion.fail_safe_on_stale,
+        use_ultrasonic=fusion.use_ultrasonic,
         required_sensors=fusion.required_sensors,
     )
 

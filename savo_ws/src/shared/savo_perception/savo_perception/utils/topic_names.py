@@ -14,6 +14,7 @@ try:
         TOPIC_DEPTH_FRONT_M as _TOPIC_DEPTH_FRONT_M,
         TOPIC_TOF_LEFT_M as _TOPIC_TOF_LEFT_M,
         TOPIC_TOF_RIGHT_M as _TOPIC_TOF_RIGHT_M,
+        TOPIC_TOF_STATUS as _TOPIC_TOF_STATUS,
         TOPIC_ULTRASONIC_FRONT_M as _TOPIC_ULTRASONIC_FRONT_M,
         TOPIC_SAFETY_STOP as _TOPIC_SAFETY_STOP,
         TOPIC_SAFETY_SLOWDOWN_FACTOR as _TOPIC_SAFETY_SLOWDOWN_FACTOR,
@@ -30,6 +31,7 @@ except Exception:
     _TOPIC_DEPTH_FRONT_M = "/depth/min_front_m"
     _TOPIC_TOF_LEFT_M = "/savo_perception/range/left_m"
     _TOPIC_TOF_RIGHT_M = "/savo_perception/range/right_m"
+    _TOPIC_TOF_STATUS = "/savo_perception/tof_status"
     _TOPIC_ULTRASONIC_FRONT_M = "/savo_perception/range/front_ultrasonic_m"
     _TOPIC_SAFETY_STOP = "/safety/stop"
     _TOPIC_SAFETY_SLOWDOWN_FACTOR = "/safety/slowdown_factor"
@@ -86,6 +88,7 @@ CMD_VEL_SAFE = _TOPIC_CMD_VEL_SAFE
 DEPTH_FRONT_M = _TOPIC_DEPTH_FRONT_M
 TOF_LEFT_M = _TOPIC_TOF_LEFT_M
 TOF_RIGHT_M = _TOPIC_TOF_RIGHT_M
+TOF_STATUS = _TOPIC_TOF_STATUS
 ULTRASONIC_FRONT_M = _TOPIC_ULTRASONIC_FRONT_M
 
 SAFETY_STOP = _TOPIC_SAFETY_STOP
@@ -126,6 +129,7 @@ class PerceptionSafetyTopics:
 @dataclass(frozen=True)
 class PerceptionStatusTopics:
     """Topic contract for perception status and diagnostics."""
+    tof_status: str = TOF_STATUS
     range_health: str = SAVO_PERCEPTION_RANGE_HEALTH
     safety_state: str = SAVO_PERCEPTION_SAFETY_STATE
     dashboard: str = SAVO_PERCEPTION_DASHBOARD
@@ -205,6 +209,7 @@ DEFAULT_SAFETY_TOPIC_MAP: Dict[str, str] = {
 }
 
 DEFAULT_STATUS_TOPIC_MAP: Dict[str, str] = {
+    "tof_status": TOF_STATUS,
     "range_health": SAVO_PERCEPTION_RANGE_HEALTH,
     "safety_state": SAVO_PERCEPTION_SAFETY_STATE,
     "dashboard": SAVO_PERCEPTION_DASHBOARD,
@@ -240,6 +245,7 @@ __all__ = [
     "DEPTH_FRONT_M",
     "TOF_LEFT_M",
     "TOF_RIGHT_M",
+    "TOF_STATUS",
     "ULTRASONIC_FRONT_M",
     "SAFETY_STOP",
     "SAFETY_SLOWDOWN_FACTOR",

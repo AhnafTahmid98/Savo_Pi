@@ -45,6 +45,12 @@ class RangeHealthNodePy(Node):
         self.declare_parameter("publish_hz", 2.0)
         self.declare_parameter("stale_timeout_s", 0.30)
         self.declare_parameter("include_depth_in_overall_ok", False)
+        self.declare_parameter("use_ultrasonic", True)
+        self.declare_parameter("required_sensors", ["tof_left", "tof_right"])
+        self.declare_parameter(
+            "optional_sensors",
+            ["depth_front", "ultrasonic_front"],
+        )
 
         values = {
             "depth_front_topic": self.get_parameter("depth_front_topic").value,
@@ -54,12 +60,21 @@ class RangeHealthNodePy(Node):
             "range_health_topic": self.get_parameter("range_health_topic").value,
             "publish_hz": self.get_parameter("publish_hz").value,
             "stale_timeout_s": self.get_parameter("stale_timeout_s").value,
+            "use_ultrasonic": self.get_parameter("use_ultrasonic").value,
         }
 
         self.params = load_range_health_params(values)
         self.include_depth_in_overall_ok = bool(
             self.get_parameter("include_depth_in_overall_ok").value
         )
+        self.required_sensors = [
+            str(name)
+            for name in self.get_parameter("required_sensors").value
+            if self.params.use_ultrasonic or str(name) != "ultrasonic_front"
+        ]
+        self.optional_sensors = [
+            str(name) for name in self.get_parameter("optional_sensors").value
+        ]
 
         self.samples: Dict[str, RangeSample] = {
             "depth_front": self._missing_sample("depth_front", required=False),
@@ -86,12 +101,13 @@ class RangeHealthNodePy(Node):
             lambda msg: self._on_range_msg("tof_right", msg, required=True),
             qos_range_sensor(),
         )
-        self.create_subscription(
-            Float32,
-            self.params.ultrasonic_front_topic,
-            lambda msg: self._on_range_msg("ultrasonic_front", msg, required=False),
-            qos_range_sensor(),
-        )
+        if self.params.use_ultrasonic:
+            self.create_subscription(
+                Float32,
+                self.params.ultrasonic_front_topic,
+                lambda msg: self._on_range_msg("ultrasonic_front", msg, required=False),
+                qos_range_sensor(),
+            )
 
         self.pub = self.create_publisher(
             String,
@@ -116,18 +132,26 @@ class RangeHealthNodePy(Node):
     def _on_timer(self) -> None:
         now_s = time.monotonic()
 
+        enabled_samples = {
+            name: sample
+            for name, sample in self.samples.items()
+            if name != "ultrasonic_front" or self.params.use_ultrasonic
+        }
         health = {
             name: SensorHealth.from_sample(
                 sample,
                 stale_timeout_s=self.params.stale_timeout_s,
                 now_mono_s=now_s,
             )
-            for name, sample in self.samples.items()
+            for name, sample in enabled_samples.items()
         }
 
-        required_sensors = ["tof_left", "tof_right"]
+        required_sensors = list(self.required_sensors)
         if self.include_depth_in_overall_ok:
             required_sensors.append("depth_front")
+        optional_sensors = [
+            name for name in self.optional_sensors if name not in required_sensors
+        ]
 
         required_health = [health[name] for name in required_sensors]
         ok = all(item.ok for item in required_health)
@@ -152,7 +176,10 @@ class RangeHealthNodePy(Node):
             "stamp_mono_s": now_s,
             "stale_timeout_s": self.params.stale_timeout_s,
             "required_sensors": required_sensors,
-            "optional_sensors": [] if self.include_depth_in_overall_ok else ["depth_front"],
+            "optional_sensors": optional_sensors,
+            "disabled_sensors": (
+                [] if self.params.use_ultrasonic else ["ultrasonic_front"]
+            ),
             "stale_sensors": stale_required,
             "error_sensors": error_required,
             "sensors": {name: item.to_dict() for name, item in health.items()},
@@ -168,8 +195,8 @@ class RangeHealthNodePy(Node):
         except Exception:
             distance_m = math.nan
 
-        if math.isnan(distance_m):
-            return self._missing_sample(sensor_name, required=required, reason="nan_or_invalid")
+        if not math.isfinite(distance_m):
+            return self._missing_sample(sensor_name, required=required, reason="non_finite")
 
         if distance_m <= 0.0:
             return self._missing_sample(sensor_name, required=required, reason="non_positive")

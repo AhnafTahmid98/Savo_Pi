@@ -240,6 +240,7 @@ TEST(AutonomousMappingMissionTest, InitialScanWithoutHeadEntersFrontier)
   decision = mission.observe(inputs);
   EXPECT_EQ(decision.snapshot.state, MissionState::Starting);
   EXPECT_TRUE(decision.request_frontier_mode);
+  EXPECT_FALSE(decision.request_head_scan_start);
 
   inputs.mode = MappingMode::Autonomous;
   inputs.exploration_mode = ExplorationMode::Frontier;
@@ -247,6 +248,33 @@ TEST(AutonomousMappingMissionTest, InitialScanWithoutHeadEntersFrontier)
   inputs.runtime_authorized = true;
   decision = mission.observe(inputs);
   EXPECT_EQ(decision.snapshot.state, MissionState::Exploring);
+  EXPECT_FALSE(decision.request_head_scan_start);
+}
+
+TEST(AutonomousMappingMissionTest, DisabledScansNeedNoScanServices)
+{
+  AutonomousMappingMission initial_mission;
+  auto initial_inputs = starting_inputs();
+  initial_inputs.session_state = SessionState::Active;
+
+  auto decision = initial_mission.start(valid_request(), initial_inputs);
+  EXPECT_EQ(decision.snapshot.state, MissionState::Starting);
+  EXPECT_TRUE(decision.request_frontier_mode);
+  EXPECT_FALSE(decision.request_scan360_start);
+  EXPECT_FALSE(decision.request_head_scan_start);
+
+  AutonomousMappingMission final_mission;
+  MissionInputs final_inputs;
+  enter_coverage_active(final_mission, final_inputs);
+  final_inputs.coverage_execution_active = false;
+  final_inputs.coverage_execution_complete = true;
+  final_inputs.coverage_execution_succeeded = true;
+
+  decision = final_mission.observe(final_inputs);
+  EXPECT_EQ(decision.snapshot.state, MissionState::Saving);
+  EXPECT_TRUE(decision.request_map_save);
+  EXPECT_FALSE(decision.request_scan360_start);
+  EXPECT_FALSE(decision.request_head_scan_start);
 }
 
 TEST(AutonomousMappingMissionTest, RunsCoverageReturnFinalScansBeforeSaving)

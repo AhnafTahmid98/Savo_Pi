@@ -83,6 +83,7 @@ private:
 
   bool include_depth_in_overall_ok_{false};
   bool depth_front_required_{false};
+  bool use_ultrasonic_{true};
 
   bool publish_json_{true};
   bool publish_compact_status_{true};
@@ -92,7 +93,8 @@ private:
     "tof_right"};
 
   std::vector<std::string> optional_sensors_{
-    "depth_front"};
+    "depth_front",
+    "ultrasonic_front"};
 
   RangeSample depth_front_;
   RangeSample tof_left_;
