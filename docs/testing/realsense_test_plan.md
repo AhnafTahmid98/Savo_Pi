@@ -36,7 +36,7 @@ Configured `/camera/camera/...` color/depth/aligned images, CameraInfo and point
 
 | Test ID | Stage / class | Verification and acceptance |
 | --- | --- | --- |
-| RLS-001 | T0 `STATIC` | Verify serial binding, `848x480x30` depth and `640x480x30` color configuration, alignment/sync, profile-specific point cloud, `publish_tf=false`, health timeout, ROI/range/percentile, and one Edge device owner. |
+| RLS-001 | T0 `STATIC` | Verify serial binding, `848x480x15` depth and `640x480x15` color configuration, alignment/sync, profile-specific point cloud, `publish_tf=false`, health timeout, ROI/range/percentile, and one Edge device owner. |
 | RLS-002 | T1 `UNIT`/`PC` | Package build/tests pass for topics/frames, serial, stream status/timing, depth math, diagnostics, profiles, and C++ defaults. |
 | RLS-003 | T2 `TARGET-NON-HARDWARE` | Launch argument/config parsing passes without claiming a camera; missing streams become unhealthy and front depth invalid/stale. |
 | RLS-004 | T3 `HARDWARE-NON-ACTUATING` | Enumerate D435; record serial, firmware report, USB mode, port/cable, temperatures if available, and selected profile. Identity mismatch blocks production start. |
@@ -78,4 +78,3 @@ Source/retained PC evidence exists. Current USB3, identity, streams, thermal/ban
 - [RealSense setup](../setup/realsense_setup.md)
 - [VO plan](vo_test_plan.md)
 - [Perception plan](perception_test_plan.md)
-

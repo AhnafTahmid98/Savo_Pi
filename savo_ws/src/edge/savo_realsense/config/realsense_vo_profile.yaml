@@ -3,13 +3,13 @@ camera_topic_monitor_node:
     publish_hz: 2.0
     stale_timeout_s: 0.50
 
-    expected_color_hz: 30.0
-    expected_depth_hz: 30.0
-    expected_aligned_depth_hz: 30.0
-    expected_camera_info_hz: 30.0
-    expected_pointcloud_hz: 30.0
+    expected_color_hz: 15.0
+    expected_depth_hz: 15.0
+    expected_aligned_depth_hz: 15.0
+    expected_camera_info_hz: 15.0
+    expected_pointcloud_hz: 8.0
 
-    require_pointcloud: true
+    require_pointcloud: false
     require_aligned_depth: true
 
 camera_health_node:

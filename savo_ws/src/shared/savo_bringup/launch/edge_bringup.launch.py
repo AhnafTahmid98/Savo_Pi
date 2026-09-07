@@ -102,11 +102,17 @@ def _setup(context):
     ]
 
     if start_realsense:
+        if start_obstacle_cloud:
+            camera_config_name = "realsense_d435_camera.yaml"
+        elif start_vo:
+            camera_config_name = "realsense_vo_driver.yaml"
+        else:
+            camera_config_name = "realsense_minimal.yaml"
         camera_config = PathJoinSubstitution(
             [
                 FindPackageShare("savo_realsense"),
                 "config",
-                "realsense_d435_camera.yaml",
+                camera_config_name,
             ]
         )
         nodes_config = PathJoinSubstitution(
@@ -184,19 +190,37 @@ def _setup(context):
 
     if start_speech:
         actions.append(
-            IncludeLaunchDescription(
-                _frontend_launch("savo_speech", "speech_bringup.launch.xml"),
-                launch_arguments={
-                    "params_file": LaunchConfiguration("speech_params_file")
-                }.items(),
+            TimerAction(
+                period=LaunchConfiguration("speech_start_delay_s"),
+                actions=[
+                    IncludeLaunchDescription(
+                        _frontend_launch(
+                            "savo_speech", "speech_bringup.launch.xml"
+                        ),
+                        launch_arguments={
+                            "params_file": LaunchConfiguration(
+                                "speech_params_file"
+                            )
+                        }.items(),
+                    )
+                ],
+                cancel_on_shutdown=True,
             )
         )
 
     if start_ui:
         actions.append(
-            IncludeLaunchDescription(
-                _python_launch("savo_ui", "ui_bringup.launch.py"),
-                launch_arguments={"profile": LaunchConfiguration("ui_profile")}.items(),
+            TimerAction(
+                period=LaunchConfiguration("ui_start_delay_s"),
+                actions=[
+                    IncludeLaunchDescription(
+                        _python_launch("savo_ui", "ui_bringup.launch.py"),
+                        launch_arguments={
+                            "profile": LaunchConfiguration("ui_profile")
+                        }.items(),
+                    )
+                ],
+                cancel_on_shutdown=True,
             )
         )
 
@@ -301,7 +325,7 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument("start_vo", default_value="true"),
             DeclareLaunchArgument("start_obstacle_cloud", default_value="true"),
             DeclareLaunchArgument(
-                "enable_observer_color_relay", default_value="true"
+                "enable_observer_color_relay", default_value="false"
             ),
             DeclareLaunchArgument("start_speech", default_value="false"),
             DeclareLaunchArgument("start_ui", default_value="false"),
@@ -321,10 +345,16 @@ def generate_launch_description() -> LaunchDescription:
                 "observer_relay_start_delay_s", default_value="28.0"
             ),
             DeclareLaunchArgument(
-                "bridge_start_delay_s", default_value="34.0"
+                "speech_start_delay_s", default_value="34.0"
             ),
             DeclareLaunchArgument(
-                "readiness_start_delay_s", default_value="40.0"
+                "ui_start_delay_s", default_value="40.0"
+            ),
+            DeclareLaunchArgument(
+                "bridge_start_delay_s", default_value="46.0"
+            ),
+            DeclareLaunchArgument(
+                "readiness_start_delay_s", default_value="52.0"
             ),
             DeclareLaunchArgument("vo_profile", default_value="real_robot_v1"),
             DeclareLaunchArgument("ui_profile", default_value="pi"),

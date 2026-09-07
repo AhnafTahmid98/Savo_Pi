@@ -140,8 +140,8 @@ def generate_launch_description() -> LaunchDescription:
         ),
         DeclareLaunchArgument(
             "enable_observer_color_relay",
-            default_value="true",
-            description="Publish the production observer compressed D435 color",
+            default_value="false",
+            description="Publish the optional observer compressed D435 color",
         ),
         DeclareLaunchArgument(
             "realsense_start_delay_s",

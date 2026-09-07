@@ -29,8 +29,8 @@ The default `realsense_d435_camera.yaml` enables:
 
 | Stream/setting | Value |
 | --- | --- |
-| Color | `640x480x30` |
-| Depth | `848x480x30` |
+| Color | `640x480x15` |
+| Depth | `848x480x15` |
 | Aligned depth | enabled |
 | Synchronization | enabled |
 | Point cloud in camera driver | enabled |

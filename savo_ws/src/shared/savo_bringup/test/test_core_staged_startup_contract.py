@@ -35,8 +35,10 @@ EDGE_STAGE_DEFAULTS = {
     "vo_start_delay_s": "14.0",
     "obstacle_cloud_start_delay_s": "22.0",
     "observer_relay_start_delay_s": "28.0",
-    "bridge_start_delay_s": "34.0",
-    "readiness_start_delay_s": "40.0",
+    "speech_start_delay_s": "34.0",
+    "ui_start_delay_s": "40.0",
+    "bridge_start_delay_s": "46.0",
+    "readiness_start_delay_s": "52.0",
 }
 
 
@@ -191,8 +193,8 @@ def test_robot_forwards_core_delays_only_through_core_branch() -> None:
             assert f'"{name}"' not in edge_branch
 
 
-def test_edge_staging_defaults_remain_unchanged() -> None:
-    """Core timing adds no coupling to the validated Edge timeline."""
+def test_edge_staging_defaults_remain_isolated_from_core() -> None:
+    """Core timing adds no coupling to the complete Edge timeline."""
     edge_defaults = launch_defaults(EDGE_LAUNCH)
     robot_defaults = launch_defaults(ROBOT_LAUNCH)
     assert {

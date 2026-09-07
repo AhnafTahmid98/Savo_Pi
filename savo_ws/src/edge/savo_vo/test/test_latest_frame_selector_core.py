@@ -20,6 +20,34 @@ def test_latest_frame_selector_and_interval_guard(tmp_path: Path) -> None:
 
 #include "savo_vo/latest_frame_selector.hpp"
 
+void verify_source_rate(const double source_rate_hz)
+{
+  constexpr double processing_rate_hz = 12.0;
+  savo_vo::LatestFrameSelector selector;
+  double next_source_stamp_s = 0.0;
+  double previous_processed_stamp_s = 0.0;
+  bool have_previous = false;
+
+  for (int tick = 0; tick <= 24; ++tick) {
+    const double processing_time_s =
+      static_cast<double>(tick) / processing_rate_hz;
+    while (next_source_stamp_s <= processing_time_s + 1e-9) {
+      assert(selector.offer(next_source_stamp_s));
+      next_source_stamp_s += 1.0 / source_rate_hz;
+    }
+    const auto selected = selector.take();
+    if (!selected.has_value()) {
+      continue;
+    }
+    if (have_previous) {
+      assert(savo_vo::valid_frame_interval(
+        previous_processed_stamp_s, selected.value(), 0.20));
+    }
+    previous_processed_stamp_s = selected.value();
+    have_previous = true;
+  }
+}
+
 int main()
 {
   savo_vo::LatestFrameSelector selector;
@@ -37,6 +65,18 @@ int main()
   assert(savo_vo::valid_frame_interval(1.0, 1.1, 0.20));
   assert(!savo_vo::valid_frame_interval(1.0, 1.0, 0.20));
   assert(!savo_vo::valid_frame_interval(1.0, 1.201, 0.20));
+
+  double reference_stamp_s = 1.0;
+  const double post_gap_stamp_s = 1.4;
+  assert(!savo_vo::valid_frame_interval(
+    reference_stamp_s, post_gap_stamp_s, 0.20));
+  reference_stamp_s = post_gap_stamp_s;
+  assert(savo_vo::valid_frame_interval(
+    reference_stamp_s, post_gap_stamp_s + (1.0 / 15.0), 0.20));
+
+  verify_source_rate(15.0);
+  verify_source_rate(20.0);
+  verify_source_rate(25.0);
   return 0;
 }
 ''',

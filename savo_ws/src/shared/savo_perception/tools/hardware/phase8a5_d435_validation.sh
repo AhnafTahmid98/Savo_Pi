@@ -925,8 +925,8 @@ params = config['/camera/camera']['ros__parameters']
 
 expected = {
     'serial_no': expected_serial,
-    'depth_module.depth_profile': '848x480x30',
-    'rgb_camera.color_profile': '640x480x30',
+    'depth_module.depth_profile': '848x480x15',
+    'rgb_camera.color_profile': '640x480x15',
     'align_depth.enable': True,
     'enable_sync': True,
     'pointcloud__neon_.enable': True,
@@ -961,7 +961,7 @@ expected_filter = {
     'self_filter_enabled': True,
     'max_output_points': 100000,
     'transform_timeout_s': 0.10,
-    'max_processing_hz': 10.0,
+    'max_processing_hz': 8.0,
     'stale_timeout_s': 0.75,
 }
 
@@ -1317,8 +1317,8 @@ expected = {
     'serial_no': expected_serial,
     'enable_color': True,
     'enable_depth': True,
-    'depth_module.depth_profile': '848x480x30',
-    'rgb_camera.color_profile': '640x480x30',
+    'depth_module.depth_profile': '848x480x15',
+    'rgb_camera.color_profile': '640x480x15',
     'align_depth.enable': True,
     'enable_sync': True,
     'pointcloud__neon_.enable': True,

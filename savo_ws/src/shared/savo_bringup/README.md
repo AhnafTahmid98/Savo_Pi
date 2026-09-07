@@ -285,10 +285,12 @@ they do not change any steady-state stream, monitor, VO, filter, or relay rate.
 | `14.0` s | Visual odometry | C++ RGB-D odometry, republisher, health, and diagnostics |
 | `22.0` s | Obstacle cloud | TF transform, crop/self-filter, and 0.05 m voxel reduction |
 | `28.0` s | Observer relay | Raw D435 color to compressed observer color |
-| `34.0` s | Bridge | `savo_bridge_node` with the selected safe command policy |
-| `40.0` s | Readiness | Edge bringup readiness begins steady-state validation |
+| `34.0` s | Speech | Optional native capture, wake/VAD, and SavoMind transport |
+| `40.0` s | UI | Optional launch-owned UI; production systemd UI keeps this disabled |
+| `46.0` s | Bridge | `savo_bridge_node` with the selected safe command policy |
+| `52.0` s | Readiness | Edge bringup readiness begins steady-state validation |
 
-The expected total startup and health-settling window is approximately 40–60
+The expected total startup and health-settling window is approximately 52–72
 seconds. Raw PointCloud2 remains part of the single validated RealSense driver:
 `/camera/camera/depth/color/points` is transformed and filtered into
 `/savo_perception/obstacles/points`. This Robot Savo perception voxel reduction
@@ -301,8 +303,10 @@ The delay arguments are:
 - `vo_start_delay_s` (default `14.0`)
 - `obstacle_cloud_start_delay_s` (default `22.0`)
 - `observer_relay_start_delay_s` (default `28.0`)
-- `bridge_start_delay_s` (default `34.0`)
-- `readiness_start_delay_s` (default `40.0`)
+- `speech_start_delay_s` (default `34.0`)
+- `ui_start_delay_s` (default `40.0`)
+- `bridge_start_delay_s` (default `46.0`)
+- `readiness_start_delay_s` (default `52.0`)
 
 All are exposed by `robot_bringup.launch.py`; `0.0` requests immediate startup.
 For example, extend only the VO stabilization window with:

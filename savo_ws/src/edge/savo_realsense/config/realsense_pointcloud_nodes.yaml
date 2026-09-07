@@ -2,10 +2,10 @@ camera_topic_monitor_node:
   ros__parameters:
     publish_hz: 2.0
     stale_timeout_s: 0.75
-    expected_color_hz: 20.0
-    expected_depth_hz: 20.0
-    expected_aligned_depth_hz: 20.0
-    expected_camera_info_hz: 20.0
+    expected_color_hz: 15.0
+    expected_depth_hz: 15.0
+    expected_aligned_depth_hz: 15.0
+    expected_camera_info_hz: 15.0
     expected_pointcloud_hz: 8.0
     require_pointcloud: true
     require_aligned_depth: true

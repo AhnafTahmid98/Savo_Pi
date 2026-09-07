@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import yaml
+
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 
@@ -91,8 +93,6 @@ def test_cpp_and_python_executable_names_are_present():
 
 
 def test_profiles_wire_raw_and_clean_vo_topics():
-    import yaml
-
     for profile_name in PROFILE_FILES:
         profile_path = PACKAGE_ROOT / "config" / "profiles" / profile_name
         data = yaml.safe_load(profile_path.read_text(encoding="utf-8"))
@@ -126,6 +126,17 @@ def test_profiles_wire_raw_and_clean_vo_topics():
         assert diagnostics["status_topic"] == "/vo/status"
         assert diagnostics["health_topic"] == "/vo/health"
         assert diagnostics["diagnostics_topic"] == "/diagnostics"
+
+
+def test_real_robot_profile_uses_controlled_12_hz_processing():
+    profile_path = PACKAGE_ROOT / "config" / "profiles" / "real_robot_v1.yaml"
+    data = yaml.safe_load(profile_path.read_text(encoding="utf-8"))
+    rgbd = data["rgbd_odometry_node"]["ros__parameters"]
+
+    assert rgbd["processing_rate_hz"] == 12.0
+    assert rgbd["sync_queue_size"] == 2
+    assert rgbd["max_sync_delta_s"] == 0.02
+    assert rgbd["max_frame_interval_s"] == 0.20
 
 
 def test_no_direct_savo_realsense_dependency_in_launch_or_profiles():

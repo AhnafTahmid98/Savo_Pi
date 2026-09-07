@@ -2,10 +2,61 @@ from pathlib import Path
 
 
 PACKAGE = Path(__file__).resolve().parents[1]
+SOURCE_ROOT = PACKAGE.parents[1]
+SUPERVISOR_NODE = (
+    SOURCE_ROOT / 'shared/savo_supervisor/src/supervisor_node.cpp'
+)
 
 
 def read(relative: str) -> str:
     return (PACKAGE / relative).read_text(encoding='utf-8')
+
+
+def compact(text: str) -> str:
+    """Collapse C++ formatting while retaining exact interface tokens."""
+    return ' '.join(text.split())
+
+
+def test_mapping_status_qos_matches_authoritative_supervisor_consumer() -> None:
+    producer = compact(read('src/nodes/mapping_supervisor_node.cpp'))
+    consumer = compact(SUPERVISOR_NODE.read_text(encoding='utf-8'))
+
+    assert 'status_topic_, qos::state_qos());' in producer
+    assert (
+        'mapping_status_topic_, '
+        'rclcpp::QoS(1).transient_local().reliable(),'
+    ) in consumer
+
+
+def test_coverage_status_qos_matches_autonomous_orchestrator_consumer() -> None:
+    producer = compact(read('src/nodes/coverage_mapper_node.cpp'))
+    consumer = compact(read('src/nodes/autonomous_mapping_orchestrator_node.cpp'))
+
+    assert 'status_topic_, qos::state_qos());' in producer
+    assert 'coverage_planner_status_topic_, retained_qos,' in consumer
+
+
+def test_coverage_operation_status_qos_matches_retained_consumer() -> None:
+    producer = compact(
+        read('src/nodes/coverage_operation_orchestrator_node.cpp')
+    )
+    consumer = compact(read('src/nodes/autonomous_mapping_orchestrator_node.cpp'))
+
+    assert 'status_topic_, qos::state_qos());' in producer
+    assert 'coverage_operation_status_topic_, retained_qos,' in consumer
+
+
+def test_topic_specific_fix_preserves_generic_streaming_status_qos() -> None:
+    qos_source = compact(read('src/ros/qos_profiles.cpp'))
+    status_body = qos_source.split('rclcpp::QoS status_qos()', maxsplit=1)[1]
+    status_body = status_body.split('rclcpp::QoS state_qos()', maxsplit=1)[0]
+    state_body = qos_source.split('rclcpp::QoS state_qos()', maxsplit=1)[1]
+    state_body = state_body.split('rclcpp::QoS command_qos()', maxsplit=1)[0]
+
+    assert '.reliable()' in status_body
+    assert '.durability_volatile()' in status_body
+    assert '.reliable()' in state_body
+    assert '.transient_local()' in state_body
 
 
 def test_orchestrator_is_registered_and_installed() -> None:

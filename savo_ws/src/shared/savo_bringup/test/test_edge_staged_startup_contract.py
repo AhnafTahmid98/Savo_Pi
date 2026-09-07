@@ -18,6 +18,11 @@ BRIDGE_CONFIG = (
     PROJECT_ROOT
     / "savo_ws/src/shared/savo_bridge/config/savo_bridge.edge.yaml"
 )
+EDGE_SERVICE = PROJECT_ROOT / "deploy/systemd/savo_edge.service"
+UI_RUNTIME_SERVICE = (
+    PROJECT_ROOT
+    / "savo_ws/src/edge/savo_ui/systemd/savo-ui-runtime.service"
+)
 
 STAGE_DEFAULTS = {
     "realsense_start_delay_s": "0.0",
@@ -25,8 +30,10 @@ STAGE_DEFAULTS = {
     "vo_start_delay_s": "14.0",
     "obstacle_cloud_start_delay_s": "22.0",
     "observer_relay_start_delay_s": "28.0",
-    "bridge_start_delay_s": "34.0",
-    "readiness_start_delay_s": "40.0",
+    "speech_start_delay_s": "34.0",
+    "ui_start_delay_s": "40.0",
+    "bridge_start_delay_s": "46.0",
+    "readiness_start_delay_s": "52.0",
 }
 
 
@@ -106,6 +113,8 @@ def test_edge_stages_use_launch_timers_with_zero_delay_support() -> None:
     for name in (
         "vo_start_delay_s",
         "obstacle_cloud_start_delay_s",
+        "speech_start_delay_s",
+        "ui_start_delay_s",
         "bridge_start_delay_s",
         "readiness_start_delay_s",
     ):
@@ -129,7 +138,7 @@ def test_edge_stages_use_launch_timers_with_zero_delay_support() -> None:
 def test_pending_stages_are_canceled_on_launch_shutdown() -> None:
     """Ctrl+C cannot allow a pending staged action to fire afterward."""
     expected_timer_counts = {
-        EDGE_LAUNCH: 4,
+        EDGE_LAUNCH: 6,
         REALSENSE_LAUNCH: 3,
     }
     for path, expected_count in expected_timer_counts.items():
@@ -189,7 +198,13 @@ def test_feature_flags_still_gate_all_delayed_edge_components() -> None:
         "if start_obstacle_cloud:": (
             'period=LaunchConfiguration("obstacle_cloud_start_delay_s")'
         ),
-        "if start_bridge:": 'period=LaunchConfiguration("bridge_start_delay_s")',
+        "if start_speech:": (
+            'period=LaunchConfiguration("speech_start_delay_s")'
+        ),
+        "if start_ui:": 'period=LaunchConfiguration("ui_start_delay_s")',
+        "if start_bridge:": (
+            'period=LaunchConfiguration("bridge_start_delay_s")'
+        ),
         "if start_power:": "power_edge.launch.py",
     }
     for guard, delayed_action in expected_guards.items():
@@ -202,6 +217,35 @@ def test_feature_flags_still_gate_all_delayed_edge_components() -> None:
     assert 'if start_vo and not start_realsense:' in launch
     assert 'if explicit_obstacle_cloud and not start_realsense:' in launch
     assert '"enable_observer_color_relay": (' in launch
+    assert (
+        launch_defaults(EDGE_LAUNCH)["enable_observer_color_relay"]
+        == "false"
+    )
+    assert (
+        launch_defaults(ROBOT_LAUNCH)["enable_observer_color_relay"]
+        == "false"
+    )
+
+
+def test_systemd_and_edge_launch_have_one_default_ui_owner() -> None:
+    """The systemd UI owns production display while launch UI stays opt-in."""
+    edge = read(EDGE_LAUNCH)
+    edge_service = read(EDGE_SERVICE)
+    ui_service = read(UI_RUNTIME_SERVICE)
+
+    assert launch_defaults(EDGE_LAUNCH)["start_speech"] == "false"
+    assert launch_defaults(EDGE_LAUNCH)["start_ui"] == "false"
+    assert (
+        "Wants=network-online.target savo-ui-runtime.service" in edge_service
+    )
+    assert (
+        "After=network-online.target savo-ui-runtime.service" in edge_service
+    )
+    assert "Environment=SAVO_START_UI=false" in edge_service
+    assert "Before=savo_edge.service" in ui_service
+    assert "Conflicts=savo-ui.service" in ui_service
+    assert edge.count('"savo_speech", "speech_bringup.launch.xml"') == 1
+    assert edge.count('"savo_ui", "ui_bringup.launch.py"') == 1
 
 
 def test_edge_power_remains_optional_for_readiness() -> None:
@@ -318,8 +362,8 @@ def test_existing_production_profiles_and_topics_remain_selected() -> None:
     assert '"realsense_d435_nodes.yaml"' in edge
     assert '"implementation": "cpp"' in edge
     assert 'default_value="real_robot_v1"' in edge
-    assert "depth_module.depth_profile: \"848x480x30\"" in camera
-    assert "rgb_camera.color_profile: \"640x480x30\"" in camera
+    assert "depth_module.depth_profile: \"848x480x15\"" in camera
+    assert "rgb_camera.color_profile: \"640x480x15\"" in camera
     assert "align_depth.enable: true" in camera
     assert "enable_sync: true" in camera
     assert "pointcloud__neon_.enable: true" in camera
@@ -343,6 +387,36 @@ def test_existing_production_profiles_and_topics_remain_selected() -> None:
         "heartbeat_topic: /savo_perception/obstacle_cloud/heartbeat"
         in obstacle
     )
+
+
+def test_pointcloud_driver_work_follows_obstacle_cloud_selection() -> None:
+    """VO-only and lidar-only modes do not construct unused raw clouds."""
+    edge = read(EDGE_LAUNCH)
+    vo_driver = read(
+        PROJECT_ROOT
+        / "savo_ws/src/edge/savo_realsense/config/realsense_vo_driver.yaml"
+    )
+    minimal_driver = read(
+        PROJECT_ROOT
+        / "savo_ws/src/edge/savo_realsense/config/realsense_minimal.yaml"
+    )
+
+    obstacle_branch = edge.index("if start_obstacle_cloud:")
+    vo_branch = edge.index("elif start_vo:", obstacle_branch)
+    minimal_branch = edge.index("else:", vo_branch)
+    assert edge.index('camera_config_name = "realsense_d435_camera.yaml"') > (
+        obstacle_branch
+    )
+    assert (
+        edge.index('camera_config_name = "realsense_vo_driver.yaml"')
+        > vo_branch
+    )
+    assert (
+        edge.index('camera_config_name = "realsense_minimal.yaml"')
+        > minimal_branch
+    )
+    assert "pointcloud__neon_.enable: false" in vo_driver
+    assert "pointcloud__neon_.enable: false" in minimal_driver
 
 
 def test_robot_bringup_forwards_every_edge_stage_delay() -> None:

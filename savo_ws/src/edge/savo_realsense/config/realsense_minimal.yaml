@@ -1,4 +1,4 @@
-realsense2_camera:
+/camera/camera:
   ros__parameters:
     camera_name: camera
     camera_namespace: camera
@@ -16,14 +16,14 @@ realsense2_camera:
 
     color_width: 640
     color_height: 480
-    color_fps: 30
+    color_fps: 15
 
-    depth_width: 640
+    depth_width: 848
     depth_height: 480
-    depth_fps: 30
+    depth_fps: 15
 
-    depth_module.depth_profile: "640x480x30"
-    rgb_camera.color_profile: "640x480x30"
+    depth_module.depth_profile: "848x480x15"
+    rgb_camera.color_profile: "640x480x15"
 
     align_depth.enable: false
     pointcloud.enable: false
@@ -42,10 +42,10 @@ camera_topic_monitor_node:
     publish_hz: 2.0
     stale_timeout_s: 0.50
 
-    expected_color_hz: 30.0
-    expected_depth_hz: 30.0
-    expected_aligned_depth_hz: 30.0
-    expected_camera_info_hz: 30.0
+    expected_color_hz: 15.0
+    expected_depth_hz: 15.0
+    expected_aligned_depth_hz: 15.0
+    expected_camera_info_hz: 15.0
     expected_pointcloud_hz: 10.0
 
     require_pointcloud: false

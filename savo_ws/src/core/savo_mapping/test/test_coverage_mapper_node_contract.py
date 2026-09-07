@@ -268,9 +268,11 @@ def test_ros_interfaces_are_read_only_and_configurable() -> None:
     for qos_factory in (
         'qos::map_qos()',
         'qos::state_qos()',
-        'qos::status_qos()',
     ):
         assert qos_factory in source, qos_factory
+
+    compact_source = ' '.join(source.split())
+    assert 'status_topic_, qos::state_qos());' in compact_source
 
 
 def test_activation_defaults_and_planner_parameters_are_locked() -> None:

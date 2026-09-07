@@ -124,3 +124,20 @@ def test_cpp_vo_uses_synchronized_rgbd_pnp_not_affine_pixel_motion():
     assert "estimateAffinePartial2D" not in node
     assert "std::clamp(delta_x" not in node
     assert "find_package(message_filters REQUIRED)" in cmake
+
+
+def test_invalid_interval_reseeds_without_publishing_fake_motion():
+    node = (PACKAGE_ROOT / "src/rgbd_odometry_node.cpp").read_text(
+        encoding="utf-8"
+    )
+    interval_guard = node.split("if (!valid_frame_interval(", maxsplit=1)[1]
+    rejection = interval_guard.split("if (previous_features_", maxsplit=1)[0]
+
+    assert (
+        "reset_reference(gray_image, aligned_depth_image, current_stamp_s);"
+        in rejection
+    )
+    assert "VOTrackingState::kRejected" in rejection
+    assert "return quality;" in rejection
+    assert "pose_ = compose_pose" not in rejection
+    assert "publish_odometry" not in rejection

@@ -207,7 +207,7 @@ false; LiDAR remains responsible for reliable clearing.
 
 The raw sensor subscription is best-effort, volatile, and `KeepLast(1)`, so an
 expensive callback cannot accumulate old camera clouds. Production processing
-is intentionally bounded by `max_processing_hz: 10.0`; rate-limited arrivals
+is intentionally bounded by `max_processing_hz: 8.0`; rate-limited arrivals
 are counted but are dropped before TF lookup or point iteration and do not
 indicate camera failure. Health freshness continues to use the most recent
 successfully processed cloud. The node transforms and filters each finite point

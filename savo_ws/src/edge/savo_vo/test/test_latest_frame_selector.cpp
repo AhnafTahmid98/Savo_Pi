@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include <limits>
+#include <vector>
 
 namespace
 {
@@ -63,6 +64,61 @@ TEST(FrameIntervalTest, RetainsInvalidIntervalProtection)
   EXPECT_FALSE(savo_vo::valid_frame_interval(1.0, 1.0, 0.20));
   EXPECT_FALSE(savo_vo::valid_frame_interval(1.0, 0.9, 0.20));
   EXPECT_FALSE(savo_vo::valid_frame_interval(1.0, 1.201, 0.20));
+}
+
+TEST(FrameIntervalTest, CameraRatesFrom15To25HzRemainValidAt12HzProcessing)
+{
+  constexpr double processing_rate_hz = 12.0;
+  constexpr double max_interval_s = 0.20;
+
+  for (const double source_rate_hz : {15.0, 20.0, 25.0}) {
+    LatestFrameSelector selector;
+    double next_source_stamp_s = 0.0;
+    double previous_processed_stamp_s = 0.0;
+    bool have_previous = false;
+    std::size_t processed_count = 0U;
+
+    for (int tick = 0; tick <= 24; ++tick) {
+      const double processing_time_s =
+        static_cast<double>(tick) / processing_rate_hz;
+      while (next_source_stamp_s <= processing_time_s + 1e-9) {
+        ASSERT_TRUE(selector.offer(next_source_stamp_s));
+        next_source_stamp_s += 1.0 / source_rate_hz;
+      }
+
+      const auto selected = selector.take();
+      if (!selected.has_value()) {
+        continue;
+      }
+      EXPECT_EQ(selector.pending_count(), 0U);
+      if (have_previous) {
+        EXPECT_TRUE(savo_vo::valid_frame_interval(
+          previous_processed_stamp_s,
+          selected.value(),
+          max_interval_s));
+      }
+      previous_processed_stamp_s = selected.value();
+      have_previous = true;
+      ++processed_count;
+    }
+
+    EXPECT_GE(processed_count, 20U);
+  }
+}
+
+TEST(FrameIntervalTest, LongSourceGapReseedsOnceThenNextFrameRecovers)
+{
+  double reference_stamp_s = 1.0;
+
+  const double post_gap_stamp_s = 1.4;
+  EXPECT_FALSE(savo_vo::valid_frame_interval(
+    reference_stamp_s, post_gap_stamp_s, 0.20));
+
+  // The node replaces the reference without estimating or publishing motion.
+  reference_stamp_s = post_gap_stamp_s;
+  const double recovered_stamp_s = post_gap_stamp_s + (1.0 / 15.0);
+  EXPECT_TRUE(savo_vo::valid_frame_interval(
+    reference_stamp_s, recovered_stamp_s, 0.20));
 }
 
 }  // namespace

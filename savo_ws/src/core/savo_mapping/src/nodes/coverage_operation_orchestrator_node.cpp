@@ -209,7 +209,7 @@ private:
     state_publisher_ = create_publisher<std_msgs::msg::String>(
       state_topic_, qos::state_qos());
     status_publisher_ = create_publisher<std_msgs::msg::String>(
-      status_topic_, qos::status_qos());
+      status_topic_, qos::state_qos());
     events_publisher_ = create_publisher<std_msgs::msg::String>(
       events_topic_, qos::event_qos());
 

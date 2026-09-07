@@ -2,10 +2,10 @@
 
 ## Production observer color relay
 
-The production D435 color stream remains full-rate `640x480x30` at
+The production D435 color stream is `640x480x15` at
 `/camera/camera/color/image_raw` on Edge. For the external observer only,
-The canonical `realsense_bringup.launch.py` starts one standard
-`image_transport` republisher on Edge by default:
+the canonical `realsense_bringup.launch.py` starts one standard
+`image_transport` republisher on Edge when explicitly enabled:
 
 ```text
 /camera/camera/color/image_raw
@@ -14,13 +14,16 @@ The canonical `realsense_bringup.launch.py` starts one standard
   -> Ubuntu RViz compressed transport
 ```
 
-Production depth at `/camera/camera/depth/image_rect_raw` and the raw cloud at
-`/camera/camera/depth/color/points` also remain unchanged and available.
+Production depth is `848x480x15` at
+`/camera/camera/depth/image_rect_raw`. The raw cloud at
+`/camera/camera/depth/color/points` is generated only when the obstacle-cloud
+pipeline is selected; VO-only operation keeps aligned depth but disables raw
+pointcloud construction.
 
 The relay exists only for the observer path. It does not change camera FPS or
 resolution, the raw color topic, raw pointcloud, navigation or perception
-semantics, VO, or fixed D435 TF ownership. It can be disabled for controlled
-testing with `enable_observer_color_relay:=false`.
+semantics, VO, or fixed D435 TF ownership. It defaults off and can be requested
+with `enable_observer_color_relay:=true`.
 
 Normal production is:
 
@@ -51,8 +54,10 @@ ros2 launch savo_realsense realsense_vo.launch.py \
   enable_observer_color_relay:=true
 ```
 
-The canonical driver configuration is `realsense_d435_camera.yaml`; it already
-enables the local raw pointcloud required by the obstacle filter. The legacy
+The canonical pointcloud driver configuration is
+`realsense_d435_camera.yaml`; it enables the local raw pointcloud required by
+the obstacle filter. `realsense_vo_driver.yaml` retains synchronized color and
+aligned depth while disabling pointcloud work. The legacy
 `realsense_pointcloud_camera.yaml` and `realsense_pointcloud_nodes.yaml` files
 remain installed for their standalone launch interface and are contract-tested
 to match the canonical production configuration.
@@ -70,6 +75,11 @@ publishing `/camera/camera/depth/color/points`. Selector `0` failed on this
 runtime with `No matching stream for texture 'Process - Any'`. Production uses
 the hardware-validated selector `1`; any missing, stale, malformed, or
 transform-failing cloud remains a real failure.
+
+One real D435 startup emitted a `Right MIPI error` hardware notification before
+the node later became healthy. Robot Savo does not suppress or translate this
+warning into success; it remains a hardware/firmware/cable follow-up even when
+subsequent stream health is OK.
 
 Recommended writing order
 Step 1 — package metadata

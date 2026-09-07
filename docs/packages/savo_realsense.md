@@ -57,7 +57,7 @@ RealSense `publish_tf=false`; `savo_description` exclusively owns fixed camera f
 | Parameter | Default | Purpose |
 | --- | ---: | --- |
 | serial | `801212070967` | Repository-bound D435 identity; verify deployed unit |
-| depth/color | `848x480x30`, `640x480x30` | Streams |
+| depth/color | `848x480x15`, `640x480x15` | Streams |
 | alignment/sync | `true/true` | RGB-D pairing |
 | pointcloud | enabled in D435 profile | Optional consumers |
 | stale timeout | `0.75 s` | Health |

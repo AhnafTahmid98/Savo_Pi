@@ -18,8 +18,8 @@ def test_pointcloud_camera_profile_matches_robot_savo_d435_config() -> None:
 
     assert params["enable_color"] is True
     assert params["enable_depth"] is True
-    assert params["depth_module.depth_profile"] == "848x480x30"
-    assert params["rgb_camera.color_profile"] == "640x480x30"
+    assert params["depth_module.depth_profile"] == "848x480x15"
+    assert params["rgb_camera.color_profile"] == "640x480x15"
     assert params["color_qos"] == "SENSOR_DATA"
     assert params["depth_qos"] == "SENSOR_DATA"
     assert params["align_depth.enable"] is True
@@ -32,8 +32,8 @@ def test_main_d435_profile_keeps_vo_streams_and_pointcloud() -> None:
 
     assert params["enable_color"] is True
     assert params["enable_depth"] is True
-    assert params["depth_module.depth_profile"] == "848x480x30"
-    assert params["rgb_camera.color_profile"] == "640x480x30"
+    assert params["depth_module.depth_profile"] == "848x480x15"
+    assert params["rgb_camera.color_profile"] == "640x480x15"
     assert params["align_depth.enable"] is True
     assert params["enable_sync"] is True
     assert params["pointcloud__neon_.enable"] is True
@@ -67,7 +67,10 @@ def test_d435_health_uses_required_lightweight_pipeline_signals() -> None:
     assert monitor_params["require_pointcloud"] is True
     assert monitor_params["expected_pointcloud_hz"] > 0.0
     assert monitor_params["require_aligned_depth"] is True
-    assert monitor_params["expected_aligned_depth_hz"] > 0.0
+    assert monitor_params["expected_aligned_depth_hz"] == 15.0
+    assert monitor_params["expected_color_hz"] == 15.0
+    assert monitor_params["expected_depth_hz"] == 15.0
+    assert monitor_params["expected_camera_info_hz"] == 15.0
     assert health_params == {
         "status_hz": 2.0,
         "stale_timeout_s": 0.75,
@@ -186,6 +189,20 @@ def test_minimal_profile_does_not_require_aligned_depth() -> None:
     assert health_params["require_depth_signal"] is False
     assert health_params["require_vo_health"] is False
     assert health_params["require_obstacle_cloud_health"] is False
+
+
+def test_minimal_launch_scopes_multi_node_yaml_through_ros() -> None:
+    launch = (
+        PACKAGE_ROOT / "launch" / "realsense_minimal.launch.py"
+    ).read_text(encoding="utf-8")
+    config = load_yaml("realsense_minimal.yaml")
+
+    assert "/camera/camera" in config
+    assert "realsense2_camera" not in config
+    assert 'executable="realsense2_camera_node"' in launch
+    assert "parameters=[config_file]" in launch
+    assert "rs_launch.py" not in launch
+    assert "IncludeLaunchDescription" not in launch
 
 
 def test_all_runtime_driver_profiles_leave_fixed_tf_to_description() -> None:

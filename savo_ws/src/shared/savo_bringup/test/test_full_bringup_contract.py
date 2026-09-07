@@ -408,7 +408,7 @@ def test_validated_normal_runtime_defaults_are_synchronized() -> None:
     assert top["start_realsense"] == "true"
     assert top["start_vo"] == "true"
     assert top["start_obstacle_cloud"] == "true"
-    assert top["enable_observer_color_relay"] == "true"
+    assert top["enable_observer_color_relay"] == "false"
     assert top["start_speech"] == "false"
     assert top["start_ui"] == "false"
     assert top["d435_voxel_validated"] == "true"
@@ -437,7 +437,7 @@ def test_validated_normal_runtime_defaults_are_synchronized() -> None:
     assert edge["start_realsense"] == "true"
     assert edge["start_vo"] == "true"
     assert edge["start_obstacle_cloud"] == "true"
-    assert edge["enable_observer_color_relay"] == "true"
+    assert edge["enable_observer_color_relay"] == "false"
     assert edge["d435_voxel_validated"] == "true"
     assert edge["vo_profile"] == "real_robot_v1"
     assert edge["active_map_id"] == ""
@@ -465,8 +465,8 @@ def test_full_edge_pipeline_uses_bounded_latest_sample_contracts() -> None:
             encoding="utf-8"
         )
     )["/camera/camera"]["ros__parameters"]
-    assert camera["depth_module.depth_profile"] == "848x480x30"
-    assert camera["rgb_camera.color_profile"] == "640x480x30"
+    assert camera["depth_module.depth_profile"] == "848x480x15"
+    assert camera["rgb_camera.color_profile"] == "640x480x15"
     assert camera["align_depth.enable"] is True
     assert camera["pointcloud__neon_.enable"] is True
     assert camera["pointcloud__neon_.stream_filter"] == 1
@@ -483,7 +483,7 @@ def test_full_edge_pipeline_uses_bounded_latest_sample_contracts() -> None:
         )
     )["rgbd_odometry_node"]["ros__parameters"]
     assert vo_config["sync_queue_size"] == 2
-    assert vo_config["processing_rate_hz"] == 15.0
+    assert vo_config["processing_rate_hz"] == 12.0
     assert vo_config["max_frame_interval_s"] == 0.20
     vo_source = (vo_root / "src/rgbd_odometry_node.cpp").read_text(
         encoding="utf-8"
@@ -504,11 +504,14 @@ def test_full_edge_pipeline_uses_bounded_latest_sample_contracts() -> None:
         "keep_last(1).best_effort().durability_volatile()"
         in obstacle_source
     )
-    assert obstacle_config["max_processing_hz"] == 10.0
+    assert obstacle_config["max_processing_hz"] == 8.0
     assert obstacle_config["stale_timeout_s"] == 0.75
 
     edge_launch = read("launch/edge_bringup.launch.py")
     assert '"require_obstacle_cloud": start_obstacle_cloud' in edge_launch
+    assert 'camera_config_name = "realsense_d435_camera.yaml"' in edge_launch
+    assert 'camera_config_name = "realsense_vo_driver.yaml"' in edge_launch
+    assert 'camera_config_name = "realsense_minimal.yaml"' in edge_launch
 
 
 def test_all_production_vo_entrypoints_and_wrapper_are_synchronized() -> None:

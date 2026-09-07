@@ -166,6 +166,8 @@ def _setup(context):
             "vo_start_delay_s",
             "obstacle_cloud_start_delay_s",
             "observer_relay_start_delay_s",
+            "speech_start_delay_s",
+            "ui_start_delay_s",
             "bridge_start_delay_s",
             "readiness_start_delay_s",
             "vo_profile",
@@ -336,7 +338,7 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument("start_vo", default_value="true"),
             DeclareLaunchArgument("start_obstacle_cloud", default_value="true"),
             DeclareLaunchArgument(
-                "enable_observer_color_relay", default_value="true"
+                "enable_observer_color_relay", default_value="false"
             ),
             DeclareLaunchArgument("start_speech", default_value="false"),
             DeclareLaunchArgument("start_ui", default_value="false"),
@@ -356,10 +358,16 @@ def generate_launch_description() -> LaunchDescription:
                 "observer_relay_start_delay_s", default_value="28.0"
             ),
             DeclareLaunchArgument(
-                "bridge_start_delay_s", default_value="34.0"
+                "speech_start_delay_s", default_value="34.0"
             ),
             DeclareLaunchArgument(
-                "readiness_start_delay_s", default_value="40.0"
+                "ui_start_delay_s", default_value="40.0"
+            ),
+            DeclareLaunchArgument(
+                "bridge_start_delay_s", default_value="46.0"
+            ),
+            DeclareLaunchArgument(
+                "readiness_start_delay_s", default_value="52.0"
             ),
             DeclareLaunchArgument("vo_profile", default_value="real_robot_v1"),
             DeclareLaunchArgument("ui_profile", default_value="pi"),

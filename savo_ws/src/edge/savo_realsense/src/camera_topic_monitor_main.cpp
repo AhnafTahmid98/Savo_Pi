@@ -29,11 +29,11 @@ public:
   {
     publish_hz_ = declare_parameter<double>("publish_hz", 2.0);
     params_.stale_timeout_s = declare_parameter<double>("stale_timeout_s", 0.75);
-    params_.expected_color_hz = declare_parameter<double>("expected_color_hz", 20.0);
-    params_.expected_depth_hz = declare_parameter<double>("expected_depth_hz", 20.0);
+    params_.expected_color_hz = declare_parameter<double>("expected_color_hz", 15.0);
+    params_.expected_depth_hz = declare_parameter<double>("expected_depth_hz", 15.0);
     params_.expected_aligned_depth_hz =
-      declare_parameter<double>("expected_aligned_depth_hz", 20.0);
-    params_.expected_camera_info_hz = declare_parameter<double>("expected_camera_info_hz", 20.0);
+      declare_parameter<double>("expected_aligned_depth_hz", 15.0);
+    params_.expected_camera_info_hz = declare_parameter<double>("expected_camera_info_hz", 15.0);
     params_.expected_pointcloud_hz = declare_parameter<double>("expected_pointcloud_hz", 8.0);
     require_pointcloud_ = declare_parameter<bool>("require_pointcloud", false);
     require_aligned_depth_ = declare_parameter<bool>("require_aligned_depth", false);

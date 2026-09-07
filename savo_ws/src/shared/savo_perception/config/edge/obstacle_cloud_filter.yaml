@@ -38,7 +38,7 @@ obstacle_cloud_filter_node:
 
     # This optional marking helper intentionally processes only fresh samples.
     # The input subscription also keeps only the newest raw cloud.
-    max_processing_hz: 10.0
+    max_processing_hz: 8.0
 
     stale_timeout_s: 0.75
     status_publish_hz: 2.0

@@ -125,4 +125,23 @@ TEST(VOHealthState, FreshStatusAtTimeoutBoundaryRemainsAuthoritative)
     "error: error: tracking failed");
 }
 
+TEST(VOHealthState, HealthySamplesAfterTransientGapRestoreHealth)
+{
+  auto state = fresh_state(
+    "rejected: invalid RGB-D frame interval; reference reseeded");
+  state.last_status_time_s = 9.6;
+  state.has_odom = true;
+  state.last_odom_time_s = 9.0;
+  EXPECT_EQ(
+    savo_vo::evaluate_vo_health(state, kNow, kTimeout),
+    "degraded: " + state.status_text);
+
+  state.last_status_time_s = 9.9;
+  state.status_text = "tracking accepted=true";
+  state.last_odom_time_s = 9.9;
+  EXPECT_EQ(
+    savo_vo::evaluate_vo_health(state, kNow, kTimeout),
+    "ok: tracking accepted=true");
+}
+
 }  // namespace

@@ -113,7 +113,7 @@ def test_edge_configuration_is_safe_and_ordered():
     assert config['self_max_y_m'] > config['self_min_y_m']
     assert config['self_max_z_m'] > config['self_min_z_m']
     assert config['max_output_points'] > 0
-    assert config['max_processing_hz'] == 10.0
+    assert config['max_processing_hz'] == 8.0
 
 
 def test_input_qos_rate_gate_and_one_pass_filter_are_bounded():

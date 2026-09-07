@@ -75,8 +75,7 @@ def test_vo_launch_separates_driver_and_monitor_configs() -> None:
     assert '"require_obstacle_cloud_health": False' in launch_text
     assert "rs_launch.py" not in launch_text
     assert "IncludeLaunchDescription" not in launch_text
-    assert '"realsense_d435_camera.yaml"' in launch_text
-    assert '"realsense_vo_driver.yaml"' not in launch_text
+    assert '"realsense_vo_driver.yaml"' in launch_text
     assert '"realsense_vo_profile.yaml"' in launch_text
 
 
@@ -166,13 +165,13 @@ def test_observer_color_relay_runtime_dependencies_are_declared() -> None:
     }.issubset(runtime_dependencies)
 
 
-def test_canonical_bringup_starts_one_camera_and_production_color_relay() -> None:
+def test_canonical_bringup_starts_one_camera_and_optional_color_relay() -> None:
     launch_path = "launch/realsense_bringup.launch.py"
     launch_text = read_file(launch_path)
 
     assert launch_argument_defaults(launch_path)[
         "enable_observer_color_relay"
-    ] == "true"
+    ] == "false"
     assert launch_text.count('executable="realsense2_camera_node"') == 1
     assert launch_text.count("Node(") == 4
     assert '"realsense_d435_camera.yaml"' in launch_text
@@ -221,7 +220,7 @@ def test_canonical_bringup_starts_one_camera_and_production_color_relay() -> Non
     ]
 
 
-def test_vo_launch_driver_config_is_validated_production_profile() -> None:
+def test_pointcloud_driver_config_is_validated_production_profile() -> None:
     config = load_yaml("config/realsense_d435_camera.yaml")
     params = config["/camera/camera"]["ros__parameters"]
 
@@ -230,8 +229,8 @@ def test_vo_launch_driver_config_is_validated_production_profile() -> None:
     assert params["serial_no"] == "801212070967"
     assert params["enable_color"] is True
     assert params["enable_depth"] is True
-    assert params["depth_module.depth_profile"] == "848x480x30"
-    assert params["rgb_camera.color_profile"] == "640x480x30"
+    assert params["depth_module.depth_profile"] == "848x480x15"
+    assert params["rgb_camera.color_profile"] == "640x480x15"
     assert params["color_qos"] == "SENSOR_DATA"
     assert params["depth_qos"] == "SENSOR_DATA"
     assert params["align_depth.enable"] is True
@@ -260,11 +259,17 @@ def test_vo_launch_driver_disables_tf_infrared_and_motion_streams() -> None:
     assert params["enable_accel"] is False
 
 
-def test_legacy_vo_driver_matches_validated_production_driver() -> None:
-    legacy = load_yaml("config/realsense_vo_driver.yaml")
-    production = load_yaml("config/realsense_d435_camera.yaml")
+def test_vo_only_driver_keeps_rgbd_but_disables_pointcloud() -> None:
+    params = load_yaml("config/realsense_vo_driver.yaml")[
+        "/camera/camera"
+    ]["ros__parameters"]
 
-    assert legacy == production
+    assert params["depth_module.depth_profile"] == "848x480x15"
+    assert params["rgb_camera.color_profile"] == "640x480x15"
+    assert params["align_depth.enable"] is True
+    assert params["enable_sync"] is True
+    assert params["pointcloud__neon_.enable"] is False
+    assert params["publish_tf"] is False
 
 
 def test_vo_monitor_profile_keeps_diagnostics_and_lightweight_health_split() -> None:
@@ -277,9 +282,12 @@ def test_vo_monitor_profile_keeps_diagnostics_and_lightweight_health_split() -> 
     monitor = config["camera_topic_monitor_node"]["ros__parameters"]
     health = config["camera_health_node"]["ros__parameters"]
 
-    assert monitor["expected_pointcloud_hz"] == 30.0
-    assert monitor["require_pointcloud"] is True
-    assert monitor["expected_aligned_depth_hz"] == 30.0
+    assert monitor["expected_pointcloud_hz"] == 8.0
+    assert monitor["require_pointcloud"] is False
+    assert monitor["expected_color_hz"] == 15.0
+    assert monitor["expected_depth_hz"] == 15.0
+    assert monitor["expected_aligned_depth_hz"] == 15.0
+    assert monitor["expected_camera_info_hz"] == 15.0
     assert monitor["require_aligned_depth"] is True
     assert health["depth_signal_topic"] == "/depth/min_front_m"
     assert health["vo_health_topic"] == "/vo/health"

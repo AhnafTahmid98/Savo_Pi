@@ -105,7 +105,7 @@ def generate_launch_description() -> LaunchDescription:
             default_value=PathJoinSubstitution([
                 FindPackageShare("savo_realsense"),
                 "config",
-                "realsense_d435_camera.yaml",
+                "realsense_vo_driver.yaml",
             ]),
         ),
         DeclareLaunchArgument(

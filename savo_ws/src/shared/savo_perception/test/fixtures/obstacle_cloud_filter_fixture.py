@@ -308,7 +308,7 @@ def run_filter(fixture):
     assert ready_status['height_rejected'] == 2
     assert ready_status['self_rejected'] == 1
     assert ready_status['voxel_rejected'] == 1
-    assert ready_status['max_processing_hz'] == 10.0
+    assert ready_status['max_processing_hz'] == 8.0
     assert ready_status['clouds_rate_limited'] >= 0
     assert (
         ready_status['clouds_published']
