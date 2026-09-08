@@ -14,6 +14,7 @@
   <buildtool_depend>ament_cmake_python</buildtool_depend>
 
   <depend>diagnostic_msgs</depend>
+  <depend>nlohmann-json-dev</depend>
   <depend>rclcpp</depend>
   <depend>savo_msgs</depend>
   <exec_depend>rclpy</exec_depend>

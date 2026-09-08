@@ -12,6 +12,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
+find_package(nlohmann_json REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(savo_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
@@ -35,6 +36,11 @@ target_include_directories(savo_bringup_contract
   PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
+)
+
+target_link_libraries(savo_bringup_contract
+  PRIVATE
+    nlohmann_json::nlohmann_json
 )
 
 add_executable(bringup_readiness_node

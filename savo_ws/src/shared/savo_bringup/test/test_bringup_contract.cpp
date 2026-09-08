@@ -265,3 +265,106 @@ TEST(BringupContract, QualityAggregationIsWorstRequiredAndFailClosed)
     savo_bringup::WorstRequiredQuality({QualityLevel::kExcellent}, false),
     QualityLevel::kBelowMinimum);
 }
+
+TEST(BringupContract, HealthyPerceptionAggregateIgnoresOptionalStaleChildren)
+{
+  using savo_bringup::QualityLevel;
+  const auto evaluation =
+    savo_bringup::EvaluateStructuredHealthPayload(
+    R"({
+    "overall_ok": true,
+    "overall_status": "OK",
+    "quality": "MINIMUM",
+    "required_sensors": ["tof_left", "tof_right"],
+    "optional_sensors": ["depth_front", "ultrasonic_front"],
+    "disabled_sensors": ["ultrasonic_front"],
+    "sensors": [
+      {
+        "sensor_name": "depth_front",
+        "status": "STALE",
+        "ok": false,
+        "required": false,
+        "optional": true
+      },
+      {"sensor_name": "tof_left", "status": "OK", "ok": true, "required": true},
+      {"sensor_name": "tof_right", "status": "OK", "ok": true, "required": true}
+    ]
+  })");
+
+  ASSERT_TRUE(evaluation);
+  EXPECT_TRUE(evaluation->valid);
+  EXPECT_TRUE(evaluation->ready);
+  EXPECT_FALSE(evaluation->failed);
+  EXPECT_EQ(evaluation->quality, QualityLevel::kMinimum);
+}
+
+TEST(BringupContract, UnhealthyPerceptionAggregateFailsClosed)
+{
+  const auto evaluation =
+    savo_bringup::EvaluateStructuredHealthPayload(
+    R"({
+    "overall_ok": false,
+    "overall_status": "STALE",
+    "quality": "BELOW_MINIMUM",
+    "stale_required_sensors": ["tof_left"]
+  })");
+
+  ASSERT_TRUE(evaluation);
+  EXPECT_TRUE(evaluation->valid);
+  EXPECT_FALSE(evaluation->ready);
+  EXPECT_TRUE(evaluation->failed);
+}
+
+TEST(BringupContract, BelowMinimumAggregateQualityCannotBecomeReady)
+{
+  using savo_bringup::QualityLevel;
+  const auto evaluation =
+    savo_bringup::EvaluateStructuredHealthPayload(
+    R"({
+    "overall_ok": true,
+    "overall_status": "OK",
+    "quality": "BELOW_MINIMUM"
+  })");
+
+  ASSERT_TRUE(evaluation);
+  EXPECT_TRUE(evaluation->valid);
+  EXPECT_FALSE(evaluation->ready);
+  EXPECT_FALSE(evaluation->failed);
+  EXPECT_EQ(evaluation->quality, QualityLevel::kBelowMinimum);
+}
+
+TEST(BringupContract, StructuredHealthNeverReportsReadyAndFailed)
+{
+  for (const auto * payload : {
+    R"({"overall_ok":true,"overall_status":"OK","quality":"MINIMUM"})",
+    R"({"overall_ok":false,"overall_status":"ERROR","quality":"BELOW_MINIMUM"})",
+    R"({"ready":true,"state":"STALE","quality":"EXCELLENT"})"})
+  {
+    const auto evaluation = savo_bringup::EvaluateStructuredHealthPayload(payload);
+    ASSERT_TRUE(evaluation);
+    EXPECT_FALSE(evaluation->ready && evaluation->failed);
+  }
+}
+
+TEST(BringupContract, LocalizationAggregateIgnoresOptionalVoChildFailure)
+{
+  using savo_bringup::QualityLevel;
+  const auto evaluation =
+    savo_bringup::EvaluateStructuredHealthPayload(
+    R"({
+    "state": "DEGRADED",
+    "ready": true,
+    "quality": "GOOD",
+    "components": {
+      "imu": {"required": true, "ready": true},
+      "wheel_odom": {"required": true, "ready": true},
+      "vo_odom": {"required": false, "ready": false, "state": "STALE"}
+    }
+  })");
+
+  ASSERT_TRUE(evaluation);
+  EXPECT_TRUE(evaluation->valid);
+  EXPECT_TRUE(evaluation->ready);
+  EXPECT_FALSE(evaluation->failed);
+  EXPECT_EQ(evaluation->quality, QualityLevel::kGood);
+}

@@ -454,9 +454,17 @@ private:
     string_subscriptions_.push_back(create_subscription<String>(
       resolved_topic, rclcpp::QoS(10).reliable(),
         [this, key, availability_only](const String::SharedPtr message) {
-          const bool failed = ContainsFailureToken(message->data);
-          Mark(key, availability_only ? !failed : ContainsReadyToken(message->data), failed,
-          message->data, ExtractQuality(message->data));
+          const auto structured =
+          savo_bringup::EvaluateStructuredHealthPayload(message->data);
+          const bool failed = structured ? structured->failed :
+          ContainsFailureToken(message->data);
+          const bool ready = structured ? structured->ready :
+          ContainsReadyToken(message->data);
+          const auto quality = structured ? structured->quality :
+          ExtractQuality(message->data);
+          Mark(
+            key, availability_only ? !failed : ready, failed,
+            message->data, quality);
       }));
   }
 

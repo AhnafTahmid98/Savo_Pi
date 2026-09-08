@@ -137,6 +137,14 @@ struct ReadinessDecision
   std::vector<std::string> degraded;
 };
 
+struct StructuredHealthEvaluation
+{
+  bool valid{false};
+  bool ready{false};
+  bool failed{true};
+  std::optional<QualityLevel> quality;
+};
+
 struct BringupRequirements
 {
   bool core_required{false};
@@ -166,6 +174,9 @@ std::string_view ToString(QualityLevel value) noexcept;
 std::string_view ToString(StartupStageState value) noexcept;
 
 std::optional<QualityLevel> ParseQualityLevel(std::string_view value) noexcept;
+
+std::optional<StructuredHealthEvaluation> EvaluateStructuredHealthPayload(
+  std::string_view payload) noexcept;
 
 bool ValidateStartupStageTiming(const StartupStageTiming & timing) noexcept;
 

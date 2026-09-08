@@ -8,10 +8,14 @@
 #include <cmath>
 #include <string>
 
+#include <nlohmann/json.hpp>
+
 namespace savo_bringup
 {
 namespace
 {
+
+using Json = nlohmann::json;
 
 std::string Normalize(std::string_view value)
 {
@@ -234,6 +238,82 @@ std::optional<QualityLevel> ParseQualityLevel(const std::string_view value) noex
     return QualityLevel::kExcellent;
   }
   return std::nullopt;
+}
+
+std::optional<StructuredHealthEvaluation> EvaluateStructuredHealthPayload(
+  const std::string_view payload) noexcept
+{
+  const auto first_content = std::find_if_not(
+    payload.begin(), payload.end(),
+    [](const unsigned char character) {return std::isspace(character) != 0;});
+  if (first_content == payload.end() || *first_content != '{') {
+    return std::nullopt;
+  }
+
+  const auto invalid = []() {return StructuredHealthEvaluation{};};
+  try {
+    const Json object = Json::parse(payload, nullptr, false);
+    if (object.is_discarded() || !object.is_object()) {
+      return invalid();
+    }
+
+    bool has_authoritative_health = false;
+    bool authoritative_health = true;
+    for (const auto * field : {"overall_ok", "startup_ready", "ready", "ok", "healthy"}) {
+      if (!object.contains(field)) {
+        continue;
+      }
+      has_authoritative_health = true;
+      if (!object.at(field).is_boolean()) {
+        return invalid();
+      }
+      authoritative_health = authoritative_health && object.at(field).get<bool>();
+    }
+    if (!has_authoritative_health) {
+      return std::nullopt;
+    }
+
+    bool authoritative_failure = false;
+    for (const auto * field : {"overall_status", "status", "state"}) {
+      if (!object.contains(field)) {
+        continue;
+      }
+      if (!object.at(field).is_string()) {
+        return invalid();
+      }
+      const auto status = Normalize(object.at(field).get<std::string>());
+      authoritative_failure = authoritative_failure ||
+        status == "blocked" || status == "critical" || status == "error" ||
+        status == "fault" || status == "stale" || status == "unknown";
+    }
+
+    std::optional<QualityLevel> quality;
+    for (const auto * field : {"quality", "rate_quality"}) {
+      if (!object.contains(field)) {
+        continue;
+      }
+      if (!object.at(field).is_string()) {
+        return invalid();
+      }
+      const auto parsed = ParseQualityLevel(object.at(field).get<std::string>());
+      if (!parsed) {
+        return invalid();
+      }
+      quality = quality ? std::min(*quality, *parsed) : *parsed;
+    }
+
+    StructuredHealthEvaluation evaluation;
+    evaluation.valid = true;
+    evaluation.failed = !authoritative_health || authoritative_failure;
+    evaluation.ready = !evaluation.failed &&
+      quality != QualityLevel::kBelowMinimum;
+    evaluation.quality = quality;
+    return evaluation;
+  } catch (const Json::exception &) {
+    return invalid();
+  } catch (...) {
+    return invalid();
+  }
 }
 
 bool ValidateStartupStageTiming(const StartupStageTiming & timing) noexcept
