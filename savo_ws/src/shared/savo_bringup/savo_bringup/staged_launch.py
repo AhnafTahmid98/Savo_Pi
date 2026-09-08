@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from launch import Action
-from launch.actions import EmitEvent, GroupAction, LogError, RegisterEventHandler
+from launch.actions import EmitEvent, GroupAction, LogInfo, RegisterEventHandler
 from launch.event_handlers import OnProcessExit
 from launch.events import Shutdown
 
@@ -59,7 +59,7 @@ def build_staged_sequence(
         def on_exit(event, _context, *, following=next_group, name=stage_name):
             if event.returncode != 0:
                 return [
-                    LogError(msg=f"Robot Savo startup stage failed: {name}"),
+                    LogInfo(msg=f"Robot Savo startup stage failed: {name}"),
                     EmitEvent(
                         event=Shutdown(
                             reason=f"startup stage {name} failed"
