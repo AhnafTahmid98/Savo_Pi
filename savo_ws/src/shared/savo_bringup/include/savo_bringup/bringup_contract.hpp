@@ -52,6 +52,70 @@ enum class ReadinessState
   kShuttingDown,
 };
 
+enum class QualityLevel
+{
+  kBelowMinimum,
+  kMinimum,
+  kGood,
+  kExcellent,
+};
+
+enum class StartupStageState
+{
+  kStarting,
+  kWaitingForDependencies,
+  kStabilizing,
+  kReady,
+  kFailed,
+  kShuttingDown,
+};
+
+struct StartupStageTiming
+{
+  double minimum_settle_s{0.0};
+  double stable_ready_s{0.0};
+  double startup_timeout_s{1.0};
+};
+
+struct StartupStageInput
+{
+  bool configuration_valid{true};
+  bool processes_started{false};
+  bool dependencies_ready{false};
+  bool unrecoverable_failure{false};
+  bool shutting_down{false};
+  QualityLevel quality{QualityLevel::kBelowMinimum};
+  std::string reason{"waiting_for_processes"};
+};
+
+struct StartupStageDecision
+{
+  StartupStageState state{StartupStageState::kStarting};
+  bool ready{false};
+  bool failed{false};
+  double stable_for_s{0.0};
+  QualityLevel quality{QualityLevel::kBelowMinimum};
+  std::string reason{"stage_starting"};
+};
+
+class StartupStageTracker
+{
+public:
+  explicit StartupStageTracker(StartupStageTiming timing);
+
+  [[nodiscard]] StartupStageDecision Update(
+    double elapsed_s,
+    const StartupStageInput & input);
+
+  [[nodiscard]] const StartupStageTiming & timing() const noexcept;
+
+private:
+  StartupStageTiming timing_;
+  bool terminal_ready_{false};
+  bool terminal_failed_{false};
+  double stable_since_s_{-1.0};
+};
+
 struct DependencyStatus
 {
   std::string name;
@@ -98,6 +162,16 @@ std::string_view ToString(HostRole value) noexcept;
 std::string_view ToString(RobotMode value) noexcept;
 std::string_view ToString(BringupProfile value) noexcept;
 std::string_view ToString(ReadinessState value) noexcept;
+std::string_view ToString(QualityLevel value) noexcept;
+std::string_view ToString(StartupStageState value) noexcept;
+
+std::optional<QualityLevel> ParseQualityLevel(std::string_view value) noexcept;
+
+bool ValidateStartupStageTiming(const StartupStageTiming & timing) noexcept;
+
+QualityLevel WorstRequiredQuality(
+  const std::vector<QualityLevel> & required_quality,
+  bool dependencies_ready) noexcept;
 
 ReadinessDecision EvaluateReadiness(
   const std::vector<DependencyStatus> & dependencies,

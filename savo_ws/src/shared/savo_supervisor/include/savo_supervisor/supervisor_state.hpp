@@ -79,6 +79,10 @@ struct ComponentSummary
   double timeout_s{0.0};
   std::size_t malformed_message_count{0};
   std::size_t recovery_count{0};
+  std::string startup_phase{"STARTING"};
+  bool ever_operational{false};
+  double startup_stable_for_s{0.0};
+  double startup_timeout_s{0.0};
 };
 
 struct SafetySummary

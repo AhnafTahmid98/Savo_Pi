@@ -41,7 +41,8 @@ def test_autonomous_mapping_launch_composes_all_core_owners() -> None:
     required_launches = {
         '"base_bringup.launch.py"',
         '"lidar_mapping_ready.launch.py"',
-        '"perception_bringup.launch.py"',
+        '"range_sensors.launch.py"',
+        '"safety_bringup.launch.py"',
         '"control_bringup.launch.py"',
         '"localization_bringup.launch.py"',
         '"power_core.launch.py"',
@@ -212,12 +213,9 @@ def test_canonical_entry_forwards_only_semantic_interruption_control() -> None:
         "                    )"
         in core
     )
-    assert (
-        '"semantic_interruption_enabled": LaunchConfiguration(\n'
-        '                "start_semantic_interruption"\n'
-        "            )"
-        in autonomous
-    )
+    assert '"semantic_interruption_enabled": "true"' in autonomous
+    assert '"start_mapping_foundation": "false"' in autonomous
+    assert '"start_mapping_runtime": "false"' in autonomous
     assert (
         '"require_semantic_autonomous_mapping": LaunchConfiguration(\n'
         '                "start_semantic_interruption"\n'
@@ -356,7 +354,9 @@ def test_bringup_installs_am4_and_runtime_dependencies() -> None:
     assert package.find("./export/build_type").text == "ament_cmake"
 
     dependencies = {
-        element.text for element in package.findall("exec_depend")
+        element.text
+        for tag in ("depend", "exec_depend")
+        for element in package.findall(tag)
     }
 
     # savo_bringup is shared by Core and Edge, so its manifest must stay

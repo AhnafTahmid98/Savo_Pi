@@ -111,6 +111,7 @@ private:
   double debug_publish_rate_hz_{2.0};
   double timestamp_fault_hold_s_{2.0};
   std::size_t producer_rate_window_size_{30U};
+  RateThresholds producer_rate_thresholds_{10.0, 20.0, 25.0};
   double timeout_s_{0.5};
   bool publish_tf_{false};
   bool publish_joint_states_{true};

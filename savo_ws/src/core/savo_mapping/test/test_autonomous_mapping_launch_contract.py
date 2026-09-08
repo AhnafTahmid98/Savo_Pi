@@ -55,7 +55,7 @@ def test_autonomous_mapping_launch_is_valid_and_complete() -> None:
     }.issubset(executables)
 
     includes = {
-        element.attrib['file'] for element in root.findall('include')
+        element.attrib['file'] for element in root.findall('.//include')
     }
     assert any('online_async_launch.py' in value for value in includes)
     assert any('map_session_manager.launch.xml' in value for value in includes)
@@ -74,6 +74,37 @@ def test_autonomous_mapping_launch_is_valid_and_complete() -> None:
         'autonomous_mapping_orchestrator.launch.xml' in value
         for value in includes
     )
+
+
+def test_foundation_and_runtime_are_independently_gateable_and_inert() -> None:
+    tree = ET.parse(LAUNCH)
+    root = tree.getroot()
+    arguments = {element.attrib['name'] for element in root.findall('arg')}
+    assert {'start_mapping_foundation', 'start_mapping_runtime'} <= arguments
+
+    foundation_nodes = {
+        node.attrib['exec']
+        for node in root.findall('node')
+        if node.attrib.get('if') == '$(var start_mapping_foundation)'
+    }
+    assert {
+        'mapping_mode_manager_node',
+        'mapping_supervisor_node',
+        'slam_lifecycle_health_bridge_node',
+    } <= foundation_nodes
+
+    runtime_includes = [
+        include
+        for include in root.findall('.//include')
+        if include.attrib.get('if') == '$(var start_mapping_runtime)'
+    ]
+    assert any(
+        'frontier_mapping.launch.xml' in include.attrib['file']
+        for include in runtime_includes
+    )
+    source = LAUNCH.read_text(encoding='utf-8')
+    assert '<arg\n      name="auto_start"\n      value="false"/>' in source
+    assert '<arg name="auto_plan" value="false"/>' in source
 
 
 def test_autonomous_launch_starts_safe_and_preserves_ownership() -> None:

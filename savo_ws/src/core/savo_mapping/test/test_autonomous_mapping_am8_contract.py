@@ -71,6 +71,17 @@ def test_release_artifacts_bind_approval_locations_and_geometry() -> None:
         'discard_unpromoted_release',
     ):
         assert token in source
+    assert 'manifest["quality"]["common_quality"] = "GOOD"' in source
+    assert '"quality_passed_and_operator_approved"' in source
+    assert '(active.active ? "GOOD" : "BELOW_MINIMUM")' in source
+
+
+def test_saved_map_quality_metadata_does_not_replace_approval() -> None:
+    source = read('src/session/saved_map_quality.cpp')
+    assert 'evaluation.passed ? "GOOD"' in source
+    assert 'evaluation.passed ? "MINIMUM"' in source
+    assert 'handoff.ready && handoff.approved ?' in source
+    assert '"quality_passed_approval_required"' in source
 
 
 def test_launch_wires_locked_geometry_into_orchestrator() -> None:

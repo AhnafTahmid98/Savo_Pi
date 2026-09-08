@@ -45,6 +45,9 @@ ComponentStatus make_status(
     SupervisorPolicy::DefaultLocalizationConfig();
 
   status.config.required = required;
+  // Most tests exercise established runtime semantics. Startup-specific tests
+  // explicitly clear this flag.
+  status.ever_operational = true;
 
   return status;
 }
@@ -139,7 +142,81 @@ TEST(SupervisorPolicy, DefaultLocalizationConfig)
   EXPECT_DOUBLE_EQ(config.heartbeat_timeout_s, 2.5);
   EXPECT_TRUE(config.heartbeat_liveness_only);
   EXPECT_DOUBLE_EQ(config.consistency_transition_grace_s, 1.5);
+  EXPECT_DOUBLE_EQ(config.startup_stable_ready_s, 1.5);
+  EXPECT_DOUBLE_EQ(config.startup_timeout_s, 20.0);
   EXPECT_EQ(config.expected_schema_version, 1);
+}
+
+TEST(SupervisorPolicy, StartupTransientErrorWaitsWithoutBecomingOperational)
+{
+  SupervisorPolicy policy;
+  auto status = make_status();
+  status.ever_operational = false;
+  observe_all(status, 6.0);
+  set_consistent_state(status, "ERROR", false, false);
+
+  const auto result = policy.EvaluateComponent(status, test_time(6.1), 6.1);
+
+  EXPECT_EQ(result.state, ComponentState::INITIALIZING);
+  EXPECT_EQ(result.startup_phase, "STARTING");
+  EXPECT_FALSE(result.ready);
+  EXPECT_FALSE(status.startup_failed);
+}
+
+TEST(SupervisorPolicy, StartupRequiresContinuousStableReadyWindow)
+{
+  SupervisorPolicy policy;
+  auto status = make_status();
+  status.ever_operational = false;
+  observe_all(status, 10.0);
+  set_consistent_state(status, "OK", true, false);
+
+  auto result = policy.EvaluateComponent(status, test_time(10.1), 10.1);
+  EXPECT_EQ(result.startup_phase, "STABILIZING");
+  EXPECT_FALSE(result.ready);
+
+  result = policy.EvaluateComponent(status, test_time(11.4), 11.4);
+  EXPECT_EQ(result.startup_phase, "STABILIZING");
+  EXPECT_FALSE(result.ready);
+
+  result = policy.EvaluateComponent(status, test_time(11.7), 11.7);
+  EXPECT_EQ(result.startup_phase, "OPERATIONAL");
+  EXPECT_TRUE(result.ready);
+  EXPECT_TRUE(status.ever_operational);
+}
+
+TEST(SupervisorPolicy, StartupTimeoutIsTerminalUntilRestart)
+{
+  SupervisorPolicy policy;
+  auto status = make_status();
+  status.ever_operational = false;
+  status.config.startup_timeout_s = 4.0;
+
+  auto result = policy.EvaluateComponent(status, test_time(4.0), 4.0);
+  EXPECT_EQ(result.state, ComponentState::ERROR);
+  EXPECT_EQ(result.startup_phase, "STARTUP_FAILED");
+  EXPECT_TRUE(status.startup_failed);
+
+  observe_all(status, 5.0);
+  set_consistent_state(status, "OK", true, false);
+  result = policy.EvaluateComponent(status, test_time(5.1), 5.1);
+  EXPECT_EQ(result.state, ComponentState::ERROR);
+  EXPECT_EQ(result.startup_phase, "STARTUP_FAILED");
+  EXPECT_FALSE(result.ready);
+}
+
+TEST(SupervisorPolicy, EstablishedComponentFailureRemainsImmediate)
+{
+  SupervisorPolicy policy;
+  auto status = make_status();
+  status.ever_operational = true;
+  observe_all(status, 30.0);
+  set_consistent_state(status, "ERROR", false, false);
+
+  const auto result = policy.EvaluateComponent(status, test_time(30.1), 30.1);
+  EXPECT_EQ(result.state, ComponentState::ERROR);
+  EXPECT_EQ(result.startup_phase, "OPERATIONAL");
+  EXPECT_FALSE(result.ready);
 }
 
 TEST(SupervisorPolicy, MissingDuringStartupIsInitializing)

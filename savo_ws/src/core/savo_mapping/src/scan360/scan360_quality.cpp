@@ -91,6 +91,24 @@ std::string_view to_string(
   return "insufficient_data";
 }
 
+std::string_view common_quality(
+  QualityGrade grade)
+{
+  switch (grade) {
+    case QualityGrade::InsufficientData:
+    case QualityGrade::Rejected:
+      return "BELOW_MINIMUM";
+
+    case QualityGrade::Acceptable:
+      return "MINIMUM";
+
+    case QualityGrade::Good:
+      return "GOOD";
+  }
+
+  return "BELOW_MINIMUM";
+}
+
 bool thresholds_are_valid(
   const Scan360QualityThresholds & thresholds)
 {

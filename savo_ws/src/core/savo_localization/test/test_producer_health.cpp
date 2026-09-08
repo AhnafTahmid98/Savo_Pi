@@ -4,6 +4,8 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <limits>
+#include <stdexcept>
 #include <string>
 
 #include "savo_localization/producer_health.hpp"
@@ -14,6 +16,10 @@ namespace
 {
 
 constexpr std::int64_t kMillisecondNs{1000000};
+constexpr RateThresholds kImuThresholds{10.0, 15.0, 20.0};
+constexpr RateThresholds kWheelThresholds{10.0, 20.0, 25.0};
+constexpr RateThresholds kEkfThresholds{10.0, 20.0, 25.0};
+constexpr RateThresholds kVoThresholds{5.0, 8.0, 12.0};
 
 ProducerHealthSnapshot healthy_imu_snapshot(
   const ProducerRateObservation & rate)
@@ -48,7 +54,7 @@ TEST(ProducerHealthTest, SourceRateStaysTwentyFiveHzWithFiveHzHealthDelivery)
         1000000000LL + sample_time_ns,
         30U));
     if (sample % 5 == 0) {
-      const auto rate = producer.Observe(sample_time_ns, 25.0);
+      const auto rate = producer.Observe(sample_time_ns, kImuThresholds);
       consumer.Record(
         sample_time_ns,
         SerializeProducerHealth(healthy_imu_snapshot(rate)),
@@ -56,7 +62,7 @@ TEST(ProducerHealthTest, SourceRateStaysTwentyFiveHzWithFiveHzHealthDelivery)
     }
   }
 
-  const auto producer_rate = producer.Observe(2000 * kMillisecondNs, 25.0);
+  const auto producer_rate = producer.Observe(2000 * kMillisecondNs, kImuThresholds);
   const auto consumed = consumer.Observe(2000 * kMillisecondNs, 0.5);
   EXPECT_TRUE(producer_rate.available);
   EXPECT_NEAR(producer_rate.rate_hz, 25.0, 1.0e-9);
@@ -64,28 +70,28 @@ TEST(ProducerHealthTest, SourceRateStaysTwentyFiveHzWithFiveHzHealthDelivery)
   EXPECT_NEAR(consumed.snapshot.producer_rate_hz, 25.0, 1.0e-9);
   EXPECT_NEAR(consumed.receive_rate_hz, 5.0, 1.0e-9);
   EXPECT_TRUE(consumer.ObserveRateValid(
-      2000 * kMillisecondNs, 25.0, 0.50, 1000 * kMillisecondNs));
+      2000 * kMillisecondNs, kImuThresholds, 1000 * kMillisecondNs));
 }
 
-TEST(ProducerHealthTest, GenuineTenHzProducerFailsExistingImuMinimum)
+TEST(ProducerHealthTest, GenuineRateBelowTenHzFailsImuMinimum)
 {
   ProducerRateTracker producer;
   for (std::int64_t sample = 0; sample < 10; ++sample) {
-    const auto time_ns = sample * 100 * kMillisecondNs;
+    const auto time_ns = sample * 100100100LL;
     producer.RecordSuccess(time_ns, 1000000000LL + time_ns, 30U);
   }
 
-  const auto rate = producer.Observe(900 * kMillisecondNs, 25.0);
+  const auto rate = producer.Observe(900900900LL, kImuThresholds);
   ProducerHealthConsumer consumer;
   consumer.Record(
-    900 * kMillisecondNs,
+    900900900LL,
     SerializeProducerHealth(healthy_imu_snapshot(rate)),
     30U);
 
-  EXPECT_NEAR(rate.rate_hz, 10.0, 1.0e-9);
+  EXPECT_NEAR(rate.rate_hz, 9.99, 1.0e-6);
   EXPECT_EQ(rate.quality, RateQuality::kBelowMinimum);
   EXPECT_FALSE(consumer.ObserveRateValid(
-      900 * kMillisecondNs, 25.0, 0.50, 1000 * kMillisecondNs));
+      900900900LL, kImuThresholds, 1000 * kMillisecondNs));
 }
 
 TEST(ProducerHealthTest, StartupRateIsInvalidUntilThreeSamplesEstablishEvidence)
@@ -94,28 +100,28 @@ TEST(ProducerHealthTest, StartupRateIsInvalidUntilThreeSamplesEstablishEvidence)
   ProducerHealthConsumer consumer;
 
   producer.RecordSuccess(0, 1000000000LL, 30U);
-  auto rate = producer.Observe(0, 25.0);
+  auto rate = producer.Observe(0, kImuThresholds);
   EXPECT_FALSE(rate.available);
   EXPECT_EQ(rate.quality, RateQuality::kBelowMinimum);
   consumer.Record(0, SerializeProducerHealth(healthy_imu_snapshot(rate)), 30U);
-  EXPECT_FALSE(consumer.ObserveRateValid(0, 25.0, 0.50, 1000000000LL));
+  EXPECT_FALSE(consumer.ObserveRateValid(0, kImuThresholds, 1000000000LL));
 
   producer.RecordSuccess(40000000LL, 1040000000LL, 30U);
-  rate = producer.Observe(40000000LL, 25.0);
+  rate = producer.Observe(40000000LL, kImuThresholds);
   EXPECT_FALSE(rate.available);
   consumer.Record(
     40000000LL, SerializeProducerHealth(healthy_imu_snapshot(rate)), 30U);
   EXPECT_FALSE(consumer.ObserveRateValid(
-      40000000LL, 25.0, 0.50, 1000000000LL));
+      40000000LL, kImuThresholds, 1000000000LL));
 
   producer.RecordSuccess(80000000LL, 1080000000LL, 30U);
-  rate = producer.Observe(80000000LL, 25.0);
+  rate = producer.Observe(80000000LL, kImuThresholds);
   EXPECT_TRUE(rate.available);
   EXPECT_EQ(rate.quality, RateQuality::kExcellent);
   consumer.Record(
     80000000LL, SerializeProducerHealth(healthy_imu_snapshot(rate)), 30U);
   EXPECT_TRUE(consumer.ObserveRateValid(
-      80000000LL, 25.0, 0.50, 1000000000LL));
+      80000000LL, kImuThresholds, 1000000000LL));
 }
 
 TEST(ProducerHealthTest, OnlyEstablishedLiveLowRateReceivesFailureDebounce)
@@ -211,20 +217,110 @@ TEST(ProducerHealthTest, TimestampRegressionRemainsHardEvidence)
   EXPECT_TRUE(producer.RecordSuccess(300, 1050, 30U));
 }
 
-TEST(ProducerHealthTest, RateQualityBoundariesMatchContract)
+TEST(ProducerHealthTest, ExplicitRateQualityBoundariesMatchEachStreamContract)
 {
   EXPECT_EQ(
-    ProducerRateTracker::ClassifyQuality(12.499, 25.0),
+    ProducerRateTracker::ClassifyQuality(9.99, kImuThresholds),
     RateQuality::kBelowMinimum);
   EXPECT_EQ(
-    ProducerRateTracker::ClassifyQuality(12.5, 25.0),
+    ProducerRateTracker::ClassifyQuality(10.0, kImuThresholds),
     RateQuality::kMinimum);
   EXPECT_EQ(
-    ProducerRateTracker::ClassifyQuality(18.75, 25.0),
+    ProducerRateTracker::ClassifyQuality(14.99, kImuThresholds),
+    RateQuality::kMinimum);
+  EXPECT_EQ(
+    ProducerRateTracker::ClassifyQuality(15.0, kImuThresholds),
     RateQuality::kGood);
   EXPECT_EQ(
-    ProducerRateTracker::ClassifyQuality(22.5, 25.0),
+    ProducerRateTracker::ClassifyQuality(19.99, kImuThresholds),
+    RateQuality::kGood);
+  EXPECT_EQ(
+    ProducerRateTracker::ClassifyQuality(20.0, kImuThresholds),
     RateQuality::kExcellent);
+
+  for (const auto & thresholds : {kWheelThresholds, kEkfThresholds}) {
+    EXPECT_EQ(
+      ProducerRateTracker::ClassifyQuality(9.99, thresholds),
+      RateQuality::kBelowMinimum);
+    EXPECT_EQ(
+      ProducerRateTracker::ClassifyQuality(10.0, thresholds),
+      RateQuality::kMinimum);
+    EXPECT_EQ(
+      ProducerRateTracker::ClassifyQuality(19.99, thresholds),
+      RateQuality::kMinimum);
+    EXPECT_EQ(
+      ProducerRateTracker::ClassifyQuality(20.0, thresholds),
+      RateQuality::kGood);
+    EXPECT_EQ(
+      ProducerRateTracker::ClassifyQuality(24.99, thresholds),
+      RateQuality::kGood);
+    EXPECT_EQ(
+      ProducerRateTracker::ClassifyQuality(25.0, thresholds),
+      RateQuality::kExcellent);
+  }
+
+  EXPECT_EQ(
+    ProducerRateTracker::ClassifyQuality(4.99, kVoThresholds),
+    RateQuality::kBelowMinimum);
+  EXPECT_EQ(
+    ProducerRateTracker::ClassifyQuality(5.0, kVoThresholds),
+    RateQuality::kMinimum);
+  EXPECT_EQ(
+    ProducerRateTracker::ClassifyQuality(7.99, kVoThresholds),
+    RateQuality::kMinimum);
+  EXPECT_EQ(
+    ProducerRateTracker::ClassifyQuality(8.0, kVoThresholds),
+    RateQuality::kGood);
+  EXPECT_EQ(
+    ProducerRateTracker::ClassifyQuality(11.99, kVoThresholds),
+    RateQuality::kGood);
+  EXPECT_EQ(
+    ProducerRateTracker::ClassifyQuality(12.0, kVoThresholds),
+    RateQuality::kExcellent);
+}
+
+TEST(ProducerHealthTest, InvalidRatesFailClassificationClosed)
+{
+  EXPECT_EQ(
+    ProducerRateTracker::ClassifyQuality(
+      std::numeric_limits<double>::quiet_NaN(), kImuThresholds),
+    RateQuality::kBelowMinimum);
+  EXPECT_EQ(
+    ProducerRateTracker::ClassifyQuality(
+      std::numeric_limits<double>::infinity(), kImuThresholds),
+    RateQuality::kBelowMinimum);
+  EXPECT_EQ(
+    ProducerRateTracker::ClassifyQuality(
+      -std::numeric_limits<double>::infinity(), kImuThresholds),
+    RateQuality::kBelowMinimum);
+  EXPECT_EQ(
+    ProducerRateTracker::ClassifyQuality(-1.0, kImuThresholds),
+    RateQuality::kBelowMinimum);
+}
+
+TEST(ProducerHealthTest, MalformedExplicitThresholdsAreRejected)
+{
+  EXPECT_NO_THROW(ProducerRateTracker::ValidateThresholds({10.0, 10.0, 10.0}));
+  EXPECT_THROW(
+    ProducerRateTracker::ValidateThresholds({0.0, 15.0, 20.0}),
+    std::invalid_argument);
+  EXPECT_THROW(
+    ProducerRateTracker::ValidateThresholds({-1.0, 15.0, 20.0}),
+    std::invalid_argument);
+  EXPECT_THROW(
+    ProducerRateTracker::ValidateThresholds({16.0, 15.0, 20.0}),
+    std::invalid_argument);
+  EXPECT_THROW(
+    ProducerRateTracker::ValidateThresholds({10.0, 21.0, 20.0}),
+    std::invalid_argument);
+  EXPECT_THROW(
+    ProducerRateTracker::ValidateThresholds(
+      {10.0, std::numeric_limits<double>::quiet_NaN(), 20.0}),
+    std::invalid_argument);
+  EXPECT_THROW(
+    ProducerRateTracker::ValidateThresholds(
+      {10.0, 15.0, std::numeric_limits<double>::infinity()}),
+    std::invalid_argument);
 }
 
 TEST(ProducerHealthTest, InvalidPayloadFailsClosed)

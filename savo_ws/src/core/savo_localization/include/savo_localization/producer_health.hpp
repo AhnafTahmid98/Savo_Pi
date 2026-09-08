@@ -20,6 +20,13 @@ enum class RateQuality : std::uint8_t
   kExcellent
 };
 
+struct RateThresholds
+{
+  double minimum_hz{0.0};
+  double good_hz{0.0};
+  double excellent_hz{0.0};
+};
+
 struct ProducerRateObservation
 {
   bool available{false};
@@ -38,11 +45,13 @@ public:
 
   [[nodiscard]] ProducerRateObservation Observe(
     std::int64_t monotonic_time_ns,
-    double expected_rate_hz) const;
+    const RateThresholds & thresholds) const;
+
+  static void ValidateThresholds(const RateThresholds & thresholds);
 
   [[nodiscard]] static RateQuality ClassifyQuality(
     double rate_hz,
-    double expected_rate_hz) noexcept;
+    const RateThresholds & thresholds);
 
   [[nodiscard]] static std::string_view QualityString(
     RateQuality quality) noexcept;
@@ -134,8 +143,7 @@ public:
 
   [[nodiscard]] bool ObserveRateValid(
     std::int64_t current_receive_time_ns,
-    double expected_rate_hz,
-    double minimum_rate_ratio,
+    const RateThresholds & thresholds,
     std::int64_t transition_debounce_ns);
 
 private:

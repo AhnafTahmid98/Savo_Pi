@@ -56,6 +56,20 @@ def test_control_uses_actor_bound_to_observed_mission() -> None:
     assert 'request->actor_id = core_.snapshot().mission_actor_id;' in source
 
 
+def test_semantic_quality_is_evidence_based_and_startup_is_separate() -> None:
+    source = read('src/nodes/semantic_interruption_coordinator_node.cpp')
+
+    assert (
+        'message.startup_ready = snapshot.state != '
+        'SemanticInterruptionState::Failed;'
+    ) in source
+    assert 'snapshot.state == SemanticInterruptionState::Completed' in source
+    assert 'message.quality = "GOOD";' in source
+    assert 'message.quality = "MINIMUM";' in source
+    assert 'message.quality = "BELOW_MINIMUM";' in source
+    assert 'message.quality_reason = snapshot.reason;' in source
+
+
 def test_configuration_uses_current_repository_endpoints() -> None:
     config = read('config/semantic_interruption.yaml')
 

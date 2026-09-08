@@ -27,6 +27,16 @@
     description="Configure and activate SLAM Toolbox automatically"/>
 
   <arg
+    name="start_mapping_foundation"
+    default="true"
+    description="Start monitor-only mapping ownership, SLAM, health bridge, and map session"/>
+
+  <arg
+    name="start_mapping_runtime"
+    default="true"
+    description="Start inert autonomous exploration, Scan360, coverage, and action servers"/>
+
+  <arg
     name="slam_params_file"
     default="$(find-pkg-share savo_mapping)/config/slam_toolbox_mapping.yaml"
     description="SLAM Toolbox online mapping parameters"/>
@@ -112,6 +122,7 @@
     never authorizes motion by itself.
   -->
   <node
+    if="$(var start_mapping_foundation)"
     pkg="savo_mapping"
     exec="mapping_mode_manager_node"
     name="mapping_mode_manager_node"
@@ -134,6 +145,7 @@
   </node>
 
   <node
+    if="$(var start_mapping_foundation)"
     pkg="savo_mapping"
     exec="mapping_supervisor_node"
     name="mapping_supervisor_node"
@@ -160,6 +172,7 @@
   </node>
 
   <include
+    if="$(var start_mapping_foundation)"
     file="$(find-pkg-share slam_toolbox)/launch/online_async_launch.py">
 
     <arg
@@ -180,6 +193,7 @@
   </include>
 
   <node
+    if="$(var start_mapping_foundation)"
     pkg="savo_mapping"
     exec="slam_lifecycle_health_bridge_node"
     name="slam_lifecycle_health_bridge_node"
@@ -194,6 +208,7 @@
   </node>
 
   <include
+    if="$(var start_mapping_foundation)"
     file="$(find-pkg-share savo_mapping)/launch/map_session_manager.launch.xml">
 
     <arg
@@ -214,6 +229,7 @@
   </include>
 
   <include
+    if="$(var start_mapping_runtime)"
     file="$(find-pkg-share savo_mapping)/launch/frontier_mapping.launch.xml">
 
     <!-- Static node gate is open; exploration_manager runtime authority remains closed. -->
@@ -247,6 +263,7 @@
   </include>
 
   <include
+    if="$(var start_mapping_runtime)"
     file="$(find-pkg-share savo_mapping)/launch/scan360_mapping.launch.xml">
 
     <arg
@@ -275,6 +292,7 @@
   </include>
 
   <include
+    if="$(var start_mapping_runtime)"
     file="$(find-pkg-share savo_mapping)/launch/autonomous_mapping_orchestrator.launch.xml">
 
     <arg
@@ -305,6 +323,8 @@
       name="final_head_scan_required"
       value="$(var final_head_scan_required)"/>
   </include>
+
+  <group if="$(var start_mapping_runtime)">
 
   <include
     file="$(find-pkg-share savo_mapping)/launch/coverage_mapping.launch.xml"
@@ -349,6 +369,8 @@
     <arg name="enabled" value="true"/>
     <arg name="use_sim_time" value="$(var use_sim_time)"/>
   </include>
+
+  </group>
 
   <node
     if="$(var semantic_interruption_enabled)"

@@ -32,7 +32,6 @@ localization_health_node:
     expected_wheel_odom_rate_hz: 10.0
     expected_ekf_rate_hz: 20.0
 
-    rate_tolerance_ratio: 0.70
     rate_window_size: 20
 
     max_imu_age_s: 2.0

@@ -26,7 +26,6 @@ localization_health_node:
     require_base_to_imu_tf: true
 
     expected_imu_rate_hz: 25.0
-    rate_tolerance_ratio: 0.50
 
     max_imu_age_s: 0.5
     max_tf_age_s: 0.5

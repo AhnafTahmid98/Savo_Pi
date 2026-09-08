@@ -173,6 +173,12 @@ class LidarHealthNode(Node):
                 driver_status=self._driver_state.get("status"),
                 watchdog_status=self._watchdog_state.get("status"),
                 scan_quality_status=self._scan_quality.get("status"),
+                quality=(
+                    "BELOW_MINIMUM"
+                    if decision.status in (STATUS_ERROR, STATUS_OFFLINE)
+                    else "MINIMUM"
+                ),
+                quality_reason="existing_lidar_health_gates_only",
             )
         )
         self._health_pub.publish(msg)

@@ -29,6 +29,8 @@ def test_typed_observation_bridge_and_action_server_are_wired() -> None:
     assert "tf_buffer_.transform" in action
     assert "require_stationary_signal" in action
     assert "require_localization_signal" in action
+    assert 'result->quality = confirmed ? "GOOD" : "BELOW_MINIMUM"' in action
+    assert 'feedback->quality = accepted > 0U ? "MINIMUM"' in action
 
     assert "apriltag_confirmation_action_node" in cmake
     assert "tf2_geometry_msgs" in cmake

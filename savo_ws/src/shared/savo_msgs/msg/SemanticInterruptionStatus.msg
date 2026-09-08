@@ -40,3 +40,10 @@ bool registration_started
 bool registration_complete
 bool resume_requested
 bool resume_complete
+
+# Process readiness is separate from semantic-evidence quality. An idle
+# coordinator is startup-ready but has BELOW_MINIMUM evidence until a valid
+# candidate is active. A completed registration/resume is GOOD.
+bool startup_ready
+string quality
+string quality_reason

@@ -465,6 +465,8 @@ std::string RangeHealthNode::health_to_json(const std::vector<SensorHealth> & he
   out << "{";
   out << "\"overall_ok\":" << (overall_ok(health) ? "true" : "false") << ",";
   out << "\"overall_status\":\"" << overall_status(health) << "\",";
+  out << "\"quality\":\"" << (overall_ok(health) ? "MINIMUM" : "BELOW_MINIMUM") << "\",";
+  out << "\"quality_reason\":\"required_range_health_only\",";
   out << "\"stale_required_sensors\":" << string_list_to_json(stale_required_sensors(health)) << ",";
   out << "\"error_required_sensors\":" << string_list_to_json(error_required_sensors(health)) << ",";
   out << "\"required_sensors\":" << string_list_to_json(required_sensors_) << ",";

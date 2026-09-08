@@ -264,6 +264,11 @@ YAML::Node make_quality_report(
   report["evaluated_unix_ns"] = unix_now_ns();
   report["passed"] = evaluation.passed;
   report["reason"] = evaluation.reason;
+  report["quality"] =
+    evaluation.passed ? "GOOD" :
+    "BELOW_MINIMUM";
+  report["quality_reason"] =
+    evaluation.reason;
 
   auto policy = report["policy"];
 
@@ -612,6 +617,13 @@ void persist_quality_evaluation(
   map_quality["passed"] =
     evaluation.passed;
 
+  map_quality["quality"] =
+    evaluation.passed ? "GOOD" :
+    "BELOW_MINIMUM";
+
+  map_quality["quality_reason"] =
+    evaluation.reason;
+
   map_quality["report"] =
     evaluation.report_path.string();
 
@@ -650,6 +662,15 @@ void persist_quality_evaluation(
     verification.frame_id;
 
   handoff["approved"] = false;
+
+  handoff["quality"] =
+    evaluation.passed ? "MINIMUM" :
+    "BELOW_MINIMUM";
+
+  handoff["quality_reason"] =
+    evaluation.passed ?
+    "quality_passed_approval_required" :
+    "quality_failed";
 
   handoff["reason"] =
     evaluation.passed ?
@@ -758,14 +779,15 @@ NavigationHandoff set_navigation_handoff(
 
   const YAML::Node map_quality =
     manifest["map_quality"];
+  const bool map_quality_passed =
+    map_quality &&
+    map_quality["evaluated"] &&
+    map_quality["evaluated"].as<bool>() &&
+    map_quality["passed"] &&
+    map_quality["passed"].as<bool>();
 
   if (approved) {
-    if (!map_quality ||
-      !map_quality["evaluated"] ||
-      !map_quality["evaluated"].as<bool>() ||
-      !map_quality["passed"] ||
-      !map_quality["passed"].as<bool>())
-    {
+    if (!map_quality_passed) {
       throw std::runtime_error(
               "quality_evaluation_not_passed");
     }
@@ -817,6 +839,14 @@ NavigationHandoff set_navigation_handoff(
   contract["approved"] =
     approved;
 
+  contract["quality"] =
+    approved ? "GOOD" :
+    (map_quality_passed ?
+    "MINIMUM" : "BELOW_MINIMUM");
+
+  contract["quality_reason"] =
+    reason;
+
   contract["reason"] =
     reason;
 
@@ -857,6 +887,10 @@ std::string quality_evaluation_to_json(
     << "\",\"frame_id\":\""
     << escape_json(evaluation.frame_id)
     << "\",\"reason\":\""
+    << escape_json(evaluation.reason)
+    << "\",\"quality\":\""
+    << (evaluation.passed ? "GOOD" : "BELOW_MINIMUM")
+    << "\",\"quality_reason\":\""
     << escape_json(evaluation.reason)
     << "\",\"report\":\""
     << escape_json(
@@ -924,6 +958,13 @@ std::string navigation_handoff_to_json(
     << "\",\"frame_id\":\""
     << escape_json(handoff.frame_id)
     << "\",\"reason\":\""
+    << escape_json(handoff.reason)
+    << "\",\"quality\":\""
+    << (
+    handoff.ready && handoff.approved ?
+    "GOOD" :
+    (handoff.ready ? "MINIMUM" : "BELOW_MINIMUM"))
+    << "\",\"quality_reason\":\""
     << escape_json(handoff.reason)
     << "\",\"map_yaml\":\""
     << escape_json(

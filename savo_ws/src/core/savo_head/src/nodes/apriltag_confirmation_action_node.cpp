@@ -445,6 +445,10 @@ private:
     feedback->state_text = text;
     feedback->accepted_observations = accepted;
     feedback->rejected_observations = rejected;
+    feedback->quality = accepted > 0U ? "MINIMUM" : "BELOW_MINIMUM";
+    feedback->quality_reason = accepted > 0U ?
+      "accepted_candidate_observation" :
+      "waiting_for_valid_candidate_observation";
     if (latest.has_value()) {
       feedback->current_tag_id = latest->tag_id;
       feedback->current_detection_quality = latest->detection_quality;
@@ -469,6 +473,8 @@ private:
     result->confirmed = confirmed;
     result->result_code = code;
     result->reason = reason;
+    result->quality = confirmed ? "GOOD" : "BELOW_MINIMUM";
+    result->quality_reason = reason;
     result->accepted_observations =
       static_cast<std::uint32_t>(accepted.size());
     result->rejected_observations = rejected;

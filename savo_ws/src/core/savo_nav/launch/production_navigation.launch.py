@@ -337,8 +337,14 @@ def _launch_verified_release(context):
             'map_release_id': release['map_release_id'],
             'params_file': LaunchConfiguration('params_file'),
             'readiness_params': LaunchConfiguration('readiness_params'),
+            'startup_readiness_params': LaunchConfiguration(
+                'startup_readiness_params'
+            ),
             'autostart': LaunchConfiguration('autostart'),
             'start_readiness': LaunchConfiguration('start_readiness'),
+            'start_startup_readiness': LaunchConfiguration(
+                'start_startup_readiness'
+            ),
             'start_goal_gateway': LaunchConfiguration('start_goal_gateway'),
             'require_map_context_sync': 'true',
             'use_sim_time': LaunchConfiguration('use_sim_time'),
@@ -417,6 +423,13 @@ def generate_launch_description():
                 description='Navigation readiness profile.',
             ),
             DeclareLaunchArgument(
+                'startup_readiness_params',
+                default_value=PathJoinSubstitution(
+                    [nav_share, 'config', 'startup_readiness.yaml']
+                ),
+                description='Nav2 startup-only readiness profile.',
+            ),
+            DeclareLaunchArgument(
                 'map_context_params',
                 default_value=PathJoinSubstitution(
                     [nav_share, 'config', 'active_map_context.yaml']
@@ -426,6 +439,9 @@ def generate_launch_description():
             DeclareLaunchArgument('use_sim_time', default_value='false'),
             DeclareLaunchArgument('autostart', default_value='true'),
             DeclareLaunchArgument('start_readiness', default_value='true'),
+            DeclareLaunchArgument(
+                'start_startup_readiness', default_value='true'
+            ),
             DeclareLaunchArgument('start_goal_gateway', default_value='true'),
             DeclareLaunchArgument(
                 'start_map_context_sync',

@@ -23,7 +23,9 @@ def test_identity_and_spatial_confirmation_policy() -> None:
 int main()
 {
   using savo_head::apriltag_contract::Duty;
+  using savo_head::apriltag_contract::ClassifyCommonQuality;
   using savo_head::apriltag_contract::ClassifyIdentityEvidence;
+  using savo_head::apriltag_contract::CommonQuality;
   using savo_head::apriltag_contract::HasMinimumEvidence;
   using savo_head::apriltag_contract::IdentityEvidenceDisposition;
   using savo_head::apriltag_contract::IsIdentityOnlyArrival;
@@ -37,6 +39,23 @@ int main()
   // Identity-only arrival must not require camera pose, TF, or spatial evidence.
   static_assert(IsIdentityOnlyArrival(confirm_arrival, false));
   static_assert(!RequiresSpatialEvidence(confirm_arrival, false));
+
+  static_assert(
+    ClassifyCommonQuality(
+      IdentityEvidenceDisposition::kUnstable, 5U, 5U, true, true, true) ==
+    CommonQuality::kBelowMinimum);
+  static_assert(
+    ClassifyCommonQuality(
+      IdentityEvidenceDisposition::kAccepted, 1U, 5U, false, false, false) ==
+    CommonQuality::kMinimum);
+  static_assert(
+    ClassifyCommonQuality(
+      IdentityEvidenceDisposition::kAccepted, 5U, 5U, true, false, true) ==
+    CommonQuality::kBelowMinimum);
+  static_assert(
+    ClassifyCommonQuality(
+      IdentityEvidenceDisposition::kAccepted, 5U, 5U, true, true, true) ==
+    CommonQuality::kGood);
 
   // A map-pose-required arrival retains the full spatial contract.
   static_assert(!IsIdentityOnlyArrival(confirm_arrival, true));

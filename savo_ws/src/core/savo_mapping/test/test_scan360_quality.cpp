@@ -91,6 +91,32 @@ TEST(
 
 TEST(
   Scan360QualityContract,
+  NativeGradesHaveConservativeCommonQuality)
+{
+  EXPECT_EQ(
+    scan360::common_quality(
+      scan360::QualityGrade::
+      InsufficientData),
+    "BELOW_MINIMUM");
+
+  EXPECT_EQ(
+    scan360::common_quality(
+      scan360::QualityGrade::Rejected),
+    "BELOW_MINIMUM");
+
+  EXPECT_EQ(
+    scan360::common_quality(
+      scan360::QualityGrade::Acceptable),
+    "MINIMUM");
+
+  EXPECT_EQ(
+    scan360::common_quality(
+      scan360::QualityGrade::Good),
+    "GOOD");
+}
+
+TEST(
+  Scan360QualityContract,
   CompleteAccurateScanIsGood)
 {
   const auto result =

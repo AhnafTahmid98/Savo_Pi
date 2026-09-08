@@ -13,12 +13,18 @@ find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(savo_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
 
 set(SAVO_BRINGUP_DEPENDENCIES
   diagnostic_msgs
   rclcpp
+  savo_msgs
   std_msgs
+  tf2
+  tf2_ros
 )
 
 add_library(savo_bringup_contract SHARED
@@ -35,6 +41,10 @@ add_executable(bringup_readiness_node
   src/nodes/bringup_readiness_node.cpp
 )
 
+add_executable(startup_stage_gate_node
+  src/nodes/startup_stage_gate_node.cpp
+)
+
 target_include_directories(bringup_readiness_node
   PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -46,6 +56,11 @@ target_link_libraries(bringup_readiness_node
 
 ament_target_dependencies(bringup_readiness_node
   ${SAVO_BRINGUP_DEPENDENCIES}
+)
+
+ament_target_dependencies(startup_stage_gate_node
+  rclcpp
+  std_msgs
 )
 
 ament_python_install_package(${PROJECT_NAME})
@@ -74,6 +89,7 @@ install(
   TARGETS
     savo_bringup_contract
     bringup_readiness_node
+    startup_stage_gate_node
   EXPORT export_savo_bringup
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib

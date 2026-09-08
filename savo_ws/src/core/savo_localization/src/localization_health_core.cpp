@@ -82,14 +82,11 @@ bool RateAccountingTracker::Record(
 
 RateAccountingObservation RateAccountingTracker::Observe(
   const std::int64_t current_receive_time_ns,
-  const double expected_rate_hz,
-  const double minimum_rate_ratio,
+  const RateThresholds & thresholds,
   const std::int64_t transition_debounce_ns)
 {
-  if (!std::isfinite(expected_rate_hz) || expected_rate_hz <= 0.0 ||
-    !std::isfinite(minimum_rate_ratio) || minimum_rate_ratio <= 0.0 ||
-    minimum_rate_ratio > 1.0 || transition_debounce_ns < 0)
-  {
+  ProducerRateTracker::ValidateThresholds(thresholds);
+  if (transition_debounce_ns < 0) {
     throw std::invalid_argument("invalid rate accounting threshold");
   }
 
@@ -101,12 +98,11 @@ RateAccountingObservation RateAccountingTracker::Observe(
   observation.validation_rate_hz = observation.source_rate_available ?
     observation.source_rate_hz : observation.receive_rate_hz;
   observation.quality = ProducerRateTracker::ClassifyQuality(
-    observation.validation_rate_hz, expected_rate_hz);
+    observation.validation_rate_hz, thresholds);
 
   const bool evidence_available =
     observation.source_rate_available || observation.receive_rate_available;
-  const bool instant_valid =
-    observation.validation_rate_hz >= expected_rate_hz * minimum_rate_ratio;
+  const bool instant_valid = observation.quality != RateQuality::kBelowMinimum;
   observation.rate_valid = rate_debouncer_.Observe(
     current_receive_time_ns, evidence_available, instant_valid,
     transition_debounce_ns);
@@ -248,6 +244,40 @@ std::string_view LocalizationHealthCore::ToString(
   }
 
   return "UNKNOWN";
+}
+
+RateQuality LocalizationHealthCore::AggregateRequiredQuality(
+  const LocalizationHealthInputs & inputs,
+  const LocalizationHealthResult & result) noexcept
+{
+  if (!result.ready) {
+    return RateQuality::kBelowMinimum;
+  }
+  const std::array<const SourceHealthObservation *, 4> sources{
+    &inputs.imu,
+    &inputs.wheel_odom,
+    &inputs.filtered_odom,
+    &inputs.vo_odom};
+  RateQuality aggregate = RateQuality::kExcellent;
+  bool required_source_found = false;
+  for (const auto * source : sources) {
+    if (source == nullptr || !source->enabled || !source->required) {
+      continue;
+    }
+    required_source_found = true;
+    RateQuality quality = RateQuality::kBelowMinimum;
+    if (source->rate_quality == "EXCELLENT") {
+      quality = RateQuality::kExcellent;
+    } else if (source->rate_quality == "GOOD") {
+      quality = RateQuality::kGood;
+    } else if (source->rate_quality == "MINIMUM") {
+      quality = RateQuality::kMinimum;
+    }
+    if (static_cast<std::uint8_t>(quality) < static_cast<std::uint8_t>(aggregate)) {
+      aggregate = quality;
+    }
+  }
+  return required_source_found ? aggregate : RateQuality::kBelowMinimum;
 }
 
 void LocalizationHealthCore::AppendSourceErrors(

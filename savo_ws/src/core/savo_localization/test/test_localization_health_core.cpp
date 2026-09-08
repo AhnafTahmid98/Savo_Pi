@@ -16,10 +16,17 @@ using savo_localization::LocalizationHealthCore;
 using savo_localization::LocalizationHealthInputs;
 using savo_localization::LocalizationHealthState;
 using savo_localization::ProducerRateTracker;
+using savo_localization::RateAccountingObservation;
 using savo_localization::RateAccountingTracker;
 using savo_localization::RateQuality;
+using savo_localization::RateThresholds;
 using savo_localization::SourceHealthObservation;
 using savo_localization::TransformHealthObservation;
+
+constexpr RateThresholds kImuThresholds{10.0, 15.0, 20.0};
+constexpr RateThresholds kWheelThresholds{10.0, 20.0, 25.0};
+constexpr RateThresholds kEkfThresholds{10.0, 20.0, 25.0};
+constexpr RateThresholds kVoThresholds{5.0, 8.0, 12.0};
 
 SourceHealthObservation healthy_source(
   std::string name,
@@ -36,6 +43,7 @@ SourceHealthObservation healthy_source(
   source.timestamp_valid = true;
   source.rate_valid = true;
   source.age_s = 0.01;
+  source.target_rate_hz = 30.0;
   source.rate_hz = 30.0;
   source.source_rate_hz = 30.0;
   source.receive_rate_hz = 30.0;
@@ -70,6 +78,21 @@ LocalizationHealthInputs healthy_inputs()
   return inputs;
 }
 
+RateAccountingObservation observe_rate(
+  const std::int64_t period_ns,
+  const RateThresholds & thresholds)
+{
+  RateAccountingTracker tracker;
+  constexpr std::int64_t kBaseNs = 1000000000LL;
+  for (std::int64_t index = 0; index < 3; ++index) {
+    EXPECT_FALSE(tracker.Record(
+        kBaseNs + index * period_ns,
+        kBaseNs + index * period_ns,
+        3U));
+  }
+  return tracker.Observe(kBaseNs + 2 * period_ns, thresholds, 1000000000LL);
+}
+
 TEST(LocalizationHealthCoreTest, ConvertsAllStatesToStableStrings)
 {
   const std::vector<std::pair<LocalizationHealthState, std::string>> expected{
@@ -100,7 +123,7 @@ TEST(LocalizationHealthCoreTest, ObservedEkfSeparatesHeaderAndReceiveRates)
   }
 
   const auto rates = tracker.Observe(
-    kBaseNs + 29 * kReceivePeriodNs, 25.0, 0.50, 1000000000LL);
+    kBaseNs + 29 * kReceivePeriodNs, kEkfThresholds, 1000000000LL);
   EXPECT_TRUE(rates.source_rate_available);
   EXPECT_TRUE(rates.receive_rate_available);
   EXPECT_NEAR(rates.source_rate_hz, 25.0, 0.01);
@@ -110,10 +133,10 @@ TEST(LocalizationHealthCoreTest, ObservedEkfSeparatesHeaderAndReceiveRates)
   EXPECT_EQ(rates.quality, RateQuality::kExcellent);
 }
 
-TEST(LocalizationHealthCoreTest, GenuineLowSourceRateFailsClosed)
+TEST(LocalizationHealthCoreTest, GenuineSourceRateBelowExplicitMinimumFailsClosed)
 {
   RateAccountingTracker tracker;
-  constexpr std::int64_t kPeriodNs = 100000000LL;
+  constexpr std::int64_t kPeriodNs = 125000000LL;
   constexpr std::int64_t kBaseNs = 1000000000LL;
   for (std::int64_t index = 0; index < 5; ++index) {
     EXPECT_FALSE(tracker.Record(
@@ -123,8 +146,8 @@ TEST(LocalizationHealthCoreTest, GenuineLowSourceRateFailsClosed)
   }
 
   const auto rates = tracker.Observe(
-    kBaseNs + 4 * kPeriodNs, 25.0, 0.50, 1000000000LL);
-  EXPECT_NEAR(rates.source_rate_hz, 10.0, 0.01);
+    kBaseNs + 4 * kPeriodNs, kImuThresholds, 1000000000LL);
+  EXPECT_NEAR(rates.source_rate_hz, 8.0, 0.01);
   EXPECT_FALSE(rates.rate_valid);
   EXPECT_EQ(rates.quality, RateQuality::kBelowMinimum);
 }
@@ -142,16 +165,16 @@ TEST(LocalizationHealthCoreTest, EkfTargetRateIsNotTheOperationalMinimum)
   }
 
   const auto rates = tracker.Observe(
-    kBaseNs + 29 * kPeriodNs, 30.0, 0.50, 3000000000LL);
+    kBaseNs + 29 * kPeriodNs, kEkfThresholds, 3000000000LL);
   EXPECT_NEAR(rates.source_rate_hz, 20.0, 0.01);
   EXPECT_TRUE(rates.rate_valid);
-  EXPECT_EQ(rates.quality, RateQuality::kMinimum);
+  EXPECT_EQ(rates.quality, RateQuality::kGood);
 }
 
 TEST(LocalizationHealthCoreTest, MissingSourceTimingFallsBackFailClosedToReceiveRate)
 {
   RateAccountingTracker tracker;
-  constexpr std::int64_t kPeriodNs = 100000000LL;
+  constexpr std::int64_t kPeriodNs = 125000000LL;
   constexpr std::int64_t kBaseNs = 1000000000LL;
   for (std::int64_t index = 0; index < 5; ++index) {
     EXPECT_FALSE(tracker.Record(
@@ -161,26 +184,26 @@ TEST(LocalizationHealthCoreTest, MissingSourceTimingFallsBackFailClosedToReceive
   }
 
   const auto rates = tracker.Observe(
-    kBaseNs + 4 * kPeriodNs, 25.0, 0.50, 1000000000LL);
+    kBaseNs + 4 * kPeriodNs, kImuThresholds, 1000000000LL);
   EXPECT_FALSE(rates.source_rate_available);
   EXPECT_TRUE(rates.receive_rate_available);
-  EXPECT_NEAR(rates.validation_rate_hz, 10.0, 0.01);
+  EXPECT_NEAR(rates.validation_rate_hz, 8.0, 0.01);
   EXPECT_FALSE(rates.rate_valid);
 }
 
 TEST(LocalizationHealthCoreTest, RateQualityBoundariesAreStableMetadata)
 {
   EXPECT_EQ(
-    ProducerRateTracker::ClassifyQuality(12.49, 25.0),
+    ProducerRateTracker::ClassifyQuality(9.99, kImuThresholds),
     RateQuality::kBelowMinimum);
   EXPECT_EQ(
-    ProducerRateTracker::ClassifyQuality(12.50, 25.0),
+    ProducerRateTracker::ClassifyQuality(10.0, kImuThresholds),
     RateQuality::kMinimum);
   EXPECT_EQ(
-    ProducerRateTracker::ClassifyQuality(18.75, 25.0),
+    ProducerRateTracker::ClassifyQuality(15.0, kImuThresholds),
     RateQuality::kGood);
   EXPECT_EQ(
-    ProducerRateTracker::ClassifyQuality(22.50, 25.0),
+    ProducerRateTracker::ClassifyQuality(20.0, kImuThresholds),
     RateQuality::kExcellent);
   EXPECT_EQ(
     ProducerRateTracker::QualityString(RateQuality::kMinimum),
@@ -191,6 +214,25 @@ TEST(LocalizationHealthCoreTest, RateQualityBoundariesAreStableMetadata)
   EXPECT_EQ(
     ProducerRateTracker::QualityString(RateQuality::kExcellent),
     "EXCELLENT");
+}
+
+TEST(LocalizationHealthCoreTest, ExactOperationalMinimumRatesAreValid)
+{
+  const auto imu = observe_rate(100000000LL, kImuThresholds);
+  const auto wheel = observe_rate(100000000LL, kWheelThresholds);
+  const auto ekf = observe_rate(100000000LL, kEkfThresholds);
+  const auto vo = observe_rate(200000000LL, kVoThresholds);
+
+  EXPECT_NEAR(imu.validation_rate_hz, 10.0, 0.01);
+  EXPECT_TRUE(imu.rate_valid);
+  EXPECT_EQ(imu.quality, RateQuality::kMinimum);
+  EXPECT_TRUE(wheel.rate_valid);
+  EXPECT_EQ(wheel.quality, RateQuality::kMinimum);
+  EXPECT_TRUE(ekf.rate_valid);
+  EXPECT_EQ(ekf.quality, RateQuality::kMinimum);
+  EXPECT_NEAR(vo.validation_rate_hz, 5.0, 0.01);
+  EXPECT_TRUE(vo.rate_valid);
+  EXPECT_EQ(vo.quality, RateQuality::kMinimum);
 }
 
 TEST(LocalizationHealthCoreTest, EstablishedRateUsesTransitionDebounce)
@@ -204,7 +246,7 @@ TEST(LocalizationHealthCoreTest, EstablishedRateUsesTransitionDebounce)
         3U));
   }
   EXPECT_TRUE(tracker.Observe(
-      kBaseNs + 80000000LL, 25.0, 0.50, 1000000000LL).rate_valid);
+      kBaseNs + 80000000LL, kImuThresholds, 1000000000LL).rate_valid);
 
   for (std::int64_t index = 1; index <= 3; ++index) {
     EXPECT_FALSE(tracker.Record(
@@ -213,11 +255,11 @@ TEST(LocalizationHealthCoreTest, EstablishedRateUsesTransitionDebounce)
         3U));
   }
   const auto pending = tracker.Observe(
-    kBaseNs + 680000000LL, 25.0, 0.50, 1000000000LL);
-  EXPECT_LT(pending.source_rate_hz, 12.5);
+    kBaseNs + 680000000LL, kImuThresholds, 1000000000LL);
+  EXPECT_LT(pending.source_rate_hz, 10.0);
   EXPECT_TRUE(pending.rate_valid);
   EXPECT_FALSE(tracker.Observe(
-      kBaseNs + 1680000000LL, 25.0, 0.50, 1000000000LL).rate_valid);
+      kBaseNs + 1680000000LL, kImuThresholds, 1000000000LL).rate_valid);
 }
 
 TEST(LocalizationHealthCoreTest, TransientEkfLowRateDoesNotImmediatelyFail)
@@ -232,23 +274,23 @@ TEST(LocalizationHealthCoreTest, TransientEkfLowRateDoesNotImmediatelyFail)
         3U));
   }
   EXPECT_TRUE(tracker.Observe(
-      kBaseNs + 66666666LL, 30.0, 0.50, kDebounceNs).rate_valid);
+      kBaseNs + 66666666LL, kEkfThresholds, kDebounceNs).rate_valid);
 
   for (std::int64_t index = 1; index <= 3; ++index) {
     EXPECT_FALSE(tracker.Record(
-        kBaseNs + 66666666LL + index * 100000000LL,
-        kBaseNs + 66666666LL + index * 100000000LL,
+        kBaseNs + 66666666LL + index * 200000000LL,
+        kBaseNs + 66666666LL + index * 200000000LL,
         3U));
   }
   const auto transient = tracker.Observe(
-    kBaseNs + 366666666LL, 30.0, 0.50, kDebounceNs);
-  EXPECT_LT(transient.source_rate_hz, 15.0);
+    kBaseNs + 666666666LL, kEkfThresholds, kDebounceNs);
+  EXPECT_LT(transient.source_rate_hz, 10.0);
   EXPECT_TRUE(transient.rate_valid);
 
   EXPECT_TRUE(tracker.Observe(
-      kBaseNs + 3366666665LL, 30.0, 0.50, kDebounceNs).rate_valid);
+      kBaseNs + 3666666665LL, kEkfThresholds, kDebounceNs).rate_valid);
   EXPECT_FALSE(tracker.Observe(
-      kBaseNs + 3366666666LL, 30.0, 0.50, kDebounceNs).rate_valid);
+      kBaseNs + 3666666666LL, kEkfThresholds, kDebounceNs).rate_valid);
 }
 
 TEST(LocalizationHealthCoreTest, HeaderTimestampRegressionIsReported)
@@ -269,6 +311,45 @@ TEST(LocalizationHealthCoreTest, ReportsOkWhenAllRequiredEvidenceIsHealthy)
   EXPECT_FALSE(result.degraded);
   EXPECT_EQ(result.reason_code, "localization_operational");
   EXPECT_TRUE(result.reasons.empty());
+}
+
+TEST(LocalizationHealthCoreTest, MinimumQualityStreamsRemainOperational)
+{
+  const LocalizationHealthCore core;
+  auto inputs = healthy_inputs();
+  inputs.imu.rate_hz = 10.0;
+  inputs.imu.source_rate_hz = 10.0;
+  inputs.imu.rate_quality = "MINIMUM";
+  inputs.wheel_odom.rate_hz = 10.0;
+  inputs.wheel_odom.source_rate_hz = 10.0;
+  inputs.wheel_odom.rate_quality = "MINIMUM";
+  inputs.filtered_odom.rate_hz = 10.0;
+  inputs.filtered_odom.source_rate_hz = 10.0;
+  inputs.filtered_odom.rate_quality = "MINIMUM";
+  inputs.vo_odom = healthy_source("vo_odom", false);
+  inputs.vo_odom.rate_hz = 5.0;
+  inputs.vo_odom.source_rate_hz = 5.0;
+  inputs.vo_odom.rate_quality = "MINIMUM";
+
+  const auto result = core.Evaluate(inputs);
+
+  EXPECT_EQ(result.state, LocalizationHealthState::kOk);
+  EXPECT_TRUE(result.ready);
+  EXPECT_FALSE(result.degraded);
+}
+
+TEST(LocalizationHealthCoreTest, FifteenHzGoodImuIsReady)
+{
+  const LocalizationHealthCore core;
+  auto inputs = healthy_inputs();
+  inputs.imu.rate_hz = 15.0;
+  inputs.imu.source_rate_hz = 15.0;
+  inputs.imu.rate_quality = "GOOD";
+
+  const auto result = core.Evaluate(inputs);
+
+  EXPECT_EQ(result.state, LocalizationHealthState::kOk);
+  EXPECT_TRUE(result.ready);
 }
 
 TEST(LocalizationHealthCoreTest, MissingRequiredInputIsInitializingDuringGrace)
@@ -601,6 +682,49 @@ TEST(LocalizationHealthCoreTest, DisabledSourcesDoNotAffectReadiness)
 
   EXPECT_EQ(result.state, LocalizationHealthState::kOk);
   EXPECT_TRUE(result.ready);
+}
+
+TEST(LocalizationHealthCoreTest, AggregateQualityUsesWorstRequiredSource)
+{
+  const LocalizationHealthCore core;
+  auto inputs = healthy_inputs();
+  inputs.imu.rate_quality = "GOOD";
+  inputs.wheel_odom.rate_quality = "MINIMUM";
+  inputs.filtered_odom.rate_quality = "EXCELLENT";
+
+  const auto result = core.Evaluate(inputs);
+  EXPECT_TRUE(result.ready);
+  EXPECT_EQ(
+    LocalizationHealthCore::AggregateRequiredQuality(inputs, result),
+    RateQuality::kMinimum);
+}
+
+TEST(LocalizationHealthCoreTest, OptionalVoIsExcludedFromAggregateQuality)
+{
+  const LocalizationHealthCore core;
+  auto inputs = healthy_inputs();
+  inputs.vo_odom = healthy_source("vo_odom", false);
+  inputs.vo_odom.rate_quality = "BELOW_MINIMUM";
+  inputs.vo_odom.rate_valid = false;
+
+  const auto result = core.Evaluate(inputs);
+  EXPECT_TRUE(result.ready);
+  EXPECT_EQ(
+    LocalizationHealthCore::AggregateRequiredQuality(inputs, result),
+    RateQuality::kExcellent);
+}
+
+TEST(LocalizationHealthCoreTest, NotReadyForcesBelowMinimumAggregateQuality)
+{
+  const LocalizationHealthCore core;
+  auto inputs = healthy_inputs();
+  inputs.imu.fresh = false;
+
+  const auto result = core.Evaluate(inputs);
+  EXPECT_FALSE(result.ready);
+  EXPECT_EQ(
+    LocalizationHealthCore::AggregateRequiredQuality(inputs, result),
+    RateQuality::kBelowMinimum);
 }
 
 }  // namespace

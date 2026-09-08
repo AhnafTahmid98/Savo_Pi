@@ -57,6 +57,13 @@ def _snapshot() -> RangeSnapshot:
     )
 
 
+def test_common_quality_reuses_existing_required_range_health() -> None:
+    source = _read(PACKAGE / "src/nodes/range_health_node.cpp")
+
+    assert 'overall_ok(health) ? "MINIMUM" : "BELOW_MINIMUM"' in source
+    assert '\\"quality_reason\\":\\"required_range_health_only\\"' in source
+
+
 def test_left_nan_is_a_required_invalid_stop() -> None:
     snapshot = _snapshot()
     snapshot = RangeSnapshot(snapshot.depth_front, _invalid("tof_left"), snapshot.tof_right,

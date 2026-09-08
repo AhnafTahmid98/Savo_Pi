@@ -800,6 +800,11 @@ ReleaseRecord create_release_impl(
 
     manifest["quality"]["operator_approved"] = true;
 
+    manifest["quality"]["common_quality"] = "GOOD";
+
+    manifest["quality"]["common_quality_reason"] =
+      "quality_passed_and_operator_approved";
+
     manifest["navigation"]["eligible"] =
       true;
 
@@ -1501,6 +1506,10 @@ std::string active_map_to_json(
     << ",\"active\":"
     << active.active
     << ",\"reason\":\""
+    << escape_json(active.reason)
+    << "\",\"quality\":\""
+    << (active.active ? "GOOD" : "BELOW_MINIMUM")
+    << "\",\"quality_reason\":\""
     << escape_json(active.reason)
     << "\",\"release_id\":\""
     << escape_json(active.release_id)

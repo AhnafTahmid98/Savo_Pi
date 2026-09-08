@@ -46,8 +46,7 @@ public:
 
   [[nodiscard]] RateAccountingObservation Observe(
     std::int64_t current_receive_time_ns,
-    double expected_rate_hz,
-    double minimum_rate_ratio,
+    const RateThresholds & thresholds,
     std::int64_t transition_debounce_ns);
 
   [[nodiscard]] double AgeSeconds(std::int64_t current_receive_time_ns) const;
@@ -77,6 +76,7 @@ struct SourceHealthObservation
   bool diagnostic_warning{false};
   bool diagnostic_error{false};
   double age_s{-1.0};
+  double target_rate_hz{0.0};
   double rate_hz{0.0};
   double source_rate_hz{0.0};
   double receive_rate_hz{0.0};
@@ -130,6 +130,10 @@ public:
 
   [[nodiscard]] static std::string_view ToString(
     LocalizationHealthState state) noexcept;
+
+  [[nodiscard]] static RateQuality AggregateRequiredQuality(
+    const LocalizationHealthInputs & inputs,
+    const LocalizationHealthResult & result) noexcept;
 
 private:
   static void AppendSourceErrors(

@@ -792,7 +792,8 @@ def test_safe_idle_preserves_core_safety_head_and_tf_contracts() -> None:
             for parameters in driver_parameters
         )
 
-    assert "require_head" not in readiness
+    assert 'declare_parameter<bool>("require_head", false)' in readiness
+    assert 'declare_parameter<bool>("require_semantic", false)' in readiness
     assert "require_head" not in read("config/core_real_robot.yaml")
 
 

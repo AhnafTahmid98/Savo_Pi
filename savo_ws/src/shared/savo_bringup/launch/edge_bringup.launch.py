@@ -5,7 +5,6 @@ from launch.actions import DeclareLaunchArgument
 from launch.actions import IncludeLaunchDescription
 from launch.actions import LogInfo
 from launch.actions import OpaqueFunction
-from launch.actions import TimerAction
 from launch.launch_description_sources import FrontendLaunchDescriptionSource
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
@@ -18,6 +17,8 @@ from savo_bringup.launch_contract import as_bool
 from savo_bringup.launch_contract import resolve_requirements
 from savo_bringup.launch_contract import should_start_obstacle_cloud
 from savo_bringup.launch_contract import validate_selection
+from savo_bringup.staged_launch import StartupStageGroup
+from savo_bringup.staged_launch import build_staged_sequence
 
 
 def _python_launch(package: str, filename: str):
@@ -92,7 +93,7 @@ def _setup(context):
         start_vo=start_vo,
         start_speech=start_speech,
     )
-    actions = [
+    infrastructure_actions = [
         LogInfo(
             msg=(
                 "Robot Savo edge bringup validated: "
@@ -100,6 +101,11 @@ def _setup(context):
             )
         )
     ]
+    realsense_actions = []
+    vo_actions = []
+    obstacle_actions = []
+    bridge_actions = []
+    optional_app_actions = []
 
     if start_realsense:
         if start_obstacle_cloud:
@@ -122,130 +128,90 @@ def _setup(context):
                 "realsense_d435_nodes.yaml",
             ]
         )
-        actions.append(
+        realsense_actions.append(
             IncludeLaunchDescription(
                 _python_launch("savo_realsense", "realsense_bringup.launch.py"),
                 launch_arguments={
                     "camera_config_file": camera_config,
                     "nodes_config_file": nodes_config,
                     "use_depth_front_min": "true",
-                    "require_vo_health": (
-                        "true" if start_vo else "false"
-                    ),
-                    "require_obstacle_cloud_health": (
-                        "true" if start_obstacle_cloud else "false"
-                    ),
+                    # Later staged components own their own health gates. Making
+                    # camera startup depend on them would recreate a cycle.
+                    "require_vo_health": "false",
+                    "require_obstacle_cloud_health": "false",
                     "enable_observer_color_relay": (
                         "true" if enable_observer_color_relay else "false"
                     ),
-                    "realsense_start_delay_s": LaunchConfiguration(
-                        "realsense_start_delay_s"
-                    ),
-                    "camera_support_start_delay_s": LaunchConfiguration(
-                        "camera_support_start_delay_s"
-                    ),
-                    "observer_relay_start_delay_s": LaunchConfiguration(
-                        "observer_relay_start_delay_s"
-                    ),
+                    "realsense_start_delay_s": "0.0",
+                    "camera_support_start_delay_s": "0.0",
+                    "observer_relay_start_delay_s": "0.0",
                 }.items(),
             )
         )
 
     if start_vo:
-        actions.append(
-            TimerAction(
-                period=LaunchConfiguration("vo_start_delay_s"),
-                actions=[
-                    IncludeLaunchDescription(
-                        _python_launch("savo_vo", "vo_bringup.launch.py"),
-                        launch_arguments={
-                            "implementation": "cpp",
-                            "profile": LaunchConfiguration("vo_profile"),
-                            "log_level": LaunchConfiguration("log_level"),
-                        }.items(),
-                    )
-                ],
-                cancel_on_shutdown=True,
+        vo_actions.append(
+            IncludeLaunchDescription(
+                _python_launch("savo_vo", "vo_bringup.launch.py"),
+                launch_arguments={
+                    "implementation": "cpp",
+                    "profile": LaunchConfiguration("vo_profile"),
+                    "log_level": LaunchConfiguration("log_level"),
+                }.items(),
             )
         )
 
     if start_obstacle_cloud:
-        actions.append(
-            TimerAction(
-                period=LaunchConfiguration("obstacle_cloud_start_delay_s"),
-                actions=[
-                    IncludeLaunchDescription(
-                        _python_launch(
-                            "savo_perception",
-                            "obstacle_cloud_filter.launch.py",
-                        ),
-                        launch_arguments={
-                            "use_sim_time": LaunchConfiguration("use_sim_time")
-                        }.items(),
-                    )
-                ],
-                cancel_on_shutdown=True,
+        obstacle_actions.append(
+            IncludeLaunchDescription(
+                _python_launch(
+                    "savo_perception",
+                    "obstacle_cloud_filter.launch.py",
+                ),
+                launch_arguments={
+                    "use_sim_time": LaunchConfiguration("use_sim_time")
+                }.items(),
             )
         )
 
     if start_speech:
-        actions.append(
-            TimerAction(
-                period=LaunchConfiguration("speech_start_delay_s"),
-                actions=[
-                    IncludeLaunchDescription(
-                        _frontend_launch(
-                            "savo_speech", "speech_bringup.launch.xml"
-                        ),
-                        launch_arguments={
-                            "params_file": LaunchConfiguration(
-                                "speech_params_file"
-                            )
-                        }.items(),
-                    )
-                ],
-                cancel_on_shutdown=True,
+        optional_app_actions.append(
+            IncludeLaunchDescription(
+                _frontend_launch(
+                    "savo_speech", "speech_bringup.launch.xml"
+                ),
+                launch_arguments={
+                    "params_file": LaunchConfiguration("speech_params_file")
+                }.items(),
             )
         )
 
     if start_ui:
-        actions.append(
-            TimerAction(
-                period=LaunchConfiguration("ui_start_delay_s"),
-                actions=[
-                    IncludeLaunchDescription(
-                        _python_launch("savo_ui", "ui_bringup.launch.py"),
-                        launch_arguments={
-                            "profile": LaunchConfiguration("ui_profile")
-                        }.items(),
-                    )
-                ],
-                cancel_on_shutdown=True,
+        optional_app_actions.append(
+            IncludeLaunchDescription(
+                _python_launch("savo_ui", "ui_bringup.launch.py"),
+                launch_arguments={
+                    "profile": LaunchConfiguration("ui_profile")
+                }.items(),
             )
         )
 
     if start_bridge:
-        actions.append(
-            TimerAction(
-                period=LaunchConfiguration("bridge_start_delay_s"),
-                actions=[
-                    IncludeLaunchDescription(
-                        _python_launch("savo_bridge", "edge_bridge.launch.py"),
-                        launch_arguments={
-                            "robot_mode": mode,
-                            "active_map_id": LaunchConfiguration("active_map_id"),
-                            "active_map_revision": LaunchConfiguration(
-                                "active_map_revision"
-                            ),
-                        }.items(),
-                    )
-                ],
-                cancel_on_shutdown=True,
+        bridge_actions.append(
+            IncludeLaunchDescription(
+                _python_launch("savo_bridge", "edge_bridge.launch.py"),
+                launch_arguments={
+                    "robot_mode": mode,
+                    "active_map_id": LaunchConfiguration("active_map_id"),
+                    "active_map_revision": LaunchConfiguration(
+                        "active_map_revision"
+                    ),
+                }.items(),
             )
         )
 
     if start_power:
-        actions.append(
+        infrastructure_actions.append(
             IncludeLaunchDescription(
                 _python_launch("savo_power", "power_edge.launch.py"),
                 launch_arguments={
@@ -256,11 +222,9 @@ def _setup(context):
             )
         )
 
-    actions.append(
-        TimerAction(
-            period=LaunchConfiguration("readiness_start_delay_s"),
-            actions=[
-                Node(
+    infrastructure_actions.insert(
+        0,
+        Node(
                     package="savo_bringup",
                     executable="bringup_readiness_node",
                     name="edge_bringup_readiness_node",
@@ -271,6 +235,13 @@ def _setup(context):
                                 FindPackageShare("savo_bringup"),
                                 "config",
                                 "edge_real_robot.yaml",
+                            ]
+                        ),
+                        PathJoinSubstitution(
+                            [
+                                FindPackageShare("savo_bringup"),
+                                "config",
+                                "startup_stages.yaml",
                             ]
                         ),
                         {
@@ -292,6 +263,7 @@ def _setup(context):
                             # If the validated cloud helper was selected, Edge
                             # readiness observes its health and heartbeat.
                             "require_obstacle_cloud": start_obstacle_cloud,
+                            "startup.enabled": True,
                         },
                     ],
                     arguments=[
@@ -299,12 +271,31 @@ def _setup(context):
                         "--log-level",
                         LaunchConfiguration("log_level"),
                     ],
-                )
-            ],
-            cancel_on_shutdown=True,
-        )
+                ),
     )
-    return actions
+    groups = [
+        StartupStageGroup("infrastructure", tuple(infrastructure_actions))
+    ]
+    if start_realsense:
+        groups.append(StartupStageGroup("realsense", tuple(realsense_actions)))
+    if start_vo:
+        groups.append(StartupStageGroup("vo", tuple(vo_actions)))
+    if start_obstacle_cloud:
+        groups.append(
+            StartupStageGroup("obstacle_cloud", tuple(obstacle_actions))
+        )
+    if start_bridge:
+        groups.append(StartupStageGroup("bridge", tuple(bridge_actions)))
+    if optional_app_actions:
+        groups.append(
+            StartupStageGroup("optional_apps", tuple(optional_app_actions))
+        )
+    groups.append(StartupStageGroup("complete", ()))
+    return build_staged_sequence(
+        groups,
+        status_topic="/savo_bringup/edge/startup_status",
+        log_level=LaunchConfiguration("log_level"),
+    )
 
 
 def generate_launch_description() -> LaunchDescription:

@@ -182,11 +182,30 @@ TEST(MappingStatusContract, StatusJsonContainsStableFields)
   EXPECT_NE(json.find("\"session_state\":\"active\""), std::string::npos);
   EXPECT_NE(json.find("\"healthy\":true"), std::string::npos);
   EXPECT_NE(json.find("\"ready\":true"), std::string::npos);
+  EXPECT_NE(json.find("\"startup_ready\":true"), std::string::npos);
+  EXPECT_NE(json.find("\"quality\":\"MINIMUM\""), std::string::npos);
+  EXPECT_NE(json.find("\"quality_reason\":\"ready\""), std::string::npos);
   EXPECT_NE(json.find("\"slam_active\":true"), std::string::npos);
   EXPECT_NE(json.find("\"quality_score\":0.91"), std::string::npos);
   EXPECT_NE(json.find("\"heartbeat_seq\":42"), std::string::npos);
   EXPECT_NE(json.find("\"active_map_name\":\"savonia_floor_1\""), std::string::npos);
   EXPECT_NE(json.find("\"message\":\"scan360 running\""), std::string::npos);
+}
+
+TEST(MappingStatusContract, CommonQualityDoesNotPromotePlaceholderScore)
+{
+  savo_mapping::MappingStatus status;
+  status.quality_score = 1.0;
+  EXPECT_EQ(savo_mapping::common_startup_quality(status), "BELOW_MINIMUM");
+
+  status.healthy = true;
+  status.ready = true;
+  status.slam_active = true;
+  status.scan_received = true;
+  status.tf_ok = true;
+  status.odom_ok = true;
+  status.map_received = true;
+  EXPECT_EQ(savo_mapping::common_startup_quality(status), "MINIMUM");
 }
 
 TEST(MappingStatusContract, StatusJsonEscapesTextFields)

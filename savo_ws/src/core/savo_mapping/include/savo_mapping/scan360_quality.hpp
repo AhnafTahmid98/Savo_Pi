@@ -81,6 +81,11 @@ struct Scan360QualityResult
 std::string_view to_string(
   QualityGrade grade);
 
+// Additive adapter for bringup-wide quality metadata. Native Scan360 grades
+// remain authoritative and all existing acceptance thresholds are unchanged.
+std::string_view common_quality(
+  QualityGrade grade);
+
 bool thresholds_are_valid(
   const Scan360QualityThresholds & thresholds);
 

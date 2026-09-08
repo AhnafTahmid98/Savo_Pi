@@ -148,7 +148,6 @@ def test_node_preserves_loc3a_read_services() -> None:
             assert forbidden not in combined
 
 
-
 def test_status_snapshot_latched_heartbeat_volatile() -> None:
     source = read(
         "src/location_registry_node.cpp"
@@ -172,6 +171,12 @@ def test_status_snapshot_latched_heartbeat_volatile() -> None:
     assert "mode" in source
     assert "read_only" in source
 
+    # Common quality is additive status metadata; registry readiness remains
+    # authoritative and no location persistence schema is changed.
+    assert '\\"quality\\"' in source
+    assert '\\"quality_reason\\"' in source
+    assert '"MINIMUM"' in source
+    assert '"BELOW_MINIMUM"' in source
 
 
 def test_resolution_remains_fail_closed() -> None:

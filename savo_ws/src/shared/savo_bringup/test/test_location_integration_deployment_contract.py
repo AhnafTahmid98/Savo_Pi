@@ -112,7 +112,9 @@ def test_bringup_is_installable_lifecycle_package() -> None:
     assert root.find("./export/build_type").text == "ament_cmake"
 
     exec_dependencies = {
-        element.text for element in root.findall("exec_depend")
+        element.text
+        for tag in ("depend", "exec_depend")
+        for element in root.findall(tag)
     }
 
     assert {

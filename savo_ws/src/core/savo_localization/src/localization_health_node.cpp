@@ -326,7 +326,30 @@ private:
       "expected_wheel_odom_rate_hz", 30.0);
     expected_ekf_rate_hz_ = declare_parameter<double>("expected_ekf_rate_hz", 30.0);
     expected_vo_rate_hz_ = declare_parameter<double>("expected_vo_rate_hz", 15.0);
-    rate_tolerance_ratio_ = declare_parameter<double>("rate_tolerance_ratio", 0.50);
+    imu_rate_thresholds_.minimum_hz = declare_parameter<double>(
+      "imu_min_rate_hz", imu_rate_thresholds_.minimum_hz);
+    imu_rate_thresholds_.good_hz = declare_parameter<double>(
+      "imu_good_rate_hz", imu_rate_thresholds_.good_hz);
+    imu_rate_thresholds_.excellent_hz = declare_parameter<double>(
+      "imu_excellent_rate_hz", imu_rate_thresholds_.excellent_hz);
+    wheel_odom_rate_thresholds_.minimum_hz = declare_parameter<double>(
+      "wheel_odom_min_rate_hz", wheel_odom_rate_thresholds_.minimum_hz);
+    wheel_odom_rate_thresholds_.good_hz = declare_parameter<double>(
+      "wheel_odom_good_rate_hz", wheel_odom_rate_thresholds_.good_hz);
+    wheel_odom_rate_thresholds_.excellent_hz = declare_parameter<double>(
+      "wheel_odom_excellent_rate_hz", wheel_odom_rate_thresholds_.excellent_hz);
+    ekf_rate_thresholds_.minimum_hz = declare_parameter<double>(
+      "ekf_min_rate_hz", ekf_rate_thresholds_.minimum_hz);
+    ekf_rate_thresholds_.good_hz = declare_parameter<double>(
+      "ekf_good_rate_hz", ekf_rate_thresholds_.good_hz);
+    ekf_rate_thresholds_.excellent_hz = declare_parameter<double>(
+      "ekf_excellent_rate_hz", ekf_rate_thresholds_.excellent_hz);
+    vo_rate_thresholds_.minimum_hz = declare_parameter<double>(
+      "vo_min_rate_hz", vo_rate_thresholds_.minimum_hz);
+    vo_rate_thresholds_.good_hz = declare_parameter<double>(
+      "vo_good_rate_hz", vo_rate_thresholds_.good_hz);
+    vo_rate_thresholds_.excellent_hz = declare_parameter<double>(
+      "vo_excellent_rate_hz", vo_rate_thresholds_.excellent_hz);
     rate_transition_debounce_s_ = declare_parameter<double>(
       "rate_transition_debounce_s", 1.0);
     ekf_rate_transition_debounce_s_ = declare_parameter<double>(
@@ -357,11 +380,11 @@ private:
 
   void validate_parameters() const
   {
-    const std::array<double, 19> positive_values{
+    const std::array<double, 18> positive_values{
       publish_rate_hz_, heartbeat_rate_hz_, startup_grace_s_,
       timestamp_fault_hold_s_, expected_imu_rate_hz_,
       expected_wheel_odom_rate_hz_, expected_ekf_rate_hz_,
-      expected_vo_rate_hz_, rate_tolerance_ratio_, rate_transition_debounce_s_,
+      expected_vo_rate_hz_, rate_transition_debounce_s_,
       ekf_rate_transition_debounce_s_,
       max_imu_age_s_,
       max_wheel_odom_age_s_, max_filtered_odom_age_s_, max_vo_odom_age_s_,
@@ -378,9 +401,10 @@ private:
     if (!finite(max_yaw_jump_rad_) || max_yaw_jump_rad_ <= 0.0) {
       throw std::invalid_argument("max_yaw_jump_rad must be finite and > 0");
     }
-    if (rate_tolerance_ratio_ > 1.0) {
-      throw std::invalid_argument("rate_tolerance_ratio must be <= 1.0");
-    }
+    ProducerRateTracker::ValidateThresholds(imu_rate_thresholds_);
+    ProducerRateTracker::ValidateThresholds(wheel_odom_rate_thresholds_);
+    ProducerRateTracker::ValidateThresholds(ekf_rate_thresholds_);
+    ProducerRateTracker::ValidateThresholds(vo_rate_thresholds_);
     if (max_encoder_illegal_transitions_ < 0) {
       throw std::invalid_argument("max_encoder_illegal_transitions must be >= 0");
     }
@@ -523,6 +547,7 @@ private:
     const bool required,
     const double max_age_s,
     const double expected_rate_hz,
+    const RateThresholds & rate_thresholds,
     const std::string & expected_node,
     const std::string & expected_frame,
     const std::string & expected_child_frame,
@@ -532,6 +557,7 @@ private:
     observation.name = name;
     observation.enabled = enabled;
     observation.required = required;
+    observation.target_rate_hz = expected_rate_hz;
     const auto consumed = tracker.Observe(current_receive_time_ns, max_age_s);
     observation.received = consumed.received;
     observation.detail = consumed.detail;
@@ -566,13 +592,12 @@ private:
     observation.rate_hz = observation.source_rate_hz;
     observation.rate_valid = tracker.ObserveRateValid(
       current_receive_time_ns,
-      expected_rate_hz,
-      rate_tolerance_ratio_,
+      rate_thresholds,
       static_cast<std::int64_t>(std::llround(rate_transition_debounce_s_ * 1.0e9)));
     observation.rate_basis = "producer_successful_publication";
     observation.rate_quality = std::string(ProducerRateTracker::QualityString(
         ProducerRateTracker::ClassifyQuality(
-          observation.source_rate_hz, expected_rate_hz)));
+          observation.source_rate_hz, rate_thresholds)));
 
     observation.diagnostic_error = !consumed.payload_valid || !identity_valid ||
       consumed.snapshot.health_state == "ERROR" || !consumed.snapshot.hardware_ok;
@@ -597,6 +622,7 @@ private:
     const bool required,
     const double max_age_s,
     const double expected_rate_hz,
+    const RateThresholds & rate_thresholds,
     const double rate_transition_debounce_s,
     const std::int64_t current_receive_time_ns)
   {
@@ -604,6 +630,7 @@ private:
     observation.name = name;
     observation.enabled = enabled;
     observation.required = required;
+    observation.target_rate_hz = expected_rate_hz;
     observation.received = tracker.received;
     observation.age_s = tracker.age_s(current_receive_time_ns);
     observation.fresh = tracker.received && observation.age_s <= max_age_s;
@@ -611,7 +638,7 @@ private:
     observation.frame_valid = tracker.frame_valid;
     observation.timestamp_valid = tracker.timestamp_valid(current_receive_time_ns);
     const auto rates = tracker.rate_accounting.Observe(
-      current_receive_time_ns, expected_rate_hz, rate_tolerance_ratio_,
+      current_receive_time_ns, rate_thresholds,
       static_cast<std::int64_t>(std::llround(rate_transition_debounce_s * 1.0e9)));
     observation.source_rate_hz = rates.source_rate_hz;
     observation.receive_rate_hz = rates.receive_rate_hz;
@@ -667,19 +694,21 @@ private:
 
     inputs.imu = make_producer_observation(
       "imu", imu_tracker_, use_imu_, use_imu_, max_imu_age_s_,
-      expected_imu_rate_hz_, "imu_node", imu_frame_id_, "",
+      expected_imu_rate_hz_, imu_rate_thresholds_, "imu_node", imu_frame_id_, "",
       current_receive_time_ns);
     inputs.wheel_odom = make_producer_observation(
       "wheel_odom", wheel_tracker_, use_wheel_odom_, use_wheel_odom_,
-      max_wheel_odom_age_s_, expected_wheel_odom_rate_hz_, "wheel_odom_node",
+      max_wheel_odom_age_s_, expected_wheel_odom_rate_hz_, wheel_odom_rate_thresholds_,
+      "wheel_odom_node",
       odom_frame_id_, base_frame_id_, current_receive_time_ns);
     inputs.filtered_odom = make_source_observation(
       "filtered_odom", filtered_tracker_, use_ekf_, use_ekf_,
-      max_filtered_odom_age_s_, expected_ekf_rate_hz_,
+      max_filtered_odom_age_s_, expected_ekf_rate_hz_, ekf_rate_thresholds_,
       ekf_rate_transition_debounce_s_, current_receive_time_ns);
     inputs.vo_odom = make_source_observation(
       "vo_odom", vo_tracker_, use_vo_, vo_required_, max_vo_odom_age_s_,
-      expected_vo_rate_hz_, rate_transition_debounce_s_, current_receive_time_ns);
+      expected_vo_rate_hz_, vo_rate_thresholds_, rate_transition_debounce_s_,
+      current_receive_time_ns);
 
     const auto odom_to_base = observe_transform(
       odom_frame_id_, base_frame_id_, true, current_time);
@@ -723,6 +752,7 @@ private:
            << "\"diagnostic_warning\":" << bool_text(source.diagnostic_warning) << ','
            << "\"diagnostic_error\":" << bool_text(source.diagnostic_error) << ','
            << "\"age_s\":" << source.age_s << ','
+           << "\"target_rate_hz\":" << source.target_rate_hz << ','
            << "\"rate_hz\":" << source.rate_hz << ','
            << "\"source_rate_hz\":" << source.source_rate_hz << ','
            << "\"receive_rate_hz\":" << source.receive_rate_hz << ','
@@ -751,6 +781,8 @@ private:
     const LocalizationHealthInputs & inputs,
     const rclcpp::Time & current_time) const
   {
+    const auto quality = LocalizationHealthCore::AggregateRequiredQuality(inputs, result);
+    const std::string quality_text(ProducerRateTracker::QualityString(quality));
     std::ostringstream output;
     output << std::fixed << std::setprecision(6);
     output << '{'
@@ -759,6 +791,8 @@ private:
            << "\"state\":\"" << LocalizationHealthCore::ToString(result.state) << "\","
            << "\"ready\":" << bool_text(result.ready) << ','
            << "\"degraded\":" << bool_text(result.degraded) << ','
+           << "\"quality\":\"" << quality_text << "\","
+           << "\"quality_reason\":\"worst_required_source_rate\","
            << "\"reason_code\":\"" << escape_json(result.reason_code) << "\","
            << "\"stamp_s\":" << current_time.seconds() << ','
            << "\"startup_age_s\":" << inputs.startup_age_s << ','
@@ -793,8 +827,10 @@ private:
 
   [[nodiscard]] std::string summary_json(
     const LocalizationHealthResult & result,
+    const LocalizationHealthInputs & inputs,
     const rclcpp::Time & current_time) const
   {
+    const auto quality = LocalizationHealthCore::AggregateRequiredQuality(inputs, result);
     std::ostringstream output;
     output << std::fixed << std::setprecision(6)
            << '{'
@@ -802,6 +838,8 @@ private:
            << "\"state\":\"" << LocalizationHealthCore::ToString(result.state) << "\","
            << "\"ready\":" << bool_text(result.ready) << ','
            << "\"degraded\":" << bool_text(result.degraded) << ','
+           << "\"quality\":\"" << ProducerRateTracker::QualityString(quality) << "\","
+           << "\"quality_reason\":\"worst_required_source_rate\","
            << "\"reason_code\":\"" << escape_json(result.reason_code) << "\","
            << "\"stamp_s\":" << current_time.seconds()
            << '}';
@@ -825,6 +863,10 @@ private:
       "state", std::string(LocalizationHealthCore::ToString(result.state))));
     status.values.push_back(key_value("ready", bool_text(result.ready)));
     status.values.push_back(key_value("degraded", bool_text(result.degraded)));
+    status.values.push_back(key_value(
+      "quality", std::string(ProducerRateTracker::QualityString(
+          LocalizationHealthCore::AggregateRequiredQuality(inputs, result)))));
+    status.values.push_back(key_value("quality_reason", "worst_required_source_rate"));
     status.values.push_back(key_value("reasons", join_reasons(result.reasons)));
     status.values.push_back(key_value("base_frame", base_frame_id_));
     status.values.push_back(key_value(
@@ -848,7 +890,7 @@ private:
     health_publisher_->publish(health_message);
 
     std_msgs::msg::String summary_message;
-    summary_message.data = summary_json(result, current_time);
+    summary_message.data = summary_json(result, inputs, current_time);
     summary_publisher_->publish(summary_message);
 
     diagnostics_publisher_->publish(make_diagnostics(result, inputs, current_time));
@@ -927,7 +969,10 @@ private:
   double expected_wheel_odom_rate_hz_{30.0};
   double expected_ekf_rate_hz_{30.0};
   double expected_vo_rate_hz_{15.0};
-  double rate_tolerance_ratio_{0.50};
+  RateThresholds imu_rate_thresholds_{10.0, 15.0, 20.0};
+  RateThresholds wheel_odom_rate_thresholds_{10.0, 20.0, 25.0};
+  RateThresholds ekf_rate_thresholds_{10.0, 20.0, 25.0};
+  RateThresholds vo_rate_thresholds_{5.0, 8.0, 12.0};
   double rate_transition_debounce_s_{1.0};
   double ekf_rate_transition_debounce_s_{3.0};
   std::size_t rate_window_size_{30U};

@@ -45,6 +45,7 @@ bool is_navigation_handoff_ready(const MappingStatus & status, double quality_th
 bool is_status_consistent(const MappingStatus & status);
 
 std::string readiness_text(const MappingStatus & status);
+std::string common_startup_quality(const MappingStatus & status);
 std::string make_status_json(const MappingStatus & status);
 
 }  // namespace savo_mapping

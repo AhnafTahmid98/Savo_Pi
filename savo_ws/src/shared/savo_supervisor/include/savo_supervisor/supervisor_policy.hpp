@@ -49,6 +49,11 @@ struct SupervisorPolicy
     const rclcpp::Time & now,
     double startup_age_s) const;
 
+  ComponentSummary EvaluateComponentRaw(
+    ComponentStatus & status,
+    const rclcpp::Time & now,
+    double startup_age_s) const;
+
   SupervisorState EvaluateSupervisor(
     const std::vector<ComponentSummary> & summaries,
     const SafetySummary & safety,

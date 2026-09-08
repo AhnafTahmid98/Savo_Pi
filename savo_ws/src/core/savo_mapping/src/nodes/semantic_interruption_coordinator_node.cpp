@@ -676,6 +676,15 @@ private:
       message.registration_complete = snapshot.registration_complete;
       message.resume_requested = snapshot.resume_requested;
       message.resume_complete = snapshot.resume_complete;
+      message.startup_ready = snapshot.state != SemanticInterruptionState::Failed;
+      if (snapshot.state == SemanticInterruptionState::Completed) {
+        message.quality = "GOOD";
+      } else if (snapshot.active) {
+        message.quality = "MINIMUM";
+      } else {
+        message.quality = "BELOW_MINIMUM";
+      }
+      message.quality_reason = snapshot.reason;
     }
     status_publisher_->publish(message);
   }

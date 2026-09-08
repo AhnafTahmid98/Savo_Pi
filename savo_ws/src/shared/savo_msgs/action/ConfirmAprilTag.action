@@ -87,6 +87,13 @@ uint32 accepted_observations
 uint32 rejected_observations
 float32 position_stddev_m
 float32 yaw_stddev_rad
+
+# Additive evidence quality. RESULT_CONFIRMED is GOOD because the existing
+# stable-observation and optional spatial-evidence gates have all passed.
+# Failed terminal results are BELOW_MINIMUM. No current independent evidence
+# threshold justifies EXCELLENT.
+string quality
+string quality_reason
 ---
 # Action feedback states.
 uint8 STATE_WAITING_FOR_CAMERA=0
@@ -104,5 +111,10 @@ uint32 rejected_observations
 
 int32 current_tag_id
 float32 current_detection_quality
+
+# Candidate evidence is MINIMUM only after at least one observation has passed
+# identity/freshness/detection/hamming and required spatial validation.
+string quality
+string quality_reason
 
 savo_msgs/AprilTagObservation latest_observation

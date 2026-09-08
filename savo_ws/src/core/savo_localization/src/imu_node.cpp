@@ -105,6 +105,10 @@ void ImuNode::declare_parameters()
   declare_parameter<double>("timestamp_fault_hold_s", timestamp_fault_hold_s_);
   declare_parameter<int>(
     "producer_rate_window_size", static_cast<int>(producer_rate_window_size_));
+  declare_parameter<double>("imu_min_rate_hz", producer_rate_thresholds_.minimum_hz);
+  declare_parameter<double>("imu_good_rate_hz", producer_rate_thresholds_.good_hz);
+  declare_parameter<double>(
+    "imu_excellent_rate_hz", producer_rate_thresholds_.excellent_hz);
   declare_parameter<bool>("reset_on_start", reset_on_start_);
   declare_parameter<bool>(
     "calibration_restore_enabled",
@@ -173,6 +177,10 @@ void ImuNode::load_parameters()
   timestamp_fault_hold_s_ = get_parameter("timestamp_fault_hold_s").as_double();
   producer_rate_window_size_ = static_cast<std::size_t>(
     get_parameter("producer_rate_window_size").as_int());
+  producer_rate_thresholds_.minimum_hz = get_parameter("imu_min_rate_hz").as_double();
+  producer_rate_thresholds_.good_hz = get_parameter("imu_good_rate_hz").as_double();
+  producer_rate_thresholds_.excellent_hz =
+    get_parameter("imu_excellent_rate_hz").as_double();
   reset_on_start_ = get_parameter("reset_on_start").as_bool();
   calibration_restore_enabled_ =
     get_parameter("calibration_restore_enabled").as_bool();
@@ -232,6 +240,7 @@ void ImuNode::load_parameters()
   if (producer_rate_window_size_ < 3U) {
     throw std::runtime_error("producer_rate_window_size must be >= 3");
   }
+  ProducerRateTracker::ValidateThresholds(producer_rate_thresholds_);
 
   if (i2c_bus_ < 0) {
     throw std::runtime_error("i2c_bus must be >= 0");
@@ -556,7 +565,8 @@ ProducerHealthSnapshot ImuNode::make_health_snapshot(
   snapshot.publish_count = publish_count_;
   snapshot.error_count = error_count_;
 
-  const auto rate = producer_rate_tracker_.Observe(monotonic_time_ns, publish_rate_hz_);
+  const auto rate = producer_rate_tracker_.Observe(
+    monotonic_time_ns, producer_rate_thresholds_);
   snapshot.producer_rate_available = rate.available;
   snapshot.producer_rate_hz = rate.rate_hz;
   snapshot.last_success_age_s = rate.last_success_age_s;

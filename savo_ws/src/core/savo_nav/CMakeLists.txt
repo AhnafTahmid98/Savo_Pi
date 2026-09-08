@@ -21,6 +21,7 @@ find_package(ament_cmake REQUIRED)
 find_package(action_msgs REQUIRED)
 find_package(builtin_interfaces REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(lifecycle_msgs REQUIRED)
 find_package(nav2_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
@@ -31,6 +32,7 @@ find_package(std_msgs REQUIRED)
 find_package(tf2_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
+find_package(tf2_ros REQUIRED)
 
 add_library(
   savo_nav_core
@@ -50,6 +52,7 @@ add_library(
   src/core/location_navigation_contract.cpp
   src/core/map_context.cpp
   src/core/nav2_health_monitor.cpp
+  src/core/nav2_startup_readiness.cpp
   src/core/navigation_readiness.cpp
   src/core/navigation_result.cpp
   src/core/navigation_state.cpp
@@ -147,6 +150,27 @@ add_executable(
   src/nodes/navigation_readiness_node.cpp
 )
 
+add_executable(
+  nav2_startup_readiness_node
+  src/nodes/nav2_startup_readiness_node.cpp
+)
+
+target_link_libraries(
+  nav2_startup_readiness_node
+  savo_nav_core
+)
+
+ament_target_dependencies(
+  nav2_startup_readiness_node
+  lifecycle_msgs
+  nav2_msgs
+  rclcpp
+  rclcpp_action
+  std_msgs
+  tf2
+  tf2_ros
+)
+
 target_link_libraries(
   navigation_readiness_node
   savo_nav_core
@@ -236,6 +260,7 @@ install(
 install(
   TARGETS
     navigation_readiness_node
+    nav2_startup_readiness_node
     active_map_context_node
     navigate_to_location_node
     control_recovery_guard_node
@@ -317,6 +342,18 @@ if(BUILD_TESTING)
   if(TARGET test_navigation_readiness)
     target_link_libraries(
       test_navigation_readiness
+      savo_nav_core
+    )
+  endif()
+
+  ament_add_gtest(
+    test_nav2_startup_readiness
+    test/unit/test_nav2_startup_readiness.cpp
+  )
+
+  if(TARGET test_nav2_startup_readiness)
+    target_link_libraries(
+      test_nav2_startup_readiness
       savo_nav_core
     )
   endif()

@@ -1,0 +1,14 @@
+nav2_startup_readiness_node:
+  ros__parameters:
+    publish_rate_hz: 2.0
+    output_topic: /savo_nav/startup_readiness
+    required_lifecycle_nodes:
+      - controller_server
+      - planner_server
+      - behavior_server
+      - bt_navigator
+      - waypoint_follower
+    navigate_to_pose_action: /navigate_to_pose
+    follow_waypoints_action: /follow_waypoints
+    odom_frame: odom
+    base_frame: base_footprint

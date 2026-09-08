@@ -29,6 +29,13 @@ enum class IdentityEvidenceDisposition : std::uint8_t
   kUnstable = 2U,
 };
 
+enum class CommonQuality : std::uint8_t
+{
+  kBelowMinimum = 0U,
+  kMinimum = 1U,
+  kGood = 2U,
+};
+
 [[nodiscard]] constexpr bool IsValidDuty(const std::uint8_t value)
 {
   return value == static_cast<std::uint8_t>(Duty::kRegisterLocation) ||
@@ -76,6 +83,30 @@ enum class IdentityEvidenceDisposition : std::uint8_t
 {
   return minimum_observations > 0U &&
          accepted_observations >= minimum_observations;
+}
+
+// The current confirmation contract can defend GOOD after its existing stable
+// evidence gate. It has no independent threshold that justifies EXCELLENT.
+[[nodiscard]] constexpr CommonQuality ClassifyCommonQuality(
+  const IdentityEvidenceDisposition identity,
+  const std::size_t accepted_observations,
+  const std::size_t minimum_observations,
+  const bool spatial_evidence_required,
+  const bool spatial_evidence_valid,
+  const bool confirmation_complete)
+{
+  if (identity != IdentityEvidenceDisposition::kAccepted ||
+    accepted_observations == 0U ||
+    (spatial_evidence_required && !spatial_evidence_valid))
+  {
+    return CommonQuality::kBelowMinimum;
+  }
+  if (confirmation_complete &&
+    HasMinimumEvidence(accepted_observations, minimum_observations))
+  {
+    return CommonQuality::kGood;
+  }
+  return CommonQuality::kMinimum;
 }
 
 }  // namespace savo_head::apriltag_contract

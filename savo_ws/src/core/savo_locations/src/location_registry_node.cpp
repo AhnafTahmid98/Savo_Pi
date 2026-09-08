@@ -607,6 +607,18 @@ void LocationRegistryNode::publish_status()
       << "\"storage_healthy\":"
       << (storage_healthy_ ? "true" : "false")
       << ","
+      << "\"quality\":\""
+      << (
+      ready_ && storage_healthy_ ?
+      "MINIMUM" :
+      "BELOW_MINIMUM")
+      << "\","
+      << "\"quality_reason\":\""
+      << json_escape(
+        ready_ && storage_healthy_ ?
+        "persistent_registry_ready" :
+        reason_)
+      << "\","
       << "\"mutation_in_progress\":"
       << (
       mutation_in_progress_ ?

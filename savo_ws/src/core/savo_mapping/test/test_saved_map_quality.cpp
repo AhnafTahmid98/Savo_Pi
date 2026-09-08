@@ -93,6 +93,14 @@ TEST(SavedMapQuality, ConnectedMapPasses)
     evaluation.metrics
     .largest_free_component_ratio,
     1.0);
+
+  const auto payload =
+    savo_mapping::quality::
+    quality_evaluation_to_json(evaluation);
+
+  EXPECT_NE(
+    payload.find("\"quality\":\"GOOD\""),
+    std::string::npos);
 }
 
 TEST(SavedMapQuality, DisconnectedFreeSpaceFails)
@@ -168,4 +176,41 @@ TEST(SavedMapQuality, InvalidDataSizeFails)
   EXPECT_EQ(
     evaluation.failed_checks.front(),
     "occupancy_data_size_mismatch");
+
+  const auto payload =
+    savo_mapping::quality::
+    quality_evaluation_to_json(evaluation);
+
+  EXPECT_NE(
+    payload.find(
+      "\"quality\":\"BELOW_MINIMUM\""),
+    std::string::npos);
+}
+
+TEST(SavedMapQuality, HandoffQualityNeverBypassesApproval)
+{
+  savo_mapping::quality::NavigationHandoff handoff;
+  handoff.ready = false;
+  handoff.approved = false;
+  handoff.reason =
+    "quality_passed_approval_required";
+
+  auto payload =
+    savo_mapping::quality::
+    navigation_handoff_to_json(handoff);
+
+  EXPECT_NE(
+    payload.find(
+      "\"quality\":\"BELOW_MINIMUM\""),
+    std::string::npos);
+
+  handoff.ready = true;
+  handoff.approved = true;
+  handoff.reason = "operator_approved";
+  payload = savo_mapping::quality::
+    navigation_handoff_to_json(handoff);
+
+  EXPECT_NE(
+    payload.find("\"quality\":\"GOOD\""),
+    std::string::npos);
 }

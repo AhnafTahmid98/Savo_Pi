@@ -75,16 +75,14 @@ bool ProducerRateTracker::RecordSuccess(
 
 ProducerRateObservation ProducerRateTracker::Observe(
   const std::int64_t monotonic_time_ns,
-  const double expected_rate_hz) const
+  const RateThresholds & thresholds) const
 {
-  if (!std::isfinite(expected_rate_hz) || expected_rate_hz <= 0.0) {
-    throw std::invalid_argument("expected producer rate must be finite and positive");
-  }
+  ValidateThresholds(thresholds);
 
   ProducerRateObservation observation;
   observation.available = success_times_ns_.size() >= 3U;
   observation.rate_hz = window_rate_hz(success_times_ns_);
-  observation.quality = ClassifyQuality(observation.rate_hz, expected_rate_hz);
+  observation.quality = ClassifyQuality(observation.rate_hz, thresholds);
   if (last_success_time_ns_ >= 0) {
     observation.last_success_age_s = std::max(
       0.0,
@@ -93,27 +91,39 @@ ProducerRateObservation ProducerRateTracker::Observe(
   return observation;
 }
 
+void ProducerRateTracker::ValidateThresholds(const RateThresholds & thresholds)
+{
+  if (!std::isfinite(thresholds.minimum_hz) ||
+    !std::isfinite(thresholds.good_hz) ||
+    !std::isfinite(thresholds.excellent_hz) ||
+    thresholds.minimum_hz <= 0.0 ||
+    thresholds.minimum_hz > thresholds.good_hz ||
+    thresholds.good_hz > thresholds.excellent_hz)
+  {
+    throw std::invalid_argument(
+            "rate thresholds must satisfy 0 < minimum_hz <= good_hz <= excellent_hz");
+  }
+}
+
 RateQuality ProducerRateTracker::ClassifyQuality(
   const double rate_hz,
-  const double expected_rate_hz) noexcept
+  const RateThresholds & thresholds)
 {
-  if (!std::isfinite(rate_hz) || !std::isfinite(expected_rate_hz) ||
-    rate_hz < 0.0 || expected_rate_hz <= 0.0)
-  {
+  ValidateThresholds(thresholds);
+  if (!std::isfinite(rate_hz) || rate_hz < 0.0) {
     return RateQuality::kBelowMinimum;
   }
 
-  const double ratio = rate_hz / expected_rate_hz;
-  if (ratio >= 0.90) {
-    return RateQuality::kExcellent;
+  if (rate_hz < thresholds.minimum_hz) {
+    return RateQuality::kBelowMinimum;
   }
-  if (ratio >= 0.75) {
-    return RateQuality::kGood;
-  }
-  if (ratio >= 0.50) {
+  if (rate_hz < thresholds.good_hz) {
     return RateQuality::kMinimum;
   }
-  return RateQuality::kBelowMinimum;
+  if (rate_hz < thresholds.excellent_hz) {
+    return RateQuality::kGood;
+  }
+  return RateQuality::kExcellent;
 }
 
 std::string_view ProducerRateTracker::QualityString(
@@ -341,19 +351,13 @@ ConsumedProducerHealth ProducerHealthConsumer::Observe(
 
 bool ProducerHealthConsumer::ObserveRateValid(
   const std::int64_t current_receive_time_ns,
-  const double expected_rate_hz,
-  const double minimum_rate_ratio,
+  const RateThresholds & thresholds,
   const std::int64_t transition_debounce_ns)
 {
-  if (!std::isfinite(expected_rate_hz) || expected_rate_hz <= 0.0 ||
-    !std::isfinite(minimum_rate_ratio) || minimum_rate_ratio <= 0.0 ||
-    minimum_rate_ratio > 1.0)
-  {
-    throw std::invalid_argument("invalid producer health rate threshold");
-  }
+  ProducerRateTracker::ValidateThresholds(thresholds);
   const bool evidence_available = payload_valid_ && snapshot_.producer_rate_available;
-  const bool instantaneous_valid = snapshot_.producer_rate_hz >=
-    expected_rate_hz * minimum_rate_ratio;
+  const bool instantaneous_valid = ProducerRateTracker::ClassifyQuality(
+    snapshot_.producer_rate_hz, thresholds) != RateQuality::kBelowMinimum;
   return rate_debouncer_.Observe(
     current_receive_time_ns, evidence_available, instantaneous_valid,
     transition_debounce_ns);

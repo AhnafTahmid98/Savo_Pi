@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from math import inf, nan
+from pathlib import Path
 
 from savo_lidar.constants import (
     DEFAULT_SERIAL_PORT,
@@ -20,6 +21,17 @@ from savo_lidar.diagnostics import (
     normalize_frame_id,
     run_scan_rate_check,
 )
+
+
+def test_common_quality_reuses_existing_lidar_health_gates():
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "savo_lidar/nodes/lidar_health_node.py"
+    ).read_text(encoding="utf-8")
+
+    assert "if decision.status in (STATUS_ERROR, STATUS_OFFLINE)" in source
+    assert 'else "MINIMUM"' in source
+    assert 'quality_reason="existing_lidar_health_gates_only"' in source
 
 
 def test_normalize_frame_id_strips_slash_and_spaces():

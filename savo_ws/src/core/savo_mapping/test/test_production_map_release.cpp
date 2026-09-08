@@ -151,6 +151,31 @@ TEST(ProductionMapRelease, InvalidReleaseIdentifiers)
     valid_release_id("release name"));
 }
 
+TEST(ProductionMapRelease, ActiveMapQualityRequiresActiveRelease)
+{
+  savo_mapping::release::ActiveMapContract active;
+  active.active = false;
+  active.reason = "no_active_production_map";
+
+  auto payload =
+    savo_mapping::release::
+    active_map_to_json(active);
+
+  EXPECT_NE(
+    payload.find(
+      "\"quality\":\"BELOW_MINIMUM\""),
+    std::string::npos);
+
+  active.active = true;
+  active.reason = "active_production_map_verified";
+  payload = savo_mapping::release::
+    active_map_to_json(active);
+
+  EXPECT_NE(
+    payload.find("\"quality\":\"GOOD\""),
+    std::string::npos);
+}
+
 TEST(ProductionMapRelease, CreateVerifyPromoteDeactivate)
 {
   const fs::path root =

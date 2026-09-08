@@ -28,6 +28,8 @@ struct ComponentConfig
   bool enforce_consistency{false};
   bool heartbeat_liveness_only{false};
   double consistency_transition_grace_s{0.0};
+  double startup_stable_ready_s{1.5};
+  double startup_timeout_s{20.0};
 
   double health_timeout_s{1.0};
   double summary_timeout_s{1.0};
@@ -63,6 +65,10 @@ struct ComponentStatus
   std::string heartbeat_reason_code;
 
   std::optional<rclcpp::Time> consistency_mismatch_since;
+  std::optional<rclcpp::Time> startup_stable_since;
+  bool ever_operational{false};
+  bool startup_failed{false};
+  std::string startup_failure_reason;
 };
 
 }  // namespace savo_supervisor

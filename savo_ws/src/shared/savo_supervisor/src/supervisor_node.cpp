@@ -440,6 +440,8 @@ public:
       policy_.events_topic, rclcpp::QoS(10).reliable());
     system_ready_publisher_ = create_publisher<std_msgs::msg::Bool>(
       system_ready_topic_, rclcpp::QoS(1).transient_local().reliable());
+    startup_ready_publisher_ = create_publisher<std_msgs::msg::Bool>(
+      startup_ready_topic_, rclcpp::QoS(1).transient_local().reliable());
     remote_commands_ready_publisher_ = create_publisher<std_msgs::msg::Bool>(
       remote_commands_ready_topic_, rclcpp::QoS(1).transient_local().reliable());
     shutdown_requested_publisher_ = create_publisher<std_msgs::msg::Bool>(
@@ -557,6 +559,8 @@ private:
     declare_parameter<std::string>(
       "system_authority.system_ready_topic", "/savo_supervisor/system_ready");
     declare_parameter<std::string>(
+      "system_authority.startup_ready_topic", "/savo_supervisor/startup_ready");
+    declare_parameter<std::string>(
       "system_authority.remote_commands_ready_topic",
       "/savo_supervisor/remote_commands_ready");
     declare_parameter<std::string>(
@@ -616,6 +620,9 @@ private:
     declare_parameter<double>(
       prefix + ".consistency_transition_grace_s",
       defaults.consistency_transition_grace_s);
+    declare_parameter<double>(
+      prefix + ".startup_stable_ready_s", defaults.startup_stable_ready_s);
+    declare_parameter<double>(prefix + ".startup_timeout_s", defaults.startup_timeout_s);
   }
 
   svo::ComponentConfig load_component(
@@ -634,6 +641,9 @@ private:
       get_parameter(prefix + ".expected_schema_version").as_int());
     config.consistency_transition_grace_s =
       get_parameter(prefix + ".consistency_transition_grace_s").as_double();
+    config.startup_stable_ready_s =
+      get_parameter(prefix + ".startup_stable_ready_s").as_double();
+    config.startup_timeout_s = get_parameter(prefix + ".startup_timeout_s").as_double();
     return config;
   }
 
@@ -755,6 +765,8 @@ private:
     system_state_path_ = get_parameter("system_authority.state_path").as_string();
     system_ready_topic_ =
       get_parameter("system_authority.system_ready_topic").as_string();
+    startup_ready_topic_ =
+      get_parameter("system_authority.startup_ready_topic").as_string();
     remote_commands_ready_topic_ =
       get_parameter("system_authority.remote_commands_ready_topic").as_string();
     shutdown_requested_topic_ =
@@ -819,6 +831,7 @@ private:
       throw std::runtime_error("required edge component cannot be disabled");
     }
     if (system_state_service_name_.empty() || system_ready_topic_.empty() ||
+      startup_ready_topic_.empty() ||
       remote_commands_ready_topic_.empty() || shutdown_requested_topic_.empty() ||
       system_actor_prefixes_.empty())
     {
@@ -830,9 +843,10 @@ private:
       policy_.health_topic,
       policy_.events_topic,
       system_ready_topic_,
+      startup_ready_topic_,
       remote_commands_ready_topic_,
       shutdown_requested_topic_};
-    if (output_topics.size() != 7U) {
+    if (output_topics.size() != 8U) {
       throw std::runtime_error("duplicate supervisor output topic");
     }
     const bool topics_valid =
@@ -1631,6 +1645,12 @@ private:
       !latest_system_snapshot_.shutdown_requested;
     system_ready_publisher_->publish(system_ready);
 
+    std_msgs::msg::Bool startup_ready;
+    startup_ready.data = latest_system_snapshot_.startup_ready &&
+      !latest_system_snapshot_.fault_latched &&
+      !latest_system_snapshot_.shutdown_requested;
+    startup_ready_publisher_->publish(startup_ready);
+
     std_msgs::msg::Bool remote_commands_ready;
     remote_commands_ready.data = latest_system_snapshot_.remote_commands_ready;
     remote_commands_ready_publisher_->publish(remote_commands_ready);
@@ -2022,6 +2042,7 @@ private:
   std::string system_state_service_name_;
   std::string system_state_path_;
   std::string system_ready_topic_;
+  std::string startup_ready_topic_;
   std::string remote_commands_ready_topic_;
   std::string shutdown_requested_topic_;
   std::string mapping_status_topic_;
@@ -2085,6 +2106,7 @@ private:
   rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr health_publisher_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr events_publisher_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr system_ready_publisher_;
+  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr startup_ready_publisher_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr remote_commands_ready_publisher_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr shutdown_requested_publisher_;
   rclcpp::Service<savo_msgs::srv::AuthorizeLocationOperation>::SharedPtr

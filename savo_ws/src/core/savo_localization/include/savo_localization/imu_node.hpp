@@ -90,6 +90,7 @@ private:
   double diagnostics_publish_rate_hz_{2.0};
   double timestamp_fault_hold_s_{2.0};
   std::size_t producer_rate_window_size_{30U};
+  RateThresholds producer_rate_thresholds_{10.0, 15.0, 20.0};
   bool reset_on_start_{true};
   bool calibration_restore_enabled_{true};
   bool calibration_require_verified_restore_{true};

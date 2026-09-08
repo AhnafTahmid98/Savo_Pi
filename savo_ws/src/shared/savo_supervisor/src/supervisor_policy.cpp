@@ -276,6 +276,14 @@ std::string validate_component(const ComponentConfig & config)
   {
     return config.name + " consistency_transition_grace_s must be finite and non-negative";
   }
+  if (!finite_nonnegative(config.startup_stable_ready_s)) {
+    return config.name + " startup_stable_ready_s must be finite and non-negative";
+  }
+  if (!finite_positive(config.startup_timeout_s) ||
+    config.startup_timeout_s <= config.startup_stable_ready_s)
+  {
+    return config.name + " startup_timeout_s must exceed startup_stable_ready_s";
+  }
   return {};
 }
 
@@ -405,7 +413,7 @@ ComponentConfig SupervisorPolicy::DefaultPowerConfig()
     true, true, false, 3.0, 3.0, 3.0);
 }
 
-ComponentSummary SupervisorPolicy::EvaluateComponent(
+ComponentSummary SupervisorPolicy::EvaluateComponentRaw(
   ComponentStatus & status,
   const rclcpp::Time & now,
   double startup_age_s) const
@@ -573,6 +581,78 @@ ComponentSummary SupervisorPolicy::EvaluateComponent(
   return result;
 }
 
+ComponentSummary SupervisorPolicy::EvaluateComponent(
+  ComponentStatus & status,
+  const rclcpp::Time & now,
+  const double startup_age_s) const
+{
+  auto result = EvaluateComponentRaw(status, now, startup_age_s);
+  result.startup_timeout_s = status.config.startup_timeout_s;
+  result.ever_operational = status.ever_operational;
+
+  if (!status.config.enabled) {
+    result.startup_phase = "OPERATIONAL";
+    result.ever_operational = true;
+    return result;
+  }
+  if (status.startup_failed) {
+    set_component_result(
+      result, ComponentState::ERROR, false, false,
+      status.startup_failure_reason, "component startup failure is terminal until restart");
+    result.startup_phase = "STARTUP_FAILED";
+    return result;
+  }
+  if (status.ever_operational) {
+    result.startup_phase = "OPERATIONAL";
+    result.ever_operational = true;
+    return result;
+  }
+
+  if (result.ready) {
+    if (!status.startup_stable_since.has_value()) {
+      status.startup_stable_since = now;
+    }
+    result.startup_stable_for_s = std::max(
+      0.0, (now - status.startup_stable_since.value()).seconds());
+    if (result.startup_stable_for_s >= status.config.startup_stable_ready_s) {
+      status.ever_operational = true;
+      result.ever_operational = true;
+      result.startup_phase = "OPERATIONAL";
+      return result;
+    }
+    result.ready = false;
+    result.state = ComponentState::INITIALIZING;
+    result.startup_phase = "STABILIZING";
+    result.reason_code = status.config.name + "_startup_stabilizing";
+    result.detail = "component health is ready; waiting for stable-ready duration";
+    return result;
+  }
+
+  status.startup_stable_since.reset();
+  if (finite_nonnegative(startup_age_s) &&
+    startup_age_s >= status.config.startup_timeout_s)
+  {
+    status.startup_failed = true;
+    status.startup_failure_reason = status.config.name + "_startup_timeout:" +
+      result.reason_code;
+    set_component_result(
+      result, ComponentState::ERROR, false, false,
+      status.startup_failure_reason, "component did not stabilize before startup timeout");
+    result.startup_phase = "STARTUP_FAILED";
+    return result;
+  }
+
+  const std::string observed_state = ToString(result.state);
+  const std::string observed_reason = result.reason_code;
+  result.state = ComponentState::INITIALIZING;
+  result.ready = false;
+  result.degraded = false;
+  result.startup_phase = "STARTING";
+  result.reason_code = status.config.name + "_startup_waiting";
+  result.detail = "raw_state=" + observed_state + ";raw_reason=" + observed_reason;
+  return result;
+}
+
 SupervisorState SupervisorPolicy::EvaluateSupervisor(
   const std::vector<ComponentSummary> & summaries,
   const SafetySummary & safety,
@@ -694,7 +774,11 @@ std::string SupervisorPolicy::CompactStateJson(
       {"last_message_age_s", component.last_message_age_s},
       {"timeout_s", component.timeout_s},
       {"malformed_message_count", component.malformed_message_count},
-      {"recovery_count", component.recovery_count}
+      {"recovery_count", component.recovery_count},
+      {"startup_phase", component.startup_phase},
+      {"ever_operational", component.ever_operational},
+      {"startup_stable_for_s", component.startup_stable_for_s},
+      {"startup_timeout_s", component.startup_timeout_s}
     };
   }
 

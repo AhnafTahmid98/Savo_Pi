@@ -144,7 +144,7 @@ def test_ekf_launch_keeps_ekf_and_health_profiles_consistent() -> None:
     }
 
 
-def test_vo_health_remains_optional_with_existing_rate_contract() -> None:
+def test_vo_health_remains_optional_with_explicit_rate_contract() -> None:
     diagnostics = yaml.safe_load(
         (PACKAGE_ROOT / "config" / "diagnostics.yaml").read_text(encoding="utf-8")
     )["localization_health_node"]["ros__parameters"]
@@ -153,15 +153,13 @@ def test_vo_health_remains_optional_with_existing_rate_contract() -> None:
     )
 
     assert diagnostics["expected_vo_rate_hz"] == 15.0
-    assert diagnostics["rate_tolerance_ratio"] == 0.50
-    assert (
-        diagnostics["expected_vo_rate_hz"] * diagnostics["rate_tolerance_ratio"]
-        == 7.5
-    )
+    assert diagnostics["vo_min_rate_hz"] == 5.0
+    assert diagnostics["vo_good_rate_hz"] == 8.0
+    assert diagnostics["vo_excellent_rate_hz"] == 12.0
     assert 'declare_parameter<bool>("vo_required", false)' in source
 
 
-def test_producer_health_rate_accounting_preserves_existing_floor_and_freshness() -> None:
+def test_producer_health_rate_accounting_uses_explicit_floors_and_existing_freshness() -> None:
     diagnostics = yaml.safe_load(
         (PACKAGE_ROOT / "config" / "diagnostics.yaml").read_text(encoding="utf-8")
     )["localization_health_node"]["ros__parameters"]
@@ -181,21 +179,28 @@ def test_producer_health_rate_accounting_preserves_existing_floor_and_freshness(
     )["wheel_odom_node"]["ros__parameters"]
 
     assert diagnostics["expected_imu_rate_hz"] == 25.0
-    assert diagnostics["rate_tolerance_ratio"] == 0.50
-    assert (
-        diagnostics["expected_imu_rate_hz"] * diagnostics["rate_tolerance_ratio"]
-        == 12.5
-    )
     assert diagnostics["expected_ekf_rate_hz"] == 30.0
-    assert (
-        diagnostics["expected_ekf_rate_hz"] * diagnostics["rate_tolerance_ratio"]
-        == 15.0
-    )
+    expected_thresholds = {
+        "imu_min_rate_hz": 10.0,
+        "imu_good_rate_hz": 15.0,
+        "imu_excellent_rate_hz": 20.0,
+        "wheel_odom_min_rate_hz": 10.0,
+        "wheel_odom_good_rate_hz": 20.0,
+        "wheel_odom_excellent_rate_hz": 25.0,
+        "ekf_min_rate_hz": 10.0,
+        "ekf_good_rate_hz": 20.0,
+        "ekf_excellent_rate_hz": 25.0,
+        "vo_min_rate_hz": 5.0,
+        "vo_good_rate_hz": 8.0,
+        "vo_excellent_rate_hz": 12.0,
+    }
+    for name, value in expected_thresholds.items():
+        assert diagnostics[name] == value
+        assert standalone[name] == value
     assert diagnostics["rate_window_size"] == 30
     assert diagnostics["rate_transition_debounce_s"] == 1.0
     assert diagnostics["ekf_rate_transition_debounce_s"] == 3.0
     assert standalone["expected_imu_rate_hz"] == 25.0
-    assert standalone["rate_tolerance_ratio"] == 0.50
     assert standalone["rate_transition_debounce_s"] == 1.0
     assert standalone["ekf_rate_transition_debounce_s"] == 3.0
     assert diagnostics["max_imu_age_s"] == 0.5
@@ -205,13 +210,32 @@ def test_producer_health_rate_accounting_preserves_existing_floor_and_freshness(
     assert imu["publish_rate_hz"] == 25.0
     assert imu["health_publish_rate_hz"] == 5.0
     assert imu["diagnostics_publish_rate_hz"] == 2.0
+    assert imu["imu_min_rate_hz"] == expected_thresholds["imu_min_rate_hz"]
+    assert imu["imu_good_rate_hz"] == expected_thresholds["imu_good_rate_hz"]
+    assert (
+        imu["imu_excellent_rate_hz"]
+        == expected_thresholds["imu_excellent_rate_hz"]
+    )
     assert wheel["publish_rate_hz"] == 30.0
     assert wheel["health_publish_rate_hz"] == 5.0
+    assert (
+        wheel["wheel_odom_min_rate_hz"]
+        == expected_thresholds["wheel_odom_min_rate_hz"]
+    )
+    assert (
+        wheel["wheel_odom_good_rate_hz"]
+        == expected_thresholds["wheel_odom_good_rate_hz"]
+    )
+    assert (
+        wheel["wheel_odom_excellent_rate_hz"]
+        == expected_thresholds["wheel_odom_excellent_rate_hz"]
+    )
     assert wheel["publish_debug_state"] is False
     for token in (
         "source_rate_hz",
         "receive_rate_hz",
         "source_rate_available",
+        "target_rate_hz",
         "rate_basis",
         "rate_quality",
         "producer_successful_publication",
@@ -219,6 +243,27 @@ def test_producer_health_rate_accounting_preserves_existing_floor_and_freshness(
         r'<< "\"role\":\"liveness\","',
     ):
         assert token in source
+
+
+def test_ratio_rate_policy_is_removed_from_localization_health_configuration() -> None:
+    paths = [
+        PACKAGE_ROOT / "config" / "diagnostics.yaml",
+        PACKAGE_ROOT / "config" / "localization_health.yaml",
+        *(PACKAGE_ROOT / "config" / "profiles").glob("*.yaml"),
+    ]
+    for path in paths:
+        assert "rate_tolerance_ratio" not in path.read_text(encoding="utf-8")
+
+    for relative in (
+        "include/savo_localization/producer_health.hpp",
+        "include/savo_localization/localization_health_core.hpp",
+        "src/producer_health.cpp",
+        "src/localization_health_core.cpp",
+        "src/localization_health_node.cpp",
+    ):
+        assert "rate_tolerance_ratio" not in (PACKAGE_ROOT / relative).read_text(
+            encoding="utf-8"
+        )
 
 
 def test_health_aggregator_does_not_observe_required_raw_topics_or_global_diagnostics() -> None:

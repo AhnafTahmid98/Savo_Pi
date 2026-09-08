@@ -89,10 +89,16 @@ def test_confirmation_action_result_contract() -> None:
         "uint32 rejected_observations",
         "float32 position_stddev_m",
         "float32 yaw_stddev_rad",
+        "string quality",
+        "string quality_reason",
     }
 
     for field in required_result_fields:
         assert field in text, f"Missing result field: {field}"
+
+    feedback = text.split("\n---\n", maxsplit=2)[2]
+    assert "string quality" in feedback
+    assert "string quality_reason" in feedback
 
 
 def test_confirmation_action_terminal_results() -> None:

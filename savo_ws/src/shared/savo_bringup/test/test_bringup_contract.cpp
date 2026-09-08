@@ -180,3 +180,88 @@ TEST(BringupContract, ReadinessCoversReadyWaitingStaleBlockedAndDegraded)
   EXPECT_FALSE(invalid.ready);
   EXPECT_EQ(invalid.state, ReadinessState::kBlocked);
 }
+
+TEST(BringupContract, StartupStageRequiresContinuousStableReadiness)
+{
+  using savo_bringup::QualityLevel;
+  using savo_bringup::StartupStageInput;
+  using savo_bringup::StartupStageState;
+  using savo_bringup::StartupStageTiming;
+  using savo_bringup::StartupStageTracker;
+
+  StartupStageTracker tracker(StartupStageTiming{1.0, 2.0, 10.0});
+  StartupStageInput input;
+  input.processes_started = true;
+  input.dependencies_ready = true;
+  input.quality = QualityLevel::kGood;
+
+  EXPECT_EQ(tracker.Update(0.5, input).state, StartupStageState::kWaitingForDependencies);
+  EXPECT_EQ(tracker.Update(1.0, input).state, StartupStageState::kStabilizing);
+
+  input.dependencies_ready = false;
+  input.reason = "imu_stale";
+  EXPECT_EQ(tracker.Update(2.5, input).state, StartupStageState::kWaitingForDependencies);
+
+  input.dependencies_ready = true;
+  EXPECT_EQ(tracker.Update(3.0, input).state, StartupStageState::kStabilizing);
+  EXPECT_FALSE(tracker.Update(4.9, input).ready);
+  const auto ready = tracker.Update(5.0, input);
+  EXPECT_TRUE(ready.ready);
+  EXPECT_EQ(ready.state, StartupStageState::kReady);
+  EXPECT_EQ(ready.quality, QualityLevel::kGood);
+}
+
+TEST(BringupContract, StartupStageTimeoutIsTerminal)
+{
+  using savo_bringup::StartupStageInput;
+  using savo_bringup::StartupStageState;
+  using savo_bringup::StartupStageTiming;
+  using savo_bringup::StartupStageTracker;
+
+  StartupStageTracker tracker(StartupStageTiming{0.0, 1.0, 3.0});
+  StartupStageInput input;
+  input.processes_started = true;
+  input.reason = "tof_left_not_observed";
+  const auto failed = tracker.Update(3.0, input);
+  EXPECT_TRUE(failed.failed);
+  EXPECT_EQ(failed.state, StartupStageState::kFailed);
+  EXPECT_EQ(failed.reason, "stage_startup_timeout:tof_left_not_observed");
+
+  input.dependencies_ready = true;
+  EXPECT_TRUE(tracker.Update(3.1, input).failed);
+}
+
+TEST(BringupContract, StartupStageRejectsBelowMinimumRequiredQuality)
+{
+  using savo_bringup::QualityLevel;
+  using savo_bringup::StartupStageInput;
+  using savo_bringup::StartupStageState;
+  using savo_bringup::StartupStageTiming;
+  using savo_bringup::StartupStageTracker;
+
+  StartupStageTracker tracker(StartupStageTiming{0.0, 1.0, 5.0});
+  StartupStageInput input;
+  input.processes_started = true;
+  input.dependencies_ready = true;
+  input.quality = QualityLevel::kBelowMinimum;
+
+  const auto decision = tracker.Update(2.0, input);
+  EXPECT_FALSE(decision.ready);
+  EXPECT_EQ(decision.state, StartupStageState::kWaitingForDependencies);
+  EXPECT_EQ(decision.reason, "required_quality_below_minimum");
+}
+
+TEST(BringupContract, QualityAggregationIsWorstRequiredAndFailClosed)
+{
+  using savo_bringup::QualityLevel;
+  EXPECT_EQ(
+    savo_bringup::WorstRequiredQuality(
+      {QualityLevel::kExcellent, QualityLevel::kMinimum, QualityLevel::kGood}, true),
+    QualityLevel::kMinimum);
+  EXPECT_EQ(
+    savo_bringup::WorstRequiredQuality({}, true),
+    QualityLevel::kMinimum);
+  EXPECT_EQ(
+    savo_bringup::WorstRequiredQuality({QualityLevel::kExcellent}, false),
+    QualityLevel::kBelowMinimum);
+}

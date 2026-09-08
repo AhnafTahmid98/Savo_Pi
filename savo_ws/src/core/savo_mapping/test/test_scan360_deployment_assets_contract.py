@@ -80,11 +80,11 @@ IMMUTABLE_HASHES = {
     'test/test_scan360_rotate_action_binding.cpp':
         '027584eaec8187aca1ef4b92e38608447f00a6de5fa6390515ee1a65be6c2f1b',
     'include/savo_mapping/scan360_quality.hpp':
-        '1c1119275a9b76b3edc90ec38e963ae2008cd096d71b86d86b5b3a28f928b61a',
+        '442dd6871cee8adaba72db8d509429d92f66f43d5bee5d8b48152b7b7608016a',
     'src/scan360/scan360_quality.cpp':
-        '2494a38c6c6cd33db50f1eaff0460223cd32516d1eff809aed51966f840fe678',
+        'b90e4fda62457116943c9b783d0d8702a891ebcb7c8eab355462164f6a1a065d',
     'test/test_scan360_quality.cpp':
-        '7075dea04abc7e737617ba3241dddc1599122c9c015970bc1f23cf37cb017c49',
+        '867fa343869086bc520cecfc1a5fcf9b651386d10a98c6c4fc7e3eac9eca8aab',
     'package.xml':
         '235cedf79a50b5e3f8b4d1477f5f8e7f0415503b0f0db775c24637007c9c34e1',
 }

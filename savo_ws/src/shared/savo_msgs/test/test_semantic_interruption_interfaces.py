@@ -38,6 +38,9 @@ def test_status_covers_the_complete_typed_lifecycle() -> None:
         'bool registration_complete',
         'bool resume_requested',
         'bool resume_complete',
+        'bool startup_ready',
+        'string quality',
+        'string quality_reason',
     ):
         assert token in status
 

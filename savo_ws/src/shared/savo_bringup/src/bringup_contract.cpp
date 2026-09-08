@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <string>
 
 namespace savo_bringup
@@ -181,6 +182,173 @@ std::string_view ToString(const ReadinessState value) noexcept
       return "shutting_down";
   }
   return "unknown";
+}
+
+std::string_view ToString(const QualityLevel value) noexcept
+{
+  switch (value) {
+    case QualityLevel::kBelowMinimum:
+      return "BELOW_MINIMUM";
+    case QualityLevel::kMinimum:
+      return "MINIMUM";
+    case QualityLevel::kGood:
+      return "GOOD";
+    case QualityLevel::kExcellent:
+      return "EXCELLENT";
+  }
+  return "BELOW_MINIMUM";
+}
+
+std::string_view ToString(const StartupStageState value) noexcept
+{
+  switch (value) {
+    case StartupStageState::kStarting:
+      return "STARTING";
+    case StartupStageState::kWaitingForDependencies:
+      return "WAITING_FOR_DEPENDENCIES";
+    case StartupStageState::kStabilizing:
+      return "STABILIZING";
+    case StartupStageState::kReady:
+      return "READY";
+    case StartupStageState::kFailed:
+      return "FAILED";
+    case StartupStageState::kShuttingDown:
+      return "SHUTTING_DOWN";
+  }
+  return "FAILED";
+}
+
+std::optional<QualityLevel> ParseQualityLevel(const std::string_view value) noexcept
+{
+  const auto normalized = Normalize(value);
+  if (normalized == "below_minimum") {
+    return QualityLevel::kBelowMinimum;
+  }
+  if (normalized == "minimum") {
+    return QualityLevel::kMinimum;
+  }
+  if (normalized == "good") {
+    return QualityLevel::kGood;
+  }
+  if (normalized == "excellent") {
+    return QualityLevel::kExcellent;
+  }
+  return std::nullopt;
+}
+
+bool ValidateStartupStageTiming(const StartupStageTiming & timing) noexcept
+{
+  return std::isfinite(timing.minimum_settle_s) &&
+         std::isfinite(timing.stable_ready_s) &&
+         std::isfinite(timing.startup_timeout_s) &&
+         timing.minimum_settle_s >= 0.0 &&
+         timing.stable_ready_s >= 0.0 &&
+         timing.startup_timeout_s > timing.minimum_settle_s + timing.stable_ready_s;
+}
+
+QualityLevel WorstRequiredQuality(
+  const std::vector<QualityLevel> & required_quality,
+  const bool dependencies_ready) noexcept
+{
+  if (!dependencies_ready) {
+    return QualityLevel::kBelowMinimum;
+  }
+  if (required_quality.empty()) {
+    return QualityLevel::kMinimum;
+  }
+  return *std::min_element(required_quality.begin(), required_quality.end());
+}
+
+StartupStageTracker::StartupStageTracker(StartupStageTiming timing)
+: timing_(timing)
+{
+}
+
+const StartupStageTiming & StartupStageTracker::timing() const noexcept
+{
+  return timing_;
+}
+
+StartupStageDecision StartupStageTracker::Update(
+  const double elapsed_s,
+  const StartupStageInput & input)
+{
+  StartupStageDecision decision;
+  decision.quality = input.dependencies_ready ? input.quality : QualityLevel::kBelowMinimum;
+
+  if (input.shutting_down) {
+    decision.state = StartupStageState::kShuttingDown;
+    decision.reason = "shutdown_requested";
+    return decision;
+  }
+  if (terminal_failed_) {
+    decision.state = StartupStageState::kFailed;
+    decision.failed = true;
+    decision.reason = input.reason.empty() ? "stage_failed" : input.reason;
+    return decision;
+  }
+  if (terminal_ready_) {
+    decision.state = StartupStageState::kReady;
+    decision.ready = true;
+    decision.quality = input.dependencies_ready ? input.quality : QualityLevel::kBelowMinimum;
+    decision.reason = input.dependencies_ready ? "stable_ready" : input.reason;
+    return decision;
+  }
+  if (!ValidateStartupStageTiming(timing_) || !input.configuration_valid ||
+    input.unrecoverable_failure)
+  {
+    terminal_failed_ = true;
+    decision.state = StartupStageState::kFailed;
+    decision.failed = true;
+    decision.reason = !input.configuration_valid ? "invalid_stage_configuration" :
+      (input.reason.empty() ? "unrecoverable_stage_failure" : input.reason);
+    return decision;
+  }
+  if (!std::isfinite(elapsed_s) || elapsed_s < 0.0) {
+    terminal_failed_ = true;
+    decision.state = StartupStageState::kFailed;
+    decision.failed = true;
+    decision.reason = "invalid_stage_clock";
+    return decision;
+  }
+  if (elapsed_s >= timing_.startup_timeout_s) {
+    terminal_failed_ = true;
+    decision.state = StartupStageState::kFailed;
+    decision.failed = true;
+    decision.reason = input.reason.empty() ? "stage_startup_timeout" :
+      "stage_startup_timeout:" + input.reason;
+    return decision;
+  }
+  if (!input.processes_started || elapsed_s < timing_.minimum_settle_s) {
+    stable_since_s_ = -1.0;
+    decision.state = input.processes_started ?
+      StartupStageState::kWaitingForDependencies : StartupStageState::kStarting;
+    decision.reason = input.processes_started ? "minimum_settle_pending" :
+      "waiting_for_processes";
+    return decision;
+  }
+  if (!input.dependencies_ready || input.quality == QualityLevel::kBelowMinimum) {
+    stable_since_s_ = -1.0;
+    decision.state = StartupStageState::kWaitingForDependencies;
+    decision.reason = input.quality == QualityLevel::kBelowMinimum ?
+      "required_quality_below_minimum" :
+      (input.reason.empty() ? "waiting_for_dependencies" : input.reason);
+    return decision;
+  }
+  if (stable_since_s_ < 0.0) {
+    stable_since_s_ = elapsed_s;
+  }
+  decision.stable_for_s = std::max(0.0, elapsed_s - stable_since_s_);
+  if (decision.stable_for_s >= timing_.stable_ready_s) {
+    terminal_ready_ = true;
+    decision.state = StartupStageState::kReady;
+    decision.ready = true;
+    decision.reason = "stable_ready";
+    return decision;
+  }
+  decision.state = StartupStageState::kStabilizing;
+  decision.reason = "waiting_for_stable_ready_window";
+  return decision;
 }
 
 ReadinessDecision EvaluateReadiness(

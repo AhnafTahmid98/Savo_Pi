@@ -103,61 +103,53 @@ def test_every_staged_launch_configuration_is_declared() -> None:
         assert referenced <= declared, (path, referenced - declared)
 
 
-def test_edge_stages_use_launch_timers_with_zero_delay_support() -> None:
-    """Every heavy stage uses launch-native timing and accepts zero."""
+def test_edge_stages_use_nonblocking_dependency_gates() -> None:
+    """Heavy Edge stages are released by health, not elapsed wall time."""
     edge = read(EDGE_LAUNCH)
     realsense = read(REALSENSE_LAUNCH)
 
-    assert "from launch.actions import TimerAction" in edge
-    assert "from launch.actions import TimerAction" in realsense
-    for name in (
-        "vo_start_delay_s",
-        "obstacle_cloud_start_delay_s",
-        "speech_start_delay_s",
-        "ui_start_delay_s",
-        "bridge_start_delay_s",
-        "readiness_start_delay_s",
+    assert "TimerAction" not in edge
+    assert "StartupStageGroup" in edge
+    assert "build_staged_sequence" in edge
+    assert '"startup.enabled": True' in edge
+    assert '"startup_stages.yaml"' in edge
+    for stage in (
+        "infrastructure",
+        "realsense",
+        "vo",
+        "obstacle_cloud",
+        "bridge",
+        "optional_apps",
+        "complete",
     ):
-        assert f'period=LaunchConfiguration("{name}")' in edge
+        assert f'"{stage}"' in edge
+
+    # The camera package retains its local compatibility timers, but the Edge
+    # entrypoint forces all of them to zero and proves readiness by status.
+    assert "from launch.actions import TimerAction" in realsense
     for name in (
         "realsense_start_delay_s",
         "camera_support_start_delay_s",
         "observer_relay_start_delay_s",
     ):
-        assert f'LaunchConfiguration(\n        "{name}"' in realsense
-        assert f"period={name}" in realsense
+        assert f'"{name}": "0.0"' in edge
 
-    # TimerAction accepts a 0.0 period; no validation or shell sleep changes
-    # the semantics of an explicit zero-delay override.
     assert "ExecuteProcess" not in edge
     assert "sleep" not in edge.lower()
     assert "ExecuteProcess" not in realsense
     assert "sleep" not in realsense.lower()
 
 
-def test_pending_stages_are_canceled_on_launch_shutdown() -> None:
-    """Ctrl+C cannot allow a pending staged action to fire afterward."""
-    expected_timer_counts = {
-        EDGE_LAUNCH: 6,
-        REALSENSE_LAUNCH: 3,
-    }
-    for path, expected_count in expected_timer_counts.items():
-        tree = ast.parse(read(path), filename=str(path))
-        timers = [
-            node
-            for node in ast.walk(tree)
-            if isinstance(node, ast.Call)
-            and getattr(node.func, "id", "") == "TimerAction"
-        ]
-        assert len(timers) == expected_count
-        for timer in timers:
-            cancel_value = next(
-                keyword.value
-                for keyword in timer.keywords
-                if keyword.arg == "cancel_on_shutdown"
-            )
-            assert isinstance(cancel_value, ast.Constant)
-            assert cancel_value.value is True
+def test_pending_stages_fail_closed_on_launch_shutdown() -> None:
+    """Only a successful gate exit can release the following stage."""
+    staged = read(PACKAGE_ROOT / "savo_bringup" / "staged_launch.py")
+    gate = read(PACKAGE_ROOT / "src/nodes/startup_stage_gate_node.cpp")
+
+    assert "OnProcessExit(target_action=gate" in staged
+    assert "if event.returncode != 0:" in staged
+    assert "Shutdown(" in staged
+    assert "int exit_code_{3};" in gate
+    assert "exit_code_ = 0;" in gate
 
 
 def test_camera_stage_is_one_driver_then_support_then_observer_relay() -> None:
@@ -178,10 +170,8 @@ def test_camera_health_requirements_follow_enabled_edge_consumers() -> None:
     edge = read(EDGE_LAUNCH)
     realsense = read(REALSENSE_LAUNCH)
 
-    assert '"require_vo_health": (' in edge
-    assert '"true" if start_vo else "false"' in edge
-    assert '"require_obstacle_cloud_health": (' in edge
-    assert '"true" if start_obstacle_cloud else "false"' in edge
+    assert '"require_vo_health": "false"' in edge
+    assert '"require_obstacle_cloud_health": "false"' in edge
     assert '"require_depth_signal": ParameterValue(' in realsense
     assert '"require_vo_health": ParameterValue(' in realsense
     assert '"require_obstacle_cloud_health": ParameterValue(' in realsense
@@ -189,28 +179,20 @@ def test_camera_health_requirements_follow_enabled_edge_consumers() -> None:
     assert '"require_obstacle_cloud": start_obstacle_cloud' in edge
 
 
-def test_feature_flags_still_gate_all_delayed_edge_components() -> None:
-    """A timer is only created after its existing feature gate passes."""
+def test_feature_flags_gate_all_dependency_released_edge_components() -> None:
+    """Disabled features never enter their dependency-released stage."""
     launch = read(EDGE_LAUNCH)
-    expected_guards = {
-        "if start_realsense:": "realsense_bringup.launch.py",
-        "if start_vo:": 'period=LaunchConfiguration("vo_start_delay_s")',
-        "if start_obstacle_cloud:": (
-            'period=LaunchConfiguration("obstacle_cloud_start_delay_s")'
-        ),
-        "if start_speech:": (
-            'period=LaunchConfiguration("speech_start_delay_s")'
-        ),
-        "if start_ui:": 'period=LaunchConfiguration("ui_start_delay_s")',
-        "if start_bridge:": (
-            'period=LaunchConfiguration("bridge_start_delay_s")'
-        ),
-        "if start_power:": "power_edge.launch.py",
-    }
-    for guard, delayed_action in expected_guards.items():
+    for guard, action in (
+        ("if start_realsense:", "realsense_bringup.launch.py"),
+        ("if start_vo:", "vo_bringup.launch.py"),
+        ("if start_obstacle_cloud:", "obstacle_cloud_filter.launch.py"),
+        ("if start_speech:", "speech_bringup.launch.xml"),
+        ("if start_ui:", "ui_bringup.launch.py"),
+        ("if start_bridge:", "edge_bridge.launch.py"),
+        ("if start_power:", "power_edge.launch.py"),
+    ):
         guard_offset = launch.index(guard)
-        action_offset = launch.index(delayed_action, guard_offset)
-        assert action_offset > guard_offset
+        assert launch.index(action, guard_offset) > guard_offset
 
     assert "and explicit_obstacle_cloud" in launch
     assert "and obstacle_cloud_requested" in launch

@@ -32,6 +32,9 @@ def generate_launch_description():
             'readiness.yaml',
         ]
     )
+    default_startup_readiness_params = PathJoinSubstitution(
+        [package_share, 'config', 'startup_readiness.yaml']
+    )
 
     default_gateway_params = PathJoinSubstitution(
         [
@@ -75,6 +78,9 @@ def generate_launch_description():
     readiness_params = LaunchConfiguration(
         'readiness_params'
     )
+    startup_readiness_params = LaunchConfiguration(
+        'startup_readiness_params'
+    )
 
     goal_gateway_params = LaunchConfiguration(
         'goal_gateway_params'
@@ -89,6 +95,9 @@ def generate_launch_description():
 
     start_readiness = LaunchConfiguration(
         'start_readiness'
+    )
+    start_startup_readiness = LaunchConfiguration(
+        'start_startup_readiness'
     )
 
     start_goal_gateway = LaunchConfiguration(
@@ -188,6 +197,10 @@ def generate_launch_description():
                 ),
             ),
             DeclareLaunchArgument(
+                'startup_readiness_params',
+                default_value=default_startup_readiness_params,
+            ),
+            DeclareLaunchArgument(
                 'goal_gateway_params',
                 default_value=default_gateway_params,
                 description=(
@@ -217,6 +230,9 @@ def generate_launch_description():
                 'start_readiness',
                 default_value='true',
                 description='Start the readiness monitor.',
+            ),
+            DeclareLaunchArgument(
+                'start_startup_readiness', default_value='true'
             ),
             DeclareLaunchArgument(
                 'start_goal_gateway',
@@ -471,6 +487,20 @@ def generate_launch_description():
                         'expected_map_release_id': map_release_id,
                     },
                 ],
+                arguments=[
+                    '--ros-args',
+                    '--log-level',
+                    log_level,
+                ],
+            ),
+            Node(
+                package='savo_nav',
+                executable='nav2_startup_readiness_node',
+                name='nav2_startup_readiness_node',
+                output='screen',
+                emulate_tty=True,
+                condition=IfCondition(start_startup_readiness),
+                parameters=[startup_readiness_params],
                 arguments=[
                     '--ros-args',
                     '--log-level',

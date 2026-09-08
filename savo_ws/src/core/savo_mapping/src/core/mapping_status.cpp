@@ -153,6 +153,13 @@ std::string readiness_text(const MappingStatus & status)
   return status.ready ? "ready" : "not_ready";
 }
 
+std::string common_startup_quality(const MappingStatus & status)
+{
+  // The current quality_score is explicitly a structural placeholder. Do not
+  // promote it to GOOD/EXCELLENT production evidence.
+  return is_mapping_ready(status) ? "MINIMUM" : "BELOW_MINIMUM";
+}
+
 std::string make_status_json(const MappingStatus & status)
 {
   std::ostringstream out;
@@ -164,6 +171,9 @@ std::string make_status_json(const MappingStatus & status)
   out << "\"session_state\":\"" << std::string{to_string(status.session_state)} << "\",";
   out << "\"healthy\":" << bool_text(status.healthy) << ",";
   out << "\"ready\":" << bool_text(status.ready) << ",";
+  out << "\"startup_ready\":" << bool_text(is_mapping_ready(status)) << ",";
+  out << "\"quality\":\"" << common_startup_quality(status) << "\",";
+  out << "\"quality_reason\":\"" << json_escape(readiness_text(status)) << "\",";
   out << "\"slam_active\":" << bool_text(status.slam_active) << ",";
   out << "\"map_received\":" << bool_text(status.map_received) << ",";
   out << "\"scan_received\":" << bool_text(status.scan_received) << ",";

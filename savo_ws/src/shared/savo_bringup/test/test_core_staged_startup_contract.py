@@ -107,35 +107,30 @@ def test_core_stage_defaults_are_dependency_ordered() -> None:
     assert float(defaults["readiness_start_delay_s"]) > 40.0
 
 
-def test_core_stages_use_nonblocking_shutdown_canceling_timers() -> None:
-    """Every Core stage uses one launch-native helper with clean shutdown."""
+def test_core_stages_use_nonblocking_dependency_gates() -> None:
+    """Core startup is released by retained stage status, never wall time."""
     launch = read(CORE_LAUNCH)
-    tree = ast.parse(launch, filename=str(CORE_LAUNCH))
 
-    assert "from launch.actions import TimerAction" in launch
-    timers = [
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-        and getattr(node.func, "id", "") == "TimerAction"
-    ]
-    assert len(timers) == 1
-    cancel_value = next(
-        keyword.value
-        for keyword in timers[0].keywords
-        if keyword.arg == "cancel_on_shutdown"
-    )
-    assert isinstance(cancel_value, ast.Constant)
-    assert cancel_value.value is True
+    assert "TimerAction" not in launch
+    assert "StartupStageGroup" in launch
+    assert "build_staged_sequence" in launch
+    assert '"startup.enabled": True' in launch
+    assert '"startup_stages.yaml"' in launch
+    for stage in (
+        "infrastructure",
+        "hardware",
+        "motion_safety",
+        "sensor_stabilization",
+        "localization",
+        "supervisor",
+        "navigation",
+        "slam_foundation",
+        "complete",
+    ):
+        assert f'"{stage}"' in launch
     assert "ExecuteProcess" not in launch
     assert "subprocess" not in launch
     assert "time.sleep" not in launch
-
-    for name in CORE_STAGE_DEFAULTS:
-        assert f'_stage(\n                    "{name}"' in launch or (
-            name == "readiness_start_delay_s"
-            and f'_stage(\n            "{name}"' in launch
-        )
 
 
 def test_every_core_launch_configuration_is_declared() -> None:
@@ -247,14 +242,29 @@ def test_core_composition_keeps_single_component_owners() -> None:
     for marker in (
         '_python_launch("savo_description", "description.launch.py")',
         '_python_launch("savo_base", "base_bringup.launch.py")',
-        '"savo_localization", "localization_bringup.launch.py"',
         '_python_launch("savo_supervisor", "supervisor.launch.py")',
     ):
         assert core.count(marker) == 1
 
+    # Localization is deliberately split into producer hardware and the
+    # EKF/aggregate-health stage; mutually exclusive flags keep one owner.
+    assert core.count('"savo_localization", "localization_bringup.launch.py"') == 2
+    assert '"use_imu": "true"' in core
+    assert '"use_wheel_odom": "true"' in core
+    assert '"use_ekf": "false"' in core
+    assert '"use_imu": "false"' in core
+    assert '"use_wheel_odom": "false"' in core
+    assert '"use_ekf": "true"' in core
+
     assert autonomous.count('"savo_description", "description.launch.py"') == 1
     assert autonomous.count('"savo_base", "base_bringup.launch.py"') == 1
-    assert autonomous.count('"localization_bringup.launch.py"') == 1
+    assert autonomous.count('"localization_bringup.launch.py"') == 2
+    assert '"use_imu": "true"' in autonomous
+    assert '"use_wheel_odom": "true"' in autonomous
+    assert '"use_ekf": "false"' in autonomous
+    assert '"use_imu": "false"' in autonomous
+    assert '"use_wheel_odom": "false"' in autonomous
+    assert '"use_ekf": "true"' in autonomous
     assert autonomous.count('"savo_supervisor", "supervisor.launch.py"') == 1
 
     description = read(

@@ -124,6 +124,12 @@ void WheelOdomNode::declare_parameters()
   declare_parameter<double>("timestamp_fault_hold_s", timestamp_fault_hold_s_);
   declare_parameter<int>(
     "producer_rate_window_size", static_cast<int>(producer_rate_window_size_));
+  declare_parameter<double>(
+    "wheel_odom_min_rate_hz", producer_rate_thresholds_.minimum_hz);
+  declare_parameter<double>(
+    "wheel_odom_good_rate_hz", producer_rate_thresholds_.good_hz);
+  declare_parameter<double>(
+    "wheel_odom_excellent_rate_hz", producer_rate_thresholds_.excellent_hz);
   declare_parameter<double>("timeout_s", timeout_s_);
   declare_parameter<bool>("publish_tf", publish_tf_);
   declare_parameter<bool>("publish_joint_states", publish_joint_states_);
@@ -202,6 +208,12 @@ void WheelOdomNode::load_parameters()
   timestamp_fault_hold_s_ = get_parameter("timestamp_fault_hold_s").as_double();
   producer_rate_window_size_ = static_cast<std::size_t>(
     get_parameter("producer_rate_window_size").as_int());
+  producer_rate_thresholds_.minimum_hz =
+    get_parameter("wheel_odom_min_rate_hz").as_double();
+  producer_rate_thresholds_.good_hz =
+    get_parameter("wheel_odom_good_rate_hz").as_double();
+  producer_rate_thresholds_.excellent_hz =
+    get_parameter("wheel_odom_excellent_rate_hz").as_double();
   timeout_s_ = get_parameter("timeout_s").as_double();
   publish_tf_ = get_parameter("publish_tf").as_bool();
   publish_joint_states_ = get_parameter("publish_joint_states").as_bool();
@@ -293,6 +305,7 @@ void WheelOdomNode::load_parameters()
   if (producer_rate_window_size_ < 3U) {
     throw std::runtime_error("producer_rate_window_size must be >= 3");
   }
+  ProducerRateTracker::ValidateThresholds(producer_rate_thresholds_);
   if (publish_debug_state_ && wheel_odom_debug_topic_.empty()) {
     throw std::runtime_error(
             "wheel_odom_debug_topic cannot be empty when publish_debug_state is true");
@@ -704,7 +717,8 @@ ProducerHealthSnapshot WheelOdomNode::make_health_snapshot(
       last_encoder_sample_->total_illegal_transitions();
   }
 
-  const auto rate = producer_rate_tracker_.Observe(monotonic_time_ns, publish_rate_hz_);
+  const auto rate = producer_rate_tracker_.Observe(
+    monotonic_time_ns, producer_rate_thresholds_);
   snapshot.producer_rate_available = rate.available;
   snapshot.producer_rate_hz = rate.rate_hz;
   snapshot.last_success_age_s = rate.last_success_age_s;
