@@ -116,8 +116,8 @@ private:
           result.request_pending = false;
           try {
             result.active =
-              future.get()->current_state.id ==
-              lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE;
+            future.get()->current_state.id ==
+            lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE;
           } catch (const std::exception &) {
             result.active = false;
           }

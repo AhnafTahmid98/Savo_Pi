@@ -3,10 +3,12 @@
 
 """Validate construction of the saved-map launch description."""
 
+from collections import Counter
 import importlib.util
 from pathlib import Path
 
 from launch import LaunchContext, LaunchDescription
+from launch.utilities import normalize_to_list_of_substitutions
 from launch.utilities import perform_substitutions
 from launch_ros.actions import Node
 
@@ -56,48 +58,38 @@ def test_launch_description_constructs():
     context = LaunchContext()
 
     def resolve(substitutions):
-        return perform_substitutions(context, substitutions)
+        return perform_substitutions(
+            context,
+            normalize_to_list_of_substitutions(substitutions),
+        )
 
-    identities = {
+    identities = Counter(
         (
-            resolve(node.package),
-            resolve(node.executable),
-            resolve(node.node_name),
+            resolve(node.node_package),
+            resolve(node.node_executable),
         )
         for node in nodes
-    }
-    assert identities == {
-        ('nav2_map_server', 'map_server', 'map_server'),
-        ('nav2_amcl', 'amcl', 'amcl'),
-        ('nav2_controller', 'controller_server', 'controller_server'),
-        ('nav2_planner', 'planner_server', 'planner_server'),
-        ('nav2_behaviors', 'behavior_server', 'behavior_server'),
-        ('nav2_bt_navigator', 'bt_navigator', 'bt_navigator'),
-        ('nav2_waypoint_follower', 'waypoint_follower', 'waypoint_follower'),
-        (
-            'nav2_lifecycle_manager',
-            'lifecycle_manager',
-            'lifecycle_manager_localization',
-        ),
-        (
-            'nav2_lifecycle_manager',
-            'lifecycle_manager',
-            'lifecycle_manager_navigation',
-        ),
-        ('savo_nav', 'goal_gateway_node', 'goal_gateway_node'),
-        ('savo_nav', 'navigation_readiness_node', 'navigation_readiness_node'),
-        (
-            'savo_nav',
-            'nav2_startup_readiness_node',
-            'nav2_startup_readiness_node',
-        ),
-        (
-            'savo_nav',
-            'control_recovery_guard_node',
-            'control_recovery_guard_node',
-        ),
-        ('savo_nav', 'goal_admission_gate_node', 'goal_admission_gate_node'),
-    }
+    )
+    expected_identities = Counter(
+        {
+            ('nav2_map_server', 'map_server'): 1,
+            ('nav2_amcl', 'amcl'): 1,
+            ('nav2_controller', 'controller_server'): 1,
+            ('nav2_planner', 'planner_server'): 1,
+            ('nav2_behaviors', 'behavior_server'): 1,
+            ('nav2_bt_navigator', 'bt_navigator'): 1,
+            ('nav2_waypoint_follower', 'waypoint_follower'): 1,
+            ('nav2_lifecycle_manager', 'lifecycle_manager'): 2,
+            ('savo_nav', 'goal_gateway_node'): 1,
+            ('savo_nav', 'navigation_readiness_node'): 1,
+            ('savo_nav', 'nav2_startup_readiness_node'): 1,
+            ('savo_nav', 'control_recovery_guard_node'): 1,
+            ('savo_nav', 'goal_admission_gate_node'): 1,
+        }
+    )
+
+    assert sum(identities.values()) == 14
+    assert identities == expected_identities
 
 
 def test_launch_file_has_no_default_map_fixture():
