@@ -145,9 +145,45 @@ def test_pending_stages_fail_closed_on_launch_shutdown() -> None:
     staged = read(PACKAGE_ROOT / "savo_bringup" / "staged_launch.py")
     gate = read(PACKAGE_ROOT / "src/nodes/startup_stage_gate_node.cpp")
 
+    tree = ast.parse(staged)
+    launch_import = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.ImportFrom)
+        and node.module == "launch.actions"
+    )
+    imported_actions = {alias.name for alias in launch_import.names}
+    on_exit = next(
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef) and node.name == "on_exit"
+    )
+    failure_branch = on_exit.body[0]
+    success_return = on_exit.body[1]
+
+    assert isinstance(failure_branch, ast.If)
+    assert isinstance(failure_branch.body[0], ast.Return)
+    failure_names = {
+        node.id
+        for node in ast.walk(failure_branch.body[0])
+        if isinstance(node, ast.Name)
+    }
+    assert isinstance(success_return, ast.Return)
+    success_names = {
+        node.id
+        for node in ast.walk(success_return)
+        if isinstance(node, ast.Name)
+    }
+    unsupported_error_action = "Log" + "Error"
+
     assert "OnProcessExit(target_action=gate" in staged
     assert "if event.returncode != 0:" in staged
-    assert "Shutdown(" in staged
+    assert "LogInfo" in imported_actions
+    assert unsupported_error_action not in imported_actions
+    assert {"LogInfo", "EmitEvent", "Shutdown"} <= failure_names
+    assert "following" not in failure_names
+    assert "following" in success_names
+    assert 'LogInfo(msg=f"Robot Savo startup stage failed: {name}")' in staged
     assert "int exit_code_{3};" in gate
     assert "exit_code_ = 0;" in gate
 
