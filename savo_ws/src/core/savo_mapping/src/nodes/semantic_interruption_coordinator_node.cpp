@@ -329,6 +329,9 @@ private:
     {
       std::lock_guard<std::mutex> lock(mutex_);
       core_.BeginPause(now().nanoseconds());
+      ++control_request_generation_;
+      control_request_in_flight_ = false;
+      control_request_acknowledged_ = false;
     }
     publish_status();
     request_control(ControlMission::Request::COMMAND_PAUSE, "semantic_tag_detected");
@@ -426,41 +429,101 @@ private:
   void request_control(const std::uint8_t command, const std::string & reason)
   {
     if (!control_client_->service_is_ready()) {
-      fail("autonomous_mapping_control_service_unavailable", command !=
-        ControlMission::Request::COMMAND_RESUME);
+      // FastDDS discovery is not necessarily symmetric at the same instant.
+      // Keep the interruption fail-closed and retry from the timer until the
+      // existing pause/resume deadline expires.
       return;
     }
 
     auto request = std::make_shared<ControlMission::Request>();
+    std::uint64_t request_generation = 0U;
     {
       std::lock_guard<std::mutex> lock(mutex_);
+      if (control_request_in_flight_ || control_request_acknowledged_) {
+        return;
+      }
+      const auto state = core_.snapshot().state;
+      const bool state_matches =
+        (command == ControlMission::Request::COMMAND_PAUSE &&
+        state == SemanticInterruptionState::Pausing) ||
+        (command == ControlMission::Request::COMMAND_RESUME &&
+        state == SemanticInterruptionState::Resuming);
+      if (!state_matches) {
+        return;
+      }
       request->contract_version = ControlMission::Request::CONTRACT_VERSION;
       request->mission_id = core_.snapshot().mission_id;
       request->actor_id = core_.snapshot().mission_actor_id;
       request->command = command;
       request->reason = reason;
+      request_generation = control_request_generation_;
+      control_request_in_flight_ = true;
     }
 
-    control_client_->async_send_request(
-      request,
-      [this, command](rclcpp::Client<ControlMission>::SharedFuture future)
+    try {
+      control_client_->async_send_request(
+        request,
+        [this, command, request_generation](
+          rclcpp::Client<ControlMission>::SharedFuture future)
+        {
+          ControlMission::Response::SharedPtr response;
+          try {
+            response = future.get();
+          } catch (const std::exception & exception) {
+            {
+              std::lock_guard<std::mutex> lock(mutex_);
+              if (request_generation != control_request_generation_) {
+                return;
+              }
+              control_request_in_flight_ = false;
+            }
+            RCLCPP_WARN(
+              get_logger(), "Semantic control request failed and will retry: %s",
+              exception.what());
+            return;
+          }
+          if (!response->accepted) {
+            {
+              std::lock_guard<std::mutex> lock(mutex_);
+              if (request_generation != control_request_generation_) {
+                return;
+              }
+              control_request_in_flight_ = false;
+              control_request_acknowledged_ = true;
+            }
+            fail(
+              command == ControlMission::Request::COMMAND_PAUSE ?
+              "autonomous_mapping_pause_rejected:" + response->reason :
+              "autonomous_mapping_resume_rejected:" + response->reason,
+              command != ControlMission::Request::COMMAND_RESUME);
+            return;
+          }
+
+          {
+            std::lock_guard<std::mutex> lock(mutex_);
+            if (request_generation != control_request_generation_) {
+              return;
+            }
+            control_request_in_flight_ = false;
+            control_request_acknowledged_ = true;
+            if (command == ControlMission::Request::COMMAND_PAUSE) {
+              core_.PauseAccepted(now().nanoseconds());
+            }
+          }
+          publish_status();
+        });
+    } catch (const std::exception & exception) {
       {
-        const auto response = future.get();
-        if (!response->accepted) {
-          fail(
-            command == ControlMission::Request::COMMAND_PAUSE ?
-            "autonomous_mapping_pause_rejected:" + response->reason :
-            "autonomous_mapping_resume_rejected:" + response->reason,
-            command != ControlMission::Request::COMMAND_RESUME);
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (request_generation != control_request_generation_) {
           return;
         }
-
-        if (command == ControlMission::Request::COMMAND_PAUSE) {
-          std::lock_guard<std::mutex> lock(mutex_);
-          core_.PauseAccepted(now().nanoseconds());
-        }
-        publish_status();
-      });
+        control_request_in_flight_ = false;
+      }
+      RCLCPP_WARN(
+        get_logger(), "Semantic control dispatch failed and will retry: %s",
+        exception.what());
+    }
   }
 
   void start_registration(const RegisterLocation::Goal & goal)
@@ -511,6 +574,9 @@ private:
           core_.RegistrationSucceeded(
             wrapped.result->candidate.candidate_id, now().nanoseconds());
           core_.BeginResume(now().nanoseconds());
+          ++control_request_generation_;
+          control_request_in_flight_ = false;
+          control_request_acknowledged_ = false;
         }
         publish_status();
         request_control(
@@ -536,6 +602,9 @@ private:
       {
         std::lock_guard<std::mutex> lock(mutex_);
         core_.BeginFailureResume(now().nanoseconds());
+        ++control_request_generation_;
+        control_request_in_flight_ = false;
+        control_request_acknowledged_ = false;
       }
       publish_status();
       request_control(
@@ -549,6 +618,8 @@ private:
     bool timed_out = false;
     bool cancel_registration = false;
     bool failure_resume = false;
+    bool retry_pause = false;
+    bool retry_resume = false;
     {
       std::lock_guard<std::mutex> lock(mutex_);
       const auto previous_state = core_.snapshot().state;
@@ -563,6 +634,12 @@ private:
         registration_client_->async_cancel_goal(registration_goal_handle_);
         registration_goal_handle_.reset();
       }
+      if (!timed_out && !control_request_in_flight_ &&
+        !control_request_acknowledged_)
+      {
+        retry_pause = core_.snapshot().state == SemanticInterruptionState::Pausing;
+        retry_resume = core_.snapshot().state == SemanticInterruptionState::Resuming;
+      }
     }
 
     if (timed_out) {
@@ -571,12 +648,23 @@ private:
         {
           std::lock_guard<std::mutex> lock(mutex_);
           core_.BeginFailureResume(now().nanoseconds());
+          ++control_request_generation_;
+          control_request_in_flight_ = false;
+          control_request_acknowledged_ = false;
         }
         publish_status();
         request_control(
           ControlMission::Request::COMMAND_RESUME,
           "semantic_interruption_timeout_policy");
       }
+    } else if (retry_pause) {
+      request_control(
+        ControlMission::Request::COMMAND_PAUSE,
+        "semantic_tag_detected");
+    } else if (retry_resume) {
+      request_control(
+        ControlMission::Request::COMMAND_RESUME,
+        "semantic_interruption_resume_retry");
     }
   }
 
@@ -698,6 +786,9 @@ private:
   savo_msgs::msg::LocationCandidate location_candidate_{};
   std::set<std::string> known_tags_{};
   RegisterGoalHandle::SharedPtr registration_goal_handle_{};
+  std::uint64_t control_request_generation_{0U};
+  bool control_request_in_flight_{false};
+  bool control_request_acknowledged_{false};
 
   double registration_timeout_s_{30.0};
   std::string observation_topic_{};

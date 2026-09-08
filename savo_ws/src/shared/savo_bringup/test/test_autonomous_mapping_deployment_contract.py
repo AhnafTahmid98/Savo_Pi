@@ -104,6 +104,7 @@ def test_autonomous_mapping_launch_is_fail_closed_by_default() -> None:
 
 
 def test_optional_ultrasonic_and_control_monitors_propagate_without_changing_defaults() -> None:
+    """Optional sensing and monitors propagate without changing safe defaults."""
     autonomous = read("launch/autonomous_mapping.launch.py")
     core = read("launch/core_bringup.launch.py")
     robot = read("launch/robot_bringup.launch.py")
@@ -120,6 +121,7 @@ def test_optional_ultrasonic_and_control_monitors_propagate_without_changing_def
 
 
 def test_headless_mapping_flags_propagate_without_weakening_defaults() -> None:
+    """Headless mapping remains coherent while production defaults stay enabled."""
     autonomous = read("launch/autonomous_mapping.launch.py")
     core = read("launch/core_bringup.launch.py")
     robot = read("launch/robot_bringup.launch.py")

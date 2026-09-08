@@ -69,7 +69,7 @@ std::optional<savo_bringup::QualityLevel> ExtractQuality(const std::string & pay
   std::string compact(payload);
   compact.erase(
     std::remove_if(compact.begin(), compact.end(),
-      [](const unsigned char character) {return std::isspace(character) != 0;}),
+      [](const unsigned char character) {return std::isspace(character) != 0; }),
     compact.end());
   for (const auto quality : {
       savo_bringup::QualityLevel::kBelowMinimum,
@@ -91,10 +91,10 @@ bool ContainsReadyToken(const std::string & value)
 {
   std::string normalized(value);
   std::transform(normalized.begin(), normalized.end(), normalized.begin(),
-    [](const unsigned char character) {return static_cast<char>(std::tolower(character));});
+    [](const unsigned char character) {return static_cast<char>(std::tolower(character)); });
   normalized.erase(
     std::remove_if(normalized.begin(), normalized.end(),
-      [](const unsigned char character) {return std::isspace(character) != 0;}),
+      [](const unsigned char character) {return std::isspace(character) != 0; }),
     normalized.end());
   return normalized == "ready" || normalized.rfind("ok:", 0U) == 0U ||
          normalized.find("ready=true") != std::string::npos ||
@@ -113,10 +113,10 @@ bool ContainsFailureToken(const std::string & value)
 {
   std::string normalized(value);
   std::transform(normalized.begin(), normalized.end(), normalized.begin(),
-    [](const unsigned char character) {return static_cast<char>(std::tolower(character));});
+    [](const unsigned char character) {return static_cast<char>(std::tolower(character)); });
   normalized.erase(
     std::remove_if(normalized.begin(), normalized.end(),
-      [](const unsigned char character) {return std::isspace(character) != 0;}),
+      [](const unsigned char character) {return std::isspace(character) != 0; }),
     normalized.end());
   return normalized == "blocked" || normalized == "fault" || normalized == "error" ||
          normalized.rfind("error:", 0U) == 0U ||
@@ -479,10 +479,10 @@ private:
     string_subscriptions_.push_back(create_subscription<String>(
       topic, rclcpp::QoS(1).reliable().transient_local(),
         [this](const String::SharedPtr message) {
-          const bool unarmed = message->data.find("\"system_armed\":false") !=
-            std::string::npos;
-          const bool latch_clear = message->data.find("\"fault_latched\":false") !=
-            std::string::npos;
+          const bool unarmed =
+            message->data.find("\"system_armed\":false") != std::string::npos;
+          const bool latch_clear =
+            message->data.find("\"fault_latched\":false") != std::string::npos;
           const bool mission_idle =
             message->data.find("\"active_operation\":\"NONE\"") != std::string::npos ||
             message->data.find("\"active_operation\":\"none\"") != std::string::npos;
@@ -620,22 +620,22 @@ private:
       "semantic_status_topic", "/savo_mapping/semantic_interruption/status");
     semantic_subscription_ =
       create_subscription<savo_msgs::msg::SemanticInterruptionStatus>(
-      topic, rclcpp::QoS(1).reliable().transient_local(),
-      [this](const savo_msgs::msg::SemanticInterruptionStatus::SharedPtr message) {
-        const bool contract_valid = message->contract_version ==
-          savo_msgs::msg::SemanticInterruptionStatus::CONTRACT_VERSION;
-        const bool failed = message->state ==
-          savo_msgs::msg::SemanticInterruptionStatus::STATE_FAILED;
-        Mark(
-          "semantic", contract_valid && message->startup_ready && !failed,
-          !contract_valid || failed,
-          message->state_text + ":" + message->reason,
-          contract_valid && !failed ?
-          std::optional<savo_bringup::QualityLevel>{
-            savo_bringup::QualityLevel::kMinimum} :
-          std::optional<savo_bringup::QualityLevel>{
-            savo_bringup::QualityLevel::kBelowMinimum});
-      });
+        topic, rclcpp::QoS(1).reliable().transient_local(),
+        [this](const savo_msgs::msg::SemanticInterruptionStatus::SharedPtr message) {
+          const bool contract_valid = message->contract_version ==
+            savo_msgs::msg::SemanticInterruptionStatus::CONTRACT_VERSION;
+          const bool failed = message->state ==
+            savo_msgs::msg::SemanticInterruptionStatus::STATE_FAILED;
+          Mark(
+            "semantic", contract_valid && message->startup_ready && !failed,
+            !contract_valid || failed,
+            message->state_text + ":" + message->reason,
+            contract_valid && !failed ?
+            std::optional<savo_bringup::QualityLevel>{
+              savo_bringup::QualityLevel::kMinimum} :
+            std::optional<savo_bringup::QualityLevel>{
+              savo_bringup::QualityLevel::kBelowMinimum});
+        });
   }
 
   void Mark(

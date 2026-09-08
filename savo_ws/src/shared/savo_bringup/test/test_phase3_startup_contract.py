@@ -9,10 +9,12 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def read(relative: str) -> str:
+    """Read one bringup package file as UTF-8 text."""
     return (ROOT / relative).read_text(encoding="utf-8")
 
 
 def test_stage_configuration_is_finite_and_dependency_ordered() -> None:
+    """Every ordered startup stage has finite stabilization and timeout values."""
     config = yaml.safe_load(read("config/startup_stages.yaml"))[
         "bringup_readiness_node"
     ]["ros__parameters"]
@@ -57,6 +59,7 @@ def test_stage_configuration_is_finite_and_dependency_ordered() -> None:
 
 
 def test_coordinator_is_process_only_and_preserves_real_tf_contract() -> None:
+    """The coordinator gates processes without becoming motion authority."""
     source = read("src/nodes/bringup_readiness_node.cpp")
 
     assert '"infrastructure.parent_frame", "base_footprint"' in source
@@ -77,6 +80,7 @@ def test_coordinator_is_process_only_and_preserves_real_tf_contract() -> None:
 
 
 def test_stage_gate_requires_stable_minimum_quality_and_fails_closed() -> None:
+    """Stage release requires stable quality and nonzero exits remain terminal."""
     core = read("src/bringup_contract.cpp")
     gate = read("src/nodes/startup_stage_gate_node.cpp")
     launch = read("savo_bringup/staged_launch.py")
@@ -94,6 +98,7 @@ def test_stage_gate_requires_stable_minimum_quality_and_fails_closed() -> None:
 
 
 def test_optional_stages_are_omitted_instead_of_faked_ready() -> None:
+    """Disabled optional stages are absent rather than represented as ready."""
     autonomous = read("launch/autonomous_mapping.launch.py")
 
     assert 'if enabled["start_head"]:' in autonomous
@@ -107,6 +112,7 @@ def test_optional_stages_are_omitted_instead_of_faked_ready() -> None:
 
 
 def test_launch_never_creates_motion_or_mission_authority() -> None:
+    """Staged launch remains stopped, unarmed, and unable to submit goals."""
     autonomous = read("launch/autonomous_mapping.launch.py")
 
     assert 'default_value="STOP"' in autonomous

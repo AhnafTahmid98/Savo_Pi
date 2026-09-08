@@ -803,6 +803,7 @@ def run() -> int:
                     "start_head_observer:=false",
                     f"locations_database_path:={database}",
                     "locations_create_parent_directories:=true",
+                    f"supervisor_state_path:={run_dir / 'supervisor_state.json'}",
                     "supervisor_startup_grace_s:=0.0",
                     "supervisor_allow_degraded_motion:=true",
                     "head_minimum_observations:=3",

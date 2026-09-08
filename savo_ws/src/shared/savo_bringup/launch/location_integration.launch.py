@@ -162,6 +162,9 @@ def generate_launch_description() -> LaunchDescription:
                 "startup_grace_s": _floating(
                     "supervisor_startup_grace_s"
                 ),
+                "system_authority.state_path": LaunchConfiguration(
+                    "supervisor_state_path"
+                ),
                 "location_authorization.allow_degraded_motion": _boolean(
                     "supervisor_allow_degraded_motion"
                 ),
@@ -354,6 +357,10 @@ def generate_launch_description() -> LaunchDescription:
         DeclareLaunchArgument(
             "supervisor_startup_grace_s",
             default_value="3.0",
+        ),
+        DeclareLaunchArgument(
+            "supervisor_state_path",
+            default_value="/var/lib/robot_savo/supervisor/system_state.json",
         ),
         DeclareLaunchArgument(
             "supervisor_allow_degraded_motion",

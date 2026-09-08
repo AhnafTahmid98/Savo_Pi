@@ -56,6 +56,23 @@ def test_control_uses_actor_bound_to_observed_mission() -> None:
     assert 'request->actor_id = core_.snapshot().mission_actor_id;' in source
 
 
+def test_control_discovery_gap_retries_within_existing_deadline() -> None:
+    """Retry transient DDS discovery gaps within the existing deadline."""
+    source = read('src/nodes/semantic_interruption_coordinator_node.cpp')
+
+    assert 'control_request_in_flight_' in source
+    assert 'control_request_acknowledged_' in source
+    assert 'control_request_generation_' in source
+    assert (
+        'request_generation != control_request_generation_' in source
+    )
+    assert 'retry_pause = core_.snapshot().state ==' in source
+    assert 'retry_resume = core_.snapshot().state ==' in source
+    assert 'core_.Tick(now().nanoseconds())' in source
+    assert 'autonomous_mapping_pause_rejected:' in source
+    assert 'autonomous_mapping_resume_rejected:' in source
+
+
 def test_semantic_quality_is_evidence_based_and_startup_is_separate() -> None:
     source = read('src/nodes/semantic_interruption_coordinator_node.cpp')
 

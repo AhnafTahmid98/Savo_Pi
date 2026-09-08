@@ -66,6 +66,7 @@ def test_location_lifecycle_launch_contract() -> None:
         '"review_operation_timeout_s"',
         '"navigation_action_name"',
         '"arrival_confirmation_timeout_s"',
+        '"supervisor_state_path"',
     }
     for token in required_arguments:
         assert token in launch
@@ -180,6 +181,7 @@ def test_runtime_uses_only_public_lifecycle_boundaries() -> None:
         '"/safety/slowdown_factor"',
         "_publish_clear_safety",
         '"navigation_action_name:=/navigate_to_pose"',
+        'f"supervisor_state_path:={run_dir / \'supervisor_state.json\'}"',
         "candidate.approach_pose",
         "approved.tag_pose_map",
         "arrival_confirmed",

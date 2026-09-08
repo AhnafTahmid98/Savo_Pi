@@ -175,10 +175,12 @@ TEST(SupervisorPolicy, StartupRequiresContinuousStableReadyWindow)
   EXPECT_EQ(result.startup_phase, "STABILIZING");
   EXPECT_FALSE(result.ready);
 
+  observe_all(status, 11.4);
   result = policy.EvaluateComponent(status, test_time(11.4), 11.4);
   EXPECT_EQ(result.startup_phase, "STABILIZING");
   EXPECT_FALSE(result.ready);
 
+  observe_all(status, 11.7);
   result = policy.EvaluateComponent(status, test_time(11.7), 11.7);
   EXPECT_EQ(result.startup_phase, "OPERATIONAL");
   EXPECT_TRUE(result.ready);
