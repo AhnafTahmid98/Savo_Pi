@@ -186,7 +186,7 @@ def test_make_stream_diagnostic_ok() -> None:
     diagnostic = make_stream_diagnostic("RealSense color image", status)
 
     assert diagnostic.level == DiagnosticStatus.OK
-    assert diagnostic.message == "stream OK"
+    assert diagnostic.message == "stream EXCELLENT"
 
 
 def test_make_stream_diagnostic_stale() -> None:
@@ -210,7 +210,7 @@ def test_make_stream_diagnostic_low_rate() -> None:
         topic="/camera/camera/color/image_raw",
         seen=True,
         stale=False,
-        rate_hz=8.0,
+        rate_hz=7.99,
         expected_hz=30.0,
         last_age_s=0.01,
     )
@@ -218,7 +218,7 @@ def test_make_stream_diagnostic_low_rate() -> None:
     diagnostic = make_stream_diagnostic("RealSense color image", status)
 
     assert diagnostic.level == DiagnosticStatus.WARN
-    assert diagnostic.message == "stream below expected rate"
+    assert diagnostic.message == "stream BELOW_MINIMUM"
 
 
 def test_make_camera_diagnostic_ok() -> None:
