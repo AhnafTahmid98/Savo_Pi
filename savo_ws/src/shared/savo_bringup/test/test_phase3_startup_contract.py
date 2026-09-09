@@ -97,18 +97,75 @@ def test_stage_gate_requires_stable_minimum_quality_and_fails_closed() -> None:
     assert "Shutdown(" in launch
 
 
-def test_optional_stages_are_omitted_instead_of_faked_ready() -> None:
-    """Disabled optional stages are absent rather than represented as ready."""
+def test_terminal_stage_completion_and_gate_release_are_exact() -> None:
+    """Only final-stage readiness marks startup complete and releases its gate."""
+    coordinator = read("src/nodes/bringup_readiness_node.cpp")
+    gate = read("src/nodes/startup_stage_gate_node.cpp")
+
+    ready_branch = coordinator.index("if (decision.ready) {")
+    completed_append = coordinator.index(
+        "completed_stages_.push_back(stage_name);", ready_branch
+    )
+    final_check = coordinator.index(
+        "if (current_stage_ >= stages_.size()) {", completed_append
+    )
+    complete_assignment = coordinator.index(
+        "startup_complete_ = true;", final_check
+    )
+
+    assert ready_branch < completed_append < final_check < complete_assignment
+    assert (
+        "startup_complete_ && decision.ready && !runtime_failed_"
+        in coordinator
+    )
+    completed_branch = gate.index("if (Completed(payload)) {")
+    assert gate.index("exit_code_ = 0;", completed_branch) > completed_branch
+    failed_branch = gate.index('payload.find("\\\"state\\\":\\\"FAILED\\\"")')
+    assert failed_branch < completed_branch
+    assert gate.index("exit_code_ = 2;", failed_branch) < completed_branch
+
+
+def test_complete_ready_payload_is_coherent() -> None:
+    """Successful completion has one safe terminal reason and no fake input."""
+    coordinator = read("src/nodes/bringup_readiness_node.cpp")
+
+    assert 'stage_name == "complete"' in coordinator
+    assert '"bringup_complete_safe_unarmed" : decision.reason' in coordinator
+    assert 'AddStage("complete", complete);' in coordinator
+    assert 'AddStage("complete", {});' in coordinator
+    assert (
+        'decision.failed && pending.empty() ?\n'
+        "      std::vector<std::string>{reason} : pending"
+        in coordinator
+    )
+
+
+def test_established_dependency_revalidation_is_fail_closed_and_debounced() -> None:
+    """One boundary miss blocks; sustained loss becomes a terminal failure."""
+    coordinator = read("src/nodes/bringup_readiness_node.cpp")
+    contract = read("src/bringup_contract.cpp")
+
+    assert "established_dependency_tracker_.Update(lost_signature)" in coordinator
+    assert "input.dependencies_ready = false;" in coordinator
+    assert "input.unrecoverable_failure = established.confirmed_loss;" in coordinator
+    assert "established_dependency_revalidation_pending:" in coordinator
+    assert "established_dependency_lost:" in coordinator
+    assert "consecutive_loss_samples_ >= confirmation_samples_" in contract
+    assert "decision.reason = terminal_failure_reason_;" in contract
+    assert "runtime_failed_ = established.confirmed_loss;" in coordinator
+    assert "decision.failed = runtime_failed_;" in coordinator
+    assert "startup_complete_ && decision.ready && !runtime_failed_" in coordinator
+
+
+def test_optional_components_use_launch_conditions_without_fake_stages() -> None:
+    """Disabled optional components are controlled by ordinary conditions."""
     autonomous = read("launch/autonomous_mapping.launch.py")
 
-    assert 'if enabled["start_head"]:' in autonomous
-    assert 'if enabled["start_location_lifecycle"]:' in autonomous
-    assert 'if enabled["start_semantic_interruption"]:' in autonomous
-    assert '"require_head": enabled["start_head"]' in autonomous
-    assert (
-        '"require_semantic": enabled["start_semantic_interruption"]'
-        in autonomous
-    )
+    assert 'condition=IfCondition(LaunchConfiguration("start_head"))' in autonomous
+    assert 'LaunchConfiguration("start_location_lifecycle")' in autonomous
+    assert '"semantic_interruption_enabled": LaunchConfiguration(' in autonomous
+    assert "StartupStageGroup" not in autonomous
+    assert "bringup_readiness_node" not in autonomous
 
 
 def test_launch_never_creates_motion_or_mission_authority() -> None:

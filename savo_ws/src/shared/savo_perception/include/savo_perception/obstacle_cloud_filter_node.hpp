@@ -12,7 +12,9 @@
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
 
+#include <chrono>
 #include <cstddef>
+#include <deque>
 #include <memory>
 #include <string>
 
@@ -40,6 +42,8 @@ private:
   void publish_health_and_status();
   void publish_heartbeat();
   std::string make_status_json() const;
+  double output_rate_hz() const;
+  std::string output_rate_quality() const;
 
   ObstacleCloudFilterConfig filter_config_;
 
@@ -52,6 +56,10 @@ private:
 
   double transform_timeout_s_{0.10};
   double max_processing_hz_{10.0};
+  double minimum_output_rate_hz_{3.0};
+  double good_output_rate_hz_{5.0};
+  double excellent_output_rate_hz_{7.0};
+  double output_rate_window_s_{2.0};
   double stale_timeout_s_{0.75};
   double status_publish_hz_{2.0};
   double heartbeat_hz_{1.0};
@@ -72,8 +80,9 @@ private:
   std::size_t clouds_published_{0U};
   std::size_t clouds_rate_limited_{0U};
   std::size_t heartbeat_counter_{0U};
+  std::deque<std::chrono::steady_clock::time_point> publication_times_;
 
-  rclcpp::Time last_valid_input_time_{0, 0, RCL_ROS_TIME};
+  std::chrono::steady_clock::time_point last_valid_input_time_{};
 
   std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener>

@@ -59,7 +59,7 @@ ros2 topic hz /camera/camera/color/image_raw
 ros2 topic hz /camera/camera/depth/image_rect_raw
 ```
 
-Expected result: the smoke test finds an Intel USB device and all required topics, status is current, streams approach their configured 30 Hz under stable load, and VO progresses beyond missing-input errors. Waiting for a reference or lack of scene texture is not proof of VO performance.
+Expected result: the smoke test finds an Intel USB device and all required topics, status is current, streams approach their configured 15 Hz under stable load, and VO progresses beyond missing-input errors. Waiting for a reference or lack of scene texture is not proof of VO performance.
 
 ## Obstacle-cloud gate
 

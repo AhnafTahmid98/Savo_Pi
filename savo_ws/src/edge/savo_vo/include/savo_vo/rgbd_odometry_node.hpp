@@ -102,7 +102,7 @@ private:
   std::string camera_frame_;
 
   int sync_queue_size_{2};
-  double processing_rate_hz_{15.0};
+  double processing_rate_hz_{12.0};
   double max_sync_delta_s_{0.02};
   double max_frame_interval_s_{0.20};
 

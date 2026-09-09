@@ -167,6 +167,8 @@ private:
     declare_parameter<double>("startup_grace_s", 3.0);
     declare_parameter<double>("metadata_stale_timeout_s", 2.0);
     declare_parameter<double>("min_frame_rate_hz", 10.0);
+    declare_parameter<double>("good_frame_rate_hz", 20.0);
+    declare_parameter<double>("excellent_frame_rate_hz", 27.0);
     declare_parameter<std::int64_t>("min_frame_samples", 5);
     declare_parameter<double>("frame_rate_ema_alpha", 0.20);
     declare_parameter<bool>("require_calibration_for_pose", true);
@@ -223,6 +225,10 @@ private:
     config_.metadata_stale_timeout_s =
       get_parameter("metadata_stale_timeout_s").as_double();
     config_.min_frame_rate_hz = get_parameter("min_frame_rate_hz").as_double();
+    config_.good_frame_rate_hz =
+      get_parameter("good_frame_rate_hz").as_double();
+    config_.excellent_frame_rate_hz =
+      get_parameter("excellent_frame_rate_hz").as_double();
     config_.min_frame_samples = static_cast<std::uint64_t>(min_frame_samples);
     config_.require_calibration_for_pose =
       get_parameter("require_calibration_for_pose").as_bool();
@@ -354,6 +360,7 @@ private:
       make_key_value("metadata_age_s", metadata_age_s),
       make_key_value("camera_info_age_s", metadata_age_s),
       make_key_value("frame_rate_hz", snapshot.frame_rate_hz),
+      make_key_value("rate_quality", camera_rate_quality(config_, snapshot)),
       make_key_value("frames_received", snapshot.frames_received),
       make_key_value("metadata_frame_id", snapshot.metadata_frame_id),
       make_key_value("camera_info_frame_id", snapshot.metadata_frame_id),
@@ -377,7 +384,8 @@ private:
 
   double now_s() const
   {
-    return now().seconds();
+    return std::chrono::duration<double>(
+      std::chrono::steady_clock::now().time_since_epoch()).count();
   }
 
   CameraHealthConfig config_{};
@@ -408,7 +416,7 @@ private:
   rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr camera_info_sub_{};
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr status_pub_{};
   rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr
-  diagnostics_pub_{};
+    diagnostics_pub_{};
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr health_service_{};
   rclcpp::TimerBase::SharedPtr status_timer_{};
 };

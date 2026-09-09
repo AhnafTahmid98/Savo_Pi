@@ -35,6 +35,12 @@ public:
       declare_parameter<double>("expected_aligned_depth_hz", 15.0);
     params_.expected_camera_info_hz = declare_parameter<double>("expected_camera_info_hz", 15.0);
     params_.expected_pointcloud_hz = declare_parameter<double>("expected_pointcloud_hz", 8.0);
+    params_.camera_minimum_hz = declare_parameter<double>("camera_minimum_hz", 8.0);
+    params_.camera_good_hz = declare_parameter<double>("camera_good_hz", 12.0);
+    params_.camera_excellent_hz = declare_parameter<double>("camera_excellent_hz", 14.0);
+    params_.pointcloud_minimum_hz = declare_parameter<double>("pointcloud_minimum_hz", 3.0);
+    params_.pointcloud_good_hz = declare_parameter<double>("pointcloud_good_hz", 5.0);
+    params_.pointcloud_excellent_hz = declare_parameter<double>("pointcloud_excellent_hz", 7.0);
     require_pointcloud_ = declare_parameter<bool>("require_pointcloud", false);
     require_aligned_depth_ = declare_parameter<bool>("require_aligned_depth", false);
 
@@ -47,59 +53,79 @@ public:
 
     color_sub_ = create_subscription<sensor_msgs::msg::Image>(
       COLOR_IMAGE_TOPIC, sensor_qos,
-      [this](sensor_msgs::msg::Image::ConstSharedPtr) { color_tracker_.tick(now()); });
+      [this](sensor_msgs::msg::Image::ConstSharedPtr) {
+        color_tracker_.tick(savo_realsense::RateTracker::Clock::now());
+      });
 
     color_info_sub_ = create_subscription<sensor_msgs::msg::CameraInfo>(
       COLOR_INFO_TOPIC, reliable_qos,
-      [this](sensor_msgs::msg::CameraInfo::ConstSharedPtr) { color_info_tracker_.tick(now()); });
+      [this](sensor_msgs::msg::CameraInfo::ConstSharedPtr) {
+        color_info_tracker_.tick(savo_realsense::RateTracker::Clock::now());
+      });
 
     depth_sub_ = create_subscription<sensor_msgs::msg::Image>(
       DEPTH_IMAGE_TOPIC, sensor_qos,
-      [this](sensor_msgs::msg::Image::ConstSharedPtr) { depth_tracker_.tick(now()); });
+      [this](sensor_msgs::msg::Image::ConstSharedPtr) {
+        depth_tracker_.tick(savo_realsense::RateTracker::Clock::now());
+      });
 
     depth_info_sub_ = create_subscription<sensor_msgs::msg::CameraInfo>(
       DEPTH_INFO_TOPIC, reliable_qos,
-      [this](sensor_msgs::msg::CameraInfo::ConstSharedPtr) { depth_info_tracker_.tick(now()); });
+      [this](sensor_msgs::msg::CameraInfo::ConstSharedPtr) {
+        depth_info_tracker_.tick(savo_realsense::RateTracker::Clock::now());
+      });
 
     aligned_depth_sub_ = create_subscription<sensor_msgs::msg::Image>(
       ALIGNED_DEPTH_IMAGE_TOPIC, sensor_qos,
-      [this](sensor_msgs::msg::Image::ConstSharedPtr) { aligned_depth_tracker_.tick(now()); });
+      [this](sensor_msgs::msg::Image::ConstSharedPtr) {
+        aligned_depth_tracker_.tick(savo_realsense::RateTracker::Clock::now());
+      });
 
     pointcloud_sub_ = create_subscription<sensor_msgs::msg::PointCloud2>(
       POINTCLOUD_TOPIC, sensor_qos,
-      [this](sensor_msgs::msg::PointCloud2::ConstSharedPtr) { pointcloud_tracker_.tick(now()); });
+      [this](sensor_msgs::msg::PointCloud2::ConstSharedPtr) {
+        pointcloud_tracker_.tick(savo_realsense::RateTracker::Clock::now());
+      });
 
     diagnostics_pub_ =
       create_publisher<diagnostic_msgs::msg::DiagnosticArray>(DIAGNOSTICS_TOPIC, reliable_qos);
 
     timer_ = create_wall_timer(
       std::chrono::duration<double>(1.0 / publish_hz_),
-      [this]() { publish_diagnostics(); });
+      [this]() {publish_diagnostics();});
   }
 
 private:
   void publish_diagnostics()
   {
-    const auto now_time = now();
+    const auto monotonic_now = savo_realsense::RateTracker::Clock::now();
+    const auto ros_now = now();
 
     const auto color = savo_realsense::build_stream_status(
-      COLOR_IMAGE_TOPIC, color_tracker_, now_time,
-      params_.expected_color_hz, params_.stale_timeout_s);
+      COLOR_IMAGE_TOPIC, color_tracker_, monotonic_now,
+      params_.expected_color_hz, params_.stale_timeout_s,
+      params_.camera_minimum_hz, params_.camera_good_hz, params_.camera_excellent_hz);
     const auto color_info = savo_realsense::build_stream_status(
-      COLOR_INFO_TOPIC, color_info_tracker_, now_time,
-      params_.expected_camera_info_hz, params_.stale_timeout_s);
+      COLOR_INFO_TOPIC, color_info_tracker_, monotonic_now,
+      params_.expected_camera_info_hz, params_.stale_timeout_s,
+      params_.camera_minimum_hz, params_.camera_good_hz, params_.camera_excellent_hz);
     const auto depth = savo_realsense::build_stream_status(
-      DEPTH_IMAGE_TOPIC, depth_tracker_, now_time,
-      params_.expected_depth_hz, params_.stale_timeout_s);
+      DEPTH_IMAGE_TOPIC, depth_tracker_, monotonic_now,
+      params_.expected_depth_hz, params_.stale_timeout_s,
+      params_.camera_minimum_hz, params_.camera_good_hz, params_.camera_excellent_hz);
     const auto depth_info = savo_realsense::build_stream_status(
-      DEPTH_INFO_TOPIC, depth_info_tracker_, now_time,
-      params_.expected_camera_info_hz, params_.stale_timeout_s);
+      DEPTH_INFO_TOPIC, depth_info_tracker_, monotonic_now,
+      params_.expected_camera_info_hz, params_.stale_timeout_s,
+      params_.camera_minimum_hz, params_.camera_good_hz, params_.camera_excellent_hz);
     const auto aligned_depth = savo_realsense::build_stream_status(
-      ALIGNED_DEPTH_IMAGE_TOPIC, aligned_depth_tracker_, now_time,
-      params_.expected_aligned_depth_hz, params_.stale_timeout_s);
+      ALIGNED_DEPTH_IMAGE_TOPIC, aligned_depth_tracker_, monotonic_now,
+      params_.expected_aligned_depth_hz, params_.stale_timeout_s,
+      params_.camera_minimum_hz, params_.camera_good_hz, params_.camera_excellent_hz);
     const auto pointcloud = savo_realsense::build_stream_status(
-      POINTCLOUD_TOPIC, pointcloud_tracker_, now_time,
-      params_.expected_pointcloud_hz, params_.stale_timeout_s);
+      POINTCLOUD_TOPIC, pointcloud_tracker_, monotonic_now,
+      params_.expected_pointcloud_hz, params_.stale_timeout_s,
+      params_.pointcloud_minimum_hz, params_.pointcloud_good_hz,
+      params_.pointcloud_excellent_hz);
 
     std::vector<diagnostic_msgs::msg::DiagnosticStatus> diagnostics;
     diagnostics.push_back(savo_realsense::make_stream_diagnostic("RealSense color image", color));
@@ -119,7 +145,7 @@ private:
         savo_realsense::make_stream_diagnostic("RealSense pointcloud", pointcloud));
     }
 
-    diagnostics_pub_->publish(savo_realsense::make_diagnostic_array(diagnostics, now_time));
+    diagnostics_pub_->publish(savo_realsense::make_diagnostic_array(diagnostics, ros_now));
   }
 
   double publish_hz_{2.0};

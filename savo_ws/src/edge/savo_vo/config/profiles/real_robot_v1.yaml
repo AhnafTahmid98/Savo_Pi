@@ -63,6 +63,9 @@ vo_health_node:
     status_topic: /vo/status
     health_topic: /vo/health
     stale_timeout_s: 0.5
+    minimum_rate_hz: 5.0
+    good_rate_hz: 8.0
+    excellent_rate_hz: 12.0
 vo_diagnostics_node:
   ros__parameters:
     status_topic: /vo/status

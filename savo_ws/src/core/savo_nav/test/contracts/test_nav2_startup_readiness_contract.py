@@ -7,10 +7,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_startup_gate_is_separate_from_mission_readiness():
-    """Startup readiness remains separate from strict mission readiness."""
+def test_startup_readiness_is_diagnostic_only():
+    """The legacy probe remains available but is not a production gate."""
     launch = (ROOT / 'launch/live_mapping_navigation.launch.py').read_text()
-    assert 'nav2_startup_readiness_node' in launch
+    assert "executable='nav2_startup_readiness_node'" not in launch
     assert 'navigation_readiness_node' in launch
     source = (ROOT / 'src/nodes/nav2_startup_readiness_node.cpp').read_text()
     assert 'async_send_request' in source

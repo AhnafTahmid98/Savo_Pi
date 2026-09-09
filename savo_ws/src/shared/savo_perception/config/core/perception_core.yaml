@@ -279,6 +279,14 @@ range_health_node:
     publish_hz: 2.0
     stale_timeout_s: 0.30
     heartbeat_hz: 1.0
+    rate_window_s: 2.0
+    rate_min_samples: 5
+    tof_minimum_rate_hz: 5.0
+    tof_good_rate_hz: 8.0
+    tof_excellent_rate_hz: 9.0
+    depth_minimum_rate_hz: 5.0
+    depth_good_rate_hz: 10.0
+    depth_excellent_rate_hz: 12.0
 
     include_depth_in_overall_ok: false
     depth_front_required: false
@@ -311,6 +319,14 @@ range_health_node_py:
     publish_hz: 2.0
     stale_timeout_s: 0.30
     heartbeat_hz: 1.0
+    rate_window_s: 2.0
+    rate_min_samples: 5
+    tof_minimum_rate_hz: 5.0
+    tof_good_rate_hz: 8.0
+    tof_excellent_rate_hz: 9.0
+    depth_minimum_rate_hz: 5.0
+    depth_good_rate_hz: 10.0
+    depth_excellent_rate_hz: 12.0
 
     include_depth_in_overall_ok: false
     depth_front_required: false

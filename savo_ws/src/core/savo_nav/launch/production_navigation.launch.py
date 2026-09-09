@@ -440,7 +440,7 @@ def generate_launch_description():
             DeclareLaunchArgument('autostart', default_value='true'),
             DeclareLaunchArgument('start_readiness', default_value='true'),
             DeclareLaunchArgument(
-                'start_startup_readiness', default_value='true'
+                'start_startup_readiness', default_value='false'
             ),
             DeclareLaunchArgument('start_goal_gateway', default_value='true'),
             DeclareLaunchArgument(

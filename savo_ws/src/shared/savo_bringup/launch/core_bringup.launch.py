@@ -1,26 +1,22 @@
 """Launch the production Robot Savo core stack for one explicit robot mode."""
 
-from dataclasses import dataclass
-
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.actions import IncludeLaunchDescription
 from launch.actions import LogInfo
 from launch.actions import OpaqueFunction
+from launch.actions import TimerAction
 from launch.launch_description_sources import FrontendLaunchDescriptionSource
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch.substitutions import PathJoinSubstitution
 
-from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 from savo_bringup.launch_contract import as_bool
 from savo_bringup.launch_contract import resolve_requirements
 from savo_bringup.launch_contract import should_start_location_lifecycle
 from savo_bringup.launch_contract import validate_selection
-from savo_bringup.staged_launch import StartupStageGroup
-from savo_bringup.staged_launch import build_staged_sequence
 
 
 def _python_launch(package: str, filename: str):
@@ -39,32 +35,12 @@ def _value(context, name: str) -> str:
     return LaunchConfiguration(name).perform(context).strip()
 
 
-@dataclass(frozen=True)
-class _PendingStageAction:
-    stage: str
-    action: object
-
-
-_COMPATIBILITY_STAGE_MAP = {
-    "description_start_delay_s": "infrastructure",
-    "base_start_delay_s": "motion_safety",
-    "lidar_start_delay_s": "hardware",
-    "perception_start_delay_s": "hardware",
-    "control_start_delay_s": "motion_safety",
-    "localization_start_delay_s": "localization",
-    "power_start_delay_s": "hardware",
-    "head_start_delay_s": "head",
-    "supervisor_start_delay_s": "supervisor",
-    "location_lifecycle_start_delay_s": "semantic_locations",
-    "manual_mapping_start_delay_s": "slam_foundation",
-    "navigation_start_delay_s": "navigation",
-}
-
-
 def _stage(delay_argument: str, action):
-    """Map a legacy delay argument to its dependency-gated startup stage."""
-    return _PendingStageAction(
-        _COMPATIBILITY_STAGE_MAP[delay_argument], action
+    """Start one Core component after its bounded compatibility offset."""
+    return TimerAction(
+        period=LaunchConfiguration(delay_argument),
+        actions=[action],
+        cancel_on_shutdown=True,
     )
 
 
@@ -75,7 +51,7 @@ def _setup(context):
     allow_provisional = as_bool(_value(context, "allow_provisional_geometry"))
     voxel_validated = as_bool(_value(context, "d435_voxel_validated"))
     if _value(context, "control_startup_mode").upper() != "STOP":
-        raise RuntimeError("staged Core bringup must start control in STOP")
+        raise RuntimeError("Core bringup must start control in STOP")
 
     validate_selection(
         "core",
@@ -303,7 +279,7 @@ def _setup(context):
                     "perception_start_delay_s",
                     IncludeLaunchDescription(
                         _python_launch(
-                            "savo_perception", "range_sensors.launch.py"
+                            "savo_perception", "perception_bringup.launch.py"
                         ),
                         launch_arguments={
                             "driver_impl": "cpp",
@@ -313,27 +289,6 @@ def _setup(context):
                             "use_ultrasonic": LaunchConfiguration(
                                 "perception_use_ultrasonic"
                             ),
-                            "use_dashboard": "false",
-                        }.items(),
-                    ),
-                )
-            )
-            actions.append(
-                _PendingStageAction(
-                    "motion_safety",
-                    IncludeLaunchDescription(
-                        _python_launch(
-                            "savo_perception", "safety_bringup.launch.py"
-                        ),
-                        launch_arguments={
-                            "driver_impl": "cpp",
-                            "config_file": LaunchConfiguration(
-                                "perception_config_file"
-                            ),
-                            "use_ultrasonic": LaunchConfiguration(
-                                "perception_use_ultrasonic"
-                            ),
-                            "use_range_health": "false",
                             "use_dashboard": "false",
                         }.items(),
                     ),
@@ -368,23 +323,6 @@ def _setup(context):
             )
         if start_localization:
             actions.append(
-                _PendingStageAction(
-                    "hardware",
-                    IncludeLaunchDescription(
-                        _python_launch(
-                            "savo_localization", "localization_bringup.launch.py"
-                        ),
-                        launch_arguments={
-                            "use_vo": LaunchConfiguration("localization_use_vo"),
-                            "use_imu": "true",
-                            "use_wheel_odom": "true",
-                            "use_ekf": "false",
-                            "use_health": "false",
-                        }.items(),
-                    ),
-                )
-            )
-            actions.append(
                 _stage(
                     "localization_start_delay_s",
                     IncludeLaunchDescription(
@@ -393,8 +331,8 @@ def _setup(context):
                         ),
                         launch_arguments={
                             "use_vo": LaunchConfiguration("localization_use_vo"),
-                            "use_imu": "false",
-                            "use_wheel_odom": "false",
+                            "use_imu": "true",
+                            "use_wheel_odom": "true",
                             "use_ekf": "true",
                             "use_health": "true",
                         }.items(),
@@ -557,105 +495,7 @@ def _setup(context):
                 )
             )
 
-    coordinator = Node(
-        package="savo_bringup",
-        executable="bringup_readiness_node",
-        name="bringup_readiness_node",
-        output="screen",
-        parameters=[
-            PathJoinSubstitution(
-                [
-                    FindPackageShare("savo_bringup"),
-                    "config",
-                    "core_real_robot.yaml",
-                ]
-            ),
-            PathJoinSubstitution(
-                [
-                    FindPackageShare("savo_bringup"),
-                    "config",
-                    "startup_stages.yaml",
-                ]
-            ),
-            {
-                "host_role": "core",
-                "robot_mode": mode,
-                "bringup_profile": profile,
-                "d435_voxel_validated": voxel_validated,
-                "require_locked_geometry": require_locked,
-                "allow_provisional_geometry": allow_provisional,
-                "require_geometry": start_description,
-                "geometry_policy_validated": True,
-                "require_base": start_base,
-                "require_control": start_control,
-                "require_safety": start_perception,
-                "require_lidar": start_lidar,
-                "require_perception": start_perception,
-                "require_localization": start_localization,
-                "require_power": start_power,
-                "require_supervisor": start_supervisor,
-                "require_supervisor_authority": False,
-                "require_mapping": requirements.require_mapping,
-                "mapping_readiness_topic": "/savo_mapping/status",
-                "require_navigation": requirements.require_navigation,
-                "require_head": start_head,
-                "head_status_topic": "/savo_head/dashboard_text",
-                "require_locations": start_locations,
-                "require_semantic": False,
-                "require_active_release": False,
-                "require_map_context": False,
-                "require_goal_admission": False,
-                "require_bridge": False,
-                "require_realsense": False,
-                "require_vo": False,
-                "require_speech": False,
-                "startup.enabled": True,
-            },
-        ],
-        arguments=["--ros-args", "--log-level", log_level],
-    )
-    stage_actions: dict[str, list[object]] = {}
-    initial_actions = []
-    for action in actions:
-        if isinstance(action, _PendingStageAction):
-            stage_actions.setdefault(action.stage, []).append(action.action)
-        else:
-            initial_actions.append(action)
-    stage_actions.setdefault("infrastructure", []).insert(0, coordinator)
-    stage_actions["infrastructure"] = (
-        initial_actions + stage_actions["infrastructure"]
-    )
-
-    stage_order = ["infrastructure"]
-    if start_power or start_localization or start_perception or start_lidar:
-        stage_order.append("hardware")
-    if start_base or start_control or start_perception:
-        stage_order.append("motion_safety")
-    if start_localization or start_perception or start_lidar:
-        stage_order.append("sensor_stabilization")
-    if start_localization:
-        stage_order.append("localization")
-    if start_supervisor:
-        stage_order.append("supervisor")
-    if requirements.require_navigation:
-        stage_order.append("navigation")
-    if requirements.require_mapping:
-        stage_order.extend(("slam_foundation", "mapping_runtime"))
-    if start_head:
-        stage_order.append("head")
-    if start_locations:
-        stage_order.append("semantic_locations")
-    stage_order.append("complete")
-
-    groups = [
-        StartupStageGroup(name, tuple(stage_actions.get(name, ())))
-        for name in stage_order
-    ]
-    return build_staged_sequence(
-        groups,
-        status_topic="/savo_bringup/core/startup_status",
-        log_level=log_level,
-    )
+    return actions
 
 
 def generate_launch_description() -> LaunchDescription:
@@ -666,7 +506,7 @@ def generate_launch_description() -> LaunchDescription:
         [
             DeclareLaunchArgument("robot_mode", default_value="safe_idle"),
             DeclareLaunchArgument("bringup_profile", default_value="lidar_only"),
-            DeclareLaunchArgument("d435_voxel_validated", default_value="true"),
+            DeclareLaunchArgument("d435_voxel_validated", default_value="false"),
             DeclareLaunchArgument("use_sim_time", default_value="false"),
             DeclareLaunchArgument("log_level", default_value="info"),
             DeclareLaunchArgument("map_id", default_value="robot_savo_map"),

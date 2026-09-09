@@ -2,6 +2,10 @@
 #define SAVO_PERCEPTION__RANGE_HEALTH_NODE_HPP_
 
 #include <chrono>
+#include <cstddef>
+#include <cstdint>
+#include <deque>
+#include <map>
 #include <memory>
 #include <optional>
 #include <string>
@@ -50,6 +54,11 @@ private:
   [[nodiscard]] std::vector<SensorHealth> current_health() const;
   [[nodiscard]] bool overall_ok(const std::vector<SensorHealth> & health) const;
   [[nodiscard]] std::string overall_status(const std::vector<SensorHealth> & health) const;
+  void record_receipt(const std::string & sensor_name);
+  [[nodiscard]] bool rate_valid(const std::string & sensor_name) const;
+  [[nodiscard]] double receive_rate_hz(const std::string & sensor_name) const;
+  [[nodiscard]] std::string rate_quality(const std::string & sensor_name) const;
+  [[nodiscard]] bool rate_ok(const std::string & sensor_name) const;
 
   [[nodiscard]] bool is_required_sensor(const std::string & sensor_name) const;
   [[nodiscard]] bool is_optional_sensor(const std::string & sensor_name) const;
@@ -80,6 +89,14 @@ private:
   double publish_hz_{constants::kRangeHealthPublishHzDefault};
   double stale_timeout_s_{constants::kSensorStaleTimeoutSDefault};
   double heartbeat_hz_{1.0};
+  double rate_window_s_{2.0};
+  std::size_t rate_min_samples_{5U};
+  double tof_minimum_rate_hz_{5.0};
+  double tof_good_rate_hz_{8.0};
+  double tof_excellent_rate_hz_{9.0};
+  double depth_minimum_rate_hz_{5.0};
+  double depth_good_rate_hz_{10.0};
+  double depth_excellent_rate_hz_{12.0};
 
   bool include_depth_in_overall_ok_{false};
   bool depth_front_required_{false};
@@ -100,6 +117,9 @@ private:
   RangeSample tof_left_;
   RangeSample tof_right_;
   RangeSample ultrasonic_front_;
+  std::map<
+    std::string,
+    std::deque<std::chrono::steady_clock::time_point>> receipt_times_;
 
   std::uint64_t heartbeat_count_{0};
 

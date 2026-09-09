@@ -67,9 +67,10 @@ Supported profiles:
 - the semantic review gateway is enabled;
 - map quality approval is required for the production AM-8 example.
 
-## Readiness authority
+## Diagnostic readiness utility
 
-The C++ `bringup_readiness_node` publishes independent core and edge state:
+The retained C++ `bringup_readiness_node` can publish independent Core and
+Edge diagnostic state:
 
 ```text
 /savo_bringup/core/state
@@ -83,8 +84,9 @@ The C++ `bringup_readiness_node` publishes independent core and edge state:
 /savo_bringup/edge/diagnostics
 ```
 
-It aggregates existing package authorities; it does not replace safety,
-supervisor, AM-8, navigation readiness, or goal admission.
+Production launch no longer uses this node to release processes or as a
+startup authority. Package health, Supervisor, AM-8, navigation readiness,
+and goal admission retain their respective runtime authority.
 
 ## First real test profile
 

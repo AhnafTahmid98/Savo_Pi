@@ -23,7 +23,7 @@ from savo_lidar.diagnostics import (
 )
 
 
-def test_common_quality_reuses_existing_lidar_health_gates():
+def test_lidar_health_exposes_rate_quality_separately_from_health_gates():
     source = (
         Path(__file__).resolve().parents[1]
         / "savo_lidar/nodes/lidar_health_node.py"
@@ -31,7 +31,8 @@ def test_common_quality_reuses_existing_lidar_health_gates():
 
     assert "if decision.status in (STATUS_ERROR, STATUS_OFFLINE)" in source
     assert 'else "MINIMUM"' in source
-    assert 'quality_reason="existing_lidar_health_gates_only"' in source
+    assert "rate_quality=rate_quality" in source
+    assert 'quality_reason="scan_validity_and_hardware_health"' in source
 
 
 def test_normalize_frame_id_strips_slash_and_spaces():

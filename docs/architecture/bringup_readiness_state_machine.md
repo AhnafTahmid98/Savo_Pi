@@ -1,6 +1,14 @@
-# Bringup Readiness State Machine
+# Legacy Bringup Readiness Diagnostic
 
-`savo_bringup` publishes independent Core and Edge readiness decisions. Readiness permits a configured launch graph to operate; it is not supervisor arming or motion authorization.
+This document describes a retained diagnostic/test utility. Production Core,
+Edge, and autonomous-mapping launches no longer use this state machine to
+release processes; package health and Supervisor/mission authority are the
+production contracts.
+
+When launched explicitly, the retained node publishes independent Core and Edge
+diagnostic readiness decisions. Production launch composition does not consume
+them to release processes. Diagnostic readiness is not Supervisor arming or
+motion authorization.
 
 ## States
 

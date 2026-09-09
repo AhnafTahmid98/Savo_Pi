@@ -259,7 +259,7 @@ public:
   : Node("localization_health_node"),
     tf_buffer_(get_clock()),
     tf_listener_(tf_buffer_),
-    start_time_(now())
+    start_time_ns_(steady_now_ns())
   {
     declare_and_load_parameters();
     create_publishers();
@@ -325,7 +325,7 @@ private:
     expected_wheel_odom_rate_hz_ = declare_parameter<double>(
       "expected_wheel_odom_rate_hz", 30.0);
     expected_ekf_rate_hz_ = declare_parameter<double>("expected_ekf_rate_hz", 30.0);
-    expected_vo_rate_hz_ = declare_parameter<double>("expected_vo_rate_hz", 15.0);
+    expected_vo_rate_hz_ = declare_parameter<double>("expected_vo_rate_hz", 12.0);
     imu_rate_thresholds_.minimum_hz = declare_parameter<double>(
       "imu_min_rate_hz", imu_rate_thresholds_.minimum_hz);
     imu_rate_thresholds_.good_hz = declare_parameter<double>(
@@ -491,7 +491,7 @@ private:
 
   void on_filtered_odom(const nav_msgs::msg::Odometry & message)
   {
-    const auto receive_time = now();
+    const std::int64_t receive_time_ns = steady_now_ns();
     record_odom(filtered_tracker_, message, odom_frame_id_, base_frame_id_);
 
     const double x = message.pose.pose.position.x;
@@ -499,24 +499,27 @@ private:
     const double yaw = yaw_from_quaternion(message.pose.pose.orientation);
 
     if (filtered_pose_received_ && valid_odom_message(message)) {
-      const double dt_s = std::max(0.0, (receive_time - previous_filtered_receive_).seconds());
+      const double dt_s = std::max(
+        0.0, static_cast<double>(receive_time_ns - previous_filtered_receive_ns_) * 1.0e-9);
       if (dt_s > 0.0 && dt_s <= 1.0) {
         const double distance = std::hypot(x - previous_filtered_x_, y - previous_filtered_y_);
         if (distance > max_pose_jump_m_) {
-          pose_jump_fault_until_s_ = receive_time.seconds() + timestamp_fault_hold_s_;
+          pose_jump_fault_until_ns_ = receive_time_ns + static_cast<std::int64_t>(
+            std::llround(timestamp_fault_hold_s_ * 1.0e9));
         }
 
         const double yaw_change = std::abs(
           shortest_angular_distance(previous_filtered_yaw_, yaw));
         if (yaw_change > max_yaw_jump_rad_) {
-          yaw_jump_fault_until_s_ = receive_time.seconds() + timestamp_fault_hold_s_;
+          yaw_jump_fault_until_ns_ = receive_time_ns + static_cast<std::int64_t>(
+            std::llround(timestamp_fault_hold_s_ * 1.0e9));
         }
       }
     }
 
     if (finite(x) && finite(y) && finite(yaw)) {
       filtered_pose_received_ = true;
-      previous_filtered_receive_ = receive_time;
+      previous_filtered_receive_ns_ = receive_time_ns;
       previous_filtered_x_ = x;
       previous_filtered_y_ = y;
       previous_filtered_yaw_ = yaw;
@@ -689,7 +692,8 @@ private:
     const std::int64_t current_receive_time_ns)
   {
     LocalizationHealthInputs inputs;
-    inputs.startup_age_s = std::max(0.0, (current_time - start_time_).seconds());
+    inputs.startup_age_s = std::max(
+      0.0, static_cast<double>(current_receive_time_ns - start_time_ns_) * 1.0e-9);
     inputs.startup_grace_s = startup_grace_s_;
 
     inputs.imu = make_producer_observation(
@@ -729,9 +733,9 @@ private:
     inputs.base_to_imu.detail = base_to_imu.detail;
 
     inputs.filtered_pose_jump_detected =
-      current_time.seconds() < pose_jump_fault_until_s_;
+      current_receive_time_ns < pose_jump_fault_until_ns_;
     inputs.filtered_yaw_jump_detected =
-      current_time.seconds() < yaw_jump_fault_until_s_;
+      current_receive_time_ns < yaw_jump_fault_until_ns_;
 
     return inputs;
   }
@@ -968,7 +972,7 @@ private:
   double expected_imu_rate_hz_{25.0};
   double expected_wheel_odom_rate_hz_{30.0};
   double expected_ekf_rate_hz_{30.0};
-  double expected_vo_rate_hz_{15.0};
+  double expected_vo_rate_hz_{12.0};
   RateThresholds imu_rate_thresholds_{10.0, 15.0, 20.0};
   RateThresholds wheel_odom_rate_thresholds_{10.0, 20.0, 25.0};
   RateThresholds ekf_rate_thresholds_{10.0, 20.0, 25.0};
@@ -996,16 +1000,16 @@ private:
   RuntimeTracker vo_tracker_{};
 
   bool filtered_pose_received_{false};
-  rclcpp::Time previous_filtered_receive_{};
+  std::int64_t previous_filtered_receive_ns_{0};
   double previous_filtered_x_{0.0};
   double previous_filtered_y_{0.0};
   double previous_filtered_yaw_{0.0};
-  double pose_jump_fault_until_s_{0.0};
-  double yaw_jump_fault_until_s_{0.0};
+  std::int64_t pose_jump_fault_until_ns_{0};
+  std::int64_t yaw_jump_fault_until_ns_{0};
 
   tf2_ros::Buffer tf_buffer_;
   tf2_ros::TransformListener tf_listener_;
-  rclcpp::Time start_time_;
+  std::int64_t start_time_ns_{0};
 
   LocalizationHealthState last_state_{LocalizationHealthState::kUnknown};
   std::string last_reason_code_{"not_evaluated"};

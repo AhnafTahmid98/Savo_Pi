@@ -211,7 +211,7 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument("host_role", default_value="auto"),
             DeclareLaunchArgument("robot_mode", default_value="safe_idle"),
             DeclareLaunchArgument("bringup_profile", default_value="lidar_only"),
-            DeclareLaunchArgument("d435_voxel_validated", default_value="true"),
+            DeclareLaunchArgument("d435_voxel_validated", default_value="false"),
             DeclareLaunchArgument("require_locked_geometry", default_value="true"),
             DeclareLaunchArgument(
                 "allow_provisional_geometry", default_value="false"
@@ -336,7 +336,7 @@ def generate_launch_description() -> LaunchDescription:
             ),
             DeclareLaunchArgument("start_realsense", default_value="true"),
             DeclareLaunchArgument("start_vo", default_value="true"),
-            DeclareLaunchArgument("start_obstacle_cloud", default_value="true"),
+            DeclareLaunchArgument("start_obstacle_cloud", default_value="false"),
             DeclareLaunchArgument(
                 "enable_observer_color_relay", default_value="false"
             ),

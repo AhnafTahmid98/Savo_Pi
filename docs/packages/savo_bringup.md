@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Distributed Core/Edge launch orchestration and readiness aggregation.
+Distributed Core/Edge launch composition with package-owned health.
 
 ## Deployment
 
@@ -10,7 +10,7 @@ Built on both Pis. `robot_bringup.launch.py` selects `host_role:=core|edge`; dep
 
 ## Responsibilities
 
-Validate role/mode/profile, compose package launches, aggregate independent readiness/heartbeat/diagnostics, apply geometry/D435 gates, and expose supported manual mapping, autonomous mapping, live/saved-map navigation, and diagnostics compositions.
+Validate role/mode/profile, compose package launches, apply geometry/D435 profile gates, and expose supported manual mapping, autonomous mapping, live/saved-map navigation, and diagnostics compositions.
 
 ## Non-responsibilities and authority boundaries
 
@@ -24,21 +24,21 @@ Python launch graphs, C++ readiness contract/node, configuration, and contract/r
 
 ### `bringup_readiness_node`
 
-Publishes role-specific state, boolean ready, heartbeat, and diagnostics after required component freshness and policy gates pass.
+Retained as a diagnostic/test utility. Production Core, Edge, and autonomous-mapping launch paths do not use it to release processes.
 
 ## Runtime data flow
 
-`role + mode + profile + component states + geometry policy -> readiness`; launch graph starts only components belonging to that host.
+`role + mode + profile -> package launch selection`; each package publishes its own health, while Supervisor and mission owners retain authority.
 
 ## ROS interfaces
 
 ### Published topics
 
-Under `/savo_bringup/{core|edge}` (or configured namespace): `state` (`String`), `ready` (`Bool`), `heartbeat` (`UInt64`), and diagnostics.
+When the retained diagnostic node is launched explicitly, under `/savo_bringup/{core|edge}` (or configured namespace): `state` (`String`), `ready` (`Bool`), `heartbeat` (`UInt64`), and diagnostics.
 
 ### Subscribed topics
 
-Configured base, control, safety, LiDAR, perception, localization, power, supervisor, navigation, bridge, RealSense, VO, speech, UI, and obstacle-cloud state topics according to role/profile.
+The retained diagnostic node can subscribe to configured base, control, safety, LiDAR, perception, localization, power, supervisor, navigation, bridge, RealSense, VO, speech, UI, and obstacle-cloud state topics according to role/profile. Production launch composition does not use those subscriptions to release processes.
 
 ### Services
 
@@ -54,7 +54,7 @@ None; launches description, localization, SLAM/AMCL owners without duplicating t
 
 ## Parameters and configuration
 
-Modes: `safe_idle`, `manual`, `manual_mapping`, `autonomous_mapping`, `saved_map_navigation`, `diagnostics`. Profiles: `bench`, `lidar_only`, `lidar_d435_voxel`, `production`. Defaults include 60 s startup timeout, 3 s freshness, `d435_voxel_validated=false`.
+Modes: `safe_idle`, `manual`, `manual_mapping`, `autonomous_mapping`, `saved_map_navigation`, `diagnostics`. Profiles: `bench`, `lidar_only`, `lidar_d435_voxel`, `production`. Production defaults include `d435_voxel_validated=false`; the retained diagnostic has its own timeout and freshness parameters.
 
 ## Launch files
 
@@ -80,11 +80,11 @@ ROS launch, lifecycle/Nav2/SLAM components selected by compositions.
 
 ## Safety behavior
 
-Invalid role/mode/profile, provisional geometry in motion profiles, missing required state, stale components, unvalidated D435 voxel, or missing map release fails closed. Safe-idle and STOP are defaults.
+Invalid role/mode/profile, provisional geometry in motion profiles, unvalidated D435 voxel selection, or missing map release fails closed. Package health and Supervisor authority enforce runtime eligibility. Safe-idle and STOP are defaults.
 
 ## Failure and degraded behavior
 
-Optional Edge speech/UI/cloud can remain absent; required component loss makes that role not ready. Edge readiness never grants Core motion.
+Optional Edge speech/UI/cloud can remain absent. Required package-health and Supervisor contracts remain fail closed; no Edge status grants Core motion.
 
 ## Startup and shutdown behavior
 

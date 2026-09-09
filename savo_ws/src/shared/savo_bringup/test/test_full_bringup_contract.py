@@ -94,7 +94,8 @@ def test_core_bringup_owns_every_core_package_and_mode_boundary() -> None:
     assert "production_navigation.launch.py" in launch
     assert "manual_mapping.launch.xml" in launch
     assert "autonomous_mapping.launch.py" in launch
-    assert "bringup_readiness_node" in launch
+    assert "bringup_readiness_node" not in launch
+    assert "startup_stage_gate_node" not in launch
 
 
 def test_edge_bringup_uses_cpp_production_implementations() -> None:
@@ -123,7 +124,7 @@ def test_edge_bringup_uses_cpp_production_implementations() -> None:
     assert launch.count("realsense_bringup.launch.py") == 1
     assert "realsense_pointcloud.launch.py" not in launch
     assert realsense.count('executable="realsense2_camera_node"') == 1
-    assert 'executable="camera_topic_monitor_node"' not in realsense
+    assert 'executable="camera_topic_monitor_node"' in realsense
     assert 'executable="camera_health_node"' in realsense
     assert 'executable="depth_front_min_node"' in realsense
     assert 'package="image_transport"' in realsense
@@ -176,20 +177,18 @@ def test_edge_realsense_and_obstacle_cloud_profile_selection() -> None:
             explicit_start=False,
         ) is True
     for mode in ("autonomous_mapping", "saved_map_navigation"):
-        for selected_profile in ("lidar_only", "lidar_d435_voxel"):
-            assert should_start_obstacle_cloud(
-                mode,
-                selected_profile,
-                d435_voxel_validated=True,
-                explicit_start=False,
-            ) is True
-            assert should_start_obstacle_cloud(
-                mode,
-                selected_profile,
-                d435_voxel_validated=False,
-                explicit_start=False,
-            ) is False
-
+        assert should_start_obstacle_cloud(
+            mode,
+            "lidar_only",
+            d435_voxel_validated=True,
+            explicit_start=False,
+        ) is False
+        assert should_start_obstacle_cloud(
+            mode,
+            "lidar_d435_voxel",
+            d435_voxel_validated=True,
+            explicit_start=False,
+        ) is True
     assert should_start_obstacle_cloud(
         "safe_idle",
         "lidar_only",
@@ -208,7 +207,7 @@ def test_edge_realsense_and_obstacle_cloud_profile_selection() -> None:
         d435_voxel_validated=False,
         explicit_start=True,
     ) is False
-    assert '"require_obstacle_cloud": start_obstacle_cloud' in launch
+    assert "bringup_readiness_node" not in launch
     assert 'and explicit_obstacle_cloud' in launch
     assert 'and obstacle_cloud_requested' in launch
     assert 'if explicit_obstacle_cloud and not start_realsense' in launch
@@ -407,11 +406,11 @@ def test_validated_normal_runtime_defaults_are_synchronized() -> None:
     assert top["supervisor_auto_arm"] == "false"
     assert top["start_realsense"] == "true"
     assert top["start_vo"] == "true"
-    assert top["start_obstacle_cloud"] == "true"
+    assert top["start_obstacle_cloud"] == "false"
     assert top["enable_observer_color_relay"] == "false"
     assert top["start_speech"] == "false"
     assert top["start_ui"] == "false"
-    assert top["d435_voxel_validated"] == "true"
+    assert top["d435_voxel_validated"] == "false"
     assert top["speech_params_file"] == "edge_real_robot_v1.yaml"
     assert top["active_map_id"] == ""
     assert top["active_map_revision"] == "0"
@@ -430,15 +429,15 @@ def test_validated_normal_runtime_defaults_are_synchronized() -> None:
     ):
         assert core[name] == "true", name
     assert core["start_location_lifecycle"] == "false"
-    assert core["d435_voxel_validated"] == "true"
+    assert core["d435_voxel_validated"] == "false"
     assert core["edge_ups_expected"] == "false"
 
     edge = launch_string_defaults("launch/edge_bringup.launch.py")
     assert edge["start_realsense"] == "true"
     assert edge["start_vo"] == "true"
-    assert edge["start_obstacle_cloud"] == "true"
+    assert edge["start_obstacle_cloud"] == "false"
     assert edge["enable_observer_color_relay"] == "false"
-    assert edge["d435_voxel_validated"] == "true"
+    assert edge["d435_voxel_validated"] == "false"
     assert edge["vo_profile"] == "real_robot_v1"
     assert edge["active_map_id"] == ""
     assert edge["active_map_revision"] == "0"
@@ -508,7 +507,7 @@ def test_full_edge_pipeline_uses_bounded_latest_sample_contracts() -> None:
     assert obstacle_config["stale_timeout_s"] == 0.75
 
     edge_launch = read("launch/edge_bringup.launch.py")
-    assert '"require_obstacle_cloud": start_obstacle_cloud' in edge_launch
+    assert "bringup_readiness_node" not in edge_launch
     assert 'camera_config_name = "realsense_d435_camera.yaml"' in edge_launch
     assert 'camera_config_name = "realsense_vo_driver.yaml"' in edge_launch
     assert 'camera_config_name = "realsense_minimal.yaml"' in edge_launch
@@ -670,16 +669,16 @@ def test_profiles_are_versioned_and_record_d435_validation() -> None:
 
     assert profiles["lidar_only"]["d435_voxel_validated"] is False
     assert profiles["lidar_only"]["navigation_profile"] == "lidar_only"
-    assert profiles["lidar_d435_voxel"]["d435_voxel_validated"] is True
-    assert profiles["production"]["d435_voxel_validated"] is True
+    assert profiles["lidar_d435_voxel"]["d435_voxel_validated"] is False
+    assert profiles["production"]["d435_voxel_validated"] is False
     assert profiles["production"]["allow_provisional_geometry"] is False
     edge = yaml.safe_load(read("config/edge_real_robot.yaml"))
     assert edge["bringup_readiness_node"]["ros__parameters"][
         "d435_voxel_validated"
-    ] is True
+    ] is False
     core = yaml.safe_load(read("config/core_real_robot.yaml"))
     core_params = core["bringup_readiness_node"]["ros__parameters"]
-    assert core_params["d435_voxel_validated"] is True
+    assert core_params["d435_voxel_validated"] is False
     for edge_resource in (
         "require_bridge",
         "require_realsense",

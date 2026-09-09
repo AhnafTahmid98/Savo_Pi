@@ -41,9 +41,10 @@ lidar_filter_node:
     min_range_m: 0.15
     max_range_m: 12.0
 
-    # Mapping needs cleaner scans than bench testing.
+    # Keep mapping quality warnings strict while using the hardware-validated
+    # RPLIDAR A1 hard-error floor.
     warn_valid_ratio: 0.70
-    error_valid_ratio: 0.40
+    error_valid_ratio: 0.30
 
 lidar_watchdog_node:
   ros__parameters:
@@ -64,8 +65,10 @@ lidar_health_node:
     publish_hz: 1.0
 
     min_valid_ratio_warn: 0.70
-    min_valid_ratio_error: 0.40
+    min_valid_ratio_error: 0.30
     min_scan_rate_hz: 3.0
+    good_scan_rate_hz: 5.0
+    excellent_scan_rate_hz: 6.5
 
 lidar_state_publisher_node:
   ros__parameters:

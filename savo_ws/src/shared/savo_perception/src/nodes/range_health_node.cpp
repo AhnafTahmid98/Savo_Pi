@@ -86,6 +86,14 @@ void RangeHealthNode::declare_parameters()
   declare_parameter<double>("publish_hz", constants::kRangeHealthPublishHzDefault);
   declare_parameter<double>("stale_timeout_s", constants::kSensorStaleTimeoutSDefault);
   declare_parameter<double>("heartbeat_hz", 1.0);
+  declare_parameter<double>("rate_window_s", 2.0);
+  declare_parameter<std::int64_t>("rate_min_samples", 5);
+  declare_parameter<double>("tof_minimum_rate_hz", 5.0);
+  declare_parameter<double>("tof_good_rate_hz", 8.0);
+  declare_parameter<double>("tof_excellent_rate_hz", 9.0);
+  declare_parameter<double>("depth_minimum_rate_hz", 5.0);
+  declare_parameter<double>("depth_good_rate_hz", 10.0);
+  declare_parameter<double>("depth_excellent_rate_hz", 12.0);
 
   declare_parameter<bool>("include_depth_in_overall_ok", false);
   declare_parameter<bool>("depth_front_required", false);
@@ -126,6 +134,29 @@ void RangeHealthNode::load_parameters()
   heartbeat_hz_ = safe_rate_hz(
     get_parameter("heartbeat_hz").as_double(),
     1.0);
+
+  rate_window_s_ = safe_rate_hz(
+    get_parameter("rate_window_s").as_double(),
+    2.0);
+  const auto rate_min_samples = get_parameter("rate_min_samples").as_int();
+  rate_min_samples_ = rate_min_samples >= 2 ?
+    static_cast<std::size_t>(rate_min_samples) : 5U;
+  tof_minimum_rate_hz_ = safe_rate_hz(
+    get_parameter("tof_minimum_rate_hz").as_double(), 5.0);
+  tof_good_rate_hz_ = std::max(
+    tof_minimum_rate_hz_,
+    get_parameter("tof_good_rate_hz").as_double());
+  tof_excellent_rate_hz_ = std::max(
+    tof_good_rate_hz_,
+    get_parameter("tof_excellent_rate_hz").as_double());
+  depth_minimum_rate_hz_ = safe_rate_hz(
+    get_parameter("depth_minimum_rate_hz").as_double(), 5.0);
+  depth_good_rate_hz_ = std::max(
+    depth_minimum_rate_hz_,
+    get_parameter("depth_good_rate_hz").as_double());
+  depth_excellent_rate_hz_ = std::max(
+    depth_good_rate_hz_,
+    get_parameter("depth_excellent_rate_hz").as_double());
 
   include_depth_in_overall_ok_ = get_parameter("include_depth_in_overall_ok").as_bool();
   depth_front_required_ = get_parameter("depth_front_required").as_bool();
@@ -225,21 +256,25 @@ void RangeHealthNode::setup_interfaces()
 
 void RangeHealthNode::on_depth_front(const std_msgs::msg::Float32::SharedPtr msg)
 {
+  record_receipt("depth_front");
   depth_front_ = sample_from_value("depth_front", msg->data, "depth_front");
 }
 
 void RangeHealthNode::on_tof_left(const std_msgs::msg::Float32::SharedPtr msg)
 {
+  record_receipt("tof_left");
   tof_left_ = sample_from_value("tof_left", msg->data, "tof_left");
 }
 
 void RangeHealthNode::on_tof_right(const std_msgs::msg::Float32::SharedPtr msg)
 {
+  record_receipt("tof_right");
   tof_right_ = sample_from_value("tof_right", msg->data, "tof_right");
 }
 
 void RangeHealthNode::on_ultrasonic_front(const std_msgs::msg::Float32::SharedPtr msg)
 {
+  record_receipt("ultrasonic_front");
   ultrasonic_front_ = sample_from_value("ultrasonic_front", msg->data, "ultrasonic_front");
 }
 
@@ -304,20 +339,94 @@ std::vector<SensorHealth> RangeHealthNode::current_health() const
 bool RangeHealthNode::overall_ok(const std::vector<SensorHealth> & health) const
 {
   for (const auto & item : health) {
-    if (is_required_sensor(item.sensor_name) && !item.ok) {
+    if (
+      is_required_sensor(item.sensor_name) &&
+      (!item.ok || !rate_ok(item.sensor_name)))
+    {
       return false;
     }
 
     if (
       include_depth_in_overall_ok_ &&
       item.sensor_name == "depth_front" &&
-      !item.ok)
+      (!item.ok || !rate_ok(item.sensor_name)))
     {
       return false;
     }
   }
 
   return true;
+}
+
+void RangeHealthNode::record_receipt(const std::string & sensor_name)
+{
+  auto & times = receipt_times_[sensor_name];
+  const auto receipt_time = std::chrono::steady_clock::now();
+  times.push_back(receipt_time);
+  while (
+    times.size() > 2U &&
+    std::chrono::duration<double>(receipt_time - times.front()).count() >
+    rate_window_s_)
+  {
+    times.pop_front();
+  }
+}
+
+bool RangeHealthNode::rate_valid(const std::string & sensor_name) const
+{
+  const auto iterator = receipt_times_.find(sensor_name);
+  return iterator != receipt_times_.end() &&
+         iterator->second.size() >= rate_min_samples_;
+}
+
+double RangeHealthNode::receive_rate_hz(const std::string & sensor_name) const
+{
+  const auto iterator = receipt_times_.find(sensor_name);
+  if (iterator == receipt_times_.end() || iterator->second.size() < 2U) {
+    return 0.0;
+  }
+
+  const auto & times = iterator->second;
+  const double interval_s =
+    std::chrono::duration<double>(times.back() - times.front()).count();
+  if (!std::isfinite(interval_s) || interval_s <= 0.0) {
+    return 0.0;
+  }
+  return static_cast<double>(times.size() - 1U) / interval_s;
+}
+
+std::string RangeHealthNode::rate_quality(const std::string & sensor_name) const
+{
+  if (sensor_name == "ultrasonic_front") {
+    return "NOT_APPLICABLE";
+  }
+  if (!rate_valid(sensor_name)) {
+    return "ESTABLISHING";
+  }
+
+  const bool is_depth = sensor_name == "depth_front";
+  const double rate_hz = receive_rate_hz(sensor_name);
+  const double minimum_hz = is_depth ?
+    depth_minimum_rate_hz_ : tof_minimum_rate_hz_;
+  const double good_hz = is_depth ? depth_good_rate_hz_ : tof_good_rate_hz_;
+  const double excellent_hz = is_depth ?
+    depth_excellent_rate_hz_ : tof_excellent_rate_hz_;
+
+  if (rate_hz < minimum_hz) {
+    return "BELOW_MINIMUM";
+  }
+  if (rate_hz < good_hz) {
+    return "MINIMUM";
+  }
+  if (rate_hz < excellent_hz) {
+    return "GOOD";
+  }
+  return "EXCELLENT";
+}
+
+bool RangeHealthNode::rate_ok(const std::string & sensor_name) const
+{
+  return rate_quality(sensor_name) != "BELOW_MINIMUM";
 }
 
 std::string RangeHealthNode::overall_status(const std::vector<SensorHealth> & health) const
@@ -378,7 +487,8 @@ std::vector<std::string> RangeHealthNode::error_required_sensors(
   for (const auto & item : health) {
     if (
       is_required_sensor(item.sensor_name) &&
-      item.status == SensorStatus::kError)
+      (item.status == SensorStatus::kError ||
+      (!item.stale && !rate_ok(item.sensor_name))))
     {
       out.push_back(item.sensor_name);
     }
@@ -418,6 +528,9 @@ void RangeHealthNode::publish_sensor_status(const std::vector<SensorHealth> & he
 
     for (const auto & item : health) {
       out << " " << item.sensor_name << "=" << to_string(item.status);
+      if (item.sensor_name != "ultrasonic_front") {
+        out << "/" << rate_quality(item.sensor_name);
+      }
     }
 
     if (!use_ultrasonic_) {
@@ -467,8 +580,10 @@ std::string RangeHealthNode::health_to_json(const std::vector<SensorHealth> & he
   out << "\"overall_status\":\"" << overall_status(health) << "\",";
   out << "\"quality\":\"" << (overall_ok(health) ? "MINIMUM" : "BELOW_MINIMUM") << "\",";
   out << "\"quality_reason\":\"required_range_health_only\",";
-  out << "\"stale_required_sensors\":" << string_list_to_json(stale_required_sensors(health)) << ",";
-  out << "\"error_required_sensors\":" << string_list_to_json(error_required_sensors(health)) << ",";
+  out << "\"stale_required_sensors\":" <<
+    string_list_to_json(stale_required_sensors(health)) << ",";
+  out << "\"error_required_sensors\":" <<
+    string_list_to_json(error_required_sensors(health)) << ",";
   out << "\"required_sensors\":" << string_list_to_json(required_sensors_) << ",";
   out << "\"optional_sensors\":" << string_list_to_json(optional_sensors_) << ",";
   out << "\"disabled_sensors\":" << string_list_to_json(disabled_sensors) << ",";
@@ -498,6 +613,9 @@ std::string RangeHealthNode::sensor_health_to_json(const SensorHealth & health) 
   out << "\"ok\":" << (health.ok ? "true" : "false") << ",";
   out << "\"stale\":" << (health.stale ? "true" : "false") << ",";
   out << "\"valid\":" << (health.valid ? "true" : "false") << ",";
+  out << "\"receive_rate_hz\":" << receive_rate_hz(health.sensor_name) << ",";
+  out << "\"rate_valid\":" << (rate_valid(health.sensor_name) ? "true" : "false") << ",";
+  out << "\"rate_quality\":\"" << rate_quality(health.sensor_name) << "\",";
   out << "\"last_distance_m\":" << optional_double_to_json(health.last_distance_m) << ",";
   out << "\"age_s\":" << health.age_s << ",";
   out << "\"required\":" << (is_required_sensor(health.sensor_name) ? "true" : "false") << ",";

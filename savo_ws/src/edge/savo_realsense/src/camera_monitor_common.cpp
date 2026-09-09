@@ -13,7 +13,25 @@ namespace savo_realsense
 
 bool StreamStatus::ok() const
 {
-  return seen && !stale && rate_hz > 0.0;
+  return seen && !stale && rate_quality != "BELOW_MINIMUM";
+}
+
+std::string classify_rate_quality(
+  const double rate_hz,
+  const double minimum_hz,
+  const double good_hz,
+  const double excellent_hz)
+{
+  if (!std::isfinite(rate_hz) || rate_hz < minimum_hz) {
+    return "BELOW_MINIMUM";
+  }
+  if (rate_hz < good_hz) {
+    return "MINIMUM";
+  }
+  if (rate_hz < excellent_hz) {
+    return "GOOD";
+  }
+  return "EXCELLENT";
 }
 
 RateTracker::RateTracker(std::size_t window_size)
@@ -21,10 +39,10 @@ RateTracker::RateTracker(std::size_t window_size)
 {
 }
 
-void RateTracker::tick(const rclcpp::Time & now)
+void RateTracker::tick(const TimePoint now)
 {
   if (seen_) {
-    const double dt = (now - last_time_).seconds();
+    const double dt = std::chrono::duration<double>(now - last_time_).count();
     if (dt > 0.0) {
       intervals_.push_back(dt);
       while (intervals_.size() > window_size_) {
@@ -56,22 +74,25 @@ double RateTracker::rate_hz() const
   return static_cast<double>(intervals_.size()) / total;
 }
 
-double RateTracker::last_age_s(const rclcpp::Time & now) const
+double RateTracker::last_age_s(const TimePoint now) const
 {
   if (!seen_) {
     return std::numeric_limits<double>::infinity();
   }
 
-  const double age = (now - last_time_).seconds();
+  const double age = std::chrono::duration<double>(now - last_time_).count();
   return age < 0.0 ? 0.0 : age;
 }
 
 StreamStatus build_stream_status(
   const std::string & topic,
   const RateTracker & tracker,
-  const rclcpp::Time & now,
-  double expected_hz,
-  double stale_timeout_s)
+  const RateTracker::TimePoint now,
+  const double expected_hz,
+  const double stale_timeout_s,
+  const double minimum_hz,
+  const double good_hz,
+  const double excellent_hz)
 {
   const double last_age = tracker.last_age_s(now);
 
@@ -82,6 +103,11 @@ StreamStatus build_stream_status(
   status.rate_hz = tracker.rate_hz();
   status.expected_hz = expected_hz;
   status.last_age_s = last_age;
+  status.minimum_hz = minimum_hz;
+  status.good_hz = good_hz;
+  status.excellent_hz = excellent_hz;
+  status.rate_quality = classify_rate_quality(
+    status.rate_hz, minimum_hz, good_hz, excellent_hz);
   return status;
 }
 
@@ -111,7 +137,7 @@ diagnostic_msgs::msg::DiagnosticStatus make_stream_diagnostic(
 
   if (status.ok()) {
     diagnostic.level = diagnostic_msgs::msg::DiagnosticStatus::OK;
-    diagnostic.message = "stream ok";
+    diagnostic.message = "stream " + status.rate_quality;
   } else if (!status.seen) {
     diagnostic.level = diagnostic_msgs::msg::DiagnosticStatus::ERROR;
     diagnostic.message = "stream not seen";
@@ -120,15 +146,15 @@ diagnostic_msgs::msg::DiagnosticStatus make_stream_diagnostic(
     diagnostic.message = "stream stale";
   } else {
     diagnostic.level = diagnostic_msgs::msg::DiagnosticStatus::WARN;
-    diagnostic.message = "stream rate unavailable";
+    diagnostic.message = "stream BELOW_MINIMUM";
   }
 
   auto add_value = [&](const std::string & key, const std::string & value) {
-    diagnostic_msgs::msg::KeyValue item;
-    item.key = key;
-    item.value = value;
-    diagnostic.values.push_back(item);
-  };
+      diagnostic_msgs::msg::KeyValue item;
+      item.key = key;
+      item.value = value;
+      diagnostic.values.push_back(item);
+    };
 
   add_value("topic", status.topic);
   add_value("seen", bool_text(status.seen));
@@ -136,6 +162,10 @@ diagnostic_msgs::msg::DiagnosticStatus make_stream_diagnostic(
   add_value("rate_hz", number_text(status.rate_hz));
   add_value("expected_hz", number_text(status.expected_hz));
   add_value("last_age_s", number_text(status.last_age_s));
+  add_value("rate_quality", status.rate_quality);
+  add_value("minimum_hz", number_text(status.minimum_hz));
+  add_value("good_hz", number_text(status.good_hz));
+  add_value("excellent_hz", number_text(status.excellent_hz));
 
   return diagnostic;
 }

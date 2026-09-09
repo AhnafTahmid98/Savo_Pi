@@ -14,13 +14,7 @@ from launch.substitutions import LaunchConfiguration
 from launch.substitutions import PathJoinSubstitution
 from launch.substitutions import PythonExpression
 
-from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
-
-from savo_bringup.launch_contract import as_bool
-from savo_bringup.staged_launch import StartupStageGroup
-from savo_bringup.staged_launch import build_staged_sequence
-
 
 _MAP_ID_PATTERN = re.compile(r"[a-z][a-z0-9_]*")
 
@@ -43,7 +37,7 @@ def _validate_arguments(context):
 
     if control_mode != "STOP":
         raise RuntimeError(
-            "staged autonomous mapping must start control in STOP"
+            "autonomous mapping must start control in STOP"
         )
 
     return [
@@ -132,8 +126,8 @@ def generate_launch_description() -> LaunchDescription:
         }.items(),
     )
 
-    perception_hardware_launch = IncludeLaunchDescription(
-        _python_launch("savo_perception", "range_sensors.launch.py"),
+    perception_launch = IncludeLaunchDescription(
+        _python_launch("savo_perception", "perception_bringup.launch.py"),
         condition=IfCondition(LaunchConfiguration("start_perception")),
         launch_arguments={
             "driver_impl": LaunchConfiguration("perception_driver_impl"),
@@ -141,20 +135,6 @@ def generate_launch_description() -> LaunchDescription:
             "use_ultrasonic": LaunchConfiguration(
                 "perception_use_ultrasonic"
             ),
-            "use_dashboard": "false",
-        }.items(),
-    )
-
-    perception_safety_launch = IncludeLaunchDescription(
-        _python_launch("savo_perception", "safety_bringup.launch.py"),
-        condition=IfCondition(LaunchConfiguration("start_perception")),
-        launch_arguments={
-            "driver_impl": LaunchConfiguration("perception_driver_impl"),
-            "config_file": LaunchConfiguration("perception_config_file"),
-            "use_ultrasonic": LaunchConfiguration(
-                "perception_use_ultrasonic"
-            ),
-            "use_range_health": "false",
             "use_dashboard": "false",
         }.items(),
     )
@@ -181,7 +161,7 @@ def generate_launch_description() -> LaunchDescription:
         }.items(),
     )
 
-    localization_hardware_launch = IncludeLaunchDescription(
+    localization_launch = IncludeLaunchDescription(
         _python_launch(
             "savo_localization",
             "localization_bringup.launch.py",
@@ -191,21 +171,6 @@ def generate_launch_description() -> LaunchDescription:
             "use_vo": LaunchConfiguration("localization_use_vo"),
             "use_imu": "true",
             "use_wheel_odom": "true",
-            "use_ekf": "false",
-            "use_health": "false",
-        }.items(),
-    )
-
-    localization_filter_launch = IncludeLaunchDescription(
-        _python_launch(
-            "savo_localization",
-            "localization_bringup.launch.py",
-        ),
-        condition=IfCondition(LaunchConfiguration("start_localization")),
-        launch_arguments={
-            "use_vo": LaunchConfiguration("localization_use_vo"),
-            "use_imu": "false",
-            "use_wheel_odom": "false",
             "use_ekf": "true",
             "use_health": "true",
         }.items(),
@@ -352,36 +317,16 @@ def generate_launch_description() -> LaunchDescription:
         ),
     }
 
-    mapping_foundation_launch = IncludeLaunchDescription(
+    mapping_launch = IncludeLaunchDescription(
         _frontend_launch("savo_mapping", "autonomous_mapping.launch.xml"),
         condition=IfCondition(LaunchConfiguration("start_mapping")),
         launch_arguments={
             **mapping_common_arguments,
             "start_mapping_foundation": "true",
-            "start_mapping_runtime": "false",
-            "semantic_interruption_enabled": "false",
-        }.items(),
-    )
-
-    mapping_runtime_launch = IncludeLaunchDescription(
-        _frontend_launch("savo_mapping", "autonomous_mapping.launch.xml"),
-        condition=IfCondition(LaunchConfiguration("start_mapping")),
-        launch_arguments={
-            **mapping_common_arguments,
-            "start_mapping_foundation": "false",
             "start_mapping_runtime": "true",
-            "semantic_interruption_enabled": "false",
-        }.items(),
-    )
-
-    mapping_semantic_launch = IncludeLaunchDescription(
-        _frontend_launch("savo_mapping", "autonomous_mapping.launch.xml"),
-        condition=IfCondition(LaunchConfiguration("start_semantic_interruption")),
-        launch_arguments={
-            **mapping_common_arguments,
-            "start_mapping_foundation": "false",
-            "start_mapping_runtime": "false",
-            "semantic_interruption_enabled": "true",
+            "semantic_interruption_enabled": LaunchConfiguration(
+                "start_semantic_interruption"
+            ),
         }.items(),
     )
 
@@ -443,164 +388,6 @@ def generate_launch_description() -> LaunchDescription:
             "coverage_operation_orchestrator.yaml",
         ]
     )
-    startup_stages_config = PathJoinSubstitution(
-        [FindPackageShare("savo_bringup"), "config", "startup_stages.yaml"]
-    )
-
-    def _build_staged_actions(context):
-        enabled = {
-            name: as_bool(LaunchConfiguration(name).perform(context))
-            for name in (
-                "start_description",
-                "start_base",
-                "start_lidar",
-                "start_perception",
-                "start_control",
-                "start_localization",
-                "start_power",
-                "start_supervisor",
-                "start_navigation",
-                "start_mapping",
-                "start_head",
-                "start_location_lifecycle",
-                "start_semantic_interruption",
-            )
-        }
-        coordinator = Node(
-            package="savo_bringup",
-            executable="bringup_readiness_node",
-            name="bringup_readiness_node",
-            output="screen",
-            parameters=[
-                PathJoinSubstitution(
-                    [
-                        FindPackageShare("savo_bringup"),
-                        "config",
-                        "core_real_robot.yaml",
-                    ]
-                ),
-                startup_stages_config,
-                {
-                    "host_role": "core",
-                    "robot_mode": "autonomous_mapping",
-                    "bringup_profile": LaunchConfiguration(
-                        "bringup_profile"
-                    ),
-                    "d435_voxel_validated": LaunchConfiguration(
-                        "d435_voxel_validated"
-                    ),
-                    "require_locked_geometry": LaunchConfiguration(
-                        "require_locked_geometry"
-                    ),
-                    "allow_provisional_geometry": LaunchConfiguration(
-                        "allow_provisional_geometry"
-                    ),
-                    "startup.enabled": True,
-                    "require_geometry": enabled["start_description"],
-                    "geometry_policy_validated": True,
-                    "require_base": enabled["start_base"],
-                    "require_control": enabled["start_control"],
-                    "require_safety": enabled["start_perception"],
-                    "require_lidar": enabled["start_lidar"],
-                    "require_perception": enabled["start_perception"],
-                    "require_localization": enabled["start_localization"],
-                    "require_power": enabled["start_power"],
-                    "require_supervisor": enabled["start_supervisor"],
-                    "require_supervisor_authority": False,
-                    "require_mapping": enabled["start_mapping"],
-                    "mapping_readiness_topic": "/savo_mapping/status",
-                    "require_navigation": enabled["start_navigation"],
-                    "require_head": enabled["start_head"],
-                    "head_status_topic": "/savo_head/dashboard_text",
-                    "require_locations": enabled["start_location_lifecycle"],
-                    "require_semantic": enabled["start_semantic_interruption"],
-                    "require_active_release": False,
-                    "require_map_context": False,
-                    "require_goal_admission": False,
-                    "require_bridge": False,
-                    "require_realsense": False,
-                    "require_vo": False,
-                    "require_speech": False,
-                },
-            ],
-            arguments=["--ros-args", "--log-level", log_level],
-        )
-
-        groups = [
-            StartupStageGroup(
-                "infrastructure", (coordinator, description_launch)
-            )
-        ]
-        if any(
-            enabled[name]
-            for name in (
-                "start_power",
-                "start_localization",
-                "start_perception",
-                "start_lidar",
-            )
-        ):
-            groups.append(
-                StartupStageGroup(
-                    "hardware",
-                    (
-                        power_launch,
-                        localization_hardware_launch,
-                        perception_hardware_launch,
-                        lidar_launch,
-                    ),
-                )
-            )
-        if any(
-            enabled[name]
-            for name in ("start_base", "start_control", "start_perception")
-        ):
-            groups.append(
-                StartupStageGroup(
-                    "motion_safety",
-                    (base_launch, control_launch, perception_safety_launch),
-                )
-            )
-        if any(
-            enabled[name]
-            for name in ("start_localization", "start_perception", "start_lidar")
-        ):
-            groups.append(StartupStageGroup("sensor_stabilization", ()))
-        if enabled["start_localization"]:
-            groups.append(
-                StartupStageGroup("localization", (localization_filter_launch,))
-            )
-        if enabled["start_supervisor"]:
-            groups.append(StartupStageGroup("supervisor", (supervisor_launch,)))
-        if enabled["start_navigation"]:
-            groups.append(StartupStageGroup("navigation", (navigation_launch,)))
-        if enabled["start_mapping"]:
-            groups.append(
-                StartupStageGroup("slam_foundation", (mapping_foundation_launch,))
-            )
-            groups.append(
-                StartupStageGroup("mapping_runtime", (mapping_runtime_launch,))
-            )
-        if enabled["start_head"]:
-            groups.append(StartupStageGroup("head", (head_launch,)))
-        semantic_location_actions = []
-        if enabled["start_location_lifecycle"]:
-            semantic_location_actions.append(location_lifecycle_launch)
-        if enabled["start_semantic_interruption"]:
-            semantic_location_actions.append(mapping_semantic_launch)
-        if semantic_location_actions:
-            groups.append(
-                StartupStageGroup(
-                    "semantic_locations", tuple(semantic_location_actions)
-                )
-            )
-        groups.append(StartupStageGroup("complete", ()))
-        return build_staged_sequence(
-            groups,
-            status_topic="/savo_bringup/core/startup_status",
-            log_level=log_level,
-        )
-
     return LaunchDescription(
         [
             DeclareLaunchArgument(
@@ -826,6 +613,17 @@ def generate_launch_description() -> LaunchDescription:
                 "final_head_scan_required", default_value="true"
             ),
             OpaqueFunction(function=_validate_arguments),
-            OpaqueFunction(function=_build_staged_actions),
+            description_launch,
+            base_launch,
+            lidar_launch,
+            perception_launch,
+            control_launch,
+            localization_launch,
+            power_launch,
+            supervisor_launch,
+            navigation_launch,
+            mapping_launch,
+            head_launch,
+            location_lifecycle_launch,
         ]
     )

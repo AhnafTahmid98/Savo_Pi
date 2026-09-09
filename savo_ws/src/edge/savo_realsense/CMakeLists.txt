@@ -183,6 +183,13 @@ if(BUILD_TESTING)
     savo_realsense_camera_health_state
   )
 
+  ament_add_gtest(test_camera_monitor_common
+    test/test_camera_monitor_common.cpp
+  )
+  target_link_libraries(test_camera_monitor_common
+    savo_realsense_camera_monitor_common
+  )
+
   ament_add_gtest(test_depth_processing_gate
     test/test_depth_processing_gate.cpp
   )

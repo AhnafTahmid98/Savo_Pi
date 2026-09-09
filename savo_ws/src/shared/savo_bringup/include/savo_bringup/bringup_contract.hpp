@@ -4,6 +4,7 @@
 #ifndef SAVO_BRINGUP__BRINGUP_CONTRACT_HPP_
 #define SAVO_BRINGUP__BRINGUP_CONTRACT_HPP_
 
+#include <cstddef>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -114,6 +115,29 @@ private:
   bool terminal_ready_{false};
   bool terminal_failed_{false};
   double stable_since_s_{-1.0};
+  std::string terminal_failure_reason_;
+};
+
+struct EstablishedDependencyDecision
+{
+  bool blocking{false};
+  bool confirmed_loss{false};
+};
+
+class EstablishedDependencyTracker
+{
+public:
+  explicit EstablishedDependencyTracker(std::size_t confirmation_samples = 2U);
+
+  [[nodiscard]] EstablishedDependencyDecision Update(
+    std::string_view loss_signature) noexcept;
+
+  [[nodiscard]] std::size_t confirmation_samples() const noexcept;
+
+private:
+  std::size_t confirmation_samples_{2U};
+  std::size_t consecutive_loss_samples_{0U};
+  std::string last_loss_signature_;
 };
 
 struct DependencyStatus

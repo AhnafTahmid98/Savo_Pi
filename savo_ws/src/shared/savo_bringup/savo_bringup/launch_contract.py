@@ -62,10 +62,9 @@ def should_start_obstacle_cloud(
     explicit_start: bool,
 ) -> bool:
     """Run the validated D435 helper for selected production use."""
+    del robot_mode
     return d435_voxel_validated and (
-        explicit_start
-        or bringup_profile in {"lidar_d435_voxel", "production"}
-        or robot_mode in {"autonomous_mapping", "saved_map_navigation"}
+        explicit_start or bringup_profile == "lidar_d435_voxel"
     )
 
 

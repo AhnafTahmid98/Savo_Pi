@@ -107,7 +107,7 @@ void RGBDOdometryNode::declare_parameters()
   declare_parameter<std::string>(constants::kCameraFrameParam, constants::kCameraFrame);
 
   declare_parameter<int>("sync_queue_size", 2);
-  declare_parameter<double>("processing_rate_hz", 15.0);
+  declare_parameter<double>("processing_rate_hz", 12.0);
   declare_parameter<double>("max_sync_delta_s", 0.02);
   declare_parameter<double>("max_frame_interval_s", 0.20);
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <cstddef>
 #include <deque>
 #include <string>
@@ -20,6 +21,12 @@ struct StreamMonitorParams
   double expected_aligned_depth_hz{15.0};
   double expected_camera_info_hz{15.0};
   double expected_pointcloud_hz{8.0};
+  double camera_minimum_hz{8.0};
+  double camera_good_hz{12.0};
+  double camera_excellent_hz{14.0};
+  double pointcloud_minimum_hz{3.0};
+  double pointcloud_good_hz{5.0};
+  double pointcloud_excellent_hz{7.0};
 };
 
 struct StreamStatus
@@ -30,6 +37,10 @@ struct StreamStatus
   double rate_hz{0.0};
   double expected_hz{0.0};
   double last_age_s{0.0};
+  double minimum_hz{0.0};
+  double good_hz{0.0};
+  double excellent_hz{0.0};
+  std::string rate_quality{"BELOW_MINIMUM"};
 
   bool ok() const;
 };
@@ -37,16 +48,19 @@ struct StreamStatus
 class RateTracker
 {
 public:
+  using Clock = std::chrono::steady_clock;
+  using TimePoint = Clock::time_point;
+
   explicit RateTracker(std::size_t window_size = 64);
 
-  void tick(const rclcpp::Time & now);
+  void tick(TimePoint now);
   bool seen() const;
   double rate_hz() const;
-  double last_age_s(const rclcpp::Time & now) const;
+  double last_age_s(TimePoint now) const;
 
 private:
   bool seen_{false};
-  rclcpp::Time last_time_{0, 0, RCL_ROS_TIME};
+  TimePoint last_time_{};
   std::deque<double> intervals_;
   std::size_t window_size_{64};
 };
@@ -54,9 +68,18 @@ private:
 StreamStatus build_stream_status(
   const std::string & topic,
   const RateTracker & tracker,
-  const rclcpp::Time & now,
+  RateTracker::TimePoint now,
   double expected_hz,
-  double stale_timeout_s);
+  double stale_timeout_s,
+  double minimum_hz,
+  double good_hz,
+  double excellent_hz);
+
+std::string classify_rate_quality(
+  double rate_hz,
+  double minimum_hz,
+  double good_hz,
+  double excellent_hz);
 
 diagnostic_msgs::msg::DiagnosticStatus make_stream_diagnostic(
   const std::string & name,

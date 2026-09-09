@@ -72,7 +72,7 @@ def test_profiles_select_baseline_and_vo_health_modes() -> None:
 
     assert baseline_health["use_vo"] is False
     assert vo_health["use_vo"] is True
-    assert vo_health["expected_vo_rate_hz"] == 15.0
+    assert vo_health["expected_vo_rate_hz"] == 12.0
     assert vo_health["max_vo_odom_age_s"] == 0.5
     assert "vo_required" not in baseline_health
     assert "vo_required" not in vo_health
@@ -152,7 +152,7 @@ def test_vo_health_remains_optional_with_explicit_rate_contract() -> None:
         encoding="utf-8"
     )
 
-    assert diagnostics["expected_vo_rate_hz"] == 15.0
+    assert diagnostics["expected_vo_rate_hz"] == 12.0
     assert diagnostics["vo_min_rate_hz"] == 5.0
     assert diagnostics["vo_good_rate_hz"] == 8.0
     assert diagnostics["vo_excellent_rate_hz"] == 12.0
@@ -340,6 +340,18 @@ def test_rate_quality_does_not_expand_top_level_state_vocabulary() -> None:
     assert 'return "EXCELLENT";' in producer
     assert 'LocalizationHealthState::kGood' not in core
     assert 'LocalizationHealthState::kExcellent' not in core
+
+
+def test_runtime_elapsed_time_is_steady_and_ros_time_remains_for_tf_and_stamps() -> None:
+    node = (PACKAGE_ROOT / "src" / "localization_health_node.cpp").read_text(
+        encoding="utf-8"
+    )
+
+    assert "start_time_ns_(steady_now_ns())" in node
+    assert "const std::int64_t receive_time_ns = steady_now_ns();" in node
+    assert "current_receive_time_ns < pose_jump_fault_until_ns_" in node
+    assert "const rclcpp::Time transform_time(transform.header.stamp);" in node
+    assert "array.header.stamp = current_time;" in node
 
 
 def test_launch_defaults_reference_the_intended_profiles() -> None:

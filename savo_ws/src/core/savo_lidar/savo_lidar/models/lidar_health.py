@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from math import isfinite
 from typing import Any
 
 from savo_lidar.constants import (
@@ -112,6 +113,33 @@ def _clamp_ratio(value: float) -> float:
     return max(0.0, min(1.0, float(value)))
 
 
+def lidar_rate_quality(
+    rate_hz: float,
+    *,
+    minimum_hz: float = 3.0,
+    good_hz: float = 5.0,
+    excellent_hz: float = 6.5,
+) -> str:
+    """Classify LiDAR publication rate independently from scan validity."""
+    rate_hz = float(rate_hz)
+    minimum_hz = float(minimum_hz)
+    good_hz = float(good_hz)
+    excellent_hz = float(excellent_hz)
+
+    if not all(isfinite(value) for value in (rate_hz, minimum_hz, good_hz, excellent_hz)):
+        return "BELOW_MINIMUM"
+    if not 0.0 <= minimum_hz <= good_hz <= excellent_hz:
+        raise ValueError("LiDAR rate-quality thresholds must be non-negative and ordered")
+    if rate_hz < minimum_hz:
+        return "BELOW_MINIMUM"
+    if rate_hz < good_hz:
+        return "MINIMUM"
+    if rate_hz < excellent_hz:
+        return "GOOD"
+    return "EXCELLENT"
+
+
 __all__ = [
     "LidarHealth",
+    "lidar_rate_quality",
 ]

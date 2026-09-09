@@ -114,6 +114,10 @@ def test_edge_configuration_is_safe_and_ordered():
     assert config['self_max_z_m'] > config['self_min_z_m']
     assert config['max_output_points'] > 0
     assert config['max_processing_hz'] == 8.0
+    assert config['minimum_output_rate_hz'] == 3.0
+    assert config['good_output_rate_hz'] == 5.0
+    assert config['excellent_output_rate_hz'] == 7.0
+    assert config['output_rate_window_s'] == 2.0
 
 
 def test_input_qos_rate_gate_and_one_pass_filter_are_bounded():
@@ -152,6 +156,8 @@ def test_input_qos_rate_gate_and_one_pass_filter_are_bounded():
         'malformed_clouds',
         'clouds_received',
         'clouds_published',
+        'output_rate_hz',
+        'rate_quality',
         'age_seconds',
         'clearing_supported',
         'semantics',
@@ -175,12 +181,23 @@ def test_input_qos_rate_gate_and_one_pass_filter_are_bounded():
 
     assert callback.index('reject_cloud(\n      "malformed_cloud"') > gate
     assert callback.index('reject_cloud(\n      "transform_unavailable"') > gate
-    assert callback.index('last_valid_input_time_ = now()') > transform
+    assert callback.index('last_valid_input_time_ = publication_time') > transform
 
     finite_rejection = callback.index('!std::isfinite(x)')
     transform_math = callback.index('r00 * x')
     accumulator = callback.index('filter_accumulator_->consume')
     assert finite_rejection < accumulator < transform_math
+
+
+def test_health_freshness_is_monotonic_while_cloud_stamps_remain_ros_time():
+    header = read('include/savo_perception/obstacle_cloud_filter_node.hpp')
+    source = read('src/nodes/obstacle_cloud_filter_node.cpp')
+
+    assert 'std::chrono::steady_clock::time_point last_valid_input_time_' in header
+    assert 'std::chrono::steady_clock::now() - last_valid_input_time_' in source
+    assert 'const rclcpp::Time cloud_time(' in source
+    assert 'message->header.stamp,' in source
+    assert 'output.header.stamp = message->header.stamp;' in source
 
 
 def test_launch_starts_only_the_filter_node():

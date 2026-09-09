@@ -68,8 +68,9 @@ std::optional<savo_bringup::QualityLevel> ExtractQuality(const std::string & pay
 {
   std::string compact(payload);
   compact.erase(
-    std::remove_if(compact.begin(), compact.end(),
-    [](const unsigned char character) {return std::isspace(character) != 0;}),
+    std::remove_if(
+      compact.begin(), compact.end(),
+      [](const unsigned char character) {return std::isspace(character) != 0;}),
     compact.end());
   for (const auto quality : {
       savo_bringup::QualityLevel::kBelowMinimum,
@@ -90,11 +91,13 @@ std::optional<savo_bringup::QualityLevel> ExtractQuality(const std::string & pay
 bool ContainsReadyToken(const std::string & value)
 {
   std::string normalized(value);
-  std::transform(normalized.begin(), normalized.end(), normalized.begin(),
+  std::transform(
+    normalized.begin(), normalized.end(), normalized.begin(),
     [](const unsigned char character) {return static_cast<char>(std::tolower(character));});
   normalized.erase(
-    std::remove_if(normalized.begin(), normalized.end(),
-    [](const unsigned char character) {return std::isspace(character) != 0;}),
+    std::remove_if(
+      normalized.begin(), normalized.end(),
+      [](const unsigned char character) {return std::isspace(character) != 0;}),
     normalized.end());
   return normalized == "ready" || normalized.rfind("ok:", 0U) == 0U ||
          normalized.find("ready=true") != std::string::npos ||
@@ -112,11 +115,13 @@ bool ContainsReadyToken(const std::string & value)
 bool ContainsFailureToken(const std::string & value)
 {
   std::string normalized(value);
-  std::transform(normalized.begin(), normalized.end(), normalized.begin(),
+  std::transform(
+    normalized.begin(), normalized.end(), normalized.begin(),
     [](const unsigned char character) {return static_cast<char>(std::tolower(character));});
   normalized.erase(
-    std::remove_if(normalized.begin(), normalized.end(),
-    [](const unsigned char character) {return std::isspace(character) != 0;}),
+    std::remove_if(
+      normalized.begin(), normalized.end(),
+      [](const unsigned char character) {return std::isspace(character) != 0;}),
     normalized.end());
   return normalized == "blocked" || normalized == "fault" || normalized == "error" ||
          normalized.rfind("error:", 0U) == 0U ||
@@ -227,8 +232,9 @@ private:
       throw std::invalid_argument("readiness timing parameters must be positive");
     }
 
-    require_geometry_ = declare_parameter<bool>("require_geometry",
-        role_ != savo_bringup::HostRole::kEdge);
+    require_geometry_ = declare_parameter<bool>(
+      "require_geometry",
+      role_ != savo_bringup::HostRole::kEdge);
     geometry_policy_validated_ = declare_parameter<bool>(
       "geometry_policy_validated", require_locked_geometry_ || allow_provisional_geometry_);
     infrastructure_parent_frame_ = declare_parameter<std::string>(
@@ -395,9 +401,12 @@ private:
         complete.push_back("supervisor_startup");
         complete.push_back("supervisor_safe_unarmed");
       }
+      // The tracked terminal stage owns final startup stabilization. The
+      // post-sequence branch below only maintains runtime readiness.
       AddStage("complete", complete);
     } else if (role_ == savo_bringup::HostRole::kEdge) {
-      AddStage("infrastructure", require_power_ ? std::vector<std::string>{"power"} :
+      AddStage(
+        "infrastructure", require_power_ ? std::vector<std::string>{"power"} :
         std::vector<std::string>{});
       if (require_realsense_) {
         AddStage("realsense", {"realsense"});
@@ -421,6 +430,8 @@ private:
       if (!apps.empty()) {
         AddStage("optional_apps", apps);
       }
+      // Edge has no additional terminal dependency, but still requires the
+      // configured final stable-ready window before the launch gate exits.
       AddStage("complete", {});
     } else {
       throw std::invalid_argument("staged startup cannot coordinate host_role=all");
@@ -451,8 +462,9 @@ private:
     const bool availability_only = false)
   {
     const auto resolved_topic = declare_parameter<std::string>(parameter, topic);
-    string_subscriptions_.push_back(create_subscription<String>(
-      resolved_topic, rclcpp::QoS(10).reliable(),
+    string_subscriptions_.push_back(
+      create_subscription<String>(
+        resolved_topic, rclcpp::QoS(10).reliable(),
         [this, key, availability_only](const String::SharedPtr message) {
           const auto structured =
           savo_bringup::EvaluateStructuredHealthPayload(message->data);
@@ -465,7 +477,7 @@ private:
           Mark(
             key, availability_only ? !failed : ready, failed,
             message->data, quality);
-      }));
+        }));
   }
 
   void SubscribeExactString(
@@ -473,8 +485,9 @@ private:
     const std::string & expected)
   {
     const auto resolved_topic = declare_parameter<std::string>(parameter, topic);
-    string_subscriptions_.push_back(create_subscription<String>(
-      resolved_topic, rclcpp::QoS(10).reliable(),
+    string_subscriptions_.push_back(
+      create_subscription<String>(
+        resolved_topic, rclcpp::QoS(10).reliable(),
         [this, key, expected](const String::SharedPtr message) {
           Mark(key, message->data == expected, false, message->data);
         }));
@@ -484,8 +497,9 @@ private:
   {
     const auto topic = declare_parameter<std::string>(
       "supervisor_state_topic", "/savo_supervisor/state_summary");
-    string_subscriptions_.push_back(create_subscription<String>(
-      topic, rclcpp::QoS(1).reliable().transient_local(),
+    string_subscriptions_.push_back(
+      create_subscription<String>(
+        topic, rclcpp::QoS(1).reliable().transient_local(),
         [this](const String::SharedPtr message) {
           const bool unarmed =
           message->data.find("\"system_armed\":false") != std::string::npos;
@@ -505,23 +519,25 @@ private:
     const bool invert = false)
   {
     const auto resolved_topic = declare_parameter<std::string>(parameter, topic);
-    bool_subscriptions_.push_back(create_subscription<Bool>(
-      resolved_topic, rclcpp::QoS(10).reliable(),
+    bool_subscriptions_.push_back(
+      create_subscription<Bool>(
+        resolved_topic, rclcpp::QoS(10).reliable(),
         [this, key, invert](const Bool::SharedPtr message) {
           const bool ready = invert ? !message->data : message->data;
           Mark(key, ready, false, BoolText(message->data));
-      }));
+        }));
   }
 
   void SubscribeCounter(
     const std::string & key, const std::string & parameter, const std::string & topic)
   {
     const auto resolved_topic = declare_parameter<std::string>(parameter, topic);
-    counter_subscriptions_.push_back(create_subscription<UInt64>(
-      resolved_topic, rclcpp::QoS(10).reliable(),
+    counter_subscriptions_.push_back(
+      create_subscription<UInt64>(
+        resolved_topic, rclcpp::QoS(10).reliable(),
         [this, key](const UInt64::SharedPtr message) {
           Mark(key, true, false, std::to_string(message->data));
-      }));
+        }));
   }
 
   void ConfigureSubscriptions()
@@ -543,8 +559,9 @@ private:
       SubscribeString("lidar_health", "lidar_health_topic", "/savo_lidar/health");
     }
     if (require_perception_) {
-      SubscribeString("perception_heartbeat", "perception_heartbeat_topic",
-          "/savo_perception/heartbeat", true);
+      SubscribeString(
+        "perception_heartbeat", "perception_heartbeat_topic",
+        "/savo_perception/heartbeat", true);
       SubscribeString(
         "perception_health", "perception_health_topic", "/savo_perception/range_health");
     }
@@ -553,8 +570,9 @@ private:
       SubscribeString(
         "wheel_state", "wheel_state_topic", "/savo_localization/wheel_odom_state");
       SubscribeString("localization", "localization_health_topic", "/savo_localization/health");
-      SubscribeString("localization_heartbeat", "localization_heartbeat_topic",
-          "/savo_localization/heartbeat", true);
+      SubscribeString(
+        "localization_heartbeat", "localization_heartbeat_topic",
+        "/savo_localization/heartbeat", true);
     }
     if (require_power_) {
       const std::string topic = role_ == savo_bringup::HostRole::kEdge ?
@@ -562,10 +580,12 @@ private:
       SubscribeString("power", "power_status_topic", topic, true);
     }
     if (require_supervisor_) {
-      SubscribeString("supervisor_heartbeat", "supervisor_heartbeat_topic",
-          "/savo_supervisor/heartbeat", true);
-      SubscribeBool("supervisor_startup", "supervisor_startup_ready_topic",
-          "/savo_supervisor/startup_ready");
+      SubscribeString(
+        "supervisor_heartbeat", "supervisor_heartbeat_topic",
+        "/savo_supervisor/heartbeat", true);
+      SubscribeBool(
+        "supervisor_startup", "supervisor_startup_ready_topic",
+        "/savo_supervisor/startup_ready");
       SubscribeSupervisorState();
     }
     if (require_mapping_) {
@@ -580,12 +600,14 @@ private:
     }
     if (require_map_context_) {
       SubscribeString("map_context", "map_context_status_topic", "/savo_nav/map_context/status");
-      SubscribeCounter("map_context_heartbeat", "map_context_heartbeat_topic",
-          "/savo_nav/map_context/heartbeat");
+      SubscribeCounter(
+        "map_context_heartbeat", "map_context_heartbeat_topic",
+        "/savo_nav/map_context/heartbeat");
     }
     if (require_goal_admission_) {
-      SubscribeString("goal_admission", "goal_admission_state_topic",
-          "/savo_nav/goal_admission/state", true);
+      SubscribeString(
+        "goal_admission", "goal_admission_state_topic",
+        "/savo_nav/goal_admission/state", true);
     }
     if (require_bridge_) {
       SubscribeBool("bridge", "bridge_readiness_topic", "/savo_bridge/readiness");
@@ -605,8 +627,9 @@ private:
       SubscribeString("ui", "ui_status_topic", "/savo_ui/status_text", true);
     }
     if (require_obstacle_cloud_) {
-      SubscribeBool("obstacle_cloud", "obstacle_cloud_health_topic",
-          "/savo_perception/obstacle_cloud/health");
+      SubscribeBool(
+        "obstacle_cloud", "obstacle_cloud_health_topic",
+        "/savo_perception/obstacle_cloud/health");
       SubscribeString(
         "obstacle_cloud_heartbeat", "obstacle_cloud_heartbeat_topic",
         "/savo_perception/obstacle_cloud/heartbeat", true);
@@ -628,22 +651,22 @@ private:
       "semantic_status_topic", "/savo_mapping/semantic_interruption/status");
     semantic_subscription_ =
       create_subscription<savo_msgs::msg::SemanticInterruptionStatus>(
-        topic, rclcpp::QoS(1).reliable().transient_local(),
+      topic, rclcpp::QoS(1).reliable().transient_local(),
       [this](const savo_msgs::msg::SemanticInterruptionStatus::SharedPtr message) {
         const bool contract_valid = message->contract_version ==
         savo_msgs::msg::SemanticInterruptionStatus::CONTRACT_VERSION;
         const bool failed = message->state ==
         savo_msgs::msg::SemanticInterruptionStatus::STATE_FAILED;
         Mark(
-            "semantic", contract_valid && message->startup_ready && !failed,
-            !contract_valid || failed,
-            message->state_text + ":" + message->reason,
-            contract_valid && !failed ?
-            std::optional<savo_bringup::QualityLevel>{
+          "semantic", contract_valid && message->startup_ready && !failed,
+          !contract_valid || failed,
+          message->state_text + ":" + message->reason,
+          contract_valid && !failed ?
+          std::optional<savo_bringup::QualityLevel>{
           savo_bringup::QualityLevel::kMinimum} :
-            std::optional<savo_bringup::QualityLevel>{
+          std::optional<savo_bringup::QualityLevel>{
           savo_bringup::QualityLevel::kBelowMinimum});
-        });
+      });
   }
 
   void Mark(
@@ -674,7 +697,8 @@ private:
     if (!required) {
       return;
     }
-    dependencies.push_back({
+    dependencies.push_back(
+      {
         name, waiting_state, required, true, true, ready, false,
         ready ? "validated" : "not_validated"});
   }
@@ -703,7 +727,8 @@ private:
         detail = "heartbeat_stale";
       }
     }
-    dependencies.push_back({
+    dependencies.push_back(
+      {
         name, waiting_state, required, observed, fresh, status.ready,
         status.failed, detail});
   }
@@ -797,9 +822,12 @@ private:
     const std::vector<std::string> & pending)
   {
     const auto publish_time = std::chrono::steady_clock::now();
+    const bool startup_ready = startup_complete_ && decision.ready && !runtime_failed_;
+    const std::vector<std::string> failed_dependencies = decision.failed && pending.empty() ?
+      std::vector<std::string>{reason} : pending;
     const std::string status_key = stage_name + ":" +
       std::string(savo_bringup::ToString(decision.state)) + ":" + reason + ":" +
-      BoolText(startup_complete_) + ":" + BoolText(runtime_failed_);
+      BoolText(startup_ready) + ":" + BoolText(runtime_failed_);
     const bool changed = status_key != last_startup_status_key_;
     const double publish_age_s = startup_status_published_ ?
       std::chrono::duration<double>(
@@ -829,16 +857,18 @@ private:
            << ",\"stage_index\":" << current_stage_
            << ",\"state\":\"" << savo_bringup::ToString(decision.state) << "\""
            << ",\"launch_released\":true"
-           << ",\"process_started\":" << BoolText(decision.state !=
+           << ",\"process_started\":" << BoolText(
+      decision.state !=
       savo_bringup::StartupStageState::kStarting)
-           << ",\"startup_ready\":" << BoolText(startup_complete_ && !runtime_failed_)
+           << ",\"startup_ready\":" << BoolText(startup_ready)
            << ",\"stable_for_s\":" << decision.stable_for_s
            << ",\"elapsed_s\":" << elapsed_s
            << ",\"quality\":\"" << savo_bringup::ToString(decision.quality) << "\""
            << ",\"quality_reason\":\"" << JsonEscape(reason) << "\""
            << ",\"reason\":\"" << JsonEscape(reason) << "\""
            << ",\"pending_dependencies\":" << JsonArray(pending)
-           << ",\"failed_dependencies\":" << (decision.failed ? JsonArray(pending) : "[]")
+           << ",\"failed_dependencies\":" <<
+      (decision.failed ? JsonArray(failed_dependencies) : "[]")
            << ",\"completed_stages\":" << JsonArray(completed_stages_)
            << ",\"enabled_stages\":" << JsonArray(enabled) << '}';
     String message;
@@ -846,7 +876,7 @@ private:
     startup_status_publisher_->publish(message);
 
     Bool ready_message;
-    ready_message.data = startup_complete_ && !runtime_failed_;
+    ready_message.data = startup_ready;
     ready_publisher_->publish(ready_message);
     String legacy_state;
     legacy_state.data = "state=" + std::string(savo_bringup::ToString(decision.state)) +
@@ -860,25 +890,32 @@ private:
   void EvaluateStartupAndPublish()
   {
     if (current_stage_ >= stages_.size()) {
+      // Startup already completed through the tracked "complete" stage.
+      // Continue revalidating established dependencies without redefining
+      // the startup transition.
       startup_complete_ = true;
-      runtime_failed_ = false;
       std::vector<std::string> lost;
       for (const auto & stage : stages_) {
         const auto input = StageInput(stage);
         if (!input.dependencies_ready) {
-          runtime_failed_ = true;
           lost.push_back(stage.name + ":" + input.reason);
         }
       }
+      const std::string lost_signature = Join(lost);
+      const auto established = established_dependency_tracker_.Update(lost_signature);
+      runtime_failed_ = established.confirmed_loss;
       savo_bringup::StartupStageDecision decision;
       decision.state = runtime_failed_ ? savo_bringup::StartupStageState::kFailed :
+        established.blocking ? savo_bringup::StartupStageState::kWaitingForDependencies :
         savo_bringup::StartupStageState::kReady;
-      decision.ready = !runtime_failed_;
+      decision.ready = !established.blocking;
       decision.failed = runtime_failed_;
-      decision.quality = runtime_failed_ ? savo_bringup::QualityLevel::kBelowMinimum :
+      decision.quality = established.blocking ? savo_bringup::QualityLevel::kBelowMinimum :
         savo_bringup::QualityLevel::kMinimum;
-      const std::string reason = runtime_failed_ ?
-        "established_dependency_lost:" + Join(lost) : "bringup_complete_safe_unarmed";
+      const std::string reason = established.blocking ?
+        (runtime_failed_ ? "established_dependency_lost:" :
+        "established_dependency_revalidation_pending:") + lost_signature :
+        "bringup_complete_safe_unarmed";
       PublishStartupStatus("complete", decision, 0.0, reason, lost);
       PublishStartupHeartbeat();
       return;
@@ -892,9 +929,15 @@ private:
       }
     }
     auto input = StageInput(stages_[current_stage_]);
-    if (!lost.empty()) {
-      input.unrecoverable_failure = true;
-      input.reason = "established_dependency_lost:" + Join(lost);
+    const std::string lost_signature = Join(lost);
+    const auto established = established_dependency_tracker_.Update(lost_signature);
+    if (established.blocking) {
+      input.dependencies_ready = false;
+      input.quality = savo_bringup::QualityLevel::kBelowMinimum;
+      input.unrecoverable_failure = established.confirmed_loss;
+      input.reason = established.confirmed_loss ?
+        "established_dependency_lost:" + lost_signature :
+        "established_dependency_revalidation_pending:" + lost_signature;
     }
     const auto current_time = std::chrono::steady_clock::now();
     const double elapsed = std::chrono::duration<double>(current_time - stage_entered_at_).count();
@@ -905,7 +948,8 @@ private:
       pending.push_back(input.reason);
     }
     const std::string stage_name = stages_[current_stage_].name;
-    const std::string reason = decision.reason;
+    const std::string reason = decision.ready && stage_name == "complete" ?
+      "bringup_complete_safe_unarmed" : decision.reason;
     if (decision.ready) {
       completed_stages_.push_back(stage_name);
       ++current_stage_;
@@ -933,41 +977,55 @@ private:
     }
     using savo_bringup::ReadinessState;
     std::vector<savo_bringup::DependencyStatus> dependencies;
-    AddStatic(dependencies, "geometry", require_geometry_, geometry_policy_validated_,
+    AddStatic(
+      dependencies, "geometry", require_geometry_, geometry_policy_validated_,
       ReadinessState::kValidatingGeometry);
     AddDynamic(dependencies, "base", require_base_, ReadinessState::kWaitingForDependencies);
     AddDynamic(dependencies, "control", require_control_, ReadinessState::kWaitingForSafety);
     AddDynamic(dependencies, "safety_state", require_safety_, ReadinessState::kWaitingForSafety);
     AddDynamic(dependencies, "safety_clear", require_safety_, ReadinessState::kWaitingForSafety);
-    AddDynamic(dependencies, "lidar_heartbeat", require_lidar_,
-        ReadinessState::kWaitingForDependencies);
-    AddDynamic(dependencies, "perception_heartbeat", require_perception_,
-        ReadinessState::kWaitingForSafety);
-    AddDynamic(dependencies, "localization", require_localization_,
+    AddDynamic(
+      dependencies, "lidar_heartbeat", require_lidar_,
+      ReadinessState::kWaitingForDependencies);
+    AddDynamic(
+      dependencies, "perception_heartbeat", require_perception_,
+      ReadinessState::kWaitingForSafety);
+    AddDynamic(
+      dependencies, "localization", require_localization_,
       ReadinessState::kWaitingForLocalization, "localization_heartbeat");
     AddDynamic(dependencies, "power", require_power_, ReadinessState::kWaitingForDependencies);
-    AddDynamic(dependencies, "supervisor_heartbeat", require_supervisor_,
-        ReadinessState::kWaitingForSafety);
-    AddDynamic(dependencies, "supervisor_authority", require_supervisor_authority_,
-        ReadinessState::kWaitingForSafety);
+    AddDynamic(
+      dependencies, "supervisor_heartbeat", require_supervisor_,
+      ReadinessState::kWaitingForSafety);
+    AddDynamic(
+      dependencies, "supervisor_authority", require_supervisor_authority_,
+      ReadinessState::kWaitingForSafety);
     AddDynamic(dependencies, "mapping", require_mapping_, ReadinessState::kWaitingForNavigation);
-    AddStatic(dependencies, "active_release", require_active_release_, active_release_verified_,
+    AddStatic(
+      dependencies, "active_release", require_active_release_, active_release_verified_,
       ReadinessState::kWaitingForMapContext);
-    AddDynamic(dependencies, "map_context", require_map_context_,
+    AddDynamic(
+      dependencies, "map_context", require_map_context_,
       ReadinessState::kWaitingForMapContext, "map_context_heartbeat");
-    AddDynamic(dependencies, "navigation", require_navigation_,
+    AddDynamic(
+      dependencies, "navigation", require_navigation_,
       ReadinessState::kWaitingForNavigation, "navigation_heartbeat");
-    AddDynamic(dependencies, "goal_admission", require_goal_admission_,
-        ReadinessState::kWaitingForNavigation);
-    AddDynamic(dependencies, "bridge", require_bridge_, ReadinessState::kWaitingForDependencies,
-        "bridge_heartbeat");
-    AddDynamic(dependencies, "realsense", require_realsense_,
-        ReadinessState::kWaitingForDependencies);
+    AddDynamic(
+      dependencies, "goal_admission", require_goal_admission_,
+      ReadinessState::kWaitingForNavigation);
+    AddDynamic(
+      dependencies, "bridge", require_bridge_, ReadinessState::kWaitingForDependencies,
+      "bridge_heartbeat");
+    AddDynamic(
+      dependencies, "realsense", require_realsense_,
+      ReadinessState::kWaitingForDependencies);
     AddDynamic(dependencies, "vo", require_vo_, ReadinessState::kWaitingForDependencies);
-    AddDynamic(dependencies, "speech", require_speech_, ReadinessState::kWaitingForDependencies,
-        "speech_heartbeat");
+    AddDynamic(
+      dependencies, "speech", require_speech_, ReadinessState::kWaitingForDependencies,
+      "speech_heartbeat");
     AddDynamic(dependencies, "ui", require_ui_, ReadinessState::kWaitingForDependencies);
-    AddDynamic(dependencies, "obstacle_cloud", require_obstacle_cloud_,
+    AddDynamic(
+      dependencies, "obstacle_cloud", require_obstacle_cloud_,
       ReadinessState::kWaitingForNavigation, "obstacle_cloud_heartbeat");
 
     const bool startup_expired = (now() - started_at_).seconds() > startup_timeout_s_;
@@ -1099,6 +1157,7 @@ private:
   std::map<std::string, Observation> observations_;
   std::vector<Stage> stages_;
   std::vector<std::string> completed_stages_;
+  savo_bringup::EstablishedDependencyTracker established_dependency_tracker_;
   std::string last_state_;
   std::string last_reason_;
   bool startup_status_published_{false};

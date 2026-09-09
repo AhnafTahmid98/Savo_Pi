@@ -122,10 +122,23 @@ def test_profiles_wire_raw_and_clean_vo_topics():
 
         assert health["odom_topic"] == "/vo/odom"
         assert health["health_topic"] == "/vo/health"
+        if profile_name == "real_robot_v1.yaml":
+            assert health["minimum_rate_hz"] == 5.0
+            assert health["good_rate_hz"] == 8.0
+            assert health["excellent_rate_hz"] == 12.0
 
         assert diagnostics["status_topic"] == "/vo/status"
         assert diagnostics["health_topic"] == "/vo/health"
         assert diagnostics["diagnostics_topic"] == "/diagnostics"
+
+
+def test_vo_health_elapsed_time_uses_steady_clock():
+    source = (PACKAGE_ROOT / "src/vo_health_node.cpp").read_text(encoding="utf-8")
+
+    assert "std::chrono::steady_clock::now()" in source
+    assert "state_.last_odom_time_s = receipt_time_s;" in source
+    assert "state_.last_status_time_s = monotonic_now_s();" in source
+    assert "build_health_message(monotonic_now_s())" in source
 
 
 def test_real_robot_profile_uses_controlled_12_hz_processing():

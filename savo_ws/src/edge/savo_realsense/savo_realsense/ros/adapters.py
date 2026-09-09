@@ -13,6 +13,7 @@ def stream_status_to_key_values(status: StreamStatus) -> list[KeyValue]:
         KeyValue(key="rate_hz", value=f"{status.rate_hz:.2f}"),
         KeyValue(key="expected_hz", value=f"{status.expected_hz:.2f}"),
         KeyValue(key="last_age_s", value=f"{status.last_age_s:.3f}"),
+        KeyValue(key="rate_quality", value=status.rate_quality),
     ]
 
 

@@ -13,7 +13,7 @@ localization_health_node:
     expected_imu_rate_hz: 25.0
     expected_wheel_odom_rate_hz: 30.0
     expected_ekf_rate_hz: 30.0
-    expected_vo_rate_hz: 15.0
+    expected_vo_rate_hz: 12.0
 
     rate_window_size: 30
     imu_min_rate_hz: 10.0
@@ -72,7 +72,7 @@ localization_dashboard:
     expected_imu_rate_hz: 25.0
     expected_wheel_odom_rate_hz: 30.0
     expected_ekf_rate_hz: 30.0
-    expected_vo_rate_hz: 15.0
+    expected_vo_rate_hz: 12.0
 
     max_imu_age_s: 0.5
     max_wheel_odom_age_s: 0.5

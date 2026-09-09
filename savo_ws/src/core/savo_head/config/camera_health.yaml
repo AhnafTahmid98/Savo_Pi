@@ -19,6 +19,8 @@
     metadata_stale_timeout_s: 2.0
 
     min_frame_rate_hz: 10.0
+    good_frame_rate_hz: 20.0
+    excellent_frame_rate_hz: 27.0
     min_frame_samples: 5
     frame_rate_ema_alpha: 0.20
 

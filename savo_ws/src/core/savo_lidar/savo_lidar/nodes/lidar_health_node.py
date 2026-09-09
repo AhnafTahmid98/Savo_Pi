@@ -18,6 +18,7 @@ from savo_lidar.constants import (
     STATUS_ERROR,
     STATUS_OFFLINE,
 )
+from savo_lidar.models import lidar_rate_quality
 from savo_lidar.ros import get_float_param, get_string_param
 from savo_lidar.safety import LidarHealthPolicy
 from savo_lidar.utils import RateTracker, node_start_message, node_stop_message, status_qos
@@ -57,6 +58,8 @@ class LidarHealthNode(Node):
             "min_scan_rate_hz",
             SCAN_RATE_MIN_HZ,
         )
+        self._good_scan_rate_hz = get_float_param(self, "good_scan_rate_hz", 5.0)
+        self._excellent_scan_rate_hz = get_float_param(self, "excellent_scan_rate_hz", 6.5)
 
         self._validate_config()
 
@@ -125,6 +128,12 @@ class LidarHealthNode(Node):
 
         if self._min_scan_rate_hz < 0.0:
             raise ValueError(f"min_scan_rate_hz cannot be negative, got {self._min_scan_rate_hz}")
+        if not (
+            self._min_scan_rate_hz
+            <= self._good_scan_rate_hz
+            <= self._excellent_scan_rate_hz
+        ):
+            raise ValueError("LiDAR rate-quality thresholds must be ordered")
 
     def _on_driver_state(self, msg: String) -> None:
         self._driver_state = self._safe_json_loads(msg.data)
@@ -144,6 +153,12 @@ class LidarHealthNode(Node):
 
         scan_rate_hz = self._scan_rate_hz()
         valid_ratio = self._valid_ratio()
+        rate_quality = lidar_rate_quality(
+            scan_rate_hz,
+            minimum_hz=self._min_scan_rate_hz,
+            good_hz=self._good_scan_rate_hz,
+            excellent_hz=self._excellent_scan_rate_hz,
+        )
 
         decision = self._policy.evaluate(
             hardware_ok=hardware_ok,
@@ -165,6 +180,10 @@ class LidarHealthNode(Node):
                 driver_running=driver_running,
                 stale=stale,
                 scan_rate_hz=scan_rate_hz,
+                rate_quality=rate_quality,
+                rate_minimum_hz=self._min_scan_rate_hz,
+                rate_good_hz=self._good_scan_rate_hz,
+                rate_excellent_hz=self._excellent_scan_rate_hz,
                 valid_ratio=valid_ratio,
                 health_publish_rate_hz=health_publish_rate_hz,
                 driver_state_received=bool(self._driver_state),
@@ -178,7 +197,7 @@ class LidarHealthNode(Node):
                     if decision.status in (STATUS_ERROR, STATUS_OFFLINE)
                     else "MINIMUM"
                 ),
-                quality_reason="existing_lidar_health_gates_only",
+                quality_reason="scan_validity_and_hardware_health",
             )
         )
         self._health_pub.publish(msg)

@@ -103,6 +103,15 @@ std::vector<std::string> CameraHealthConfig::validation_errors() const
       "min_frame_rate_hz must be finite and non-negative");
   }
 
+  if (
+    !std::isfinite(good_frame_rate_hz) ||
+    !std::isfinite(excellent_frame_rate_hz) ||
+    good_frame_rate_hz < min_frame_rate_hz ||
+    excellent_frame_rate_hz < good_frame_rate_hz)
+  {
+    errors.emplace_back("camera frame-rate thresholds must be monotonic");
+  }
+
   if (min_frame_samples == 0U) {
     errors.emplace_back("min_frame_samples must be positive");
   }
@@ -127,6 +136,25 @@ const char * to_string(CameraHealthLevel level)
   }
 
   return "ERROR";
+}
+
+std::string camera_rate_quality(
+  const CameraHealthConfig & config,
+  const CameraHealthSnapshot & snapshot)
+{
+  if (snapshot.frames_received < config.min_frame_samples) {
+    return "ESTABLISHING";
+  }
+  if (snapshot.frame_rate_hz < config.min_frame_rate_hz) {
+    return "BELOW_MINIMUM";
+  }
+  if (snapshot.frame_rate_hz < config.good_frame_rate_hz) {
+    return "MINIMUM";
+  }
+  if (snapshot.frame_rate_hz < config.excellent_frame_rate_hz) {
+    return "GOOD";
+  }
+  return "EXCELLENT";
 }
 
 CameraHealthResult evaluate_camera_health(
@@ -241,6 +269,7 @@ std::string camera_health_status_text(
     << (snapshot.stream_metadata_seen ? "true" : "false")
     << " calibrated=" << (snapshot.camera_calibrated ? "true" : "false")
     << " frame_rate_hz=" << snapshot.frame_rate_hz
+    << " rate_quality=" << camera_rate_quality(config, snapshot)
     << " frames_received=" << snapshot.frames_received
     << " frame_id=" << snapshot.metadata_frame_id
     << " metadata_resolution=" << snapshot.metadata_width

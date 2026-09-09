@@ -3,11 +3,22 @@
 #include <algorithm>
 #include <chrono>
 #include <functional>
+#include <sstream>
 
 #include "savo_vo/vo_constants.hpp"
 
 namespace savo_vo
 {
+namespace
+{
+
+double monotonic_now_s()
+{
+  return std::chrono::duration<double>(
+    std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
+}  // namespace
 
 VOHealthNode::VOHealthNode(
   const rclcpp::NodeOptions & options)
@@ -60,6 +71,9 @@ void VOHealthNode::declare_parameters()
   declare_parameter<double>(
     constants::kStaleTimeoutSParam,
     constants::kDefaultStaleTimeoutS);
+  declare_parameter<double>("minimum_rate_hz", 5.0);
+  declare_parameter<double>("good_rate_hz", 8.0);
+  declare_parameter<double>("excellent_rate_hz", 12.0);
 }
 
 void VOHealthNode::load_parameters()
@@ -68,6 +82,9 @@ void VOHealthNode::load_parameters()
   status_topic_ = get_parameter(constants::kStatusTopicParam).as_string();
   health_topic_ = get_parameter(constants::kHealthTopicParam).as_string();
   stale_timeout_s_ = get_parameter(constants::kStaleTimeoutSParam).as_double();
+  minimum_rate_hz_ = std::max(0.1, get_parameter("minimum_rate_hz").as_double());
+  good_rate_hz_ = std::max(minimum_rate_hz_, get_parameter("good_rate_hz").as_double());
+  excellent_rate_hz_ = std::max(good_rate_hz_, get_parameter("excellent_rate_hz").as_double());
 
   if (odom_topic_.empty()) {
     odom_topic_ = constants::kVoOdomTopic;
@@ -117,8 +134,16 @@ void VOHealthNode::on_odom(const Odometry::SharedPtr msg)
     return;
   }
 
+  const double receipt_time_s = monotonic_now_s();
   state_.has_odom = true;
-  state_.last_odom_time_s = now().seconds();
+  state_.last_odom_time_s = receipt_time_s;
+  odom_times_s_.push_back(receipt_time_s);
+  while (
+    odom_times_s_.size() > 2U &&
+    receipt_time_s - odom_times_s_.front() > 2.0)
+  {
+    odom_times_s_.pop_front();
+  }
 }
 
 void VOHealthNode::on_status(const String::SharedPtr msg)
@@ -128,20 +153,52 @@ void VOHealthNode::on_status(const String::SharedPtr msg)
   }
 
   state_.has_status = true;
-  state_.last_status_time_s = now().seconds();
+  state_.last_status_time_s = monotonic_now_s();
   state_.status_text = msg->data.empty() ? "status empty" : msg->data;
 }
 
 void VOHealthNode::publish_health()
 {
   String message;
-  message.data = build_health_message(now().seconds());
+  message.data = build_health_message(monotonic_now_s());
   health_pub_->publish(message);
 }
 
 std::string VOHealthNode::build_health_message(const double now_s) const
 {
-  return evaluate_vo_health(state_, now_s, stale_timeout_s_);
+  const std::string base_health = evaluate_vo_health(state_, now_s, stale_timeout_s_);
+  const double rate_hz = measured_rate_hz();
+  const std::string quality = rate_quality(rate_hz);
+  std::ostringstream output;
+  if (base_health.rfind("ok:", 0U) == 0U && quality == "BELOW_MINIMUM") {
+    output << "degraded: visual odometry rate below minimum; ";
+  }
+  output << base_health << "; rate_hz=" << rate_hz << "; rate_quality=" << quality;
+  return output.str();
+}
+
+double VOHealthNode::measured_rate_hz() const
+{
+  if (odom_times_s_.size() < 2U) {
+    return 0.0;
+  }
+  const double interval_s = odom_times_s_.back() - odom_times_s_.front();
+  return interval_s > 0.0 ?
+         static_cast<double>(odom_times_s_.size() - 1U) / interval_s : 0.0;
+}
+
+std::string VOHealthNode::rate_quality(const double rate_hz) const
+{
+  if (rate_hz < minimum_rate_hz_) {
+    return "BELOW_MINIMUM";
+  }
+  if (rate_hz < good_rate_hz_) {
+    return "MINIMUM";
+  }
+  if (rate_hz < excellent_rate_hz_) {
+    return "GOOD";
+  }
+  return "EXCELLENT";
 }
 
 }  // namespace savo_vo

@@ -173,12 +173,12 @@ def test_canonical_bringup_starts_one_camera_and_optional_color_relay() -> None:
         "enable_observer_color_relay"
     ] == "false"
     assert launch_text.count('executable="realsense2_camera_node"') == 1
-    assert launch_text.count("Node(") == 4
+    assert launch_text.count("Node(") == 5
     assert '"realsense_d435_camera.yaml"' in launch_text
     assert '"realsense_d435_nodes.yaml"' in launch_text
     assert 'executable="depth_front_min_node"' in launch_text
     assert 'executable="camera_health_node"' in launch_text
-    assert 'executable="camera_topic_monitor_node"' not in launch_text
+    assert 'executable="camera_topic_monitor_node"' in launch_text
 
     relays = [
         call

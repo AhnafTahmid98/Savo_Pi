@@ -1,5 +1,6 @@
 #pragma once
 
+#include <deque>
 #include <string>
 
 #include "nav_msgs/msg/odometry.hpp"
@@ -35,13 +36,19 @@ private:
 
   void publish_health();
   std::string build_health_message(double now_s) const;
+  double measured_rate_hz() const;
+  std::string rate_quality(double rate_hz) const;
 
   std::string odom_topic_;
   std::string status_topic_;
   std::string health_topic_;
 
   double stale_timeout_s_{0.50};
+  double minimum_rate_hz_{5.0};
+  double good_rate_hz_{8.0};
+  double excellent_rate_hz_{12.0};
   VOHealthState state_;
+  std::deque<double> odom_times_s_;
 
   rclcpp::Publisher<String>::SharedPtr health_pub_;
   rclcpp::Subscription<Odometry>::SharedPtr odom_sub_;

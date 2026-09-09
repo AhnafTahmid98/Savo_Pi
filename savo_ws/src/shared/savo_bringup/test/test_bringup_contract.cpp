@@ -228,7 +228,158 @@ TEST(BringupContract, StartupStageTimeoutIsTerminal)
   EXPECT_EQ(failed.reason, "stage_startup_timeout:tof_left_not_observed");
 
   input.dependencies_ready = true;
-  EXPECT_TRUE(tracker.Update(3.1, input).failed);
+  const auto still_failed = tracker.Update(3.1, input);
+  EXPECT_TRUE(still_failed.failed);
+  EXPECT_EQ(still_failed.reason, "stage_startup_timeout:tof_left_not_observed");
+}
+
+TEST(BringupContract, EmptyCompleteStageStabilizesAtMinimumQuality)
+{
+  using savo_bringup::QualityLevel;
+  using savo_bringup::StartupStageInput;
+  using savo_bringup::StartupStageState;
+  using savo_bringup::StartupStageTiming;
+  using savo_bringup::StartupStageTracker;
+
+  StartupStageTracker tracker(StartupStageTiming{0.0, 0.5, 10.0});
+  StartupStageInput input;
+  input.processes_started = true;
+  input.dependencies_ready = true;
+  input.quality = savo_bringup::WorstRequiredQuality({}, true);
+  input.reason = "all_required_stage_dependencies_ready";
+
+  const auto stabilizing = tracker.Update(0.0, input);
+  EXPECT_EQ(stabilizing.state, StartupStageState::kStabilizing);
+  EXPECT_FALSE(stabilizing.ready);
+  EXPECT_EQ(stabilizing.quality, QualityLevel::kMinimum);
+  EXPECT_FALSE(tracker.Update(0.49, input).ready);
+  const auto ready = tracker.Update(0.5, input);
+  EXPECT_TRUE(ready.ready);
+  EXPECT_EQ(ready.state, StartupStageState::kReady);
+}
+
+TEST(BringupContract, EstablishedDependencyLossBlocksBeforeItBecomesTerminal)
+{
+  savo_bringup::EstablishedDependencyTracker tracker;
+
+  EXPECT_EQ(tracker.confirmation_samples(), 2U);
+  EXPECT_FALSE(tracker.Update("").blocking);
+
+  const auto boundary_loss = tracker.Update("bridge:bridge_heartbeat_stale");
+  EXPECT_TRUE(boundary_loss.blocking);
+  EXPECT_FALSE(boundary_loss.confirmed_loss);
+
+  const auto recovered = tracker.Update("");
+  EXPECT_FALSE(recovered.blocking);
+  EXPECT_FALSE(recovered.confirmed_loss);
+
+  EXPECT_FALSE(tracker.Update("bridge:bridge_heartbeat_stale").confirmed_loss);
+  const auto different_loss = tracker.Update("vo:vo_stale");
+  EXPECT_TRUE(different_loss.blocking);
+  EXPECT_FALSE(different_loss.confirmed_loss);
+  const auto sustained_loss = tracker.Update("vo:vo_stale");
+  EXPECT_TRUE(sustained_loss.blocking);
+  EXPECT_TRUE(sustained_loss.confirmed_loss);
+}
+
+TEST(BringupContract, TerminalFailurePreservesActualCause)
+{
+  using savo_bringup::QualityLevel;
+  using savo_bringup::StartupStageInput;
+  using savo_bringup::StartupStageTiming;
+  using savo_bringup::StartupStageTracker;
+
+  StartupStageTracker tracker(StartupStageTiming{0.0, 0.5, 10.0});
+  StartupStageInput input;
+  input.processes_started = true;
+  input.unrecoverable_failure = true;
+  input.reason = "established_dependency_lost:bridge:bridge_heartbeat_stale";
+  const auto failed = tracker.Update(0.2, input);
+  ASSERT_TRUE(failed.failed);
+
+  input.unrecoverable_failure = false;
+  input.dependencies_ready = true;
+  input.quality = QualityLevel::kMinimum;
+  input.reason = "all_required_stage_dependencies_ready";
+  const auto latched = tracker.Update(0.4, input);
+  EXPECT_TRUE(latched.failed);
+  EXPECT_EQ(latched.quality, QualityLevel::kBelowMinimum);
+  EXPECT_EQ(latched.reason, failed.reason);
+  EXPECT_EQ(
+    latched.reason,
+    "established_dependency_lost:bridge:bridge_heartbeat_stale");
+}
+
+TEST(BringupContract, EdgeSequenceReachesReadyOnlyAfterEmptyCompleteIsStable)
+{
+  using savo_bringup::QualityLevel;
+  using savo_bringup::StartupStageInput;
+  using savo_bringup::StartupStageTiming;
+  using savo_bringup::StartupStageTracker;
+
+  StartupStageInput ready_input;
+  ready_input.processes_started = true;
+  ready_input.dependencies_ready = true;
+  ready_input.quality = QualityLevel::kMinimum;
+  ready_input.reason = "all_required_stage_dependencies_ready";
+
+  for (const auto * stage : {"infrastructure", "realsense", "vo", "bridge"}) {
+    StartupStageTracker tracker(StartupStageTiming{0.0, 0.0, 10.0});
+    EXPECT_TRUE(tracker.Update(0.0, ready_input).ready) << stage;
+  }
+
+  bool startup_complete = false;
+  StartupStageTracker complete(StartupStageTiming{0.0, 0.5, 10.0});
+  startup_complete = complete.Update(0.0, ready_input).ready;
+  EXPECT_FALSE(startup_complete);
+  startup_complete = complete.Update(0.5, ready_input).ready;
+  EXPECT_TRUE(startup_complete);
+}
+
+TEST(BringupContract, InfrastructureOnlyEdgeSequenceCompletes)
+{
+  using savo_bringup::QualityLevel;
+  using savo_bringup::StartupStageInput;
+  using savo_bringup::StartupStageTiming;
+  using savo_bringup::StartupStageTracker;
+
+  StartupStageInput ready_input;
+  ready_input.processes_started = true;
+  ready_input.dependencies_ready = true;
+  ready_input.quality = QualityLevel::kMinimum;
+
+  StartupStageTracker infrastructure(StartupStageTiming{0.5, 1.0, 15.0});
+  EXPECT_FALSE(infrastructure.Update(0.5, ready_input).ready);
+  EXPECT_TRUE(infrastructure.Update(1.5, ready_input).ready);
+
+  StartupStageTracker complete(StartupStageTiming{0.0, 0.5, 10.0});
+  EXPECT_FALSE(complete.Update(0.0, ready_input).ready);
+  EXPECT_TRUE(complete.Update(0.5, ready_input).ready);
+}
+
+TEST(BringupContract, CoreCompleteUsesTheSameFailClosedStableContract)
+{
+  using savo_bringup::QualityLevel;
+  using savo_bringup::StartupStageInput;
+  using savo_bringup::StartupStageState;
+  using savo_bringup::StartupStageTiming;
+  using savo_bringup::StartupStageTracker;
+
+  StartupStageTracker complete(StartupStageTiming{0.0, 0.5, 10.0});
+  StartupStageInput input;
+  input.processes_started = true;
+  input.dependencies_ready = true;
+  input.quality = QualityLevel::kMinimum;
+
+  EXPECT_EQ(complete.Update(0.0, input).state, StartupStageState::kStabilizing);
+  input.dependencies_ready = false;
+  input.reason = "supervisor_safe_unarmed_stale";
+  EXPECT_EQ(
+    complete.Update(0.25, input).state,
+    StartupStageState::kWaitingForDependencies);
+  input.dependencies_ready = true;
+  EXPECT_FALSE(complete.Update(0.5, input).ready);
+  EXPECT_TRUE(complete.Update(1.0, input).ready);
 }
 
 TEST(BringupContract, StartupStageRejectsBelowMinimumRequiredQuality)

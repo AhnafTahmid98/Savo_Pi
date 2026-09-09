@@ -157,27 +157,22 @@ not start mapping, Nav2, a navigation goal, or location lifecycle services.
 The location lifecycle is owned by `manual_mapping`, `autonomous_mapping`, and
 `saved_map_navigation`, or may be requested explicitly in another mode.
 
-Core readiness requires the local geometry, base, control/safety, LiDAR,
-perception, localization, power, and Supervisor contracts. Edge-owned bridge,
-RealSense, VO, obstacle-cloud, speech, and UI resources are not local Core
-readiness dependencies. The head starts in normal safe idle for camera and
-status availability, with `center_on_start=false`, but is not a basic driving
-readiness dependency; semantic mapping modes own the location/head integration
-they require.
+The Core operational baseline includes local geometry, base, control/safety,
+LiDAR, perception, localization, power, and Supervisor contracts. Edge-owned
+bridge, RealSense, VO, obstacle-cloud, speech, and UI resources are not Core
+startup dependencies. The head starts in normal safe idle for camera and status
+availability, with `center_on_start=false`, but is not a basic driving
+dependency; semantic mapping modes own the location/head integration they
+require.
 
-### Staged Core startup
+### Simple Core startup
 
-Canonical non-autonomous Core startup is staged to spread Raspberry Pi 5
-serial, GPIO/I2C, camera, localization, and DDS discovery work over time. Each
-stage is released only after its required retained/live health observations
-remain ready for the stable window in `config/startup_stages.yaml`. A finite
-stage timeout shuts launch down; elapsed wall time alone never proves readiness.
-
-The dependency order is infrastructure, hardware, motion/safety, sensor
-stabilization, localization, Supervisor startup, optional Nav2, optional
-SLAM/mapping runtime, optional head, optional semantic/locations, and complete.
-The complete state is deliberately safe and unarmed: control is `STOP`,
-Supervisor is not armed, and launch has submitted no action goal.
+Canonical Core startup uses ordinary package launch includes with bounded,
+historical compatibility offsets. Package-owned health and Supervisor
+authority remain responsible for runtime eligibility; no global readiness
+coordinator releases processes and there is no artificial `complete` stage.
+The robot still starts with control in `STOP`, Supervisor unarmed, and no
+submitted action goal.
 
 The historical delay arguments remain declared and forwarded for launch API
 compatibility:
@@ -196,25 +191,18 @@ compatibility:
 - `navigation_start_delay_s` (default `40.0`)
 - `readiness_start_delay_s` (default `45.0`)
 
-They no longer authorize or time stage transitions. `startup_stages.yaml` owns
-minimum settle, stable-ready, and timeout values. Existing `start_*` flags are
-evaluated before building the stage list, so disabled optional stages are
-omitted rather than represented by fake success.
+These offsets spread startup load but never prove health or authorize motion.
+Existing `start_*` flags omit disabled optional components.
 
 Safe idle remains stopped and unarmed, starts no SLAM or Nav2, does not center
 the head, and does not auto-start its scan. Manual SLAM and saved-map
 navigation start only in their matching dependency stages. Location services
 remain off in normal safe idle and do not imply navigation.
 
-The dedicated `autonomous_mapping.launch.py` uses the same coordinator. Nav2
-must publish startup readiness before SLAM foundation starts; SLAM must then
-publish real scan/map/TF/odom readiness before mapping runtime starts. Mission
-readiness and Supervisor lease admission remain separate and strict.
-
-ROS launch chains groups from successful stage-gate process exits. Normal
-Ctrl+C makes a waiting gate exit nonzero, so it cannot release another group.
-No shell sleeps or detached launch wrappers are involved. Core staging is
-independent from the separately configured Edge sequence.
+The dedicated `autonomous_mapping.launch.py` directly composes the current
+Nav2, SLAM, and mapping runtime. Launch initializes them but never submits the
+typed autonomous-mapping action; mission readiness and Supervisor lease
+admission remain separate and strict.
 
 Run the matching edge stack on `savo-edge`:
 
@@ -240,26 +228,24 @@ Supported robot modes are:
 
 Supported profiles are `bench`, `lidar_only`, `lidar_d435_voxel`, and
 `production`. Motion-capable non-bench profiles require a locked geometry
-profile. The D435 obstacle pipeline is hardware validated, so canonical
-real-robot Edge bringup defaults `d435_voxel_validated:=true` and
-`start_obstacle_cloud:=true`. It starts the single validated D435 camera,
-camera health authority, front-depth producer, VO, local raw pointcloud,
-filtered obstacle cloud, and compressed observer color relay. Camera health
+profile. Canonical `lidar_only` Edge bringup defaults
+`d435_voxel_validated:=false` and `start_obstacle_cloud:=false`; it may still
+start the D435 camera, front-depth producer, and VO. The filtered obstacle
+cloud is explicitly enabled only for controlled validation or the
+`lidar_d435_voxel` profile. Camera health
 uses the lightweight front-depth, VO-health, and obstacle-cloud-health signals;
 it does not add Image or PointCloud2 subscriptions to the production graph.
 Explicitly disabling the obstacle or observer relay remains available for
-controlled testing. When the validated obstacle cloud is started, its health
-and heartbeat are required by Edge readiness; it remains independent of the
-Core LiDAR navigation path, where LiDAR is the reliable clearing source.
+controlled testing. When the validated obstacle cloud is started, its package
+health and heartbeat remain observable; it remains independent of the Core
+LiDAR navigation path, where LiDAR is the reliable clearing source.
 
-### Staged Edge startup
+### Simple Edge startup
 
-Canonical Edge startup is staged to keep D435 USB initialization, DDS graph
-discovery, RGB-D VO, PointCloud2 filtering, and JPEG compression from creating
-one Raspberry Pi CPU/current/network spike. Its dependency order is optional
-power/infrastructure, RealSense, optional VO, optional obstacle cloud, Bridge,
-optional apps, and complete. Every enabled producer must remain ready for its
-configured stable window; each stage has a finite timeout.
+Canonical Edge startup uses ordinary package includes with bounded
+compatibility offsets to spread D435, VO, PointCloud2, Bridge, and optional-app
+startup load. There is no global stage gate or synthetic completion state;
+each producer publishes its own health and status.
 
 Raw PointCloud2 remains part of the single validated RealSense driver:
 `/camera/camera/depth/color/points` is transformed and filtered into
@@ -278,9 +264,8 @@ The historical delay arguments remain available for compatibility:
 - `bridge_start_delay_s` (default `46.0`)
 - `readiness_start_delay_s` (default `52.0`)
 
-They do not prove or release readiness. Stage timing is configured centrally in
-`startup_stages.yaml`. The nested RealSense launch receives zero compatibility
-delays because the Edge coordinator owns inter-subsystem sequencing.
+They do not prove readiness or authorize motion. The nested RealSense launch
+retains its own camera/support offsets.
 
 The normal hardware-validation command is:
 
@@ -300,16 +285,14 @@ ros2 launch savo_bringup robot_bringup.launch.py \
   start_ui:=false
 ```
 
-`start_edge_power:=false` omits the known-bad Edge UPS node and removes power
-from Edge readiness requirements. Bridge graph evidence also excludes both the
-UPS and Edge readiness node. The bridge proves its local Edge DDS presence from
-its own node and four owned topics, while independently requiring Core graph
-visibility, fresh observation topics, live command transport, and snapshot
-publication. Edge readiness may therefore require Bridge readiness without a
-`Bridge -> Edge readiness -> Bridge` cycle.
+`start_edge_power:=false` omits the known-bad Edge UPS node. Bridge graph
+evidence also excludes both the UPS and the retired Edge readiness node. The
+bridge proves its local Edge DDS presence from its own node and four owned
+topics, while independently requiring Core graph visibility, fresh observation
+topics, live command transport, and snapshot publication. There is therefore
+no `Bridge -> Edge readiness -> Bridge` cycle in production.
 
-During normal Ctrl+C shutdown, a pending gate cannot report successful stage
-completion and already-started child nodes are terminated by the launch
+During normal Ctrl+C shutdown, child nodes are terminated by the launch
 service. Speech and UI retain their existing optional behavior.
 
 For hardware discovery checks, avoid leaving the ROS 2 CLI daemon competing
@@ -333,7 +316,7 @@ ros2 launch savo_bringup saved_map_navigation.launch.py \
   control_startup_mode:=STOP
 ```
 
-The C++ `bringup_readiness_node` publishes:
+The retained diagnostic-only C++ `bringup_readiness_node` can publish:
 
 ```text
 /savo_bringup/core/state
@@ -347,9 +330,9 @@ The C++ `bringup_readiness_node` publishes:
 /savo_bringup/edge/diagnostics
 ```
 
-It aggregates the supervisor, navigation, bridge, RealSense, VO, and speech
-readiness required by the selected host and profile. It does not replace the
-safety, supervisor, AM-8, or Nav2 authorities.
+It is not launched by production Core, Edge, or autonomous-mapping bringup.
+It remains available for historical diagnostics and tests and does not replace
+the safety, Supervisor, mapping, or Nav2 authorities.
 
 Saved-map production navigation preserves the complete gate:
 

@@ -72,6 +72,14 @@ int main()
   snapshot.metadata_frame_id = "pi_camera_optical_frame";
   snapshot.frames_received = 10;
   snapshot.frame_rate_hz = 29.8;
+  assert(camera_rate_quality(config, snapshot) == "EXCELLENT");
+  snapshot.frame_rate_hz = 20.0;
+  assert(camera_rate_quality(config, snapshot) == "GOOD");
+  snapshot.frame_rate_hz = 10.0;
+  assert(camera_rate_quality(config, snapshot) == "MINIMUM");
+  snapshot.frame_rate_hz = 9.9;
+  assert(camera_rate_quality(config, snapshot) == "BELOW_MINIMUM");
+  snapshot.frame_rate_hz = 29.8;
 
   result = evaluate_camera_health(config, snapshot);
   assert(result.level == CameraHealthLevel::kWarn);
@@ -179,6 +187,9 @@ def test_camera_health_config_defaults_and_static_encoding_contract():
     assert health["expected_frame_id"] == "pi_camera_optical_frame"
     assert health["expected_encoding"] == driver["image_encoding"] == "rgb8"
     assert health["metadata_stale_timeout_s"] == 2.0
+    assert health["min_frame_rate_hz"] == 10.0
+    assert health["good_frame_rate_hz"] == 20.0
+    assert health["excellent_frame_rate_hz"] == 27.0
     assert "image_stale_timeout_s" not in health
     assert "camera_info_stale_timeout_s" not in health
     assert "strict_encoding" not in health

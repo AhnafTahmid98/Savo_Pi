@@ -278,3 +278,32 @@ def test_required_tofs_remain_required_and_ultrasonic_optional() -> None:
     config = _read(PACKAGE / "config" / "core" / "perception_core.yaml")
     assert "required_sensors:\n      - tof_left\n      - tof_right" in config
     assert "optional_sensors:\n      - depth_front\n      - ultrasonic_front" in config
+
+
+def test_range_rate_quality_is_package_local_and_preserves_optionality() -> None:
+    config = _read(PACKAGE / "config" / "core" / "perception_core.yaml")
+    cpp = _read(PACKAGE / "src" / "nodes" / "range_health_node.cpp")
+    fallback = _read(
+        PACKAGE / "savo_perception" / "nodes" / "range_health_node_py.py"
+    )
+
+    for token in (
+        "tof_minimum_rate_hz: 5.0",
+        "tof_good_rate_hz: 8.0",
+        "tof_excellent_rate_hz: 9.0",
+        "depth_minimum_rate_hz: 5.0",
+        "depth_good_rate_hz: 10.0",
+        "depth_excellent_rate_hz: 12.0",
+    ):
+        assert token in config
+
+    for source in (cpp, fallback):
+        assert "BELOW_MINIMUM" in source
+        assert "MINIMUM" in source
+        assert "GOOD" in source
+        assert "EXCELLENT" in source
+
+    assert 'include_depth_in_overall_ok_ &&' in cpp
+    assert "include_depth_in_overall_ok" in fallback
+    assert 'sensor_name == "ultrasonic_front"' in cpp
+    assert 'sensor_name == "ultrasonic_front"' in fallback

@@ -300,6 +300,15 @@ void ObstacleCloudFilterNode::declare_and_read_parameters()
     "max_processing_hz",
     10.0);
 
+  minimum_output_rate_hz_ =
+    declare_parameter<double>("minimum_output_rate_hz", 3.0);
+  good_output_rate_hz_ =
+    declare_parameter<double>("good_output_rate_hz", 5.0);
+  excellent_output_rate_hz_ =
+    declare_parameter<double>("excellent_output_rate_hz", 7.0);
+  output_rate_window_s_ =
+    declare_parameter<double>("output_rate_window_s", 2.0);
+
   stale_timeout_s_ =
     declare_parameter<double>(
     "stale_timeout_s",
@@ -348,6 +357,15 @@ std::string ObstacleCloudFilterNode::validate_parameters() const
 
   if (!finite_positive(max_processing_hz_)) {
     return "invalid_max_processing_rate";
+  }
+
+  if (
+    !finite_positive(minimum_output_rate_hz_) ||
+    good_output_rate_hz_ < minimum_output_rate_hz_ ||
+    excellent_output_rate_hz_ < good_output_rate_hz_ ||
+    !finite_positive(output_rate_window_s_))
+  {
+    return "invalid_output_rate_thresholds";
   }
 
   if (!finite_positive(stale_timeout_s_)) {
@@ -623,10 +641,21 @@ void ObstacleCloudFilterNode::handle_cloud(
 
   cloud_publisher_->publish(output);
 
+  const auto publication_time = std::chrono::steady_clock::now();
+  publication_times_.push_back(publication_time);
+  while (
+    publication_times_.size() > 2U &&
+    std::chrono::duration<double>(
+      publication_time - publication_times_.front()).count() >
+    output_rate_window_s_)
+  {
+    publication_times_.pop_front();
+  }
+
   ++clouds_published_;
   last_stats_ = result.stats;
   input_frame_ = message->header.frame_id;
-  last_valid_input_time_ = now();
+  last_valid_input_time_ = publication_time;
   have_valid_input_ = true;
   healthy_ = true;
   state_ = "ready";
@@ -659,21 +688,20 @@ void ObstacleCloudFilterNode::publish_health_and_status()
     configuration_valid_ &&
     have_valid_input_)
   {
-    double age_seconds = 0.0;
-
-    try {
-      age_seconds =
-        (now() - last_valid_input_time_).seconds();
-    } catch (const std::exception & error) {
-      healthy_ = false;
-      state_ = "stale";
-      reason_ = error.what();
-    }
+    const double age_seconds = std::chrono::duration<double>(
+      std::chrono::steady_clock::now() - last_valid_input_time_).count();
 
     if (age_seconds > stale_timeout_s_) {
       healthy_ = false;
       state_ = "stale";
       reason_ = "input_cloud_stale";
+    } else if (
+      publication_times_.size() >= 2U &&
+      output_rate_hz() < minimum_output_rate_hz_)
+    {
+      healthy_ = false;
+      state_ = "degraded";
+      reason_ = "output_rate_below_minimum";
     }
   }
 
@@ -706,13 +734,8 @@ std::string ObstacleCloudFilterNode::make_status_json() const
   double age_seconds = -1.0;
 
   if (have_valid_input_) {
-    try {
-      age_seconds =
-        (now() - last_valid_input_time_).seconds();
-    } catch (const std::exception &) {
-      age_seconds =
-        std::numeric_limits<double>::infinity();
-    }
+    age_seconds = std::chrono::duration<double>(
+      std::chrono::steady_clock::now() - last_valid_input_time_).count();
   }
 
   std::ostringstream output;
@@ -737,10 +760,44 @@ std::string ObstacleCloudFilterNode::make_status_json() const
   output << ",\"clouds_published\":" << clouds_published_;
   output << ",\"clouds_rate_limited\":" << clouds_rate_limited_;
   output << ",\"max_processing_hz\":" << max_processing_hz_;
+  output << ",\"output_rate_hz\":" << output_rate_hz();
+  output << ",\"rate_quality\":\"" << output_rate_quality() << "\"";
+  output << ",\"minimum_output_rate_hz\":" << minimum_output_rate_hz_;
+  output << ",\"good_output_rate_hz\":" << good_output_rate_hz_;
+  output << ",\"excellent_output_rate_hz\":" << excellent_output_rate_hz_;
+  output << ",\"output_rate_window_s\":" << output_rate_window_s_;
   output << ",\"age_seconds\":" << age_seconds;
   output << ",\"clearing_supported\":false";
   output << ",\"semantics\":\"obstacle_only\"}";
   return output.str();
+}
+
+double ObstacleCloudFilterNode::output_rate_hz() const
+{
+  if (publication_times_.size() < 2U) {
+    return 0.0;
+  }
+  const double interval_s = std::chrono::duration<double>(
+    publication_times_.back() - publication_times_.front()).count();
+  if (!finite_positive(interval_s)) {
+    return 0.0;
+  }
+  return static_cast<double>(publication_times_.size() - 1U) / interval_s;
+}
+
+std::string ObstacleCloudFilterNode::output_rate_quality() const
+{
+  const double rate_hz = output_rate_hz();
+  if (rate_hz < minimum_output_rate_hz_) {
+    return "BELOW_MINIMUM";
+  }
+  if (rate_hz < good_output_rate_hz_) {
+    return "MINIMUM";
+  }
+  if (rate_hz < excellent_output_rate_hz_) {
+    return "GOOD";
+  }
+  return "EXCELLENT";
 }
 
 }  // namespace savo_perception

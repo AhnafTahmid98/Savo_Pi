@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from .lidar_config import LidarDriverConfig, make_driver_config
-from .lidar_health import LidarHealth
+from .lidar_health import LidarHealth, lidar_rate_quality
 from .lidar_state import LidarState, make_lidar_state
 from .scan_quality import ScanQuality, make_scan_quality, quality_status
 from .sector_scan import SectorScan, make_sector_scan
@@ -19,5 +19,6 @@ __all__ = [
     'make_lidar_state',
     'make_scan_quality',
     'make_sector_scan',
+    'lidar_rate_quality',
     'quality_status',
 ]

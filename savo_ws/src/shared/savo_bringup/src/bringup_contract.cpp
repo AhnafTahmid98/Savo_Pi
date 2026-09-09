@@ -364,7 +364,8 @@ StartupStageDecision StartupStageTracker::Update(
   if (terminal_failed_) {
     decision.state = StartupStageState::kFailed;
     decision.failed = true;
-    decision.reason = input.reason.empty() ? "stage_failed" : input.reason;
+    decision.quality = QualityLevel::kBelowMinimum;
+    decision.reason = terminal_failure_reason_;
     return decision;
   }
   if (terminal_ready_) {
@@ -378,25 +379,28 @@ StartupStageDecision StartupStageTracker::Update(
     input.unrecoverable_failure)
   {
     terminal_failed_ = true;
+    terminal_failure_reason_ = !input.configuration_valid ? "invalid_stage_configuration" :
+      (input.reason.empty() ? "unrecoverable_stage_failure" : input.reason);
     decision.state = StartupStageState::kFailed;
     decision.failed = true;
-    decision.reason = !input.configuration_valid ? "invalid_stage_configuration" :
-      (input.reason.empty() ? "unrecoverable_stage_failure" : input.reason);
+    decision.reason = terminal_failure_reason_;
     return decision;
   }
   if (!std::isfinite(elapsed_s) || elapsed_s < 0.0) {
     terminal_failed_ = true;
+    terminal_failure_reason_ = "invalid_stage_clock";
     decision.state = StartupStageState::kFailed;
     decision.failed = true;
-    decision.reason = "invalid_stage_clock";
+    decision.reason = terminal_failure_reason_;
     return decision;
   }
   if (elapsed_s >= timing_.startup_timeout_s) {
     terminal_failed_ = true;
+    terminal_failure_reason_ = input.reason.empty() ? "stage_startup_timeout" :
+      "stage_startup_timeout:" + input.reason;
     decision.state = StartupStageState::kFailed;
     decision.failed = true;
-    decision.reason = input.reason.empty() ? "stage_startup_timeout" :
-      "stage_startup_timeout:" + input.reason;
+    decision.reason = terminal_failure_reason_;
     return decision;
   }
   if (!input.processes_started || elapsed_s < timing_.minimum_settle_s) {
@@ -429,6 +433,35 @@ StartupStageDecision StartupStageTracker::Update(
   decision.state = StartupStageState::kStabilizing;
   decision.reason = "waiting_for_stable_ready_window";
   return decision;
+}
+
+EstablishedDependencyTracker::EstablishedDependencyTracker(
+  const std::size_t confirmation_samples)
+: confirmation_samples_(std::max<std::size_t>(1U, confirmation_samples))
+{
+}
+
+EstablishedDependencyDecision EstablishedDependencyTracker::Update(
+  const std::string_view loss_signature) noexcept
+{
+  if (loss_signature.empty()) {
+    consecutive_loss_samples_ = 0U;
+    last_loss_signature_.clear();
+    return {};
+  }
+  if (loss_signature != last_loss_signature_) {
+    consecutive_loss_samples_ = 0U;
+    last_loss_signature_ = loss_signature;
+  }
+  if (consecutive_loss_samples_ < confirmation_samples_) {
+    ++consecutive_loss_samples_;
+  }
+  return {true, consecutive_loss_samples_ >= confirmation_samples_};
+}
+
+std::size_t EstablishedDependencyTracker::confirmation_samples() const noexcept
+{
+  return confirmation_samples_;
 }
 
 ReadinessDecision EvaluateReadiness(

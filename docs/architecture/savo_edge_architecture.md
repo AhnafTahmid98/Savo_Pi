@@ -13,7 +13,7 @@ ROS state <-> savo_bridge <-> /run/savo_bridge/* <-> SavoMind
 ROS state -> savo_ui (read-only)
 ```
 
-The repository-bound D435 configuration selects serial `801212070967`, depth `848 x 480 @ 30 Hz`, color `640 x 480 @ 30 Hz`, aligned depth, and synchronized point-cloud profile. These values describe configuration, not proof that the installed device/USB path meets them. RealSense TF publication is disabled; shared description owns its fixed frames.
+The repository-bound D435 configuration selects serial `801212070967`, depth `848 x 480 @ 15 Hz`, color `640 x 480 @ 15 Hz`, aligned depth, and synchronized point-cloud profile. These values describe configuration, not proof that the installed device/USB path meets them. RealSense TF publication is disabled; shared description owns its fixed frames.
 
 ## Authority boundary
 

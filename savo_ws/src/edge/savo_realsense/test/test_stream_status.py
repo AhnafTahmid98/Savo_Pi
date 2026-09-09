@@ -54,33 +54,41 @@ def test_stream_status_not_ok_when_rate_is_zero() -> None:
     assert not status.ok
 
 
-def test_stream_status_below_expected_rate_when_less_than_half_expected() -> None:
+def test_camera_rate_uses_production_minimum_not_legacy_ratio() -> None:
     status = StreamStatus(
         topic="/camera/camera/color/image_raw",
         seen=True,
         stale=False,
-        rate_hz=10.0,
-        expected_hz=30.0,
+        rate_hz=7.99,
+        expected_hz=15.0,
         last_age_s=0.01,
     )
 
     assert status.below_expected_rate
 
 
-def test_stream_status_not_below_expected_rate_at_half_expected() -> None:
+def test_camera_rate_quality_boundaries() -> None:
     status = StreamStatus(
         topic="/camera/camera/color/image_raw",
         seen=True,
         stale=False,
-        rate_hz=15.0,
-        expected_hz=30.0,
+        rate_hz=8.0,
+        expected_hz=15.0,
         last_age_s=0.01,
     )
 
     assert not status.below_expected_rate
+    assert status.rate_quality == "MINIMUM"
+
+    assert StreamStatus(
+        "/color", True, False, 12.0, 15.0, 0.01
+    ).rate_quality == "GOOD"
+    assert StreamStatus(
+        "/color", True, False, 14.0, 15.0, 0.01
+    ).rate_quality == "EXCELLENT"
 
 
-def test_stream_status_ignores_rate_check_when_expected_rate_is_zero() -> None:
+def test_one_hz_pointcloud_is_below_minimum_even_when_fresh() -> None:
     status = StreamStatus(
         topic="/camera/camera/depth/color/points",
         seen=True,
@@ -90,10 +98,11 @@ def test_stream_status_ignores_rate_check_when_expected_rate_is_zero() -> None:
         last_age_s=0.01,
     )
 
-    assert not status.below_expected_rate
+    assert status.below_expected_rate
+    assert not status.ok
 
 
-def test_validated_native_pointcloud_rate_remains_healthy_when_fresh() -> None:
+def test_pointcloud_below_three_hz_is_degraded_when_fresh() -> None:
     status = StreamStatus(
         topic="/camera/camera/depth/color/points",
         seen=True,
@@ -103,5 +112,21 @@ def test_validated_native_pointcloud_rate_remains_healthy_when_fresh() -> None:
         last_age_s=0.37,
     )
 
-    assert status.ok
+    assert not status.ok
     assert status.below_expected_rate
+
+
+def test_pointcloud_rate_quality_boundaries() -> None:
+    """The optional 8 Hz cloud producer reports its own quality bands."""
+    def make(rate: float) -> StreamStatus:
+        return StreamStatus(
+            "/camera/camera/depth/color/points",
+            True,
+            False,
+            rate,
+            8.0,
+            0.01,
+        )
+    assert make(3.0).rate_quality == "MINIMUM"
+    assert make(5.0).rate_quality == "GOOD"
+    assert make(7.0).rate_quality == "EXCELLENT"

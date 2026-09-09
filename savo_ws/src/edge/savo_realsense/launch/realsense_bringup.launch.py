@@ -61,6 +61,21 @@ def generate_launch_description() -> LaunchDescription:
         ],
     )
 
+    stream_monitor_node = Node(
+        package="savo_realsense",
+        executable="camera_topic_monitor_node",
+        name="camera_topic_monitor_node",
+        output="screen",
+        parameters=[
+            nodes_config_file,
+            {
+                "require_pointcloud": ParameterValue(
+                    require_obstacle_cloud_health, value_type=bool
+                ),
+            },
+        ],
+    )
+
     depth_front_min_node = Node(
         package="savo_realsense",
         executable="depth_front_min_node",
@@ -170,7 +185,7 @@ def generate_launch_description() -> LaunchDescription:
         ),
         TimerAction(
             period=camera_support_start_delay_s,
-            actions=[health_node, depth_front_min_node],
+            actions=[health_node, stream_monitor_node, depth_front_min_node],
             cancel_on_shutdown=True,
         ),
         TimerAction(

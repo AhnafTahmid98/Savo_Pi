@@ -190,6 +190,10 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_driver_dryrun test/test_driver_dryrun.py)
   ament_add_pytest_test(test_cpp_cadence_contract test/test_cpp_cadence_contract.py)
   ament_add_pytest_test(test_lidar_models test/test_lidar_models.py)
+  ament_add_pytest_test(
+    test_mapping_quality_contract
+    test/test_mapping_quality_contract.py
+  )
   ament_add_pytest_test(test_frame_contract test/test_frame_contract.py)
 endif()
 

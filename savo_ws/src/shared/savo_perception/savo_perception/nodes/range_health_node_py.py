@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import math
 import time
+from collections import deque
 from typing import Dict
 
 try:
@@ -40,10 +41,21 @@ class RangeHealthNodePy(Node):
         self.declare_parameter("depth_front_topic", "/depth/min_front_m")
         self.declare_parameter("tof_left_topic", "/savo_perception/range/left_m")
         self.declare_parameter("tof_right_topic", "/savo_perception/range/right_m")
-        self.declare_parameter("ultrasonic_front_topic", "/savo_perception/range/front_ultrasonic_m")
+        self.declare_parameter(
+            "ultrasonic_front_topic",
+            "/savo_perception/range/front_ultrasonic_m",
+        )
         self.declare_parameter("range_health_topic", "/savo_perception/range_health")
         self.declare_parameter("publish_hz", 2.0)
         self.declare_parameter("stale_timeout_s", 0.30)
+        self.declare_parameter("rate_window_s", 2.0)
+        self.declare_parameter("rate_min_samples", 5)
+        self.declare_parameter("tof_minimum_rate_hz", 5.0)
+        self.declare_parameter("tof_good_rate_hz", 8.0)
+        self.declare_parameter("tof_excellent_rate_hz", 9.0)
+        self.declare_parameter("depth_minimum_rate_hz", 5.0)
+        self.declare_parameter("depth_good_rate_hz", 10.0)
+        self.declare_parameter("depth_excellent_rate_hz", 12.0)
         self.declare_parameter("include_depth_in_overall_ok", False)
         self.declare_parameter("use_ultrasonic", True)
         self.declare_parameter("required_sensors", ["tof_left", "tof_right"])
@@ -75,6 +87,31 @@ class RangeHealthNodePy(Node):
         self.optional_sensors = [
             str(name) for name in self.get_parameter("optional_sensors").value
         ]
+        self.rate_window_s = max(
+            0.1, float(self.get_parameter("rate_window_s").value)
+        )
+        self.rate_min_samples = max(
+            2, int(self.get_parameter("rate_min_samples").value)
+        )
+        self.tof_rate_thresholds = (
+            float(self.get_parameter("tof_minimum_rate_hz").value),
+            float(self.get_parameter("tof_good_rate_hz").value),
+            float(self.get_parameter("tof_excellent_rate_hz").value),
+        )
+        self.depth_rate_thresholds = (
+            float(self.get_parameter("depth_minimum_rate_hz").value),
+            float(self.get_parameter("depth_good_rate_hz").value),
+            float(self.get_parameter("depth_excellent_rate_hz").value),
+        )
+        self.receipt_times = {
+            name: deque()
+            for name in (
+                "depth_front",
+                "tof_left",
+                "tof_right",
+                "ultrasonic_front",
+            )
+        }
 
         self.samples: Dict[str, RangeSample] = {
             "depth_front": self._missing_sample("depth_front", required=False),
@@ -126,8 +163,45 @@ class RangeHealthNodePy(Node):
         )
 
     def _on_range_msg(self, sensor_name: str, msg, *, required: bool) -> None:
+        self._record_receipt(sensor_name)
         value = getattr(msg, "data", math.nan)
         self.samples[sensor_name] = self._sample_from_value(sensor_name, value, required=required)
+
+    def _record_receipt(self, sensor_name: str) -> None:
+        now_s = time.monotonic()
+        times = self.receipt_times[sensor_name]
+        times.append(now_s)
+        while len(times) > 2 and now_s - times[0] > self.rate_window_s:
+            times.popleft()
+
+    def _rate_valid(self, sensor_name: str) -> bool:
+        return len(self.receipt_times[sensor_name]) >= self.rate_min_samples
+
+    def _receive_rate_hz(self, sensor_name: str) -> float:
+        times = self.receipt_times[sensor_name]
+        if len(times) < 2:
+            return 0.0
+        interval_s = times[-1] - times[0]
+        return (len(times) - 1) / interval_s if interval_s > 0.0 else 0.0
+
+    def _rate_quality(self, sensor_name: str) -> str:
+        if sensor_name == "ultrasonic_front":
+            return "NOT_APPLICABLE"
+        if not self._rate_valid(sensor_name):
+            return "ESTABLISHING"
+        thresholds = (
+            self.depth_rate_thresholds
+            if sensor_name == "depth_front"
+            else self.tof_rate_thresholds
+        )
+        rate_hz = self._receive_rate_hz(sensor_name)
+        if rate_hz < thresholds[0]:
+            return "BELOW_MINIMUM"
+        if rate_hz < thresholds[1]:
+            return "MINIMUM"
+        if rate_hz < thresholds[2]:
+            return "GOOD"
+        return "EXCELLENT"
 
     def _on_timer(self) -> None:
         now_s = time.monotonic()
@@ -154,13 +228,19 @@ class RangeHealthNodePy(Node):
         ]
 
         required_health = [health[name] for name in required_sensors]
-        ok = all(item.ok for item in required_health)
+        low_rate_required = [
+            item.sensor_name
+            for item in required_health
+            if self._rate_quality(item.sensor_name) == "BELOW_MINIMUM"
+        ]
+        ok = all(item.ok for item in required_health) and not low_rate_required
 
         stale_required = [item.sensor_name for item in required_health if item.stale]
         error_required = [
             item.sensor_name
             for item in required_health
-            if not item.ok and not item.stale
+            if (not item.ok and not item.stale)
+            or item.sensor_name in low_rate_required
         ]
 
         if ok:
@@ -182,7 +262,15 @@ class RangeHealthNodePy(Node):
             ),
             "stale_sensors": stale_required,
             "error_sensors": error_required,
-            "sensors": {name: item.to_dict() for name, item in health.items()},
+            "sensors": {
+                name: {
+                    **item.to_dict(),
+                    "receive_rate_hz": self._receive_rate_hz(name),
+                    "rate_valid": self._rate_valid(name),
+                    "rate_quality": self._rate_quality(name),
+                }
+                for name, item in health.items()
+            },
         }
 
         msg = String()
@@ -227,7 +315,10 @@ class RangeHealthNodePy(Node):
 
 def main(args=None) -> int:
     if not ROS_AVAILABLE:
-        print("ERROR: rclpy/std_msgs are not available. Source ROS 2 Jazzy before running this node.")
+        print(
+            "ERROR: rclpy/std_msgs are not available. "
+            "Source ROS 2 Jazzy before running this node."
+        )
         return 1
 
     rclpy.init(args=args)

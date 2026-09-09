@@ -55,12 +55,6 @@ private:
 
   void OnStatus(const std::string & payload)
   {
-    if (Completed(payload)) {
-      exit_code_ = 0;
-      RCLCPP_INFO(get_logger(), "Startup stage '%s' is ready", target_stage_.c_str());
-      rclcpp::shutdown();
-      return;
-    }
     const std::string current = "\"current_stage\":\"" + target_stage_ + "\"";
     if (payload.find(current) != std::string::npos &&
       payload.find("\"state\":\"FAILED\"") != std::string::npos)
@@ -68,6 +62,12 @@ private:
       exit_code_ = 2;
       RCLCPP_ERROR(
         get_logger(), "Startup stage '%s' failed: %s", target_stage_.c_str(), payload.c_str());
+      rclcpp::shutdown();
+      return;
+    }
+    if (Completed(payload)) {
+      exit_code_ = 0;
+      RCLCPP_INFO(get_logger(), "Startup stage '%s' is ready", target_stage_.c_str());
       rclcpp::shutdown();
     }
   }

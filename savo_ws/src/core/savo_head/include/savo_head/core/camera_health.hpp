@@ -25,6 +25,8 @@ struct CameraHealthConfig
   double startup_grace_s{3.0};
   double metadata_stale_timeout_s{2.0};
   double min_frame_rate_hz{10.0};
+  double good_frame_rate_hz{20.0};
+  double excellent_frame_rate_hz{27.0};
 
   std::uint64_t min_frame_samples{5U};
 
@@ -68,6 +70,10 @@ struct CameraHealthResult
 };
 
 [[nodiscard]] const char * to_string(CameraHealthLevel level);
+
+[[nodiscard]] std::string camera_rate_quality(
+  const CameraHealthConfig & config,
+  const CameraHealthSnapshot & snapshot);
 
 [[nodiscard]] CameraHealthResult evaluate_camera_health(
   const CameraHealthConfig & config,

@@ -103,41 +103,38 @@ def test_every_staged_launch_configuration_is_declared() -> None:
         assert referenced <= declared, (path, referenced - declared)
 
 
-def test_edge_stages_use_nonblocking_dependency_gates() -> None:
-    """Heavy Edge stages are released by health, not elapsed wall time."""
+def test_edge_uses_simple_bounded_offsets_without_global_gates() -> None:
+    """Edge production has no Phase-3 process-release coordinator."""
     edge = read(EDGE_LAUNCH)
     realsense = read(REALSENSE_LAUNCH)
 
-    assert "TimerAction" not in edge
-    assert "StartupStageGroup" in edge
-    assert "build_staged_sequence" in edge
-    assert '"startup.enabled": True' in edge
-    assert '"startup_stages.yaml"' in edge
-    for stage in (
-        "infrastructure",
-        "realsense",
-        "vo",
-        "obstacle_cloud",
-        "bridge",
-        "optional_apps",
-        "complete",
-    ):
-        assert f'"{stage}"' in edge
+    assert "TimerAction" in edge
+    assert "StartupStageGroup" not in edge
+    assert "build_staged_sequence" not in edge
+    assert "startup_stage_gate_node" not in edge
+    assert "bringup_readiness_node" not in edge
+    assert '"complete"' not in edge
 
-    # The camera package retains its local compatibility timers, but the Edge
-    # entrypoint forces all of them to zero and proves readiness by status.
     assert "from launch.actions import TimerAction" in realsense
     for name in (
         "realsense_start_delay_s",
         "camera_support_start_delay_s",
         "observer_relay_start_delay_s",
     ):
-        assert f'"{name}": "0.0"' in edge
+        assert f'"{name}": LaunchConfiguration(' in edge
 
     assert "ExecuteProcess" not in edge
     assert "sleep" not in edge.lower()
     assert "ExecuteProcess" not in realsense
     assert "sleep" not in realsense.lower()
+
+
+def test_edge_has_no_artificial_terminal_stage() -> None:
+    """Completion is component-owned rather than a synthetic launch stage."""
+    edge = read(EDGE_LAUNCH)
+    assert "StartupStageGroup" not in edge
+    assert "build_staged_sequence" not in edge
+    assert '"complete"' not in edge
 
 
 def test_pending_stages_fail_closed_on_launch_shutdown() -> None:
@@ -194,8 +191,11 @@ def test_camera_stage_is_one_driver_then_support_then_observer_relay() -> None:
 
     assert launch.count('executable="realsense2_camera_node"') == 1
     assert "actions=[realsense_node]" in launch
-    assert "actions=[health_node, depth_front_min_node]" in launch
-    assert 'executable="camera_topic_monitor_node"' not in launch
+    assert (
+        "actions=[health_node, stream_monitor_node, depth_front_min_node]"
+        in launch
+    )
+    assert 'executable="camera_topic_monitor_node"' in launch
     assert "actions=[observer_color_relay]" in launch
     assert 'condition=IfCondition(use_depth_front_min)' in launch
     assert 'condition=IfCondition(enable_observer_color_relay)' in launch
@@ -212,7 +212,7 @@ def test_camera_health_requirements_follow_enabled_edge_consumers() -> None:
     assert '"require_vo_health": ParameterValue(' in realsense
     assert '"require_obstacle_cloud_health": ParameterValue(' in realsense
     assert 'default_value="false"' in realsense
-    assert '"require_obstacle_cloud": start_obstacle_cloud' in edge
+    assert "bringup_readiness_node" not in edge
 
 
 def test_feature_flags_gate_all_dependency_released_edge_components() -> None:
@@ -266,13 +266,13 @@ def test_systemd_and_edge_launch_have_one_default_ui_owner() -> None:
     assert edge.count('"savo_ui", "ui_bringup.launch.py"') == 1
 
 
-def test_edge_power_remains_optional_for_readiness() -> None:
-    """Broken Edge UPS hardware can be disabled without blocking readiness."""
+def test_edge_power_remains_optional() -> None:
+    """Broken Edge UPS hardware remains opt-in and outside startup authority."""
     launch = read(EDGE_LAUNCH)
 
     assert 'start_power = as_bool(_value(context, "start_power"))' in launch
     assert "if start_power:" in launch
-    assert '"require_power": start_power' in launch
+    assert "bringup_readiness_node" not in launch
     assert 'DeclareLaunchArgument("start_power", default_value="false")' in launch
 
 

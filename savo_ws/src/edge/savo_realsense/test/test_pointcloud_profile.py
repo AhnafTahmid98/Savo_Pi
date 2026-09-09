@@ -107,7 +107,7 @@ def test_compatibility_pointcloud_profiles_match_canonical_production() -> None:
     )
 
 
-def test_native_health_uses_fresh_nonzero_pointcloud_not_expected_rate() -> None:
+def test_native_health_requires_minimum_rate_quality() -> None:
     implementation = (
         PACKAGE_ROOT / "src" / "camera_monitor_common.cpp"
     ).read_text(encoding="utf-8")
@@ -115,8 +115,8 @@ def test_native_health_uses_fresh_nonzero_pointcloud_not_expected_rate() -> None
         "bool StreamStatus::ok() const", maxsplit=1
     )[1].split("}", maxsplit=1)[0]
 
-    assert "return seen && !stale && rate_hz > 0.0;" in ok_body
-    assert "expected_hz" not in ok_body
+    assert 'rate_quality != "BELOW_MINIMUM"' in ok_body
+    assert 'add_value("rate_quality", status.rate_quality)' in implementation
 
 
 def test_production_health_does_not_subscribe_to_camera_payloads() -> None:

@@ -42,7 +42,7 @@ def load_launch_module():
 
 
 def test_launch_description_constructs():
-    """Verify the complete saved-map node set, including startup readiness."""
+    """Verify the complete saved-map node set without a startup gate."""
     module = load_launch_module()
 
     description = module.generate_launch_description()
@@ -82,13 +82,12 @@ def test_launch_description_constructs():
             ('nav2_lifecycle_manager', 'lifecycle_manager'): 2,
             ('savo_nav', 'goal_gateway_node'): 1,
             ('savo_nav', 'navigation_readiness_node'): 1,
-            ('savo_nav', 'nav2_startup_readiness_node'): 1,
             ('savo_nav', 'control_recovery_guard_node'): 1,
             ('savo_nav', 'goal_admission_gate_node'): 1,
         }
     )
 
-    assert sum(identities.values()) == 14
+    assert sum(identities.values()) == 13
     assert identities == expected_identities
 
 

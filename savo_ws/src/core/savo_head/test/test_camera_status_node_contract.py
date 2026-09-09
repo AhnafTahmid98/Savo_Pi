@@ -50,8 +50,17 @@ def test_live_camera_status_topics_and_public_outputs_are_locked():
         '"ready_for_pose_estimation"',
         '"stream_metadata_seen"',
         '"image_publisher_present"',
+        '"rate_quality"',
     ):
         assert fragment in source
+
+
+def test_elapsed_health_time_is_monotonic_and_message_stamps_remain_ros_time():
+    source = read("src/nodes/head_camera_status_node.cpp")
+
+    assert "std::chrono::steady_clock::now().time_since_epoch()" in source
+    assert "stamp_nanoseconds(msg->header.stamp)" in source
+    assert "array.header.stamp = now();" in source
 
 
 def test_camera_health_yaml_matches_node():

@@ -21,7 +21,7 @@ def make_stream_diagnostic(
     hardware_id: str = "intel_realsense",
 ) -> DiagnosticStatus:
     level = DiagnosticStatus.OK
-    message = "stream OK"
+    message = f"stream {status.rate_quality}"
 
     if not status.seen:
         level = DiagnosticStatus.ERROR
@@ -31,7 +31,7 @@ def make_stream_diagnostic(
         message = "stream stale"
     elif status.below_expected_rate:
         level = DiagnosticStatus.WARN
-        message = "stream below expected rate"
+        message = "stream BELOW_MINIMUM"
 
     return DiagnosticStatus(
         level=level,

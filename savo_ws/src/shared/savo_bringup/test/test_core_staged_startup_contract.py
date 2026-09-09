@@ -107,27 +107,16 @@ def test_core_stage_defaults_are_dependency_ordered() -> None:
     assert float(defaults["readiness_start_delay_s"]) > 40.0
 
 
-def test_core_stages_use_nonblocking_dependency_gates() -> None:
-    """Core startup is released by retained stage status, never wall time."""
+def test_core_uses_simple_bounded_launch_offsets_without_global_gates() -> None:
+    """Core production has no Phase-3 process-release coordinator."""
     launch = read(CORE_LAUNCH)
 
-    assert "TimerAction" not in launch
-    assert "StartupStageGroup" in launch
-    assert "build_staged_sequence" in launch
-    assert '"startup.enabled": True' in launch
-    assert '"startup_stages.yaml"' in launch
-    for stage in (
-        "infrastructure",
-        "hardware",
-        "motion_safety",
-        "sensor_stabilization",
-        "localization",
-        "supervisor",
-        "navigation",
-        "slam_foundation",
-        "complete",
-    ):
-        assert f'"{stage}"' in launch
+    assert "TimerAction" in launch
+    assert "StartupStageGroup" not in launch
+    assert "build_staged_sequence" not in launch
+    assert "startup_stage_gate_node" not in launch
+    assert "bringup_readiness_node" not in launch
+    assert '"complete"' not in launch
     assert "ExecuteProcess" not in launch
     assert "subprocess" not in launch
     assert "time.sleep" not in launch
@@ -235,7 +224,7 @@ def test_modes_start_only_their_owned_mapping_or_navigation_stack() -> None:
 
 
 def test_core_composition_keeps_single_component_owners() -> None:
-    """Staging wraps existing includes instead of duplicating stacks."""
+    """Simple bringup includes each component stack once."""
     core = read(CORE_LAUNCH)
     autonomous = read(AUTONOMOUS_LAUNCH)
 
@@ -246,24 +235,16 @@ def test_core_composition_keeps_single_component_owners() -> None:
     ):
         assert core.count(marker) == 1
 
-    # Localization is deliberately split into producer hardware and the
-    # EKF/aggregate-health stage; mutually exclusive flags keep one owner.
-    assert core.count('"savo_localization", "localization_bringup.launch.py"') == 2
+    assert core.count('"savo_localization", "localization_bringup.launch.py"') == 1
     assert '"use_imu": "true"' in core
     assert '"use_wheel_odom": "true"' in core
-    assert '"use_ekf": "false"' in core
-    assert '"use_imu": "false"' in core
-    assert '"use_wheel_odom": "false"' in core
     assert '"use_ekf": "true"' in core
 
     assert autonomous.count('"savo_description", "description.launch.py"') == 1
     assert autonomous.count('"savo_base", "base_bringup.launch.py"') == 1
-    assert autonomous.count('"localization_bringup.launch.py"') == 2
+    assert autonomous.count('"localization_bringup.launch.py"') == 1
     assert '"use_imu": "true"' in autonomous
     assert '"use_wheel_odom": "true"' in autonomous
-    assert '"use_ekf": "false"' in autonomous
-    assert '"use_imu": "false"' in autonomous
-    assert '"use_wheel_odom": "false"' in autonomous
     assert '"use_ekf": "true"' in autonomous
     assert autonomous.count('"savo_supervisor", "supervisor.launch.py"') == 1
 
@@ -274,27 +255,16 @@ def test_core_composition_keeps_single_component_owners() -> None:
     assert description.count('package="robot_state_publisher"') == 1
 
 
-def test_readiness_starts_last_without_weakening_requirements() -> None:
-    """Readiness observes the settled system with its existing gates."""
+def test_global_readiness_is_not_a_production_launch_authority() -> None:
+    """Package health and Supervisor remain independent of global bringup."""
     launch = read(CORE_LAUNCH)
     readiness_source = read(
         PACKAGE_ROOT / "src/nodes/bringup_readiness_node.cpp"
     )
 
-    readiness_offset = launch.index('"readiness_start_delay_s"')
-    assert readiness_offset > launch.index('"navigation_start_delay_s"')
-    for gate in (
-        '"require_base": start_base',
-        '"require_control": start_control',
-        '"require_safety": start_perception',
-        '"require_lidar": start_lidar',
-        '"require_localization": start_localization',
-        '"require_power": start_power',
-        '"require_mapping": requirements.require_mapping',
-        '"require_navigation": requirements.require_navigation',
-    ):
-        assert gate in launch
-    assert 'SubscribeString("supervisor_heartbeat"' in readiness_source
+    assert "bringup_readiness_node" not in launch
+    assert "startup_stage_gate_node" not in launch
+    assert '"supervisor_heartbeat", "supervisor_heartbeat_topic"' in readiness_source
     assert "/savo_bringup/core/ready" not in read(
         PROJECT_ROOT / "savo_ws/src/shared/savo_supervisor/config/supervisor.yaml"
     )
@@ -334,6 +304,6 @@ def test_autonomous_mapping_authority_path_is_intentionally_unchanged() -> None:
 
     assert 'if mode == "autonomous_mapping":' in core
     assert '"autonomous_mapping.launch.py"' in core
-    assert "TimerAction" not in autonomous
+    assert "StartupStageGroup" not in autonomous
     assert 'default_value="STOP"' in autonomous
     assert "typed RunAutonomousMapping action only after readiness" in autonomous

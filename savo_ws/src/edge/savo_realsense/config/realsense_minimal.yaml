@@ -46,7 +46,13 @@ camera_topic_monitor_node:
     expected_depth_hz: 15.0
     expected_aligned_depth_hz: 15.0
     expected_camera_info_hz: 15.0
-    expected_pointcloud_hz: 10.0
+    expected_pointcloud_hz: 8.0
+    camera_minimum_hz: 8.0
+    camera_good_hz: 12.0
+    camera_excellent_hz: 14.0
+    pointcloud_minimum_hz: 3.0
+    pointcloud_good_hz: 5.0
+    pointcloud_excellent_hz: 7.0
 
     require_pointcloud: false
     require_aligned_depth: false
