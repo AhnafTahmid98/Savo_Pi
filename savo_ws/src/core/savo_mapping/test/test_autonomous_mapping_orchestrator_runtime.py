@@ -352,16 +352,19 @@ class RuntimeHarness:
                 identity_exact
                 and request.expected_generation == self.authority_generation
             )
-            authorized = (
-                self.authority_allowed
-                and exact
-                and self.authority_state != 'IDLE'
-                and (
-                    request.command
-                    != AuthorizeOperation.Request.COMMAND_CHECK
-                    or self.authority_state == 'ACTIVE'
+            if request.command == AuthorizeOperation.Request.COMMAND_RELEASE:
+                authorized = exact and self.authority_state != 'IDLE'
+            else:
+                authorized = (
+                    self.authority_allowed
+                    and exact
+                    and self.authority_state != 'IDLE'
+                    and (
+                        request.command
+                        != AuthorizeOperation.Request.COMMAND_CHECK
+                        or self.authority_state == 'ACTIVE'
+                    )
                 )
-            )
 
         if request.command == AuthorizeOperation.Request.COMMAND_RELEASE:
             if authorized:
@@ -510,6 +513,10 @@ class RuntimeHarness:
             self.handoff_state_pub.publish(self.string_message('idle'))
             self.control_mode_state_pub.publish(self.string_message('STOP'))
             time.sleep(0.05)
+
+    def publish_session_active_state(self):
+        """Publish only the mapping-session activation acknowledgement."""
+        self.session_state_pub.publish(self.string_message('active'))
 
     def publish_exploring_state(self):
         """Publish the authorized frontier workflow state."""
@@ -845,10 +852,15 @@ def test_one_action_acquires_lease_and_completes_core_only_mission():
             in harness.authority_commands
         ), harness.diagnostics()
         assert wait_until(
+            lambda: 'mission-am3-runtime' in harness.start_session_commands
+        ), harness.diagnostics()
+
+        harness.publish_session_active_state()
+        assert wait_until(
             lambda: 'NAV' in harness.control_mode_commands
         ), harness.diagnostics()
         assert wait_until(
-            lambda: 'mission-am3-runtime' in harness.start_session_commands
+            lambda: 'autonomous:frontier' in harness.mode_commands
         ), harness.diagnostics()
 
         harness.publish_exploring_state()
