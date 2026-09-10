@@ -168,7 +168,7 @@ TEST(LocalizationHealthCoreTest, EkfTargetRateIsNotTheOperationalMinimum)
     kBaseNs + 29 * kPeriodNs, kEkfThresholds, 3000000000LL);
   EXPECT_NEAR(rates.source_rate_hz, 20.0, 0.01);
   EXPECT_TRUE(rates.rate_valid);
-  EXPECT_EQ(rates.quality, RateQuality::kGood);
+  EXPECT_EQ(rates.quality, RateQuality::kExcellent);
 }
 
 TEST(LocalizationHealthCoreTest, MissingSourceTimingFallsBackFailClosedToReceiveRate)
