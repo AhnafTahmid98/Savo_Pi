@@ -324,7 +324,7 @@ private:
     expected_imu_rate_hz_ = declare_parameter<double>("expected_imu_rate_hz", 25.0);
     expected_wheel_odom_rate_hz_ = declare_parameter<double>(
       "expected_wheel_odom_rate_hz", 30.0);
-    expected_ekf_rate_hz_ = declare_parameter<double>("expected_ekf_rate_hz", 30.0);
+    expected_ekf_rate_hz_ = declare_parameter<double>("expected_ekf_rate_hz", 20.0);
     expected_vo_rate_hz_ = declare_parameter<double>("expected_vo_rate_hz", 12.0);
     imu_rate_thresholds_.minimum_hz = declare_parameter<double>(
       "imu_min_rate_hz", imu_rate_thresholds_.minimum_hz);
@@ -971,11 +971,11 @@ private:
 
   double expected_imu_rate_hz_{25.0};
   double expected_wheel_odom_rate_hz_{30.0};
-  double expected_ekf_rate_hz_{30.0};
+  double expected_ekf_rate_hz_{20.0};
   double expected_vo_rate_hz_{12.0};
   RateThresholds imu_rate_thresholds_{10.0, 15.0, 20.0};
   RateThresholds wheel_odom_rate_thresholds_{10.0, 20.0, 25.0};
-  RateThresholds ekf_rate_thresholds_{10.0, 20.0, 25.0};
+  RateThresholds ekf_rate_thresholds_{10.0, 15.0, 20.0};
   RateThresholds vo_rate_thresholds_{5.0, 8.0, 12.0};
   double rate_transition_debounce_s_{1.0};
   double ekf_rate_transition_debounce_s_{3.0};

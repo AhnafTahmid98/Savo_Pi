@@ -99,7 +99,7 @@ def make_healthy_output() -> EkfOutputHealth:
         fresh=True,
         last_age_s=0.05,
         message_count=30,
-        rate_hz=30.0,
+        rate_hz=20.0,
         frame_ok=True,
         finite_ok=True,
         covariance_ok=True,
@@ -116,7 +116,7 @@ def make_stale_output() -> EkfOutputHealth:
         fresh=False,
         last_age_s=1.5,
         message_count=30,
-        rate_hz=30.0,
+        rate_hz=20.0,
         frame_ok=True,
         finite_ok=True,
         covariance_ok=True,
@@ -557,8 +557,7 @@ def test_check_ekf_health_rejects_bad_min_healthy_inputs() -> None:
 
 def test_check_ekf_rate_health_ok() -> None:
     result = check_ekf_rate_health(
-        measured_hz=30.0,
-        expected_hz=30.0,
+        measured_hz=20.0,
         tolerance_ratio=0.50,
     )
 
@@ -570,8 +569,8 @@ def test_check_ekf_rate_health_ok() -> None:
 
 def test_check_ekf_rate_health_warns_when_low() -> None:
     result = check_ekf_rate_health(
-        measured_hz=10.0,
-        expected_hz=30.0,
+        measured_hz=9.9,
+        expected_hz=20.0,
         tolerance_ratio=0.50,
     )
 
@@ -584,7 +583,7 @@ def test_check_ekf_rate_health_warns_when_low() -> None:
 def test_check_ekf_rate_health_errors_when_zero() -> None:
     result = check_ekf_rate_health(
         measured_hz=0.0,
-        expected_hz=30.0,
+        expected_hz=20.0,
     )
 
     assert result.ok is False
@@ -595,21 +594,21 @@ def test_check_ekf_rate_health_errors_when_zero() -> None:
 
 def test_check_ekf_rate_health_rejects_bad_expected_rate() -> None:
     with pytest.raises(ValueError):
-        check_ekf_rate_health(measured_hz=30.0, expected_hz=0.0)
+        check_ekf_rate_health(measured_hz=20.0, expected_hz=0.0)
 
 
 def test_check_ekf_rate_health_rejects_bad_tolerance() -> None:
     with pytest.raises(ValueError):
         check_ekf_rate_health(
-            measured_hz=30.0,
-            expected_hz=30.0,
+            measured_hz=20.0,
+            expected_hz=20.0,
             tolerance_ratio=-0.1,
         )
 
     with pytest.raises(ValueError):
         check_ekf_rate_health(
-            measured_hz=30.0,
-            expected_hz=30.0,
+            measured_hz=20.0,
+            expected_hz=20.0,
             tolerance_ratio=1.0,
         )
 

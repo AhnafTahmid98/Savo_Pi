@@ -31,7 +31,7 @@ wheel_odom_node:
 
 ekf_filter_node:
   ros__parameters:
-    frequency: 30.0
+    frequency: 20.0
     sensor_timeout: 0.2
     two_d_mode: true
 
@@ -58,7 +58,10 @@ localization_health_node:
 
     expected_imu_rate_hz: 25.0
     expected_wheel_odom_rate_hz: 30.0
-    expected_ekf_rate_hz: 30.0
+    expected_ekf_rate_hz: 20.0
+    ekf_min_rate_hz: 10.0
+    ekf_good_rate_hz: 15.0
+    ekf_excellent_rate_hz: 20.0
 
     max_imu_age_s: 0.5
     max_wheel_odom_age_s: 0.5

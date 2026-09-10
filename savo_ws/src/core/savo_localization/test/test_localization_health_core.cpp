@@ -25,7 +25,7 @@ using savo_localization::TransformHealthObservation;
 
 constexpr RateThresholds kImuThresholds{10.0, 15.0, 20.0};
 constexpr RateThresholds kWheelThresholds{10.0, 20.0, 25.0};
-constexpr RateThresholds kEkfThresholds{10.0, 20.0, 25.0};
+constexpr RateThresholds kEkfThresholds{10.0, 15.0, 20.0};
 constexpr RateThresholds kVoThresholds{5.0, 8.0, 12.0};
 
 SourceHealthObservation healthy_source(
@@ -214,6 +214,19 @@ TEST(LocalizationHealthCoreTest, RateQualityBoundariesAreStableMetadata)
   EXPECT_EQ(
     ProducerRateTracker::QualityString(RateQuality::kExcellent),
     "EXCELLENT");
+
+  EXPECT_EQ(
+    ProducerRateTracker::ClassifyQuality(9.9, kEkfThresholds),
+    RateQuality::kBelowMinimum);
+  EXPECT_EQ(
+    ProducerRateTracker::ClassifyQuality(10.0, kEkfThresholds),
+    RateQuality::kMinimum);
+  EXPECT_EQ(
+    ProducerRateTracker::ClassifyQuality(15.0, kEkfThresholds),
+    RateQuality::kGood);
+  EXPECT_EQ(
+    ProducerRateTracker::ClassifyQuality(20.0, kEkfThresholds),
+    RateQuality::kExcellent);
 }
 
 TEST(LocalizationHealthCoreTest, ExactOperationalMinimumRatesAreValid)
@@ -489,7 +502,7 @@ TEST(LocalizationHealthCoreTest, ProlongedFilteredOdomLowRateBlocksReadiness)
   const LocalizationHealthCore core;
   auto inputs = healthy_inputs();
   inputs.filtered_odom.rate_valid = false;
-  inputs.filtered_odom.rate_hz = 14.0;
+  inputs.filtered_odom.rate_hz = 9.9;
 
   const auto result = core.Evaluate(inputs);
 
@@ -506,7 +519,7 @@ TEST(LocalizationHealthCoreTest, FreshFilteredOdomSurvivesDebouncedRateDip)
   const LocalizationHealthCore core;
   auto inputs = healthy_inputs();
   inputs.filtered_odom.rate_valid = true;
-  inputs.filtered_odom.rate_hz = 14.0;
+  inputs.filtered_odom.rate_hz = 9.9;
   inputs.filtered_odom.rate_quality = "BELOW_MINIMUM";
 
   const auto result = core.Evaluate(inputs);

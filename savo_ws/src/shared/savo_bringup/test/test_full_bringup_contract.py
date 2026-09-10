@@ -98,6 +98,41 @@ def test_core_bringup_owns_every_core_package_and_mode_boundary() -> None:
     assert "startup_stage_gate_node" not in launch
 
 
+def test_core_safe_idle_and_autonomous_mapping_share_ekf_rate_policy() -> None:
+    """All Core entrypoints must resolve the same final localization profiles."""
+    robot = read("launch/robot_bringup.launch.py")
+    core = read("launch/core_bringup.launch.py")
+    autonomous = read("launch/autonomous_mapping.launch.py")
+    project_root = ROOT.parents[3]
+    localization_root = project_root / "savo_ws/src/core/savo_localization"
+
+    assert '"robot_mode",' in robot
+    assert '"localization_use_vo",' in robot
+    assert "core_arguments[name] = LaunchConfiguration(name)" in robot
+    for launch in (core, autonomous):
+        assert '"savo_localization"' in launch
+        assert '"localization_bringup.launch.py"' in launch
+        assert '"use_vo": LaunchConfiguration("localization_use_vo")' in launch
+
+    for profile_name in (
+        "robot_savo_4enc_imu_ekf.yaml",
+        "robot_savo_4enc_imu_vo_ekf.yaml",
+    ):
+        profile = yaml.safe_load(
+            (
+                localization_root / "config" / "profiles" / profile_name
+            ).read_text(encoding="utf-8")
+        )
+        ekf = profile["ekf_filter_node"]["ros__parameters"]
+        health = profile["localization_health_node"]["ros__parameters"]
+        assert ekf["frequency"] == 20.0
+        assert ekf["sensor_timeout"] == 0.2
+        assert health["expected_ekf_rate_hz"] == 20.0
+        assert health["ekf_min_rate_hz"] == 10.0
+        assert health["ekf_good_rate_hz"] == 15.0
+        assert health["ekf_excellent_rate_hz"] == 20.0
+
+
 def test_edge_bringup_uses_cpp_production_implementations() -> None:
     """Edge launch must select production C++ implementations."""
     launch = read("launch/edge_bringup.launch.py")

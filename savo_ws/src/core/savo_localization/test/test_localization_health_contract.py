@@ -179,7 +179,7 @@ def test_producer_health_rate_accounting_uses_explicit_floors_and_existing_fresh
     )["wheel_odom_node"]["ros__parameters"]
 
     assert diagnostics["expected_imu_rate_hz"] == 25.0
-    assert diagnostics["expected_ekf_rate_hz"] == 30.0
+    assert diagnostics["expected_ekf_rate_hz"] == 20.0
     expected_thresholds = {
         "imu_min_rate_hz": 10.0,
         "imu_good_rate_hz": 15.0,
@@ -188,8 +188,8 @@ def test_producer_health_rate_accounting_uses_explicit_floors_and_existing_fresh
         "wheel_odom_good_rate_hz": 20.0,
         "wheel_odom_excellent_rate_hz": 25.0,
         "ekf_min_rate_hz": 10.0,
-        "ekf_good_rate_hz": 20.0,
-        "ekf_excellent_rate_hz": 25.0,
+        "ekf_good_rate_hz": 15.0,
+        "ekf_excellent_rate_hz": 20.0,
         "vo_min_rate_hz": 5.0,
         "vo_good_rate_hz": 8.0,
         "vo_excellent_rate_hz": 12.0,

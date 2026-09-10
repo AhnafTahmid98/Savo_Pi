@@ -18,7 +18,7 @@ namespace
 constexpr std::int64_t kMillisecondNs{1000000};
 constexpr RateThresholds kImuThresholds{10.0, 15.0, 20.0};
 constexpr RateThresholds kWheelThresholds{10.0, 20.0, 25.0};
-constexpr RateThresholds kEkfThresholds{10.0, 20.0, 25.0};
+constexpr RateThresholds kEkfThresholds{10.0, 15.0, 20.0};
 constexpr RateThresholds kVoThresholds{5.0, 8.0, 12.0};
 
 ProducerHealthSnapshot healthy_imu_snapshot(
@@ -238,26 +238,43 @@ TEST(ProducerHealthTest, ExplicitRateQualityBoundariesMatchEachStreamContract)
     ProducerRateTracker::ClassifyQuality(20.0, kImuThresholds),
     RateQuality::kExcellent);
 
-  for (const auto & thresholds : {kWheelThresholds, kEkfThresholds}) {
-    EXPECT_EQ(
-      ProducerRateTracker::ClassifyQuality(9.99, thresholds),
-      RateQuality::kBelowMinimum);
-    EXPECT_EQ(
-      ProducerRateTracker::ClassifyQuality(10.0, thresholds),
-      RateQuality::kMinimum);
-    EXPECT_EQ(
-      ProducerRateTracker::ClassifyQuality(19.99, thresholds),
-      RateQuality::kMinimum);
-    EXPECT_EQ(
-      ProducerRateTracker::ClassifyQuality(20.0, thresholds),
-      RateQuality::kGood);
-    EXPECT_EQ(
-      ProducerRateTracker::ClassifyQuality(24.99, thresholds),
-      RateQuality::kGood);
-    EXPECT_EQ(
-      ProducerRateTracker::ClassifyQuality(25.0, thresholds),
-      RateQuality::kExcellent);
-  }
+  EXPECT_EQ(
+    ProducerRateTracker::ClassifyQuality(9.99, kWheelThresholds),
+    RateQuality::kBelowMinimum);
+  EXPECT_EQ(
+    ProducerRateTracker::ClassifyQuality(10.0, kWheelThresholds),
+    RateQuality::kMinimum);
+  EXPECT_EQ(
+    ProducerRateTracker::ClassifyQuality(19.99, kWheelThresholds),
+    RateQuality::kMinimum);
+  EXPECT_EQ(
+    ProducerRateTracker::ClassifyQuality(20.0, kWheelThresholds),
+    RateQuality::kGood);
+  EXPECT_EQ(
+    ProducerRateTracker::ClassifyQuality(24.99, kWheelThresholds),
+    RateQuality::kGood);
+  EXPECT_EQ(
+    ProducerRateTracker::ClassifyQuality(25.0, kWheelThresholds),
+    RateQuality::kExcellent);
+
+  EXPECT_EQ(
+    ProducerRateTracker::ClassifyQuality(9.9, kEkfThresholds),
+    RateQuality::kBelowMinimum);
+  EXPECT_EQ(
+    ProducerRateTracker::ClassifyQuality(10.0, kEkfThresholds),
+    RateQuality::kMinimum);
+  EXPECT_EQ(
+    ProducerRateTracker::ClassifyQuality(14.99, kEkfThresholds),
+    RateQuality::kMinimum);
+  EXPECT_EQ(
+    ProducerRateTracker::ClassifyQuality(15.0, kEkfThresholds),
+    RateQuality::kGood);
+  EXPECT_EQ(
+    ProducerRateTracker::ClassifyQuality(19.99, kEkfThresholds),
+    RateQuality::kGood);
+  EXPECT_EQ(
+    ProducerRateTracker::ClassifyQuality(20.0, kEkfThresholds),
+    RateQuality::kExcellent);
 
   EXPECT_EQ(
     ProducerRateTracker::ClassifyQuality(4.99, kVoThresholds),
