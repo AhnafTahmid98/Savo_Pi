@@ -444,7 +444,7 @@ TEST(
 
   const auto result =
     machine.mark_aborted(
-      "savo_nav_aborted_after_cancel_rejection");
+    "savo_nav_aborted_after_cancel_rejection");
 
   EXPECT_TRUE(result.accepted);
 
@@ -618,18 +618,18 @@ TEST(
   ParsesEveryPublishedState)
 {
   for (const auto state : {
-      exploration::GoalHandoffState::kIdle,
-      exploration::GoalHandoffState::kWaitingForServer,
-      exploration::GoalHandoffState::kSending,
-      exploration::GoalHandoffState::kAccepted,
-      exploration::GoalHandoffState::kExecuting,
-      exploration::GoalHandoffState::kCanceling,
-      exploration::GoalHandoffState::kSucceeded,
-      exploration::GoalHandoffState::kRejected,
-      exploration::GoalHandoffState::kAborted,
-      exploration::GoalHandoffState::kCanceled,
-      exploration::GoalHandoffState::kTimedOut,
-      exploration::GoalHandoffState::kError})
+    exploration::GoalHandoffState::kIdle,
+    exploration::GoalHandoffState::kWaitingForServer,
+    exploration::GoalHandoffState::kSending,
+    exploration::GoalHandoffState::kAccepted,
+    exploration::GoalHandoffState::kExecuting,
+    exploration::GoalHandoffState::kCanceling,
+    exploration::GoalHandoffState::kSucceeded,
+    exploration::GoalHandoffState::kRejected,
+    exploration::GoalHandoffState::kAborted,
+    exploration::GoalHandoffState::kCanceled,
+    exploration::GoalHandoffState::kTimedOut,
+    exploration::GoalHandoffState::kError})
   {
     const auto parsed = exploration::goal_handoff_state_from_string(
       exploration::to_string(state));

@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cinttypes>
 #include <cmath>
 #include <cstdint>
 #include <functional>
@@ -272,66 +273,66 @@ public:
     state_publisher_ =
       create_publisher<
       std_msgs::msg::String>(
-        state_topic_,
-        retained_qos);
+      state_topic_,
+      retained_qos);
 
     status_publisher_ =
       create_publisher<
       std_msgs::msg::String>(
-        status_topic_,
-        retained_qos);
+      status_topic_,
+      retained_qos);
 
     typed_status_publisher_ =
       create_publisher<
       savo_msgs::msg::FrontierExplorationStatus>(
-        typed_status_topic_,
-        retained_qos);
+      typed_status_topic_,
+      retained_qos);
 
     selected_goal_publisher_ =
       create_publisher<
       geometry_msgs::msg::PoseStamped>(
-        selected_goal_topic_,
-        rclcpp::QoS(1).reliable());
+      selected_goal_topic_,
+      rclcpp::QoS(1).reliable());
 
     map_subscription_ =
       create_subscription<
       nav_msgs::msg::OccupancyGrid>(
-        map_topic_,
-        retained_qos,
-        std::bind(
-          &FrontierExplorerNode::handle_map,
-          this,
-          std::placeholders::_1));
+      map_topic_,
+      retained_qos,
+      std::bind(
+        &FrontierExplorerNode::handle_map,
+        this,
+        std::placeholders::_1));
 
     handoff_status_subscription_ =
       create_subscription<
       savo_msgs::msg::ExplorationGoalStatus>(
-        handoff_status_topic_,
-        retained_qos,
-        std::bind(
-          &FrontierExplorerNode::
+      handoff_status_topic_,
+      retained_qos,
+      std::bind(
+        &FrontierExplorerNode::
         handle_handoff_status,
-          this,
-          std::placeholders::_1));
+        this,
+        std::placeholders::_1));
 
     runtime_enabled_subscription_ =
       create_subscription<
       std_msgs::msg::Bool>(
-        runtime_enabled_topic_,
-        retained_qos,
-        std::bind(
-          &FrontierExplorerNode::
+      runtime_enabled_topic_,
+      retained_qos,
+      std::bind(
+        &FrontierExplorerNode::
         handle_runtime_enabled,
-          this,
-          std::placeholders::_1));
+        this,
+        std::placeholders::_1));
 
     planning_timer_ =
       create_wall_timer(
-        std::chrono::milliseconds(
-          planning_period_ms),
-        std::bind(
-          &FrontierExplorerNode::planning_tick,
-          this));
+      std::chrono::milliseconds(
+        planning_period_ms),
+      std::bind(
+        &FrontierExplorerNode::planning_tick,
+        this));
 
     set_state(
       enabled_ ?
@@ -477,8 +478,8 @@ private:
       RCLCPP_WARN(
         get_logger(),
         "ignored inconsistent handoff status: "
-        "sequence=%llu request_id=%s state=%s",
-        static_cast<unsigned long long>(message->sequence),
+        "sequence=%" PRIu64 " request_id=%s state=%s",
+        static_cast<std::uint64_t>(message->sequence),
         message->request_id.c_str(),
         message->state.c_str());
 
@@ -491,9 +492,9 @@ private:
       RCLCPP_WARN(
         get_logger(),
         "ignored regressed handoff status sequence: "
-        "received=%llu current=%llu",
-        static_cast<unsigned long long>(message->sequence),
-        static_cast<unsigned long long>(
+        "received=%" PRIu64 " current=%" PRIu64,
+        static_cast<std::uint64_t>(message->sequence),
+        static_cast<std::uint64_t>(
           handoff_observation_.sequence));
 
       return;
@@ -601,10 +602,10 @@ private:
 
     const double norm =
       std::sqrt(
-        orientation.x * orientation.x +
-        orientation.y * orientation.y +
-        orientation.z * orientation.z +
-        orientation.w * orientation.w);
+      orientation.x * orientation.x +
+      orientation.y * orientation.y +
+      orientation.z * orientation.z +
+      orientation.w * orientation.w);
 
     if (norm < 1.0e-9) {
       throw std::invalid_argument(

@@ -44,7 +44,8 @@ TEST(TopicNamesContract, MappingOutputTopicsAreStable)
   EXPECT_EQ(std::string{savo_mapping::topics::SESSION_STATE}, "/savo_mapping/session_state");
   EXPECT_EQ(std::string{savo_mapping::topics::MAP_QUALITY}, "/savo_mapping/map_quality");
   EXPECT_EQ(std::string{savo_mapping::topics::MAP_SAVED}, "/savo_mapping/map_saved");
-  EXPECT_EQ(std::string{savo_mapping::topics::EXPLORATION_STATUS},
+  EXPECT_EQ(
+    std::string{savo_mapping::topics::EXPLORATION_STATUS},
     "/savo_mapping/exploration_status");
   EXPECT_EQ(std::string{savo_mapping::topics::SEMANTIC_EVENTS}, "/savo_mapping/semantic_events");
   EXPECT_EQ(
@@ -68,11 +69,13 @@ TEST(TopicNamesContract, MappingOutputTopicsAreStable)
 TEST(TopicNamesContract, MappingCommandTopicsAreStable)
 {
   EXPECT_EQ(std::string{savo_mapping::topics::MODE_CMD}, "/savo_mapping/mode_cmd");
-  EXPECT_EQ(std::string{savo_mapping::topics::START_SESSION_CMD},
+  EXPECT_EQ(
+    std::string{savo_mapping::topics::START_SESSION_CMD},
     "/savo_mapping/start_session_cmd");
   EXPECT_EQ(std::string{savo_mapping::topics::STOP_SESSION_CMD}, "/savo_mapping/stop_session_cmd");
   EXPECT_EQ(std::string{savo_mapping::topics::SAVE_MAP_CMD}, "/savo_mapping/save_map_cmd");
-  EXPECT_EQ(std::string{savo_mapping::topics::CANCEL_SESSION_CMD},
+  EXPECT_EQ(
+    std::string{savo_mapping::topics::CANCEL_SESSION_CMD},
     "/savo_mapping/cancel_session_cmd");
   EXPECT_EQ(std::string{savo_mapping::topics::SCAN360_CMD}, "/savo_mapping/scan360_cmd");
 }
@@ -143,27 +146,35 @@ TEST(TopicNamesContract, ClassifiesMappingStatusTopics)
   EXPECT_TRUE(savo_mapping::topics::is_mapping_status_topic(savo_mapping::topics::STATUS));
   EXPECT_TRUE(savo_mapping::topics::is_mapping_status_topic(savo_mapping::topics::READINESS));
   EXPECT_TRUE(savo_mapping::topics::is_mapping_status_topic(savo_mapping::topics::MODE));
-  EXPECT_TRUE(savo_mapping::topics::is_mapping_status_topic(
-    savo_mapping::topics::AUTONOMOUS_MISSION_STATUS));
-  EXPECT_TRUE(savo_mapping::topics::is_mapping_status_topic(
-    savo_mapping::topics::FRONTIER_EXPLORER_STATUS));
+  EXPECT_TRUE(
+    savo_mapping::topics::is_mapping_status_topic(
+      savo_mapping::topics::AUTONOMOUS_MISSION_STATUS));
+  EXPECT_TRUE(
+    savo_mapping::topics::is_mapping_status_topic(
+      savo_mapping::topics::FRONTIER_EXPLORER_STATUS));
   EXPECT_TRUE(savo_mapping::topics::is_mapping_status_topic(savo_mapping::topics::WORKFLOW_PHASE));
   EXPECT_TRUE(savo_mapping::topics::is_mapping_status_topic(savo_mapping::topics::SESSION_STATE));
   EXPECT_TRUE(savo_mapping::topics::is_mapping_status_topic(savo_mapping::topics::MAP_QUALITY));
   EXPECT_TRUE(savo_mapping::topics::is_mapping_status_topic(savo_mapping::topics::MAP_SAVED));
-  EXPECT_TRUE(savo_mapping::topics::is_mapping_status_topic(
-    savo_mapping::topics::EXPLORATION_STATUS));
+  EXPECT_TRUE(
+    savo_mapping::topics::is_mapping_status_topic(
+      savo_mapping::topics::EXPLORATION_STATUS));
   EXPECT_TRUE(savo_mapping::topics::is_mapping_status_topic(savo_mapping::topics::SEMANTIC_EVENTS));
-  EXPECT_TRUE(savo_mapping::topics::is_mapping_status_topic(
-    savo_mapping::topics::SEMANTIC_STATUS));
-  EXPECT_TRUE(savo_mapping::topics::is_mapping_status_topic(
-    savo_mapping::topics::SEMANTIC_HEARTBEAT));
-  EXPECT_TRUE(savo_mapping::topics::is_mapping_status_topic(
-    savo_mapping::topics::LOCATION_REVIEW_STATUS));
-  EXPECT_TRUE(savo_mapping::topics::is_mapping_status_topic(
-    savo_mapping::topics::LOCATION_REVIEW_RESULTS));
-  EXPECT_TRUE(savo_mapping::topics::is_mapping_status_topic(
-    savo_mapping::topics::LOCATION_REVIEW_HEARTBEAT));
+  EXPECT_TRUE(
+    savo_mapping::topics::is_mapping_status_topic(
+      savo_mapping::topics::SEMANTIC_STATUS));
+  EXPECT_TRUE(
+    savo_mapping::topics::is_mapping_status_topic(
+      savo_mapping::topics::SEMANTIC_HEARTBEAT));
+  EXPECT_TRUE(
+    savo_mapping::topics::is_mapping_status_topic(
+      savo_mapping::topics::LOCATION_REVIEW_STATUS));
+  EXPECT_TRUE(
+    savo_mapping::topics::is_mapping_status_topic(
+      savo_mapping::topics::LOCATION_REVIEW_RESULTS));
+  EXPECT_TRUE(
+    savo_mapping::topics::is_mapping_status_topic(
+      savo_mapping::topics::LOCATION_REVIEW_HEARTBEAT));
   EXPECT_TRUE(savo_mapping::topics::is_mapping_status_topic(savo_mapping::topics::DASHBOARD));
 
   EXPECT_FALSE(savo_mapping::topics::is_mapping_status_topic(savo_mapping::topics::SCAN));
@@ -173,13 +184,16 @@ TEST(TopicNamesContract, ClassifiesMappingStatusTopics)
 TEST(TopicNamesContract, ClassifiesMappingCommandTopics)
 {
   EXPECT_TRUE(savo_mapping::topics::is_mapping_command_topic(savo_mapping::topics::MODE_CMD));
-  EXPECT_TRUE(savo_mapping::topics::is_mapping_command_topic(
-    savo_mapping::topics::START_SESSION_CMD));
-  EXPECT_TRUE(savo_mapping::topics::is_mapping_command_topic(
-    savo_mapping::topics::STOP_SESSION_CMD));
+  EXPECT_TRUE(
+    savo_mapping::topics::is_mapping_command_topic(
+      savo_mapping::topics::START_SESSION_CMD));
+  EXPECT_TRUE(
+    savo_mapping::topics::is_mapping_command_topic(
+      savo_mapping::topics::STOP_SESSION_CMD));
   EXPECT_TRUE(savo_mapping::topics::is_mapping_command_topic(savo_mapping::topics::SAVE_MAP_CMD));
-  EXPECT_TRUE(savo_mapping::topics::is_mapping_command_topic(
-    savo_mapping::topics::CANCEL_SESSION_CMD));
+  EXPECT_TRUE(
+    savo_mapping::topics::is_mapping_command_topic(
+      savo_mapping::topics::CANCEL_SESSION_CMD));
   EXPECT_TRUE(savo_mapping::topics::is_mapping_command_topic(savo_mapping::topics::SCAN360_CMD));
 
   EXPECT_FALSE(savo_mapping::topics::is_mapping_command_topic(savo_mapping::topics::STATUS));
@@ -196,8 +210,9 @@ TEST(TopicNamesContract, ClassifiesExternalInputTopics)
   EXPECT_TRUE(savo_mapping::topics::is_external_input_topic(savo_mapping::topics::ODOM));
   EXPECT_TRUE(savo_mapping::topics::is_external_input_topic(savo_mapping::topics::ODOM_FILTERED));
   EXPECT_TRUE(savo_mapping::topics::is_external_input_topic(savo_mapping::topics::WHEEL_ODOM));
-  EXPECT_TRUE(savo_mapping::topics::is_external_input_topic(
-    savo_mapping::topics::REALSENSE_STATUS));
+  EXPECT_TRUE(
+    savo_mapping::topics::is_external_input_topic(
+      savo_mapping::topics::REALSENSE_STATUS));
   EXPECT_TRUE(savo_mapping::topics::is_external_input_topic(savo_mapping::topics::DEPTH_MIN_FRONT));
   EXPECT_TRUE(savo_mapping::topics::is_external_input_topic(savo_mapping::topics::DEPTH_POINTS));
   EXPECT_TRUE(
@@ -254,8 +269,9 @@ TEST(TopicNamesContract, ClassifiesNavigationAndSafetyTopics)
   EXPECT_TRUE(
     savo_mapping::topics::is_safety_awareness_topic(
       savo_mapping::topics::SAFETY_SLOWDOWN_FACTOR));
-  EXPECT_TRUE(savo_mapping::topics::is_safety_awareness_topic(
-    savo_mapping::topics::CONTROL_MODE_STATE));
+  EXPECT_TRUE(
+    savo_mapping::topics::is_safety_awareness_topic(
+      savo_mapping::topics::CONTROL_MODE_STATE));
 
   EXPECT_FALSE(savo_mapping::topics::is_navigation_handoff_topic(savo_mapping::topics::SCAN));
   EXPECT_FALSE(savo_mapping::topics::is_safety_awareness_topic(savo_mapping::topics::MAP));

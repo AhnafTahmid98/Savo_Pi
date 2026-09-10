@@ -62,26 +62,26 @@ TEST(
   EXPECT_EQ(
     std::string{
     to_string(
-        RuntimeDisposition::
+      RuntimeDisposition::
       WaitingForAuthority)},
     "waiting_for_authority");
 
   EXPECT_EQ(
     std::string{
     to_string(
-        RuntimeDisposition::Disabled)},
+      RuntimeDisposition::Disabled)},
     "disabled");
 
   EXPECT_EQ(
     std::string{
     to_string(
-        RuntimeDisposition::Enabled)},
+      RuntimeDisposition::Enabled)},
     "enabled");
 
   EXPECT_EQ(
     std::string{
     to_string(
-        RuntimeDisposition::
+      RuntimeDisposition::
       CancelRequired)},
     "cancel_required");
 }

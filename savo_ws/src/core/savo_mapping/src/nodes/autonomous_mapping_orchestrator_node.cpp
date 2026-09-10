@@ -778,8 +778,8 @@ private:
     autonomous::FrontierCompletionConfig completion_config;
     const std::int64_t minimum_exhaustion_observations =
       declare_parameter<std::int64_t>(
-        "completion.minimum_exhaustion_observations",
-        3);
+      "completion.minimum_exhaustion_observations",
+      3);
     if (
       minimum_exhaustion_observations <= 0 ||
       minimum_exhaustion_observations > 1000000)
@@ -791,24 +791,24 @@ private:
       static_cast<std::uint32_t>(minimum_exhaustion_observations);
     completion_config.minimum_stable_duration_s =
       declare_parameter<double>(
-        "completion.minimum_stable_duration_s",
-        5.0);
+      "completion.minimum_stable_duration_s",
+      5.0);
     completion_config.status_timeout_s =
       declare_parameter<double>(
-        "completion.frontier_status_timeout_s",
-        3.0);
+      "completion.frontier_status_timeout_s",
+      3.0);
     completion_config.allow_no_frontiers =
       declare_parameter<bool>(
-        "completion.allow_no_frontiers",
-        true);
+      "completion.allow_no_frontiers",
+      true);
     completion_config.allow_no_reachable_frontiers =
       declare_parameter<bool>(
-        "completion.allow_no_reachable_frontiers",
-        true);
+      "completion.allow_no_reachable_frontiers",
+      true);
     completion_config.allow_no_selectable_frontier =
       declare_parameter<bool>(
-        "completion.allow_no_selectable_frontier",
-        false);
+      "completion.allow_no_selectable_frontier",
+      false);
 
     const std::string completion_config_error =
       autonomous::validate_frontier_completion_config(completion_config);
@@ -1670,7 +1670,7 @@ private:
             state != autonomous::MissionState::Canceling);
           const bool due = !authority_last_check_attempt_.has_value() ||
             std::chrono::duration<double>(
-              current_time - authority_last_check_attempt_.value()).count() >=
+            current_time - authority_last_check_attempt_.value()).count() >=
             supervisor_authority_check_period_s_;
           if (motion_authority_relevant && due) {
             authority_check_in_flight_ = true;
@@ -2918,7 +2918,7 @@ private:
         }
         if (
           std::chrono::duration<double>(
-          current_time - release_phase_started_at_.value()).count() >=
+            current_time - release_phase_started_at_.value()).count() >=
           phase_timeout)
         {
           release_timeout_latched_ = true;
@@ -4570,7 +4570,7 @@ private:
                 !ids.insert(location.location_id).second)
                 {
                   throw std::runtime_error(
-                          "approved_location_contract_invalid");
+                    "approved_location_contract_invalid");
                 }
                 canonical.push_back(
                   location.location_id + ":" +
@@ -5256,7 +5256,7 @@ private:
           try {
             std::string geometry_reason;
             if (!validate_geometry_profile(
-                &geometry_digest, &geometry_reason))
+              &geometry_digest, &geometry_reason))
             {
               throw std::runtime_error(geometry_reason);
             }

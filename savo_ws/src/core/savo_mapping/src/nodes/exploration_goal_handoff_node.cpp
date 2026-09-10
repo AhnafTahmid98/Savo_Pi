@@ -145,63 +145,63 @@ public:
     state_publisher_ =
       create_publisher<
       std_msgs::msg::String>(
-        exploration::kGoalStateTopic,
-        state_qos);
+      exploration::kGoalStateTopic,
+      state_qos);
 
     status_publisher_ =
       create_publisher<
       std_msgs::msg::String>(
-        exploration::kGoalStatusTopic,
-        state_qos);
+      exploration::kGoalStatusTopic,
+      state_qos);
 
     typed_status_publisher_ =
       create_publisher<
       savo_msgs::msg::ExplorationGoalStatus>(
-        exploration::kGoalTypedStatusTopic,
-        state_qos);
+      exploration::kGoalTypedStatusTopic,
+      state_qos);
 
     feedback_publisher_ =
       create_publisher<
       std_msgs::msg::String>(
-        exploration::kGoalFeedbackTopic,
-        rclcpp::QoS(10).reliable());
+      exploration::kGoalFeedbackTopic,
+      rclcpp::QoS(10).reliable());
 
     selected_goal_subscription_ =
       create_subscription<
       geometry_msgs::msg::PoseStamped>(
-        exploration::kSelectedGoalTopic,
-        rclcpp::QoS(1).reliable(),
-        std::bind(
-          &ExplorationGoalHandoffNode::
+      exploration::kSelectedGoalTopic,
+      rclcpp::QoS(1).reliable(),
+      std::bind(
+        &ExplorationGoalHandoffNode::
         handle_selected_goal,
-          this,
-          std::placeholders::_1));
+        this,
+        std::placeholders::_1));
 
     cancel_service_ =
       create_service<
       std_srvs::srv::Trigger>(
-        exploration::kGoalCancelService,
-        std::bind(
-          &ExplorationGoalHandoffNode::
+      exploration::kGoalCancelService,
+      std::bind(
+        &ExplorationGoalHandoffNode::
         handle_cancel,
-          this,
-          std::placeholders::_1,
-          std::placeholders::_2));
+        this,
+        std::placeholders::_1,
+        std::placeholders::_2));
 
     action_client_ =
       rclcpp_action::create_client<
       NavigateToPose>(
-        this,
-        exploration::kExplorationActionName);
+      this,
+      exploration::kExplorationActionName);
 
     watchdog_timer_ =
       create_wall_timer(
-        std::chrono::milliseconds(
-          poll_period_ms),
-        std::bind(
-          &ExplorationGoalHandoffNode::
+      std::chrono::milliseconds(
+        poll_period_ms),
+      std::bind(
+        &ExplorationGoalHandoffNode::
         check_handoff_watchdog,
-          this));
+        this));
 
     publish_state();
     publish_status(true);
@@ -312,10 +312,10 @@ private:
 
     const double norm =
       std::sqrt(
-        orientation.x * orientation.x +
-        orientation.y * orientation.y +
-        orientation.z * orientation.z +
-        orientation.w * orientation.w);
+      orientation.x * orientation.x +
+      orientation.y * orientation.y +
+      orientation.z * orientation.z +
+      orientation.w * orientation.w);
 
     if (norm < 1.0e-9) {
       reason =
@@ -348,7 +348,7 @@ private:
     const std::string request_id =
       "frontier-" +
       std::to_string(
-        machine_.sequence() + 1U);
+      machine_.sequence() + 1U);
 
     const auto transition =
       machine_.begin(request_id);
@@ -618,7 +618,7 @@ private:
       std::string{
         "savo_nav_cancel_response_code_"} +
       std::to_string(
-        static_cast<int>(
+      static_cast<int>(
         return_code));
   }
 
@@ -688,8 +688,8 @@ private:
 
     const std::string reason =
       cancel_response_reason(
-        response->return_code,
-        has_canceling_goal);
+      response->return_code,
+      has_canceling_goal);
 
     if (!reason.empty()) {
       cancel_acknowledged_ = false;
@@ -1027,7 +1027,7 @@ private:
       << escape_json(request_id)
       << "\",\"state\":\""
       << exploration::to_string(
-           machine_.state())
+      machine_.state())
       << "\",\"distance_remaining\":"
       << feedback->distance_remaining
       << ",\"number_of_recoveries\":"
@@ -1100,13 +1100,13 @@ private:
             error_code != 0U)
           {
             publish_transition(
-            machine_.mark_aborted(
-              result_reason(
-                "savo_nav_result_error",
-                wrapped_result.result)));
+              machine_.mark_aborted(
+                result_reason(
+                  "savo_nav_result_error",
+                  wrapped_result.result)));
           } else {
             publish_transition(
-            machine_.mark_succeeded());
+              machine_.mark_succeeded());
           }
 
           break;
@@ -1116,10 +1116,10 @@ private:
         ResultCode::ABORTED:
         {
           publish_transition(
-          machine_.mark_aborted(
-            result_reason(
-              "savo_nav_aborted",
-              wrapped_result.result)));
+            machine_.mark_aborted(
+              result_reason(
+                "savo_nav_aborted",
+                wrapped_result.result)));
 
           break;
         }
@@ -1128,8 +1128,8 @@ private:
         ResultCode::CANCELED:
         {
           publish_transition(
-          machine_.mark_canceled(
-            "savo_nav_canceled"));
+            machine_.mark_canceled(
+              "savo_nav_canceled"));
 
           break;
         }
@@ -1139,8 +1139,8 @@ private:
       default:
         {
           publish_transition(
-          machine_.mark_error(
-            "savo_nav_result_unknown"));
+            machine_.mark_error(
+              "savo_nav_result_unknown"));
 
           break;
         }
@@ -1153,10 +1153,10 @@ private:
         std::string{
         "terminal_result_transition_failed:"} +
       exploration::to_string(
-          machine_.state()) +
+        machine_.state()) +
       ":result_code_" +
       std::to_string(
-          static_cast<int>(
+        static_cast<int>(
           wrapped_result.code));
 
       const auto error_transition =
@@ -1222,7 +1222,7 @@ private:
       prefix +
       ":code=" +
       std::to_string(
-        result->error_code);
+      result->error_code);
 
     if (!result->error_msg.empty()) {
       reason +=
@@ -1444,21 +1444,21 @@ private:
       << machine_.sequence()
       << ",\"request_id\":\""
       << escape_json(
-           machine_.request_id())
+      machine_.request_id())
       << "\",\"state\":\""
       << exploration::to_string(
-           machine_.state())
+      machine_.state())
       << "\",\"active\":"
       << exploration::is_active(
-           machine_.state())
+      machine_.state())
       << ",\"terminal\":"
       << exploration::is_terminal(
-           machine_.state())
+      machine_.state())
       << ",\"reason\":\""
       << escape_json(reason)
       << "\",\"action_name\":\""
       << escape_json(
-           exploration::
+      exploration::
       kExplorationActionName)
       << "\"}";
 
