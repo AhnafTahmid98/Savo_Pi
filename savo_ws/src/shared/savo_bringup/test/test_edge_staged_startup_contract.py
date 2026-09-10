@@ -26,14 +26,14 @@ UI_RUNTIME_SERVICE = (
 
 STAGE_DEFAULTS = {
     "realsense_start_delay_s": "0.0",
-    "camera_support_start_delay_s": "7.0",
-    "vo_start_delay_s": "14.0",
-    "obstacle_cloud_start_delay_s": "22.0",
-    "observer_relay_start_delay_s": "28.0",
-    "speech_start_delay_s": "34.0",
-    "ui_start_delay_s": "40.0",
-    "bridge_start_delay_s": "46.0",
-    "readiness_start_delay_s": "52.0",
+    "camera_support_start_delay_s": "10.0",
+    "vo_start_delay_s": "22.0",
+    "obstacle_cloud_start_delay_s": "34.0",
+    "observer_relay_start_delay_s": "40.0",
+    "speech_start_delay_s": "46.0",
+    "ui_start_delay_s": "50.0",
+    "bridge_start_delay_s": "54.0",
+    "readiness_start_delay_s": "60.0",
 }
 
 
@@ -94,6 +94,24 @@ def test_default_edge_stage_delays_exist_and_are_monotonic() -> None:
     values = [float(defaults[name]) for name in STAGE_DEFAULTS]
     assert values == sorted(values)
     assert len(set(values)) == len(values)
+
+
+def test_heavy_edge_stages_are_spread_across_nominal_sixty_second_window() -> None:
+    """D435, VO, cloud/voxel and Bridge do not share one startup burst."""
+    defaults = launch_defaults(EDGE_LAUNCH)
+
+    camera_support = float(defaults["camera_support_start_delay_s"])
+    vo = float(defaults["vo_start_delay_s"])
+    obstacle_cloud = float(defaults["obstacle_cloud_start_delay_s"])
+    bridge = float(defaults["bridge_start_delay_s"])
+    compatibility_readiness = float(defaults["readiness_start_delay_s"])
+
+    assert camera_support >= 10.0
+    assert vo - camera_support >= 10.0
+    assert obstacle_cloud - vo >= 10.0
+    assert bridge >= 54.0
+    assert compatibility_readiness == 60.0
+    assert compatibility_readiness - bridge >= 6.0
 
 
 def test_every_staged_launch_configuration_is_declared() -> None:

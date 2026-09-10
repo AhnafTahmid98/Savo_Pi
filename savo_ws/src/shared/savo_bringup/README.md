@@ -249,17 +249,21 @@ is not the Nav2 voxel costmap layer and Edge bringup does not start Nav2.
 The historical delay arguments remain available for compatibility:
 
 - `realsense_start_delay_s` (default `0.0`)
-- `camera_support_start_delay_s` (default `7.0`)
-- `vo_start_delay_s` (default `14.0`)
-- `obstacle_cloud_start_delay_s` (default `22.0`)
-- `observer_relay_start_delay_s` (default `28.0`)
-- `speech_start_delay_s` (default `34.0`)
-- `ui_start_delay_s` (default `40.0`)
-- `bridge_start_delay_s` (default `46.0`)
-- `readiness_start_delay_s` (default `52.0`)
+- `camera_support_start_delay_s` (default `10.0`)
+- `vo_start_delay_s` (default `22.0`)
+- `obstacle_cloud_start_delay_s` (default `34.0`)
+- `observer_relay_start_delay_s` (default `40.0`)
+- `speech_start_delay_s` (default `46.0`)
+- `ui_start_delay_s` (default `50.0`)
+- `bridge_start_delay_s` (default `54.0`)
+- `readiness_start_delay_s` (default `60.0`)
 
-They do not prove readiness or authorize motion. The nested RealSense launch
-retains its own camera/support offsets.
+These offsets spread the heavy D435, VO, filtered PointCloud2/voxel, and Bridge
+startup work across roughly one minute. `readiness_start_delay_s` remains a
+compatibility-only launch argument; production Edge does not launch the retired
+bringup readiness node. Elapsed time therefore does not prove readiness or
+authorize motion. The nested RealSense launch retains its own camera/support
+offsets and component health remains authoritative.
 
 The normal hardware-validation command is:
 

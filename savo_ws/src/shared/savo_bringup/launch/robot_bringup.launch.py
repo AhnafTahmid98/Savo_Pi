@@ -348,26 +348,26 @@ def generate_launch_description() -> LaunchDescription:
                 "realsense_start_delay_s", default_value="0.0"
             ),
             DeclareLaunchArgument(
-                "camera_support_start_delay_s", default_value="7.0"
+                "camera_support_start_delay_s", default_value="10.0"
             ),
-            DeclareLaunchArgument("vo_start_delay_s", default_value="14.0"),
+            DeclareLaunchArgument("vo_start_delay_s", default_value="22.0"),
             DeclareLaunchArgument(
-                "obstacle_cloud_start_delay_s", default_value="22.0"
-            ),
-            DeclareLaunchArgument(
-                "observer_relay_start_delay_s", default_value="28.0"
+                "obstacle_cloud_start_delay_s", default_value="34.0"
             ),
             DeclareLaunchArgument(
-                "speech_start_delay_s", default_value="34.0"
+                "observer_relay_start_delay_s", default_value="40.0"
             ),
             DeclareLaunchArgument(
-                "ui_start_delay_s", default_value="40.0"
+                "speech_start_delay_s", default_value="46.0"
             ),
             DeclareLaunchArgument(
-                "bridge_start_delay_s", default_value="46.0"
+                "ui_start_delay_s", default_value="50.0"
             ),
             DeclareLaunchArgument(
-                "readiness_start_delay_s", default_value="52.0"
+                "bridge_start_delay_s", default_value="54.0"
+            ),
+            DeclareLaunchArgument(
+                "readiness_start_delay_s", default_value="60.0"
             ),
             DeclareLaunchArgument("vo_profile", default_value="real_robot_v1"),
             DeclareLaunchArgument("ui_profile", default_value="pi"),

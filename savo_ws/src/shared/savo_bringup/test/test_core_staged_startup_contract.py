@@ -46,14 +46,14 @@ AUTONOMOUS_STAGE_DEFAULTS = {
 
 EDGE_STAGE_DEFAULTS = {
     "realsense_start_delay_s": "0.0",
-    "camera_support_start_delay_s": "7.0",
-    "vo_start_delay_s": "14.0",
-    "obstacle_cloud_start_delay_s": "22.0",
-    "observer_relay_start_delay_s": "28.0",
-    "speech_start_delay_s": "34.0",
-    "ui_start_delay_s": "40.0",
-    "bridge_start_delay_s": "46.0",
-    "readiness_start_delay_s": "52.0",
+    "camera_support_start_delay_s": "10.0",
+    "vo_start_delay_s": "22.0",
+    "obstacle_cloud_start_delay_s": "34.0",
+    "observer_relay_start_delay_s": "40.0",
+    "speech_start_delay_s": "46.0",
+    "ui_start_delay_s": "50.0",
+    "bridge_start_delay_s": "54.0",
+    "readiness_start_delay_s": "60.0",
 }
 
 
