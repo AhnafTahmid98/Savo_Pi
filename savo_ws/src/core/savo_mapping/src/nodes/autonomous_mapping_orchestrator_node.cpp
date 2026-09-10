@@ -196,6 +196,66 @@ bool scan360_state_is_active(const std::string_view state)
     state == "canceling";
 }
 
+enum class LowLevelControlMode : std::uint8_t
+{
+  Stop = 0U,
+  Auto,
+  Nav,
+  Other,
+};
+
+std::optional<LowLevelControlMode> low_level_control_mode_from_string(
+  const std::string_view value)
+{
+  if (value == "STOP") {
+    return LowLevelControlMode::Stop;
+  }
+  if (value == "AUTO") {
+    return LowLevelControlMode::Auto;
+  }
+  if (value == "NAV") {
+    return LowLevelControlMode::Nav;
+  }
+  return std::nullopt;
+}
+
+std::string_view to_string(const LowLevelControlMode mode)
+{
+  switch (mode) {
+    case LowLevelControlMode::Stop:
+      return "STOP";
+    case LowLevelControlMode::Auto:
+      return "AUTO";
+    case LowLevelControlMode::Nav:
+      return "NAV";
+    case LowLevelControlMode::Other:
+      return "STOP";
+  }
+  return "STOP";
+}
+
+LowLevelControlMode required_low_level_control_mode(
+  const autonomous::MissionDecision & decision)
+{
+  if (autonomous::is_scan_state(decision.snapshot.state) ||
+    decision.request_scan360_mode || decision.request_scan360_start)
+  {
+    return LowLevelControlMode::Auto;
+  }
+
+  if (decision.snapshot.state == autonomous::MissionState::Exploring ||
+    decision.snapshot.state == autonomous::MissionState::CoveragePending ||
+    decision.snapshot.state == autonomous::MissionState::Coverage ||
+    decision.snapshot.state == autonomous::MissionState::ReturningToStart ||
+    decision.request_frontier_mode || decision.request_coverage_approve ||
+    decision.request_return_to_start)
+  {
+    return LowLevelControlMode::Nav;
+  }
+
+  return LowLevelControlMode::Stop;
+}
+
 }  // namespace
 
 class AutonomousMappingOrchestratorNode final : public rclcpp::Node
@@ -611,6 +671,13 @@ private:
     inputs_.return_to_start_maximum_attempts =
       static_cast<std::uint32_t>(return_maximum_attempts);
 
+    control_mode_command_topic_ = declare_parameter<std::string>(
+      "control_mode_command_topic",
+      "/savo_control/mode_cmd");
+    control_mode_state_topic_ = declare_parameter<std::string>(
+      "control_mode_state_topic",
+      "/savo_control/mode_state");
+
     mode_command_topic_ = declare_parameter<std::string>(
       "mode_command_topic",
       std::string{topics::MODE_CMD});
@@ -782,6 +849,8 @@ private:
       &return_action_name_,
       &start_pose_target_frame_,
       &start_pose_source_frame_,
+      &control_mode_command_topic_,
+      &control_mode_state_topic_,
       &mode_command_topic_,
       &start_session_command_topic_,
       &cancel_session_command_topic_,
@@ -934,6 +1003,10 @@ private:
       mode_command_topic_,
       command_qos);
 
+    control_mode_command_publisher_ = create_publisher<StringMessage>(
+      control_mode_command_topic_,
+      command_qos);
+
     start_session_command_publisher_ = create_publisher<StringMessage>(
       start_session_command_topic_,
       command_qos);
@@ -949,6 +1022,14 @@ private:
       retained_qos,
       std::bind(
         &AutonomousMappingOrchestratorNode::handle_mode,
+        this,
+        std::placeholders::_1));
+
+    control_mode_state_subscription_ = create_subscription<StringMessage>(
+      control_mode_state_topic_,
+      retained_qos,
+      std::bind(
+        &AutonomousMappingOrchestratorNode::handle_control_mode_state,
         this,
         std::placeholders::_1));
 
@@ -1142,7 +1223,6 @@ private:
       !goal->map_id.empty() &&
       goal->map_revision > 0U &&
       !goal->authority_request_id.empty() &&
-      goal->authority_generation > 0U &&
       goal->strategy == RunMission::Goal::STRATEGY_FRONTIER &&
       duration_valid(goal->mission_timeout);
 
@@ -1227,10 +1307,19 @@ private:
       authority_map_id_ = goal->map_id;
       authority_map_revision_ = goal->map_revision;
       authority_generation_ = goal->authority_generation;
+      authority_acquire_on_admission_ = goal->authority_generation == 0U;
       authority_require_semantic_ = goal->require_semantic;
       authority_check_in_flight_ = true;
       authority_validated_ = false;
       authority_resume_required_ = false;
+      authority_loss_abort_pending_ = false;
+      control_mode_owned_ = false;
+      control_mode_nonstop_commanded_ = false;
+      control_stop_command_sent_ = false;
+      control_mode_state_generation_ = 0U;
+      control_stop_observation_floor_ = 0U;
+      terminal_control_stop_pending_ = false;
+      last_control_mode_command_attempt_.reset();
       authority_admission_started_at_ = std::chrono::steady_clock::now();
       inputs_.supervisor_authority_received = false;
       inputs_.supervisor_authorized = false;
@@ -1261,8 +1350,13 @@ private:
   }
 
   bool exact_authority_response_locked(
-    const std::shared_ptr<AuthorizeOperation::Response> & response) const
+    const std::shared_ptr<AuthorizeOperation::Response> & response,
+    const bool allow_generation_adoption = false) const
   {
+    const bool generation_matches = response &&
+      (allow_generation_adoption ?
+      response->authority_generation > 0U :
+      response->authority_generation == authority_generation_);
     return response && response->authorized &&
            response->result_code ==
            AuthorizeOperation::Response::RESULT_AUTHORIZED &&
@@ -1270,7 +1364,7 @@ private:
            response->active_operation ==
            AuthorizeOperation::Request::OP_START_AUTONOMOUS_MAPPING &&
            response->active_request_id == authority_request_id_ &&
-           response->authority_generation == authority_generation_;
+           generation_matches;
   }
 
   void dispatch_authority_check(
@@ -1290,10 +1384,14 @@ private:
         inputs_.supervisor_authorized = false;
         if (authority_validated_) {
           authority_resume_required_ = true;
+          authority_loss_abort_pending_ = true;
         }
         return;
       }
+      const bool acquire = admission && authority_acquire_on_admission_;
       request = make_authority_request_locked(
+        acquire ?
+        AuthorizeOperation::Request::COMMAND_ACQUIRE :
         AuthorizeOperation::Request::COMMAND_CHECK);
       authority_last_check_attempt_ = std::chrono::steady_clock::now();
     }
@@ -1315,7 +1413,14 @@ private:
               }
               authority_check_in_flight_ = false;
               inputs_.supervisor_authority_received = true;
-              const bool exact = exact_authority_response_locked(response);
+              const bool adopt_generation =
+                admission && authority_acquire_on_admission_;
+              const bool exact = exact_authority_response_locked(
+                response, adopt_generation);
+              if (exact && adopt_generation) {
+                authority_generation_ = response->authority_generation;
+                authority_acquire_on_admission_ = false;
+              }
               inputs_.supervisor_authorized =
               exact && !authority_resume_required_;
 
@@ -1331,7 +1436,7 @@ private:
                 mission_request.authority_request_id =
                 goal->authority_request_id;
                 mission_request.authority_generation =
-                goal->authority_generation;
+                authority_generation_;
                 mission_request.require_semantic = goal->require_semantic;
                 mission_request.strategy =
                 autonomous::MissionStrategy::Frontier;
@@ -1352,6 +1457,8 @@ private:
                   goal_handle_.reset();
                   authority_validated_ = false;
                   release_rejected_lease = true;
+                } else {
+                  control_mode_owned_ = true;
                 }
               } else if (admission) {
                 if (response &&
@@ -1377,6 +1484,7 @@ private:
                 authority_last_validated_ = std::chrono::steady_clock::now();
               } else {
                 authority_resume_required_ = true;
+                authority_loss_abort_pending_ = true;
                 if (response &&
                 response->active_operation ==
                 AuthorizeOperation::Request::OP_START_AUTONOMOUS_MAPPING &&
@@ -1393,6 +1501,7 @@ private:
             inputs_.supervisor_authorized = false;
             if (authority_validated_) {
               authority_resume_required_ = true;
+              authority_loss_abort_pending_ = true;
             }
             RCLCPP_ERROR(
               get_logger(), "Supervisor authority CHECK failed: %s",
@@ -1414,6 +1523,7 @@ private:
       inputs_.supervisor_authorized = false;
       if (authority_validated_) {
         authority_resume_required_ = true;
+        authority_loss_abort_pending_ = true;
       }
       RCLCPP_ERROR(
         get_logger(), "Supervisor authority CHECK dispatch failed: %s",
@@ -1461,8 +1571,14 @@ private:
             response->active_request_id != authority_request_id_));
             if (released || ownership_already_gone) {
               authority_validated_ = false;
+              authority_acquire_on_admission_ = false;
               inputs_.supervisor_authorized = false;
               authority_terminal_release_pending_ = false;
+              authority_loss_abort_pending_ = false;
+              control_mode_owned_ = false;
+              control_mode_nonstop_commanded_ = false;
+              control_stop_command_sent_ = false;
+              terminal_control_stop_pending_ = false;
               goal_reserved_ = false;
               if (terminal_cleanup && pending_terminal_handle_ &&
               pending_terminal_snapshot_.has_value() &&
@@ -1572,6 +1688,7 @@ private:
         inputs_.supervisor_authority_received = true;
         inputs_.supervisor_authorized = false;
         authority_resume_required_ = true;
+        authority_loss_abort_pending_ = true;
       }
     }
     if (release_pending) {
@@ -1913,6 +2030,26 @@ private:
     {
       std::lock_guard<std::mutex> lock(mutex_);
       inputs_.mode = value.value();
+    }
+    evaluate_and_apply();
+  }
+
+  void handle_control_mode_state(
+    const StringMessage::ConstSharedPtr message)
+  {
+    const auto mode = low_level_control_mode_from_string(message->data);
+    if (!mode.has_value()) {
+      RCLCPP_WARN(
+        get_logger(),
+        "observed unsupported low-level control mode state: %s",
+        message->data.c_str());
+    }
+
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      control_mode_received_ = true;
+      control_mode_state_ = mode.value_or(LowLevelControlMode::Other);
+      ++control_mode_state_generation_;
     }
     evaluate_and_apply();
   }
@@ -2646,6 +2783,21 @@ private:
     return false;
   }
 
+  bool control_mode_retry_elapsed_locked(
+    const std::chrono::steady_clock::time_point current_time)
+  {
+    if (
+      !last_control_mode_command_attempt_.has_value() ||
+      current_time - last_control_mode_command_attempt_.value() >=
+      std::chrono::milliseconds(command_retry_period_ms_))
+    {
+      last_control_mode_command_attempt_ = current_time;
+      return true;
+    }
+
+    return false;
+  }
+
   void evaluate_and_apply()
   {
     maintain_supervisor_authority();
@@ -2682,6 +2834,7 @@ private:
     bool dispatch_rollback = false;
     bool verification_started_this_cycle = false;
     bool dispatch_terminal_authority_release = false;
+    std::optional<LowLevelControlMode> control_mode_command;
     std::string map_save_mission_id;
     std::string verification_directory;
     std::string verification_map_id;
@@ -3013,6 +3166,16 @@ private:
 
       const auto mission_state = mission_.snapshot().state;
       if (
+        authority_loss_abort_pending_ &&
+        autonomous::is_active(mission_state) &&
+        mission_state != autonomous::MissionState::Canceling)
+      {
+        authority_loss_abort_pending_ = false;
+        primary_failure_reason_ = "supervisor_mapping_authority_lost";
+        decision = mission_.abort(
+          autonomous::MissionResult::ReadinessLost,
+          primary_failure_reason_, inputs_);
+      } else if (  // NOLINT(readability/braces)
         mission_state == autonomous::MissionState::AwaitingApproval &&
         approval_started_at_.has_value() && !inputs_.review_complete &&
         std::chrono::duration<double>(
@@ -3083,6 +3246,57 @@ private:
 
       refresh_sequence_stage_locked(decision.snapshot.state);
 
+      const bool exact_mapping_authority =
+        control_mode_owned_ && authority_validated_ &&
+        inputs_.supervisor_authority_received &&
+        inputs_.supervisor_authorized && !authority_resume_required_;
+      const LowLevelControlMode required_control_mode =
+        exact_mapping_authority ?
+        required_low_level_control_mode(decision) :
+        LowLevelControlMode::Stop;
+      const bool required_control_mode_observed =
+        control_mode_received_ && control_mode_state_ == required_control_mode;
+      const bool nav_mode_observed = exact_mapping_authority &&
+        control_mode_received_ &&
+        control_mode_state_ == LowLevelControlMode::Nav;
+      const bool auto_mode_observed = exact_mapping_authority &&
+        control_mode_received_ &&
+        control_mode_state_ == LowLevelControlMode::Auto;
+
+      const bool stop_command_confirmed =
+        required_control_mode == LowLevelControlMode::Stop &&
+        control_mode_nonstop_commanded_ && control_stop_command_sent_ &&
+        control_mode_state_generation_ > control_stop_observation_floor_ &&
+        control_mode_received_ &&
+        control_mode_state_ == LowLevelControlMode::Stop;
+      if (stop_command_confirmed) {
+        control_mode_nonstop_commanded_ = false;
+        control_stop_command_sent_ = false;
+      }
+
+      const bool stop_command_required =
+        required_control_mode == LowLevelControlMode::Stop &&
+        control_mode_nonstop_commanded_ && !control_stop_command_sent_;
+      const bool stop_confirmation_pending =
+        required_control_mode == LowLevelControlMode::Stop &&
+        control_mode_nonstop_commanded_ && control_stop_command_sent_ &&
+        !stop_command_confirmed;
+      const bool control_mode_command_due = stop_command_required ||
+        ((!required_control_mode_observed || stop_confirmation_pending) &&
+        control_mode_retry_elapsed_locked(current_time));
+      if (control_mode_owned_ && control_mode_command_due) {
+        control_mode_command = required_control_mode;
+        if (required_control_mode == LowLevelControlMode::Stop) {
+          if (!control_stop_command_sent_) {
+            control_stop_observation_floor_ = control_mode_state_generation_;
+            control_stop_command_sent_ = true;
+          }
+        } else {
+          control_mode_nonstop_commanded_ = true;
+          control_stop_command_sent_ = false;
+        }
+      }
+
       if (
         decision.request_start_session &&
         command_retry_elapsed_locked("start_session", current_time))
@@ -3091,14 +3305,14 @@ private:
       }
 
       if (
-        decision.request_frontier_mode &&
+        decision.request_frontier_mode && nav_mode_observed &&
         command_retry_elapsed_locked("frontier_mode", current_time))
       {
         publish_frontier_mode = true;
       }
 
       if (
-        decision.request_scan360_mode &&
+        decision.request_scan360_mode && auto_mode_observed &&
         command_retry_elapsed_locked("scan360_mode", current_time))
       {
         publish_scan360_mode = true;
@@ -3117,7 +3331,7 @@ private:
         capture_start_pose = true;
       }
 
-      if (decision.request_scan360_start) {
+      if (decision.request_scan360_start && auto_mode_observed) {
         if (!inputs_.scan360_started) {
           inputs_.scan360_started = true;
           inputs_.scan360_state = "waiting_for_service";
@@ -3241,14 +3455,14 @@ private:
       }
 
       if (
-        decision.request_coverage_approve &&
+        decision.request_coverage_approve && nav_mode_observed &&
         !coverage_approval_started_at_.has_value())
       {
         coverage_approval_started_at_ = current_time;
       }
 
       if (
-        decision.request_coverage_approve &&
+        decision.request_coverage_approve && nav_mode_observed &&
         coverage_candidate_valid_ &&
         coverage_candidate_generation_ ==
         coverage_candidate_generation_floor_ + 1U &&
@@ -3296,7 +3510,7 @@ private:
         dispatch_coverage_reset = true;
       }
 
-      if (decision.request_return_to_start) {
+      if (decision.request_return_to_start && nav_mode_observed) {
         if (
           !return_goal_in_flight_ &&
           !inputs_.return_to_start_started &&
@@ -3486,11 +3700,18 @@ private:
         pending_terminal_handle_ = goal_handle_;
         pending_terminal_snapshot_ = mission_.snapshot();
         pending_terminal_status_ = status;
-        authority_terminal_release_pending_ = true;
+        terminal_control_stop_pending_ = true;
         goal_reserved_ = true;
-        dispatch_terminal_authority_release = true;
         feedback_handle.reset();
         goal_handle_.reset();
+      }
+
+      const bool terminal_stop_confirmed =
+        !control_mode_nonstop_commanded_ || stop_command_confirmed;
+      if (terminal_control_stop_pending_ && terminal_stop_confirmed) {
+        terminal_control_stop_pending_ = false;
+        authority_terminal_release_pending_ = true;
+        dispatch_terminal_authority_release = true;
       }
     }
 
@@ -3500,6 +3721,12 @@ private:
       auto feedback = std::make_shared<RunMission::Feedback>();
       feedback->status = status;
       feedback_handle->publish_feedback(feedback);
+    }
+
+    if (control_mode_command.has_value()) {
+      publish_string(
+        control_mode_command_publisher_,
+        std::string{to_string(control_mode_command.value())});
     }
 
     if (publish_start_session) {
@@ -5490,6 +5717,8 @@ private:
   std::string return_action_name_;
   std::string start_pose_target_frame_;
   std::string start_pose_source_frame_;
+  std::string control_mode_command_topic_;
+  std::string control_mode_state_topic_;
   std::string mode_command_topic_;
   std::string start_session_command_topic_;
   std::string cancel_session_command_topic_;
@@ -5578,6 +5807,8 @@ private:
   authority_last_release_attempt_;
   std::optional<std::chrono::steady_clock::time_point>
   last_command_attempt_;
+  std::optional<std::chrono::steady_clock::time_point>
+  last_control_mode_command_attempt_;
   std::optional<std::chrono::steady_clock::time_point>
   map_save_started_at_;
   std::optional<std::chrono::steady_clock::time_point>
@@ -5687,9 +5918,18 @@ private:
   bool authority_check_in_flight_{false};
   bool authority_release_in_flight_{false};
   bool authority_validated_{false};
+  bool authority_acquire_on_admission_{false};
   bool authority_resume_required_{false};
   bool authority_require_semantic_{true};
   bool authority_terminal_release_pending_{false};
+  bool authority_loss_abort_pending_{false};
+  bool control_mode_received_{false};
+  bool control_mode_owned_{false};
+  bool control_mode_nonstop_commanded_{false};
+  bool control_stop_command_sent_{false};
+  bool terminal_control_stop_pending_{false};
+  std::uint64_t control_mode_state_generation_{0U};
+  std::uint64_t control_stop_observation_floor_{0U};
   std::uint64_t scan360_operation_epoch_{0U};
   std::uint64_t head_scan_operation_epoch_{0U};
   std::uint64_t coverage_operation_epoch_{0U};
@@ -5718,6 +5958,7 @@ private:
   double coverage_last_remaining_distance_m_{0.0};
   autonomous::MissionState observed_sequence_state_{
     autonomous::MissionState::Idle};
+  LowLevelControlMode control_mode_state_{LowLevelControlMode::Stop};
 
   rclcpp_action::Server<RunMission>::SharedPtr action_server_;
   rclcpp::Service<ControlMission>::SharedPtr control_service_;
@@ -5747,11 +5988,14 @@ private:
 
   rclcpp::Publisher<MissionStatus>::SharedPtr status_publisher_;
   rclcpp::Publisher<StringMessage>::SharedPtr mode_command_publisher_;
+  rclcpp::Publisher<StringMessage>::SharedPtr control_mode_command_publisher_;
   rclcpp::Publisher<StringMessage>::SharedPtr start_session_command_publisher_;
   rclcpp::Publisher<StringMessage>::SharedPtr cancel_session_command_publisher_;
   rclcpp::Publisher<StringMessage>::SharedPtr joint_active_release_publisher_;
 
   rclcpp::Subscription<StringMessage>::SharedPtr mode_subscription_;
+  rclcpp::Subscription<StringMessage>::SharedPtr
+    control_mode_state_subscription_;
   rclcpp::Subscription<StringMessage>::SharedPtr exploration_mode_subscription_;
   rclcpp::Subscription<StringMessage>::SharedPtr workflow_phase_subscription_;
   rclcpp::Subscription<StringMessage>::SharedPtr session_state_subscription_;

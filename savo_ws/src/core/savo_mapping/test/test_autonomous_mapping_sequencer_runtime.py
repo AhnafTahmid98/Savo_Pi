@@ -85,6 +85,8 @@ class SequencerHarness:
         self.runtime_authority_topic = f'{prefix}/runtime_authority'
         self.handoff_state_topic = f'{prefix}/handoff_state'
         self.frontier_status_topic = f'{prefix}/frontier_status'
+        self.control_mode_command_topic = f'{prefix}/control/mode_cmd'
+        self.control_mode_state_topic = f'{prefix}/control/mode_state'
         self.mode_command_topic = f'{prefix}/mode_cmd'
         self.start_session_topic = f'{prefix}/start_session_cmd'
         self.cancel_session_topic = f'{prefix}/cancel_session_cmd'
@@ -108,6 +110,7 @@ class SequencerHarness:
         self.tf_broadcaster = TransformBroadcaster(self.node)
 
         self.mode_commands = []
+        self.control_mode_commands = []
         self.start_session_commands = []
         self.cancel_session_commands = []
         self.statuses = []
@@ -147,11 +150,20 @@ class SequencerHarness:
         self.head_state_pub = self.node.create_publisher(
             String, self.head_state_topic, command_qos()
         )
+        self.control_mode_state_pub = self.node.create_publisher(
+            String, self.control_mode_state_topic, retained_qos()
+        )
 
         self.mode_command_sub = self.node.create_subscription(
             String,
             self.mode_command_topic,
             lambda msg: self.mode_commands.append(msg.data),
+            command_qos(),
+        )
+        self.control_mode_command_sub = self.node.create_subscription(
+            String,
+            self.control_mode_command_topic,
+            self.handle_control_mode_command,
             command_qos(),
         )
         self.start_session_sub = self.node.create_subscription(
@@ -257,6 +269,9 @@ class SequencerHarness:
             '-p', f'runtime_authority_topic:={self.runtime_authority_topic}',
             '-p', f'handoff_state_topic:={self.handoff_state_topic}',
             '-p', f'frontier_status_topic:={self.frontier_status_topic}',
+            '-p',
+            f'control_mode_command_topic:={self.control_mode_command_topic}',
+            '-p', f'control_mode_state_topic:={self.control_mode_state_topic}',
             '-p', f'mode_command_topic:={self.mode_command_topic}',
             '-p', f'start_session_command_topic:={self.start_session_topic}',
             '-p', f'cancel_session_command_topic:={self.cancel_session_topic}',
@@ -317,6 +332,11 @@ class SequencerHarness:
         message = Bool()
         message.data = value
         return message
+
+    def handle_control_mode_command(self, message):
+        """Record and acknowledge the production low-level mode command."""
+        self.control_mode_commands.append(message.data)
+        self.control_mode_state_pub.publish(self.string_message(message.data))
 
     def accept_trigger(self, _request, response):
         """Accept a generic fixture trigger."""
@@ -431,6 +451,7 @@ class SequencerHarness:
             self.safety_stop_pub.publish(self.bool_message(False))
             self.runtime_authority_pub.publish(self.bool_message(False))
             self.handoff_state_pub.publish(self.string_message('idle'))
+            self.control_mode_state_pub.publish(self.string_message('STOP'))
             time.sleep(0.05)
 
     def publish_monitor_state(self):
@@ -509,6 +530,7 @@ class SequencerHarness:
             output = self.process.stdout.read()
         return (
             f'process={self.process.poll()} modes={self.mode_commands[-12:]} '
+            f'control_modes={self.control_mode_commands[-12:]} '
             f'starts={self.start_session_commands[-5:]} '
             f'cancels={self.cancel_session_commands[-5:]} '
             f'scan_starts={self.scan_start_count} '
@@ -561,6 +583,9 @@ def test_initial_sequence_and_conditional_scan_resume_frontier():
             time.sleep(0.05)
 
         assert wait_until(
+            lambda: 'AUTO' in harness.control_mode_commands
+        ), harness.diagnostics()
+        assert wait_until(
             lambda: 'autonomous:scan360' in harness.mode_commands
         ), harness.diagnostics()
         harness.publish_scan_state()
@@ -579,6 +604,7 @@ def test_initial_sequence_and_conditional_scan_resume_frontier():
         assert wait_until(
             lambda: 'autonomous:frontier' in harness.mode_commands
         ), harness.diagnostics()
+        assert 'NAV' in harness.control_mode_commands
         harness.publish_frontier_state()
 
         assert wait_until(
@@ -619,6 +645,7 @@ def test_initial_sequence_and_conditional_scan_resume_frontier():
             lambda: harness.mode_commands.count('autonomous:scan360')
             > previous_scan_mode_count
         ), harness.diagnostics()
+        assert harness.control_mode_commands.count('AUTO') >= 2
         harness.publish_scan_state()
         assert wait_until(
             lambda: harness.scan_start_count == 2
@@ -628,6 +655,7 @@ def test_initial_sequence_and_conditional_scan_resume_frontier():
             lambda: harness.mode_commands.count('autonomous:frontier')
             > previous_frontier_count
         ), harness.diagnostics()
+        assert harness.control_mode_commands.count('NAV') >= 2
         harness.publish_frontier_state()
 
         assert wait_until(
@@ -642,6 +670,9 @@ def test_initial_sequence_and_conditional_scan_resume_frontier():
             'runtime_cleanup',
         )
         assert response.accepted
+        assert wait_until(
+            lambda: 'STOP' in harness.control_mode_commands
+        ), harness.diagnostics()
 
         assert wait_until(
             lambda: harness.mode_commands.count('monitor_only')

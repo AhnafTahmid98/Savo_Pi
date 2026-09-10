@@ -158,6 +158,42 @@ def test_commands_flow_through_mapping_mode_manager_topics() -> None:
         assert token in source
 
 
+def test_motion_dispatch_waits_for_lease_bound_control_mode() -> None:
+    source = compact(
+        read('src/nodes/autonomous_mapping_orchestrator_node.cpp')
+    )
+    config = read('config/autonomous_mapping_orchestrator.yaml')
+
+    for token in (
+        'control_mode_command_topic: "/savo_control/mode_cmd"',
+        'control_mode_state_topic: "/savo_control/mode_state"',
+    ):
+        assert token in config
+
+    for token in (
+        'control_mode_owned_ && authority_validated_',
+        'inputs_.supervisor_authorized && !authority_resume_required_',
+        'authority_acquire_on_admission_ = goal->authority_generation == 0U',
+        'AuthorizeOperation::Request::COMMAND_ACQUIRE',
+        'response->authority_generation > 0U',
+        'decision.request_frontier_mode && nav_mode_observed',
+        'decision.request_scan360_mode && auto_mode_observed',
+        'decision.request_scan360_start && auto_mode_observed',
+        'decision.request_coverage_approve && nav_mode_observed',
+        'decision.request_return_to_start && nav_mode_observed',
+        'primary_failure_reason_ = "supervisor_mapping_authority_lost"',
+        'terminal_control_stop_pending_ = true',
+        'control_mode_state_ == LowLevelControlMode::Stop',
+        'const bool control_mode_command_due = stop_command_required ||',
+    ):
+        assert token in source
+
+    assert 'goal->authority_generation > 0U' not in source
+    assert 'mission_request.authority_generation = authority_generation_' in (
+        source
+    )
+
+
 def test_completion_detection_is_typed_and_routes_save_publicly() -> None:
     source = read('src/nodes/autonomous_mapping_orchestrator_node.cpp')
     mission = read('src/workflow/autonomous_mapping_mission.cpp')

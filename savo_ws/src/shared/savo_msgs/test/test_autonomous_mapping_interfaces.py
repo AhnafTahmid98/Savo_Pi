@@ -164,6 +164,8 @@ def test_action_starts_one_mission_and_returns_typed_status() -> None:
     ):
         assert token in text
 
+    assert "A zero authority_generation asks the action server" in text
+    assert "A nonzero generation identifies" in text
     assert "geometry_msgs/PoseStamped" not in text
     assert "nav2_msgs" not in text
 

@@ -100,7 +100,7 @@ MissionCapabilities MissionAuthority::EvaluateCapabilities(
     core_running && core.can_start_geometric_mapping && capabilities.mapping_available &&
     dependencies.mapping.ready;
   capabilities.can_start_autonomous_mapping = policy_.allow_autonomous_mapping &&
-    capabilities.can_start_manual_mapping && capabilities.navigation_ready &&
+    capabilities.can_start_manual_mapping &&
     dependencies.endpoints.autonomous_mapping_action &&
     (!policy_.require_semantic_autonomous_mapping || capabilities.semantic_mapping_ready);
   capabilities.can_run_scan360 = policy_.allow_scan360 && core_running &&

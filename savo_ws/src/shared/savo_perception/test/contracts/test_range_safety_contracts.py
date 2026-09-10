@@ -7,13 +7,19 @@ import re
 import time
 from pathlib import Path
 
+import yaml
+
 from savo_perception.models.range_sample import (
     RangeSample,
     RangeSnapshot,
     is_valid_distance,
 )
 from savo_perception.models.sensor_health import SensorHealth
-from savo_perception.safety.range_fusion import RangeFusionConfig, fuse_range_snapshot
+from savo_perception.safety.range_fusion import (
+    RangeFusionConfig,
+    fuse_range_snapshot,
+    slowdown_from_distance,
+)
 
 
 PACKAGE = Path(__file__).resolve().parents[2]
@@ -272,6 +278,65 @@ def test_real_tof_topology_is_unchanged() -> None:
         "right_channel: 3",
     ):
         assert token in config
+
+
+def test_real_profile_uses_tuned_slowdown_and_unchanged_stop_thresholds() -> None:
+    profile_path = (
+        PACKAGE / "config" / "profiles" / "core_real_robot_v1.yaml"
+    )
+    profile = yaml.safe_load(_read(profile_path))
+
+    for node_name in ("safety_stop_node", "safety_stop_node_py"):
+        params = profile[node_name]["ros__parameters"]
+        assert math.isclose(params["front_slow_m"], 0.40)
+        assert math.isclose(params["side_slow_m"], 0.12)
+        assert math.isclose(params["front_stop_m"], 0.25)
+        assert math.isclose(params["side_stop_m"], 0.08)
+        assert params["front_slow_m"] > params["front_stop_m"]
+        assert params["side_slow_m"] > params["side_stop_m"]
+
+
+def test_tuned_production_slowdown_boundaries() -> None:
+    assert math.isclose(
+        slowdown_from_distance(0.401, stop_m=0.25, slow_m=0.40),
+        1.0,
+    )
+    assert slowdown_from_distance(0.399, stop_m=0.25, slow_m=0.40) < 1.0
+    assert math.isclose(
+        slowdown_from_distance(0.25, stop_m=0.25, slow_m=0.40),
+        0.0,
+    )
+
+    assert math.isclose(
+        slowdown_from_distance(0.121, stop_m=0.08, slow_m=0.12),
+        1.0,
+    )
+    assert slowdown_from_distance(0.119, stop_m=0.08, slow_m=0.12) < 1.0
+    assert math.isclose(
+        slowdown_from_distance(0.08, stop_m=0.08, slow_m=0.12),
+        0.0,
+    )
+
+
+def test_side_hard_stop_overrides_front_slowdown() -> None:
+    snapshot = _snapshot()
+    snapshot = RangeSnapshot(
+        _sample("depth_front", 0.30),
+        _sample("tof_left", 0.08),
+        snapshot.tof_right,
+        snapshot.ultrasonic_front,
+    )
+    config = RangeFusionConfig(
+        front_stop_m=0.25,
+        front_slow_m=0.40,
+        side_stop_m=0.08,
+        side_slow_m=0.12,
+    )
+
+    decision = fuse_range_snapshot(snapshot, config).decision
+    assert decision.stop_required
+    assert decision.reason == "side_stop_zone"
+    assert math.isclose(decision.slowdown_factor, 0.0)
 
 
 def test_required_tofs_remain_required_and_ultrasonic_optional() -> None:

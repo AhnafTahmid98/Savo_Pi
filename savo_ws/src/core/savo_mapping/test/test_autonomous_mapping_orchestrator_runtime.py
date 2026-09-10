@@ -67,7 +67,7 @@ def installed_executable():
 class RuntimeHarness:
     """Run the production orchestrator against controlled state fixtures."""
 
-    def __init__(self):
+    def __init__(self, auto_ack_control_mode=True):
         suffix = f'{os.getpid()}_{time.monotonic_ns()}'
         prefix = f'/test/am3_{suffix}'
 
@@ -83,6 +83,8 @@ class RuntimeHarness:
         self.runtime_authority_topic = f'{prefix}/runtime_authority'
         self.handoff_state_topic = f'{prefix}/handoff_state'
         self.frontier_status_topic = f'{prefix}/frontier_status'
+        self.control_mode_command_topic = f'{prefix}/control/mode_cmd'
+        self.control_mode_state_topic = f'{prefix}/control/mode_state'
         self.mode_command_topic = f'{prefix}/mode_cmd'
         self.start_session_topic = f'{prefix}/start_session_cmd'
         self.cancel_session_topic = f'{prefix}/cancel_session_cmd'
@@ -100,6 +102,8 @@ class RuntimeHarness:
         self.executor.add_node(self.node)
 
         self.mode_commands = []
+        self.control_mode_commands = []
+        self.auto_ack_control_mode = auto_ack_control_mode
         self.start_session_commands = []
         self.cancel_session_commands = []
         self.statuses = []
@@ -141,7 +145,16 @@ class RuntimeHarness:
             self.frontier_status_topic,
             retained_qos(),
         )
+        self.control_mode_state_pub = self.node.create_publisher(
+            String, self.control_mode_state_topic, retained_qos()
+        )
 
+        self.control_mode_command_sub = self.node.create_subscription(
+            String,
+            self.control_mode_command_topic,
+            self.handle_control_mode_command,
+            command_qos(),
+        )
         self.mode_command_sub = self.node.create_subscription(
             String,
             self.mode_command_topic,
@@ -221,9 +234,14 @@ class RuntimeHarness:
             '-p', f'runtime_authority_topic:={self.runtime_authority_topic}',
             '-p', f'handoff_state_topic:={self.handoff_state_topic}',
             '-p', f'frontier_status_topic:={self.frontier_status_topic}',
+            '-p',
+            f'control_mode_command_topic:={self.control_mode_command_topic}',
+            '-p', f'control_mode_state_topic:={self.control_mode_state_topic}',
             '-p', 'sequence.require_start_pose_capture:=false',
             '-p', 'sequence.require_initial_scan360:=false',
             '-p', 'sequence.require_initial_head_scan:=false',
+            '-p', 'final_sequence.require_final_scan360:=false',
+            '-p', 'final_sequence.require_final_head_scan:=false',
             '-p', 'coverage.enabled:=false',
             '-p', 'coverage.required:=false',
             '-p', f'mode_command_topic:={self.mode_command_topic}',
@@ -298,39 +316,66 @@ class RuntimeHarness:
         response.message = 'handoff_cancel_accepted'
         return response
 
+    def handle_control_mode_command(self, message):
+        """Record and optionally acknowledge a low-level mode command."""
+        self.control_mode_commands.append(message.data)
+        if self.auto_ack_control_mode:
+            self.control_mode_state_pub.publish(
+                self.string_message(message.data)
+            )
+
     def handle_authority(self, request, response):
         """Emulate one exact Supervisor mapping lease."""
         self.authority_commands.append(request.command)
-        exact = (
+        identity_exact = (
             request.operation
             == AuthorizeOperation.Request.OP_START_AUTONOMOUS_MAPPING
             and request.request_id == 'authority-am3-runtime'
             and request.actor_id == 'runtime-operator'
             and request.map_id == 'campus_main'
             and request.map_revision == 1
-            and request.require_semantic
-            and request.expected_generation == self.authority_generation
         )
+
+        authorized = False
+        if request.command == AuthorizeOperation.Request.COMMAND_ACQUIRE:
+            authorized = (
+                self.authority_allowed
+                and identity_exact
+                and request.expected_generation == 0
+                and self.authority_state == 'IDLE'
+            )
+            if authorized:
+                self.authority_generation += 1
+                self.authority_state = 'ACTIVE'
+        else:
+            exact = (
+                identity_exact
+                and request.expected_generation == self.authority_generation
+            )
+            authorized = (
+                self.authority_allowed
+                and exact
+                and self.authority_state != 'IDLE'
+                and (
+                    request.command
+                    != AuthorizeOperation.Request.COMMAND_CHECK
+                    or self.authority_state == 'ACTIVE'
+                )
+            )
+
         if request.command == AuthorizeOperation.Request.COMMAND_RELEASE:
-            if exact:
+            if authorized:
                 self.authority_generation += 1
                 self.authority_state = 'IDLE'
         elif request.command == AuthorizeOperation.Request.COMMAND_PAUSE:
-            if exact:
+            if authorized:
                 self.authority_generation += 1
                 self.authority_state = 'PAUSED'
         elif request.command == AuthorizeOperation.Request.COMMAND_RESUME:
-            if exact:
+            if authorized:
                 self.authority_generation += 1
                 self.authority_state = 'ACTIVE'
-        response.authorized = (
-            self.authority_allowed
-            and exact
-            and (
-                request.command != AuthorizeOperation.Request.COMMAND_CHECK
-                or self.authority_state == 'ACTIVE'
-            )
-        )
+        response.authorized = authorized
         response.result_code = (
             AuthorizeOperation.Response.RESULT_AUTHORIZED
             if response.authorized
@@ -463,6 +508,7 @@ class RuntimeHarness:
             self.safety_stop_pub.publish(self.bool_message(False))
             self.runtime_authority_pub.publish(self.bool_message(False))
             self.handoff_state_pub.publish(self.string_message('idle'))
+            self.control_mode_state_pub.publish(self.string_message('STOP'))
             time.sleep(0.05)
 
     def publish_exploring_state(self):
@@ -481,7 +527,13 @@ class RuntimeHarness:
         self.workflow_phase_pub.publish(self.string_message('idle'))
         self.runtime_authority_pub.publish(self.bool_message(False))
 
-    def send_goal(self, auto_save=True, authority_generation=1):
+    def send_goal(
+        self,
+        auto_save=True,
+        authority_generation=1,
+        require_semantic=True,
+        require_quality_approval=True,
+    ):
         """Start one typed frontier mission."""
         goal = RunAutonomousMapping.Goal()
         goal.contract_version = RunAutonomousMapping.Goal.CONTRACT_VERSION
@@ -492,9 +544,9 @@ class RuntimeHarness:
         goal.strategy = RunAutonomousMapping.Goal.STRATEGY_FRONTIER
         goal.authority_request_id = 'authority-am3-runtime'
         goal.authority_generation = authority_generation
-        goal.require_semantic = True
+        goal.require_semantic = require_semantic
         goal.auto_save = auto_save
-        goal.require_quality_approval = True
+        goal.require_quality_approval = require_quality_approval
 
         self._wait_for_action_server()
         future = self.action_client.send_goal_async(goal)
@@ -567,6 +619,7 @@ class RuntimeHarness:
             output = self.process.stdout.read()
         return (
             f'poll={self.process.poll()} modes={self.mode_commands} '
+            f'control_modes={self.control_mode_commands} '
             f'action_server_ready={self.action_client.server_is_ready()} '
             f'executor_alive={self.spin_thread.is_alive()} '
             f'executor_error={self.executor_error} '
@@ -610,6 +663,55 @@ def ros_context():
     rclpy.init()
     yield
     rclpy.shutdown()
+
+
+def test_frontier_waits_for_observed_nav_mode():
+    """Do not enable frontier navigation until NAV is actually observed."""
+    harness = RuntimeHarness(auto_ack_control_mode=False)
+    try:
+        harness.publish_initial_state()
+        assert not harness.control_mode_commands
+        goal_handle = harness.send_goal(auto_save=False)
+        result_future = goal_handle.get_result_async()
+        assert wait_until(
+            lambda: 'mission-am3-runtime' in harness.start_session_commands
+        ), harness.diagnostics()
+        harness.session_state_pub.publish(harness.string_message('active'))
+
+        assert wait_until(
+            lambda: 'NAV' in harness.control_mode_commands
+        ), harness.diagnostics()
+        time.sleep(0.25)
+        assert 'autonomous:frontier' not in harness.mode_commands
+
+        harness.control_mode_state_pub.publish(harness.string_message('NAV'))
+        assert wait_until(
+            lambda: 'autonomous:frontier' in harness.mode_commands
+        ), harness.diagnostics()
+
+        response = harness.control(
+            ControlAutonomousMapping.Request.COMMAND_CANCEL,
+            'runtime_cleanup',
+        )
+        assert response.accepted
+        assert wait_until(
+            lambda: 'STOP' in harness.control_mode_commands
+        ), harness.diagnostics()
+        harness.publish_monitor_state()
+        assert wait_until(
+            lambda: 'mission-am3-runtime' in harness.cancel_session_commands
+        ), harness.diagnostics()
+        harness.session_state_pub.publish(harness.string_message('cancelled'))
+        time.sleep(0.25)
+        assert AuthorizeOperation.Request.COMMAND_RELEASE not in (
+            harness.authority_commands
+        )
+        assert not result_future.done()
+
+        harness.control_mode_state_pub.publish(harness.string_message('STOP'))
+        assert wait_until(result_future.done), harness.diagnostics()
+    finally:
+        harness.close()
 
 
 def test_start_pause_resume_and_cancel_lifecycle():
@@ -717,18 +819,34 @@ def test_start_pause_resume_and_cancel_lifecycle():
         assert AuthorizeOperation.Request.COMMAND_RELEASE in (
             harness.authority_commands
         )
+        assert 'STOP' in harness.control_mode_commands
     finally:
         harness.close()
 
 
-def test_stable_frontier_exhaustion_completes_manual_save_mission():
-    """Confirm AM-2 completion only after stable typed observations."""
+def test_one_action_acquires_lease_and_completes_core_only_mission():
+    """One action owns lease, NAV selection, exploration, and cleanup."""
     harness = RuntimeHarness()
     try:
         harness.publish_initial_state()
-        goal_handle = harness.send_goal(auto_save=False)
+        assert not harness.control_mode_commands
+        harness.authority_generation = 0
+        harness.authority_state = 'IDLE'
+        goal_handle = harness.send_goal(
+            auto_save=False,
+            authority_generation=0,
+            require_semantic=False,
+            require_quality_approval=False,
+        )
         result_future = goal_handle.get_result_async()
 
+        assert wait_until(
+            lambda: AuthorizeOperation.Request.COMMAND_ACQUIRE
+            in harness.authority_commands
+        ), harness.diagnostics()
+        assert wait_until(
+            lambda: 'NAV' in harness.control_mode_commands
+        ), harness.diagnostics()
         assert wait_until(
             lambda: 'mission-am3-runtime' in harness.start_session_commands
         ), harness.diagnostics()
@@ -781,6 +899,7 @@ def test_stable_frontier_exhaustion_completes_manual_save_mission():
         assert AuthorizeOperation.Request.COMMAND_RELEASE in (
             harness.authority_commands
         )
+        assert 'STOP' in harness.control_mode_commands
     finally:
         harness.close()
 
@@ -799,12 +918,16 @@ def test_direct_action_with_stale_authority_never_starts_workflow():
             RunAutonomousMapping.Result.RESULT_READINESS_LOST
         )
         assert not harness.start_session_commands
+        assert not {
+            'NAV',
+            'AUTO',
+        }.intersection(harness.control_mode_commands)
     finally:
         harness.close()
 
 
-def test_supervisor_revocation_pauses_without_automatic_resume():
-    """Revoked motion stays quiesced after dependency recovery."""
+def test_supervisor_revocation_stops_and_aborts():
+    """Revoked mapping authority stops motion and aborts the mission."""
     harness = RuntimeHarness()
     try:
         harness.publish_initial_state()
@@ -824,56 +947,26 @@ def test_supervisor_revocation_pauses_without_automatic_resume():
         harness.authority_allowed = False
         assert wait_until(
             lambda: harness.latest_state()
-            in {
-                AutonomousMappingStatus.STATE_PAUSING,
-                AutonomousMappingStatus.STATE_PAUSED,
-            }
+            == AutonomousMappingStatus.STATE_CANCELING
         ), harness.diagnostics()
+        assert 'STOP' in harness.control_mode_commands
         harness.publish_monitor_state()
         assert wait_until(
-            lambda: harness.latest_state()
-            == AutonomousMappingStatus.STATE_PAUSED
-        ), harness.diagnostics()
-
-        frontier_count = harness.mode_commands.count('autonomous:frontier')
-        harness.authority_allowed = True
-        time.sleep(2.0)
-        assert harness.latest_state() == AutonomousMappingStatus.STATE_PAUSED
-        assert (
-            harness.mode_commands.count('autonomous:frontier')
-            == frontier_count
-        )
-
-        response = harness.control(
-            ControlAutonomousMapping.Request.COMMAND_RESUME,
-            'explicit_resume_after_revalidation',
-        )
-        assert response.accepted
-        assert wait_until(
-            lambda: harness.mode_commands.count('autonomous:frontier')
-            > frontier_count
-        ), harness.diagnostics()
-
-        harness.publish_exploring_state()
-        response = harness.control(
-            ControlAutonomousMapping.Request.COMMAND_CANCEL,
-            'test_cleanup',
-        )
-        assert response.accepted
-        prior_monitor_count = harness.mode_commands.count('monitor_only')
-        assert wait_until(
-            lambda: harness.mode_commands.count('monitor_only')
-            > prior_monitor_count
-        ), harness.diagnostics()
-        harness.publish_monitor_state()
-        assert wait_until(
-            lambda: 'mission-am3-runtime'
-            in harness.cancel_session_commands
+            lambda: 'mission-am3-runtime' in harness.cancel_session_commands
         ), harness.diagnostics()
         harness.session_state_pub.publish(
             harness.string_message('cancelled')
         )
         assert wait_until(result_future.done), harness.diagnostics()
+        result = result_future.result().result
+        assert not result.success
+        assert result.result_code == (
+            RunAutonomousMapping.Result.RESULT_READINESS_LOST
+        )
+        assert AuthorizeOperation.Request.COMMAND_RELEASE in (
+            harness.authority_commands
+        )
+        assert 'STOP' in harness.control_mode_commands
     finally:
         harness.close()
 

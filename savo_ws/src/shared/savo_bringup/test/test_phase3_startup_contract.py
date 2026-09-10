@@ -169,7 +169,7 @@ def test_optional_components_use_launch_conditions_without_fake_stages() -> None
 
 
 def test_launch_never_creates_motion_or_mission_authority() -> None:
-    """Staged launch remains stopped, unarmed, and unable to submit goals."""
+    """Simple timer staging remains unable to authorize or command motion."""
     autonomous = read("launch/autonomous_mapping.launch.py")
 
     assert 'default_value="STOP"' in autonomous
@@ -177,4 +177,6 @@ def test_launch_never_creates_motion_or_mission_authority() -> None:
     assert "async_send_goal" not in autonomous
     assert "ros2 action send_goal" not in autonomous
     assert "ActionClient" not in autonomous
-    assert "TimerAction" not in autonomous
+    assert "TimerAction" in autonomous
+    assert "StartupStageGroup" not in autonomous
+    assert "startup_stage_gate_node" not in autonomous

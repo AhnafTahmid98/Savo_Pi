@@ -19,6 +19,9 @@ autonomous_mapping_orchestrator_node:
     handoff_state_topic: "/savo_mapping/exploration_goal/state"
     frontier_status_topic: "/savo_mapping/frontier_explorer/typed_status"
 
+    control_mode_command_topic: "/savo_control/mode_cmd"
+    control_mode_state_topic: "/savo_control/mode_state"
+
     mode_command_topic: "/savo_mapping/mode_cmd"
     start_session_command_topic: "/savo_mapping/start_session_cmd"
     cancel_session_command_topic: "/savo_mapping/cancel_session_cmd"

@@ -52,36 +52,29 @@ ros2 launch savo_bringup autonomous_mapping.launch.py \
   map_id:=campus_main
 ```
 
-The launch starts base, LiDAR, range safety, control, localization, core power,
-supervisor, `savo_head`, live-map Nav2 and the package-local autonomous mapping
-launch. It does not send an autonomous mission goal and defaults the control
-layer to `STOP`. Scan360 is available through its public service but is started
-only by the typed mission sequencer.
+The launch staggers description, base, LiDAR, range safety, control,
+localization, core power, Supervisor, live-map Nav2, SLAM and autonomous
+mapping to reduce Core Pi startup contention. It does not send an autonomous
+mission goal and defaults the control layer to `STOP`. Head, semantic/location,
+VO, ultrasonic, coverage and initial/final scan workflows remain available but
+default off for the first Core-only geometric mapping run.
 
 During a controlled real-robot test, first confirm mapping, navigation, safety,
-localization and power readiness. Then request `NAV` control authority and send
-the typed mission action with the same map identifier:
+localization and power readiness, arm Supervisor explicitly, and send one typed
+mission action. Generation zero asks the orchestrator to acquire the exact
+mapping lease before it selects any motion-capable control mode:
 
 ```bash
-ros2 topic pub --once \
-  /savo_control/mode_cmd \
-  std_msgs/msg/String \
-  "{data: NAV}"
-
-ros2 service call \
-  /savo_supervisor/authorize_operation \
-  savo_msgs/srv/AuthorizeOperation \
-  "{command: 1, operation: 3, request_id: mapping_request_001, actor_id: operator_1, map_id: campus_main, map_revision: 1, require_semantic: true, motion_required: true, expected_generation: 0}"
-
-# Use authority_generation returned by the authorized ACQUIRE response.
 ros2 action send_goal \
   /savo_mapping/autonomous/run \
   savo_msgs/action/RunAutonomousMapping \
-  "{contract_version: 3, mission_id: mission_campus_main_001, actor_id: operator_1, map_id: campus_main, map_revision: 1, strategy: 1, authority_request_id: mapping_request_001, authority_generation: 1, require_semantic: true, auto_save: true, require_quality_approval: true, mission_timeout: {sec: 0, nanosec: 0}}"
+  "{contract_version: 3, mission_id: mission_campus_main_001, actor_id: operator_1, map_id: campus_main, map_revision: 1, strategy: 1, authority_request_id: mapping_request_001, authority_generation: 0, require_semantic: false, auto_save: false, require_quality_approval: false, mission_timeout: {sec: 0, nanosec: 0}}"
 ```
 
 The action goal is the only mission start boundary, but it proceeds only after
-an exact Supervisor lease CHECK. AM-5 records the initial
+the orchestrator acquires and verifies the exact Supervisor lease. Existing
+callers that supply a nonzero, pre-acquired generation retain the independent
+lease CHECK path. AM-5 records the initial
 map-frame pose, runs an initial Scan360, switches to monitor-only for the initial
 head scan, then enters frontier exploration. A typed control request can insert
 a guarded conditional Scan360 and automatically resume frontier exploration.
@@ -110,7 +103,8 @@ provisional profile. Controlled bench tests may explicitly set
 `allow_provisional_geometry:=true`; this does not constitute a measurement lock.
 
 For a non-hardware launch inspection, each package group can be disabled with
-its `start_*` argument. The production defaults start all core-side groups.
+its `start_*` argument. The dedicated launch starts the required Core geometric
+mapping groups and leaves optional hardware and semantic workflows disabled.
 
 ## AM-8 one-launch completion contract
 

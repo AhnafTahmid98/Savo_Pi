@@ -142,6 +142,36 @@ TEST(MissionAuthority, NavigationRequiresApprovedSavedRelease)
   EXPECT_TRUE(authority.EvaluateCapabilities(dependencies).can_navigate);
 }
 
+TEST(MissionAuthority, AutonomousMappingAdmissionDoesNotRequireNavigationGoalAcceptance)
+{
+  auto dependencies = healthy_dependencies();
+  dependencies.navigation.ready = false;
+  dependencies.navigation.goal_acceptance_allowed = false;
+
+  savo_supervisor::MissionAuthority authority;
+  const auto capabilities = authority.EvaluateCapabilities(dependencies);
+  EXPECT_FALSE(capabilities.navigation_ready);
+  EXPECT_TRUE(capabilities.can_start_autonomous_mapping);
+
+  auto mapping = request(
+    savo_supervisor::AuthorityCommand::kAcquire,
+    savo_supervisor::MissionOperation::kAutonomousMapping);
+  mapping.require_semantic = true;
+  EXPECT_TRUE(authority.Handle(mapping, dependencies).authorized);
+
+  savo_supervisor::MissionAuthority navigation_authority;
+  dependencies.map_context.type = savo_supervisor::MapContextType::kSavedRelease;
+  dependencies.map_context.map_release_id = "release-1";
+  dependencies.map_context.approved = true;
+  auto navigation = request(
+    savo_supervisor::AuthorityCommand::kAcquire,
+    savo_supervisor::MissionOperation::kNavigateToPose);
+  navigation.map_release_id = "release-1";
+  const auto denied = navigation_authority.Handle(navigation, dependencies);
+  EXPECT_FALSE(denied.authorized);
+  EXPECT_EQ(denied.reason, "navigation_not_ready_or_map_mismatch");
+}
+
 TEST(MissionAuthority, ExclusiveOperationOwnershipRejectsConflict)
 {
   auto dependencies = healthy_dependencies();
@@ -162,6 +192,65 @@ TEST(MissionAuthority, ExclusiveOperationOwnershipRejectsConflict)
     savo_supervisor::MissionOperation::kAutonomousMapping);
 }
 
+TEST(MissionAuthority, NonCriticalDegradationKeepsExactCoreOnlyMappingLeaseActive)
+{
+  auto dependencies = healthy_dependencies();
+  savo_supervisor::MissionAuthorityPolicy policy;
+  policy.require_semantic_autonomous_mapping = false;
+  savo_supervisor::MissionAuthority authority{policy};
+  auto acquire = request(
+    savo_supervisor::AuthorityCommand::kAcquire,
+    savo_supervisor::MissionOperation::kAutonomousMapping);
+  acquire.require_semantic = false;
+  ASSERT_TRUE(authority.Handle(acquire, dependencies).authorized);
+  const auto generation = authority.state().generation;
+
+  dependencies.core.health = savo_supervisor::AggregateHealth::DEGRADED;
+  dependencies.core.degraded = true;
+  dependencies.system.remote_commands_ready = false;
+  dependencies.navigation.ready = false;
+  dependencies.navigation.goal_acceptance_allowed = false;
+  dependencies.head = {};
+  dependencies.locations = {};
+  dependencies.endpoints.rotate_to_heading_action = false;
+  dependencies.endpoints.coverage_action = false;
+  dependencies.endpoints.apriltag_confirmation_action = false;
+
+  EXPECT_FALSE(authority.Revalidate(dependencies));
+  EXPECT_EQ(authority.state().state, savo_supervisor::OperationState::kActive);
+  EXPECT_EQ(authority.state().generation, generation);
+
+  auto check = request(
+    savo_supervisor::AuthorityCommand::kCheck,
+    savo_supervisor::MissionOperation::kAutonomousMapping);
+  check.require_semantic = false;
+  check.expected_generation = generation;
+  EXPECT_TRUE(authority.Handle(check, dependencies).authorized);
+}
+
+TEST(MissionAuthority, SafetyLossStillRevokesDegradedCoreOnlyMappingLease)
+{
+  auto dependencies = healthy_dependencies();
+  savo_supervisor::MissionAuthorityPolicy policy;
+  policy.require_semantic_autonomous_mapping = false;
+  savo_supervisor::MissionAuthority authority{policy};
+  auto acquire = request(
+    savo_supervisor::AuthorityCommand::kAcquire,
+    savo_supervisor::MissionOperation::kAutonomousMapping);
+  acquire.require_semantic = false;
+  ASSERT_TRUE(authority.Handle(acquire, dependencies).authorized);
+
+  dependencies.core.health = savo_supervisor::AggregateHealth::DEGRADED;
+  dependencies.core.degraded = true;
+  dependencies.core.safety = savo_supervisor::SafetyObservation::STOPPED;
+
+  EXPECT_TRUE(authority.Revalidate(dependencies));
+  EXPECT_EQ(authority.state().state, savo_supervisor::OperationState::kRevoked);
+  EXPECT_EQ(
+    authority.state().reason,
+    "runtime_authorization_revoked:safety_stop_active");
+}
+
 TEST(MissionAuthority, RuntimeFaultRevokesAndRequiresExplicitResume)
 {
   auto dependencies = healthy_dependencies();
@@ -172,11 +261,11 @@ TEST(MissionAuthority, RuntimeFaultRevokesAndRequiresExplicitResume)
   acquire.require_semantic = true;
   ASSERT_TRUE(authority.Handle(acquire, dependencies).authorized);
 
-  dependencies.navigation.fresh = false;
+  dependencies.mapping.fresh = false;
   EXPECT_TRUE(authority.Revalidate(dependencies));
   EXPECT_EQ(authority.state().state, savo_supervisor::OperationState::kRevoked);
 
-  dependencies.navigation.fresh = true;
+  dependencies.mapping.fresh = true;
   EXPECT_FALSE(authority.Revalidate(dependencies));
   EXPECT_EQ(authority.state().state, savo_supervisor::OperationState::kRevoked);
 
@@ -214,7 +303,7 @@ TEST(MissionAuthority, MappingAndNavigationCapabilitiesFailClosed)
   auto missing_navigation = healthy_dependencies();
   missing_navigation.navigation.ready = false;
   capabilities = authority.EvaluateCapabilities(missing_navigation);
-  EXPECT_FALSE(capabilities.can_start_autonomous_mapping);
+  EXPECT_TRUE(capabilities.can_start_autonomous_mapping);
 
   missing_navigation.map_context.type =
     savo_supervisor::MapContextType::kSavedRelease;
@@ -241,6 +330,28 @@ TEST(MissionAuthority, SafetyStopBlocksMotionWithoutBlockingReview)
     savo_supervisor::MissionOperation::kReviewLocation);
   review.motion_required = false;
   EXPECT_TRUE(authority.Handle(review, dependencies).authorized);
+}
+
+TEST(MissionAuthority, UnsafeOrFaultedSystemBlocksAutonomousMapping)
+{
+  auto mapping = request(
+    savo_supervisor::AuthorityCommand::kAcquire,
+    savo_supervisor::MissionOperation::kAutonomousMapping);
+  mapping.require_semantic = true;
+
+  auto unsafe = healthy_dependencies();
+  unsafe.core.safety = savo_supervisor::SafetyObservation::STOPPED;
+  savo_supervisor::MissionAuthority unsafe_authority;
+  const auto safety_denied = unsafe_authority.Handle(mapping, unsafe);
+  EXPECT_FALSE(safety_denied.authorized);
+  EXPECT_EQ(safety_denied.reason, "safety_stop_active");
+
+  auto faulted = healthy_dependencies();
+  faulted.system.fault_latched = true;
+  savo_supervisor::MissionAuthority faulted_authority;
+  const auto fault_denied = faulted_authority.Handle(mapping, faulted);
+  EXPECT_FALSE(fault_denied.authorized);
+  EXPECT_EQ(fault_denied.reason, "system_fault_latched");
 }
 
 TEST(MissionAuthority, ActiveLeaseRejectsWrongActorAndStaleGeneration)

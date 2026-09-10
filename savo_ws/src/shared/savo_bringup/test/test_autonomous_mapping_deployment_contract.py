@@ -66,7 +66,7 @@ def test_autonomous_mapping_launch_is_fail_closed_by_default() -> None:
     assert '"lidar_profile"' in launch
     assert 'default_value="mapping_rplidar_a1.yaml"' in launch
     assert '"localization_use_vo"' in launch
-    assert '"localization_use_vo",\n                default_value="true"' in launch
+    assert '"localization_use_vo",\n                default_value="false"' in launch
     assert "_MAP_ID_PATTERN" in launch
     assert "OpaqueFunction(function=_validate_arguments)" in launch
 
@@ -88,7 +88,7 @@ def test_autonomous_mapping_launch_is_fail_closed_by_default() -> None:
     assert '"start_location_lifecycle"' in launch
     assert '"start_semantic_interruption"' in launch
     assert (
-        '"start_semantic_interruption", default_value="true"'
+        '"start_semantic_interruption", default_value="false"'
         in launch
     )
     assert '"locations_database_path"' in launch
@@ -102,8 +102,8 @@ def test_autonomous_mapping_launch_is_fail_closed_by_default() -> None:
     assert '"start_locations": "true"' in launch
 
 
-def test_optional_ultrasonic_and_control_monitors_propagate_without_changing_defaults() -> None:
-    """Optional sensing and monitors propagate without changing safe defaults."""
+def test_optional_ultrasonic_and_control_monitors_propagate() -> None:
+    """Optional sensing and monitors remain explicit launch controls."""
     autonomous = read("launch/autonomous_mapping.launch.py")
     core = read("launch/core_bringup.launch.py")
     robot = read("launch/robot_bringup.launch.py")
@@ -119,8 +119,8 @@ def test_optional_ultrasonic_and_control_monitors_propagate_without_changing_def
     assert '"control_startup_mode",\n                default_value="STOP"' in autonomous
 
 
-def test_headless_mapping_flags_propagate_without_weakening_defaults() -> None:
-    """Headless mapping remains coherent while production defaults stay enabled."""
+def test_headless_mapping_is_the_dedicated_launch_default() -> None:
+    """The dedicated room-mapping entry point is Core-only by default."""
     autonomous = read("launch/autonomous_mapping.launch.py")
     core = read("launch/core_bringup.launch.py")
     robot = read("launch/robot_bringup.launch.py")
@@ -144,6 +144,13 @@ def test_headless_mapping_flags_propagate_without_weakening_defaults() -> None:
         assert f'"{argument}"' in robot
         assert f'name="{argument}" default="true"' in mapping
 
+    for argument in scan_arguments:
+        assert f'"{argument}", default_value="false"' in autonomous
+
+    assert '"start_head", default_value="false"' in autonomous
+    assert '"start_location_lifecycle", default_value="false"' in autonomous
+    assert '"start_semantic_interruption", default_value="false"' in autonomous
+    assert '"coverage_enabled", default_value="false"' in autonomous
     assert '"start_head": LaunchConfiguration("start_head")' in core
     assert (
         'condition=IfCondition(LaunchConfiguration("start_head"))'
@@ -172,8 +179,8 @@ def test_headless_mapping_flags_propagate_without_weakening_defaults() -> None:
     assert "ros2 action send_goal" not in autonomous
 
 
-def test_canonical_entry_forwards_only_semantic_interruption_control() -> None:
-    """Canonical false disables only continuous semantic interruption."""
+def test_semantic_interruption_remains_configurable_across_entries() -> None:
+    """The dedicated mapping default is geometric without removing semantics."""
     robot = read("launch/robot_bringup.launch.py")
     core = read("launch/core_bringup.launch.py")
     autonomous = read("launch/autonomous_mapping.launch.py")
@@ -185,11 +192,15 @@ def test_canonical_entry_forwards_only_semantic_interruption_control() -> None:
         / "autonomous_mapping.launch.xml"
     ).read_text(encoding="utf-8")
 
-    for launch in (robot, core, autonomous):
+    for launch in (robot, core):
         assert (
             '"start_semantic_interruption", default_value="true"'
             in launch
         )
+    assert (
+        '"start_semantic_interruption", default_value="false"'
+        in autonomous
+    )
 
     core_branch = robot.split(
         'if role in {"core", "all"}:', maxsplit=1
@@ -229,8 +240,8 @@ def test_canonical_entry_forwards_only_semantic_interruption_control() -> None:
     assert 'if="$(var semantic_interruption_enabled)"' in mapping
     assert 'exec="semantic_interruption_coordinator_node"' in mapping
 
-    assert '"start_head", default_value="true"' in autonomous
-    assert '"start_location_lifecycle", default_value="true"' in autonomous
+    assert '"start_head", default_value="false"' in autonomous
+    assert '"start_location_lifecycle", default_value="false"' in autonomous
     assert '"start_supervisor", default_value="true"' in autonomous
     assert 'start_supervisor = True' in core
     assert '"true" if start_locations else "false"' in core
@@ -398,17 +409,18 @@ def test_bringup_installs_am4_and_runtime_dependencies() -> None:
     assert "scripts/run_location_lifecycle_runtime" in cmake
 
 
-def test_readme_documents_two_step_motion_authority() -> None:
-    """Operator documentation keeps launch and motion as separate actions."""
+def test_readme_documents_one_action_mapping_authority() -> None:
+    """Launch stays inert and one action owns lease and mode selection."""
     readme = read("README.md")
 
     assert "autonomous_mapping.launch.py" in readme
     assert "defaults the control" in readme
     assert "layer to `STOP`." in readme
     assert "`STOP`." in readme
-    assert "/savo_control/mode_cmd" in readme
     assert "/savo_mapping/autonomous/run" in readme
-    assert "same map identifier" in readme
+    assert "authority_generation: 0" in readme
+    assert "orchestrator acquires and verifies" in readme
+    assert "/savo_control/mode_cmd" not in readme
     assert "`savo_description` is included" in readme
 
 

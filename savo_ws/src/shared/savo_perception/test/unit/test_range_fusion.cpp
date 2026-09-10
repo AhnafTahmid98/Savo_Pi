@@ -36,6 +36,16 @@ RangeSnapshot clear_snapshot()
   return snapshot;
 }
 
+RangeFusionConfig tuned_production_thresholds()
+{
+  auto config = RangeFusionConfig{};
+  config.front_stop_m = 0.25;
+  config.front_slow_m = 0.40;
+  config.side_stop_m = 0.08;
+  config.side_slow_m = 0.12;
+  return config;
+}
+
 TEST(RangeFusionTest, LeftRequiredTofInvalidStops)
 {
   auto snapshot = clear_snapshot();
@@ -129,6 +139,86 @@ TEST(RangeFusionTest, EnabledCloseUltrasonicStops)
 
   EXPECT_TRUE(result.decision.stop_required);
   EXPECT_EQ(result.decision.reason, "front_stop_zone");
+}
+
+TEST(RangeFusionTest, FrontAboveProductionSlowdownThresholdIsClear)
+{
+  auto snapshot = clear_snapshot();
+  snapshot.depth_front = sample("depth_front", 0.401);
+
+  const auto result = fuse_range_snapshot(snapshot, tuned_production_thresholds());
+
+  EXPECT_FALSE(result.decision.stop_required);
+  EXPECT_EQ(result.decision.status, SafetyStatus::kOk);
+  EXPECT_DOUBLE_EQ(result.decision.slowdown_factor, 1.0);
+}
+
+TEST(RangeFusionTest, FrontInsideProductionSlowdownThresholdSlows)
+{
+  auto snapshot = clear_snapshot();
+  snapshot.depth_front = sample("depth_front", 0.399);
+
+  const auto result = fuse_range_snapshot(snapshot, tuned_production_thresholds());
+
+  EXPECT_FALSE(result.decision.stop_required);
+  EXPECT_EQ(result.decision.status, SafetyStatus::kSlow);
+  EXPECT_EQ(result.decision.reason, "front_slow_zone");
+  EXPECT_LT(result.decision.slowdown_factor, 1.0);
+}
+
+TEST(RangeFusionTest, FrontProductionHardStopThresholdIsUnchanged)
+{
+  auto snapshot = clear_snapshot();
+  snapshot.depth_front = sample("depth_front", 0.30);
+  snapshot.ultrasonic_front = sample("ultrasonic_front", 0.25);
+
+  const auto result = fuse_range_snapshot(snapshot, tuned_production_thresholds());
+
+  EXPECT_TRUE(result.decision.stop_required);
+  EXPECT_EQ(result.decision.status, SafetyStatus::kSafetyStop);
+  EXPECT_EQ(result.decision.reason, "front_stop_zone");
+  EXPECT_DOUBLE_EQ(result.decision.slowdown_factor, 0.0);
+}
+
+TEST(RangeFusionTest, SideAboveProductionSlowdownThresholdIsClear)
+{
+  auto snapshot = clear_snapshot();
+  snapshot.tof_left = sample("tof_left", 0.121);
+  snapshot.tof_right = sample("tof_right", 0.121);
+
+  const auto result = fuse_range_snapshot(snapshot, tuned_production_thresholds());
+
+  EXPECT_FALSE(result.decision.stop_required);
+  EXPECT_EQ(result.decision.status, SafetyStatus::kOk);
+  EXPECT_DOUBLE_EQ(result.decision.slowdown_factor, 1.0);
+}
+
+TEST(RangeFusionTest, SideInsideProductionSlowdownThresholdSlows)
+{
+  auto snapshot = clear_snapshot();
+  snapshot.tof_left = sample("tof_left", 0.119);
+  snapshot.tof_right = sample("tof_right", 0.119);
+
+  const auto result = fuse_range_snapshot(snapshot, tuned_production_thresholds());
+
+  EXPECT_FALSE(result.decision.stop_required);
+  EXPECT_EQ(result.decision.status, SafetyStatus::kSlow);
+  EXPECT_EQ(result.decision.reason, "side_slow_zone");
+  EXPECT_LT(result.decision.slowdown_factor, 1.0);
+}
+
+TEST(RangeFusionTest, SideHardStopOverridesConcurrentFrontSlowdown)
+{
+  auto snapshot = clear_snapshot();
+  snapshot.depth_front = sample("depth_front", 0.30);
+  snapshot.tof_left = sample("tof_left", 0.08);
+
+  const auto result = fuse_range_snapshot(snapshot, tuned_production_thresholds());
+
+  EXPECT_TRUE(result.decision.stop_required);
+  EXPECT_EQ(result.decision.status, SafetyStatus::kSafetyStop);
+  EXPECT_EQ(result.decision.reason, "side_stop_zone");
+  EXPECT_DOUBLE_EQ(result.decision.slowdown_factor, 0.0);
 }
 
 TEST(RangeFusionTest, NonFiniteAndNonPositiveDistancesAreInvalid)

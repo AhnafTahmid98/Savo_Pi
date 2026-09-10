@@ -7,6 +7,7 @@ from launch.actions import DeclareLaunchArgument
 from launch.actions import IncludeLaunchDescription
 from launch.actions import LogInfo
 from launch.actions import OpaqueFunction
+from launch.actions import TimerAction
 from launch.conditions import IfCondition
 from launch.launch_description_sources import FrontendLaunchDescriptionSource
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -51,7 +52,7 @@ def _validate_arguments(context):
             msg=(
                 "Autonomous motion is never started by launch. Send the "
                 "typed RunAutonomousMapping action only after readiness "
-                "and the required control mode are confirmed."
+                "is confirmed; the orchestrator selects control modes."
             )
         ),
     ]
@@ -72,6 +73,15 @@ def _frontend_launch(package: str, filename: str):
         PathJoinSubstitution(
             [FindPackageShare(package), "launch", filename]
         )
+    )
+
+
+def _stage(delay_argument: str, action):
+    """Start one mapping-stack component after its bounded load offset."""
+    return TimerAction(
+        period=LaunchConfiguration(delay_argument),
+        actions=[action],
+        cancel_on_shutdown=True,
     )
 
 
@@ -450,12 +460,12 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument(
                 "start_supervisor", default_value="true"
             ),
-            DeclareLaunchArgument("start_head", default_value="true"),
+            DeclareLaunchArgument("start_head", default_value="false"),
             DeclareLaunchArgument(
-                "start_location_lifecycle", default_value="true"
+                "start_location_lifecycle", default_value="false"
             ),
             DeclareLaunchArgument(
-                "start_semantic_interruption", default_value="true"
+                "start_semantic_interruption", default_value="false"
             ),
             DeclareLaunchArgument(
                 "start_navigation", default_value="true"
@@ -499,14 +509,14 @@ def generate_launch_description() -> LaunchDescription:
             ),
             DeclareLaunchArgument(
                 "perception_use_ultrasonic",
-                default_value="true",
+                default_value="false",
             ),
             DeclareLaunchArgument(
                 "control_startup_mode",
                 default_value="STOP",
                 description=(
-                    "Safe default is STOP. NAV may be selected explicitly "
-                    "only during a controlled real-robot test."
+                    "Safe launch default is STOP. The mission orchestrator "
+                    "may select NAV/AUTO only after exact authority."
                 ),
             ),
             DeclareLaunchArgument(
@@ -527,7 +537,7 @@ def generate_launch_description() -> LaunchDescription:
             ),
             DeclareLaunchArgument(
                 "localization_use_vo",
-                default_value="true",
+                default_value="false",
                 description=(
                     "Fuse the validated Edge VO stream during production "
                     "localization."
@@ -582,7 +592,7 @@ def generate_launch_description() -> LaunchDescription:
                 default_value=default_slam_params,
             ),
             DeclareLaunchArgument("slam_autostart", default_value="true"),
-            DeclareLaunchArgument("coverage_enabled", default_value="true"),
+            DeclareLaunchArgument("coverage_enabled", default_value="false"),
             DeclareLaunchArgument(
                 "coverage_params_file", default_value=default_coverage_params
             ),
@@ -601,29 +611,60 @@ def generate_launch_description() -> LaunchDescription:
                 default_value=default_coverage_operation,
             ),
             DeclareLaunchArgument(
-                "initial_scan360_required", default_value="true"
+                "initial_scan360_required", default_value="false"
             ),
             DeclareLaunchArgument(
-                "initial_head_scan_required", default_value="true"
+                "initial_head_scan_required", default_value="false"
             ),
             DeclareLaunchArgument(
-                "final_scan360_required", default_value="true"
+                "final_scan360_required", default_value="false"
             ),
             DeclareLaunchArgument(
-                "final_head_scan_required", default_value="true"
+                "final_head_scan_required", default_value="false"
+            ),
+            DeclareLaunchArgument(
+                "description_start_delay_s", default_value="0.0"
+            ),
+            DeclareLaunchArgument("base_start_delay_s", default_value="3.0"),
+            DeclareLaunchArgument("lidar_start_delay_s", default_value="6.0"),
+            DeclareLaunchArgument(
+                "perception_start_delay_s", default_value="9.0"
+            ),
+            DeclareLaunchArgument(
+                "control_start_delay_s", default_value="12.0"
+            ),
+            DeclareLaunchArgument(
+                "localization_start_delay_s", default_value="17.0"
+            ),
+            DeclareLaunchArgument("power_start_delay_s", default_value="22.0"),
+            DeclareLaunchArgument("head_start_delay_s", default_value="27.0"),
+            DeclareLaunchArgument(
+                "supervisor_start_delay_s", default_value="33.0"
+            ),
+            DeclareLaunchArgument(
+                "location_lifecycle_start_delay_s", default_value="37.0"
+            ),
+            DeclareLaunchArgument(
+                "navigation_start_delay_s", default_value="40.0"
+            ),
+            DeclareLaunchArgument(
+                "mapping_start_delay_s", default_value="45.0"
             ),
             OpaqueFunction(function=_validate_arguments),
-            description_launch,
-            base_launch,
-            lidar_launch,
-            perception_launch,
-            control_launch,
-            localization_launch,
-            power_launch,
-            supervisor_launch,
-            navigation_launch,
-            mapping_launch,
-            head_launch,
-            location_lifecycle_launch,
+            _stage("description_start_delay_s", description_launch),
+            _stage("base_start_delay_s", base_launch),
+            _stage("lidar_start_delay_s", lidar_launch),
+            _stage("perception_start_delay_s", perception_launch),
+            _stage("control_start_delay_s", control_launch),
+            _stage("localization_start_delay_s", localization_launch),
+            _stage("power_start_delay_s", power_launch),
+            _stage("head_start_delay_s", head_launch),
+            _stage("supervisor_start_delay_s", supervisor_launch),
+            _stage(
+                "location_lifecycle_start_delay_s",
+                location_lifecycle_launch,
+            ),
+            _stage("navigation_start_delay_s", navigation_launch),
+            _stage("mapping_start_delay_s", mapping_launch),
         ]
     )

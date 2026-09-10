@@ -204,6 +204,42 @@ def _setup(context):
                     "final_head_scan_required": LaunchConfiguration(
                         "final_head_scan_required"
                     ),
+                    "description_start_delay_s": LaunchConfiguration(
+                        "description_start_delay_s"
+                    ),
+                    "base_start_delay_s": LaunchConfiguration(
+                        "base_start_delay_s"
+                    ),
+                    "lidar_start_delay_s": LaunchConfiguration(
+                        "lidar_start_delay_s"
+                    ),
+                    "perception_start_delay_s": LaunchConfiguration(
+                        "perception_start_delay_s"
+                    ),
+                    "control_start_delay_s": LaunchConfiguration(
+                        "control_start_delay_s"
+                    ),
+                    "localization_start_delay_s": LaunchConfiguration(
+                        "localization_start_delay_s"
+                    ),
+                    "power_start_delay_s": LaunchConfiguration(
+                        "power_start_delay_s"
+                    ),
+                    "head_start_delay_s": LaunchConfiguration(
+                        "head_start_delay_s"
+                    ),
+                    "supervisor_start_delay_s": LaunchConfiguration(
+                        "supervisor_start_delay_s"
+                    ),
+                    "location_lifecycle_start_delay_s": LaunchConfiguration(
+                        "location_lifecycle_start_delay_s"
+                    ),
+                    "navigation_start_delay_s": LaunchConfiguration(
+                        "navigation_start_delay_s"
+                    ),
+                    "mapping_start_delay_s": LaunchConfiguration(
+                        "readiness_start_delay_s"
+                    ),
                     "nav_params_file": nav_params,
                     "nav_readiness_params": readiness_params,
                     "locations_database_path": LaunchConfiguration(

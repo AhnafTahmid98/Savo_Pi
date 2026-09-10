@@ -17,9 +17,9 @@ string map_id
 uint32 map_revision
 uint8 strategy
 
-# Evidence for the live, exclusive Supervisor lease acquired before this goal
-# is submitted. The action server independently CHECKs this exact lease; these
-# fields are identifiers, not a client-asserted authorization decision.
+# Supervisor lease identity. A zero authority_generation asks the action server
+# to ACQUIRE the lease using these exact fields. A nonzero generation identifies
+# a lease acquired by an upstream caller and is independently CHECKed.
 string authority_request_id
 uint64 authority_generation
 bool require_semantic

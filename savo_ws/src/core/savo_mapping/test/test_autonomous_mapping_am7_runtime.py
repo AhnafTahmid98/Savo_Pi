@@ -101,6 +101,8 @@ class Am7RuntimeHarness:
         self.runtime_authority_topic = f'{prefix}/runtime_authority'
         self.handoff_state_topic = f'{prefix}/handoff_state'
         self.frontier_status_topic = f'{prefix}/frontier_status'
+        self.control_mode_command_topic = f'{prefix}/control/mode_cmd'
+        self.control_mode_state_topic = f'{prefix}/control/mode_state'
         self.mode_command_topic = f'{prefix}/mode_cmd'
         self.start_session_topic = f'{prefix}/start_session_cmd'
         self.cancel_session_topic = f'{prefix}/cancel_session_cmd'
@@ -137,6 +139,7 @@ class Am7RuntimeHarness:
         self.executor.add_node(self.node)
         self.tf_broadcaster = TransformBroadcaster(self.node)
         self.mode_commands = []
+        self.control_mode_commands = []
         self.start_commands = []
         self.statuses = []
         self.scan_starts = 0
@@ -213,11 +216,20 @@ class Am7RuntimeHarness:
         self.coverage_operation_status_pub = self._publisher(
             String, self.coverage_operation_status_topic, retained_qos()
         )
+        self.control_mode_state_pub = self._publisher(
+            String, self.control_mode_state_topic, retained_qos()
+        )
 
         self.node.create_subscription(
             String,
             self.mode_command_topic,
             lambda msg: self.mode_commands.append(msg.data),
+            command_qos(),
+        )
+        self.node.create_subscription(
+            String,
+            self.control_mode_command_topic,
+            self._handle_control_mode_command,
             command_qos(),
         )
         self.node.create_subscription(
@@ -433,6 +445,8 @@ class Am7RuntimeHarness:
             'runtime_authority_topic': self.runtime_authority_topic,
             'handoff_state_topic': self.handoff_state_topic,
             'frontier_status_topic': self.frontier_status_topic,
+            'control_mode_command_topic': self.control_mode_command_topic,
+            'control_mode_state_topic': self.control_mode_state_topic,
             'mode_command_topic': self.mode_command_topic,
             'start_session_command_topic': self.start_session_topic,
             'cancel_session_command_topic': self.cancel_session_topic,
@@ -506,6 +520,10 @@ class Am7RuntimeHarness:
             text=True,
             start_new_session=True,
         )
+
+    def _handle_control_mode_command(self, message):
+        self.control_mode_commands.append(message.data)
+        self.control_mode_state_pub.publish(self.string_message(message.data))
 
     def _accept(self, _request, response):
         response.success = True
@@ -894,6 +912,7 @@ class Am7RuntimeHarness:
             self.safety_stop_pub.publish(self.bool_message(False))
             self.runtime_authority_pub.publish(self.bool_message(False))
             self.handoff_state_pub.publish(self.string_message('idle'))
+            self.control_mode_state_pub.publish(self.string_message('STOP'))
             time.sleep(0.05)
 
     def publish_workflow(self, mode, exploration, phase, authorized):
@@ -952,6 +971,9 @@ class Am7RuntimeHarness:
         self.session_state_pub.publish(self.string_message('active'))
 
         assert wait_until(
+            lambda: 'AUTO' in self.control_mode_commands
+        ), self.diagnostics()
+        assert wait_until(
             lambda: 'autonomous:scan360' in self.mode_commands
         ), self.diagnostics()
         self.publish_workflow('autonomous', 'scan360', 'scan360', False)
@@ -965,11 +987,13 @@ class Am7RuntimeHarness:
         assert wait_until(
             lambda: 'autonomous:frontier' in self.mode_commands
         ), self.diagnostics()
+        assert 'NAV' in self.control_mode_commands
         self.publish_workflow('autonomous', 'frontier', 'exploring', True)
         assert wait_until(
             lambda: self.latest_state()
             == AutonomousMappingStatus.STATE_EXPLORING
         ), self.diagnostics()
+        frontier_nav_count = self.control_mode_commands.count('NAV')
         self.publish_exhaustion()
 
         previous_monitors = self.mode_commands.count('monitor_only')
@@ -985,6 +1009,7 @@ class Am7RuntimeHarness:
                 for status in self.statuses
             )
         ), self.diagnostics()
+        assert self.control_mode_commands.count('NAV') > frontier_nav_count
         return result_future
 
     def start_initial_scan(self):
@@ -1012,6 +1037,7 @@ class Am7RuntimeHarness:
             f'executor_alive={self.spin_thread.is_alive()} '
             f'executor_error={self.executor_error} '
             f'modes={self.mode_commands[-12:]} scans={self.scan_starts} '
+            f'control_modes={self.control_mode_commands[-12:]} '
             f'heads={self.head_starts} plans={self.coverage_requests} '
             f'approvals={self.coverage_approvals} returns={len(self.return_goals)} '
             f'saves={self.map_saves} '
@@ -1121,6 +1147,7 @@ def test_full_am7_am8_runtime_sequence():
         assert harness.statuses[-1].approval_recorded
         assert harness.statuses[-1].release_succeeded
         assert harness.statuses[-1].joint_active_release_verified
+        assert harness.control_mode_commands[-1] == 'STOP'
     finally:
         harness.close()
 
@@ -1148,6 +1175,9 @@ def test_rejected_return_fails_without_becoming_active():
         assert rejected.return_to_start_complete
         assert not rejected.return_to_start_succeeded
         assert rejected.return_to_start_reason == 'guarded_return_goal_rejected'
+        assert wait_until(
+            lambda: 'STOP' in harness.control_mode_commands
+        ), harness.diagnostics()
     finally:
         harness.close()
 
@@ -1177,6 +1207,9 @@ def test_late_return_acceptance_is_canceled_and_reaches_terminal():
             timeout=4.0,
         ), harness.diagnostics()
         assert not harness.statuses[-1].return_to_start_active
+        assert wait_until(
+            lambda: 'STOP' in harness.control_mode_commands
+        ), harness.diagnostics()
     finally:
         harness.close()
 
@@ -1203,6 +1236,9 @@ def test_return_cancellation_rejection_latches_non_quiesced_fault():
         assert harness.return_cancel_requests == 1
         assert harness.scan_starts == 1
         assert harness.map_saves == 0
+        assert wait_until(
+            lambda: 'STOP' in harness.control_mode_commands
+        ), harness.diagnostics()
     finally:
         harness.close()
 
@@ -1232,6 +1268,9 @@ def test_return_cancellation_timeout_survives_primary_timeout():
         assert harness.return_cancel_requests == 1
         assert harness.scan_starts == 1
         assert harness.map_saves == 0
+        assert wait_until(
+            lambda: 'STOP' in harness.control_mode_commands
+        ), harness.diagnostics()
     finally:
         harness.close()
 
@@ -1278,6 +1317,9 @@ def test_no_coverage_feedback_times_out_and_still_cancels():
         ), harness.diagnostics()
         assert len(harness.return_goals) == 0
         assert harness.map_saves == 0
+        assert wait_until(
+            lambda: 'STOP' in harness.control_mode_commands
+        ), harness.diagnostics()
     finally:
         harness.close()
 
@@ -1305,6 +1347,9 @@ def test_coverage_cancel_timeout_survives_feedback_timeout():
         assert harness.coverage_cancels >= 1
         assert len(harness.return_goals) == 0
         assert harness.map_saves == 0
+        assert wait_until(
+            lambda: 'STOP' in harness.control_mode_commands
+        ), harness.diagnostics()
     finally:
         harness.close()
 

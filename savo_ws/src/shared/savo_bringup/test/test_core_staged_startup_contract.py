@@ -29,6 +29,21 @@ CORE_STAGE_DEFAULTS = {
     "readiness_start_delay_s": "45.0",
 }
 
+AUTONOMOUS_STAGE_DEFAULTS = {
+    "description_start_delay_s": "0.0",
+    "base_start_delay_s": "3.0",
+    "lidar_start_delay_s": "6.0",
+    "perception_start_delay_s": "9.0",
+    "control_start_delay_s": "12.0",
+    "localization_start_delay_s": "17.0",
+    "power_start_delay_s": "22.0",
+    "head_start_delay_s": "27.0",
+    "supervisor_start_delay_s": "33.0",
+    "location_lifecycle_start_delay_s": "37.0",
+    "navigation_start_delay_s": "40.0",
+    "mapping_start_delay_s": "45.0",
+}
+
 EDGE_STAGE_DEFAULTS = {
     "realsense_start_delay_s": "0.0",
     "camera_support_start_delay_s": "7.0",
@@ -91,6 +106,71 @@ def launch_argument_names(path: Path) -> tuple[set[str], set[str]]:
     return declared, referenced
 
 
+def staged_actions(path: Path) -> dict[str, str]:
+    """Return action-variable to delay-argument bindings from `_stage` calls."""
+    stages = {}
+    for node in ast.walk(ast.parse(read(path), filename=str(path))):
+        if not isinstance(node, ast.Call):
+            continue
+        if getattr(node.func, "id", "") != "_stage" or len(node.args) != 2:
+            continue
+        delay, action = node.args
+        if not isinstance(delay, ast.Constant) or not isinstance(action, ast.Name):
+            continue
+        stages[action.id] = delay.value
+    return stages
+
+
+def autonomous_wrapper_include(path: Path) -> tuple[ast.Call, dict[str, str]]:
+    """Return the parent call and delay forwarding for the mapping include."""
+    tree = ast.parse(read(path), filename=str(path))
+    parents = {
+        child: parent
+        for parent in ast.walk(tree)
+        for child in ast.iter_child_nodes(parent)
+    }
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        if getattr(node.func, "id", "") != "IncludeLaunchDescription":
+            continue
+        if not any(
+            isinstance(child, ast.Constant)
+            and child.value == "autonomous_mapping.launch.py"
+            for child in ast.walk(node)
+        ):
+            continue
+
+        forwarding = {}
+        for keyword in node.keywords:
+            if keyword.arg != "launch_arguments":
+                continue
+            value = keyword.value
+            if not (
+                isinstance(value, ast.Call)
+                and isinstance(value.func, ast.Attribute)
+                and isinstance(value.func.value, ast.Dict)
+            ):
+                continue
+            for key, item in zip(value.func.value.keys, value.func.value.values):
+                if not (
+                    isinstance(key, ast.Constant)
+                    and isinstance(key.value, str)
+                    and key.value.endswith("_start_delay_s")
+                    and isinstance(item, ast.Call)
+                    and getattr(item.func, "id", "") == "LaunchConfiguration"
+                    and item.args
+                    and isinstance(item.args[0], ast.Constant)
+                ):
+                    continue
+                forwarding[key.value] = item.args[0].value
+
+        parent = parents[node]
+        assert isinstance(parent, ast.Call)
+        return parent, forwarding
+    raise AssertionError("Core launch does not include autonomous mapping")
+
+
 def test_core_stage_defaults_are_dependency_ordered() -> None:
     """Core Pi defaults preserve the requested dependency-safe timeline."""
     defaults = launch_defaults(CORE_LAUNCH)
@@ -105,6 +185,130 @@ def test_core_stage_defaults_are_dependency_ordered() -> None:
     assert float(defaults["manual_mapping_start_delay_s"]) == 40.0
     assert float(defaults["navigation_start_delay_s"]) == 40.0
     assert float(defaults["readiness_start_delay_s"]) > 40.0
+
+
+def test_autonomous_mapping_uses_dependency_ordered_core_offsets() -> None:
+    """The dedicated mapping launch staggers heavy stacks through TimerAction."""
+    defaults = launch_defaults(AUTONOMOUS_LAUNCH)
+    assert {
+        name: defaults[name] for name in AUTONOMOUS_STAGE_DEFAULTS
+    } == AUTONOMOUS_STAGE_DEFAULTS
+
+    expected_bindings = {
+        "description_launch": "description_start_delay_s",
+        "base_launch": "base_start_delay_s",
+        "lidar_launch": "lidar_start_delay_s",
+        "perception_launch": "perception_start_delay_s",
+        "control_launch": "control_start_delay_s",
+        "localization_launch": "localization_start_delay_s",
+        "power_launch": "power_start_delay_s",
+        "head_launch": "head_start_delay_s",
+        "supervisor_launch": "supervisor_start_delay_s",
+        "location_lifecycle_launch": "location_lifecycle_start_delay_s",
+        "navigation_launch": "navigation_start_delay_s",
+        "mapping_launch": "mapping_start_delay_s",
+    }
+    assert staged_actions(AUTONOMOUS_LAUNCH) == expected_bindings
+
+    required_order = (
+        "description_launch",
+        "base_launch",
+        "lidar_launch",
+        "perception_launch",
+        "control_launch",
+        "localization_launch",
+        "power_launch",
+        "supervisor_launch",
+        "navigation_launch",
+        "mapping_launch",
+    )
+    delays = [
+        float(defaults[expected_bindings[action]]) for action in required_order
+    ]
+    assert delays == sorted(delays)
+    assert len(delays) == len(set(delays))
+    assert defaults["localization_start_delay_s"] != defaults[
+        "navigation_start_delay_s"
+    ]
+
+
+def test_core_autonomous_entry_forwards_its_canonical_stage_offsets() -> None:
+    """The Core wrapper and direct mapping entry share one timing contract."""
+    parent, forwarding = autonomous_wrapper_include(CORE_LAUNCH)
+    assert isinstance(parent.func, ast.Attribute)
+    assert isinstance(parent.func.value, ast.Name)
+    assert parent.func.value.id == "actions"
+    assert parent.func.attr == "append"
+
+    expected_forwarding = {
+        name: (
+            "readiness_start_delay_s"
+            if name == "mapping_start_delay_s"
+            else name
+        )
+        for name in AUTONOMOUS_STAGE_DEFAULTS
+    }
+    assert forwarding == expected_forwarding
+
+    core_defaults = launch_defaults(CORE_LAUNCH)
+    effective_offsets = {
+        child_name: core_defaults[parent_name]
+        for child_name, parent_name in forwarding.items()
+    }
+    assert effective_offsets == AUTONOMOUS_STAGE_DEFAULTS
+
+
+def test_autonomous_timers_stagger_only_and_cannot_authorize_motion() -> None:
+    """Timer stages schedule includes without creating readiness or authority."""
+    launch = read(AUTONOMOUS_LAUNCH)
+
+    assert "TimerAction" in launch
+    assert "period=LaunchConfiguration(delay_argument)" in launch
+    assert "cancel_on_shutdown=True" in launch
+    assert "StartupStageGroup" not in launch
+    assert "build_staged_sequence" not in launch
+    assert "startup_stage_gate_node" not in launch
+    assert "bringup_readiness_node" not in launch
+    assert "ExecuteProcess" not in launch
+    assert "ActionClient" not in launch
+    assert "async_send_goal" not in launch
+    assert "ros2 action send_goal" not in launch
+
+
+def test_dedicated_autonomous_defaults_are_lightweight_and_head_is_optional() -> None:
+    """Direct room mapping is Core-only while every optional flag remains exposed."""
+    defaults = launch_defaults(AUTONOMOUS_LAUNCH)
+    assert {
+        name: defaults[name]
+        for name in (
+            "perception_use_ultrasonic",
+            "localization_use_vo",
+            "start_head",
+            "start_location_lifecycle",
+            "start_semantic_interruption",
+            "coverage_enabled",
+            "initial_scan360_required",
+            "initial_head_scan_required",
+            "final_scan360_required",
+            "final_head_scan_required",
+        )
+    } == {
+        "perception_use_ultrasonic": "false",
+        "localization_use_vo": "false",
+        "start_head": "false",
+        "start_location_lifecycle": "false",
+        "start_semantic_interruption": "false",
+        "coverage_enabled": "false",
+        "initial_scan360_required": "false",
+        "initial_head_scan_required": "false",
+        "final_scan360_required": "false",
+        "final_head_scan_required": "false",
+    }
+
+    launch = read(AUTONOMOUS_LAUNCH)
+    assert 'condition=IfCondition(LaunchConfiguration("start_head"))' in launch
+    assert '"backend": LaunchConfiguration("head_backend")' in launch
+    assert '"enable_scan": "true"' in launch
 
 
 def test_core_uses_simple_bounded_launch_offsets_without_global_gates() -> None:
@@ -297,13 +501,14 @@ def test_tf_control_and_power_authorities_are_unchanged() -> None:
     assert '"edge_ups_expected", default_value="false"' in core
 
 
-def test_autonomous_mapping_authority_path_is_intentionally_unchanged() -> None:
-    """The dedicated autonomous composition remains an explicit exception."""
+def test_autonomous_mapping_authority_path_remains_explicit() -> None:
+    """Staging does not turn launch timing into mission authority."""
     core = read(CORE_LAUNCH)
     autonomous = read(AUTONOMOUS_LAUNCH)
 
     assert 'if mode == "autonomous_mapping":' in core
     assert '"autonomous_mapping.launch.py"' in core
     assert "StartupStageGroup" not in autonomous
+    assert "TimerAction" in autonomous
     assert 'default_value="STOP"' in autonomous
     assert "typed RunAutonomousMapping action only after readiness" in autonomous

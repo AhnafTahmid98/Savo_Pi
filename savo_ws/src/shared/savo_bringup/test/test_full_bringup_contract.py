@@ -382,10 +382,9 @@ def test_all_host_role_remains_bench_only() -> None:
         raise AssertionError("host_role:=all escaped its bench-only gate")
 
 
-def test_validated_normal_runtime_defaults_are_synchronized() -> None:
-    """Canonical and nested production launches must use validated defaults."""
+def test_validated_runtime_defaults_preserve_role_specific_profiles() -> None:
+    """Canonical defaults stay validated while direct mapping is Core-only."""
     expected = {
-        "localization_use_vo": "true",
         "head_enable_tf": "true",
         "head_camera_mode": "ros",
         "control_startup_mode": "STOP",
@@ -400,6 +399,16 @@ def test_validated_normal_runtime_defaults_are_synchronized() -> None:
         defaults = launch_string_defaults(launch)
         for name, value in expected.items():
             assert defaults[name] == value, f"{launch}: {name}"
+
+    assert launch_string_defaults(
+        "launch/robot_bringup.launch.py"
+    )["localization_use_vo"] == "true"
+    assert launch_string_defaults(
+        "launch/core_bringup.launch.py"
+    )["localization_use_vo"] == "true"
+    assert launch_string_defaults(
+        "launch/autonomous_mapping.launch.py"
+    )["localization_use_vo"] == "false"
 
     top = launch_string_defaults("launch/robot_bringup.launch.py")
     assert top["host_role"] == "auto"
