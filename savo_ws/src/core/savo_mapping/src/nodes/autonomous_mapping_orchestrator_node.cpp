@@ -1414,7 +1414,7 @@ private:
               authority_check_in_flight_ = false;
               inputs_.supervisor_authority_received = true;
               const bool adopt_generation =
-                admission && authority_acquire_on_admission_;
+              admission && authority_acquire_on_admission_;
               const bool exact = exact_authority_response_locked(
                 response, adopt_generation);
               if (exact && adopt_generation) {
