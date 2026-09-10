@@ -14,6 +14,7 @@ def test_interfaces_are_registered() -> None:
 
     for path in (
         "msg/AutonomousMappingStatus.msg",
+        "msg/ExplorationGoalStatus.msg",
         "msg/FrontierExplorationStatus.msg",
         "action/RunAutonomousMapping.action",
         "srv/ControlAutonomousMapping.srv",
@@ -30,7 +31,7 @@ def test_status_contract_is_typed_and_mapping_owned() -> None:
     text = read("msg/AutonomousMappingStatus.msg")
 
     for token in (
-        "uint32 CONTRACT_VERSION=4",
+        "uint32 CONTRACT_VERSION=5",
         "uint8 STRATEGY_NONE=0",
         "uint8 STRATEGY_FRONTIER=1",
         "uint8 STATE_WAITING_FOR_AUTHORITY=2",
@@ -73,6 +74,8 @@ def test_status_contract_is_typed_and_mapping_owned() -> None:
         "bool frontier_status_received",
         "string frontier_planning_status",
         "uint64 frontier_plan_sequence",
+        "string frontier_handoff_state",
+        "string frontier_handoff_reason",
         "uint32 exhaustion_observations",
         "bool completion_candidate",
         "bool completion_confirmed",
@@ -115,7 +118,7 @@ def test_frontier_status_reports_planner_evidence_without_json() -> None:
     text = read("msg/FrontierExplorationStatus.msg")
 
     for token in (
-        "uint32 CONTRACT_VERSION=1",
+        "uint32 CONTRACT_VERSION=2",
         "EXHAUSTION_NO_FRONTIERS=1",
         "EXHAUSTION_NO_REACHABLE_FRONTIERS=2",
         "uint64 map_generation",
@@ -123,6 +126,9 @@ def test_frontier_status_reports_planner_evidence_without_json() -> None:
         "uint64 plan_sequence",
         "string planning_status",
         "bool goal_pending",
+        "uint64 handoff_sequence",
+        "string handoff_request_id",
+        "string handoff_reason",
         "uint32 detected_frontiers",
         "uint32 reachable_frontiers",
     ):
@@ -130,6 +136,25 @@ def test_frontier_status_reports_planner_evidence_without_json() -> None:
 
     assert "nav_msgs/OccupancyGrid" not in text
     assert "geometry_msgs/PoseStamped" not in text
+
+
+def test_exploration_goal_status_is_typed_and_correlated() -> None:
+    text = read("msg/ExplorationGoalStatus.msg")
+
+    for token in (
+        "uint32 CONTRACT_VERSION=1",
+        "uint64 sequence",
+        "string request_id",
+        "string state",
+        "bool active",
+        "bool terminal",
+        "string reason",
+        "string action_name",
+    ):
+        assert token in text
+
+    assert "geometry_msgs/PoseStamped" not in text
+    assert "nav_msgs" not in text
 
 
 def test_action_starts_one_mission_and_returns_typed_status() -> None:

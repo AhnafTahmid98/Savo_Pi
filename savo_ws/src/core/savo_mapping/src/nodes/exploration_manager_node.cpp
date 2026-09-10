@@ -8,6 +8,7 @@
 #include <std_srvs/srv/trigger.hpp>
 
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <functional>
 #include <iostream>
@@ -133,6 +134,11 @@ public:
       "readiness_topic",
       std::string{topics::READINESS});
 
+    nav_readiness_topic_ =
+      declare_parameter<std::string>(
+      "nav_readiness_topic",
+      "/savo_nav/readiness");
+
     safety_stop_topic_ =
       declare_parameter<std::string>(
       "safety_stop_topic",
@@ -169,6 +175,11 @@ public:
       declare_parameter<std::int64_t>(
       "cancel_retry_period_ms",
       1000);
+
+    nav_readiness_timeout_sec_ =
+      declare_parameter<double>(
+      "nav_readiness_timeout_sec",
+      1.0);
 
     validate_parameters(
       evaluation_period_ms,
@@ -249,6 +260,16 @@ public:
         this,
         std::placeholders::_1));
 
+    nav_readiness_subscription_ =
+      create_subscription<StringMessage>(
+      nav_readiness_topic_,
+      retained_qos,
+      std::bind(
+        &ExplorationManagerNode::
+        handle_nav_readiness,
+        this,
+        std::placeholders::_1));
+
     safety_stop_subscription_ =
       create_subscription<BoolMessage>(
       safety_stop_topic_,
@@ -307,6 +328,7 @@ private:
       workflow_phase_topic_.empty() ||
       session_state_topic_.empty() ||
       readiness_topic_.empty() ||
+      nav_readiness_topic_.empty() ||
       safety_stop_topic_.empty() ||
       handoff_state_topic_.empty() ||
       runtime_enabled_topic_.empty() ||
@@ -333,6 +355,14 @@ private:
     {
       throw std::invalid_argument(
               "cancel_retry_period_ms_out_of_range");
+    }
+
+    if (!std::isfinite(nav_readiness_timeout_sec_) ||
+      nav_readiness_timeout_sec_ < 0.2 ||
+      nav_readiness_timeout_sec_ > 60.0)
+    {
+      throw std::invalid_argument(
+              "nav_readiness_timeout_sec_out_of_range");
     }
   }
 
@@ -462,6 +492,23 @@ private:
     evaluate_and_apply();
   }
 
+  void handle_nav_readiness(
+    const StringMessage::ConstSharedPtr message)
+  {
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+
+      inputs_.nav_readiness_received = true;
+      inputs_.nav_readiness_fresh = true;
+      inputs_.nav_ready = message->data == "ready";
+      nav_readiness_text_ = message->data;
+      nav_readiness_received_at_ =
+        std::chrono::steady_clock::now();
+    }
+
+    evaluate_and_apply();
+  }
+
   void handle_handoff_state(
     const StringMessage::ConstSharedPtr message)
   {
@@ -526,6 +573,12 @@ private:
 
     {
       std::lock_guard<std::mutex> lock(mutex_);
+
+      inputs_.nav_readiness_fresh =
+        nav_readiness_received_at_.has_value() &&
+        std::chrono::duration<double>(
+        current_time - nav_readiness_received_at_.value()).count() <=
+        nav_readiness_timeout_sec_;
 
       decision =
         exploration_runtime::evaluate(
@@ -705,6 +758,12 @@ private:
       << ",\"mapping_ready\":"
       << bool_text(
       inputs_.mapping_ready)
+      << ",\"nav_ready\":"
+      << bool_text(
+      inputs_.nav_ready)
+      << ",\"nav_readiness_fresh\":"
+      << bool_text(
+      inputs_.nav_readiness_fresh)
       << ",\"safety_stop_active\":"
       << bool_text(
       inputs_.safety_stop_active)
@@ -714,6 +773,9 @@ private:
       << ",\"readiness\":\""
       << json_escape(
       readiness_text_)
+      << "\",\"nav_readiness\":\""
+      << json_escape(
+      nav_readiness_text_)
       << "\",\"handoff_state\":\""
       << json_escape(
       handoff_state_text_)
@@ -746,6 +808,7 @@ private:
   std::string workflow_phase_topic_;
   std::string session_state_topic_;
   std::string readiness_topic_;
+  std::string nav_readiness_topic_;
   std::string safety_stop_topic_;
   std::string handoff_state_topic_;
   std::string runtime_enabled_topic_;
@@ -753,6 +816,9 @@ private:
   std::string cancel_service_name_;
 
   std::string readiness_text_{
+    "not_received"};
+
+  std::string nav_readiness_text_{
     "not_received"};
 
   std::string handoff_state_text_{
@@ -775,6 +841,12 @@ private:
 
   std::chrono::milliseconds
     cancel_retry_period_{1000};
+
+  double nav_readiness_timeout_sec_{1.0};
+
+  std::optional<
+    std::chrono::steady_clock::time_point>
+  nav_readiness_received_at_;
 
   rclcpp::Publisher<
     BoolMessage>::SharedPtr
@@ -803,6 +875,10 @@ private:
   rclcpp::Subscription<
     StringMessage>::SharedPtr
     readiness_subscription_;
+
+  rclcpp::Subscription<
+    StringMessage>::SharedPtr
+    nav_readiness_subscription_;
 
   rclcpp::Subscription<
     BoolMessage>::SharedPtr

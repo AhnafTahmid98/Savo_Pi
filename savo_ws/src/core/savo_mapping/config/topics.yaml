@@ -55,6 +55,7 @@
         selected_goal: "/savo_mapping/exploration/selected_goal"
         state: "/savo_mapping/exploration_goal/state"
         status: "/savo_mapping/exploration_goal/status"
+        typed_status: "/savo_mapping/exploration_goal/typed_status"
         feedback: "/savo_mapping/exploration_goal/feedback"
 
       navigation_awareness:

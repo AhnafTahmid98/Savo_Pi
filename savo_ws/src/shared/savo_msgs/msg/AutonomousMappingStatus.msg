@@ -6,7 +6,7 @@
 # - savo_control and savo_perception remain final movement/safety authorities.
 # - savo_head owns semantic head motion and AprilTag visual confirmation.
 
-uint32 CONTRACT_VERSION=4
+uint32 CONTRACT_VERSION=5
 
 uint8 STRATEGY_NONE=0
 uint8 STRATEGY_FRONTIER=1
@@ -116,6 +116,10 @@ bool frontier_status_fresh
 string frontier_planning_status
 uint64 frontier_plan_sequence
 uint64 frontier_map_generation
+string frontier_handoff_state
+uint64 frontier_handoff_sequence
+string frontier_handoff_request_id
+string frontier_handoff_reason
 uint32 detected_frontiers
 uint32 reachable_frontiers
 uint32 exhaustion_observations

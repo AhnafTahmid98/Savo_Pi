@@ -5,6 +5,7 @@
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <nav_msgs/msg/occupancy_grid.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <savo_msgs/msg/exploration_goal_status.hpp>
 #include <savo_msgs/msg/frontier_exploration_status.hpp>
 #include <std_msgs/msg/bool.hpp>
 #include <std_msgs/msg/string.hpp>
@@ -47,12 +48,6 @@ bool handoff_allows_new_goal(const std::string & state)
 {
   return state == "idle" ||
          is_handoff_terminal(state);
-}
-
-bool is_handoff_active(const std::string & state)
-{
-  return !state.empty() &&
-         !handoff_allows_new_goal(state);
 }
 
 std::uint8_t exhaustion_kind_from_status(const std::string & status)
@@ -137,10 +132,10 @@ public:
       "selected_goal_topic",
       exploration::kSelectedGoalTopic);
 
-    handoff_state_topic_ =
+    handoff_status_topic_ =
       declare_parameter<std::string>(
-      "handoff_state_topic",
-      exploration::kGoalStateTopic);
+      "handoff_status_topic",
+      exploration::kGoalTypedStatusTopic);
 
     runtime_enabled_topic_ =
       declare_parameter<std::string>(
@@ -308,14 +303,14 @@ public:
           this,
           std::placeholders::_1));
 
-    handoff_state_subscription_ =
+    handoff_status_subscription_ =
       create_subscription<
-      std_msgs::msg::String>(
-        handoff_state_topic_,
+      savo_msgs::msg::ExplorationGoalStatus>(
+        handoff_status_topic_,
         retained_qos,
         std::bind(
           &FrontierExplorerNode::
-        handle_handoff_state,
+        handle_handoff_status,
           this,
           std::placeholders::_1));
 
@@ -365,7 +360,7 @@ private:
   {
     if (map_topic_.empty() ||
       selected_goal_topic_.empty() ||
-      handoff_state_topic_.empty() ||
+      handoff_status_topic_.empty() ||
       runtime_enabled_topic_.empty() ||
       state_topic_.empty() ||
       status_topic_.empty() ||
@@ -450,11 +445,66 @@ private:
     ++map_generation_;
   }
 
-  void handle_handoff_state(
-    const std_msgs::msg::String::SharedPtr message)
+  void handle_handoff_status(
+    const savo_msgs::msg::
+    ExplorationGoalStatus::ConstSharedPtr message)
   {
-    handoff_state_ = message->data;
-    handoff_state_received_ = true;
+    using Status =
+      savo_msgs::msg::ExplorationGoalStatus;
+
+    if (message->contract_version !=
+      Status::CONTRACT_VERSION)
+    {
+      RCLCPP_WARN(
+        get_logger(),
+        "ignored handoff status with unsupported "
+        "contract version: %u",
+        message->contract_version);
+
+      return;
+    }
+
+    const auto parsed_state =
+      exploration::goal_handoff_state_from_string(
+      message->state);
+
+    if (!parsed_state.has_value() ||
+      message->active !=
+      exploration::is_active(parsed_state.value()) ||
+      message->terminal !=
+      exploration::is_terminal(parsed_state.value()))
+    {
+      RCLCPP_WARN(
+        get_logger(),
+        "ignored inconsistent handoff status: "
+        "sequence=%llu request_id=%s state=%s",
+        static_cast<unsigned long long>(message->sequence),
+        message->request_id.c_str(),
+        message->state.c_str());
+
+      return;
+    }
+
+    if (handoff_observation_.received &&
+      message->sequence < handoff_observation_.sequence)
+    {
+      RCLCPP_WARN(
+        get_logger(),
+        "ignored regressed handoff status sequence: "
+        "received=%llu current=%llu",
+        static_cast<unsigned long long>(message->sequence),
+        static_cast<unsigned long long>(
+          handoff_observation_.sequence));
+
+      return;
+    }
+
+    handoff_state_ = message->state;
+    handoff_observation_.received = true;
+    handoff_observation_.sequence = message->sequence;
+    handoff_observation_.request_id = message->request_id;
+    handoff_observation_.state = parsed_state.value();
+    handoff_observation_.reason = message->reason;
   }
 
   bool update_pending_goal(
@@ -470,42 +520,49 @@ private:
       goal_published_at_.value()).seconds() :
       0.0;
 
-    if (is_handoff_active(handoff_state_)) {
-      observed_active_handoff_ = true;
+    const auto decision =
+      exploration::evaluate_pending_goal(
+      expected_handoff_sequence_,
+      expected_handoff_request_id_,
+      handoff_observation_,
+      elapsed_sec,
+      goal_ack_timeout_sec_);
 
+    if (decision.disposition ==
+      exploration::PendingGoalDisposition::AcknowledgedTerminal)
+    {
+      goal_pending_ = false;
+      last_goal_completed_at_ = current_time;
       set_state(
-        "waiting_for_handoff",
-        "exploration_goal_active");
+        "waiting_for_replan",
+        decision.reason);
 
       return true;
     }
 
-    if (observed_active_handoff_ &&
-      handoff_allows_new_goal(
-          handoff_state_))
+    if (decision.disposition ==
+      exploration::PendingGoalDisposition::AcknowledgedActive)
     {
-      goal_pending_ = false;
-      observed_active_handoff_ = false;
-      last_goal_completed_at_ = current_time;
-
       set_state(
-        "waiting_for_replan",
-        "exploration_goal_terminal");
+        "waiting_for_handoff",
+        decision.reason);
 
-      return false;
+      return true;
     }
 
-    if (elapsed_sec >= goal_ack_timeout_sec_) {
+    if (decision.disposition ==
+      exploration::PendingGoalDisposition::AcknowledgementTimedOut)
+    {
       set_state(
         "error",
-        "handoff_ack_timeout");
+        decision.reason);
 
       return true;
     }
 
     set_state(
       "waiting_for_handoff",
-      "waiting_for_handoff_acknowledgement");
+      decision.reason);
 
     return true;
   }
@@ -702,7 +759,7 @@ private:
     }
 
     if (require_handoff_state_ &&
-      !handoff_state_received_)
+      !handoff_observation_.received)
     {
       set_state(
         "waiting_for_handoff",
@@ -837,14 +894,18 @@ private:
       message.pose.orientation.w =
         std::cos(half_yaw);
 
-      selected_goal_publisher_->publish(
-        message);
-
       goal_pending_ = true;
-      observed_active_handoff_ = false;
+      expected_handoff_sequence_ =
+        handoff_observation_.sequence + 1U;
+      expected_handoff_request_id_ =
+        "frontier-" +
+        std::to_string(expected_handoff_sequence_);
       goal_published_at_ = current_time;
       last_goal_published_at_ = current_time;
       last_goal_id_ = goal.goal_id;
+
+      selected_goal_publisher_->publish(
+        message);
 
       set_state(
         "goal_published",
@@ -914,6 +975,12 @@ private:
       << map_generation_
       << ",\"handoff_state\":\""
       << json_escape(handoff_state_)
+      << "\",\"handoff_sequence\":"
+      << handoff_observation_.sequence
+      << ",\"handoff_request_id\":\""
+      << json_escape(handoff_observation_.request_id)
+      << "\",\"handoff_reason\":\""
+      << json_escape(handoff_observation_.reason)
       << "\",\"goal_pending\":"
       << (goal_pending_ ? "true" : "false")
       << ",\"last_goal_id\":\""
@@ -951,6 +1018,10 @@ private:
     typed.exhaustion_kind =
       exhaustion_kind_from_status(last_planning_status_);
     typed.handoff_state = handoff_state_;
+    typed.handoff_status_received = handoff_observation_.received;
+    typed.handoff_sequence = handoff_observation_.sequence;
+    typed.handoff_request_id = handoff_observation_.request_id;
+    typed.handoff_reason = handoff_observation_.reason;
     typed.goal_pending = goal_pending_;
     typed.last_goal_id = last_goal_id_;
     typed.detected_frontiers =
@@ -968,7 +1039,7 @@ private:
 
   std::string map_topic_;
   std::string selected_goal_topic_;
-  std::string handoff_state_topic_;
+  std::string handoff_status_topic_;
   std::string runtime_enabled_topic_;
   std::string state_topic_;
   std::string status_topic_;
@@ -993,7 +1064,7 @@ private:
     latest_map_;
 
   std::string handoff_state_;
-  bool handoff_state_received_{false};
+  exploration::GoalHandoffObservation handoff_observation_;
 
   std::uint64_t map_generation_{0};
 
@@ -1001,8 +1072,8 @@ private:
     std::numeric_limits<std::uint64_t>::max()};
 
   bool goal_pending_{false};
-  bool observed_active_handoff_{false};
-
+  std::uint64_t expected_handoff_sequence_{0};
+  std::string expected_handoff_request_id_;
   std::optional<rclcpp::Time>
   goal_published_at_;
 
@@ -1046,8 +1117,8 @@ private:
     map_subscription_;
 
   rclcpp::Subscription<
-    std_msgs::msg::String>::SharedPtr
-    handoff_state_subscription_;
+    savo_msgs::msg::ExplorationGoalStatus>::SharedPtr
+    handoff_status_subscription_;
 
   rclcpp::Subscription<
     std_msgs::msg::Bool>::SharedPtr

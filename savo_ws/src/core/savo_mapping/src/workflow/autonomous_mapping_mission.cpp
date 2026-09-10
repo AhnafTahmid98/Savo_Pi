@@ -1487,7 +1487,9 @@ MissionDecision AutonomousMappingMission::evaluate_frontier_entry(
     enter(
       MissionState::WaitingForAuthority,
       "waiting_for_frontier_runtime_authority");
-    return decision(snapshot_.reason);
+    output = decision(snapshot_.reason);
+    output.request_frontier_mode = true;
+    return output;
   }
 
   enter(MissionState::Exploring, "frontier_exploration_active");

@@ -42,6 +42,7 @@ set(msg_files
   "msg/LocationCandidate.msg"
   "msg/LocationEvent.msg"
   "msg/AutonomousMappingStatus.msg"
+  "msg/ExplorationGoalStatus.msg"
   "msg/FrontierExplorationStatus.msg"
   "msg/SemanticInterruptionStatus.msg"
 )

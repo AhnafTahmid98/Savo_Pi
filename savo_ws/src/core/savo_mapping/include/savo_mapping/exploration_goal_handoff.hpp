@@ -1,7 +1,9 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
+#include <string_view>
 
 namespace savo_mapping::exploration
 {
@@ -17,6 +19,9 @@ inline constexpr char kGoalStateTopic[] =
 
 inline constexpr char kGoalStatusTopic[] =
   "/savo_mapping/exploration_goal/status";
+
+inline constexpr char kGoalTypedStatusTopic[] =
+  "/savo_mapping/exploration_goal/typed_status";
 
 inline constexpr char kGoalFeedbackTopic[] =
   "/savo_mapping/exploration_goal/feedback";
@@ -62,6 +67,43 @@ bool is_active(
 
 bool is_terminal(
   GoalHandoffState state);
+
+std::optional<GoalHandoffState>
+goal_handoff_state_from_string(
+  std::string_view state);
+
+struct GoalHandoffObservation
+{
+  bool received{false};
+  std::uint64_t sequence{0};
+  std::string request_id;
+  GoalHandoffState state{GoalHandoffState::kIdle};
+  std::string reason{"not_received"};
+};
+
+enum class PendingGoalDisposition
+{
+  WaitingForAcknowledgement,
+  AcknowledgedActive,
+  AcknowledgedTerminal,
+  AcknowledgementTimedOut,
+};
+
+struct PendingGoalDecision
+{
+  PendingGoalDisposition disposition{
+    PendingGoalDisposition::WaitingForAcknowledgement};
+  bool acknowledged{false};
+  bool clear_pending{false};
+  std::string reason{"waiting_for_handoff_acknowledgement"};
+};
+
+PendingGoalDecision evaluate_pending_goal(
+  std::uint64_t expected_sequence,
+  std::string_view expected_request_id,
+  const GoalHandoffObservation & observation,
+  double elapsed_sec,
+  double acknowledgement_timeout_sec);
 
 bool transition_allowed(
   GoalHandoffState from,

@@ -11,8 +11,8 @@ frontier_explorer_node:
     selected_goal_topic:
       "/savo_mapping/exploration/selected_goal"
 
-    handoff_state_topic:
-      "/savo_mapping/exploration_goal/state"
+    handoff_status_topic:
+      "/savo_mapping/exploration_goal/typed_status"
 
     runtime_enabled_topic:
       "/savo_mapping/exploration/runtime_enabled"

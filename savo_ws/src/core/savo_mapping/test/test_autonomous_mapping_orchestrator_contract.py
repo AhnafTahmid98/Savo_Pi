@@ -234,6 +234,45 @@ def test_frontier_explorer_publishes_typed_planner_evidence() -> None:
     assert '/savo_mapping/frontier_explorer/typed_status' in config
 
 
+def test_frontier_handoff_ack_is_typed_and_sequence_correlated() -> None:
+    explorer = read('src/nodes/frontier_explorer_node.cpp')
+    handoff = read('src/nodes/exploration_goal_handoff_node.cpp')
+    core = read('src/core/exploration_goal_handoff.cpp')
+    config = read('config/frontier_mapping.yaml')
+
+    for token in (
+        'savo_msgs/msg/exploration_goal_status.hpp',
+        'expected_handoff_sequence_',
+        'expected_handoff_request_id_',
+        'exploration::evaluate_pending_goal',
+    ):
+        assert token in explorer
+
+    assert 'typed.sequence = machine_.sequence();' in handoff
+    assert 'typed.request_id = machine_.request_id();' in handoff
+    assert 'typed.terminal = exploration::is_terminal' in handoff
+    assert 'observation.sequence == expected_sequence' in core
+    assert 'observation.request_id' in core
+    assert '/savo_mapping/exploration_goal/typed_status' in config
+    assert 'observed_active_handoff_' not in explorer
+
+
+def test_nav_is_requested_before_frontier_waits_for_nav_readiness() -> None:
+    mission = read('src/workflow/autonomous_mapping_mission.cpp')
+    manager = read('src/nodes/exploration_manager_node.cpp')
+    runtime = read('src/workflow/exploration_runtime.cpp')
+
+    waiting_block = mission.split(
+        'if (!inputs.runtime_authorized) {', maxsplit=1
+    )[1].split('}', maxsplit=1)[0]
+
+    assert 'output.request_frontier_mode = true;' in waiting_block
+    assert 'nav_readiness_subscription_' in manager
+    assert 'std::chrono::steady_clock::now()' in manager
+    assert 'control_mode_command_publisher_' not in manager
+    assert 'if (!inputs.nav_ready)' in runtime
+
+
 def test_launch_and_config_are_nonempty_and_consistent() -> None:
     launch = read('launch/autonomous_mapping_orchestrator.launch.xml')
     config = read('config/autonomous_mapping_orchestrator.yaml')

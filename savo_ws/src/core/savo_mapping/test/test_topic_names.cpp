@@ -92,6 +92,10 @@ TEST(TopicNamesContract, ExplorationHandoffTopicsAreStable)
     "/savo_mapping/exploration_goal/status");
 
   EXPECT_EQ(
+    std::string{savo_mapping::topics::EXPLORATION_GOAL_TYPED_STATUS},
+    "/savo_mapping/exploration_goal/typed_status");
+
+  EXPECT_EQ(
     std::string{savo_mapping::topics::EXPLORATION_GOAL_FEEDBACK},
     "/savo_mapping/exploration_goal/feedback");
 
@@ -217,6 +221,10 @@ TEST(TopicNamesContract, ClassifiesNavigationAndSafetyTopics)
   EXPECT_TRUE(
     savo_mapping::topics::is_navigation_handoff_topic(
       savo_mapping::topics::EXPLORATION_GOAL_STATUS));
+
+  EXPECT_TRUE(
+    savo_mapping::topics::is_navigation_handoff_topic(
+      savo_mapping::topics::EXPLORATION_GOAL_TYPED_STATUS));
 
   EXPECT_TRUE(
     savo_mapping::topics::is_navigation_handoff_topic(

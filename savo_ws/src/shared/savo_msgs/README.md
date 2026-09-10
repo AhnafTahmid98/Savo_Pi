@@ -56,6 +56,8 @@ rejection to persistent storage.
 - `RunAutonomousMapping.action` starts one mapping-owned autonomous mission.
 - `ControlAutonomousMapping.srv` pauses, resumes, or cancels that mission.
 - `AutonomousMappingStatus.msg` is the typed retained mission snapshot.
+- `ExplorationGoalStatus.msg` correlates each frontier goal with its active or
+  terminal navigation-handoff result without relying on transient states.
 - `FrontierExplorationStatus.msg` carries the latest typed frontier-planner
   evidence used by stable completion detection.
 

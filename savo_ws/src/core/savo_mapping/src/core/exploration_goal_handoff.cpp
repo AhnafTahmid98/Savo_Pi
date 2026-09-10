@@ -1,5 +1,6 @@
 #include "savo_mapping/exploration_goal_handoff.hpp"
 
+#include <cmath>
 #include <utility>
 
 namespace savo_mapping::exploration
@@ -82,6 +83,107 @@ bool is_terminal(
   }
 }
 
+std::optional<GoalHandoffState>
+goal_handoff_state_from_string(
+  const std::string_view state)
+{
+  if (state == "idle") {
+    return GoalHandoffState::kIdle;
+  }
+  if (state == "waiting_for_savo_nav") {
+    return GoalHandoffState::kWaitingForServer;
+  }
+  if (state == "sending") {
+    return GoalHandoffState::kSending;
+  }
+  if (state == "accepted") {
+    return GoalHandoffState::kAccepted;
+  }
+  if (state == "executing") {
+    return GoalHandoffState::kExecuting;
+  }
+  if (state == "canceling") {
+    return GoalHandoffState::kCanceling;
+  }
+  if (state == "succeeded") {
+    return GoalHandoffState::kSucceeded;
+  }
+  if (state == "rejected") {
+    return GoalHandoffState::kRejected;
+  }
+  if (state == "aborted") {
+    return GoalHandoffState::kAborted;
+  }
+  if (state == "canceled") {
+    return GoalHandoffState::kCanceled;
+  }
+  if (state == "timed_out") {
+    return GoalHandoffState::kTimedOut;
+  }
+  if (state == "error") {
+    return GoalHandoffState::kError;
+  }
+
+  return std::nullopt;
+}
+
+PendingGoalDecision evaluate_pending_goal(
+  const std::uint64_t expected_sequence,
+  const std::string_view expected_request_id,
+  const GoalHandoffObservation & observation,
+  const double elapsed_sec,
+  const double acknowledgement_timeout_sec)
+{
+  const bool correlated =
+    observation.received &&
+    observation.sequence == expected_sequence &&
+    std::string_view{observation.request_id} == expected_request_id;
+
+  if (correlated && is_terminal(observation.state)) {
+    return PendingGoalDecision{
+      PendingGoalDisposition::AcknowledgedTerminal,
+      true,
+      true,
+      observation.reason.empty() ?
+      to_string(observation.state) :
+      observation.reason};
+  }
+
+  if (correlated && is_active(observation.state)) {
+    return PendingGoalDecision{
+      PendingGoalDisposition::AcknowledgedActive,
+      true,
+      false,
+      observation.reason.empty() ?
+      "exploration_goal_active" :
+      observation.reason};
+  }
+
+  if (correlated) {
+    return PendingGoalDecision{
+      PendingGoalDisposition::AcknowledgedActive,
+      true,
+      false,
+      observation.reason.empty() ?
+      "handoff_response_received" :
+      observation.reason};
+  }
+
+  if (
+    std::isfinite(elapsed_sec) &&
+    std::isfinite(acknowledgement_timeout_sec) &&
+    elapsed_sec >= acknowledgement_timeout_sec)
+  {
+    return PendingGoalDecision{
+      PendingGoalDisposition::AcknowledgementTimedOut,
+      false,
+      false,
+      "handoff_ack_timeout"};
+  }
+
+  return PendingGoalDecision{};
+}
+
 bool transition_allowed(
   const GoalHandoffState from,
   const GoalHandoffState to)
@@ -110,6 +212,7 @@ bool transition_allowed(
     case GoalHandoffState::kWaitingForServer:
       return
         to == GoalHandoffState::kSending ||
+        to == GoalHandoffState::kRejected ||
         to == GoalHandoffState::kCanceled ||
         to == GoalHandoffState::kTimedOut ||
         to == GoalHandoffState::kError;

@@ -323,6 +323,23 @@ TEST(ExplorationGoalHandoff, GoalRejection)
     exploration::GoalHandoffState::kRejected);
 }
 
+TEST(
+  ExplorationGoalHandoff,
+  ValidationRejectionRemainsCorrelatedAndTerminal)
+{
+  exploration::GoalHandoffMachine machine;
+
+  ASSERT_TRUE(machine.begin("frontier-invalid").accepted);
+  ASSERT_TRUE(
+    machine.mark_rejected("goal_frame_mismatch:odom").accepted);
+
+  EXPECT_EQ(machine.sequence(), 1U);
+  EXPECT_EQ(machine.request_id(), "frontier-invalid");
+  EXPECT_EQ(machine.state(), exploration::GoalHandoffState::kRejected);
+  EXPECT_TRUE(exploration::is_terminal(machine.state()));
+  EXPECT_EQ(machine.reason(), "goal_frame_mismatch:odom");
+}
+
 TEST(ExplorationGoalHandoff, ActiveCancellation)
 {
   exploration::GoalHandoffMachine machine;
@@ -492,4 +509,134 @@ TEST(ExplorationGoalHandoff, SequenceIncrements)
   EXPECT_EQ(
     machine.request_id(),
     "frontier-2");
+}
+
+TEST(
+  ExplorationGoalHandoff,
+  RapidTerminalResponseAcknowledgesWithoutObservedActiveState)
+{
+  const exploration::GoalHandoffObservation observation{
+    true,
+    7U,
+    "frontier-7",
+    exploration::GoalHandoffState::kRejected,
+    "savo_nav_rejected_goal"};
+
+  const auto decision = exploration::evaluate_pending_goal(
+    7U, "frontier-7", observation, 0.1, 3.0);
+
+  EXPECT_EQ(
+    decision.disposition,
+    exploration::PendingGoalDisposition::AcknowledgedTerminal);
+  EXPECT_TRUE(decision.acknowledged);
+  EXPECT_TRUE(decision.clear_pending);
+  EXPECT_EQ(decision.reason, "savo_nav_rejected_goal");
+}
+
+TEST(
+  ExplorationGoalHandoff,
+  UncorrelatedRetainedTerminalDoesNotAcknowledgeCurrentGoal)
+{
+  const exploration::GoalHandoffObservation observation{
+    true,
+    6U,
+    "frontier-6",
+    exploration::GoalHandoffState::kRejected,
+    "prior_goal_rejected"};
+
+  const auto decision = exploration::evaluate_pending_goal(
+    7U, "frontier-7", observation, 0.1, 3.0);
+
+  EXPECT_EQ(
+    decision.disposition,
+    exploration::PendingGoalDisposition::WaitingForAcknowledgement);
+  EXPECT_FALSE(decision.acknowledged);
+  EXPECT_FALSE(decision.clear_pending);
+}
+
+TEST(
+  ExplorationGoalHandoff,
+  NoCorrelatedResponseProducesTrueAcknowledgementTimeout)
+{
+  const exploration::GoalHandoffObservation observation;
+
+  const auto decision = exploration::evaluate_pending_goal(
+    2U, "frontier-2", observation, 3.0, 3.0);
+
+  EXPECT_EQ(
+    decision.disposition,
+    exploration::PendingGoalDisposition::AcknowledgementTimedOut);
+  EXPECT_FALSE(decision.acknowledged);
+  EXPECT_FALSE(decision.clear_pending);
+  EXPECT_EQ(decision.reason, "handoff_ack_timeout");
+}
+
+TEST(
+  ExplorationGoalHandoff,
+  AcceptedAndExecutingResponsesKeepOneGoalPendingUntilTerminal)
+{
+  exploration::GoalHandoffObservation observation{
+    true,
+    3U,
+    "frontier-3",
+    exploration::GoalHandoffState::kAccepted,
+    "goal_accepted"};
+
+  auto decision = exploration::evaluate_pending_goal(
+    3U, "frontier-3", observation, 0.1, 3.0);
+
+  EXPECT_EQ(
+    decision.disposition,
+    exploration::PendingGoalDisposition::AcknowledgedActive);
+  EXPECT_TRUE(decision.acknowledged);
+  EXPECT_FALSE(decision.clear_pending);
+
+  observation.state = exploration::GoalHandoffState::kExecuting;
+  observation.reason = "goal_executing";
+  decision = exploration::evaluate_pending_goal(
+    3U, "frontier-3", observation, 4.0, 3.0);
+
+  EXPECT_EQ(
+    decision.disposition,
+    exploration::PendingGoalDisposition::AcknowledgedActive);
+  EXPECT_FALSE(decision.clear_pending);
+
+  observation.state = exploration::GoalHandoffState::kSucceeded;
+  observation.reason = "goal_succeeded";
+  decision = exploration::evaluate_pending_goal(
+    3U, "frontier-3", observation, 4.1, 3.0);
+
+  EXPECT_EQ(
+    decision.disposition,
+    exploration::PendingGoalDisposition::AcknowledgedTerminal);
+  EXPECT_TRUE(decision.clear_pending);
+  EXPECT_EQ(decision.reason, "goal_succeeded");
+}
+
+TEST(
+  ExplorationGoalHandoff,
+  ParsesEveryPublishedState)
+{
+  for (const auto state : {
+      exploration::GoalHandoffState::kIdle,
+      exploration::GoalHandoffState::kWaitingForServer,
+      exploration::GoalHandoffState::kSending,
+      exploration::GoalHandoffState::kAccepted,
+      exploration::GoalHandoffState::kExecuting,
+      exploration::GoalHandoffState::kCanceling,
+      exploration::GoalHandoffState::kSucceeded,
+      exploration::GoalHandoffState::kRejected,
+      exploration::GoalHandoffState::kAborted,
+      exploration::GoalHandoffState::kCanceled,
+      exploration::GoalHandoffState::kTimedOut,
+      exploration::GoalHandoffState::kError})
+  {
+    const auto parsed = exploration::goal_handoff_state_from_string(
+      exploration::to_string(state));
+    ASSERT_TRUE(parsed.has_value());
+    EXPECT_EQ(parsed.value(), state);
+  }
+
+  EXPECT_FALSE(
+    exploration::goal_handoff_state_from_string("unknown").has_value());
 }

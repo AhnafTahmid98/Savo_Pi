@@ -37,6 +37,10 @@ RuntimeInputs ready_frontier_inputs()
   inputs.readiness_received = true;
   inputs.mapping_ready = true;
 
+  inputs.nav_readiness_received = true;
+  inputs.nav_readiness_fresh = true;
+  inputs.nav_ready = true;
+
   inputs.safety_stop_received = true;
   inputs.safety_stop_active = false;
 
@@ -344,6 +348,62 @@ TEST(
     decision.reason,
     "cancel_required: "
     "mapping_not_ready");
+}
+
+TEST(
+  ExplorationRuntimeContract,
+  NavMustBecomeReadyAfterRuntimeAuthorityInputsArrive)
+{
+  auto inputs = ready_frontier_inputs();
+  inputs.nav_ready = false;
+
+  const auto decision =
+    savo_mapping::exploration_runtime::evaluate(inputs);
+
+  EXPECT_EQ(decision.disposition, RuntimeDisposition::Disabled);
+  EXPECT_FALSE(decision.frontier_enabled);
+  EXPECT_FALSE(decision.cancel_active_goal);
+  EXPECT_EQ(decision.reason, "disabled: nav_not_ready");
+}
+
+TEST(
+  ExplorationRuntimeContract,
+  MissingNavReadinessDoesNotReleaseFrontier)
+{
+  auto inputs = ready_frontier_inputs();
+  inputs.nav_readiness_received = false;
+  inputs.nav_readiness_fresh = false;
+  inputs.nav_ready = false;
+
+  const auto decision =
+    savo_mapping::exploration_runtime::evaluate(inputs);
+
+  EXPECT_EQ(
+    decision.disposition,
+    RuntimeDisposition::WaitingForAuthority);
+  EXPECT_FALSE(decision.frontier_enabled);
+  EXPECT_EQ(decision.reason, "waiting_for_authority");
+}
+
+TEST(
+  ExplorationRuntimeContract,
+  StaleNavReadinessCancelsAnActiveGoal)
+{
+  auto inputs = ready_frontier_inputs();
+  inputs.nav_readiness_fresh = false;
+  inputs.handoff_active = true;
+
+  const auto decision =
+    savo_mapping::exploration_runtime::evaluate(inputs);
+
+  EXPECT_EQ(
+    decision.disposition,
+    RuntimeDisposition::CancelRequired);
+  EXPECT_FALSE(decision.frontier_enabled);
+  EXPECT_TRUE(decision.cancel_active_goal);
+  EXPECT_EQ(
+    decision.reason,
+    "cancel_required: nav_readiness_stale");
 }
 
 TEST(

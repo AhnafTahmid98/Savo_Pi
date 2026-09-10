@@ -6,6 +6,8 @@
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
 
+#include <savo_msgs/msg/exploration_goal_status.hpp>
+
 #include <std_msgs/msg/string.hpp>
 #include <std_srvs/srv/trigger.hpp>
 
@@ -150,6 +152,12 @@ public:
       create_publisher<
       std_msgs::msg::String>(
         exploration::kGoalStatusTopic,
+        state_qos);
+
+    typed_status_publisher_ =
+      create_publisher<
+      savo_msgs::msg::ExplorationGoalStatus>(
+        exploration::kGoalTypedStatusTopic,
         state_qos);
 
     feedback_publisher_ =
@@ -337,23 +345,6 @@ private:
     geometry_msgs::msg::PoseStamped pose =
       *message;
 
-    std::string validation_reason;
-
-    if (!prepare_goal(
-        pose,
-        validation_reason))
-    {
-      publish_rejection(
-        validation_reason);
-
-      RCLCPP_WARN(
-        get_logger(),
-        "selected exploration goal rejected: %s",
-        validation_reason.c_str());
-
-      return;
-    }
-
     const std::string request_id =
       "frontier-" +
       std::to_string(
@@ -375,6 +366,24 @@ private:
     }
 
     clear_runtime_goal();
+
+    std::string validation_reason;
+
+    if (!prepare_goal(
+        pose,
+        validation_reason))
+    {
+      publish_transition(
+        machine_.mark_rejected(
+          validation_reason));
+
+      RCLCPP_WARN(
+        get_logger(),
+        "selected exploration goal rejected: %s",
+        validation_reason.c_str());
+
+      return;
+    }
 
     pending_goal_ = pose;
     pending_started_ = now();
@@ -1457,6 +1466,21 @@ private:
     message.data = output.str();
 
     status_publisher_->publish(message);
+
+    savo_msgs::msg::ExplorationGoalStatus typed;
+    typed.contract_version =
+      savo_msgs::msg::ExplorationGoalStatus::CONTRACT_VERSION;
+    typed.stamp = now();
+    typed.accepted = accepted;
+    typed.sequence = machine_.sequence();
+    typed.request_id = machine_.request_id();
+    typed.state = exploration::to_string(machine_.state());
+    typed.active = exploration::is_active(machine_.state());
+    typed.terminal = exploration::is_terminal(machine_.state());
+    typed.reason = reason;
+    typed.action_name = exploration::kExplorationActionName;
+
+    typed_status_publisher_->publish(typed);
   }
 
   void publish_rejection(
@@ -1524,6 +1548,10 @@ private:
   rclcpp::Publisher<
     std_msgs::msg::String>::SharedPtr
     status_publisher_;
+
+  rclcpp::Publisher<
+    savo_msgs::msg::ExplorationGoalStatus>::SharedPtr
+    typed_status_publisher_;
 
   rclcpp::Publisher<
     std_msgs::msg::String>::SharedPtr

@@ -19,6 +19,12 @@ exploration_manager_node:
     readiness_topic:
       "/savo_mapping/readiness"
 
+    # Navigation readiness publishes at 5 Hz. A fresh ready observation is
+    # required only after the orchestrator has selected NAV mode.
+    nav_readiness_topic:
+      "/savo_nav/readiness"
+    nav_readiness_timeout_sec: 1.0
+
     safety_stop_topic:
       "/safety/stop"
 

@@ -2377,6 +2377,10 @@ private:
 
     {
       std::lock_guard<std::mutex> lock(mutex_);
+      frontier_handoff_state_ = message->handoff_state;
+      frontier_handoff_sequence_ = message->handoff_sequence;
+      frontier_handoff_request_id_ = message->handoff_request_id;
+      frontier_handoff_reason_ = message->handoff_reason;
       ++inputs_.frontier_observation_sequence;
       const auto completion = completion_detector_.observe(
         observation,
@@ -5561,6 +5565,10 @@ private:
       snapshot.frontier_plan_sequence;
     status.frontier_map_generation =
       snapshot.frontier_map_generation;
+    status.frontier_handoff_state = frontier_handoff_state_;
+    status.frontier_handoff_sequence = frontier_handoff_sequence_;
+    status.frontier_handoff_request_id = frontier_handoff_request_id_;
+    status.frontier_handoff_reason = frontier_handoff_reason_;
     status.detected_frontiers = snapshot.detected_frontiers;
     status.reachable_frontiers = snapshot.reachable_frontiers;
     status.exhaustion_observations =
@@ -5786,6 +5794,10 @@ private:
   autonomous::AutonomousMappingMission mission_;
   autonomous::FrontierCompletionDetector completion_detector_;
   autonomous::MissionInputs inputs_;
+  std::string frontier_handoff_state_{"not_received"};
+  std::uint64_t frontier_handoff_sequence_{0};
+  std::string frontier_handoff_request_id_;
+  std::string frontier_handoff_reason_{"not_received"};
   std::shared_ptr<GoalHandle> goal_handle_;
   std::shared_ptr<GoalHandle> pending_terminal_handle_;
   std::optional<MissionStatus> pending_terminal_status_;

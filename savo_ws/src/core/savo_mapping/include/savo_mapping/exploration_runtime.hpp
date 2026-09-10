@@ -30,6 +30,10 @@ struct RuntimeInputs
   bool readiness_received{false};
   bool mapping_ready{false};
 
+  bool nav_readiness_received{false};
+  bool nav_readiness_fresh{false};
+  bool nav_ready{false};
+
   bool safety_stop_received{false};
   bool safety_stop_active{true};
 

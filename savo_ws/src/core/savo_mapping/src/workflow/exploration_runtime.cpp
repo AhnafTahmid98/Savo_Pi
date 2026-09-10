@@ -85,6 +85,7 @@ bool authority_state_complete(
     inputs.workflow_phase.has_value() &&
     inputs.session_state.has_value() &&
     inputs.readiness_received &&
+    inputs.nav_readiness_received &&
     inputs.safety_stop_received &&
     inputs.handoff_state_received;
 }
@@ -164,6 +165,18 @@ RuntimeDecision evaluate(
     return disabled_or_cancel(
       inputs,
       "session_not_active");
+  }
+
+  if (!inputs.nav_readiness_fresh) {
+    return disabled_or_cancel(
+      inputs,
+      "nav_readiness_stale");
+  }
+
+  if (!inputs.nav_ready) {
+    return disabled_or_cancel(
+      inputs,
+      "nav_not_ready");
   }
 
   if (!frontier_authorized_by_workflow(

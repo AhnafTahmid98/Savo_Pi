@@ -100,6 +100,8 @@ TEST(
   expect_not_contains(
     source,
     "kExplorationActionName");
+
+  expect_not_contains(source, "mode_cmd");
 }
 
 TEST(
@@ -133,6 +135,18 @@ TEST(
 
   expect_contains(
     source,
+    "nav_readiness_subscription_");
+
+  expect_contains(
+    source,
+    "handle_nav_readiness");
+
+  expect_contains(
+    source,
+    "std::chrono::steady_clock::now()");
+
+  expect_contains(
+    source,
     "safety_stop_subscription_");
 
   expect_contains(
@@ -156,6 +170,14 @@ TEST(
   expect_contains(
     config,
     "cancel_retry_period_ms: 1000");
+
+  expect_contains(
+    config,
+    "nav_readiness_timeout_sec: 1.0");
+
+  expect_contains(
+    config,
+    "\"/savo_nav/readiness\"");
 
   expect_contains(
     config,
@@ -210,6 +232,36 @@ TEST(
   expect_not_contains(source, "/cmd_vel");
   expect_not_contains(source, "rclcpp_action");
   expect_not_contains(source, "NavigateToPose");
+}
+
+TEST(
+  ExplorationManagerContract,
+  NavModeSelectionPrecedesLocalNavReadinessGate)
+{
+  const auto manager =
+    read_text(
+    package_root /
+    "src/nodes/exploration_manager_node.cpp");
+
+  const auto orchestrator =
+    read_text(
+    package_root /
+    "src/nodes/autonomous_mapping_orchestrator_node.cpp");
+
+  expect_contains(manager, "nav_readiness_topic_");
+  expect_contains(manager, "inputs_.nav_ready");
+  expect_not_contains(manager, "control_mode_command_publisher_");
+  expect_not_contains(manager, "mode_cmd");
+
+  expect_contains(
+    orchestrator,
+    "decision.request_frontier_mode ||");
+  expect_contains(
+    orchestrator,
+    "return \"NAV\"");
+  expect_contains(
+    orchestrator,
+    "decision.request_frontier_mode && nav_mode_observed");
 }
 
 TEST(

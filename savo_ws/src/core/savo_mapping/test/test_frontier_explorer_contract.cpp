@@ -74,7 +74,15 @@ TEST(
 
   expect_contains(
     source,
-    "exploration::kGoalStateTopic");
+    "exploration::kGoalTypedStatusTopic");
+
+  expect_contains(
+    source,
+    "savo_msgs::msg::ExplorationGoalStatus");
+
+  expect_contains(
+    source,
+    "exploration::evaluate_pending_goal");
 
   expect_contains(
     source,
@@ -133,6 +141,10 @@ TEST(
 
   expect_contains(
     config,
+    "\"/savo_mapping/exploration_goal/typed_status\"");
+
+  expect_contains(
+    config,
     "exhaustion_recheck_period_sec: 2.0");
 
   expect_not_contains(config, "/cmd_vel");
@@ -170,4 +182,25 @@ TEST(
 
   expect_not_contains(launch, "/cmd_vel");
   expect_not_contains(launch, "navigate_to_pose");
+}
+
+TEST(
+  FrontierExplorerContract,
+  HandoffPublishesCorrelatedTypedStatus)
+{
+  const auto source =
+    read_text(
+    package_root /
+    "src/nodes/exploration_goal_handoff_node.cpp");
+
+  expect_contains(
+    source,
+    "savo_msgs::msg::ExplorationGoalStatus");
+  expect_contains(
+    source,
+    "exploration::kGoalTypedStatusTopic");
+  expect_contains(source, "typed.sequence = machine_.sequence()");
+  expect_contains(source, "typed.request_id = machine_.request_id()");
+  expect_contains(source, "typed.terminal = exploration::is_terminal");
+  expect_contains(source, "typed.reason = reason");
 }

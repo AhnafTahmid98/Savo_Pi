@@ -4,7 +4,7 @@
 # most recent planner evaluation separately from the explorer's transient
 # runtime state so completion detection never depends on parsing JSON text.
 
-uint32 CONTRACT_VERSION=1
+uint32 CONTRACT_VERSION=2
 
 uint8 EXHAUSTION_NONE=0
 uint8 EXHAUSTION_NO_FRONTIERS=1
@@ -32,6 +32,10 @@ string planning_reason
 uint8 exhaustion_kind
 
 string handoff_state
+bool handoff_status_received
+uint64 handoff_sequence
+string handoff_request_id
+string handoff_reason
 bool goal_pending
 string last_goal_id
 

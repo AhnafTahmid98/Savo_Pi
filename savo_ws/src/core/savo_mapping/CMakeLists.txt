@@ -673,6 +673,7 @@ ament_target_dependencies(
   nav2_msgs
   rclcpp
   rclcpp_action
+  savo_msgs
   std_msgs
   std_srvs
 )

@@ -24,6 +24,9 @@
 - `/savo_mapping/frontier_explorer/typed_status` publishes
   `FrontierExplorationStatus.msg`; AM-2 completion detection consumes only
   this typed planner evidence and never parses the legacy JSON status.
+- `/savo_mapping/exploration_goal/typed_status` publishes
+  `ExplorationGoalStatus.msg`; its sequence and request ID correlate rapid
+  terminal action responses even when an intermediate active state is missed.
 
 The public mission contract never carries a Nav2 pose or path. Exploration goal
 selection remains internal to `savo_mapping`, and all movement is forwarded

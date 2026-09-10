@@ -77,6 +77,8 @@ inline constexpr std::string_view EXPLORATION_GOAL_STATE =
   "/savo_mapping/exploration_goal/state";
 inline constexpr std::string_view EXPLORATION_GOAL_STATUS =
   "/savo_mapping/exploration_goal/status";
+inline constexpr std::string_view EXPLORATION_GOAL_TYPED_STATUS =
+  "/savo_mapping/exploration_goal/typed_status";
 inline constexpr std::string_view EXPLORATION_GOAL_FEEDBACK =
   "/savo_mapping/exploration_goal/feedback";
 inline constexpr std::string_view COVERAGE_PATH =

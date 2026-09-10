@@ -869,6 +869,10 @@ TEST(AutonomousMappingMissionTest, EntersExploringOnlyWithRuntimeAuthority)
   EXPECT_EQ(
     waiting.snapshot.state,
     MissionState::WaitingForAuthority);
+  EXPECT_TRUE(waiting.request_frontier_mode);
+  EXPECT_EQ(
+    waiting.reason,
+    "waiting_for_frontier_runtime_authority");
 
   inputs.runtime_authorized = true;
   const auto exploring = mission.observe(inputs);
