@@ -961,7 +961,9 @@ def test_supervisor_revocation_stops_and_aborts():
             lambda: harness.latest_state()
             == AutonomousMappingStatus.STATE_CANCELING
         ), harness.diagnostics()
-        assert 'STOP' in harness.control_mode_commands
+        assert wait_until(
+            lambda: 'STOP' in harness.control_mode_commands
+        ), harness.diagnostics()
         harness.publish_monitor_state()
         assert wait_until(
             lambda: 'mission-am3-runtime' in harness.cancel_session_commands
