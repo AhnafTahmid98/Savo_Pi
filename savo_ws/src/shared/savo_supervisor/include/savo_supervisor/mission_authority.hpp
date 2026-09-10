@@ -116,7 +116,6 @@ struct LocationsObservation
 
 struct EndpointAvailability
 {
-  bool autonomous_mapping_action{false};
   bool rotate_to_heading_action{false};
   bool coverage_action{false};
   bool apriltag_confirmation_action{false};

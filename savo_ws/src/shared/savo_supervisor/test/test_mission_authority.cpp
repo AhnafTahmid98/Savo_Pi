@@ -50,7 +50,6 @@ savo_supervisor::MissionDependencySnapshot healthy_dependencies()
   dependencies.locations.write_ready = true;
   dependencies.locations.storage_healthy = true;
 
-  dependencies.endpoints.autonomous_mapping_action = true;
   dependencies.endpoints.rotate_to_heading_action = true;
   dependencies.endpoints.coverage_action = true;
   dependencies.endpoints.apriltag_confirmation_action = true;
@@ -170,6 +169,22 @@ TEST(MissionAuthority, AutonomousMappingAdmissionDoesNotRequireNavigationGoalAcc
   const auto denied = navigation_authority.Handle(navigation, dependencies);
   EXPECT_FALSE(denied.authorized);
   EXPECT_EQ(denied.reason, "navigation_not_ready_or_map_mismatch");
+}
+
+TEST(MissionAuthority, AutonomousMappingCapabilityUsesReadinessNotActionDiscovery)
+{
+  auto dependencies = healthy_dependencies();
+
+  savo_supervisor::MissionAuthority authority;
+  const auto capabilities = authority.EvaluateCapabilities(dependencies);
+  EXPECT_TRUE(capabilities.can_start_manual_mapping);
+  EXPECT_TRUE(capabilities.can_start_autonomous_mapping);
+
+  auto mapping = request(
+    savo_supervisor::AuthorityCommand::kAcquire,
+    savo_supervisor::MissionOperation::kAutonomousMapping);
+  mapping.require_semantic = true;
+  EXPECT_TRUE(authority.Handle(mapping, dependencies).authorized);
 }
 
 TEST(MissionAuthority, ExclusiveOperationOwnershipRejectsConflict)

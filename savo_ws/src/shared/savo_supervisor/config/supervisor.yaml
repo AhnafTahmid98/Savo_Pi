@@ -125,7 +125,6 @@ savo_supervisor_node:
     mission.locations_status_timeout_s: 2.0
     mission.locations_heartbeat_timeout_s: 2.0
 
-    mission.autonomous_mapping_action: /savo_mapping/autonomous/run
     mission.rotate_to_heading_action: /savo_control/rotate_to_heading
     mission.coverage_action: /savo_nav/coverage/execute_path
     mission.apriltag_confirmation_action: /savo_head/apriltag/confirm

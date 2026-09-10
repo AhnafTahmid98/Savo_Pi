@@ -22,7 +22,6 @@
 #include "savo_msgs/action/confirm_april_tag.hpp"
 #include "savo_msgs/action/execute_coverage_path.hpp"
 #include "savo_msgs/action/rotate_to_heading.hpp"
-#include "savo_msgs/action/run_autonomous_mapping.hpp"
 #include "savo_msgs/srv/authorize_location_operation.hpp"
 #include "savo_msgs/srv/authorize_operation.hpp"
 #include "savo_msgs/srv/manage_system_state.hpp"
@@ -542,8 +541,6 @@ private:
     declare_parameter<double>("mission.locations_heartbeat_timeout_s", 2.0);
 
     declare_parameter<std::string>(
-      "mission.autonomous_mapping_action", "/savo_mapping/autonomous/run");
-    declare_parameter<std::string>(
       "mission.rotate_to_heading_action", "/savo_control/rotate_to_heading");
     declare_parameter<std::string>(
       "mission.coverage_action", "/savo_nav/coverage/execute_path");
@@ -747,8 +744,6 @@ private:
       get_parameter("mission.locations_status_timeout_s").as_double();
     locations_heartbeat_timeout_s_ =
       get_parameter("mission.locations_heartbeat_timeout_s").as_double();
-    autonomous_mapping_action_name_ =
-      get_parameter("mission.autonomous_mapping_action").as_string();
     rotate_to_heading_action_name_ =
       get_parameter("mission.rotate_to_heading_action").as_string();
     coverage_action_name_ = get_parameter("mission.coverage_action").as_string();
@@ -1339,9 +1334,6 @@ private:
 
   void create_action_clients()
   {
-    autonomous_mapping_client_ =
-      rclcpp_action::create_client<savo_msgs::action::RunAutonomousMapping>(
-      this, autonomous_mapping_action_name_);
     rotate_to_heading_client_ =
       rclcpp_action::create_client<savo_msgs::action::RotateToHeading>(
       this, rotate_to_heading_action_name_);
@@ -1393,8 +1385,6 @@ private:
       locations_heartbeat_freshness.received && !locations_heartbeat_freshness.stale &&
       locations_heartbeat_freshness.valid;
 
-    dependencies.endpoints.autonomous_mapping_action =
-      autonomous_mapping_client_->wait_for_action_server(std::chrono::seconds(0));
     dependencies.endpoints.rotate_to_heading_action =
       rotate_to_heading_client_->wait_for_action_server(std::chrono::seconds(0));
     dependencies.endpoints.coverage_action =
@@ -2051,7 +2041,6 @@ private:
   std::string head_status_topic_;
   std::string locations_status_topic_;
   std::string locations_heartbeat_topic_;
-  std::string autonomous_mapping_action_name_;
   std::string rotate_to_heading_action_name_;
   std::string coverage_action_name_;
   std::string apriltag_confirmation_action_name_;
@@ -2115,8 +2104,6 @@ private:
     operation_authorization_service_;
   rclcpp::Service<savo_msgs::srv::UpdateMapContext>::SharedPtr map_context_service_;
   rclcpp::Service<savo_msgs::srv::ManageSystemState>::SharedPtr system_state_service_;
-  rclcpp_action::Client<savo_msgs::action::RunAutonomousMapping>::SharedPtr
-    autonomous_mapping_client_;
   rclcpp_action::Client<savo_msgs::action::RotateToHeading>::SharedPtr
     rotate_to_heading_client_;
   rclcpp_action::Client<savo_msgs::action::ExecuteCoveragePath>::SharedPtr coverage_client_;

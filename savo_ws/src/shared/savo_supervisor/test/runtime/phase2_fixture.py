@@ -19,7 +19,6 @@ from savo_msgs.action import (
     ConfirmAprilTag,
     ExecuteCoveragePath,
     RotateToHeading,
-    RunAutonomousMapping,
 )
 from std_msgs.msg import Bool, String, UInt64
 
@@ -90,12 +89,6 @@ class MissionFixture(Node):
         self._control = self.create_subscription(
             String, _CONTROL_TOPIC, self._on_control, status_qos)
 
-        self._mapping_action = ActionServer(
-            self,
-            RunAutonomousMapping,
-            '/savo_mapping/autonomous/run',
-            self._execute_mapping,
-        )
         self._rotate_action = ActionServer(
             self,
             RotateToHeading,
@@ -267,10 +260,6 @@ class MissionFixture(Node):
             heartbeat.data = self._heartbeat
             self._locations_heartbeat.publish(heartbeat)
 
-    async def _execute_mapping(self, goal_handle):
-        goal_handle.abort()
-        return RunAutonomousMapping.Result()
-
     async def _execute_rotate(self, goal_handle):
         goal_handle.abort()
         return RotateToHeading.Result()
@@ -284,7 +273,6 @@ class MissionFixture(Node):
         return ConfirmAprilTag.Result()
 
     def destroy_node(self) -> bool:
-        self._mapping_action.destroy()
         self._rotate_action.destroy()
         self._coverage_action.destroy()
         self._tag_action.destroy()

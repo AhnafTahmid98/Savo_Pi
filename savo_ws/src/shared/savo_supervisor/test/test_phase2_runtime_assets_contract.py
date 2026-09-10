@@ -21,12 +21,17 @@ def test_phase2_runtime_assets_cover_stateful_authority() -> None:
         '/savo_nav/status',
         '/savo_head/status',
         '/savo_locations/status',
-        '/savo_mapping/autonomous/run',
         '/savo_control/rotate_to_heading',
         '/savo_nav/coverage/execute_path',
         '/savo_head/apriltag/confirm',
     ):
         assert token in fixture
+
+    # Autonomous mapping availability is derived from mapping/core readiness;
+    # the global Supervisor must not join its action feedback transport merely
+    # to discover the endpoint.
+    assert '/savo_mapping/autonomous/run' not in fixture
+    assert 'RunAutonomousMapping' not in fixture
 
     for token in (
         'COMMAND_ACQUIRE',

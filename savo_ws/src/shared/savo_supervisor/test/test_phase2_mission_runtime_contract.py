@@ -36,3 +36,14 @@ def test_phase2_is_permission_only():
     )
     for topic in forbidden_publishers:
         assert f'create_publisher<{topic}' not in source
+
+
+def test_supervisor_does_not_consume_autonomous_mapping_action_feedback():
+    source = NODE.read_text()
+    assert (
+        'rclcpp_action::create_client<savo_msgs::action::RunAutonomousMapping>'
+        not in source
+    )
+    assert 'autonomous_mapping_client_' not in source
+    assert 'mission.autonomous_mapping_action' not in source
+    assert '/savo_supervisor/authorize_operation' in source
