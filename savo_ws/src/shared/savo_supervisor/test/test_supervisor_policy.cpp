@@ -147,6 +147,27 @@ TEST(SupervisorPolicy, DefaultLocalizationConfig)
   EXPECT_EQ(config.expected_schema_version, 1);
 }
 
+TEST(SupervisorPolicy, DirectPowerDiagnosticsPreserveSourceVoltageAndReason)
+{
+  SupervisorPolicy policy;
+  ComponentStatus status;
+  status.config = SupervisorPolicy::DefaultBaseBatteryConfig();
+  status.ever_operational = true;
+  status.summary_valid = true;
+  status.summary_state = "DEGRADED";
+  status.summary_ready = true;
+  status.summary_degraded = true;
+  status.summary_reason_code = "base_battery_low";
+  status.summary_detail = "source=base_battery;state=LOW;voltage_v=6.65";
+  status.summary_tracker.observe_message(test_time(10.0), std::nullopt, false, "");
+
+  const auto summary = policy.EvaluateComponent(status, test_time(10.0), 10.0);
+  EXPECT_EQ(summary.state, ComponentState::DEGRADED);
+  EXPECT_TRUE(summary.ready);
+  EXPECT_EQ(summary.reason_code, "base_battery_low");
+  EXPECT_EQ(summary.detail, "source=base_battery;state=LOW;voltage_v=6.65");
+}
+
 TEST(SupervisorPolicy, StartupTransientErrorWaitsWithoutBecomingOperational)
 {
   SupervisorPolicy policy;

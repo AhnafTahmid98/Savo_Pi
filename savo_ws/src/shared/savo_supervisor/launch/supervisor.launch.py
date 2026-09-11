@@ -46,6 +46,10 @@ def _launch_supervisor(context):
                         'system_state_path'),
                     'system_authority.auto_arm': ParameterValue(
                         LaunchConfiguration('auto_arm'), value_type=bool),
+                    'edge_ups.required': ParameterValue(
+                        LaunchConfiguration('edge_ups_required'),
+                        value_type=bool,
+                    ),
                     (
                         'mission_authorization.'
                         'require_semantic_autonomous_mapping'
@@ -95,6 +99,13 @@ def generate_launch_description():
             'auto_arm',
             default_value='false',
             description='Automatically arm when startup dependencies are ready.',
+        ),
+        DeclareLaunchArgument(
+            'edge_ups_required',
+            default_value='false',
+            description=(
+                'Require the independent Edge UPS for this Core profile.'
+            ),
         ),
         DeclareLaunchArgument(
             'require_semantic_autonomous_mapping',

@@ -83,11 +83,39 @@ savo_supervisor_node:
       startup_stable_ready_s: 3.0
       startup_timeout_s: 30.0
 
-    power:
+    # Per-source power inputs are authoritative for safety and mission policy.
+    # /savo_power/status and /savo_power/health remain aggregate diagnostics only.
+    base_battery:
       enabled: true
       required: true
-      health_topic: /savo_power/health
-      summary_topic: /savo_power/status
+      health_topic: ""
+      summary_topic: /savo_power/base/battery
+      heartbeat_topic: ""
+      health_timeout_s: 3.0
+      summary_timeout_s: 3.0
+      heartbeat_timeout_s: 3.0
+      expected_schema_version: 1
+      startup_stable_ready_s: 2.0
+      startup_timeout_s: 20.0
+
+    core_ups:
+      enabled: true
+      required: true
+      health_topic: ""
+      summary_topic: /savo_power/core/ups
+      heartbeat_topic: ""
+      health_timeout_s: 3.0
+      summary_timeout_s: 3.0
+      heartbeat_timeout_s: 3.0
+      expected_schema_version: 1
+      startup_stable_ready_s: 2.0
+      startup_timeout_s: 20.0
+
+    edge_ups:
+      enabled: true
+      required: false
+      health_topic: ""
+      summary_topic: /savo_power/edge/ups
       heartbeat_topic: ""
       health_timeout_s: 3.0
       summary_timeout_s: 3.0

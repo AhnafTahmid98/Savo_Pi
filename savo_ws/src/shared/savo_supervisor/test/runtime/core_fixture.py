@@ -24,6 +24,9 @@ _COMPONENTS = (
     'lidar',
     'localization',
     'power',
+    'base_battery',
+    'core_ups',
+    'edge_ups',
     'safety',
 )
 
@@ -95,10 +98,12 @@ class CoreFixture(Node):
         self._localization_heartbeat = self.create_publisher(
             String, '/savo_localization/heartbeat', status_qos)
 
-        self._power_health = self.create_publisher(
-            String, '/savo_power/health', status_qos)
-        self._power_status = self.create_publisher(
-            String, '/savo_power/status', status_qos)
+        self._base_battery = self.create_publisher(
+            String, '/savo_power/base/battery', status_qos)
+        self._core_ups = self.create_publisher(
+            String, '/savo_power/core/ups', status_qos)
+        self._edge_ups = self.create_publisher(
+            String, '/savo_power/edge/ups', status_qos)
 
         self._safety_stop_publisher = self.create_publisher(
             Bool, '/safety/stop', status_qos)
@@ -239,11 +244,15 @@ class CoreFixture(Node):
                 'stamp_s': stamp_s,
             }))
 
-        if self._drop_component != 'power':
-            self._power_status.publish(self._string(
-                'overall=OK health=OK core=OK edge=OK base=OK'))
-            self._power_health.publish(self._string(
-                'level=OK state=OK reason=power_ok'))
+        if self._drop_component not in ('power', 'base_battery'):
+            self._base_battery.publish(self._string(
+                'Base battery OK: 8.12 V, SoC 85.8%'))
+        if self._drop_component not in ('power', 'core_ups'):
+            self._core_ups.publish(self._string(
+                'Core UPS OK: 4.01 V, capacity 86.0%'))
+        if self._drop_component not in ('power', 'edge_ups'):
+            self._edge_ups.publish(self._string(
+                'Edge UPS OK: 4.02 V, capacity 87.0%'))
 
         if self._drop_component != 'safety':
             stop = Bool()

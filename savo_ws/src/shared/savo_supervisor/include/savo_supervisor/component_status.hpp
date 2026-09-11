@@ -52,17 +52,20 @@ struct ComponentStatus
   bool health_ready{false};
   bool health_degraded{false};
   std::string health_reason_code;
+  std::string health_detail;
 
   std::string summary_state{"UNKNOWN"};
   bool summary_ready{false};
   bool summary_degraded{false};
   std::string summary_reason_code;
+  std::string summary_detail;
 
   std::string heartbeat_state{"UNKNOWN"};
   bool heartbeat_alive{false};
   bool heartbeat_ready{false};
   bool heartbeat_degraded{false};
   std::string heartbeat_reason_code;
+  std::string heartbeat_detail;
 
   std::optional<rclcpp::Time> consistency_mismatch_since;
   std::optional<rclcpp::Time> startup_stable_since;

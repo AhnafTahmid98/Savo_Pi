@@ -6,7 +6,10 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <exception>
+#include <iomanip>
 #include <initializer_list>
+#include <regex>
 #include <sstream>
 #include <string>
 #include <unordered_map>
@@ -165,6 +168,60 @@ ParsedCorePayload parse_power_state(
     return unavailable("power_error", source + "=" + state);
   }
   return unavailable("power_unknown", source + "=" + state);
+}
+
+std::string power_source_label(const std::string & source)
+{
+  if (source == "base_battery") {
+    return "Base battery";
+  }
+  if (source == "core_ups") {
+    return "Core UPS";
+  }
+  if (source == "edge_ups") {
+    return "Edge UPS";
+  }
+  return {};
+}
+
+ParsedCorePayload parse_direct_power_state(
+  const std::string & raw_state,
+  const std::string & source,
+  const std::optional<double> & voltage_v,
+  const bool source_ok)
+{
+  const auto state = uppercase(raw_state);
+  const auto detail = [&source, &state, &voltage_v]() {
+      std::ostringstream stream;
+      stream << "source=" << source << ";state=" << state;
+      if (voltage_v.has_value()) {
+        stream << ";voltage_v=" << std::fixed << std::setprecision(2) << *voltage_v;
+      }
+      return stream.str();
+    }();
+
+  ParsedCorePayload result;
+  if (state == "ERROR" || !source_ok) {
+    result = unavailable(source + "_error", detail);
+  } else if (state == "STALE") {
+    result = unavailable(source + "_stale", detail, "STALE");
+  } else if (state == "CRITICAL") {
+    result = unavailable(source + "_critical", detail);
+  } else if (state == "LOW" || state == "WARN" || state == "WARNING") {
+    result = operational(source + "_low", true, detail);
+  } else if (state == "OK" || state == "FULL" || state == "CHARGING") {
+    result = operational(source + "_operational", false, detail);
+  } else {
+    result = unavailable(source + "_unknown", detail);
+  }
+
+  if (result.ready &&
+    (!voltage_v.has_value() || !std::isfinite(*voltage_v) || *voltage_v <= 0.0))
+  {
+    return invalid(source + "_measurement_invalid", "missing or invalid direct voltage");
+  }
+  result.voltage_v = voltage_v;
+  return result;
 }
 
 }  // namespace
@@ -387,6 +444,64 @@ ParsedCorePayload CorePayloadParser::ParsePowerHealth(const std::string & payloa
     return result;
   }
   return parse_power_state(state.empty() ? "OK" : state, "health");
+}
+
+ParsedCorePayload CorePayloadParser::ParsePowerSource(
+  const std::string & payload,
+  const std::string & expected_source) const
+{
+  const auto expected_label = power_source_label(expected_source);
+  if (expected_label.empty()) {
+    return invalid("power_source_invalid", "unsupported expected power source");
+  }
+
+  Json object;
+  std::string json_detail;
+  if (!payload.empty() && payload.front() == '{' &&
+    parse_json_object(payload, object, json_detail))
+  {
+    try {
+      const auto source = object.at("source").get<std::string>();
+      if (source != expected_source) {
+        return invalid(
+          expected_source + "_source_mismatch",
+          "expected " + expected_source + ", received " + source);
+      }
+      std::optional<double> voltage_v;
+      if (object.contains("voltage_v") && !object.at("voltage_v").is_null()) {
+        voltage_v = object.at("voltage_v").get<double>();
+      }
+      return parse_direct_power_state(
+        object.at("state").get<std::string>(), expected_source, voltage_v,
+        object.value("ok", true));
+    } catch (const Json::exception & exception) {
+      return invalid(expected_source + "_measurement_invalid", exception.what());
+    }
+  }
+
+  static const std::regex line_pattern(
+    R"(^\s*(Base battery|Core UPS|Edge UPS)\s+([A-Za-z]+):\s+)"
+    R"((n/a|[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+))\s+V(?:,.*)?\s*$)",
+    std::regex::icase);
+  std::smatch match;
+  if (!std::regex_match(payload, match, line_pattern)) {
+    return invalid(expected_source + "_measurement_invalid", "invalid direct power payload");
+  }
+  if (uppercase(match[1].str()) != uppercase(expected_label)) {
+    return invalid(
+      expected_source + "_source_mismatch",
+      "expected " + expected_label + ", received " + match[1].str());
+  }
+  try {
+    std::optional<double> voltage_v;
+    if (uppercase(match[3].str()) != "N/A") {
+      voltage_v = std::stod(match[3].str());
+    }
+    return parse_direct_power_state(
+      match[2].str(), expected_source, voltage_v, true);
+  } catch (const std::exception & exception) {
+    return invalid(expected_source + "_measurement_invalid", exception.what());
+  }
 }
 
 }  // namespace savo_supervisor

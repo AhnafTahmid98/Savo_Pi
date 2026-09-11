@@ -18,6 +18,19 @@ The C++ supervisor integrates:
 
 It publishes core health, safety and motion capabilities and fails closed for missing, stale, malformed or unhealthy required inputs.
 
+Power supervision follows the three physical domains independently. Supervisor
+consumes `/savo_power/base/battery`, `/savo_power/core/ups`, and
+`/savo_power/edge/ups` directly, preserving each source's identity, voltage,
+freshness, validity, state, and reason. Base battery and Core UPS are required;
+Edge UPS is optional unless the selected bringup profile sets
+`edge_ups_expected:=true`. The aggregate `/savo_power/status` and
+`/savo_power/health` outputs remain available for UI and diagnostics but are not
+mission-authority inputs.
+
+New mapping admission may require nominal power. Once mapping owns its lease, a
+fresh, valid LOW source remains operational and may continue; CRITICAL, stale,
+invalid, or error state in a required power domain still revokes authority.
+
 ### Phase 2 — mission authority, mapping and navigation
 
 The supervisor additionally observes:

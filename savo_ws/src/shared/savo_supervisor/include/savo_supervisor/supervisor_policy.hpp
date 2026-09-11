@@ -31,7 +31,9 @@ struct SupervisorPolicy
   ComponentConfig perception;
   ComponentConfig lidar;
   ComponentConfig localization;
-  ComponentConfig power;
+  ComponentConfig base_battery;
+  ComponentConfig core_ups;
+  ComponentConfig edge_ups;
 
   SupervisorPolicy();
   bool Validate() const;
@@ -42,7 +44,9 @@ struct SupervisorPolicy
   static ComponentConfig DefaultPerceptionConfig();
   static ComponentConfig DefaultLidarConfig();
   static ComponentConfig DefaultLocalizationConfig();
-  static ComponentConfig DefaultPowerConfig();
+  static ComponentConfig DefaultBaseBatteryConfig();
+  static ComponentConfig DefaultCoreUpsConfig();
+  static ComponentConfig DefaultEdgeUpsConfig();
 
   ComponentSummary EvaluateComponent(
     ComponentStatus & status,

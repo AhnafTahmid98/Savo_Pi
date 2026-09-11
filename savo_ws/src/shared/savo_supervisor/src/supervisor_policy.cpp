@@ -116,6 +116,28 @@ const std::string & channel_reason(const ComponentStatus & status, Channel chann
   return status.health_reason_code;
 }
 
+const std::string & channel_detail(const ComponentStatus & status, Channel channel)
+{
+  switch (channel) {
+    case Channel::kHealth: return status.health_detail;
+    case Channel::kSummary: return status.summary_detail;
+    case Channel::kHeartbeat: return status.heartbeat_detail;
+  }
+  return status.health_detail;
+}
+
+std::string observed_detail(const ComponentStatus & status)
+{
+  const std::array<Channel, 3> channels{
+    Channel::kHealth, Channel::kSummary, Channel::kHeartbeat};
+  for (const auto channel : channels) {
+    if (channel_required(status.config, channel) && !channel_detail(status, channel).empty()) {
+      return channel_detail(status, channel);
+    }
+  }
+  return {};
+}
+
 std::string channel_name(Channel channel)
 {
   switch (channel) {
@@ -131,6 +153,11 @@ std::string component_reason(
   Channel channel,
   const std::string & condition)
 {
+  if (config.name == "base_battery" || config.name == "core_ups" ||
+    config.name == "edge_ups")
+  {
+    return config.name + "_" + condition;
+  }
   if (config.name == "localization") {
     if (condition == "initializing") {return reason::kLocalizationInitializing;}
     if (condition == "missing" && channel == Channel::kHealth) {
@@ -247,6 +274,22 @@ bool component_nominal(
   return item != nullptr && item->ready && !item->degraded && item->state == ComponentState::OK;
 }
 
+bool component_ready_if_required(
+  const std::vector<ComponentSummary> & summaries,
+  const std::string & name)
+{
+  const auto * item = find_component(summaries, name);
+  return item != nullptr && (!item->required || (item->enabled && item->ready));
+}
+
+bool component_nominal_if_required(
+  const std::vector<ComponentSummary> & summaries,
+  const std::string & name)
+{
+  const auto * item = find_component(summaries, name);
+  return item != nullptr && (!item->required || component_nominal(summaries, name));
+}
+
 std::string validate_component(const ComponentConfig & config)
 {
   if (config.required && !config.enabled) {
@@ -325,7 +368,9 @@ SupervisorPolicy::SupervisorPolicy()
   perception(DefaultPerceptionConfig()),
   lidar(DefaultLidarConfig()),
   localization(DefaultLocalizationConfig()),
-  power(DefaultPowerConfig())
+  base_battery(DefaultBaseBatteryConfig()),
+  core_ups(DefaultCoreUpsConfig()),
+  edge_ups(DefaultEdgeUpsConfig())
 {
 }
 
@@ -346,8 +391,9 @@ std::string SupervisorPolicy::ValidationError() const
     return "supervisor output topics must be unique";
   }
 
-  const std::array<const ComponentConfig *, 6> components{
-    &base, &control, &perception, &lidar, &localization, &power};
+  const std::array<const ComponentConfig *, 8> components{
+    &base, &control, &perception, &lidar, &localization,
+    &base_battery, &core_ups, &edge_ups};
   for (const auto * config : components) {
     const auto error = validate_component(*config);
     if (!error.empty()) {return error;}
@@ -406,11 +452,27 @@ ComponentConfig SupervisorPolicy::DefaultLocalizationConfig()
   return config;
 }
 
-ComponentConfig SupervisorPolicy::DefaultPowerConfig()
+ComponentConfig SupervisorPolicy::DefaultBaseBatteryConfig()
 {
   return make_config(
-    "power", "/savo_power/health", "/savo_power/status", "",
-    true, true, false, 3.0, 3.0, 3.0);
+    "base_battery", "", "/savo_power/base/battery", "",
+    false, true, false, 3.0, 3.0, 3.0);
+}
+
+ComponentConfig SupervisorPolicy::DefaultCoreUpsConfig()
+{
+  return make_config(
+    "core_ups", "", "/savo_power/core/ups", "",
+    false, true, false, 3.0, 3.0, 3.0);
+}
+
+ComponentConfig SupervisorPolicy::DefaultEdgeUpsConfig()
+{
+  auto config = make_config(
+    "edge_ups", "", "/savo_power/edge/ups", "",
+    false, true, false, 3.0, 3.0, 3.0);
+  config.required = false;
+  return config;
 }
 
 ComponentSummary SupervisorPolicy::EvaluateComponentRaw(
@@ -535,28 +597,31 @@ ComponentSummary SupervisorPolicy::EvaluateComponentRaw(
     }
     const auto & observed_state = channel_state(status, channel);
     if (observed_state == "ERROR") {
+      const auto detail = observed_detail(status);
       set_component_result(result, ComponentState::ERROR, false, false,
         channel_reason(status, channel).empty() ?
         component_reason(status.config, channel, "error") :
         channel_reason(status, channel),
-        status.config.name + " reports ERROR");
+        detail.empty() ? status.config.name + " reports ERROR" : detail);
       return result;
     }
     if (observed_state == "STALE") {
+      const auto detail = observed_detail(status);
       set_component_result(result, ComponentState::STALE, false, false,
         channel_reason(status, channel).empty() ?
         component_reason(status.config, channel, "stale") :
         channel_reason(status, channel),
-        status.config.name + " reports STALE");
+        detail.empty() ? status.config.name + " reports STALE" : detail);
       return result;
     }
     if (observed_state == "INITIALIZING") {any_initializing = true;}
     if (!channel_ready(status, channel) && observed_state != "INITIALIZING") {
+      const auto detail = observed_detail(status);
       set_component_result(result, ComponentState::ERROR, false, false,
         channel_reason(status, channel).empty() ?
         component_reason(status.config, channel, "not_ready") :
         channel_reason(status, channel),
-        status.config.name + " reports ready=false");
+        detail.empty() ? status.config.name + " reports ready=false" : detail);
       return result;
     }
     any_degraded = any_degraded || channel_degraded(status, channel) ||
@@ -570,14 +635,20 @@ ComponentSummary SupervisorPolicy::EvaluateComponentRaw(
     return result;
   }
   if (any_degraded) {
+    const auto detail = observed_detail(status);
+    const auto reason_code = channel_reason(status, Channel::kSummary);
     set_component_result(result, ComponentState::DEGRADED, true, true,
-      component_reason(status.config, Channel::kHealth, "degraded"),
-      status.config.name + " is operational with restrictions");
+      reason_code.empty() ?
+      component_reason(status.config, Channel::kHealth, "degraded") : reason_code,
+      detail.empty() ? status.config.name + " is operational with restrictions" : detail);
     return result;
   }
+  const auto detail = observed_detail(status);
+  const auto reason_code = channel_reason(status, Channel::kSummary);
   set_component_result(result, ComponentState::OK, true, false,
-    component_reason(status.config, Channel::kHealth, "operational"),
-    status.config.name + " is operational");
+    reason_code.empty() ?
+    component_reason(status.config, Channel::kHealth, "operational") : reason_code,
+    detail.empty() ? status.config.name + " is operational" : detail);
   return result;
 }
 
@@ -724,7 +795,9 @@ SupervisorState SupervisorPolicy::EvaluateSupervisor(
   const bool control_motion_available = component_nominal(summaries, "control");
   const bool perception_ready = component_ready(summaries, "perception");
   const bool localization_ready = component_ready(summaries, "localization");
-  const bool power_ready = component_ready(summaries, "power");
+  const bool base_battery_ready = component_ready(summaries, "base_battery");
+  const bool core_ups_ready = component_ready(summaries, "core_ups");
+  const bool edge_ups_ready = component_ready_if_required(summaries, "edge_ups");
   const bool lidar_ready = component_ready(summaries, "lidar");
   const bool motion_safety = safety.observation == SafetyObservation::CLEAR ||
     (safety.observation == SafetyObservation::SLOWDOWN && safety.slowdown_factor > 0.0);
@@ -733,14 +806,17 @@ SupervisorState SupervisorPolicy::EvaluateSupervisor(
   state.capabilities.core_safety_ready = safety.ready;
   state.capabilities.core_motion_ready = base_ready && control_ready &&
     base_motion_available && control_motion_available && perception_ready &&
-    localization_ready && power_ready && motion_safety;
+    localization_ready && base_battery_ready && core_ups_ready && edge_ups_ready && motion_safety;
   state.capabilities.can_manual_drive = state.capabilities.core_motion_ready &&
     (!manual_drive_requires_lidar || lidar_ready);
   state.capabilities.can_rotate = state.capabilities.core_motion_ready &&
     (!rotate_requires_lidar || lidar_ready);
   state.capabilities.can_start_geometric_mapping = state.capabilities.core_motion_ready &&
     lidar_ready && component_nominal(summaries, "lidar") &&
-    (!geometric_mapping_requires_nominal_power || component_nominal(summaries, "power"));
+    (!geometric_mapping_requires_nominal_power ||
+    (component_nominal(summaries, "base_battery") &&
+    component_nominal(summaries, "core_ups") &&
+    component_nominal_if_required(summaries, "edge_ups")));
   return state;
 }
 

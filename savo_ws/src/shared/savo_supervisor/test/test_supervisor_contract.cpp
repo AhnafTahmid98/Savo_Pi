@@ -18,6 +18,21 @@ TEST(SupervisorContract, DefaultPolicyIsValid)
   EXPECT_TRUE(policy.ValidationError().empty());
 }
 
+TEST(SupervisorContract, PowerDomainsUseDirectIndependentTopics)
+{
+  SupervisorPolicy policy;
+
+  EXPECT_EQ(policy.base_battery.name, "base_battery");
+  EXPECT_EQ(policy.base_battery.summary_topic, "/savo_power/base/battery");
+  EXPECT_TRUE(policy.base_battery.required);
+  EXPECT_EQ(policy.core_ups.name, "core_ups");
+  EXPECT_EQ(policy.core_ups.summary_topic, "/savo_power/core/ups");
+  EXPECT_TRUE(policy.core_ups.required);
+  EXPECT_EQ(policy.edge_ups.name, "edge_ups");
+  EXPECT_EQ(policy.edge_ups.summary_topic, "/savo_power/edge/ups");
+  EXPECT_FALSE(policy.edge_ups.required);
+}
+
 TEST(SupervisorContract, RejectsInvalidPublishRate)
 {
   SupervisorPolicy policy;

@@ -20,6 +20,7 @@ struct ParsedCorePayload
   bool alive{true};
   std::string reason_code{"payload_not_parsed"};
   std::optional<builtin_interfaces::msg::Time> stamp{};
+  std::optional<double> voltage_v{};
   std::string detail{};
 };
 
@@ -35,6 +36,9 @@ public:
   ParsedCorePayload ParseLidarHeartbeat(const std::string & payload) const;
   ParsedCorePayload ParsePowerStatus(const std::string & payload) const;
   ParsedCorePayload ParsePowerHealth(const std::string & payload) const;
+  ParsedCorePayload ParsePowerSource(
+    const std::string & payload,
+    const std::string & expected_source) const;
 };
 
 }  // namespace savo_supervisor

@@ -125,3 +125,72 @@ TEST(CorePayloadParser, CriticalPowerBlocksReadiness)
   EXPECT_TRUE(result.valid);
   EXPECT_FALSE(result.ready);
 }
+
+TEST(CorePayloadParser, ParsesDirectBaseBatteryMeasurement)
+{
+  CorePayloadParser parser;
+  const auto result = parser.ParsePowerSource(
+    "Base battery LOW: 6.65 V, SoC 12.4%", "base_battery");
+  EXPECT_TRUE(result.valid);
+  EXPECT_TRUE(result.ready);
+  EXPECT_TRUE(result.degraded);
+  EXPECT_EQ(result.reason_code, "base_battery_low");
+  ASSERT_TRUE(result.voltage_v.has_value());
+  EXPECT_DOUBLE_EQ(result.voltage_v.value(), 6.65);
+}
+
+TEST(CorePayloadParser, ParsesDirectUpsJsonMeasurement)
+{
+  CorePayloadParser parser;
+  const auto result = parser.ParsePowerSource(
+    R"({"source":"core_ups","state":"OK","ok":true,"voltage_v":4.01})",
+    "core_ups");
+  EXPECT_TRUE(result.valid);
+  EXPECT_TRUE(result.ready);
+  EXPECT_FALSE(result.degraded);
+  EXPECT_EQ(result.reason_code, "core_ups_operational");
+  ASSERT_TRUE(result.voltage_v.has_value());
+  EXPECT_DOUBLE_EQ(result.voltage_v.value(), 4.01);
+}
+
+TEST(CorePayloadParser, RejectsWrongDirectPowerSource)
+{
+  CorePayloadParser parser;
+  const auto result = parser.ParsePowerSource(
+    "Edge UPS OK: 4.02 V, capacity 86.0%", "core_ups");
+  EXPECT_FALSE(result.valid);
+  EXPECT_FALSE(result.ready);
+  EXPECT_EQ(result.reason_code, "core_ups_source_mismatch");
+}
+
+TEST(CorePayloadParser, DirectCriticalSourceFailsClosed)
+{
+  CorePayloadParser parser;
+  const auto result = parser.ParsePowerSource(
+    "Core UPS CRITICAL: 3.19 V, capacity 2.0%", "core_ups");
+  EXPECT_TRUE(result.valid);
+  EXPECT_FALSE(result.ready);
+  EXPECT_EQ(result.reason_code, "core_ups_critical");
+}
+
+TEST(CorePayloadParser, RejectsInvalidDirectVoltage)
+{
+  CorePayloadParser parser;
+  const auto result = parser.ParsePowerSource(
+    R"({"source":"edge_ups","state":"OK","ok":true,"voltage_v":null})",
+    "edge_ups");
+  EXPECT_FALSE(result.valid);
+  EXPECT_FALSE(result.ready);
+  EXPECT_EQ(result.reason_code, "edge_ups_measurement_invalid");
+}
+
+TEST(CorePayloadParser, DirectReadErrorKeepsSourceSpecificReason)
+{
+  CorePayloadParser parser;
+  const auto result = parser.ParsePowerSource(
+    "Core UPS error: n/a V, error: i2c read failed", "core_ups");
+  EXPECT_TRUE(result.valid);
+  EXPECT_FALSE(result.ready);
+  EXPECT_EQ(result.reason_code, "core_ups_error");
+  EXPECT_FALSE(result.voltage_v.has_value());
+}

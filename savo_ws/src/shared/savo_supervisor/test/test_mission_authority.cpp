@@ -222,6 +222,7 @@ TEST(MissionAuthority, NonCriticalDegradationKeepsExactCoreOnlyMappingLeaseActiv
 
   dependencies.core.health = savo_supervisor::AggregateHealth::DEGRADED;
   dependencies.core.degraded = true;
+  dependencies.core.capabilities.can_start_geometric_mapping = false;
   dependencies.system.remote_commands_ready = false;
   dependencies.navigation.ready = false;
   dependencies.navigation.goal_acceptance_allowed = false;
@@ -241,6 +242,51 @@ TEST(MissionAuthority, NonCriticalDegradationKeepsExactCoreOnlyMappingLeaseActiv
   check.require_semantic = false;
   check.expected_generation = generation;
   EXPECT_TRUE(authority.Handle(check, dependencies).authorized);
+}
+
+TEST(MissionAuthority, NewMappingAdmissionStillRequiresNominalPower)
+{
+  auto dependencies = healthy_dependencies();
+  dependencies.core.health = savo_supervisor::AggregateHealth::DEGRADED;
+  dependencies.core.degraded = true;
+  dependencies.core.capabilities.can_start_geometric_mapping = false;
+
+  savo_supervisor::MissionAuthorityPolicy policy;
+  policy.require_semantic_autonomous_mapping = false;
+  savo_supervisor::MissionAuthority authority{policy};
+  auto acquire = request(
+    savo_supervisor::AuthorityCommand::kAcquire,
+    savo_supervisor::MissionOperation::kAutonomousMapping);
+  acquire.require_semantic = false;
+
+  const auto denied = authority.Handle(acquire, dependencies);
+  EXPECT_FALSE(denied.authorized);
+  EXPECT_EQ(denied.reason, "autonomous_mapping_not_ready");
+}
+
+TEST(MissionAuthority, RequiredPowerFailureRevokesRunningMapping)
+{
+  auto dependencies = healthy_dependencies();
+  savo_supervisor::MissionAuthorityPolicy policy;
+  policy.require_semantic_autonomous_mapping = false;
+  savo_supervisor::MissionAuthority authority{policy};
+  auto acquire = request(
+    savo_supervisor::AuthorityCommand::kAcquire,
+    savo_supervisor::MissionOperation::kAutonomousMapping);
+  acquire.require_semantic = false;
+  ASSERT_TRUE(authority.Handle(acquire, dependencies).authorized);
+
+  dependencies.core.lifecycle = savo_supervisor::Lifecycle::FAULTED;
+  dependencies.core.ready = false;
+  dependencies.core.capabilities.core_health_ready = false;
+  dependencies.core.capabilities.core_motion_ready = false;
+  dependencies.core.capabilities.can_start_geometric_mapping = false;
+
+  EXPECT_TRUE(authority.Revalidate(dependencies));
+  EXPECT_EQ(authority.state().state, savo_supervisor::OperationState::kRevoked);
+  EXPECT_EQ(
+    authority.state().reason,
+    "runtime_authorization_revoked:supervisor_faulted");
 }
 
 TEST(MissionAuthority, SafetyLossStillRevokesDegradedCoreOnlyMappingLease)

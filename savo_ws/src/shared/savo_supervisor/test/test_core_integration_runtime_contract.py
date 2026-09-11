@@ -17,12 +17,14 @@ def test_node_observes_all_phase1_components_and_direct_safety() -> None:
         'perception_status_',
         'lidar_status_',
         'localization_status_',
-        'power_status_',
+        'base_battery_status_',
+        'core_ups_status_',
+        'edge_ups_status_',
         'ParseBaseState',
         'ParseControlStatus',
         'ParsePerceptionHealth',
         'ParseLidarState',
-        'ParsePowerStatus',
+        'ParsePowerSource',
         'safety_stop_tracker_',
         'safety_slowdown_tracker_',
     ):
@@ -55,12 +57,18 @@ def test_default_policy_uses_existing_package_contracts() -> None:
         '/savo_localization/health',
         '/savo_localization/state_summary',
         '/savo_localization/heartbeat',
-        '/savo_power/health',
-        '/savo_power/status',
+        '/savo_power/base/battery',
+        '/savo_power/core/ups',
+        '/savo_power/edge/ups',
         '/safety/stop',
         '/safety/slowdown_factor',
     ):
         assert topic in policy or topic in config
+
+    assert '/savo_power/status' not in policy
+    assert 'ParsePowerStatus(msg->data)' not in (
+        ROOT / 'src/supervisor_node.cpp'
+    ).read_text(encoding='utf-8')
 
 
 def test_phase1_capability_contract_and_runtime_fixture_exist() -> None:

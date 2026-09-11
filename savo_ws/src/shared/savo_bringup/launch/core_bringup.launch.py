@@ -422,6 +422,9 @@ def _setup(context):
                                 "supervisor_state_path"
                             ),
                             "auto_arm": LaunchConfiguration("supervisor_auto_arm"),
+                            "edge_ups_required": LaunchConfiguration(
+                                "edge_ups_expected"
+                            ),
                         }.items(),
                     ),
                 )

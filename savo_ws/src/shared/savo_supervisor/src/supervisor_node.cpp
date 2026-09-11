@@ -79,6 +79,7 @@ void apply_payload(
       status.health_ready = parsed.ready;
       status.health_degraded = parsed.degraded;
       status.health_reason_code = parsed.reason_code;
+      status.health_detail = parsed.detail;
       status.health_tracker.observe_message(
         receive_time, parsed.stamp, !parsed.valid, parsed.detail);
       break;
@@ -88,6 +89,7 @@ void apply_payload(
       status.summary_ready = parsed.ready;
       status.summary_degraded = parsed.degraded;
       status.summary_reason_code = parsed.reason_code;
+      status.summary_detail = parsed.detail;
       status.summary_tracker.observe_message(
         receive_time, parsed.stamp, !parsed.valid, parsed.detail);
       break;
@@ -98,6 +100,7 @@ void apply_payload(
       status.heartbeat_ready = parsed.ready;
       status.heartbeat_degraded = parsed.degraded;
       status.heartbeat_reason_code = parsed.reason_code;
+      status.heartbeat_detail = parsed.detail;
       status.heartbeat_tracker.observe_message(
         receive_time, parsed.stamp, !parsed.valid, parsed.detail);
       break;
@@ -394,7 +397,10 @@ public:
     declare_component_parameters("lidar", svo::SupervisorPolicy::DefaultLidarConfig());
     declare_component_parameters(
       "localization", svo::SupervisorPolicy::DefaultLocalizationConfig());
-    declare_component_parameters("power", svo::SupervisorPolicy::DefaultPowerConfig());
+    declare_component_parameters(
+      "base_battery", svo::SupervisorPolicy::DefaultBaseBatteryConfig());
+    declare_component_parameters("core_ups", svo::SupervisorPolicy::DefaultCoreUpsConfig());
+    declare_component_parameters("edge_ups", svo::SupervisorPolicy::DefaultEdgeUpsConfig());
     load_policy();
     system_state_store_ = svo::SystemStateStore(system_state_path_);
     const auto persistent_state = system_state_store_.Load();
@@ -425,7 +431,10 @@ public:
     perception_status_ = initialize_component(policy_.perception);
     lidar_status_ = initialize_component(policy_.lidar);
     localization_status_ = initialize_component(policy_.localization);
-    power_status_ = initialize_component(policy_.power);
+    base_battery_status_ = initialize_component(policy_.base_battery);
+    core_ups_status_ = initialize_component(policy_.core_ups);
+    edge_ups_status_ = initialize_component(policy_.edge_ups);
+    edge_ups_status_.ever_operational = !policy_.edge_ups.required;
     localization_parser_ = svo::LocalizationPayloadParser(
       policy_.localization.expected_schema_version);
 
@@ -665,7 +674,10 @@ private:
     policy_.lidar = load_component("lidar", svo::SupervisorPolicy::DefaultLidarConfig());
     policy_.localization = load_component(
       "localization", svo::SupervisorPolicy::DefaultLocalizationConfig());
-    policy_.power = load_component("power", svo::SupervisorPolicy::DefaultPowerConfig());
+    policy_.base_battery = load_component(
+      "base_battery", svo::SupervisorPolicy::DefaultBaseBatteryConfig());
+    policy_.core_ups = load_component("core_ups", svo::SupervisorPolicy::DefaultCoreUpsConfig());
+    policy_.edge_ups = load_component("edge_ups", svo::SupervisorPolicy::DefaultEdgeUpsConfig());
 
     safety_stop_topic_ = get_parameter("safety.stop_topic").as_string();
     safety_slowdown_topic_ = get_parameter("safety.slowdown_topic").as_string();
@@ -951,20 +963,31 @@ private:
     if (policy_.localization.enabled) {
       subscribe_localization_inputs();
     }
-    if (policy_.power.enabled) {
+    if (policy_.base_battery.enabled) {
       subscribe_string(
-        policy_.power.health_topic,
+        policy_.base_battery.summary_topic,
         [this](std_msgs::msg::String::SharedPtr msg) {
           apply_payload(
-            power_status_, Channel::kHealth,
-            core_parser_.ParsePowerHealth(msg->data), now());
+            base_battery_status_, Channel::kSummary,
+            core_parser_.ParsePowerSource(msg->data, "base_battery"), now());
         });
+    }
+    if (policy_.core_ups.enabled) {
       subscribe_string(
-        policy_.power.summary_topic,
+        policy_.core_ups.summary_topic,
         [this](std_msgs::msg::String::SharedPtr msg) {
           apply_payload(
-            power_status_, Channel::kSummary,
-            core_parser_.ParsePowerStatus(msg->data), now());
+            core_ups_status_, Channel::kSummary,
+            core_parser_.ParsePowerSource(msg->data, "core_ups"), now());
+        });
+    }
+    if (policy_.edge_ups.enabled) {
+      subscribe_string(
+        policy_.edge_ups.summary_topic,
+        [this](std_msgs::msg::String::SharedPtr msg) {
+          apply_payload(
+            edge_ups_status_, Channel::kSummary,
+            core_parser_.ParsePowerSource(msg->data, "edge_ups"), now());
         });
     }
   }
@@ -1545,7 +1568,7 @@ private:
   {
     const double startup_age_s = (evaluation_time - startup_time_).seconds();
     std::vector<svo::ComponentSummary> summaries;
-    summaries.reserve(6U);
+    summaries.reserve(8U);
     summaries.push_back(policy_.EvaluateComponent(base_status_, evaluation_time, startup_age_s));
     summaries.push_back(policy_.EvaluateComponent(control_status_, evaluation_time, startup_age_s));
     summaries.push_back(policy_.EvaluateComponent(
@@ -1553,7 +1576,12 @@ private:
     summaries.push_back(policy_.EvaluateComponent(lidar_status_, evaluation_time, startup_age_s));
     summaries.push_back(policy_.EvaluateComponent(
       localization_status_, evaluation_time, startup_age_s));
-    summaries.push_back(policy_.EvaluateComponent(power_status_, evaluation_time, startup_age_s));
+    summaries.push_back(policy_.EvaluateComponent(
+      base_battery_status_, evaluation_time, startup_age_s));
+    summaries.push_back(policy_.EvaluateComponent(
+      core_ups_status_, evaluation_time, startup_age_s));
+    summaries.push_back(policy_.EvaluateComponent(
+      edge_ups_status_, evaluation_time, startup_age_s));
     const auto core_state = policy_.EvaluateSupervisor(
       summaries, evaluate_safety(evaluation_time), evaluation_time, startup_age_s);
 
@@ -2010,7 +2038,9 @@ private:
   svo::ComponentStatus perception_status_{};
   svo::ComponentStatus lidar_status_{};
   svo::ComponentStatus localization_status_{};
-  svo::ComponentStatus power_status_{};
+  svo::ComponentStatus base_battery_status_{};
+  svo::ComponentStatus core_ups_status_{};
+  svo::ComponentStatus edge_ups_status_{};
 
   std::string safety_stop_topic_;
   std::string safety_slowdown_topic_;

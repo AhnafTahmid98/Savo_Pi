@@ -242,7 +242,8 @@ public:
 private:
   [[nodiscard]] MissionAuthorizationDecision CheckOperation(
     const MissionAuthorizationRequest & request,
-    const MissionDependencySnapshot & dependencies) const;
+    const MissionDependencySnapshot & dependencies,
+    bool continuation = false) const;
 
   MissionAuthorityPolicy policy_{};
   MissionAuthorityState state_{};

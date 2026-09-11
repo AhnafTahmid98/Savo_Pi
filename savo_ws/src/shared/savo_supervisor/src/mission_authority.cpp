@@ -3,6 +3,7 @@
 
 #include "savo_supervisor/mission_authority.hpp"
 
+#include <string>
 #include <utility>
 
 namespace savo_supervisor
@@ -124,7 +125,8 @@ MissionCapabilities MissionAuthority::EvaluateCapabilities(
 
 MissionAuthorizationDecision MissionAuthority::CheckOperation(
   const MissionAuthorizationRequest & request,
-  const MissionDependencySnapshot & dependencies) const
+  const MissionDependencySnapshot & dependencies,
+  const bool continuation) const
 {
   if (request.operation == MissionOperation::kNone || request.request_id.empty() ||
     request.actor_id.empty())
@@ -173,7 +175,11 @@ MissionAuthorizationDecision MissionAuthority::CheckOperation(
       unavailable_reason = "manual_mapping_not_ready";
       break;
     case MissionOperation::kAutonomousMapping:
-      allowed = capabilities.can_start_autonomous_mapping &&
+      allowed = (continuation ?
+        policy_.allow_autonomous_mapping &&
+        dependencies.core.capabilities.core_motion_ready &&
+        capabilities.mapping_available && dependencies.mapping.ready :
+        capabilities.can_start_autonomous_mapping) &&
         (!request.require_semantic || capabilities.semantic_mapping_ready);
       unavailable_reason = request.require_semantic ?
         "autonomous_semantic_mapping_not_ready" : "autonomous_mapping_not_ready";
@@ -244,7 +250,9 @@ MissionAuthorizationDecision MissionAuthority::Handle(
           "operation_requires_explicit_resume");
       }
     }
-    return CheckOperation(request, dependencies);
+    return CheckOperation(
+      request, dependencies,
+      IsExclusiveOperation(request.operation) && state_.state == OperationState::kActive);
   }
 
   if (request.command == AuthorityCommand::kAcquire) {
@@ -355,7 +363,7 @@ bool MissionAuthority::Revalidate(const MissionDependencySnapshot & dependencies
   request.require_semantic = state_.semantic_required;
   request.remote_origin = state_.remote_origin;
   request.motion_required = IsExclusiveOperation(state_.operation);
-  const auto decision = CheckOperation(request, dependencies);
+  const auto decision = CheckOperation(request, dependencies, true);
   if (decision.authorized) {
     return false;
   }

@@ -298,6 +298,15 @@ def test_edge_ups_expectation_reaches_every_core_power_launch() -> None:
 
     assert '"edge_ups_expected": LaunchConfiguration(' in core
     assert '"edge_ups_expected": LaunchConfiguration(' in autonomous
+    assert '"edge_ups_required": LaunchConfiguration(' in core
+    assert '"edge_ups_required": LaunchConfiguration(' in autonomous
+
+    supervisor = (
+        ROOT.parent / "savo_supervisor" / "launch" / "supervisor.launch.py"
+    ).read_text(encoding="utf-8")
+    assert "'edge_ups_required'" in supervisor
+    assert "'edge_ups.required': ParameterValue(" in supervisor
+    assert "default_value='false'" in supervisor
 
 
 def test_full_entry_point_keeps_core_and_edge_roles_explicit() -> None:

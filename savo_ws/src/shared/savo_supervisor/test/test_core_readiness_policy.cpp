@@ -30,13 +30,17 @@ savo_supervisor::ComponentSummary ready_component(
 
 std::vector<savo_supervisor::ComponentSummary> healthy_core()
 {
+  auto edge_ups = ready_component("edge_ups");
+  edge_ups.required = false;
   return {
     ready_component("base"),
     ready_component("control"),
     ready_component("perception"),
     ready_component("lidar"),
     ready_component("localization"),
-    ready_component("power")};
+    ready_component("base_battery"),
+    ready_component("core_ups"),
+    edge_ups};
 }
 
 savo_supervisor::SafetySummary clear_safety()
@@ -100,11 +104,85 @@ TEST(CoreReadinessPolicy, LowPowerAllowsManualMotionButBlocksNewMapping)
 {
   savo_supervisor::SupervisorPolicy policy;
   auto core = healthy_core();
-  core.back() = ready_component("power", true);
+  core[5] = ready_component("base_battery", true);
   const auto state = policy.EvaluateSupervisor(
     core, clear_safety(), test_time(), 10.0);
   EXPECT_TRUE(state.capabilities.can_manual_drive);
   EXPECT_FALSE(state.capabilities.can_start_geometric_mapping);
+}
+
+TEST(CoreReadinessPolicy, OptionalEdgeUpsFailureDoesNotBlockCoreMapping)
+{
+  savo_supervisor::SupervisorPolicy policy;
+  auto core = healthy_core();
+  core.back().ready = false;
+  core.back().state = savo_supervisor::ComponentState::ERROR;
+  core.back().reason_code = "edge_ups_critical";
+
+  const auto state = policy.EvaluateSupervisor(
+    core, clear_safety(), test_time(), 10.0);
+  EXPECT_EQ(state.lifecycle, savo_supervisor::Lifecycle::RUNNING);
+  EXPECT_TRUE(state.capabilities.core_motion_ready);
+  EXPECT_TRUE(state.capabilities.can_start_geometric_mapping);
+}
+
+TEST(CoreReadinessPolicy, RequiredEdgeUpsFailureBlocksCoreMapping)
+{
+  savo_supervisor::SupervisorPolicy policy;
+  auto core = healthy_core();
+  core.back().required = true;
+  core.back().ready = false;
+  core.back().state = savo_supervisor::ComponentState::ERROR;
+  core.back().reason_code = "edge_ups_critical";
+
+  const auto state = policy.EvaluateSupervisor(
+    core, clear_safety(), test_time(), 10.0);
+  EXPECT_EQ(state.lifecycle, savo_supervisor::Lifecycle::FAULTED);
+  EXPECT_FALSE(state.capabilities.core_motion_ready);
+  EXPECT_FALSE(state.capabilities.can_start_geometric_mapping);
+}
+
+TEST(CoreReadinessPolicy, LowCoreUpsIsOperationalButBlocksNewMapping)
+{
+  savo_supervisor::SupervisorPolicy policy;
+  auto core = healthy_core();
+  core[6] = ready_component("core_ups", true);
+
+  const auto state = policy.EvaluateSupervisor(
+    core, clear_safety(), test_time(), 10.0);
+  EXPECT_EQ(state.lifecycle, savo_supervisor::Lifecycle::RUNNING);
+  EXPECT_TRUE(state.capabilities.core_motion_ready);
+  EXPECT_FALSE(state.capabilities.can_start_geometric_mapping);
+}
+
+TEST(CoreReadinessPolicy, CriticalBaseBatteryFailsClosed)
+{
+  savo_supervisor::SupervisorPolicy policy;
+  auto core = healthy_core();
+  core[5].ready = false;
+  core[5].state = savo_supervisor::ComponentState::ERROR;
+  core[5].reason_code = "base_battery_critical";
+
+  const auto state = policy.EvaluateSupervisor(
+    core, clear_safety(), test_time(), 10.0);
+  EXPECT_EQ(state.lifecycle, savo_supervisor::Lifecycle::FAULTED);
+  EXPECT_EQ(state.reason_code, "base_battery_critical");
+  EXPECT_FALSE(state.capabilities.core_motion_ready);
+}
+
+TEST(CoreReadinessPolicy, StaleCoreUpsFailsClosedWithSourceReason)
+{
+  savo_supervisor::SupervisorPolicy policy;
+  auto core = healthy_core();
+  core[6].ready = false;
+  core[6].state = savo_supervisor::ComponentState::STALE;
+  core[6].reason_code = "core_ups_stale";
+
+  const auto state = policy.EvaluateSupervisor(
+    core, clear_safety(), test_time(), 10.0);
+  EXPECT_EQ(state.lifecycle, savo_supervisor::Lifecycle::FAULTED);
+  EXPECT_EQ(state.reason_code, "core_ups_stale");
+  EXPECT_FALSE(state.capabilities.core_motion_ready);
 }
 
 TEST(CoreReadinessPolicy, MissingRequiredLidarFaultsSupervisor)
