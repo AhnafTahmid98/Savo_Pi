@@ -33,6 +33,70 @@ double window_rate_hz(const std::deque<std::int64_t> & timestamps_ns) noexcept
          static_cast<double>(duration_ns);
 }
 
+std::int64_t max_window_gap_ns(
+  const std::deque<std::int64_t> & timestamps_ns) noexcept
+{
+  std::int64_t maximum_gap_ns = 0;
+  for (std::size_t index = 1U; index < timestamps_ns.size(); ++index) {
+    maximum_gap_ns = std::max(
+      maximum_gap_ns, timestamps_ns[index] - timestamps_ns[index - 1U]);
+  }
+  return maximum_gap_ns;
+}
+
+double max_window_gap_s(const std::deque<std::int64_t> & timestamps_ns) noexcept
+{
+  return static_cast<double>(max_window_gap_ns(timestamps_ns)) / 1.0e9;
+}
+
+struct WindowRateEstimate
+{
+  double raw_rate_hz{0.0};
+  double sustained_rate_hz{0.0};
+  double max_gap_s{0.0};
+  bool isolated_gap_excluded{false};
+};
+
+WindowRateEstimate estimate_window_rate(
+  const std::deque<std::int64_t> & timestamps_ns,
+  const double minimum_rate_hz) noexcept
+{
+  WindowRateEstimate estimate;
+  estimate.raw_rate_hz = window_rate_hz(timestamps_ns);
+  estimate.sustained_rate_hz = estimate.raw_rate_hz;
+  if (timestamps_ns.size() < 2U) {
+    return estimate;
+  }
+
+  const std::int64_t maximum_gap_ns = max_window_gap_ns(timestamps_ns);
+  estimate.max_gap_s = static_cast<double>(maximum_gap_ns) / 1.0e9;
+
+  if (timestamps_ns.size() < 4U || estimate.raw_rate_hz >= minimum_rate_hz) {
+    return estimate;
+  }
+
+  // Freshness independently fails closed while a producer is stopped. Once it
+  // is live again, do not let that one already-detected gap masquerade as a
+  // sustained low publication rate for the rest of this count-based window.
+  // Excluding one interval is allowed only when all remaining intervals,
+  // evaluated together, satisfy the unchanged minimum rate.
+  const std::int64_t duration_ns = timestamps_ns.back() - timestamps_ns.front();
+  const std::int64_t sustained_duration_ns = duration_ns - maximum_gap_ns;
+  if (sustained_duration_ns <= 0) {
+    return estimate;
+  }
+
+  const std::size_t sustained_interval_count = timestamps_ns.size() - 2U;
+  const double candidate_rate_hz =
+    static_cast<double>(sustained_interval_count) * 1.0e9 /
+    static_cast<double>(sustained_duration_ns);
+  if (candidate_rate_hz >= minimum_rate_hz) {
+    estimate.sustained_rate_hz = candidate_rate_hz;
+    estimate.isolated_gap_excluded = true;
+  }
+  return estimate;
+}
+
 bool valid_health_state(const std::string & state)
 {
   return state == "INITIALIZING" || state == "OK" ||
@@ -81,7 +145,14 @@ ProducerRateObservation ProducerRateTracker::Observe(
 
   ProducerRateObservation observation;
   observation.available = success_times_ns_.size() >= 3U;
-  observation.rate_hz = window_rate_hz(success_times_ns_);
+  const auto estimate = estimate_window_rate(
+    success_times_ns_, thresholds.minimum_hz);
+  observation.rate_hz = estimate.sustained_rate_hz;
+  observation.raw_window_rate_hz = estimate.raw_rate_hz;
+  observation.max_inter_publication_gap_s = estimate.max_gap_s;
+  observation.last_success_monotonic_ns = last_success_time_ns_;
+  observation.window_sample_count = success_times_ns_.size();
+  observation.isolated_gap_excluded = estimate.isolated_gap_excluded;
   observation.quality = ClassifyQuality(observation.rate_hz, thresholds);
   if (last_success_time_ns_ >= 0) {
     observation.last_success_age_s = std::max(
@@ -213,7 +284,15 @@ std::string SerializeProducerHealth(const ProducerHealthSnapshot & snapshot)
     {"calibration_mag", snapshot.calibration_mag},
     {"producer_rate_available", snapshot.producer_rate_available},
     {"producer_rate_hz", snapshot.producer_rate_hz},
+    {"raw_window_rate_hz", snapshot.raw_window_rate_hz},
     {"last_success_age_s", snapshot.last_success_age_s},
+    {"max_inter_publication_gap_s", snapshot.max_inter_publication_gap_s},
+    {"last_success_monotonic_ns", snapshot.last_success_monotonic_ns},
+    {"rate_window_sample_count", snapshot.rate_window_sample_count},
+    {"isolated_gap_excluded", snapshot.isolated_gap_excluded},
+    {"health_publish_monotonic_ns", snapshot.health_publish_monotonic_ns},
+    {"health_publish_gap_s", snapshot.health_publish_gap_s},
+    {"max_health_publish_gap_s", snapshot.max_health_publish_gap_s},
     {"rate_quality", snapshot.rate_quality},
     {"sample_count", snapshot.sample_count},
     {"publish_count", snapshot.publish_count},
@@ -257,7 +336,20 @@ bool ParseProducerHealth(
     parsed.calibration_mag = object.at("calibration_mag").get<int>();
     parsed.producer_rate_available = object.at("producer_rate_available").get<bool>();
     parsed.producer_rate_hz = object.at("producer_rate_hz").get<double>();
+    parsed.raw_window_rate_hz = object.value(
+      "raw_window_rate_hz", parsed.producer_rate_hz);
     parsed.last_success_age_s = object.at("last_success_age_s").get<double>();
+    parsed.max_inter_publication_gap_s = object.value(
+      "max_inter_publication_gap_s", 0.0);
+    parsed.last_success_monotonic_ns = object.value(
+      "last_success_monotonic_ns", static_cast<std::int64_t>(-1));
+    parsed.rate_window_sample_count = object.value(
+      "rate_window_sample_count", static_cast<std::uint64_t>(0U));
+    parsed.isolated_gap_excluded = object.value("isolated_gap_excluded", false);
+    parsed.health_publish_monotonic_ns = object.value(
+      "health_publish_monotonic_ns", static_cast<std::int64_t>(-1));
+    parsed.health_publish_gap_s = object.value("health_publish_gap_s", -1.0);
+    parsed.max_health_publish_gap_s = object.value("max_health_publish_gap_s", 0.0);
     parsed.rate_quality = object.at("rate_quality").get<std::string>();
     parsed.sample_count = object.at("sample_count").get<std::uint64_t>();
     parsed.publish_count = object.at("publish_count").get<std::uint64_t>();
@@ -274,7 +366,12 @@ bool ParseProducerHealth(
       return false;
     }
     if (!finite_nonnegative(parsed.producer_rate_hz) ||
-      !std::isfinite(parsed.last_success_age_s) || parsed.last_success_age_s < -1.0)
+      !finite_nonnegative(parsed.raw_window_rate_hz) ||
+      !finite_nonnegative(parsed.max_inter_publication_gap_s) ||
+      !std::isfinite(parsed.last_success_age_s) || parsed.last_success_age_s < -1.0 ||
+      parsed.last_success_monotonic_ns < -1 || parsed.health_publish_monotonic_ns < -1 ||
+      !std::isfinite(parsed.health_publish_gap_s) || parsed.health_publish_gap_s < -1.0 ||
+      !finite_nonnegative(parsed.max_health_publish_gap_s))
     {
       error = "invalid producer rate or freshness value";
       return false;
@@ -344,6 +441,7 @@ ConsumedProducerHealth ProducerHealthConsumer::Observe(
       snapshot_.last_success_age_s + observation.receive_age_s;
   }
   observation.receive_rate_hz = window_rate_hz(receive_timestamps_ns_);
+  observation.max_receive_gap_s = max_window_gap_s(receive_timestamps_ns_);
   observation.fresh = payload_valid_ && observation.receive_age_s <= max_age_s &&
     observation.producer_age_s >= 0.0 && observation.producer_age_s <= max_age_s;
   return observation;

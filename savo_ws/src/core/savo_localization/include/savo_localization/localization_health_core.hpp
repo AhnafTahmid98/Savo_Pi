@@ -80,6 +80,18 @@ struct SourceHealthObservation
   double rate_hz{0.0};
   double source_rate_hz{0.0};
   double receive_rate_hz{0.0};
+  double raw_window_rate_hz{0.0};
+  double max_inter_publication_gap_s{0.0};
+  double health_publish_gap_s{-1.0};
+  double max_health_publish_gap_s{0.0};
+  double max_health_receive_gap_s{0.0};
+  double consumer_receive_age_s{-1.0};
+  double producer_last_success_age_s{-1.0};
+  double minimum_rate_hz{0.0};
+  double freshness_limit_s{0.0};
+  double rate_debounce_s{0.0};
+  std::uint64_t rate_window_sample_count{0U};
+  bool isolated_gap_excluded{false};
   bool source_rate_available{false};
   std::string rate_basis{"unavailable"};
   std::string rate_quality{"BELOW_MINIMUM"};

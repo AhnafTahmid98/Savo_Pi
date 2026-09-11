@@ -199,6 +199,8 @@ private:
   ProducerRateTracker producer_rate_tracker_{};
   std::int64_t timestamp_fault_until_ns_{0};
   std::int64_t last_health_publish_ns_{-1};
+  double last_health_publish_gap_s_{-1.0};
+  double max_health_publish_gap_s_{0.0};
   std::int64_t last_debug_publish_ns_{-1};
   std::string last_health_state_{};
   std::string last_health_reason_{};

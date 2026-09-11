@@ -592,6 +592,24 @@ private:
     observation.source_rate_hz = consumed.payload_valid ?
       consumed.snapshot.producer_rate_hz : 0.0;
     observation.receive_rate_hz = consumed.receive_rate_hz;
+    observation.raw_window_rate_hz = consumed.payload_valid ?
+      consumed.snapshot.raw_window_rate_hz : 0.0;
+    observation.max_inter_publication_gap_s = consumed.payload_valid ?
+      consumed.snapshot.max_inter_publication_gap_s : 0.0;
+    observation.health_publish_gap_s = consumed.payload_valid ?
+      consumed.snapshot.health_publish_gap_s : -1.0;
+    observation.max_health_publish_gap_s = consumed.payload_valid ?
+      consumed.snapshot.max_health_publish_gap_s : 0.0;
+    observation.max_health_receive_gap_s = consumed.max_receive_gap_s;
+    observation.consumer_receive_age_s = consumed.receive_age_s;
+    observation.producer_last_success_age_s = consumed.producer_age_s;
+    observation.minimum_rate_hz = rate_thresholds.minimum_hz;
+    observation.freshness_limit_s = max_age_s;
+    observation.rate_debounce_s = rate_transition_debounce_s_;
+    observation.rate_window_sample_count = consumed.payload_valid ?
+      consumed.snapshot.rate_window_sample_count : 0U;
+    observation.isolated_gap_excluded = consumed.payload_valid &&
+      consumed.snapshot.isolated_gap_excluded;
     observation.rate_hz = observation.source_rate_hz;
     observation.rate_valid = tracker.ObserveRateValid(
       current_receive_time_ns,
@@ -645,6 +663,11 @@ private:
       static_cast<std::int64_t>(std::llround(rate_transition_debounce_s * 1.0e9)));
     observation.source_rate_hz = rates.source_rate_hz;
     observation.receive_rate_hz = rates.receive_rate_hz;
+    observation.minimum_rate_hz = rate_thresholds.minimum_hz;
+    observation.freshness_limit_s = max_age_s;
+    observation.rate_debounce_s = rate_transition_debounce_s;
+    observation.consumer_receive_age_s = observation.age_s;
+    observation.producer_last_success_age_s = observation.age_s;
     observation.source_rate_available = rates.source_rate_available;
     observation.rate_hz = rates.validation_rate_hz;
     observation.rate_valid = rates.rate_valid;
@@ -760,6 +783,20 @@ private:
            << "\"rate_hz\":" << source.rate_hz << ','
            << "\"source_rate_hz\":" << source.source_rate_hz << ','
            << "\"receive_rate_hz\":" << source.receive_rate_hz << ','
+           << "\"raw_window_rate_hz\":" << source.raw_window_rate_hz << ','
+           << "\"max_inter_publication_gap_s\":"
+           << source.max_inter_publication_gap_s << ','
+           << "\"health_publish_gap_s\":" << source.health_publish_gap_s << ','
+           << "\"max_health_publish_gap_s\":" << source.max_health_publish_gap_s << ','
+           << "\"max_health_receive_gap_s\":" << source.max_health_receive_gap_s << ','
+           << "\"consumer_receive_age_s\":" << source.consumer_receive_age_s << ','
+           << "\"producer_last_success_age_s\":"
+           << source.producer_last_success_age_s << ','
+           << "\"minimum_rate_hz\":" << source.minimum_rate_hz << ','
+           << "\"freshness_limit_s\":" << source.freshness_limit_s << ','
+           << "\"rate_debounce_s\":" << source.rate_debounce_s << ','
+           << "\"rate_window_sample_count\":" << source.rate_window_sample_count << ','
+           << "\"isolated_gap_excluded\":" << bool_text(source.isolated_gap_excluded) << ','
            << "\"source_rate_available\":" << bool_text(source.source_rate_available) << ','
            << "\"rate_basis\":\"" << source.rate_basis << "\","
            << "\"rate_quality\":\"" << source.rate_quality << "\","
@@ -800,6 +837,8 @@ private:
            << "\"reason_code\":\"" << escape_json(result.reason_code) << "\","
            << "\"stamp_s\":" << current_time.seconds() << ','
            << "\"startup_age_s\":" << inputs.startup_age_s << ','
+           << "\"evaluation_gap_s\":" << last_evaluation_gap_s_ << ','
+           << "\"max_evaluation_gap_s\":" << max_evaluation_gap_s_ << ','
            << "\"frames\":{"
            << "\"odom\":\"" << escape_json(odom_frame_id_) << "\","
            << "\"base\":\"" << escape_json(base_frame_id_) << "\","
@@ -850,6 +889,49 @@ private:
     return output.str();
   }
 
+  static void append_producer_diagnostic_values(
+    diagnostic_msgs::msg::DiagnosticStatus & status,
+    const std::string & prefix,
+    const SourceHealthObservation & source)
+  {
+    status.values.push_back(key_value(
+      prefix + "_source_rate_hz", std::to_string(source.source_rate_hz)));
+    status.values.push_back(key_value(
+      prefix + "_raw_window_rate_hz", std::to_string(source.raw_window_rate_hz)));
+    status.values.push_back(key_value(
+      prefix + "_receive_rate_hz", std::to_string(source.receive_rate_hz)));
+    status.values.push_back(key_value(
+      prefix + "_max_inter_publication_gap_s",
+      std::to_string(source.max_inter_publication_gap_s)));
+    status.values.push_back(key_value(
+      prefix + "_health_publish_gap_s", std::to_string(source.health_publish_gap_s)));
+    status.values.push_back(key_value(
+      prefix + "_max_health_publish_gap_s",
+      std::to_string(source.max_health_publish_gap_s)));
+    status.values.push_back(key_value(
+      prefix + "_max_health_receive_gap_s",
+      std::to_string(source.max_health_receive_gap_s)));
+    status.values.push_back(key_value(
+      prefix + "_consumer_receive_age_s",
+      std::to_string(source.consumer_receive_age_s)));
+    status.values.push_back(key_value(
+      prefix + "_producer_last_success_age_s",
+      std::to_string(source.producer_last_success_age_s)));
+    status.values.push_back(key_value(
+      prefix + "_minimum_rate_hz", std::to_string(source.minimum_rate_hz)));
+    status.values.push_back(key_value(
+      prefix + "_freshness_limit_s", std::to_string(source.freshness_limit_s)));
+    status.values.push_back(key_value(
+      prefix + "_rate_debounce_s", std::to_string(source.rate_debounce_s)));
+    status.values.push_back(key_value(
+      prefix + "_rate_window_sample_count",
+      std::to_string(source.rate_window_sample_count)));
+    status.values.push_back(key_value(
+      prefix + "_isolated_gap_excluded", bool_text(source.isolated_gap_excluded)));
+    status.values.push_back(key_value(
+      prefix + "_rate_valid", bool_text(source.rate_valid)));
+  }
+
   diagnostic_msgs::msg::DiagnosticArray make_diagnostics(
     const LocalizationHealthResult & result,
     const LocalizationHealthInputs & inputs,
@@ -876,6 +958,12 @@ private:
     status.values.push_back(key_value(
       "filtered_odom_age_s", std::to_string(inputs.filtered_odom.age_s)));
     status.values.push_back(key_value(
+      "evaluation_gap_s", std::to_string(last_evaluation_gap_s_)));
+    status.values.push_back(key_value(
+      "max_evaluation_gap_s", std::to_string(max_evaluation_gap_s_)));
+    append_producer_diagnostic_values(status, "imu", inputs.imu);
+    append_producer_diagnostic_values(status, "wheel", inputs.wheel_odom);
+    status.values.push_back(key_value(
       "odom_to_base_tf", bool_text(inputs.odom_to_base.available && inputs.odom_to_base.fresh)));
     status.values.push_back(key_value(
       "base_to_imu_tf", bool_text(inputs.base_to_imu.available && inputs.base_to_imu.fresh)));
@@ -886,7 +974,15 @@ private:
   void evaluate_and_publish()
   {
     const auto current_time = now();
-    const auto inputs = build_inputs(current_time, steady_now_ns());
+    const std::int64_t current_receive_time_ns = steady_now_ns();
+    if (last_evaluation_ns_ >= 0) {
+      last_evaluation_gap_s_ = static_cast<double>(
+        current_receive_time_ns - last_evaluation_ns_) / 1.0e9;
+      max_evaluation_gap_s_ = std::max(
+        max_evaluation_gap_s_, last_evaluation_gap_s_);
+    }
+    last_evaluation_ns_ = current_receive_time_ns;
+    const auto inputs = build_inputs(current_time, current_receive_time_ns);
     const auto result = core_.Evaluate(inputs);
 
     std_msgs::msg::String health_message;
@@ -1010,6 +1106,9 @@ private:
   tf2_ros::Buffer tf_buffer_;
   tf2_ros::TransformListener tf_listener_;
   std::int64_t start_time_ns_{0};
+  std::int64_t last_evaluation_ns_{-1};
+  double last_evaluation_gap_s_{-1.0};
+  double max_evaluation_gap_s_{0.0};
 
   LocalizationHealthState last_state_{LocalizationHealthState::kUnknown};
   std::string last_reason_code_{"not_evaluated"};

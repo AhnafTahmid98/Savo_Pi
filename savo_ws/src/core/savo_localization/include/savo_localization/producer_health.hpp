@@ -31,7 +31,12 @@ struct ProducerRateObservation
 {
   bool available{false};
   double rate_hz{0.0};
+  double raw_window_rate_hz{0.0};
   double last_success_age_s{-1.0};
+  double max_inter_publication_gap_s{0.0};
+  std::int64_t last_success_monotonic_ns{-1};
+  std::uint64_t window_sample_count{0U};
+  bool isolated_gap_excluded{false};
   RateQuality quality{RateQuality::kBelowMinimum};
 };
 
@@ -101,7 +106,15 @@ struct ProducerHealthSnapshot
   int calibration_mag{0};
   bool producer_rate_available{false};
   double producer_rate_hz{0.0};
+  double raw_window_rate_hz{0.0};
   double last_success_age_s{-1.0};
+  double max_inter_publication_gap_s{0.0};
+  std::int64_t last_success_monotonic_ns{-1};
+  std::uint64_t rate_window_sample_count{0U};
+  bool isolated_gap_excluded{false};
+  std::int64_t health_publish_monotonic_ns{-1};
+  double health_publish_gap_s{-1.0};
+  double max_health_publish_gap_s{0.0};
   std::string rate_quality{"BELOW_MINIMUM"};
   std::uint64_t sample_count{0U};
   std::uint64_t publish_count{0U};
@@ -126,6 +139,7 @@ struct ConsumedProducerHealth
   double receive_age_s{-1.0};
   double producer_age_s{-1.0};
   double receive_rate_hz{0.0};
+  double max_receive_gap_s{0.0};
   std::string detail{};
 };
 

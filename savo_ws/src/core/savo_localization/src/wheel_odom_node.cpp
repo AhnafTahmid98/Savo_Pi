@@ -476,13 +476,22 @@ void WheelOdomNode::publish_health_outputs(
   const std::int64_t monotonic_time_ns,
   const bool force)
 {
-  const auto snapshot = make_health_snapshot(monotonic_time_ns);
+  auto snapshot = make_health_snapshot(monotonic_time_ns);
   const bool transition = snapshot.health_state != last_health_state_ ||
     snapshot.reason != last_health_reason_;
 
   if (force || transition || output_due(
       monotonic_time_ns, last_health_publish_ns_, health_publish_rate_hz_))
   {
+    if (last_health_publish_ns_ >= 0) {
+      last_health_publish_gap_s_ = static_cast<double>(
+        monotonic_time_ns - last_health_publish_ns_) / 1.0e9;
+      max_health_publish_gap_s_ = std::max(
+        max_health_publish_gap_s_, last_health_publish_gap_s_);
+    }
+    snapshot.health_publish_monotonic_ns = monotonic_time_ns;
+    snapshot.health_publish_gap_s = last_health_publish_gap_s_;
+    snapshot.max_health_publish_gap_s = max_health_publish_gap_s_;
     publish_state(snapshot);
     last_health_publish_ns_ = monotonic_time_ns;
   }
@@ -721,7 +730,14 @@ ProducerHealthSnapshot WheelOdomNode::make_health_snapshot(
     monotonic_time_ns, producer_rate_thresholds_);
   snapshot.producer_rate_available = rate.available;
   snapshot.producer_rate_hz = rate.rate_hz;
+  snapshot.raw_window_rate_hz = rate.raw_window_rate_hz;
   snapshot.last_success_age_s = rate.last_success_age_s;
+  snapshot.max_inter_publication_gap_s = rate.max_inter_publication_gap_s;
+  snapshot.last_success_monotonic_ns = rate.last_success_monotonic_ns;
+  snapshot.rate_window_sample_count = rate.window_sample_count;
+  snapshot.isolated_gap_excluded = rate.isolated_gap_excluded;
+  snapshot.health_publish_gap_s = last_health_publish_gap_s_;
+  snapshot.max_health_publish_gap_s = max_health_publish_gap_s_;
   snapshot.rate_quality = std::string(ProducerRateTracker::QualityString(rate.quality));
 
   if (!last_odom_sample_) {
