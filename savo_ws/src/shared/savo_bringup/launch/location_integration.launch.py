@@ -192,11 +192,20 @@ def generate_launch_description() -> LaunchDescription:
                 "lidar.required": _boolean(
                     "supervisor_lidar_required"
                 ),
-                "power.enabled": _boolean(
+                "base_battery.enabled": _boolean(
                     "supervisor_power_enabled"
                 ),
-                "power.required": _boolean(
+                "base_battery.required": _boolean(
                     "supervisor_power_required"
+                ),
+                "core_ups.enabled": _boolean(
+                    "supervisor_power_enabled"
+                ),
+                "core_ups.required": _boolean(
+                    "supervisor_power_required"
+                ),
+                "edge_ups.enabled": _boolean(
+                    "supervisor_power_enabled"
                 ),
                 "localization.enabled": _boolean(
                     "supervisor_localization_enabled"

@@ -150,6 +150,15 @@ class LifecycleNode(Node):
         self.power_status_publisher = self.create_publisher(
             String, "/savo_power/status", status_qos
         )
+        self.base_battery_publisher = self.create_publisher(
+            String, "/savo_power/base/battery", status_qos
+        )
+        self.core_ups_publisher = self.create_publisher(
+            String, "/savo_power/core/ups", status_qos
+        )
+        self.edge_ups_publisher = self.create_publisher(
+            String, "/savo_power/edge/ups", status_qos
+        )
         self.mapping_status_publisher = self.create_publisher(
             String, "/savo_mapping/status", retained_qos
         )
@@ -309,6 +318,15 @@ class LifecycleNode(Node):
         ))
         self.power_health_publisher.publish(self._string(
             "level=OK state=OK reason=power_ok"
+        ))
+        self.base_battery_publisher.publish(self._string(
+            "Base battery OK: 8.12 V, SoC 85.8%"
+        ))
+        self.core_ups_publisher.publish(self._string(
+            "Core UPS OK: 4.01 V, capacity 86.0%"
+        ))
+        self.edge_ups_publisher.publish(self._string(
+            "Edge UPS OK: 4.02 V, capacity 87.0%"
         ))
 
         self.mapping_status_publisher.publish(self._string({

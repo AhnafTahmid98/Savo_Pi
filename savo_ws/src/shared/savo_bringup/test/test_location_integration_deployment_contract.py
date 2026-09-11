@@ -88,6 +88,16 @@ def test_location_lifecycle_launch_contract() -> None:
     for token in production_supervisor_defaults:
         assert token in launch
 
+    required_power_bindings = {
+        '"base_battery.enabled": _boolean(',
+        '"base_battery.required": _boolean(',
+        '"core_ups.enabled": _boolean(',
+        '"core_ups.required": _boolean(',
+        '"edge_ups.enabled": _boolean(',
+    }
+    for token in required_power_bindings:
+        assert token in launch
+
     assert "fake_location_nav2_server_node" not in launch
     assert "ParameterValue" in launch
     assert "_critical_exit_handler" in launch

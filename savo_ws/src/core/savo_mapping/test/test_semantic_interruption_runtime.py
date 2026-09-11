@@ -408,6 +408,11 @@ def test_real_am7_orchestrator_pauses_replans_and_resumes_coverage():
         assert wait_until(
             lambda: am7.latest_state() == AutonomousMappingStatus.STATE_PAUSED
         ), am7.diagnostics()
+        assert wait_until(
+            lambda: semantic_statuses
+            and semantic_statuses[-1].state
+            == SemanticInterruptionStatus.STATE_WAITING_FOR_SEMANTICS
+        ), am7.diagnostics()
 
         request = SubmitSemanticLocation.Request()
         request.contract_version = SubmitSemanticLocation.Request.CONTRACT_VERSION
