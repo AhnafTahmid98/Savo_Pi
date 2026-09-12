@@ -1,4 +1,5 @@
-"""Canonical absolute TimerAction offsets for Core production startup.
+"""
+Canonical absolute TimerAction offsets for Core production startup.
 
 These delays stagger process startup only; they do not establish readiness or
 authorize motion. Edge startup has its own independent timing defaults.
