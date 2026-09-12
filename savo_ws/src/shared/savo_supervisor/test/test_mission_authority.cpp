@@ -77,6 +77,49 @@ savo_supervisor::MissionAuthorizationRequest request(
   return value;
 }
 
+savo_supervisor::ComponentSummary ready_component(
+  const std::string & name,
+  const bool degraded = false,
+  const std::string & reason = {})
+{
+  savo_supervisor::ComponentSummary component;
+  component.name = name;
+  component.enabled = true;
+  component.required = name != "edge_ups";
+  component.ready = true;
+  component.degraded = degraded;
+  component.state = degraded ?
+    savo_supervisor::ComponentState::DEGRADED :
+    savo_supervisor::ComponentState::OK;
+  component.reason_code = reason;
+  return component;
+}
+
+savo_supervisor::MissionDependencySnapshot with_environmental_motion_interlock(
+  savo_supervisor::MissionDependencySnapshot dependencies)
+{
+  dependencies.core.health = savo_supervisor::AggregateHealth::DEGRADED;
+  dependencies.core.degraded = true;
+  dependencies.core.safety = savo_supervisor::SafetyObservation::STOPPED;
+  dependencies.core.safety_summary.observation =
+    savo_supervisor::SafetyObservation::STOPPED;
+  dependencies.core.safety_summary.ready = true;
+  dependencies.core.safety_summary.stop_fresh = true;
+  dependencies.core.safety_summary.slowdown_fresh = true;
+  dependencies.core.safety_summary.stop_active = true;
+  dependencies.core.capabilities.core_motion_ready = false;
+  dependencies.core.component_summaries = {
+    ready_component("base", true, "base_motion_interlocked"),
+    ready_component("control", true, "control_motion_interlocked"),
+    ready_component("perception"),
+    ready_component("lidar"),
+    ready_component("localization"),
+    ready_component("base_battery"),
+    ready_component("core_ups"),
+    ready_component("edge_ups")};
+  return dependencies;
+}
+
 }  // namespace
 
 TEST(MissionAuthority, HealthySemanticMappingCapabilitiesAreReady)
@@ -289,7 +332,7 @@ TEST(MissionAuthority, RequiredPowerFailureRevokesRunningMapping)
     "runtime_authorization_revoked:supervisor_faulted");
 }
 
-TEST(MissionAuthority, SafetyLossStillRevokesDegradedCoreOnlyMappingLease)
+TEST(MissionAuthority, EnvironmentalInterlockKeepsActiveMappingLease)
 {
   auto dependencies = healthy_dependencies();
   savo_supervisor::MissionAuthorityPolicy policy;
@@ -301,15 +344,57 @@ TEST(MissionAuthority, SafetyLossStillRevokesDegradedCoreOnlyMappingLease)
   acquire.require_semantic = false;
   ASSERT_TRUE(authority.Handle(acquire, dependencies).authorized);
 
-  dependencies.core.health = savo_supervisor::AggregateHealth::DEGRADED;
-  dependencies.core.degraded = true;
-  dependencies.core.safety = savo_supervisor::SafetyObservation::STOPPED;
+  dependencies = with_environmental_motion_interlock(dependencies);
+
+  EXPECT_FALSE(authority.Revalidate(dependencies));
+  EXPECT_EQ(authority.state().state, savo_supervisor::OperationState::kActive);
+  EXPECT_EQ(
+    savo_supervisor::ModeForAuthority(dependencies.core, authority.state()),
+    savo_supervisor::OperatingMode::MAPPING);
+}
+
+TEST(MissionAuthority, ExternalStopStillRevokesActiveMappingLease)
+{
+  auto dependencies = healthy_dependencies();
+  savo_supervisor::MissionAuthorityPolicy policy;
+  policy.require_semantic_autonomous_mapping = false;
+  savo_supervisor::MissionAuthority authority{policy};
+  auto acquire = request(
+    savo_supervisor::AuthorityCommand::kAcquire,
+    savo_supervisor::MissionOperation::kAutonomousMapping);
+  acquire.require_semantic = false;
+  ASSERT_TRUE(authority.Handle(acquire, dependencies).authorized);
+
+  dependencies = with_environmental_motion_interlock(dependencies);
+  dependencies.core.component_summaries[1] =
+    ready_component("control", true, "control_external_stop");
+  dependencies.core.component_summaries[1].detail = "mode=NAV";
+
+  EXPECT_TRUE(authority.Revalidate(dependencies));
+  EXPECT_EQ(authority.state().state, savo_supervisor::OperationState::kRevoked);
+}
+
+TEST(MissionAuthority, UnknownSafetyStillRevokesActiveMappingLease)
+{
+  auto dependencies = healthy_dependencies();
+  savo_supervisor::MissionAuthorityPolicy policy;
+  policy.require_semantic_autonomous_mapping = false;
+  savo_supervisor::MissionAuthority authority{policy};
+  auto acquire = request(
+    savo_supervisor::AuthorityCommand::kAcquire,
+    savo_supervisor::MissionOperation::kAutonomousMapping);
+  acquire.require_semantic = false;
+  ASSERT_TRUE(authority.Handle(acquire, dependencies).authorized);
+
+  dependencies.core.safety = savo_supervisor::SafetyObservation::UNKNOWN;
+  dependencies.core.safety_summary.ready = false;
+  dependencies.core.capabilities.core_safety_ready = false;
 
   EXPECT_TRUE(authority.Revalidate(dependencies));
   EXPECT_EQ(authority.state().state, savo_supervisor::OperationState::kRevoked);
   EXPECT_EQ(
     authority.state().reason,
-    "runtime_authorization_revoked:safety_stop_active");
+    "runtime_authorization_revoked:safety_unknown");
 }
 
 TEST(MissionAuthority, RuntimeFaultRevokesAndRequiresExplicitResume)

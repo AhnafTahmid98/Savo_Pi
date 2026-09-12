@@ -37,6 +37,39 @@ TEST(CorePayloadParser, BaseSafetyBlockRemainsReady)
   EXPECT_TRUE(result.degraded);
 }
 
+TEST(CorePayloadParser, BaseEnvironmentalInterlockRemainsOperational)
+{
+  CorePayloadParser parser;
+  const auto result =
+    parser.ParseBaseState(
+    R"({
+    "status_level":"SAFETY_STOP",
+    "backend":{"connected":true},
+    "safety":{"safety_stop":true,"estop_latched":false},
+    "diagnostics":{"last_board_error":""}
+  })");
+  EXPECT_TRUE(result.valid);
+  EXPECT_TRUE(result.ready);
+  EXPECT_TRUE(result.degraded);
+  EXPECT_EQ(result.reason_code, "base_motion_interlocked");
+}
+
+TEST(CorePayloadParser, BaseEmergencyStopFailsClosed)
+{
+  CorePayloadParser parser;
+  const auto result =
+    parser.ParseBaseState(
+    R"({
+    "status_level":"SAFETY_STOP",
+    "backend":{"connected":true},
+    "safety":{"safety_stop":false,"estop_latched":true},
+    "diagnostics":{"last_board_error":""}
+  })");
+  EXPECT_TRUE(result.valid);
+  EXPECT_FALSE(result.ready);
+  EXPECT_EQ(result.reason_code, "base_emergency_stop_latched");
+}
+
 TEST(CorePayloadParser, BaseStaleCommandIsNormalSafeIdle)
 {
   CorePayloadParser parser;
@@ -76,6 +109,24 @@ TEST(CorePayloadParser, ControlStaleCommandIsSafeOperationalState)
   EXPECT_TRUE(result.valid);
   EXPECT_TRUE(result.ready);
   EXPECT_FALSE(result.degraded);
+}
+
+TEST(CorePayloadParser, ControlEnvironmentalInterlockIsDistinctFromExternalStop)
+{
+  CorePayloadParser parser;
+  const auto interlock = parser.ParseControlStatus(
+    "mode=NAV; safety_stop=true; external_stop=false; recovery_active=false");
+  EXPECT_TRUE(interlock.valid);
+  EXPECT_TRUE(interlock.ready);
+  EXPECT_TRUE(interlock.degraded);
+  EXPECT_EQ(interlock.reason_code, "control_motion_interlocked");
+
+  const auto external = parser.ParseControlStatus(
+    "mode=STOP; safety_stop=false; external_stop=true; recovery_active=false");
+  EXPECT_TRUE(external.valid);
+  EXPECT_TRUE(external.ready);
+  EXPECT_TRUE(external.degraded);
+  EXPECT_EQ(external.reason_code, "control_external_stop");
 }
 
 TEST(CorePayloadParser, PerceptionRequiredSensorFailureBlocksReadiness)

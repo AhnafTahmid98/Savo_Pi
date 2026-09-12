@@ -280,12 +280,13 @@ TEST(
 
 TEST(
   ExplorationRuntimeContract,
-  SafetyStopDisablesOrCancels)
+  EnvironmentalMotionInterlockKeepsFrontierRuntimeEnabled)
 {
   auto inputs =
     ready_frontier_inputs();
 
   inputs.safety_stop_active = true;
+  inputs.nav_ready = false;
 
   auto decision =
     savo_mapping::
@@ -294,11 +295,17 @@ TEST(
 
   EXPECT_EQ(
     decision.disposition,
-    RuntimeDisposition::Disabled);
+    RuntimeDisposition::Enabled);
 
   EXPECT_EQ(
     decision.reason,
-    "disabled: safety_stop_active");
+    "enabled: environmental_motion_interlock");
+
+  EXPECT_TRUE(
+    decision.frontier_enabled);
+
+  EXPECT_FALSE(
+    decision.cancel_active_goal);
 
   inputs.handoff_active = true;
 
@@ -309,16 +316,14 @@ TEST(
 
   EXPECT_EQ(
     decision.disposition,
-    RuntimeDisposition::
-    CancelRequired);
+    RuntimeDisposition::Enabled);
 
-  EXPECT_TRUE(
+  EXPECT_FALSE(
     decision.cancel_active_goal);
 
   EXPECT_EQ(
     decision.reason,
-    "cancel_required: "
-    "safety_stop_active");
+    "enabled: environmental_motion_interlock");
 }
 
 TEST(

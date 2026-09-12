@@ -146,12 +146,6 @@ RuntimeDecision evaluate(
       "waiting_for_authority");
   }
 
-  if (inputs.safety_stop_active) {
-    return disabled_or_cancel(
-      inputs,
-      "safety_stop_active");
-  }
-
   if (!inputs.mapping_ready) {
     return disabled_or_cancel(
       inputs,
@@ -173,18 +167,26 @@ RuntimeDecision evaluate(
       "nav_readiness_stale");
   }
 
-  if (!inputs.nav_ready) {
-    return disabled_or_cancel(
-      inputs,
-      "nav_not_ready");
-  }
-
   if (!frontier_authorized_by_workflow(
       inputs))
   {
     return disabled_or_cancel(
       inputs,
       "frontier_not_authorized");
+  }
+
+  if (inputs.safety_stop_active) {
+    return make_decision(
+      RuntimeDisposition::Enabled,
+      true,
+      false,
+      "enabled: environmental_motion_interlock");
+  }
+
+  if (!inputs.nav_ready) {
+    return disabled_or_cancel(
+      inputs,
+      "nav_not_ready");
   }
 
   return make_decision(

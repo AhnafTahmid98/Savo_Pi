@@ -243,6 +243,31 @@ ParsedCorePayload CorePayloadParser::ParseBaseState(const std::string & payload)
         "base_backend_unavailable",
         !board_error.empty() ? board_error : "base backend disconnected or reports error");
     }
+    if (level == "SAFETY_STOP") {
+      if (!object.contains("safety") || !object.at("safety").is_object()) {
+        return invalid(
+          "base_message_invalid",
+          "SAFETY_STOP requires explicit safety state");
+      }
+      const auto & safety = object.at("safety");
+      const bool safety_stop = safety.at("safety_stop").get<bool>();
+      const bool estop_latched = !safety.at("estop_latched").is_null() &&
+        safety.at("estop_latched").get<bool>();
+      if (estop_latched) {
+        return unavailable(
+          "base_emergency_stop_latched",
+          "base emergency stop is latched");
+      }
+      if (safety_stop) {
+        return operational(
+          "base_motion_interlocked",
+          true,
+          "base output is safely blocked by the perception motion interlock");
+      }
+      return invalid(
+        "base_message_invalid",
+        "SAFETY_STOP has no active safety or emergency stop source");
+    }
     if (level == "BLOCKED") {
       return operational("base_safely_blocked", true, "base output is safely blocked");
     }
@@ -268,7 +293,9 @@ ParsedCorePayload CorePayloadParser::ParseControlStatus(const std::string & payl
     return invalid("control_message_invalid", "missing or unsupported control mode");
   }
 
-  bool degraded = false;
+  bool safety_stop = false;
+  bool external_stop = false;
+  bool recovery_active = false;
   for (const auto * key : {"safety_stop", "external_stop", "recovery_active"}) {
     const auto iterator = values.find(key);
     if (iterator == values.end()) {
@@ -278,14 +305,26 @@ ParsedCorePayload CorePayloadParser::ParseControlStatus(const std::string & payl
     if (!bool_text(iterator->second, value)) {
       return invalid("control_message_invalid", std::string("invalid boolean: ") + key);
     }
-    degraded = degraded || value;
+    if (std::string{key} == "safety_stop") {
+      safety_stop = value;
+    } else if (std::string{key} == "external_stop") {
+      external_stop = value;
+    } else {
+      recovery_active = value;
+    }
   }
 
   // A stale or timed-out command is a normal safe-zero condition, not node failure.
-  return operational(
-    degraded ? "control_safely_inhibited" : "control_operational",
-    degraded,
-    "mode=" + uppercase(mode));
+  if (external_stop) {
+    return operational("control_external_stop", true, "mode=" + uppercase(mode));
+  }
+  if (recovery_active) {
+    return operational("control_recovery_active", true, "mode=" + uppercase(mode));
+  }
+  if (safety_stop) {
+    return operational("control_motion_interlocked", true, "mode=" + uppercase(mode));
+  }
+  return operational("control_operational", false, "mode=" + uppercase(mode));
 }
 
 ParsedCorePayload CorePayloadParser::ParsePerceptionHealth(const std::string & payload) const

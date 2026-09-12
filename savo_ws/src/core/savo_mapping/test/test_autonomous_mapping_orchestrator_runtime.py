@@ -890,6 +890,10 @@ def test_one_action_acquires_lease_and_completes_core_only_mission():
             )
         ), harness.diagnostics()
 
+        assert harness.control_mode_commands[-1] == 'NAV', (
+            harness.diagnostics()
+        )
+
         previous_monitor_count = harness.mode_commands.count('monitor_only')
         assert wait_until(
             lambda: harness.mode_commands.count('monitor_only')
@@ -912,6 +916,49 @@ def test_one_action_acquires_lease_and_completes_core_only_mission():
             harness.authority_commands
         )
         assert 'STOP' in harness.control_mode_commands
+    finally:
+        harness.close()
+
+
+def test_environmental_obstacle_keeps_same_active_mission_in_nav():
+    """A fresh perception interlock stops wheels, not mapping authority."""
+    harness = RuntimeHarness()
+    try:
+        harness.publish_initial_state()
+        goal_handle = harness.send_goal(auto_save=False)
+        result_future = goal_handle.get_result_async()
+        assert wait_until(
+            lambda: 'mission-am3-runtime' in harness.start_session_commands
+        ), harness.diagnostics()
+        harness.publish_exploring_state()
+        assert wait_until(
+            lambda: harness.latest_state()
+            == AutonomousMappingStatus.STATE_EXPLORING
+        ), harness.diagnostics()
+        assert harness.control_mode_commands[-1] == 'NAV'
+
+        stop_count = harness.control_mode_commands.count('STOP')
+        harness.handoff_state_pub.publish(harness.string_message('executing'))
+        harness.safety_stop_pub.publish(harness.bool_message(True))
+        time.sleep(0.35)
+
+        assert harness.latest_state() == AutonomousMappingStatus.STATE_EXPLORING
+        assert harness.control_mode_commands[-1] == 'NAV'
+        assert harness.control_mode_commands.count('STOP') == stop_count
+        assert harness.handoff_cancel_count == 0
+        assert not result_future.done()
+
+        harness.safety_stop_pub.publish(harness.bool_message(False))
+        time.sleep(0.20)
+        assert harness.latest_state() == AutonomousMappingStatus.STATE_EXPLORING
+        assert harness.control_mode_commands[-1] == 'NAV'
+        assert not result_future.done()
+
+        response = harness.control(
+            ControlAutonomousMapping.Request.COMMAND_CANCEL,
+            'runtime_cleanup',
+        )
+        assert response.accepted
     finally:
         harness.close()
 

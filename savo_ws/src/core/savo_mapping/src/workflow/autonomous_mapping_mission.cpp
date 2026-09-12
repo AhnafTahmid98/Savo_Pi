@@ -1759,7 +1759,6 @@ bool AutonomousMappingMission::safe_mapping_state(
 {
   return
     inputs.mapping_ready &&
-    !inputs.safety_stop_active &&
     inputs.supervisor_authority_received &&
     inputs.supervisor_authorized;
 }

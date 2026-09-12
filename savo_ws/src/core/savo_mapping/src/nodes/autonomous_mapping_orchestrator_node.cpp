@@ -244,6 +244,7 @@ LowLevelControlMode required_low_level_control_mode(
   }
 
   if (decision.snapshot.state == autonomous::MissionState::Exploring ||
+    decision.snapshot.state == autonomous::MissionState::CompletionPending ||
     decision.snapshot.state == autonomous::MissionState::CoveragePending ||
     decision.snapshot.state == autonomous::MissionState::Coverage ||
     decision.snapshot.state == autonomous::MissionState::ReturningToStart ||

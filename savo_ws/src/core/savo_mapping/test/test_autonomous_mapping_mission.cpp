@@ -933,7 +933,7 @@ TEST(AutonomousMappingMissionTest, ResumeRequiresPausedMission)
   EXPECT_EQ(rejected.reason, "mission_not_paused");
 }
 
-TEST(AutonomousMappingMissionTest, AuthorityLossLatchesPause)
+TEST(AutonomousMappingMissionTest, EnvironmentalMotionInterlockKeepsMissionExploring)
 {
   AutonomousMappingMission mission;
   ASSERT_TRUE(
@@ -941,6 +941,31 @@ TEST(AutonomousMappingMissionTest, AuthorityLossLatchesPause)
 
   auto inputs = exploring_inputs();
   inputs.safety_stop_active = true;
+  inputs.handoff_active = true;
+  inputs.handoff_state = "executing";
+
+  const auto decision = mission.observe(inputs);
+
+  EXPECT_EQ(decision.snapshot.state, MissionState::Exploring);
+  EXPECT_TRUE(decision.snapshot.active);
+  EXPECT_TRUE(decision.snapshot.safety_stop_active);
+  EXPECT_FALSE(decision.request_handoff_cancel);
+
+  inputs.safety_stop_active = false;
+  const auto cleared = mission.observe(inputs);
+  EXPECT_EQ(cleared.snapshot.state, MissionState::Exploring);
+  EXPECT_TRUE(cleared.snapshot.active);
+  EXPECT_FALSE(cleared.request_handoff_cancel);
+}
+
+TEST(AutonomousMappingMissionTest, SupervisorAuthorityLossLatchesPause)
+{
+  AutonomousMappingMission mission;
+  ASSERT_TRUE(
+    mission.start(valid_request(), exploring_inputs()).accepted);
+
+  auto inputs = exploring_inputs();
+  inputs.supervisor_authorized = false;
   inputs.handoff_active = true;
   inputs.handoff_state = "executing";
 
@@ -1036,6 +1061,9 @@ TEST(AutonomousMappingMissionTest, TracksGoalOutcomesOnce)
   inputs.handoff_state = "aborted";
   decision = mission.observe(inputs);
   EXPECT_EQ(decision.snapshot.goals_failed, 1U);
+  EXPECT_EQ(decision.snapshot.state, MissionState::Exploring);
+  EXPECT_TRUE(decision.snapshot.active);
+  EXPECT_FALSE(decision.terminal);
 }
 
 

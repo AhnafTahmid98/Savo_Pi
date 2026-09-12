@@ -3,6 +3,7 @@
 
 #include "savo_supervisor/mission_authority.hpp"
 
+#include <algorithm>
 #include <string>
 #include <utility>
 
@@ -58,6 +59,61 @@ MissionAuthorizationDecision allow(std::string reason)
   decision.code = MissionAuthorizationCode::kAuthorized;
   decision.reason = std::move(reason);
   return decision;
+}
+
+const ComponentSummary * find_component(
+  const SupervisorState & core,
+  const std::string & name)
+{
+  const auto iterator = std::find_if(
+    core.component_summaries.begin(),
+    core.component_summaries.end(),
+    [&name](const ComponentSummary & component) {
+      return component.name == name;
+    });
+  return iterator == core.component_summaries.end() ? nullptr : &(*iterator);
+}
+
+bool component_is_nominal_or_interlocked(
+  const SupervisorState & core,
+  const std::string & name,
+  const std::string & interlock_reason)
+{
+  const auto * component = find_component(core, name);
+  if (component == nullptr || !component->enabled || !component->ready) {
+    return false;
+  }
+  const bool nominal = !component->degraded && component->state == ComponentState::OK;
+  const bool interlocked = component->degraded &&
+    component->state == ComponentState::DEGRADED &&
+    component->reason_code == interlock_reason;
+  return nominal || interlocked;
+}
+
+bool healthy_environmental_motion_interlock(const SupervisorState & core)
+{
+  if (core.lifecycle != Lifecycle::RUNNING || !core.ready ||
+    !core.capabilities.core_health_ready || !core.capabilities.core_safety_ready ||
+    core.safety != SafetyObservation::STOPPED || !core.safety_summary.ready ||
+    !core.safety_summary.stop_fresh || !core.safety_summary.slowdown_fresh ||
+    !core.safety_summary.stop_active)
+  {
+    return false;
+  }
+
+  const bool all_required_ready = std::all_of(
+    core.component_summaries.begin(),
+    core.component_summaries.end(),
+    [](const ComponentSummary & component) {
+      return !component.required || (component.enabled && component.ready);
+    });
+  const bool base_ready = component_is_nominal_or_interlocked(
+    core, "base", "base_motion_interlocked");
+  const bool control_ready = component_is_nominal_or_interlocked(
+    core, "control", "control_motion_interlocked");
+  const auto * perception = find_component(core, "perception");
+  return all_required_ready && base_ready && control_ready &&
+         perception != nullptr && perception->ready;
 }
 
 }  // namespace
@@ -158,7 +214,12 @@ MissionAuthorizationDecision MissionAuthority::CheckOperation(
   if (dependencies.core.safety == SafetyObservation::UNKNOWN) {
     return deny(MissionAuthorizationCode::kSafetyBlocked, "safety_unknown");
   }
-  if (request.motion_required && dependencies.core.safety == SafetyObservation::STOPPED) {
+  const bool mapping_continues_while_interlocked =
+    continuation && request.operation == MissionOperation::kAutonomousMapping &&
+    healthy_environmental_motion_interlock(dependencies.core);
+  if (request.motion_required && dependencies.core.safety == SafetyObservation::STOPPED &&
+    !mapping_continues_while_interlocked)
+  {
     return deny(MissionAuthorizationCode::kSafetyBlocked, "safety_stop_active");
   }
 
@@ -177,7 +238,8 @@ MissionAuthorizationDecision MissionAuthority::CheckOperation(
     case MissionOperation::kAutonomousMapping:
       allowed = (continuation ?
         policy_.allow_autonomous_mapping &&
-        dependencies.core.capabilities.core_motion_ready &&
+        (dependencies.core.capabilities.core_motion_ready ||
+        mapping_continues_while_interlocked) &&
         capabilities.mapping_available && dependencies.mapping.ready :
         capabilities.can_start_autonomous_mapping) &&
         (!request.require_semantic || capabilities.semantic_mapping_ready);
@@ -408,7 +470,13 @@ OperatingMode ModeForAuthority(
   if (core.lifecycle == Lifecycle::FAULTED) {
     return OperatingMode::ERROR;
   }
-  if (core.safety == SafetyObservation::STOPPED) {
+  const bool mapping_continues_while_interlocked =
+    authority.operation == MissionOperation::kAutonomousMapping &&
+    authority.state == OperationState::kActive &&
+    healthy_environmental_motion_interlock(core);
+  if (core.safety == SafetyObservation::STOPPED &&
+    !mapping_continues_while_interlocked)
+  {
     return OperatingMode::ESTOP;
   }
   if (authority.state == OperationState::kPaused ||

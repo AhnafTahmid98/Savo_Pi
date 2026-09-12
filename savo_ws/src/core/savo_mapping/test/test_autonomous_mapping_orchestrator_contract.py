@@ -217,6 +217,16 @@ def test_completion_detection_is_typed_and_routes_save_publicly() -> None:
     assert 'save.map_session_service' in source
 
 
+def test_completion_pending_retains_navigation_control_mode() -> None:
+    """Tentative frontier exhaustion must not select terminal STOP."""
+    source = compact(read('src/nodes/autonomous_mapping_orchestrator_node.cpp'))
+
+    assert (
+        'decision.snapshot.state == autonomous::MissionState::Exploring || '
+        'decision.snapshot.state == autonomous::MissionState::CompletionPending ||'
+    ) in source
+
+
 def test_frontier_explorer_publishes_typed_planner_evidence() -> None:
     source = read('src/nodes/frontier_explorer_node.cpp')
     config = read('config/frontier_mapping.yaml')
