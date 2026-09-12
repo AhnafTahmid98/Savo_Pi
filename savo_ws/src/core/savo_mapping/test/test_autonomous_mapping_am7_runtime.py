@@ -993,7 +993,8 @@ class Am7RuntimeHarness:
             lambda: self.latest_state()
             == AutonomousMappingStatus.STATE_EXPLORING
         ), self.diagnostics()
-        frontier_nav_count = self.control_mode_commands.count('NAV')
+        assert self.control_mode_commands[-1] == 'NAV', self.diagnostics()
+        frontier_control_index = len(self.control_mode_commands) - 1
         self.publish_exhaustion()
 
         previous_monitors = self.mode_commands.count('monitor_only')
@@ -1009,7 +1010,10 @@ class Am7RuntimeHarness:
                 for status in self.statuses
             )
         ), self.diagnostics()
-        assert self.control_mode_commands.count('NAV') > frontier_nav_count
+        # NAV may remain selected without another command being published.
+        # Include the frontier command so an unchanged NAV is checked too.
+        transition_modes = self.control_mode_commands[frontier_control_index:]
+        assert all(mode == 'NAV' for mode in transition_modes), self.diagnostics()
         return result_future
 
     def start_initial_scan(self):
