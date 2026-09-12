@@ -17,6 +17,7 @@ from savo_bringup.launch_contract import as_bool
 from savo_bringup.launch_contract import resolve_requirements
 from savo_bringup.launch_contract import should_start_location_lifecycle
 from savo_bringup.launch_contract import validate_selection
+from savo_bringup.startup_timing import CORE_START_DELAYS
 
 
 def _python_launch(package: str, filename: str):
@@ -638,35 +639,56 @@ def generate_launch_description() -> LaunchDescription:
                 "final_head_scan_required", default_value="true"
             ),
             DeclareLaunchArgument(
-                "description_start_delay_s", default_value="0.0"
-            ),
-            DeclareLaunchArgument("base_start_delay_s", default_value="3.0"),
-            DeclareLaunchArgument("lidar_start_delay_s", default_value="6.0"),
-            DeclareLaunchArgument(
-                "perception_start_delay_s", default_value="9.0"
+                "description_start_delay_s",
+                default_value=CORE_START_DELAYS["description"],
             ),
             DeclareLaunchArgument(
-                "control_start_delay_s", default_value="12.0"
+                "base_start_delay_s",
+                default_value=CORE_START_DELAYS["base"],
             ),
             DeclareLaunchArgument(
-                "localization_start_delay_s", default_value="17.0"
-            ),
-            DeclareLaunchArgument("power_start_delay_s", default_value="22.0"),
-            DeclareLaunchArgument("head_start_delay_s", default_value="27.0"),
-            DeclareLaunchArgument(
-                "supervisor_start_delay_s", default_value="33.0"
+                "lidar_start_delay_s",
+                default_value=CORE_START_DELAYS["lidar"],
             ),
             DeclareLaunchArgument(
-                "location_lifecycle_start_delay_s", default_value="37.0"
+                "perception_start_delay_s",
+                default_value=CORE_START_DELAYS["perception"],
             ),
             DeclareLaunchArgument(
-                "manual_mapping_start_delay_s", default_value="40.0"
+                "control_start_delay_s",
+                default_value=CORE_START_DELAYS["control"],
             ),
             DeclareLaunchArgument(
-                "navigation_start_delay_s", default_value="40.0"
+                "localization_start_delay_s",
+                default_value=CORE_START_DELAYS["localization"],
             ),
             DeclareLaunchArgument(
-                "readiness_start_delay_s", default_value="45.0"
+                "power_start_delay_s",
+                default_value=CORE_START_DELAYS["power"],
+            ),
+            DeclareLaunchArgument(
+                "head_start_delay_s",
+                default_value=CORE_START_DELAYS["head"],
+            ),
+            DeclareLaunchArgument(
+                "supervisor_start_delay_s",
+                default_value=CORE_START_DELAYS["supervisor"],
+            ),
+            DeclareLaunchArgument(
+                "location_lifecycle_start_delay_s",
+                default_value=CORE_START_DELAYS["location_lifecycle"],
+            ),
+            DeclareLaunchArgument(
+                "manual_mapping_start_delay_s",
+                default_value=CORE_START_DELAYS["mapping"],
+            ),
+            DeclareLaunchArgument(
+                "navigation_start_delay_s",
+                default_value=CORE_START_DELAYS["navigation"],
+            ),
+            DeclareLaunchArgument(
+                "readiness_start_delay_s",
+                default_value=CORE_START_DELAYS["mapping"],
             ),
             OpaqueFunction(function=_setup),
         ]

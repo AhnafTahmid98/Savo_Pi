@@ -15,33 +15,33 @@ AUTONOMOUS_LAUNCH = PACKAGE_ROOT / "launch" / "autonomous_mapping.launch.py"
 
 CORE_STAGE_DEFAULTS = {
     "description_start_delay_s": "0.0",
-    "base_start_delay_s": "3.0",
-    "lidar_start_delay_s": "6.0",
-    "perception_start_delay_s": "9.0",
-    "control_start_delay_s": "12.0",
-    "localization_start_delay_s": "17.0",
-    "power_start_delay_s": "22.0",
-    "head_start_delay_s": "27.0",
-    "supervisor_start_delay_s": "33.0",
-    "location_lifecycle_start_delay_s": "37.0",
-    "manual_mapping_start_delay_s": "40.0",
-    "navigation_start_delay_s": "40.0",
-    "readiness_start_delay_s": "45.0",
+    "base_start_delay_s": "5.0",
+    "lidar_start_delay_s": "10.0",
+    "perception_start_delay_s": "15.0",
+    "control_start_delay_s": "20.0",
+    "localization_start_delay_s": "30.0",
+    "power_start_delay_s": "35.0",
+    "head_start_delay_s": "40.0",
+    "supervisor_start_delay_s": "45.0",
+    "location_lifecycle_start_delay_s": "50.0",
+    "manual_mapping_start_delay_s": "60.0",
+    "navigation_start_delay_s": "55.0",
+    "readiness_start_delay_s": "60.0",
 }
 
 AUTONOMOUS_STAGE_DEFAULTS = {
     "description_start_delay_s": "0.0",
-    "base_start_delay_s": "3.0",
-    "lidar_start_delay_s": "6.0",
-    "perception_start_delay_s": "9.0",
-    "control_start_delay_s": "12.0",
-    "localization_start_delay_s": "17.0",
-    "power_start_delay_s": "22.0",
-    "head_start_delay_s": "27.0",
-    "supervisor_start_delay_s": "33.0",
-    "location_lifecycle_start_delay_s": "37.0",
-    "navigation_start_delay_s": "40.0",
-    "mapping_start_delay_s": "45.0",
+    "base_start_delay_s": "5.0",
+    "lidar_start_delay_s": "10.0",
+    "perception_start_delay_s": "15.0",
+    "control_start_delay_s": "20.0",
+    "localization_start_delay_s": "30.0",
+    "power_start_delay_s": "35.0",
+    "head_start_delay_s": "40.0",
+    "supervisor_start_delay_s": "45.0",
+    "location_lifecycle_start_delay_s": "50.0",
+    "navigation_start_delay_s": "55.0",
+    "mapping_start_delay_s": "60.0",
 }
 
 EDGE_STAGE_DEFAULTS = {
@@ -63,7 +63,7 @@ def read(path: Path) -> str:
 
 
 def launch_defaults(path: Path) -> dict[str, str]:
-    """Extract literal launch argument defaults without importing ROS."""
+    """Resolve literal or canonical timing defaults without importing ROS."""
     defaults = {}
     for node in ast.walk(ast.parse(read(path), filename=str(path))):
         if not isinstance(node, ast.Call):
@@ -74,17 +74,53 @@ def launch_defaults(path: Path) -> dict[str, str]:
             continue
         default = next(
             (
-                keyword.value.value
+                keyword.value
                 for keyword in node.keywords
                 if keyword.arg == "default_value"
-                and isinstance(keyword.value, ast.Constant)
-                and isinstance(keyword.value.value, str)
             ),
             None,
         )
-        if default is not None:
-            defaults[node.args[0].value] = default
+        if isinstance(default, ast.Constant) and isinstance(default.value, str):
+            defaults[node.args[0].value] = default.value
+        elif (
+            isinstance(default, ast.Subscript)
+            and isinstance(default.value, ast.Name)
+            and default.value.id == "CORE_START_DELAYS"
+        ):
+            from savo_bringup.startup_timing import CORE_START_DELAYS
+
+            defaults[node.args[0].value] = CORE_START_DELAYS[
+                ast.literal_eval(default.slice)
+            ]
     return defaults
+
+
+def test_core_entrypoints_share_one_timing_source() -> None:
+    """Every Core delay default comes from the same installed Python module."""
+    for path, names in (
+        (CORE_LAUNCH, set(CORE_STAGE_DEFAULTS)),
+        (AUTONOMOUS_LAUNCH, set(AUTONOMOUS_STAGE_DEFAULTS)),
+        (ROBOT_LAUNCH, (set(CORE_STAGE_DEFAULTS) - {"readiness_start_delay_s"})
+         | {"core_readiness_start_delay_s"}),
+    ):
+        source = read(path)
+        assert "from savo_bringup.startup_timing import CORE_START_DELAYS" in source
+        for node in ast.walk(ast.parse(source)):
+            if not (
+                isinstance(node, ast.Call)
+                and getattr(node.func, "id", "") == "DeclareLaunchArgument"
+                and node.args
+                and isinstance(node.args[0], ast.Constant)
+                and node.args[0].value in names
+            ):
+                continue
+            default = next(k.value for k in node.keywords if k.arg == "default_value")
+            assert isinstance(default, ast.Subscript), node.args[0].value
+            assert isinstance(default.value, ast.Name)
+            assert default.value.id == "CORE_START_DELAYS"
+
+    cmake = read(PACKAGE_ROOT / "CMakeLists.txt")
+    assert "ament_python_install_package(${PROJECT_NAME})" in cmake
 
 
 def launch_argument_names(path: Path) -> tuple[set[str], set[str]]:
@@ -182,9 +218,9 @@ def test_core_stage_defaults_are_dependency_ordered() -> None:
     foundation_values = [float(defaults[name]) for name in foundation]
     assert foundation_values == sorted(foundation_values)
     assert len(set(foundation_values)) == len(foundation_values)
-    assert float(defaults["manual_mapping_start_delay_s"]) == 40.0
-    assert float(defaults["navigation_start_delay_s"]) == 40.0
-    assert float(defaults["readiness_start_delay_s"]) > 40.0
+    assert float(defaults["manual_mapping_start_delay_s"]) == 60.0
+    assert float(defaults["navigation_start_delay_s"]) == 55.0
+    assert float(defaults["readiness_start_delay_s"]) == 60.0
 
 
 def test_autonomous_mapping_uses_dependency_ordered_core_offsets() -> None:

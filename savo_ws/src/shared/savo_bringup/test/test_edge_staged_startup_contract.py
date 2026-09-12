@@ -349,9 +349,10 @@ def test_core_launch_does_not_receive_edge_stage_controls() -> None:
 
     for name in STAGE_DEFAULTS.keys() - {"readiness_start_delay_s"}:
         assert name not in core
-    assert launch_defaults(PACKAGE_ROOT / "launch" / "core_bringup.launch.py")[
-        "readiness_start_delay_s"
-    ] == "45.0"
+    core_declared, _ = launch_argument_names(
+        PACKAGE_ROOT / "launch" / "core_bringup.launch.py"
+    )
+    assert "readiness_start_delay_s" in core_declared
     core_branch = robot.split('if role in {"core", "all"}:', maxsplit=1)[1]
     core_branch = core_branch.split('if role in {"edge", "all"}:', maxsplit=1)[0]
     for name in STAGE_DEFAULTS.keys() - {"readiness_start_delay_s"}:

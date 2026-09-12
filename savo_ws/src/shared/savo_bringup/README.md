@@ -172,18 +172,27 @@ The historical delay arguments remain declared and forwarded for launch API
 compatibility:
 
 - `description_start_delay_s` (default `0.0`)
-- `base_start_delay_s` (default `3.0`)
-- `lidar_start_delay_s` (default `6.0`)
-- `perception_start_delay_s` (default `9.0`)
-- `control_start_delay_s` (default `12.0`)
-- `localization_start_delay_s` (default `17.0`)
-- `power_start_delay_s` (default `22.0`)
-- `head_start_delay_s` (default `27.0`)
-- `supervisor_start_delay_s` (default `33.0`)
-- `location_lifecycle_start_delay_s` (default `37.0`)
-- `manual_mapping_start_delay_s` (default `40.0`)
-- `navigation_start_delay_s` (default `40.0`)
-- `readiness_start_delay_s` (default `45.0`)
+- `base_start_delay_s` (default `5.0`)
+- `lidar_start_delay_s` (default `10.0`)
+- `perception_start_delay_s` (default `15.0`)
+- `control_start_delay_s` (default `20.0`)
+- `localization_start_delay_s` (default `30.0`)
+- `power_start_delay_s` (default `35.0`)
+- `head_start_delay_s` (default `40.0`)
+- `supervisor_start_delay_s` (default `45.0`)
+- `location_lifecycle_start_delay_s` (default `50.0`)
+- `manual_mapping_start_delay_s` (default `60.0`)
+- `navigation_start_delay_s` (default `55.0`)
+- `readiness_start_delay_s` (default `60.0`)
+
+`savo_bringup/startup_timing.py` owns the shared defaults used by
+`robot_bringup.launch.py`, `core_bringup.launch.py`, and the direct autonomous
+mapping launch. All offsets are seconds from launch, not cumulative waits.
+The autonomous launch starts Nav2 at T=55 and SLAM plus mapping runtime at T=60
+using `mapping_start_delay_s`. The Core wrapper preserves its historical
+`readiness_start_delay_s` alias for that mapping offset; the robot role wrapper
+exposes it as `core_readiness_start_delay_s`. No readiness process is launched.
+Edge timing remains independent.
 
 These offsets spread startup load but never prove health or authorize motion.
 Existing `start_*` flags omit disabled optional components.
