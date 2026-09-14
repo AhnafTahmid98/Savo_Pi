@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 
 #include "savo_supervisor/mission_authority.hpp"
+#include "savo_supervisor/system_authority.hpp"
 
 namespace
 {
@@ -121,6 +122,54 @@ savo_supervisor::MissionDependencySnapshot with_environmental_motion_interlock(
 }
 
 }  // namespace
+
+TEST(MissionAuthority, ClearedArmedCoreAdmitsMappingAndFreshnessLossRequiresExplicitRecovery)
+{
+  auto dependencies = healthy_dependencies();
+  dependencies.core.safety_summary.ready = true;
+  savo_supervisor::ComponentSummary edge;
+  edge.name = "edge_ups";
+  edge.enabled = true;
+  edge.required = false;
+  edge.state = savo_supervisor::ComponentState::STALE;
+  dependencies.core.component_summaries.push_back(edge);
+  auto system_dependencies = savo_supervisor::EvaluateCoreSystemDependencies(dependencies.core);
+  system_dependencies.startup_dependencies_ready = true;
+  savo_supervisor::SystemAuthority system;
+  system.RestoreFaultLatch(true, 42U, "old_fault");
+  savo_supervisor::SystemAuthorityRequest command;
+  command.request_id = "verified-recovery";
+  command.actor_id = "operator";
+  command.command = savo_supervisor::SystemCommand::kClearFaultLatch;
+  ASSERT_TRUE(system.Handle(command, system_dependencies).accepted);
+  command.command = savo_supervisor::SystemCommand::kArm;
+  ASSERT_TRUE(system.Handle(command, system_dependencies).accepted);
+  EXPECT_FALSE(system.Update(system_dependencies));
+  dependencies.system.armed = system.snapshot(system_dependencies).armed;
+  dependencies.system.fault_latched = system.snapshot(system_dependencies).fault_latched;
+  savo_supervisor::MissionAuthority authority;
+  const auto acquire = request(savo_supervisor::AuthorityCommand::kAcquire,
+    savo_supervisor::MissionOperation::kAutonomousMapping);
+  ASSERT_TRUE(authority.Handle(acquire, dependencies).authorized);
+
+  system_dependencies.core_ready = false;
+  system_dependencies.core_fault = {savo_supervisor::CoreFaultKind::kUnavailable,
+    "localization:STALE:localization_summary_stale"};
+  ASSERT_TRUE(system.Update(system_dependencies));
+  dependencies.system.armed = system.snapshot(system_dependencies).armed;
+  dependencies.system.fault_latched = system.snapshot(system_dependencies).fault_latched;
+  EXPECT_FALSE(dependencies.system.fault_latched);
+  EXPECT_TRUE(authority.Revalidate(dependencies));
+  EXPECT_EQ(authority.state().state, savo_supervisor::OperationState::kRevoked);
+  EXPECT_EQ(authority.state().reason, "runtime_authorization_revoked:system_not_armed");
+
+  system_dependencies = savo_supervisor::EvaluateCoreSystemDependencies(dependencies.core);
+  system_dependencies.startup_dependencies_ready = true;
+  EXPECT_FALSE(system.Update(system_dependencies));
+  EXPECT_FALSE(system.snapshot(system_dependencies).armed);
+  EXPECT_FALSE(authority.Revalidate(dependencies));
+  EXPECT_EQ(authority.state().state, savo_supervisor::OperationState::kRevoked);
+}
 
 TEST(MissionAuthority, HealthySemanticMappingCapabilitiesAreReady)
 {

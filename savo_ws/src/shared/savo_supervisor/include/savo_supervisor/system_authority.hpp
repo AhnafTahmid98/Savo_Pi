@@ -3,8 +3,12 @@
 
 #pragma once
 
+#include <chrono>
 #include <cstdint>
+#include <optional>
 #include <string>
+
+#include "savo_supervisor/supervisor_state.hpp"
 
 namespace savo_supervisor
 {
@@ -40,16 +44,31 @@ enum class SystemAuthorityCode : std::uint8_t
   kGenerationMismatch,
 };
 
+enum class CoreFaultKind
+{
+  kNone,
+  kUnavailable,
+  kCritical,
+};
+
+struct CoreFaultEvidence
+{
+  CoreFaultKind kind{CoreFaultKind::kNone};
+  std::string reason;
+};
+
 struct SystemDependencySnapshot
 {
   bool core_ready{false};
-  bool core_faulted{false};
+  CoreFaultEvidence core_fault;
   bool safety_known{false};
   bool startup_dependencies_ready{false};
   bool degraded{false};
   bool remote_commands_ready{false};
   bool mission_idle{true};
 };
+
+[[nodiscard]] SystemDependencySnapshot EvaluateCoreSystemDependencies(const SupervisorState & core);
 
 struct SystemAuthorityPolicy
 {
@@ -91,7 +110,9 @@ class SystemAuthority
 public:
   explicit SystemAuthority(SystemAuthorityPolicy policy = {});
 
-  [[nodiscard]] bool Update(const SystemDependencySnapshot & dependencies);
+  [[nodiscard]] bool Update(
+    const SystemDependencySnapshot & dependencies,
+    std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now());
 
   [[nodiscard]] SystemAuthorityDecision Handle(
     const SystemAuthorityRequest & request,
@@ -112,6 +133,8 @@ private:
   bool armed_{false};
   bool fault_latched_{false};
   bool shutdown_requested_{false};
+  bool rearm_required_{false};
+  std::optional<std::chrono::steady_clock::time_point> unavailable_since_;
   std::uint64_t generation_{0U};
   std::string reason_{"system_booting"};
   std::string last_actor_{};

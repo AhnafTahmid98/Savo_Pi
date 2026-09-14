@@ -8,6 +8,7 @@
 
 #include "rclcpp/rclcpp.hpp"
 #include "savo_supervisor/supervisor_policy.hpp"
+#include "savo_supervisor/system_authority.hpp"
 
 namespace
 {
@@ -58,6 +59,60 @@ rclcpp::Time test_time()
 }
 
 }  // namespace
+
+TEST(CoreReadinessPolicy, ExpiredRequiredMessageFaultsReadinessWithoutImmediatePersistentLatch)
+{
+  savo_supervisor::SupervisorPolicy policy;
+  savo_supervisor::ComponentStatus lidar;
+  lidar.config = policy.lidar;
+  lidar.summary_valid = true;
+  lidar.summary_ready = true;
+  lidar.summary_state = "OK";
+  lidar.heartbeat_valid = true;
+  lidar.heartbeat_alive = true;
+  lidar.heartbeat_ready = true;
+  lidar.heartbeat_state = "OK";
+  lidar.ever_operational = true;
+  const rclcpp::Time last_received(10, 0, RCL_ROS_TIME);
+  lidar.summary_tracker.observe_message(last_received, std::nullopt, false, "");
+  lidar.heartbeat_tracker.observe_message(last_received, std::nullopt, false, "");
+  auto components = healthy_core();
+  components[3] = policy.EvaluateComponent(lidar, last_received, 10.0);
+  auto core = policy.EvaluateSupervisor(components, clear_safety(), last_received, 10.0);
+  auto dependencies = savo_supervisor::EvaluateCoreSystemDependencies(core);
+  dependencies.startup_dependencies_ready = true;
+  savo_supervisor::SystemAuthority authority;
+  savo_supervisor::SystemAuthorityRequest arm;
+  arm.command = savo_supervisor::SystemCommand::kArm;
+  arm.request_id = "fresh-core";
+  arm.actor_id = "operator";
+  ASSERT_TRUE(authority.Handle(arm, dependencies).accepted);
+
+  const rclcpp::Time expired(12, 1, RCL_ROS_TIME);
+  components[3] = policy.EvaluateComponent(lidar, expired, 12.0);
+  ASSERT_EQ(components[3].state, savo_supervisor::ComponentState::STALE);
+  core = policy.EvaluateSupervisor(components, clear_safety(), expired, 12.0);
+  EXPECT_EQ(core.lifecycle, savo_supervisor::Lifecycle::FAULTED);
+  EXPECT_FALSE(core.capabilities.core_motion_ready);
+  dependencies = savo_supervisor::EvaluateCoreSystemDependencies(core);
+  EXPECT_EQ(dependencies.core_fault.reason, "lidar:STALE:lidar_summary_stale");
+  ASSERT_TRUE(authority.Update(dependencies));
+  EXPECT_FALSE(authority.snapshot(dependencies).armed);
+  EXPECT_FALSE(authority.snapshot(dependencies).fault_latched);
+
+  // A clock integrity fault must not receive the freshness-only persistence grace.
+  lidar.summary_tracker.observe_message(rclcpp::Time(9, 0, RCL_ROS_TIME),
+    std::nullopt, false, "");
+  components[3] = policy.EvaluateComponent(lidar, expired, 12.0);
+  ASSERT_EQ(components[3].state, savo_supervisor::ComponentState::INVALID);
+  core = policy.EvaluateSupervisor(components, clear_safety(), expired, 12.0);
+  dependencies = savo_supervisor::EvaluateCoreSystemDependencies(core);
+  EXPECT_EQ(dependencies.core_fault.kind, savo_supervisor::CoreFaultKind::kCritical);
+  EXPECT_TRUE(authority.Update(dependencies));
+  EXPECT_TRUE(authority.snapshot(dependencies).fault_latched);
+  EXPECT_EQ(authority.snapshot(dependencies).reason,
+    "core_fault_latched:lidar:INVALID:ros_time_regression_detected");
+}
 
 TEST(CoreReadinessPolicy, HealthyCoreEnablesMotionAndMapping)
 {

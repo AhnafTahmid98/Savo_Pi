@@ -213,7 +213,15 @@ Typed startup and lifecycle authority using `savo_msgs/srv/ManageSystemState`:
 - `BEGIN_SHUTDOWN`
 - `CLEAR_FAULT_LATCH`
 
-Production startup is disarmed by default. Motion-capable operations are denied until an explicit `ARM` request succeeds. A required core fault after arming disarms the system and latches the fault. The latch is atomically persisted and survives supervisor restart; dependency recovery alone does not clear it.
+Production startup is disarmed by default. Motion-capable operations are denied until an explicit `ARM` request succeeds. Loss of required Core readiness after arming immediately disarms the system and revokes mission authority. Recovery never automatically re-arms or resumes a mission.
+
+Persistence is distinct from this immediate safety response:
+
+- Required component ERROR/INVALID (including critical power, contract and timestamp integrity faults) latches immediately. Invalid safety messages also latch immediately.
+- Missing/stale required inputs and unknown safety observations disarm immediately, but latch only if Core unavailability is still observed after one continuous second. This persistence-only window uses `std::chrono::steady_clock`; repeated service calls cannot accelerate it. Recovery observed within the window cancels pending persistence, not the requirement for explicit re-arm and mission RESUME.
+- Qualification continues after the initial disarm, so a sustained outage still latches. A critical fault during qualification latches immediately. Optional Edge loss and a valid environmental obstacle STOP do not independently latch Core.
+
+No freshness, startup, power or motion thresholds are extended. The latch is atomically persisted and survives supervisor restart; recovery alone does not clear it. The existing event/state/persistence `reason` retains evidence such as `core_fault_latched:base_battery:ERROR:base_battery_critical` or `core_fault_latched:lidar:STALE:lidar_summary_stale`. The first transient disarm uses `core_unavailable:<component>:<state>:<reason>`. Persistence schema version 1 remains compatible with old saved latches; old generic reasons cannot retrospectively identify their source.
 
 Remote-origin actors such as `savo_bridge`, SavoMind, the operator app and `savo_speech` require a healthy bridge command path. Bridge loss revokes an active remote lease while preserving local core supervision. Recovery never resumes a mission automatically.
 

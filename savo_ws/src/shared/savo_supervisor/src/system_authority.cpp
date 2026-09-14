@@ -32,6 +32,49 @@ SystemAuthorityDecision reject(SystemAuthorityCode code, std::string reason)
 
 }  // namespace
 
+SystemDependencySnapshot EvaluateCoreSystemDependencies(const SupervisorState & core)
+{
+  SystemDependencySnapshot dependencies;
+  dependencies.core_ready = core.lifecycle == Lifecycle::RUNNING && core.ready &&
+    core.capabilities.core_health_ready && core.capabilities.core_safety_ready;
+  dependencies.safety_known = core.safety != SafetyObservation::UNKNOWN;
+  // Examine all required components: an earlier stale source must not hide a critical fault.
+  for (const auto & component : core.component_summaries) {
+    if (!component.required || component.ready) {
+      continue;
+    }
+    const bool temporary = component.state == ComponentState::STALE ||
+      component.state == ComponentState::INITIALIZING || component.state == ComponentState::UNKNOWN;
+    CoreFaultEvidence fault{
+      temporary ? CoreFaultKind::kUnavailable : CoreFaultKind::kCritical,
+      component.name + ":" + ToString(component.state) + ":" + component.reason_code};
+    if (!temporary) {
+      dependencies.core_fault = std::move(fault);
+      return dependencies;
+    }
+    if (dependencies.core_fault.kind == CoreFaultKind::kNone) {
+      dependencies.core_fault = std::move(fault);
+    }
+  }
+  if (!core.safety_summary.ready || !dependencies.safety_known) {
+    const auto & reason = core.safety_summary.reason_code;
+    const bool temporary = reason == "safety_stop_missing" || reason == "safety_stop_stale" ||
+      reason == "safety_slowdown_missing" || reason == "safety_slowdown_stale" ||
+      reason == "safety_state_unknown";
+    if (!temporary || dependencies.core_fault.kind == CoreFaultKind::kNone) {
+      dependencies.core_fault = {
+        temporary ? CoreFaultKind::kUnavailable : CoreFaultKind::kCritical,
+        "safety:UNKNOWN:" + reason};
+    }
+  }
+  if (dependencies.core_fault.kind == CoreFaultKind::kNone &&
+    (core.lifecycle == Lifecycle::FAULTED || core.health == AggregateHealth::ERROR))
+  {
+    dependencies.core_fault = {CoreFaultKind::kCritical, "core:ERROR:" + core.reason_code};
+  }
+  return dependencies;
+}
+
 SystemAuthority::SystemAuthority(SystemAuthorityPolicy policy)
 : policy_(std::move(policy))
 {
@@ -46,19 +89,42 @@ void SystemAuthority::change(std::string reason, std::string actor)
   }
 }
 
-bool SystemAuthority::Update(const SystemDependencySnapshot & dependencies)
+bool SystemAuthority::Update(
+  const SystemDependencySnapshot & dependencies,
+  const std::chrono::steady_clock::time_point now)
 {
-  if (shutdown_requested_) {
+  if (shutdown_requested_ || fault_latched_) {
     return false;
   }
-  if (armed_ && dependencies.core_faulted && policy_.latch_core_faults_after_arm) {
+  const bool unavailable = !dependencies.core_ready || !dependencies.safety_known ||
+    dependencies.core_fault.kind != CoreFaultKind::kNone;
+  if (!unavailable) {
+    unavailable_since_.reset();
+  } else if (armed_ || unavailable_since_.has_value()) {
+    const bool was_armed = armed_;
     armed_ = false;
-    fault_latched_ = true;
-    change("core_fault_latched", "automatic_revalidation");
-    return true;
+    rearm_required_ = true;
+    if (!unavailable_since_.has_value()) {
+      unavailable_since_ = now;
+    }
+    const auto evidence = dependencies.core_fault.reason.empty() ?
+      "core:UNKNOWN:required_core_dependency_unavailable" : dependencies.core_fault.reason;
+    // Persistence qualification only. Authority is lost on the FIRST observation.
+    // Service calls cannot accelerate this window; it uses monotonic elapsed time.
+    const bool confirmed = dependencies.core_fault.kind == CoreFaultKind::kCritical ||
+      now - *unavailable_since_ >= std::chrono::seconds(1);
+    if (confirmed && policy_.latch_core_faults_after_arm) {
+      fault_latched_ = true;
+      change("core_fault_latched:" + evidence, "automatic_revalidation");
+      return true;
+    }
+    if (was_armed) {
+      change("core_unavailable:" + evidence, "automatic_revalidation");
+      return true;
+    }
   }
-  if (policy_.auto_arm && !armed_ && !fault_latched_ &&
-    dependencies.core_ready && dependencies.startup_dependencies_ready)
+  if (policy_.auto_arm && !rearm_required_ && !armed_ && !fault_latched_ &&
+    !unavailable && dependencies.startup_dependencies_ready)
   {
     armed_ = true;
     change("system_auto_armed", "automatic_startup");
@@ -91,10 +157,15 @@ SystemAuthorityDecision SystemAuthority::Handle(
       return accept(
         "system_already_armed", SystemAuthorityCode::kAlreadyInState);
     }
-    if (!dependencies.core_ready || !dependencies.startup_dependencies_ready) {
+    if (!dependencies.core_ready || !dependencies.safety_known ||
+      dependencies.core_fault.kind != CoreFaultKind::kNone ||
+      !dependencies.startup_dependencies_ready)
+    {
       return reject(SystemAuthorityCode::kNotReady, "startup_dependencies_not_ready");
     }
     armed_ = true;
+    rearm_required_ = false;
+    unavailable_since_.reset();
     change(request.reason.empty() ? "system_armed" : request.reason, request.actor_id);
     return accept(reason_);
   }
@@ -104,6 +175,7 @@ SystemAuthorityDecision SystemAuthority::Handle(
         "system_already_disarmed", SystemAuthorityCode::kAlreadyInState);
     }
     armed_ = false;
+    rearm_required_ = true;
     change(request.reason.empty() ? "system_disarmed" : request.reason, request.actor_id);
     return accept(reason_);
   }
@@ -125,11 +197,14 @@ SystemAuthorityDecision SystemAuthority::Handle(
         "fault_latch_already_clear", SystemAuthorityCode::kAlreadyInState);
     }
     const bool safe = dependencies.core_ready && dependencies.safety_known &&
+      dependencies.core_fault.kind == CoreFaultKind::kNone &&
       dependencies.startup_dependencies_ready && dependencies.mission_idle;
     if (!safe) {
       return reject(SystemAuthorityCode::kUnsafeToClear, "fault_latch_clear_not_safe");
     }
     fault_latched_ = false;
+    rearm_required_ = true;
+    unavailable_since_.reset();
     change(request.reason.empty() ? "fault_latch_cleared" : request.reason, request.actor_id);
     return accept(reason_);
   }
@@ -144,6 +219,8 @@ void SystemAuthority::RestoreFaultLatch(
   armed_ = false;
   fault_latched_ = fault_latched;
   shutdown_requested_ = false;
+  rearm_required_ = true;
+  unavailable_since_.reset();
   generation_ = generation;
   reason_ = fault_latched ?
     (reason.empty() ? "fault_latch_restored" : reason) :

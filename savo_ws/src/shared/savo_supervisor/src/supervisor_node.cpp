@@ -1309,12 +1309,7 @@ private:
     const svo::SupervisorState & core,
     const svo::EdgeSupervisionState & edge) const
   {
-    svo::SystemDependencySnapshot dependencies;
-    dependencies.core_ready = core.lifecycle == svo::Lifecycle::RUNNING &&
-      core.ready && core.capabilities.core_health_ready && core.capabilities.core_safety_ready;
-    dependencies.core_faulted = core.lifecycle == svo::Lifecycle::FAULTED ||
-      core.health == svo::AggregateHealth::ERROR;
-    dependencies.safety_known = core.safety != svo::SafetyObservation::UNKNOWN;
+    auto dependencies = svo::EvaluateCoreSystemDependencies(core);
     dependencies.startup_dependencies_ready = edge.capabilities.edge_startup_ready;
     dependencies.degraded = core.degraded || edge.degraded;
     dependencies.remote_commands_ready = edge.capabilities.remote_command_path_ready;
@@ -1544,7 +1539,12 @@ private:
     if (!summary.stop_fresh || !summary.slowdown_fresh) {
       summary.observation = svo::SafetyObservation::UNKNOWN;
       summary.ready = false;
-      summary.reason_code = !stop.received ? "safety_stop_missing" :
+      summary.reason_code = stop.time_regression || stop.timestamp_fault ||
+        slowdown.time_regression || slowdown.timestamp_fault ? "safety_time_regression" :
+        (stop.received && (!safety_stop_valid_ || stop.malformed)) ||
+        (slowdown.received && (!safety_slowdown_valid_ || slowdown.malformed)) ?
+        "safety_message_invalid" :
+        !stop.received ? "safety_stop_missing" :
         stop.stale ? "safety_stop_stale" :
         !slowdown.received ? "safety_slowdown_missing" :
         slowdown.stale ? "safety_slowdown_stale" : "safety_message_invalid";
