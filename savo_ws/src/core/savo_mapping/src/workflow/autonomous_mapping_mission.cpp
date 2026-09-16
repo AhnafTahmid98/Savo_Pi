@@ -1750,7 +1750,7 @@ bool AutonomousMappingMission::authority_inputs_complete(
     inputs.readiness_received &&
     inputs.safety_stop_received &&
     inputs.runtime_authority_received &&
-    inputs.supervisor_authority_received &&
+    inputs.mission_authority_received &&
     inputs.handoff_state_received;
 }
 
@@ -1759,8 +1759,8 @@ bool AutonomousMappingMission::safe_mapping_state(
 {
   return
     inputs.mapping_ready &&
-    inputs.supervisor_authority_received &&
-    inputs.supervisor_authorized;
+    inputs.mission_authority_received &&
+    inputs.mission_authorized;
 }
 
 bool AutonomousMappingMission::workflow_is_frontier(

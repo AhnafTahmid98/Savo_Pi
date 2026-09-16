@@ -21,6 +21,7 @@ find_package(rclcpp REQUIRED)
 find_package(builtin_interfaces REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(savo_msgs REQUIRED)
+find_package(diagnostic_msgs REQUIRED)
 find_package(nav2_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(slam_toolbox REQUIRED)
@@ -46,6 +47,7 @@ add_library(${PROJECT_NAME}_core
   src/core/session_state.cpp
   src/core/mapping_types.cpp
   src/core/mapping_status.cpp
+  src/core/local_mapping_health.cpp
   src/core/supervisor_runtime.cpp
   src/exploration/exploration_goal.cpp
   src/exploration/exploration_planner.cpp
@@ -150,6 +152,7 @@ ament_target_dependencies(mapping_supervisor_node
   std_msgs
   geometry_msgs
   sensor_msgs
+  diagnostic_msgs
   nav_msgs
   tf2
   tf2_ros
@@ -235,6 +238,9 @@ set(_savo_mapping_public_headers
   include/savo_mapping/frontier_detector.hpp
   include/savo_mapping/frontier_selector.hpp
   include/savo_mapping/manual_workflow_state.hpp
+  include/savo_mapping/local_mapping_authority.hpp
+  include/savo_mapping/local_mapping_health.hpp
+  include/savo_mapping/mapping_phase_authority.hpp
   include/savo_mapping/workflow_authority.hpp
   include/savo_mapping/exploration_runtime.hpp
   include/savo_mapping/frontier_completion_detector.hpp
@@ -917,6 +923,7 @@ ament_target_dependencies(
   rclcpp
   std_msgs
   std_srvs
+  savo_msgs
 )
 
 install(
@@ -1609,6 +1616,26 @@ if(BUILD_TESTING)
   )
   target_link_libraries(test_mapping_supervisor_runtime
     ${PROJECT_NAME}_core
+  )
+  ament_add_gtest(test_local_mapping_health
+    test/test_local_mapping_health.cpp
+  )
+  target_link_libraries(test_local_mapping_health
+    ${PROJECT_NAME}_core
+  )
+  ament_add_gtest(test_local_mapping_authority
+    test/test_local_mapping_authority.cpp
+  )
+  target_link_libraries(test_local_mapping_authority
+    ${PROJECT_NAME}_core
+  )
+  ament_add_gtest(test_mapping_phase_authority
+    test/test_mapping_phase_authority.cpp
+  )
+  target_link_libraries(test_mapping_phase_authority ${PROJECT_NAME}_core)
+  ament_add_pytest_test(test_mapping_local_authority_contract
+    test/test_mapping_local_authority_contract.py
+    TIMEOUT 60
   )
   ament_add_gtest(test_slam_contract
     test/test_slam_contract.cpp

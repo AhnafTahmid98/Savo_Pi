@@ -16,17 +16,18 @@ def test_mapping_commands_are_typed_and_quality_gated() -> None:
     assert 'require_semantic' in protocol
 
 
-def test_mapping_action_requires_exact_supervisor_lease_first() -> None:
+def test_mapping_action_requests_exact_mapping_local_acquisition() -> None:
     dispatcher = read('src/ros_command_dispatcher.cpp')
     for token in (
-        'COMMAND_ACQUIRE',
-        'OP_START_AUTONOMOUS_MAPPING',
-        'bridge_supervisor_authorization_rejected',
         'goal.authority_request_id',
-        'goal.authority_generation',
+        'goal.authority_generation = 0U',
         'goal.require_semantic',
     ):
         assert token in dispatcher
+    mapping = dispatcher.split('CommandDispatchResult dispatch_start_mapping(', 1)[1]
+    mapping = mapping.split('CommandDispatchResult dispatch_mapping_control(', 1)[0]
+    assert 'supervisor_authorization_client_' not in mapping
+    assert 'async_cancel_goal' in mapping
 
 
 def test_status_queries_cover_navigation_mapping_and_supervisor() -> None:

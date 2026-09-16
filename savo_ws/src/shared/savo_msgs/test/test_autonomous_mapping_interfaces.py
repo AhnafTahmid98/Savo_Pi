@@ -189,8 +189,9 @@ def test_action_starts_one_mission_and_returns_typed_status() -> None:
     ):
         assert token in text
 
-    assert "A zero authority_generation asks the action server" in text
-    assert "A nonzero generation identifies" in text
+    assert "Zero asks the orchestrator to acquire a new" in text
+    assert "Nonzero pre-acquired system-Supervisor generations are explicitly rejected" in text
+    assert "mapping_local_preacquired_generation_not_supported" in text
     assert "geometry_msgs/PoseStamped" not in text
     assert "nav2_msgs" not in text
 

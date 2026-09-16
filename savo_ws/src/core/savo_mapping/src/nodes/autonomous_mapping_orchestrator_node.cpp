@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: LicenseRef-Proprietary
 
 #include "savo_mapping/autonomous_mapping_mission.hpp"
+#include "savo_mapping/local_mapping_authority.hpp"
 #include "savo_mapping/autonomous_mapping_am7.hpp"
 #include "savo_mapping/frontier_completion_detector.hpp"
 #include "savo_mapping/saved_map_contract.hpp"
@@ -20,6 +21,7 @@
 #include <savo_msgs/msg/frontier_exploration_status.hpp>
 #include <savo_msgs/srv/control_autonomous_mapping.hpp>
 #include <savo_msgs/srv/authorize_operation.hpp>
+#include <savo_msgs/srv/authorize_location_operation.hpp>
 #include <savo_msgs/srv/commit_location_release.hpp>
 #include <savo_msgs/srv/list_location_candidates.hpp>
 #include <savo_msgs/srv/list_locations.hpp>
@@ -62,6 +64,7 @@ using RunMission = savo_msgs::action::RunAutonomousMapping;
 using GoalHandle = rclcpp_action::ServerGoalHandle<RunMission>;
 using ControlMission = savo_msgs::srv::ControlAutonomousMapping;
 using AuthorizeOperation = savo_msgs::srv::AuthorizeOperation;
+using AuthorizeLocation = savo_msgs::srv::AuthorizeLocationOperation;
 using MissionStatus = savo_msgs::msg::AutonomousMappingStatus;
 using FrontierStatus = savo_msgs::msg::FrontierExplorationStatus;
 using Trigger = std_srvs::srv::Trigger;
@@ -466,13 +469,8 @@ private:
       "control_service",
       "/savo_mapping/autonomous/control");
 
-    supervisor_authorization_service_name_ = declare_parameter<std::string>(
-      "supervisor_authorization_service",
-      "/savo_supervisor/authorize_operation");
-    supervisor_authority_check_period_s_ = declare_parameter<double>(
-      "supervisor_authority_check_period_s", 0.5);
-    supervisor_authority_stale_timeout_s_ = declare_parameter<double>(
-      "supervisor_authority_stale_timeout_s", 1.5);
+    local_health_topic_ = declare_parameter<std::string>(
+      "local_health_topic", "/savo_mapping/local_health");
 
     status_topic_ = declare_parameter<std::string>(
       "status_topic",
@@ -822,7 +820,7 @@ private:
     const std::string * endpoint_values[] = {
       &action_name_,
       &control_service_name_,
-      &supervisor_authorization_service_name_,
+      &local_health_topic_,
       &status_topic_,
       &mode_topic_,
       &exploration_mode_topic_,
@@ -884,14 +882,6 @@ private:
     {
       throw std::invalid_argument(
               "evaluation_period_ms_out_of_range");
-    }
-
-    if (supervisor_authority_check_period_s_ <= 0.0 ||
-      supervisor_authority_stale_timeout_s_ <
-      supervisor_authority_check_period_s_)
-    {
-      throw std::invalid_argument(
-              "supervisor_authority_timing_invalid");
     }
 
     if (
@@ -1000,6 +990,10 @@ private:
       status_topic_,
       retained_qos);
 
+    local_authority_publisher_ = create_publisher<StringMessage>(
+      "/savo_mapping/autonomous/authority",
+      rclcpp::QoS(rclcpp::KeepLast(1)).reliable().durability_volatile());
+
     mode_command_publisher_ = create_publisher<StringMessage>(
       mode_command_topic_,
       command_qos);
@@ -1017,6 +1011,16 @@ private:
       command_qos);
     joint_active_release_publisher_ = create_publisher<StringMessage>(
       joint_active_release_topic_, retained_qos);
+
+    local_health_subscription_ = create_subscription<StringMessage>(
+      local_health_topic_, rclcpp::QoS(rclcpp::KeepLast(1)).reliable().durability_volatile(),
+      [this](StringMessage::ConstSharedPtr message) {
+        {
+          std::lock_guard<std::mutex> lock(mutex_);
+          local_health_.observe(message->data, std::chrono::steady_clock::now());
+        }
+        evaluate_and_apply();
+      });
 
     mode_subscription_ = create_subscription<StringMessage>(
       mode_topic_,
@@ -1176,8 +1180,14 @@ private:
       coverage_operation_reset_service_name_);
     return_action_client_ = rclcpp_action::create_client<NavigateToPose>(
       this, return_action_name_);
-    supervisor_authorization_client_ = create_client<AuthorizeOperation>(
-      supervisor_authorization_service_name_);
+    phase_authorization_service_ = create_service<AuthorizeOperation>(
+      "/savo_mapping/autonomous/authorize_phase",
+      std::bind(&AutonomousMappingOrchestratorNode::handle_phase_authorization,
+      this, std::placeholders::_1, std::placeholders::_2));
+    location_authorization_service_ = create_service<AuthorizeLocation>(
+      "/savo_mapping/autonomous/authorize_location_operation",
+      std::bind(&AutonomousMappingOrchestratorNode::handle_location_authorization,
+      this, std::placeholders::_1, std::placeholders::_2));
 
     control_service_ = create_service<ControlMission>(
       control_service_name_,
@@ -1308,9 +1318,7 @@ private:
       authority_map_id_ = goal->map_id;
       authority_map_revision_ = goal->map_revision;
       authority_generation_ = goal->authority_generation;
-      authority_acquire_on_admission_ = goal->authority_generation == 0U;
       authority_require_semantic_ = goal->require_semantic;
-      authority_check_in_flight_ = true;
       authority_validated_ = false;
       authority_resume_required_ = false;
       authority_loss_abort_pending_ = false;
@@ -1321,9 +1329,8 @@ private:
       control_stop_observation_floor_ = 0U;
       terminal_control_stop_pending_ = false;
       last_control_mode_command_attempt_.reset();
-      authority_admission_started_at_ = std::chrono::steady_clock::now();
-      inputs_.supervisor_authority_received = false;
-      inputs_.supervisor_authorized = false;
+      inputs_.mission_authority_received = false;
+      inputs_.mission_authorized = false;
       reset_sequence_pipeline_locked();
       reset_save_pipeline_locked();
       completion_detector_.reset("mission_started");
@@ -1333,460 +1340,243 @@ private:
     dispatch_authority_check(goal_handle, true);
   }
 
-  std::shared_ptr<AuthorizeOperation::Request>
-  make_authority_request_locked(const std::uint8_t command) const
-  {
-    auto request = std::make_shared<AuthorizeOperation::Request>();
-    request->command = command;
-    request->operation =
-      AuthorizeOperation::Request::OP_START_AUTONOMOUS_MAPPING;
-    request->request_id = authority_request_id_;
-    request->actor_id = authority_actor_id_;
-    request->map_id = authority_map_id_;
-    request->map_revision = authority_map_revision_;
-    request->require_semantic = authority_require_semantic_;
-    request->motion_required = true;
-    request->expected_generation = authority_generation_;
-    return request;
-  }
-
-  bool exact_authority_response_locked(
-    const std::shared_ptr<AuthorizeOperation::Response> & response,
-    const bool allow_generation_adoption = false) const
-  {
-    const bool generation_matches = response &&
-      (allow_generation_adoption ?
-      response->authority_generation > 0U :
-      response->authority_generation == authority_generation_);
-    return response && response->authorized &&
-           response->result_code ==
-           AuthorizeOperation::Response::RESULT_AUTHORIZED &&
-           response->operation_state == "ACTIVE" &&
-           response->active_operation ==
-           AuthorizeOperation::Request::OP_START_AUTONOMOUS_MAPPING &&
-           response->active_request_id == authority_request_id_ &&
-           generation_matches;
-  }
-
   void dispatch_authority_check(
-    const std::shared_ptr<GoalHandle> & goal_handle,
-    const bool admission)
+    const std::shared_ptr<GoalHandle> & goal_handle, const bool admission)
   {
-    std::shared_ptr<AuthorizeOperation::Request> request;
+    std::shared_ptr<RunMission::Result> failed_result;
     {
       std::lock_guard<std::mutex> lock(mutex_);
-      if (!goal_handle_ || goal_handle_ != goal_handle) {
-        authority_check_in_flight_ = false;
+      if (!goal_handle_ || goal_handle_ != goal_handle || !admission) {
         return;
       }
-      if (!supervisor_authorization_client_->service_is_ready()) {
-        authority_check_in_flight_ = false;
-        inputs_.supervisor_authority_received = true;
-        inputs_.supervisor_authorized = false;
-        if (authority_validated_) {
-          authority_resume_required_ = true;
-          authority_loss_abort_pending_ = true;
+      const auto goal = goal_handle->get_goal();
+      const local_authority::Identity identity{
+        goal->mission_id, goal->actor_id, goal->authority_request_id,
+        goal->map_id, goal->map_revision, goal->require_semantic};
+      const auto now = std::chrono::steady_clock::now();
+      const bool acquired = local_authority_.acquire(
+        identity, goal->authority_generation, local_health_, now);
+      inputs_.mission_authority_received = true;
+      inputs_.mission_authorized = acquired;
+      authority_validated_ = acquired;
+      std::string failure = local_authority_.reason();
+      if (acquired) {
+        authority_generation_ = local_authority_.generation();
+        autonomous::MissionRequest request;
+        request.mission_id = goal->mission_id;
+        request.actor_id = goal->actor_id;
+        request.map_id = goal->map_id;
+        request.map_revision = goal->map_revision;
+        request.authority_request_id = goal->authority_request_id;
+        request.authority_generation = authority_generation_;
+        request.require_semantic = goal->require_semantic;
+        request.strategy = autonomous::MissionStrategy::Frontier;
+        request.auto_save = goal->auto_save;
+        request.require_quality_approval = goal->require_quality_approval;
+        const auto decision = mission_.start(request, inputs_);
+        if (decision.accepted) {
+          control_mode_owned_ = true;
+        } else {
+          failure = decision.reason;
+          authority_validated_ = false;
         }
-        return;
       }
-      const bool acquire = admission && authority_acquire_on_admission_;
-      request = make_authority_request_locked(
-        acquire ?
-        AuthorizeOperation::Request::COMMAND_ACQUIRE :
-        AuthorizeOperation::Request::COMMAND_CHECK);
-      authority_last_check_attempt_ = std::chrono::steady_clock::now();
-    }
-
-    try {
-      supervisor_authorization_client_->async_send_request(
-        request,
-        [this, goal_handle, admission](
-          const rclcpp::Client<AuthorizeOperation>::SharedFuture future)
-        {
-          std::shared_ptr<RunMission::Result> failed_result;
-          bool release_rejected_lease = false;
-          try {
-            const auto response = future.get();
-            {
-              std::lock_guard<std::mutex> lock(mutex_);
-              if (!goal_handle_ || goal_handle_ != goal_handle) {
-                return;
-              }
-              authority_check_in_flight_ = false;
-              inputs_.supervisor_authority_received = true;
-              const bool adopt_generation =
-              admission && authority_acquire_on_admission_;
-              const bool exact = exact_authority_response_locked(
-                response, adopt_generation);
-              if (exact && adopt_generation) {
-                authority_generation_ = response->authority_generation;
-                authority_acquire_on_admission_ = false;
-              }
-              inputs_.supervisor_authorized =
-              exact && !authority_resume_required_;
-
-              if (admission && exact) {
-                authority_validated_ = true;
-                authority_last_validated_ = std::chrono::steady_clock::now();
-                autonomous::MissionRequest mission_request;
-                const auto goal = goal_handle->get_goal();
-                mission_request.mission_id = goal->mission_id;
-                mission_request.actor_id = goal->actor_id;
-                mission_request.map_id = goal->map_id;
-                mission_request.map_revision = goal->map_revision;
-                mission_request.authority_request_id =
-                goal->authority_request_id;
-                mission_request.authority_generation =
-                authority_generation_;
-                mission_request.require_semantic = goal->require_semantic;
-                mission_request.strategy =
-                autonomous::MissionStrategy::Frontier;
-                mission_request.auto_save = goal->auto_save;
-                mission_request.require_quality_approval =
-                goal->require_quality_approval;
-                mission_started_at_ = std::chrono::steady_clock::now();
-                const auto decision = mission_.start(
-                  mission_request, inputs_);
-                if (!decision.accepted) {
-                  failed_result = std::make_shared<RunMission::Result>();
-                  failed_result->success = false;
-                  failed_result->result_code = RunMission::Result::RESULT_BUSY;
-                  failed_result->reason = decision.reason;
-                  failed_result->final_status = make_status_locked();
-                  failed_result->map_saved = false;
-                  failed_result->map_release_id.clear();
-                  goal_handle_.reset();
-                  authority_validated_ = false;
-                  release_rejected_lease = true;
-                } else {
-                  control_mode_owned_ = true;
-                }
-              } else if (admission) {
-                if (response &&
-                response->active_operation ==
-                AuthorizeOperation::Request::OP_START_AUTONOMOUS_MAPPING &&
-                response->active_request_id == authority_request_id_)
-                {
-                  authority_generation_ = response->authority_generation;
-                  release_rejected_lease = true;
-                }
-                failed_result = std::make_shared<RunMission::Result>();
-                failed_result->success = false;
-                failed_result->result_code =
-                RunMission::Result::RESULT_READINESS_LOST;
-                failed_result->reason = response ?
-                "supervisor_authority_rejected:" + response->reason :
-                "supervisor_authority_response_invalid";
-                failed_result->final_status = make_status_locked();
-                failed_result->map_saved = false;
-                failed_result->map_release_id.clear();
-                goal_handle_.reset();
-              } else if (exact) {
-                authority_last_validated_ = std::chrono::steady_clock::now();
-              } else {
-                authority_resume_required_ = true;
-                authority_loss_abort_pending_ = true;
-                if (response &&
-                response->active_operation ==
-                AuthorizeOperation::Request::OP_START_AUTONOMOUS_MAPPING &&
-                response->active_request_id == authority_request_id_)
-                {
-                  authority_generation_ = response->authority_generation;
-                }
-              }
-            }
-          } catch (const std::exception & error) {
-            std::lock_guard<std::mutex> lock(mutex_);
-            authority_check_in_flight_ = false;
-            inputs_.supervisor_authority_received = true;
-            inputs_.supervisor_authorized = false;
-            if (authority_validated_) {
-              authority_resume_required_ = true;
-              authority_loss_abort_pending_ = true;
-            }
-            RCLCPP_ERROR(
-              get_logger(), "Supervisor authority CHECK failed: %s",
-              error.what());
-          }
-
-          if (failed_result) {
-            goal_handle->abort(failed_result);
-          }
-          if (release_rejected_lease) {
-            dispatch_authority_release(false);
-          }
-          evaluate_and_apply();
-        });
-    } catch (const std::exception & error) {
-      std::lock_guard<std::mutex> lock(mutex_);
-      authority_check_in_flight_ = false;
-      inputs_.supervisor_authority_received = true;
-      inputs_.supervisor_authorized = false;
-      if (authority_validated_) {
-        authority_resume_required_ = true;
-        authority_loss_abort_pending_ = true;
+      if (!authority_validated_) {
+        local_authority_.release();
+        inputs_.mission_authorized = false;
+        failed_result = std::make_shared<RunMission::Result>();
+        failed_result->success = false;
+        failed_result->result_code = RunMission::Result::RESULT_READINESS_LOST;
+        failed_result->reason = failure;
+        failed_result->final_status = make_status_locked();
+        goal_handle_.reset();
       }
-      RCLCPP_ERROR(
-        get_logger(), "Supervisor authority CHECK dispatch failed: %s",
-        error.what());
     }
+    if (failed_result) {
+      goal_handle->abort(failed_result);
+    }
+    evaluate_and_apply();
   }
 
   void dispatch_authority_release(const bool terminal_cleanup)
   {
-    std::shared_ptr<AuthorizeOperation::Request> request;
+    std::shared_ptr<GoalHandle> completed_handle;
+    std::optional<MissionStatus> completed_status;
+    std::optional<autonomous::MissionSnapshot> completed_snapshot;
     {
       std::lock_guard<std::mutex> lock(mutex_);
-      if (authority_release_in_flight_ || authority_request_id_.empty() ||
-        !supervisor_authorization_client_->service_is_ready())
+      // Called after the existing terminal STOP acknowledgement barrier.
+      local_authority_.release();
+      authority_validated_ = false;
+      inputs_.mission_authorized = false;
+      authority_terminal_release_pending_ = false;
+      authority_loss_abort_pending_ = false;
+      control_mode_owned_ = false;
+      control_mode_nonstop_commanded_ = false;
+      control_stop_command_sent_ = false;
+      terminal_control_stop_pending_ = false;
+      goal_reserved_ = false;
+      if (terminal_cleanup && pending_terminal_handle_ &&
+        pending_terminal_snapshot_.has_value() && pending_terminal_status_.has_value())
       {
-        return;
+        completed_handle = pending_terminal_handle_;
+        completed_snapshot = pending_terminal_snapshot_;
+        completed_status = pending_terminal_status_;
+        pending_terminal_handle_.reset();
+        pending_terminal_snapshot_.reset();
+        pending_terminal_status_.reset();
       }
-      authority_release_in_flight_ = true;
-      authority_last_release_attempt_ = std::chrono::steady_clock::now();
-      request = make_authority_request_locked(
-        AuthorizeOperation::Request::COMMAND_RELEASE);
     }
-
-    try {
-      supervisor_authorization_client_->async_send_request(
-        request,
-        [this, terminal_cleanup](
-          const rclcpp::Client<AuthorizeOperation>::SharedFuture future)
-        {
-          std::shared_ptr<GoalHandle> completed_handle;
-          std::optional<MissionStatus> completed_status;
-          std::optional<autonomous::MissionSnapshot> completed_snapshot;
-          try {
-            const auto response = future.get();
-            std::lock_guard<std::mutex> lock(mutex_);
-            authority_release_in_flight_ = false;
-            const bool released = response &&
-            response->authorized &&
-            response->operation_state == "IDLE" &&
-            response->active_operation == AuthorizeOperation::Request::OP_NONE &&
-            response->active_request_id.empty();
-            const bool ownership_already_gone = response &&
-            (response->operation_state == "IDLE" ||
-            (!response->active_request_id.empty() &&
-            response->active_request_id != authority_request_id_));
-            if (released || ownership_already_gone) {
-              authority_validated_ = false;
-              authority_acquire_on_admission_ = false;
-              inputs_.supervisor_authorized = false;
-              authority_terminal_release_pending_ = false;
-              authority_loss_abort_pending_ = false;
-              control_mode_owned_ = false;
-              control_mode_nonstop_commanded_ = false;
-              control_stop_command_sent_ = false;
-              terminal_control_stop_pending_ = false;
-              goal_reserved_ = false;
-              if (terminal_cleanup && pending_terminal_handle_ &&
-              pending_terminal_snapshot_.has_value() &&
-              pending_terminal_status_.has_value())
-              {
-                completed_handle = pending_terminal_handle_;
-                completed_snapshot = pending_terminal_snapshot_;
-                completed_status = pending_terminal_status_;
-                pending_terminal_handle_.reset();
-                pending_terminal_snapshot_.reset();
-                pending_terminal_status_.reset();
-              }
-            } else {
-              if (response &&
-              response->active_operation ==
-              AuthorizeOperation::Request::OP_START_AUTONOMOUS_MAPPING &&
-              response->active_request_id == authority_request_id_)
-              {
-                authority_generation_ = response->authority_generation;
-              }
-            }
-          } catch (const std::exception & error) {
-            std::lock_guard<std::mutex> lock(mutex_);
-            authority_release_in_flight_ = false;
-            RCLCPP_ERROR(
-              get_logger(), "Supervisor authority RELEASE failed: %s",
-              error.what());
-          }
-          if (completed_handle && completed_status.has_value() &&
-          completed_snapshot.has_value())
-          {
-            finish_action(
-              completed_handle, completed_status.value(),
-              completed_snapshot.value());
-          }
-        });
-    } catch (const std::exception & error) {
-      std::lock_guard<std::mutex> lock(mutex_);
-      authority_release_in_flight_ = false;
-      RCLCPP_ERROR(
-        get_logger(), "Supervisor authority RELEASE dispatch failed: %s",
-        error.what());
+    if (completed_handle && completed_status && completed_snapshot) {
+      finish_action(completed_handle, *completed_status, *completed_snapshot);
     }
   }
 
-  void maintain_supervisor_authority()
+  void maintain_local_authority()
   {
-    std::shared_ptr<GoalHandle> check_handle;
-    std::shared_ptr<GoalHandle> admission_timeout_handle;
-    std::shared_ptr<RunMission::Result> admission_timeout_result;
-    bool admission = false;
-    bool release_pending = false;
-    const auto current_time = std::chrono::steady_clock::now();
+    std::lock_guard<std::mutex> lock(mutex_);
+    const auto state = mission_.snapshot().state;
+    if (!authority_validated_ || !autonomous::is_active(state) ||
+      state == autonomous::MissionState::Canceling)
     {
-      std::lock_guard<std::mutex> lock(mutex_);
-      release_pending = authority_terminal_release_pending_;
-      if (release_pending) {
-        // Terminal ownership cleanup is retried until Supervisor confirms that
-        // this lease is released or no longer belongs to this mission.
-      } else {
-        if (goal_handle_ && !authority_validated_ &&
-          mission_.snapshot().state == autonomous::MissionState::Idle &&
-          authority_admission_started_at_.has_value() &&
-          std::chrono::duration<double>(
-            current_time - authority_admission_started_at_.value()).count() >=
-          supervisor_authority_stale_timeout_s_)
-        {
-          admission_timeout_handle = goal_handle_;
-          admission_timeout_result = std::make_shared<RunMission::Result>();
-          admission_timeout_result->success = false;
-          admission_timeout_result->result_code =
-            RunMission::Result::RESULT_READINESS_LOST;
-          admission_timeout_result->reason =
-            "supervisor_authority_admission_timeout";
-          admission_timeout_result->final_status = make_status_locked();
-          admission_timeout_result->map_saved = false;
-          admission_timeout_result->map_release_id.clear();
-          goal_handle_.reset();
-          goal_reserved_ = false;
-          authority_check_in_flight_ = false;
-        } else if (goal_handle_ && !authority_check_in_flight_) {
-          const auto state = mission_.snapshot().state;
-          admission = !authority_validated_ &&
-            state == autonomous::MissionState::Idle;
-          const bool motion_authority_relevant = admission ||
-            (autonomous::is_active(state) &&
-            state != autonomous::MissionState::Paused &&
-            state != autonomous::MissionState::Pausing &&
-            state != autonomous::MissionState::Canceling);
-          const bool due = !authority_last_check_attempt_.has_value() ||
-            std::chrono::duration<double>(
-            current_time - authority_last_check_attempt_.value()).count() >=
-            supervisor_authority_check_period_s_;
-          if (motion_authority_relevant && due) {
-            authority_check_in_flight_ = true;
-            check_handle = goal_handle_;
-          }
-        }
-      }
-
-      if (authority_validated_ && authority_last_validated_.has_value() &&
-        autonomous::is_active(mission_.snapshot().state) &&
-        std::chrono::duration<double>(
-          current_time - authority_last_validated_.value()).count() >=
-        supervisor_authority_stale_timeout_s_)
-      {
-        inputs_.supervisor_authority_received = true;
-        inputs_.supervisor_authorized = false;
-        authority_resume_required_ = true;
-        authority_loss_abort_pending_ = true;
-      }
+      return;
     }
-    if (release_pending) {
-      dispatch_authority_release(true);
-    } else if (admission_timeout_handle && admission_timeout_result) {
-      admission_timeout_handle->abort(admission_timeout_result);
-      dispatch_authority_release(false);
-    } else if (check_handle) {
-      dispatch_authority_check(check_handle, admission);
+    const auto now = std::chrono::steady_clock::now();
+    const bool paused = state == autonomous::MissionState::Paused ||
+      state == autonomous::MissionState::Pausing;
+    // Even a paused mission loses its lease on genuinely failed required health.
+    // Only an explicit RESUME can restore a deliberately paused, still-valid lease.
+    if (!local_health_.ready(false, authority_require_semantic_, now) ||
+      (!paused && !local_authority_.revalidate(local_health_, now)))
+    {
+      local_authority_.release();
+      inputs_.mission_authorized = false;
+      authority_resume_required_ = true;
+      authority_loss_abort_pending_ = true;
     }
   }
 
   void dispatch_authority_control(
-    const std::uint8_t command,
-    const std::string & reason,
-    const bool retry_on_generation = true)
+    const std::uint8_t command, const std::string & reason)
   {
-    std::shared_ptr<AuthorizeOperation::Request> authority_request;
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (command == AuthorizeOperation::Request::COMMAND_PAUSE) {
+      local_authority_.pause();
+      inputs_.mission_authorized = false;
+      authority_resume_required_ = true;
+      return;
+    }
+    if (command == AuthorizeOperation::Request::COMMAND_RESUME &&
+      local_authority_.resume(local_health_, std::chrono::steady_clock::now()))
+    {
+      inputs_.mission_authority_received = true;
+      inputs_.mission_authorized = true;
+      authority_resume_required_ = false;
+      const auto decision = mission_.control(
+        autonomous::MissionCommand::Resume, reason, inputs_);
+      if (!decision.accepted) {
+        local_authority_.pause();
+        inputs_.mission_authorized = false;
+        authority_resume_required_ = true;
+      }
+    }
+  }
+
+  void handle_phase_authorization(
+    const AuthorizeOperation::Request::SharedPtr request,
+    AuthorizeOperation::Response::SharedPtr response)
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    const auto state = mission_.snapshot().state;
+    const bool coverage_phase =
+      state == autonomous::MissionState::CoveragePending ||
+      state == autonomous::MissionState::Coverage;
+    const bool scope = request->operation ==
+      AuthorizeOperation::Request::OP_RUN_COVERAGE && coverage_phase;
+    const bool exact = request->command == AuthorizeOperation::Request::COMMAND_CHECK &&
+      request->motion_required && request->map_release_id.empty() &&
+      request->request_id == authority_request_id_ &&
+      request->actor_id == authority_actor_id_ &&
+      request->map_id == authority_map_id_ &&
+      request->map_revision == authority_map_revision_ &&
+      request->expected_generation == authority_generation_ &&
+      request->require_semantic == authority_require_semantic_;
+    response->authorized = scope && exact && local_authority_.check(
+      local_authority_.identity(), authority_generation_, local_health_,
+      std::chrono::steady_clock::now());
+    response->result_code = response->authorized ?
+      AuthorizeOperation::Response::RESULT_AUTHORIZED :
+      AuthorizeOperation::Response::RESULT_INVALID_REQUEST;
+    response->reason = response->authorized ?
+      "mapping_local_phase_authorized" : "mapping_local_phase_denied";
+    response->operation_state = local_authority_.active() ? "ACTIVE" : "IDLE";
+    response->active_operation = local_authority_.active() ?
+      AuthorizeOperation::Request::OP_START_AUTONOMOUS_MAPPING :
+      AuthorizeOperation::Request::OP_NONE;
+    response->active_request_id = local_authority_.active() ? authority_request_id_ : "";
+    response->authority_generation = authority_generation_;
+    response->evaluated_at = now();
+  }
+
+  bool semantic_permission_locked() const
+  {
+    const auto state = mission_.snapshot().state;
+    return local_authority_.owned() && authority_require_semantic_ &&
+           autonomous::is_active(state) && state != autonomous::MissionState::Canceling &&
+           local_health_.ready(false, true, std::chrono::steady_clock::now());
+  }
+
+  void handle_location_authorization(
+    const AuthorizeLocation::Request::SharedPtr request,
+    AuthorizeLocation::Response::SharedPtr response)
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    const auto state = mission_.snapshot().state;
+    const auto prefix = authority_request_id_ + ":" +
+      std::to_string(authority_generation_) + ":";
+    const bool registration = request->operation ==
+      AuthorizeLocation::Request::OP_REGISTER_LOCATION_CANDIDATE &&
+      state == autonomous::MissionState::Paused;
+    const bool review = (request->operation == AuthorizeLocation::Request::OP_APPROVE_LOCATION ||
+      request->operation == AuthorizeLocation::Request::OP_REJECT_LOCATION_CANDIDATE) &&
+      (state == autonomous::MissionState::Paused || state == autonomous::MissionState::Exploring ||
+      state == autonomous::MissionState::VerifyingLocations ||
+      state == autonomous::MissionState::AwaitingApproval);
+    response->authorized = semantic_permission_locked() && (registration || review) &&
+      !request->motion_required && !request->candidate_id.empty() &&
+      request->actor_id == authority_actor_id_ && request->map_id == authority_map_id_ &&
+      request->map_revision == authority_map_revision_ &&
+      request->request_id.size() > prefix.size() && request->request_id.rfind(prefix, 0U) == 0U;
+    response->result_code = response->authorized ?
+      AuthorizeLocation::Response::RESULT_AUTHORIZED :
+      AuthorizeLocation::Response::RESULT_INVALID_REQUEST;
+    response->reason = response->authorized ?
+      "mapping_local_semantic_authorized" : "mapping_local_semantic_denied";
+    // Legacy response field, explicitly identifies this different authority owner.
+    response->supervisor_lifecycle = "MAPPING_LOCAL";
+    response->evaluated_at = now();
+  }
+
+  void publish_local_authority()
+  {
+    nlohmann::json payload;
     {
       std::lock_guard<std::mutex> lock(mutex_);
-      if (!supervisor_authorization_client_->service_is_ready()) {
-        inputs_.supervisor_authorized = false;
-        authority_resume_required_ = true;
-        return;
-      }
-      authority_request = make_authority_request_locked(command);
+      const auto state = mission_.snapshot().state;
+      const bool active = local_authority_.check(
+        local_authority_.identity(), authority_generation_, local_health_,
+        std::chrono::steady_clock::now());
+      payload = {{"schema_version", 1}, {"node", "savo_mapping"},
+        {"mission_id", local_authority_.identity().mission_id},
+        {"actor_id", authority_actor_id_}, {"request_id", authority_request_id_},
+        {"map_id", authority_map_id_}, {"map_revision", authority_map_revision_},
+        {"generation", authority_generation_}, {"require_semantic", authority_require_semantic_},
+        {"active", active}, {"coverage_allowed", active &&
+          (state == autonomous::MissionState::CoveragePending ||
+          state == autonomous::MissionState::Coverage)},
+        {"semantic_allowed", semantic_permission_locked()}};
     }
-    try {
-      supervisor_authorization_client_->async_send_request(
-        authority_request,
-        [this, command, reason, retry_on_generation](
-          const rclcpp::Client<AuthorizeOperation>::SharedFuture future)
-        {
-          bool retry = false;
-          try {
-            const auto response = future.get();
-            {
-              std::lock_guard<std::mutex> lock(mutex_);
-              const bool same_lease = response &&
-              response->active_operation ==
-              AuthorizeOperation::Request::OP_START_AUTONOMOUS_MAPPING &&
-              response->active_request_id == authority_request_id_;
-              if (same_lease && response->authority_generation > 0U) {
-                const bool stale_request =
-                response->authority_generation != authority_generation_;
-                authority_generation_ = response->authority_generation;
-                retry = stale_request && !response->authorized &&
-                retry_on_generation &&
-                command == AuthorizeOperation::Request::COMMAND_RESUME;
-              }
-
-              if (command == AuthorizeOperation::Request::COMMAND_PAUSE) {
-                inputs_.supervisor_authorized = false;
-                authority_resume_required_ = true;
-              } else {
-                if (!retry && same_lease &&
-                response->operation_state == "ACTIVE" &&
-                (response->authorized ||
-                response->reason == "operation_not_paused_or_revoked"))
-                {
-                  inputs_.supervisor_authority_received = true;
-                  inputs_.supervisor_authorized = true;
-                  authority_resume_required_ = false;
-                  authority_last_validated_ = std::chrono::steady_clock::now();
-                  (void)mission_.control(
-                    autonomous::MissionCommand::Resume, reason, inputs_);
-                } else {
-                  if (command ==
-                  AuthorizeOperation::Request::COMMAND_RESUME)
-                  {
-                    inputs_.supervisor_authorized = false;
-                    authority_resume_required_ = true;
-                  }
-                }
-              }
-            }
-          } catch (const std::exception & error) {
-            std::lock_guard<std::mutex> lock(mutex_);
-            inputs_.supervisor_authorized = false;
-            authority_resume_required_ = true;
-            RCLCPP_ERROR(
-              get_logger(), "Supervisor authority control failed: %s",
-              error.what());
-          }
-          if (retry) {
-            dispatch_authority_control(command, reason, false);
-          }
-          evaluate_and_apply();
-        });
-    } catch (const std::exception & error) {
-      std::lock_guard<std::mutex> lock(mutex_);
-      inputs_.supervisor_authorized = false;
-      authority_resume_required_ = true;
-      RCLCPP_ERROR(
-        get_logger(), "Supervisor authority control dispatch failed: %s",
-        error.what());
-    }
+    publish_string(local_authority_publisher_, payload.dump());
   }
 
   void handle_control(
@@ -1855,17 +1645,17 @@ private:
         dispatch_authority_resume = true;
         response->accepted = true;
         response->result_code = ControlMission::Response::RESULT_ACCEPTED;
-        response->reason = "supervisor_resume_authorization_pending";
+        response->reason = "mapping_local_resume_requested";
         response->status = make_status_locked();
       } else {
         if (request->command ==
           ControlMission::Request::COMMAND_REQUEST_SCAN360 &&
-          (!inputs_.supervisor_authorized || authority_resume_required_))
+          (!inputs_.mission_authorized || authority_resume_required_))
         {
           response->accepted = false;
           response->result_code =
             ControlMission::Response::RESULT_INVALID_STATE;
-          response->reason = "supervisor_authority_not_active";
+          response->reason = "mapping_local_authority_not_active";
           response->status = make_status_locked();
           return;
         }
@@ -1892,7 +1682,7 @@ private:
         if (decision.accepted && request->command ==
           ControlMission::Request::COMMAND_PAUSE)
         {
-          inputs_.supervisor_authorized = false;
+          inputs_.mission_authorized = false;
           authority_resume_required_ = true;
           dispatch_authority_pause = true;
         }
@@ -2805,7 +2595,7 @@ private:
 
   void evaluate_and_apply()
   {
-    maintain_supervisor_authority();
+    maintain_local_authority();
     attempt_startup_release_recovery();
 
     autonomous::MissionDecision decision;
@@ -3176,7 +2966,8 @@ private:
         mission_state != autonomous::MissionState::Canceling)
       {
         authority_loss_abort_pending_ = false;
-        primary_failure_reason_ = "supervisor_mapping_authority_lost";
+        primary_failure_reason_ = "mapping_local_authority_lost:" +
+          local_health_.reason(std::chrono::steady_clock::now());
         decision = mission_.abort(
           autonomous::MissionResult::ReadinessLost,
           primary_failure_reason_, inputs_);
@@ -3253,8 +3044,8 @@ private:
 
       const bool exact_mapping_authority =
         control_mode_owned_ && authority_validated_ &&
-        inputs_.supervisor_authority_received &&
-        inputs_.supervisor_authorized && !authority_resume_required_;
+        inputs_.mission_authority_received &&
+        inputs_.mission_authorized && !authority_resume_required_;
       const LowLevelControlMode required_control_mode =
         exact_mapping_authority ?
         required_low_level_control_mode(decision) :
@@ -3721,6 +3512,7 @@ private:
     }
 
     status_publisher_->publish(status);
+    publish_local_authority();
 
     if (feedback_handle) {
       auto feedback = std::make_shared<RunMission::Feedback>();
@@ -5698,7 +5490,9 @@ private:
 
   std::string action_name_;
   std::string control_service_name_;
-  std::string supervisor_authorization_service_name_;
+  std::string local_health_topic_;
+  local_authority::Health local_health_;
+  local_authority::Authority local_authority_;
   std::string status_topic_;
   std::string mode_topic_;
   std::string exploration_mode_topic_;
@@ -5750,8 +5544,6 @@ private:
   std::int64_t evaluation_period_ms_{250};
   std::int64_t command_retry_period_ms_{1000};
   double default_mission_timeout_s_{0.0};
-  double supervisor_authority_check_period_s_{0.5};
-  double supervisor_authority_stale_timeout_s_{1.5};
   double mission_timeout_s_{0.0};
   double map_save_operation_timeout_s_{45.0};
   double location_verification_timeout_s_{15.0};
@@ -5810,14 +5602,6 @@ private:
 
   std::optional<std::chrono::steady_clock::time_point>
   mission_started_at_;
-  std::optional<std::chrono::steady_clock::time_point>
-  authority_last_check_attempt_;
-  std::optional<std::chrono::steady_clock::time_point>
-  authority_admission_started_at_;
-  std::optional<std::chrono::steady_clock::time_point>
-  authority_last_validated_;
-  std::optional<std::chrono::steady_clock::time_point>
-  authority_last_release_attempt_;
   std::optional<std::chrono::steady_clock::time_point>
   last_command_attempt_;
   std::optional<std::chrono::steady_clock::time_point>
@@ -5928,10 +5712,7 @@ private:
   bool recovery_in_flight_{false};
   bool release_timeout_latched_{false};
   bool goal_reserved_{false};
-  bool authority_check_in_flight_{false};
-  bool authority_release_in_flight_{false};
   bool authority_validated_{false};
-  bool authority_acquire_on_admission_{false};
   bool authority_resume_required_{false};
   bool authority_require_semantic_{true};
   bool authority_terminal_release_pending_{false};
@@ -5977,8 +5758,9 @@ private:
   rclcpp::Service<ControlMission>::SharedPtr control_service_;
   rclcpp::Service<ReviewRelease>::SharedPtr review_service_;
   rclcpp::Client<Trigger>::SharedPtr handoff_cancel_client_;
-  rclcpp::Client<AuthorizeOperation>::SharedPtr
-    supervisor_authorization_client_;
+  rclcpp::Service<AuthorizeOperation>::SharedPtr phase_authorization_service_;
+  rclcpp::Service<AuthorizeLocation>::SharedPtr location_authorization_service_;
+  rclcpp::Subscription<StringMessage>::SharedPtr local_health_subscription_;
   rclcpp::Client<Trigger>::SharedPtr map_save_client_;
   rclcpp::Client<ListCandidates>::SharedPtr location_candidates_client_;
   rclcpp::Client<ListLocations>::SharedPtr location_list_client_;
@@ -6000,6 +5782,7 @@ private:
   ReturnGoalHandle::SharedPtr return_goal_handle_;
 
   rclcpp::Publisher<MissionStatus>::SharedPtr status_publisher_;
+  rclcpp::Publisher<StringMessage>::SharedPtr local_authority_publisher_;
   rclcpp::Publisher<StringMessage>::SharedPtr mode_command_publisher_;
   rclcpp::Publisher<StringMessage>::SharedPtr control_mode_command_publisher_;
   rclcpp::Publisher<StringMessage>::SharedPtr start_session_command_publisher_;

@@ -9,6 +9,8 @@
 #include <functional>
 #include <future>
 #include <memory>
+#include <mutex>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -16,6 +18,8 @@
 
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "std_msgs/msg/string.hpp"
+#include "savo_mapping/mapping_phase_authority.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
 #include "savo_msgs/action/confirm_april_tag.hpp"
 #include "savo_msgs/action/register_mapped_location.hpp"
@@ -112,8 +116,21 @@ public:
       "action_name", "/savo_mapping/locations/register");
     head_action_name_ = declare_parameter<std::string>(
       "head_confirmation_action", "/savo_head/apriltag/confirm");
+    mapping_local_authority_ = declare_parameter<bool>("mapping_local_authority", false);
     authorization_service_name_ = declare_parameter<std::string>(
-      "authorization_service", "/savo_supervisor/authorize_location_operation");
+      "authorization_service", mapping_local_authority_ ?
+      "/savo_mapping/autonomous/authorize_location_operation" :
+      "/savo_supervisor/authorize_location_operation");
+    if (mapping_local_authority_) {
+      authorization_service_name_ = "/savo_mapping/autonomous/authorize_location_operation";
+      phase_subscription_ = create_subscription<std_msgs::msg::String>(
+        "/savo_mapping/autonomous/authority",
+        rclcpp::QoS(1).reliable().durability_volatile(),
+        [this](std_msgs::msg::String::ConstSharedPtr message) {
+          std::lock_guard<std::mutex> lock(phase_mutex_);
+          parent_context_.observe(message->data, std::chrono::steady_clock::now());
+        });
+    }
     registration_service_name_ = declare_parameter<std::string>(
       "registration_service", "/savo_locations/candidates/register");
     default_timeout_s_ = declare_parameter<double>("default_timeout_s", 25.0);
@@ -160,6 +177,31 @@ public:
   }
 
 private:
+  bool bind_local_phase(Authorize::Request & request, const std::string & session = "")
+  {
+    if (!mapping_local_authority_) {return true;}
+    std::lock_guard<std::mutex> lock(phase_mutex_);
+    if (!parent_context_.semantic_ready(
+        request.actor_id, request.map_id, request.map_revision, std::chrono::steady_clock::now()) ||
+      (!session.empty() && session != parent_context_.mission_id))
+    {
+      bound_context_.reset();
+      return false;
+    }
+    bound_context_ = parent_context_;
+    request.request_id = parent_context_.scoped_request_id(request.request_id);
+    return true;
+  }
+
+  bool local_phase_valid() const
+  {
+    if (!mapping_local_authority_) {return true;}
+    std::lock_guard<std::mutex> lock(phase_mutex_);
+    return bound_context_ && parent_context_.same_lease(*bound_context_) &&
+           parent_context_.semantic_ready(bound_context_->actor_id, bound_context_->map_id,
+           bound_context_->map_revision, std::chrono::steady_clock::now());
+  }
+
   rclcpp_action::GoalResponse handle_goal(
     const rclcpp_action::GoalUUID &,
     const std::shared_ptr<const RegisterMappedLocation::Goal> goal)
@@ -271,7 +313,7 @@ private:
     const std::shared_ptr<RegisterGoalHandle> & goal_handle,
     const rclcpp::Time & deadline) const
   {
-    while (!canceled_or_expired(goal_handle, deadline)) {
+    while (!canceled_or_expired(goal_handle, deadline) && local_phase_valid()) {
       if (future.wait_for(std::chrono::milliseconds(50)) == std::future_status::ready) {
         return true;
       }
@@ -319,6 +361,11 @@ private:
     authorization_request->map_id = goal->map_id;
     authorization_request->map_revision = goal->map_revision;
     authorization_request->motion_required = false;
+    if (!bind_local_phase(*authorization_request, goal->source_session_id)) {
+      finish(goal_handle, false, RegisterMappedLocation::Result::RESULT_SUPERVISOR_DENIED,
+        "mapping_local_semantic_binding_denied", empty_candidate);
+      return;
+    }
 
     auto authorization_future =
       authorization_client_->async_send_request(authorization_request);
@@ -337,11 +384,12 @@ private:
     }
 
     const auto authorization = authorization_future.get();
-    if (!authorization->authorized) {
+    if (!authorization->authorized || !local_phase_valid()) {
       finish(
         goal_handle,
         false,
         RegisterMappedLocation::Result::RESULT_SUPERVISOR_DENIED,
+        authorization->authorized ? "mapping_local_semantic_authority_lost" :
         authorization->reason,
         empty_candidate);
       return;
@@ -375,6 +423,25 @@ private:
     head_goal.require_map_pose = true;
 
     rclcpp_action::Client<ConfirmAprilTag>::SendGoalOptions head_options;
+    std::optional<phase_authority::Context> dispatched_context;
+    {
+      std::lock_guard<std::mutex> lock(phase_mutex_);
+      dispatched_context = bound_context_;
+    }
+    head_options.goal_response_callback =
+      [this, goal_handle, deadline, dispatched_context](ConfirmGoalHandle::SharedPtr handle) {
+        bool permitted = true;
+        if (mapping_local_authority_) {
+          std::lock_guard<std::mutex> lock(phase_mutex_);
+          permitted = dispatched_context && parent_context_.same_lease(*dispatched_context) &&
+            parent_context_.semantic_ready(dispatched_context->actor_id,
+            dispatched_context->map_id, dispatched_context->map_revision,
+            std::chrono::steady_clock::now());
+        }
+        if (handle && (!permitted || canceled_or_expired(goal_handle, deadline))) {
+          (void)head_client_->async_cancel_goal(handle);
+        }
+      };
     head_options.feedback_callback =
       [this, goal_handle](
       ConfirmGoalHandle::SharedPtr,
@@ -389,6 +456,11 @@ private:
           head_feedback->current_tag_id);
       };
 
+    if (!local_phase_valid()) {
+      finish(goal_handle, false, RegisterMappedLocation::Result::RESULT_SUPERVISOR_DENIED,
+        "mapping_local_semantic_authority_lost", empty_candidate);
+      return;
+    }
     auto head_goal_future = head_client_->async_send_goal(head_goal, head_options);
     if (!wait_future(head_goal_future, goal_handle, deadline)) {
       const bool canceled = goal_handle->is_canceling();
@@ -555,6 +627,11 @@ private:
       candidate.detection_quality,
       candidate.tag_id);
 
+    if (!local_phase_valid()) {
+      finish(goal_handle, false, RegisterMappedLocation::Result::RESULT_SUPERVISOR_DENIED,
+        "mapping_local_semantic_authority_lost", empty_candidate);
+      return;
+    }
     auto registration_request = std::make_shared<RegisterCandidate::Request>();
     registration_request->candidate = candidate;
     registration_request->actor_id = goal->actor_id;
@@ -618,6 +695,11 @@ private:
   std::atomic<bool> persistence_in_progress_{false};
   std::string action_name_{};
   std::string head_action_name_{};
+  bool mapping_local_authority_{false};
+  mutable std::mutex phase_mutex_;
+  phase_authority::Context parent_context_;
+  std::optional<phase_authority::Context> bound_context_;
+  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr phase_subscription_;
   std::string authorization_service_name_{};
   std::string registration_service_name_{};
   double default_timeout_s_{25.0};

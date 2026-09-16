@@ -63,6 +63,7 @@
     default="$(find-pkg-share savo_mapping)/config/autonomous_mapping_orchestrator.yaml"/>
 
   <arg name="coverage_enabled" default="true"/>
+  <arg name="local_health_edge_ups_required" default="false"/>
   <arg
     name="coverage_params_file"
     default="$(find-pkg-share savo_mapping)/config/coverage_mapping.yaml"/>
@@ -165,6 +166,12 @@
 
     <param
       from="$(var mapping_profile_file)"/>
+
+    <param name="local_health.enabled" value="true"/>
+    <param name="local_health.edge_ups_required"
+      value="$(var local_health_edge_ups_required)"/>
+    <param name="local_health.semantic_required"
+      value="$(var semantic_interruption_enabled)"/>
 
     <param
       name="use_sim_time"
@@ -367,6 +374,7 @@
     if="$(var coverage_enabled)">
     <arg name="params_file" value="$(var coverage_operation_params_file)"/>
     <arg name="enabled" value="true"/>
+    <arg name="mapping_local_authority" value="true"/>
     <arg name="use_sim_time" value="$(var use_sim_time)"/>
   </include>
 

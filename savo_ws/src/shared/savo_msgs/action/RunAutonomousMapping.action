@@ -17,9 +17,11 @@ string map_id
 uint32 map_revision
 uint8 strategy
 
-# Supervisor lease identity. A zero authority_generation asks the action server
-# to ACQUIRE the lease using these exact fields. A nonzero generation identifies
-# a lease acquired by an upstream caller and is independently CHECKed.
+# Mapping-local lease identity. Zero asks the orchestrator to acquire a new
+# mission-bound lease using these exact fields and direct subsystem readiness.
+# Nonzero pre-acquired system-Supervisor generations are explicitly rejected:
+# mapping_local_preacquired_generation_not_supported. No field is ignored.
+# Wire layout/version remain unchanged; callers must send zero for acquisition.
 string authority_request_id
 uint64 authority_generation
 bool require_semantic

@@ -263,10 +263,16 @@ Production Coverage bringup uses `coverage_operation_orchestrator_node` as the
 only public operator approval surface. The B3F approve, cancel and reset
 services are remapped under `/savo_mapping/_internal/coverage_execution/*`.
 
-The orchestrator requires both:
+Standalone operation (the default `mapping_local_authority=false`) requires both:
 
 1. a staged valid Coverage plan in `coverage_execution_handoff_node`; and
 2. a fresh, ready and authorized `/savo_supervisor/state_summary` snapshot.
+
+Within an autonomous mapping mission, launch sets `mapping_local_authority=true`.
+Coverage instead checks the exact active parent mission through
+`/savo_mapping/autonomous/authorize_phase` and fresh
+`/savo_mapping/autonomous/authority` evidence. It does not subscribe to or wait
+for the system Supervisor in this mode. The parent owns NAV and mission cleanup.
 
 Public operation interfaces:
 
@@ -291,8 +297,15 @@ the internal B3F service.
 `/savo_mapping/locations/review` as the supported operator review boundary. It
 loads the authoritative candidate from `/savo_locations/candidates/get`, checks
 that the candidate is still pending at the expected revision, requests the
-matching non-motion authorization from `savo_supervisor`, and then forwards
+matching non-motion authorization from `savo_supervisor` in standalone mode,
+and then forwards
 exactly one approval or rejection request to `savo_locations`.
+
+Autonomous composition selects mapping-local authorization for registration and
+review instead. Actor, map, revision, parent request and generation must match
+the active semantic mission. Paused semantic work grants no motion authority.
+Legacy response enum names remain wire-compatible; reasons identify the actual
+authority owner. Standalone Supervisor behavior is unchanged.
 
 The gateway publishes transient-local status on
 `/savo_mapping/locations/review/status`, terminal JSON results on
@@ -421,7 +434,7 @@ After stable frontier exhaustion, the mission quiesces frontier execution and
 requests a fresh Coverage plan through
 `/savo_mapping/coverage/request_plan`. Planning remains non-automatic and does
 not authorize movement. A valid, fresh retained plan is executed only through
-the supervisor-gated `/savo_mapping/coverage_operation/approve` boundary and
+the parent-mission-gated `/savo_mapping/coverage_operation/approve` boundary and
 the guarded `/savo_nav/coverage/execute_path` action pipeline.
 
 After Coverage succeeds, the robot returns to the captured start pose through

@@ -242,7 +242,7 @@ def test_semantic_interruption_remains_configurable_across_entries() -> None:
 
     assert '"start_head", default_value="false"' in autonomous
     assert '"start_location_lifecycle", default_value="false"' in autonomous
-    assert '"start_supervisor", default_value="true"' in autonomous
+    assert '"start_supervisor", default_value="false"' in autonomous
     assert 'start_supervisor = True' in core
     assert '"true" if start_locations else "false"' in core
 

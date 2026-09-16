@@ -266,6 +266,7 @@ def generate_launch_description() -> LaunchDescription:
                 "dependency_wait_timeout_s": _floating(
                     "registration_dependency_wait_timeout_s"
                 ),
+                "mapping_local_authority": _boolean("mapping_local_authority"),
             },
         ],
         arguments=common_arguments,
@@ -284,6 +285,7 @@ def generate_launch_description() -> LaunchDescription:
                 "dependency_wait_timeout_s": _floating(
                     "review_dependency_wait_timeout_s"
                 ),
+                "mapping_local_authority": _boolean("mapping_local_authority"),
                 "operation_timeout_s": _floating(
                     "review_operation_timeout_s"
                 ),
@@ -345,6 +347,7 @@ def generate_launch_description() -> LaunchDescription:
             description="ROS logging level for the location lifecycle.",
         ),
         DeclareLaunchArgument("start_locations", default_value="true"),
+        DeclareLaunchArgument("mapping_local_authority", default_value="false"),
         DeclareLaunchArgument("start_supervisor", default_value="true"),
         DeclareLaunchArgument("start_head_observer", default_value="true"),
         DeclareLaunchArgument("start_head_action", default_value="true"),

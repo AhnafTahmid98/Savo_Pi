@@ -30,7 +30,6 @@ from rclpy.qos import ReliabilityPolicy
 from savo_msgs.action import RunAutonomousMapping
 from savo_msgs.msg import AutonomousMappingStatus
 from savo_msgs.msg import FrontierExplorationStatus
-from savo_msgs.srv import AuthorizeOperation
 from savo_msgs.srv import CommitLocationRelease
 from savo_msgs.srv import ListLocationCandidates
 from savo_msgs.srv import ListLocations
@@ -129,9 +128,9 @@ class Am7RuntimeHarness:
         self.location_commit_service = f'{prefix}/locations/commit'
         self.location_rollback_service = f'{prefix}/locations/rollback'
         self.release_review_service = f'{prefix}/release/review'
-        self.authority_service = f'{prefix}/authorize_operation'
-        self.authority_generation = 1
-        self.authority_state = 'ACTIVE'
+        self.local_health_topic = f'{prefix}/local_health'
+        self.health_allowed = True
+        self.health_publication_enabled = True
 
         self.node = rclpy.create_node(f'am7_fixture_{suffix}')
         self.group = ReentrantCallbackGroup()
@@ -293,12 +292,10 @@ class Am7RuntimeHarness:
             self._rollback_location_release,
             callback_group=self.group,
         )
-        self.node.create_service(
-            AuthorizeOperation,
-            self.authority_service,
-            self._authorize_operation,
-            callback_group=self.group,
+        self.local_health_pub = self.node.create_publisher(
+            String, self.local_health_topic, QoSProfile(depth=1)
         )
+        self.health_timer = self.node.create_timer(0.1, self.publish_local_health)
 
         self.return_server = ActionServer(
             self.node,
@@ -349,33 +346,18 @@ class Am7RuntimeHarness:
             Trigger, name, callback, callback_group=self.group
         )
 
-    def _authorize_operation(self, request, response):
-        """Emulate one exact Supervisor mapping lease."""
-        if request.command == AuthorizeOperation.Request.COMMAND_RELEASE:
-            self.authority_generation += 1
-            self.authority_state = 'IDLE'
-        elif request.command == AuthorizeOperation.Request.COMMAND_PAUSE:
-            self.authority_generation += 1
-            self.authority_state = 'PAUSED'
-        elif request.command == AuthorizeOperation.Request.COMMAND_RESUME:
-            self.authority_generation += 1
-            self.authority_state = 'ACTIVE'
-        response.authorized = True
-        response.result_code = AuthorizeOperation.Response.RESULT_AUTHORIZED
-        response.reason = 'fixture_authorized'
-        response.operation_state = self.authority_state
-        response.active_operation = (
-            AuthorizeOperation.Request.OP_NONE
-            if self.authority_state == 'IDLE'
-            else AuthorizeOperation.Request.OP_START_AUTONOMOUS_MAPPING
-        )
-        response.active_request_id = (
-            '' if self.authority_state == 'IDLE' else request.request_id
-        )
-        response.authority_generation = self.authority_generation
-        return response
+    def publish_local_health(self):
+        """Publish direct mapping health; no system Supervisor exists in this fixture."""
+        if not self.health_publication_enabled:
+            return
+        self.local_health_pub.publish(String(data=json.dumps({
+            'schema_version': 1, 'node': 'savo_mapping',
+            'admission_ready': self.health_allowed,
+            'continuation_ready': self.health_allowed,
+            'semantic_ready': True,
+            'reason': 'ready' if self.health_allowed else 'core_ups_critical',
+        })))
 
-    @staticmethod
     def string_message(value):
         message = String()
         message.data = value
@@ -434,7 +416,7 @@ class Am7RuntimeHarness:
         parameters = {
             'action_name': self.action_name,
             'control_service': self.control_service,
-            'supervisor_authorization_service': self.authority_service,
+            'local_health_topic': self.local_health_topic,
             'status_topic': self.status_topic,
             'mode_topic': self.mode_topic,
             'exploration_mode_topic': self.exploration_mode_topic,
@@ -948,7 +930,7 @@ class Am7RuntimeHarness:
         goal.map_revision = 1
         goal.strategy = RunAutonomousMapping.Goal.STRATEGY_FRONTIER
         goal.authority_request_id = 'authority-am7-runtime'
-        goal.authority_generation = 1
+        goal.authority_generation = 0
         goal.require_semantic = True
         goal.auto_save = True
         goal.require_quality_approval = True

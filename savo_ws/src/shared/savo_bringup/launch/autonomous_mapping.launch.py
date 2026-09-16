@@ -268,6 +268,7 @@ def generate_launch_description() -> LaunchDescription:
             "start_head_observer": "false",
             "start_head_action": "true",
             "start_registration": "true",
+            "mapping_local_authority": "true",
             "start_review_gateway": "true",
             "start_navigation": "false",
             "locations_database_path": LaunchConfiguration(
@@ -283,6 +284,9 @@ def generate_launch_description() -> LaunchDescription:
     )
 
     mapping_common_arguments = {
+        "local_health_edge_ups_required": LaunchConfiguration(
+            "edge_ups_expected"
+        ),
         "map_id": LaunchConfiguration("map_id"),
         "map_output_root": LaunchConfiguration("map_output_root"),
         "allow_map_overwrite": LaunchConfiguration(
@@ -461,7 +465,7 @@ def generate_launch_description() -> LaunchDescription:
             ),
             DeclareLaunchArgument("start_power", default_value="true"),
             DeclareLaunchArgument(
-                "start_supervisor", default_value="true"
+                "start_supervisor", default_value="false"
             ),
             DeclareLaunchArgument("start_head", default_value="false"),
             DeclareLaunchArgument(

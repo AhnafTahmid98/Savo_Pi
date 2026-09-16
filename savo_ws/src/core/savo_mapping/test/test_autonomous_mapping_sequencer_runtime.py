@@ -3,6 +3,7 @@
 
 """Isolated runtime validation for the AM-5 autonomous mission prelude."""
 
+import json
 import os
 from pathlib import Path
 import signal
@@ -21,7 +22,6 @@ from rclpy.qos import QoSProfile
 from rclpy.qos import ReliabilityPolicy
 from savo_msgs.action import RunAutonomousMapping
 from savo_msgs.msg import AutonomousMappingStatus
-from savo_msgs.srv import AuthorizeOperation
 from savo_msgs.srv import ControlAutonomousMapping
 from std_msgs.msg import Bool
 from std_msgs.msg import String
@@ -92,9 +92,9 @@ class SequencerHarness:
         self.cancel_session_topic = f'{prefix}/cancel_session_cmd'
         self.handoff_cancel_service = f'{prefix}/handoff_cancel'
         self.map_save_service = f'{prefix}/map_save'
-        self.authority_service = f'{prefix}/authorize_operation'
-        self.authority_generation = 1
-        self.authority_state = 'ACTIVE'
+        self.local_health_topic = f'{prefix}/local_health'
+        self.health_allowed = True
+        self.health_publication_enabled = True
         self.scan_state_topic = f'{prefix}/scan360/state'
         self.scan_start_service = f'{prefix}/scan360/start'
         self.scan_cancel_service = f'{prefix}/scan360/cancel'
@@ -227,12 +227,10 @@ class SequencerHarness:
             self.handle_head_resume,
             callback_group=self.group,
         )
-        self.authority_server = self.node.create_service(
-            AuthorizeOperation,
-            self.authority_service,
-            self.handle_authority,
-            callback_group=self.group,
+        self.local_health_pub = self.node.create_publisher(
+            String, self.local_health_topic, QoSProfile(depth=1)
         )
+        self.health_timer = self.node.create_timer(0.1, self.publish_local_health)
 
         self.action_client = ActionClient(
             self.node,
@@ -258,7 +256,7 @@ class SequencerHarness:
             '-p', f'action_name:={self.action_name}',
             '-p', f'control_service:={self.control_service}',
             '-p',
-            f'supervisor_authorization_service:={self.authority_service}',
+            f'local_health_topic:={self.local_health_topic}',
             '-p', f'status_topic:={self.status_topic}',
             '-p', f'mode_topic:={self.mode_topic}',
             '-p', f'exploration_mode_topic:={self.exploration_mode_topic}',
@@ -344,31 +342,17 @@ class SequencerHarness:
         response.message = 'accepted'
         return response
 
-    def handle_authority(self, request, response):
-        """Emulate one exact Supervisor mapping lease."""
-        if request.command == AuthorizeOperation.Request.COMMAND_RELEASE:
-            self.authority_generation += 1
-            self.authority_state = 'IDLE'
-        elif request.command == AuthorizeOperation.Request.COMMAND_PAUSE:
-            self.authority_generation += 1
-            self.authority_state = 'PAUSED'
-        elif request.command == AuthorizeOperation.Request.COMMAND_RESUME:
-            self.authority_generation += 1
-            self.authority_state = 'ACTIVE'
-        response.authorized = True
-        response.result_code = AuthorizeOperation.Response.RESULT_AUTHORIZED
-        response.reason = 'fixture_authorized'
-        response.operation_state = self.authority_state
-        response.active_operation = (
-            AuthorizeOperation.Request.OP_NONE
-            if self.authority_state == 'IDLE'
-            else AuthorizeOperation.Request.OP_START_AUTONOMOUS_MAPPING
-        )
-        response.active_request_id = (
-            '' if self.authority_state == 'IDLE' else request.request_id
-        )
-        response.authority_generation = self.authority_generation
-        return response
+    def publish_local_health(self):
+        """Publish direct mapping health; no system Supervisor exists in this fixture."""
+        if not self.health_publication_enabled:
+            return
+        self.local_health_pub.publish(String(data=json.dumps({
+            'schema_version': 1, 'node': 'savo_mapping',
+            'admission_ready': self.health_allowed,
+            'continuation_ready': self.health_allowed,
+            'semantic_ready': True,
+            'reason': 'ready' if self.health_allowed else 'core_ups_critical',
+        })))
 
     def delayed_publish(self, publisher, value, delay=0.10):
         """Publish a terminal component state after a service response."""
@@ -441,6 +425,8 @@ class SequencerHarness:
 
     def publish_initial_state(self):
         """Publish a safe monitor-only idle state and fresh TF repeatedly."""
+        assert wait_until(lambda: self.local_health_pub.get_subscription_count() > 0)
+        self.publish_local_health()
         for _ in range(10):
             self.publish_transform()
             self.mode_pub.publish(self.string_message('monitor_only'))
@@ -490,7 +476,7 @@ class SequencerHarness:
         goal.map_revision = 1
         goal.strategy = RunAutonomousMapping.Goal.STRATEGY_FRONTIER
         goal.authority_request_id = 'authority-am5-runtime'
-        goal.authority_generation = 1
+        goal.authority_generation = 0
         goal.require_semantic = True
         goal.auto_save = False
         goal.require_quality_approval = False

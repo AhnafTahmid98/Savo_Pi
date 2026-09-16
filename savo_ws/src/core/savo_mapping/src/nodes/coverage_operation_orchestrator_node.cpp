@@ -18,6 +18,8 @@
 #include "rclcpp/rclcpp.hpp"
 #include "savo_mapping/coverage_execution_handoff.hpp"
 #include "savo_mapping/coverage_operation_orchestrator.hpp"
+#include "savo_mapping/mapping_phase_authority.hpp"
+#include "savo_msgs/srv/authorize_operation.hpp"
 #include "savo_mapping/qos_profiles.hpp"
 #include "std_msgs/msg/string.hpp"
 #include "std_srvs/srv/trigger.hpp"
@@ -72,6 +74,7 @@ class CoverageOperationOrchestratorNode : public rclcpp::Node
 {
 public:
   using Trigger = std_srvs::srv::Trigger;
+  using Authorize = savo_msgs::srv::AuthorizeOperation;
 
   CoverageOperationOrchestratorNode()
   : Node("coverage_operation_orchestrator_node")
@@ -99,6 +102,7 @@ private:
   void load_parameters()
   {
     enabled_ = declare_parameter<bool>("enabled", true);
+    mapping_local_authority_ = declare_parameter<bool>("mapping_local_authority", false);
 
     supervisor_state_topic_ = declare_parameter<std::string>(
       "supervisor_state_topic", coverage::kSupervisorStateTopic);
@@ -218,8 +222,9 @@ private:
 
     supervisor_subscription_ =
       create_subscription<std_msgs::msg::String>(
-      supervisor_state_topic_,
-      latched_qos,
+      mapping_local_authority_ ? "/savo_mapping/autonomous/authority" : supervisor_state_topic_,
+      mapping_local_authority_ ?
+      rclcpp::QoS(1).reliable().durability_volatile() : latched_qos,
       std::bind(
         &CoverageOperationOrchestratorNode::handle_supervisor,
         this,
@@ -252,6 +257,11 @@ private:
         this,
         std::placeholders::_1));
 
+    if (mapping_local_authority_) {
+      phase_client_ = create_client<Authorize>(
+        "/savo_mapping/autonomous/authorize_phase",
+        rmw_qos_profile_services_default, callback_group_);
+    }
     internal_approve_client_ = create_client<Trigger>(
       internal_approve_service_,
       rclcpp::ServicesQoS(),
@@ -310,8 +320,21 @@ private:
   {
     {
       std::lock_guard<std::mutex> lock(mutex_);
-      supervisor_snapshot_ =
-        coverage::parse_supervisor_authorization(message->data);
+      if (mapping_local_authority_) {
+        parent_context_.observe(message->data, std::chrono::steady_clock::now());
+        const bool allowed = parent_context_.coverage_ready(std::chrono::steady_clock::now()) &&
+          (!approved_parent_.has_value() || parent_context_.same_lease(*approved_parent_));
+        // Legacy internal snapshot adapter; no system-Supervisor data is consumed.
+        supervisor_snapshot_ = {};
+        supervisor_snapshot_.valid = parent_context_.fresh(std::chrono::steady_clock::now());
+        supervisor_snapshot_.ready = allowed;
+        supervisor_snapshot_.lifecycle = allowed ? "RUNNING" : "IDLE";
+        supervisor_snapshot_.health = allowed ? "OK" : "ERROR";
+        supervisor_snapshot_.reason = allowed ?
+          "mapping_local_phase_authorized" : "mapping_local_phase_not_authorized";
+      } else {
+        supervisor_snapshot_ = coverage::parse_supervisor_authorization(message->data);
+      }
       supervisor_received_at_ =
         std::chrono::steady_clock::now();
     }
@@ -417,6 +440,44 @@ private:
     return response->success;
   }
 
+  bool check_parent_phase(savo_mapping::phase_authority::Context & checked)
+  {
+    if (!mapping_local_authority_) {return true;}
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      checked = parent_context_;
+    }
+    if (!checked.coverage_ready(std::chrono::steady_clock::now()) ||
+      !phase_client_->service_is_ready()) {return false;}
+    auto request = std::make_shared<Authorize::Request>();
+    request->command = Authorize::Request::COMMAND_CHECK;
+    request->operation = Authorize::Request::OP_RUN_COVERAGE;
+    request->request_id = checked.request_id;
+    request->actor_id = checked.actor_id;
+    request->map_id = checked.map_id;
+    request->map_revision = checked.map_revision;
+    request->require_semantic = checked.require_semantic;
+    request->motion_required = true;
+    request->expected_generation = checked.generation;
+    auto future = phase_client_->async_send_request(request);
+    if (future.wait_for(std::chrono::duration<double>(policy_.internal_service_timeout_sec)) !=
+      std::future_status::ready)
+    {
+      phase_client_->remove_pending_request(future);
+      return false;
+    }
+    const auto response = future.get();
+    std::lock_guard<std::mutex> lock(mutex_);
+    return response && response->authorized &&
+           response->result_code == Authorize::Response::RESULT_AUTHORIZED &&
+           response->operation_state == "ACTIVE" &&
+           response->active_operation == Authorize::Request::OP_START_AUTONOMOUS_MAPPING &&
+           response->active_request_id == checked.request_id &&
+           response->authority_generation == checked.generation &&
+           parent_context_.coverage_ready(std::chrono::steady_clock::now()) &&
+           parent_context_.same_lease(checked);
+  }
+
   void handle_public_approve(
     const Trigger::Request::SharedPtr,
     Trigger::Response::SharedPtr response)
@@ -437,6 +498,12 @@ private:
       }
     }
 
+    savo_mapping::phase_authority::Context checked_parent;
+    if (!check_parent_phase(checked_parent)) {
+      response->success = false;
+      response->message = "mapping_local_phase_check_failed";
+      return;
+    }
     const auto decision = approval_decision();
     if (!decision.accepted) {
       response->success = false;
@@ -449,6 +516,16 @@ private:
 
     {
       std::lock_guard<std::mutex> lock(mutex_);
+      if (mapping_local_authority_) {
+        if (!parent_context_.same_lease(checked_parent) ||
+          !parent_context_.coverage_ready(std::chrono::steady_clock::now()))
+        {
+          response->success = false;
+          response->message = "mapping_local_phase_changed_before_approval";
+          return;
+        }
+        approved_parent_ = checked_parent;
+      }
       approval_pending_ = true;
       pending_candidate_generation_ =
         decision.candidate_generation;
@@ -470,6 +547,11 @@ private:
 
     {
       std::lock_guard<std::mutex> lock(mutex_);
+      if (mapping_local_authority_ && (!parent_context_.same_lease(checked_parent) ||
+        !parent_context_.coverage_ready(std::chrono::steady_clock::now())))
+      {
+        generation_matches = false;
+      }
       approval_pending_ = false;
       pending_candidate_generation_ = 0U;
       if (accepted && generation_matches) {
@@ -526,6 +608,7 @@ private:
     response->message = internal_message;
     if (response->success) {
       std::lock_guard<std::mutex> lock(mutex_);
+      approved_parent_.reset();
       approved_candidate_generation_ = 0U;
       approved_mission_id_.clear();
       supervisor_cancel_requested_ = false;
@@ -542,7 +625,7 @@ private:
 
   void watchdog_tick()
   {
-    if (!enabled_ || !policy_.cancel_on_supervisor_loss) {
+    if (!enabled_ || (!mapping_local_authority_ && !policy_.cancel_on_supervisor_loss)) {
       return;
     }
 
@@ -698,7 +781,9 @@ private:
       << ",\"node\":\"coverage_operation_orchestrator\""
       << ",\"enabled\":" << bool_text(enabled_)
       << ",\"state\":\"" << json_escape(state) << "\""
-      << ",\"supervisor_authorized\":"
+      << ",\"authority_owner\":\"" <<
+      (mapping_local_authority_ ? "mapping_local" : "system_supervisor")
+      << "\",\"supervisor_authorized\":"
       << bool_text(authorized)
       << ",\"supervisor_age_sec\":" << supervisor_age_json
       << ",\"supervisor_lifecycle\":\""
@@ -767,6 +852,10 @@ private:
   std::int64_t watchdog_period_ms_{100};
   std::int64_t publish_period_ms_{500};
 
+  bool mapping_local_authority_{false};
+  savo_mapping::phase_authority::Context parent_context_;
+  std::optional<savo_mapping::phase_authority::Context> approved_parent_;
+  rclcpp::Client<Authorize>::SharedPtr phase_client_;
   std::string supervisor_state_topic_;
   std::string handoff_state_topic_;
   std::string handoff_status_topic_;

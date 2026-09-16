@@ -53,16 +53,19 @@ ros2 launch savo_bringup autonomous_mapping.launch.py \
 ```
 
 The launch staggers description, base, LiDAR, range safety, control,
-localization, core power, Supervisor, live-map Nav2, SLAM and autonomous
+localization, core power, live-map Nav2, SLAM and autonomous
 mapping to reduce Core Pi startup contention. It does not send an autonomous
 mission goal and defaults the control layer to `STOP`. Head, semantic/location,
 VO, ultrasonic, coverage and initial/final scan workflows remain available but
 default off for the first Core-only geometric mapping run.
+The dedicated launch defaults `start_supervisor=false`; normal system bringup
+still supports the system Supervisor with its existing defaults and latch policy.
 
 During a controlled real-robot test, first confirm mapping, navigation, safety,
-localization and power readiness, arm Supervisor explicitly, and send one typed
-mission action. Generation zero asks the orchestrator to acquire the exact
-mapping lease before it selects any motion-capable control mode:
+localization and power readiness, then send one typed mission action.
+No Supervisor ARM or service is required. Generation zero asks the orchestrator
+to acquire a mission-bound mapping-local lease from direct subsystem evidence
+before it selects any motion-capable control mode:
 
 ```bash
 ros2 action send_goal \
@@ -72,11 +75,11 @@ ros2 action send_goal \
 ```
 
 The action goal is the only mission start boundary, but it proceeds only after
-the orchestrator acquires and verifies the exact Supervisor lease. Existing
-callers that supply a nonzero, pre-acquired generation retain the independent
-lease CHECK path. AM-5 records the initial
-map-frame pose, runs an initial Scan360, switches to monitor-only for the initial
-head scan, then enters frontier exploration. A typed control request can insert
+the orchestrator acquires and verifies its exact mapping-local lease. Nonzero
+pre-acquired Supervisor generations are rejected explicitly; callers must send
+zero, keeping request, actor, map and semantic fields intact. AM-5 records the
+initial map-frame pose and performs initial Scan360/head scans only when their
+existing flags require them, then enters frontier exploration. A typed control request can insert
 a guarded conditional Scan360 and automatically resume frontier exploration.
 Stable frontier exhaustion still triggers monitor-only mode, atomic map-session
 save, pose-graph serialization and committed-session verification before
@@ -110,8 +113,11 @@ mapping groups and leaves optional hardware and semantic workflows disabled.
 
 `autonomous_mapping.launch.py` starts the location review gateway and the
 mapping orchestrator in the same guarded stack. A production mission goal must
-use `contract_version: 3`, an exact live Supervisor authority generation, and
+use `contract_version: 3`, `authority_generation: 0` for local acquisition, and
 `require_quality_approval: true`.
+
+See [mapping-local authority validation](../../../../docs/validation/mapping_local_authority.md)
+for ownership, compatibility, and Core ROS 2 Jazzy validation commands.
 
 The required terminal path is:
 
@@ -204,7 +210,7 @@ remain off in normal safe idle and do not imply navigation.
 
 The dedicated `autonomous_mapping.launch.py` directly composes the current
 Nav2, SLAM, and mapping runtime. Launch initializes them but never submits the
-typed autonomous-mapping action; mission readiness and Supervisor lease
+typed autonomous-mapping action; mission readiness and mapping-local lease
 admission remain separate and strict.
 
 Run the matching edge stack on `savo-edge`:

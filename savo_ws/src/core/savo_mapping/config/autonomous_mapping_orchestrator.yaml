@@ -4,9 +4,8 @@ autonomous_mapping_orchestrator_node:
 
     action_name: "/savo_mapping/autonomous/run"
     control_service: "/savo_mapping/autonomous/control"
-    supervisor_authorization_service: "/savo_supervisor/authorize_operation"
-    supervisor_authority_check_period_s: 0.5
-    supervisor_authority_stale_timeout_s: 1.5
+    # Mapping-local evidence, not a system-Supervisor lease. Receipt TTL is 1.5 s.
+    local_health_topic: "/savo_mapping/local_health"
     status_topic: "/savo_mapping/autonomous/status"
 
     mode_topic: "/savo_mapping/mode"

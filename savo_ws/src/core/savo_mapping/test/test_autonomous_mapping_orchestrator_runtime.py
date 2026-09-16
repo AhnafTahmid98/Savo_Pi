@@ -3,6 +3,7 @@
 
 """Isolated runtime validation for the AM-3 mission orchestrator."""
 
+import json
 import os
 from pathlib import Path
 import signal
@@ -22,7 +23,6 @@ from rclpy.qos import ReliabilityPolicy
 from savo_msgs.action import RunAutonomousMapping
 from savo_msgs.msg import AutonomousMappingStatus
 from savo_msgs.msg import FrontierExplorationStatus
-from savo_msgs.srv import AuthorizeOperation
 from savo_msgs.srv import ControlAutonomousMapping
 from std_msgs.msg import Bool
 from std_msgs.msg import String
@@ -90,11 +90,9 @@ class RuntimeHarness:
         self.cancel_session_topic = f'{prefix}/cancel_session_cmd'
         self.handoff_cancel_service = f'{prefix}/handoff_cancel'
         self.map_save_service = f'{prefix}/map_save'
-        self.authority_service = f'{prefix}/authorize_operation'
-        self.authority_generation = 1
-        self.authority_state = 'ACTIVE'
-        self.authority_allowed = True
-        self.authority_commands = []
+        self.local_health_topic = f'{prefix}/local_health'
+        self.health_allowed = True
+        self.health_publication_enabled = True
 
         self.node = rclpy.create_node(f'am3_fixture_{suffix}')
         self.group = ReentrantCallbackGroup()
@@ -192,12 +190,10 @@ class RuntimeHarness:
             self.handle_map_save,
             callback_group=self.group,
         )
-        self.authority_server = self.node.create_service(
-            AuthorizeOperation,
-            self.authority_service,
-            self.handle_authority,
-            callback_group=self.group,
+        self.local_health_pub = self.node.create_publisher(
+            String, self.local_health_topic, QoSProfile(depth=1)
         )
+        self.health_timer = self.node.create_timer(0.1, self.publish_local_health)
 
         self.action_client = ActionClient(
             self.node,
@@ -223,7 +219,7 @@ class RuntimeHarness:
             '-p', f'action_name:={self.action_name}',
             '-p', f'control_service:={self.control_service}',
             '-p',
-            f'supervisor_authorization_service:={self.authority_service}',
+            f'local_health_topic:={self.local_health_topic}',
             '-p', f'status_topic:={self.status_topic}',
             '-p', f'mode_topic:={self.mode_topic}',
             '-p', f'exploration_mode_topic:={self.exploration_mode_topic}',
@@ -324,82 +320,17 @@ class RuntimeHarness:
                 self.string_message(message.data)
             )
 
-    def handle_authority(self, request, response):
-        """Emulate one exact Supervisor mapping lease."""
-        self.authority_commands.append(request.command)
-        identity_exact = (
-            request.operation
-            == AuthorizeOperation.Request.OP_START_AUTONOMOUS_MAPPING
-            and request.request_id == 'authority-am3-runtime'
-            and request.actor_id == 'runtime-operator'
-            and request.map_id == 'campus_main'
-            and request.map_revision == 1
-        )
-
-        authorized = False
-        if request.command == AuthorizeOperation.Request.COMMAND_ACQUIRE:
-            authorized = (
-                self.authority_allowed
-                and identity_exact
-                and request.expected_generation == 0
-                and self.authority_state == 'IDLE'
-            )
-            if authorized:
-                self.authority_generation += 1
-                self.authority_state = 'ACTIVE'
-        else:
-            exact = (
-                identity_exact
-                and request.expected_generation == self.authority_generation
-            )
-            if request.command == AuthorizeOperation.Request.COMMAND_RELEASE:
-                authorized = exact and self.authority_state != 'IDLE'
-            else:
-                authorized = (
-                    self.authority_allowed
-                    and exact
-                    and self.authority_state != 'IDLE'
-                    and (
-                        request.command
-                        != AuthorizeOperation.Request.COMMAND_CHECK
-                        or self.authority_state == 'ACTIVE'
-                    )
-                )
-
-        if request.command == AuthorizeOperation.Request.COMMAND_RELEASE:
-            if authorized:
-                self.authority_generation += 1
-                self.authority_state = 'IDLE'
-        elif request.command == AuthorizeOperation.Request.COMMAND_PAUSE:
-            if authorized:
-                self.authority_generation += 1
-                self.authority_state = 'PAUSED'
-        elif request.command == AuthorizeOperation.Request.COMMAND_RESUME:
-            if authorized:
-                self.authority_generation += 1
-                self.authority_state = 'ACTIVE'
-        response.authorized = authorized
-        response.result_code = (
-            AuthorizeOperation.Response.RESULT_AUTHORIZED
-            if response.authorized
-            else AuthorizeOperation.Response.RESULT_OWNERSHIP_MISMATCH
-        )
-        response.reason = (
-            'fixture_authorized'
-            if response.authorized
-            else 'fixture_authority_rejected'
-        )
-        response.operation_state = self.authority_state
-        response.active_operation = (
-            AuthorizeOperation.Request.OP_NONE
-            if self.authority_state == 'IDLE'
-            else AuthorizeOperation.Request.OP_START_AUTONOMOUS_MAPPING
-        )
-        response.active_request_id = (
-            '' if self.authority_state == 'IDLE' else request.request_id
-        )
-        response.authority_generation = self.authority_generation
-        return response
+    def publish_local_health(self):
+        """Publish direct mapping health; no system Supervisor exists in this fixture."""
+        if not self.health_publication_enabled:
+            return
+        self.local_health_pub.publish(String(data=json.dumps({
+            'schema_version': 1, 'node': 'savo_mapping',
+            'admission_ready': self.health_allowed,
+            'continuation_ready': self.health_allowed,
+            'semantic_ready': True,
+            'reason': 'ready' if self.health_allowed else 'core_ups_critical',
+        })))
 
     def create_valid_session(self, map_id):
         """Create one saved-map session accepted by the production verifier."""
@@ -502,6 +433,8 @@ class RuntimeHarness:
 
     def publish_initial_state(self):
         """Publish a safe monitor-only idle mapping state."""
+        assert wait_until(lambda: self.local_health_pub.get_subscription_count() > 0)
+        self.publish_local_health()
         for _ in range(3):
             self.mode_pub.publish(self.string_message('monitor_only'))
             self.exploration_mode_pub.publish(self.string_message('idle'))
@@ -537,7 +470,7 @@ class RuntimeHarness:
     def send_goal(
         self,
         auto_save=True,
-        authority_generation=1,
+        authority_generation=0,
         require_semantic=True,
         require_quality_approval=True,
     ):
@@ -710,8 +643,9 @@ def test_frontier_waits_for_observed_nav_mode():
         ), harness.diagnostics()
         harness.session_state_pub.publish(harness.string_message('cancelled'))
         time.sleep(0.25)
-        assert AuthorizeOperation.Request.COMMAND_RELEASE not in (
-            harness.authority_commands
+        assert not any(
+            '/savo_supervisor/' in name
+            for name, _ in harness.node.get_service_names_and_types()
         )
         assert not result_future.done()
 
@@ -823,8 +757,9 @@ def test_start_pause_resume_and_cancel_lifecycle():
         assert wrapped_result.result.final_status.state == (
             AutonomousMappingStatus.STATE_CANCELED
         )
-        assert AuthorizeOperation.Request.COMMAND_RELEASE in (
-            harness.authority_commands
+        assert not any(
+            '/savo_supervisor/' in name
+            for name, _ in harness.node.get_service_names_and_types()
         )
         assert 'STOP' in harness.control_mode_commands
     finally:
@@ -837,8 +772,6 @@ def test_one_action_acquires_lease_and_completes_core_only_mission():
     try:
         harness.publish_initial_state()
         assert not harness.control_mode_commands
-        harness.authority_generation = 0
-        harness.authority_state = 'IDLE'
         goal_handle = harness.send_goal(
             auto_save=False,
             authority_generation=0,
@@ -847,10 +780,10 @@ def test_one_action_acquires_lease_and_completes_core_only_mission():
         )
         result_future = goal_handle.get_result_async()
 
-        assert wait_until(
-            lambda: AuthorizeOperation.Request.COMMAND_ACQUIRE
-            in harness.authority_commands
-        ), harness.diagnostics()
+        assert not any(
+            '/savo_supervisor/' in name
+            for name, _ in harness.node.get_service_names_and_types()
+        )
         assert wait_until(
             lambda: 'mission-am3-runtime' in harness.start_session_commands
         ), harness.diagnostics()
@@ -912,8 +845,9 @@ def test_one_action_acquires_lease_and_completes_core_only_mission():
             AutonomousMappingStatus.STATE_COMPLETED
         )
         assert not wrapped_result.result.map_saved
-        assert AuthorizeOperation.Request.COMMAND_RELEASE in (
-            harness.authority_commands
+        assert not any(
+            '/savo_supervisor/' in name
+            for name, _ in harness.node.get_service_names_and_types()
         )
         assert 'STOP' in harness.control_mode_commands
     finally:
@@ -985,7 +919,8 @@ def test_direct_action_with_stale_authority_never_starts_workflow():
         harness.close()
 
 
-def test_supervisor_revocation_stops_and_aborts():
+@pytest.mark.parametrize('failure', ['critical', 'stale'])
+def test_required_health_failure_stops_and_aborts_without_supervisor(failure):
     """Revoked mapping authority stops motion and aborts the mission."""
     harness = RuntimeHarness()
     try:
@@ -1001,9 +936,10 @@ def test_supervisor_revocation_stops_and_aborts():
             == AutonomousMappingStatus.STATE_EXPLORING
         ), harness.diagnostics()
 
-        harness.authority_generation += 1
-        harness.authority_state = 'REVOKED'
-        harness.authority_allowed = False
+        if failure == 'critical':
+            harness.health_allowed = False
+        else:
+            harness.health_publication_enabled = False
         assert wait_until(
             lambda: harness.latest_state()
             == AutonomousMappingStatus.STATE_CANCELING
@@ -1024,8 +960,11 @@ def test_supervisor_revocation_stops_and_aborts():
         assert result.result_code == (
             RunAutonomousMapping.Result.RESULT_READINESS_LOST
         )
-        assert AuthorizeOperation.Request.COMMAND_RELEASE in (
-            harness.authority_commands
+        assert result.reason.startswith('mapping_local_authority_lost:')
+        assert 'supervisor_mapping_authority_lost' not in result.reason
+        assert not any(
+            '/savo_supervisor/' in name
+            for name, _ in harness.node.get_service_names_and_types()
         )
         assert 'STOP' in harness.control_mode_commands
     finally:
@@ -1084,8 +1023,9 @@ def test_auto_save_rejects_a_map_that_fails_the_requested_quality_gate():
             status.state == AutonomousMappingStatus.STATE_VERIFYING
             for status in harness.statuses
         )
-        assert AuthorizeOperation.Request.COMMAND_RELEASE in (
-            harness.authority_commands
+        assert not any(
+            '/savo_supervisor/' in name
+            for name, _ in harness.node.get_service_names_and_types()
         )
     finally:
         harness.close()
@@ -1125,8 +1065,9 @@ def test_auto_save_failure_returns_typed_save_failed_result():
         assert wrapped_result.final_status.state == (
             AutonomousMappingStatus.STATE_FAILED
         )
-        assert AuthorizeOperation.Request.COMMAND_RELEASE in (
-            harness.authority_commands
+        assert not any(
+            '/savo_supervisor/' in name
+            for name, _ in harness.node.get_service_names_and_types()
         )
     finally:
         harness.close()

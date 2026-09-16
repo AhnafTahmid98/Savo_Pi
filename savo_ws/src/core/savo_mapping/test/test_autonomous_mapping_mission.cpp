@@ -48,8 +48,8 @@ MissionInputs starting_inputs()
   inputs.safety_stop_active = false;
   inputs.runtime_authority_received = true;
   inputs.runtime_authorized = false;
-  inputs.supervisor_authority_received = true;
-  inputs.supervisor_authorized = true;
+  inputs.mission_authority_received = true;
+  inputs.mission_authorized = true;
   inputs.handoff_state_received = true;
   inputs.handoff_active = false;
   inputs.handoff_state = "idle";
@@ -121,7 +121,7 @@ TEST(AutonomousMappingMissionTest, SupervisorRevocationPausesAndNeedsExplicitRes
   ASSERT_TRUE(mission.start(valid_request(), inputs).accepted);
   ASSERT_EQ(mission.snapshot().state, MissionState::Exploring);
 
-  inputs.supervisor_authorized = false;
+  inputs.mission_authorized = false;
   auto decision = mission.observe(inputs);
   EXPECT_EQ(decision.snapshot.state, MissionState::Pausing);
 
@@ -132,7 +132,7 @@ TEST(AutonomousMappingMissionTest, SupervisorRevocationPausesAndNeedsExplicitRes
   decision = mission.observe(inputs);
   EXPECT_EQ(decision.snapshot.state, MissionState::Paused);
 
-  inputs.supervisor_authorized = true;
+  inputs.mission_authorized = true;
   decision = mission.observe(inputs);
   EXPECT_EQ(decision.snapshot.state, MissionState::Paused);
 
@@ -965,7 +965,7 @@ TEST(AutonomousMappingMissionTest, SupervisorAuthorityLossLatchesPause)
     mission.start(valid_request(), exploring_inputs()).accepted);
 
   auto inputs = exploring_inputs();
-  inputs.supervisor_authorized = false;
+  inputs.mission_authorized = false;
   inputs.handoff_active = true;
   inputs.handoff_state = "executing";
 

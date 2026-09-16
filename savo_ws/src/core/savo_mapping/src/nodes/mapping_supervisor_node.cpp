@@ -1,4 +1,5 @@
 #include "savo_mapping/exploration_mode.hpp"
+#include "savo_mapping/local_mapping_health.hpp"
 #include "savo_mapping/mapping_mode.hpp"
 #include "savo_mapping/mapping_status.hpp"
 #include "savo_mapping/map_quality_placeholder.hpp"
@@ -10,22 +11,28 @@
 #include "savo_mapping/version.hpp"
 #include "savo_mapping/workflow_phase.hpp"
 
+#include <diagnostic_msgs/msg/diagnostic_array.hpp>
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <nav_msgs/msg/occupancy_grid.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/laser_scan.hpp>
+#include <std_msgs/msg/bool.hpp>
+#include <std_msgs/msg/float32.hpp>
 #include <std_msgs/msg/string.hpp>
 #include <tf2/exceptions.hpp>
 #include <tf2/time.hpp>
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
 
+#include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <functional>
 #include <iostream>
 #include <limits>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -33,6 +40,7 @@
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace savo_mapping
 {
@@ -76,6 +84,14 @@ double receipt_age_s(
 bool is_zero_stamp(const builtin_interfaces::msg::Time & stamp)
 {
   return stamp.sec == 0 && stamp.nanosec == 0;
+}
+
+bool text_is_ready(std::string value)
+{
+  std::transform(value.begin(), value.end(), value.begin(), [](unsigned char character) {
+      return static_cast<char>(std::toupper(character));
+    });
+  return value == "OK" || value == "READY" || value == "STREAMING";
 }
 
 }  // namespace
@@ -221,6 +237,31 @@ private:
       *this,
       "optional_features.semantic_mapping_enabled",
       false);
+
+    local_health_enabled_ = params::declare_or_get<bool>(
+      *this, "local_health.enabled", false);
+
+    local_health_edge_ups_required_ = params::declare_or_get<bool>(
+      *this, "local_health.edge_ups_required", false);
+
+    local_health_semantic_required_ = params::declare_or_get<bool>(
+      *this, "local_health.semantic_required", false);
+
+    local_health_output_topic_ = require_non_empty(
+      "local_health.output_topic",
+      params::declare_or_get<std::string>(
+        *this, "local_health.output_topic", std::string{"/savo_mapping/local_health"}));
+
+    if (local_health_enabled_) {
+      local_health_monitor_ = std::make_unique<local_health::Monitor>(
+        local_health_edge_ups_required_);
+      for (const auto & source : local_health_monitor_->sources()) {
+        local_health_topics_[source.name] = require_non_empty(
+          "local_health.topics." + source.name,
+          params::declare_or_get<std::string>(
+            *this, "local_health.topics." + source.name, source.topic));
+      }
+    }
 
     const MonitorOnlyPolicy monitor_only_policy{
       allow_direct_motor_control_,
@@ -438,6 +479,12 @@ private:
     map_quality_publisher_ =
       create_publisher<std_msgs::msg::String>(
       map_quality_topic_, qos::state_qos());
+
+    if (local_health_enabled_) {
+      local_health_publisher_ = create_publisher<std_msgs::msg::String>(
+        local_health_output_topic_,
+        rclcpp::QoS(rclcpp::KeepLast(1)).reliable().durability_volatile());
+    }
   }
 
   void create_subscriptions()
@@ -502,6 +549,101 @@ private:
         on_session_state,
         this,
         _1));
+
+    create_local_health_subscriptions();
+  }
+
+  void create_local_health_subscriptions()
+  {
+    if (!local_health_enabled_ || !local_health_monitor_) {return;}
+
+    const auto input_qos = rclcpp::QoS(rclcpp::KeepLast(10)).reliable().durability_volatile();
+    for (const auto & source : local_health_monitor_->sources()) {
+      if (source.name == "safety_stop" || source.name == "safety_slowdown" ||
+        source.name == "head")
+      {
+        continue;
+      }
+      if (!local_health_semantic_required_ && source.name == "locations") {continue;}
+      local_health_string_subscriptions_.push_back(
+        create_subscription<std_msgs::msg::String>(
+          local_health_topics_.at(source.name), input_qos,
+          [this, source_name = source.name](const std_msgs::msg::String::ConstSharedPtr message) {
+            observe_local_health(source_name, message->data);
+          }));
+    }
+
+    local_health_stop_subscription_ = create_subscription<std_msgs::msg::Bool>(
+      local_health_topics_.at("safety_stop"), input_qos,
+      [this](const std_msgs::msg::Bool::ConstSharedPtr message) {
+        observe_local_health("safety_stop", message->data ? "true" : "false");
+      });
+
+    local_health_slowdown_subscription_ = create_subscription<std_msgs::msg::Float32>(
+      local_health_topics_.at("safety_slowdown"), input_qos,
+      [this](const std_msgs::msg::Float32::ConstSharedPtr message) {
+        std::ostringstream text;
+        text << message->data;
+        observe_local_health("safety_slowdown", text.str());
+      });
+
+    if (local_health_semantic_required_) {
+      local_health_head_subscription_ =
+        create_subscription<diagnostic_msgs::msg::DiagnosticArray>(
+          local_health_topics_.at("head"), input_qos,
+          std::bind(&MappingSupervisorNode::on_head_status, this, std::placeholders::_1));
+    }
+
+    RCLCPP_INFO(
+      get_logger(),
+      "mapping-local health enabled: output=%s edge_ups_required=%s semantic_required=%s",
+      local_health_output_topic_.c_str(),
+      local_health_edge_ups_required_ ? "true" : "false",
+      local_health_semantic_required_ ? "true" : "false");
+  }
+
+  void observe_local_health(const std::string & source, const std::string & payload)
+  {
+    std::lock_guard<std::mutex> lock(local_health_mutex_);
+    local_health_monitor_->observe(source, payload, SteadyClock::now());
+  }
+
+  void on_head_status(
+    const diagnostic_msgs::msg::DiagnosticArray::ConstSharedPtr message)
+  {
+    const auto status = std::find_if(
+      message->status.begin(), message->status.end(), [](const auto & item) {
+        return item.name == "savo_head.head_status";
+      });
+    if (status == message->status.end()) {
+      observe_local_health("head", "{}");
+      return;
+    }
+
+    std::map<std::string, std::string> values;
+    for (const auto & item : status->values) {
+      if (!values.emplace(item.key, item.value).second) {
+        observe_local_health("head", "{}");
+        return;
+      }
+    }
+    const auto value = [&values](const std::string & key) -> std::string {
+        const auto found = values.find(key);
+        return found == values.end() ? std::string{} : found->second;
+      };
+    const bool operational =
+      status->level <= diagnostic_msgs::msg::DiagnosticStatus::WARN;
+    const bool pan_tilt_ready = text_is_ready(value("pan_tilt_state"));
+    const bool camera_ready = value("camera_stream_healthy") == "true";
+    const bool camera_pose_ready = value("camera_pose_ready") == "true";
+
+    std::ostringstream payload;
+    payload << std::boolalpha
+            << "{\"operational\":" << operational
+            << ",\"pan_tilt_ready\":" << pan_tilt_ready
+            << ",\"camera_ready\":" << camera_ready
+            << ",\"camera_pose_ready\":" << camera_pose_ready << "}";
+    observe_local_health("head", payload.str());
   }
 
   void create_timers()
@@ -873,6 +1015,16 @@ private:
     publish_text(
       map_quality_publisher_,
       make_map_quality_json(quality_snapshot));
+
+    if (local_health_enabled_ && local_health_publisher_) {
+      local_health::Decision local_decision;
+      {
+        std::lock_guard<std::mutex> lock(local_health_mutex_);
+        local_decision = local_health_monitor_->evaluate(
+          snapshot.ready, SteadyClock::now());
+      }
+      publish_text(local_health_publisher_, local_decision.json());
+    }
   }
 
   static void publish_text(
@@ -942,6 +1094,10 @@ private:
   bool voxel_obstacle_monitoring_enabled_{false};
   bool semantic_mapping_enabled_{false};
 
+  bool local_health_enabled_{false};
+  bool local_health_edge_ups_required_{false};
+  bool local_health_semantic_required_{false};
+
   std::string scan_topic_;
   std::string map_topic_;
   std::string odom_topic_;
@@ -954,6 +1110,8 @@ private:
   std::string session_state_topic_;
   std::string dashboard_topic_;
   std::string map_quality_topic_;
+  std::string local_health_output_topic_;
+  std::map<std::string, std::string> local_health_topics_;
 
   std::string map_frame_;
   std::string odom_frame_;
@@ -972,6 +1130,9 @@ private:
 
   std::string last_readiness_reason_;
 
+  std::mutex local_health_mutex_;
+  std::unique_ptr<local_health::Monitor> local_health_monitor_;
+
   tf2_ros::Buffer tf_buffer_;
   tf2_ros::TransformListener tf_listener_;
 
@@ -979,6 +1140,7 @@ private:
   StringPublisher::SharedPtr readiness_publisher_;
   StringPublisher::SharedPtr dashboard_publisher_;
   StringPublisher::SharedPtr map_quality_publisher_;
+  StringPublisher::SharedPtr local_health_publisher_;
 
   rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr
     scan_subscription_;
@@ -1000,6 +1162,18 @@ private:
 
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr
     session_state_subscription_;
+
+  std::vector<rclcpp::Subscription<std_msgs::msg::String>::SharedPtr>
+  local_health_string_subscriptions_;
+
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr
+    local_health_stop_subscription_;
+
+  rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr
+    local_health_slowdown_subscription_;
+
+  rclcpp::Subscription<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr
+    local_health_head_subscription_;
 
   rclcpp::TimerBase::SharedPtr status_timer_;
   rclcpp::TimerBase::SharedPtr heartbeat_timer_;

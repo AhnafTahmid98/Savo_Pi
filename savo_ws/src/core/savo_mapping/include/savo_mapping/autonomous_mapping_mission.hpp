@@ -111,8 +111,8 @@ struct MissionInputs
   bool runtime_authority_received{false};
   bool runtime_authorized{false};
 
-  bool supervisor_authority_received{false};
-  bool supervisor_authorized{false};
+  bool mission_authority_received{false};
+  bool mission_authorized{false};
 
   bool handoff_state_received{false};
   bool handoff_active{false};

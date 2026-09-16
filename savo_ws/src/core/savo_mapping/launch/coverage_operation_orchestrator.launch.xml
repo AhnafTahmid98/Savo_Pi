@@ -8,6 +8,7 @@
     description="Unified Coverage operation orchestration parameters"/>
 
   <arg name="enabled" default="true" description="Enable Coverage operation orchestration"/>
+  <arg name="mapping_local_authority" default="false"/>
   <arg name="use_sim_time" default="false" description="Use the ROS simulation clock"/>
 
   <node
@@ -18,6 +19,7 @@
 
     <param from="$(var params_file)"/>
     <param name="enabled" value="$(var enabled)"/>
+    <param name="mapping_local_authority" value="$(var mapping_local_authority)"/>
     <param name="use_sim_time" value="$(var use_sim_time)"/>
   </node>
 

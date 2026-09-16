@@ -29,6 +29,13 @@ Manual mapping start and standalone save/release mutation are intentionally not
 exposed because the current workspace has no bridge-safe typed authority for
 them. Operator approval is never accepted from SavoMind.
 
+Autonomous starts send `RunAutonomousMapping` with `authority_generation=0` and
+the original request/actor/map/semantic identity. The mapping orchestrator owns
+local admission and authority; the bridge does not ACQUIRE, CHECK, or RELEASE a
+system-Supervisor lease for this command. A timed-out goal submission is canceled
+if its acceptance arrives later. Other command families and optional read-only
+Supervisor status queries are unchanged.
+
 ## Fail-closed map context
 
 The production profile and launch defaults use an empty map ID and revision 0.

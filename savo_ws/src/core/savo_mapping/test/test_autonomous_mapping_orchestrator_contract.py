@@ -98,7 +98,7 @@ def test_orchestrator_uses_typed_public_boundary() -> None:
         'MissionCommand::Cancel',
         'MissionCommand::RequestScan360',
         'COMMAND_CHECK',
-        'COMMAND_RELEASE',
+        'local_authority_.release()',
         'authority_generation',
     ):
         assert token in source
@@ -172,16 +172,16 @@ def test_motion_dispatch_waits_for_lease_bound_control_mode() -> None:
 
     for token in (
         'control_mode_owned_ && authority_validated_',
-        'inputs_.supervisor_authorized && !authority_resume_required_',
-        'authority_acquire_on_admission_ = goal->authority_generation == 0U',
-        'AuthorizeOperation::Request::COMMAND_ACQUIRE',
-        'response->authority_generation > 0U',
+        'inputs_.mission_authorized && !authority_resume_required_',
+        'local_authority_.acquire(',
+        'identity, goal->authority_generation, local_health_, now',
+        'authority_generation_ = local_authority_.generation()',
         'decision.request_frontier_mode && nav_mode_observed',
         'decision.request_scan360_mode && auto_mode_observed',
         'decision.request_scan360_start && auto_mode_observed',
         'decision.request_coverage_approve && nav_mode_observed',
         'decision.request_return_to_start && nav_mode_observed',
-        'primary_failure_reason_ = "supervisor_mapping_authority_lost"',
+        'primary_failure_reason_ = "mapping_local_authority_lost:"',
         'terminal_control_stop_pending_ = true',
         'control_mode_state_ == LowLevelControlMode::Stop',
         'const bool control_mode_command_due = stop_command_required ||',
@@ -189,7 +189,7 @@ def test_motion_dispatch_waits_for_lease_bound_control_mode() -> None:
         assert token in source
 
     assert 'goal->authority_generation > 0U' not in source
-    assert 'mission_request.authority_generation = authority_generation_' in (
+    assert 'request.authority_generation = authority_generation_' in (
         source
     )
 
@@ -300,7 +300,7 @@ def test_launch_and_config_are_nonempty_and_consistent() -> None:
         '/savo_mapping/autonomous/run',
         '/savo_mapping/autonomous/control',
         '/savo_mapping/autonomous/status',
-        '/savo_supervisor/authorize_operation',
+        '/savo_mapping/local_health',
         '/savo_mapping/exploration/runtime_enabled',
         '/savo_mapping/exploration_goal/state',
         '/savo_mapping/frontier_explorer/typed_status',

@@ -18,6 +18,7 @@
 
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/string.hpp"
+#include "savo_mapping/mapping_phase_authority.hpp"
 #include "std_msgs/msg/u_int64.hpp"
 
 #include "savo_msgs/msg/location_candidate.hpp"
@@ -95,8 +96,21 @@ public:
       "service_name", "/savo_mapping/locations/review");
     candidate_lookup_service_name_ = declare_parameter<std::string>(
       "candidate_lookup_service", "/savo_locations/candidates/get");
+    mapping_local_authority_ = declare_parameter<bool>("mapping_local_authority", false);
     authorization_service_name_ = declare_parameter<std::string>(
-      "authorization_service", "/savo_supervisor/authorize_location_operation");
+      "authorization_service", mapping_local_authority_ ?
+      "/savo_mapping/autonomous/authorize_location_operation" :
+      "/savo_supervisor/authorize_location_operation");
+    if (mapping_local_authority_) {
+      authorization_service_name_ = "/savo_mapping/autonomous/authorize_location_operation";
+      phase_subscription_ = create_subscription<std_msgs::msg::String>(
+        "/savo_mapping/autonomous/authority",
+        rclcpp::QoS(1).reliable().durability_volatile(),
+        [this](std_msgs::msg::String::ConstSharedPtr message) {
+          std::lock_guard<std::mutex> lock(phase_mutex_);
+          parent_context_.observe(message->data, std::chrono::steady_clock::now());
+        });
+    }
     approval_service_name_ = declare_parameter<std::string>(
       "approval_service", "/savo_locations/candidates/approve");
     rejection_service_name_ = declare_parameter<std::string>(
@@ -180,6 +194,31 @@ public:
   }
 
 private:
+  bool bind_local_phase(Authorize::Request & request, const std::string & session = "")
+  {
+    if (!mapping_local_authority_) {return true;}
+    std::lock_guard<std::mutex> lock(phase_mutex_);
+    if (!parent_context_.semantic_ready(
+        request.actor_id, request.map_id, request.map_revision, std::chrono::steady_clock::now()) ||
+      (!session.empty() && session != parent_context_.mission_id))
+    {
+      bound_context_.reset();
+      return false;
+    }
+    bound_context_ = parent_context_;
+    request.request_id = parent_context_.scoped_request_id(request.request_id);
+    return true;
+  }
+
+  bool local_phase_valid() const
+  {
+    if (!mapping_local_authority_) {return true;}
+    std::lock_guard<std::mutex> lock(phase_mutex_);
+    return bound_context_ && parent_context_.same_lease(*bound_context_) &&
+           parent_context_.semantic_ready(bound_context_->actor_id, bound_context_->map_id,
+           bound_context_->map_revision, std::chrono::steady_clock::now());
+  }
+
   void handle_review(
     const std::shared_ptr<ReviewService::Request> request,
     std::shared_ptr<ReviewService::Response> response)
@@ -344,6 +383,11 @@ private:
     authorization->map_id = candidate.map_id;
     authorization->map_revision = candidate.map_revision;
     authorization->motion_required = false;
+    if (!bind_local_phase(*authorization)) {
+      finish(request, response, ReviewService::Response::RESULT_SUPERVISOR_DENIED,
+        "mapping_local_semantic_binding_denied");
+      return false;
+    }
 
     auto future = authorization_client_->async_send_request(authorization);
     if (!wait_until_ready(future, operation_timeout_s_)) {
@@ -356,13 +400,13 @@ private:
     }
 
     const auto decision = future.get();
-    if (!decision->authorized) {
+    if (!decision->authorized || !local_phase_valid()) {
       authorization_denials_.fetch_add(1U);
       finish(
         request,
         response,
         ReviewService::Response::RESULT_SUPERVISOR_DENIED,
-        decision->reason);
+        decision->authorized ? "mapping_local_semantic_authority_lost" : decision->reason);
       return false;
     }
 
@@ -391,6 +435,11 @@ private:
       return;
     }
 
+    if (!local_phase_valid()) {
+      finish(request, response, ReviewService::Response::RESULT_SUPERVISOR_DENIED,
+        "mapping_local_semantic_authority_lost");
+      return;
+    }
     auto approval = std::make_shared<Approve::Request>();
     approval->candidate_id = request.candidate_id;
     approval->expected_candidate_revision = request.expected_candidate_revision;
@@ -460,6 +509,11 @@ private:
       return;
     }
 
+    if (!local_phase_valid()) {
+      finish(request, response, ReviewService::Response::RESULT_SUPERVISOR_DENIED,
+        "mapping_local_semantic_authority_lost");
+      return;
+    }
     auto rejection = std::make_shared<Reject::Request>();
     rejection->candidate_id = request.candidate_id;
     rejection->expected_candidate_revision = request.expected_candidate_revision;
@@ -635,6 +689,11 @@ private:
 
   std::string service_name_{};
   std::string candidate_lookup_service_name_{};
+  bool mapping_local_authority_{false};
+  mutable std::mutex phase_mutex_;
+  phase_authority::Context parent_context_;
+  std::optional<phase_authority::Context> bound_context_;
+  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr phase_subscription_;
   std::string authorization_service_name_{};
   std::string approval_service_name_{};
   std::string rejection_service_name_{};

@@ -483,9 +483,11 @@ protected:
         last_mapping_goal_has_exact_authority_.store(
           goal->actor_id == "savo_bridge:mapping_agent" &&
           goal->authority_request_id == "mapping-start-request" &&
-          goal->authority_generation == 1U &&
+          goal->authority_generation == 0U &&
           goal->require_semantic);
-        return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
+        return mapping_action_allowed_.load() ?
+               rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE :
+               rclcpp_action::GoalResponse::REJECT;
       },
       [](const std::shared_ptr<MappingServerGoalHandle>)
       {
@@ -1081,6 +1083,7 @@ protected:
   std::atomic<bool> last_mapping_goal_has_exact_authority_{false};
   std::atomic<std::size_t> supervisor_authorization_request_count_{0U};
   std::atomic<std::uint8_t> last_supervisor_authority_command_{0U};
+  std::atomic<bool> mapping_action_allowed_{true};
   std::atomic<bool> supervisor_authorization_allowed_{true};
   std::atomic<std::int64_t> supervisor_authorization_delay_ms_{0};
 
@@ -1511,31 +1514,26 @@ TEST_F(
   EXPECT_TRUE(last_mapping_goal_auto_save_.load());
   EXPECT_TRUE(last_mapping_goal_requires_approval_.load());
   EXPECT_TRUE(last_mapping_goal_has_exact_authority_.load());
-  EXPECT_EQ(supervisor_authorization_request_count_.load(), 1U);
-  EXPECT_EQ(
-    last_supervisor_authority_command_.load(),
-    AuthorizeOperation::Request::COMMAND_ACQUIRE);
+  EXPECT_EQ(supervisor_authorization_request_count_.load(), 0U);
 }
 
 TEST_F(
   RosCommandDispatcherTest,
-  SupervisorRejectionPreventsAutonomousMappingActionSubmission)
+  SystemSupervisorRejectionDoesNotOwnMappingLocalAdmission)
 {
   supervisor_authorization_allowed_.store(false);
   const auto result = dispatcher_->dispatch(
     make_start_mapping_command("mapping-supervisor-rejected-1"));
 
-  EXPECT_FALSE(result.accepted);
-  EXPECT_NE(
-    result.reason.find("bridge_supervisor_authorization_rejected"),
-    std::string::npos);
-  EXPECT_EQ(mapping_goal_request_count_.load(), 0U);
-  EXPECT_GE(supervisor_authorization_request_count_.load(), 1U);
+  EXPECT_TRUE(result.accepted) << result.reason;
+  EXPECT_EQ(mapping_goal_request_count_.load(), 1U);
+  EXPECT_TRUE(last_mapping_goal_has_exact_authority_.load());
+  EXPECT_EQ(supervisor_authorization_request_count_.load(), 0U);
 }
 
 TEST_F(
   RosCommandDispatcherTest,
-  MissingSupervisorPreventsAutonomousMappingActionSubmission)
+  MissingSupervisorStillSubmitsMappingLocalAcquisition)
 {
   auto supervisor_probe = fixture_node_->create_client<AuthorizeOperation>(
     config_.supervisor_authorization_service);
@@ -1550,24 +1548,24 @@ TEST_F(
   const auto result = dispatcher_->dispatch(
     make_start_mapping_command("mapping-supervisor-missing-1"));
 
-  EXPECT_FALSE(result.accepted);
-  EXPECT_EQ(result.reason, "bridge_supervisor_authorization_unavailable");
-  EXPECT_EQ(mapping_goal_request_count_.load(), 0U);
+  EXPECT_TRUE(result.accepted) << result.reason;
+  EXPECT_EQ(mapping_goal_request_count_.load(), 1U);
+  EXPECT_TRUE(last_mapping_goal_has_exact_authority_.load());
+  EXPECT_EQ(supervisor_authorization_request_count_.load(), 0U);
 }
 
 TEST_F(
   RosCommandDispatcherTest,
-  AvailableSupervisorWithoutTimelyResponseReturnsTimeout)
+  MappingActionServerCanRejectLocalAdmission)
 {
-  supervisor_authorization_delay_ms_.store(
-    config_.supervisor_authorization_timeout_ms + 400);
+  mapping_action_allowed_.store(false);
   const auto result = dispatcher_->dispatch(
     make_start_mapping_command("mapping-supervisor-timeout-1"));
 
   EXPECT_FALSE(result.accepted);
-  EXPECT_EQ(result.reason, "bridge_supervisor_authorization_timeout");
-  EXPECT_EQ(mapping_goal_request_count_.load(), 0U);
-  EXPECT_GE(supervisor_authorization_request_count_.load(), 1U);
+  EXPECT_EQ(result.reason, "bridge_mapping_goal_rejected_or_timed_out");
+  EXPECT_EQ(mapping_goal_request_count_.load(), 1U);
+  EXPECT_EQ(supervisor_authorization_request_count_.load(), 0U);
 }
 
 TEST_F(
