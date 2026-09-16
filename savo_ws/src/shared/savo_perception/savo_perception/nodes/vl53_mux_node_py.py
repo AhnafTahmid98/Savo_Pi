@@ -20,7 +20,7 @@ except Exception:
     Float32 = None
     ROS_AVAILABLE = False
 
-from savo_perception.constants import NODE_NAME_VL53_MUX
+from savo_perception.constants import NODE_NAME_VL53_MUX, VL53_LEFT_CHANNEL_DEFAULT
 from savo_perception.drivers import Vl53MuxConfig, Vl53MuxDriver
 from savo_perception.ros.params import load_vl53_mux_params
 from savo_perception.ros.qos_profiles import qos_range_sensor
@@ -34,7 +34,7 @@ class Vl53MuxNodePy(Node):
         self.declare_parameter("tca_addr", 0x70)
         self.declare_parameter("vl53_addr", 0x29)
         self.declare_parameter("right_channel", 3)
-        self.declare_parameter("left_channel", 2)
+        self.declare_parameter("left_channel", VL53_LEFT_CHANNEL_DEFAULT)
         self.declare_parameter("rate_hz", 10.0)
         self.declare_parameter("median_window", 5)
         self.declare_parameter("left_topic", "/savo_perception/range/left_m")

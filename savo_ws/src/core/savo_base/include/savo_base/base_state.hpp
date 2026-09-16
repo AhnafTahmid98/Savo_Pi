@@ -32,6 +32,7 @@ struct BaseRuntimeState
 {
   std::string node_name{"base_driver_node"};
   std::string last_board_error{};
+  std::string last_recovery_stop_error{};
 
   bool connected{false};
   bool safety_stop{false};

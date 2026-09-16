@@ -94,7 +94,9 @@ std::string BaseStateJson::make(
   ss << "},";
 
   ss << "\"diagnostics\":{";
-  ss << "\"last_board_error\":\"" << escape_json(state.last_board_error) << "\"";
+  ss << "\"last_board_error\":\"" << escape_json(state.last_board_error) << "\",";
+  ss << "\"last_recovery_stop_error\":\""
+     << escape_json(state.last_recovery_stop_error) << "\"";
   ss << "}";
 
   ss << "}";

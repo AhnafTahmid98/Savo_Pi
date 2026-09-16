@@ -24,7 +24,7 @@ inline constexpr std::uint8_t kTca9548aAddrDefault = 0x70;
 inline constexpr std::uint8_t kVl53l1xAddrDefault = 0x29;
 
 inline constexpr int kVl53RightChannelDefault = 3;
-inline constexpr int kVl53LeftChannelDefault = 2;
+inline constexpr int kVl53LeftChannelDefault = 7;
 inline constexpr double kVl53RateHzDefault = 10.0;
 inline constexpr int kVl53MedianWindowDefault = 5;
 inline constexpr double kVl53SettleSDefault = 0.002;

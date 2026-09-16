@@ -279,6 +279,10 @@ if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
   find_package(ament_cmake_pytest REQUIRED)
 
+  ament_add_gtest(test_tof_defaults
+    test/unit/test_tof_defaults.cpp
+  )
+
   ament_add_gtest(test_obstacle_cloud_filter
     test/unit/test_obstacle_cloud_filter.cpp
   )

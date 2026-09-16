@@ -9,7 +9,7 @@ vl53_mux_node:
     vl53_addr: 0x29
 
     right_channel: 3
-    left_channel: 2
+    left_channel: 7
 
     rate_hz: 10.0
     median_window: 5
@@ -36,7 +36,7 @@ vl53_mux_node_py:
     vl53_addr: 0x29
 
     right_channel: 3
-    left_channel: 2
+    left_channel: 7
 
     rate_hz: 10.0
     median_window: 5

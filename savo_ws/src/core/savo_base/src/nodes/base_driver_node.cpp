@@ -1,4 +1,5 @@
 #include "savo_base/base_driver_node.hpp"
+#include "savo_base/driver_runtime.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -245,47 +246,45 @@ void BaseDriverNode::loop_callback()
   SafetyDecision decision = safety_->evaluate(snapshot);
   WheelDuty duty{0, 0, 0, 0};
 
-  try {
-    if (decision.force_zero) {
-      board_->stop();
-      ++counters_.zero_count;
+  driver_detail::run_board_operation(
+    [&]() {
+      if (decision.force_zero) {
+        board_->stop();
+        ++counters_.zero_count;
 
-      if (decision.blocked || watchdog.tripped) {
-        ++counters_.trip_count;
-      }
-    } else {
-      const GuardedCommand command = command_guard_->apply(
+        if (decision.blocked || watchdog.tripped) {
+          ++counters_.trip_count;
+        }
+      } else {
+        const GuardedCommand command = command_guard_->apply(
         latest_cmd_.linear.x * decision.slowdown_factor,
         latest_cmd_.linear.y * decision.slowdown_factor,
         latest_cmd_.angular.z * decision.slowdown_factor);
 
-      if (!command.valid) {
-        decision.force_zero = true;
-        decision.blocked = true;
-        decision.reason = "invalid_command";
-        board_->stop();
-        ++counters_.zero_count;
-        ++counters_.trip_count;
-      } else {
-        duty = mixer_->mix(command.vx, command.vy, command.wz);
-        board_->write(duty);
-        ++counters_.board_write_count;
+        if (!command.valid) {
+          decision.force_zero = true;
+          decision.blocked = true;
+          decision.reason = "invalid_command";
+          board_->stop();
+          ++counters_.zero_count;
+          ++counters_.trip_count;
+        } else {
+          duty = mixer_->mix(command.vx, command.vy, command.wz);
+          board_->write(duty);
+          ++counters_.board_write_count;
+        }
       }
-    }
 
-    last_board_error_.clear();
-  } catch (const std::exception & exc) {
-    last_board_error_ = exc.what();
-    board_->stop();
-    ++counters_.zero_count;
-    ++counters_.trip_count;
-
+    },
+    [this]() {board_->stop();}, decision, duty, counters_,
+    last_board_error_, last_recovery_stop_error_);
+  if (!last_board_error_.empty()) {
     RCLCPP_ERROR_THROTTLE(
       get_logger(),
       *get_clock(),
       1000,
-      "base_driver_node board error: %s",
-      exc.what());
+      "base_driver_node board fault (restart required): %s; recovery stop error: %s",
+      last_board_error_.c_str(), last_recovery_stop_error_.c_str());
   }
 
   publish_state(decision, watchdog, duty);
@@ -299,6 +298,7 @@ void BaseDriverNode::publish_state(
   BaseRuntimeState state{};
   state.node_name = "base_driver_node";
   state.last_board_error = last_board_error_;
+  state.last_recovery_stop_error = last_recovery_stop_error_;
   state.connected = board_ && board_->connected();
   state.safety_stop = safety_stop_;
 
@@ -356,14 +356,15 @@ std::string BaseDriverNode::bool_text(const bool value)
 
 int main(int argc, char ** argv)
 {
-  rclcpp::init(argc, argv);
-
-  try {
-    rclcpp::spin(std::make_shared<savo_base::BaseDriverNode>());
-  } catch (const std::exception & exc) {
-    RCLCPP_FATAL(rclcpp::get_logger("base_driver_node"), "%s", exc.what());
-  }
-
-  rclcpp::shutdown();
-  return 0;
+  return savo_base::driver_detail::run_main(
+    [&]() {
+      rclcpp::init(argc, argv);
+      rclcpp::spin(std::make_shared<savo_base::BaseDriverNode>());
+    },
+    [](const char * error) {
+      RCLCPP_FATAL(rclcpp::get_logger("base_driver_node"), "%s", error);
+    },
+    []() {
+      if (rclcpp::ok()) {rclcpp::shutdown();}
+    });
 }

@@ -73,6 +73,7 @@ private:
 
   BaseCounters counters_{};
   std::string last_board_error_;
+  std::string last_recovery_stop_error_;
 };
 
 }  // namespace savo_base

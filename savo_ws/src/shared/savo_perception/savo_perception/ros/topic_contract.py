@@ -148,7 +148,7 @@ TOPIC_CONTRACT: Dict[str, TopicSpec] = {
         name=TOF_LEFT_M_TOPIC,
         msg_type=Float32,
         direction="pubsub",
-        description="Left VL53L1X range in meters from TCA9548A mux channel 2.",
+        description="Left VL53L1X range in meters from TCA9548A mux channel 7.",
         required=True,
         qos_key="range_sensor",
     ),

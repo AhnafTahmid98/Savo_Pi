@@ -136,6 +136,13 @@ if(BUILD_TESTING)
 
   ament_flake8(CONFIG_FILE ${CMAKE_CURRENT_SOURCE_DIR}/setup.cfg)
 
+  ament_add_gtest(test_driver_runtime
+    test/test_driver_runtime.cpp
+    src/state/base_state.cpp
+  )
+  target_include_directories(test_driver_runtime PRIVATE include)
+  target_compile_features(test_driver_runtime PRIVATE cxx_std_17)
+
   ament_add_gtest(test_freenove_motor_board
     test/test_freenove_motor_board.cpp
     src/drivers/freenove_motor_board.cpp

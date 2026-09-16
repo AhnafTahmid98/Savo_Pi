@@ -4,11 +4,15 @@ from __future__ import annotations
 
 import math
 import re
+import runpy
 import time
 from pathlib import Path
 
 import yaml
 
+from savo_perception.diagnostics.tof_mux_check import build_arg_parser
+from savo_perception.drivers.vl53_mux_driver import Vl53MuxConfig
+from savo_perception.ros.params import load_vl53_mux_params
 from savo_perception.models.range_sample import (
     RangeSample,
     RangeSnapshot,
@@ -268,16 +272,32 @@ def test_tof_status_is_bounded_throttled_and_keeps_real_errors() -> None:
     assert "read_exception:" in node
 
 
-def test_real_tof_topology_is_unchanged() -> None:
-    config = _read(PACKAGE / "config" / "profiles" / "core_real_robot_v1.yaml")
-    for token in (
-        "bus: 1",
-        "tca_addr: 0x70",
-        "vl53_addr: 0x29",
-        "left_channel: 2",
-        "right_channel: 3",
-    ):
-        assert token in config
+def test_real_tof_topology_uses_rewired_left_channel() -> None:
+    for path in ("core/perception_core.yaml", "core/tof_mux.yaml",
+                 "profiles/core_real_robot_v1.yaml"):
+        config = yaml.safe_load(_read(PACKAGE / "config" / path))
+        for node in ("vl53_mux_node", "vl53_mux_node_py"):
+            params = load_vl53_mux_params(config[node]["ros__parameters"])
+            assert (params.left_channel, params.right_channel) == (7, 3), (path, node)
+            assert (params.bus, params.tca_addr, params.vl53_addr) == (1, 0x70, 0x29)
+
+
+def test_python_tof_default_paths_use_rewired_left_channel() -> None:
+    for params in (Vl53MuxConfig(), load_vl53_mux_params({})):
+        assert (params.left_channel, params.right_channel) == (7, 3)
+        assert (params.bus, params.tca_addr, params.vl53_addr) == (1, 0x70, 0x29)
+
+
+def test_tof_diagnostic_defaults_follow_physical_mapping() -> None:
+    scan_cli = runpy.run_path(str(PACKAGE / "scripts/tof_mux_scan_cli.py"))
+    for parser in (build_arg_parser(), scan_cli["build_arg_parser"]()):
+        args = parser.parse_args([])
+        assert (args.left_ch, args.right_ch) == (7, 3)
+        assert (args.bus, args.tca_addr, args.vl53_addr) == (1, 0x70, 0x29)
+    assert scan_cli["expected_label"](7, right_ch=3, left_ch=7) == "LEFT expected"
+    config = yaml.safe_load(_read(PACKAGE / "config/diagnostics.yaml"))
+    params = load_vl53_mux_params(config["diagnostics"]["tof_mux_check"])
+    assert (params.left_channel, params.right_channel) == (7, 3)
 
 
 def test_real_profile_uses_tuned_slowdown_and_unchanged_stop_thresholds() -> None:
