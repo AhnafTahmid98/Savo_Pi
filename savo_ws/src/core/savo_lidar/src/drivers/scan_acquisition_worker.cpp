@@ -50,7 +50,11 @@ void ScanAcquisitionWorker::start()
 
 void ScanAcquisitionWorker::request_stop() noexcept
 {
-  const bool already_requested = stop_requested_.exchange(true);
+  bool already_requested = false;
+  {
+    std::lock_guard<std::mutex> lock(wait_mutex_);
+    already_requested = stop_requested_.exchange(true);
+  }
 
   if (!already_requested && cancel_acquire_) {
     try {

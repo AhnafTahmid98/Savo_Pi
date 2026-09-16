@@ -358,6 +358,7 @@ class Am7RuntimeHarness:
             'reason': 'ready' if self.health_allowed else 'core_ups_critical',
         })))
 
+    @staticmethod
     def string_message(value):
         message = String()
         message.data = value
