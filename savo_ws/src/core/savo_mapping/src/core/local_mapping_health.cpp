@@ -146,6 +146,7 @@ void Monitor::observe(
   try {
     bool operational = false;
     bool nominal = true;
+    bool reason_explicit = false;
     if (source == "safety_stop") {
       operational = true;
       nominal = !boolean(payload);
@@ -240,6 +241,7 @@ void Monitor::observe(
       nominal = classified->policy == PowerPolicy::NOMINAL;
       operational = ok && voltage_ok && classified->policy != PowerPolicy::FAILED;
       value.reason = source + "_" + state;
+      reason_explicit = true;
     } else {
       const auto json = source.rfind("localization", 0) == 0 ?
         strict_json(payload) : Json::parse(payload);
@@ -318,7 +320,7 @@ void Monitor::observe(
     value.valid = true;
     value.continuation = operational;
     value.admission = operational && nominal;
-    if (value.reason == source + "_invalid") {
+    if (!reason_explicit) {
       value.reason = source + (operational ? (nominal ? "_ready" : "_restricted") : "_unavailable");
     }
   } catch (const std::exception &) {
