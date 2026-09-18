@@ -133,7 +133,9 @@ sudo install -m 0640 deploy/systemd/robot-savo.env.example \
 sudoedit /etc/robot-savo/robot-savo.env
 ```
 
-Verify repository paths, ROS domain, middleware configuration, network interface assumptions, state/log directories, and any explicitly enabled Edge features.
+Verify ROS domain, middleware configuration, network interface assumptions,
+state/log directories, and any explicitly enabled Edge features. Repository
+paths come from the renderer-generated `robot-savo.paths.env`, not this file.
 
 Do not place provider credentials in Git. Use the SavoMind companion system's protected environment mechanism.
 
@@ -141,25 +143,25 @@ Do not place provider credentials in Git. Use the SavoMind companion system's pr
 
 ```bash
 cd ~/Savo_Pi
-sudo bash deploy/systemd/render_units.sh \
+sudo bash deploy/systemd/install_services.sh \
+  --profile edge \
   --user "$USER" \
-  --group "$USER" \
-  --root "$PWD" \
-  --output-dir /tmp/robot-savo-units
+  --group "$(id -gn)" \
+  --root "$PWD"
 ```
 
 ```bash
-systemd-analyze verify /tmp/robot-savo-units/savo_edge.service
-sudo install -m 0644 /tmp/robot-savo-units/savo_edge.service \
-  /etc/systemd/system/savo_edge.service
-sudo systemctl daemon-reload
+systemd-analyze verify \
+  /etc/systemd/system/savo_edge.service \
+  /etc/systemd/system/savo-ui-runtime.service
 ```
 
 Do not also enable:
 
 - The generic `savo.service` in Edge mode.
 - Standalone `savo_bridge.service` while distributed Edge bringup starts the bridge.
-- Standalone `savo-ui.service` while distributed Edge bringup starts the UI.
+- Standalone `savo-ui.service` while `savo-ui-runtime.service` is enabled or
+  active.
 
 Each runtime component must have exactly one owner.
 
@@ -183,14 +185,17 @@ Default behavior must preserve:
 - VO enabled
 - D435 obstacle cloud disabled
 - Speech disabled
-- UI disabled
+- Distributed launch UI disabled (`SAVO_START_UI=false`); the separate
+  production `savo-ui-runtime.service` is the only UI owner
 - Bridge enabled
 
 Validate device health and Core connectivity without authorizing motion.
 
 ## 10. Enable optional Edge components deliberately
 
-Speech, UI, and D435 obstacle-cloud integration should be enabled one at a time only after their component test plans pass.
+Speech and D435 obstacle-cloud integration should be enabled one at a time only
+after their component test plans pass. UI validation applies to the separately
+owned `savo-ui-runtime.service`; do not enable a second UI path.
 
 For every feature change:
 
@@ -254,7 +259,8 @@ Edge deployment passes when:
 - Core and Edge discover each other reliably.
 - RealSense and VO health are visible.
 - Bridge socket ownership and peer restrictions are correct.
-- Optional speech/UI/cloud features remain disabled until validated.
+- Optional speech/cloud features remain disabled until validated, and only the
+  systemd UI runtime owns the framebuffer.
 - Restart and rollback procedures are available.
 
 Continue with the component and full-robot test plans before enabling autonomous behavior.

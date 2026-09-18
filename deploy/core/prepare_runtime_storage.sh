@@ -7,6 +7,8 @@ OWNER="${SUDO_USER:-${USER:-}}"
 GROUP="${OWNER}"
 STATE_ROOT="/var/lib/robot_savo"
 LOG_ROOT="/var/log/robot_savo"
+RUNTIME_ROOT="/run/robot-savo"
+RUNTIME_ROOT_EXPLICIT=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -26,8 +28,13 @@ while [[ $# -gt 0 ]]; do
       LOG_ROOT="${2:-}"
       shift 2
       ;;
+    --runtime-root)
+      RUNTIME_ROOT="${2:-}"
+      RUNTIME_ROOT_EXPLICIT=1
+      shift 2
+      ;;
     -h|--help)
-      echo "Usage: sudo $0 [--owner USER] [--group GROUP] [--state-root PATH] [--log-root PATH]"
+      echo "Usage: sudo $0 [--owner USER] [--group GROUP] [--state-root PATH] [--log-root PATH] [--runtime-root PATH]"
       exit 0
       ;;
     *)
@@ -37,18 +44,28 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if [[ "${EUID}" -ne 0 && "${RUNTIME_ROOT_EXPLICIT}" == "0" && \
+  "${STATE_ROOT}" != /var/* && "${LOG_ROOT}" != /var/* ]]
+then
+  RUNTIME_ROOT="${STATE_ROOT}/run"
+fi
+
 if [[ -z "${OWNER}" || -z "${GROUP}" ]]; then
   echo "Owner and group must be non-empty." >&2
   exit 2
 fi
 
-if [[ -z "${STATE_ROOT}" || -z "${LOG_ROOT}" || "${STATE_ROOT}" == "/" || "${LOG_ROOT}" == "/" ]]; then
-  echo "State and log roots must be non-empty, non-root paths." >&2
+if [[ -z "${STATE_ROOT}" || -z "${LOG_ROOT}" || -z "${RUNTIME_ROOT}" || \
+  "${STATE_ROOT}" == "/" || "${LOG_ROOT}" == "/" || "${RUNTIME_ROOT}" == "/" ]]
+then
+  echo "State, log, and runtime roots must be non-empty, non-root paths." >&2
   exit 2
 fi
 
-if [[ "${EUID}" -ne 0 && ( "${STATE_ROOT}" == /var/* || "${LOG_ROOT}" == /var/* ) ]]; then
-  echo "Run this script with sudo for /var storage roots." >&2
+if [[ "${EUID}" -ne 0 && ( "${STATE_ROOT}" == /var/* || "${LOG_ROOT}" == /var/* || \
+  "${RUNTIME_ROOT}" == /run/* ) ]]
+then
+  echo "Run this script with sudo for /var storage or /run runtime roots." >&2
   exit 1
 fi
 
@@ -68,6 +85,7 @@ directories=(
   "${LOG_ROOT}"
   "${LOG_ROOT}/core"
   "${LOG_ROOT}/edge"
+  "${RUNTIME_ROOT}"
 )
 
 if [[ "${EUID}" -eq 0 ]]; then

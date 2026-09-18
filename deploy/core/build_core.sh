@@ -104,6 +104,11 @@ main() {
       --return-code-on-test-failure \
       --event-handlers console_direct+
     colcon test-result --verbose
+
+    savo_log "Validating deployment assets without installing or activating services"
+    python3 -m pytest -q "${SAVO_ROOT}/deploy/test"
+    python3 "${SAVO_ROOT}/deploy/common/validate_deployment_assets.py" \
+      --root "${SAVO_ROOT}"
   fi
 
   savo_log "Robot Savo core build completed successfully"

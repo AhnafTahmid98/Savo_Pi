@@ -131,3 +131,22 @@ TEST(LocalMappingAuthority, SemanticScopeAndHealthProducerIdentityAreNotIgnored)
     R"("continuation_ready":true,"semantic_ready":true,"reason":"ready"})", now);
   EXPECT_FALSE(authority.revalidate(observation, now));
 }
+
+TEST(LocalMappingAuthority, SemanticRevalidationReportsSemanticUnavailable)
+{
+  const auto now = Clock::time_point{};
+  auto semantic = identity();
+  semantic.require_semantic = true;
+
+  Authority authority;
+  ASSERT_TRUE(authority.acquire(semantic, 0U, health(now), now));
+
+  Health semantics_missing;
+  semantics_missing.observe(
+    R"({"schema_version":1,"node":"savo_mapping","admission_ready":true,)"
+    R"("continuation_ready":true,"semantic_ready":false,"reason":"ready"})", now);
+
+  EXPECT_FALSE(authority.revalidate(semantics_missing, now));
+  EXPECT_FALSE(authority.active());
+  EXPECT_EQ(authority.reason(), "mapping_local_semantic_unavailable");
+}

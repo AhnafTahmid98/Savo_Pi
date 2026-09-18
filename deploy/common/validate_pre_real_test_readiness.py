@@ -36,8 +36,16 @@ REQUIRED = (
     "deploy/systemd/savo_edge.service",
     "deploy/systemd/savo.service",
     "deploy/systemd/savo_mapping.service",
+    "deploy/systemd/savo-location-stack@.service",
     "deploy/systemd/render_units.sh",
+    "deploy/systemd/install_services.sh",
+    "deploy/systemd/robot-savo-core-tmpfiles.conf.in",
+    "deploy/systemd/robot-savo.paths.env.in",
     "deploy/systemd/robot-savo-tmpfiles.conf",
+    "deploy/common/runtime_ownership.py",
+    "deploy/common/validate_deployment_assets.py",
+    "deploy/core/run_autonomous_mapping.sh",
+    "savo_ws/src/edge/savo_ui/scripts/install_savo_ui_service.sh",
     "deploy/edge/prepare_runtime_sockets.sh",
     "deploy/edge/savomind_speech_contract.yaml",
     "deploy/common/backup_robot_state.sh",
@@ -94,6 +102,32 @@ RUNTIME_SUFFIXES = {
     ".cpp", ".c", ".hpp", ".h", ".py", ".sh", ".yaml", ".yml",
     ".xml", ".service", ".conf", ".launch", ".action", ".srv", ".msg",
 }
+GENERATED_PARTS = {
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    "build",
+    "install",
+    "log",
+}
+
+
+def is_generated_path(path: Path) -> bool:
+    """Return true for generated build, install, log, and cache artifacts."""
+    return path.suffix == ".pyc" or any(part in GENERATED_PARTS for part in path.parts)
+
+
+def autonomous_action_contract_version(action_contract: str) -> int:
+    """Read the single authoritative autonomous action contract constant."""
+    matches = re.findall(
+        r"^uint32\s+CONTRACT_VERSION=(\d+)\s*$",
+        action_contract,
+        re.MULTILINE,
+    )
+    if len(matches) != 1:
+        raise ValueError("RunAutonomousMapping must define exactly one contract version")
+    return int(matches[0])
 
 
 @dataclass(frozen=True)
@@ -172,6 +206,8 @@ class Validator:
                 if not path.is_file() or path.stat().st_size != 0:
                     continue
                 relative = path.relative_to(self.root).as_posix()
+                if is_generated_path(Path(relative)):
+                    continue
                 if self._intentional_empty(path):
                     intentional += 1
                 elif relative.startswith("docs/"):
@@ -216,6 +252,8 @@ class Validator:
                 if not path.is_file() or path.stat().st_size == 0:
                     continue
                 relative = path.relative_to(self.root).as_posix()
+                if is_generated_path(Path(relative)):
+                    continue
                 kind = ""
                 try:
                     if path.suffix in {".yaml", ".yml"}:
@@ -367,15 +405,18 @@ class Validator:
             r"['\"]start_review_gateway['\"]\s*:\s*['\"]true['\"]",
             bringup,
         ))
-        contract_ok = bool(re.search(
-            r"^uint32\s+CONTRACT_VERSION=2\s*$",
-            action_contract,
-            re.MULTILINE,
-        )) and "contract_version: 2" in bringup_readme
+        try:
+            contract_version = autonomous_action_contract_version(action_contract)
+        except ValueError:
+            contract_version = None
+        contract_ok = contract_version is not None and (
+            f"contract_version: {contract_version}" in bringup_readme
+        )
         self.add(
             "am8_required",
             "PASS" if quality_ok and review_ok and contract_ok else "FAIL",
-            f"quality={quality_ok}; review_gateway={review_ok}; contract_v2={contract_ok}",
+            f"quality={quality_ok}; review_gateway={review_ok}; "
+            f"contract_version={contract_version}; contract_ok={contract_ok}",
         )
 
     def validate_scripts(self) -> None:
@@ -549,6 +590,15 @@ class Validator:
         self.validate_parsers()
         self.validate_scripts()
         self.validate_network_and_units()
+        self.command(
+            "deployment_assets",
+            [
+                "python3",
+                str(self.root / "deploy/common/validate_deployment_assets.py"),
+                "--root",
+                str(self.root),
+            ],
+        )
         self.validate_persistent_operations()
         self.validate_rosdep()
         observer = self.root / "deploy/observer/validate_observer.sh"

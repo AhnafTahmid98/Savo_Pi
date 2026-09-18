@@ -67,7 +67,7 @@ Run once on a new Core installation, and again only when ownership or directory 
 cd ~/Savo_Pi
 sudo bash deploy/core/prepare_runtime_storage.sh \
   --owner "$USER" \
-  --group "$USER"
+  --group "$(id -gn)"
 ```
 
 The script creates the controlled runtime structure under:
@@ -131,8 +131,8 @@ sudoedit /etc/robot-savo/robot-savo.env
 
 ### Verify at minimum
 
-- `SAVO_ROOT` points to the deployed repository.
-- `SAVO_WS` points to its `savo_ws` workspace.
+- `SAVO_ROOT` and `SAVO_WS` are absent; they come from the renderer-generated
+  `/etc/robot-savo/robot-savo.paths.env`.
 - `ROS_DISTRO=jazzy`.
 - ROS domain and middleware settings match Edge and observer hosts.
 - State and log roots use the prepared persistent directories.
@@ -140,31 +140,30 @@ sudoedit /etc/robot-savo/robot-savo.env
 
 ## 7. Render Core systemd units
 
-Render into a staging directory first:
+Install the verified Core-only profile without enabling or starting it:
 
 ```bash
 cd ~/Savo_Pi
-sudo bash deploy/systemd/render_units.sh \
+sudo bash deploy/systemd/install_services.sh \
+  --profile core \
   --user "$USER" \
-  --group "$USER" \
-  --root "$PWD" \
-  --output-dir /tmp/robot-savo-units
+  --group "$(id -gn)" \
+  --root "$PWD"
 ```
 
 Inspect the rendered Core unit and verify it before installation:
 
 ```bash
-systemd-analyze verify /tmp/robot-savo-units/savo_core.service
-sed -n '1,240p' /tmp/robot-savo-units/savo_core.service
+systemd-analyze verify /etc/systemd/system/savo_core.service
+sed -n '1,240p' /etc/systemd/system/savo_core.service
+cat /etc/robot-savo/robot-savo.paths.env
+cat /etc/tmpfiles.d/robot-savo-core.conf
+stat -c '%U %G %a %n' /run/robot-savo
 ```
 
-Install only the selected production unit:
-
-```bash
-sudo install -m 0644 /tmp/robot-savo-units/savo_core.service \
-  /etc/systemd/system/savo_core.service
-sudo systemctl daemon-reload
-```
+The installed tmpfiles policy recreates the private lock directory after every
+boot. No repeated storage-preparation or service start is required before a
+direct production runner can acquire the same Core lock.
 
 Do not simultaneously enable the generic `savo.service` in Core mode. One role must have one service owner.
 

@@ -107,7 +107,11 @@ The former wheel-geometry conflict is closed in source: description, base, and l
 
 One Phase 4 hardware finding still requires closure: base and head drivers separately initialize the same PCA9685 at Core bus 1 address `0x40`; channels do not overlap, but chip-wide initialization and concurrent access require validation.
 
-The current Edge role service also orders itself after `savo-ui-runtime.service` while setting distributed `SAVO_START_UI=false`; the renderer emits the companion unit but fresh-install guidance does not install it automatically. UI service ownership must be reconciled and tested rather than enabling another owner to silence the dependency.
+The Edge role service orders itself after `savo-ui-runtime.service` while
+setting distributed `SAVO_START_UI=false`. The role-scoped Edge installer
+installs both units without activating them, making the systemd runtime the
+single production framebuffer/UI owner. Standalone `savo-ui.service` remains an
+alternative and must not run with that bundle.
 
 ## Source/documentation discrepancies requiring follow-up
 

@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Shared Robot Savo deploy environment.
 
-export SAVO_ROOT="${SAVO_ROOT:-$HOME/Savo_Pi}"
+SAVO_ENV_COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SAVO_DEFAULT_ROOT="$(cd "${SAVO_ENV_COMMON_DIR}/../.." && pwd)"
+export SAVO_ROOT="${SAVO_ROOT:-${SAVO_DEFAULT_ROOT}}"
 export SAVO_WS="${SAVO_WS:-$SAVO_ROOT/savo_ws}"
 export ROS_DISTRO="${ROS_DISTRO:-jazzy}"
 

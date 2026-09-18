@@ -29,13 +29,44 @@ while IFS= read -r -d '' path; do
     '#!/usr/bin/env python3') python3 -m py_compile "${path}" ;;
     *) echo "Unsupported observer script shebang: ${path}" >&2; exit 1 ;;
   esac
-done < <(find "${REPO_ROOT}/deploy/observer" "${PACKAGE}/scripts" -type f -print0)
+done < <(
+  find "${REPO_ROOT}/deploy/observer" "${PACKAGE}/scripts" \
+    \( -type d \( -name __pycache__ -o -name .pytest_cache -o -name .mypy_cache -o -name .ruff_cache \) -prune \) -o \
+    \( -type f ! -name '*.pyc' -print0 \)
+)
 
-if rg -n 'SetGoal|SetInitialPose|PublishPoint|Teleop' "${PACKAGE}/rviz"; then
+observer_scan() {
+  local pattern="$1"
+  shift
+  local rc
+
+  if command -v rg >/dev/null 2>&1; then
+    if rg -n "${pattern}" "$@"; then
+      return 0
+    else
+      rc=$?
+    fi
+  else
+    if grep -RInE -- "${pattern}" "$@"; then
+      return 0
+    else
+      rc=$?
+    fi
+  fi
+
+  if [[ ${rc} -eq 1 ]]; then
+    return 1
+  fi
+
+  echo "Observer source scan failed with exit code ${rc}." >&2
+  exit "${rc}"
+}
+
+if observer_scan 'SetGoal|SetInitialPose|PublishPoint|Teleop' "${PACKAGE}/rviz"; then
   echo 'Unsafe RViz tool found.' >&2
   exit 1
 fi
-if rg -n 'create_client|create_service|rclcpp_action|/cmd_vel|/goal_pose|/initialpose' \
+if observer_scan 'create_client|create_service|rclcpp_action|/cmd_vel|/goal_pose|/initialpose' \
   "${PACKAGE}/src" "${PACKAGE}/launch"; then
   echo 'Mutation interface found in observer runtime.' >&2
   exit 1

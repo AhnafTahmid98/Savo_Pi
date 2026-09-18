@@ -94,3 +94,29 @@ def test_system_service_uses_intro_entrypoint():
         'Conflicts=savo-ui.service'
         in service
     )
+
+
+def test_systemd_runtime_is_production_owner_and_standalone_installer_is_safe():
+    readme = (ROOT / 'README.md').read_text(encoding='utf-8')
+    installer = (
+        ROOT / 'scripts/install_savo_ui_service.sh'
+    ).read_text(encoding='utf-8')
+
+    assert 'savo-ui-runtime.service' in readme
+    assert 'SAVO_START_UI=false' in readme
+    assert 'robot-savo.paths.env' in installer
+    assert 'savo_edge.service' in installer
+    assert 'savo-ui-runtime.service' in installer
+    assert 'is-active' in installer
+    assert 'systemctl start' not in installer
+
+
+def test_standalone_installer_is_install_only_until_operator_explicitly_enables():
+    installer = (
+        ROOT / 'scripts/install_savo_ui_service.sh'
+    ).read_text(encoding='utf-8')
+
+    assert 'systemctl enable' not in installer
+    assert 'systemctl start' not in installer
+    assert 'systemctl restart' not in installer
+    assert 'systemctl stop' not in installer

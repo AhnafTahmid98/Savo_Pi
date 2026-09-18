@@ -50,3 +50,11 @@ def test_autonomous_children_check_scoped_parent_and_standalone_stays_supported(
     coverage = (ROOT / 'src/nodes/coverage_operation_orchestrator_node.cpp').read_text()
     assert 'COMMAND_CHECK' in coverage
     assert 'OP_RUN_COVERAGE' in coverage
+
+
+def test_semantic_revalidation_has_explicit_semantic_loss_reason():
+    source = (ROOT / 'include/savo_mapping/local_mapping_authority.hpp').read_text()
+    assert 'mapping_local_semantic_unavailable' in source
+    revalidate = source.split('bool revalidate(', 1)[1].split('void pause()', 1)[0]
+    assert 'health.ready(false, false, now)' in revalidate
+    assert 'mapping_local_semantic_unavailable' in revalidate

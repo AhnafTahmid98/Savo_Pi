@@ -45,12 +45,16 @@ writes permanent logs, a SQLite database, and a JSON report under
 
 ## Guarded autonomous mapping bringup and sequencer (AM-5)
 
-The core-side autonomous mapping stack is composed with:
+The production Core autonomous mapping stack is started from the repository
+root through the ownership-protected runner:
 
 ```bash
-ros2 launch savo_bringup autonomous_mapping.launch.py \
-  map_id:=campus_main
+bash deploy/core/run_autonomous_mapping.sh map_id:=campus_main
 ```
+
+Direct `ros2 launch savo_bringup autonomous_mapping.launch.py` remains a
+component/development interface and does not provide the production Core-owner
+lock.
 
 The launch staggers description, base, LiDAR, range safety, control,
 localization, core power, live-map Nav2, SLAM and autonomous
@@ -141,14 +145,15 @@ is validated on Robot SAVO.
 Production runtime nodes are C++. Python is used only for ROS 2 launch
 orchestration and the retained location-lifecycle test tool.
 
-The primary entry point is:
+The production Core entry point is:
 
 ```bash
-ros2 launch savo_bringup robot_bringup.launch.py \
-  host_role:=core \
-  robot_mode:=safe_idle \
-  bringup_profile:=lidar_only
+bash deploy/core/run_core.sh
 ```
+
+Direct `robot_bringup.launch.py` and `core_bringup.launch.py` invocation is for
+intentional component/development testing and does not replace the production
+ownership runner.
 
 The default Core `safe_idle` contract starts robot description/fixed TF, base,
 LiDAR, perception, control in `STOP`, localization with VO fusion, Core power,

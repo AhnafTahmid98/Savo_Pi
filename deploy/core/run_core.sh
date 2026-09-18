@@ -20,8 +20,26 @@ ACTIVE_MAP_CONTRACT="${SAVO_ACTIVE_MAP_CONTRACT:-${PRODUCTION_MAP_ROOT}/active_m
 
 main() {
   savo_assert_core_host
+  savo_require_cmd python3
   savo_require_cmd ros2
   savo_require_dir "${SAVO_WS}"
+
+  case "${ROBOT_MODE}" in
+    manual_mapping)
+      savo_die "manual_mapping must use deploy/core/run_mapping_service.sh so the explicit mapping gates are enforced"
+      ;;
+    autonomous_mapping)
+      savo_die "autonomous_mapping must use deploy/core/run_autonomous_mapping.sh so the dedicated Supervisor-free mapping path is enforced"
+      ;;
+  esac
+
+  ownership_tool="${SAVO_ROOT}/deploy/common/runtime_ownership.py"
+  ownership_preflight=(python3 "${ownership_tool}" preflight --owner core --ignore-pid "$$")
+  if [[ -n "${SAVO_SERVICE_UNIT:-}" ]]; then
+    ownership_preflight+=(--allow-unit "${SAVO_SERVICE_UNIT}")
+  fi
+  "${ownership_preflight[@]}"
+
   savo_source_ros
   savo_source_ws
 
@@ -45,7 +63,7 @@ main() {
   printf 'Robot Savo launch: role=core mode=%s profile=%s startup=STOP\n' \
     "${ROBOT_MODE}" "${BRINGUP_PROFILE}"
 
-  exec ros2 launch savo_bringup robot_bringup.launch.py \
+  launch_command=(ros2 launch savo_bringup robot_bringup.launch.py
     host_role:=core \
     robot_mode:="${ROBOT_MODE}" \
     bringup_profile:="${BRINGUP_PROFILE}" \
@@ -63,7 +81,12 @@ main() {
     localization_use_vo:="${SAVO_LOCALIZATION_USE_VO:-true}" \
     start_semantic_interruption:="${SAVO_START_SEMANTIC_INTERRUPTION:-true}" \
     start_speech:=false \
-    start_ui:=false
+    start_ui:=false)
+
+  exec python3 "${ownership_tool}" run-core-owner \
+    --owner core \
+    --lock-file /run/robot-savo/core-owner.lock \
+    -- "${launch_command[@]}"
 }
 
 main "$@"

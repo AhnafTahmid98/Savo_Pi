@@ -1,0 +1,2 @@
+# Robot SAVO Core lifetime-lock directory.
+d /run/robot-savo 0750 @SAVO_USER@ @SAVO_GROUP@ -

@@ -11,9 +11,12 @@ on the UI timer. Independent freshness timers show `STALE` and block safety
 presentation when data ages out. Camera preview remains optional and disabled in
 the production profile until its bandwidth is validated.
 
-Production startup is through edge bringup with `SAVO_START_UI=true`. The
-standalone `savo-ui.service` exists for display-only maintenance and its installer
-refuses to coexist with an enabled edge service.
+Production startup is owned by `savo-ui-runtime.service`, installed beside
+`savo_edge.service` by the role-scoped Edge installer. Distributed Edge launch
+keeps `SAVO_START_UI=false`, so there is one framebuffer/UI node owner. The
+standalone `savo-ui.service` exists only for display maintenance; its explicit
+`--standalone` installer refuses an enabled or active Edge/production UI owner,
+installs the renderer-matched paths environment, and does not enable or start the unit.
 
 ```bash
 ros2 launch savo_ui ui_bringup.launch.py profile:=pc

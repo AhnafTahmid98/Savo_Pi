@@ -37,7 +37,7 @@ The installer checks Ubuntu 24.04, ARM64, free space, ROS, and the exact 14-pack
 ```bash
 sudo bash deploy/core/prepare_runtime_storage.sh \
   --owner "$USER" \
-  --group "$USER"
+  --group "$(id -gn)"
 ```
 
 This creates the persistent state hierarchy under `/var/lib/robot_savo` and logs under `/var/log/robot_savo`, owned by the selected runtime identity with mode `0750`. A new installation is expected to contain empty databases/artifact directories. These paths survive reboot; `/tmp` and `/run` do not.
@@ -73,18 +73,18 @@ Required evidence is all 14 Core packages present, a clean build, and zero test 
 
 ## Configure the service
 
-Prepare the protected environment as described in [environment and secrets](environment_and_secrets.md), setting `SAVO_ROLE=core`. Render and review the units:
+Prepare the protected environment as described in [environment and secrets](environment_and_secrets.md), setting `SAVO_ROLE=core`. Install only the Core profile; this renders, verifies, installs the unit and matching paths environment, and performs daemon-reload without enabling or starting it:
 
 ```bash
-sudo bash deploy/systemd/render_units.sh \
+sudo bash deploy/systemd/install_services.sh \
+  --profile core \
   --user "$USER" \
-  --group "$USER" \
-  --root "$PWD" \
-  --output-dir /tmp/robot-savo-units
-systemd-analyze verify /tmp/robot-savo-units/savo_core.service
-sudo install -m 0644 /tmp/robot-savo-units/savo_core.service \
-  /etc/systemd/system/savo_core.service
-sudo systemctl daemon-reload
+  --group "$(id -gn)" \
+  --root "$PWD"
+systemd-analyze verify /etc/systemd/system/savo_core.service
+cat /etc/robot-savo/robot-savo.paths.env
+cat /etc/tmpfiles.d/robot-savo-core.conf
+stat -c '%U %G %a %n' /run/robot-savo
 ```
 
 Do not enable both `savo_core.service` and generic `savo.service` in Core mode. Rendering and enabling are separate from starting.

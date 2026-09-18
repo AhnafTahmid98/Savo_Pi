@@ -12,7 +12,9 @@ map, and map creation is not release promotion.
 ## Common preconditions
 
 - Pre-operation inspection, storage preflight, Core safety/localization/TF, and
-  supervisor authority pass.
+  the authority contract for the selected mapping composition pass. Normal
+  system/manual workflows may use the system Supervisor; dedicated autonomous
+  mapping uses mapping-local authority and does not require it.
 - Geometry is locked; SLAM is the sole `map -> odom` publisher.
 - AMCL/saved-map navigation is not running concurrently.
 - A unique `<map-id>`, revision plan, operator identity, and session evidence
@@ -33,8 +35,14 @@ set `SAVO_ENABLE_MAPPING_SERVICE=true` in the deployed environment and created
 `/etc/robot-savo/enable-mapping-service`. Operators must not create those gates
 ad hoc.
 
-1. Confirm Core is in `STOP` and the mapping service gate was released for this
-   session.
+1. Confirm Core is in `STOP`, stop the normal full-Core owner, verify
+   `savo_core.service` and Core-role `savo.service` are inactive, and run:
+
+   ```bash
+   python3 deploy/common/runtime_ownership.py preflight --owner mapping
+   ```
+
+   Then confirm the mapping service gate was released for this session.
 2. Start and observe the installed unit:
 
    ```bash
@@ -61,7 +69,21 @@ an approved bridge/operator client. This repository does not ship a routine
 operator CLI for constructing that action goal. Do not call internal exploration,
 coverage, Scan360, or Nav2 interfaces directly.
 
-1. Verify autonomous mapping readiness and supervisor permission.
+Start the dedicated Supervisor-free composition through the ownership-protected
+runner, not through the normal Core service with `SAVO_ROBOT_MODE=autonomous_mapping`
+and not by bypassing it with a direct `ros2 launch` command:
+
+```bash
+bash deploy/core/run_autonomous_mapping.sh
+```
+
+This starts the stack in `STOP` and does not submit a mapping mission.
+
+1. Verify autonomous mapping readiness. In the dedicated local-authority
+   composition, `start_supervisor=false` and a request with
+   `authority_generation=0` acquires mission-bound mapping-local authority; do
+   not wait for or call the system Supervisor. Normal system compositions that
+   deliberately start Supervisor retain their existing authority workflow.
 2. Submit a unique mission and map identity through the approved client.
 3. Monitor `/savo_mapping/autonomous/status`, safety, localization, map quality,
    storage, and command cancellation capability.

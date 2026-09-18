@@ -7,8 +7,18 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/env_core.sh"
 
 savo_assert_core_host
+savo_require_cmd python3
 savo_require_cmd ros2
 savo_require_dir "${SAVO_WS}"
+
+OWNERSHIP_TOOL="${SAVO_ROOT}/deploy/common/runtime_ownership.py"
+OWNERSHIP_PREFLIGHT=(
+  python3 "${OWNERSHIP_TOOL}" preflight --owner location --ignore-pid "$$"
+)
+if [[ -n "${SAVO_SERVICE_UNIT:-}" ]]; then
+  OWNERSHIP_PREFLIGHT+=(--allow-unit "${SAVO_SERVICE_UNIT}")
+fi
+"${OWNERSHIP_PREFLIGHT[@]}"
 
 if [[ ! -f "${SAVO_WS}/install/setup.bash" ]]; then
   savo_die "Workspace setup missing: ${SAVO_WS}/install/setup.bash"

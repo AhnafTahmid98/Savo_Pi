@@ -4,19 +4,21 @@ Wants=network-online.target
 After=network-online.target
 StartLimitIntervalSec=60
 StartLimitBurst=5
-ConditionPathExists=/home/%i/Savo_Pi/deploy/core/run_location_stack.sh
-ConditionPathExists=/home/%i/Savo_Pi/savo_ws/install/setup.bash
+ConditionPathExists=@SAVO_ROOT@/deploy/core/run_location_stack.sh
+ConditionPathExists=@SAVO_WS@/install/setup.bash
 
 [Service]
 Type=simple
-User=%i
-Group=%i
-WorkingDirectory=/home/%i/Savo_Pi
+User=@SAVO_USER@
+Group=@SAVO_GROUP@
+WorkingDirectory=@SAVO_ROOT@
 
-Environment=SAVO_ROOT=/home/%i/Savo_Pi
+EnvironmentFile=-/etc/robot-savo/robot-savo.env
+EnvironmentFile=/etc/robot-savo/robot-savo.paths.env
 Environment=ROS_DISTRO=jazzy
 Environment=PYTHONUNBUFFERED=1
 Environment=RCUTILS_LOGGING_BUFFERED_STREAM=1
+Environment=SAVO_SERVICE_UNIT=savo-location-stack@%i.service
 
 StateDirectory=robot_savo
 StateDirectoryMode=0750
@@ -25,9 +27,11 @@ LogsDirectoryMode=0750
 RuntimeDirectory=robot_savo
 RuntimeDirectoryMode=0750
 
-ExecStart=/home/%i/Savo_Pi/deploy/core/run_location_stack.sh
+ExecCondition=/usr/bin/python3 @SAVO_ROOT@/deploy/common/runtime_ownership.py preflight --owner location --allow-unit savo-location-stack@%i.service
+ExecStart=@SAVO_ROOT@/deploy/core/run_location_stack.sh
 
 Restart=on-failure
+RestartPreventExitStatus=4
 RestartSec=5
 TimeoutStartSec=45
 TimeoutStopSec=30

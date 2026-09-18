@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: LicenseRef-Proprietary
 #include "savo_mapping/local_mapping_health.hpp"
 
+#include <algorithm>
+#include <cctype>
 #include <cmath>
+#include <optional>
 #include <regex>
 #include <set>
 #include <sstream>
@@ -15,6 +18,38 @@ namespace savo_mapping::local_health
 namespace
 {
 using Json = nlohmann::json;
+
+enum class PowerPolicy
+{
+  NOMINAL,
+  RESTRICTED,
+  FAILED
+};
+
+struct PowerState
+{
+  std::string canonical;
+  PowerPolicy policy;
+};
+
+std::optional<PowerState> power_state(std::string state)
+{
+  std::transform(
+    state.begin(), state.end(), state.begin(),
+    [](unsigned char character) {return static_cast<char>(std::tolower(character));});
+  if (state == "ok" || state == "charging" || state == "full") {
+    return PowerState{state, PowerPolicy::NOMINAL};
+  }
+  if (state == "low" || state == "warn" || state == "warning") {
+    return PowerState{state, PowerPolicy::RESTRICTED};
+  }
+  if (state == "critical" || state == "error" || state == "stale" ||
+    state == "unknown" || state == "invalid")
+  {
+    return PowerState{state, PowerPolicy::FAILED};
+  }
+  return std::nullopt;
+}
 
 std::string trim(std::string value)
 {
@@ -172,29 +207,38 @@ void Monitor::observe(
       }
     } else if (source == "base_battery" || source == "core_ups" || source == "edge_ups") {
       std::string state;
-      double voltage = 0.0;
+      std::optional<double> voltage;
       bool ok = true;
       if (!payload.empty() && payload.front() == '{') {
         const auto json = Json::parse(payload);
         if (json.at("source") != source) {return;}
         state = json.at("state").get<std::string>();
-        voltage = json.at("voltage_v").get<double>();
+        const auto & voltage_field = json.at("voltage_v");
+        if (voltage_field.is_number()) {
+          voltage = voltage_field.get<double>();
+        } else if (!voltage_field.is_null()) {
+          return;
+        }
         ok = json.value("ok", true);
       } else {
         static const std::regex pattern(
           R"(^\s*(Base battery|Core UPS|Edge UPS)\s+([A-Za-z]+):\s+)"
-          R"(([+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+))\s+V(?:,.*)?\s*$)");
+          R"((n/a|[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+))\s+V(?:,.*)?\s*$)");
         std::smatch match;
         if (!std::regex_match(payload, match, pattern)) {return;}
         const std::string label = source == "base_battery" ? "Base battery" :
           source == "core_ups" ? "Core UPS" : "Edge UPS";
         if (match[1] != label) {return;}
         state = match[2];
-        voltage = std::stod(match[3]);
+        if (match[3] != "n/a") {voltage = std::stod(match[3]);}
       }
-      nominal = state == "OK" || state == "FULL" || state == "CHARGING";
-      operational = ok && std::isfinite(voltage) && voltage > 0.0 &&
-        (nominal || state == "LOW" || state == "WARN" || state == "WARNING");
+      const auto classified = power_state(state);
+      if (!classified) {return;}
+      state = classified->canonical;
+      const bool voltage_ok = voltage.has_value() && std::isfinite(*voltage) && *voltage > 0.0;
+      if (classified->policy != PowerPolicy::FAILED && !voltage_ok) {return;}
+      nominal = classified->policy == PowerPolicy::NOMINAL;
+      operational = ok && voltage_ok && classified->policy != PowerPolicy::FAILED;
       value.reason = source + "_" + state;
     } else {
       const auto json = source.rfind("localization", 0) == 0 ?
@@ -312,10 +356,6 @@ Decision Monitor::evaluate(bool mapping_ready, Clock::time_point now) const
     const bool fresh = observed.valid && receipt_fresh;
     if (source.name == "head" || source.name == "locations") {
       const bool semantic_source_ready = fresh && observed.continuation;
-      if (result.semantic_ready && !semantic_source_ready && result.reason == "ready") {
-        result.reason = receipt_fresh ? observed.reason :
-          source.name + "_missing_stale_or_invalid";
-      }
       result.semantic_ready = result.semantic_ready && semantic_source_ready;
     }
     if (!source.required) {continue;}

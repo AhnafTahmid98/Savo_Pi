@@ -71,28 +71,29 @@ Require all 10 Edge packages and zero test failures/errors.
 
 ## Environment and service
 
-Prepare `/etc/robot-savo/robot-savo.env` from the repository example, set `SAVO_ROLE=edge`, and match the Core ROS domain/RMW. Render and install only the role unit:
+Prepare `/etc/robot-savo/robot-savo.env` from the repository example, set
+`SAVO_ROLE=edge`, and match the Core ROS domain/RMW. Install the Edge ownership
+bundle; it contains the Edge role and the single systemd UI runtime, but enables
+or starts neither:
 
 ```bash
-sudo bash deploy/systemd/render_units.sh \
+sudo bash deploy/systemd/install_services.sh \
+  --profile edge \
   --user "$USER" \
-  --group "$USER" \
-  --root "$PWD" \
-  --output-dir /tmp/robot-savo-units
-systemd-analyze verify /tmp/robot-savo-units/savo_edge.service
-sudo install -m 0644 /tmp/robot-savo-units/savo_edge.service \
-  /etc/systemd/system/savo_edge.service
-sudo systemctl daemon-reload
+  --group "$(id -gn)" \
+  --root "$PWD"
+systemd-analyze verify \
+  /etc/systemd/system/savo_edge.service \
+  /etc/systemd/system/savo-ui-runtime.service
 ```
 
 Do not also enable generic `savo.service`, standalone UI, or standalone bridge when distributed bringup owns the same component.
 
-The current `savo_edge.service` also declares `Wants=`/`After=` on
-`savo-ui-runtime.service`, while its distributed launch environment keeps
-`SAVO_START_UI=false`. The renderer emits both units, but this fresh-install
-procedure intentionally does not install the UI runtime unit automatically.
-Resolve and validate the intended UI ownership before installing that companion
-unit; do not install it merely to silence a dependency warning.
+`savo_edge.service` declares `Wants=`/`After=` on
+`savo-ui-runtime.service`, while distributed launch keeps
+`SAVO_START_UI=false`. Therefore the companion systemd unit is the only default
+framebuffer/UI node owner. Do not enable standalone `savo-ui.service` or set
+distributed `SAVO_START_UI=true` with this bundle.
 
 ## Safe-idle commissioning
 
@@ -103,7 +104,7 @@ The current Edge defaults are:
 | Robot/control | `safe_idle` / `STOP` |
 | Bringup profile | `lidar_only` |
 | RealSense / VO / bridge | enabled |
-| Speech / UI | disabled |
+| Speech / distributed-launch UI | disabled; systemd UI runtime is separate |
 | D435 obstacle cloud | disabled |
 | D435 voxel validation | false |
 

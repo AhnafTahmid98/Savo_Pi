@@ -30,8 +30,8 @@ void feed(Monitor & monitor, Clock::time_point now)
   monitor.observe("perception_safety",
     R"({"active_decision":{"stop_required":false,"slowdown_factor":1.0}})", now);
   monitor.observe("perception_heartbeat", R"({"ok":true})", now);
-  monitor.observe("base_battery", "Base battery OK: 8.10 V", now);
-  monitor.observe("core_ups", "Core UPS OK: 4.00 V", now);
+  monitor.observe("base_battery", "Base battery ok: 8.03 V, SoC 81.7%", now);
+  monitor.observe("core_ups", "Core UPS ok: 3.83 V, capacity 68.0%", now);
   monitor.observe("safety_stop", "false", now);
   monitor.observe("safety_slowdown", "1.0", now);
   monitor.observe("nav", "state=blocked;goal_acceptance_allowed=false;"
@@ -47,9 +47,81 @@ TEST(LocalMappingHealth, DirectHealthySourcesAdmitInStopWithoutOptionalEdge)
   const auto now = Clock::time_point{};
   EXPECT_FALSE(monitor.evaluate(true, now).admission_ready);
   feed(monitor, now);
-  EXPECT_TRUE(monitor.evaluate(true, now).admission_ready);
-  EXPECT_TRUE(monitor.evaluate(true, now).continuation_ready);
+  const auto decision = monitor.evaluate(true, now);
+  EXPECT_TRUE(decision.admission_ready);
+  EXPECT_TRUE(decision.continuation_ready);
+  EXPECT_EQ(decision.reason, "ready");
   EXPECT_FALSE(monitor.evaluate(false, now).continuation_ready);
+}
+
+TEST(LocalMappingHealth, ProductionPowerStatesPreserveAdmissionAndContinuationPolicy)
+{
+  const auto now = Clock::time_point{};
+  for (const auto * state : {"ok", "charging", "full"}) {
+    Monitor monitor;
+    feed(monitor, now);
+    monitor.observe(
+      "base_battery", std::string("Base battery ") + state + ": 8.03 V, SoC 81.7%", now);
+    const auto decision = monitor.evaluate(true, now);
+    EXPECT_TRUE(decision.admission_ready) << state;
+    EXPECT_TRUE(decision.continuation_ready) << state;
+  }
+
+  for (const auto * state : {"low", "warn", "warning"}) {
+    Monitor monitor;
+    feed(monitor, now);
+    monitor.observe(
+      "base_battery", std::string("Base battery ") + state + ": 7.00 V", now);
+    const auto decision = monitor.evaluate(true, now);
+    EXPECT_FALSE(decision.admission_ready) << state;
+    EXPECT_TRUE(decision.continuation_ready) << state;
+    EXPECT_EQ(decision.reason, std::string("base_battery_") + state);
+  }
+
+  for (const auto * state : {"critical", "error", "stale", "unknown", "invalid"}) {
+    Monitor monitor;
+    feed(monitor, now);
+    monitor.observe(
+      "base_battery", std::string("Base battery ") + state + ": 7.00 V", now);
+    const auto decision = monitor.evaluate(true, now);
+    EXPECT_FALSE(decision.admission_ready) << state;
+    EXPECT_FALSE(decision.continuation_ready) << state;
+    EXPECT_EQ(decision.reason, std::string("base_battery_") + state);
+  }
+
+  Monitor unrecognized;
+  feed(unrecognized, now);
+  unrecognized.observe("base_battery", "Base battery arbitrary: 8.03 V", now);
+  const auto unrecognized_decision = unrecognized.evaluate(true, now);
+  EXPECT_FALSE(unrecognized_decision.admission_ready);
+  EXPECT_FALSE(unrecognized_decision.continuation_ready);
+  EXPECT_EQ(unrecognized_decision.reason, "base_battery_missing_stale_or_invalid");
+}
+
+TEST(LocalMappingHealth, LowercaseJsonPowerStatesUseTheSamePolicy)
+{
+  const auto now = Clock::time_point{};
+  Monitor nominal;
+  feed(nominal, now);
+  nominal.observe(
+    "core_ups", R"({"source":"core_ups","state":"charging","voltage_v":3.83,"ok":true})",
+    now);
+  EXPECT_TRUE(nominal.evaluate(true, now).admission_ready);
+  EXPECT_TRUE(nominal.evaluate(true, now).continuation_ready);
+
+  Monitor restricted;
+  feed(restricted, now);
+  restricted.observe(
+    "core_ups", R"({"source":"core_ups","state":"low","voltage_v":3.50,"ok":true})", now);
+  EXPECT_FALSE(restricted.evaluate(true, now).admission_ready);
+  EXPECT_TRUE(restricted.evaluate(true, now).continuation_ready);
+
+  Monitor failed;
+  feed(failed, now);
+  failed.observe(
+    "core_ups", R"({"source":"core_ups","state":"error","voltage_v":3.50,"ok":false})", now);
+  EXPECT_FALSE(failed.evaluate(true, now).admission_ready);
+  EXPECT_FALSE(failed.evaluate(true, now).continuation_ready);
 }
 
 TEST(LocalMappingHealth, RequiredFailureAndExpiredObservationFailClosed)
@@ -70,6 +142,23 @@ TEST(LocalMappingHealth, RequiredFailureAndExpiredObservationFailClosed)
   EXPECT_FALSE(monitor.evaluate(true, now + std::chrono::milliseconds(1001)).continuation_ready);
 }
 
+TEST(LocalMappingHealth, FirstRequiredBlockerAndMappingReasonRemainDeterministic)
+{
+  const auto now = Clock::time_point{};
+  Monitor required_blockers;
+  feed(required_blockers, now);
+  required_blockers.observe("base", "invalid", now);
+  EXPECT_EQ(required_blockers.evaluate(true, now).reason, "base_missing_stale_or_invalid");
+  required_blockers.observe("lidar", "invalid", now);
+  EXPECT_EQ(required_blockers.evaluate(true, now).reason, "base_missing_stale_or_invalid");
+
+  Monitor mapping_blocked;
+  feed(mapping_blocked, now);
+  EXPECT_EQ(
+    mapping_blocked.evaluate(false, now).reason,
+    "mapping_scan_map_odom_tf_not_ready");
+}
+
 TEST(LocalMappingHealth, EnvironmentalStopAndLowPowerPermitOnlyContinuation)
 {
   Monitor monitor;
@@ -81,13 +170,13 @@ TEST(LocalMappingHealth, EnvironmentalStopAndLowPowerPermitOnlyContinuation)
   EXPECT_FALSE(monitor.evaluate(true, now).admission_ready);
   EXPECT_TRUE(monitor.evaluate(true, now).continuation_ready);
   feed(monitor, now);
-  monitor.observe("base_battery", "Base battery LOW: 7.00 V", now);
+  monitor.observe("base_battery", "Base battery low: 7.00 V", now);
   EXPECT_FALSE(monitor.evaluate(true, now).admission_ready);
   EXPECT_TRUE(monitor.evaluate(true, now).continuation_ready);
   for (const auto * source : {"base_battery", "core_ups"}) {
     feed(monitor, now);
     monitor.observe(source, std::string("{\"source\":\"") + source +
-      "\",\"state\":\"CRITICAL\",\"voltage_v\":3.0}", now);
+      "\",\"state\":\"critical\",\"voltage_v\":3.0}", now);
     EXPECT_FALSE(monitor.evaluate(true, now).continuation_ready);
   }
 }
@@ -230,7 +319,7 @@ TEST(LocalMappingHealth, SemanticReadinessTracksOptionalHeadAndLocationsEvidence
   EXPECT_TRUE(invalid_head.admission_ready);
   EXPECT_TRUE(invalid_head.continuation_ready);
   EXPECT_FALSE(invalid_head.semantic_ready);
-  EXPECT_EQ(invalid_head.reason, "head_invalid");
+  EXPECT_EQ(invalid_head.reason, "ready");
 }
 
 TEST(LocalMappingHealth, EdgeUpsIsOptionalUnlessExplicitlyExpected)
@@ -243,9 +332,9 @@ TEST(LocalMappingHealth, EdgeUpsIsOptionalUnlessExplicitlyExpected)
   Monitor required_edge(true);
   feed(required_edge, now);
   EXPECT_FALSE(required_edge.evaluate(true, now).continuation_ready);
-  required_edge.observe("edge_ups", "Edge UPS OK: 4.10 V", now);
+  required_edge.observe("edge_ups", "Edge UPS ok: 4.10 V", now);
   EXPECT_TRUE(required_edge.evaluate(true, now).admission_ready);
-  required_edge.observe("edge_ups", "Edge UPS LOW: 3.30 V", now);
+  required_edge.observe("edge_ups", "Edge UPS low: 3.30 V", now);
   EXPECT_FALSE(required_edge.evaluate(true, now).admission_ready);
   EXPECT_TRUE(required_edge.evaluate(true, now).continuation_ready);
 }
@@ -258,5 +347,29 @@ TEST(LocalMappingHealth, PublishedPayloadHasStableSchemaAndProducerIdentity)
   EXPECT_EQ(
     monitor.evaluate(true, now).json(),
     R"({"admission_ready":true,"continuation_ready":true,"node":"savo_mapping",)"
-    R"("reason":"head_missing_stale_or_invalid","schema_version":1,"semantic_ready":false})");
+    R"("reason":"ready","schema_version":1,"semantic_ready":false})");
+}
+
+TEST(LocalMappingHealth, ProductionFailedPowerWithoutVoltageRetainsSpecificReason)
+{
+  const auto now = Clock::time_point{};
+
+  Monitor core_failed;
+  feed(core_failed, now);
+  core_failed.observe(
+    "core_ups",
+    "Core UPS error: n/a V, error: Failed to read word from 0x36: Connection timed out",
+    now);
+  const auto core_decision = core_failed.evaluate(true, now);
+  EXPECT_FALSE(core_decision.admission_ready);
+  EXPECT_FALSE(core_decision.continuation_ready);
+  EXPECT_EQ(core_decision.reason, "core_ups_error");
+
+  Monitor base_stale;
+  feed(base_stale, now);
+  base_stale.observe("base_battery", "Base battery stale: n/a V", now);
+  const auto base_decision = base_stale.evaluate(true, now);
+  EXPECT_FALSE(base_decision.admission_ready);
+  EXPECT_FALSE(base_decision.continuation_ready);
+  EXPECT_EQ(base_decision.reason, "base_battery_stale");
 }

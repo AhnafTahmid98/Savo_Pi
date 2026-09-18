@@ -11,11 +11,18 @@ User=@SAVO_USER@
 Group=@SAVO_GROUP@
 WorkingDirectory=@SAVO_ROOT@
 EnvironmentFile=-/etc/robot-savo/robot-savo.env
+EnvironmentFile=/etc/robot-savo/robot-savo.paths.env
 Environment=SAVO_ROBOT_MODE=safe_idle
 Environment=SAVO_BRINGUP_PROFILE=lidar_only
 Environment=SAVO_CONTROL_STARTUP_MODE=STOP
+Environment=SAVO_SERVICE_UNIT=savo_core.service
+RuntimeDirectory=robot-savo
+RuntimeDirectoryMode=0750
+RuntimeDirectoryPreserve=yes
+ExecCondition=/usr/bin/python3 @SAVO_ROOT@/deploy/common/runtime_ownership.py preflight --owner core --allow-unit savo_core.service
 ExecStart=@SAVO_ROOT@/deploy/core/run_core.sh
 Restart=on-failure
+RestartPreventExitStatus=4
 RestartSec=5
 KillSignal=SIGINT
 TimeoutStopSec=30

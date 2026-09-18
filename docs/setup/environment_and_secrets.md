@@ -10,7 +10,7 @@ Robot Savo separates reviewable non-secret runtime settings from host-local cred
 
 | Value | Current default or rule |
 | --- | --- |
-| `SAVO_ROOT` | `$HOME/Savo_Pi` unless explicitly set |
+| `SAVO_ROOT` | Repository checkout containing `deploy/common/env_common.sh` unless explicitly set |
 | `SAVO_WS` | `$SAVO_ROOT/savo_ws` |
 | `ROS_DISTRO` | `jazzy` |
 | `ROS_DOMAIN_ID` | `0`, but all hosts must use the same reviewed value |
@@ -33,9 +33,17 @@ sudo install -m 0640 deploy/systemd/robot-savo.env.example \
 sudoedit /etc/robot-savo/robot-savo.env
 ```
 
-Set the absolute repository/workspace paths, correct `SAVO_ROLE`, common ROS domain/RMW, dedicated network interface names, and only reviewed feature flags. Keep `safe_idle`, `lidar_only`, `STOP`, locked geometry, provisional-geometry rejection, and unvalidated D435 obstacle integration unchanged during setup.
+Set the correct `SAVO_ROLE`, common ROS domain/RMW, dedicated network interface
+names, and only reviewed feature flags. Do not set `SAVO_ROOT` or `SAVO_WS` in
+this file. The unit renderer generates `/etc/robot-savo/robot-savo.paths.env`
+from its deployment root, and rendered units load it after this configuration.
+Keep `safe_idle`, `lidar_only`, `STOP`, locked geometry,
+provisional-geometry rejection, and unvalidated D435 obstacle integration
+unchanged during setup.
 
-The role-specific units use `EnvironmentFile=-/etc/robot-savo/robot-savo.env`; a missing file is allowed, but commissioning must record the effective environment.
+The role-specific units allow a missing `robot-savo.env`, but require the
+generated `robot-savo.paths.env`. Commissioning must record both the effective
+configuration and rendered deployment root.
 
 ## Secrets boundary
 

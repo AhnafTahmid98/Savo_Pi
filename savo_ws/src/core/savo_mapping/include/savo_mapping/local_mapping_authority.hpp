@@ -122,7 +122,8 @@ public:
     if (!health.ready(false, identity_.require_semantic, now)) {
       active_ = false;
       paused_ = false;
-      reason_ = health.reason(now);
+      reason_ = identity_.require_semantic && health.ready(false, false, now) ?
+        "mapping_local_semantic_unavailable" : health.reason(now);
       return false;
     }
     return true;

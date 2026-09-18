@@ -1,6 +1,11 @@
 # Mapping and Navigation Architecture
 
-Mapping creates reviewed, immutable map releases; navigation consumes only a verified active release. Both run on Core and remain subordinate to supervisor permission, readiness, control, and safety.
+Mapping creates reviewed, immutable map releases; navigation consumes only a
+verified active release. Both run on Core and remain subordinate to readiness,
+control, and safety. Normal system operation may additionally use system
+Supervisor permission. The dedicated autonomous mapping composition defaults
+`start_supervisor=false` and uses mission-bound mapping-local authority with
+`authority_generation=0` instead of an indirect Supervisor dependency.
 
 ## Mapping lifecycle
 
