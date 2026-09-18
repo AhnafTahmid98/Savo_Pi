@@ -2,6 +2,9 @@
 set -Eeuo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+# Shared ROS 2 DDS/domain configuration.
+source "${REPO_ROOT}/deploy/common/env_common.sh"
 WORKSPACE="${REPO_ROOT}/savo_ws"
 MODE="${SAVO_OBSERVER_MODE:-full}"
 PROFILE="${SAVO_OBSERVER_PROFILE:-standard}"

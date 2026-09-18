@@ -15,7 +15,8 @@ export SAVO_WIFI_IFACE="${SAVO_WIFI_IFACE:-wlan0}"
 
 # ROS 2 network defaults.
 export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}"
-export ROS_LOCALHOST_ONLY="${ROS_LOCALHOST_ONLY:-0}"
+export ROS_AUTOMATIC_DISCOVERY_RANGE="${ROS_AUTOMATIC_DISCOVERY_RANGE:-SUBNET}"
+export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_fastrtps_cpp}"
 
 savo_log() {
   printf '[SavoDeploy] %s\n' "$*"

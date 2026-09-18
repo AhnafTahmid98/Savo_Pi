@@ -2,6 +2,9 @@
 set -Eeuo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+# Shared ROS 2 DDS/domain configuration.
+source "${REPO_ROOT}/deploy/common/env_common.sh"
 source /opt/ros/jazzy/setup.bash
 source "${REPO_ROOT}/savo_ws/install/setup.bash"
 exec ros2 run savo_observer check_observer_connection
