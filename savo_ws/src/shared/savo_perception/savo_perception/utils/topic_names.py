@@ -16,6 +16,7 @@ try:
         TOPIC_TOF_RIGHT_M as _TOPIC_TOF_RIGHT_M,
         TOPIC_TOF_STATUS as _TOPIC_TOF_STATUS,
         TOPIC_ULTRASONIC_FRONT_M as _TOPIC_ULTRASONIC_FRONT_M,
+        TOPIC_ULTRASONIC_STATUS as _TOPIC_ULTRASONIC_STATUS,
         TOPIC_SAFETY_STOP as _TOPIC_SAFETY_STOP,
         TOPIC_SAFETY_SLOWDOWN_FACTOR as _TOPIC_SAFETY_SLOWDOWN_FACTOR,
         TOPIC_SAVO_PERCEPTION_RANGE_HEALTH as _TOPIC_RANGE_HEALTH,
@@ -33,6 +34,7 @@ except Exception:
     _TOPIC_TOF_RIGHT_M = "/savo_perception/range/right_m"
     _TOPIC_TOF_STATUS = "/savo_perception/tof_status"
     _TOPIC_ULTRASONIC_FRONT_M = "/savo_perception/range/front_ultrasonic_m"
+    _TOPIC_ULTRASONIC_STATUS = "/savo_perception/ultrasonic_status"
     _TOPIC_SAFETY_STOP = "/safety/stop"
     _TOPIC_SAFETY_SLOWDOWN_FACTOR = "/safety/slowdown_factor"
     _TOPIC_RANGE_HEALTH = "/savo_perception/range_health"
@@ -90,6 +92,7 @@ TOF_LEFT_M = _TOPIC_TOF_LEFT_M
 TOF_RIGHT_M = _TOPIC_TOF_RIGHT_M
 TOF_STATUS = _TOPIC_TOF_STATUS
 ULTRASONIC_FRONT_M = _TOPIC_ULTRASONIC_FRONT_M
+ULTRASONIC_STATUS = _TOPIC_ULTRASONIC_STATUS
 
 SAFETY_STOP = _TOPIC_SAFETY_STOP
 SAFETY_SLOWDOWN_FACTOR = _TOPIC_SAFETY_SLOWDOWN_FACTOR
@@ -130,6 +133,7 @@ class PerceptionSafetyTopics:
 class PerceptionStatusTopics:
     """Topic contract for perception status and diagnostics."""
     tof_status: str = TOF_STATUS
+    ultrasonic_status: str = ULTRASONIC_STATUS
     range_health: str = SAVO_PERCEPTION_RANGE_HEALTH
     safety_state: str = SAVO_PERCEPTION_SAFETY_STATE
     dashboard: str = SAVO_PERCEPTION_DASHBOARD

@@ -80,6 +80,9 @@ def test_autonomous_mapping_launch_is_fail_closed_by_default() -> None:
     assert '"start_description", default_value="true"' in launch
     assert '"require_locked_geometry", default_value="true"' in launch
     assert '"allow_provisional_geometry", default_value="false"' in launch
+    assert "production requires require_locked_geometry:=true" in launch
+    assert "production forbids allow_provisional_geometry:=true" in launch
+    assert "canonical production geometry profile" in launch
     assert '"start_head"' in launch
     assert '"head_enable_tf"' in launch
     assert '"head_enable_tf",\n                default_value="true"' in launch

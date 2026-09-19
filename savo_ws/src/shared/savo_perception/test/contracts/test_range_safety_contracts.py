@@ -19,6 +19,9 @@ from savo_perception.models.range_sample import (
     is_valid_distance,
 )
 from savo_perception.models.sensor_health import SensorHealth
+from savo_perception.nodes.range_health_node_py import (
+    fresh_ultrasonic_diagnostic_error,
+)
 from savo_perception.safety.range_fusion import (
     RangeFusionConfig,
     fuse_range_snapshot,
@@ -316,6 +319,23 @@ def test_real_profile_uses_tuned_slowdown_and_unchanged_stop_thresholds() -> Non
         assert params["side_slow_m"] > params["side_stop_m"]
 
 
+def test_autonomous_mapping_selects_production_perception_authority() -> None:
+    launch = _read(
+        PACKAGE.parents[1]
+        / "shared"
+        / "savo_bringup"
+        / "launch"
+        / "autonomous_mapping.launch.py"
+    )
+    generic = _read(PACKAGE / "config/core/perception_core.yaml")
+    generic_safety = _read(PACKAGE / "config/core/range_safety.yaml")
+
+    assert '"core_real_robot_v1.yaml"' in launch
+    assert '"config_file": LaunchConfiguration("perception_config_file")' in launch
+    for source in (generic, generic_safety):
+        assert "not the autonomous-mapping threshold authority" in source
+
+
 def test_tuned_production_slowdown_boundaries() -> None:
     assert math.isclose(
         slowdown_from_distance(0.401, stop_m=0.25, slow_m=0.40),
@@ -363,6 +383,76 @@ def test_required_tofs_remain_required_and_ultrasonic_optional() -> None:
     config = _read(PACKAGE / "config" / "core" / "perception_core.yaml")
     assert "required_sensors:\n      - tof_left\n      - tof_right" in config
     assert "optional_sensors:\n      - depth_front\n      - ultrasonic_front" in config
+
+
+def test_ultrasonic_driver_causes_reach_range_health_status() -> None:
+    driver = _read(PACKAGE / "src/drivers/ultrasonic_reader.cpp")
+    producer = _read(PACKAGE / "src/nodes/ultrasonic_node.cpp")
+    producer_py = _read(
+        PACKAGE / "savo_perception" / "nodes" / "ultrasonic_node_py.py"
+    )
+    health = _read(PACKAGE / "src/nodes/range_health_node.cpp")
+    health_py = _read(
+        PACKAGE / "savo_perception" / "nodes" / "range_health_node_py.py"
+    )
+    topics = _read(PACKAGE / "include/savo_perception/topic_names.hpp")
+
+    for cause in (
+        "echo_idle_timeout",
+        "echo_start_timeout",
+        "echo_end_timeout",
+        "echo_read_failed",
+        "distance_out_of_valid_range",
+    ):
+        assert cause in driver
+    assert "kUltrasonicStatus" in topics
+    assert "publish_status(reading.error)" in producer
+    assert "qos_state_string(depth=1)" in producer_py
+    assert "on_ultrasonic_status" in health
+    assert "qos_state_string(depth=1)" in health_py
+    assert "ultrasonic_error_" in health
+    assert "ultrasonic_status_receipt_" in health
+    assert "current_ultrasonic_error(now)" in health
+    assert '"invalid_distance"' in health
+
+
+def test_ultrasonic_diagnostic_cause_is_used_only_while_fresh() -> None:
+    assert fresh_ultrasonic_diagnostic_error(
+        "echo_end_timeout",
+        received_mono_s=10.0,
+        now_mono_s=10.2,
+        stale_timeout_s=0.3,
+    ) == "echo_end_timeout"
+    assert fresh_ultrasonic_diagnostic_error(
+        "echo_end_timeout",
+        received_mono_s=10.0,
+        now_mono_s=10.31,
+        stale_timeout_s=0.3,
+    ) == ""
+    assert fresh_ultrasonic_diagnostic_error(
+        "echo_end_timeout",
+        received_mono_s=10.0,
+        now_mono_s=9.9,
+        stale_timeout_s=0.3,
+    ) == ""
+    assert fresh_ultrasonic_diagnostic_error(
+        "",
+        received_mono_s=10.0,
+        now_mono_s=10.1,
+        stale_timeout_s=0.3,
+    ) == ""
+
+
+def test_ultrasonic_status_is_part_of_the_topic_contract() -> None:
+    topics = yaml.safe_load(_read(PACKAGE / "config" / "topics.yaml"))
+    topic_name = "/savo_perception/ultrasonic_status"
+
+    assert topics["topics"]["health"]["ultrasonic_status"] == topic_name
+    assert topics["ownership"]["ultrasonic_status"]["topic"] == topic_name
+
+    names = _read(PACKAGE / "savo_perception" / "utils" / "topic_names.py")
+    assert "TOPIC_ULTRASONIC_STATUS as _TOPIC_ULTRASONIC_STATUS" in names
+    assert "ultrasonic_status: str = ULTRASONIC_STATUS" in names
 
 
 def test_range_rate_quality_is_package_local_and_preserves_optionality() -> None:

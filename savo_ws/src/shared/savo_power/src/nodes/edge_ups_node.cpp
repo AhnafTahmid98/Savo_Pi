@@ -90,10 +90,6 @@ private:
       ups_address,
       params::kUpsAddress);
 
-    params_.sample_rate_hz = declare_parameter<double>(
-      params::kSampleRateHz,
-      params_.sample_rate_hz);
-
     params_.publish_rate_hz = declare_parameter<double>(
       params::kPublishRateHz,
       params_.publish_rate_hz);

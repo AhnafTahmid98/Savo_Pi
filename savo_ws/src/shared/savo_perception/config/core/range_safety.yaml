@@ -1,5 +1,7 @@
 # Robot Savo range safety fusion configuration.
 # C++ node is default. Python node uses the same parameter contract as fallback.
+# This generic file is not the autonomous-mapping threshold authority.
+# Production autonomous mapping selects profiles/core_real_robot_v1.yaml.
 
 safety_stop_node:
   ros__parameters:

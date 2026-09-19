@@ -160,6 +160,13 @@ class Ads7830Driver:
                 pcb_version=self._config.pcb_version,
             )
 
+    def close(self) -> None:
+        """Release the underlying bus when it provides close()."""
+
+        close = getattr(self._bus, "close", None)
+        if callable(close):
+            close()
+
 
 def make_ads7830_driver(
     *,
@@ -171,15 +178,18 @@ def make_ads7830_driver(
     """Create an ADS7830 driver using a real SmbusAdapter."""
 
     bus = SmbusAdapter(bus_id)
-
-    return Ads7830Driver(
-        bus=bus,
-        config=Ads7830Config(
-            address=address,
-            channel=channel,
-            pcb_version=pcb_version,
-        ),
-    )
+    try:
+        return Ads7830Driver(
+            bus=bus,
+            config=Ads7830Config(
+                address=address,
+                channel=channel,
+                pcb_version=pcb_version,
+            ),
+        )
+    except Exception:
+        bus.close()
+        raise
 
 
 def read_kit_battery_once(

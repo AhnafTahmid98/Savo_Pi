@@ -95,10 +95,6 @@ void KitBatteryNode::load_params()
 
   params_.pcb_version = ads7830_pcb_version_from_string(pcb_version);
 
-  params_.sample_rate_hz = declare_parameter<double>(
-    params::kSampleRateHz,
-    params_.sample_rate_hz);
-
   params_.publish_rate_hz = declare_parameter<double>(
     params::kPublishRateHz,
     params_.publish_rate_hz);

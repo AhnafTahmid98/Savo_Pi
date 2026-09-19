@@ -52,4 +52,4 @@ Core state is rooted at `/var/lib/robot_savo`; Core logs are rooted at `/var/log
 
 ## Validation status
 
-Source-contract, role, bringup, observer, and aggregate pre-real-test validators exist and pass in the current development checkout. This is not physical authorization. The current geometry profile is provisional, current-target regression is outstanding, D435 voxel use is unvalidated by default, and the hardware gaps in the [calibration register](../hardware/calibration_register.md) remain open.
+Source-contract, role, bringup, observer, and aggregate pre-real-test validators exist. This is not physical authorization. Canonical production geometry is locked at revision 5 and remains a mandatory production gate; current-target regression is outstanding, D435 voxel use is unvalidated by default, and the runtime/model-fidelity gaps in the [calibration register](../hardware/calibration_register.md) remain open.

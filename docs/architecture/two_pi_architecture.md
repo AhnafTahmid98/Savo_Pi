@@ -15,7 +15,7 @@ Authoritative package membership is the 14-package Core array and 10-package Edg
 
 ## Cross-host contracts
 
-The hosts share ROS 2 Jazzy DDS over a dedicated Ethernet link, normally `192.168.50.1/24` and `192.168.50.2/24`. They require a matching `ROS_DOMAIN_ID` and middleware selection; the systemd example selects `rmw_cyclonedds_cpp`. Core is the preferred Chrony source on the isolated link.
+The hosts share ROS 2 Jazzy DDS over a dedicated Ethernet link, normally `192.168.50.1/24` and `192.168.50.2/24`. They use matching `ROS_DOMAIN_ID`, `ROS_AUTOMATIC_DISCOVERY_RANGE=SUBNET`, and `RMW_IMPLEMENTATION=rmw_fastrtps_cpp`; `ROS_LOCALHOST_ONLY` remains unset. Core is the preferred Chrony source on the isolated link.
 
 State crossing Edge to Core includes `/vo/odom`, RealSense/VO health, optional obstacle-cloud data, Edge UPS state, and typed bridge requests. Core to Edge includes robot state, readiness, safety, map/navigation/location state, and bounded action/service results. Raw high-bandwidth RGB-D remains Edge-local unless a configured consumer requires it.
 

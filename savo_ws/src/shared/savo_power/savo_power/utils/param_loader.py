@@ -17,7 +17,6 @@ from savo_power.models.power_status import (
 from savo_power.utils.clamp import (
     clamp_i2c_7bit_address,
     clamp_publish_rate_hz,
-    clamp_raw_byte,
     to_float,
     to_int,
 )
@@ -488,7 +487,6 @@ def default_ups_params(
         "source": normalized.value,
         c.PARAM_I2C_BUS: c.DEFAULT_I2C_BUS,
         c.PARAM_UPS_ADDRESS: c.UPS_HAT_DEFAULT_ADDRESS,
-        c.PARAM_SAMPLE_RATE_HZ: c.DEFAULT_SAMPLE_RATE_HZ,
         c.PARAM_PUBLISH_RATE_HZ: c.DEFAULT_PUBLISH_RATE_HZ,
     }
 
@@ -501,7 +499,6 @@ def default_kit_battery_params() -> dict[str, object]:
         c.PARAM_ADS7830_ADDRESS: c.ADS7830_DEFAULT_ADDRESS,
         c.PARAM_ADS7830_CHANNEL: c.ADS7830_DEFAULT_CHANNEL,
         c.PARAM_ADS7830_PCB_VERSION: c.ADS7830_DEFAULT_PCB_VERSION,
-        c.PARAM_SAMPLE_RATE_HZ: c.DEFAULT_SAMPLE_RATE_HZ,
         c.PARAM_PUBLISH_RATE_HZ: c.DEFAULT_PUBLISH_RATE_HZ,
     }
 

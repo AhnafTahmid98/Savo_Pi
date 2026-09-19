@@ -64,7 +64,7 @@ def test_param_load_result_can_represent_success():
         elif name in {"path", "source", "filename"}:
             kwargs[name] = "test.yaml"
         elif name in {"data", "params", "parameters", "value"}:
-            kwargs[name] = {"sample_rate_hz": 1.0}
+            kwargs[name] = {"publish_rate_hz": 1.0}
         elif name in {"errors", "warnings"}:
             kwargs[name] = []
         elif name in {"message", "error"}:

@@ -54,7 +54,7 @@ Fixed robot tree including `base_footprint -> base_link` and static sensor/mount
 
 ## Parameters and configuration
 
-`robot_dimensions.yaml`, `wheel_geometry.yaml`, and `sensor_mounts.yaml` form profile `robot_savo_core_v1`. The current repository status identifies geometry as provisional; `measurement_state`, digest, and generated footprint must agree before a locked profile is accepted.
+`robot_dimensions.yaml`, `wheel_geometry.yaml`, and `sensor_mounts.yaml` mirror the canonical `robot_savo_core_v1` profile. The production artifact is locked at geometry revision 5 with no remaining calibration blockers; `measurement_state`, digest, and generated footprint must continue to agree.
 
 ## Launch files
 
@@ -104,11 +104,11 @@ Tests parse Xacro/config, enforce required/no-duplicate frames, geometry contrac
 
 ## Current validation status
 
-Source-validated; current physical geometry is not locked. Earlier hardware baseline does not validate this profile digest.
+Source-validated; canonical physical geometry is locked at revision 5. A geometry change still requires a new reviewed revision, digest, generated footprint, and applicable hardware regression.
 
 ## Known limitations and remaining validation
 
-Measure, review, lock, regenerate footprint/digest, then verify robot TF physically.
+Preserve the locked artifact and verify its TF/footprint against the assembled robot after any geometry-affecting hardware change.
 
 ## Change-control considerations
 

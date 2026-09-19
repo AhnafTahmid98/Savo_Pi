@@ -140,6 +140,13 @@ if(BUILD_TESTING)
     ${PROJECT_NAME}
   )
 
+  ament_add_gtest(test_ups_hat_driver_cpp
+    test/test_ups_hat_driver.cpp
+  )
+  target_link_libraries(test_ups_hat_driver_cpp
+    ${PROJECT_NAME}
+  )
+
   file(GLOB SAVO_POWER_PYTEST_FILES test/test_*.py)
 
   foreach(test_file ${SAVO_POWER_PYTEST_FILES})

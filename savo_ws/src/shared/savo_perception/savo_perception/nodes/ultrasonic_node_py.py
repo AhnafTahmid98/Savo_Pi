@@ -11,19 +11,21 @@ from typing import Optional
 try:
     import rclpy
     from rclpy.node import Node
-    from std_msgs.msg import Float32
+    from std_msgs.msg import Float32, String
 
     ROS_AVAILABLE = True
 except Exception:
     rclpy = None
     Node = object
     Float32 = None
+    String = None
     ROS_AVAILABLE = False
 
 from savo_perception.constants import NODE_NAME_ULTRASONIC
 from savo_perception.drivers import UltrasonicConfig, UltrasonicDriver
 from savo_perception.ros.params import load_ultrasonic_params
 from savo_perception.ros.qos_profiles import qos_range_sensor
+from savo_perception.ros.qos_profiles import qos_state_string
 
 
 class UltrasonicNodePy(Node):
@@ -43,6 +45,7 @@ class UltrasonicNodePy(Node):
         self.declare_parameter("echo_timeout_us", 30000)
         self.declare_parameter("echo_idle_timeout_us", 30000)
         self.declare_parameter("output_topic", "/savo_perception/range/front_ultrasonic_m")
+        self.declare_parameter("status_topic", "/savo_perception/ultrasonic_status")
         self.declare_parameter("publish_nan_on_error", True)
 
         values = {
@@ -86,6 +89,11 @@ class UltrasonicNodePy(Node):
             self.params.output_topic,
             qos_range_sensor(),
         )
+        self.status_pub = self.create_publisher(
+            String,
+            self.get_parameter("status_topic").value,
+            qos_state_string(depth=1),
+        )
 
         self._start_driver()
 
@@ -123,6 +131,7 @@ class UltrasonicNodePy(Node):
 
     def _on_timer(self) -> None:
         if not self.driver.started:
+            self._publish_status(self.driver_error or "not_started")
             if self.publish_nan_on_error:
                 self._publish_distance(None)
             return
@@ -132,11 +141,18 @@ class UltrasonicNodePy(Node):
         except Exception as exc:
             self.driver_error = str(exc)
             self.get_logger().warn(f"Ultrasonic read failed: {exc}")
+            self._publish_status(f"read_failed:{type(exc).__name__}")
             if self.publish_nan_on_error:
                 self._publish_distance(None)
             return
 
+        self._publish_status(sample.error)
         self._publish_distance(sample.distance_m)
+
+    def _publish_status(self, error: str) -> None:
+        msg = String()
+        msg.data = error or "ok"
+        self.status_pub.publish(msg)
 
     def _publish_distance(self, distance_m: Optional[float]) -> None:
         msg = Float32()

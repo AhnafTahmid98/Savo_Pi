@@ -13,7 +13,7 @@ Internet/admin Wi-Fi                 Internet/admin Wi-Fi
 
 ## ROS and time
 
-Both hosts require the same `ROS_DOMAIN_ID` (default `0`), `ROS_LOCALHOST_ONLY=0`, ROS 2 Jazzy installation, and compatible RMW implementation. The systemd environment example selects `rmw_cyclonedds_cpp`. A production deployment must verify DDS discovery is bound only to trusted interfaces; matching variables alone do not prove firewall or multicast behavior.
+Both hosts require the same `ROS_DOMAIN_ID` (default `0`), `ROS_AUTOMATIC_DISCOVERY_RANGE=SUBNET`, ROS 2 Jazzy installation, and `RMW_IMPLEMENTATION=rmw_fastrtps_cpp`; `ROS_LOCALHOST_ONLY` is unset. A production deployment must verify DDS discovery is bound only to trusted interfaces; matching variables alone do not prove firewall or multicast behavior.
 
 Chrony makes Core the preferred isolated-link source. Core can synchronize from Internet pools and advertises time to the robot subnet; Edge prefers Core and can use Internet pools as fallback. Clock health is a hard prerequisite for timestamp freshness, TF, sensor fusion, and distributed timeout decisions.
 

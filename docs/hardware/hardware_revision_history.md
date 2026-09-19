@@ -5,7 +5,7 @@ This repository does not currently contain enough as-built evidence to assign a 
 | Identifier/date | Classification | Evidence and disposition |
 | --- | --- | --- |
 | Earlier Robot Savo baseline (date not reconstructed here) | Historical hardware exercise | Prior documentation reports physical operation; does not validate current source/configuration |
-| `robot_savo_core_v1` | Software geometry profile | Current selected profile; `measurement_state: provisional`; not an as-built revision |
+| `robot_savo_core_v1` revision 5 | Software geometry profile | Current canonical production profile; `measurement_state: locked`, `calibration_remaining: []`; not by itself a complete as-built hardware revision |
 | 2026-08-09 Phase 4 audit | Documentation baseline | Source-derived inventory created; physical measurements and serials remain pending |
 
 ## Required revision record

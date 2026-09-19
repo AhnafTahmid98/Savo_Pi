@@ -12,12 +12,23 @@ Canonical outputs include `/savo_power/core/ups`, `/savo_power/edge/ups`,
 read-only dashboard topics. Python implementations remain as configured
 fallback and diagnostic paths.
 
+Producer hardware reads occur on the `publish_rate_hz` timer (1 Hz in the
+production profiles). There is intentionally no independent
+`sample_rate_hz`. Thresholds use the canonical `ups_*` and `base_*` names from
+`config/power_common.yaml`; role-specific YAML must not contain aliases that
+look configurable but are ignored.
+
 Core and edge launches are separate:
 
 ```text
 launch/power_core.launch.py
 launch/power_edge.launch.py
 ```
+
+`power_core.launch.py` always creates the required Core UPS, base battery,
+aggregate, health, and dashboard nodes. Optional Edge health/dashboard nodes
+are controlled by explicit launch arguments. The old profile-level
+`enable_*` keys were not launch controls and are not part of the contract.
 
 Do not assume percentage values are valid unless the corresponding source and
 calibration state report them as valid. Power faults must remain visible to

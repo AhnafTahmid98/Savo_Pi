@@ -65,7 +65,13 @@ None.
 | base empty/low/full | `6.40/7.20/8.40 V` | Provisional policy/calibration |
 | UPS low/critical | `3.40/3.20 V` | Cell thresholds |
 | stale timeout | `5 s` | Health |
+| publish/read rate | `1 Hz` | Producers take one hardware sample per publication; there is no separate sampling-rate control |
 | automatic shutdown | `false` | Must be validated before enabling |
+
+`config/power_common.yaml` owns the canonical threshold names. Role-specific
+producer YAML contains only parameters consumed by that producer. Core
+required-node membership is fixed by `power_core.launch.py`; profile files do
+not advertise inactive `enable_*` controls.
 
 ## Launch files
 

@@ -6,7 +6,7 @@ Stable identifiers map to the detailed stages: `DSC-001`=D0, `DSC-002`=D1, `DSC-
 
 Validate the Robot Savo physical model, fixed TF contract, dynamic-head boundary, Nav2 footprint, coordinate conventions, and geometry-lock process before any motion-capable production mode is authorized.
 
-The current profile `robot_savo_core_v1.yaml` is marked `provisional`. That state is an intentional motion blocker until a physical measurement pass is completed, reviewed, and committed.
+The current `robot_savo_core_v1.yaml` profile is locked at geometry revision 5 with no remaining calibration blockers. Production tests must reject any provisional replacement or attempt to bypass the locked-profile gate.
 
 ## Ownership boundary
 
@@ -66,13 +66,13 @@ colcon test-result --verbose
 
 Pass criteria: zero build/test failures and all installed description assets present.
 
-## Stage D1 — provisional profile inspection
+## Stage D1 — locked production profile inspection
 
 ```bash
 cd ~/Savo_Pi/savo_ws/src/shared/savo_description
 python3 scripts/validate_geometry_profile.py \
   config/profiles/robot_savo_core_v1.yaml \
-  --allow-provisional
+  --require-locked
 python3 scripts/print_geometry_summary.py \
   config/profiles/robot_savo_core_v1.yaml
 
@@ -80,10 +80,12 @@ python3 scripts/print_geometry_summary.py \
 
 Expected current result:
 
-- profile validates only when provisional state is allowed;
-- summary states `Physical measurement lock: NOT COMPLETE`;
+- profile validates with the production locked-state requirement;
+- summary states that the physical measurement lock is complete;
 - a canonical SHA-256 digest and derived Nav2 footprint are printed.
-Negative gate:
+Bench-only negative testing may use a separate provisional fixture with
+`--allow-provisional`; never substitute that fixture into a production runner.
+Production gate:
 
 ```bash
 python3 scripts/validate_geometry_profile.py \
@@ -92,7 +94,9 @@ python3 scripts/validate_geometry_profile.py \
 
 ```
 
-While the profile remains provisional, this command must fail. If it passes unexpectedly, stop and investigate the validator/profile.
+This command must pass for the canonical revision-5 artifact. A provisional,
+malformed, calibration-blocked, or different profile must fail production
+validation and keep motion blocked.
 
 ## Stage D2 — generate and check URDF
 
@@ -169,7 +173,9 @@ Fill metadata:
 - notes and uncertainties.
 A reviewer must independently check sign conventions, left/right symmetry assumptions, units, and sensor optical-frame rotations.
 
-Do not change `measurement_state` to `locked` until the review is complete.
+For a future geometry change, work on a new provisional revision and do not set
+`measurement_state: locked` until measurement and independent review are
+complete. Do not mutate the accepted revision-5 artifact in place.
 
 ## Stage D5 — locked profile gate
 

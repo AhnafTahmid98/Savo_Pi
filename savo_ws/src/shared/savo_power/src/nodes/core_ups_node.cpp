@@ -60,7 +60,19 @@ public:
     timer_ = create_wall_timer(
       std::chrono::duration_cast<std::chrono::milliseconds>(period),
       [this]() {
-        publish_reading();
+        try {
+          publish_reading();
+        } catch (const std::exception & error) {
+          last_error_ = error.what();
+          reset_driver();
+          publish_error_reading(last_error_);
+          RCLCPP_ERROR_THROTTLE(
+            get_logger(),
+            *get_clock(),
+            5000,
+            "Core UPS timer callback failed; retrying next cycle: %s",
+            last_error_.c_str());
+        }
       });
 
     RCLCPP_INFO(
@@ -88,10 +100,6 @@ private:
     params_.device_address = checked_i2c_address(
       ups_address,
       params::kUpsAddress);
-
-    params_.sample_rate_hz = declare_parameter<double>(
-      params::kSampleRateHz,
-      params_.sample_rate_hz);
 
     params_.publish_rate_hz = declare_parameter<double>(
       params::kPublishRateHz,
@@ -147,6 +155,12 @@ private:
     }
   }
 
+  void reset_driver()
+  {
+    driver_.reset();
+    bus_.reset();
+  }
+
   BatteryReading read_core_ups()
   {
     if (!ensure_driver()) {
@@ -158,6 +172,12 @@ private:
     reading.ok = reading.state != PowerState::ERROR &&
                  reading.state != PowerState::UNKNOWN &&
                  reading.state != PowerState::STALE;
+
+    if (reading.state == PowerState::ERROR) {
+      last_error_ = reading.error_message.empty() ?
+        "core_ups_read_error" : reading.error_message;
+      reset_driver();
+    }
 
     return reading;
   }
@@ -201,6 +221,21 @@ private:
     }
   }
 
+  void publish_error_reading(const std::string & error) noexcept
+  {
+    try {
+      std_msgs::msg::String message;
+      message.data = format_battery_reading_line(
+        make_error_reading(BatterySource::CORE_UPS, error));
+      publisher_->publish(message);
+    } catch (const std::exception & publish_error) {
+      RCLCPP_ERROR(
+        get_logger(),
+        "Core UPS could not publish callback error state: %s",
+        publish_error.what());
+    }
+  }
+
   UpsNodeParams params_{};
   std::unique_ptr<LinuxI2cBus> bus_{};
   std::unique_ptr<UpsHatDriver> driver_{};
@@ -217,8 +252,17 @@ int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
 
-  auto node = std::make_shared<savo_power::CoreUpsNode>();
-  rclcpp::spin(node);
+  try {
+    auto node = std::make_shared<savo_power::CoreUpsNode>();
+    rclcpp::spin(node);
+  } catch (const std::exception & error) {
+    RCLCPP_ERROR(
+      rclcpp::get_logger("core_ups_node"),
+      "Core UPS node stopped by unrecoverable error: %s",
+      error.what());
+    rclcpp::shutdown();
+    return 1;
+  }
 
   rclcpp::shutdown();
   return 0;

@@ -14,13 +14,15 @@ Robot Savo separates reviewable non-secret runtime settings from host-local cred
 | `SAVO_WS` | `$SAVO_ROOT/savo_ws` |
 | `ROS_DISTRO` | `jazzy` |
 | `ROS_DOMAIN_ID` | `0`, but all hosts must use the same reviewed value |
-| `ROS_LOCALHOST_ONLY` | `0` |
+| `ROS_AUTOMATIC_DISCOVERY_RANGE` | `SUBNET` |
+| `RMW_IMPLEMENTATION` | `rmw_fastrtps_cpp` |
+| `ROS_LOCALHOST_ONLY` | Unset for distributed discovery |
 | `SAVO_ROLE` | Set by the selected Core or Edge role |
 | `SAVO_ROBOT_MODE` | `safe_idle` |
 | `SAVO_BRINGUP_PROFILE` | `lidar_only` |
 | `SAVO_CONTROL_STARTUP_MODE` | `STOP` |
 
-The shared systemd example also sets `RMW_IMPLEMENTATION=rmw_cyclonedds_cpp`; the shell role environment does not impose an RMW. Use a compatible installed RMW on every participating host.
+The shared systemd example and role shell environment use the same FastDDS contract. Use `rmw_fastrtps_cpp` on every participating host; do not switch middleware to mask a discovery or SHM problem.
 
 ## Protected systemd environment
 
@@ -66,7 +68,7 @@ Inspect names without dumping secret values:
 ```bash
 systemctl show savo_core.service -p EnvironmentFiles
 systemctl show savo_edge.service -p EnvironmentFiles
-env | grep -E '^(ROS_DOMAIN_ID|ROS_LOCALHOST_ONLY|RMW_IMPLEMENTATION|SAVO_ROLE)='
+env | grep -E '^(ROS_DOMAIN_ID|ROS_AUTOMATIC_DISCOVERY_RANGE|ROS_LOCALHOST_ONLY|RMW_IMPLEMENTATION|SAVO_ROLE)='
 stat -c '%A %U:%G %n' /etc/robot-savo /etc/robot-savo/robot-savo.env
 git status --short
 ```

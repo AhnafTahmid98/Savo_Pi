@@ -2,6 +2,7 @@ import py_compile
 from pathlib import Path
 
 from savo_power.nodes import kit_battery_node_py
+from savo_power.ros.params import KitBatteryNodeParams
 
 
 def test_kit_battery_python_node_module_compiles():
@@ -114,3 +115,48 @@ def test_kit_battery_node_does_not_enable_shutdown_or_motor_control():
         "wheel_speed",
     ]:
         assert forbidden not in combined
+
+
+def test_python_base_battery_factory_uses_bus_factory_contract(monkeypatch):
+    captured = {}
+
+    def fake_factory(**kwargs):
+        captured.update(kwargs)
+        return object()
+
+    monkeypatch.setattr(
+        kit_battery_node_py,
+        "make_ads7830_driver",
+        fake_factory,
+    )
+    params = KitBatteryNodeParams(
+        i2c_bus=1,
+        address=0x48,
+        channel=2,
+        pcb_version="v2",
+    )
+
+    driver = kit_battery_node_py.create_ads7830_driver_from_params(params)
+
+    assert driver is not None
+    assert captured == {
+        "bus_id": 1,
+        "address": 0x48,
+        "channel": 2,
+        "pcb_version": "v2",
+    }
+
+
+def test_python_base_battery_driver_close_is_best_effort():
+    class FakeDriver:
+        def __init__(self):
+            self.close_count = 0
+
+        def close(self):
+            self.close_count += 1
+
+    driver = FakeDriver()
+
+    kit_battery_node_py.close_driver(driver)
+
+    assert driver.close_count == 1

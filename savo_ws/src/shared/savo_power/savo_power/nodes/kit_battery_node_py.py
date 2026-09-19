@@ -7,14 +7,15 @@ from typing import Any
 
 from savo_power import constants as c
 from savo_power.drivers.ads7830 import (
-    Ads7830Config,
     Ads7830Driver,
+    make_ads7830_driver,
 )
 from savo_power.models.kit_battery_reading import (
     KitBatteryReading,
     make_kit_battery_error,
 )
 from savo_power.models.power_status import BatterySource
+from savo_power.policy.power_policy import apply_power_policy
 from savo_power.ros.adapters import (
     make_reading_json_message,
     reading_to_json_text,
@@ -90,15 +91,25 @@ def create_timer_period_s(rate_hz: float) -> float:
 
 def create_ads7830_driver_from_params(params: KitBatteryNodeParams) -> Ads7830Driver:
     """Create ADS7830 driver from node parameters."""
-
-    config = Ads7830Config(
+    return make_ads7830_driver(
         bus_id=params.i2c_bus,
         address=params.address,
         channel=params.channel,
         pcb_version=params.pcb_version,
     )
 
-    return Ads7830Driver(config)
+
+def close_driver(driver: object | None) -> None:
+    """Best-effort release of an ADS7830 driver."""
+    if driver is None:
+        return
+    close = getattr(driver, "close", None)
+    if not callable(close):
+        return
+    try:
+        close()
+    except Exception:  # noqa: BLE001 - shutdown remains best effort
+        pass
 
 
 def read_from_driver(driver: object) -> KitBatteryReading:
@@ -214,6 +225,15 @@ if RCLPY_AVAILABLE:
 
             try:
                 reading = read_from_driver(self._driver)
+                classified = apply_power_policy(
+                    reading,
+                    self._params.thresholds,
+                )
+                if not isinstance(classified, KitBatteryReading):
+                    raise TypeError(
+                        "base battery policy returned a non-battery reading"
+                    )
+                reading = classified
                 self._state.read_count += 1
                 self._state.last_reading = reading
                 self._state.last_error = ""
@@ -243,6 +263,12 @@ if RCLPY_AVAILABLE:
         def _on_timer(self) -> None:
             reading = self.read_once()
             self.publish_reading(reading)
+
+        def destroy_node(self) -> object:
+            """Release the base-battery bus before destroying the ROS node."""
+            close_driver(self._driver)
+            self._driver = None
+            return super().destroy_node()
 
 else:
 
@@ -289,6 +315,7 @@ __all__ = [
     "base_battery_python_node_name",
     "base_battery_topic",
     "build_startup_summary",
+    "close_driver",
     "create_ads7830_driver_from_params",
     "create_timer_period_s",
     "main",

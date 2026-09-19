@@ -69,6 +69,7 @@ void UltrasonicNode::declare_parameters()
   this->declare_parameter<int>("echo_idle_timeout_us", config_.echo_idle_timeout_us);
 
   this->declare_parameter<std::string>("output_topic", config_.output_topic);
+  this->declare_parameter<std::string>("status_topic", config_.status_topic);
 
   this->declare_parameter<bool>("publish_nan_on_error", config_.publish_nan_on_error);
   this->declare_parameter<bool>("startup_fail_is_fatal", config_.startup_fail_is_fatal);
@@ -114,6 +115,7 @@ void UltrasonicNode::load_parameters()
     30000);
 
   config_.output_topic = this->get_parameter("output_topic").as_string();
+  config_.status_topic = this->get_parameter("status_topic").as_string();
 
   config_.publish_nan_on_error = this->get_parameter("publish_nan_on_error").as_bool();
   config_.startup_fail_is_fatal = this->get_parameter("startup_fail_is_fatal").as_bool();
@@ -124,6 +126,9 @@ void UltrasonicNode::setup_interfaces()
   publisher_ = this->create_publisher<std_msgs::msg::Float32>(
     config_.output_topic,
     rclcpp::SensorDataQoS());
+  status_publisher_ = this->create_publisher<std_msgs::msg::String>(
+    config_.status_topic,
+    rclcpp::QoS(1).reliable());
 
   const auto period = std::chrono::duration_cast<std::chrono::nanoseconds>(
     std::chrono::duration<double>(1.0 / config_.rate_hz));
@@ -177,6 +182,7 @@ void UltrasonicNode::stop_reader()
 void UltrasonicNode::on_timer()
 {
   if (!reader_ || !reader_->started()) {
+    publish_status(reader_error_.empty() ? "not_started" : reader_error_);
     if (config_.publish_nan_on_error) {
       publish_distance(std::nullopt);
     }
@@ -189,6 +195,7 @@ void UltrasonicNode::on_timer()
 
 void UltrasonicNode::publish_reading(const UltrasonicReading & reading)
 {
+  publish_status(reading.error);
   if (!reading.valid) {
     if (clear_no_echo_error(reading.error)) {
       publish_distance(std::numeric_limits<double>::infinity());
@@ -211,6 +218,13 @@ void UltrasonicNode::publish_reading(const UltrasonicReading & reading)
   }
 
   publish_distance(reading.filtered_m);
+}
+
+void UltrasonicNode::publish_status(const std::string & error)
+{
+  std_msgs::msg::String message;
+  message.data = error.empty() ? "ok" : error;
+  status_publisher_->publish(message);
 }
 
 void UltrasonicNode::publish_distance(const std::optional<double> & distance_m)

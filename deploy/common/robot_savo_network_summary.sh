@@ -121,6 +121,11 @@ print_neighbor_table() {
   ip neigh show dev "${SAVO_ETH_IFACE}" || true
 }
 
+print_fastdds_shm_diagnostics() {
+  section "FastDDS SHM (read-only)"
+  python3 "${SCRIPT_DIR}/diagnose_fastdds_shm.py" || true
+}
+
 print_peer_ping() {
   if [[ "${PING_PEER}" != "1" ]]; then
     return 0
@@ -144,6 +149,7 @@ main() {
   print_link_speed
   print_kernel_settings
   print_neighbor_table
+  print_fastdds_shm_diagnostics
   print_peer_ping
 }
 

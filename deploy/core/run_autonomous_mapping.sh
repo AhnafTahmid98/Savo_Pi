@@ -6,9 +6,12 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=env_core.sh
 source "${SCRIPT_DIR}/env_core.sh"
+# shellcheck source=../common/production_geometry.sh
+source "${SAVO_ROOT}/deploy/common/production_geometry.sh"
 
 [[ "${SAVO_CONTROL_STARTUP_MODE:-STOP}" == STOP ]] || \
   savo_die "Control startup must remain STOP"
+savo_assert_production_geometry_environment
 for argument in "$@"; do
   case "${argument}" in
     control_startup_mode:=*|start_supervisor:=*|supervisor_auto_arm:=*)
@@ -16,6 +19,7 @@ for argument in "$@"; do
       ;;
   esac
 done
+savo_reject_production_geometry_arguments "$@"
 savo_assert_core_host
 savo_require_cmd python3
 savo_require_cmd ros2
@@ -36,6 +40,9 @@ exec python3 "${ownership_tool}" run-core-owner \
   --lock-file /run/robot-savo/core-owner.lock \
   -- ros2 launch savo_bringup autonomous_mapping.launch.py \
   "$@" \
+  geometry_profile:="$(savo_production_geometry_profile)" \
+  require_locked_geometry:=true \
+  allow_provisional_geometry:=false \
   control_startup_mode:="${SAVO_CONTROL_STARTUP_MODE:-STOP}" \
   start_supervisor:=false \
   supervisor_auto_arm:=false

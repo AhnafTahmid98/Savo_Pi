@@ -6,11 +6,14 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=env_edge.sh
 source "${SCRIPT_DIR}/env_edge.sh"
+# shellcheck source=../common/production_geometry.sh
+source "${SAVO_ROOT}/deploy/common/production_geometry.sh"
 
 ROBOT_MODE="${SAVO_ROBOT_MODE:-safe_idle}"
 BRINGUP_PROFILE="${SAVO_BRINGUP_PROFILE:-lidar_only}"
 
 main() {
+  savo_assert_production_geometry_environment
   savo_assert_edge_host
   savo_require_cmd ros2
   savo_require_dir "${SAVO_WS}"
@@ -27,8 +30,9 @@ main() {
     host_role:=edge \
     robot_mode:="${ROBOT_MODE}" \
     bringup_profile:="${BRINGUP_PROFILE}" \
-    require_locked_geometry:="${SAVO_REQUIRE_LOCKED_GEOMETRY:-true}" \
-    allow_provisional_geometry:="${SAVO_ALLOW_PROVISIONAL_GEOMETRY:-false}" \
+    geometry_profile:="$(savo_production_geometry_profile)" \
+    require_locked_geometry:=true \
+    allow_provisional_geometry:=false \
     d435_voxel_validated:="${SAVO_D435_VOXEL_VALIDATED:-false}" \
     start_realsense:="${SAVO_START_REALSENSE:-true}" \
     start_vo:="${SAVO_START_VO:-true}" \

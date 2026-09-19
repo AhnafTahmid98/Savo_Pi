@@ -25,6 +25,6 @@ Live mapping starts SLAM as `map -> odom` owner. Saved-map navigation starts AMC
 
 ## Geometry calibration state
 
-Description, base, localization YAML, Python defaults, and C++ defaults now agree on wheel centers X `+/-0.080 m`, Y `+/-0.108 m`, wheelbase `0.160 m`, track `0.216 m`, and mecanum `k=0.188 m`. The geometry profile remains provisional because effective loaded radius, encoder signs/counts, IMU +X/+Y orientation, and runtime odometry still require physical validation.
+Description, base, localization YAML, Python defaults, and C++ defaults agree on wheel centers X `+/-0.080 m`, Y `+/-0.108 m`, wheelbase `0.160 m`, track `0.216 m`, and mecanum `k=0.188 m`. The canonical geometry profile is locked at revision 5. Effective loaded rolling behavior, encoder counts/polarity, and runtime odometry remain separate localization regression work rather than geometry-lock blockers.
 
 Source tests validate frames, configuration, and health contracts. Hardware work remains for encoder pin/polarity/counts, wheel effective radius, track/wheelbase, IMU axis/calibration, covariance, EKF drift, VO scale/latency, TF uniqueness, and transitions between SLAM and AMCL.

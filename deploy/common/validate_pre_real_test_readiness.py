@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import importlib.util
 import json
 import os
 import re
@@ -43,6 +44,8 @@ REQUIRED = (
     "deploy/systemd/robot-savo.paths.env.in",
     "deploy/systemd/robot-savo-tmpfiles.conf",
     "deploy/common/runtime_ownership.py",
+    "deploy/common/production_geometry.sh",
+    "deploy/common/diagnose_fastdds_shm.py",
     "deploy/common/validate_deployment_assets.py",
     "deploy/core/run_autonomous_mapping.sh",
     "savo_ws/src/edge/savo_ui/scripts/install_savo_ui_service.sh",
@@ -79,7 +82,6 @@ REQUIRED = (
 )
 
 PHYSICAL_BLOCKERS = (
-    "AM-0B geometry measurement and lock",
     "/var/lib/robot_savo preparation on core",
     "target Pi dependency installation",
     "core/edge safe-idle validation",
@@ -135,6 +137,44 @@ class Check:
     name: str
     status: str
     detail: str
+
+
+def validate_production_geometry(
+    profile_path: Path,
+    geometry_module_path: Path | None = None,
+) -> Check:
+    """Validate the canonical artifact with the production geometry contract."""
+    if geometry_module_path is None:
+        geometry_module_path = (
+            profile_path.parents[2] / "scripts/geometry_profile.py"
+        )
+    try:
+        spec = importlib.util.spec_from_file_location(
+            "savo_description_geometry_profile",
+            geometry_module_path,
+        )
+        if spec is None or spec.loader is None:
+            raise RuntimeError("could not load geometry validation module")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        profile = module.load_profile(profile_path)
+        module.validate_profile(
+            profile,
+            require_locked=True,
+            allow_provisional=False,
+        )
+        metadata = profile["metadata"]
+        if metadata.get("profile_id") != "robot_savo_core_v1":
+            raise ValueError("unexpected production geometry profile_id")
+        if metadata.get("geometry_revision") != 5:
+            raise ValueError("production geometry revision must be 5")
+        return Check(
+            "geometry_locked",
+            "PASS",
+            "locked production geometry revision 5",
+        )
+    except Exception as error:  # noqa: BLE001 - readiness must fail closed
+        return Check("geometry_locked", "FAIL", str(error))
 
 
 class Validator:
@@ -370,14 +410,20 @@ class Validator:
             "STOP is the deployment default",
         )
 
+        geometry_check = validate_production_geometry(
+            self.root / (
+                "savo_ws/src/shared/savo_description/config/profiles/"
+                "robot_savo_core_v1.yaml"
+            )
+        )
+        self.add(
+            geometry_check.name,
+            geometry_check.status,
+            geometry_check.detail,
+        )
+
         run_core_path = self.root / "deploy/core/run_core.sh"
         run_core = run_core_path.read_text(encoding="utf-8") if run_core_path.is_file() else ""
-        self.add(
-            "geometry_provisional",
-            "PASS" if "allow_provisional_geometry:=\"${SAVO_ALLOW_PROVISIONAL_GEOMETRY:-false}\"" in run_core
-            else "FAIL",
-            "BLOCKED_FOR_MOTION: geometry_not_locked",
-        )
         self.add(
             "voxel_default",
             "PASS" if "d435_voxel_validated:=\"${SAVO_D435_VOXEL_VALIDATED:-false}\"" in run_core
@@ -625,6 +671,10 @@ class Validator:
             overall = "PASS"
             exit_code = 0
 
+        geometry_failed = any(
+            check.name == "geometry_locked" and check.status != "PASS"
+            for check in self.checks
+        )
         report = {
             "schema_version": 2,
             "generated_utc": datetime.now(UTC).isoformat(),
@@ -632,7 +682,9 @@ class Validator:
             "checks": [asdict(check) for check in self.checks],
             "physical_blockers": list(PHYSICAL_BLOCKERS),
             "external_blockers": [check.detail for check in blockers],
-            "blocked_for_motion": "geometry_not_locked",
+            "blocked_for_motion": (
+                "geometry_not_locked" if geometry_failed else None
+            ),
         }
         output_dir.mkdir(parents=True, exist_ok=True)
         (output_dir / "pre_real_test_readiness.json").write_text(

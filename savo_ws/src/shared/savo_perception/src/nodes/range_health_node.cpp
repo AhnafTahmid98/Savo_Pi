@@ -78,6 +78,7 @@ void RangeHealthNode::declare_parameters()
   declare_parameter<std::string>("tof_left_topic", topics::kTofLeftM);
   declare_parameter<std::string>("tof_right_topic", topics::kTofRightM);
   declare_parameter<std::string>("ultrasonic_front_topic", topics::kUltrasonicFrontM);
+  declare_parameter<std::string>("ultrasonic_status_topic", topics::kUltrasonicStatus);
 
   declare_parameter<std::string>("range_health_topic", topics::kRangeHealth);
   declare_parameter<std::string>("sensor_status_topic", topics::kSensorStatus);
@@ -118,6 +119,7 @@ void RangeHealthNode::load_parameters()
   tof_left_topic_ = get_parameter("tof_left_topic").as_string();
   tof_right_topic_ = get_parameter("tof_right_topic").as_string();
   ultrasonic_front_topic_ = get_parameter("ultrasonic_front_topic").as_string();
+  ultrasonic_status_topic_ = get_parameter("ultrasonic_status_topic").as_string();
 
   range_health_topic_ = get_parameter("range_health_topic").as_string();
   sensor_status_topic_ = get_parameter("sensor_status_topic").as_string();
@@ -214,6 +216,12 @@ void RangeHealthNode::setup_interfaces()
       [this](const std_msgs::msg::Float32::SharedPtr msg) {
         on_ultrasonic_front(msg);
       });
+    ultrasonic_status_sub_ = create_subscription<std_msgs::msg::String>(
+      ultrasonic_status_topic_,
+      rclcpp::QoS(1).reliable(),
+      [this](const std_msgs::msg::String::SharedPtr msg) {
+        on_ultrasonic_status(msg);
+      });
   }
 
   const auto status_qos = rclcpp::QoS(10).reliable();
@@ -278,6 +286,12 @@ void RangeHealthNode::on_ultrasonic_front(const std_msgs::msg::Float32::SharedPt
   ultrasonic_front_ = sample_from_value("ultrasonic_front", msg->data, "ultrasonic_front");
 }
 
+void RangeHealthNode::on_ultrasonic_status(const std_msgs::msg::String::SharedPtr msg)
+{
+  ultrasonic_error_ = msg->data == "ok" ? "" : msg->data;
+  ultrasonic_status_receipt_ = std::chrono::steady_clock::now();
+}
+
 void RangeHealthNode::on_timer()
 {
   const auto health = current_health();
@@ -319,6 +333,22 @@ RangeSample RangeHealthNode::missing_sample(
   return sample;
 }
 
+std::string RangeHealthNode::current_ultrasonic_error(
+  const std::chrono::steady_clock::time_point now) const
+{
+  if (ultrasonic_error_.empty() || !ultrasonic_status_receipt_.has_value()) {
+    return "";
+  }
+
+  const double age_s = std::chrono::duration<double>(
+    now - *ultrasonic_status_receipt_).count();
+  if (age_s < 0.0 || age_s > stale_timeout_s_) {
+    return "";
+  }
+
+  return ultrasonic_error_;
+}
+
 std::vector<SensorHealth> RangeHealthNode::current_health() const
 {
   const auto now = std::chrono::steady_clock::now();
@@ -330,7 +360,12 @@ std::vector<SensorHealth> RangeHealthNode::current_health() const
   };
 
   if (use_ultrasonic_) {
-    health.push_back(make_sensor_health(ultrasonic_front_, stale_timeout_s_, now));
+    auto ultrasonic_sample = ultrasonic_front_;
+    const auto ultrasonic_error = current_ultrasonic_error(now);
+    if (!ultrasonic_sample.valid && !ultrasonic_error.empty()) {
+      ultrasonic_sample.error = ultrasonic_error;
+    }
+    health.push_back(make_sensor_health(ultrasonic_sample, stale_timeout_s_, now));
   }
 
   return health;

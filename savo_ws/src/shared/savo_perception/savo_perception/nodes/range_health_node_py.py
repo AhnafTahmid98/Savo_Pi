@@ -9,7 +9,8 @@ import json
 import math
 import time
 from collections import deque
-from typing import Dict
+from dataclasses import replace
+from typing import Dict, Optional
 
 try:
     import rclpy
@@ -34,6 +35,22 @@ from savo_perception.ros.qos_profiles import (
 )
 
 
+def fresh_ultrasonic_diagnostic_error(
+    cause: str,
+    *,
+    received_mono_s: Optional[float],
+    now_mono_s: float,
+    stale_timeout_s: float,
+) -> str:
+    """Return a diagnostic cause only while its receipt is current."""
+    if not cause or received_mono_s is None:
+        return ""
+    age_s = now_mono_s - received_mono_s
+    if age_s < 0.0 or age_s > stale_timeout_s:
+        return ""
+    return cause
+
+
 class RangeHealthNodePy(Node):
     def __init__(self) -> None:
         super().__init__(f"{NODE_NAME_RANGE_HEALTH}_py")
@@ -44,6 +61,10 @@ class RangeHealthNodePy(Node):
         self.declare_parameter(
             "ultrasonic_front_topic",
             "/savo_perception/range/front_ultrasonic_m",
+        )
+        self.declare_parameter(
+            "ultrasonic_status_topic",
+            "/savo_perception/ultrasonic_status",
         )
         self.declare_parameter("range_health_topic", "/savo_perception/range_health")
         self.declare_parameter("publish_hz", 2.0)
@@ -119,6 +140,8 @@ class RangeHealthNodePy(Node):
             "tof_right": self._missing_sample("tof_right", required=True),
             "ultrasonic_front": self._missing_sample("ultrasonic_front", required=False),
         }
+        self.ultrasonic_error = ""
+        self.ultrasonic_status_received_mono_s: Optional[float] = None
 
         self.create_subscription(
             Float32,
@@ -145,6 +168,12 @@ class RangeHealthNodePy(Node):
                 lambda msg: self._on_range_msg("ultrasonic_front", msg, required=False),
                 qos_range_sensor(),
             )
+            self.create_subscription(
+                String,
+                self.get_parameter("ultrasonic_status_topic").value,
+                self._on_ultrasonic_status,
+                qos_state_string(depth=1),
+            )
 
         self.pub = self.create_publisher(
             String,
@@ -166,6 +195,11 @@ class RangeHealthNodePy(Node):
         self._record_receipt(sensor_name)
         value = getattr(msg, "data", math.nan)
         self.samples[sensor_name] = self._sample_from_value(sensor_name, value, required=required)
+
+    def _on_ultrasonic_status(self, msg) -> None:
+        cause = str(getattr(msg, "data", ""))
+        self.ultrasonic_error = "" if cause == "ok" else cause
+        self.ultrasonic_status_received_mono_s = time.monotonic()
 
     def _record_receipt(self, sensor_name: str) -> None:
         now_s = time.monotonic()
@@ -211,6 +245,22 @@ class RangeHealthNodePy(Node):
             for name, sample in self.samples.items()
             if name != "ultrasonic_front" or self.params.use_ultrasonic
         }
+        ultrasonic_cause = fresh_ultrasonic_diagnostic_error(
+            self.ultrasonic_error,
+            received_mono_s=self.ultrasonic_status_received_mono_s,
+            now_mono_s=now_s,
+            stale_timeout_s=self.params.stale_timeout_s,
+        )
+        ultrasonic_sample = enabled_samples.get("ultrasonic_front")
+        if (
+            ultrasonic_sample is not None
+            and not ultrasonic_sample.valid
+            and ultrasonic_cause
+        ):
+            enabled_samples["ultrasonic_front"] = replace(
+                ultrasonic_sample,
+                error=ultrasonic_cause,
+            )
         health = {
             name: SensorHealth.from_sample(
                 sample,

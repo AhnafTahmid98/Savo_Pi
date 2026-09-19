@@ -38,7 +38,6 @@ inline constexpr double kBaseBatteryFullVoltageDefault = 8.40;
 inline constexpr double kBaseBatteryLowSocDefault = 20.0;
 inline constexpr double kBaseBatteryFullSocDefault = 95.0;
 
-inline constexpr double kSampleRateHzDefault = 1.0;
 inline constexpr double kHealthPublishHzDefault = 1.0;
 inline constexpr double kDashboardPublishHzDefault = 1.0;
 inline constexpr double kStaleTimeoutSDefault = 5.0;

@@ -1,6 +1,9 @@
 """Launch Robot Savo's guarded core-side autonomous mapping stack."""
 
+from pathlib import Path
 import re
+
+from ament_index_python.packages import get_package_share_directory
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
@@ -31,6 +34,26 @@ def _validate_arguments(context):
         .strip()
         .upper()
     )
+    require_locked_geometry = (
+        LaunchConfiguration("require_locked_geometry")
+        .perform(context)
+        .strip()
+        .lower()
+    )
+    allow_provisional_geometry = (
+        LaunchConfiguration("allow_provisional_geometry")
+        .perform(context)
+        .strip()
+        .lower()
+    )
+    geometry_profile = Path(
+        LaunchConfiguration("geometry_profile").perform(context)
+    ).resolve()
+    canonical_geometry_profile = Path(
+        get_package_share_directory("savo_description")
+    ).joinpath(
+        "config", "profiles", "robot_savo_core_v1.yaml"
+    ).resolve()
 
     if not _MAP_ID_PATTERN.fullmatch(map_id):
         raise RuntimeError(
@@ -41,6 +64,21 @@ def _validate_arguments(context):
     if control_mode != "STOP":
         raise RuntimeError(
             "autonomous mapping must start control in STOP"
+        )
+
+    if require_locked_geometry not in {"true", "1", "yes", "on"}:
+        raise RuntimeError(
+            "autonomous mapping production requires require_locked_geometry:=true"
+        )
+
+    if allow_provisional_geometry not in {"false", "0", "no", "off"}:
+        raise RuntimeError(
+            "autonomous mapping production forbids allow_provisional_geometry:=true"
+        )
+
+    if geometry_profile != canonical_geometry_profile:
+        raise RuntimeError(
+            "autonomous mapping requires the canonical production geometry profile"
         )
 
     return [

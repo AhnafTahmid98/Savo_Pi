@@ -134,6 +134,13 @@ class UpsHatDriver:
                 str(exc),
             )
 
+    def close(self) -> None:
+        """Release the underlying bus when it provides close()."""
+
+        close = getattr(self._bus, "close", None)
+        if callable(close):
+            close()
+
 
 def make_ups_hat_driver(
     *,
@@ -144,14 +151,17 @@ def make_ups_hat_driver(
     """Create a UPS HAT driver using a real SmbusAdapter."""
 
     bus = SmbusAdapter(bus_id)
-
-    return UpsHatDriver(
-        bus=bus,
-        config=UpsHatConfig(
-            source=normalize_battery_source(source),
-            address=address,
-        ),
-    )
+    try:
+        return UpsHatDriver(
+            bus=bus,
+            config=UpsHatConfig(
+                source=normalize_battery_source(source),
+                address=address,
+            ),
+        )
+    except Exception:
+        bus.close()
+        raise
 
 
 def make_core_ups_driver(

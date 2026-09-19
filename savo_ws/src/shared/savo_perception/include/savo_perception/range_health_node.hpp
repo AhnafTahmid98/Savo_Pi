@@ -37,6 +37,7 @@ private:
   void on_tof_left(const std_msgs::msg::Float32::SharedPtr msg);
   void on_tof_right(const std_msgs::msg::Float32::SharedPtr msg);
   void on_ultrasonic_front(const std_msgs::msg::Float32::SharedPtr msg);
+  void on_ultrasonic_status(const std_msgs::msg::String::SharedPtr msg);
 
   void on_timer();
   void on_heartbeat_timer();
@@ -50,6 +51,8 @@ private:
     const std::string & sensor_name,
     const std::string & reason,
     bool stale_now) const;
+  [[nodiscard]] std::string current_ultrasonic_error(
+    std::chrono::steady_clock::time_point now) const;
 
   [[nodiscard]] std::vector<SensorHealth> current_health() const;
   [[nodiscard]] bool overall_ok(const std::vector<SensorHealth> & health) const;
@@ -81,6 +84,7 @@ private:
   std::string tof_left_topic_{topics::kTofLeftM};
   std::string tof_right_topic_{topics::kTofRightM};
   std::string ultrasonic_front_topic_{topics::kUltrasonicFrontM};
+  std::string ultrasonic_status_topic_{topics::kUltrasonicStatus};
 
   std::string range_health_topic_{topics::kRangeHealth};
   std::string sensor_status_topic_{topics::kSensorStatus};
@@ -117,6 +121,8 @@ private:
   RangeSample tof_left_;
   RangeSample tof_right_;
   RangeSample ultrasonic_front_;
+  std::string ultrasonic_error_;
+  std::optional<std::chrono::steady_clock::time_point> ultrasonic_status_receipt_;
   std::map<
     std::string,
     std::deque<std::chrono::steady_clock::time_point>> receipt_times_;
@@ -127,6 +133,7 @@ private:
   rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr tof_left_sub_;
   rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr tof_right_sub_;
   rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr ultrasonic_front_sub_;
+  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr ultrasonic_status_sub_;
 
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr range_health_pub_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr sensor_status_pub_;

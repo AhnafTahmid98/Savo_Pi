@@ -17,6 +17,14 @@ def generate_launch_description() -> LaunchDescription:
             [FindPackageShare("savo_bringup"), "launch", "core_bringup.launch.py"]
         )
     )
+    default_geometry_profile = PathJoinSubstitution(
+        [
+            FindPackageShare("savo_description"),
+            "config",
+            "profiles",
+            "robot_savo_core_v1.yaml",
+        ]
+    )
     return LaunchDescription(
         [
             DeclareLaunchArgument("map_id", default_value="robot_savo_map"),
@@ -25,6 +33,9 @@ def generate_launch_description() -> LaunchDescription:
                 default_value="/var/lib/robot_savo/maps/sessions",
             ),
             DeclareLaunchArgument("bringup_profile", default_value="lidar_only"),
+            DeclareLaunchArgument(
+                "geometry_profile", default_value=default_geometry_profile
+            ),
             DeclareLaunchArgument("require_locked_geometry", default_value="true"),
             DeclareLaunchArgument(
                 "allow_provisional_geometry", default_value="false"
@@ -38,6 +49,7 @@ def generate_launch_description() -> LaunchDescription:
                     "map_id": LaunchConfiguration("map_id"),
                     "map_output_root": LaunchConfiguration("map_output_root"),
                     "bringup_profile": LaunchConfiguration("bringup_profile"),
+                    "geometry_profile": LaunchConfiguration("geometry_profile"),
                     "require_locked_geometry": LaunchConfiguration(
                         "require_locked_geometry"
                     ),

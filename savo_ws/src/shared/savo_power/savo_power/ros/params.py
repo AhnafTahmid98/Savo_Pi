@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, is_dataclass
+from dataclasses import asdict, dataclass, field, is_dataclass
 from enum import Enum
-from typing import Any, Mapping
+from typing import Mapping
 
 from savo_power import constants as c
 from savo_power.models.kit_battery_reading import normalize_pcb_version
@@ -22,8 +22,10 @@ class UpsNodeParams:
     source: BatterySource
     i2c_bus: int = c.DEFAULT_I2C_BUS
     address: int = c.UPS_HAT_DEFAULT_ADDRESS
-    sample_rate_hz: float = c.DEFAULT_SAMPLE_RATE_HZ
     publish_rate_hz: float = c.DEFAULT_PUBLISH_RATE_HZ
+    thresholds: PowerPolicyThresholds = field(
+        default_factory=PowerPolicyThresholds
+    )
 
     def to_dict(self) -> dict[str, object]:
         return to_jsonable(self)  # type: ignore[return-value]
@@ -37,8 +39,10 @@ class KitBatteryNodeParams:
     address: int = c.ADS7830_DEFAULT_ADDRESS
     channel: int = c.ADS7830_DEFAULT_CHANNEL
     pcb_version: str = c.ADS7830_DEFAULT_PCB_VERSION
-    sample_rate_hz: float = c.DEFAULT_SAMPLE_RATE_HZ
     publish_rate_hz: float = c.DEFAULT_PUBLISH_RATE_HZ
+    thresholds: PowerPolicyThresholds = field(
+        default_factory=PowerPolicyThresholds
+    )
 
     def to_dict(self) -> dict[str, object]:
         return to_jsonable(self)  # type: ignore[return-value]
@@ -352,14 +356,6 @@ def read_ups_node_params(
             c.PARAM_UPS_ADDRESS,
             c.UPS_HAT_DEFAULT_ADDRESS,
         ),
-        sample_rate_hz=normalize_rate_hz(
-            declare_and_get_parameter(
-                node,
-                c.PARAM_SAMPLE_RATE_HZ,
-                c.DEFAULT_SAMPLE_RATE_HZ,
-            ),
-            c.DEFAULT_SAMPLE_RATE_HZ,
-        ),
         publish_rate_hz=normalize_rate_hz(
             declare_and_get_parameter(
                 node,
@@ -368,6 +364,7 @@ def read_ups_node_params(
             ),
             c.DEFAULT_PUBLISH_RATE_HZ,
         ),
+        thresholds=read_power_policy_thresholds(node),
     )
 
 
@@ -397,14 +394,6 @@ def read_kit_battery_node_params(node: object) -> KitBatteryNodeParams:
                 c.ADS7830_DEFAULT_PCB_VERSION,
             )
         ),
-        sample_rate_hz=normalize_rate_hz(
-            declare_and_get_parameter(
-                node,
-                c.PARAM_SAMPLE_RATE_HZ,
-                c.DEFAULT_SAMPLE_RATE_HZ,
-            ),
-            c.DEFAULT_SAMPLE_RATE_HZ,
-        ),
         publish_rate_hz=normalize_rate_hz(
             declare_and_get_parameter(
                 node,
@@ -413,6 +402,7 @@ def read_kit_battery_node_params(node: object) -> KitBatteryNodeParams:
             ),
             c.DEFAULT_PUBLISH_RATE_HZ,
         ),
+        thresholds=read_power_policy_thresholds(node),
     )
 
 

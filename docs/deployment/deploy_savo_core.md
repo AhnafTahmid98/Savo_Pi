@@ -108,9 +108,7 @@ bash deploy/common/validate_full_bringup.sh
 bash deploy/common/validate_pre_real_test_readiness.sh
 ```
 
-`validate_full_bringup.sh` must pass. The aggregate validator may report a hardware or measurement `BLOCKED` condition, but it must not report a source-contract `FAIL`.
-
-A geometry block is expected while the active geometry profile remains provisional. Do not remove the gate to make the validator green.
+`validate_full_bringup.sh` must pass. The aggregate validator may report an external/hardware `BLOCKED` condition, but it must not report a source-contract `FAIL`. The canonical revision-5 geometry check must report `geometry_locked: PASS`; missing, malformed, provisional, or calibration-blocked geometry is a failure and motion block.
 
 ## 6. Review production environment
 
@@ -186,7 +184,7 @@ The default launch must remain:
 - Visual odometry fusion disabled
 - D435 voxel validation false
 
-If geometry is still provisional, a motion-capable production path should fail closed. Record that block rather than bypassing it.
+If a selected geometry artifact is provisional or differs from the canonical locked revision, a motion-capable production path must fail closed. Record that block rather than bypassing it.
 
 ## 9. Enable the service after verification
 

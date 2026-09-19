@@ -469,7 +469,8 @@ period; delayed TF does not resend the navigation goal.
 
 AM-8 combined map/location verification, approval, and atomic release are
 implemented and bind every release to an immutable geometry-profile artifact
-and digest. Geometry revision 2 remains provisional, so production release is
-fail-closed until the profile is locked. Existing releases retain their
-original geometry digest; do not rewrite them after a geometry revision.
-Create and revalidate a new map/location release after geometry is locked.
+and digest. Canonical production geometry is locked at revision 5, and release
+remains fail-closed for any missing, malformed, provisional, or mismatched
+artifact. Existing releases retain their original geometry digest; do not
+rewrite them after a geometry revision. Create and revalidate a new
+map/location release after every geometry revision.

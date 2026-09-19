@@ -7,6 +7,7 @@
 
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/float32.hpp"
+#include "std_msgs/msg/string.hpp"
 
 #include "savo_perception/constants.hpp"
 #include "savo_perception/topic_names.hpp"
@@ -35,6 +36,7 @@ struct SAVO_PERCEPTION_PUBLIC UltrasonicNodeConfig
   int echo_idle_timeout_us{30000};
 
   std::string output_topic{topics::kUltrasonicFrontM};
+  std::string status_topic{topics::kUltrasonicStatus};
 
   bool publish_nan_on_error{constants::kPublishNanOnErrorDefault};
   bool startup_fail_is_fatal{constants::kStartupFailIsFatalDefault};
@@ -57,6 +59,7 @@ private:
 
   void publish_reading(const UltrasonicReading & reading);
   void publish_distance(const std::optional<double> & distance_m);
+  void publish_status(const std::string & error);
 
   [[nodiscard]] UltrasonicConfig make_reader_config() const;
 
@@ -66,6 +69,7 @@ private:
   std::string reader_error_;
 
   rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr publisher_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr status_publisher_;
   rclcpp::TimerBase::SharedPtr timer_;
 };
 

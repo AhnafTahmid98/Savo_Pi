@@ -17,7 +17,6 @@ namespace params
 
 inline constexpr const char * kI2cBus = "i2c_bus";
 inline constexpr const char * kDeviceAddress = "device_address";
-inline constexpr const char * kSampleRateHz = "sample_rate_hz";
 inline constexpr const char * kPublishRateHz = "publish_rate_hz";
 
 inline constexpr const char * kBatterySource = "battery_source";
@@ -131,7 +130,6 @@ struct UpsNodeParams
   std::uint8_t device_address{constants::kUpsHatAddrDefault};
   BatterySource source{BatterySource::CORE_UPS};
 
-  double sample_rate_hz{constants::kSampleRateHzDefault};
   double publish_rate_hz{constants::kHealthPublishHzDefault};
 
   PowerPolicyThresholds thresholds{};
@@ -144,7 +142,6 @@ struct BaseBatteryNodeParams
   std::uint8_t channel{constants::kBaseBatteryAdcChannelDefault};
   Ads7830PcbVersion pcb_version{Ads7830PcbVersion::V2};
 
-  double sample_rate_hz{constants::kSampleRateHzDefault};
   double publish_rate_hz{constants::kHealthPublishHzDefault};
 
   PowerPolicyThresholds thresholds{};

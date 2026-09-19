@@ -6,6 +6,8 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=env_core.sh
 source "${SCRIPT_DIR}/env_core.sh"
+# shellcheck source=../common/production_geometry.sh
+source "${SAVO_ROOT}/deploy/common/production_geometry.sh"
 
 ROBOT_MODE="${SAVO_ROBOT_MODE:-safe_idle}"
 BRINGUP_PROFILE="${SAVO_BRINGUP_PROFILE:-lidar_only}"
@@ -19,6 +21,7 @@ SUPERVISOR_STATE_ROOT="${SAVO_SUPERVISOR_STATE_ROOT:-${STATE_ROOT}/supervisor}"
 ACTIVE_MAP_CONTRACT="${SAVO_ACTIVE_MAP_CONTRACT:-${PRODUCTION_MAP_ROOT}/active_map.yaml}"
 
 main() {
+  savo_assert_production_geometry_environment
   savo_assert_core_host
   savo_require_cmd python3
   savo_require_cmd ros2
@@ -74,8 +77,9 @@ main() {
     locations_database_path:="${LOCATION_STATE_ROOT}/locations.db" \
     locations_releases_root:="${LOCATION_STATE_ROOT}/releases" \
     supervisor_state_path:="${SUPERVISOR_STATE_ROOT}/system_state.json" \
-    require_locked_geometry:="${SAVO_REQUIRE_LOCKED_GEOMETRY:-true}" \
-    allow_provisional_geometry:="${SAVO_ALLOW_PROVISIONAL_GEOMETRY:-false}" \
+    geometry_profile:="$(savo_production_geometry_profile)" \
+    require_locked_geometry:=true \
+    allow_provisional_geometry:=false \
     d435_voxel_validated:="${SAVO_D435_VOXEL_VALIDATED:-false}" \
     control_startup_mode:="${SAVO_CONTROL_STARTUP_MODE:-STOP}" \
     localization_use_vo:="${SAVO_LOCALIZATION_USE_VO:-true}" \

@@ -2,6 +2,8 @@ import inspect
 import py_compile
 from pathlib import Path
 
+import pytest
+
 from savo_power.drivers import ads7830, smbus_adapter, ups_hat
 from savo_power.models import kit_battery_reading, ups_reading
 
@@ -40,6 +42,98 @@ def test_ups_hat_driver_exports_driver_or_factory_symbol():
         "ups" in name.lower() and "driver" in name.lower()
         for name in names
     )
+
+
+def test_ups_hat_driver_close_releases_its_bus():
+    class FakeBus:
+        def __init__(self):
+            self.close_count = 0
+
+        def read_word_data(self, _address, _register):
+            return 0
+
+        def close(self):
+            self.close_count += 1
+
+    bus = FakeBus()
+    driver = ups_hat.UpsHatDriver(
+        bus,
+        ups_hat.UpsHatConfig(source="core_ups"),
+    )
+
+    driver.close()
+
+    assert bus.close_count == 1
+
+
+def test_ups_hat_factory_closes_bus_if_driver_construction_fails(monkeypatch):
+    class FakeBus:
+        def __init__(self, _bus_id):
+            self.close_count = 0
+
+        def close(self):
+            self.close_count += 1
+
+    buses = []
+
+    def fake_bus_factory(bus_id):
+        bus = FakeBus(bus_id)
+        buses.append(bus)
+        return bus
+
+    monkeypatch.setattr(ups_hat, "SmbusAdapter", fake_bus_factory)
+
+    with pytest.raises(ValueError, match="UPS HAT source"):
+        ups_hat.make_ups_hat_driver(source="base_battery")
+
+    assert len(buses) == 1
+    assert buses[0].close_count == 1
+
+
+def test_ads7830_driver_close_releases_its_bus():
+    class FakeBus:
+        def __init__(self):
+            self.close_count = 0
+
+        def write_byte(self, _address, _value):
+            pass
+
+        def read_byte(self, _address):
+            return 0
+
+        def close(self):
+            self.close_count += 1
+
+    bus = FakeBus()
+    driver = ads7830.Ads7830Driver(bus)
+
+    driver.close()
+
+    assert bus.close_count == 1
+
+
+def test_ads7830_factory_closes_bus_if_driver_construction_fails(monkeypatch):
+    class FakeBus:
+        def __init__(self, _bus_id):
+            self.close_count = 0
+
+        def close(self):
+            self.close_count += 1
+
+    buses = []
+
+    def fake_bus_factory(bus_id):
+        bus = FakeBus(bus_id)
+        buses.append(bus)
+        return bus
+
+    monkeypatch.setattr(ads7830, "SmbusAdapter", fake_bus_factory)
+
+    with pytest.raises(ValueError, match="channel"):
+        ads7830.make_ads7830_driver(channel=99)
+
+    assert len(buses) == 1
+    assert buses[0].close_count == 1
 
 
 def test_ads7830_driver_exports_known_dryrun_helpers():

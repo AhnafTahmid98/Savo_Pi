@@ -116,7 +116,7 @@ Implemented with PC evidence/earlier baseline; GPIO signs, IMU orientation, EKF/
 
 ## Known limitations and remaining validation
 
-Geometry remains provisional despite synchronized wheel centers: CPR/polarity, loaded radius/slip, covariance, and BNO055 +X/+Y orientation need hardware validation. VO scale, timestamps, dropout/reseed, and EKF interaction also require guarded hardware validation; the launch default is not acceptance evidence.
+Canonical geometry is locked at revision 5. Encoder CPR/polarity, loaded rolling behavior/slip, covariance, and localization runtime performance still require guarded regression; those runtime checks do not make the geometry artifact provisional. VO scale, timestamps, dropout/reseed, and EKF interaction also require guarded hardware validation; the launch default is not acceptance evidence.
 
 ## Change-control considerations
 

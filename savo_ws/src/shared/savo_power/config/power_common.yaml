@@ -7,7 +7,6 @@
     ads7830_channel: 2
     ads7830_pcb_version: "v2"
 
-    sample_rate_hz: 1.0
     publish_rate_hz: 1.0
     stale_timeout_s: 5.0
 

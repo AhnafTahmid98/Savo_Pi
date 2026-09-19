@@ -67,6 +67,7 @@ ultrasonic_node:
     echo_idle_timeout_us: 30000
 
     output_topic: "/savo_perception/range/front_ultrasonic_m"
+    status_topic: "/savo_perception/ultrasonic_status"
 
     publish_nan_on_error: true
     startup_fail_is_fatal: false
@@ -90,6 +91,7 @@ ultrasonic_node_py:
     echo_idle_timeout_us: 30000
 
     output_topic: "/savo_perception/range/front_ultrasonic_m"
+    status_topic: "/savo_perception/ultrasonic_status"
 
     publish_nan_on_error: true
     startup_fail_is_fatal: false
@@ -228,6 +230,7 @@ range_health_node:
     tof_left_topic: "/savo_perception/range/left_m"
     tof_right_topic: "/savo_perception/range/right_m"
     ultrasonic_front_topic: "/savo_perception/range/front_ultrasonic_m"
+    ultrasonic_status_topic: "/savo_perception/ultrasonic_status"
 
     range_health_topic: "/savo_perception/range_health"
     sensor_status_topic: "/savo_perception/sensor_status"
@@ -268,6 +271,7 @@ range_health_node_py:
     tof_left_topic: "/savo_perception/range/left_m"
     tof_right_topic: "/savo_perception/range/right_m"
     ultrasonic_front_topic: "/savo_perception/range/front_ultrasonic_m"
+    ultrasonic_status_topic: "/savo_perception/ultrasonic_status"
 
     range_health_topic: "/savo_perception/range_health"
     sensor_status_topic: "/savo_perception/sensor_status"

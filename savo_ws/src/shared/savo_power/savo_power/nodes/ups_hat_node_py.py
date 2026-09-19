@@ -3,20 +3,25 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable
 
 from savo_power import constants as c
 from savo_power.drivers.ups_hat import (
-    UpsHatConfig,
     UpsHatDriver,
+    make_ups_hat_driver,
 )
 from savo_power.models.power_status import (
     BatterySource,
+    PowerState,
     normalize_battery_source,
 )
 from savo_power.models.ups_reading import (
     UpsReading,
     make_ups_error,
+)
+from savo_power.policy.power_policy import (
+    PowerPolicyThresholds,
+    apply_power_policy,
 )
 from savo_power.ros.adapters import (
     make_reading_json_message,
@@ -31,7 +36,6 @@ from savo_power.ros.qos_profiles import power_sensor_qos
 from savo_power.utils.logging import (
     get_node_logger,
     log_error,
-    log_exception,
     log_info,
     log_power_reading,
     log_startup,
@@ -127,14 +131,60 @@ def create_timer_period_s(rate_hz: float) -> float:
 
 def create_ups_driver_from_params(params: UpsNodeParams) -> UpsHatDriver:
     """Create UPS HAT driver from node parameters."""
-
-    config = UpsHatConfig(
+    return make_ups_hat_driver(
         source=params.source,
         bus_id=params.i2c_bus,
         address=params.address,
     )
 
-    return UpsHatDriver(config)
+
+def apply_configured_policy(
+    reading: UpsReading,
+    thresholds: PowerPolicyThresholds,
+) -> UpsReading:
+    """Classify a UPS reading using the node's canonical thresholds."""
+    classified = apply_power_policy(reading, thresholds)
+    if not isinstance(classified, UpsReading):
+        raise TypeError("UPS policy returned a non-UPS reading")
+    return classified
+
+
+def close_driver(driver: object | None) -> None:
+    """Best-effort release of a driver before it is discarded."""
+    if driver is None:
+        return
+    close = getattr(driver, "close", None)
+    if not callable(close):
+        return
+    try:
+        close()
+    except Exception:  # noqa: BLE001 - recovery must still return fail-closed state
+        pass
+
+
+def read_with_recovery(
+    driver: object | None,
+    driver_factory: Callable[[], object],
+    source: BatterySource,
+    thresholds: PowerPolicyThresholds,
+) -> tuple[UpsReading, object | None]:
+    """Read once, returning an error sample and reset driver on failure."""
+    active_driver = driver
+    try:
+        if active_driver is None:
+            active_driver = driver_factory()
+        reading = apply_configured_policy(
+            read_from_driver(active_driver),
+            thresholds,
+        )
+        if reading.state == PowerState.ERROR:
+            close_driver(active_driver)
+            return reading, None
+        return reading, active_driver
+    except Exception as exc:  # noqa: BLE001 - hardware errors must fail closed
+        close_driver(active_driver)
+        error = f"{type(exc).__name__}: {exc}"
+        return make_error_reading(source, error), None
 
 
 def read_from_driver(driver: object) -> UpsReading:
@@ -219,7 +269,7 @@ if RCLPY_AVAILABLE:
                 power_sensor_qos(),
             )
 
-            self._driver = driver or create_ups_driver_from_params(self._params)
+            self._driver = driver
 
             self._timer = self.create_timer(
                 create_timer_period_s(self._params.publish_rate_hz),
@@ -251,25 +301,26 @@ if RCLPY_AVAILABLE:
         def read_once(self) -> UpsReading:
             """Read once from UPS HAT driver."""
 
-            try:
-                reading = read_from_driver(self._driver)
+            reading, self._driver = read_with_recovery(
+                self._driver,
+                lambda: create_ups_driver_from_params(self._params),
+                self._source,
+                self._params.thresholds,
+            )
+            if reading.state != PowerState.ERROR:
                 self._state.read_count += 1
                 self._state.last_reading = reading
                 self._state.last_error = ""
                 return reading
-            except Exception as exc:  # noqa: BLE001 - hardware errors must be published
-                self._state.error_count += 1
-                self._state.last_error = f"{type(exc).__name__}: {exc}"
 
-                log_exception(
-                    self._logger,
-                    "UPS HAT read failed",
-                    exc,
-                )
-
-                reading = make_error_reading(self._source, self._state.last_error)
-                self._state.last_reading = reading
-                return reading
+            self._state.error_count += 1
+            self._state.last_error = reading.error_message
+            log_error(
+                self._logger,
+                f"UPS HAT read failed: {reading.error_message}",
+            )
+            self._state.last_reading = reading
+            return reading
 
         def publish_reading(self, reading: UpsReading) -> None:
             """Publish one reading."""
@@ -282,6 +333,12 @@ if RCLPY_AVAILABLE:
         def _on_timer(self) -> None:
             reading = self.read_once()
             self.publish_reading(reading)
+
+        def destroy_node(self) -> object:
+            """Release the UPS bus before destroying the ROS node."""
+            close_driver(self._driver)
+            self._driver = None
+            return super().destroy_node()
 
 else:
 
@@ -338,6 +395,8 @@ __all__ = [
     "UpsHatNodePy",
     "UpsHatNodeState",
     "build_startup_summary",
+    "apply_configured_policy",
+    "close_driver",
     "create_timer_period_s",
     "create_ups_driver_from_params",
     "main",
@@ -345,6 +404,7 @@ __all__ = [
     "main_edge",
     "make_error_reading",
     "read_from_driver",
+    "read_with_recovery",
     "reading_to_publish_text",
     "source_to_python_node_name",
     "source_to_topic",

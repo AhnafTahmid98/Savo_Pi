@@ -159,7 +159,9 @@ On the robot and observer use the same domain and compatible DDS implementation:
 
 ```bash
 export ROS_DOMAIN_ID=0
-export ROS_LOCALHOST_ONLY=0
+export ROS_AUTOMATIC_DISCOVERY_RANGE=SUBNET
+export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+unset ROS_LOCALHOST_ONLY
 ```
 
 Both devices must be on the same multicast-capable LAN (or a routed DDS setup),
@@ -201,7 +203,8 @@ Noble VM on the Mac. VM/runtime acceptance is not yet claimed here.
 
 ## Troubleshooting
 
-- No topics: check `ROS_DOMAIN_ID`, `ROS_LOCALHOST_ONLY=0`, DDS implementation,
+- No topics: check `ROS_DOMAIN_ID`, `ROS_AUTOMATIC_DISCOVERY_RANGE=SUBNET`,
+  `ROS_LOCALHOST_ONLY` is unset, the FastDDS implementation,
   multicast, VM bridge mode, and firewall.
 - TF errors: use `view:=tf`; the observer never publishes transforms.
 - Giant covariance volumes: use the checked-in views, which disable RViz's

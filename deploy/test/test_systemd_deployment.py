@@ -66,6 +66,79 @@ def test_core_and_mapping_runners_use_the_same_lifetime_lock() -> None:
     assert "action send_goal" not in autonomous
 
 
+def test_autonomous_mapping_runner_rejects_geometry_policy_overrides() -> None:
+    runner = ROOT / "deploy/core/run_autonomous_mapping.sh"
+
+    for argument in (
+        "require_locked_geometry:=false",
+        "allow_provisional_geometry:=true",
+        "geometry_profile:=/tmp/not-production.yaml",
+        "geometry_profile:=",
+        "geometry_profile:=/tmp/profile:=duplicate.yaml",
+    ):
+        result = subprocess.run(
+            ["bash", str(runner), argument],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        assert result.returncode != 0
+        assert "forbids overriding" in result.stderr
+        assert argument.split(":=", maxsplit=1)[0] in result.stderr
+
+
+def test_production_role_runners_reject_unsafe_geometry_environment() -> None:
+    cases = (
+        ("deploy/core/run_core.sh", "SAVO_REQUIRE_LOCKED_GEOMETRY", "false"),
+        ("deploy/core/run_core.sh", "SAVO_ALLOW_PROVISIONAL_GEOMETRY", "true"),
+        ("deploy/edge/run_edge.sh", "SAVO_REQUIRE_LOCKED_GEOMETRY", "false"),
+        ("deploy/edge/run_edge.sh", "SAVO_ALLOW_PROVISIONAL_GEOMETRY", "true"),
+    )
+
+    for relative, variable, value in cases:
+        environment = os.environ.copy()
+        environment[variable] = value
+        result = subprocess.run(
+            ["bash", str(ROOT / relative)],
+            env=environment,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        assert result.returncode != 0
+        assert "production geometry policy" in result.stderr.lower()
+        assert variable in result.stderr
+
+
+def test_production_geometry_helper_uses_the_installed_package_artifact(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace with spaces"
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            'SAVO_WS="$1"; source "$2"; savo_production_geometry_profile',
+            "bash",
+            str(workspace),
+            str(ROOT / "deploy/common/production_geometry.sh"),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == str(
+        workspace
+        / "install/savo_description/share/savo_description/config/profiles/"
+        "robot_savo_core_v1.yaml"
+    )
+    assert "/src/shared/savo_description" not in result.stdout
+
+
 def test_runtime_storage_prepares_direct_runner_lock_directory() -> None:
     storage = _read("deploy/core/prepare_runtime_storage.sh")
 
@@ -330,8 +403,6 @@ def test_direct_deploy_environment_defaults_to_the_checkout_containing_the_scrip
     assert result.stdout.splitlines() == [str(ROOT), str(ROOT / "savo_ws")]
 
 
-
-
 def test_normal_core_runner_refuses_specialized_mapping_modes() -> None:
     """Production Core service must not bypass dedicated mapping gates."""
     runner = _read("deploy/core/run_core.sh")
@@ -340,6 +411,7 @@ def test_normal_core_runner_refuses_specialized_mapping_modes() -> None:
     assert "run_mapping_service.sh" in runner
     assert "autonomous_mapping" in runner
     assert "run_autonomous_mapping.sh" in runner
+
 
 def test_manual_mapping_runner_enforces_both_explicit_enable_gates() -> None:
     runner = _read("deploy/core/run_mapping_service.sh")

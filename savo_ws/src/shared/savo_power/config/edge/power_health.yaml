@@ -5,9 +5,6 @@
 
     automatic_shutdown_enabled: false
 
-    status_topic: "/savo_power/status"
-    health_topic: "/savo_power/health"
-    shutdown_request_topic: "/savo_power/shutdown_request"
 
 /power_health_node_py:
   ros__parameters:
@@ -15,7 +12,3 @@
     stale_timeout_s: 5.0
 
     automatic_shutdown_enabled: false
-
-    status_topic: "/savo_power/status"
-    health_topic: "/savo_power/health"
-    shutdown_request_topic: "/savo_power/shutdown_request"
