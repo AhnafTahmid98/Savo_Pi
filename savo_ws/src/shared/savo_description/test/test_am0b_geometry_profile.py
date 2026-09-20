@@ -25,6 +25,19 @@ def test_profile_schema_and_locked_gate():
     assert profile["model_fidelity_todos"]
 
 
+def test_duplicate_yaml_key_is_rejected(tmp_path: Path):
+    profile_text = PROFILE.read_text(encoding="utf-8").replace(
+        "  geometry_revision: 5\n",
+        "  geometry_revision: 4\n  geometry_revision: 5\n",
+        1,
+    )
+    profile = tmp_path / "duplicate-key.yaml"
+    profile.write_text(profile_text, encoding="utf-8")
+
+    with pytest.raises(MODULE.GeometryProfileError, match="duplicate YAML key"):
+        MODULE.load_profile(profile)
+
+
 def test_profile_has_required_tf_chain_without_duplicates_or_cycles():
     profile = MODULE.load_profile(PROFILE)
     frames = profile["frames"]

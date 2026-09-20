@@ -1,4 +1,6 @@
 from pathlib import Path
+import os
+import subprocess
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -32,3 +34,46 @@ def test_observer_uses_shared_network_environment():
         "deploy/observer/check_connection.sh",
     ):
         assert expected in _read(relative)
+
+
+def test_environment_summary_supports_intentionally_unset_localhost_only():
+    environment = os.environ.copy()
+    environment.pop("ROS_LOCALHOST_ONLY", None)
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            'set -u; source "$1"; savo_print_env',
+            "bash",
+            str(ROOT / "deploy/common/env_common.sh"),
+        ],
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "ROS_AUTOMATIC_DISCOVERY_RANGE = SUBNET" in result.stdout
+    assert "RMW_IMPLEMENTATION = rmw_fastrtps_cpp" in result.stdout
+    assert "ROS_LOCALHOST_ONLY = <unset>" in result.stdout
+
+
+def test_common_environment_clears_inherited_localhost_only():
+    environment = os.environ.copy()
+    environment["ROS_LOCALHOST_ONLY"] = "1"
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            'source "$1"; [[ -z "${ROS_LOCALHOST_ONLY+x}" ]]',
+            "bash",
+            str(ROOT / "deploy/common/env_common.sh"),
+        ],
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr

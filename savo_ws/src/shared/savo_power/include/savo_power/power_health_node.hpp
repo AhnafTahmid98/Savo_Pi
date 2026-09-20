@@ -9,6 +9,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/string.hpp>
 
+#include <chrono>
 #include <string>
 
 namespace savo_power
@@ -43,7 +44,7 @@ private:
   rclcpp::TimerBase::SharedPtr timer_{};
 
   bool status_seen_{false};
-  rclcpp::Time last_status_seen_{};
+  std::chrono::steady_clock::time_point last_status_seen_{};
   std::string last_status_text_{};
 };
 

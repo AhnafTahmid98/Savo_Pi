@@ -1,5 +1,6 @@
 #include "savo_power/power_aggregator.hpp"
 
+#include <cmath>
 #include <sstream>
 #include <string>
 
@@ -89,7 +90,8 @@ PowerSourceStatus PowerAggregator::make_source_status(
   status.expected = expected;
   status.seen = true;
   status.age_s = input.age_s;
-  status.stale = input.age_s > config_.stale_timeout_s;
+  status.stale = !std::isfinite(input.age_s) || input.age_s < 0.0 ||
+    input.age_s > config_.stale_timeout_s;
 
   if (status.stale) {
     status.state = PowerState::STALE;

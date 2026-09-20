@@ -47,6 +47,31 @@ class GeometryProfileError(ValueError):
     """Raised when a safety-critical geometry contract is invalid."""
 
 
+class _UniqueKeySafeLoader(yaml.SafeLoader):
+    """Safe YAML loader that rejects ambiguous duplicate mapping keys."""
+
+
+def _construct_unique_mapping(loader, node, deep=False):
+    loader.flatten_mapping(node)
+    mapping = {}
+    for key_node, value_node in node.value:
+        key = loader.construct_object(key_node, deep=deep)
+        try:
+            duplicate = key in mapping
+        except TypeError as exc:
+            raise GeometryProfileError("YAML mapping keys must be hashable") from exc
+        if duplicate:
+            raise GeometryProfileError(f"duplicate YAML key: {key!r}")
+        mapping[key] = loader.construct_object(value_node, deep=deep)
+    return mapping
+
+
+_UniqueKeySafeLoader.add_constructor(
+    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
+    _construct_unique_mapping,
+)
+
+
 def _mapping(value: Any, field: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise GeometryProfileError(f"{field} must be a mapping")
@@ -110,7 +135,7 @@ def _rpy_matrix(rpy):
 
 def load_profile(path: str | Path) -> dict[str, Any]:
     profile_path = Path(path)
-    data = yaml.safe_load(profile_path.read_text())
+    data = yaml.load(profile_path.read_text(), Loader=_UniqueKeySafeLoader)
     return _mapping(data, str(profile_path))
 
 

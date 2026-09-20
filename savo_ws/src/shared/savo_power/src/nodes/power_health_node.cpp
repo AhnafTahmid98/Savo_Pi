@@ -86,7 +86,7 @@ void PowerHealthNode::update_status(
   const std::string & status_text)
 {
   last_status_text_ = status_text;
-  last_status_seen_ = now();
+  last_status_seen_ = std::chrono::steady_clock::now();
   status_seen_ = true;
 }
 
@@ -96,7 +96,8 @@ double PowerHealthNode::status_age_s() const
     return 0.0;
   }
 
-  return (now() - last_status_seen_).seconds();
+  return std::chrono::duration<double>(
+    std::chrono::steady_clock::now() - last_status_seen_).count();
 }
 
 PowerHealthInput PowerHealthNode::make_health_input() const

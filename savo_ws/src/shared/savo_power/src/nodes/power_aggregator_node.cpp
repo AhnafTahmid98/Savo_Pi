@@ -146,7 +146,7 @@ void PowerAggregatorNode::update_source(
   const std::string & text)
 {
   source.seen = true;
-  source.last_seen = now();
+  source.last_seen = std::chrono::steady_clock::now();
   source.text = text;
   source.state = state_from_text(text);
 }
@@ -183,7 +183,8 @@ double PowerAggregatorNode::source_age_s(
     return 0.0;
   }
 
-  return (now() - source.last_seen).seconds();
+  return std::chrono::duration<double>(
+    std::chrono::steady_clock::now() - source.last_seen).count();
 }
 
 void PowerAggregatorNode::publish_status()

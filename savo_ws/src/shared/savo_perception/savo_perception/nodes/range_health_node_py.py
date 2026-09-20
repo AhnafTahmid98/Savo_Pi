@@ -9,7 +9,6 @@ import json
 import math
 import time
 from collections import deque
-from dataclasses import replace
 from typing import Dict, Optional
 
 try:
@@ -49,6 +48,19 @@ def fresh_ultrasonic_diagnostic_error(
     if age_s < 0.0 or age_s > stale_timeout_s:
         return ""
     return cause
+
+
+def update_ultrasonic_diagnostic(
+    cause: str,
+    *,
+    received_mono_s: Optional[float],
+    incoming: str,
+    now_mono_s: float,
+) -> tuple[str, Optional[float]]:
+    """Apply a latest-state diagnostic without treating empty data as recovery."""
+    if not incoming:
+        return cause, received_mono_s
+    return ("" if incoming == "ok" else incoming), now_mono_s
 
 
 class RangeHealthNodePy(Node):
@@ -197,9 +209,14 @@ class RangeHealthNodePy(Node):
         self.samples[sensor_name] = self._sample_from_value(sensor_name, value, required=required)
 
     def _on_ultrasonic_status(self, msg) -> None:
-        cause = str(getattr(msg, "data", ""))
-        self.ultrasonic_error = "" if cause == "ok" else cause
-        self.ultrasonic_status_received_mono_s = time.monotonic()
+        self.ultrasonic_error, self.ultrasonic_status_received_mono_s = (
+            update_ultrasonic_diagnostic(
+                self.ultrasonic_error,
+                received_mono_s=self.ultrasonic_status_received_mono_s,
+                incoming=str(getattr(msg, "data", "")),
+                now_mono_s=time.monotonic(),
+            )
+        )
 
     def _record_receipt(self, sensor_name: str) -> None:
         now_s = time.monotonic()
@@ -251,16 +268,6 @@ class RangeHealthNodePy(Node):
             now_mono_s=now_s,
             stale_timeout_s=self.params.stale_timeout_s,
         )
-        ultrasonic_sample = enabled_samples.get("ultrasonic_front")
-        if (
-            ultrasonic_sample is not None
-            and not ultrasonic_sample.valid
-            and ultrasonic_cause
-        ):
-            enabled_samples["ultrasonic_front"] = replace(
-                ultrasonic_sample,
-                error=ultrasonic_cause,
-            )
         health = {
             name: SensorHealth.from_sample(
                 sample,
@@ -315,6 +322,9 @@ class RangeHealthNodePy(Node):
             "sensors": {
                 name: {
                     **item.to_dict(),
+                    "diagnostic_error": (
+                        ultrasonic_cause if name == "ultrasonic_front" else ""
+                    ),
                     "receive_rate_hz": self._receive_rate_hz(name),
                     "rate_valid": self._rate_valid(name),
                     "rate_quality": self._rate_quality(name),

@@ -9,6 +9,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/string.hpp>
 
+#include <chrono>
 #include <string>
 
 namespace savo_power
@@ -29,7 +30,7 @@ private:
     BatterySource source{BatterySource::UNKNOWN};
     bool seen{false};
     PowerState state{PowerState::UNKNOWN};
-    rclcpp::Time last_seen{};
+    std::chrono::steady_clock::time_point last_seen{};
     std::string text{};
   };
 

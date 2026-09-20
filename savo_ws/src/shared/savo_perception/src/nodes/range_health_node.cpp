@@ -288,6 +288,9 @@ void RangeHealthNode::on_ultrasonic_front(const std_msgs::msg::Float32::SharedPt
 
 void RangeHealthNode::on_ultrasonic_status(const std_msgs::msg::String::SharedPtr msg)
 {
+  if (msg->data.empty()) {
+    return;
+  }
   ultrasonic_error_ = msg->data == "ok" ? "" : msg->data;
   ultrasonic_status_receipt_ = std::chrono::steady_clock::now();
 }
@@ -360,12 +363,7 @@ std::vector<SensorHealth> RangeHealthNode::current_health() const
   };
 
   if (use_ultrasonic_) {
-    auto ultrasonic_sample = ultrasonic_front_;
-    const auto ultrasonic_error = current_ultrasonic_error(now);
-    if (!ultrasonic_sample.valid && !ultrasonic_error.empty()) {
-      ultrasonic_sample.error = ultrasonic_error;
-    }
-    health.push_back(make_sensor_health(ultrasonic_sample, stale_timeout_s_, now));
+    health.push_back(make_sensor_health(ultrasonic_front_, stale_timeout_s_, now));
   }
 
   return health;
@@ -640,6 +638,8 @@ std::string RangeHealthNode::health_to_json(const std::vector<SensorHealth> & he
 
 std::string RangeHealthNode::sensor_health_to_json(const SensorHealth & health) const
 {
+  const auto diagnostic_error = health.sensor_name == "ultrasonic_front" ?
+    current_ultrasonic_error(std::chrono::steady_clock::now()) : "";
   std::ostringstream out;
 
   out << "{";
@@ -656,6 +656,7 @@ std::string RangeHealthNode::sensor_health_to_json(const SensorHealth & health) 
   out << "\"required\":" << (is_required_sensor(health.sensor_name) ? "true" : "false") << ",";
   out << "\"optional\":" << (is_optional_sensor(health.sensor_name) ? "true" : "false") << ",";
   out << "\"error\":\"" << json_escape(health.error) << "\",";
+  out << "\"diagnostic_error\":\"" << json_escape(diagnostic_error) << "\",";
   out << "\"source\":\"" << json_escape(health.source) << "\"";
   out << "}";
 

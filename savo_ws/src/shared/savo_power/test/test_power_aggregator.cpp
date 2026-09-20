@@ -1,6 +1,7 @@
 #include "gtest/gtest.h"
 
 #include "savo_power/power_aggregator.hpp"
+#include "savo_power/power_health.hpp"
 
 namespace
 {
@@ -128,6 +129,34 @@ TEST(PowerAggregatorRequiredBase, MissingOrErrorStillFailsWithOptionalEdge)
   EXPECT_EQ(
     aggregator.aggregate(error).overall_state,
     savo_power::PowerState::ERROR);
+}
+
+TEST(PowerFreshness, NegativeRequiredSourceAgeFailsStale)
+{
+  auto inputs = healthy_required_inputs();
+  inputs.core_ups.age_s = -0.001;
+
+  const savo_power::PowerAggregator aggregator;
+  const auto summary = aggregator.aggregate(inputs);
+
+  EXPECT_EQ(summary.core_ups.state, savo_power::PowerState::STALE);
+  EXPECT_EQ(summary.overall_state, savo_power::PowerState::STALE);
+  EXPECT_EQ(summary.health_level, savo_power::PowerHealthLevel::ERROR);
+}
+
+TEST(PowerFreshness, NegativeAggregateAgeFailsHealthStale)
+{
+  savo_power::PowerHealthInput input;
+  input.seen = true;
+  input.state = savo_power::PowerState::OK;
+  input.age_s = -0.001;
+
+  const savo_power::PowerHealth health;
+  const auto result = health.evaluate(input);
+
+  EXPECT_TRUE(result.stale);
+  EXPECT_EQ(result.state, savo_power::PowerState::STALE);
+  EXPECT_EQ(result.level, savo_power::PowerHealthLevel::ERROR);
 }
 
 }  // namespace

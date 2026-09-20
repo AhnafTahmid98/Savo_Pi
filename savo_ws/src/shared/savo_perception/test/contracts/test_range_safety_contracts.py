@@ -21,6 +21,7 @@ from savo_perception.models.range_sample import (
 from savo_perception.models.sensor_health import SensorHealth
 from savo_perception.nodes.range_health_node_py import (
     fresh_ultrasonic_diagnostic_error,
+    update_ultrasonic_diagnostic,
 )
 from savo_perception.safety.range_fusion import (
     RangeFusionConfig,
@@ -412,7 +413,7 @@ def test_ultrasonic_driver_causes_reach_range_health_status() -> None:
     assert "qos_state_string(depth=1)" in health_py
     assert "ultrasonic_error_" in health
     assert "ultrasonic_status_receipt_" in health
-    assert "current_ultrasonic_error(now)" in health
+    assert "current_ultrasonic_error(" in health
     assert '"invalid_distance"' in health
 
 
@@ -441,6 +442,33 @@ def test_ultrasonic_diagnostic_cause_is_used_only_while_fresh() -> None:
         now_mono_s=10.1,
         stale_timeout_s=0.3,
     ) == ""
+
+
+def test_ultrasonic_diagnostic_updates_do_not_erase_failure_on_empty_status() -> None:
+    assert update_ultrasonic_diagnostic(
+        "echo_end_timeout",
+        received_mono_s=10.0,
+        incoming="",
+        now_mono_s=10.1,
+    ) == ("echo_end_timeout", 10.0)
+    assert update_ultrasonic_diagnostic(
+        "echo_end_timeout",
+        received_mono_s=10.0,
+        incoming="ok",
+        now_mono_s=10.1,
+    ) == ("", 10.1)
+
+
+def test_ultrasonic_diagnostic_is_not_attached_to_uncorrelated_range_sample() -> None:
+    health = _read(PACKAGE / "src" / "nodes" / "range_health_node.cpp")
+    health_py = _read(
+        PACKAGE / "savo_perception" / "nodes" / "range_health_node_py.py"
+    )
+
+    assert "diagnostic_error" in health
+    assert '"diagnostic_error"' in health_py
+    assert "ultrasonic_sample.error =" not in health
+    assert "replace(\n                ultrasonic_sample" not in health_py
 
 
 def test_ultrasonic_status_is_part_of_the_topic_contract() -> None:

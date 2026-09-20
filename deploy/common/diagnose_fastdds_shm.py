@@ -40,6 +40,30 @@ def _shm_candidates(shm_root: Path) -> list[dict[str, object]]:
     return candidates
 
 
+def _looks_like_ros_process(arguments: list[str]) -> bool:
+    if not arguments:
+        return False
+
+    lowered = [argument.lower() for argument in arguments]
+    basenames = {Path(argument).name for argument in lowered}
+    if basenames.intersection(
+        {"ros2", "fastdds", "component_container", "component_container_mt"}
+    ):
+        return True
+
+    executable = lowered[0]
+    if "/opt/ros/" in executable and "/lib/" in executable:
+        return True
+    if "/install/savo_" in executable and "/lib/savo_" in executable:
+        return True
+
+    if "--ros-args" in lowered:
+        return True
+
+    command = " ".join(lowered)
+    return "rmw_fastrtps" in command or "fastdds" in command
+
+
 def _active_ros_processes(
     proc_root: Path,
     *,
@@ -54,23 +78,16 @@ def _active_ros_processes(
         if ignore_pid is not None and int(process_dir.name) == ignore_pid:
             continue
         try:
-            command = process_dir.joinpath("cmdline").read_bytes().replace(
-                b"\0", b" "
-            ).decode("utf-8", errors="replace").strip()
+            raw_arguments = process_dir.joinpath("cmdline").read_bytes().split(b"\0")
         except OSError:
             continue
-        lowered = command.lower()
-        if any(
-            marker in lowered
-            for marker in (
-                "/ros2",
-                " ros2 ",
-                "savo_",
-                "robot_savo",
-                "rmw_fastrtps",
-                "fastdds",
-            )
-        ):
+        arguments = [
+            argument.decode("utf-8", errors="replace")
+            for argument in raw_arguments
+            if argument
+        ]
+        if _looks_like_ros_process(arguments):
+            command = " ".join(arguments)
             processes.append({"pid": int(process_dir.name), "command": command})
     return processes
 

@@ -87,6 +87,57 @@ def test_diagnostic_does_not_count_its_own_process(tmp_path: Path) -> None:
     assert report["active_process_count"] == 0
 
 
+def test_unrelated_repository_process_is_not_reported_as_ros(
+    tmp_path: Path,
+) -> None:
+    shm_root = tmp_path / "shm"
+    proc_root = tmp_path / "proc"
+    shm_root.mkdir()
+    process = proc_root / "321"
+    process.mkdir(parents=True)
+    process.joinpath("cmdline").write_bytes(
+        b"python3\0/home/savo/Savo_Pi/deploy/common/validate_deployment_assets.py\0"
+    )
+
+    report = _run(shm_root, proc_root)
+
+    assert report["state"] == "NO_FASTDDS_SHM_CANDIDATES"
+    assert report["active_process_count"] == 0
+
+
+def test_installed_savo_ros_node_is_reported_as_active(tmp_path: Path) -> None:
+    shm_root = tmp_path / "shm"
+    proc_root = tmp_path / "proc"
+    shm_root.mkdir()
+    process = proc_root / "322"
+    process.mkdir(parents=True)
+    process.joinpath("cmdline").write_bytes(
+        b"/home/savo/Savo_Pi/savo_ws/install/savo_power/lib/"
+        b"savo_power/core_ups_node\0--ros-args\0"
+    )
+
+    report = _run(shm_root, proc_root)
+
+    assert report["state"] == "ROS_PARTICIPANTS_ACTIVE"
+    assert report["active_process_count"] == 1
+
+
+def test_native_ros_install_node_is_reported_as_active(tmp_path: Path) -> None:
+    shm_root = tmp_path / "shm"
+    proc_root = tmp_path / "proc"
+    shm_root.mkdir()
+    process = proc_root / "323"
+    process.mkdir(parents=True)
+    process.joinpath("cmdline").write_bytes(
+        b"/opt/ros/jazzy/lib/nav2_controller/controller_server\0--ros-args\0"
+    )
+
+    report = _run(shm_root, proc_root)
+
+    assert report["state"] == "ROS_PARTICIPANTS_ACTIVE"
+    assert report["active_process_count"] == 1
+
+
 def test_diagnostic_contains_no_cleanup_implementation() -> None:
     source = SCRIPT.read_text(encoding="utf-8")
 

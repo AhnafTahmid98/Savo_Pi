@@ -88,6 +88,21 @@ def test_autonomous_mapping_runner_rejects_geometry_policy_overrides() -> None:
         assert argument.split(":=", maxsplit=1)[0] in result.stderr
 
 
+def test_autonomous_mapping_runner_rejects_perception_profile_override() -> None:
+    runner = ROOT / "deploy/core/run_autonomous_mapping.sh"
+    argument = "perception_config_file:=/tmp/unreviewed-perception.yaml"
+
+    result = subprocess.run(
+        ["bash", str(runner), argument],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "forbids overriding perception_config_file" in result.stderr
+
+
 def test_production_role_runners_reject_unsafe_geometry_environment() -> None:
     cases = (
         ("deploy/core/run_core.sh", "SAVO_REQUIRE_LOCKED_GEOMETRY", "false"),

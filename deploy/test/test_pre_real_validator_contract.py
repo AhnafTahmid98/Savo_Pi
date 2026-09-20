@@ -141,6 +141,30 @@ def test_malformed_geometry_fails_closed(tmp_path: Path) -> None:
     assert check.detail
 
 
+def test_duplicate_geometry_key_fails_closed(tmp_path: Path) -> None:
+    module = _module()
+    canonical = ROOT / (
+        "savo_ws/src/shared/savo_description/config/profiles/"
+        "robot_savo_core_v1.yaml"
+    )
+    profile_text = canonical.read_text(encoding="utf-8").replace(
+        "  geometry_revision: 5\n",
+        "  geometry_revision: 4\n  geometry_revision: 5\n",
+        1,
+    )
+    profile = tmp_path / "duplicate-key.yaml"
+    profile.write_text(profile_text, encoding="utf-8")
+
+    check = module.validate_production_geometry(
+        profile,
+        ROOT / "savo_ws/src/shared/savo_description/scripts/geometry_profile.py",
+    )
+
+    assert check.name == "geometry_locked"
+    assert check.status == "FAIL"
+    assert "duplicate YAML key" in check.detail
+
+
 def test_missing_geometry_profile_fails_closed(tmp_path: Path) -> None:
     module = _module()
 
@@ -172,6 +196,26 @@ def test_wrong_geometry_profile_id_fails_closed(tmp_path: Path) -> None:
 
     assert check.status == "FAIL"
     assert "unexpected production geometry profile_id" in check.detail
+
+
+def test_wrong_geometry_revision_fails_closed(tmp_path: Path) -> None:
+    module = _module()
+    canonical = ROOT / (
+        "savo_ws/src/shared/savo_description/config/profiles/"
+        "robot_savo_core_v1.yaml"
+    )
+    profile_data = yaml.safe_load(canonical.read_text(encoding="utf-8"))
+    profile_data["metadata"]["geometry_revision"] = 4
+    profile = tmp_path / "wrong-revision.yaml"
+    profile.write_text(yaml.safe_dump(profile_data), encoding="utf-8")
+
+    check = module.validate_production_geometry(
+        profile,
+        ROOT / "savo_ws/src/shared/savo_description/scripts/geometry_profile.py",
+    )
+
+    assert check.status == "FAIL"
+    assert "production geometry revision must be 5" in check.detail
 
 
 def test_locked_geometry_with_remaining_calibration_fails_closed(

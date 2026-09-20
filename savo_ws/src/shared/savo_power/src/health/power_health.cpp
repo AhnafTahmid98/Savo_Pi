@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <sstream>
 #include <string>
 
@@ -92,7 +93,8 @@ PowerHealthResult PowerHealth::evaluate(
     return result;
   }
 
-  result.stale = input.age_s > config_.stale_timeout_s;
+  result.stale = !std::isfinite(input.age_s) || input.age_s < 0.0 ||
+    input.age_s > config_.stale_timeout_s;
 
   if (result.stale) {
     result.state = PowerState::STALE;

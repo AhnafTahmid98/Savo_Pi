@@ -54,6 +54,14 @@ def _validate_arguments(context):
     ).joinpath(
         "config", "profiles", "robot_savo_core_v1.yaml"
     ).resolve()
+    perception_config_file = Path(
+        LaunchConfiguration("perception_config_file").perform(context)
+    ).resolve()
+    canonical_perception_config_file = Path(
+        get_package_share_directory("savo_perception")
+    ).joinpath(
+        "config", "profiles", "core_real_robot_v1.yaml"
+    ).resolve()
 
     if not _MAP_ID_PATTERN.fullmatch(map_id):
         raise RuntimeError(
@@ -79,6 +87,11 @@ def _validate_arguments(context):
     if geometry_profile != canonical_geometry_profile:
         raise RuntimeError(
             "autonomous mapping requires the canonical production geometry profile"
+        )
+
+    if perception_config_file != canonical_perception_config_file:
+        raise RuntimeError(
+            "autonomous mapping requires the canonical production perception profile"
         )
 
     return [
