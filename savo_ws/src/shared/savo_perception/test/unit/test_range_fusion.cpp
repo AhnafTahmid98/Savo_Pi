@@ -6,6 +6,8 @@
 
 #include "savo_perception/perception_types.hpp"
 #include "savo_perception/range_fusion.hpp"
+#include "savo_perception/range_health_policy.hpp"
+#include "savo_perception/range_sensor_parameters.hpp"
 
 namespace savo_perception
 {
@@ -66,6 +68,34 @@ TEST(RangeFusionTest, RightRequiredTofInvalidStops)
 
   EXPECT_TRUE(result.decision.stop_required);
   EXPECT_EQ(result.decision.reason, "required_sensor_invalid");
+}
+
+TEST(RangeFusionTest, OptionalLeftTofInvalidRemainsVisibleWithoutRequiredStop)
+{
+  auto snapshot = clear_snapshot();
+  snapshot.tof_left = invalid_sample("tof_left");
+  auto config = RangeFusionConfig{};
+  config.required_sensors.clear();
+
+  const auto result = fuse_range_snapshot(snapshot, config);
+
+  EXPECT_FALSE(result.decision.stop_required);
+  EXPECT_NE(result.decision.reason, "required_sensor_invalid");
+  EXPECT_TRUE(contains_sensor_name(result.invalid_sensors, "tof_left"));
+}
+
+TEST(RangeFusionTest, OptionalRightTofInvalidRemainsVisibleWithoutRequiredStop)
+{
+  auto snapshot = clear_snapshot();
+  snapshot.tof_right = invalid_sample("tof_right");
+  auto config = RangeFusionConfig{};
+  config.required_sensors.clear();
+
+  const auto result = fuse_range_snapshot(snapshot, config);
+
+  EXPECT_FALSE(result.decision.stop_required);
+  EXPECT_NE(result.decision.reason, "required_sensor_invalid");
+  EXPECT_TRUE(contains_sensor_name(result.invalid_sensors, "tof_right"));
 }
 
 TEST(RangeFusionTest, RequiredTofStaleStops)
@@ -243,6 +273,55 @@ TEST(RangeFusionTest, ContradictoryInfiniteSampleCannotReportValidHealth)
   EXPECT_FALSE(health.ok);
   EXPECT_FALSE(health.last_distance_m.has_value());
   EXPECT_EQ(health.status, SensorStatus::kError);
+}
+
+TEST(RangeHealthPolicyTest, OptionalTofErrorDoesNotFailDegradedRequiredHealth)
+{
+  const std::vector<SensorHealth> health{
+    make_sensor_health(invalid_sample("tof_left"), 1.0),
+    make_sensor_health(sample("tof_right", 0.6), 1.0),
+  };
+
+  const auto result = evaluate_required_range_health(health, {});
+
+  EXPECT_EQ(health.front().status, SensorStatus::kError);
+  EXPECT_FALSE(health.front().valid);
+  EXPECT_TRUE(result.ok);
+  EXPECT_EQ(result.status, SensorStatus::kOk);
+  EXPECT_TRUE(result.stale_required_sensors.empty());
+  EXPECT_TRUE(result.error_required_sensors.empty());
+}
+
+TEST(RangeHealthPolicyTest, RequiredTofErrorFailsProductionRequiredHealth)
+{
+  const std::vector<SensorHealth> health{
+    make_sensor_health(invalid_sample("tof_left"), 1.0),
+    make_sensor_health(sample("tof_right", 0.6), 1.0),
+  };
+
+  const auto result = evaluate_required_range_health(
+    health, {"tof_left", "tof_right"});
+
+  EXPECT_FALSE(result.ok);
+  EXPECT_EQ(result.status, SensorStatus::kError);
+  ASSERT_EQ(result.error_required_sensors.size(), 1U);
+  EXPECT_EQ(result.error_required_sensors.front(), "tof_left");
+}
+
+TEST(RangeSensorParametersTest, NoRequiredSensorSentinelDecodesToEmpty)
+{
+  const auto decoded = normalize_required_sensor_names(
+    {kNoRequiredSensorSentinel});
+
+  EXPECT_TRUE(decoded.empty());
+}
+
+TEST(RangeSensorParametersTest, NoRequiredSensorSentinelRejectsMixedValues)
+{
+  EXPECT_THROW(
+    normalize_required_sensor_names(
+      {kNoRequiredSensorSentinel, "tof_left"}),
+    std::invalid_argument);
 }
 
 }  // namespace

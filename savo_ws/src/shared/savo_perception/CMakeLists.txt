@@ -292,6 +292,21 @@ if(BUILD_TESTING)
     src/fusion/range_fusion.cpp
   )
 
+  ament_add_gtest(test_degraded_profile_parameters
+    test/unit/test_degraded_profile_parameters.cpp
+  )
+  if(TARGET test_degraded_profile_parameters)
+    set(SAVO_PERCEPTION_DEGRADED_PROFILE_PATH
+      "${CMAKE_INSTALL_PREFIX}/share/${PROJECT_NAME}/config/profiles/core_lidar_mapping_degraded.yaml"
+    )
+    target_compile_definitions(test_degraded_profile_parameters PRIVATE
+      "SAVO_PERCEPTION_DEGRADED_PROFILE_PATH=\"${SAVO_PERCEPTION_DEGRADED_PROFILE_PATH}\""
+    )
+    ament_target_dependencies(test_degraded_profile_parameters
+      rclcpp
+    )
+  endif()
+
   if(TARGET test_obstacle_cloud_filter)
     target_link_libraries(test_obstacle_cloud_filter
       savo_perception_obstacle_cloud_filter

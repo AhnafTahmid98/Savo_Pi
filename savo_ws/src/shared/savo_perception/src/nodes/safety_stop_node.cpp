@@ -1,4 +1,5 @@
 #include "savo_perception/safety_stop_node.hpp"
+#include "savo_perception/range_sensor_parameters.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -187,7 +188,8 @@ void SafetyStopNode::load_parameters()
   policy_config_.fusion.fail_safe_on_stale = get_parameter("fail_safe_on_stale").as_bool();
 
   policy_config_.fusion.required_sensors =
-    get_parameter("required_sensors").as_string_array();
+    normalize_required_sensor_names(
+      get_parameter("required_sensors").as_string_array());
 
   policy_config_.fusion.use_depth_front = get_parameter("use_depth_front").as_bool();
   policy_config_.fusion.depth_front_required = get_parameter("depth_front_required").as_bool();

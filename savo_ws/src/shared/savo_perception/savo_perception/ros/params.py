@@ -49,6 +49,20 @@ from savo_perception.utils.topic_names import (
     ULTRASONIC_FRONT_M,
 )
 
+NO_REQUIRED_SENSOR_SENTINEL = "__none__"
+
+
+def normalize_required_sensor_names(values: Sequence[Any]) -> tuple[str, ...]:
+    """Decode the ROS-typed sentinel used for an empty string array."""
+    names = tuple(str(value) for value in values)
+    if names == (NO_REQUIRED_SENSOR_SENTINEL,):
+        return ()
+    if NO_REQUIRED_SENSOR_SENTINEL in names:
+        raise ValueError(
+            "__none__ must be the only configured value for required_sensors"
+        )
+    return names
+
 
 @dataclass(frozen=True)
 class Vl53MuxParams:
@@ -342,6 +356,8 @@ __all__ = [
     "SafetyStopParams",
     "CmdVelSafetyGateParams",
     "RangeHealthParams",
+    "NO_REQUIRED_SENSOR_SENTINEL",
+    "normalize_required_sensor_names",
     "get_param",
     "to_bool",
     "to_int",

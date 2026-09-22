@@ -24,9 +24,16 @@ except Exception:
     String = None
     ROS_AVAILABLE = False
 
-from savo_perception.constants import NODE_NAME_RANGE_HEALTH, STATUS_ERROR, STATUS_OK, STATUS_STALE
-from savo_perception.models import RangeSample, SensorHealth
-from savo_perception.ros.params import load_range_health_params
+from savo_perception.constants import NODE_NAME_RANGE_HEALTH
+from savo_perception.models import (
+    RangeSample,
+    SensorHealth,
+    evaluate_required_range_health,
+)
+from savo_perception.ros.params import (
+    load_range_health_params,
+    normalize_required_sensor_names,
+)
 from savo_perception.ros.qos_profiles import (
     qos_depth_sensor,
     qos_range_sensor,
@@ -112,9 +119,14 @@ class RangeHealthNodePy(Node):
         self.include_depth_in_overall_ok = bool(
             self.get_parameter("include_depth_in_overall_ok").value
         )
+        self.required_sensors = list(
+            normalize_required_sensor_names(
+                self.get_parameter("required_sensors").value
+            )
+        )
         self.required_sensors = [
-            str(name)
-            for name in self.get_parameter("required_sensors").value
+            name
+            for name in self.required_sensors
             if self.params.use_ultrasonic or str(name) != "ultrasonic_front"
         ]
         self.optional_sensors = [
@@ -284,32 +296,20 @@ class RangeHealthNodePy(Node):
             name for name in self.optional_sensors if name not in required_sensors
         ]
 
-        required_health = [health[name] for name in required_sensors]
         low_rate_required = [
-            item.sensor_name
-            for item in required_health
-            if self._rate_quality(item.sensor_name) == "BELOW_MINIMUM"
+            name
+            for name in required_sensors
+            if self._rate_quality(name) == "BELOW_MINIMUM"
         ]
-        ok = all(item.ok for item in required_health) and not low_rate_required
-
-        stale_required = [item.sensor_name for item in required_health if item.stale]
-        error_required = [
-            item.sensor_name
-            for item in required_health
-            if (not item.ok and not item.stale)
-            or item.sensor_name in low_rate_required
-        ]
-
-        if ok:
-            status = STATUS_OK
-        elif stale_required:
-            status = STATUS_STALE
-        else:
-            status = STATUS_ERROR
+        required_health = evaluate_required_range_health(
+            health,
+            required_sensors=required_sensors,
+            below_minimum_rate_sensors=low_rate_required,
+        )
 
         payload = {
-            "ok": ok,
-            "status": status,
+            "ok": required_health["ok"],
+            "status": required_health["status"],
             "stamp_mono_s": now_s,
             "stale_timeout_s": self.params.stale_timeout_s,
             "required_sensors": required_sensors,
@@ -317,8 +317,8 @@ class RangeHealthNodePy(Node):
             "disabled_sensors": (
                 [] if self.params.use_ultrasonic else ["ultrasonic_front"]
             ),
-            "stale_sensors": stale_required,
-            "error_sensors": error_required,
+            "stale_sensors": required_health["stale_required_sensors"],
+            "error_sensors": required_health["error_required_sensors"],
             "sensors": {
                 name: {
                     **item.to_dict(),
@@ -337,17 +337,31 @@ class RangeHealthNodePy(Node):
         msg.data = json.dumps(payload, sort_keys=True, separators=(",", ":"))
         self.pub.publish(msg)
 
-    def _sample_from_value(self, sensor_name: str, value: float, *, required: bool) -> RangeSample:
+    @staticmethod
+    def _sample_from_value(
+        sensor_name: str,
+        value: float,
+        *,
+        required: bool,
+    ) -> RangeSample:
         try:
             distance_m = float(value)
         except Exception:
             distance_m = math.nan
 
         if not math.isfinite(distance_m):
-            return self._missing_sample(sensor_name, required=required, reason="non_finite")
+            return RangeSample.invalid(
+                sensor_name=sensor_name,
+                source="ros_topic",
+                error="non_finite",
+            )
 
         if distance_m <= 0.0:
-            return self._missing_sample(sensor_name, required=required, reason="non_positive")
+            return RangeSample.invalid(
+                sensor_name=sensor_name,
+                source="ros_topic",
+                error="non_positive",
+            )
 
         return RangeSample.now(
             sensor_name=sensor_name,

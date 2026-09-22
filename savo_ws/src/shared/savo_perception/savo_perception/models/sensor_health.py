@@ -9,7 +9,7 @@ import json
 import math
 import time
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 from savo_perception.constants import (
     STATUS_ERROR,
@@ -155,8 +155,44 @@ def summarize_samples(
     )
 
 
+def evaluate_required_range_health(
+    health_by_name: Mapping[str, SensorHealth],
+    *,
+    required_sensors: Sequence[str],
+    below_minimum_rate_sensors: Sequence[str] = (),
+) -> Dict[str, Any]:
+    """Evaluate aggregate health using only explicitly required sensors."""
+    below_minimum = set(below_minimum_rate_sensors)
+    stale_required: List[str] = []
+    error_required: List[str] = []
+
+    for sensor_name in required_sensors:
+        health = health_by_name.get(sensor_name)
+        if health is None:
+            error_required.append(sensor_name)
+        elif health.stale:
+            stale_required.append(sensor_name)
+        elif not health.ok or sensor_name in below_minimum:
+            error_required.append(sensor_name)
+
+    if error_required:
+        status = STATUS_ERROR
+    elif stale_required:
+        status = STATUS_STALE
+    else:
+        status = STATUS_OK
+
+    return {
+        "ok": not stale_required and not error_required,
+        "status": status,
+        "stale_required_sensors": stale_required,
+        "error_required_sensors": error_required,
+    }
+
+
 __all__ = [
     "SensorHealth",
     "RangeHealthSummary",
+    "evaluate_required_range_health",
     "summarize_samples",
 ]

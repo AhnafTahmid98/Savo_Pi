@@ -277,6 +277,54 @@ TEST(AutonomousMappingMissionTest, DisabledScansNeedNoScanServices)
   EXPECT_FALSE(decision.request_head_scan_start);
 }
 
+TEST(
+  AutonomousMappingMissionTest,
+  DedicatedStartupCapturesPoseThenSelectsFrontierWithoutScanRequest)
+{
+  AutonomousMappingMission mission;
+  auto inputs = starting_inputs();
+  inputs.require_start_pose_capture = true;
+  inputs.require_initial_scan360 = false;
+  inputs.require_initial_head_scan = false;
+
+  auto decision = mission.start(valid_request(), inputs);
+  ASSERT_TRUE(decision.accepted);
+  EXPECT_TRUE(decision.request_start_session);
+  EXPECT_FALSE(decision.request_frontier_mode);
+  EXPECT_FALSE(decision.request_scan360_mode);
+  EXPECT_FALSE(decision.request_scan360_start);
+  EXPECT_FALSE(decision.request_return_to_start);
+
+  inputs.session_state = SessionState::Active;
+  decision = mission.observe(inputs);
+  EXPECT_EQ(decision.snapshot.state, MissionState::CapturingStartPose);
+  EXPECT_TRUE(decision.request_start_pose_capture);
+  EXPECT_FALSE(decision.request_frontier_mode);
+  EXPECT_FALSE(decision.request_scan360_mode);
+  EXPECT_FALSE(decision.request_scan360_start);
+
+  inputs.start_pose_capture_started = true;
+  inputs.start_pose_capture_complete = true;
+  inputs.start_pose_valid = true;
+  inputs.start_pose_reason = "start_pose_captured";
+  inputs.start_pose_generation = 1U;
+  decision = mission.observe(inputs);
+  EXPECT_EQ(decision.snapshot.state, MissionState::CapturingStartPose);
+  EXPECT_TRUE(decision.request_frontier_mode);
+  EXPECT_FALSE(decision.request_scan360_mode);
+  EXPECT_FALSE(decision.request_scan360_start);
+  EXPECT_FALSE(decision.request_return_to_start);
+
+  inputs.mode = MappingMode::Autonomous;
+  inputs.exploration_mode = ExplorationMode::Frontier;
+  inputs.workflow_phase = WorkflowPhase::Exploring;
+  inputs.runtime_authorized = true;
+  decision = mission.observe(inputs);
+  EXPECT_EQ(decision.snapshot.state, MissionState::Exploring);
+  EXPECT_FALSE(decision.request_scan360_mode);
+  EXPECT_FALSE(decision.request_scan360_start);
+}
+
 TEST(AutonomousMappingMissionTest, RunsCoverageReturnFinalScansBeforeSaving)
 {
   AutonomousMappingMission mission;

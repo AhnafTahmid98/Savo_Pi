@@ -20,6 +20,10 @@ from launch.substitutions import PythonExpression
 
 from launch_ros.substitutions import FindPackageShare
 
+from savo_bringup.autonomous_mapping_profiles import (
+    resolve_autonomous_mapping_profile,
+    validate_startup_scan360_disabled,
+)
 from savo_bringup.startup_timing import CORE_START_DELAYS
 
 _MAP_ID_PATTERN = re.compile(r"[a-z][a-z0-9_]*")
@@ -27,6 +31,56 @@ _MAP_ID_PATTERN = re.compile(r"[a-z][a-z0-9_]*")
 
 def _validate_arguments(context):
     """Fail before node startup when safety-critical arguments are invalid."""
+    initial_scan360_required = LaunchConfiguration(
+        "initial_scan360_required"
+    ).perform(context)
+    try:
+        validate_startup_scan360_disabled(initial_scan360_required)
+    except ValueError as error:
+        raise RuntimeError(str(error)) from error
+
+    profile_name = LaunchConfiguration(
+        "autonomous_mapping_profile"
+    ).perform(context)
+    perception_config_override = LaunchConfiguration(
+        "perception_config_file"
+    ).perform(context)
+    nav_params_override = LaunchConfiguration(
+        "nav_params_file"
+    ).perform(context)
+    try:
+        selected_assets = resolve_autonomous_mapping_profile(
+            profile_name,
+            perception_config_file=perception_config_override,
+            nav_params_file=nav_params_override,
+        )
+    except ValueError as error:
+        raise RuntimeError(str(error)) from error
+
+    perception_config_file = Path(
+        get_package_share_directory("savo_perception")
+    ).joinpath(
+        "config", "profiles", selected_assets.perception_config_filename
+    ).resolve()
+    nav_params_file = Path(
+        get_package_share_directory("savo_nav")
+    ).joinpath(
+        "config", selected_assets.nav_params_filename
+    ).resolve()
+    if not perception_config_file.is_file():
+        raise RuntimeError(
+            f"autonomous mapping perception profile missing: {perception_config_file}"
+        )
+    if not nav_params_file.is_file():
+        raise RuntimeError(
+            f"autonomous mapping Nav2 profile missing: {nav_params_file}"
+        )
+
+    context.launch_configurations["perception_config_file"] = str(
+        perception_config_file
+    )
+    context.launch_configurations["nav_params_file"] = str(nav_params_file)
+
     map_id = LaunchConfiguration("map_id").perform(context).strip()
     control_mode = (
         LaunchConfiguration("control_startup_mode")
@@ -54,14 +108,9 @@ def _validate_arguments(context):
     ).joinpath(
         "config", "profiles", "robot_savo_core_v1.yaml"
     ).resolve()
-    perception_config_file = Path(
-        LaunchConfiguration("perception_config_file").perform(context)
-    ).resolve()
-    canonical_perception_config_file = Path(
-        get_package_share_directory("savo_perception")
-    ).joinpath(
-        "config", "profiles", "core_real_robot_v1.yaml"
-    ).resolve()
+    perception_use_ultrasonic = LaunchConfiguration(
+        "perception_use_ultrasonic"
+    ).perform(context).strip().lower()
 
     if not _MAP_ID_PATTERN.fullmatch(map_id):
         raise RuntimeError(
@@ -89,16 +138,20 @@ def _validate_arguments(context):
             "autonomous mapping requires the canonical production geometry profile"
         )
 
-    if perception_config_file != canonical_perception_config_file:
+    if (
+        profile_name.strip() == "core_lidar_mapping_degraded" and
+        perception_use_ultrasonic not in {"false", "0", "no", "off"}
+    ):
         raise RuntimeError(
-            "autonomous mapping requires the canonical production perception profile"
+            "core_lidar_mapping_degraded requires perception_use_ultrasonic:=false"
         )
 
     return [
         LogInfo(
             msg=(
                 "Robot Savo AM-7/AM-8 launch validated: "
-                f"map_id={map_id}, control_startup_mode={control_mode}"
+                f"map_id={map_id}, profile={profile_name.strip()}, "
+                f"control_startup_mode={control_mode}"
             )
         ),
         LogInfo(
@@ -145,8 +198,6 @@ def generate_launch_description() -> LaunchDescription:
     scan360_required = PythonExpression(
         [
             "'",
-            LaunchConfiguration("initial_scan360_required"),
-            "'.lower() in ('true', '1', 'yes', 'on') or '",
             LaunchConfiguration("final_scan360_required"),
             "'.lower() in ('true', '1', 'yes', 'on')",
         ]
@@ -371,9 +422,7 @@ def generate_launch_description() -> LaunchDescription:
         "coverage_operation_params_file": LaunchConfiguration(
             "coverage_operation_params_file"
         ),
-        "initial_scan360_required": LaunchConfiguration(
-            "initial_scan360_required"
-        ),
+        "initial_scan360_required": "false",
         "initial_head_scan_required": LaunchConfiguration(
             "initial_head_scan_required"
         ),
@@ -398,27 +447,12 @@ def generate_launch_description() -> LaunchDescription:
         }.items(),
     )
 
-    default_perception_config = PathJoinSubstitution(
-        [
-            FindPackageShare("savo_perception"),
-            "config",
-            "profiles",
-            "core_real_robot_v1.yaml",
-        ]
-    )
     default_geometry_profile = PathJoinSubstitution(
         [
             FindPackageShare("savo_description"),
             "config",
             "profiles",
             "robot_savo_core_v1.yaml",
-        ]
-    )
-    default_nav_params = PathJoinSubstitution(
-        [
-            FindPackageShare("savo_nav"),
-            "config",
-            "nav2_live_mapping.yaml",
         ]
     )
     default_nav_readiness = PathJoinSubstitution(
@@ -464,6 +498,14 @@ def generate_launch_description() -> LaunchDescription:
                 description=(
                     "Required lowercase map/session identifier. The action "
                     "goal must use the same map_id."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "autonomous_mapping_profile",
+                default_value="production",
+                description=(
+                    "Atomic autonomous-mapping perception/Nav2 profile: "
+                    "production or core_lidar_mapping_degraded."
                 ),
             ),
             DeclareLaunchArgument(
@@ -563,7 +605,11 @@ def generate_launch_description() -> LaunchDescription:
             ),
             DeclareLaunchArgument(
                 "perception_config_file",
-                default_value=default_perception_config,
+                default_value="",
+                description=(
+                    "Internal profile-selected perception asset; direct "
+                    "overrides are forbidden."
+                ),
             ),
             DeclareLaunchArgument(
                 "perception_use_ultrasonic",
@@ -637,8 +683,11 @@ def generate_launch_description() -> LaunchDescription:
                 ),
             ),
             DeclareLaunchArgument(
-                "nav_params_file",
-                default_value=default_nav_params,
+                "nav_params_file", default_value="",
+                description=(
+                    "Internal profile-selected Nav2 asset; direct overrides "
+                    "are forbidden."
+                ),
             ),
             DeclareLaunchArgument(
                 "nav_readiness_params",
@@ -669,7 +718,12 @@ def generate_launch_description() -> LaunchDescription:
                 default_value=default_coverage_operation,
             ),
             DeclareLaunchArgument(
-                "initial_scan360_required", default_value="false"
+                "initial_scan360_required",
+                default_value="false",
+                description=(
+                    "Fixed false for dedicated autonomous mapping; attempts "
+                    "to enable startup Scan360 are rejected before startup."
+                ),
             ),
             DeclareLaunchArgument(
                 "initial_head_scan_required", default_value="false"

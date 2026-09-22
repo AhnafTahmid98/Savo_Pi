@@ -56,6 +56,60 @@ Direct `ros2 launch savo_bringup autonomous_mapping.launch.py` remains a
 component/development interface and does not provide the production Core-owner
 lock.
 
+### Temporary Core LiDAR-only degraded mapping
+
+`core_lidar_mapping_degraded` is an explicit, temporary real-robot test mode
+for the current unreliable ToF wiring. It has no required short-range sensors:
+both ToFs, front depth, and front ultrasonic remain optional. The
+ToF driver and diagnostics stay enabled, so invalid readings remain invalid
+and visible; this profile does not invent safe distances. LiDAR, SLAM,
+localization, Nav2, base/control, power, mapping health, and mapping authority
+remain required and fail closed through their existing policies.
+
+The production runner cannot select the degraded profile: it pins
+`autonomous_mapping_profile:=production` and rejects profile or paired-file
+overrides. From a controlled Core shell, the degraded profile must instead be
+selected explicitly:
+
+```bash
+ros2 launch savo_bringup autonomous_mapping.launch.py \
+  map_id:=<lowercase_map_id> \
+  autonomous_mapping_profile:=core_lidar_mapping_degraded \
+  perception_use_ultrasonic:=false
+```
+
+The launch still starts in `STOP`, does not ARM, and does not submit an
+autonomous-mapping action, Nav2 Spin action, navigation goal, or velocity
+command. Dedicated autonomous mapping fixes `initial_scan360_required:=false`;
+the launch fails before nodes start if an operator tries to enable it, and the
+production runner rejects that override. Start-pose capture and SLAM startup
+are stationary. Mission admission acquires mapping-local authority and selects
+NAV without commanding base motion. Frontier planning begins from the current
+TF pose, and the first navigation goal comes from the selected reachable
+frontier through the exploration handoff. Nav2 may still turn normally while
+following that real path; the degraded profile retains `max_vel_theta: 0.30`,
+`acc_lim_theta: 0.50`, and `decel_lim_theta: -0.50` rather than forcing
+straight-line motion. Before any motion-capable action, an operator must
+inspect the live sources and routing:
+
+```bash
+ros2 topic hz /scan
+ros2 topic echo --once /map
+ros2 run tf2_ros tf2_echo map base_link
+ros2 lifecycle get /controller_server
+ros2 lifecycle get /planner_server
+ros2 topic echo --once /savo_perception/range_health
+ros2 topic echo --once /savo_perception/tof_status
+ros2 topic echo --once /safety/stop
+ros2 topic info --verbose /cmd_vel_nav
+ros2 topic info --verbose /cmd_vel_safe
+```
+
+An invalid optional ToF is expected to remain visible as a sensor-level
+`ERROR`; it must not be the sole reason for required-range failure or
+`/safety/stop`. Any real LiDAR, localization, SLAM, Nav2, control, power,
+mapping-health, authority, or ownership failure remains a no-go condition.
+
 The launch staggers description, base, LiDAR, range safety, control,
 localization, core power, live-map Nav2, SLAM and autonomous
 mapping to reduce Core Pi startup contention. It does not send an autonomous
@@ -82,8 +136,9 @@ The action goal is the only mission start boundary, but it proceeds only after
 the orchestrator acquires and verifies its exact mapping-local lease. Nonzero
 pre-acquired Supervisor generations are rejected explicitly; callers must send
 zero, keeping request, actor, map and semantic fields intact. AM-5 records the
-initial map-frame pose and performs initial Scan360/head scans only when their
-existing flags require them, then enters frontier exploration. A typed control request can insert
+initial map-frame pose without moving the base. The dedicated workflow never
+performs startup Scan360 and enters frontier exploration directly. A typed
+control request can insert
 a guarded conditional Scan360 and automatically resume frontier exploration.
 Stable frontier exhaustion still triggers monitor-only mode, atomic map-session
 save, pose-graph serialization and committed-session verification before

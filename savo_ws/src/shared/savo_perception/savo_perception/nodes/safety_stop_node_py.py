@@ -25,7 +25,10 @@ except Exception:
 
 from savo_perception.constants import NODE_NAME_SAFETY_STOP
 from savo_perception.models import RangeSample, RangeSnapshot
-from savo_perception.ros.params import load_safety_stop_params
+from savo_perception.ros.params import (
+    load_safety_stop_params,
+    normalize_required_sensor_names,
+)
 from savo_perception.ros.qos_profiles import (
     qos_depth_sensor,
     qos_range_sensor,
@@ -108,7 +111,9 @@ class SafetyStopNodePy(Node):
         }
 
         self.params = load_safety_stop_params(values)
-        required = tuple(str(x) for x in self.get_parameter("required_sensors").value)
+        required = normalize_required_sensor_names(
+            self.get_parameter("required_sensors").value
+        )
 
         fusion_cfg = RangeFusionConfig(
             front_stop_m=self.params.front_stop_m,
@@ -226,17 +231,31 @@ class SafetyStopNodePy(Node):
         state_msg.data = update.state.to_json()
         self.state_pub.publish(state_msg)
 
-    def _sample_from_value(self, sensor_name: str, value: float, *, required: bool) -> RangeSample:
+    @staticmethod
+    def _sample_from_value(
+        sensor_name: str,
+        value: float,
+        *,
+        required: bool,
+    ) -> RangeSample:
         try:
             distance_m = float(value)
         except Exception:
             distance_m = math.nan
 
         if not math.isfinite(distance_m):
-            return self._missing_sample(sensor_name, required=required, reason="non_finite")
+            return RangeSample.invalid(
+                sensor_name=sensor_name,
+                source="ros_topic",
+                error="non_finite",
+            )
 
         if distance_m <= 0.0:
-            return self._missing_sample(sensor_name, required=required, reason="non_positive")
+            return RangeSample.invalid(
+                sensor_name=sensor_name,
+                source="ros_topic",
+                error="non_positive",
+            )
 
         return RangeSample.now(
             sensor_name=sensor_name,

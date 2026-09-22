@@ -1,8 +1,16 @@
 """Deployment contracts for the autonomous mapping bringup."""
 
 import ast
+import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
+
+import pytest
+
+from savo_bringup import autonomous_mapping_profiles as mapping_profiles
+from savo_bringup.autonomous_mapping_profiles import (
+    resolve_autonomous_mapping_profile,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -11,6 +19,153 @@ ROOT = Path(__file__).resolve().parents[1]
 def read(relative: str) -> str:
     """Read one package-relative contract fixture."""
     return (ROOT / relative).read_text(encoding="utf-8")
+
+
+def test_autonomous_mapping_profile_resolver_allowlists_atomic_pairs() -> None:
+    """Only the approved perception/Nav2 asset pairs can be selected."""
+    production = resolve_autonomous_mapping_profile("production")
+    degraded = resolve_autonomous_mapping_profile(
+        "core_lidar_mapping_degraded"
+    )
+
+    assert production.perception_config_filename == "core_real_robot_v1.yaml"
+    assert production.nav_params_filename == "nav2_live_mapping.yaml"
+    assert (
+        degraded.perception_config_filename
+        == "core_lidar_mapping_degraded.yaml"
+    )
+    assert (
+        degraded.nav_params_filename
+        == "nav2_live_mapping_core_lidar_degraded.yaml"
+    )
+
+
+def test_autonomous_mapping_profile_resolver_rejects_unknown_names() -> None:
+    """Profile spelling is exact so degraded mode cannot be selected loosely."""
+    for profile_name in ("", "degraded", "Production", "unknown"):
+        with pytest.raises(ValueError, match="unsupported autonomous mapping profile"):
+            resolve_autonomous_mapping_profile(profile_name)
+
+
+def test_autonomous_mapping_profile_resolver_rejects_direct_file_overrides() -> None:
+    """Operators cannot create mixed or arbitrary policy pairs."""
+    overrides = (
+        {"perception_config_file": "/tmp/perception.yaml"},
+        {"nav_params_file": "/tmp/nav2.yaml"},
+        {
+            "perception_config_file": "/tmp/perception.yaml",
+            "nav_params_file": "/tmp/nav2.yaml",
+        },
+    )
+
+    for override in overrides:
+        with pytest.raises(ValueError, match="selected atomically"):
+            resolve_autonomous_mapping_profile("production", **override)
+
+
+def test_dedicated_mapping_rejects_startup_scan360_override() -> None:
+    """Startup Scan360 is fixed off for every dedicated mapping profile."""
+    for disabled in ("false", "0", "no", "off", " FALSE "):
+        mapping_profiles.validate_startup_scan360_disabled(disabled)
+
+    for enabled in ("true", "1", "yes", "on", " TRUE ", "", "maybe"):
+        with pytest.raises(
+            ValueError,
+            match="initial_scan360_required must remain false",
+        ):
+            mapping_profiles.validate_startup_scan360_disabled(enabled)
+
+
+def test_autonomous_mapping_launch_selects_profile_before_staged_nodes() -> None:
+    """The launch default is production and direct asset overrides are internal."""
+    launch = read("launch/autonomous_mapping.launch.py")
+    perception_launch = (
+        ROOT.parents[1]
+        / "shared"
+        / "savo_perception"
+        / "launch"
+        / "perception_bringup.launch.py"
+    ).read_text(encoding="utf-8")
+
+    assert (
+        '"autonomous_mapping_profile",\n                default_value="production"'
+        in launch
+    )
+    assert (
+        '"perception_config_file",\n                default_value=""'
+        in launch
+    )
+    assert '"nav_params_file", default_value=""' in launch
+    assert "resolve_autonomous_mapping_profile(" in launch
+    assert "validate_startup_scan360_disabled(" in launch
+    assert launch.index("validate_startup_scan360_disabled(") < launch.index(
+        "resolve_autonomous_mapping_profile("
+    )
+    assert 'context.launch_configurations["perception_config_file"]' in launch
+    assert 'context.launch_configurations["nav_params_file"]' in launch
+    assert '"use_tof",\n                default_value="true"' in perception_launch
+    assert (
+        "core_lidar_mapping_degraded requires "
+        "perception_use_ultrasonic:=false"
+    ) in launch
+    assert launch.index("OpaqueFunction(function=_validate_arguments)") < launch.index(
+        '_stage("description_start_delay_s"'
+    )
+
+
+def test_production_runner_pins_profile_and_rejects_policy_overrides() -> None:
+    """The production entrypoint cannot silently or explicitly enter degraded mode."""
+    runner = (ROOT.parents[3] / "deploy/core/run_autonomous_mapping.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'autonomous_mapping_profile:="production"' in runner
+    for argument in (
+        "autonomous_mapping_profile:=*",
+        "perception_config_file:=*",
+        "nav_params_file:=*",
+        "initial_scan360_required:=*",
+    ):
+        assert argument in runner
+
+
+def test_readme_documents_explicit_degraded_operator_flow() -> None:
+    """Temporary mode is conspicuous and cannot be confused with production."""
+    readme = read("README.md")
+
+    assert "core_lidar_mapping_degraded" in readme
+    assert "no required short-range sensors" in readme
+    assert "perception_use_ultrasonic:=false" in readme
+    assert "production runner cannot select the degraded profile" in readme
+    assert "/savo_perception/range_health" in readme
+    assert "/savo_perception/tof_status" in readme
+    assert "/cmd_vel_nav" in readme
+    assert "/cmd_vel_safe" in readme
+
+
+def test_dedicated_mapping_keeps_required_non_range_dependencies() -> None:
+    """The degraded selector changes no mapping-critical startup dependency."""
+    launch = read("launch/autonomous_mapping.launch.py")
+
+    for start_argument in (
+        "start_base",
+        "start_lidar",
+        "start_control",
+        "start_localization",
+        "start_power",
+        "start_navigation",
+        "start_mapping",
+    ):
+        assert re.search(
+            rf'DeclareLaunchArgument\(\s*"{start_argument}",\s*'
+            r'default_value="true"',
+            launch,
+        )
+    assert re.search(
+        r'DeclareLaunchArgument\(\s*"slam_autostart",\s*'
+        r'default_value="true"',
+        launch,
+    )
 
 
 def test_autonomous_mapping_launch_composes_all_core_owners() -> None:
@@ -74,6 +229,9 @@ def test_autonomous_mapping_launch_is_fail_closed_by_default() -> None:
     assert "ros2 action send_goal" not in launch
     assert "ActionClient" not in launch
     assert "create_client" not in launch
+    assert "create_publisher" not in launch
+    assert "cmd_vel" not in launch
+    assert "nav2_msgs.action.Spin" not in launch
     assert '"supervisor_auto_arm", default_value="false"' in launch
     assert '"auto_arm": LaunchConfiguration("supervisor_auto_arm")' in launch
     assert '_python_launch("savo_description"' in launch
@@ -83,7 +241,8 @@ def test_autonomous_mapping_launch_is_fail_closed_by_default() -> None:
     assert "production requires require_locked_geometry:=true" in launch
     assert "production forbids allow_provisional_geometry:=true" in launch
     assert "canonical production geometry profile" in launch
-    assert "canonical production perception profile" in launch
+    assert '"autonomous_mapping_profile"' in launch
+    assert "resolve_autonomous_mapping_profile(" in launch
     assert '"start_head"' in launch
     assert '"head_enable_tf"' in launch
     assert '"head_enable_tf",\n                default_value="true"' in launch
@@ -149,7 +308,13 @@ def test_headless_mapping_is_the_dedicated_launch_default() -> None:
         assert f'name="{argument}" default="true"' in mapping
 
     for argument in scan_arguments:
-        assert f'"{argument}", default_value="false"' in autonomous
+        assert re.search(
+            rf'"{argument}",\s*default_value="false"',
+            autonomous,
+        )
+
+    assert "validate_startup_scan360_disabled(" in autonomous
+    assert '"initial_scan360_required": "false"' in autonomous
 
     assert '"start_head", default_value="false"' in autonomous
     assert '"start_location_lifecycle", default_value="false"' in autonomous
@@ -169,8 +334,11 @@ def test_headless_mapping_is_the_dedicated_launch_default() -> None:
 
     # Scan360 needs the rotate server if either mission scan is required.
     assert 'scan360_required = PythonExpression(' in autonomous
-    assert 'LaunchConfiguration("initial_scan360_required")' in autonomous
     assert 'LaunchConfiguration("final_scan360_required")' in autonomous
+    scan_condition = autonomous.split(
+        "scan360_required = PythonExpression(", maxsplit=1
+    )[1].split("description_launch =", maxsplit=1)[0]
+    assert 'LaunchConfiguration("initial_scan360_required")' not in scan_condition
     assert '"use_rotate_to_heading": scan360_required' in autonomous
 
     # Launch remains inert and authority remains closed in headless mode too.
@@ -351,7 +519,8 @@ def test_one_launch_wires_complete_am8_release_chain() -> None:
     ).read_text(encoding="utf-8")
 
     assert '"start_review_gateway": "true"' in launch
-    assert '"nav2_live_mapping.yaml"' in launch
+    profiles = read("savo_bringup/autonomous_mapping_profiles.py")
+    assert 'nav_params_filename="nav2_live_mapping.yaml"' in profiles
     assert '"nav_params_file"' in launch
     assert '"nav_readiness_params"' in launch
     assert '"location_integration.launch.py"' in launch

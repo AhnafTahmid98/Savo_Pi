@@ -194,6 +194,35 @@ def test_motion_dispatch_waits_for_lease_bound_control_mode() -> None:
     )
 
 
+def test_dedicated_startup_has_no_spin_or_synthetic_navigation_dispatch() -> None:
+    """Only frontier handoff may create the first exploration Nav2 goal."""
+    orchestrator = read('src/nodes/autonomous_mapping_orchestrator_node.cpp')
+    frontier = read('src/nodes/frontier_explorer_node.cpp')
+    handoff = read('src/nodes/exploration_goal_handoff_node.cpp')
+
+    for source in (orchestrator, frontier, handoff):
+        assert 'nav2_msgs/action/spin.hpp' not in source
+        assert 'nav2_msgs::action::Spin' not in source
+
+    capture_body = orchestrator.split(
+        'void capture_start_pose_request()', maxsplit=1
+    )[1].split('void request_map_save()', maxsplit=1)[0]
+    assert 'start_pose_reader_->read()' in capture_body
+    assert 'async_send_goal' not in capture_body
+    assert 'cmd_vel' not in capture_body
+
+    assert 'planner_->plan(' in frontier
+    assert 'const auto [robot_x_m, robot_y_m] =' in frontier
+    assert 'robot_position();' in frontier
+    assert 'message.pose.position.x = goal.x_m;' in frontier
+    assert 'message.pose.position.y = goal.y_m;' in frontier
+    assert 'selected_goal_publisher_->publish(' in frontier
+    assert 'handle_selected_goal' in handoff
+    assert 'pending_goal_ = pose;' in handoff
+    assert 'action_client_->async_send_goal(' in handoff
+    assert 'cmd_vel' not in orchestrator
+
+
 def test_completion_detection_is_typed_and_routes_save_publicly() -> None:
     source = read('src/nodes/autonomous_mapping_orchestrator_node.cpp')
     mission = read('src/workflow/autonomous_mapping_mission.cpp')

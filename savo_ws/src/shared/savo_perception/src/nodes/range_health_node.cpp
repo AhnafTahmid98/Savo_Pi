@@ -1,4 +1,5 @@
 #include "savo_perception/range_health_node.hpp"
+#include "savo_perception/range_sensor_parameters.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -164,7 +165,8 @@ void RangeHealthNode::load_parameters()
   depth_front_required_ = get_parameter("depth_front_required").as_bool();
   use_ultrasonic_ = get_parameter("use_ultrasonic").as_bool();
 
-  required_sensors_ = get_parameter("required_sensors").as_string_array();
+  required_sensors_ = normalize_required_sensor_names(
+    get_parameter("required_sensors").as_string_array());
   optional_sensors_ = get_parameter("optional_sensors").as_string_array();
 
   if (!use_ultrasonic_) {
@@ -371,24 +373,7 @@ std::vector<SensorHealth> RangeHealthNode::current_health() const
 
 bool RangeHealthNode::overall_ok(const std::vector<SensorHealth> & health) const
 {
-  for (const auto & item : health) {
-    if (
-      is_required_sensor(item.sensor_name) &&
-      (!item.ok || !rate_ok(item.sensor_name)))
-    {
-      return false;
-    }
-
-    if (
-      include_depth_in_overall_ok_ &&
-      item.sensor_name == "depth_front" &&
-      (!item.ok || !rate_ok(item.sensor_name)))
-    {
-      return false;
-    }
-  }
-
-  return true;
+  return required_health(health).ok;
 }
 
 void RangeHealthNode::record_receipt(const std::string & sensor_name)
@@ -464,22 +449,7 @@ bool RangeHealthNode::rate_ok(const std::string & sensor_name) const
 
 std::string RangeHealthNode::overall_status(const std::vector<SensorHealth> & health) const
 {
-  const auto stale_required = stale_required_sensors(health);
-  const auto error_required = error_required_sensors(health);
-
-  if (!error_required.empty()) {
-    return "ERROR";
-  }
-
-  if (!stale_required.empty()) {
-    return "STALE";
-  }
-
-  if (!overall_ok(health)) {
-    return "ERROR";
-  }
-
-  return "OK";
+  return to_string(required_health(health).status);
 }
 
 bool RangeHealthNode::is_required_sensor(const std::string & sensor_name) const
@@ -501,33 +471,39 @@ bool RangeHealthNode::is_optional_sensor(const std::string & sensor_name) const
 std::vector<std::string> RangeHealthNode::stale_required_sensors(
   const std::vector<SensorHealth> & health) const
 {
-  std::vector<std::string> out;
-
-  for (const auto & item : health) {
-    if (is_required_sensor(item.sensor_name) && item.stale) {
-      out.push_back(item.sensor_name);
-    }
-  }
-
-  return out;
+  return required_health(health).stale_required_sensors;
 }
 
 std::vector<std::string> RangeHealthNode::error_required_sensors(
   const std::vector<SensorHealth> & health) const
 {
-  std::vector<std::string> out;
+  return required_health(health).error_required_sensors;
+}
 
+RequiredRangeHealth RangeHealthNode::required_health(
+  const std::vector<SensorHealth> & health) const
+{
+  auto required = required_sensors_;
+  if (
+    include_depth_in_overall_ok_ &&
+    !is_required_sensor("depth_front"))
+  {
+    required.push_back("depth_front");
+  }
+
+  std::vector<std::string> below_minimum_rate_sensors;
   for (const auto & item : health) {
     if (
-      is_required_sensor(item.sensor_name) &&
-      (item.status == SensorStatus::kError ||
-      (!item.stale && !rate_ok(item.sensor_name))))
+      std::find(required.begin(), required.end(), item.sensor_name) !=
+      required.end() &&
+      !item.stale && !rate_ok(item.sensor_name))
     {
-      out.push_back(item.sensor_name);
+      below_minimum_rate_sensors.push_back(item.sensor_name);
     }
   }
 
-  return out;
+  return evaluate_required_range_health(
+    health, required, below_minimum_rate_sensors);
 }
 
 void RangeHealthNode::publish_health(const std::vector<SensorHealth> & health)

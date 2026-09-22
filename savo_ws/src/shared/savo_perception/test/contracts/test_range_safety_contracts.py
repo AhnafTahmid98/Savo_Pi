@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import copy
 import math
 import re
 import runpy
 import time
 from pathlib import Path
 
+import pytest
 import yaml
 
 from savo_perception.diagnostics.tof_mux_check import build_arg_parser
@@ -18,11 +20,17 @@ from savo_perception.models.range_sample import (
     RangeSnapshot,
     is_valid_distance,
 )
-from savo_perception.models.sensor_health import SensorHealth
+from savo_perception.models.sensor_health import (
+    SensorHealth,
+    evaluate_required_range_health,
+)
 from savo_perception.nodes.range_health_node_py import (
+    RangeHealthNodePy,
     fresh_ultrasonic_diagnostic_error,
     update_ultrasonic_diagnostic,
 )
+from savo_perception.nodes.safety_stop_node_py import SafetyStopNodePy
+from savo_perception.ros import params as ros_params
 from savo_perception.safety.range_fusion import (
     RangeFusionConfig,
     fuse_range_snapshot,
@@ -94,6 +102,42 @@ def test_right_nan_is_a_required_invalid_stop() -> None:
     decision = fuse_range_snapshot(snapshot).decision
     assert decision.stop_required
     assert decision.reason == "required_sensor_invalid"
+
+
+def test_degraded_left_nan_is_reported_without_required_sensor_stop() -> None:
+    snapshot = _snapshot()
+    snapshot = RangeSnapshot(
+        snapshot.depth_front,
+        _invalid("tof_left"),
+        snapshot.tof_right,
+        snapshot.ultrasonic_front,
+    )
+    result = fuse_range_snapshot(
+        snapshot,
+        RangeFusionConfig(required_sensors=()),
+    )
+
+    assert "tof_left" in result.invalid_sensors
+    assert result.decision.reason != "required_sensor_invalid"
+    assert not result.decision.stop_required
+
+
+def test_degraded_right_nan_is_reported_without_required_sensor_stop() -> None:
+    snapshot = _snapshot()
+    snapshot = RangeSnapshot(
+        snapshot.depth_front,
+        snapshot.tof_left,
+        _invalid("tof_right"),
+        snapshot.ultrasonic_front,
+    )
+    result = fuse_range_snapshot(
+        snapshot,
+        RangeFusionConfig(required_sensors=()),
+    )
+
+    assert "tof_right" in result.invalid_sensors
+    assert result.decision.reason != "required_sensor_invalid"
+    assert not result.decision.stop_required
 
 
 def test_required_tof_staleness_stops() -> None:
@@ -191,6 +235,75 @@ def test_health_never_reports_valid_with_null_distance() -> None:
     assert not health.valid
     assert not health.ok
     assert health.last_distance_m is None
+
+
+def test_degraded_required_health_ignores_optional_tof_error() -> None:
+    health = {
+        "tof_left": SensorHealth.from_sample(
+            RangeSample.invalid(
+                sensor_name="tof_left",
+                error="invalid_distance",
+            ),
+            stale_timeout_s=1.0,
+        ),
+        "tof_right": SensorHealth.from_sample(
+            _sample("tof_right"),
+            stale_timeout_s=1.0,
+        ),
+    }
+
+    result = evaluate_required_range_health(health, required_sensors=[])
+
+    assert health["tof_left"].status == "ERROR"
+    assert not health["tof_left"].valid
+    assert health["tof_left"].error == "invalid_distance"
+    assert result == {
+        "ok": True,
+        "status": "OK",
+        "stale_required_sensors": [],
+        "error_required_sensors": [],
+    }
+
+
+def test_production_required_health_fails_on_tof_error() -> None:
+    health = {
+        "tof_left": SensorHealth.from_sample(
+            RangeSample.invalid(
+                sensor_name="tof_left",
+                error="invalid_distance",
+            ),
+            stale_timeout_s=1.0,
+        ),
+        "tof_right": SensorHealth.from_sample(
+            _sample("tof_right"),
+            stale_timeout_s=1.0,
+        ),
+    }
+
+    result = evaluate_required_range_health(
+        health,
+        required_sensors=["tof_left", "tof_right"],
+    )
+
+    assert not result["ok"]
+    assert result["status"] == "ERROR"
+    assert result["error_required_sensors"] == ["tof_left"]
+
+
+def test_received_invalid_tof_is_error_not_stale_in_python_fallbacks() -> None:
+    for node_type in (RangeHealthNodePy, SafetyStopNodePy):
+        for invalid_value in (math.nan, math.inf, -math.inf, 0.0, -0.1):
+            sample = node_type._sample_from_value(
+                "tof_left",
+                invalid_value,
+                required=True,
+            )
+            health = SensorHealth.from_sample(sample, stale_timeout_s=1.0)
+
+            assert not sample.valid
+            assert sample.distance_m is None
+            assert health.status == "ERROR"
+            assert not health.stale
 
 
 def test_perception_launch_disables_driver_and_passes_flag_to_consumers() -> None:
@@ -321,17 +434,17 @@ def test_real_profile_uses_tuned_slowdown_and_unchanged_stop_thresholds() -> Non
 
 
 def test_autonomous_mapping_selects_production_perception_authority() -> None:
-    launch = _read(
-        PACKAGE.parents[1]
-        / "shared"
-        / "savo_bringup"
-        / "launch"
-        / "autonomous_mapping.launch.py"
+    bringup = PACKAGE.parents[1] / "shared" / "savo_bringup"
+    launch = _read(bringup / "launch" / "autonomous_mapping.launch.py")
+    profiles = _read(
+        bringup / "savo_bringup" / "autonomous_mapping_profiles.py"
     )
     generic = _read(PACKAGE / "config/core/perception_core.yaml")
     generic_safety = _read(PACKAGE / "config/core/range_safety.yaml")
 
-    assert '"core_real_robot_v1.yaml"' in launch
+    assert 'perception_config_filename="core_real_robot_v1.yaml"' in profiles
+    assert '"autonomous_mapping_profile"' in launch
+    assert "resolve_autonomous_mapping_profile(" in launch
     assert '"config_file": LaunchConfiguration("perception_config_file")' in launch
     for source in (generic, generic_safety):
         assert "not the autonomous-mapping threshold authority" in source
@@ -384,6 +497,70 @@ def test_required_tofs_remain_required_and_ultrasonic_optional() -> None:
     config = _read(PACKAGE / "config" / "core" / "perception_core.yaml")
     assert "required_sensors:\n      - tof_left\n      - tof_right" in config
     assert "optional_sensors:\n      - depth_front\n      - ultrasonic_front" in config
+
+
+def test_production_and_degraded_profiles_only_change_sensor_optionality() -> None:
+    profiles = PACKAGE / "config" / "profiles"
+    production = yaml.safe_load(_read(profiles / "core_real_robot_v1.yaml"))
+    degraded = yaml.safe_load(
+        _read(profiles / "core_lidar_mapping_degraded.yaml")
+    )
+    policy_nodes = (
+        "safety_stop_node",
+        "safety_stop_node_py",
+        "range_health_node",
+        "range_health_node_py",
+    )
+    optional_sensors = [
+        "tof_left",
+        "tof_right",
+        "depth_front",
+        "ultrasonic_front",
+    ]
+
+    expected = copy.deepcopy(production)
+    for node_name in policy_nodes:
+        production_params = production[node_name]["ros__parameters"]
+        degraded_params = degraded[node_name]["ros__parameters"]
+
+        assert production_params["required_sensors"] == [
+            "tof_left",
+            "tof_right",
+        ]
+        assert degraded_params["required_sensors"] == ["__none__"]
+        assert ros_params.normalize_required_sensor_names(
+            degraded_params["required_sensors"]
+        ) == ()
+        assert degraded_params["optional_sensors"] == optional_sensors
+
+        expected[node_name]["ros__parameters"]["required_sensors"] = [
+            "__none__"
+        ]
+        expected[node_name]["ros__parameters"]["optional_sensors"] = (
+            optional_sensors
+        )
+
+    assert degraded == expected
+
+    driver = degraded["vl53_mux_node"]["ros__parameters"]
+    assert driver["tca_addr"] == 0x70
+    assert driver["vl53_addr"] == 0x29
+    assert driver["left_channel"] == 7
+    assert driver["right_channel"] == 3
+    assert driver["publish_nan_on_error"] is True
+    assert (
+        degraded["cmd_vel_safety_gate"]["ros__parameters"][
+            "cmd_vel_safe_topic"
+        ]
+        == "/cmd_vel_safe"
+    )
+
+
+def test_required_sensor_transport_sentinel_rejects_mixed_configuration() -> None:
+    with pytest.raises(ValueError, match="must be the only configured value"):
+        ros_params.normalize_required_sensor_names(
+            ["__none__", "tof_left"]
+        )
 
 
 def test_ultrasonic_driver_causes_reach_range_health_status() -> None:

@@ -17,6 +17,7 @@
 
 #include "savo_perception/constants.hpp"
 #include "savo_perception/perception_types.hpp"
+#include "savo_perception/range_health_policy.hpp"
 #include "savo_perception/topic_names.hpp"
 #include "savo_perception/visibility_control.hpp"
 
@@ -62,6 +63,8 @@ private:
   [[nodiscard]] double receive_rate_hz(const std::string & sensor_name) const;
   [[nodiscard]] std::string rate_quality(const std::string & sensor_name) const;
   [[nodiscard]] bool rate_ok(const std::string & sensor_name) const;
+  [[nodiscard]] RequiredRangeHealth required_health(
+    const std::vector<SensorHealth> & health) const;
 
   [[nodiscard]] bool is_required_sensor(const std::string & sensor_name) const;
   [[nodiscard]] bool is_optional_sensor(const std::string & sensor_name) const;

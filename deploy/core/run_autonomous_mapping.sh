@@ -14,7 +14,7 @@ source "${SAVO_ROOT}/deploy/common/production_geometry.sh"
 savo_assert_production_geometry_environment
 for argument in "$@"; do
   case "${argument}" in
-    control_startup_mode:=*|start_supervisor:=*|supervisor_auto_arm:=*|perception_config_file:=*)
+    control_startup_mode:=*|start_supervisor:=*|supervisor_auto_arm:=*|autonomous_mapping_profile:=*|perception_config_file:=*|nav_params_file:=*|initial_scan360_required:=*)
       savo_die "Dedicated autonomous runner forbids overriding ${argument%%:=*}"
       ;;
   esac
@@ -41,7 +41,7 @@ exec python3 "${ownership_tool}" run-core-owner \
   -- ros2 launch savo_bringup autonomous_mapping.launch.py \
   "$@" \
   geometry_profile:="$(savo_production_geometry_profile)" \
-  perception_config_file:="${SAVO_WS}/install/savo_perception/share/savo_perception/config/profiles/core_real_robot_v1.yaml" \
+  autonomous_mapping_profile:="production" \
   require_locked_geometry:=true \
   allow_provisional_geometry:=false \
   control_startup_mode:="${SAVO_CONTROL_STARTUP_MODE:-STOP}" \

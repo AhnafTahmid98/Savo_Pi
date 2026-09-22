@@ -22,6 +22,7 @@ from savo_perception.models.safety_state import (
 from savo_perception.models.sensor_health import (
     RangeHealthSummary,
     SensorHealth,
+    evaluate_required_range_health,
     summarize_samples,
 )
 
@@ -42,5 +43,6 @@ __all__ = [
     # sensor_health
     "SensorHealth",
     "RangeHealthSummary",
+    "evaluate_required_range_health",
     "summarize_samples",
 ]
