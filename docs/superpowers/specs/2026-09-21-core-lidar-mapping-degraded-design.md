@@ -62,11 +62,18 @@ configuration except for:
 - `max_vel_theta: 0.30`
 - `acc_lim_theta: 0.50`
 - `decel_lim_theta: -0.50`
+- appending the DWB `Twirling` critic
+- `Twirling.scale: 10.0`
 
 Linear limits, footprints, costmaps, inflation, and both LiDAR obstacle layers
 remain byte-for-value equivalent to production. RPLIDAR remains the SLAM and
 Nav2 obstacle source. LiDAR, SLAM, localization, Nav2, base/control, and power
 requirements are not weakened.
+
+The degraded-only `Twirling` cost penalizes pure angular motion while the
+holonomic base is traveling toward a frontier. It does not impose a nonzero
+minimum translational velocity, remove `RotateToGoal`, or disable simultaneous
+linear and angular commands. Production DWB behavior remains unchanged.
 
 Velocity routing remains `Nav2 /cmd_vel_nav` through the existing control path
 and perception safety gate to `/cmd_vel_safe`, then to `savo_base`. Nothing
@@ -111,6 +118,8 @@ LiDAR requirements and velocity routing, and an exact recursive Nav2 diff.
 They also lock fixed-false startup Scan360, inert launch/admission behavior,
 stationary pose capture, current-pose frontier planning, frontier-only initial
 goal handoff, and preservation of ordinary Nav2 path-following rotation.
+The recursive Nav2 guard also permits only the degraded `Twirling` critic and
+scale in addition to the three approved yaw-limit differences.
 
 Run focused tests for `savo_perception`, `savo_bringup`, `savo_nav`, and
 `savo_mapping`, then the complete hardware-free workspace suite. Also run

@@ -162,6 +162,9 @@ controller_server:
       - "PathAlign"
       - "PathDist"
       - "GoalDist"
+      # Penalize pure travel-time spin on the holonomic base without
+      # disabling angular correction or RotateToGoal near the goal.
+      - "Twirling"
 
       BaseObstacle.scale: 0.02
 
@@ -177,6 +180,8 @@ controller_server:
       RotateToGoal.scale: 24.0
       RotateToGoal.slowing_factor: 5.0
       RotateToGoal.lookahead_time: -1.0
+
+      Twirling.scale: 10.0
 
 local_costmap:
   local_costmap:

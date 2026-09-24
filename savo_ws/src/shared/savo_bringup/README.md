@@ -89,7 +89,11 @@ TF pose, and the first navigation goal comes from the selected reachable
 frontier through the exploration handoff. Nav2 may still turn normally while
 following that real path; the degraded profile retains `max_vel_theta: 0.30`,
 `acc_lim_theta: 0.50`, and `decel_lim_theta: -0.50` rather than forcing
-straight-line motion. Before any motion-capable action, an operator must
+straight-line motion. Its DWB controller also enables the holonomic
+`Twirling` critic at scale `10.0` so travel-time pure rotation is penalized;
+zero translational speed remains legal, angular correction while moving stays
+available, and `RotateToGoal` remains enabled for required final alignment.
+Before any motion-capable action, an operator must
 inspect the live sources and routing:
 
 ```bash

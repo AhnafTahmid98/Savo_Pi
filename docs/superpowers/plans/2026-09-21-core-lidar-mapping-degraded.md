@@ -4,7 +4,7 @@
 
 **Goal:** Add an explicit temporary Core-only LiDAR autonomous-mapping profile that tolerates invalid optional ToFs without weakening the default production path.
 
-**Architecture:** An allowlisted `autonomous_mapping_profile` selector atomically chooses one perception/Nav2 asset pair. Perception policy remains driven by required sensor membership, while a small pure range-health evaluator makes aggregate behavior directly testable in both C++ and Python. The degraded Nav2 file is a production clone with only three angular limits changed.
+**Architecture:** An allowlisted `autonomous_mapping_profile` selector atomically chooses one perception/Nav2 asset pair. Perception policy remains driven by required sensor membership, while a small pure range-health evaluator makes aggregate behavior directly testable in both C++ and Python. The degraded Nav2 file is a production clone with three reduced angular limits plus a bounded holonomic `Twirling` critic added after real-robot validation.
 
 **Tech Stack:** ROS 2 Jazzy launch, C++17/rclcpp/gtest, Python/pytest, ROS parameter YAML, Nav2 DWB.
 
@@ -18,7 +18,7 @@
 - Because Jazzy cannot type an empty YAML sequence, degraded profiles encode the empty required set as `["__none__"]`; every C++ and Python policy node validates and normalizes it to an empty set before use.
 - LEFT ToF remains TCA channel 7; RIGHT remains channel 3; TCA remains `0x70`; VL53L1X remains `0x29`.
 - Do not modify `savo_ws/src/core/savo_base/`, motor behavior, linear Nav2 velocity, costmaps, or `/cmd_vel_safe` routing.
-- The degraded Nav2 file changes only `max_vel_theta`, `acc_lim_theta`, and `decel_lim_theta` to `0.30`, `0.50`, and `-0.50`.
+- The degraded Nav2 file changes `max_vel_theta`, `acc_lim_theta`, and `decel_lim_theta` to `0.30`, `0.50`, and `-0.50`, and appends `Twirling` at scale `10.0` to penalize travel-time pure rotation without forcing translation.
 - The production runner explicitly pins production and rejects profile/file overrides.
 - Dedicated autonomous mapping fixes `initial_scan360_required` to false and rejects attempts to enable it before nodes start.
 - Launch, mission admission, start-pose capture, and SLAM initialization produce no physical base motion; the first navigation goal comes from frontier selection/handoff after mapping-local authority and NAV selection.
@@ -154,7 +154,7 @@ health is OK, and production aggregate health is ERROR.
 
 **Interfaces:**
 - Consumes: production `nav2_live_mapping.yaml`.
-- Produces: a live-mapping Nav2 file whose only leaf differences are the three angular limits.
+- Produces: the initial live-mapping Nav2 file whose only leaf differences are the three angular limits; Task 9 adds the later real-robot holonomic correction.
 
 - [ ] **Step 1: Write a failing recursive YAML-diff test**
 
@@ -176,7 +176,7 @@ remain `0.55`, `1.00`, and `-1.00`.
 
 Run the two Nav2 contract files. Expected: degraded file missing.
 
-- [ ] **Step 3: Copy production Nav2 YAML and change only angular limits**
+- [ ] **Step 3: Copy production Nav2 YAML and initially change only angular limits**
 
 Do not edit the production file. Preserve `/scan` observation sources, costmap
 plugins, footprints, all linear velocity/acceleration limits, and controller
@@ -355,8 +355,9 @@ the selected frontier alone reaches the Nav2 exploration action handoff.
 
 - [ ] **Step 4: Preserve ordinary Nav2 turning**
 
-Retain the exact three-leaf degraded Nav2 diff, assert the degraded maximum yaw
-velocity remains nonzero, and retain the `RotateToGoal` path-following critic.
+Retain the exact allowlisted degraded Nav2 diff, assert the degraded maximum yaw
+velocity remains nonzero, retain the `RotateToGoal` path-following critic, and
+allow the degraded-only `Twirling` critic added by subsequent real-robot tuning.
 
 - [ ] **Step 5: Run focused and full hardware-free verification**
 
@@ -391,3 +392,37 @@ reach range fusion, aggregate health, or diagnostics.
 Load the installed degraded profile with
 `rclcpp::parameter_map_from_yaml_file`, assert all four node parameters are
 typed string arrays, and assert normalization yields an empty effective set.
+
+### Task 9: Penalize Initial Pure Twirling During Degraded Frontier Travel
+
+**Files:**
+- Modify: `savo_ws/src/core/savo_nav/config/nav2_live_mapping_core_lidar_degraded.yaml`
+- Modify: `savo_ws/src/core/savo_nav/test/contracts/test_live_mapping_navigation_contracts.py`
+- Modify: degraded-profile documentation
+
+**Interfaces:**
+- Consumes: holonomic DWB candidate trajectories after a real frontier goal is accepted.
+- Produces: a degraded-only `Twirling` cost that discourages zero-translation angular motion during travel without forcing translation or disabling goal rotation.
+
+- [ ] **Step 1: Prove the controller source of rotation**
+
+Verify the exploration BT contains no `Spin`, Jazzy `RotateToGoal` is inactive
+outside the XY goal window, and the active DWB profile has `PathAlign` and
+`GoalAlign` but no holonomic `Twirling` cost.
+
+- [ ] **Step 2: Add the failing degraded controller contract**
+
+Require production to remain unchanged, degraded to append only `Twirling` at
+scale `10.0`, `min_speed_xy` to remain zero, X/Y holonomic motion to remain
+bidirectional, and angular/final-goal rotation support to remain enabled.
+
+- [ ] **Step 3: Add the minimal degraded-only critic**
+
+Append `Twirling` and set `Twirling.scale: 10.0`. Do not change goal
+orientation, collision critics, costmaps, goal checker, velocity routing,
+localization policy, or production Nav2 configuration.
+
+- [ ] **Step 4: Run focused and full verification**
+
+Run Nav2, mapping, and bringup contracts; check the recursive production diff;
+run `git diff --check`; and prove production Nav2 and `savo_base` have no diff.

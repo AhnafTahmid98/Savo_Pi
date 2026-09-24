@@ -85,8 +85,8 @@ def test_live_mapping_profile_records_tf_authority():
     assert profile['direct_velocity_authority'] is False
 
 
-def test_degraded_nav2_changes_only_approved_yaw_limits():
-    """Keep degraded mapping identical except for conservative yaw limits."""
+def test_degraded_nav2_changes_only_approved_controller_tuning():
+    """Keep production fixed while adding bounded degraded holonomic tuning."""
     production_document = yaml.safe_load(
         PRODUCTION_NAV2.read_text(encoding='utf-8')
     )
@@ -99,6 +99,8 @@ def test_degraded_nav2_changes_only_approved_yaw_limits():
         'controller_server.ros__parameters.FollowPath.max_vel_theta',
         'controller_server.ros__parameters.FollowPath.acc_lim_theta',
         'controller_server.ros__parameters.FollowPath.decel_lim_theta',
+        'controller_server.ros__parameters.FollowPath.critics[7]',
+        'controller_server.ros__parameters.FollowPath.Twirling.scale',
     }
     actual_differences = {
         key
@@ -128,6 +130,39 @@ def test_degraded_nav2_changes_only_approved_yaw_limits():
     assert degraded[
         'controller_server.ros__parameters.FollowPath.max_vel_theta'
     ] > 0.0
-    assert 'RotateToGoal' in degraded_document[
+
+    production_follow_path = production_document[
         'controller_server'
-    ]['ros__parameters']['FollowPath']['critics']
+    ]['ros__parameters']['FollowPath']
+    degraded_follow_path = degraded_document[
+        'controller_server'
+    ]['ros__parameters']['FollowPath']
+
+    assert 'Twirling' not in production_follow_path['critics']
+    assert degraded_follow_path['critics'] == [
+        *production_follow_path['critics'],
+        'Twirling',
+    ]
+    assert degraded_follow_path['Twirling.scale'] == 10.0
+
+
+def test_degraded_holonomic_tuning_discourages_twirling_without_forcing_motion():
+    """Penalize travel-time spin while preserving STOP and normal turning."""
+    document = yaml.safe_load(DEGRADED_NAV2.read_text(encoding='utf-8'))
+    controller = document['controller_server']['ros__parameters']
+    follow_path = controller['FollowPath']
+    goal_checker = controller['general_goal_checker']
+
+    assert follow_path['plugin'] == 'dwb_core::DWBLocalPlanner'
+    assert follow_path['min_speed_xy'] == 0.0
+    assert follow_path['min_speed_theta'] == 0.0
+    assert follow_path['min_vel_x'] < 0.0 < follow_path['max_vel_x']
+    assert follow_path['min_vel_y'] < 0.0 < follow_path['max_vel_y']
+    assert follow_path['max_vel_theta'] == 0.30
+    assert follow_path['acc_lim_theta'] == 0.50
+    assert follow_path['decel_lim_theta'] == -0.50
+    assert follow_path['critics'][-1] == 'Twirling'
+    assert follow_path['Twirling.scale'] == 10.0
+    assert 'RotateToGoal' in follow_path['critics']
+    assert follow_path['RotateToGoal.scale'] > 0.0
+    assert goal_checker['yaw_goal_tolerance'] > 0.0
