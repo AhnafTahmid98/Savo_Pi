@@ -13,9 +13,10 @@ Core only. Manual and autonomous compositions are selected by `savo_bringup`; pr
 - Coordinate SLAM Toolbox without taking its TF authority.
 - Manage mapping mode/readiness/workflow/session state.
 - Run manual mapping and frontier exploration.
-- Plan coverage and stage it until explicit supervisor-authorized execution.
+- Plan coverage and stage it until explicit authority-checked execution.
 - Execute contract-v3 `RunAutonomousMapping` behind an exact, continuously
-  checked Supervisor lease: start pose, initial/final Scan360/head scans,
+  checked mapping-local lease in the dedicated autonomous composition: start
+  pose, initial/final Scan360/head scans,
   frontier exhaustion, coverage, return near start, save, verification,
   location checks, operator review, and release.
 - Register semantic candidates via head evidence and locations persistence.
@@ -23,7 +24,7 @@ Core only. Manual and autonomous compositions are selected by `savo_bringup`; pr
 
 ## Non-responsibilities and authority boundaries
 
-Does not drive motors, publish `/cmd_vel*`, execute Nav2 paths, own `map -> odom`, approve maps/locations for the operator, or bypass supervisor/control/perception. Selected goals/plans are inert until admitted by `savo_nav` and the command chain.
+Does not drive motors, publish `/cmd_vel*`, execute Nav2 paths, own `map -> odom`, approve maps/locations for the operator, or bypass the authority, control, and perception boundaries active for a workflow. Selected goals/plans are inert until admitted by `savo_nav` and the command chain.
 
 ## Package structure
 
@@ -41,11 +42,11 @@ Production C++ domain/orchestrator/planner/nodes, XML/Python launches, YAML, RVi
 
 ### Coverage and Scan360
 
-`coverage_mapper_node` produces inert `nav_msgs/Path`; `coverage_execution_handoff_node` stages a plan; `coverage_operation_orchestrator_node` rechecks supervisor state and explicitly approves/cancels internal handoff; `scan360_mapper_node` uses `RotateToHeading` and map/scan quality. Publishing a path never starts motion.
+`coverage_mapper_node` produces inert `nav_msgs/Path`; `coverage_execution_handoff_node` stages a plan; `coverage_operation_orchestrator_node` rechecks the configured authority boundary and explicitly approves/cancels internal handoff. Dedicated autonomous mapping uses parent-scoped mapping-local authority; standalone workflows may retain system-Supervisor authorization. `scan360_mapper_node` uses `RotateToHeading` and map/scan quality. Publishing a path never starts motion.
 
 ### Semantic locations
 
-`semantic_landmark_bridge_node`, `semantic_interruption_coordinator_node`, `mapped_location_registration_node`, `location_review_gateway_node`, and operator `location_review_cli`. Mapping validates/georeferences; `savo_locations` persists; supervisor authorizes; operator approves/rejects.
+`semantic_landmark_bridge_node`, `semantic_interruption_coordinator_node`, `mapped_location_registration_node`, `location_review_gateway_node`, and operator `location_review_cli`. Mapping validates/georeferences; `savo_locations` persists; the configured mapping-local or system-Supervisor boundary authorizes; operator approves/rejects.
 
 ### Non-production components
 
@@ -68,11 +69,11 @@ Key stable outputs include `/savo_mapping/{mode,workflow_phase,session_state,rea
 
 ### Subscribed topics
 
-`/map`, `/scan`, `/odometry/filtered`, TF, safety stop, localization/control/supervisor readiness/authority, head scan/tag state, nav handoff feedback/results, locations events/status, and SLAM lifecycle state.
+`/map`, `/scan`, `/odometry/filtered`, TF, safety stop, localization/control readiness, mapping-local authority, optional workflow-specific system-Supervisor state, head scan/tag state, nav handoff feedback/results, locations events/status, and SLAM lifecycle state.
 
 ### Services
 
-Key services: mapping mode/session start/cancel; `/savo_mapping/map_session/save`; frontier/exploration cancel; coverage request/reset, staged approve/cancel/reset, supervisor-facing coverage-operation approve/cancel/reset; Scan360 start/cancel; semantic submission/review gateway; `/savo_mapping/autonomous/control`; `/autonomous/review_release`; plus SLAM lifecycle/map-saver clients. Names are configuration-driven under `/savo_mapping`.
+Key services: mapping mode/session start/cancel; `/savo_mapping/map_session/save`; frontier/exploration cancel; coverage request/reset, staged approve/cancel/reset, authority-facing coverage-operation approve/cancel/reset; Scan360 start/cancel; semantic submission/review gateway; `/savo_mapping/autonomous/control`; `/autonomous/review_release`; plus SLAM lifecycle/map-saver clients. Names are configuration-driven under `/savo_mapping`.
 
 ### Actions
 
@@ -109,7 +110,7 @@ None directly; consumes LiDAR/localization/head and requests movement through gu
 
 ### Internal Robot Savo dependencies
 
-Messages, LiDAR, localization, head, control action, perception safety, nav actions, locations services, supervisor authority, description geometry, bringup.
+Messages, LiDAR, localization, head, control action, perception safety, nav actions, locations services, description geometry, and bringup. System-Supervisor interfaces remain available to general or standalone workflows but are not required by dedicated autonomous mapping.
 
 ### External ROS/system dependencies
 

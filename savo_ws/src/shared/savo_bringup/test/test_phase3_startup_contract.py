@@ -183,6 +183,88 @@ def test_autonomous_stage_dependencies_are_slam_then_nav_then_runtime() -> None:
     )
 
 
+def test_mapping_runtime_liveness_is_required_only_after_runtime_launch() -> None:
+    """Pre-runtime stages cannot wait for the not-yet-launched orchestrator."""
+    coordinator = read("src/nodes/bringup_readiness_node.cpp")
+    autonomous = read("launch/autonomous_mapping.launch.py")
+
+    slam_block = coordinator.split(
+        'if (require_mapping_) {', maxsplit=1
+    )[1].split('if (require_navigation_) {', maxsplit=1)[0]
+    navigation_block = coordinator.split(
+        'if (require_navigation_) {', maxsplit=1
+    )[1].split('if (require_mapping_runtime_) {', maxsplit=1)[0]
+    runtime_block = coordinator.split(
+        'if (require_mapping_runtime_) {', maxsplit=1
+    )[1].split('if (require_head_) {', maxsplit=1)[0]
+
+    assert '"mapping_runtime"' not in slam_block
+    assert '"mapping_runtime"' not in navigation_block
+    assert 'mapping_runtime.push_back("mapping_runtime")' in runtime_block
+
+    assert 'name="mapping_runtime"' in autonomous
+    assert 'actions=(mapping_runtime_launch,)' in autonomous
+    staged_launch = read("savo_bringup/staged_launch.py")
+    assert 'GroupAction(actions=[*group.actions, gate])' in staged_launch
+
+
+def test_mapping_runtime_status_is_typed_liveness_not_mission_readiness() -> None:
+    """Idle, unauthorized status is valid startup liveness evidence."""
+    coordinator = read("src/nodes/bringup_readiness_node.cpp")
+    callback = coordinator.split(
+        "void SubscribeMappingRuntimeStatus()", maxsplit=1
+    )[1].split("\n  void ", maxsplit=1)[0]
+
+    assert 'savo_msgs/msg/autonomous_mapping_status.hpp' in coordinator
+    assert '"/savo_mapping/autonomous/status"' in callback
+    assert 'rclcpp::QoS(1).reliable().transient_local()' in callback
+    assert (
+        'message->contract_version ==\n'
+        '        savo_msgs::msg::AutonomousMappingStatus::CONTRACT_VERSION'
+        in callback
+    )
+    assert 'Mark("mapping_runtime", contract_valid, !contract_valid' in callback
+
+    for forbidden_state_requirement in (
+        'message->active',
+        'message->runtime_authorized',
+        'message->mapping_ready',
+        'message->state',
+        'STATE_IDLE',
+        'STATE_EXPLORING',
+    ):
+        assert forbidden_state_requirement not in callback
+
+
+def test_mapping_runtime_status_uses_existing_fail_closed_freshness() -> None:
+    """Missing, stale, or wrong-version status cannot release the stage."""
+    coordinator = read("src/nodes/bringup_readiness_node.cpp")
+    observation_ready = coordinator.split(
+        "bool ObservationReady(", maxsplit=1
+    )[1].split("\n  savo_bringup::StartupStageInput", maxsplit=1)[0]
+
+    assert 'found == observations_.end() || !found->second.seen' in observation_ready
+    assert 'reason = key + "_not_observed";' in observation_ready
+    assert 'if (!Fresh(found->second))' in observation_ready
+    assert 'reason = key + "_stale";' in observation_ready
+    assert 'found->second.failed || !found->second.ready' in observation_ready
+    assert 'startup_observation_freshness_s_' in coordinator
+    assert 'SubscribeMappingRuntimeStatus();' in coordinator
+
+
+def test_dedicated_mapping_liveness_gate_preserves_stop_and_inert_startup() -> None:
+    """Runtime startup observation cannot command or authorize the robot."""
+    coordinator = read("src/nodes/bringup_readiness_node.cpp")
+    autonomous = read("launch/autonomous_mapping.launch.py")
+
+    assert 'default_value="STOP"' in autonomous
+    assert '"control_startup_mode"' in autonomous
+    assert 'async_send_goal' not in coordinator
+    assert 'ActionClient' not in coordinator
+    assert 'AuthorizeOperation' not in coordinator
+    assert 'ControlAutonomousMapping' not in coordinator
+
+
 def test_launch_never_creates_motion_or_mission_authority() -> None:
     """Simple timer staging remains unable to authorize or command motion."""
     autonomous = read("launch/autonomous_mapping.launch.py")

@@ -7,16 +7,17 @@
 - `savo_nav` owns validation and execution of each admitted exploration goal.
 - `savo_control` and `savo_perception` remain final movement and safety
   authorities.
-- `savo_supervisor` owns the exclusive mission lease and operating-mode
-  authorization; it does not choose frontiers or save maps.
+- Dedicated autonomous mapping uses a mission-bound mapping-local lease backed
+  by direct subsystem health. `savo_supervisor` remains available for general
+  system and standalone workflows, but is not part of this dedicated path.
 
 ## Public interfaces
 
 - `/savo_mapping/autonomous/run` uses `RunAutonomousMapping.action` and starts
   exactly one mission. Contract v3 carries the request ID, generation, map
-  context, and semantic requirement of the Supervisor lease. Generation zero
-  asks the orchestrator to acquire the lease; a nonzero generation identifies
-  a lease already acquired by an upstream caller.
+  context, and semantic requirement of the mapping-local lease. Generation
+  zero asks the orchestrator to acquire a new lease. Nonzero pre-acquired
+  generations are rejected; no system-Supervisor lease is silently accepted.
 - `/savo_mapping/autonomous/control` uses `ControlAutonomousMapping.srv` and
   supports pause, resume and cancel.
 - `/savo_mapping/autonomous/status` publishes
@@ -32,21 +33,19 @@ The public mission contract never carries a Nav2 pose or path. Exploration goal
 selection remains internal to `savo_mapping`, and all movement is forwarded
 through the existing guarded `savo_nav` exploration handoff.
 
-The bridge remains compatible: it calls `/savo_supervisor/authorize_operation`
-with `COMMAND_ACQUIRE` before submitting the action, and the mapping action
-server independently CHECKs that lease. A direct action caller may instead
-send generation zero, causing the orchestrator to ACQUIRE and verify the same
-actor, request, operation, map ID, map revision, and semantic requirement
-before starting a session or scan. It
-revalidates the lease while the mission is active, pauses and quiesces on loss,
-requires explicit RESUME, and releases the lease before reporting a terminal
-action result. A raw action client therefore cannot bypass Supervisor merely by
-supplying an actor string.
+The bridge and direct action clients submit generation zero. The orchestrator
+validates the actor, request, map context, semantic scope, and direct local
+health before acquiring a new mapping-local generation or starting a session
+or scan. It revalidates that local authority while the mission is active,
+pauses and quiesces on loss, requires explicit RESUME, and clears authority
+only after terminal STOP acknowledgement. Supplying an actor string alone
+therefore cannot bypass mapping-local admission, control, or safety checks.
 
 AM-7 adds movement internally without adding poses or paths to the public
-mission request: Coverage uses the supervisor-gated public Coverage operation
-services and return-to-start uses the guarded
+mission request: dedicated Coverage uses parent-scoped mapping-local child
+authorization and return-to-start uses the guarded
 `/savo_nav/navigation/navigate_to_pose` action. Raw Nav2 actions remain private.
+Standalone Coverage may retain its system-Supervisor authorization mode.
 
 ## AM-1 behavior
 
@@ -94,7 +93,8 @@ CoveragePending -> Coverage -> ReturningToStart
 Coverage planning is explicitly requested and correlated by new plan and map
 generations. Empty plans are not successful unless the planner explicitly
 marks a valid no-op. Execution is approved, canceled, and reset only through
-the public supervisor-authorized Coverage operation boundary.
+the configured Coverage operation authority boundary. Dedicated autonomous
+mapping selects mapping-local authority for this boundary.
 
 Return uses the captured `start_pose_map`, a normalized map-frame quaternion,
 the guarded navigation action, and a final fresh map-to-base proximity check.

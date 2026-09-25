@@ -146,6 +146,23 @@ def test_slam_lifecycle_has_one_deterministic_owner() -> None:
     assert forwarded['use_lifecycle_manager'] == 'true'
 
 
+def test_directly_launched_lifecycle_manager_is_a_runtime_dependency() -> None:
+    """The package that launches the SLAM lifecycle manager declares it."""
+    launch_root = ET.parse(LAUNCH).getroot()
+    directly_launched_packages = {
+        node.attrib['pkg'] for node in launch_root.findall('.//node')
+    }
+    manifest_root = ET.parse(PACKAGE / 'package.xml').getroot()
+    runtime_dependencies = {
+        element.text
+        for tag in ('depend', 'exec_depend')
+        for element in manifest_root.findall(tag)
+    }
+
+    assert 'nav2_lifecycle_manager' in directly_launched_packages
+    assert 'nav2_lifecycle_manager' in runtime_dependencies
+
+
 def test_autonomous_launch_starts_safe_and_preserves_ownership() -> None:
     """Launch starts idle and does not absorb hardware or Nav2 ownership."""
     text = LAUNCH.read_text(encoding='utf-8')

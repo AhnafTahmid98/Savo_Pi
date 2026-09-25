@@ -24,11 +24,11 @@ Python launch graphs, C++ readiness contract/node, configuration, and contract/r
 
 ### `bringup_readiness_node`
 
-Retained as a diagnostic/test utility. Production Core, Edge, and autonomous-mapping launch paths do not use it to release processes.
+Publishes aggregate diagnostics/readiness. Production Core and Edge launch paths do not use it to release processes; dedicated autonomous mapping additionally uses its staged evidence to release SLAM foundation, Nav2, and the inert mapping runtime in provider-before-consumer order.
 
 ## Runtime data flow
 
-`role + mode + profile -> package launch selection`; each package publishes its own health, while Supervisor and mission owners retain authority.
+`role + mode + profile -> package launch selection`; each package publishes its own health. The system Supervisor retains authority where configured, while dedicated autonomous mapping uses mapping-local mission authority.
 
 ## ROS interfaces
 
@@ -38,7 +38,7 @@ When the retained diagnostic node is launched explicitly, under `/savo_bringup/{
 
 ### Subscribed topics
 
-The retained diagnostic node can subscribe to configured base, control, safety, LiDAR, perception, localization, power, supervisor, navigation, bridge, RealSense, VO, speech, UI, and obstacle-cloud state topics according to role/profile. Production launch composition does not use those subscriptions to release processes.
+The readiness node can subscribe to configured base, control, safety, LiDAR, perception, localization, power, supervisor, mapping, navigation, bridge, RealSense, VO, speech, UI, and obstacle-cloud state topics according to role/profile. Dedicated autonomous mapping uses the relevant observations for staged process release; ordinary Core and Edge composition does not.
 
 ### Services
 
@@ -80,11 +80,11 @@ ROS launch, lifecycle/Nav2/SLAM components selected by compositions.
 
 ## Safety behavior
 
-Invalid role/mode/profile, provisional geometry in motion profiles, unvalidated D435 voxel selection, or missing map release fails closed. Package health and Supervisor authority enforce runtime eligibility. Safe-idle and STOP are defaults.
+Invalid role/mode/profile, provisional geometry in motion profiles, unvalidated D435 voxel selection, or missing map release fails closed. Package health and the authority boundary selected by the workflow enforce runtime eligibility. Dedicated autonomous mapping defaults the system Supervisor off and uses mapping-local authority. Safe-idle and STOP are defaults.
 
 ## Failure and degraded behavior
 
-Optional Edge speech/UI/cloud can remain absent. Required package-health and Supervisor contracts remain fail closed; no Edge status grants Core motion.
+Optional Edge speech/UI/cloud can remain absent. Required package-health and configured authority contracts remain fail closed; no Edge status grants Core motion. Dedicated autonomous mapping does not require system-Supervisor readiness or authority.
 
 ## Startup and shutdown behavior
 

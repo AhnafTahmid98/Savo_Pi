@@ -23,6 +23,7 @@
 #include "diagnostic_msgs/msg/diagnostic_status.hpp"
 #include "diagnostic_msgs/msg/key_value.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "savo_msgs/msg/autonomous_mapping_status.hpp"
 #include "savo_msgs/msg/semantic_interruption_status.hpp"
 #include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/string.hpp"
@@ -386,6 +387,7 @@ private:
         if (require_navigation_) {
           mapping_runtime.push_back("navigation_startup");
         }
+        mapping_runtime.push_back("mapping_runtime");
         AddStage("mapping_runtime", std::move(mapping_runtime));
       }
       if (require_head_) {
@@ -601,6 +603,9 @@ private:
       SubscribeString(
         "slam_lifecycle", "slam_health_topic", "/savo_mapping/slam_health");
     }
+    if (require_mapping_runtime_) {
+      SubscribeMappingRuntimeStatus();
+    }
     if (require_navigation_) {
       SubscribeString(
         "navigation_startup", "navigation_startup_readiness_topic",
@@ -676,6 +681,21 @@ private:
           savo_bringup::QualityLevel::kMinimum} :
           std::optional<savo_bringup::QualityLevel>{
           savo_bringup::QualityLevel::kBelowMinimum});
+      });
+  }
+
+  void SubscribeMappingRuntimeStatus()
+  {
+    const auto topic = declare_parameter<std::string>(
+      "mapping_runtime_status_topic", "/savo_mapping/autonomous/status");
+    mapping_runtime_subscription_ =
+      create_subscription<savo_msgs::msg::AutonomousMappingStatus>(
+      topic, rclcpp::QoS(1).reliable().transient_local(),
+      [this](const savo_msgs::msg::AutonomousMappingStatus::SharedPtr message) {
+        const bool contract_valid = message->contract_version ==
+        savo_msgs::msg::AutonomousMappingStatus::CONTRACT_VERSION;
+        Mark("mapping_runtime", contract_valid, !contract_valid,
+          contract_valid ? "contract_valid" : "contract_version_mismatch");
       });
   }
 
@@ -1185,6 +1205,8 @@ private:
   std::vector<rclcpp::Subscription<UInt64>::SharedPtr> counter_subscriptions_;
   rclcpp::Subscription<savo_msgs::msg::SemanticInterruptionStatus>::SharedPtr
     semantic_subscription_;
+  rclcpp::Subscription<savo_msgs::msg::AutonomousMappingStatus>::SharedPtr
+    mapping_runtime_subscription_;
   rclcpp::TimerBase::SharedPtr timer_;
   std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
