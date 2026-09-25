@@ -18,6 +18,8 @@ from launch.substitutions import LaunchConfiguration
 from launch.substitutions import PathJoinSubstitution
 from launch.substitutions import PythonExpression
 
+from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
 from savo_bringup.autonomous_mapping_profiles import (
@@ -25,6 +27,8 @@ from savo_bringup.autonomous_mapping_profiles import (
     validate_startup_scan360_disabled,
 )
 from savo_bringup.startup_timing import CORE_START_DELAYS
+from savo_bringup.staged_launch import StartupStageGroup
+from savo_bringup.staged_launch import build_staged_sequence
 
 _MAP_ID_PATTERN = re.compile(r"[a-z][a-z0-9_]*")
 
@@ -111,6 +115,12 @@ def _validate_arguments(context):
     perception_use_ultrasonic = LaunchConfiguration(
         "perception_use_ultrasonic"
     ).perform(context).strip().lower()
+    start_mapping = LaunchConfiguration("start_mapping").perform(
+        context
+    ).strip().lower() in {"true", "1", "yes", "on"}
+    start_navigation = LaunchConfiguration("start_navigation").perform(
+        context
+    ).strip().lower() in {"true", "1", "yes", "on"}
 
     if not _MAP_ID_PATTERN.fullmatch(map_id):
         raise RuntimeError(
@@ -144,6 +154,12 @@ def _validate_arguments(context):
     ):
         raise RuntimeError(
             "core_lidar_mapping_degraded requires perception_use_ultrasonic:=false"
+        )
+
+    if start_navigation and not start_mapping:
+        raise RuntimeError(
+            "live-mapping Nav2 requires start_mapping:=true so SLAM owns "
+            "the map and map-to-odom transform before Nav2 starts"
         )
 
     return [
@@ -188,6 +204,64 @@ def _stage(delay_argument: str, action):
         period=LaunchConfiguration(delay_argument),
         actions=[action],
         cancel_on_shutdown=True,
+    )
+
+
+def _enabled(context, argument: str) -> bool:
+    """Resolve a boolean launch argument using ROS launch spellings."""
+    return LaunchConfiguration(argument).perform(context).strip().lower() in {
+        "true",
+        "1",
+        "yes",
+        "on",
+    }
+
+
+def _build_autonomous_sequence(
+    context,
+    *,
+    readiness_node,
+    mapping_foundation_launch,
+    navigation_launch,
+    mapping_runtime_launch,
+    log_level,
+):
+    """Build the runtime-specific SLAM -> Nav2 -> mapping process chain."""
+    if not _enabled(context, "start_mapping"):
+        if _enabled(context, "start_navigation"):
+            raise RuntimeError(
+                "live-mapping Nav2 cannot start without its SLAM foundation"
+            )
+        return []
+
+    groups = [
+        StartupStageGroup(
+            name="localization",
+            actions=(readiness_node,),
+        ),
+        StartupStageGroup(
+            name="slam_foundation",
+            actions=(mapping_foundation_launch,),
+        ),
+    ]
+    if _enabled(context, "start_navigation"):
+        groups.extend(
+            [
+                StartupStageGroup(
+                    name="navigation",
+                    actions=(navigation_launch,),
+                ),
+                StartupStageGroup(
+                    name="mapping_runtime",
+                    actions=(mapping_runtime_launch,),
+                ),
+            ]
+        )
+
+    return build_staged_sequence(
+        groups,
+        status_topic="/savo_bringup/core/startup_status",
+        log_level=log_level,
     )
 
 
@@ -353,6 +427,7 @@ def generate_launch_description() -> LaunchDescription:
             "use_sim_time": use_sim_time,
             "autostart": LaunchConfiguration("nav_autostart"),
             "start_readiness": "true",
+            "start_startup_readiness": "true",
             "start_goal_gateway": "true",
             "log_level": log_level,
         }.items(),
@@ -434,17 +509,81 @@ def generate_launch_description() -> LaunchDescription:
         ),
     }
 
-    mapping_launch = IncludeLaunchDescription(
+    mapping_foundation_launch = IncludeLaunchDescription(
         _frontend_launch("savo_mapping", "autonomous_mapping.launch.xml"),
         condition=IfCondition(LaunchConfiguration("start_mapping")),
         launch_arguments={
             **mapping_common_arguments,
             "start_mapping_foundation": "true",
+            "start_mapping_runtime": "false",
+            "semantic_interruption_enabled": LaunchConfiguration(
+                "start_semantic_interruption"
+            ),
+        }.items(),
+    )
+
+    mapping_runtime_launch = IncludeLaunchDescription(
+        _frontend_launch("savo_mapping", "autonomous_mapping.launch.xml"),
+        condition=IfCondition(LaunchConfiguration("start_mapping")),
+        launch_arguments={
+            **mapping_common_arguments,
+            "start_mapping_foundation": "false",
             "start_mapping_runtime": "true",
             "semantic_interruption_enabled": LaunchConfiguration(
                 "start_semantic_interruption"
             ),
         }.items(),
+    )
+
+    bringup_readiness_params = PathJoinSubstitution(
+        [FindPackageShare("savo_bringup"), "config", "core_real_robot.yaml"]
+    )
+    startup_stages_params = PathJoinSubstitution(
+        [FindPackageShare("savo_bringup"), "config", "startup_stages.yaml"]
+    )
+    readiness_node = Node(
+        package="savo_bringup",
+        executable="bringup_readiness_node",
+        name="bringup_readiness_node",
+        output="screen",
+        parameters=[
+            bringup_readiness_params,
+            startup_stages_params,
+            {
+                "use_sim_time": ParameterValue(use_sim_time, value_type=bool),
+                "robot_mode": "autonomous_mapping",
+                "bringup_profile": LaunchConfiguration("bringup_profile"),
+                "d435_voxel_validated": ParameterValue(
+                    LaunchConfiguration("d435_voxel_validated"),
+                    value_type=bool,
+                ),
+                "require_supervisor": False,
+                "require_supervisor_authority": False,
+                "require_navigation": ParameterValue(
+                    LaunchConfiguration("start_navigation"), value_type=bool
+                ),
+                "require_mapping": True,
+                "require_mapping_runtime": ParameterValue(
+                    LaunchConfiguration("start_navigation"), value_type=bool
+                ),
+                "require_head": False,
+                "require_locations": False,
+                "require_semantic": False,
+                "startup.enabled": True,
+            },
+        ],
+        arguments=["--ros-args", "--log-level", log_level],
+    )
+
+    autonomous_sequence = OpaqueFunction(
+        function=_build_autonomous_sequence,
+        kwargs={
+            "readiness_node": readiness_node,
+            "mapping_foundation_launch": mapping_foundation_launch,
+            "navigation_launch": navigation_launch,
+            "mapping_runtime_launch": mapping_runtime_launch,
+            "log_level": log_level,
+        },
     )
 
     default_geometry_profile = PathJoinSubstitution(
@@ -777,6 +916,10 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument(
                 "navigation_start_delay_s",
                 default_value=CORE_START_DELAYS["navigation"],
+                description=(
+                    "Compatibility timing input; autonomous Nav2 release is "
+                    "readiness-gated after SLAM and does not use this delay."
+                ),
             ),
             DeclareLaunchArgument(
                 "mapping_start_delay_s",
@@ -796,7 +939,6 @@ def generate_launch_description() -> LaunchDescription:
                 "location_lifecycle_start_delay_s",
                 location_lifecycle_launch,
             ),
-            _stage("navigation_start_delay_s", navigation_launch),
-            _stage("mapping_start_delay_s", mapping_launch),
+            _stage("mapping_start_delay_s", autonomous_sequence),
         ]
     )

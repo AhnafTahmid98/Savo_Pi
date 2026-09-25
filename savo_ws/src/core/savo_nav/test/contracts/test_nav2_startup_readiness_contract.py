@@ -7,10 +7,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_startup_readiness_is_diagnostic_only():
-    """The legacy probe remains available but is not a production gate."""
+def test_startup_readiness_monitor_is_launchable_for_dependency_gating():
+    """Live mapping can verify Nav2 without requiring NAV control mode."""
     launch = (ROOT / 'launch/live_mapping_navigation.launch.py').read_text()
-    assert "executable='nav2_startup_readiness_node'" not in launch
+    assert "executable='nav2_startup_readiness_node'" in launch
+    assert "condition=IfCondition(start_startup_readiness)" in launch
+    assert "parameters=[startup_readiness_params]" in launch
     assert 'navigation_readiness_node' in launch
     source = (ROOT / 'src/nodes/nav2_startup_readiness_node.cpp').read_text()
     assert 'async_send_request' in source

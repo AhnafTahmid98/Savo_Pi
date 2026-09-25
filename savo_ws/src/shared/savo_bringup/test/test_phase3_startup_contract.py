@@ -31,8 +31,8 @@ def test_stage_configuration_is_finite_and_dependency_ordered() -> None:
             "sensor_stabilization",
             "localization",
             "supervisor",
-            "navigation",
             "slam_foundation",
+            "navigation",
             "mapping_runtime",
             "head",
             "semantic_locations",
@@ -66,6 +66,7 @@ def test_coordinator_is_process_only_and_preserves_real_tf_contract() -> None:
     assert '"infrastructure.child_frame", "base_link"' in source
     assert "/savo_supervisor/startup_ready" in source
     assert "/savo_nav/startup_readiness" in source
+    assert "/savo_mapping/slam_health" in source
     assert "/savo_supervisor/system_ready" not in source
 
     for forbidden in (
@@ -164,8 +165,22 @@ def test_optional_components_use_launch_conditions_without_fake_stages() -> None
     assert 'condition=IfCondition(LaunchConfiguration("start_head"))' in autonomous
     assert 'LaunchConfiguration("start_location_lifecycle")' in autonomous
     assert '"semantic_interruption_enabled": LaunchConfiguration(' in autonomous
-    assert "StartupStageGroup" not in autonomous
-    assert "bringup_readiness_node" not in autonomous
+    assert "StartupStageGroup" in autonomous
+    assert "bringup_readiness_node" in autonomous
+
+
+def test_autonomous_stage_dependencies_are_slam_then_nav_then_runtime() -> None:
+    """Live-map ownership is established before either downstream consumer."""
+    coordinator = read("src/nodes/bringup_readiness_node.cpp")
+    slam = coordinator.index('AddStage("slam_foundation"')
+    navigation = coordinator.index('AddStage("navigation"')
+    runtime = coordinator.index('AddStage("mapping_runtime"')
+    assert slam < navigation < runtime
+    assert '{"localization", "slam_lifecycle", "mapping"}' in coordinator
+    assert (
+        '{"slam_lifecycle", "mapping", "navigation_startup"}'
+        in coordinator
+    )
 
 
 def test_launch_never_creates_motion_or_mission_authority() -> None:
@@ -178,5 +193,5 @@ def test_launch_never_creates_motion_or_mission_authority() -> None:
     assert "ros2 action send_goal" not in autonomous
     assert "ActionClient" not in autonomous
     assert "TimerAction" in autonomous
-    assert "StartupStageGroup" not in autonomous
-    assert "startup_stage_gate_node" not in autonomous
+    assert "StartupStageGroup" in autonomous
+    assert "build_staged_sequence" in autonomous

@@ -255,6 +255,8 @@ private:
     require_supervisor_authority_ = declare_parameter<bool>("require_supervisor_authority", false);
     require_mapping_ = declare_parameter<bool>("require_mapping", false);
     require_navigation_ = declare_parameter<bool>("require_navigation", false);
+    require_mapping_runtime_ = declare_parameter<bool>(
+      "require_mapping_runtime", require_mapping_);
     require_active_release_ = declare_parameter<bool>("require_active_release", false);
     active_release_verified_ = declare_parameter<bool>("active_release_verified", false);
     require_map_context_ = declare_parameter<bool>("require_map_context", false);
@@ -373,12 +375,18 @@ private:
       if (require_supervisor_) {
         AddStage("supervisor", {"supervisor_startup", "supervisor_safe_unarmed"});
       }
-      if (require_navigation_) {
-        AddStage("navigation", {"navigation_startup"});
-      }
       if (require_mapping_) {
-        AddStage("slam_foundation", {"mapping"});
-        AddStage("mapping_runtime", {"mapping"});
+        AddStage("slam_foundation", {"localization", "slam_lifecycle", "mapping"});
+      }
+      if (require_navigation_) {
+        AddStage("navigation", {"slam_lifecycle", "mapping", "navigation_startup"});
+      }
+      if (require_mapping_runtime_) {
+        std::vector<std::string> mapping_runtime{"slam_lifecycle", "mapping"};
+        if (require_navigation_) {
+          mapping_runtime.push_back("navigation_startup");
+        }
+        AddStage("mapping_runtime", std::move(mapping_runtime));
       }
       if (require_head_) {
         AddStage("head", {"head"});
@@ -588,8 +596,10 @@ private:
         "/savo_supervisor/startup_ready");
       SubscribeSupervisorState();
     }
-    if (require_mapping_) {
+    if (require_mapping_ || require_mapping_runtime_) {
       SubscribeString("mapping", "mapping_readiness_topic", "/savo_mapping/readiness");
+      SubscribeString(
+        "slam_lifecycle", "slam_health_topic", "/savo_mapping/slam_health");
     }
     if (require_navigation_) {
       SubscribeString(
@@ -1122,6 +1132,7 @@ private:
   bool require_supervisor_authority_{false};
   bool require_mapping_{false};
   bool require_navigation_{false};
+  bool require_mapping_runtime_{false};
   bool require_active_release_{false};
   bool active_release_verified_{false};
   bool require_map_context_{false};

@@ -196,8 +196,26 @@
 
     <arg
       name="use_lifecycle_manager"
-      value="false"/>
+      value="true"/>
   </include>
+
+  <!--
+    This is the only owner of slam_toolbox lifecycle transitions. The
+    upstream launch-event autostart path is disabled by use_lifecycle_manager
+    so configure/activate cannot race its state-transition handler.
+  -->
+  <node
+    if="$(var start_mapping_foundation)"
+    pkg="nav2_lifecycle_manager"
+    exec="lifecycle_manager"
+    name="lifecycle_manager_slam"
+    output="screen">
+
+    <param name="use_sim_time" value="$(var use_sim_time)"/>
+    <param name="autostart" value="$(var slam_autostart)"/>
+    <param name="bond_timeout" value="4.0"/>
+    <param name="node_names" value="['slam_toolbox']"/>
+  </node>
 
   <node
     if="$(var start_mapping_foundation)"
@@ -380,15 +398,17 @@
 
   </group>
 
-  <node
-    if="$(var semantic_interruption_enabled)"
-    pkg="savo_mapping"
-    exec="semantic_interruption_coordinator_node"
-    name="semantic_interruption_coordinator_node"
-    output="screen">
+  <group if="$(var start_mapping_runtime)">
+    <node
+      if="$(var semantic_interruption_enabled)"
+      pkg="savo_mapping"
+      exec="semantic_interruption_coordinator_node"
+      name="semantic_interruption_coordinator_node"
+      output="screen">
 
-    <param from="$(var semantic_interruption_params_file)"/>
-    <param name="use_sim_time" value="$(var use_sim_time)"/>
-  </node>
+      <param from="$(var semantic_interruption_params_file)"/>
+      <param name="use_sim_time" value="$(var use_sim_time)"/>
+    </node>
+  </group>
 
 </launch>

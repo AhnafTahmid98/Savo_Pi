@@ -223,8 +223,8 @@ def test_core_stage_defaults_are_dependency_ordered() -> None:
     assert float(defaults["readiness_start_delay_s"]) == 60.0
 
 
-def test_autonomous_mapping_uses_dependency_ordered_core_offsets() -> None:
-    """The dedicated mapping launch staggers heavy stacks through TimerAction."""
+def test_autonomous_mapping_uses_readiness_gates_after_core_offsets() -> None:
+    """Heavy core starts stay staggered; SLAM/Nav/runtime use readiness gates."""
     defaults = launch_defaults(AUTONOMOUS_LAUNCH)
     assert {
         name: defaults[name] for name in AUTONOMOUS_STAGE_DEFAULTS
@@ -241,8 +241,7 @@ def test_autonomous_mapping_uses_dependency_ordered_core_offsets() -> None:
         "head_launch": "head_start_delay_s",
         "supervisor_launch": "supervisor_start_delay_s",
         "location_lifecycle_launch": "location_lifecycle_start_delay_s",
-        "navigation_launch": "navigation_start_delay_s",
-        "mapping_launch": "mapping_start_delay_s",
+        "autonomous_sequence": "mapping_start_delay_s",
     }
     assert staged_actions(AUTONOMOUS_LAUNCH) == expected_bindings
 
@@ -255,8 +254,7 @@ def test_autonomous_mapping_uses_dependency_ordered_core_offsets() -> None:
         "localization_launch",
         "power_launch",
         "supervisor_launch",
-        "navigation_launch",
-        "mapping_launch",
+        "autonomous_sequence",
     )
     delays = [
         float(defaults[expected_bindings[action]]) for action in required_order
@@ -266,6 +264,20 @@ def test_autonomous_mapping_uses_dependency_ordered_core_offsets() -> None:
     assert defaults["localization_start_delay_s"] != defaults[
         "navigation_start_delay_s"
     ]
+
+    launch = read(AUTONOMOUS_LAUNCH)
+    localization = launch.index('name="localization",\n            actions=(readiness_node,)')
+    slam = launch.index(
+        'name="slam_foundation",\n            actions=(mapping_foundation_launch,)'
+    )
+    navigation = launch.index(
+        'name="navigation",\n                    actions=(navigation_launch,)'
+    )
+    runtime = launch.index(
+        'name="mapping_runtime",\n                    actions=(mapping_runtime_launch,)'
+    )
+    assert localization < slam < navigation < runtime
+    assert '_stage("navigation_start_delay_s", navigation_launch)' not in launch
 
 
 def test_core_autonomous_entry_forwards_its_canonical_stage_offsets() -> None:
@@ -294,17 +306,16 @@ def test_core_autonomous_entry_forwards_its_canonical_stage_offsets() -> None:
     assert effective_offsets == AUTONOMOUS_STAGE_DEFAULTS
 
 
-def test_autonomous_timers_stagger_only_and_cannot_authorize_motion() -> None:
-    """Timer stages schedule includes without creating readiness or authority."""
+def test_autonomous_readiness_gates_cannot_authorize_motion() -> None:
+    """Process gates sequence infrastructure without creating motion authority."""
     launch = read(AUTONOMOUS_LAUNCH)
 
     assert "TimerAction" in launch
     assert "period=LaunchConfiguration(delay_argument)" in launch
     assert "cancel_on_shutdown=True" in launch
-    assert "StartupStageGroup" not in launch
-    assert "build_staged_sequence" not in launch
-    assert "startup_stage_gate_node" not in launch
-    assert "bringup_readiness_node" not in launch
+    assert "StartupStageGroup" in launch
+    assert "build_staged_sequence" in launch
+    assert "bringup_readiness_node" in launch
     assert "ExecuteProcess" not in launch
     assert "ActionClient" not in launch
     assert "async_send_goal" not in launch
@@ -544,7 +555,8 @@ def test_autonomous_mapping_authority_path_remains_explicit() -> None:
 
     assert 'if mode == "autonomous_mapping":' in core
     assert '"autonomous_mapping.launch.py"' in core
-    assert "StartupStageGroup" not in autonomous
+    assert "StartupStageGroup" in autonomous
+    assert "build_staged_sequence" in autonomous
     assert "TimerAction" in autonomous
     assert 'default_value="STOP"' in autonomous
     assert "typed RunAutonomousMapping action only after readiness" in autonomous

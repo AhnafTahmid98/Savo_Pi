@@ -115,11 +115,15 @@ An invalid optional ToF is expected to remain visible as a sensor-level
 mapping-health, authority, or ownership failure remains a no-go condition.
 
 The launch staggers description, base, LiDAR, range safety, control,
-localization, core power, live-map Nav2, SLAM and autonomous
-mapping to reduce Core Pi startup contention. It does not send an autonomous
-mission goal and defaults the control layer to `STOP`. Head, semantic/location,
-VO, ultrasonic, coverage and initial/final scan workflows remain available but
-default off for the first Core-only geometric mapping run.
+localization, and core power to reduce Core Pi startup contention. The
+autonomous branch then uses observed readiness, not elapsed time: stable Core
+and localization inputs release the SLAM foundation; SLAM ACTIVE plus fresh
+scan, filtered odometry, map, and map-to-odom release Nav2; active Nav2
+lifecycle nodes and action servers release the inert mapping runtime. It does
+not send an autonomous mission goal and defaults the control layer to `STOP`.
+Head, semantic/location, VO, ultrasonic, coverage and initial/final scan
+workflows remain available but default off for the first Core-only geometric
+mapping run.
 The dedicated launch defaults `start_supervisor=false`; normal system bringup
 still supports the system Supervisor with its existing defaults and latch policy.
 
@@ -231,10 +235,11 @@ require.
 
 ### Simple Core startup
 
-Canonical Core startup uses ordinary package launch includes with bounded,
-historical compatibility offsets. Package-owned health and Supervisor
-authority remain responsible for runtime eligibility; no global readiness
-coordinator releases processes and there is no artificial `complete` stage.
+Canonical non-autonomous Core startup uses ordinary package launch includes
+with bounded, historical compatibility offsets. Package-owned health and
+Supervisor authority remain responsible for runtime eligibility. Dedicated
+autonomous mapping is the exception: it uses the package-owned staged
+readiness coordinator for process release only.
 The robot still starts with control in `STOP`, Supervisor unarmed, and no
 submitted action goal.
 
@@ -258,11 +263,12 @@ compatibility:
 `savo_bringup/startup_timing.py` owns the shared defaults used by
 `robot_bringup.launch.py`, `core_bringup.launch.py`, and the direct autonomous
 mapping launch. All offsets are seconds from launch, not cumulative waits.
-The autonomous launch starts Nav2 at T=55 and SLAM plus mapping runtime at T=60
-using `mapping_start_delay_s`. The Core wrapper preserves its historical
-`readiness_start_delay_s` alias for that mapping offset; the robot role wrapper
-exposes it as `core_readiness_start_delay_s`. No readiness process is launched.
-Edge timing remains independent.
+The autonomous launch uses `mapping_start_delay_s` only as the earliest time at
+which dependency evaluation begins. It does not use
+`navigation_start_delay_s` to release Nav2. The Core wrapper preserves its
+historical `readiness_start_delay_s` alias for that evaluation offset; the
+robot role wrapper exposes it as `core_readiness_start_delay_s`. Edge timing
+remains independent.
 
 These offsets spread startup load but never prove health or authorize motion.
 Existing `start_*` flags omit disabled optional components.
@@ -272,10 +278,15 @@ the head, and does not auto-start its scan. Manual SLAM and saved-map
 navigation start only in their matching dependency stages. Location services
 remain off in normal safe idle and do not imply navigation.
 
-The dedicated `autonomous_mapping.launch.py` directly composes the current
-Nav2, SLAM, and mapping runtime. Launch initializes them but never submits the
-typed autonomous-mapping action; mission readiness and mapping-local lease
-admission remain separate and strict.
+The dedicated `autonomous_mapping.launch.py` composes the current SLAM, Nav2,
+and mapping runtime as separate readiness-gated groups. With
+`start_navigation:=false start_mapping:=true`, only the stationary SLAM
+foundation is released; mapping runtime remains omitted because its Nav2
+dependency is intentionally absent. With both flags false, neither mapping nor
+Nav2 is launched. `start_navigation:=true start_mapping:=false` is rejected as
+an invalid live-mapping composition. Launch never submits the typed
+autonomous-mapping action; mission readiness and mapping-local lease admission
+remain separate and strict.
 
 Run the matching edge stack on `savo-edge`:
 
@@ -393,7 +404,7 @@ ros2 launch savo_bringup saved_map_navigation.launch.py \
   control_startup_mode:=STOP
 ```
 
-The retained diagnostic-only C++ `bringup_readiness_node` can publish:
+The C++ `bringup_readiness_node` can publish:
 
 ```text
 /savo_bringup/core/state
@@ -407,9 +418,10 @@ The retained diagnostic-only C++ `bringup_readiness_node` can publish:
 /savo_bringup/edge/diagnostics
 ```
 
-It is not launched by production Core, Edge, or autonomous-mapping bringup.
-It remains available for historical diagnostics and tests and does not replace
-the safety, Supervisor, mapping, or Nav2 authorities.
+It is not launched by normal production Core or Edge bringup. Dedicated
+autonomous mapping launches it as a process-sequencing observer; it does not
+replace the safety, Supervisor, mapping, or Nav2 authorities and cannot select
+a control mode, submit an action, or publish velocity.
 
 Saved-map production navigation preserves the complete gate:
 

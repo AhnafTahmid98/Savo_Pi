@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 LAUNCH = ROOT / 'launch/live_mapping_navigation.launch.py'
 PROFILE = ROOT / 'config/profiles/live_mapping_real_robot.yaml'
 READINESS = ROOT / 'config/readiness.yaml'
+STARTUP_READINESS = ROOT / 'config/startup_readiness.yaml'
 PRODUCTION_NAV2 = ROOT / 'config/nav2_live_mapping.yaml'
 DEGRADED_NAV2 = (
     ROOT / 'config/nav2_live_mapping_core_lidar_degraded.yaml'
@@ -61,6 +62,32 @@ def test_live_mapping_launch_preserves_guarded_velocity_chain():
     assert "executable='goal_admission_gate_node'" in text
     assert "executable='control_recovery_guard_node'" in text
     assert '/savo_nav/_internal/exploration/navigate_to_pose' in text
+
+
+def test_live_mapping_separates_startup_evidence_from_runtime_admission():
+    """Nav2 can prove lifecycle/action health while control remains STOP."""
+    launch = LAUNCH.read_text(encoding='utf-8')
+    startup = yaml.safe_load(STARTUP_READINESS.read_text(encoding='utf-8'))
+    runtime = yaml.safe_load(READINESS.read_text(encoding='utf-8'))
+
+    assert "executable='nav2_startup_readiness_node'" in launch
+    assert "condition=IfCondition(start_startup_readiness)" in launch
+    assert startup['nav2_startup_readiness_node']['ros__parameters'][
+        'required_lifecycle_nodes'
+    ] == [
+        'controller_server',
+        'planner_server',
+        'behavior_server',
+        'bt_navigator',
+        'waypoint_follower',
+    ]
+    runtime_parameters = runtime['navigation_readiness_node'][
+        'ros__parameters'
+    ]
+    assert runtime_parameters['require_control_mode'] is True
+    assert 'control_mode' not in startup[
+        'nav2_startup_readiness_node'
+    ]['ros__parameters']
 
 
 def test_lidar_only_readiness_matches_active_costmap_baseline():

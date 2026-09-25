@@ -54,6 +54,35 @@ TEST(LocalMappingHealth, DirectHealthySourcesAdmitInStopWithoutOptionalEdge)
   EXPECT_FALSE(monitor.evaluate(false, now).continuation_ready);
 }
 
+TEST(LocalMappingHealth, StopIsAllowedButInactiveSlamAndMissingNavFailClosed)
+{
+  const auto now = Clock::time_point{};
+
+  Monitor inactive_slam;
+  feed(inactive_slam, now);
+  inactive_slam.observe(
+    "slam",
+    R"({"service_available":true,"response_received":true,)"
+    R"("response_fresh":true,"healthy":false,"state_id":2,"state":"inactive"})",
+    now);
+  const auto slam_decision = inactive_slam.evaluate(true, now);
+  EXPECT_FALSE(slam_decision.admission_ready);
+  EXPECT_FALSE(slam_decision.continuation_ready);
+  EXPECT_EQ(slam_decision.reason, "slam_unavailable");
+
+  Monitor missing_nav;
+  feed(missing_nav, now);
+  missing_nav.observe(
+    "nav",
+    "state=blocked;goal_acceptance_allowed=false;"
+    "reason=nav2_action_server_unavailable;failed_dependencies=nav2_action_server",
+    now);
+  const auto nav_decision = missing_nav.evaluate(true, now);
+  EXPECT_FALSE(nav_decision.admission_ready);
+  EXPECT_FALSE(nav_decision.continuation_ready);
+  EXPECT_EQ(nav_decision.reason, "nav_unavailable");
+}
+
 TEST(LocalMappingHealth, ProductionPowerStatesPreserveAdmissionAndContinuationPolicy)
 {
   const auto now = Clock::time_point{};

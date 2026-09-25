@@ -43,6 +43,9 @@ def generate_launch_description():
 
     params_file = LaunchConfiguration('params_file')
     readiness_params = LaunchConfiguration('readiness_params')
+    startup_readiness_params = LaunchConfiguration(
+        'startup_readiness_params'
+    )
     goal_gateway_params = LaunchConfiguration('goal_gateway_params')
     goal_admission_gate_params = LaunchConfiguration(
         'goal_admission_gate_params'
@@ -53,6 +56,9 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time')
     autostart = LaunchConfiguration('autostart')
     start_readiness = LaunchConfiguration('start_readiness')
+    start_startup_readiness = LaunchConfiguration(
+        'start_startup_readiness'
+    )
     start_goal_gateway = LaunchConfiguration('start_goal_gateway')
     log_level = LaunchConfiguration('log_level')
 
@@ -91,9 +97,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 'startup_readiness_params',
                 default_value=default_startup_readiness_params,
-                description=(
-                    'Compatibility-only legacy startup readiness parameters.'
-                ),
+                description='Nav2 lifecycle/action startup parameters.',
             ),
             DeclareLaunchArgument(
                 'goal_gateway_params',
@@ -128,7 +132,10 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 'start_startup_readiness',
                 default_value='false',
-                description='Compatibility-only; no startup gate is launched.',
+                description=(
+                    'Publish lifecycle/action startup readiness without '
+                    'requiring NAV control mode.'
+                ),
             ),
             DeclareLaunchArgument(
                 'start_goal_gateway',
@@ -258,6 +265,16 @@ def generate_launch_description():
                         '/savo_nav/_internal/coverage/execute_path',
                     ),
                 ],
+            ),
+            Node(
+                package='savo_nav',
+                executable='nav2_startup_readiness_node',
+                name='nav2_startup_readiness_node',
+                output='screen',
+                emulate_tty=True,
+                condition=IfCondition(start_startup_readiness),
+                parameters=[startup_readiness_params],
+                arguments=common_arguments,
             ),
             Node(
                 package='savo_nav',

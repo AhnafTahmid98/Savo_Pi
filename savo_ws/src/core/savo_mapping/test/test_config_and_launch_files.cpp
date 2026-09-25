@@ -991,6 +991,26 @@ TEST(OwnershipContracts, LifecycleBridgeIsReadOnly)
     std::string::npos);
 }
 
+TEST(OwnershipContracts, AutonomousSlamHasExactlyOneLifecycleOwner)
+{
+  const auto content = read_text_file(
+    package_root /
+    "launch" /
+    "autonomous_mapping.launch.xml");
+
+  expect_contains(content, "pkg=\"nav2_lifecycle_manager\"");
+  expect_contains(content, "name=\"lifecycle_manager_slam\"");
+  expect_contains(content, "name=\"node_names\" value=\"['slam_toolbox']\"");
+  expect_contains(content, "name=\"use_lifecycle_manager\"");
+  expect_contains(content, "value=\"true\"");
+
+  const auto first = content.find("name=\"lifecycle_manager_slam\"");
+  ASSERT_NE(first, std::string::npos);
+  EXPECT_EQ(
+    content.find("name=\"lifecycle_manager_slam\"", first + 1U),
+    std::string::npos);
+}
+
 TEST(OwnershipContracts, LifecycleBridgeHasNoMovementInterface)
 {
   const auto source = read_text_file(

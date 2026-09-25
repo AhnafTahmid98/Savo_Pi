@@ -52,6 +52,7 @@ def test_autonomous_mapping_launch_is_valid_and_complete() -> None:
         'mapping_mode_manager_node',
         'mapping_supervisor_node',
         'slam_lifecycle_health_bridge_node',
+        'lifecycle_manager',
     }.issubset(executables)
 
     includes = {
@@ -105,6 +106,44 @@ def test_foundation_and_runtime_are_independently_gateable_and_inert() -> None:
     source = LAUNCH.read_text(encoding='utf-8')
     assert '<arg\n      name="auto_start"\n      value="false"/>' in source
     assert '<arg name="auto_plan" value="false"/>' in source
+    semantic = next(
+        node for node in root.findall('.//node')
+        if node.attrib.get('exec') == 'semantic_interruption_coordinator_node'
+    )
+    semantic_parent = next(
+        group for group in root.findall('group') if semantic in list(group)
+    )
+    assert semantic_parent.attrib.get('if') == '$(var start_mapping_runtime)'
+
+
+def test_slam_lifecycle_has_one_deterministic_owner() -> None:
+    """A lifecycle manager owns SLAM; the health bridge stays read-only."""
+    tree = ET.parse(LAUNCH)
+    root = tree.getroot()
+    lifecycle_managers = [
+        node for node in root.findall('node')
+        if node.attrib.get('pkg') == 'nav2_lifecycle_manager'
+        and node.attrib.get('exec') == 'lifecycle_manager'
+    ]
+    assert len(lifecycle_managers) == 1
+    manager = lifecycle_managers[0]
+    assert manager.attrib.get('if') == '$(var start_mapping_foundation)'
+    parameters = {
+        param.attrib['name']: param.attrib.get('value')
+        for param in manager.findall('param')
+    }
+    assert parameters['autostart'] == '$(var slam_autostart)'
+    assert parameters['node_names'] == "['slam_toolbox']"
+
+    slam_include = next(
+        include for include in root.findall('include')
+        if 'online_async_launch.py' in include.attrib['file']
+    )
+    forwarded = {
+        arg.attrib['name']: arg.attrib['value']
+        for arg in slam_include.findall('arg')
+    }
+    assert forwarded['use_lifecycle_manager'] == 'true'
 
 
 def test_autonomous_launch_starts_safe_and_preserves_ownership() -> None:

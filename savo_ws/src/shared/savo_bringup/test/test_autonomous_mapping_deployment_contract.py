@@ -168,6 +168,26 @@ def test_dedicated_mapping_keeps_required_non_range_dependencies() -> None:
     )
 
 
+def test_dedicated_mapping_uses_fail_closed_dependency_gates() -> None:
+    """SLAM evidence releases Nav2, whose startup evidence releases runtime."""
+    launch = read("launch/autonomous_mapping.launch.py")
+
+    localization = launch.index('name="localization"')
+    slam = launch.index('name="slam_foundation"')
+    navigation = launch.index('name="navigation"')
+    runtime = launch.index('name="mapping_runtime"')
+    assert localization < slam < navigation < runtime
+
+    assert '"start_mapping_foundation": "true"' in launch
+    assert '"start_mapping_runtime": "false"' in launch
+    assert '"start_mapping_foundation": "false"' in launch
+    assert '"start_mapping_runtime": "true"' in launch
+    assert '"start_startup_readiness": "true"' in launch
+    assert 'if start_navigation and not start_mapping:' in launch
+    assert '_stage("navigation_start_delay_s", navigation_launch)' not in launch
+    assert 'actions=(mapping_runtime_launch,)' in launch
+
+
 def test_autonomous_mapping_launch_composes_all_core_owners() -> None:
     """AM-7 includes each package that owns part of autonomous mapping."""
     launch = read("launch/autonomous_mapping.launch.py")
@@ -552,6 +572,7 @@ def test_bringup_installs_am4_and_runtime_dependencies() -> None:
     # scripts and launch-time host_role logic instead.
     assert {
         "launch_xml",
+        "nav2_lifecycle_manager",
         "savo_description",
         "savo_msgs",
         "savo_perception",
