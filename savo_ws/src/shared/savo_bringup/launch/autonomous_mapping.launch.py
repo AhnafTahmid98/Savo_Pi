@@ -26,9 +26,9 @@ from savo_bringup.autonomous_mapping_profiles import (
     resolve_autonomous_mapping_profile,
     validate_startup_scan360_disabled,
 )
-from savo_bringup.startup_timing import CORE_START_DELAYS
 from savo_bringup.staged_launch import StartupStageGroup
 from savo_bringup.staged_launch import build_staged_sequence
+from savo_bringup.startup_timing import CORE_START_DELAYS
 
 _MAP_ID_PATTERN = re.compile(r"[a-z][a-z0-9_]*")
 

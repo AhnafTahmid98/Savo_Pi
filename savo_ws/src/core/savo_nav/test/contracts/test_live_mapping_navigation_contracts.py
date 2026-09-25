@@ -71,7 +71,7 @@ def test_live_mapping_separates_startup_evidence_from_runtime_admission():
     runtime = yaml.safe_load(READINESS.read_text(encoding='utf-8'))
 
     assert "executable='nav2_startup_readiness_node'" in launch
-    assert "condition=IfCondition(start_startup_readiness)" in launch
+    assert 'condition=IfCondition(start_startup_readiness)' in launch
     assert startup['nav2_startup_readiness_node']['ros__parameters'][
         'required_lifecycle_nodes'
     ] == [
