@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: LicenseRef-Proprietary
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cctype>
+#include <cmath>
 #include <cstdint>
 #include <memory>
 #include <sstream>
@@ -17,6 +19,7 @@
 #include "diagnostic_msgs/msg/key_value.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/bool.hpp"
+#include "std_msgs/msg/float32.hpp"
 #include "std_msgs/msg/string.hpp"
 #include "std_msgs/msg/u_int64.hpp"
 
@@ -31,6 +34,7 @@ using diagnostic_msgs::msg::DiagnosticArray;
 using diagnostic_msgs::msg::DiagnosticStatus;
 using diagnostic_msgs::msg::KeyValue;
 using std_msgs::msg::Bool;
+using std_msgs::msg::Float32;
 using std_msgs::msg::String;
 using std_msgs::msg::UInt64;
 
@@ -79,6 +83,11 @@ public:
     if (publish_rate_hz_ <= 0.0 || publish_rate_hz_ > 10.0) {
       throw std::invalid_argument("publish_rate_hz must be in (0, 10]");
     }
+    metric_freshness_timeout_ms_ = declare_parameter<std::int64_t>(
+      "metric_freshness_timeout_ms", 3000);
+    if (metric_freshness_timeout_ms_ <= 0) {
+      throw std::invalid_argument("metric_freshness_timeout_ms must be positive");
+    }
 
     const auto state_qos = rclcpp::QoS(1).reliable().transient_local();
     const auto stream_qos = rclcpp::QoS(10).reliable();
@@ -91,6 +100,7 @@ public:
     alerts_publisher_ = create_publisher<String>(output_namespace + "/alerts", state_qos);
 
     ConfigureSubscriptions();
+    ConfigureMetricSubscriptions();
     const auto period = std::chrono::duration<double>(1.0 / publish_rate_hz_);
     timer_ = create_wall_timer(
       std::chrono::duration_cast<std::chrono::milliseconds>(period),
@@ -99,6 +109,17 @@ public:
   }
 
 private:
+  struct MetricObservation
+  {
+    std::string name;
+    std::string topic;
+    bool is_range{true};
+    bool received{false};
+    bool valid{false};
+    std::int64_t monotonic_ms{0};
+    double value{0.0};
+  };
+
   std::vector<savo_observer::FreshnessPolicy> LoadPolicies()
   {
     const auto default_timeout = declare_parameter<std::int64_t>("freshness_timeout_ms", 5000);
@@ -157,12 +178,48 @@ private:
     Subscribe("active_map", "/savo_mapping/active_map");
   }
 
+  void ConfigureMetricSubscriptions()
+  {
+    const rclcpp::QoS range_qos = rclcpp::SensorDataQoS();
+    const auto slowdown_qos = rclcpp::QoS(10).reliable();
+    for (std::size_t index = 0; index < metric_observations_.size(); ++index) {
+      const auto & observation = metric_observations_[index];
+      metric_subscriptions_[index] = create_subscription<Float32>(
+        observation.topic, observation.is_range ? range_qos : slowdown_qos,
+        [this, index](const Float32::SharedPtr message) {
+          auto & observation = metric_observations_[index];
+          observation.received = true;
+          observation.monotonic_ms = MonotonicMilliseconds();
+          observation.value = static_cast<double>(message->data);
+          observation.valid = std::isfinite(observation.value) &&
+          (observation.is_range ? observation.value > 0.0 :
+          observation.value >= 0.0 && observation.value <= 1.0);
+        });
+    }
+  }
+
+  std::vector<savo_observer::NumericMetric> FreshMetrics(const std::int64_t monotonic_ms) const
+  {
+    std::vector<savo_observer::NumericMetric> metrics;
+    metrics.reserve(metric_observations_.size());
+    for (const auto & observation : metric_observations_) {
+      if (!observation.received || !observation.valid ||
+        monotonic_ms < observation.monotonic_ms ||
+        monotonic_ms - observation.monotonic_ms > metric_freshness_timeout_ms_)
+      {
+        continue;
+      }
+      metrics.push_back({observation.name, observation.value});
+    }
+    return metrics;
+  }
+
   void PublishSnapshot()
   {
     const auto monotonic_ms = MonotonicMilliseconds();
     const auto snapshot = savo_observer::BuildSnapshot(
       ++sequence_, monotonic_ms, freshness_.Evaluate(monotonic_ms),
-      freshness_.ClockReversalDetected());
+      freshness_.ClockReversalDetected(), FreshMetrics(monotonic_ms));
 
     String state;
     state.data = std::string(savo_observer::ToString(snapshot.state));
@@ -212,8 +269,15 @@ private:
 
   savo_observer::TelemetryFreshness freshness_;
   double publish_rate_hz_{1.0};
+  std::int64_t metric_freshness_timeout_ms_{3000};
   std::uint64_t sequence_{0};
   std::vector<rclcpp::Subscription<String>::SharedPtr> string_subscriptions_;
+  std::array<MetricObservation, 4> metric_observations_{{
+    {"safety.slowdown_factor", "/safety/slowdown_factor", false},
+    {"ranges.left_m", "/savo_perception/range/left_m"},
+    {"ranges.right_m", "/savo_perception/range/right_m"},
+    {"ranges.front_ultrasonic_m", "/savo_perception/range/front_ultrasonic_m"}}};
+  std::array<rclcpp::Subscription<Float32>::SharedPtr, 4> metric_subscriptions_;
   rclcpp::Publisher<String>::SharedPtr state_publisher_;
   rclcpp::Publisher<Bool>::SharedPtr connected_publisher_;
   rclcpp::Publisher<UInt64>::SharedPtr heartbeat_publisher_;

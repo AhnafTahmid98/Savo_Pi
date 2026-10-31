@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <deque>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -14,6 +15,12 @@
 
 namespace savo_observer
 {
+
+struct NumericMetric
+{
+  std::string name;
+  double value{0.0};
+};
 
 struct NumericSample
 {
@@ -42,11 +49,13 @@ struct TelemetrySnapshot
   bool connected{false};
   std::vector<DependencyEvaluation> dependencies;
   std::vector<std::string> alerts;
+  std::map<std::string, double> metrics;
 };
 
 [[nodiscard]] TelemetrySnapshot BuildSnapshot(
   std::uint64_t sequence, std::int64_t monotonic_ms,
-  std::vector<DependencyEvaluation> dependencies, bool clock_reversal_detected);
+  std::vector<DependencyEvaluation> dependencies, bool clock_reversal_detected,
+  std::vector<NumericMetric> metrics = {});
 [[nodiscard]] std::string SerializeSnapshot(const TelemetrySnapshot & snapshot);
 
 }  // namespace savo_observer

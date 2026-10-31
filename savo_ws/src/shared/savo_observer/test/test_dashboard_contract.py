@@ -28,6 +28,8 @@ def test_dashboard_is_bounded_and_has_clear_stale_state():
     assert "fetch('/api/config'" in script
     assert 'renderMetricGraph' in script
     assert 'JSON.parse(dependency.detail)' in script
+    assert 'detailNumbers(dependency)' in script
+    assert 'Object.entries(snapshot.metrics)' in script
     assert 'Connection lost' in script
     assert '.card.stale' in styles
 

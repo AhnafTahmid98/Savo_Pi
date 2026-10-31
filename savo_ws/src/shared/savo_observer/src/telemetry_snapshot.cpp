@@ -3,7 +3,10 @@
 
 #include "savo_observer/telemetry_snapshot.hpp"
 
+#include <cmath>
 #include <iomanip>
+#include <limits>
+#include <locale>
 #include <sstream>
 #include <stdexcept>
 #include <utility>
@@ -12,6 +15,16 @@ namespace savo_observer
 {
 namespace
 {
+
+void ValidateMetric(const std::string & name, const double value)
+{
+  if (name.empty()) {
+    throw std::invalid_argument("numeric metric name must not be empty");
+  }
+  if (!std::isfinite(value)) {
+    throw std::invalid_argument("numeric metric value must be finite");
+  }
+}
 
 std::string Escape(const std::string & input)
 {
@@ -68,12 +81,19 @@ std::size_t BoundedSeries::Capacity() const noexcept
 
 TelemetrySnapshot BuildSnapshot(
   const std::uint64_t sequence, const std::int64_t monotonic_ms,
-  std::vector<DependencyEvaluation> dependencies, const bool clock_reversal_detected)
+  std::vector<DependencyEvaluation> dependencies, const bool clock_reversal_detected,
+  std::vector<NumericMetric> metrics)
 {
   TelemetrySnapshot snapshot;
   snapshot.sequence = sequence;
   snapshot.monotonic_ms = monotonic_ms;
   snapshot.dependencies = std::move(dependencies);
+  for (const auto & metric : metrics) {
+    ValidateMetric(metric.name, metric.value);
+    if (!snapshot.metrics.emplace(metric.name, metric.value).second) {
+      throw std::invalid_argument("numeric metric names must be unique");
+    }
+  }
 
   bool required_problem = false;
   bool required_failed = false;
@@ -135,7 +155,19 @@ std::string SerializeSnapshot(const TelemetrySnapshot & snapshot)
     }
     output << "\"" << Escape(snapshot.alerts[index]) << "\"";
   }
-  output << "]}";
+  output << "],\"metrics\":{";
+  output.imbue(std::locale::classic());
+  output << std::setprecision(std::numeric_limits<double>::max_digits10);
+  bool first_metric = true;
+  for (const auto & metric : snapshot.metrics) {
+    ValidateMetric(metric.first, metric.second);
+    if (!first_metric) {
+      output << ',';
+    }
+    first_metric = false;
+    output << "\"" << Escape(metric.first) << "\":" << metric.second;
+  }
+  output << "}}";
   return output.str();
 }
 

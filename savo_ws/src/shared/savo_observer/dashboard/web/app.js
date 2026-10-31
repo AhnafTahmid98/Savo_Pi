@@ -97,6 +97,14 @@ function renderMetrics(snapshot) {
   (snapshot.dependencies || []).forEach((dependency) => {
     detailNumbers(dependency).forEach((value, name) => current.set(name, value));
   });
+  if (snapshot.metrics && typeof snapshot.metrics === 'object' && !Array.isArray(snapshot.metrics)) {
+    Object.entries(snapshot.metrics).forEach(([name, value]) => {
+      if (typeof name === 'string' && name.length > 0 &&
+          typeof value === 'number' && Number.isFinite(value)) {
+        current.set(name, value);
+      }
+    });
+  }
   current.forEach((value, name) => {
     if (!metricHistory.has(name)) metricHistory.set(name, []);
     appendBounded(metricHistory.get(name), value);
