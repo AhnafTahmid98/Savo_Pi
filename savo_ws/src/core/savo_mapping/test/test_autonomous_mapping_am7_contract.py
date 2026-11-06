@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+import yaml
+
 
 PACKAGE = Path(__file__).resolve().parents[1]
 
@@ -123,3 +125,13 @@ def test_am7_safety_state_and_correlation_contracts() -> None:
 
     for token in ('feedback_received', 'feedback_sequence', 'feedback_age_s'):
         assert token in gateway
+
+
+def test_return_proximity_configuration_matches_declared_parameter_names() -> None:
+    """Avoid ignored coverage.* parameters when return-to-start reads its own namespace."""
+    config = yaml.safe_load(read('config/autonomous_mapping_orchestrator.yaml'))
+    params = config['autonomous_mapping_orchestrator_node']['ros__parameters']
+    assert 'proximity_timeout_s' not in params['coverage']
+    assert 'proximity_poll_period_s' not in params['coverage']
+    assert params['return_to_start']['proximity_timeout_s'] == 3.0
+    assert params['return_to_start']['proximity_poll_period_s'] == 0.10

@@ -19,6 +19,3 @@
 
     navigation_handoff:
       enabled: false
-      require_saved_map: true
-      require_quality_pass: true
-      require_named_map: true

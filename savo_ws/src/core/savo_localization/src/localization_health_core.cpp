@@ -272,6 +272,13 @@ RateQuality LocalizationHealthCore::AggregateRequiredQuality(
       quality = RateQuality::kGood;
     } else if (source->rate_quality == "MINIMUM") {
       quality = RateQuality::kMinimum;
+    } else if (source->rate_valid) {
+      // The raw window can temporarily dip below the minimum while the
+      // existing rate debouncer still considers this source valid. Keep the
+      // aggregate at MINIMUM during that configured grace period; otherwise
+      // the startup gate defeats debounce and fails before health does.
+      // A sustained dip sets rate_valid=false and fails closed via Evaluate().
+      quality = RateQuality::kMinimum;
     }
     if (static_cast<std::uint8_t>(quality) < static_cast<std::uint8_t>(aggregate)) {
       aggregate = quality;

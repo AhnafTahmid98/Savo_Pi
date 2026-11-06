@@ -712,6 +712,29 @@ TEST(LocalizationHealthCoreTest, AggregateQualityUsesWorstRequiredSource)
     RateQuality::kMinimum);
 }
 
+TEST(LocalizationHealthCoreTest, AggregateQualityHonorsDebouncedRateDip)
+{
+  const LocalizationHealthCore core;
+  auto inputs = healthy_inputs();
+  inputs.filtered_odom.rate_quality = "BELOW_MINIMUM";
+  inputs.filtered_odom.rate_valid = true;  // Within configured rate debounce
+
+  const auto result = core.Evaluate(inputs);
+  ASSERT_TRUE(result.ready);
+  EXPECT_EQ(
+    LocalizationHealthCore::AggregateRequiredQuality(inputs, result),
+    RateQuality::kMinimum);
+
+  // Once the debounce declares the low rate persistent, the same source
+  // must block startup/motion rather than silently accepting low-rate odom.
+  inputs.filtered_odom.rate_valid = false;
+  const auto sustained_result = core.Evaluate(inputs);
+  ASSERT_FALSE(sustained_result.ready);
+  EXPECT_EQ(
+    LocalizationHealthCore::AggregateRequiredQuality(inputs, sustained_result),
+    RateQuality::kBelowMinimum);
+}
+
 TEST(LocalizationHealthCoreTest, OptionalVoIsExcludedFromAggregateQuality)
 {
   const LocalizationHealthCore core;

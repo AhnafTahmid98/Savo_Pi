@@ -628,6 +628,12 @@ if(BUILD_TESTING)
   )
 
   ament_add_pytest_test(
+    test_nav2_startup_readiness_contract
+    test/contracts/test_nav2_startup_readiness_contract.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(
     test_phase4_goal_contracts
     test/contracts/test_phase4_goal_contracts.py
     TIMEOUT 60
