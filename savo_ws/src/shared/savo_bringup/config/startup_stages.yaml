@@ -5,6 +5,10 @@ bringup_readiness_node:
     startup.evaluation_rate_hz: 5.0
     startup.status_publish_rate_hz: 2.0
     startup.observation_freshness_s: 3.0
+    # Only during autonomous-mapping NAV startup, in fresh STOP + safety state,
+    # tolerate a low-EKF-rate-only message while holding the gate NOT READY.
+    # Does not apply after startup or to TF, safety, power, or sensor faults.
+    startup.core.transient_ekf_rate_recovery_s: 12.0
 
     startup.core.infrastructure.minimum_settle_s: 0.5
     startup.core.infrastructure.stable_ready_s: 1.0

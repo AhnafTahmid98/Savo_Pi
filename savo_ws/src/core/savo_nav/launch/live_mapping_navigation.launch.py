@@ -5,11 +5,29 @@
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
+from launch.actions import OpaqueFunction
+from launch.actions import TimerAction
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch.substitutions import PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
+
+
+def _release_nav_nodes(context, *, nodes):
+    """Spread Nav2 process launches to avoid bursting the Core Pi EKF."""
+    stagger = LaunchConfiguration('stagger_startup').perform(context).lower()
+    if stagger not in ('true', '1', 'yes', 'on'):
+        return nodes
+    # Preserve relative process ordering and let all servers exist before
+    # the lifecycle manager begins configuring/activating them.
+    offsets = (0.0, 1.0, 2.0, 3.0, 4.0, 9.0, 5.0, 6.0, 7.0, 8.0, 8.5)
+    if len(nodes) != len(offsets):
+        raise RuntimeError('Nav2 process schedule does not match node list')
+    return [
+        node if offset == 0.0 else TimerAction(period=offset, actions=[node])
+        for offset, node in zip(offsets, nodes)
+    ]
 
 
 def generate_launch_description():
@@ -147,7 +165,17 @@ def generate_launch_description():
                 default_value='info',
                 description='ROS logging level.',
             ),
-            Node(
+            DeclareLaunchArgument(
+                'stagger_startup',
+                default_value='false',
+                description=(
+                    'Stagger Nav2 process startup for resource-limited Core Pi.'
+                ),
+            ),
+            OpaqueFunction(
+                function=_release_nav_nodes,
+                kwargs={'nodes': [
+                    Node(
                 package='nav2_controller',
                 executable='controller_server',
                 name='controller_server',
@@ -299,6 +327,8 @@ def generate_launch_description():
                 name='goal_admission_gate_node',
                 output='screen',
                 parameters=[goal_admission_gate_params],
+            ),
+                ]},
             ),
         ]
     )

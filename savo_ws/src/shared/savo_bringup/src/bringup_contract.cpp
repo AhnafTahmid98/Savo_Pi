@@ -464,6 +464,57 @@ std::size_t EstablishedDependencyTracker::confirmation_samples() const noexcept
   return confirmation_samples_;
 }
 
+StartupRecoveryWindow::StartupRecoveryWindow(const double maximum_duration_s)
+: maximum_duration_s_(std::max(0.0, maximum_duration_s))
+{
+}
+
+StartupRecoveryDecision StartupRecoveryWindow::Update(
+  const bool eligible_rate_only_loss, const double startup_stage_elapsed_s) noexcept
+{
+  if (!eligible_rate_only_loss || !std::isfinite(startup_stage_elapsed_s) ||
+    startup_stage_elapsed_s < 0.0 || maximum_duration_s_ <= 0.0)
+  {
+    first_failure_s_ = -1.0;
+    return {};
+  }
+  if (first_failure_s_ < 0.0 || startup_stage_elapsed_s < first_failure_s_) {
+    first_failure_s_ = startup_stage_elapsed_s;
+  }
+  const bool expired = startup_stage_elapsed_s - first_failure_s_ >= maximum_duration_s_;
+  return {!expired, expired};
+}
+
+bool IsTransientEkfRateLoss(const std::string_view health_json) noexcept
+{
+  try {
+    const auto health = Json::parse(std::string(health_json));
+    if (!health.is_object() || health.value("node", std::string{}) !=
+      "localization_health_node" || health.value("state", std::string{}) != "STALE" ||
+      health.value("ready", true) ||
+      health.value("reason_code", std::string{}) !=
+      "required_localization_input_unavailable")
+    {
+      return false;
+    }
+    if (!health.contains("reasons") || !health["reasons"].is_array() ||
+      health["reasons"].size() != 1U ||
+      health["reasons"][0] != "filtered_odom_rate_below_minimum")
+    {
+      return false;
+    }
+    const auto & components = health.at("components");
+    const auto & filtered = components.at("filtered_odom");
+    return filtered.is_object() && filtered.value("required", false) &&
+           filtered.value("received", false) && filtered.value("fresh", false) &&
+           filtered.value("data_valid", false) &&
+           !filtered.value("rate_valid", true) &&
+           filtered.value("rate_hz", 0.0) < filtered.value("minimum_rate_hz", 0.0);
+  } catch (const Json::exception &) {
+    return false;
+  }
+}
+
 ReadinessDecision EvaluateReadiness(
   const std::vector<DependencyStatus> & dependencies,
   const bool configuration_valid,

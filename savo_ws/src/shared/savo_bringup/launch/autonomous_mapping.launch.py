@@ -429,6 +429,7 @@ def generate_launch_description() -> LaunchDescription:
             "start_readiness": "true",
             "start_startup_readiness": "true",
             "start_goal_gateway": "true",
+            "stagger_startup": "true",
             "log_level": log_level,
         }.items(),
     )

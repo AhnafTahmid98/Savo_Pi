@@ -148,7 +148,13 @@ def test_established_dependency_revalidation_is_fail_closed_and_debounced() -> N
 
     assert "established_dependency_tracker_.Update(lost_signature)" in coordinator
     assert "input.dependencies_ready = false;" in coordinator
-    assert "input.unrecoverable_failure = established.confirmed_loss;" in coordinator
+    # The normal fail-closed path remains, but a stationary, rate-only EKF
+    # startup dip is held NOT READY for a bounded recovery window.
+    assert "input.unrecoverable_failure = recovery.expired ||" in coordinator
+    assert "(established.confirmed_loss && !recovery.holding);" in coordinator
+    assert "input.dependencies_ready = false;" in coordinator
+    assert "EligibleTransientEkfStartupLoss(lost)" in coordinator
+    assert "transient_ekf_rate_revalidation_pending:" in coordinator
     assert "established_dependency_revalidation_pending:" in coordinator
     assert "established_dependency_lost:" in coordinator
     assert "consecutive_loss_samples_ >= confirmation_samples_" in contract

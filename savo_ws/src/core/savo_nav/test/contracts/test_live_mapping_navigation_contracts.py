@@ -193,3 +193,60 @@ def test_degraded_holonomic_tuning_discourages_twirling_without_forcing_motion()
     assert 'RotateToGoal' in follow_path['critics']
     assert follow_path['RotateToGoal.scale'] > 0.0
     assert goal_checker['yaw_goal_tolerance'] > 0.0
+
+
+def test_autonomous_mapping_staggers_nav2_without_removing_guards():
+    """Only the canonical full startup opts into staggered Nav2 processes."""
+    bringup = (
+        ROOT.parents[1] / 'shared/savo_bringup/launch/autonomous_mapping.launch.py'
+    ).read_text(encoding='utf-8')
+    launch = LAUNCH.read_text(encoding='utf-8')
+    assert '"stagger_startup": "true"' in bringup
+    assert "'stagger_startup'," in launch
+    assert "default_value='false'" in launch
+    assert 'OpaqueFunction(' in launch
+    assert 'TimerAction(period=offset, actions=[node])' in launch
+    assert '9.0, 5.0, 6.0, 7.0, 8.0, 8.5' in launch
+    assert "executable='goal_admission_gate_node'" in launch
+    assert "executable='control_recovery_guard_node'" in launch
+
+
+def test_stagger_schedule_is_opt_in_and_starts_manager_last():
+    """Exercise launch release decisions without needing ROS installed."""
+    import ast
+
+    launch_source = LAUNCH.read_text(encoding='utf-8')
+    parsed = ast.parse(launch_source)
+    function = next(
+        n for n in parsed.body
+        if isinstance(n, ast.FunctionDef) and n.name == '_release_nav_nodes'
+    )
+
+    class LaunchConfigurationStub:
+        def __init__(self, key):
+            self.key = key
+
+        def perform(self, context):
+            return context[self.key]
+
+    class TimerActionStub:
+        def __init__(self, period, actions):
+            self.period = period
+            self.actions = actions
+
+    namespace = {
+        'LaunchConfiguration': LaunchConfigurationStub,
+        'TimerAction': TimerActionStub,
+    }
+    function_module = ast.Module(body=[function], type_ignores=[])
+    exec(compile(function_module, '<schedule>', 'exec'), namespace)
+    release = namespace['_release_nav_nodes']
+    nodes = list(range(11))
+
+    assert release({'stagger_startup': 'false'}, nodes=nodes) is nodes
+    staggered = release({'stagger_startup': 'true'}, nodes=nodes)
+    assert staggered[0] == 0
+    assert [action.period for action in staggered[1:]] == [
+        1.0, 2.0, 3.0, 4.0, 9.0, 5.0, 6.0, 7.0, 8.0, 8.5,
+    ]
+    assert staggered[5].actions == [5]

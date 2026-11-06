@@ -282,6 +282,56 @@ TEST(BringupContract, EstablishedDependencyLossBlocksBeforeItBecomesTerminal)
   EXPECT_TRUE(sustained_loss.confirmed_loss);
 }
 
+TEST(BringupContract, StartupRecoveryBlocksUntilStableOrExpires)
+{
+  savo_bringup::StartupRecoveryWindow window(12.0);
+  auto response = window.Update(true, 4.0);
+  EXPECT_TRUE(response.holding);
+  EXPECT_FALSE(response.expired);
+  response = window.Update(true, 15.9);
+  EXPECT_TRUE(response.holding);
+  EXPECT_FALSE(response.expired);
+  response = window.Update(true, 16.0);
+  EXPECT_FALSE(response.holding);
+  EXPECT_TRUE(response.expired);
+  response = window.Update(false, 17.0);
+  EXPECT_FALSE(response.holding);
+  EXPECT_FALSE(response.expired);
+  response = window.Update(true, 18.0);
+  EXPECT_TRUE(response.holding);
+  EXPECT_FALSE(response.expired);
+}
+
+TEST(BringupContract, StartupRecoveryDisabledUnlessExplicitlyConfigured)
+{
+  savo_bringup::StartupRecoveryWindow disabled;
+  EXPECT_FALSE(disabled.Update(true, 1.0).holding);
+  EXPECT_FALSE(disabled.Update(true, 100.0).expired);
+}
+
+TEST(BringupContract, OnlyIsolatedFreshEkfRateLossQualifies)
+{
+  const std::string health = R"({"node":"localization_health_node",
+    "state":"STALE","ready":false,
+    "reason_code":"required_localization_input_unavailable",
+    "reasons":["filtered_odom_rate_below_minimum"],
+    "components":{"filtered_odom":{"required":true,"received":true,
+    "fresh":true,"data_valid":true,"rate_valid":false,
+    "rate_hz":7.73,"minimum_rate_hz":10.0}}})";
+  EXPECT_TRUE(savo_bringup::IsTransientEkfRateLoss(health));
+  EXPECT_FALSE(savo_bringup::IsTransientEkfRateLoss("{}"));
+  EXPECT_FALSE(savo_bringup::IsTransientEkfRateLoss("not json"));
+  auto multiple_faults = health;
+  const auto reason_pos = multiple_faults.find(
+    "\"reasons\":[\"filtered_odom_rate_below_minimum\"]");
+  ASSERT_NE(reason_pos, std::string::npos);
+  multiple_faults.replace(
+    reason_pos,
+    std::string("\"reasons\":[\"filtered_odom_rate_below_minimum\"]").size(),
+    "\"reasons\":[\"filtered_odom_rate_below_minimum\",\"tf_stale\"]");
+  EXPECT_FALSE(savo_bringup::IsTransientEkfRateLoss(multiple_faults));
+}
+
 TEST(BringupContract, TerminalFailurePreservesActualCause)
 {
   using savo_bringup::QualityLevel;

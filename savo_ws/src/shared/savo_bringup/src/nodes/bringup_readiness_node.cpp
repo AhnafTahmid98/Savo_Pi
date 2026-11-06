@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cctype>
 #include <cstdint>
 #include <functional>
@@ -280,6 +281,12 @@ private:
       "startup.status_publish_rate_hz", 2.0);
     startup_observation_freshness_s_ = declare_parameter<double>(
       "startup.observation_freshness_s", freshness_timeout_s_);
+    transient_ekf_recovery_s_ = declare_parameter<double>(
+      "startup.core.transient_ekf_rate_recovery_s", 0.0);
+    if (!std::isfinite(transient_ekf_recovery_s_) || transient_ekf_recovery_s_ < 0.0) {
+      throw std::invalid_argument("invalid transient EKF startup recovery window");
+    }
+    transient_ekf_recovery_ = savo_bringup::StartupRecoveryWindow(transient_ekf_recovery_s_);
     if (startup_schema_version_ != 1 || startup_evaluation_rate_hz_ <= 0.0 ||
       startup_status_publish_rate_hz_ <= 0.0 || startup_observation_freshness_s_ <= 0.0)
     {
@@ -917,6 +924,48 @@ private:
     state_publisher_->publish(legacy_state);
   }
 
+  bool EligibleTransientEkfStartupLoss(
+    const std::vector<std::string> & lost) const
+  {
+    // Never use startup recovery for a moving, unsafe, or non-Core robot.
+    if (role_ != savo_bringup::HostRole::kCore ||
+      mode_ != savo_bringup::RobotMode::kAutonomousMapping ||
+      !require_control_ || !require_safety_ || lost.empty() ||
+      current_stage_ >= stages_.size() ||
+      (stages_[current_stage_].name != "navigation" &&
+      stages_[current_stage_].name != "mapping_runtime"))
+    {
+      return false;
+    }
+    std::string reason;
+    for (const auto & key : {"control_stop", "safety_state", "safety_clear", "base"}) {
+      if (!ObservationReady(key, reason)) {
+        return false;
+      }
+    }
+    const auto localization = observations_.find("localization");
+    if (localization == observations_.end() ||
+      !Fresh(localization->second) || localization->second.ready ||
+      !savo_bringup::IsTransientEkfRateLoss(localization->second.detail))
+    {
+      return false;
+    }
+    // A secondary failure (e.g. LiDAR, power, safety, TF) MUST disable grace.
+    // StageInput alone reports only the FIRST failed dependency; inspect them all.
+    for (std::size_t index = 0; index < current_stage_; ++index) {
+      const auto & stage = stages_[index];
+      if (stage.name == "infrastructure" && !StageInput(stage).dependencies_ready) {
+        return false;
+      }
+      for (const auto & key : stage.dependencies) {
+        if (key != "localization" && !ObservationReady(key, reason)) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
   void EvaluateStartupAndPublish()
   {
     if (current_stage_ >= stages_.size()) {
@@ -961,16 +1010,23 @@ private:
     auto input = StageInput(stages_[current_stage_]);
     const std::string lost_signature = Join(lost);
     const auto established = established_dependency_tracker_.Update(lost_signature);
+    const auto current_time = std::chrono::steady_clock::now();
+    const double elapsed = std::chrono::duration<double>(current_time - stage_entered_at_).count();
+    const auto recovery = transient_ekf_recovery_.Update(
+      EligibleTransientEkfStartupLoss(lost), elapsed);
     if (established.blocking) {
       input.dependencies_ready = false;
       input.quality = savo_bringup::QualityLevel::kBelowMinimum;
-      input.unrecoverable_failure = established.confirmed_loss;
-      input.reason = established.confirmed_loss ?
+      // STOP + valid safety + low-EKF-rate-only -> bounded, non-ready hold.
+      // All other established failures retain their original fail-closed policy.
+      input.unrecoverable_failure = recovery.expired ||
+        (established.confirmed_loss && !recovery.holding);
+      input.reason = recovery.holding ?
+        "transient_ekf_rate_revalidation_pending:" + lost_signature :
+        input.unrecoverable_failure ?
         "established_dependency_lost:" + lost_signature :
         "established_dependency_revalidation_pending:" + lost_signature;
     }
-    const auto current_time = std::chrono::steady_clock::now();
-    const double elapsed = std::chrono::duration<double>(current_time - stage_entered_at_).count();
     auto decision = stages_[current_stage_].tracker.Update(elapsed, input);
 
     std::vector<std::string> pending;
@@ -1182,6 +1238,8 @@ private:
   std::uint64_t startup_sequence_{0U};
   std::size_t current_stage_{0U};
   std::string output_namespace_;
+  double transient_ekf_recovery_s_{0.0};
+  savo_bringup::StartupRecoveryWindow transient_ekf_recovery_;
   std::string startup_id_;
   std::string infrastructure_parent_frame_{"base_footprint"};
   std::string infrastructure_child_frame_{"base_link"};

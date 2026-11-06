@@ -140,6 +140,31 @@ private:
   std::string last_loss_signature_;
 };
 
+// A bounded STARTUP-ONLY recovery window. It never indicates readiness.
+// The caller must keep the active startup stage blocked while holding.
+struct StartupRecoveryDecision
+{
+  bool holding{false};
+  bool expired{false};
+};
+
+class StartupRecoveryWindow
+{
+public:
+  explicit StartupRecoveryWindow(double maximum_duration_s = 0.0);
+
+  [[nodiscard]] StartupRecoveryDecision Update(
+    bool eligible_rate_only_loss, double startup_stage_elapsed_s) noexcept;
+
+private:
+  double maximum_duration_s_{0.0};
+  double first_failure_s_{-1.0};
+};
+
+// Require a strict, single-cause low-EKF-rate localization health report.
+// TF errors, missing sensors, multiple faults, and malformed health are excluded.
+[[nodiscard]] bool IsTransientEkfRateLoss(std::string_view health_json) noexcept;
+
 struct DependencyStatus
 {
   std::string name;
