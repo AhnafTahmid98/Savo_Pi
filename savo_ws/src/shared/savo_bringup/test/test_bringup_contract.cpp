@@ -311,7 +311,8 @@ TEST(BringupContract, StartupRecoveryDisabledUnlessExplicitlyConfigured)
 
 TEST(BringupContract, OnlyIsolatedFreshEkfRateLossQualifies)
 {
-  const std::string health = R"({"node":"localization_health_node",
+  const std::string health =
+    R"({"node":"localization_health_node",
     "state":"STALE","ready":false,
     "reason_code":"required_localization_input_unavailable",
     "reasons":["filtered_odom_rate_below_minimum"],
