@@ -290,7 +290,9 @@ def _setup(context):
                         _python_launch("savo_base", "base_bringup.launch.py"),
                         launch_arguments={
                             "profile": LaunchConfiguration("base_profile"),
-                            "base_state_publisher_impl": LaunchConfiguration("base_state_publisher_impl"),
+                            "base_state_publisher_impl": LaunchConfiguration(
+                                "base_state_publisher_impl"
+                            ),
                             "driver_impl": "cpp",
                             "use_diag_runner": "false",
                             "output": "screen",

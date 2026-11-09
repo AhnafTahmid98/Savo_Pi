@@ -1,5 +1,6 @@
 """Installed-node ROS contracts. Run on Jazzy; no motor nodes are started."""
 import ast
+from contextlib import ExitStack
 import json
 import os
 from pathlib import Path
@@ -15,6 +16,7 @@ from ament_index_python.packages import get_package_prefix  # noqa: E402
 from geometry_msgs.msg import Twist  # noqa: E402
 from rcl_interfaces.srv import GetParameters  # noqa: E402
 from rclpy.context import Context  # noqa: E402
+from rclpy.executors import SingleThreadedExecutor  # noqa: E402
 from rclpy.parameter import parameter_value_to_python  # noqa: E402
 from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy  # noqa: E402
 from rosgraph_msgs.msg import Clock  # noqa: E402
@@ -30,9 +32,28 @@ def defaults():
             and n.func.attr == "declare_parameter"}
 
 
+@pytest.fixture
+def ros_probe(monkeypatch):
+    # Own every ROS resource per scenario, including cleanup after setup failures.
+    domain = 170 + os.getpid() % 30
+    monkeypatch.setenv("ROS_LOCALHOST_ONLY", "1")
+    with ExitStack() as cleanup:
+        context = Context()
+        rclpy.init(context=context, domain_id=domain)
+        cleanup.callback(context.shutdown)
+        node = rclpy.create_node("state_probe", context=context)
+        cleanup.callback(node.destroy_node)
+        executor = SingleThreadedExecutor(context=context)
+        cleanup.callback(executor.shutdown)
+        executor.add_node(node)
+        # LIFO cleanup stops the executor before destroying the node and context.
+        yield node, executor, domain
+
+
 @pytest.mark.parametrize("executable", ["base_state_publisher_node.py", "base_state_publisher_node_cpp"])
 @pytest.mark.parametrize("mode", ["normal", "disabled", "simulated", "board"])
-def test_installed_node_contract(executable, mode, tmp_path, monkeypatch):
+def test_installed_node_contract(executable, mode, tmp_path, ros_probe):
+    node, executor, domain = ros_probe
     prefix = "/state_test_" + uuid.uuid4().hex[:10]
     settings = defaults()
     settings.update({name: prefix + "/" + name for name in settings if name.endswith("_topic")})
@@ -42,19 +63,13 @@ def test_installed_node_contract(executable, mode, tmp_path, monkeypatch):
         settings.update({name: False for name in settings if name.startswith("subscribe_")})
         settings.update(pretty_json=True, robot_name="SAVO ä 中", publish_hz=8.0, heartbeat_hz=2.0)
     # Local, isolated test transport. These tests never publish robot topic names.
-    domain = 170 + os.getpid() % 30
-    monkeypatch.setenv("ROS_LOCALHOST_ONLY", "1")
-    context = Context()
-    rclpy.init(context=context, domain_id=domain)
-    node = rclpy.create_node("state_probe", context=context)
     process = None
-    log = (tmp_path / "node.log").open("w+")
     summaries, heartbeats = [], []
 
     def pump(duration):
         end = time.monotonic() + duration
         while time.monotonic() < end:
-            rclpy.spin_once(node, timeout_sec=0.02)
+            executor.spin_once(timeout_sec=0.02)
 
     def until(predicate, timeout=10.0):
         end = time.monotonic() + timeout
@@ -62,7 +77,7 @@ def test_installed_node_contract(executable, mode, tmp_path, monkeypatch):
             if process is not None and process.poll() is not None:
                 log.flush()
                 pytest.fail("node exited: " + (tmp_path / "node.log").read_text())
-            rclpy.spin_once(node, timeout_sec=0.02)
+            executor.spin_once(timeout_sec=0.02)
         assert predicate(), "Timed out waiting for ROS contract"
 
     reliable = QoSProfile(depth=10)
@@ -87,6 +102,7 @@ def test_installed_node_contract(executable, mode, tmp_path, monkeypatch):
         # JSON literals are valid YAML parameter values, including Unicode strings.
         command += ["-p", name + ":=" + json.dumps(value, ensure_ascii=False)]
     command += ["-p", "use_sim_time:=" + str(mode == "simulated").lower()]
+    log = (tmp_path / "node.log").open("w+")
     try:
         process = subprocess.Popen(command, stdout=log, stderr=log,
                                    env={**os.environ, "ROS_DOMAIN_ID": str(domain)})
@@ -192,13 +208,13 @@ def test_installed_node_contract(executable, mode, tmp_path, monkeypatch):
         assert sample["driver_state_topics"]["watchdog_state"]["data"]["kept"] == 42
         assert sample["status_level"] == "ERROR"
     finally:
-        if process is not None:
-            process.send_signal(signal.SIGINT)
-            try:
-                process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                process.kill()
-                process.wait(timeout=5)
-        node.destroy_node()
-        context.shutdown()
-        log.close()
+        try:
+            if process is not None:
+                process.send_signal(signal.SIGINT)
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait(timeout=5)
+        finally:
+            log.close()
