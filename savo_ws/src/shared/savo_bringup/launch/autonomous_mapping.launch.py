@@ -300,6 +300,7 @@ def generate_launch_description() -> LaunchDescription:
         launch_arguments={
             "profile": LaunchConfiguration("base_profile"),
             "driver_impl": LaunchConfiguration("base_driver_impl"),
+            "base_state_publisher_impl": LaunchConfiguration("base_state_publisher_impl"),
             "use_diag_runner": "false",
             "output": "screen",
             "log_level": log_level,
@@ -632,6 +633,10 @@ def generate_launch_description() -> LaunchDescription:
     )
     return LaunchDescription(
         [
+            DeclareLaunchArgument(
+                "base_state_publisher_impl", default_value="py", choices=["py", "cpp"],
+                description="Base state summary implementation.",
+            ),
             DeclareLaunchArgument(
                 "map_id",
                 default_value="",

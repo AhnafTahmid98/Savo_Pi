@@ -134,6 +134,7 @@ def generate_launch_description() -> LaunchDescription:
             "profile": profile,
             "profile_path": profile_path,
             "driver_impl": driver_impl,
+            "base_state_publisher_impl": LaunchConfiguration("base_state_publisher_impl"),
             "use_watchdog": use_watchdog,
             "use_state_publisher": use_state_publisher,
             "use_heartbeat": use_heartbeat,
@@ -145,6 +146,10 @@ def generate_launch_description() -> LaunchDescription:
 
     return LaunchDescription([
         # base stack profile
+        DeclareLaunchArgument(
+            "base_state_publisher_impl", default_value="py", choices=["py", "cpp"],
+            description="Base state summary implementation.",
+        ),
         DeclareLaunchArgument(
             "profile",
             default_value="dryrun_sim_motoroff.yaml",

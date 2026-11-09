@@ -158,6 +158,7 @@ def generate_launch_description() -> LaunchDescription:
             "use_heartbeat": use_heartbeat,
             "use_diag_runner": use_diag_runner,
             "driver_impl": driver_impl,
+            "base_state_publisher_impl": LaunchConfiguration("base_state_publisher_impl"),
             "log_level": log_level,
             "output": output,
         }.items(),
@@ -165,6 +166,10 @@ def generate_launch_description() -> LaunchDescription:
 
     return LaunchDescription([
         # bringup controls
+        DeclareLaunchArgument(
+            "base_state_publisher_impl", default_value="py", choices=["py", "cpp"],
+            description="Base state summary implementation.",
+        ),
         DeclareLaunchArgument("use_watchdog", default_value="true"),
         DeclareLaunchArgument("use_state_publisher", default_value="true"),
         DeclareLaunchArgument("use_heartbeat", default_value="true"),

@@ -17,6 +17,7 @@ find_package(ament_cmake_python REQUIRED)  # provides ament_python_install_packa
 # Core ROS 2 (Python + optional C++)
 find_package(rclpy REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(RapidJSON REQUIRED)
 
 # Messages
 find_package(geometry_msgs REQUIRED)
@@ -59,8 +60,19 @@ ament_target_dependencies(base_driver_node
   std_msgs
 )
 
+# Aggregator core is independent of ROS so compatibility tests run on a PC.
+add_library(base_state_summary STATIC src/state/state_summary.cpp)
+target_include_directories(base_state_summary PUBLIC include)
+target_include_directories(base_state_summary SYSTEM PRIVATE ${RAPIDJSON_INCLUDE_DIRS})
+target_compile_features(base_state_summary PUBLIC cxx_std_17)
+
+add_executable(base_state_publisher_node_cpp src/nodes/base_state_publisher_node.cpp)
+target_link_libraries(base_state_publisher_node_cpp base_state_summary)
+ament_target_dependencies(base_state_publisher_node_cpp rclcpp geometry_msgs std_msgs)
+
 install(TARGETS
   base_driver_node
+  base_state_publisher_node_cpp
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -118,6 +130,10 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resource")
   )
 endif()
 
+install(DIRECTORY docs/
+  DESTINATION share/${PROJECT_NAME}/docs
+)
+
 # README/package.xml in install tree is useful for deployed robot troubleshooting
 install(FILES
   README.md
@@ -161,6 +177,12 @@ if(BUILD_TESTING)
       ament_add_pytest_test(${test_name} ${test_path})
     endif()
   endfunction()
+
+  ament_add_pytest_test(test_state_publisher_compatibility
+    test/test_state_publisher_compatibility.py
+    APPEND_ENV RAPIDJSON_INCLUDE_DIR=${RAPIDJSON_INCLUDE_DIRS})
+  add_pytest_if_exists(test_state_publisher_launch test/test_state_publisher_launch.py)
+  add_pytest_if_exists(test_state_publisher_ros test/test_state_publisher_ros.py)
 
   add_pytest_if_exists(test_mecanum_mix test/test_mecanum_mix.py)
   add_pytest_if_exists(test_wheel_command test/test_wheel_command.py)

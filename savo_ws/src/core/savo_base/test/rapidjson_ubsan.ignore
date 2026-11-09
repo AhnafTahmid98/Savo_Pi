@@ -1,0 +1,4 @@
+# RapidJSON 1.1's lazy internal stack uses null-pointer arithmetic before its
+# first allocation. Scope suppression to that third-party header; keep all
+# SAVO code and the other RapidJSON headers instrumented.
+src:*/rapidjson/internal/stack.h

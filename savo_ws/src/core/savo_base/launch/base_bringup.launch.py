@@ -68,6 +68,53 @@ def _build_base_driver_node(context, *args, **kwargs):
     ]
 
 
+def _build_base_state_publisher_node(context, *args, **kwargs):
+    impl = LaunchConfiguration("base_state_publisher_impl").perform(context)
+    if impl == "py":
+        executable = "base_state_publisher_node.py"
+    elif impl == "cpp":
+        executable = "base_state_publisher_node_cpp"
+    else:
+        raise RuntimeError("base_state_publisher_impl must be 'py' or 'cpp'")
+    if not IfCondition(LaunchConfiguration("use_state_publisher")).evaluate(context):
+        return []
+    output = LaunchConfiguration("output").perform(context)
+    log_level = LaunchConfiguration("log_level").perform(context)
+    return [Node(
+        package="savo_base",
+        executable=executable,
+        name="base_state_publisher_node",
+        output=output,
+        parameters=[
+            {
+                "cmd_topic": "/cmd_vel_safe",
+                "safety_stop_topic": "/safety/stop",
+                "slowdown_topic": "/safety/slowdown_factor",
+                "watchdog_topic": "/savo_base/watchdog_state",
+                "base_state_topic": "/savo_base/base_state",
+                "motor_board_status_topic": "/savo_base/motor_board_status",
+                "subscribe_cmd": True,
+                "subscribe_safety_stop": True,
+                "subscribe_slowdown": True,
+                "subscribe_watchdog": True,
+                "subscribe_base_state": True,
+                "subscribe_motor_board_status": False,
+                "summary_topic": "/savo_base/state_summary",
+                "heartbeat_topic": "/savo_base/state_heartbeat",
+                "publish_hz": 5.0,
+                "heartbeat_hz": 1.0,
+                "cmd_stale_s": 0.30,
+                "safety_stale_s": 0.50,
+                "watchdog_stale_s": 1.50,
+                "base_state_stale_s": 1.50,
+                "motor_board_status_stale_s": 1.50,
+                "pretty_json": False,
+            }
+        ],
+        arguments=["--ros-args", "--log-level", log_level],
+    )]
+
+
 def generate_launch_description() -> LaunchDescription:
     use_watchdog = LaunchConfiguration("use_watchdog")
     use_state_publisher = LaunchConfiguration("use_state_publisher")
@@ -95,41 +142,6 @@ def generate_launch_description() -> LaunchDescription:
                 "publish_trip_topic": True,
                 "publish_stop_request": False,
                 "stop_request_topic": "/savo_base/watchdog_stop_request",
-                "pretty_json": False,
-            }
-        ],
-        arguments=["--ros-args", "--log-level", log_level],
-    )
-
-    base_state_publisher_node = Node(
-        package="savo_base",
-        executable="base_state_publisher_node.py",
-        name="base_state_publisher_node",
-        output=output,
-        condition=IfCondition(use_state_publisher),
-        parameters=[
-            {
-                "cmd_topic": "/cmd_vel_safe",
-                "safety_stop_topic": "/safety/stop",
-                "slowdown_topic": "/safety/slowdown_factor",
-                "watchdog_topic": "/savo_base/watchdog_state",
-                "base_state_topic": "/savo_base/base_state",
-                "motor_board_status_topic": "/savo_base/motor_board_status",
-                "subscribe_cmd": True,
-                "subscribe_safety_stop": True,
-                "subscribe_slowdown": True,
-                "subscribe_watchdog": True,
-                "subscribe_base_state": True,
-                "subscribe_motor_board_status": False,
-                "summary_topic": "/savo_base/state_summary",
-                "heartbeat_topic": "/savo_base/state_heartbeat",
-                "publish_hz": 5.0,
-                "heartbeat_hz": 1.0,
-                "cmd_stale_s": 0.30,
-                "safety_stale_s": 0.50,
-                "watchdog_stale_s": 1.50,
-                "base_state_stale_s": 1.50,
-                "motor_board_status_stale_s": 1.50,
                 "pretty_json": False,
             }
         ],
@@ -197,6 +209,10 @@ def generate_launch_description() -> LaunchDescription:
     return LaunchDescription([
         # profile arguments
         DeclareLaunchArgument(
+            "base_state_publisher_impl", default_value="py", choices=["py", "cpp"],
+            description="Base state summary implementation.",
+        ),
+        DeclareLaunchArgument(
             "profile",
             default_value="dryrun_sim_motoroff.yaml",
             description=(
@@ -228,7 +244,7 @@ def generate_launch_description() -> LaunchDescription:
         DeclareLaunchArgument(
             "use_state_publisher",
             default_value="true",
-            description="Start base_state_publisher_node.py (aggregated state summary).",
+            description="Start the selected base state publisher (aggregated state summary).",
         ),
         DeclareLaunchArgument(
             "use_heartbeat",
@@ -266,7 +282,7 @@ def generate_launch_description() -> LaunchDescription:
 
         # helper nodes
         base_watchdog_node,
-        base_state_publisher_node,
+        OpaqueFunction(function=_build_base_state_publisher_node),
         base_heartbeat_node,
         base_diag_runner_node,
     ])

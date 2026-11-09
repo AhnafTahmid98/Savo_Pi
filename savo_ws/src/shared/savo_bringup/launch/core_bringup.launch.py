@@ -290,6 +290,7 @@ def _setup(context):
                         _python_launch("savo_base", "base_bringup.launch.py"),
                         launch_arguments={
                             "profile": LaunchConfiguration("base_profile"),
+                            "base_state_publisher_impl": LaunchConfiguration("base_state_publisher_impl"),
                             "driver_impl": "cpp",
                             "use_diag_runner": "false",
                             "output": "screen",
@@ -544,6 +545,10 @@ def generate_launch_description() -> LaunchDescription:
     perception_share = FindPackageShare("savo_perception")
     return LaunchDescription(
         [
+            DeclareLaunchArgument(
+                "base_state_publisher_impl", default_value="py", choices=["py", "cpp"],
+                description="Base state summary implementation.",
+            ),
             DeclareLaunchArgument("robot_mode", default_value="safe_idle"),
             DeclareLaunchArgument("bringup_profile", default_value="lidar_only"),
             DeclareLaunchArgument("d435_voxel_validated", default_value="false"),

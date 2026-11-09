@@ -27,3 +27,11 @@ source install/setup.bash
 colcon test --packages-select savo_base --ctest-args --output-on-failure
 colcon test-result --verbose
 ```
+
+
+## Optional C++ state publisher (CPU optimization phase 1)
+
+`base_state_publisher_impl:=cpp` selects the new C++17 telemetry aggregator;
+`py` remains the default and fallback. The selection is independent of the base
+driver. See [the contract audit, local checks, and Raspberry Pi validation guide](docs/cpu_phase1.md)
+before enabling it on the robot.
