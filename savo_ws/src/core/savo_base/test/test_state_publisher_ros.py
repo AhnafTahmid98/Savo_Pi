@@ -8,6 +8,7 @@ import signal
 import subprocess
 import time
 import uuid
+import warnings
 
 import pytest
 
@@ -23,6 +24,21 @@ from rosgraph_msgs.msg import Clock  # noqa: E402
 from std_msgs.msg import Bool, Float32, String  # noqa: E402
 
 PACKAGE = Path(__file__).resolve().parents[1]
+
+
+def assert_discovered_history_depth(qos, endpoint):
+    """Validate known metadata and explicitly report discovery's blind spot."""
+    if qos.history == HistoryPolicy.UNKNOWN:
+        warnings.warn(
+            f"QoS discovery limitation for {endpoint}: history=UNKNOWN "
+            f"(reported depth={qos.depth}); history/depth could not be verified "
+            "using discovery. KEEP_LAST/depth 10 are not confirmed.",
+            pytest.PytestWarning,
+            stacklevel=2,
+        )
+    else:
+        assert qos.history == HistoryPolicy.KEEP_LAST, f"{endpoint}: expected KEEP_LAST history, got {qos.history}"
+        assert qos.depth == 10, f"{endpoint}: expected depth 10, got {qos.depth}"
 
 
 def defaults():
@@ -129,8 +145,7 @@ def test_installed_node_contract(executable, mode, tmp_path, ros_probe):
                 endpoint = endpoints()[0]
                 assert endpoint.topic_type == msg_type
                 assert endpoint.qos_profile.reliability == reliability
-                assert endpoint.qos_profile.history == HistoryPolicy.KEEP_LAST
-                assert endpoint.qos_profile.depth == 10
+                assert_discovered_history_depth(endpoint.qos_profile, f"subscription {settings[key]}")
                 assert endpoint.qos_profile.durability == DurabilityPolicy.VOLATILE
             else:
                 assert endpoints() == []
@@ -140,7 +155,7 @@ def test_installed_node_contract(executable, mode, tmp_path, ros_probe):
             assert endpoints[0].topic_type == msg_type
             qos = endpoints[0].qos_profile
             assert qos.reliability == ReliabilityPolicy.RELIABLE
-            assert qos.history == HistoryPolicy.KEEP_LAST and qos.depth == 10
+            assert_discovered_history_depth(qos, f"publisher {settings[key]}")
             assert qos.durability == DurabilityPolicy.VOLATILE
 
         if mode == "simulated":
