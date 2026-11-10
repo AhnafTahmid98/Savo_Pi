@@ -48,10 +48,20 @@ def defaults():
             and n.func.attr == "declare_parameter"}
 
 
+@pytest.fixture(scope="session")
+def ros_test_domain_pool():
+    # Reserve default domain 0 and the robot's inherited domain. Consume each
+    # remaining low domain once per pytest session; never recycle after cleanup.
+    robot_domain = int(os.environ.get("ROS_DOMAIN_ID", "0"))
+    return iter(domain for domain in range(1, 102) if domain != robot_domain)
+
+
 @pytest.fixture
-def ros_probe(monkeypatch):
+def ros_probe(monkeypatch, ros_test_domain_pool):
     # Own every ROS resource per scenario, including cleanup after setup failures.
-    domain = 170 + os.getpid() % 30
+    domain = next(ros_test_domain_pool, None)
+    if domain is None:
+        pytest.fail("ROS test domain pool exhausted; refusing to reuse a domain")
     monkeypatch.setenv("ROS_LOCALHOST_ONLY", "1")
     with ExitStack() as cleanup:
         context = Context()
