@@ -548,7 +548,7 @@ def generate_launch_description() -> LaunchDescription:
     return LaunchDescription(
         [
             DeclareLaunchArgument(
-                "base_state_publisher_impl", default_value="py", choices=["py", "cpp"],
+                "base_state_publisher_impl", default_value="cpp", choices=["py", "cpp"],
                 description="Base state summary implementation.",
             ),
             DeclareLaunchArgument("robot_mode", default_value="safe_idle"),

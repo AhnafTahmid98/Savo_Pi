@@ -1,11 +1,29 @@
-# Phase 1: optional C++ base state publisher
+# Phase 1: default C++ base state publisher
 
-The Python executable remains unchanged and remains the launch default. The new
+`base_state_publisher_impl` defaults to `cpp` in all six Core/base launch paths
+after Raspberry Pi 5 ROS 2 Jazzy validation. The unchanged Python executable
+remains available through explicit `base_state_publisher_impl:=py` rollback.
 `base_state_publisher_node_cpp` is a C++17 `rclcpp` telemetry aggregator. Both use
 ROS node name `base_state_publisher_node` and JSON `node` value
 `base_state_publisher_node`. No driver, motor I/O, watchdog, control, or safety
 implementation was changed. Do not run the two executables manually together on
 the same topics; the launch selector provides exclusivity within one launch.
+
+## Core Pi validation and promotion evidence
+
+The robot operator reported that all eight isolated ROS runtime CTest scenarios
+passed on Raspberry Pi 5 with ROS 2 Jazzy, and `colcon test-result` reported zero
+failures. The reported full-stack measurements were:
+
+| Metric | Python | C++ |
+|---|---|---|
+| Publisher CPU (one core) | 13.33% | 2.75% |
+| Publisher RSS | 81.3 MiB | 42.9 MiB |
+
+C++ also showed lower maximum message-header gaps in the initial comparison.
+Timing spikes remain and require separate investigation; this default change
+does not establish that timing issues are resolved. These are supplied Core Pi
+results, not measurements independently reproduced on the development PC.
 
 ## Audited ROS contract
 
@@ -126,11 +144,19 @@ it is a header-only dependency, with no new runtime library dependency.
 After building and sourcing the workspace:
 
 ```bash
+# C++ is selected when the argument is omitted.
 ros2 launch savo_base base_bringup.launch.py \
-  profile:=dryrun_sim_motoroff.yaml base_state_publisher_impl:=cpp
+  profile:=dryrun_sim_motoroff.yaml
 ```
 
-Use `base_state_publisher_impl:=py` to return to Python, or omit the argument.
+Stop the running launch before changing implementations. To roll back explicitly:
+
+```bash
+ros2 launch savo_base base_bringup.launch.py \
+  profile:=dryrun_sim_motoroff.yaml base_state_publisher_impl:=py
+```
+
+Omitting the selector keeps C++; `base_state_publisher_impl:=cpp` is also accepted.
 `use_state_publisher:=false` starts neither implementation. Invalid selectors are
 rejected. A single launch factory creates one Node, retaining the existing node
 name and parameter overrides for both executables.
@@ -180,10 +206,11 @@ timestamps to a compiled C++ harness. They compare complete decoded summaries,
 including all nested fields, counters and nonfinite values. Launch tests execute
 the real selection factory and check wrapper forwarding/defaults.
 
-## Required Raspberry Pi Jazzy validation
+## Raspberry Pi Jazzy validation and repeat checks
 
-The PC cannot validate `rclcpp`, ament integration, DDS behavior or CPU reduction.
-On the Pi, after reviewing the changes, use the existing workspace dependencies:
+Core Pi validation is reported above. The PC cannot independently validate
+`rclcpp`, ament integration, DDS behavior or CPU reduction. To repeat validation
+after reviewing the default promotion, use the existing Pi workspace dependencies:
 
 ```bash
 cd ~/Savo_Pi/savo_ws
@@ -260,11 +287,15 @@ then record at least 60 seconds of process CPU and RSS, e.g. `pidstat -u -r -p P
 1 60`, using the selected publisher process PID. Confirm summary and heartbeat
 rates and status behavior during each run. Stop the first process before changing
 implementation. Do not infer improvement from PC compilation or a core-only
-microbenchmark: the supplied 13.7% baseline includes ROS middleware/runtime costs.
-Keep Python as the default until Pi build, behavior and CPU measurements pass.
+microbenchmark: full-stack measurements include ROS middleware/runtime costs.
+The reported successful Pi validation and CPU/RSS measurements support promoting
+C++ to the default; Python remains an explicit rollback option. Verify the new
+default and explicit Python rollback with the dry-run launch commands above,
+checking that only one state publisher is present in each run. These actual ROS
+launch smoke checks require Core Pi and cannot run on this development PC.
 
 
-## Review and local verification record (2026-11-10)
+## Initial implementation verification record (2026-11-10)
 
 - `savo_base` package pytest: **51 passed, 1 skipped** (ROS runtime module).
 - Package plus available `savo_bringup` contracts: **153 passed, 1 skipped**,
@@ -283,9 +314,11 @@ Keep Python as the default until Pi build, behavior and CPU measurements pass.
 - Independent review findings (oversized-number stack exhaustion and Unicode ST
   ligatures) were reproduced with failing tests, fixed, and verified passing.
 
-Remaining validation: actual Jazzy/ament build and all eight installed-node ROS
-cases on the Pi, CPU/RSS and timing measurements under representative load, and
-consumer compatibility if a downstream client compares raw JSON text instead of
-parsed values. Exotic malformed/Unicode/depth cases are not an exhaustive proof
-of equivalence with every configurable CPython runtime. No deployment, commit,
-push or merge was performed; Python remains the default.
+At that initial PC handoff, Jazzy execution and performance measurement remained
+Pi validation items; the subsequent successful Pi results are recorded above.
+Remaining limitations include timing spikes, the unroot-caused combined-process
+Fast DDS behavior, and consumer compatibility if a downstream client compares
+raw JSON text instead of parsed values. Exotic malformed/Unicode/depth cases
+are not an exhaustive proof of equivalence with every configurable CPython runtime.
+The default promotion changes launch defaults only; no production publisher or
+safety logic is modified.

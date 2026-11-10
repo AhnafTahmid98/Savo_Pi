@@ -29,9 +29,9 @@ colcon test-result --verbose
 ```
 
 
-## Optional C++ state publisher (CPU optimization phase 1)
+## Default C++ state publisher (CPU optimization phase 1)
 
-`base_state_publisher_impl:=cpp` selects the new C++17 telemetry aggregator;
-`py` remains the default and fallback. The selection is independent of the base
-driver. See [the contract audit, local checks, and Raspberry Pi validation guide](docs/cpu_phase1.md)
-before enabling it on the robot.
+`base_state_publisher_impl` now defaults to `cpp` after Raspberry Pi 5 Jazzy
+validation. Set `base_state_publisher_impl:=py` explicitly to roll back to Python.
+The selection is independent of the base driver and starts exactly one state
+publisher when enabled. See [the contract audit, Pi results, and validation guide](docs/cpu_phase1.md).

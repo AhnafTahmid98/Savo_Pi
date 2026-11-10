@@ -53,6 +53,11 @@ def test_invalid_selection_rejected():
         factory()({"base_state_publisher_impl": "typo", "use_state_publisher": "true"})
 
 
+@pytest.mark.parametrize("requested_impl,expected_executable", [
+    (None, "base_state_publisher_node_cpp"),
+    ("py", "base_state_publisher_node.py"),
+    ("cpp", "base_state_publisher_node_cpp"),
+])
 @pytest.mark.parametrize("relative", [
     "core/savo_base/launch/base_bringup.launch.py",
     "core/savo_base/launch/base_safe_idle.launch.py",
@@ -61,7 +66,7 @@ def test_invalid_selection_rejected():
     "shared/savo_bringup/launch/core_bringup.launch.py",
     "shared/savo_bringup/launch/autonomous_mapping.launch.py",
 ])
-def test_launch_defaults_and_forwarding(relative):
+def test_launch_defaults_and_forwarding(relative, requested_impl, expected_executable):
     tree = ast.parse((PACKAGE.parents[1] / relative).read_text())
     declarations = [n for n in ast.walk(tree) if isinstance(n, ast.Call)
                     and isinstance(n.func, ast.Name) and n.func.id == "DeclareLaunchArgument"
@@ -69,10 +74,30 @@ def test_launch_defaults_and_forwarding(relative):
                     and n.args[0].value == "base_state_publisher_impl"]
     assert len(declarations) == 1
     keywords = {kw.arg: ast.literal_eval(kw.value) for kw in declarations[0].keywords}
-    assert keywords["default_value"] == "py"
+    assert keywords["default_value"] == "cpp"
     assert set(keywords["choices"]) == {"py", "cpp"}
+    selected = keywords["default_value"] if requested_impl is None else requested_impl
+    context = {"base_state_publisher_impl": selected, "use_state_publisher": "true",
+               "output": "screen", "log_level": "info"}
     if "base_bringup.launch.py" not in relative:
-        # Verify the argument is explicitly passed to the included launch.
-        assert any(isinstance(n, ast.Dict) and any(
-            isinstance(k, ast.Constant) and k.value == "base_state_publisher_impl" for k in n.keys)
-            for n in ast.walk(tree))
+        # Execute the actual forwarding expression: an override must not be
+        # replaced with a wrapper's default or a hard-coded implementation.
+        forwarded = [value for n in ast.walk(tree) if isinstance(n, ast.Dict)
+                     for key, value in zip(n.keys, n.values)
+                     if isinstance(key, ast.Constant) and key.value == "base_state_publisher_impl"]
+        assert len(forwarded) == 1
+        expression = compile(ast.Expression(forwarded[0]), relative, "eval")
+        assert eval(expression, {"LaunchConfiguration": context.__getitem__}) == selected
+    nodes = factory()(context)
+    assert len(nodes) == 1
+    assert nodes[0].executable == expected_executable
+    assert nodes[0].name == "base_state_publisher_node"
+
+
+def test_python_rollback_preserves_complete_node_contract():
+    context = {"use_state_publisher": "true", "output": "screen", "log_level": "info"}
+    cpp = factory()({**context, "base_state_publisher_impl": "cpp"})[0]
+    py = factory()({**context, "base_state_publisher_impl": "py"})[0]
+    assert {key: value for key, value in vars(cpp).items() if key != "executable"} == {
+        key: value for key, value in vars(py).items() if key != "executable"
+    }

@@ -1,12 +1,14 @@
 # Base state publisher C++ implementation plan
 
-Goal: opt-in C++17 ROS 2 Jazzy aggregation with the existing Python contract.
+Goal: C++17 ROS 2 Jazzy aggregation with the existing Python contract, now the
+launch default following Core Pi validation, with explicit Python rollback.
 Scope: savo_base plus necessary launch forwarding; master, no commit/push/deploy.
 
 Design: a ROS-independent state core with an explicit monotonic timestamp input,
 RapidJSON streaming validation and cached serialized input data, and a thin rclcpp
 adapter. Keep Python unchanged. Use a single launch Node selected at runtime,
-with py as the default. ROS-clock timers preserve simulated-clock behavior.
+with cpp as the default and py as an explicit rollback. The initial rollout used
+py until Pi validation completed. ROS-clock timers preserve simulated-clock behavior.
 A pure streaming approach avoids rebuilding nested input JSON on each summary;
 rebuilding a DOM each tick adds allocations without changing the contract.
 
@@ -30,9 +32,14 @@ changes unstaged on master. No branch/worktree/commit was created. Independent
 review found oversized-number recursive-regex stack exhaustion and missing ST
 ligature normalization; both were reproduced by failing differential tests and
 fixed with iterative numeric scanning and explicit status mappings. ROS-only
-execution remains a Pi validation item, not a claimed local result.
+execution was subsequently reported passing on Core Pi; it is not a claimed
+local result.
 
 Final local evidence is recorded in cpu_phase1.md. The third-party RapidJSON
 internal stack UBSan finding is isolated by a header-specific test suppression;
-SAVO code remains instrumented. Required Jazzy and performance checks remain
-explicit handoff items because this development PC has no ROS installation.
+SAVO code remains instrumented. Subsequent Core Pi evidence is recorded in
+cpu_phase1.md: eight isolated runtime cases passed, zero colcon test-result
+failures, CPU 13.33% to 2.75%, and RSS 81.3 to 42.9 MiB. That evidence authorizes
+the C++ default promotion in all six launch files. Actual launch smoke tests of
+the new default and Python rollback still require ROS on Core Pi; timing spikes
+remain a separate investigation.

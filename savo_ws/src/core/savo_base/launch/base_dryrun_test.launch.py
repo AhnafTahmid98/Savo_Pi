@@ -167,7 +167,7 @@ def generate_launch_description() -> LaunchDescription:
     return LaunchDescription([
         # bringup controls
         DeclareLaunchArgument(
-            "base_state_publisher_impl", default_value="py", choices=["py", "cpp"],
+            "base_state_publisher_impl", default_value="cpp", choices=["py", "cpp"],
             description="Base state summary implementation.",
         ),
         DeclareLaunchArgument("use_watchdog", default_value="true"),
