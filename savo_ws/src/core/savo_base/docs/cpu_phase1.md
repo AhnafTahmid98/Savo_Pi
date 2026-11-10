@@ -207,6 +207,51 @@ input, summary/heartbeat rates, counters, stale stop priority, malformed-input
 retention, and ROS-time pause with monotonic command expiry. It skips explicitly
 when `rclpy` is unavailable. ROS timing tolerances should be checked under Pi load.
 
+### Process-isolated runtime CTest cases
+
+Core Pi validation found that all eight scenarios pass in separate pytest
+processes, while the combined pytest process intermittently loses GetParameters
+responses and node logs report Fast DDS service-response timeouts. The Fast DDS
+service-response timing has **not been independently root-caused**. Process
+isolation is a test execution workaround, not a production or middleware fix.
+
+CMake now registers `test_state_publisher_ros_<mode>_<impl>` for each of
+`normal`, `disabled`, `simulated`, `board` crossed with `py`, `cpp`. Each entry
+starts its own Python/pytest OS process and selects exactly one existing pytest
+node ID, for example
+`test_state_publisher_ros.py::test_installed_node_contract[normal-base_state_publisher_node.py]`.
+All entries have CTest `RUN_SERIAL=TRUE`, so they cannot overlap with other tests
+within the same CTest invocation, even when CTest is given `-j`. Independent
+CTest/colcon invocations are not coordinated by this property.
+
+Each case keeps the existing custom Context, explicit executor, localhost-only
+transport, robot-domain exclusion, cleanup and assertions. Its process-local
+domain pool is fresh, so serial cases may reuse the first eligible low domain;
+the inherited robot domain and domain 0 remain excluded. Each case gets its own
+ament runner, JUnit XML, output log and pytest cache. Missing node IDs and empty
+collection remain nonzero failures; no skip return code is registered.
+
+Reconfigure on Core Pi to replace the old combined CTest entry, then check that
+eight cases are listed and execute them through CTest:
+
+```bash
+# From savo_ws, after sourcing Jazzy and the workspace:
+colcon build --packages-select savo_base --cmake-force-configure
+source install/setup.bash
+ctest --test-dir build/savo_base -N -R '^test_state_publisher_ros_'
+# Remove only the obsolete generated result from the former combined test,
+# if present, so colcon test-result cannot report that old result as current.
+rm -f build/savo_base/test_results/savo_base/test_state_publisher_ros.xunit.xml
+colcon test --packages-select savo_base --event-handlers console_direct+ \
+  --ctest-args -R '^test_state_publisher_ros_' --output-on-failure
+colcon test-result --verbose
+```
+
+Do not use a single direct pytest invocation of the whole runtime module as the
+Pi validation command: it bypasses the process isolation. The PC can validate
+registration, selection, serial execution and reporting with non-ROS probes, but
+cannot independently reproduce or diagnose the Pi's middleware timing behavior.
+
 Then compare Python and C++ on the Pi with the same Release build, RMW, CPU
 frequency settings, topic rates, input recording, parameter settings and summary
 subscriber load. Start only one implementation at a time. A fixed replay of the

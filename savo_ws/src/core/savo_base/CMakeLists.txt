@@ -182,7 +182,35 @@ if(BUILD_TESTING)
     test/test_state_publisher_compatibility.py
     APPEND_ENV RAPIDJSON_INCLUDE_DIR=${RAPIDJSON_INCLUDE_DIRS})
   add_pytest_if_exists(test_state_publisher_launch test/test_state_publisher_launch.py)
-  add_pytest_if_exists(test_state_publisher_ros test/test_state_publisher_ros.py)
+  # Core Pi: separate pytest processes pass, while a combined process can lose
+  # GetParameters responses. The Fast DDS timing cause is not independently
+  # root-caused; isolate tests without changing middleware or runtime assertions.
+  # Use ament_add_test directly because ament_add_pytest_test validates its path
+  # as a file/directory and cannot accept an exact pytest parametrized node ID.
+  find_package(Python3 REQUIRED COMPONENTS Interpreter)
+  foreach(mode IN ITEMS normal disabled simulated board)
+    foreach(impl IN ITEMS py cpp)
+      if(impl STREQUAL "py")
+        set(executable "base_state_publisher_node.py")
+      else()
+        set(executable "base_state_publisher_node_cpp")
+      endif()
+      set(test_name "test_state_publisher_ros_${mode}_${impl}")
+      set(test_node_id
+        "${CMAKE_CURRENT_SOURCE_DIR}/test/test_state_publisher_ros.py::test_installed_node_contract[${mode}-${executable}]")
+      set(result_file "${AMENT_TEST_RESULTS_DIR}/${PROJECT_NAME}/${test_name}.xunit.xml")
+      ament_add_test(${test_name}
+        COMMAND "${Python3_EXECUTABLE}" -u -m pytest "${test_node_id}"
+          -o "cache_dir=${CMAKE_CURRENT_BINARY_DIR}/ament_cmake_pytest/${test_name}/.cache"
+          "--junit-xml=${result_file}"
+          "--junit-prefix=${PROJECT_NAME}"
+        OUTPUT_FILE "${CMAKE_BINARY_DIR}/ament_cmake_pytest/${test_name}.txt"
+        RESULT_FILE "${result_file}"
+      )
+      # Preserve pytest's nonzero exit for missing/empty collection (no skip code).
+      set_tests_properties(${test_name} PROPERTIES RUN_SERIAL TRUE LABELS "pytest")
+    endforeach()
+  endforeach()
 
   add_pytest_if_exists(test_mecanum_mix test/test_mecanum_mix.py)
   add_pytest_if_exists(test_wheel_command test/test_wheel_command.py)

@@ -1,4 +1,9 @@
-"""Installed-node ROS contracts. Run on Jazzy; no motor nodes are started."""
+"""Installed-node ROS contracts; CTest runs each case in a separate serial process.
+
+Run through CTest on Jazzy: combined pytest runs can lose GetParameters responses
+on Core Pi. Fast DDS response timing has not been independently root-caused.
+No motor nodes are started.
+"""
 import ast
 from contextlib import ExitStack
 import json
