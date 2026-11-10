@@ -127,6 +127,36 @@ struct BNO055Status
   ImuCalibration calibration{};
 };
 
+// Interpret SYS_ERR only when SYS_STATUS reports a system error (0x01).
+// In NDOF/IMU fusion modes, only SYS_STATUS=0x05 is ready for use.
+enum class BNO055OperationalState
+{
+  FUSION_RUNNING,
+  INITIALIZING,
+  SYSTEM_ERROR,
+  INVALID,
+};
+
+inline BNO055OperationalState bno055_operational_state(const BNO055Status & status)
+{
+  if (status.chip_id != BNO055_CHIP_ID) {
+    return BNO055OperationalState::INVALID;
+  }
+  switch (status.system_status) {
+    case 0x01:
+      return BNO055OperationalState::SYSTEM_ERROR;
+    case 0x05:
+      return BNO055OperationalState::FUSION_RUNNING;
+    case 0x00:
+    case 0x02:
+    case 0x03:
+    case 0x04:
+      return BNO055OperationalState::INITIALIZING;
+    default:
+      return BNO055OperationalState::INVALID;
+  }
+}
+
 struct BNO055Sample
 {
   Vector3 accel_mps2{};

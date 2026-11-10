@@ -2,6 +2,7 @@
 
 #include <cerrno>
 #include <chrono>
+#include <thread>
 #include <cstdio>
 #include <ctime>
 #include <cstring>
@@ -471,18 +472,39 @@ void BNO055CalibrationRuntime::verify_operational_status(BNO055Driver & driver)
     return;
   }
   try {
-    const BNO055Status status = driver.read_status();
-    if (status.chip_id != BNO055_CHIP_ID) {
-      mark_restore_failed("unexpected BNO055 chip id after calibration restore");
-      return;
+    // Sensor fusion may still be initializing after the operational mode switch.
+    // Do not treat a nonzero SYS_ERR as a current error unless SYS_STATUS=0x01.
+    constexpr auto kMaxWait = std::chrono::milliseconds(1000);
+    constexpr auto kPollInterval = std::chrono::milliseconds(25);
+    const auto deadline = std::chrono::steady_clock::now() + kMaxWait;
+    while (true) {
+      const BNO055Status status = driver.read_status();
+      const auto operational = bno055_operational_state(status);
+      if (operational == BNO055OperationalState::FUSION_RUNNING) {
+        state_.operational_status_verified = true;
+        state_.status = "restored";
+        return;
+      }
+      if (operational == BNO055OperationalState::SYSTEM_ERROR) {
+        mark_restore_failed("BNO055 system error after calibration restore: " +
+          std::to_string(status.system_error));
+        return;
+      }
+      if (operational == BNO055OperationalState::INVALID) {
+        mark_restore_failed(
+          "unexpected BNO055 operational status after calibration restore: chip=" +
+          std::to_string(status.chip_id) + " SYS_STATUS=" +
+          std::to_string(status.system_status));
+        return;
+      }
+      if (std::chrono::steady_clock::now() >= deadline) {
+        mark_restore_failed(
+          "BNO055 did not reach fusion-running state within 1000 ms; SYS_STATUS=" +
+          std::to_string(status.system_status));
+        return;
+      }
+      std::this_thread::sleep_for(kPollInterval);
     }
-    if (status.system_error != 0U) {
-      mark_restore_failed("BNO055 system error after calibration restore: " +
-        std::to_string(status.system_error));
-      return;
-    }
-    state_.operational_status_verified = true;
-    state_.status = "restored";
   } catch (const std::exception & exception) {
     mark_restore_failed(
       "BNO055 operational status verification failed: " + std::string(exception.what()));

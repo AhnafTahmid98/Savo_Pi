@@ -250,6 +250,7 @@ TEST(BNO055CalibrationRuntimeTest, StartupRestoresBeforeOperationalModeAndVerifi
   EXPECT_TRUE(runtime.state().restore_attempted);
   EXPECT_TRUE(runtime.state().profile_verified);
   fixture.driver->set_mode(BNO055Mode::NDOF);
+  fixture.bus->registers[0x39] = 5;  // Fusion running.
   runtime.verify_operational_status(*fixture.driver);
 
   EXPECT_EQ(runtime.state().status, "restored");
@@ -288,10 +289,71 @@ TEST(BNO055CalibrationRuntimeTest, PostRestoreSystemErrorIsReported)
 
   runtime.restore(*fixture.driver, true, true, valid_metadata());
   fixture.driver->set_mode(BNO055Mode::NDOF);
+  fixture.bus->registers[0x39] = 1;  // Actual system error.
   fixture.bus->registers[0x3A] = 9;
   runtime.verify_operational_status(*fixture.driver);
 
   EXPECT_TRUE(runtime.state().profile_verified);
+  EXPECT_FALSE(runtime.state().operational_status_verified);
+  EXPECT_TRUE(runtime.state().restore_failed);
+}
+
+TEST(BNO055CalibrationRuntimeTest, NonzeroSysErrIsIgnoredWhenFusionRunning)
+{
+  TemporaryDirectory temporary;
+  const fs::path profile_path = temporary.path() / "profile.yaml";
+  BNO055CalibrationStore store(profile_path.string());
+  std::string error;
+  ASSERT_TRUE(store.save_atomic(valid_document(), error)) << error;
+  DriverFixture fixture;
+  BNO055CalibrationRuntime runtime(profile_path.string());
+
+  runtime.restore(*fixture.driver, true, true, valid_metadata());
+  fixture.driver->set_mode(BNO055Mode::NDOF);
+  fixture.bus->registers[0x39] = 5;  // Fusion is running.
+  fixture.bus->registers[0x3A] = 2;  // Must not be treated as a current error.
+  runtime.verify_operational_status(*fixture.driver);
+
+  EXPECT_TRUE(runtime.state().profile_verified);
+  EXPECT_TRUE(runtime.state().operational_status_verified);
+  EXPECT_FALSE(runtime.state().restore_failed);
+  EXPECT_EQ(runtime.state().status, "restored");
+}
+
+TEST(BNO055CalibrationRuntimeTest, NonFusionStateCannotPassVerification)
+{
+  TemporaryDirectory temporary;
+  const fs::path profile_path = temporary.path() / "profile.yaml";
+  BNO055CalibrationStore store(profile_path.string());
+  std::string error;
+  ASSERT_TRUE(store.save_atomic(valid_document(), error)) << error;
+  DriverFixture fixture;
+  BNO055CalibrationRuntime runtime(profile_path.string());
+
+  runtime.restore(*fixture.driver, true, true, valid_metadata());
+  fixture.driver->set_mode(BNO055Mode::NDOF);
+  fixture.bus->registers[0x39] = 6;  // Running without fusion is invalid for NDOF.
+  runtime.verify_operational_status(*fixture.driver);
+
+  EXPECT_FALSE(runtime.state().operational_status_verified);
+  EXPECT_TRUE(runtime.state().restore_failed);
+}
+
+TEST(BNO055CalibrationRuntimeTest, InitializationTimeoutNeverPassesVerification)
+{
+  TemporaryDirectory temporary;
+  const fs::path profile_path = temporary.path() / "profile.yaml";
+  BNO055CalibrationStore store(profile_path.string());
+  std::string error;
+  ASSERT_TRUE(store.save_atomic(valid_document(), error)) << error;
+  DriverFixture fixture;
+  BNO055CalibrationRuntime runtime(profile_path.string());
+
+  runtime.restore(*fixture.driver, true, true, valid_metadata());
+  fixture.driver->set_mode(BNO055Mode::NDOF);
+  fixture.bus->registers[0x39] = 3;  // Still initializing indefinitely.
+  runtime.verify_operational_status(*fixture.driver);
+
   EXPECT_FALSE(runtime.state().operational_status_verified);
   EXPECT_TRUE(runtime.state().restore_failed);
 }

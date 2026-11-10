@@ -620,8 +620,8 @@ ProducerHealthSnapshot ImuNode::make_health_snapshot(
   snapshot.calibration_accel = sample.status.calibration.accel;
   snapshot.calibration_mag = sample.status.calibration.mag;
   snapshot.motion_ready = sample.status.calibration.motion_ready();
-  snapshot.hardware_ok = sample.status.chip_id == BNO055_CHIP_ID &&
-    sample.status.system_error == 0 &&
+  snapshot.hardware_ok =
+    bno055_operational_state(sample.status) == BNO055OperationalState::FUSION_RUNNING &&
     !(calibration_state.restore_failed && calibration_state.verification_required);
 
   if (read_error_active_) {
@@ -753,7 +753,7 @@ double ImuNode::yaw_to_quaternion_w(double yaw_rad)
 
 int ImuNode::diagnostic_level_from_sample(const BNO055Sample & sample) const
 {
-  if (sample.status.chip_id != BNO055_CHIP_ID || sample.status.system_error != 0) {
+  if (bno055_operational_state(sample.status) != BNO055OperationalState::FUSION_RUNNING) {
     return diagnostic_msgs::msg::DiagnosticStatus::ERROR;
   }
 
@@ -778,8 +778,18 @@ std::string ImuNode::diagnostic_message_from_sample(
     return "unexpected BNO055 chip id";
   }
 
-  if (sample.status.system_error != 0) {
-    return "BNO055 system error";
+  switch (bno055_operational_state(sample.status)) {
+    case BNO055OperationalState::SYSTEM_ERROR:
+      return "BNO055 system error (SYS_STATUS=1, SYS_ERR=" +
+             std::to_string(sample.status.system_error) + ")";
+    case BNO055OperationalState::INITIALIZING:
+      return "BNO055 not yet operational (SYS_STATUS=" +
+             std::to_string(sample.status.system_status) + ")";
+    case BNO055OperationalState::INVALID:
+      return "BNO055 unexpected operational status (SYS_STATUS=" +
+             std::to_string(sample.status.system_status) + ")";
+    case BNO055OperationalState::FUSION_RUNNING:
+      break;
   }
 
   const auto & calibration_state = calibration_runtime_->state();

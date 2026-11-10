@@ -39,6 +39,27 @@ struct DriverFixture
   std::unique_ptr<BNO055Driver> driver;
 };
 
+TEST(BNO055OperationalStateTest, UsesSystemStatusToInterpretSystemError)
+{
+  BNO055Status status;
+  status.chip_id = BNO055_CHIP_ID;
+  status.system_status = 5;
+  status.system_error = 2;
+  EXPECT_EQ(bno055_operational_state(status), BNO055OperationalState::FUSION_RUNNING);
+
+  status.system_status = 1;
+  EXPECT_EQ(bno055_operational_state(status), BNO055OperationalState::SYSTEM_ERROR);
+
+  status.system_status = 3;
+  EXPECT_EQ(bno055_operational_state(status), BNO055OperationalState::INITIALIZING);
+
+  status.system_status = 6;
+  EXPECT_EQ(bno055_operational_state(status), BNO055OperationalState::INVALID);
+
+  status.chip_id = 0;
+  EXPECT_EQ(bno055_operational_state(status), BNO055OperationalState::INVALID);
+}
+
 TEST(BNO055CalibrationRegistersTest, UsesDocumentedContiguousPageZeroAddresses)
 {
   using namespace bno055_registers;
