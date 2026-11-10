@@ -1,0 +1,22 @@
+schema_version: 1
+sensor: bno055
+metadata:
+  i2c_bus: 1
+  i2c_address: 40
+  operational_mode: ndof
+  captured_at: 2026-08-29T18:23:46Z
+calibration:
+  accel_offset:
+    x: -48
+    y: 8
+    z: -39
+  mag_offset:
+    x: 705
+    y: 1063
+    z: -2050
+  gyro_offset:
+    x: -2
+    y: -1
+    z: 2
+  accel_radius: 1000
+  mag_radius: 839
