@@ -1,6 +1,9 @@
 nav2_startup_readiness_node:
   ros__parameters:
     publish_rate_hz: 2.0
+    # Pending calls expire and are removed; confirmations expire independently.
+    lifecycle_request_timeout_s: 1.0
+    lifecycle_confirmation_freshness_s: 2.0
     output_topic: /savo_nav/startup_readiness
     required_lifecycle_nodes:
       - controller_server
