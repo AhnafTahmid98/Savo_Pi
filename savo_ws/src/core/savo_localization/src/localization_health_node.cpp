@@ -8,6 +8,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <ctime>
 #include <iomanip>
 #include <limits>
 #include <memory>
@@ -25,6 +26,7 @@
 #include "nav_msgs/msg/odometry.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "savo_localization/producer_health.hpp"
+#include "savo_localization/pipeline_timing.hpp"
 #include "std_msgs/msg/string.hpp"
 #include "tf2/exceptions.hpp"
 #include "tf2/time.hpp"
@@ -196,6 +198,79 @@ std::int64_t steady_now_ns()
   return std::chrono::duration_cast<std::chrono::nanoseconds>(
     std::chrono::steady_clock::now().time_since_epoch()).count();
 }
+
+std::int64_t thread_cpu_now_ns()
+{
+  timespec value{};
+  if (clock_gettime(CLOCK_THREAD_CPUTIME_ID, &value) != 0) {
+    return -1;
+  }
+  return static_cast<std::int64_t>(value.tv_sec) * 1000000000LL + value.tv_nsec;
+}
+
+class TimingScope
+{
+public:
+  explicit TimingScope(DurationTiming & timing)
+  : timing_(timing), start_ns_(steady_now_ns()), cpu_ns_(thread_cpu_now_ns()) {}
+
+  ~TimingScope()
+  {
+    const auto cpu_end = thread_cpu_now_ns();
+    timing_.Record(
+      steady_now_ns() - start_ns_,
+      cpu_ns_ >= 0 && cpu_end >= cpu_ns_ ? cpu_end - cpu_ns_ : -1);
+  }
+
+  TimingScope(const TimingScope &) = delete;
+  TimingScope & operator=(const TimingScope &) = delete;
+
+private:
+  DurationTiming & timing_;
+  std::int64_t start_ns_;
+  std::int64_t cpu_ns_;
+};
+
+void record_delivery(CallbackTiming & timing, const rclcpp::MessageInfo & info)
+{
+  const auto & rmw = info.get_rmw_message_info();
+  timing.Start(
+    steady_now_ns(),
+    std::chrono::duration_cast<std::chrono::nanoseconds>(
+      std::chrono::system_clock::now().time_since_epoch()).count(),
+    rmw.source_timestamp, rmw.received_timestamp);
+}
+
+struct EvaluationTiming
+{
+  std::uint64_t sequence{0};
+  DurationTiming total;
+  DurationTiming inputs;
+  DurationTiming transforms;
+  DurationTiming core;
+  DurationTiming serialization;
+  DurationTiming publication;
+  DurationTiming logging;
+
+  void WriteJson(std::ostream & output) const
+  {
+    output << "{\"sequence\":" << sequence << ",\"total\":";
+    total.WriteJson(output);
+    output << ",\"inputs\":";
+    inputs.WriteJson(output);
+    output << ",\"transforms\":";
+    transforms.WriteJson(output);
+    output << ",\"core\":";
+    core.WriteJson(output);
+    output << ",\"serialization\":";
+    serialization.WriteJson(output);
+    output << ",\"publication\":";
+    publication.WriteJson(output);
+    output << ",\"logging\":";
+    logging.WriteJson(output);
+    output << '}';
+  }
+};
 
 struct RuntimeTracker
 {
@@ -439,21 +514,41 @@ private:
   {
     filtered_odom_subscription_ = create_subscription<nav_msgs::msg::Odometry>(
       filtered_odom_topic_, rclcpp::SensorDataQoS().keep_last(1),
-      [this](nav_msgs::msg::Odometry::ConstSharedPtr message) {on_filtered_odom(*message);});
+      [this](nav_msgs::msg::Odometry::ConstSharedPtr message, const rclcpp::MessageInfo & info) {
+        record_delivery(filtered_callback_timing_, info);
+        const TimingScope scope(filtered_callback_timing_.work);
+        filtered_callback_timing_.RecordHeader(
+          now().nanoseconds(), rclcpp::Time(message->header.stamp).nanoseconds());
+        on_filtered_odom(*message);
+      });
 
     vo_odom_subscription_ = create_subscription<nav_msgs::msg::Odometry>(
       vo_odom_topic_, rclcpp::SensorDataQoS().keep_last(1),
-      [this](nav_msgs::msg::Odometry::ConstSharedPtr message) {on_vo_odom(*message);});
+      [this](nav_msgs::msg::Odometry::ConstSharedPtr message, const rclcpp::MessageInfo & info) {
+        record_delivery(vo_callback_timing_, info);
+        const TimingScope scope(vo_callback_timing_.work);
+        vo_callback_timing_.RecordHeader(
+          now().nanoseconds(), rclcpp::Time(message->header.stamp).nanoseconds());
+        on_vo_odom(*message);
+      });
 
     const auto snapshot_qos = rclcpp::QoS(
       rclcpp::KeepLast(1)).reliable().transient_local();
     imu_state_subscription_ = create_subscription<std_msgs::msg::String>(
       imu_state_topic_, snapshot_qos,
-      [this](std_msgs::msg::String::ConstSharedPtr message) {on_imu_state(message->data);});
+      [this](std_msgs::msg::String::ConstSharedPtr message, const rclcpp::MessageInfo & info) {
+        record_delivery(imu_callback_timing_, info);
+        const TimingScope scope(imu_callback_timing_.work);
+        on_imu_state(message->data);
+      });
 
     wheel_state_subscription_ = create_subscription<std_msgs::msg::String>(
       wheel_odom_state_topic_, snapshot_qos,
-      [this](std_msgs::msg::String::ConstSharedPtr message) {on_wheel_state(message->data);});
+      [this](std_msgs::msg::String::ConstSharedPtr message, const rclcpp::MessageInfo & info) {
+        record_delivery(wheel_callback_timing_, info);
+        const TimingScope scope(wheel_callback_timing_.work);
+        on_wheel_state(message->data);
+      });
   }
 
   bool odom_speed_valid(const nav_msgs::msg::Odometry & message) const
@@ -737,23 +832,26 @@ private:
       expected_vo_rate_hz_, vo_rate_thresholds_, rate_transition_debounce_s_,
       current_receive_time_ns);
 
-    const auto odom_to_base = observe_transform(
-      odom_frame_id_, base_frame_id_, true, current_time);
-    inputs.odom_to_base.name = "odom_to_base_footprint_tf";
-    inputs.odom_to_base.required = require_odom_to_base_tf_;
-    inputs.odom_to_base.available = odom_to_base.available;
-    inputs.odom_to_base.fresh = odom_to_base.fresh;
-    inputs.odom_to_base.age_s = odom_to_base.age_s;
-    inputs.odom_to_base.detail = odom_to_base.detail;
+    {
+      const TimingScope tf_scope(evaluation_timing_.transforms);
+      const auto odom_to_base = observe_transform(
+        odom_frame_id_, base_frame_id_, true, current_time);
+      inputs.odom_to_base.name = "odom_to_base_footprint_tf";
+      inputs.odom_to_base.required = require_odom_to_base_tf_;
+      inputs.odom_to_base.available = odom_to_base.available;
+      inputs.odom_to_base.fresh = odom_to_base.fresh;
+      inputs.odom_to_base.age_s = odom_to_base.age_s;
+      inputs.odom_to_base.detail = odom_to_base.detail;
 
-    const auto base_to_imu = observe_transform(
-      base_frame_id_, imu_frame_id_, false, current_time);
-    inputs.base_to_imu.name = "base_footprint_to_imu_tf";
-    inputs.base_to_imu.required = require_base_to_imu_tf_ && use_imu_;
-    inputs.base_to_imu.available = base_to_imu.available;
-    inputs.base_to_imu.fresh = base_to_imu.fresh;
-    inputs.base_to_imu.age_s = base_to_imu.age_s;
-    inputs.base_to_imu.detail = base_to_imu.detail;
+      const auto base_to_imu = observe_transform(
+        base_frame_id_, imu_frame_id_, false, current_time);
+      inputs.base_to_imu.name = "base_footprint_to_imu_tf";
+      inputs.base_to_imu.required = require_base_to_imu_tf_ && use_imu_;
+      inputs.base_to_imu.available = base_to_imu.available;
+      inputs.base_to_imu.fresh = base_to_imu.fresh;
+      inputs.base_to_imu.age_s = base_to_imu.age_s;
+      inputs.base_to_imu.detail = base_to_imu.detail;
+    }
 
     inputs.filtered_pose_jump_detected =
       current_receive_time_ns < pose_jump_fault_until_ns_;
@@ -837,6 +935,11 @@ private:
            << "\"reason_code\":\"" << escape_json(result.reason_code) << "\","
            << "\"stamp_s\":" << current_time.seconds() << ','
            << "\"startup_age_s\":" << inputs.startup_age_s << ','
+           << "\"evaluation_sequence\":" << evaluation_sequence_ << ','
+           << "\"evaluation_start_monotonic_ns\":" << last_evaluation_ns_ << ','
+           << "\"evaluation_period_excess_s\":" << std::max(
+      0.0, last_evaluation_gap_s_ - period_from_hz(publish_rate_hz_).count() / 1000.0) << ','
+           << "\"timing\":" << timing_json() << ','
            << "\"evaluation_gap_s\":" << last_evaluation_gap_s_ << ','
            << "\"max_evaluation_gap_s\":" << max_evaluation_gap_s_ << ','
            << "\"frames\":{"
@@ -971,52 +1074,93 @@ private:
     return array;
   }
 
+  std::string timing_json() const
+  {
+    std::ostringstream output;
+    output << std::fixed << std::setprecision(6)
+           << "{\"completed_evaluation\":";
+    completed_evaluation_timing_.WriteJson(output);
+    output << ",\"callbacks\":{\"imu_state\":";
+    imu_callback_timing_.WriteJson(output);
+    output << ",\"wheel_state\":";
+    wheel_callback_timing_.WriteJson(output);
+    output << ",\"filtered_odom\":";
+    filtered_callback_timing_.WriteJson(output);
+    output << ",\"vo_odom\":";
+    vo_callback_timing_.WriteJson(output);
+    output << "}}";
+    return output.str();
+  }
+
   void evaluate_and_publish()
   {
-    const auto current_time = now();
-    const std::int64_t current_receive_time_ns = steady_now_ns();
-    if (last_evaluation_ns_ >= 0) {
-      last_evaluation_gap_s_ = static_cast<double>(
-        current_receive_time_ns - last_evaluation_ns_) / 1.0e9;
-      max_evaluation_gap_s_ = std::max(
-        max_evaluation_gap_s_, last_evaluation_gap_s_);
-    }
-    last_evaluation_ns_ = current_receive_time_ns;
-    const auto inputs = build_inputs(current_time, current_receive_time_ns);
-    const auto result = core_.Evaluate(inputs);
-
-    std_msgs::msg::String health_message;
-    health_message.data = health_json(result, inputs, current_time);
-    health_publisher_->publish(health_message);
-
-    std_msgs::msg::String summary_message;
-    summary_message.data = summary_json(result, inputs, current_time);
-    summary_publisher_->publish(summary_message);
-
-    diagnostics_publisher_->publish(make_diagnostics(result, inputs, current_time));
-
-    if (result.state != last_state_ || result.reason_code != last_reason_code_) {
-      if (result.state == LocalizationHealthState::kError && log_errors_) {
-        RCLCPP_ERROR(
-          get_logger(), "localization health=%s reason=%s details=%s",
-          std::string(LocalizationHealthCore::ToString(result.state)).c_str(),
-          result.reason_code.c_str(), join_reasons(result.reasons).c_str());
-      } else if (!result.ready && log_warnings_) {
-        RCLCPP_WARN(
-          get_logger(), "localization health=%s reason=%s details=%s",
-          std::string(LocalizationHealthCore::ToString(result.state)).c_str(),
-          result.reason_code.c_str(), join_reasons(result.reasons).c_str());
-      } else {
-        RCLCPP_INFO(
-          get_logger(), "localization health=%s reason=%s",
-          std::string(LocalizationHealthCore::ToString(result.state)).c_str(),
-          result.reason_code.c_str());
+    ++evaluation_sequence_;
+    {
+      const TimingScope total_scope(evaluation_timing_.total);
+      const auto current_time = now();
+      const std::int64_t current_receive_time_ns = steady_now_ns();
+      if (last_evaluation_ns_ >= 0) {
+        last_evaluation_gap_s_ = static_cast<double>(
+          current_receive_time_ns - last_evaluation_ns_) / 1.0e9;
+        max_evaluation_gap_s_ = std::max(
+          max_evaluation_gap_s_, last_evaluation_gap_s_);
       }
-    }
+      last_evaluation_ns_ = current_receive_time_ns;
+      LocalizationHealthInputs inputs;
+      {
+        const TimingScope scope(evaluation_timing_.inputs);
+        inputs = build_inputs(current_time, current_receive_time_ns);
+      }
+      LocalizationHealthResult result;
+      {
+        const TimingScope scope(evaluation_timing_.core);
+        result = core_.Evaluate(inputs);
+      }
 
-    last_state_ = result.state;
-    last_reason_code_ = result.reason_code;
-    last_result_ = result;
+      std_msgs::msg::String health_message;
+      std_msgs::msg::String summary_message;
+      diagnostic_msgs::msg::DiagnosticArray diagnostics;
+      {
+        const TimingScope scope(evaluation_timing_.serialization);
+        health_message.data = health_json(result, inputs, current_time);
+        summary_message.data = summary_json(result, inputs, current_time);
+        diagnostics = make_diagnostics(result, inputs, current_time);
+      }
+      {
+        const TimingScope scope(evaluation_timing_.publication);
+        health_publisher_->publish(health_message);
+        summary_publisher_->publish(summary_message);
+        diagnostics_publisher_->publish(diagnostics);
+      }
+
+      {
+        const TimingScope scope(evaluation_timing_.logging);
+        if (result.state != last_state_ || result.reason_code != last_reason_code_) {
+          if (result.state == LocalizationHealthState::kError && log_errors_) {
+            RCLCPP_ERROR(
+              get_logger(), "localization health=%s reason=%s details=%s",
+              std::string(LocalizationHealthCore::ToString(result.state)).c_str(),
+              result.reason_code.c_str(), join_reasons(result.reasons).c_str());
+          } else if (!result.ready && log_warnings_) {
+            RCLCPP_WARN(
+              get_logger(), "localization health=%s reason=%s details=%s",
+              std::string(LocalizationHealthCore::ToString(result.state)).c_str(),
+              result.reason_code.c_str(), join_reasons(result.reasons).c_str());
+          } else {
+            RCLCPP_INFO(
+              get_logger(), "localization health=%s reason=%s",
+              std::string(LocalizationHealthCore::ToString(result.state)).c_str(),
+              result.reason_code.c_str());
+          }
+        }
+
+      }
+      last_state_ = result.state;
+      last_reason_code_ = result.reason_code;
+      last_result_ = result;
+    }
+    evaluation_timing_.sequence = evaluation_sequence_;
+    completed_evaluation_timing_ = evaluation_timing_;
   }
 
   void publish_heartbeat()
@@ -1106,6 +1250,13 @@ private:
   tf2_ros::Buffer tf_buffer_;
   tf2_ros::TransformListener tf_listener_;
   std::int64_t start_time_ns_{0};
+  std::uint64_t evaluation_sequence_{0};
+  EvaluationTiming evaluation_timing_;
+  EvaluationTiming completed_evaluation_timing_;
+  CallbackTiming imu_callback_timing_;
+  CallbackTiming wheel_callback_timing_;
+  CallbackTiming filtered_callback_timing_;
+  CallbackTiming vo_callback_timing_;
   std::int64_t last_evaluation_ns_{-1};
   double last_evaluation_gap_s_{-1.0};
   double max_evaluation_gap_s_{0.0};

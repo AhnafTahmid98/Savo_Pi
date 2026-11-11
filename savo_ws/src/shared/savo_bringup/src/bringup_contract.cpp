@@ -444,10 +444,12 @@ EstablishedDependencyTracker::EstablishedDependencyTracker(
 EstablishedDependencyDecision EstablishedDependencyTracker::Update(
   const std::string_view loss_signature) noexcept
 {
+  const bool changed = loss_signature != last_loss_signature_;
   if (loss_signature.empty()) {
+    const bool recovered = !last_loss_signature_.empty();
     consecutive_loss_samples_ = 0U;
     last_loss_signature_.clear();
-    return {};
+    return {false, false, 0U, changed, recovered};
   }
   if (loss_signature != last_loss_signature_) {
     consecutive_loss_samples_ = 0U;
@@ -456,7 +458,8 @@ EstablishedDependencyDecision EstablishedDependencyTracker::Update(
   if (consecutive_loss_samples_ < confirmation_samples_) {
     ++consecutive_loss_samples_;
   }
-  return {true, consecutive_loss_samples_ >= confirmation_samples_};
+  return {true, consecutive_loss_samples_ >= confirmation_samples_,
+    consecutive_loss_samples_, changed, false};
 }
 
 std::size_t EstablishedDependencyTracker::confirmation_samples() const noexcept

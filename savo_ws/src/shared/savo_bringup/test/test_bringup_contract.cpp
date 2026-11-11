@@ -578,3 +578,97 @@ TEST(BringupContract, LocalizationAggregateIgnoresOptionalVoChildFailure)
   EXPECT_FALSE(evaluation->failed);
   EXPECT_EQ(evaluation->quality, QualityLevel::kGood);
 }
+
+TEST(BringupContract, DependencyTraceCountsEvaluationsAndResetsOnRecovery)
+{
+  savo_bringup::EstablishedDependencyTracker tracker;
+  auto first = tracker.Update("localization:cached_stale_payload");
+  EXPECT_EQ(first.consecutive_loss_samples, 1U);
+  EXPECT_TRUE(first.signature_changed);
+  EXPECT_FALSE(first.confirmed_loss);
+  // No new producer report is required by the existing confirmation contract.
+  const auto second = tracker.Update("localization:cached_stale_payload");
+  EXPECT_EQ(second.consecutive_loss_samples, 2U);
+  EXPECT_FALSE(second.signature_changed);
+  EXPECT_TRUE(second.confirmed_loss);
+  EXPECT_EQ(tracker.Update("localization:cached_stale_payload").consecutive_loss_samples, 2U);
+  const auto recovered = tracker.Update("");
+  EXPECT_TRUE(recovered.recovered);
+  EXPECT_FALSE(recovered.blocking);
+  EXPECT_EQ(recovered.consecutive_loss_samples, 0U);
+  EXPECT_FALSE(tracker.Update("").recovered);
+  EXPECT_EQ(tracker.Update("safety:stop").consecutive_loss_samples, 1U);
+  EXPECT_EQ(tracker.Update("safety:external_stop").consecutive_loss_samples, 1U);
+}
+
+TEST(BringupContract, TransientLossRestartsStabilityWithoutFailure)
+{
+  savo_bringup::EstablishedDependencyTracker dependencies;
+  savo_bringup::StartupStageTracker stage({0.0, 0.5, 10.0});
+  savo_bringup::StartupStageInput input;
+  input.processes_started = true;
+  input.dependencies_ready = true;
+  input.quality = savo_bringup::QualityLevel::kMinimum;
+  EXPECT_FALSE(stage.Update(0.0, input).ready);
+  const auto loss = dependencies.Update("localization:stale");
+  input.dependencies_ready = !loss.blocking;
+  input.unrecoverable_failure = loss.confirmed_loss;
+  const auto transient = stage.Update(0.2, input);
+  EXPECT_FALSE(transient.ready);
+  EXPECT_FALSE(transient.failed);
+  const auto recovery = dependencies.Update("");
+  input.dependencies_ready = !recovery.blocking;
+  input.unrecoverable_failure = recovery.confirmed_loss;
+  EXPECT_FALSE(stage.Update(0.4, input).ready);
+  EXPECT_FALSE(stage.Update(0.8, input).ready);
+  EXPECT_TRUE(stage.Update(0.9, input).ready);
+}
+
+TEST(BringupContract, ConfirmedCachedLossRemainsTerminalAfterHealthRecovery)
+{
+  savo_bringup::EstablishedDependencyTracker dependencies;
+  savo_bringup::StartupStageTracker stage({0.0, 0.5, 10.0});
+  savo_bringup::StartupStageInput input;
+  input.processes_started = true;
+  input.reason = "established_dependency_lost:localization";
+  for (const double elapsed : {0.0, 0.2}) {
+    const auto loss = dependencies.Update("localization:stale");
+    input.dependencies_ready = !loss.blocking;
+    input.unrecoverable_failure = loss.confirmed_loss;
+    EXPECT_EQ(stage.Update(elapsed, input).failed, elapsed == 0.2);
+  }
+  const auto recovery = dependencies.Update("");
+  input.dependencies_ready = !recovery.blocking;
+  input.unrecoverable_failure = recovery.confirmed_loss;
+  input.quality = savo_bringup::QualityLevel::kExcellent;
+  input.reason = "healthy";
+  const auto terminal = stage.Update(0.31, input);
+  EXPECT_TRUE(terminal.failed);
+  EXPECT_FALSE(terminal.ready);
+  EXPECT_EQ(terminal.reason, "established_dependency_lost:localization");
+}
+
+TEST(BringupContract, SafetyAndFreshnessFaultsNeverQualifyForRateOnlyGrace)
+{
+  for (const auto * reason : {
+    "imu_stale", "wheel_odom_stale", "filtered_odom_stale",
+    "odom_to_base_footprint_tf_stale", "filtered_odom_invalid_data",
+    "filtered_odom_invalid_frame", "filtered_odom_invalid_timestamp",
+    "filtered_odom_pose_jump_detected", "filtered_odom_yaw_jump_detected"})
+  {
+    std::string health =
+      R"({"node":"localization_health_node","state":"STALE","ready":false,
+      "reason_code":"required_localization_input_unavailable",
+      "reasons":["filtered_odom_rate_below_minimum","additional_fault"],
+      "components":{"filtered_odom":{"required":true,
+      "received":true,"fresh":true,"data_valid":true,"rate_valid":false}}})";
+    health.replace(health.find("additional_fault"), std::string("additional_fault").size(), reason);
+    const auto parsed = savo_bringup::EvaluateStructuredHealthPayload(health);
+    ASSERT_TRUE(parsed && parsed->valid);
+    EXPECT_FALSE(savo_bringup::IsTransientEkfRateLoss(health)) << reason;
+  }
+  // An unsafe dependency becoming ineligible immediately cancels the rate hold.
+  savo_bringup::StartupRecoveryWindow recovery(12.0);
+  ASSERT_TRUE(recovery.Update(true, 1.0).holding);
+  EXPECT_FALSE(recovery.Update(false, 1.2).holding);
+}

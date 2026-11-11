@@ -122,6 +122,10 @@ struct EstablishedDependencyDecision
 {
   bool blocking{false};
   bool confirmed_loss{false};
+  // Diagnostic metadata; samples count coordinator evaluations, not messages.
+  std::size_t consecutive_loss_samples{0U};
+  bool signature_changed{false};
+  bool recovered{false};
 };
 
 class EstablishedDependencyTracker

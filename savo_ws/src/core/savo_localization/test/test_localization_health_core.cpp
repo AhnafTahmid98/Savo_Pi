@@ -764,3 +764,44 @@ TEST(LocalizationHealthCoreTest, NotReadyForcesBelowMinimumAggregateQuality)
 }
 
 }  // namespace
+
+TEST(LocalizationHealthCore, CapturedMultiSourceStallFailsClosedThenRecovers)
+{
+  LocalizationHealthCore core;
+  auto inputs = healthy_inputs();
+  ASSERT_TRUE(core.Evaluate(inputs).ready);
+  inputs.imu.age_s = 0.958433;
+  inputs.wheel_odom.age_s = 0.607724;
+  inputs.filtered_odom.age_s = 0.656656;
+  inputs.odom_to_base.age_s = 0.791710;
+  inputs.imu.fresh = false;
+  inputs.wheel_odom.fresh = false;
+  inputs.filtered_odom.fresh = false;
+  inputs.odom_to_base.fresh = false;
+  const auto stale = core.Evaluate(inputs);
+  EXPECT_FALSE(stale.ready);
+  EXPECT_EQ(stale.state, LocalizationHealthState::kStale);
+  EXPECT_EQ(stale.reasons.size(), 4U);
+  EXPECT_TRUE(core.Evaluate(healthy_inputs()).ready);
+}
+
+TEST(LocalizationHealthCore, SafetyFaultsOverrideStartupGraceAndRateRecovery)
+{
+  LocalizationHealthCore core;
+  for (int fault = 0; fault < 6; ++fault) {
+    auto inputs = healthy_inputs();
+    inputs.startup_age_s = 0.1;
+    inputs.filtered_odom.rate_valid = false;
+    switch (fault) {
+      case 0: inputs.imu.data_valid = false; break;
+      case 1: inputs.wheel_odom.frame_valid = false; break;
+      case 2: inputs.filtered_odom.timestamp_valid = false; break;
+      case 3: inputs.imu.diagnostic_error = true; break;
+      case 4: inputs.filtered_pose_jump_detected = true; break;
+      case 5: inputs.filtered_yaw_jump_detected = true; break;
+    }
+    const auto result = core.Evaluate(inputs);
+    EXPECT_FALSE(result.ready) << fault;
+    EXPECT_EQ(result.state, LocalizationHealthState::kError) << fault;
+  }
+}

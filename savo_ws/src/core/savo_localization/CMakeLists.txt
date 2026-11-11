@@ -277,6 +277,8 @@ if(BUILD_TESTING)
 
   ament_flake8(CONFIG_FILE ${CMAKE_CURRENT_SOURCE_DIR}/setup.cfg)
 
+  ament_add_gtest(test_pipeline_timing test/test_pipeline_timing.cpp)
+
   ament_add_gtest(
     test_localization_health_core
     test/test_localization_health_core.cpp
@@ -337,6 +339,7 @@ if(BUILD_TESTING)
     endif()
   endfunction()
 
+  add_pytest_if_exists(test_health_timing_runtime test/test_health_timing_runtime.py)
   add_pytest_if_exists(test_angle_math test/test_angle_math.py)
   add_pytest_if_exists(test_encoder_math test/test_encoder_math.py)
   add_pytest_if_exists(test_mecanum_kinematics test/test_mecanum_kinematics.py)

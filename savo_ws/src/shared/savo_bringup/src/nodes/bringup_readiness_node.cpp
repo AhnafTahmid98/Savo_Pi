@@ -177,6 +177,11 @@ public:
 private:
   struct Observation
   {
+    std::uint64_t receive_sequence{0};
+    std::uint64_t receive_event_order{0};
+    std::int64_t receive_monotonic_ns{-1};
+    std::int64_t source_timestamp_ns{0};
+    std::int64_t dds_received_timestamp_ns{0};
     bool seen{false};
     bool ready{false};
     bool failed{false};
@@ -468,6 +473,8 @@ private:
     state_publisher_ = create_publisher<String>(output_namespace_ + "/state", state_qos);
     startup_status_publisher_ = create_publisher<String>(
       output_namespace_ + "/startup_status", state_qos);
+    startup_trace_publisher_ = create_publisher<String>(
+      output_namespace_ + "/startup_trace", rclcpp::QoS(10).best_effort());
     ready_publisher_ = create_publisher<Bool>(output_namespace_ + "/ready", state_qos);
     heartbeat_publisher_ = create_publisher<UInt64>(output_namespace_ + "/heartbeat", stream_qos);
     diagnostics_publisher_ = create_publisher<DiagnosticArray>(
@@ -482,7 +489,8 @@ private:
     string_subscriptions_.push_back(
       create_subscription<String>(
         resolved_topic, rclcpp::QoS(10).reliable(),
-        [this, key, availability_only](const String::SharedPtr message) {
+        [this, key, availability_only](
+          const String::SharedPtr message, const rclcpp::MessageInfo & info) {
           const auto structured =
           savo_bringup::EvaluateStructuredHealthPayload(message->data);
           const bool failed = structured ? structured->failed :
@@ -494,6 +502,10 @@ private:
           Mark(
             key, availability_only ? !failed : ready, failed,
             message->data, quality);
+          auto & observation = observations_[key];
+          observation.source_timestamp_ns = info.get_rmw_message_info().source_timestamp;
+          observation.dds_received_timestamp_ns =
+          info.get_rmw_message_info().received_timestamp;
         }));
   }
 
@@ -711,6 +723,9 @@ private:
     std::optional<savo_bringup::QualityLevel> quality = std::nullopt)
   {
     auto & observation = observations_[key];
+    ++observation.receive_sequence;
+    observation.receive_event_order = ++trace_event_order_;
+    observation.receive_monotonic_ns = SteadyNowNs();
     observation.seen = true;
     observation.ready = ready;
     observation.failed = failed;
@@ -966,8 +981,113 @@ private:
     return true;
   }
 
+  static std::int64_t SteadyNowNs()
+  {
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(
+      std::chrono::steady_clock::now().time_since_epoch()).count();
+  }
+
+  // Best-effort, bounded trace independent of status throttling. Confirmation
+  // samples are evaluations of the cache, not necessarily new health messages.
+  void TraceStartup(
+    const std::string & stage,
+    const std::vector<std::string> & lost,
+    const savo_bringup::EstablishedDependencyDecision & established,
+    const bool recovery_eligible,
+    const savo_bringup::StartupRecoveryDecision & recovery,
+    const savo_bringup::StartupStageDecision & decision)
+  {
+    if (established.signature_changed) {
+      ++loss_signature_generation_;
+    }
+    if (decision.failed && first_failure_evaluation_ == 0U) {
+      first_failure_evaluation_ = trace_evaluation_sequence_;
+    }
+    std::vector<std::string> lost_stages;
+    for (const auto & loss : lost) {
+      lost_stages.push_back(loss.substr(0, loss.find(':')));
+    }
+    const auto trace_time_ns = SteadyNowNs();
+    std::ostringstream output;
+    output << std::fixed << std::setprecision(6)
+           << "{\"schema_version\":1,\"startup_id\":\"" << JsonEscape(startup_id_)
+           << "\",\"evaluation_sequence\":" << trace_evaluation_sequence_
+           << ",\"evaluation_event_order\":" << trace_evaluation_event_order_
+           << ",\"evaluation_start_monotonic_ns\":" << trace_evaluation_start_ns_
+           << ",\"evaluation_gap_s\":" << trace_evaluation_gap_s_
+           << ",\"decision_elapsed_s\":" <<
+      static_cast<double>(trace_time_ns - trace_evaluation_start_ns_) / 1.0e9
+           << ",\"stage\":\"" << JsonEscape(stage) << "\""
+           << ",\"lost_stages\":" << JsonArray(lost_stages)
+           << ",\"loss_signature_generation\":" << loss_signature_generation_
+           << ",\"signature_changed\":" << BoolText(established.signature_changed)
+           << ",\"consecutive_loss_samples\":" << established.consecutive_loss_samples
+           << ",\"confirmation_samples\":" <<
+      established_dependency_tracker_.confirmation_samples()
+           << ",\"blocking\":" << BoolText(established.blocking)
+           << ",\"confirmed_loss\":" << BoolText(established.confirmed_loss)
+           << ",\"dependencies_recovered\":" << BoolText(established.recovered)
+           << ",\"recovery_eligible\":" << BoolText(recovery_eligible)
+           << ",\"recovery_holding\":" << BoolText(recovery.holding)
+           << ",\"recovery_expired\":" << BoolText(recovery.expired)
+           << ",\"decision_ready\":" << BoolText(decision.ready)
+           << ",\"decision_failed\":" << BoolText(decision.failed)
+           << ",\"first_failure_evaluation\":" << first_failure_evaluation_
+           << ",\"observations\":{";
+    bool first = true;
+    for (const auto & [key, observation] : observations_) {
+      if (!first) {
+        output << ',';
+      }
+      first = false;
+      output << '\"' << JsonEscape(key) << "\":{\"receive_sequence\":" <<
+        observation.receive_sequence
+             << ",\"receive_event_order\":" << observation.receive_event_order
+             << ",\"receive_monotonic_ns\":" << observation.receive_monotonic_ns
+             << ",\"receive_age_s\":" <<
+        static_cast<double>(trace_time_ns - observation.receive_monotonic_ns) / 1.0e9
+             << ",\"dds_source_timestamp_ns\":" << observation.source_timestamp_ns
+             << ",\"dds_received_timestamp_ns\":" << observation.dds_received_timestamp_ns
+             << ",\"fresh\":" << BoolText(Fresh(observation))
+             << ",\"ready\":" << BoolText(observation.ready)
+             << ",\"failed\":" << BoolText(observation.failed) << '}';
+    }
+    output << "}}";
+    String message;
+    message.data = output.str();
+    startup_trace_publisher_->publish(message);
+
+    if (established.signature_changed ||
+      established.confirmed_loss != trace_last_confirmed_ ||
+      decision.failed != trace_last_failed_)
+    {
+      const auto localization = observations_.find("localization");
+      const auto receive_sequence = localization == observations_.end() ? 0U :
+        localization->second.receive_sequence;
+      RCLCPP_INFO(
+        get_logger(),
+        "STARTUP_TRACE eval=%s stage=%s loss_generation=%s samples=%zu/%zu "
+        "confirmed=%s recovered=%s recovery_hold=%s failed=%s localization_rx=%s",
+        std::to_string(trace_evaluation_sequence_).c_str(), stage.c_str(),
+        std::to_string(loss_signature_generation_).c_str(),
+        established.consecutive_loss_samples,
+        established_dependency_tracker_.confirmation_samples(),
+        BoolText(established.confirmed_loss).c_str(), BoolText(established.recovered).c_str(),
+        BoolText(recovery.holding).c_str(), BoolText(decision.failed).c_str(),
+        std::to_string(receive_sequence).c_str());
+    }
+    trace_last_confirmed_ = established.confirmed_loss;
+    trace_last_failed_ = decision.failed;
+  }
+
   void EvaluateStartupAndPublish()
   {
+    const auto trace_start = SteadyNowNs();
+    trace_evaluation_gap_s_ = trace_evaluation_start_ns_ >= 0 ?
+      static_cast<double>(trace_start - trace_evaluation_start_ns_) / 1.0e9 : -1.0;
+    trace_evaluation_start_ns_ = trace_start;
+    ++trace_evaluation_sequence_;
+    trace_evaluation_event_order_ = ++trace_event_order_;
     if (current_stage_ >= stages_.size()) {
       // Startup already completed through the tracked "complete" stage.
       // Continue revalidating established dependencies without redefining
@@ -995,6 +1115,7 @@ private:
         (runtime_failed_ ? "established_dependency_lost:" :
         "established_dependency_revalidation_pending:") + lost_signature :
         "bringup_complete_safe_unarmed";
+      TraceStartup("complete", lost, established, false, {}, decision);
       PublishStartupStatus("complete", decision, 0.0, reason, lost);
       PublishStartupHeartbeat();
       return;
@@ -1012,8 +1133,9 @@ private:
     const auto established = established_dependency_tracker_.Update(lost_signature);
     const auto current_time = std::chrono::steady_clock::now();
     const double elapsed = std::chrono::duration<double>(current_time - stage_entered_at_).count();
+    const bool recovery_eligible = EligibleTransientEkfStartupLoss(lost);
     const auto recovery = transient_ekf_recovery_.Update(
-      EligibleTransientEkfStartupLoss(lost), elapsed);
+      recovery_eligible, elapsed);
     if (established.blocking) {
       input.dependencies_ready = false;
       input.quality = savo_bringup::QualityLevel::kBelowMinimum;
@@ -1036,6 +1158,7 @@ private:
     const std::string stage_name = stages_[current_stage_].name;
     const std::string reason = decision.ready && stage_name == "complete" ?
       "bringup_complete_safe_unarmed" : decision.reason;
+    TraceStartup(stage_name, lost, established, recovery_eligible, recovery, decision);
     if (decision.ready) {
       completed_stages_.push_back(stage_name);
       ++current_stage_;
@@ -1247,6 +1370,16 @@ private:
   std::vector<Stage> stages_;
   std::vector<std::string> completed_stages_;
   savo_bringup::EstablishedDependencyTracker established_dependency_tracker_;
+  std::uint64_t trace_event_order_{0};
+  std::uint64_t trace_evaluation_event_order_{0};
+  std::uint64_t trace_evaluation_sequence_{0};
+  std::uint64_t loss_signature_generation_{0};
+  std::uint64_t first_failure_evaluation_{0};
+  std::int64_t trace_evaluation_start_ns_{-1};
+  double trace_evaluation_gap_s_{-1.0};
+  bool trace_last_confirmed_{false};
+  bool trace_last_failed_{false};
+  rclcpp::Publisher<String>::SharedPtr startup_trace_publisher_;
   std::string last_state_;
   std::string last_reason_;
   bool startup_status_published_{false};
