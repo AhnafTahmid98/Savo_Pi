@@ -29,7 +29,7 @@ bringup_readiness_node:
     startup.core.supervisor.stable_ready_s: 1.5
     startup.core.supervisor.startup_timeout_s: 20.0
     startup.core.slam_foundation.minimum_settle_s: 1.0
-    startup.core.slam_foundation.stable_ready_s: 2.0
+    startup.core.slam_foundation.stable_ready_s: 5.0
     startup.core.slam_foundation.startup_timeout_s: 45.0
     startup.core.navigation.minimum_settle_s: 1.0
     startup.core.navigation.stable_ready_s: 2.0

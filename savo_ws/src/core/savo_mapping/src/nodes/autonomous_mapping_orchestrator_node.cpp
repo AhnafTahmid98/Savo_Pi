@@ -268,10 +268,34 @@ public:
   AutonomousMappingOrchestratorNode()
   : Node("autonomous_mapping_orchestrator_node")
   {
+    using StartupClock = std::chrono::steady_clock;
+    const auto startup_t0 = StartupClock::now();
+
+    const auto trace = [this, &startup_t0](const char *phase) {
+        const auto elapsed_ms =
+          std::chrono::duration_cast<std::chrono::milliseconds>(
+          StartupClock::now() - startup_t0).count();
+
+        RCLCPP_INFO(
+        get_logger(),
+        "AM_STARTUP phase=%s elapsed_ms=%s",
+        phase,
+        std::to_string(elapsed_ms).c_str());
+      };
+
+    trace("constructor_begin");
+
     declare_and_validate_parameters();
+    trace("parameters_complete");
+
     create_pose_reader();
+    trace("pose_reader_complete");
+
     create_interfaces();
+    trace("interfaces_complete");
+
     discover_incomplete_release_transactions();
+    trace("recovery_discovery_complete");
 
     evaluation_timer_ = create_wall_timer(
       std::chrono::milliseconds(evaluation_period_ms_),
@@ -279,7 +303,9 @@ public:
         &AutonomousMappingOrchestratorNode::evaluate_and_apply,
         this));
 
+    trace("initial_evaluation_begin");
     evaluate_and_apply();
+    trace("initial_evaluation_complete");
 
     RCLCPP_INFO(
       get_logger(),
@@ -976,6 +1002,36 @@ private:
 
   void create_interfaces()
   {
+    using Clock = std::chrono::steady_clock;
+
+    const auto t0 = Clock::now();
+    auto previous = t0;
+
+    const auto trace_iface =
+      [this, &t0, &previous](const char * phase) {
+        const auto now = Clock::now();
+
+        const auto delta =
+          std::chrono::duration_cast<
+          std::chrono::milliseconds>(
+              now - previous).count();
+
+        const auto total =
+          std::chrono::duration_cast<
+          std::chrono::milliseconds>(
+              now - t0).count();
+
+        RCLCPP_INFO(
+          get_logger(),
+          "AM_IFACE phase=%s delta_ms=%s total_ms=%s",
+          phase,
+          std::to_string(delta).c_str(),
+          std::to_string(total).c_str());
+
+        previous = now;
+      };
+
+    trace_iface("begin");
     const auto retained_qos =
       rclcpp::QoS(rclcpp::KeepLast(1))
       .reliable()
@@ -1011,6 +1067,8 @@ private:
       command_qos);
     joint_active_release_publisher_ = create_publisher<StringMessage>(
       joint_active_release_topic_, retained_qos);
+
+    trace_iface("publishers_complete");
 
     local_health_subscription_ = create_subscription<StringMessage>(
       local_health_topic_, rclcpp::QoS(rclcpp::KeepLast(1)).reliable().durability_volatile(),
@@ -1134,52 +1192,76 @@ private:
         this,
         std::placeholders::_1));
 
+    trace_iface("subscriptions_complete");
+
     handoff_cancel_client_ = create_client<Trigger>(
       handoff_cancel_service_name_);
+    trace_iface("client_handoff_cancel_complete");
 
     map_save_client_ = create_client<Trigger>(
       map_save_service_name_);
+    trace_iface("client_map_save_complete");
 
     location_candidates_client_ = create_client<ListCandidates>(
       location_candidates_service_name_);
+    trace_iface("client_location_candidates_complete");
     location_list_client_ = create_client<ListLocations>(
       location_list_service_name_);
+    trace_iface("client_location_list_complete");
     location_prepare_client_ = create_client<PrepareLocationRelease>(
       location_prepare_service_name_);
+    trace_iface("client_location_prepare_complete");
     location_verify_client_ = create_client<VerifyLocationRelease>(
       location_verify_service_name_);
+    trace_iface("client_location_verify_complete");
     location_commit_client_ = create_client<CommitLocationRelease>(
       location_commit_service_name_);
+    trace_iface("client_location_commit_complete");
     location_rollback_client_ = create_client<RollbackLocationRelease>(
       location_rollback_service_name_);
+    trace_iface("client_location_rollback_complete");
 
     scan360_start_client_ = create_client<Trigger>(
       scan360_start_service_name_);
+    trace_iface("client_scan360_start_complete");
 
     scan360_cancel_client_ = create_client<Trigger>(
       scan360_cancel_service_name_);
+    trace_iface("client_scan360_cancel_complete");
 
     head_scan_start_client_ = create_client<Trigger>(
       head_scan_start_service_name_);
+    trace_iface("client_head_scan_start_complete");
 
     head_scan_pause_client_ = create_client<Trigger>(
       head_scan_pause_service_name_);
+    trace_iface("client_head_scan_pause_complete");
 
     head_scan_resume_client_ = create_client<Trigger>(
       head_scan_resume_service_name_);
+    trace_iface("client_head_scan_resume_complete");
 
     coverage_request_plan_client_ = create_client<Trigger>(
       coverage_request_plan_service_name_);
+    trace_iface("client_coverage_request_plan_complete");
     coverage_reset_plan_client_ = create_client<Trigger>(
       coverage_reset_plan_service_name_);
+    trace_iface("client_coverage_reset_plan_complete");
     coverage_operation_approve_client_ = create_client<Trigger>(
       coverage_operation_approve_service_name_);
+    trace_iface("client_coverage_operation_approve_complete");
     coverage_operation_cancel_client_ = create_client<Trigger>(
       coverage_operation_cancel_service_name_);
+    trace_iface("client_coverage_operation_cancel_complete");
     coverage_operation_reset_client_ = create_client<Trigger>(
       coverage_operation_reset_service_name_);
+    trace_iface("client_coverage_operation_reset_complete");
+    trace_iface("service_clients_complete");
+
     return_action_client_ = rclcpp_action::create_client<NavigateToPose>(
       this, return_action_name_);
+    trace_iface("action_client_complete");
+
     phase_authorization_service_ = create_service<AuthorizeOperation>(
       "/savo_mapping/autonomous/authorize_phase",
       std::bind(&AutonomousMappingOrchestratorNode::handle_phase_authorization,
@@ -1205,6 +1287,8 @@ private:
         std::placeholders::_1,
         std::placeholders::_2));
 
+    trace_iface("services_complete");
+
     action_server_ = rclcpp_action::create_server<RunMission>(
       this,
       action_name_,
@@ -1221,6 +1305,7 @@ private:
         &AutonomousMappingOrchestratorNode::handle_accepted,
         this,
         std::placeholders::_1));
+    trace_iface("actions_complete");
   }
 
   rclcpp_action::GoalResponse handle_goal(
@@ -3510,6 +3595,15 @@ private:
         dispatch_terminal_authority_release = true;
       }
     }
+
+    RCLCPP_INFO_ONCE(
+      get_logger(),
+      "AM_STARTUP first_status_publish contract=%u state=%u "
+      "mapping_ready=%s runtime_authorized=%s",
+      static_cast<unsigned>(status.contract_version),
+      static_cast<unsigned>(status.state),
+      status.mapping_ready ? "true" : "false",
+      status.runtime_authorized ? "true" : "false");
 
     status_publisher_->publish(status);
     publish_local_authority();

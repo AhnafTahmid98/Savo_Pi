@@ -320,6 +320,14 @@ TEST(BringupContract, OnlyIsolatedFreshEkfRateLossQualifies)
     "fresh":true,"data_valid":true,"rate_valid":false,
     "rate_hz":7.73,"minimum_rate_hz":10.0}}})";
   EXPECT_TRUE(savo_bringup::IsTransientEkfRateLoss(health));
+  // Recovery may be underway while rate validity remains debounced false.
+  auto recovering = health;
+  const std::string old_rate = R"("rate_hz":7.73)";
+  const auto rate_pos = recovering.find(old_rate);
+  ASSERT_NE(rate_pos, std::string::npos);
+  recovering.replace(rate_pos, old_rate.size(), R"("rate_hz":11.11)");
+  EXPECT_TRUE(savo_bringup::IsTransientEkfRateLoss(recovering));
+
   EXPECT_FALSE(savo_bringup::IsTransientEkfRateLoss("{}"));
   EXPECT_FALSE(savo_bringup::IsTransientEkfRateLoss("not json"));
   auto multiple_faults = health;

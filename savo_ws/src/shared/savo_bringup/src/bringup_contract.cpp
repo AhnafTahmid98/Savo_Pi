@@ -508,8 +508,7 @@ bool IsTransientEkfRateLoss(const std::string_view health_json) noexcept
     return filtered.is_object() && filtered.value("required", false) &&
            filtered.value("received", false) && filtered.value("fresh", false) &&
            filtered.value("data_valid", false) &&
-           !filtered.value("rate_valid", true) &&
-           filtered.value("rate_hz", 0.0) < filtered.value("minimum_rate_hz", 0.0);
+           !filtered.value("rate_valid", true);
   } catch (const Json::exception &) {
     return false;
   }

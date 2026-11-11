@@ -49,6 +49,12 @@ ekf_filter_node:
 
 localization_health_node:
   ros__parameters:
+    wheel_odom_excellent_rate_hz: 25.0
+    wheel_odom_good_rate_hz: 20.0
+    wheel_odom_min_rate_hz: 10.0
+    imu_excellent_rate_hz: 18.0
+    imu_good_rate_hz: 15.0
+    imu_min_rate_hz: 10.0
     publish_rate_hz: 2.0
 
     use_imu: true
@@ -59,17 +65,17 @@ localization_health_node:
     require_odom_to_base_tf: true
     require_base_to_imu_tf: true
 
-    expected_imu_rate_hz: 25.0
-    expected_wheel_odom_rate_hz: 30.0
+    expected_imu_rate_hz: 20.0
+    expected_wheel_odom_rate_hz: 25.0
     expected_ekf_rate_hz: 20.0
     ekf_min_rate_hz: 10.0
     ekf_good_rate_hz: 15.0
     ekf_excellent_rate_hz: 20.0
 
-    max_imu_age_s: 0.5
-    max_wheel_odom_age_s: 0.5
-    max_filtered_odom_age_s: 0.5
-    max_tf_age_s: 0.5
+    max_imu_age_s: 0.6
+    max_wheel_odom_age_s: 0.6
+    max_filtered_odom_age_s: 0.6
+    max_tf_age_s: 0.6
 
     log_warnings: true
     log_errors: true
@@ -77,6 +83,9 @@ localization_health_node:
 
 localization_dashboard:
   ros__parameters:
+    expected_ekf_rate_hz: 20.0
+    expected_wheel_odom_rate_hz: 25.0
+    expected_imu_rate_hz: 20.0
     refresh_rate_hz: 5.0
     stale_timeout_s: 0.5
 
